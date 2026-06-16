@@ -29,6 +29,8 @@
 
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { availableParallelism } from "node:os";
+import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 
 import {
   rankCrossSectionalMomentum,
@@ -45,7 +47,11 @@ import {
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
-const DATA_DIR = join(process.cwd(), "data", "momq", "crypto-extended");
+// Default scope = the committed crypto-extended bars. Override the data dir to
+// re-run on a different committed universe (e.g. the stable momq competition bars
+// for parity tests) without touching code:
+//   XSCAN_DATA_DIR=data/momq/bars bun run scripts/research/cross-sectional-scan.ts
+const DATA_DIR = join(process.cwd(), process.env.XSCAN_DATA_DIR ?? join("data", "momq", "crypto-extended"));
 
 // The 5 names that actually transfer to the Model-to-Market competition.
 const TRADEABLE = ["BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "BARUSD"];
@@ -405,9 +411,101 @@ function fmt(x: number, d = 3): string {
   return Number.isFinite(x) ? x.toFixed(d) : "n/a";
 }
 
+function periodsPerYearFor(tf: string): number {
+  return tf === "1d" ? 365 : tf === "1h" ? 365 * 24 : 365 * 24 * 4;
+}
+
+// ── Score a slice of the grid (the parallelizable unit of work) ──────────────
+
+/**
+ * Score the configs at `configIdxs` (indices into `buildGrid()`) on the aligned
+ * universe `uni`. Independent per config; `effectiveTrials` is the full grid
+ * size, passed in so sharding does NOT change the deflated-Sharpe correction.
+ * Workers and the serial path call this identically.
+ */
+function scoreConfigSlice(
+  uni: AlignedUniverse,
+  tf: string,
+  configIdxs: number[],
+  effectiveTrials: number,
+): ResultRow[] {
+  const periodsPerYear = periodsPerYearFor(tf);
+  const grid = buildGrid();
+  const isEnd = Math.floor(uni.times.length * IS_FRAC);
+
+  const rows: ResultRow[] = [];
+  for (const ci of configIdxs) {
+    const cfg = grid[ci]!;
+    const oos = backtest(uni, cfg, isEnd, uni.times.length);
+    if (oos.barReturns.length < 10) continue;
+    const psr = probabilisticSharpeRatio(oos.barReturns, 0, periodsPerYear);
+    const dsr = deflatedSharpeRatio(oos.barReturns, effectiveTrials, periodsPerYear);
+    const base: Omit<ResultRow, "verdict"> = {
+      cfg,
+      oosSharpe: nonAnnualizedSharpe(oos.barReturns),
+      oosSharpeAnnual: nonAnnualizedSharpe(oos.barReturns) * Math.sqrt(periodsPerYear),
+      oosReturnPct: totalReturn(oos.barReturns) * 100,
+      maxDrawdownPct: maxDrawdown(oos.barReturns) * 100,
+      avgTurnover: oos.rebalances > 0 ? oos.totalTurnover / oos.rebalances : 0,
+      psr: psr.psr,
+      dsr: dsr.dsr,
+      observedSharpeAnnual: dsr.observedSharpe,
+      expectedMaxNullSharpe: dsr.expectedMaxSharpeUnderNull,
+    };
+    rows.push({ ...base, verdict: classify(base) });
+  }
+  return rows;
+}
+
+// ── Worker entry: rebuild the universe from disk, score a config-slice ───────
+//
+// Workers re-read the bar files (cheap, ~ms/file) and rebuild the aligned
+// universe rather than receiving the cloned price panel across the thread
+// boundary. They then score only their assigned config indices.
+if (!isMainThread && parentPort) {
+  const { symbols, tf, configIdxs, effectiveTrials } = workerData as {
+    symbols: string[];
+    tf: string;
+    configIdxs: number[];
+    effectiveTrials: number;
+  };
+  const uni = alignUniverse(symbols, tf);
+  parentPort.postMessage(uni ? scoreConfigSlice(uni, tf, configIdxs, effectiveTrials) : []);
+}
+
+/** Fan the grid out across worker threads — one config-shard per worker. */
+function runShardedConfigs(
+  symbols: string[],
+  tf: string,
+  nConfigs: number,
+  effectiveTrials: number,
+): Promise<ResultRow[]> {
+  const nWorkers = Math.max(1, Math.min(availableParallelism(), nConfigs));
+  // Round-robin config indices across workers — configs cost roughly the same
+  // (same universe, same OOS length), so round-robin is even enough.
+  const chunks: number[][] = Array.from({ length: nWorkers }, () => []);
+  for (let ci = 0; ci < nConfigs; ci++) chunks[ci % nWorkers]!.push(ci);
+
+  return Promise.all(
+    chunks.map(
+      (configIdxs) =>
+        new Promise<ResultRow[]>((resolve, reject) => {
+          const w = new Worker(new URL(import.meta.url), {
+            workerData: { symbols, tf, configIdxs, effectiveTrials },
+          });
+          w.once("message", (rows: ResultRow[]) => {
+            resolve(rows);
+            void w.terminate();
+          });
+          w.once("error", reject);
+        }),
+    ),
+  ).then((perChunk) => perChunk.flat());
+}
+
 // ── One pass: sweep grid on a universe + TF, print the verdict block ─────────
 
-function runPass(label: string, symbols: string[], tf: string): void {
+async function runPass(label: string, symbols: string[], tf: string): Promise<void> {
   console.log("=".repeat(82));
   console.log(`PASS: ${label}  (TF=${tf})`);
   console.log("=".repeat(82));
@@ -418,7 +516,7 @@ function runPass(label: string, symbols: string[], tf: string): void {
     return;
   }
 
-  const periodsPerYear = tf === "1d" ? 365 : tf === "1h" ? 365 * 24 : 365 * 24 * 4;
+  const periodsPerYear = periodsPerYearFor(tf);
   const grid = buildGrid();
   const effectiveTrials = grid.length;
 
@@ -443,34 +541,27 @@ function runPass(label: string, symbols: string[], tf: string): void {
     `[spread=0 in data → floored at ${COST_FLOOR_BPS[tf]}bps round-trip; turnover IS charged]`);
   console.log(`Grid configs       : ${grid.length}  (effectiveTrials for deflated bar)`);
   console.log(`Passive baseline   : equal-weight buy&hold OOS Sharpe ${fmt(baselineSharpe, 3)}, total ret ${(baselineRet * 100).toFixed(1)}%`);
+
+  // Fan the grid sweep across worker threads — each config is independent and
+  // effectiveTrials is fixed, so sharding is exact. Opt out with XSCAN_SERIAL=1.
+  const serial = process.env.XSCAN_SERIAL === "1" || grid.length <= 1;
+  const nWorkers = serial ? 1 : Math.min(availableParallelism(), grid.length);
+  console.log(`Parallelism        : ${serial ? "serial (1 core)" : `${nWorkers} workers / ${availableParallelism()} cores, ${grid.length} configs`}`);
   console.log("");
 
-  const rows: ResultRow[] = [];
-  for (const cfg of grid) {
-    const oos = backtest(uni, cfg, isEnd, uni.times.length);
-    if (oos.barReturns.length < 10) continue;
-    const psr = probabilisticSharpeRatio(oos.barReturns, 0, periodsPerYear);
-    const dsr = deflatedSharpeRatio(oos.barReturns, effectiveTrials, periodsPerYear);
-    const base: Omit<ResultRow, "verdict"> = {
-      cfg,
-      oosSharpe: nonAnnualizedSharpe(oos.barReturns),
-      oosSharpeAnnual: nonAnnualizedSharpe(oos.barReturns) * Math.sqrt(periodsPerYear),
-      oosReturnPct: totalReturn(oos.barReturns) * 100,
-      maxDrawdownPct: maxDrawdown(oos.barReturns) * 100,
-      avgTurnover: oos.rebalances > 0 ? oos.totalTurnover / oos.rebalances : 0,
-      psr: psr.psr,
-      dsr: dsr.dsr,
-      observedSharpeAnnual: dsr.observedSharpe,
-      expectedMaxNullSharpe: dsr.expectedMaxSharpeUnderNull,
-    };
-    rows.push({ ...base, verdict: classify(base) });
-  }
+  const allIdxs = Array.from({ length: grid.length }, (_v, i) => i);
+  const rows: ResultRow[] = serial
+    ? scoreConfigSlice(uni, tf, allIdxs, effectiveTrials)
+    : await runShardedConfigs(uni.symbols, tf, grid.length, effectiveTrials);
 
   const verdictRank = { PASS: 0, marginal: 1, FAIL: 2 } as const;
   rows.sort((a, b) => {
     if (verdictRank[a.verdict] !== verdictRank[b.verdict]) return verdictRank[a.verdict] - verdictRank[b.verdict];
     if (b.dsr !== a.dsr) return b.dsr - a.dsr;
-    return b.oosSharpe - a.oosSharpe;
+    if (b.oosSharpe !== a.oosSharpe) return b.oosSharpe - a.oosSharpe;
+    // Deterministic final tie-break so the ranked table is independent of the
+    // order rows were collected in (serial loop vs sharded-worker concatenation).
+    return cfgLabel(a.cfg).localeCompare(cfgLabel(b.cfg));
   });
 
   const passes = rows.filter((r) => r.verdict === "PASS");
@@ -538,7 +629,7 @@ function fullUniverse(tf: string): string[] {
     .sort();
 }
 
-function main(): void {
+async function main(): Promise<void> {
   console.log("#".repeat(82));
   console.log("# CROSS-SECTIONAL CRYPTO FACTOR BACKTEST");
   console.log("# long top-k / short bottom-k, rebalanced — momentum & reversal, LS & LO.");
@@ -547,13 +638,18 @@ function main(): void {
   console.log("#".repeat(82));
   console.log("");
 
-  // Full 18-name universe on 1d and 1h.
-  runPass("FULL 18-NAME UNIVERSE", fullUniverse("1d"), "1d");
-  runPass("FULL 18-NAME UNIVERSE", fullUniverse("1h"), "1h");
+  // Timeframes to sweep. Defaults to the crypto-extended 1d/1h; override for a
+  // dataset with different bar suffixes (e.g. the M15-only momq competition bars
+  // for parity tests): XSCAN_TFS=M15 XSCAN_DATA_DIR=data/momq/bars bun run ...
+  const tfs = (process.env.XSCAN_TFS ?? "1d,1h").split(",").map((s) => s.trim()).filter(Boolean);
 
+  for (const tf of tfs) {
+    await runPass("FULL UNIVERSE", fullUniverse(tf), tf);
+  }
   // The 5-name competition-tradeable cross-section (what actually transfers).
-  runPass("5-NAME COMPETITION-TRADEABLE", TRADEABLE, "1d");
-  runPass("5-NAME COMPETITION-TRADEABLE", TRADEABLE, "1h");
+  for (const tf of tfs) {
+    await runPass("5-NAME COMPETITION-TRADEABLE", TRADEABLE, tf);
+  }
 }
 
-main();
+if (isMainThread) void main();

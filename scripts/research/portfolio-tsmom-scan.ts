@@ -31,6 +31,8 @@
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { availableParallelism } from "node:os";
+import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 
 import {
   deflatedSharpeRatio,
@@ -40,8 +42,12 @@ import { sizeWithVolTarget } from "../../src/core/alpha/vol-target-sizer.ts";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
-const DATA_DIR = join(process.cwd(), "data", "momq", "crypto-extended");
-const TF = process.env.PORT_TF ?? "1d"; // 1d | 1h
+// Default scope = the committed crypto-extended bars. Override the data dir to
+// re-run on a different committed universe (e.g. the stable momq competition
+// bars for parity tests) without touching code:
+//   PORT_DATA_DIR=data/momq/bars PORT_TF=M15 bun run scripts/research/portfolio-tsmom-scan.ts
+const DATA_DIR = join(process.cwd(), process.env.PORT_DATA_DIR ?? join("data", "momq", "crypto-extended"));
+const TF = process.env.PORT_TF ?? "1d"; // 1d | 1h | M15
 const PERIODS_PER_YEAR = TF === "1d" ? 365 : TF === "1h" ? 365 * 24 : 365 * 24 * 4;
 const IS_FRAC = 0.7; // first 70% in-sample, back 30% out-of-sample.
 
@@ -455,7 +461,8 @@ function fmt(x: number, d = 3): string {
   return Number.isFinite(x) ? x.toFixed(d) : "n/a";
 }
 
-function main(): void {
+/** Rebuild the aligned panel + derived returns from disk (worker + main share this). */
+function loadPanel(): { panel: Panel; der: Derived } {
   const files = readdirSync(DATA_DIR).filter((f) => f.endsWith(`_${TF}.json`));
   const symbols = files.map((f) => f.slice(0, -`_${TF}.json`.length)).sort();
 
@@ -467,6 +474,57 @@ function main(): void {
 
   const panel = buildPanel(symData);
   const der = deriveReturns(panel);
+  return { panel, der };
+}
+
+/**
+ * Score the configs at `configIdxs` (indices into `buildGrid()`). Each config is
+ * independent and `trials` is the full grid size, so sharding does NOT change the
+ * deflated-Sharpe correction. Worker + serial path call this identically.
+ */
+function scoreConfigSlice(panel: Panel, der: Derived, configIdxs: number[], trials: number): Row[] {
+  const grid = buildGrid();
+  return configIdxs.map((ci) => scoreConfig(panel, der, grid[ci]!, trials));
+}
+
+// ── Worker entry: rebuild the panel from disk, score a config-slice ──────────
+//
+// Workers re-read the bar files (cheap) and rebuild the aligned panel rather than
+// receiving the cloned price panel across the thread boundary, then score only
+// their assigned config indices.
+if (!isMainThread && parentPort) {
+  const { configIdxs, trials } = workerData as { configIdxs: number[]; trials: number };
+  const { panel, der } = loadPanel();
+  parentPort.postMessage(scoreConfigSlice(panel, der, configIdxs, trials));
+}
+
+/** Fan the grid out across worker threads — one config-shard per worker. */
+function runShardedConfigs(nConfigs: number, trials: number): Promise<Row[]> {
+  const nWorkers = Math.max(1, Math.min(availableParallelism(), nConfigs));
+  // Round-robin config indices across workers — configs cost roughly the same
+  // (same panel, same OOS length), so round-robin is even enough.
+  const chunks: number[][] = Array.from({ length: nWorkers }, () => []);
+  for (let ci = 0; ci < nConfigs; ci++) chunks[ci % nWorkers]!.push(ci);
+
+  return Promise.all(
+    chunks.map(
+      (configIdxs) =>
+        new Promise<Row[]>((resolve, reject) => {
+          const w = new Worker(new URL(import.meta.url), {
+            workerData: { configIdxs, trials },
+          });
+          w.once("message", (rows: Row[]) => {
+            resolve(rows);
+            void w.terminate();
+          });
+          w.once("error", reject);
+        }),
+    ),
+  ).then((perChunk) => perChunk.flat());
+}
+
+async function main(): Promise<void> {
+  const { panel, der } = loadPanel();
 
   const grid = buildGrid();
   const trials = grid.length; // deflated-Sharpe trial count = active grid size.
@@ -487,12 +545,26 @@ function main(): void {
   const dataSpread = median(panel.dataSpreadBps);
   console.log(`Spread (data-implied median): ${fmt(dataSpread, 2)} bps — FLOORED to ${MIN_SPREAD_BPS} bps for cost (dataset records spread=0)`);
   console.log(`Vol target (vt=1 configs): ${(TARGET_ANNUAL_VOL * 100).toFixed(0)}% annualized`);
+
+  // Fan the grid sweep across worker threads — each config is independent and
+  // trials is fixed, so sharding is exact. Opt out with PORT_SERIAL=1.
+  const serial = process.env.PORT_SERIAL === "1" || grid.length <= 1;
+  const nWorkers = serial ? 1 : Math.min(availableParallelism(), grid.length);
+  console.log(`Parallelism       : ${serial ? "serial (1 core)" : `${nWorkers} workers / ${availableParallelism()} cores, ${grid.length} configs`}`);
   console.log("");
 
-  const rows: Row[] = grid.map((cfg) => scoreConfig(panel, der, cfg, trials));
+  const allIdxs = Array.from({ length: grid.length }, (_v, i) => i);
+  const rows: Row[] = serial
+    ? scoreConfigSlice(panel, der, allIdxs, trials)
+    : await runShardedConfigs(grid.length, trials);
 
   // Rank by OOS bar Sharpe.
-  rows.sort((a, b) => b.oosSharpeBar - a.oosSharpeBar);
+  rows.sort((a, b) => {
+    if (b.oosSharpeBar !== a.oosSharpeBar) return b.oosSharpeBar - a.oosSharpeBar;
+    // Deterministic final tie-break so the ranked table is independent of the
+    // order rows were collected in (serial loop vs sharded-worker concatenation).
+    return a.cfg.id.localeCompare(b.cfg.id);
+  });
 
   // ── Honesty: active vs passive, side by side ──
   console.log("PASSIVE BENCHMARK (the bar every active strategy must beat OOS, after costs)");
@@ -597,4 +669,4 @@ function main(): void {
   console.log("");
 }
 
-main();
+if (isMainThread) void main();

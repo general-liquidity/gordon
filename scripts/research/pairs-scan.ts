@@ -29,6 +29,8 @@
 
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { availableParallelism } from "node:os";
+import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 
 import { testCointegration } from "../../src/infra/trading/quant/cointegration.ts";
 import { johansenTest } from "../../src/infra/trading/quant/johansen.ts";
@@ -246,7 +248,74 @@ function evaluatePair(a: Series, b: Series): PairResult | null {
   };
 }
 
-function main(): void {
+/** One unit of work: a single (i, j) symbol pair, referenced by name. */
+interface PairUnit {
+  a: string;
+  b: string;
+}
+
+/**
+ * Score a list of pairs. Each pair is independent and `evaluatePair` is pure given
+ * its two series, so a worker scores its slice in isolation and the main thread
+ * concatenates (no merge-time recompute). Series are loaded from disk and cached
+ * per worker — cheap (~ms/file) and avoids cloning large close maps across threads,
+ * so we shard at PAIR granularity: C(N,2) pairs split evenly across cores.
+ */
+function computeResultsForPairs(units: PairUnit[]): PairResult[] {
+  const cache = new Map<string, Series | null>();
+  const load = (sym: string): Series | null => {
+    let s = cache.get(sym);
+    if (s === undefined) {
+      s = loadSeries(sym);
+      cache.set(sym, s);
+    }
+    return s;
+  };
+
+  const results: PairResult[] = [];
+  for (const { a, b } of units) {
+    const sa = load(a);
+    const sb = load(b);
+    if (!sa || !sb) continue;
+    const r = evaluatePair(sa, sb);
+    if (r) results.push(r);
+  }
+  return results;
+}
+
+// ── Worker entry: score a pair-slice, post the results back ─────────────────
+if (!isMainThread && parentPort) {
+  const { units } = workerData as { units: PairUnit[] };
+  parentPort.postMessage(computeResultsForPairs(units));
+}
+
+/** Fan the pair list out across worker threads — one pool, the whole box. */
+function runShardedPairs(units: PairUnit[]): Promise<PairResult[]> {
+  const nWorkers = Math.max(1, Math.min(availableParallelism(), units.length));
+  // Load balance by per-pair cost (combined bar-count): caller passes units sorted
+  // heaviest-first, and we round-robin them across workers (LPT). This spreads the
+  // few expensive big-pair evaluations evenly instead of piling them into one worker.
+  const chunks: PairUnit[][] = Array.from({ length: nWorkers }, () => []);
+  units.forEach((unit, i) => chunks[i % nWorkers]!.push(unit));
+
+  return Promise.all(
+    chunks.map(
+      (chunk) =>
+        new Promise<PairResult[]>((resolve, reject) => {
+          const w = new Worker(new URL(import.meta.url), {
+            workerData: { units: chunk },
+          });
+          w.once("message", (results: PairResult[]) => {
+            resolve(results);
+            void w.terminate();
+          });
+          w.once("error", reject);
+        }),
+    ),
+  ).then((perChunk) => perChunk.flat());
+}
+
+async function main(): Promise<void> {
   let symbols = readdirSync(BARS_DIR)
     .filter((f) => f.endsWith(`_${TF}.json`))
     .map((f) => f.slice(0, -(`_${TF}.json`).length))
@@ -261,14 +330,38 @@ function main(): void {
   console.log(`Dir/TF        : ${process.env.ALPHA_BARS_DIR ?? "data/momq/bars"} / ${TF}`);
   console.log(`Symbols       : ${series.length} (${series.map((s) => s.symbol).join(", ")})`);
   console.log(`Pairs to test : ${(series.length * (series.length - 1)) / 2}`);
-  console.log("");
 
-  const results: PairResult[] = [];
+  // Flatten to the (i<j) pair list. Record each pair's original serial position so
+  // the sharded results can be restored to serial order before ranking — making the
+  // parallel output byte-identical to the serial loop (downstream sorts aren't
+  // guaranteed stable on ties). Bar-count per symbol drives heaviest-first ordering.
+  const bars = new Map(series.map((s) => [s.symbol, s.times.length]));
+  const allUnits: { unit: PairUnit; order: number }[] = [];
+  let order = 0;
   for (let i = 0; i < series.length; i++) {
     for (let j = i + 1; j < series.length; j++) {
-      const r = evaluatePair(series[i]!, series[j]!);
-      if (r) results.push(r);
+      allUnits.push({ unit: { a: series[i]!.symbol, b: series[j]!.symbol }, order: order++ });
     }
+  }
+  const serialOrder = new Map(allUnits.map(({ unit, order }) => [`${unit.a} ${unit.b}`, order]));
+
+  const serial = process.env.ALPHA_SERIAL === "1" || allUnits.length <= 1;
+  const nWorkers = serial ? 1 : Math.min(availableParallelism(), allUnits.length);
+  console.log(`Parallelism   : ${serial ? "serial (1 core)" : `${nWorkers} workers / ${availableParallelism()} cores, ${allUnits.length} pairs`}`);
+  console.log("");
+
+  let results: PairResult[];
+  if (serial) {
+    results = computeResultsForPairs(allUnits.map((u) => u.unit));
+  } else {
+    // Heaviest-first by combined bar-count so the round-robin shard is proper LPT.
+    const ordered = [...allUnits].sort(
+      (x, y) =>
+        (bars.get(y.unit.a)! + bars.get(y.unit.b)!) - (bars.get(x.unit.a)! + bars.get(x.unit.b)!),
+    );
+    results = await runShardedPairs(ordered.map((u) => u.unit));
+    // Restore serial order so ranking ties resolve identically to the serial run.
+    results.sort((x, y) => serialOrder.get(`${x.a} ${x.b}`)! - serialOrder.get(`${y.a} ${y.b}`)!);
   }
 
   const cointegrated = results.filter((r) => r.johansen && r.egBoth);
@@ -332,4 +425,4 @@ function main(): void {
   console.log("");
 }
 
-main();
+if (isMainThread) void main();
