@@ -113,6 +113,39 @@ describe("runCompetitionDryRun — money-path spine", () => {
     expect(Number.isFinite(r.competition.sharpe15m)).toBe(true);
   });
 
+  it("spread + slippage costs reduce returns and are reported (no commission/swap)", () => {
+    const prices = Array.from({ length: 60 }, (_, i) => 100 + i);
+    const run = (costs?: { spreadBps?: number; slippageBps?: number }) =>
+      runCompetitionDryRun({
+        bars: series("XAUUSD", prices, DAY, 0.1),
+        signal: (): DryRunSignal => ({ side: "long", stopDistance: 2, targetDistance: 1 }),
+        startingEquity: START,
+        periodsPerYear: 252,
+        costs,
+      });
+    const free = run();
+    const withCost = run({ spreadBps: 5, slippageBps: 2 });
+
+    expect(free.totalCostsPaid).toBe(0);
+    expect(withCost.totalCostsPaid).toBeGreaterThan(0);
+    expect(withCost.finalEquity).toBeLessThan(free.finalEquity); // friction drags returns
+  });
+
+  it("a thin gross edge can flip to a net loss once friction is charged", () => {
+    // Every trade wins exactly +1 gross; heavy per-fill cost should overwhelm it.
+    const prices = Array.from({ length: 40 }, (_, i) => 100 + i);
+    const cfg = (costs?: { spreadBps?: number }) =>
+      runCompetitionDryRun({
+        bars: series("EURUSD", prices, DAY, 0.1),
+        signal: (): DryRunSignal => ({ side: "long", stopDistance: 2, targetDistance: 1 }),
+        startingEquity: START,
+        periodsPerYear: 252,
+        costs,
+      });
+    expect(cfg().totalReturnPct).toBeGreaterThan(0); // profitable gross
+    expect(cfg({ spreadBps: 300 }).totalReturnPct).toBeLessThan(0); // unprofitable net
+  });
+
   it("Sharpe uses the supplied annualization (FX 252 ≠ crypto 365 on the same path)", () => {
     const prices = Array.from({ length: 60 }, (_, i) => 100 + i);
     const mk = (ppy: number) =>

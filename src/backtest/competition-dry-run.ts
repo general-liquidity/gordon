@@ -63,11 +63,21 @@ export interface DryRunSignal {
  */
 export type SignalFn = (bar: DryRunBar, history: DryRunBar[]) => DryRunSignal | null;
 
+export interface CostModel {
+  /** Full bid/ask spread as basis points of price — crossed once on every fill. Default 0. */
+  spreadBps?: number;
+  /** Adverse slippage / market impact as basis points of price, per fill. Default 0. */
+  slippageBps?: number;
+}
+
 export interface CompetitionDryRunInput {
   /** Chronologically ordered bars across all symbols (interleave by time). */
   bars: DryRunBar[];
   signal: SignalFn;
   startingEquity: number;
+  /** Execution friction. The competition charges NO commission/swap — only spread +
+   *  slippage + impact — so this models exactly those. Omit for a frictionless run. */
+  costs?: CostModel;
   /** Bars per year for THIS series — drives annualization of the judged Sharpe
    *  (FX/metals ≈ 252 daily; crypto ≈ 365 daily; intraday = bars/year). */
   periodsPerYear: number;
@@ -112,6 +122,8 @@ export interface CompetitionDryRunReport {
   maxDrawdownPct: number;
   tradeCount: number;
   winRate: number;
+  /** Total execution friction paid (spread + slippage) over the run, in equity units. */
+  totalCostsPaid: number;
   /** Days on which the daily-loss-kill halted new entries. */
   haltedDays: number;
   /** Peak gross exposure as a fraction of equity reached during the run. */
@@ -173,6 +185,9 @@ function exitLevel(pos: OpenPosition, price: number): "stop" | "target" | null {
 export function runCompetitionDryRun(input: CompetitionDryRunInput): CompetitionDryRunReport {
   const { bars, signal, startingEquity, periodsPerYear } = input;
   const riskFreeRate = input.riskFreeRate ?? 0.02;
+  // Adverse price move per fill: half the spread (you cross it) plus slippage.
+  const costRate = ((input.costs?.spreadBps ?? 0) / 2 + (input.costs?.slippageBps ?? 0)) / 10_000;
+  let totalCostsPaid = 0;
 
   let cash = startingEquity; // realized equity; open PnL is added at mark time
   const open = new Map<string, OpenPosition>();
@@ -205,7 +220,12 @@ export function runCompetitionDryRun(input: CompetitionDryRunInput): Competition
     exitTime: number,
     reason: DryRunTrade["exitReason"],
   ): void => {
-    const pnl = unrealized(pos, exitPrice);
+    // Adverse exit fill: a long sells lower, a short buys higher.
+    const sign = pos.side === "long" ? 1 : -1;
+    const adv = exitPrice * costRate;
+    const fill = exitPrice - sign * adv;
+    totalCostsPaid += adv * pos.units;
+    const pnl = unrealized(pos, fill);
     cash += pnl;
     trades.push({
       symbol: pos.symbol,
@@ -213,7 +233,7 @@ export function runCompetitionDryRun(input: CompetitionDryRunInput): Competition
       entryTime: histBySymbol.get(pos.symbol)?.[0]?.time ?? exitTime,
       exitTime,
       entryPrice: pos.entryPrice,
-      exitPrice,
+      exitPrice: fill,
       units: pos.units,
       pnl,
       returnPct: pos.notional > 0 ? pnl / pos.notional : 0,
@@ -284,10 +304,14 @@ export function runCompetitionDryRun(input: CompetitionDryRunInput): Competition
               : sig.side === "long"
                 ? bar.close + sig.targetDistance
                 : bar.close - sig.targetDistance;
+          // Adverse entry fill: a long buys at the ask + slippage, a short sells lower.
+          const entrySign = sig.side === "long" ? 1 : -1;
+          const entryAdv = bar.close * costRate;
+          totalCostsPaid += entryAdv * sized.sizeUnits;
           open.set(bar.symbol, {
             symbol: bar.symbol,
             side: sig.side,
-            entryPrice: bar.close,
+            entryPrice: bar.close + entrySign * entryAdv,
             units: sized.sizeUnits,
             notional: sized.sizeNotional,
             stopPrice,
@@ -343,6 +367,7 @@ export function runCompetitionDryRun(input: CompetitionDryRunInput): Competition
     maxDrawdownPct: calculateMaxDrawdown(equityCurve),
     tradeCount: trades.length,
     winRate: trades.length ? wins / trades.length : 0,
+    totalCostsPaid,
     haltedDays: haltedDaySet.size,
     peakExposurePct,
     bindingHistogram,
