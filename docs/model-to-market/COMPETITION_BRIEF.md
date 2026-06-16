@@ -1,0 +1,263 @@
+# Model to Market: The Quantitative Hack — Competition Brief
+
+**The single reference for the competition.** Last updated **2026-06-16**.
+
+> **Source-of-truth hierarchy** (organizer-stated): the **Syphonix platform "Rules" tab** (left nav of the participant console) is authoritative — the rules were updated after the 15 Jun kickoff and supersede the marketing pages. Discord (`Duncan` = tech lead, `Lotus` = ops) is the live clarification channel. The public marketing pages (`aienginehack.com/momq`, Luma) are stale where they conflict.
+>
+> Provenance tags below: **[RULES]** = official rules doc · **[DISCORD]** = organizer Discord answer · **[SITE]** = marketing page · **[CONFIRM]** = still to verify on the platform.
+
+---
+
+## 1. At a glance
+
+| | |
+|---|---|
+| **What** | UK's first live AI-native trading competition. Solo (1-person teams). ~330 participants. |
+| **Host** | AI Engine (Zoe Qin / Jamesin Seidel, Dawn Capital) × Syphonix |
+| **Capital** | $1,000,000 virtual per participant, **30:1 max leverage**, zero principal risk |
+| **Markets** | FX majors · Gold (XAUUSD) · Silver (XAGUSD) · Oil · 5 crypto. **No** stocks/indices/bonds. **No** options. |
+| **Format** | 1 week build → 1 week live paper trade → knockout rounds → top-100 final |
+| **Live launch** | **21 Jun 2026, 22:00 BST** (Asia open) |
+| **Final** | 27 Jun 2026, London, in-person **required** for the top 100 |
+| **Prize pool** | $100k cash + partner bounties (NVIDIA hardware, Anthropic credits) |
+| **Execution** | Order-book matching sim on real market data. **MT5 is the only programmatic API** (no Syphonix REST API). |
+| **Governing law** | England. Paper-only; no real-money, not investment advice. |
+
+---
+
+## 2. Schedule (BST)
+
+Authoritative dates from **[RULES]** §5, refined by **[DISCORD]**. Marketing pages disagree on times — trust the platform.
+
+| Date / time (BST) | Phase | Detail |
+|---|---|---|
+| **15 Jun, 17:00–20:00** | Opening | Portal + **historical data** + tech-perk credits open; trading **disabled**; view account credentials, familiarize. |
+| **18 Jun, 22:00** | 2nd registration deadline | — |
+| **18 Jun** | **Test environment** | MT5 credentials + API + test env open; validate all pairs and execution. |
+| **21 Jun, 22:00** | **OFFICIAL LAUNCH** | Live competition begins; accounts initialize at $1M. |
+| **22 Jun, 22:00** | Round 1 close | Snapshot + 22:00–23:00 compliance audit; eliminations. |
+| **23 Jun, 22:00** | Round 2 close | Snapshot + audit; eliminations. |
+| **24 Jun, 22:00** | Round 3 close → **Top 100 cut** | Leaderboard goes **blind**; top 100 by score advance. |
+| **24 Jun 22:00 – 26 Jun 22:00** | **Finals (blind)** | Top 100 compete; no live ranking shown. |
+| **26 Jun, 22:00** | Trading closes | All positions liquidated; final PnL + Sharpe computed; 22:00–23:00 audit. |
+| **27 Jun** | Final day, London | Panels, technical judging, networking, awards. In-person required. |
+
+**Notes**
+- **Equity carries over between rounds — it is NOT reset.** Confirmed twice **[DISCORD]**. Return is always measured off the fixed $1,000,000 baseline.
+- Some schedule details were still "tentative" as of kickoff (venue/logistics). Re-check the platform.
+- Early demo access exists for participants who post the LinkedIn promo, but **all data and the formal competition are equal for everyone**; early access is familiarization only **[DISCORD]**.
+
+---
+
+## 3. Account, leverage, instruments
+
+**Account** **[RULES]** §2: simulated, $1,000,000 initial, **30:1 max leverage**, unified market environment (everyone sees the same quotes), zero principal risk.
+
+**Asset scope** **[RULES]** §3 + **[DISCORD]**: major FX pairs, **XAUUSD** (gold), **XAGUSD** (silver), **Oil**, **AUDJPY**, … and **5 crypto: BTCUSD, ETHUSD, SOLUSD, XRPUSD, HBARUSD** (HBAR = Hedera; first announced as "BARUSD" in error). **30+ instruments total**; the final list is released in the system at login / on the 18th. **No stocks, indices, or bonds.** **No options** (use stop-losses; no option hedging).
+
+> **[CONFIRM]** Pull the full 30+ instrument list from the console once logged in — contract specs, per-instrument leverage, tick size, and spreads feed Gordon's sizing.
+
+---
+
+## 4. Data
+
+**Historical (provided)** **[DISCORD]**:
+- **Coverage:** 1 month prior to launch.
+- **Resolution:** tick-level.
+- **Depth:** minimum **5 levels of order-book depth (L2)**.
+- **Format:** parquet (~20 GB), timestamped bid/ask levels, sizes, instrument metadata. Download from the Syphonix **"Backtest data"** tab after login.
+- **Gaps flagged by participants:** **crypto is missing** from the Syphonix parquet → source crypto yourself (Gordon's native feeds cover BTC/ETH/SOL/XRP/HBAR). Some instruments have partial coverage (Oil, AUDJPY, an "XAUKUSD"). MT5 feed initially lacked L2 (being fixed).
+- **Only 1 month is provided** (size + 1-week live window). More history → use your own sources.
+
+**External data is explicitly allowed** **[DISCORD]** — news APIs, prediction markets, public crypto feeds, etc. The platform does not provide these but does not restrict them.
+
+**Live** **[DISCORD]**: the live API streams the same **5-level depth** in real time.
+
+---
+
+## 5. Execution mechanics & costs
+
+**[DISCORD]**, Duncan:
+
+- **Order-book matching model**, *not* dealing-desk. Limit orders rest as liquidity and fill by **queue position + available liquidity**; **partial fills** occur when volume is limited.
+- **Maker and taker** both supported (limit + marketable orders).
+- The **real market order book is an INPUT to a per-account simulation**. You do **not** trade the live production book; other participants **cannot** interact with your orders (matching is internal/per-account; not yet transparent).
+- **Slippage, liquidity constraints, and market impact are simulated.** Validate in the test env from the 18th.
+- **Costs: NO commission, NO swap/financing charges.** Friction = **spread + slippage + market impact only**.
+- **Sub-millisecond execution; no trading-frequency limit** on the platform side (MT5 API layer may impose its own). Safe-harbor ≤ **500 requests/sec** (above that, only penalized if it causes system anomalies).
+
+> Implication: with zero commission/swap, high-frequency *diversified* compounding carries no per-trade drag — favourable for the chosen posture (§9). But the dry-run must model spread/slippage to stay honest.
+
+---
+
+## 6. Scoring (the objective function)
+
+From **[RULES]** §§11–16. Implemented exactly in `src/core/risk-management/competition-scoring.ts`.
+
+> **[CONFIRM]** The rules were updated post-kickoff and the source-of-truth moved to the platform Rules tab. Discord still describes "**PnL primary** + risk modifiers (drawdown / leverage / margin / concentration / consistency)," consistent with the formula below — but **verify the live formula on the platform** before relying on exact weights.
+
+### 6.1 Final Score
+
+```
+Final Score = 0.70 · ReturnRank
+            + 0.15 · DrawdownRank
+            + 0.10 · SharpeRank
+            + 0.05 · RiskDiscipline
+```
+
+All ranks are **cross-sectional / relative**: each metric is converted to a 0–100 score against the **active** field (best = 100, worst = 0; a sole participant = 100). **Return dominates at 70%.**
+
+### 6.2 Metrics
+
+- **Return** `Return_i = (Equity_final - 1,000,000) / 1,000,000` (off the fixed baseline; equity carries across rounds).
+- **Max Drawdown** `MaxDD_i = max_t (PeakEquity - Equity) / PeakEquity` — lower is better.
+- **Sharpe (non-annualized)** on **15-minute equity returns**: `Sharpe_i = Mean(r) / Std(r)`, where `r_t = (E_t − E_{t-1}) / E_{t-1}`.
+  - `Std = 0 → Sharpe = 0`. *(A perfectly smooth line has zero variance → Sharpe 0; you need positive mean **with** nonzero variance.)*
+  - **< 8 valid 15-min observations → Sharpe Rank capped at 50.**
+- **Rank normalization** `Rank Score_i = 100 · (N − rank_i) / (N − 1)`, `N = 1 → 100`. Ties share a rank.
+
+### 6.3 Risk Discipline (§13) — starts at 100/round, resets each round, floor 0
+
+| Rule | Threshold | Penalty |
+|---|---|---|
+| Margin usage = UsedMargin/Equity | > 90% for ≥ 30 min | −20 |
+| | > 95% for ≥ 15 min | −30 |
+| | > 98% for ≥ 10 min | compliance review |
+| Leverage = GrossNotional/Equity | > 28× for ≥ 30 min | −20 |
+| | > 29× for ≥ 15 min | −30 |
+| | ~30× for ≥ 10 min | compliance review |
+| Single-instrument exposure | > 90% for ≥ 30 min | −10 |
+| Net directional exposure | > 95% for ≥ 30 min | −10 |
+
+Directional trading is allowed; what's penalized is **prolonged, extremely concentrated, near-full-leverage** risk.
+
+### 6.4 Red-lines (§14) — instant disqualification / elimination
+
+- **Forced liquidation (margin wipeout)** → immediate elimination, no advancement.
+- System/quote/latency/matching/settlement **exploits**, or circumventing limits → DQ.
+- **API abuse** (flooding, bypassing limits, attacks, unauthorized access) → DQ. Safe-harbor ≤ 500 req/s.
+- **Multi-account** participation, **collusion / pre-arranged trading / cross-account risk transfer** → DQ.
+
+### 6.5 Tie-breakers (§16)
+
+Final Score → higher Return → lower MaxDD → higher Sharpe → higher Risk Discipline → "more reasonable trading activity" → organizer review.
+
+### 6.6 Transparency (§8)
+
+During Rounds 1–3, participants see a **near-real-time leaderboard + peer trading logs + positions + risk metrics at 5-minute latency**. **Finals are blinded** (own account only). Post-competition, the organizer publishes final standings, verified logs, and any penalty rulings (Trade/Order IDs only; no PII).
+
+---
+
+## 7. Trading interfaces & integration
+
+**Three nominal surfaces, but for an automated system only one matters** **[DISCORD]**:
+
+| Surface | Reality |
+|---|---|
+| **MT5** | **The only programmatic path.** Full API for automation via the `MetaTrader5` Python package. Credentials open **18 Jun**. |
+| **Syphonix AI Agent** | Chat/AI-agent UI for non-coders. **No separate REST API** ("we will prepare one" — non-committal). Using it would sideline Gordon → out. |
+| **Chat interface** | Same as above — the organizers' agent, not ours. |
+
+> **Key correction:** there is **no Syphonix REST API**. The repo's `src/infra/broker/adapters/syphonix.ts` (a REST `BrokerAdapter` scaffold) is the **wrong abstraction** for execution and must be repurposed to an **MT5 adapter**. It stays gated-off and harmless until then.
+
+### 7.1 Gordon ↔ MT5 architecture
+
+```
+Gordon (Bun/TS, Windows)  ──►  MT5 bridge (MetaTrader5 Python pkg)  ──►  MT5 terminal  ──►  Syphonix sim
+   strategy · risk · scoring         order / quote / positions / account IPC          execution venue
+```
+
+- The `MetaTrader5` Python package requires a **local Windows MT5 terminal** (not native Linux; Northflank is Linux). The operator runs **Windows 11**, so MT5 + bridge + Gordon co-locate locally for dev.
+- For the **24/7 live week**, run on an **always-on Windows VPS**. Northflank ($100 credit) hosts Gordon's non-MT5 services (data, dashboards), not the MT5 terminal.
+- Bridge surface to implement: account/equity, positions, place/cancel order (market + limit), live quote + L2 depth, historical bars. Mirror the idempotency (`clientOrderId`) and capability patterns already in the Syphonix scaffold.
+
+---
+
+## 8. Prizes, judging, partner perks
+
+### 8.1 Cash (§ marketing /momq/prizes)
+
+| Place | Prize |
+|---|---|
+| 1st | $30,000 |
+| 2nd | $15,000 |
+| 3rd | $6,000 |
+| 4th | $5,000 |
+| 5th | $4,000 |
+| 6th–25th | $1,000 each |
+| **Best Sharpe Ratio** | **$10,000** |
+| **Best Technology Setup** | **$10,000** |
+
+"One winner takes $50k" = sweeping 1st ($30k) + Best Sharpe ($10k) + Best Tech ($10k).
+
+### 8.2 Partner bounties
+
+- **NVIDIA Hardware Prize** — most innovative use of Nemotron / NVIDIA compute among finalists (part of technology judging). No support channel; prize only.
+- **Anthropic Credit Prize** — best use of Claude / Anthropic API in strategy design, signal generation, or execution. **Gordon is Claude-native → natural fit.**
+
+### 8.3 Tech-prize eligibility (§9) — applies to Top 25
+
+After **Round 3 (24 Jun)**, eligible participants submit (form on the platform):
+1. **GitHub repo** link (code).
+2. Overview of **partner technologies** used + how.
+3. **Data usage** details.
+4. A **demonstration** of how the project works.
+
+**Judging criteria** (3 axes): **System Design** (architecture quality, scalability, robustness) · **AI Integration** (how effectively AI drives signal-gen / risk-management / execution) · **Execution Approach** (strategy clarity, risk-adjusted returns, performance). **IP stays with the participant**; access is for judging only.
+
+### 8.4 Developer credits / perks
+
+| Partner | Perk | Access |
+|---|---|---|
+| **Anthropic** | $50 API credits | `platform.claude.com` offer link (from Luma/Discord) |
+| **Pydantic** | $50 Logfire inference credits | `pydantic.dev/hackathon` |
+| **Doubleword** | Inference API access | via the Pydantic AI gateway (Logfire); $100 free at `unlimiteddirtcheaptokens.com`, mention "AIEngine" |
+| **Northflank** | $100 platform credit | `app.northflank.com/signup`; GPU (L4) interest form separately |
+
+---
+
+## 9. Strategy posture (operator decision, 2026-06-16)
+
+**Goal:** prioritize **1st place** while keeping a real shot at **Best Sharpe** + **Best Tech**.
+
+**Approach — diversified aggressive compounding.** Make the return come *from a high-Sharpe engine*, not from big bets:
+- Deploy capital aggressively but across **many small, vol-targeted, diversified positions** over the 30+ instruments — not a few concentrated directional bets.
+- This competes on **return (70%)** while keeping the **15-min Sharpe** high (smooth equity), controlling **drawdown (15%)**, and **never concentrating enough to risk forced liquidation** (instant elimination).
+- All ceilings stay under the §13 discipline thresholds (leverage < 28×, margin < 90%, single-instrument < 90%, net-directional < 95%).
+- Zero commission/swap means high trade count carries no drag — reinforces the approach.
+- **Best Tech + Anthropic bounty are decoupled from the trading dial** — they ride on Gordon's architecture and the submission.
+
+Encoded as `COMPETITION_RISK_AGGRESSIVE` in `competition-risk-preset.ts` (a **starting** calibration to be tuned against the official objective via the dry-run, once the historical parquet lands).
+
+> Why not a few 30× bets? It's a relative tournament with attrition: most aggressive entrants blow up (forced liquidation = auto-elimination). Gordon's no-wipeout governance **survives by construction**, which is itself a ranking edge — and the skill prizes (Sharpe, Tech) are where a disciplined system dominates the field.
+
+---
+
+## 10. What's built vs. open
+
+**Built (this prep):**
+- `core/risk-management/competition-scoring.ts` — exact §11–16 objective function (Final Score, ranks, non-annualized 15-min Sharpe + cap, §13 discipline, red-line DQ, tie-breakers). 12 tests.
+- `backtest/competition-dry-run.ts` — money-path rehearsal; reports the official metrics. 6 tests.
+- `core/risk-management/competition-risk-preset.ts` — survive-and-compound default + `COMPETITION_RISK_AGGRESSIVE` posture.
+- `core/pipeline/competition-runner.ts` — run config; `backtest/metrics.ts` annualization fix.
+
+**Open / TODO:**
+- **MT5 bridge** (the new critical path) — design the Gordon↔MT5 contract now; wire against the test env on the 18th. Repurpose `adapters/syphonix.ts` → MT5.
+- **Dry-run cost layer** — add spread + slippage (no commission/swap) for fidelity.
+- **Strategy selection (Track B)** — validate signals on the real historical parquet (+ own crypto data) with purged-CV / walk-forward / deflated-Sharpe.
+- **Posture tuning** — sweep `COMPETITION_RISK_AGGRESSIVE` against the official Final Score on real data.
+- **Tech-setup deck (Track C)** — structured to the 3 judging axes + Anthropic-bounty angle.
+
+**To CONFIRM on the platform:**
+- [ ] Current scoring formula + risk limits on the Rules tab (did 70/15/10/5 survive the post-kickoff update?).
+- [ ] Full 30+ instrument list + per-instrument contract specs, leverage, tick size, spreads.
+- [ ] Exact launch time (21 Jun 22:00 vs 23:00 BST — both cited).
+- [ ] Finals cutoff terminology (24 Jun blind cut vs 26 Jun trading close).
+- [ ] MT5 API rate limits (frequency constraints live in the MT5 layer).
+
+---
+
+## 11. Related docs
+
+- `docs/model-to-market/COMPETITION_ARCHITECTURE.md` — Gordon's system architecture for the tech-setup submission.
+- `docs/model-to-market/SYPHONIX_INTEGRATION.md` — original integration runbook (⚠️ **partly superseded**: assumed a Syphonix REST API; the real path is MT5 — see §7).
