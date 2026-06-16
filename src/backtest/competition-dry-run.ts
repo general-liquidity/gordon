@@ -75,6 +75,11 @@ export interface CompetitionDryRunInput {
   bars: DryRunBar[];
   signal: SignalFn;
   startingEquity: number;
+  /** Execution model. "taker" (default) crosses the spread and PAYS cost on every
+   *  fill — existing behavior. "maker" rests limit/post liquidity and EARNS half the
+   *  spread (a rebate) but still pays slippage/impact, and entries are not guaranteed
+   *  to fill. Omit for byte-for-byte-unchanged taker behavior. */
+  execution?: "taker" | "maker";
   /** Execution friction. The competition charges NO commission/swap — only spread +
    *  slippage + impact — so this models exactly those. Omit for a frictionless run. */
   costs?: CostModel;
@@ -122,8 +127,12 @@ export interface CompetitionDryRunReport {
   maxDrawdownPct: number;
   tradeCount: number;
   winRate: number;
-  /** Total execution friction paid (spread + slippage) over the run, in equity units. */
+  /** Total execution friction paid (spread + slippage) over the run, in equity units.
+   *  Can be NEGATIVE in "maker" mode when the earned spread-rebate exceeds slippage. */
   totalCostsPaid: number;
+  /** Maker fill rate: maker entry fills / maker entry attempts. 1 for taker runs
+   *  (taker entries always fill); 0 when there were no entry attempts. */
+  makerFillRate: number;
   /** Days on which the daily-loss-kill halted new entries. */
   haltedDays: number;
   /** Peak gross exposure as a fraction of equity reached during the run. */
@@ -185,9 +194,18 @@ function exitLevel(pos: OpenPosition, price: number): "stop" | "target" | null {
 export function runCompetitionDryRun(input: CompetitionDryRunInput): CompetitionDryRunReport {
   const { bars, signal, startingEquity, periodsPerYear } = input;
   const riskFreeRate = input.riskFreeRate ?? 0.02;
-  // Adverse price move per fill: half the spread (you cross it) plus slippage.
-  const costRate = ((input.costs?.spreadBps ?? 0) / 2 + (input.costs?.slippageBps ?? 0)) / 10_000;
+  const isMaker = input.execution === "maker";
+  const halfSpreadBps = (input.costs?.spreadBps ?? 0) / 2;
+  const slippageBps = input.costs?.slippageBps ?? 0;
+  // Adverse price move per fill, as a fraction of price.
+  //   taker: cross half the spread (PAY it) plus slippage  → (spread/2 + slip)/1e4
+  //   maker: rest the post, EARN half the spread (rebate)  → (slip − spread/2)/1e4
+  // The maker rate can be negative (net rebate); it's applied in the same
+  // adverse direction as the taker path, so a negative rate improves the fill.
+  const costRate = (isMaker ? slippageBps - halfSpreadBps : halfSpreadBps + slippageBps) / 10_000;
   let totalCostsPaid = 0;
+  let makerAttempts = 0;
+  let makerFills = 0;
 
   let cash = startingEquity; // realized equity; open PnL is added at mark time
   const open = new Map<string, OpenPosition>();
@@ -296,27 +314,48 @@ export function runCompetitionDryRun(input: CompetitionDryRunInput): Competition
           halted = true;
           haltedDaySet.add(currentDay);
         } else if (sized.verdict === "trade" && sized.sizeUnits > 0) {
-          const stopPrice =
-            sig.side === "long" ? bar.close - sig.stopDistance : bar.close + sig.stopDistance;
-          const targetPrice =
-            sig.targetDistance === undefined
-              ? null
-              : sig.side === "long"
-                ? bar.close + sig.targetDistance
-                : bar.close - sig.targetDistance;
-          // Adverse entry fill: a long buys at the ask + slippage, a short sells lower.
+          // Adverse entry fill direction: a long buys higher, a short sells lower.
+          // In maker mode `costRate` can be negative → the post price is FAVORABLE
+          // (long bids below close, short asks above close) and earns the rebate.
           const entrySign = sig.side === "long" ? 1 : -1;
           const entryAdv = bar.close * costRate;
-          totalCostsPaid += entryAdv * sized.sizeUnits;
-          open.set(bar.symbol, {
-            symbol: bar.symbol,
-            side: sig.side,
-            entryPrice: bar.close + entrySign * entryAdv,
-            units: sized.sizeUnits,
-            notional: sized.sizeNotional,
-            stopPrice,
-            targetPrice,
-          });
+          const postPrice = bar.close + entrySign * entryAdv;
+
+          // Maker fills are NOT guaranteed: a resting limit only fills if the market
+          // comes to it. With close-only data we approximate — a long bid below the
+          // close fills only if the bar's close reached down to the post (close <=
+          // post), a short ask above the close fills only if close >= post. This
+          // close-only proxy can't see intrabar lows/highs, so it's conservative:
+          // it credits a fill only when the close itself crossed the post level.
+          // (When the rebate makes the post favorable, an at-or-better close fills.)
+          let fills = true;
+          if (isMaker) {
+            makerAttempts++;
+            fills = sig.side === "long" ? bar.close <= postPrice : bar.close >= postPrice;
+            if (fills) makerFills++;
+          }
+          if (!fills) {
+            // Unfilled maker entry is cancelled — no position opened this bar.
+          } else {
+            const stopPrice =
+              sig.side === "long" ? bar.close - sig.stopDistance : bar.close + sig.stopDistance;
+            const targetPrice =
+              sig.targetDistance === undefined
+                ? null
+                : sig.side === "long"
+                  ? bar.close + sig.targetDistance
+                  : bar.close - sig.targetDistance;
+            totalCostsPaid += entryAdv * sized.sizeUnits;
+            open.set(bar.symbol, {
+              symbol: bar.symbol,
+              side: sig.side,
+              entryPrice: postPrice,
+              units: sized.sizeUnits,
+              notional: sized.sizeNotional,
+              stopPrice,
+              targetPrice,
+            });
+          }
         }
       }
     }
@@ -368,6 +407,7 @@ export function runCompetitionDryRun(input: CompetitionDryRunInput): Competition
     tradeCount: trades.length,
     winRate: trades.length ? wins / trades.length : 0,
     totalCostsPaid,
+    makerFillRate: isMaker ? (makerAttempts > 0 ? makerFills / makerAttempts : 0) : 1,
     haltedDays: haltedDaySet.size,
     peakExposurePct,
     bindingHistogram,

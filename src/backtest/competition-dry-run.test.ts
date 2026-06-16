@@ -146,6 +146,61 @@ describe("runCompetitionDryRun — money-path spine", () => {
     expect(cfg({ spreadBps: 300 }).totalReturnPct).toBeLessThan(0); // unprofitable net
   });
 
+  it("taker round-trip pays roughly the spread (positive total cost)", () => {
+    const prices = Array.from({ length: 60 }, (_, i) => 100 + i);
+    const r = runCompetitionDryRun({
+      bars: series("XAUUSD", prices, DAY, 0.1),
+      signal: (): DryRunSignal => ({ side: "long", stopDistance: 2, targetDistance: 1 }),
+      startingEquity: START,
+      periodsPerYear: 252,
+      costs: { spreadBps: 6, slippageBps: 2 },
+      // execution omitted → taker
+    });
+    expect(r.totalCostsPaid).toBeGreaterThan(0);
+    expect(r.makerFillRate).toBe(1); // taker fills always
+  });
+
+  it("maker mode earns the spread → strictly lower total cost than taker on the same winning trend", () => {
+    const prices = Array.from({ length: 60 }, (_, i) => 100 + i);
+    // slippage ≥ half-spread keeps the long maker post at/above close, so it fills
+    // every bar (same trade count); the earned half-spread cuts total cost.
+    const costs = { spreadBps: 6, slippageBps: 4 };
+    const mk = (execution: "taker" | "maker") =>
+      runCompetitionDryRun({
+        bars: series("XAUUSD", prices, DAY, 0.1),
+        signal: (): DryRunSignal => ({ side: "long", stopDistance: 2, targetDistance: 1 }),
+        startingEquity: START,
+        periodsPerYear: 252,
+        costs,
+        execution,
+      });
+    const taker = mk("taker");
+    const maker = mk("maker");
+
+    expect(maker.totalCostsPaid).toBeLessThan(taker.totalCostsPaid); // rebate
+    expect(maker.tradeCount).toBe(taker.tradeCount); // posts fill in this regime
+    expect(maker.makerFillRate).toBe(1);
+  });
+
+  it("backward-compat: omitting execution yields identical numbers to explicit taker", () => {
+    const prices = Array.from({ length: 60 }, (_, i) => 100 + i);
+    const cfg = (execution?: "taker" | "maker") =>
+      runCompetitionDryRun({
+        bars: series("XAUUSD", prices, DAY, 0.1),
+        signal: (): DryRunSignal => ({ side: "long", stopDistance: 2, targetDistance: 1 }),
+        startingEquity: START,
+        periodsPerYear: 252,
+        costs: { spreadBps: 6, slippageBps: 2 },
+        ...(execution ? { execution } : {}),
+      });
+    const omitted = cfg();
+    const explicitTaker = cfg("taker");
+    expect(omitted.finalEquity).toBe(explicitTaker.finalEquity);
+    expect(omitted.totalCostsPaid).toBe(explicitTaker.totalCostsPaid);
+    expect(omitted.tradeCount).toBe(explicitTaker.tradeCount);
+    expect(omitted.sharpe).toBe(explicitTaker.sharpe);
+  });
+
   it("Sharpe uses the supplied annualization (FX 252 ≠ crypto 365 on the same path)", () => {
     const prices = Array.from({ length: 60 }, (_, i) => 100 + i);
     const mk = (ppy: number) =>

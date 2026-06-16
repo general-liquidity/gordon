@@ -98,13 +98,14 @@ const STRATEGIES: Record<string, SignalFn> = {
 interface Agg { ret: number; sharpe: number; maxDd: number; trades: number; n: number; winInstr: number }
 const emptyAgg = (): Agg => ({ ret: 0, sharpe: 0, maxDd: 0, trades: 0, n: 0, winInstr: 0 });
 
-function runSlice(bars: DryRunBar[], signal: SignalFn, spreadBps: number) {
+function runSlice(bars: DryRunBar[], signal: SignalFn, spreadBps: number, execution: "taker" | "maker") {
   const r = runCompetitionDryRun({
     bars,
     signal,
     startingEquity: 1_000_000,
     periodsPerYear: M15_PER_YEAR,
     riskParams: COMPETITION_RISK_AGGRESSIVE,
+    execution,
     costs: { spreadBps, slippageBps: 1 },
   });
   return {
@@ -121,28 +122,34 @@ function main(): void {
   );
   console.log(`\n── edge validation: ${loaded.length}/${TRADEABLE.length} instruments, IS(70%)/OOS(30%) ──\n`);
 
+  const fmt = (a: Agg) =>
+    `ret ${((a.ret / a.n) * 100).toFixed(2).padStart(7)}%  sharpe ${(a.sharpe / a.n).toFixed(3).padStart(7)}  ` +
+    `maxDD ${((a.maxDd / a.n) * 100).toFixed(1).padStart(5)}%  win ${a.winInstr}/${a.n}  trades ${(a.trades / a.n).toFixed(0)}`;
+
   for (const [name, signal] of Object.entries(STRATEGIES)) {
-    const is = emptyAgg();
-    const oos = emptyAgg();
+    const aggs: Record<string, Agg> = {
+      "taker IS": emptyAgg(), "taker OOS": emptyAgg(), "maker IS": emptyAgg(), "maker OOS": emptyAgg(),
+    };
     for (const { bars, spreadBps } of loaded) {
       const cut = Math.floor(bars.length * 0.7);
-      const r1 = runSlice(bars.slice(0, cut), signal, spreadBps);
-      const r2 = runSlice(bars.slice(cut), signal, spreadBps);
-      for (const [agg, r] of [[is, r1], [oos, r2]] as const) {
-        agg.ret += r.ret;
-        agg.sharpe += Number.isFinite(r.sharpe) ? r.sharpe : 0;
-        agg.maxDd += r.maxDd;
-        agg.trades += r.trades;
-        agg.n += 1;
-        if (r.ret > 0) agg.winInstr += 1;
+      for (const exec of ["taker", "maker"] as const) {
+        const slices: [string, ReturnType<typeof runSlice>][] = [
+          [`${exec} IS`, runSlice(bars.slice(0, cut), signal, spreadBps, exec)],
+          [`${exec} OOS`, runSlice(bars.slice(cut), signal, spreadBps, exec)],
+        ];
+        for (const [key, r] of slices) {
+          const agg = aggs[key]!;
+          agg.ret += r.ret;
+          agg.sharpe += Number.isFinite(r.sharpe) ? r.sharpe : 0;
+          agg.maxDd += r.maxDd;
+          agg.trades += r.trades;
+          agg.n += 1;
+          if (r.ret > 0) agg.winInstr += 1;
+        }
       }
     }
-    const fmt = (a: Agg) =>
-      `ret ${((a.ret / a.n) * 100).toFixed(2).padStart(7)}%  sharpe ${(a.sharpe / a.n).toFixed(3).padStart(7)}  ` +
-      `maxDD ${((a.maxDd / a.n) * 100).toFixed(1).padStart(5)}%  win ${a.winInstr}/${a.n}  trades ${(a.trades / a.n).toFixed(0)}`;
     console.log(`${name}`);
-    console.log(`  IS  ${fmt(is)}`);
-    console.log(`  OOS ${fmt(oos)}`);
+    for (const [label, agg] of Object.entries(aggs)) console.log(`  ${label.padEnd(9)} ${fmt(agg)}`);
     console.log("");
   }
   // Passive long-only reference (directly computed, not risk-sized) for context.
