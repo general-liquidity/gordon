@@ -126,16 +126,27 @@ We tested every transparent, parameter-light signal family we could against the 
 
 Candidate primitives we wired (e.g. `src/core/alpha/reversal-strategy.ts`, `cross-sectional-contrarian.ts`, `crypto-factor-model.ts`) are kept as honest, runnable *candidates* — the validators above are the receipts that they did **not** clear the OOS-after-costs bar. One month + a single IS/OOS split is indicative, not conclusive (the validators say so in their own headers), and it is the pre-competition window, not the live week.
 
-### 4.4 What we built *because* the signals didn't survive
+### 4.4 The posture: a BARBELL, chosen by tournament theory
 
-Two things consistently *did* hold up — and with the rigor of the search itself, they are the technology story:
+With no return edge, the 70%-return rank is a variance lottery and the two prizes need *opposite* books. So the posture is a **barbell** (`src/infra/trading/competition/barbellStrategy.ts`), not a compromise — the dominated middle is exactly what tournament theory says to avoid (Hvide 2002 "low-mean high-spread"; the leader-locks-in / laggard-swings bang-bang rule):
 
-1. **Survival / no-blow-up sizing.** `sizeCompetitionTrade`'s min-of-caps composition (§2.1) means a losing streak cannot cause ruin. Forced liquidation = instant elimination (§14); a book that *cannot* wipe out has a ranking edge by construction in an attrition tournament. With **no commission** and **30:1 leverage** available to ~500 entrants, the 70%-weight return rank is a *variance contest* — the controllable edges are survival, drawdown, and Sharpe rank, not return-alpha we proved isn't there.
-2. **A beta-stripped trend posture, sized for survival.** The one lead the exhaustive search surfaced is **long-short time-series momentum**: in the OOS bear leg where equal-weight buy-hold fell ~60%, the beta-stripped book stayed positive with a ~7% drawdown — the only construction that kept the book alive while the market crashed. It doesn't clear the deflated bar (so we make NO return-edge claim), but its low-drawdown shape is exactly what the Drawdown (15%) and Sharpe (10%) ranks reward. The FROZEN config (`src/infra/trading/competition/competitionStrategy.ts`) runs that TSMOM signal across the 15 tradeable instruments, sized by **`COMPETITION_RISK_SURVIVAL`** — a tight 12% vol budget, 3× leverage, −3% daily kill, all far under the §13 thresholds, the book naturally clearing the §17 ≥30-trade floor (2512 in rehearsal). This is the EVIDENCE-BASED choice: with no alpha to compound, aggressive deployment is just variance; conceding the luck-dominated return rank to bank the controllable score is the rational play.
+1. **CORE (always on) — a dollar-neutral relative-value reversion book.** This is the Best-Sharpe vehicle. A key empirical finding drove it: across TSMOM, a mean-reversion scalper, and pairs, **only the *dollar-neutral* book produced a smooth curve** — smoothness comes from neutrality, not signal type (a directional book carries beta that gets hammered on a correlated trend; tuning brackets made it *worse*). The core trades the log-ratio z-score of every within-cluster pair (10 crypto + XAU/XAG): neutral → smooth, breadth → it clears the §17 ≥30-trade floor (2083 trades in rehearsal) where a single cointegrated pair could not. Rehearsal curve: per-bar return std **9.7e-4**, max drawdown **2.1%** — the low-variance, low-DD shape the Sharpe (10%) + Drawdown (15%) ranks reward. The field is *uncontested*: ~500 entrants gambling for the return rank are tanking their own Sharpes.
+2. **SLEEVE (conditional, ring-fenced) — one late leveraged bet.** A cheap call option on the #1 return prize, deployed ONLY when tournament theory says swing: **post-cut AND lagging** (the `max_variance` stance from the rank tracker), sized so its worst case **cannot** red-line the core or disqualify the Sharpe prize. Three independent gates must all open (post-cut, max-variance, liquidation-safe).
 
-And the **rigor of the search is itself the edge**: a walk-forward, deflated-Sharpe, multiple-testing-corrected harness that refuses to launder noise into a "winner" — plus the one genuine data advantage, since the organisers provide **no crypto backtest data**, so our self-scraped **3-year multi-regime Binance history** (18 symbols × M15/1h/1d) is coverage most entrants won't have.
+3. **Survival / no-blow-up sizing under both.** `sizeCompetitionTrade`'s min-of-caps (§2.1) + `COMPETITION_RISK_SURVIVAL` (12% vol, 3× leverage, −3% kill, all far under the §13 thresholds) means a losing streak cannot cause ruin. Forced liquidation = instant elimination (§14); a book that *cannot* wipe out has a ranking edge by construction.
 
-**The thesis:** in a no-commission, luck-dominated return tournament, the defensible edges are **disciplined survival + a beta-stripped low-drawdown book + the governance/measurement architecture** — and that **honesty and rigor IS the technology story**, which is exactly what the Best Technology axis rewards.
+And the **rigor of the search is itself the edge**: a 64-core parallel, walk-forward, deflated-Sharpe, multiple-testing-corrected harness that refuses to launder noise into a "winner" — plus the one genuine data advantage, since the organisers provide **no crypto backtest data**, so our self-scraped **multi-year Binance history** (55 symbols × M15/1h/1d) is coverage most entrants won't have.
+
+### 4.5 Express AND protect alpha — execution fidelity as machinery
+
+The competition tests not just *finding* alpha but **expressing and protecting it with execution fidelity** — and this is where Gordon is strongest, precisely because we proved there's no alpha to find, so the protection layer *is* the product. Four institution-grade pieces, all pure + tested:
+
+- **Ring-fence accounting** (`ringFence.ts`) — carves the lottery-sleeve reserve off the core; a sleeve blow-up provably leaves the core's smooth curve intact (the survival test confirms losing the *entire* sleeve never breaches the red-line).
+- **Liquidation-distance guard** (`liquidationGuard.ts`) — a first-passage model of P(forced-liquidation before the deadline); `maxSafeLeverage` sizes any bet right at the survival edge. (It quantifies the trap concretely: 30× over 100 bars at 1% bar-vol ≈ **74%** liquidation probability — why naive max-leverage eliminates most of the field.)
+- **Rank tracker** (`rankTracker.ts`) — estimates live standing and emits the bang-bang stance that times the core→sleeve flip, with the Top-100-cut gate.
+- **Path-risk Monte Carlo** (`pathRiskMonteCarlo.ts`) — *"a backtest is one path; we read 10,000."* Block-bootstrap (preserves vol clustering) + GARCH(1,1) resampling, not the vanilla shuffle that under-states tail risk. Over the Best-Sharpe core it quantified the honest tail: a naive IID MC reports a 17% 95th-pct drawdown; the realistic clustering-aware model reports **23%** (1.37× wider). We size for the 5th-percentile path, not the median — the discipline a quant desk uses to decide *trade-it-or-not*.
+
+**The thesis (which the organisers themselves stated):** *"technology should no longer be a privilege reserved for firms like Citadel or Jane Street."* Gordon is exactly that — institution-grade survival, risk-path, and governance machinery in the hands of a single operator. In a no-commission, luck-dominated return tournament, **disciplined neutral construction + survival + the governance/measurement architecture are the defensible edges**, and **honesty + rigor IS the technology story** the Best Technology axis rewards.
 
 ---
 
@@ -195,16 +206,24 @@ bun run scripts/research/portfolio-tsmom-scan.ts     # portfolio time-series mom
 bun run scripts/dev/momq-edge-validate.ts            # naive TA / momentum
 bun run scripts/dev/momq-imbalance-validate.ts       # L2 imbalance (FX depth is static)
 
-# 4. The live-trader REHEARSAL — drive the REAL CompetitionLiveTrader loop end-to-end
-#    over replayed M15 bars (ReplayMt5 stands in for the sidecar) with the FROZEN config
-#    (TSMOM + survive-and-rank preset). Exercises sizing → lot-rounding → order-shape →
-#    daily-loss-kill on the live path. Proven: 2879 cycles, 2512 orders, no crash, ≥30 trades.
+# 4. The Best-Sharpe CORE — dollar-neutral relative-value reversion book.
+#    Smooth, low-DD, ≥30 trades (the curve the Sharpe + Drawdown ranks reward).
+bun run scripts/competition/rv-reversion-rehearsal.ts
+
+# 5. PROTECT alpha — path-risk Monte Carlo (block bootstrap + GARCH, not vanilla shuffle).
+#    10,000 resampled paths → the 5th-percentile drawdown the median backtest hides.
+bun run scripts/competition/path-risk.ts
+
+# 6. The live-trader REHEARSAL — drive the REAL CompetitionLiveTrader loop end-to-end over
+#    replayed M15 bars (ReplayMt5 stands in for the sidecar). Exercises sizing → lot-rounding
+#    → order-shape → daily-loss-kill on the live path. Proven: no crash, ≥30 trades.
 bun run scripts/competition/rehearsal.ts
 
-# 5. The live runner in DRY mode — GORDON_LIVE_TRADING UNSET.
+# 7. The live runner in DRY mode — GORDON_LIVE_TRADING UNSET.
 #    Connects to the real bridge, sizes every cycle through the FROZEN COMPETITION_RISK
-#    (survive-and-rank) preset, logs intended (dry) orders, submits nothing. This is the
-#    EXACT go-live process — same strategy module the rehearsal uses — minus the two guards.
+#    (survive-and-rank) preset, logs intended (dry) orders, submits nothing — the exact
+#    go-live process minus the two guards. (Strategy module: the barbell core is wired in
+#    at go-live; the runner currently drives the single-leg path for bridge validation.)
 bun run scripts/competition/live-runner.ts
 ```
 
@@ -212,7 +231,8 @@ bun run scripts/competition/live-runner.ts
 
 1. **The money-gate:** submit an oversized / over-leveraged order → the 15-dim risk classifier **blocks** it before it reaches the venue, and the sidecar `order_check`s rather than fires.
 2. **The dry-run truth:** step 3 above — show every signal family failing OOS after costs, and the **systematic walk-forward sweep returning 0/620 past the deflated-Sharpe bar**, all scored on the *exact* competition metric under taker execution.
-3. **The audit + observability:** show the signed audit log capturing rationale, and the same run's spans landing in Logfire (`LOGFIRE_TOKEN` set).
+3. **Express AND protect:** steps 4–5 — the dollar-neutral Best-Sharpe core's *smooth* curve (≥30 trades, 2.1% DD), then the path-risk Monte Carlo showing the realistic 5th-percentile drawdown (23% vs the naive 17%) we size against. This is "execution fidelity" as machinery — the exact dimension the organisers said they're judging.
+4. **The audit + observability:** show the signed audit log capturing rationale, and the same run's spans landing in Logfire (`LOGFIRE_TOKEN` set).
 
 ---
 
@@ -228,7 +248,11 @@ bun run scripts/competition/live-runner.ts
 | `src/infra/broker/mt5/` | typed bridge client + adapter |
 | `src/core/risk-management/competition-scoring.ts` | exact §11–17 objective function (16 tests) |
 | `src/core/risk-management/competition-risk-preset.ts` | survive-and-rank sizer (`COMPETITION_RISK_SURVIVAL`) |
-| `src/infra/trading/competition/competitionStrategy.ts` | FROZEN config — TSMOM signal + universe + preset (rehearsal == live) |
+| `src/infra/trading/competition/barbellStrategy.ts` | top-level barbell decision (neutral core + ring-fenced sleeve) |
+| `src/infra/trading/competition/pairsCompetitionStrategy.ts` + `meanReversionScalper.ts` | the Best-Sharpe core engines (dollar-neutral) |
+| `src/infra/trading/quant/{pairsSystem,johansen,ouCalibration,cointegrationMonitor,kalmanHedgeRatio}.ts` | the 5-layer cointegration system |
+| `src/infra/trading/competition/{ringFence,liquidationGuard,rankTracker,inverseVolSizer}.ts` | execution-fidelity / protect-alpha machinery |
+| `src/infra/trading/quant/pathRiskMonteCarlo.ts` | path-risk MC (block bootstrap + GARCH; 5th-pct path) |
 | `src/backtest/competition-dry-run.ts` | cost-honest taker money-path simulator (FOK/IOC, no commission) |
 | `src/core/alpha/` | candidate signal primitives (reversal, cross-sectional, factor model) |
 | `scripts/dev/momq-*.ts` | the IS/OOS, after-costs signal validators (the receipts) |
@@ -260,10 +284,10 @@ The full 24/7 live-week runbook (topology, the double guard, start sequence, kil
 - **We encoded the EXACT published objective function** (`competition-scoring.ts`, §11–17, 16 tests) and validated every candidate **against it**, not a proxy.
 - **Across naive TA, momentum, reversal (time-series AND cross-sectional), the Q-7 factors, order-book imbalance, and microstructure order-flow, NO signal showed a stable edge after costs** — the signs flipped between in-sample and out-of-sample. (One month + one IS/OOS split is indicative, not conclusive — but it is enough to refuse to deploy a signal we can't measure.)
 - So we built toward what *is* consistent and measurable:
-  - **Survival / no-blow-up sizing** — min-of-caps so a losing streak can't cause ruin; forced liquidation is instant elimination, so not-wiping-out is itself a ranking edge in a no-commission, high-leverage variance contest.
-  - **Search rigor as the edge** — a walk-forward, deflated-Sharpe, multiple-testing-corrected harness that returns *0/620* rather than launder noise; plus self-scraped 3-year multi-regime crypto history (the organisers provide none).
-  - **A beta-stripped trend posture, survival-sized** — long-short TSMOM (the one lead from the search) across the 15 tradeable instruments, sized by `COMPETITION_RISK_SURVIVAL` (12% vol, 3× lev, −3% kill), all far under the §13 thresholds.
-- **The conclusion:** in a likely luck-dominated return tournament, the defensible edges are **disciplined execution + survival + the governance architecture** — and the honesty/rigor of *measuring that* is the technology story.
+  - **A barbell, chosen by tournament theory** — a dollar-neutral relative-value reversion CORE (the uncontested Best-Sharpe vehicle: smooth curve, 2.1% rehearsal DD, ≥30 trades) + a ring-fenced, liquidation-bounded lottery SLEEVE deployed only post-cut-and-lagging. The dominated middle is avoided by design.
+  - **Express AND protect alpha as machinery** — ring-fence accounting, a first-passage liquidation guard, a bang-bang rank tracker, and a block-bootstrap+GARCH path-risk Monte Carlo (the realistic 95th-pct drawdown is 23%, 1.37× the naive IID number — we size for the 5th-percentile path).
+  - **Search rigor as the edge** — a 64-core parallel, walk-forward, deflated-Sharpe, multiple-testing-corrected harness that returns *0/620* (and 0/2080 on the broad universe) rather than launder noise; plus self-scraped multi-year crypto history (the organisers provide none).
+- **The conclusion:** in a likely luck-dominated return tournament, the defensible edges are **disciplined neutral construction + survival + the governance/measurement architecture** — institution-grade machinery in a single operator's hands, which is exactly the *"technology should no longer be a privilege reserved for Citadel or Jane Street"* mandate the organisers set, and the honesty/rigor of *measuring that* is the technology story.
 
 ---
 
