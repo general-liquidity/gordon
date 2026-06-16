@@ -45,7 +45,13 @@ import {
   type SignalFn,
   type ContractSpec,
 } from "../../src/infra/trading/competition/liveTrader.ts";
-import { COMPETITION_RISK_AGGRESSIVE } from "../../src/core/risk-management/competition-risk-preset.ts";
+import { type CompetitionRiskParams } from "../../src/core/risk-management/competition-risk-preset.ts";
+import {
+  makeTsmomSignal,
+  COMPETITION_TRADEABLE,
+  COMPETITION_LIVE_CONFIG,
+  COMPETITION_RISK,
+} from "../../src/infra/trading/competition/competitionStrategy.ts";
 import {
   computeNonAnnualizedSharpe,
   computeReturn,
@@ -330,7 +336,7 @@ export function loadBars(symbol: string): Mt5Bar[] {
  * synthetic quote is sane without dominating PnL.
  */
 export function specFor(symbol: string, samplePrice: number): { contract: ContractSpec; halfSpread: number } {
-  const isCrypto = /BTC|ETH|SOL|BAR/.test(symbol);
+  const isCrypto = /BTC|ETH|SOL|XRP|BAR/.test(symbol);
   const contractSize = isCrypto ? 1 : 100_000;
   const halfSpreadBps = isCrypto ? 5 : 1; // 5bps crypto, 1bp FX, one-sided
   return {
@@ -386,14 +392,22 @@ export interface RehearsalOptions {
   maxCycles?: number;
   barsLookback?: number;
   execution?: "maker" | "taker";
+  /** Strategy to rehearse. Defaults to the FROZEN competition TSMOM signal. */
+  signal?: SignalFn;
+  /** Risk preset. Defaults to the FROZEN COMPETITION_RISK (survive-and-rank). */
+  riskParams?: CompetitionRiskParams;
   log?: (msg: string) => void;
 }
 
 export async function runRehearsal(opts: RehearsalOptions = {}): Promise<RehearsalResult> {
-  const symbols = opts.symbols ?? ["EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
+  // Default to the FROZEN competition config so the rehearsal exercises exactly what
+  // goes live: the 15 tradeable instruments, the TSMOM signal, the survival preset.
+  const symbols = opts.symbols ?? [...COMPETITION_TRADEABLE];
   const startingEquity = opts.startingEquity ?? 1_000_000;
-  const barsLookback = opts.barsLookback ?? 50;
-  const execution = opts.execution ?? "taker";
+  const barsLookback = opts.barsLookback ?? COMPETITION_LIVE_CONFIG.barsLookback;
+  const execution = opts.execution ?? COMPETITION_LIVE_CONFIG.execution;
+  const stratSignal = opts.signal ?? makeTsmomSignal();
+  const riskParams = opts.riskParams ?? COMPETITION_RISK;
   const log = opts.log ?? (() => {});
 
   // Arm gate 1 so the trader places orders against the REPLAY bridge.
@@ -410,7 +424,7 @@ export async function runRehearsal(opts: RehearsalOptions = {}): Promise<Rehears
     const { contract, halfSpread } = specFor(symbol, samplePrice);
     replaySymbols.push({ symbol, bars, contractSize: contract.contractSize ?? 1, halfSpread });
     contracts[symbol] = contract;
-    signals[symbol] = meanReversionSignal;
+    signals[symbol] = stratSignal;
   }
 
   const replay = new ReplayMt5({ startingEquity, symbols: replaySymbols });
@@ -420,8 +434,13 @@ export async function runRehearsal(opts: RehearsalOptions = {}): Promise<Rehears
     symbols: replaySymbols.map((s) => s.symbol),
     signals,
     contracts,
-    config: { execution, barsLookback, dailyLossKillPct: 0.08, timeframe: "M15" },
-    riskParams: COMPETITION_RISK_AGGRESSIVE,
+    config: {
+      execution,
+      barsLookback,
+      dailyLossKillPct: COMPETITION_LIVE_CONFIG.dailyLossKillPct,
+      timeframe: "M15",
+    },
+    riskParams,
     log: () => {}, // keep the trader quiet; we summarize at the rehearsal level
   });
 
@@ -486,7 +505,7 @@ export async function runRehearsal(opts: RehearsalOptions = {}): Promise<Rehears
 // ---------------------------------------------------------------------------
 
 if (import.meta.main) {
-  const symbols = (process.env.REHEARSAL_SYMBOLS ?? "EURUSD,GBPUSD,USDJPY,BTCUSD")
+  const symbols = (process.env.REHEARSAL_SYMBOLS ?? COMPETITION_TRADEABLE.join(","))
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);

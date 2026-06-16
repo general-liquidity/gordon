@@ -64,6 +64,29 @@ export const COMPETITION_RISK_AGGRESSIVE: CompetitionRiskParams = {
   fractionalKelly: 0.4,
 };
 
+/**
+ * "Survive-and-rank" posture — the EVIDENCE-BASED default (operator-chosen
+ * 2026-06-16, after the exhaustive alpha search returned no edge that clears the
+ * deflated-Sharpe bar in ANY strategy class). With no return alpha to compound,
+ * aggressive deployment just amplifies variance (worse drawdown rank, higher
+ * forced-liquidation risk). So this CONCEDES the luck-dominated 70% return rank
+ * and instead maximizes the CONTROLLABLE score: a tight vol budget for a smooth
+ * equity curve (Sharpe rank 10% + the §17 Best-Sharpe Award), a low daily-loss
+ * kill far from the §14 red-line (Drawdown rank 15% + survival), and a wide,
+ * diversified book of many small vol-targeted positions. Pairs naturally with a
+ * beta-stripped time-series-momentum signal: in a broad selloff the down-trending
+ * legs go short, so the book doesn't bleed with the market. Every ceiling sits far
+ * under the §13 discipline thresholds (leverage 28x / margin 90% / single 90%).
+ */
+export const COMPETITION_RISK_SURVIVAL: CompetitionRiskParams = {
+  maxRiskPerTradePct: 0.005, // 0.5% per trade — survive a long losing streak
+  maxLeverage: 3, // modest per-position cap → forces a wide, diversified book
+  volTargetAnnual: 0.12, // tight vol budget → smooth curve = low DD + high Sharpe rank
+  dailyLossKillPct: 0.03, // stop the day at −3% — protect the drawdown rank, far from forced-liq
+  maxConcurrentExposurePct: 3, // ~3x gross across the 15-instrument book (well under 28x)
+  fractionalKelly: 0.25,
+};
+
 export interface CompetitionTradeInput {
   equity: number;
   price: number;

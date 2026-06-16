@@ -5,12 +5,12 @@
  *
  *   bun run scripts/competition/live-runner.ts
  *
- * Config via env:
- *   COMP_SYMBOLS      comma list (default "XAUUSD,EURUSD")
+ * Config via env (defaults = the FROZEN competition config):
+ *   COMP_SYMBOLS      comma list (default = the 15 tradeable instruments)
  *   COMP_INTERVAL_MS  cycle cadence in ms (default 60000)
- *   COMP_EXECUTION    "maker" | "taker" (default "taker")
- *   COMP_BARS         bars lookback (default 50)
- *   COMP_KILL_PCT     daily-loss kill fraction (default 0.08)
+ *   COMP_EXECUTION    "maker" | "taker" (default "taker" — Cypher is FOK/IOC)
+ *   COMP_BARS         bars lookback (default from the frozen config)
+ *   COMP_KILL_PCT     daily-loss kill fraction (default from the frozen survival preset)
  *   COMP_TIMEFRAME    MT5 timeframe (default "M15")
  *
  * DOUBLE SAFETY GUARD — both must be set for a real order to fill:
@@ -18,21 +18,24 @@
  *   MT5_BRIDGE_ALLOW_TRADING=1 (the sidecar; checked in mt5_bridge.py)
  * Unset either ⇒ the loop runs read-only and logs intended (dry) orders.
  *
- * NOTE: the strategy here is the regime-adaptive DEFAULT — mean-revert in chop,
- * momentum in trend (see `src/core/alpha/regime-adaptive-strategy.ts`). It is the
- * honest best-available posture, NOT a proven edge: its value is robustness across
- * regimes + not taking the structurally wrong bet, not demonstrated alpha. Swap the
- * SignalFn to plug in something better.
+ * Strategy = the FROZEN beta-stripped TSMOM + survive-and-rank preset
+ * (`src/infra/trading/competition/competitionStrategy.ts`) — IDENTICAL to what the
+ * paper-mode rehearsal exercises. NOT a proven return edge; its value is low drawdown
+ * + a smooth equity curve, which is what the Drawdown/Sharpe ranks reward.
  */
 
-import { Mt5BridgeClient, type Mt5Bar } from "../../src/infra/broker/mt5/bridgeClient.ts";
+import { Mt5BridgeClient } from "../../src/infra/broker/mt5/bridgeClient.ts";
 import {
   CompetitionLiveTrader,
   type SignalFn,
   type ContractSpec,
 } from "../../src/infra/trading/competition/liveTrader.ts";
-import { COMPETITION_RISK_AGGRESSIVE } from "../../src/core/risk-management/competition-risk-preset.ts";
-import { regimeAdaptiveSignal } from "../../src/core/alpha/regime-adaptive-strategy.ts";
+import {
+  makeTsmomSignal,
+  COMPETITION_TRADEABLE,
+  COMPETITION_LIVE_CONFIG,
+  COMPETITION_RISK,
+} from "../../src/infra/trading/competition/competitionStrategy.ts";
 
 function envNum(name: string, fallback: number): number {
   const v = process.env[name];
@@ -40,24 +43,18 @@ function envNum(name: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-const symbols = (process.env.COMP_SYMBOLS ?? "XAUUSD,EURUSD")
+const symbols = (process.env.COMP_SYMBOLS ?? COMPETITION_TRADEABLE.join(","))
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
 const intervalMs = envNum("COMP_INTERVAL_MS", 60_000);
 const execution = (process.env.COMP_EXECUTION === "maker" ? "maker" : "taker") as "maker" | "taker";
-const barsLookback = envNum("COMP_BARS", 50);
-const dailyLossKillPct = envNum("COMP_KILL_PCT", 0.08);
+const barsLookback = envNum("COMP_BARS", COMPETITION_LIVE_CONFIG.barsLookback);
+const dailyLossKillPct = envNum("COMP_KILL_PCT", COMPETITION_LIVE_CONFIG.dailyLossKillPct);
 const timeframe = process.env.COMP_TIMEFRAME ?? "M15";
 
-/**
- * Regime-adaptive DEFAULT: classify the recent regime (efficiency ratio) and pick
- * the regime-appropriate signal — mean-revert in chop, momentum breakout in trend.
- * Honest best-available, NOT a proven edge (see the module header). Same vol-scaled
- * stop/target shape the dry-run/sizing spine expects.
- */
-const regimeAdaptive: SignalFn = (bars: Mt5Bar[]) =>
-  regimeAdaptiveSignal(bars.map((b) => b.close));
+/** The frozen beta-stripped time-series-momentum signal (one instance, all symbols). */
+const tsmom: SignalFn = makeTsmomSignal();
 
 const client = new Mt5BridgeClient();
 
@@ -80,7 +77,7 @@ async function bootstrap(): Promise<void> {
       volume_step: spec.volume_step,
       contractSize: spec.trade_contract_size,
     };
-    signals[symbol] = regimeAdaptive;
+    signals[symbol] = tsmom;
     console.log(`  ${symbol}: min ${spec.volume_min} / step ${spec.volume_step} lots, contract ${spec.trade_contract_size}`);
   }
 
@@ -96,7 +93,7 @@ async function bootstrap(): Promise<void> {
     signals,
     contracts,
     config: { execution, barsLookback, dailyLossKillPct, timeframe },
-    riskParams: COMPETITION_RISK_AGGRESSIVE,
+    riskParams: COMPETITION_RISK,
   });
 
   trader.runLoop(intervalMs, {
