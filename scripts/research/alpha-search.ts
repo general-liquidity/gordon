@@ -44,6 +44,10 @@ const BARS_DIR = join(process.cwd(), process.env.ALPHA_BARS_DIR ?? join("data", 
 const L2_DIR = join(DATA_DIR, "l2");
 const MANIFEST = join(DATA_DIR, "manifest.json");
 const TF = process.env.ALPHA_TF ?? "M15"; // bar-file suffix: M15 | 1h | 1d.
+// Cypher (Model to Market) is FOK/IOC-only with NO commission — you cannot rest a
+// resting limit, so there is no maker fill and no rebate: execution is TAKER-only
+// (cost = the spread you cross). Default taker; override for Gordon's non-Cypher use.
+const EXEC: "taker" | "maker" = process.env.ALPHA_EXEC === "maker" ? "maker" : "taker";
 
 const STARTING_EQUITY = 100_000;
 const EXTRA_COST_BPS = 1; // +1bps slippage on top of the per-instrument median spread.
@@ -196,7 +200,7 @@ function scoreSegment(
     bars,
     signal,
     startingEquity: STARTING_EQUITY,
-    execution: "maker",
+    execution: EXEC,
     costs: { spreadBps, slippageBps: EXTRA_COST_BPS },
     periodsPerYear: PERIODS_PER_YEAR,
   });

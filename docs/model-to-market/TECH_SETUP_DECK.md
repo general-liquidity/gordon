@@ -101,18 +101,15 @@ Final Score = 0.70·ReturnRank + 0.15·DrawdownRank + 0.10·SharpeRank + 0.05·R
 
 …including the non-annualized 15-minute Sharpe, the **<8-observation Sharpe cap at 50**, the §13 risk-discipline penalties, the §14 red-line DQ, the §16 tie-breakers, and the §17 Best Sharpe Award eligibility (`selectBestSharpeAward`). 16 tests. We optimize against the *true* objective, not a proxy.
 
-### 4.2 A cost-honest dry-run with taker AND maker execution
+### 4.2 A cost-honest, platform-accurate dry-run
 
-`src/backtest/competition-dry-run.ts` is the keystone rehearsal — the full money-path (signal → `sizeCompetitionTrade` → fills → stop/target → daily-loss-kill + exposure-cap → equity curve → judged metrics), pure and deterministic. It models the competition's *exact* friction: **NO commission, NO swap — only spread + slippage + market impact** (§5). It supports both:
+`src/backtest/competition-dry-run.ts` is the keystone rehearsal — the full money-path (signal → `sizeCompetitionTrade` → fills → stop/target → daily-loss-kill + exposure-cap → equity curve → judged metrics), pure and deterministic. It models the competition's *exact* friction as confirmed by the organisers at the kickoff: **NO commission, NO swap** — the only execution cost is the **bid-ask spread you cross** (+ slippage).
 
-- **taker** — crosses the spread, pays half-spread + slippage on every fill;
-- **maker** — rests a limit, **earns** the half-spread rebate (net cost can go negative) but is not guaranteed to fill; tracks `makerFillRate` and an expiry budget.
-
-This dual-mode model is what makes the maker finding in §4.3 measurable rather than asserted.
+Crucially, Cypher exposes **only FOK / IOC order types** — both immediate-or-cancel and marketable. There are **no resting limit orders**, so there is no passive/maker fill and no rebate to earn: every fill is a **taker** that crosses the spread. We model exactly that, and reject the tempting-but-impossible "rest a limit and earn the half-spread" trick that the platform simply does not allow. Honest cost model in, honest verdict out.
 
 ### 4.3 The honest empirical finding — *no signal showed a stable edge after costs*
 
-We tested every transparent, parameter-light signal family we could against the **real Model to Market bars** through the cost-honest dry-run, IS 70% / OOS 30%, in both taker and maker, after costs. The families and their validators:
+We tested every transparent, parameter-light signal family we could against the **real Model to Market bars** through the cost-honest dry-run under **taker execution** (the only Cypher-executable mode), IS 70% / OOS 30%, after costs — and, going further, swept the full signal library × param grid × instrument through a **walk-forward harness ranked with deflated-Sharpe / PSR multiple-testing correction** (`scripts/research/alpha-search.ts`). The families and their validators:
 
 | Signal family | Validator | OOS-after-costs verdict |
 |---|---|---|
@@ -121,8 +118,9 @@ We tested every transparent, parameter-light signal family we could against the 
 | Reversal — time-series (per-symbol z-band) | `momq-reversal-validate.ts` | failed OOS across lookbacks {7,14,21} |
 | Reversal — cross-sectional (rank, long losers/short winners) | `momq-cross-sectional-validate.ts` | IC did not hold OOS |
 | Q-7 factor composite (reversal + residual-vol; + funding on crypto) | `momq-factor-validate.ts`, `momq-crypto-q7-validate.ts` | IC not OOS-stable |
-| L2 order-book imbalance | `momq-imbalance-validate.ts` | no edge after costs |
-| Microstructure order-flow pressure | `momq-microstructure-validate.ts` | no edge after costs |
+| L2 order-book imbalance | `momq-imbalance-validate.ts` | no edge — *and the provided historical depth is static (constant 5-level sizes), so this is un-backtestable by construction; confirmed by the organisers* |
+| Microstructure order-flow pressure | `momq-microstructure-validate.ts` | no edge after costs (same static-depth caveat) |
+| Full library × params × instruments (systematic sweep) | `scripts/research/alpha-search.ts` | **0 of 620 cells** cleared the deflated-Sharpe bar (M15); repeated on **3yr extended crypto** (1h, 1d) — same verdict |
 
 > **The honest result:** across naive TA, momentum, time-series **and** cross-sectional reversal, the Q-7 factors, order-book imbalance, and microstructure order-flow, **no signal showed a stable directional edge after costs** — the signs flipped between in-sample and out-of-sample. We are **not** claiming "my bot found alpha." We *measured*, against the competition's exact objective, that the cheap directional edges are not there in this window.
 
@@ -130,13 +128,14 @@ Candidate primitives we wired (e.g. `src/core/alpha/reversal-strategy.ts`, `cros
 
 ### 4.4 What we built *because* the signals didn't survive
 
-Three things consistently *did* hold up — and they are the technology story:
+Two things consistently *did* hold up — and with the rigor of the search itself, they are the technology story:
 
-1. **Maker execution — the one consistent, measurable effect.** In maker mode the dry-run's per-fill cost can go **negative** (`costRate < 0`): resting a limit *earns* the half-spread rebate instead of paying it. With zero commission/swap (§5), recovering the spread is a structural, repeatable effect that does not depend on predicting direction. So the default leans on **earning the spread**, not on calling the next tick.
-2. **Survival / no-blow-up sizing.** `sizeCompetitionTrade`'s min-of-caps composition (§2.1) means a losing streak cannot cause ruin. Forced liquidation = instant elimination (§14); a book that *cannot* wipe out has a ranking edge by construction in an attrition tournament.
-3. **A regime-adaptive default.** `COMPETITION_RISK_AGGRESSIVE` (`competition-risk-preset.ts`) is **diversified aggressive compounding** — many small, vol-targeted, diversified positions across the 30+ instruments rather than a few concentrated bets. This competes on return (70%) while keeping the 15-min Sharpe high and controlling drawdown. All ceilings stay under the §13 discipline thresholds (leverage < 28×, margin < 90%, single-instrument < 90%, net-directional < 95%) and the many-small-trades book naturally clears the §17 ≥30-trade floor.
+1. **Survival / no-blow-up sizing.** `sizeCompetitionTrade`'s min-of-caps composition (§2.1) means a losing streak cannot cause ruin. Forced liquidation = instant elimination (§14); a book that *cannot* wipe out has a ranking edge by construction in an attrition tournament. With **no commission** and **30:1 leverage** available to ~500 entrants, the 70%-weight return rank is a *variance contest* — the controllable edges are survival, drawdown, and Sharpe rank, not return-alpha we proved isn't there.
+2. **A regime-adaptive default.** `COMPETITION_RISK_AGGRESSIVE` (`competition-risk-preset.ts`) is **diversified aggressive compounding** — many small, vol-targeted, diversified positions across the 30+ instruments rather than a few concentrated bets. This competes on return (70%) while keeping the 15-min Sharpe high and controlling drawdown. All ceilings stay under the §13 discipline thresholds (leverage < 28×, margin < 90%, single-instrument < 90%, net-directional < 95%) and the many-small-trades book naturally clears the §17 ≥30-trade floor.
 
-**The thesis:** in a likely luck-dominated return tournament, the defensible edges are **disciplined execution + survival + the governance architecture** — and that **honesty and rigor IS the technology story**, which is exactly what the Best Technology axis rewards.
+And the **rigor of the search is itself the edge**: a walk-forward, deflated-Sharpe, multiple-testing-corrected harness that refuses to launder noise into a "winner" — plus the one genuine data advantage, since the organisers provide **no crypto backtest data**, so our self-scraped **3-year multi-regime Binance history** (18 symbols × M15/1h/1d) is coverage most entrants won't have.
+
+**The thesis:** in a no-commission, luck-dominated return tournament, the defensible edges are **disciplined survival + a regime-adaptive book + the governance/measurement architecture** — and that **honesty and rigor IS the technology story**, which is exactly what the Best Technology axis rewards.
 
 ---
 
@@ -183,14 +182,15 @@ python scripts/mt5-bridge/mt5_bridge.py
 bun run scripts/dev/mt5-smoke.ts
 
 # 3. The honest empirical finding — run the cost-honest, IS/OOS validators.
-#    Each prints per-instrument return / 15-min Sharpe / maker-vs-taker, after costs.
+#    Each prints per-instrument return / 15-min Sharpe (taker, after costs).
 bun run scripts/dev/momq-edge-validate.ts            # naive TA / momentum
 bun run scripts/dev/momq-reversal-validate.ts        # time-series reversal
 bun run scripts/dev/momq-cross-sectional-validate.ts # cross-sectional reversal
 bun run scripts/dev/momq-factor-validate.ts          # Q-7 factor IC
 bun run scripts/dev/momq-imbalance-validate.ts       # L2 order-book imbalance
 bun run scripts/dev/momq-microstructure-validate.ts  # order-flow pressure
-#    → the takeaway beat: no signal survives OOS after costs; maker recovers the spread.
+#    → the takeaway beat: no signal survives OOS after costs (taker — the only Cypher mode);
+#      0/620 cells clear the deflated-Sharpe bar in the systematic sweep.
 
 # 4. The live-trader REHEARSAL — drive the REAL CompetitionLiveTrader loop
 #    end-to-end over replayed M15 bars (ReplayMt5 stands in for the sidecar).
@@ -207,7 +207,7 @@ bun run scripts/competition/live-runner.ts
 ### Three narrative beats for a live walkthrough
 
 1. **The money-gate:** submit an oversized / over-leveraged order → the 15-dim risk classifier **blocks** it before it reaches the venue, and the sidecar `order_check`s rather than fires.
-2. **The dry-run truth:** step 3 above — show every signal family failing OOS after costs, and **maker execution** recovering the spread, all scored on the *exact* competition metric.
+2. **The dry-run truth:** step 3 above — show every signal family failing OOS after costs, and the **systematic walk-forward sweep returning 0/620 past the deflated-Sharpe bar**, all scored on the *exact* competition metric under taker execution.
 3. **The audit + observability:** show the signed audit log capturing rationale, and the same run's spans landing in Logfire (`LOGFIRE_TOKEN` set).
 
 ---
@@ -224,7 +224,7 @@ bun run scripts/competition/live-runner.ts
 | `src/infra/broker/mt5/` | typed bridge client + adapter |
 | `src/core/risk-management/competition-scoring.ts` | exact §11–17 objective function (16 tests) |
 | `src/core/risk-management/competition-risk-preset.ts` | survive-and-compound + `COMPETITION_RISK_AGGRESSIVE` sizer |
-| `src/backtest/competition-dry-run.ts` | cost-honest taker/maker money-path simulator |
+| `src/backtest/competition-dry-run.ts` | cost-honest taker money-path simulator (FOK/IOC, no commission) |
 | `src/core/alpha/` | candidate signal primitives (reversal, cross-sectional, factor model) |
 | `scripts/dev/momq-*.ts` | the IS/OOS, after-costs signal validators (the receipts) |
 | `scripts/competition/` | `rehearsal.ts` (replay live-trader) + `live-runner.ts` (real bridge) |
@@ -255,8 +255,8 @@ The full 24/7 live-week runbook (topology, the double guard, start sequence, kil
 - **We encoded the EXACT published objective function** (`competition-scoring.ts`, §11–17, 16 tests) and validated every candidate **against it**, not a proxy.
 - **Across naive TA, momentum, reversal (time-series AND cross-sectional), the Q-7 factors, order-book imbalance, and microstructure order-flow, NO signal showed a stable edge after costs** — the signs flipped between in-sample and out-of-sample. (One month + one IS/OOS split is indicative, not conclusive — but it is enough to refuse to deploy a signal we can't measure.)
 - So we built toward what *is* consistent and measurable:
-  - **Maker execution** — the one repeatable effect: recovering the spread (≈ a half-spread rebate, net cost can go negative), which doesn't require predicting direction.
-  - **Survival / no-blow-up sizing** — min-of-caps so a losing streak can't cause ruin; forced liquidation is instant elimination, so not-wiping-out is itself a ranking edge.
+  - **Survival / no-blow-up sizing** — min-of-caps so a losing streak can't cause ruin; forced liquidation is instant elimination, so not-wiping-out is itself a ranking edge in a no-commission, high-leverage variance contest.
+  - **Search rigor as the edge** — a walk-forward, deflated-Sharpe, multiple-testing-corrected harness that returns *0/620* rather than launder noise; plus self-scraped 3-year multi-regime crypto history (the organisers provide none).
   - **A regime-adaptive default** — diversified aggressive compounding: many small, vol-targeted, diversified positions, all under the §13 discipline thresholds.
 - **The conclusion:** in a likely luck-dominated return tournament, the defensible edges are **disciplined execution + survival + the governance architecture** — and the honesty/rigor of *measuring that* is the technology story.
 
