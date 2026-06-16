@@ -39,6 +39,10 @@ IN = sys.argv[1] if len(sys.argv) > 1 else "data/pricer-output-2026-05-11_2026-0
 TF = sys.argv[2] if len(sys.argv) > 2 else "15min"
 TAG = sys.argv[3] if len(sys.argv) > 3 else "M15"
 OUT = "data/momq/l2"
+# Optional comma-separated symbol filter (e.g. L2_SYMBOLS=EURUSD,XAUUSD) — skips
+# everything else. Useful to extract only the tradeable instruments and avoid the
+# heavy non-tradeable gold variants / oil.
+WANTED = {s.strip() for s in os.environ.get("L2_SYMBOLS", "").split(",") if s.strip()}
 
 LADDER_COLS = ["time", "bid", "ask", "bidprices", "bidsizes", "askprices", "asksizes"]
 
@@ -117,9 +121,12 @@ def main():
         files = [IN]
     by_sym = defaultdict(list)
     for f in files:
-        by_sym[symbol_of(f)].append(f)
+        sym = symbol_of(f)
+        if WANTED and sym not in WANTED:
+            continue
+        by_sym[sym].append(f)
 
-    print(f"L2 features: {len(files)} files / {len(by_sym)} symbols → {OUT} ({TAG})", flush=True)
+    print(f"L2 features: {len(by_sym)} symbols{' (filtered)' if WANTED else ''} → {OUT} ({TAG})", flush=True)
     for sym, fs in sorted(by_sym.items()):
         rows = []
         for f in sorted(fs):
