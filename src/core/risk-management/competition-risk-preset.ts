@@ -39,6 +39,31 @@ export const COMPETITION_RISK_DEFAULTS: CompetitionRiskParams = {
   fractionalKelly: 0.25,
 };
 
+/**
+ * "Go for 1st" posture — DIVERSIFIED AGGRESSIVE COMPOUNDING (operator-chosen
+ * 2026-06-16). The official score is 70% return-rank, so this seeks return, but
+ * makes the return come from a HIGH-SHARPE engine: many small, vol-targeted,
+ * diversified positions compounded at leverage — NOT a few big directional bets.
+ * That competes for 1st while keeping the 15-min Sharpe rank high (a smooth
+ * equity curve) and never concentrating enough to risk forced liquidation
+ * (instant elimination). Every ceiling sits well under the Section-13 discipline
+ * penalties (leverage 28x / margin 90% / single-instrument 90% / net-dir 95%).
+ *
+ * STARTING calibration — tune against the official objective via
+ * `runCompetitionDryRun` once contest historical data lands. The per-position
+ * `maxLeverage` is deliberately modest to force the book wide (diversification
+ * drives the Sharpe); `maxConcurrentExposurePct` (gross, >1 here) sets the
+ * aggregate deployment.
+ */
+export const COMPETITION_RISK_AGGRESSIVE: CompetitionRiskParams = {
+  maxRiskPerTradePct: 0.015,
+  maxLeverage: 6, // per-position cap → forces a wide, diversified book
+  volTargetAnnual: 0.35,
+  dailyLossKillPct: 0.08, // round drawdown guard — protect drawdown rank + avoid forced-liq
+  maxConcurrentExposurePct: 10, // ~10x gross deployed across many instruments (well under 28x)
+  fractionalKelly: 0.4,
+};
+
 export interface CompetitionTradeInput {
   equity: number;
   price: number;

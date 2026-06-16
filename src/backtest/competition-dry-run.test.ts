@@ -98,6 +98,21 @@ describe("runCompetitionDryRun — money-path spine", () => {
     expect(r.tradeCount).toBeGreaterThan(5);
   });
 
+  it("reports the official competition metrics (return, drawdown, non-annualized 15-min Sharpe)", () => {
+    const prices = Array.from({ length: 60 }, (_, i) => 100 + i);
+    const r = runCompetitionDryRun({
+      bars: series("XAUUSD", prices, 15 * 60_000, 0.1), // 15-min bars = the official Sharpe interval
+      signal: (): DryRunSignal => ({ side: "long", stopDistance: 2, targetDistance: 1 }),
+      startingEquity: START,
+      periodsPerYear: 252,
+    });
+    // Return off the starting equity, max drawdown, and a non-annualized 15-min Sharpe.
+    expect(r.competition.returnPct).toBeCloseTo(r.finalEquity / START - 1, 9);
+    expect(r.competition.maxDrawdownPct).toBeGreaterThanOrEqual(0);
+    expect(r.competition.sharpe15mObs).toBe(r.equityCurve.length - 1);
+    expect(Number.isFinite(r.competition.sharpe15m)).toBe(true);
+  });
+
   it("Sharpe uses the supplied annualization (FX 252 ≠ crypto 365 on the same path)", () => {
     const prices = Array.from({ length: 60 }, (_, i) => 100 + i);
     const mk = (ppy: number) =>

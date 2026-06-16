@@ -20,6 +20,11 @@ import {
   type CompetitionRiskParams,
 } from "../core/risk-management/competition-risk-preset.ts";
 import type { BindingConstraint } from "../core/risk-management/competition-risk-preset.ts";
+import {
+  computeReturn,
+  computeMaxDrawdown,
+  computeNonAnnualizedSharpe,
+} from "../core/risk-management/competition-scoring.ts";
 import type { EquityPoint } from "./types.ts";
 import {
   calculateSharpeRatio,
@@ -115,6 +120,16 @@ export interface CompetitionDryRunReport {
   bindingHistogram: Record<BindingConstraint, number>;
   trades: DryRunTrade[];
   equityCurve: EquityPoint[];
+  /** The metrics scored exactly as the competition scores them (Section 12). Only
+   *  meaningful when the bars are 15-minute (the official Sharpe interval). */
+  competition: {
+    returnPct: number;
+    maxDrawdownPct: number;
+    /** Non-annualized Mean/Std of consecutive-bar equity returns (the judged Sharpe). */
+    sharpe15m: number;
+    /** Valid interval returns — Sharpe Rank caps at 50 below 8 (Section 12.5). */
+    sharpe15mObs: number;
+  };
 }
 
 const dayKey = (msEpoch: number): number => Math.floor(msEpoch / 86_400_000);
@@ -309,10 +324,19 @@ export function runCompetitionDryRun(input: CompetitionDryRunInput): Competition
 
   const wins = trades.filter((t) => t.pnl > 0).length;
 
+  const equityValues = equityCurve.map((p) => p.equity);
+  const compSharpe = computeNonAnnualizedSharpe(equityValues);
+
   return {
     startingEquity,
     finalEquity,
     totalReturnPct: startingEquity > 0 ? (finalEquity / startingEquity - 1) : 0,
+    competition: {
+      returnPct: computeReturn(finalEquity, startingEquity),
+      maxDrawdownPct: computeMaxDrawdown(equityValues),
+      sharpe15m: compSharpe.sharpe,
+      sharpe15mObs: compSharpe.nObs,
+    },
     sharpe: calculateSharpeRatio(barReturns, riskFreeRate, periodsPerYear),
     sortino: calculateSortinoRatio(barReturns, riskFreeRate, periodsPerYear),
     annualizedVol: calculateVolatility(barReturns, periodsPerYear),
