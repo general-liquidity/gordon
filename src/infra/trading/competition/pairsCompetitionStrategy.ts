@@ -79,7 +79,10 @@ export const PAIRS_COMPETITION_CONFIG: PairsCompetitionConfig = {
   perPairFraction: 0.05,
   desiredEntryZ: 2.0,
   costBps: 5,
-  kalmanDelta: 1e-5,
+  // 1e-7 (not 1e-5): a faster delta whitens a stable structural spread and collapses
+  // its half-life below the tradeable floor (verified — 1e-5 → HL 1.34 rejected, 1e-7 →
+  // HL 3.31 selected). Matches the validated value in pairsSystem.test + the backtest.
+  kalmanDelta: 1e-7,
   minObs: 200,
   timeframe: "M15",
 };
