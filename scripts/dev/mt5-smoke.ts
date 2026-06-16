@@ -56,9 +56,13 @@ async function main(): Promise<void> {
     return null;
   });
   if (depth) {
-    console.log("✓ depth (L2)");
-    line("top bid", depth.bids[0]);
-    line("top ask", depth.asks[0]);
+    if (depth.bids.length || depth.asks.length) {
+      console.log("✓ depth (L2)");
+      line("top bid", depth.bids[0]);
+      line("top ask", depth.asks[0]);
+    } else {
+      console.log("✓ depth (L2) — empty (broker not publishing MT5 DOM for this symbol yet)");
+    }
   }
 
   const bars = await client.bars({ symbol, timeframe: "M15", count: 5 });

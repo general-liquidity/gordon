@@ -143,10 +143,18 @@ def quote(symbol):
 
 
 def depth(symbol):
+    mt5.symbol_select(symbol, True)
     if not mt5.market_book_add(symbol):
         raise BridgeError(f"market_book_add('{symbol}') failed — {_last_error()}", 503)
     try:
+        # The DOM can take a moment to populate after subscribing; poll briefly.
+        # If the broker doesn't publish L2 for this symbol it just stays empty.
         book = mt5.market_book_get(symbol)
+        for _ in range(10):
+            if book:
+                break
+            time.sleep(0.1)
+            book = mt5.market_book_get(symbol)
     finally:
         mt5.market_book_release(symbol)
     bids, asks = [], []
