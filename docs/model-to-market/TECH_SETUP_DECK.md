@@ -148,6 +148,14 @@ The competition tests not just *finding* alpha but **expressing and protecting i
 
 **The thesis (which the organisers themselves stated):** *"technology should no longer be a privilege reserved for firms like Citadel or Jane Street."* Gordon is exactly that — institution-grade survival, risk-path, and governance machinery in the hands of a single operator. In a no-commission, luck-dominated return tournament, **disciplined neutral construction + survival + the governance/measurement architecture are the defensible edges**, and **honesty + rigor IS the technology story** the Best Technology axis rewards.
 
+### 4.6 Why protection beats brute-force optimization (the multiple-testing correction)
+
+The modal serious entrant runs a massive parameter optimization — hundreds of millions of backtest permutations, pruned to tens of thousands by a genetic algorithm — and deploys the best-scoring configuration. This is the dominant failure mode in quant, and the genetic algorithm makes it *worse*, not better: it reduces *compute* but is *maximal selection bias* — it explicitly searches for the best-of-N, and **walk-forward reduces look-ahead but does NOT correct for having tried N strategies.** Select the best of 300M and you are, with near-certainty, fitting the noise of one history.
+
+Gordon's research applies the correction the brute force omits: the **deflated Sharpe ratio** (Bailey–López de Prado) raises the significance bar by the *number of trials*, so a candidate must beat the expected-maximum Sharpe under the null *given how many were tested*. The asymmetry is the whole point — **more permutations make the honest bar HIGHER, not the edge easier to find.** We swept the signal library × params × instruments and the bar returned **0 of 620 (and 0 of 2,080 on the broad universe)**. The brute-force optimizer running the same data clears its (uncorrected) bar every time — and ships an overfit.
+
+So our headline result is a *refusal*: we measured that the cheap directional edges are not there, and built the protection layer instead of laundering noise into a "winner." In a contest that rewards **expressing AND protecting** alpha, *not deploying overfit noise is the protection* — and it is the part of the institutional edge (de Prado's rigor, not a balance sheet) that is genuinely transferable to a single operator.
+
 ---
 
 ## 5. Data usage (§9 deliverable)
