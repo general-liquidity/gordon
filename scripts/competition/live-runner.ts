@@ -1,27 +1,29 @@
 #!/usr/bin/env bun
 /**
- * Competition LIVE runner — wires the real MT5 bridge client into the
- * `CompetitionLiveTrader` loop with the regime-adaptive default strategy.
+ * Competition LIVE runner — wires the real MT5 bridge into the chosen strategy loop.
  *
  *   bun run scripts/competition/live-runner.ts
  *
- * Config via env (defaults = the FROZEN competition config):
- *   COMP_SYMBOLS      comma list (default = the 15 tradeable instruments)
- *   COMP_INTERVAL_MS  cycle cadence in ms (default 60000)
- *   COMP_EXECUTION    "maker" | "taker" (default "taker" — Cypher is FOK/IOC)
- *   COMP_BARS         bars lookback (default from the frozen config)
- *   COMP_KILL_PCT     daily-loss kill fraction (default from the frozen survival preset)
- *   COMP_TIMEFRAME    MT5 timeframe (default "M15")
+ * Strategy (COMP_STRATEGY):
+ *   "barbell" (DEFAULT) — the full barbell: dollar-neutral RV-reversion Best-Sharpe CORE +
+ *     ring-fenced lottery SLEEVE, driven via target-portfolio reconciliation
+ *     (`BarbellLiveRunner`). This is the go-live posture.
+ *   "tsmom" — the single-leg TSMOM path (`CompetitionLiveTrader`). Kept for BRIDGE SMOKE
+ *     VALIDATION: simplest order shape to confirm the transport before arming the barbell.
  *
- * DOUBLE SAFETY GUARD — both must be set for a real order to fill:
- *   GORDON_LIVE_TRADING=1     (this process; checked inside CompetitionLiveTrader)
- *   MT5_BRIDGE_ALLOW_TRADING=1 (the sidecar; checked in mt5_bridge.py)
- * Unset either ⇒ the loop runs read-only and logs intended (dry) orders.
+ * Config via env:
+ *   COMP_STRATEGY     "barbell" | "tsmom"            (default "barbell")
+ *   COMP_SYMBOLS      comma list                     (default = the 15 tradeable instruments)
+ *   COMP_INTERVAL_MS  cycle cadence ms               (default 60000)
+ *   COMP_BARS         bars lookback                  (default from the frozen config)
+ *   COMP_TIMEFRAME    MT5 timeframe                  (default "M15")
+ *   COMP_STARTING_EQUITY  baseline for return calc   (default = account equity at boot)
+ *   COMP_CUT_MS / COMP_DEADLINE_MS  epoch-ms of the Top-100 cut / contest end (barbell phase + horizon)
  *
- * Strategy = the FROZEN beta-stripped TSMOM + survive-and-rank preset
- * (`src/infra/trading/competition/competitionStrategy.ts`) — IDENTICAL to what the
- * paper-mode rehearsal exercises. NOT a proven return edge; its value is low drawdown
- * + a smooth equity curve, which is what the Drawdown/Sharpe ranks reward.
+ * DOUBLE SAFETY GUARD — both required for a real order to fill:
+ *   GORDON_LIVE_TRADING=1      (this process)
+ *   MT5_BRIDGE_ALLOW_TRADING=1 (the sidecar; mt5_bridge.py)
+ * Unset either ⇒ read-only: deltas are computed + logged (DRY), nothing is sent.
  */
 
 import { Mt5BridgeClient } from "../../src/infra/broker/mt5/bridgeClient.ts";
@@ -36,6 +38,7 @@ import {
   COMPETITION_LIVE_CONFIG,
   COMPETITION_RISK,
 } from "../../src/infra/trading/competition/competitionStrategy.ts";
+import { BarbellLiveRunner } from "../../src/infra/trading/competition/barbellLiveRunner.ts";
 
 function envNum(name: string, fallback: number): number {
   const v = process.env[name];
@@ -43,22 +46,17 @@ function envNum(name: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+const strategy = (process.env.COMP_STRATEGY ?? "barbell").toLowerCase();
 const symbols = (process.env.COMP_SYMBOLS ?? COMPETITION_TRADEABLE.join(","))
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
 const intervalMs = envNum("COMP_INTERVAL_MS", 60_000);
-const execution = (process.env.COMP_EXECUTION === "maker" ? "maker" : "taker") as "maker" | "taker";
 const barsLookback = envNum("COMP_BARS", COMPETITION_LIVE_CONFIG.barsLookback);
-const dailyLossKillPct = envNum("COMP_KILL_PCT", COMPETITION_LIVE_CONFIG.dailyLossKillPct);
 const timeframe = process.env.COMP_TIMEFRAME ?? "M15";
-
-/** The frozen beta-stripped time-series-momentum signal (one instance, all symbols). */
-const tsmom: SignalFn = makeTsmomSignal();
+const M15_MS = 15 * 60 * 1000;
 
 const client = new Mt5BridgeClient();
-
-const signals: Record<string, SignalFn> = {};
 const contracts: Record<string, ContractSpec> = {};
 
 async function bootstrap(): Promise<void> {
@@ -69,43 +67,63 @@ async function bootstrap(): Promise<void> {
   }
   console.log(`✓ bridge healthy — trading ${health.tradingEnabled ? "ENABLED" : "disabled (read/validate only)"}`);
 
-  // Pull live contract specs (volume_min / volume_step) per symbol for lot rounding.
   for (const symbol of symbols) {
     const spec = await client.symbol(symbol);
-    contracts[symbol] = {
-      volume_min: spec.volume_min,
-      volume_step: spec.volume_step,
-      contractSize: spec.trade_contract_size,
-    };
-    signals[symbol] = tsmom;
+    contracts[symbol] = { volume_min: spec.volume_min, volume_step: spec.volume_step, contractSize: spec.trade_contract_size };
     console.log(`  ${symbol}: min ${spec.volume_min} / step ${spec.volume_step} lots, contract ${spec.trade_contract_size}`);
   }
 
   const armed = process.env.GORDON_LIVE_TRADING === "1";
   console.log(
-    `\nGORDON_LIVE_TRADING=${armed ? "1 (ARMED)" : "unset (DRY — no real orders)"} · ` +
-      `execution=${execution} · interval=${intervalMs}ms · symbols=${symbols.join(",")}\n`,
+    `\nstrategy=${strategy} · GORDON_LIVE_TRADING=${armed ? "1 (ARMED)" : "unset (DRY — no real orders)"} · ` +
+      `interval=${intervalMs}ms · symbols=${symbols.length}\n`,
   );
 
-  const trader = new CompetitionLiveTrader({
-    client,
+  if (strategy === "tsmom") {
+    // Single-leg path — bridge smoke validation.
+    const tsmom: SignalFn = makeTsmomSignal();
+    const signals: Record<string, SignalFn> = {};
+    for (const s of symbols) signals[s] = tsmom;
+    const trader = new CompetitionLiveTrader({
+      client, symbols, signals, contracts,
+      config: { execution: "taker", barsLookback, dailyLossKillPct: COMPETITION_LIVE_CONFIG.dailyLossKillPct, timeframe },
+      riskParams: COMPETITION_RISK,
+    });
+    trader.runLoop(intervalMs, {
+      onCycle: (r) =>
+        console.log(`[tsmom] equity=${r.equity.toFixed(0)} dailyPnL=${r.dailyPnL.toFixed(0)} ${r.halted ? "HALTED " : ""}placed=${r.ordersPlaced}`),
+    });
+    return;
+  }
+
+  // ── Barbell (default go-live posture) ──
+  const acct = await client.account();
+  const startingEquity = envNum("COMP_STARTING_EQUITY", acct.equity);
+  const cutMs = envNum("COMP_CUT_MS", 0);
+  const deadlineMs = envNum("COMP_DEADLINE_MS", 0);
+
+  const runner = new BarbellLiveRunner(client, {
     symbols,
-    signals,
     contracts,
-    config: { execution, barsLookback, dailyLossKillPct, timeframe },
-    riskParams: COMPETITION_RISK,
+    startingEquity,
+    barsLookback,
+    timeframe,
+    // Phase: post-cut once we pass the cut time (sleeve eligible); pre-cut otherwise.
+    phase: () => (cutMs > 0 && Date.now() >= cutMs ? "post_cut" : "pre_cut"),
+    // Liquidation horizon: M15 bars remaining to the deadline (fallback ~5 trading days).
+    barsToDeadline: () => (deadlineMs > 0 ? Math.max(1, Math.round((deadlineMs - Date.now()) / M15_MS)) : 480),
   });
 
-  trader.runLoop(intervalMs, {
-    onCycle: (report) => {
-      const summary = report.decisions
-        .map((d) => `${d.symbol}:${d.action}${d.lots ? `(${d.lots})` : ""}`)
-        .join(" ");
-      console.log(
-        `[cycle] equity=${report.equity.toFixed(0)} dailyPnL=${report.dailyPnL.toFixed(0)} ` +
-          `${report.halted ? "HALTED " : ""}placed=${report.ordersPlaced} · ${summary}`,
-      );
-    },
+  console.log(
+    `barbell: startingEquity=${startingEquity.toFixed(0)} · ` +
+      `phase gate ${cutMs > 0 ? `cut@${new Date(cutMs).toISOString()}` : "pre_cut (no COMP_CUT_MS)"} · ` +
+      `${deadlineMs > 0 ? `deadline@${new Date(deadlineMs).toISOString()}` : "barsToDeadline=480 (no COMP_DEADLINE_MS)"}\n`,
+  );
+
+  runner.runLoop(intervalMs, (r) => {
+    const summary = r.orders.map((o) => `${o.symbol}:${o.action}(${o.side}${o.lots})`).join(" ") || "(at target)";
+    console.log(`[barbell] equity=${r.equity.toFixed(0)} ret=${(r.ourReturnPct * 100).toFixed(2)}% placed=${r.ordersPlaced} · ${summary}`);
+    console.log(`          ${r.decisionReason}`);
   });
 }
 
