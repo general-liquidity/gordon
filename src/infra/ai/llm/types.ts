@@ -6,7 +6,7 @@
 /**
  * Supported LLM providers
  */
-export type LLMProvider = "openai" | "dedalus";
+export type LLMProvider = "openai" | "dedalus" | "doubleword";
 
 /**
  * Message role in a chat conversation
@@ -139,6 +139,7 @@ export const GORDON_MODELS = {
 export interface LLMClientConfig {
   openaiApiKey?: string;
   dedalusApiKey?: string;
+  doublewordApiKey?: string;
   defaultProvider?: LLMProvider;
   defaultModel?: string;
   temperature?: number;
@@ -164,6 +165,9 @@ export interface ProviderConfig {
 export const API_ENDPOINTS = {
   openai: "https://api.openai.com/v1",
   dedalus: "https://api.dedaluslabs.ai/v1",
+  // Doubleword — OpenAI-compatible inference (Model to Market partner). Same
+  // endpoint serves realtime + async (service_tier flex) + batch tiers.
+  doubleword: "https://api.doubleword.ai/v1",
 } as const;
 
 /**

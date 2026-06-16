@@ -81,6 +81,34 @@ function parseOtlpHeaders(raw?: string): Record<string, string> {
   return headers;
 }
 
+export type TracingTarget = "custom" | "logfire" | "axiom";
+
+/**
+ * Resolve the OTLP export destination + auth headers. Precedence:
+ *   1. Explicit `OTEL_EXPORTER_OTLP_ENDPOINT` — any OTLP backend, full control.
+ *   2. Pydantic Logfire — set `LOGFIRE_TOKEN` (write token). Region via
+ *      `LOGFIRE_BASE_URL` (default US `https://logfire-us.pydantic.dev`). Gordon's
+ *      OTel spans (agent_run, tool_call, LLM calls) then land in Logfire with no
+ *      hand-crafted OTLP env strings.
+ *   3. Axiom default.
+ */
+export function resolveExporterTarget(): { target: TracingTarget; endpoint: string; headers: Record<string, string> } {
+  const explicit = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  if (explicit) {
+    return { target: "custom", endpoint: explicit, headers: parseOtlpHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS) };
+  }
+  const logfireToken = process.env.LOGFIRE_TOKEN;
+  if (logfireToken) {
+    const base = (process.env.LOGFIRE_BASE_URL || "https://logfire-us.pydantic.dev").replace(/\/+$/, "");
+    return { target: "logfire", endpoint: `${base}/v1/traces`, headers: { Authorization: logfireToken } };
+  }
+  return {
+    target: "axiom",
+    endpoint: "https://api.axiom.co/v1/traces",
+    headers: parseOtlpHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS),
+  };
+}
+
 /**
  * Get tracing configuration from environment
  */
@@ -88,10 +116,11 @@ export function getTracingConfig(): TracingConfig {
   const requested = process.env.OTEL_TRACING_ENABLED === "true";
   const reviewed = process.env.GORDON_TRACING_REVIEWED === "true";
   const consentEnabled = isTelemetryConsentEnabled();
+  const { endpoint, headers } = resolveExporterTarget();
   return {
     serviceName: process.env.OTEL_SERVICE_NAME || "gordon-trading",
-    endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "https://api.axiom.co/v1/traces",
-    headers: parseOtlpHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS),
+    endpoint,
+    headers,
     enabled: requested && reviewed && consentEnabled,
     requested,
     reviewed,

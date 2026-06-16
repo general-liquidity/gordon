@@ -6,6 +6,8 @@ type PipelinePreset = "planGeneration" | "explanations";
 const FALLBACK_MODEL_BY_PROVIDER: Record<LLMProvider, ModelConfig["model"]> = {
   dedalus: "openai/gpt-5.2",
   openai: "gpt-5.4",
+  // Doubleword catalog model — confirm/override via `dw models list`.
+  doubleword: "Qwen/Qwen3-30B",
 };
 
 export function buildFailoverModelChain(

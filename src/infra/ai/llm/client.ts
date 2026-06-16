@@ -112,6 +112,7 @@ function getBackoffDelay(attempt: number, initialDelayMs: number): number {
 export class LLMClient {
   private openaiApiKey?: string;
   private dedalusApiKey?: string;
+  private doublewordApiKey?: string;
   private defaultProvider: LLMProvider;
   private defaultModel: string;
   private defaultTemperature: number;
@@ -120,12 +121,13 @@ export class LLMClient {
   private retryDelayMs: number;
 
   constructor(config: LLMClientConfig) {
-    if (!config.openaiApiKey && !config.dedalusApiKey) {
-      throw new Error("LLMClient requires at least one API key (openaiApiKey or dedalusApiKey)");
+    if (!config.openaiApiKey && !config.dedalusApiKey && !config.doublewordApiKey) {
+      throw new Error("LLMClient requires at least one API key (openaiApiKey, dedalusApiKey, or doublewordApiKey)");
     }
 
     this.openaiApiKey = config.openaiApiKey;
     this.dedalusApiKey = config.dedalusApiKey;
+    this.doublewordApiKey = config.doublewordApiKey;
     this.defaultProvider = config.defaultProvider ?? DEFAULT_PROVIDER;
     this.defaultModel = config.defaultModel ?? DEFAULT_MODEL;
     this.defaultTemperature = config.temperature ?? DEFAULT_TEMPERATURE;
@@ -140,6 +142,9 @@ export class LLMClient {
     if (this.defaultProvider === "dedalus" && !this.dedalusApiKey) {
       throw new Error("Dedalus API key required when defaultProvider is 'dedalus'");
     }
+    if (this.defaultProvider === "doubleword" && !this.doublewordApiKey) {
+      throw new Error("Doubleword API key required when defaultProvider is 'doubleword'");
+    }
   }
 
   /**
@@ -151,6 +156,13 @@ export class LLMClient {
         throw new LLMError("OpenAI API key not configured", 401, "auth_error", provider);
       }
       return this.openaiApiKey;
+    }
+
+    if (provider === "doubleword") {
+      if (!this.doublewordApiKey) {
+        throw new LLMError("Doubleword API key not configured", 401, "auth_error", provider);
+      }
+      return this.doublewordApiKey;
     }
 
     if (!this.dedalusApiKey) {
@@ -486,6 +498,7 @@ export class LLMClient {
   hasProvider(provider: LLMProvider): boolean {
     if (provider === "openai") return !!this.openaiApiKey;
     if (provider === "dedalus") return !!this.dedalusApiKey;
+    if (provider === "doubleword") return !!this.doublewordApiKey;
     return false;
   }
 
@@ -496,6 +509,7 @@ export class LLMClient {
     const providers: LLMProvider[] = [];
     if (this.openaiApiKey) providers.push("openai");
     if (this.dedalusApiKey) providers.push("dedalus");
+    if (this.doublewordApiKey) providers.push("doubleword");
     return providers;
   }
 }
@@ -516,6 +530,7 @@ export function createLLMClientFromEnv(): LLMClient {
   return new LLMClient({
     openaiApiKey: process.env.OPENAI_API_KEY,
     dedalusApiKey: process.env.DEDALUS_API_KEY,
+    doublewordApiKey: process.env.DOUBLEWORD_API_KEY,
     defaultProvider,
     defaultModel: route.transportModelId,
   });
