@@ -118,8 +118,8 @@ We tested every transparent, parameter-light signal family we could against the 
 | Reversal — time-series (per-symbol z-band) | `momq-reversal-validate.ts` | failed OOS across lookbacks {7,14,21} |
 | Reversal — cross-sectional (rank, long losers/short winners) | `momq-cross-sectional-validate.ts` | IC did not hold OOS |
 | Q-7 factor composite (reversal + residual-vol; + funding on crypto) | `momq-factor-validate.ts`, `momq-crypto-q7-validate.ts` | IC not OOS-stable |
-| L2 order-book imbalance | `momq-imbalance-validate.ts` | no edge — *and the provided historical depth is static (constant 5-level sizes), so this is un-backtestable by construction; confirmed by the organisers* |
-| Microstructure order-flow pressure | `momq-microstructure-validate.ts` | no edge after costs (same static-depth caveat) |
+| L2 order-book imbalance | `momq-imbalance-validate.ts` | no edge — *and on FX majors the provided historical depth is **static** (imbalance ≡ 0, ≤18 distinct values/month), so it is un-backtestable there by construction; depth **does** vary on metals (XAU/XAG), the one place the signal is real* |
+| Microstructure order-flow pressure | `momq-microstructure-validate.ts` | no edge after costs (same FX static-depth caveat) |
 | Full library × params × instruments (systematic sweep) | `scripts/research/alpha-search.ts` | **0 of 620 cells** cleared the deflated-Sharpe bar (M15); repeated on **3yr extended crypto** (1h, 1d) — same verdict |
 
 > **The honest result:** across naive TA, momentum, time-series **and** cross-sectional reversal, the Q-7 factors, order-book imbalance, and microstructure order-flow, **no signal showed a stable directional edge after costs** — the signs flipped between in-sample and out-of-sample. We are **not** claiming "my bot found alpha." We *measured*, against the competition's exact objective, that the cheap directional edges are not there in this window.
