@@ -201,6 +201,100 @@ describe("runCompetitionDryRun — money-path spine", () => {
     expect(omitted.sharpe).toBe(explicitTaker.sharpe);
   });
 
+  it("maker: a resting long fills on a LATER bar that dips to the post (old single-bar model missed this)", () => {
+    // spreadBps=6, slippageBps=0 → maker half-spread rebate makes the long post 3bps
+    // BELOW each signal bar's close. The signal fires on bar 0 (close 100, post 99.97);
+    // price rises away (101, 102) so the post is NOT reached, then a later bar dips to
+    // 99.9 — below the post → the resting limit fills. The old same-bar model cancelled.
+    const prices = [100, 101, 102, 99.9, 99.9, 99.9];
+    const bars = series("EURUSD", prices, HOUR, 0.1);
+    // Signal only on the first bar (flat, no history); afterwards the resting order /
+    // open position suppresses re-signalling.
+    const signal: SignalFn = (_b, hist): DryRunSignal | null =>
+      hist.length === 0 ? { side: "long", stopDistance: 5 } : null;
+    const r = runCompetitionDryRun({
+      bars,
+      signal,
+      startingEquity: START,
+      periodsPerYear: 252,
+      costs: { spreadBps: 6, slippageBps: 0 },
+      execution: "maker",
+    });
+    expect(r.tradeCount).toBe(1); // it filled and (at end) closed
+    expect(r.trades[0]!.entryPrice).toBeCloseTo(100 * (1 - 3 / 10_000), 9); // filled at the post
+    expect(r.makerFillRate).toBe(1); // 1 attempt, 1 fill
+  });
+
+  it("maker: a resting order never reached within makerMaxRestBars is cancelled (no position, fillRate < 1)", () => {
+    // Long post sits 3bps below close (100 → 99.97). Price rises and never returns, so
+    // the post is never reached across the order's life → cancelled unfilled.
+    const prices = [100, 101, 102, 103, 104, 105, 106, 107];
+    const bars = series("GBPUSD", prices, HOUR, 0.1);
+    const signal: SignalFn = (_b, hist): DryRunSignal | null =>
+      hist.length === 0 ? { side: "long", stopDistance: 5 } : null;
+    const r = runCompetitionDryRun({
+      bars,
+      signal,
+      startingEquity: START,
+      periodsPerYear: 252,
+      costs: { spreadBps: 6, slippageBps: 0 },
+      execution: "maker",
+      makerMaxRestBars: 3,
+    });
+    expect(r.tradeCount).toBe(0); // never filled → no trade
+    expect(r.finalEquity).toBe(START); // flat, no position ever opened
+    expect(r.makerFillRate).toBeLessThan(1); // 1 attempt, 0 fills → 0
+    expect(r.makerFillRate).toBe(0);
+  });
+
+  it("maker: expiry frees the symbol so a later signal can place a fresh resting order", () => {
+    // Order 1 placed on bar 0 (post 99.97): prices rise (101,102) and never reach it in
+    // its 2-bar life → expires. Order 2 placed on bar 3 (close 105, post ≈104.9685): a
+    // later bar dips to 104 (below the post) → fills. Two attempts, one fill.
+    const prices = [100, 101, 102, 105, 104];
+    const bars = series("USDJPY", prices, HOUR, 0.1);
+    const signal: SignalFn = (b): DryRunSignal | null =>
+      b.close === 100 || b.close === 105 ? { side: "long", stopDistance: 20 } : null;
+    const r = runCompetitionDryRun({
+      bars,
+      signal,
+      startingEquity: START,
+      periodsPerYear: 252,
+      costs: { spreadBps: 6, slippageBps: 0 },
+      execution: "maker",
+      makerMaxRestBars: 2,
+    });
+    // First order expired; second filled on the 104 dip.
+    expect(r.makerFillRate).toBeCloseTo(0.5, 9); // 2 attempts, 1 fill
+    expect(r.tradeCount).toBe(1);
+  });
+
+  it("taker mode and the no-execution default are byte-for-byte unchanged from before", () => {
+    // Reuses the historical taker scenarios verbatim and asserts the same invariants.
+    const prices = Array.from({ length: 60 }, (_, i) => 100 + i);
+    const taker = runCompetitionDryRun({
+      bars: series("XAUUSD", prices, DAY, 0.1),
+      signal: (): DryRunSignal => ({ side: "long", stopDistance: 2, targetDistance: 1 }),
+      startingEquity: START,
+      periodsPerYear: 252,
+      costs: { spreadBps: 6, slippageBps: 2 },
+      execution: "taker",
+    });
+    const omitted = runCompetitionDryRun({
+      bars: series("XAUUSD", prices, DAY, 0.1),
+      signal: (): DryRunSignal => ({ side: "long", stopDistance: 2, targetDistance: 1 }),
+      startingEquity: START,
+      periodsPerYear: 252,
+      costs: { spreadBps: 6, slippageBps: 2 },
+    });
+    expect(omitted.finalEquity).toBe(taker.finalEquity);
+    expect(omitted.totalCostsPaid).toBe(taker.totalCostsPaid);
+    expect(omitted.tradeCount).toBe(taker.tradeCount);
+    expect(omitted.sharpe).toBe(taker.sharpe);
+    expect(taker.makerFillRate).toBe(1); // taker always fills
+    expect(taker.totalCostsPaid).toBeGreaterThan(0); // pays the spread
+  });
+
   it("Sharpe uses the supplied annualization (FX 252 ≠ crypto 365 on the same path)", () => {
     const prices = Array.from({ length: 60 }, (_, i) => 100 + i);
     const mk = (ppy: number) =>

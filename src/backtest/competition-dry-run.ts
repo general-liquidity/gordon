@@ -90,6 +90,9 @@ export interface CompetitionDryRunInput {
   riskParams?: Partial<CompetitionRiskParams>;
   /** Annual risk-free rate for Sharpe/Sortino (default 0.02). */
   riskFreeRate?: number;
+  /** Maker only: how many bars a resting limit order persists (including the signal
+   *  bar) before it's cancelled unfilled. Default 4. Ignored in taker mode. */
+  makerMaxRestBars?: number;
 }
 
 interface OpenPosition {
@@ -100,6 +103,21 @@ interface OpenPosition {
   notional: number;
   stopPrice: number;
   targetPrice: number | null;
+}
+
+/** A maker limit order resting in the book, waiting for the market to reach `postPrice`.
+ *  Sized once at signal time; persists across bars until filled, expired, or cancelled. */
+interface RestingOrder {
+  symbol: string;
+  side: Side;
+  postPrice: number;
+  units: number;
+  notional: number;
+  stopPrice: number;
+  targetPrice: number | null;
+  /** Index into this symbol's history at placement — drives the rest-bar expiry count. */
+  placedAtBarIndex: number;
+  placedAtTime: number;
 }
 
 export interface DryRunTrade {
@@ -203,12 +221,15 @@ export function runCompetitionDryRun(input: CompetitionDryRunInput): Competition
   // The maker rate can be negative (net rebate); it's applied in the same
   // adverse direction as the taker path, so a negative rate improves the fill.
   const costRate = (isMaker ? slippageBps - halfSpreadBps : halfSpreadBps + slippageBps) / 10_000;
+  const makerMaxRestBars = Math.max(1, input.makerMaxRestBars ?? 4);
   let totalCostsPaid = 0;
   let makerAttempts = 0;
   let makerFills = 0;
 
   let cash = startingEquity; // realized equity; open PnL is added at mark time
   const open = new Map<string, OpenPosition>();
+  // Maker only: at most one resting limit per symbol, mutually exclusive with an open position.
+  const resting = new Map<string, RestingOrder>();
   const histBySymbol = new Map<string, DryRunBar[]>();
   const trades: DryRunTrade[] = [];
   const bindingHistogram = emptyHistogram();
@@ -293,8 +314,53 @@ export function runCompetitionDryRun(input: CompetitionDryRunInput): Competition
       haltedDaySet.add(currentDay);
     }
 
-    // 4) Entry — only when flat on this symbol and not halted.
-    if (!open.has(bar.symbol) && !halted) {
+    // Open this symbol's position from a resting order or a fresh fill. Re-checks the
+    // halt + exposure cap at FILL time: a resting order placed under a clear book that
+    // would now breach the kill or the cap is cancelled instead of filled.
+    const fillResting = (ro: RestingOrder): boolean => {
+      let openExposureNotional = 0;
+      for (const p of open.values()) openExposureNotional += p.notional;
+      const capPct = input.riskParams?.maxConcurrentExposurePct ?? 0.6;
+      if (halted || openExposureNotional + ro.notional > capPct * equity + 1e-9) return false;
+      // Adverse entry fill at the post: a long buys higher, a short sells lower. In
+      // maker mode `costRate` can be negative → the post is FAVORABLE and earns the rebate.
+      const entrySign = ro.side === "long" ? 1 : -1;
+      const entryAdv = ro.postPrice * costRate;
+      totalCostsPaid += entryAdv * ro.units;
+      open.set(ro.symbol, {
+        symbol: ro.symbol,
+        side: ro.side,
+        entryPrice: ro.postPrice,
+        units: ro.units,
+        notional: ro.notional,
+        stopPrice: ro.stopPrice,
+        targetPrice: ro.targetPrice,
+      });
+      return true;
+    };
+    // A resting limit fills only when the market reaches it. With close-only data we
+    // approximate off the close: a long bid fills if close <= post, a short ask if
+    // close >= post. Conservative — it can't see intrabar lows/highs.
+    const restingReached = (ro: RestingOrder): boolean =>
+      ro.side === "long" ? bar.close <= ro.postPrice : bar.close >= ro.postPrice;
+
+    // 4a) Expire-then-fill an existing resting order on this symbol (maker only).
+    // The order lives for `makerMaxRestBars` bars counting the signal bar: it gets a
+    // fill attempt on the signal bar (at placement, 4b) plus the next maxRestBars−1
+    // bars here. Once that budget is spent it's cancelled before any further attempt.
+    const existingRest = resting.get(bar.symbol);
+    if (existingRest) {
+      if (hist.length - existingRest.placedAtBarIndex >= makerMaxRestBars) {
+        // Expired unfilled → cancel (the attempt was already counted at placement).
+        resting.delete(bar.symbol);
+      } else if (restingReached(existingRest) && fillResting(existingRest)) {
+        makerFills++;
+        resting.delete(bar.symbol);
+      }
+    }
+
+    // 4b) Entry — only when flat on this symbol AND no resting order, and not halted.
+    if (!open.has(bar.symbol) && !resting.has(bar.symbol) && !halted) {
       const sig = signal(bar, priorHistory);
       if (sig) {
         let openExposureNotional = 0;
@@ -314,37 +380,20 @@ export function runCompetitionDryRun(input: CompetitionDryRunInput): Competition
           halted = true;
           haltedDaySet.add(currentDay);
         } else if (sized.verdict === "trade" && sized.sizeUnits > 0) {
-          // Adverse entry fill direction: a long buys higher, a short sells lower.
-          // In maker mode `costRate` can be negative → the post price is FAVORABLE
-          // (long bids below close, short asks above close) and earns the rebate.
           const entrySign = sig.side === "long" ? 1 : -1;
           const entryAdv = bar.close * costRate;
           const postPrice = bar.close + entrySign * entryAdv;
+          const stopPrice =
+            sig.side === "long" ? bar.close - sig.stopDistance : bar.close + sig.stopDistance;
+          const targetPrice =
+            sig.targetDistance === undefined
+              ? null
+              : sig.side === "long"
+                ? bar.close + sig.targetDistance
+                : bar.close - sig.targetDistance;
 
-          // Maker fills are NOT guaranteed: a resting limit only fills if the market
-          // comes to it. With close-only data we approximate — a long bid below the
-          // close fills only if the bar's close reached down to the post (close <=
-          // post), a short ask above the close fills only if close >= post. This
-          // close-only proxy can't see intrabar lows/highs, so it's conservative:
-          // it credits a fill only when the close itself crossed the post level.
-          // (When the rebate makes the post favorable, an at-or-better close fills.)
-          let fills = true;
-          if (isMaker) {
-            makerAttempts++;
-            fills = sig.side === "long" ? bar.close <= postPrice : bar.close >= postPrice;
-            if (fills) makerFills++;
-          }
-          if (!fills) {
-            // Unfilled maker entry is cancelled — no position opened this bar.
-          } else {
-            const stopPrice =
-              sig.side === "long" ? bar.close - sig.stopDistance : bar.close + sig.stopDistance;
-            const targetPrice =
-              sig.targetDistance === undefined
-                ? null
-                : sig.side === "long"
-                  ? bar.close + sig.targetDistance
-                  : bar.close - sig.targetDistance;
+          if (!isMaker) {
+            // Taker entries always fill at the post (the crossed price).
             totalCostsPaid += entryAdv * sized.sizeUnits;
             open.set(bar.symbol, {
               symbol: bar.symbol,
@@ -355,6 +404,29 @@ export function runCompetitionDryRun(input: CompetitionDryRunInput): Competition
               stopPrice,
               targetPrice,
             });
+          } else {
+            // Maker: place a resting limit. It counts as one attempt; it persists and
+            // is checked on this and subsequent bars (4a), filling if/when reached.
+            makerAttempts++;
+            const ro: RestingOrder = {
+              symbol: bar.symbol,
+              side: sig.side,
+              postPrice,
+              units: sized.sizeUnits,
+              notional: sized.sizeNotional,
+              stopPrice,
+              targetPrice,
+              placedAtBarIndex: hist.length,
+              placedAtTime: bar.time,
+            };
+            // Try an immediate same-bar fill (a rebate-favorable post is reached at once).
+            if (restingReached(ro) && fillResting(ro)) {
+              makerFills++;
+            } else if (makerMaxRestBars <= 1) {
+              // Single-bar life and it didn't fill → cancel without resting.
+            } else {
+              resting.set(bar.symbol, ro);
+            }
           }
         }
       }
