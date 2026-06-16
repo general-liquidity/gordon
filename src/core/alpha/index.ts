@@ -556,3 +556,10 @@ export {
   type CryptoFactorModelResult,
   type CryptoFactorModelOptions,
 } from "./crypto-factor-model.ts";
+
+export {
+  reversalScore,
+  reversalSignal,
+  type ReversalSignal,
+  type ReversalSignalOptions,
+} from "./reversal-strategy.ts";
