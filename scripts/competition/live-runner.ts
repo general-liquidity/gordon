@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Competition LIVE runner — wires the real MT5 bridge client into the
- * `CompetitionLiveTrader` loop with a trivial inline mean-reversion stub signal.
+ * `CompetitionLiveTrader` loop with the regime-adaptive default strategy.
  *
  *   bun run scripts/competition/live-runner.ts
  *
@@ -18,9 +18,11 @@
  *   MT5_BRIDGE_ALLOW_TRADING=1 (the sidecar; checked in mt5_bridge.py)
  * Unset either ⇒ the loop runs read-only and logs intended (dry) orders.
  *
- * NOTE: the signal here is a deliberately trivial placeholder so the runner is
- * self-contained. Real alpha plugs in by swapping the SignalFn — do not treat
- * this stub as a strategy.
+ * NOTE: the strategy here is the regime-adaptive DEFAULT — mean-revert in chop,
+ * momentum in trend (see `src/core/alpha/regime-adaptive-strategy.ts`). It is the
+ * honest best-available posture, NOT a proven edge: its value is robustness across
+ * regimes + not taking the structurally wrong bet, not demonstrated alpha. Swap the
+ * SignalFn to plug in something better.
  */
 
 import { Mt5BridgeClient, type Mt5Bar } from "../../src/infra/broker/mt5/bridgeClient.ts";
@@ -30,6 +32,7 @@ import {
   type ContractSpec,
 } from "../../src/infra/trading/competition/liveTrader.ts";
 import { COMPETITION_RISK_AGGRESSIVE } from "../../src/core/risk-management/competition-risk-preset.ts";
+import { regimeAdaptiveSignal } from "../../src/core/alpha/regime-adaptive-strategy.ts";
 
 function envNum(name: string, fallback: number): number {
   const v = process.env[name];
@@ -48,23 +51,13 @@ const dailyLossKillPct = envNum("COMP_KILL_PCT", 0.08);
 const timeframe = process.env.COMP_TIMEFRAME ?? "M15";
 
 /**
- * Trivial mean-reversion STUB: fade the last bar's deviation from the lookback
- * mean. Below mean → long, above → short; stop/target scaled off recent range.
- * Placeholder only — real strategies replace this.
+ * Regime-adaptive DEFAULT: classify the recent regime (efficiency ratio) and pick
+ * the regime-appropriate signal — mean-revert in chop, momentum breakout in trend.
+ * Honest best-available, NOT a proven edge (see the module header). Same vol-scaled
+ * stop/target shape the dry-run/sizing spine expects.
  */
-const meanReversionStub: SignalFn = (bars: Mt5Bar[]) => {
-  if (bars.length < 10) return null;
-  const closes = bars.map((b) => b.close);
-  const mean = closes.reduce((a, c) => a + c, 0) / closes.length;
-  const last = closes[closes.length - 1]!;
-  const ranges = bars.map((b) => b.high - b.low).filter((r) => r > 0);
-  const atr = ranges.length ? ranges.reduce((a, r) => a + r, 0) / ranges.length : Math.abs(last) * 0.001;
-  const dev = last - mean;
-  const threshold = atr * 0.5;
-  if (Math.abs(dev) < threshold) return null;
-  const side = dev < 0 ? "long" : "short";
-  return { side, stopDistance: atr * 1.5, targetDistance: atr * 2.0 };
-};
+const regimeAdaptive: SignalFn = (bars: Mt5Bar[]) =>
+  regimeAdaptiveSignal(bars.map((b) => b.close));
 
 const client = new Mt5BridgeClient();
 
@@ -87,7 +80,7 @@ async function bootstrap(): Promise<void> {
       volume_step: spec.volume_step,
       contractSize: spec.trade_contract_size,
     };
-    signals[symbol] = meanReversionStub;
+    signals[symbol] = regimeAdaptive;
     console.log(`  ${symbol}: min ${spec.volume_min} / step ${spec.volume_step} lots, contract ${spec.trade_contract_size}`);
   }
 

@@ -563,3 +563,10 @@ export {
   type ReversalSignal,
   type ReversalSignalOptions,
 } from "./reversal-strategy.ts";
+
+export {
+  regimeAdaptiveSignal,
+  classifyRegime,
+  efficiencyRatio,
+  type RegimeAdaptiveOptions,
+} from "./regime-adaptive-strategy.ts";
