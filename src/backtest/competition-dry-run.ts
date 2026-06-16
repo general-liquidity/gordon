@@ -93,6 +93,12 @@ export interface CompetitionDryRunInput {
   /** Maker only: how many bars a resting limit order persists (including the signal
    *  bar) before it's cancelled unfilled. Default 4. Ignored in taker mode. */
   makerMaxRestBars?: number;
+  /** Perf: cap the per-bar `history` passed to the signal to the last N bars for
+   *  THIS symbol. The default (undefined) passes the full prior history — byte-for-byte
+   *  unchanged. Set it ONLY when the signal provably reads a bounded trailing window
+   *  (e.g. the alpha-search registry caps at 768): it turns the per-bar O(N) history
+   *  copy into O(N_cap), removing an O(bars²) cost on long series. */
+  maxSignalHistory?: number;
 }
 
 interface OpenPosition {
@@ -211,6 +217,7 @@ function exitLevel(pos: OpenPosition, price: number): "stop" | "target" | null {
  */
 export function runCompetitionDryRun(input: CompetitionDryRunInput): CompetitionDryRunReport {
   const { bars, signal, startingEquity, periodsPerYear } = input;
+  const maxSignalHistory = input.maxSignalHistory;
   const riskFreeRate = input.riskFreeRate ?? 0.02;
   const isMaker = input.execution === "maker";
   const halfSpreadBps = (input.costs?.spreadBps ?? 0) / 2;
@@ -302,7 +309,13 @@ export function runCompetitionDryRun(input: CompetitionDryRunInput): Competition
 
     // 2) Append to this symbol's history (after exit checks; entry sees prior bars).
     const hist = histBySymbol.get(bar.symbol) ?? [];
-    const priorHistory = hist.slice();
+    // Snapshot the prior history for the signal. When the caller declares a bounded
+    // signal window, copy only the last N bars (O(N_cap)) instead of the whole
+    // history (O(bars) per bar → O(bars²)); otherwise full copy (unchanged).
+    const priorHistory =
+      maxSignalHistory != null && hist.length > maxSignalHistory
+        ? hist.slice(hist.length - maxSignalHistory)
+        : hist.slice();
     hist.push(bar);
     histBySymbol.set(bar.symbol, hist);
 

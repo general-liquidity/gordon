@@ -34,7 +34,7 @@ import {
   deflatedSharpeRatio,
   probabilisticSharpeRatio,
 } from "../../src/infra/trading/ops/backtestCredibility.ts";
-import { STRATEGY_REGISTRY, type ResearchBar, type StrategyFactory } from "./strategy-registry.ts";
+import { STRATEGY_REGISTRY, HISTORY_CAP, type ResearchBar, type StrategyFactory } from "./strategy-registry.ts";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -203,6 +203,9 @@ function scoreSegment(
     signal,
     startingEquity: STARTING_EQUITY,
     execution: EXEC,
+    // Registry signals read only the last HISTORY_CAP bars (closesOf/candlesOf cap),
+    // so bounding the dry-run's per-bar history copy to the same window is exact.
+    maxSignalHistory: HISTORY_CAP,
     costs: { spreadBps, slippageBps: EXTRA_COST_BPS },
     periodsPerYear: PERIODS_PER_YEAR,
   });

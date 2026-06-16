@@ -81,7 +81,7 @@ export interface StrategyFactory {
  * full history while turning the per-bar O(N) indicator recompute (→ O(N²) over a
  * run) into O(CAP) (→ O(N·CAP)). Verified by M15 verdict + marginal-list parity.
  */
-const HISTORY_CAP = 768;
+export const HISTORY_CAP = 768;
 
 function closesOf(history: ResearchBar[], bar: ResearchBar): number[] {
   const start = Math.max(0, history.length - HISTORY_CAP);
