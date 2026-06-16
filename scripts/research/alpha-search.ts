@@ -329,83 +329,113 @@ function fmt(x: number, d = 3): string {
 
 // ── Cell evaluation (the parallelizable unit of work) ───────────────────────
 
+/** One unit of work: a single (instrument × strategy × config) cell. */
+interface Cell {
+  symbol: string;
+  strategyIdx: number;
+  paramIdx: number;
+}
+
+/** Score one cell. Returns null when the cell is skipped (no L2, too few trades). */
+function scoreCell(
+  inst: LoadedInstrument,
+  factory: StrategyFactory,
+  params: Record<string, unknown>,
+  effectiveTrials: number,
+): ResultRow | null {
+  if (factory.inputs === "l2" && !inst.hasL2) return null;
+
+  let wf: WalkForwardOutcome;
+  try {
+    wf = walkForward(inst.bars, factory, params, inst.medianSpreadBps);
+  } catch {
+    return null;
+  }
+
+  const pooled = wf.pooledOosReturns;
+  if (pooled.length < 10) return null;
+
+  const psr = probabilisticSharpeRatio(pooled, 0, PERIODS_PER_YEAR);
+  const dsr = deflatedSharpeRatio(pooled, effectiveTrials, PERIODS_PER_YEAR);
+  const foldPositiveFrac = wf.foldSharpes.length
+    ? wf.foldSharpes.filter((s) => s > 0).length / wf.foldSharpes.length
+    : 0;
+
+  const base: Omit<ResultRow, "verdict"> = {
+    strategyId: factory.id,
+    family: factory.family,
+    symbol: inst.symbol,
+    params,
+    trades: wf.oos.trades,
+    oosReturnPct: wf.oos.oosReturnPct,
+    oosSharpe15m: wf.oos.oosSharpe15m,
+    oosSharpeAnnual: wf.oos.oosSharpeAnnual,
+    maxDrawdownPct: wf.oos.maxDrawdownPct,
+    foldSharpeMean: wf.foldSharpeMean,
+    foldSharpeStd: wf.foldSharpeStd,
+    foldPositiveFrac,
+    psr: psr.psr,
+    dsr: dsr.dsr,
+    observedSharpeAnnual: dsr.observedSharpe,
+    expectedMaxNullSharpe: dsr.expectedMaxSharpeUnderNull,
+  };
+  return { ...base, verdict: classify(base) };
+}
+
 /**
- * Evaluate every (strategy × config) cell for a SET of instruments. This is the
- * embarrassingly-parallel core: each cell is independent and `effectiveTrials`
- * is a global constant, so a worker can score its instrument-shard in isolation
- * and the main thread simply concatenates the rows (no merge-time recompute).
+ * Score a list of cells. Each cell is independent and `effectiveTrials` is a
+ * global constant, so a worker scores its slice in isolation and the main thread
+ * concatenates (no merge-time recompute). Instruments are loaded from disk and
+ * cached per worker — cheap (~ms/file) and avoids cloning large bar arrays across
+ * threads, so we can shard at CELL granularity and split even one big instrument's
+ * configs across cores (the long pole the by-instrument version couldn't break).
  */
-function computeRowsForInstruments(instruments: LoadedInstrument[], effectiveTrials: number): ResultRow[] {
-  const rows: ResultRow[] = [];
-  for (const factory of STRATEGY_REGISTRY) {
-    for (const params of factory.paramGrid) {
-      for (const inst of instruments) {
-        if (factory.inputs === "l2" && !inst.hasL2) continue;
-
-        let wf: WalkForwardOutcome;
-        try {
-          wf = walkForward(inst.bars, factory, params, inst.medianSpreadBps);
-        } catch {
-          continue;
-        }
-
-        const pooled = wf.pooledOosReturns;
-        if (pooled.length < 10) continue;
-
-        const psr = probabilisticSharpeRatio(pooled, 0, PERIODS_PER_YEAR);
-        const dsr = deflatedSharpeRatio(pooled, effectiveTrials, PERIODS_PER_YEAR);
-        const foldPositiveFrac = wf.foldSharpes.length
-          ? wf.foldSharpes.filter((s) => s > 0).length / wf.foldSharpes.length
-          : 0;
-
-        const base: Omit<ResultRow, "verdict"> = {
-          strategyId: factory.id,
-          family: factory.family,
-          symbol: inst.symbol,
-          params,
-          trades: wf.oos.trades,
-          oosReturnPct: wf.oos.oosReturnPct,
-          oosSharpe15m: wf.oos.oosSharpe15m,
-          oosSharpeAnnual: wf.oos.oosSharpeAnnual,
-          maxDrawdownPct: wf.oos.maxDrawdownPct,
-          foldSharpeMean: wf.foldSharpeMean,
-          foldSharpeStd: wf.foldSharpeStd,
-          foldPositiveFrac,
-          psr: psr.psr,
-          dsr: dsr.dsr,
-          observedSharpeAnnual: dsr.observedSharpe,
-          expectedMaxNullSharpe: dsr.expectedMaxSharpeUnderNull,
-        };
-        rows.push({ ...base, verdict: classify(base) });
-      }
+function computeRowsForCells(cells: Cell[], effectiveTrials: number): ResultRow[] {
+  const cache = new Map<string, LoadedInstrument | null>();
+  const load = (sym: string): LoadedInstrument | null => {
+    let inst = cache.get(sym);
+    if (inst === undefined) {
+      inst = loadInstrument(sym);
+      cache.set(sym, inst);
     }
+    return inst;
+  };
+
+  const rows: ResultRow[] = [];
+  for (const { symbol, strategyIdx, paramIdx } of cells) {
+    const inst = load(symbol);
+    if (!inst) continue;
+    const factory = STRATEGY_REGISTRY[strategyIdx];
+    const params = factory?.paramGrid[paramIdx];
+    if (!factory || !params) continue;
+    const row = scoreCell(inst, factory, params, effectiveTrials);
+    if (row) rows.push(row);
   }
   return rows;
 }
 
-// ── Worker entry: score an instrument-shard, post the rows back ─────────────
+// ── Worker entry: score a cell-slice, post the rows back ────────────────────
 if (!isMainThread && parentPort) {
-  const { instruments, effectiveTrials } = workerData as {
-    instruments: LoadedInstrument[];
-    effectiveTrials: number;
-  };
-  parentPort.postMessage(computeRowsForInstruments(instruments, effectiveTrials));
+  const { cells, effectiveTrials } = workerData as { cells: Cell[]; effectiveTrials: number };
+  parentPort.postMessage(computeRowsForCells(cells, effectiveTrials));
 }
 
-/** Fan the instrument shards out across worker threads (one pool, all cores). */
-function runShardedInWorkers(instruments: LoadedInstrument[], effectiveTrials: number): Promise<ResultRow[]> {
-  const cores = availableParallelism();
-  const nWorkers = Math.max(1, Math.min(cores, instruments.length));
-  // Round-robin instruments into nWorkers shards (balances bar-count reasonably).
-  const shards: LoadedInstrument[][] = Array.from({ length: nWorkers }, () => []);
-  instruments.forEach((inst, i) => shards[i % nWorkers]!.push(inst));
+/** Fan the cell list out across worker threads — one pool, the whole box. */
+function runShardedCells(cells: Cell[], effectiveTrials: number): Promise<ResultRow[]> {
+  const nWorkers = Math.max(1, Math.min(availableParallelism(), cells.length));
+  // Load balance by per-cell cost (instrument bar-count): caller passes cells
+  // sorted heaviest-first, and we round-robin them across workers (LPT). This
+  // spreads the few expensive big-instrument cells evenly instead of piling them
+  // into one worker — the imbalance a contiguous symbol-major split would create.
+  const chunks: Cell[][] = Array.from({ length: nWorkers }, () => []);
+  cells.forEach((cell, i) => chunks[i % nWorkers]!.push(cell));
 
   return Promise.all(
-    shards.map(
-      (shard) =>
+    chunks.map(
+      (chunk) =>
         new Promise<ResultRow[]>((resolve, reject) => {
           const w = new Worker(new URL(import.meta.url), {
-            workerData: { instruments: shard, effectiveTrials },
+            workerData: { cells: chunk, effectiveTrials },
           });
           w.once("message", (rows: ResultRow[]) => {
             resolve(rows);
@@ -414,7 +444,7 @@ function runShardedInWorkers(instruments: LoadedInstrument[], effectiveTrials: n
           w.once("error", reject);
         }),
     ),
-  ).then((perShard) => perShard.flat());
+  ).then((perChunk) => perChunk.flat());
 }
 
 async function main(): Promise<void> {
@@ -453,17 +483,28 @@ async function main(): Promise<void> {
   console.log(`Walk-forward       : ${N_FOLDS} rolling OOS folds over the back ${(100 * (1 - IS_FRAC)).toFixed(0)}%`);
   console.log(`Bars/instrument    : ${median(instruments.map((i) => i.bars.length))} median`);
 
-  // Fan the instrument shards across worker threads — the sweep is embarrassingly
-  // parallel (independent cells), so use the whole box, not one core. Opt out with
-  // ALPHA_SERIAL=1 for debugging.
-  const serial = process.env.ALPHA_SERIAL === "1" || instruments.length <= 1;
-  const nWorkers = serial ? 1 : Math.min(availableParallelism(), instruments.length);
-  console.log(`Parallelism        : ${serial ? "serial (1 core)" : `${nWorkers} workers / ${availableParallelism()} cores`}`);
+  // Flatten to a cell list so the heaviest instrument's configs split across workers
+  // too (the long pole by-instrument sharding couldn't break). Emit heaviest-first
+  // (by bar-count) so the round-robin shard is proper LPT load balancing.
+  const cells: Cell[] = [];
+  const byBarsDesc = [...instruments].sort((a, b) => b.bars.length - a.bars.length);
+  byBarsDesc.forEach((inst) => {
+    STRATEGY_REGISTRY.forEach((factory, strategyIdx) => {
+      if (factory.inputs === "l2" && !inst.hasL2) return;
+      factory.paramGrid.forEach((_p, paramIdx) => cells.push({ symbol: inst.symbol, strategyIdx, paramIdx }));
+    });
+  });
+
+  // Fan the cells across worker threads — the sweep is embarrassingly parallel, so
+  // use the whole box, not one core. Opt out with ALPHA_SERIAL=1 for debugging.
+  const serial = process.env.ALPHA_SERIAL === "1" || cells.length <= 1;
+  const nWorkers = serial ? 1 : Math.min(availableParallelism(), cells.length);
+  console.log(`Parallelism        : ${serial ? "serial (1 core)" : `${nWorkers} workers / ${availableParallelism()} cores, ${cells.length} cells`}`);
   console.log("");
 
   const rows: ResultRow[] = serial
-    ? computeRowsForInstruments(instruments, effectiveTrials)
-    : await runShardedInWorkers(instruments, effectiveTrials);
+    ? computeRowsForCells(cells, effectiveTrials)
+    : await runShardedCells(cells, effectiveTrials);
 
   // Rank: PASS first, then by deflated-Sharpe, then by pooled OOS Sharpe.
   const verdictRank = { PASS: 0, marginal: 1, FAIL: 2 } as const;
