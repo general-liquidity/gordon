@@ -169,7 +169,13 @@ Gordon (Bun/TS, Windows)  ──►  MT5 bridge (MetaTrader5 Python pkg)  ──
 
 - The `MetaTrader5` Python package requires a **local Windows MT5 terminal** (not native Linux; Northflank is Linux). The operator runs **Windows 11**, so MT5 + bridge + Gordon co-locate locally for dev.
 - For the **24/7 live week**, run on an **always-on Windows VPS**. Northflank ($100 credit) hosts Gordon's non-MT5 services (data, dashboards), not the MT5 terminal.
-- Bridge surface to implement: account/equity, positions, place/cancel order (market + limit), live quote + L2 depth, historical bars. Mirror the idempotency (`clientOrderId`) and capability patterns already in the Syphonix scaffold.
+
+### 7.2 The bridge — BUILT
+
+- **Python sidecar** `scripts/mt5-bridge/mt5_bridge.py` — wraps the `MetaTrader5` package behind a localhost JSON API. Endpoints: `/health /account /positions /orders /symbols /symbol /quote /depth (L2) /bars /order /cancel /close`. Binds to `127.0.0.1` only; **deny-first trading guard** (`/order`,`/cancel`,`/close` validate via `order_check` and refuse to fire unless `MT5_BRIDGE_ALLOW_TRADING=1`). MT5 API surface used: `account_info`, `positions_get`, `orders_get`, `symbols_get`/`symbol_info`, `symbol_info_tick`, `market_book_get` (L2), `copy_rates_*`, `order_send`/`order_check`.
+- **Typed client** `src/infra/broker/mt5/bridgeClient.ts` (`Mt5BridgeClient`) — Gordon-side transport, 8 tests.
+- **BrokerAdapter** `src/infra/broker/adapters/mt5.ts` (`Mt5Adapter`, brokerId `mt5`) — maps onto the normalized broker contract; registered in the factory + inclusion gate (approved). 7 adapter tests. `BrokerCredentials.apiKey` = bridge token, `baseUrl` = bridge URL; the MT5 account login/password/server live in the **sidecar env**, never in Gordon.
+- **Run it:** install MT5 terminal + log in → `pip install -r scripts/mt5-bridge/requirements.txt` → set `MT5_LOGIN/MT5_PASSWORD/MT5_SERVER`, `MT5_BRIDGE_TOKEN`, `MT5_BRIDGE_ALLOW_TRADING=1` → `python scripts/mt5-bridge/mt5_bridge.py` → `bun run scripts/dev/mt5-smoke.ts` to verify against the real account. See `scripts/mt5-bridge/README.md`.
 
 ---
 
@@ -256,8 +262,10 @@ Encoded as `COMPETITION_RISK_AGGRESSIVE` in `competition-risk-preset.ts` (a **st
 - `core/risk-management/competition-risk-preset.ts` — survive-and-compound default + `COMPETITION_RISK_AGGRESSIVE` posture.
 - `core/pipeline/competition-runner.ts` — run config; `backtest/metrics.ts` annualization fix.
 
+**Built (this prep), cont'd:**
+- **MT5 bridge — DONE** (§7.2): Python sidecar + `Mt5BridgeClient` + `Mt5Adapter` (registered, gate-approved). 15 tests. Validate against the real account via `scripts/dev/mt5-smoke.ts`; wire to Syphonix's MT5 creds on the 18th (just swap the sidecar env).
+
 **Open / TODO:**
-- **MT5 bridge** (the new critical path) — design the Gordon↔MT5 contract now; wire against the test env on the 18th. Repurpose `adapters/syphonix.ts` → MT5.
 - **Dry-run cost layer** — add spread + slippage (no commission/swap) for fidelity.
 - **Strategy selection (Track B)** — validate signals on the real historical parquet (+ own crypto data) with purged-CV / walk-forward / deflated-Sharpe.
 - **Posture tuning** — sweep `COMPETITION_RISK_AGGRESSIVE` against the official Final Score on real data.
