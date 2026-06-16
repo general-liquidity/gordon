@@ -94,7 +94,7 @@ Authoritative dates from **[RULES]** §5, refined by **[DISCORD]**. Marketing pa
 
 From **[RULES]** §§11–16. Implemented exactly in `src/core/risk-management/competition-scoring.ts`.
 
-> **[CONFIRM]** The rules were updated post-kickoff and the source-of-truth moved to the platform Rules tab. Discord still describes "**PnL primary** + risk modifiers (drawdown / leverage / margin / concentration / consistency)," consistent with the formula below — but **verify the live formula on the platform** before relying on exact weights.
+> **[RULES, confirmed 2026-06-16]** Verified against the updated platform rules: the 70/15/10/5 Final Score formula below is **unchanged**. The update **added Section 17 (Best Sharpe Ratio Award)** — see §8.5. Sections 1–16 and 18–21 are as transcribed.
 
 ### 6.1 Final Score
 
@@ -185,7 +185,7 @@ Gordon (Bun/TS, Windows)  ──►  MT5 bridge (MetaTrader5 Python pkg)  ──
 | 4th | $5,000 |
 | 5th | $4,000 |
 | 6th–25th | $1,000 each |
-| **Best Sharpe Ratio** | **$10,000** |
+| **Best Sharpe Ratio** | **$10,000** (eligibility-gated — see §8.5) |
 | **Best Technology Setup** | **$10,000** |
 
 "One winner takes $50k" = sweeping 1st ($30k) + Best Sharpe ($10k) + Best Tech ($10k).
@@ -214,6 +214,20 @@ After **Round 3 (24 Jun)**, eligible participants submit (form on the platform):
 | **Doubleword** | Inference API access | via the Pydantic AI gateway (Logfire); $100 free at `unlimiteddirtcheaptokens.com`, mention "AIEngine" |
 | **Northflank** | $100 platform credit | `app.northflank.com/signup`; GPU (L4) interest form separately |
 
+### 8.5 Best Sharpe Ratio Award — $10,000 (§17)
+
+Implemented in `competition-scoring.ts` (`selectBestSharpeAward` / `isBestSharpeEligible`).
+
+**Eligibility — ALL four required:**
+1. **Reach the Finals** (Top 100).
+2. **Finish within the Top 50 of the final overall ranking.**
+3. **No red-line violations.**
+4. **≥ 30 trades executed.**
+
+**Metric:** non-annualized 15-min-return Sharpe (`Mean(r)/Std(r)`) over the **entire competition period** (21–26 Jun), not just the finals. **Winner** = highest Sharpe among the eligible; ties break on **higher Final Return**, then **lower MaxDD**.
+
+> **Strategic consequence — this ALIGNS "go for 1st" with "Best Sharpe", it does not trade them off.** You cannot win the Sharpe award with a low-return smooth book: a Top-50 *overall* finish (return-driven) is a hard gate. So high return is a *prerequisite* for the Sharpe prize. Combined with the **≥30-trade floor**, this is exactly what the diversified-aggressive-compounding posture (§9) produces — high return from many small, smooth, diversified trades. A few-big-bets approach risks failing both the Top-50 gate (variance/blow-up) and the 30-trade floor.
+
 ---
 
 ## 9. Strategy posture (operator decision, 2026-06-16)
@@ -225,6 +239,7 @@ After **Round 3 (24 Jun)**, eligible participants submit (form on the platform):
 - This competes on **return (70%)** while keeping the **15-min Sharpe** high (smooth equity), controlling **drawdown (15%)**, and **never concentrating enough to risk forced liquidation** (instant elimination).
 - All ceilings stay under the §13 discipline thresholds (leverage < 28×, margin < 90%, single-instrument < 90%, net-directional < 95%).
 - Zero commission/swap means high trade count carries no drag — reinforces the approach.
+- **Maintain ≥ 30 trades and a Top-50 overall finish** — both are hard gates for the Best Sharpe Award (§8.5). The diversified many-small-trades book clears the trade floor naturally; the return focus clears the Top-50 gate.
 - **Best Tech + Anthropic bounty are decoupled from the trading dial** — they ride on Gordon's architecture and the submission.
 
 Encoded as `COMPETITION_RISK_AGGRESSIVE` in `competition-risk-preset.ts` (a **starting** calibration to be tuned against the official objective via the dry-run, once the historical parquet lands).
@@ -236,7 +251,7 @@ Encoded as `COMPETITION_RISK_AGGRESSIVE` in `competition-risk-preset.ts` (a **st
 ## 10. What's built vs. open
 
 **Built (this prep):**
-- `core/risk-management/competition-scoring.ts` — exact §11–16 objective function (Final Score, ranks, non-annualized 15-min Sharpe + cap, §13 discipline, red-line DQ, tie-breakers). 12 tests.
+- `core/risk-management/competition-scoring.ts` — exact §11–17 objective function (Final Score, ranks, non-annualized 15-min Sharpe + cap, §13 discipline, red-line DQ, tie-breakers) + the §17 Best Sharpe Award eligibility/winner selection (`selectBestSharpeAward`). 16 tests.
 - `backtest/competition-dry-run.ts` — money-path rehearsal; reports the official metrics. 6 tests.
 - `core/risk-management/competition-risk-preset.ts` — survive-and-compound default + `COMPETITION_RISK_AGGRESSIVE` posture.
 - `core/pipeline/competition-runner.ts` — run config; `backtest/metrics.ts` annualization fix.
@@ -249,7 +264,7 @@ Encoded as `COMPETITION_RISK_AGGRESSIVE` in `competition-risk-preset.ts` (a **st
 - **Tech-setup deck (Track C)** — structured to the 3 judging axes + Anthropic-bounty angle.
 
 **To CONFIRM on the platform:**
-- [ ] Current scoring formula + risk limits on the Rules tab (did 70/15/10/5 survive the post-kickoff update?).
+- [x] Current scoring formula + risk limits on the Rules tab — **confirmed 2026-06-16**: 70/15/10/5 unchanged; §17 Best Sharpe Award added.
 - [ ] Full 30+ instrument list + per-instrument contract specs, leverage, tick size, spreads.
 - [ ] Exact launch time (21 Jun 22:00 vs 23:00 BST — both cited).
 - [ ] Finals cutoff terminology (24 Jun blind cut vs 26 Jun trading close).

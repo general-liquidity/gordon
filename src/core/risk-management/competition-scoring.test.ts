@@ -5,9 +5,12 @@ import {
   computeNonAnnualizedSharpe,
   computeRiskDiscipline,
   scoreCompetitionRound,
+  selectBestSharpeAward,
+  isBestSharpeEligible,
   COMPETITION_INITIAL_EQUITY,
   type ParticipantRound,
   type RiskSample,
+  type BestSharpeCandidate,
 } from "./competition-scoring.ts";
 
 const M = COMPETITION_INITIAL_EQUITY;
@@ -113,5 +116,51 @@ describe("scoreCompetitionRound", () => {
   it("a sole flawless participant scores the full 100", () => {
     const solo = scoreCompetitionRound([A]);
     expect(solo[0]!.finalScore).toBeCloseTo(100, 6); // all ranks default 100, risk discipline 100
+  });
+});
+
+describe("selectBestSharpeAward (Section 17)", () => {
+  const base: BestSharpeCandidate = {
+    id: "x",
+    reachedFinals: true,
+    finalOverallRank: 10,
+    redLineViolation: false,
+    tradeCount: 40,
+    sharpe: 1.0,
+    finalReturn: 0.2,
+    maxDrawdown: 0.1,
+  };
+
+  it("each eligibility gate is enforced (Finals, Top-50, no red-line, ≥30 trades)", () => {
+    expect(isBestSharpeEligible(base)).toBe(true);
+    expect(isBestSharpeEligible({ ...base, reachedFinals: false })).toBe(false);
+    expect(isBestSharpeEligible({ ...base, finalOverallRank: 51 })).toBe(false);
+    expect(isBestSharpeEligible({ ...base, redLineViolation: true })).toBe(false);
+    expect(isBestSharpeEligible({ ...base, tradeCount: 29 })).toBe(false);
+  });
+
+  it("highest Sharpe among eligible wins; ineligible high-Sharpe entrants are excluded", () => {
+    const result = selectBestSharpeAward([
+      { ...base, id: "ineligible_29_trades", sharpe: 5.0, tradeCount: 29 }, // huge Sharpe but < 30 trades
+      { ...base, id: "ineligible_rank60", sharpe: 4.0, finalOverallRank: 60 }, // not Top-50
+      { ...base, id: "winner", sharpe: 1.5 },
+      { ...base, id: "runner_up", sharpe: 1.2 },
+    ]);
+    expect(result.winner!.id).toBe("winner");
+    expect(result.eligible.map((c) => c.id)).toEqual(["winner", "runner_up"]);
+  });
+
+  it("ties break on higher final return, then lower drawdown", () => {
+    const r = selectBestSharpeAward([
+      { ...base, id: "lowReturn", sharpe: 2.0, finalReturn: 0.1 },
+      { ...base, id: "highReturn", sharpe: 2.0, finalReturn: 0.3 },
+    ]);
+    expect(r.winner!.id).toBe("highReturn");
+  });
+
+  it("returns no winner when nobody is eligible", () => {
+    const r = selectBestSharpeAward([{ ...base, tradeCount: 5 }]);
+    expect(r.winner).toBeNull();
+    expect(r.eligible).toHaveLength(0);
   });
 });

@@ -300,3 +300,67 @@ export function scoreCompetitionRound(
 
   return [...scored, ...disqualified];
 }
+
+// ----------------------------------------------------------------------------
+// Best Sharpe Ratio Award (Section 17) — a separate $10k prize, gated behind a
+// Top-50 OVERALL finish. Note: chasing 1st place is a PREREQUISITE for this
+// award, not a trade-off against it.
+// ----------------------------------------------------------------------------
+
+/** Section 17 eligibility floor on executed trades. */
+export const BEST_SHARPE_MIN_TRADES = 30;
+/** Section 17 eligibility — must finish within the Top-N of the final overall ranking. */
+export const BEST_SHARPE_TOP_N = 50;
+
+export interface BestSharpeCandidate {
+  id: string;
+  /** Reached the Finals (Top 100). */
+  reachedFinals: boolean;
+  /** 1-based position in the FINAL overall ranking. */
+  finalOverallRank: number;
+  /** Any confirmed red-line violation (forced liq / exploit / abuse / multi-account). */
+  redLineViolation: boolean;
+  /** Trades executed over the competition. */
+  tradeCount: number;
+  /** Non-annualized 15-min Sharpe over the ENTIRE competition (via computeNonAnnualizedSharpe). */
+  sharpe: number;
+  /** Tie-break 1 — higher Final Return ranks higher. */
+  finalReturn: number;
+  /** Tie-break 2 — lower MaxDD ranks higher. */
+  maxDrawdown: number;
+}
+
+export interface BestSharpeResult {
+  /** Candidates meeting all four Section-17 criteria, ordered best-first. */
+  eligible: BestSharpeCandidate[];
+  /** The award winner (highest Sharpe; ties → higher return → lower MaxDD), or null if none eligible. */
+  winner: BestSharpeCandidate | null;
+}
+
+/** Section 17 — does a candidate meet ALL eligibility criteria? */
+export function isBestSharpeEligible(c: BestSharpeCandidate): boolean {
+  return (
+    c.reachedFinals &&
+    c.finalOverallRank <= BEST_SHARPE_TOP_N &&
+    !c.redLineViolation &&
+    c.tradeCount >= BEST_SHARPE_MIN_TRADES
+  );
+}
+
+/**
+ * Section 17 — select the Best Sharpe Ratio Award winner. Filters to eligible
+ * participants (Finals + Top-50 overall + no red-line + ≥30 trades), then ranks
+ * by Sharpe with the published tie-breakers (higher Final Return, then lower
+ * MaxDD). Pure.
+ */
+export function selectBestSharpeAward(candidates: BestSharpeCandidate[]): BestSharpeResult {
+  const eligible = candidates
+    .filter(isBestSharpeEligible)
+    .sort(
+      (a, b) =>
+        b.sharpe - a.sharpe ||
+        b.finalReturn - a.finalReturn ||
+        a.maxDrawdown - b.maxDrawdown,
+    );
+  return { eligible, winner: eligible[0] ?? null };
+}
