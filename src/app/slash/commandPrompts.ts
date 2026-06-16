@@ -6,6 +6,7 @@
 import { buildGeneratedPrompt } from "../../infra/runtime/actions/surfaces.ts";
 import { BrokerFactory } from "../../infra/broker/index.ts";
 import { getSkillSlashCommandIds } from "../../infra/skills/slashCommands.ts";
+import { buildMomqStatusPanel, buildTracingStatusLine } from "./momqStatus.ts";
 import type { SlashCommand } from "./slashCommands.ts";
 
 // Cache the skill-id set on first call. Discovery is memoized by registry.ts
@@ -31,10 +32,12 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
   }
 
   switch (command.name) {
+    case "momq":
+      return `Display the following Model to Market competition status to the operator exactly as written, then stop:\n\n${buildMomqStatusPanel()}`;
     case "flags": {
       const trimmed = args.trim();
       if (!trimmed || trimmed === "list") {
-        return "Call manage_flags with action='list' and show me the current state of each opt-in behavior flag in a table. For each, indicate whether it's on, its raw value, and a one-line summary of what enabling it does. Note that persistent changes require editing .env in the project root.";
+        return `Call manage_flags with action='list' and show me the current state of each opt-in behavior flag in a table. For each, indicate whether it's on, its raw value, and a one-line summary of what enabling it does. Then show this OpenTelemetry export status verbatim: "${buildTracingStatusLine()}". Note that persistent changes require editing .env in the project root.`;
       }
       if (trimmed.startsWith("set ")) {
         const rest = trimmed.slice(4).trim();

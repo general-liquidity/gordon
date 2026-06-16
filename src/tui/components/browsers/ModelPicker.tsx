@@ -29,6 +29,7 @@ const PROVIDERS: ModelOption[] = [
   { label: "Anthropic (Claude)", value: "anthropic" },
   { label: "Google (Gemini)", value: "google" },
   { label: "Dedalus (OpenAI-compatible router)", value: "dedalus" },
+  { label: "Doubleword (OpenAI-compatible)", value: "doubleword" },
 ];
 
 const MODEL_OPTIONS: Record<string, ModelOption[]> = {
@@ -62,6 +63,10 @@ const MODEL_OPTIONS: Record<string, ModelOption[]> = {
     { label: "Gemini 3 Flash", value: "google/gemini-3-flash-preview" },
     { label: "Grok 4.1 Reasoning", value: "xai/grok-4-1-fast-reasoning" },
     { label: "Kimi K2", value: "moonshot/kimi-k2-0905-preview" },
+    { label: "Provider default", value: "__default__" },
+  ],
+  doubleword: [
+    { label: "Nemotron 3 Ultra (NVFP4)", value: "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4" },
     { label: "Provider default", value: "__default__" },
   ],
 };

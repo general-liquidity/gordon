@@ -25,7 +25,7 @@ export type DirectProviderName = "anthropic" | "openai" | "google";
 export type ProviderPrefix = DirectProviderName | "xai" | "moonshot";
 
 /** Full provider routing choices Gordon supports */
-export type ProviderName = DirectProviderName | "dedalus";
+export type ProviderName = DirectProviderName | "dedalus" | "doubleword";
 export type TransportProvider = "openai" | "anthropic" | "google";
 
 export interface ProviderConfig {
@@ -72,7 +72,7 @@ export interface MastraOpenAICompatibleModelConfig {
 export type MastraModelConfig = ModelString | MastraOpenAICompatibleModelConfig | any;
 
 interface OpenAICompatibleProviderConfig {
-  apiKeyEnvVar: "DEDALUS_API_KEY";
+  apiKeyEnvVar: "DEDALUS_API_KEY" | "DOUBLEWORD_API_KEY";
   baseUrl: string;
 }
 
@@ -131,15 +131,28 @@ export const DEDALUS_MODELS = [
 
 const DEDALUS_MODEL_ID_SET = new Set<ModelString>(DEDALUS_MODELS.map((model) => model.id));
 
+/**
+ * Doubleword-supported chat models via the OpenAI-compatible API.
+ * Not typed as ModelMetadata because the "nvidia" prefix isn't a ProviderPrefix.
+ */
+export const DOUBLEWORD_MODEL_IDS: readonly string[] = [
+  "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4",
+];
+
 /** OpenAI-compatible provider base URLs */
 export const DEDALUS_BASE_URL = "https://api.dedaluslabs.ai/v1";
+export const DOUBLEWORD_BASE_URL = "https://api.doubleword.ai/v1";
 
 const OPENAI_COMPATIBLE_PROVIDERS = {
   dedalus: {
     apiKeyEnvVar: "DEDALUS_API_KEY",
     baseUrl: DEDALUS_BASE_URL,
   },
-} as const satisfies Record<"dedalus", OpenAICompatibleProviderConfig>;
+  doubleword: {
+    apiKeyEnvVar: "DOUBLEWORD_API_KEY",
+    baseUrl: DOUBLEWORD_BASE_URL,
+  },
+} as const satisfies Record<"dedalus" | "doubleword", OpenAICompatibleProviderConfig>;
 
 // ============================================================================
 // Helpers
@@ -150,7 +163,7 @@ function isDirectProviderName(value: string): value is DirectProviderName {
 }
 
 function isProviderName(value: string): value is ProviderName {
-  return isDirectProviderName(value) || value === "dedalus";
+  return isDirectProviderName(value) || value === "dedalus" || value === "doubleword";
 }
 
 function splitModelString(modelId: string): { prefix?: string; rawModelId: string } {
@@ -176,6 +189,7 @@ function splitModelString(modelId: string): { prefix?: string; rawModelId: strin
 export class ProviderRegistry {
   private availableDirectProviders: Set<DirectProviderName> = new Set();
   private hasDedalusKey = false;
+  private hasDoublewordKey = false;
   private nativeOpenAIApiKey?: string;
   private nativeOpenAIBaseUrl?: string;
   private dedalusModels: ModelMetadata[] = [...DEDALUS_MODELS];
@@ -214,6 +228,10 @@ export class ProviderRegistry {
 
     if (process.env.DEDALUS_API_KEY) {
       this.hasDedalusKey = true;
+    }
+
+    if (process.env.DOUBLEWORD_API_KEY) {
+      this.hasDoublewordKey = true;
     }
 
     this.initialized = true;
@@ -374,6 +392,26 @@ export class ProviderRegistry {
       };
     }
 
+    if (resolved.provider === "doubleword") {
+      if (!this.hasDoublewordKey) {
+        throw new Error(
+          `Provider "doubleword" selected but DOUBLEWORD_API_KEY not configured.\n` +
+          `Set DOUBLEWORD_API_KEY in your .env file or switch provider.`
+        );
+      }
+
+      return {
+        modelString: resolved.fullModelId,
+        resolvedModelString: `openai/${resolved.fullModelId}` as ModelString,
+        provider: "doubleword",
+        transportProvider: "openai",
+        transportModelId: resolved.fullModelId,
+        viaOpenAICompatibleProvider: true,
+        baseUrl: DOUBLEWORD_BASE_URL,
+        apiKeyEnvVar: "DOUBLEWORD_API_KEY",
+      };
+    }
+
     if (isDirectProviderName(resolved.provider) && this.availableDirectProviders.has(resolved.provider)) {
       const envVarMap: Record<DirectProviderName, string> = {
         openai: "OPENAI_API_KEY",
@@ -420,7 +458,7 @@ export class ProviderRegistry {
   } {
     const { prefix, rawModelId } = splitModelString(modelId);
 
-    if (provider === "dedalus") {
+    if (provider === "dedalus" || provider === "doubleword") {
       const fullModelId = (prefix ? `${prefix}/${rawModelId}` : modelId) as ModelString;
       return { provider, fullModelId, rawModelId };
     }
@@ -520,6 +558,11 @@ export class ProviderRegistry {
       const dedalusDefault = this.getDedalusModelCatalog()[0]?.id || DEDALUS_MODELS[0].id;
       const model = process.env.GORDON_MODEL || dedalusDefault;
       return this.getRouteForSelection("dedalus", model);
+    }
+
+    if (rawProvider === "doubleword") {
+      const model = process.env.GORDON_MODEL || DOUBLEWORD_MODEL_IDS[0]!;
+      return this.getRouteForSelection("doubleword", model);
     }
 
     let provider = rawProvider && isDirectProviderName(rawProvider)
@@ -765,6 +808,7 @@ export class ProviderRegistry {
   reset(): void {
     this.availableDirectProviders.clear();
     this.hasDedalusKey = false;
+    this.hasDoublewordKey = false;
     this.nativeOpenAIApiKey = undefined;
     this.nativeOpenAIBaseUrl = undefined;
     this.dedalusModels = [...DEDALUS_MODELS];

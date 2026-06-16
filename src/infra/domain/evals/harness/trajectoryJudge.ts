@@ -39,6 +39,32 @@ const logger = createModuleLogger("trajectory-judge");
 
 const DEFAULT_JUDGE_MODEL = "anthropic/claude-sonnet-4-6";
 
+/**
+ * Resolve which direct-client provider + transport model id a judgeModel maps to.
+ *
+ * Default routing is unchanged: judge calls go through `dedalus` with the
+ * model string as-is (e.g. "anthropic/claude-sonnet-4-6", "openai/test").
+ *
+ * Opt-in: a judgeModel of the form `doubleword/<model>` routes the judge
+ * through the existing Doubleword provider on the direct LLMClient
+ * (OpenAI-compatible, DOUBLEWORD_API_KEY). The `doubleword/` prefix is
+ * stripped so the bare model id is sent to the endpoint.
+ *
+ * Realtime only — async Batch API (JSONL) routing is a future cost
+ * optimization, out of scope here.
+ */
+const DOUBLEWORD_PREFIX = "doubleword/";
+
+function resolveJudgeRoute(judgeModel: string): {
+  provider: "dedalus" | "doubleword";
+  model: string;
+} {
+  if (judgeModel.startsWith(DOUBLEWORD_PREFIX)) {
+    return { provider: "doubleword", model: judgeModel.slice(DOUBLEWORD_PREFIX.length) };
+  }
+  return { provider: "dedalus", model: judgeModel };
+}
+
 const JudgeResponseSchema = z.object({
   scores: z.array(
     z.object({
@@ -112,6 +138,8 @@ export async function judgeTrajectories(
 
   const judgePrompt = buildJudgePrompt(request.scenario, request.trajectories);
 
+  const route = resolveJudgeRoute(judgeModel);
+
   let parsed: JudgeResponse;
   try {
     parsed = await client.chatWithJSON(
@@ -125,8 +153,8 @@ export async function judgeTrajectories(
       ],
       JudgeResponseSchema,
       {
-        provider: "dedalus",
-        model: judgeModel,
+        provider: route.provider,
+        model: route.model,
         temperature: options.temperature ?? 0.1,
       },
     );

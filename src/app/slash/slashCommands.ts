@@ -8,6 +8,7 @@ import {
   mergeSlashCommands,
 } from "../../infra/runtime/actions/surfaces.ts";
 import { getSkillSlashCommands } from "../../infra/skills/slashCommands.ts";
+import { buildTracingStatusLine } from "./momqStatus.ts";
 import {
   type CommandAudience,
   type SlashCommandCategory,
@@ -165,7 +166,6 @@ export const DIRECT_TOOL_TARGETS = new Set([
   "dismiss_proactive_suggestion",
   "suppress_proactive_category",
 ]);
-
 
 const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   // Market Discovery
@@ -1253,7 +1253,17 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     category: "system",
     level: 2,
     action: "agent",
-    whenToUse: "Inspect the 5 remaining opt-in behavior flags or change them for the current session. Persistent changes require editing .env.",
+    whenToUse: `Inspect the 5 remaining opt-in behavior flags or change them for the current session. Persistent changes require editing .env. (${buildTracingStatusLine()})`,
+  },
+  {
+    name: "momq",
+    aliases: ["competition"],
+    description: "Model to Market competition status — risk posture, env readiness, tracing target, and bring-up checklist (read-only)",
+    usage: "/momq",
+    category: "system",
+    level: 2,
+    action: "agent",
+    whenToUse: `Check competition readiness before the run: aggressive risk posture, DOUBLEWORD_API_KEY/LOGFIRE_TOKEN presence, MT5 bridge checklist. (${buildTracingStatusLine()})`,
   },
   {
     name: "config",
