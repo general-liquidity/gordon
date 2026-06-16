@@ -31,6 +31,7 @@ import {
   type PairTarget,
   type PairsCompetitionConfig,
 } from "./pairsCompetitionStrategy.ts";
+import { rvPairTargets, RV_REVERSION_CONFIG, type RvReversionConfig } from "./rvReversionCore.ts";
 import {
   assessStanding,
   DEFAULT_FIELD,
@@ -55,7 +56,16 @@ export interface BarbellConfig {
   redLineFraction: number;
   /** Max acceptable probability the sleeve liquidates before the deadline. Default 0.10. */
   sleeveMaxBreachProb: number;
-  /** Pairs-core config (universe, max pairs, per-pair fraction, z thresholds). */
+  /**
+   * Core engine. "rv" (DEFAULT) = relaxed relative-value reversion over all within-cluster
+   * ratio pairs — the validated ≥30-trade smooth Best-Sharpe vehicle. "strict" = the
+   * cointegration gauntlet (`pairsCompetitionStrategy`) — fewer, higher-conviction pairs but
+   * trade-starved on the thin comp universe.
+   */
+  core: "rv" | "strict";
+  /** RV-reversion core config (used when core="rv"). */
+  rvConfig: RvReversionConfig;
+  /** Strict pairs-core config (used when core="strict"). */
   pairsConfig: PairsCompetitionConfig;
 }
 
@@ -63,6 +73,8 @@ export const BARBELL_CONFIG: BarbellConfig = {
   sleeveFraction: 0.08,
   redLineFraction: 0.5,
   sleeveMaxBreachProb: 0.1,
+  core: "rv",
+  rvConfig: RV_REVERSION_CONFIG,
   pairsConfig: PAIRS_COMPETITION_CONFIG,
 };
 
@@ -132,9 +144,13 @@ export function barbellDecision(input: BarbellInput): BarbellDecision {
     redLineEquity,
   });
 
-  // ── CORE: dollar-neutral pairs book, sized off the core equity (not the sleeve). ──
-  const selected = selectPairs(input.barsBySymbol, { config: cfg.pairsConfig });
-  const core = pairTargets(input.barsBySymbol, selected, ringFence.coreEquity, { config: cfg.pairsConfig });
+  // ── CORE: dollar-neutral book, sized off the core equity (not the sleeve). ──
+  // "rv" = relaxed ratio-reversion (the validated ≥30-trade smooth vehicle); "strict" =
+  // cointegration gauntlet (higher conviction, trade-starved on the thin comp universe).
+  const core =
+    cfg.core === "strict"
+      ? pairTargets(input.barsBySymbol, selectPairs(input.barsBySymbol, { config: cfg.pairsConfig }), ringFence.coreEquity, { config: cfg.pairsConfig })
+      : rvPairTargets(input.barsBySymbol, ringFence.coreEquity, cfg.rvConfig);
 
   // ── STANDING: bang-bang stance. ──
   const standing = assessStanding({ ourReturn: input.ourReturnPct, field, phase: input.phase });
