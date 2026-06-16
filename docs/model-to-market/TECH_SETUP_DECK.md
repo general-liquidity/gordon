@@ -131,11 +131,11 @@ Candidate primitives we wired (e.g. `src/core/alpha/reversal-strategy.ts`, `cros
 Two things consistently *did* hold up — and with the rigor of the search itself, they are the technology story:
 
 1. **Survival / no-blow-up sizing.** `sizeCompetitionTrade`'s min-of-caps composition (§2.1) means a losing streak cannot cause ruin. Forced liquidation = instant elimination (§14); a book that *cannot* wipe out has a ranking edge by construction in an attrition tournament. With **no commission** and **30:1 leverage** available to ~500 entrants, the 70%-weight return rank is a *variance contest* — the controllable edges are survival, drawdown, and Sharpe rank, not return-alpha we proved isn't there.
-2. **A regime-adaptive default.** `COMPETITION_RISK_AGGRESSIVE` (`competition-risk-preset.ts`) is **diversified aggressive compounding** — many small, vol-targeted, diversified positions across the 30+ instruments rather than a few concentrated bets. This competes on return (70%) while keeping the 15-min Sharpe high and controlling drawdown. All ceilings stay under the §13 discipline thresholds (leverage < 28×, margin < 90%, single-instrument < 90%, net-directional < 95%) and the many-small-trades book naturally clears the §17 ≥30-trade floor.
+2. **A beta-stripped trend posture, sized for survival.** The one lead the exhaustive search surfaced is **long-short time-series momentum**: in the OOS bear leg where equal-weight buy-hold fell ~60%, the beta-stripped book stayed positive with a ~7% drawdown — the only construction that kept the book alive while the market crashed. It doesn't clear the deflated bar (so we make NO return-edge claim), but its low-drawdown shape is exactly what the Drawdown (15%) and Sharpe (10%) ranks reward. The FROZEN config (`src/infra/trading/competition/competitionStrategy.ts`) runs that TSMOM signal across the 15 tradeable instruments, sized by **`COMPETITION_RISK_SURVIVAL`** — a tight 12% vol budget, 3× leverage, −3% daily kill, all far under the §13 thresholds, the book naturally clearing the §17 ≥30-trade floor (2512 in rehearsal). This is the EVIDENCE-BASED choice: with no alpha to compound, aggressive deployment is just variance; conceding the luck-dominated return rank to bank the controllable score is the rational play.
 
 And the **rigor of the search is itself the edge**: a walk-forward, deflated-Sharpe, multiple-testing-corrected harness that refuses to launder noise into a "winner" — plus the one genuine data advantage, since the organisers provide **no crypto backtest data**, so our self-scraped **3-year multi-regime Binance history** (18 symbols × M15/1h/1d) is coverage most entrants won't have.
 
-**The thesis:** in a no-commission, luck-dominated return tournament, the defensible edges are **disciplined survival + a regime-adaptive book + the governance/measurement architecture** — and that **honesty and rigor IS the technology story**, which is exactly what the Best Technology axis rewards.
+**The thesis:** in a no-commission, luck-dominated return tournament, the defensible edges are **disciplined survival + a beta-stripped low-drawdown book + the governance/measurement architecture** — and that **honesty and rigor IS the technology story**, which is exactly what the Best Technology axis rewards.
 
 ---
 
@@ -181,26 +181,30 @@ python scripts/mt5-bridge/mt5_bridge.py
 #    reflects the (unset) sidecar guard, proving the validate-only posture.
 bun run scripts/dev/mt5-smoke.ts
 
-# 3. The honest empirical finding — run the cost-honest, IS/OOS validators.
-#    Each prints per-instrument return / 15-min Sharpe (taker, after costs).
+# 3. The headline empirical finding — the SYSTEMATIC, multiple-testing-corrected sweep.
+#    Sweeps Gordon's signal library × param grid × instrument through the cost-honest
+#    money-path under walk-forward folds, ranked with deflated-Sharpe / PSR. Taker only.
+bun run scripts/research/alpha-search.ts
+#    → 0 of 620 (strategy×config×instrument) cells clear the deflated bar. Then the SAME
+#      null across every class we could test — exhaustive, not cherry-picked:
+bun run scripts/research/ensemble-search.ts          # signal ensembles
+bun run scripts/research/pairs-scan.ts               # cointegration pairs (Johansen+EG+OU)
+bun run scripts/research/cross-sectional-scan.ts     # long top / short bottom
+bun run scripts/research/portfolio-tsmom-scan.ts     # portfolio time-series momentum
+#    Supporting per-instrument transparency (taker, IS/OOS):
 bun run scripts/dev/momq-edge-validate.ts            # naive TA / momentum
-bun run scripts/dev/momq-reversal-validate.ts        # time-series reversal
-bun run scripts/dev/momq-cross-sectional-validate.ts # cross-sectional reversal
-bun run scripts/dev/momq-factor-validate.ts          # Q-7 factor IC
-bun run scripts/dev/momq-imbalance-validate.ts       # L2 order-book imbalance
-bun run scripts/dev/momq-microstructure-validate.ts  # order-flow pressure
-#    → the takeaway beat: no signal survives OOS after costs (taker — the only Cypher mode);
-#      0/620 cells clear the deflated-Sharpe bar in the systematic sweep.
+bun run scripts/dev/momq-imbalance-validate.ts       # L2 imbalance (FX depth is static)
 
-# 4. The live-trader REHEARSAL — drive the REAL CompetitionLiveTrader loop
-#    end-to-end over replayed M15 bars (ReplayMt5 stands in for the sidecar).
-#    Exercises sizing → lot-rounding → order-shape → daily-loss-kill on the live path.
+# 4. The live-trader REHEARSAL — drive the REAL CompetitionLiveTrader loop end-to-end
+#    over replayed M15 bars (ReplayMt5 stands in for the sidecar) with the FROZEN config
+#    (TSMOM + survive-and-rank preset). Exercises sizing → lot-rounding → order-shape →
+#    daily-loss-kill on the live path. Proven: 2879 cycles, 2512 orders, no crash, ≥30 trades.
 bun run scripts/competition/rehearsal.ts
 
 # 5. The live runner in DRY mode — GORDON_LIVE_TRADING UNSET.
-#    Connects to the real bridge, sizes every cycle through COMPETITION_RISK_AGGRESSIVE,
-#    logs intended (dry) orders, submits nothing. This is the exact go-live process,
-#    minus the two guards.
+#    Connects to the real bridge, sizes every cycle through the FROZEN COMPETITION_RISK
+#    (survive-and-rank) preset, logs intended (dry) orders, submits nothing. This is the
+#    EXACT go-live process — same strategy module the rehearsal uses — minus the two guards.
 bun run scripts/competition/live-runner.ts
 ```
 
@@ -223,7 +227,8 @@ bun run scripts/competition/live-runner.ts
 | `scripts/mt5-bridge/` | MT5 Python sidecar (`mt5_bridge.py`, `requirements.txt`, `README.md`) |
 | `src/infra/broker/mt5/` | typed bridge client + adapter |
 | `src/core/risk-management/competition-scoring.ts` | exact §11–17 objective function (16 tests) |
-| `src/core/risk-management/competition-risk-preset.ts` | survive-and-compound + `COMPETITION_RISK_AGGRESSIVE` sizer |
+| `src/core/risk-management/competition-risk-preset.ts` | survive-and-rank sizer (`COMPETITION_RISK_SURVIVAL`) |
+| `src/infra/trading/competition/competitionStrategy.ts` | FROZEN config — TSMOM signal + universe + preset (rehearsal == live) |
 | `src/backtest/competition-dry-run.ts` | cost-honest taker money-path simulator (FOK/IOC, no commission) |
 | `src/core/alpha/` | candidate signal primitives (reversal, cross-sectional, factor model) |
 | `scripts/dev/momq-*.ts` | the IS/OOS, after-costs signal validators (the receipts) |
@@ -257,7 +262,7 @@ The full 24/7 live-week runbook (topology, the double guard, start sequence, kil
 - So we built toward what *is* consistent and measurable:
   - **Survival / no-blow-up sizing** — min-of-caps so a losing streak can't cause ruin; forced liquidation is instant elimination, so not-wiping-out is itself a ranking edge in a no-commission, high-leverage variance contest.
   - **Search rigor as the edge** — a walk-forward, deflated-Sharpe, multiple-testing-corrected harness that returns *0/620* rather than launder noise; plus self-scraped 3-year multi-regime crypto history (the organisers provide none).
-  - **A regime-adaptive default** — diversified aggressive compounding: many small, vol-targeted, diversified positions, all under the §13 discipline thresholds.
+  - **A beta-stripped trend posture, survival-sized** — long-short TSMOM (the one lead from the search) across the 15 tradeable instruments, sized by `COMPETITION_RISK_SURVIVAL` (12% vol, 3× lev, −3% kill), all far under the §13 thresholds.
 - **The conclusion:** in a likely luck-dominated return tournament, the defensible edges are **disciplined execution + survival + the governance architecture** — and the honesty/rigor of *measuring that* is the technology story.
 
 ---

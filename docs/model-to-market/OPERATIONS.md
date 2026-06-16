@@ -144,8 +144,8 @@ The **Risk Discipline** score (§13) resets to 100 each round and is penalized f
 - Also DQ: exploiting quote/latency/matching/settlement, API abuse / flooding (safe-harbor ≤ 500 req/s), multi-account, collusion / pre-arranged trading.
 
 **These are enforced in code, not just watched.** The **competition risk preset** (`src/core/risk-management/competition-risk-preset.ts`) sizes every order as a **min-of-caps** so the most conservative constraint always binds:
-- `COMPETITION_RISK_DEFAULTS` (survive-and-compound): 0.5% per-trade risk, 3× leverage, 15% vol target, 3% daily-loss kill, 60% exposure cap, 0.25 fractional Kelly.
-- `COMPETITION_RISK_AGGRESSIVE` (go-for-1st posture): 1.5% per-trade, 6× per-position leverage (forces a wide diversified book), 35% vol target, 8% daily-loss kill, ~10× gross exposure, 0.4 fractional Kelly.
+- **`COMPETITION_RISK_SURVIVAL` (the FROZEN default — survive-and-rank):** 0.5% per-trade risk, 3× leverage, 12% vol target, 3% daily-loss kill, 3× gross exposure, 0.25 fractional Kelly. Chosen after the exhaustive search found no edge: concede the luck-dominated return rank, bank the controllable Drawdown/Sharpe ranks + survival.
+- `COMPETITION_RISK_AGGRESSIVE` (go-for-1st gamble — NOT the default): 1.5% per-trade, 6× per-position leverage, 35% vol target, 8% daily-loss kill, ~10× gross exposure, 0.4 fractional Kelly. Only swap in to gamble the return rank.
 
 Every ceiling in both presets sits **well under** the §13 thresholds (leverage < 28×, margin < 90%, single-instrument < 90%, net-directional < 95%) and never concentrates enough to risk forced liquidation. The `daily_loss_kill` constraint **halts trading for the day** (verdict `halt`) when the day's PnL hits the kill level — protecting drawdown rank and keeping the book away from the red line. The preset is **pure and never throws**; it is selected via the run config, not auto-wired.
 
@@ -190,7 +190,7 @@ Run this immediately before **21 Jun 22:00 BST**. Arm the two guards **only at t
 - [ ] **Bridge token matches** — `MT5_BRIDGE_TOKEN` identical on the sidecar and in Gordon's `apiKey`; `baseUrl` = `http://127.0.0.1:8788`.
 - [ ] **Smoke test green** — `bun run scripts/dev/mt5-smoke.ts` passes (account + quote + depth + bars + symbol spec). Re-run with the final symbol list.
 - [ ] **Final tradeable instrument list confirmed** on the platform/console — the 30+ instruments + per-instrument contract specs / leverage / tick size / spreads (released at login). Symbols are resolved from the venue catalog at runtime, never hardcoded.
-- [ ] **Risk preset selected** — `COMPETITION_RISK_AGGRESSIVE` (or `DEFAULTS`) wired into the run config; ceilings confirmed under §13 thresholds.
+- [ ] **Risk preset confirmed** — `COMPETITION_RISK_SURVIVAL` (the frozen default in `competitionStrategy.ts`); ceilings confirmed under §13 thresholds. Swap to `AGGRESSIVE` only as a deliberate gamble.
 - [ ] **Optional perks** — `LOGFIRE_TOKEN` set for tracing; `DOUBLEWORD_API_KEY` if used.
 - [ ] **Both guards set — deliberately, at go-live** — `MT5_BRIDGE_ALLOW_TRADING=1` on the sidecar **and** `GORDON_LIVE_TRADING=1` on the runner. Until both are `1`, the stack is validate-only by design.
 - [ ] **Kill switch rehearsed** — Section 7 steps confirmed working (disarm runner, stop runner, disarm sidecar) before capital is live.
