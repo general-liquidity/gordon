@@ -31,14 +31,19 @@
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { availableParallelism } from "node:os";
-import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 
 import {
   deflatedSharpeRatio,
   probabilisticSharpeRatio,
 } from "../../src/infra/trading/ops/backtestCredibility.ts";
 import { sizeWithVolTarget } from "../../src/core/alpha/vol-target-sizer.ts";
+
+// NOTE: this scan is intentionally SERIAL. The whole sweep — build the aligned
+// panel once, then score the ~120-config grid — runs in ~3s even on the 52-symbol
+// × 8-year universe. Worker-thread sharding here is net-NEGATIVE: each worker would
+// rebuild the shared (expensive) panel from disk to parallelize (cheap) configs,
+// which thrashes and hangs. Parallelism helps the per-cell-heavy scans (alpha-search,
+// pairs); it does not help a cheap shared-panel sweep like this one.
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -487,43 +492,7 @@ function scoreConfigSlice(panel: Panel, der: Derived, configIdxs: number[], tria
   return configIdxs.map((ci) => scoreConfig(panel, der, grid[ci]!, trials));
 }
 
-// ── Worker entry: rebuild the panel from disk, score a config-slice ──────────
-//
-// Workers re-read the bar files (cheap) and rebuild the aligned panel rather than
-// receiving the cloned price panel across the thread boundary, then score only
-// their assigned config indices.
-if (!isMainThread && parentPort) {
-  const { configIdxs, trials } = workerData as { configIdxs: number[]; trials: number };
-  const { panel, der } = loadPanel();
-  parentPort.postMessage(scoreConfigSlice(panel, der, configIdxs, trials));
-}
-
-/** Fan the grid out across worker threads — one config-shard per worker. */
-function runShardedConfigs(nConfigs: number, trials: number): Promise<Row[]> {
-  const nWorkers = Math.max(1, Math.min(availableParallelism(), nConfigs));
-  // Round-robin config indices across workers — configs cost roughly the same
-  // (same panel, same OOS length), so round-robin is even enough.
-  const chunks: number[][] = Array.from({ length: nWorkers }, () => []);
-  for (let ci = 0; ci < nConfigs; ci++) chunks[ci % nWorkers]!.push(ci);
-
-  return Promise.all(
-    chunks.map(
-      (configIdxs) =>
-        new Promise<Row[]>((resolve, reject) => {
-          const w = new Worker(new URL(import.meta.url), {
-            workerData: { configIdxs, trials },
-          });
-          w.once("message", (rows: Row[]) => {
-            resolve(rows);
-            void w.terminate();
-          });
-          w.once("error", reject);
-        }),
-    ),
-  ).then((perChunk) => perChunk.flat());
-}
-
-async function main(): Promise<void> {
+function main(): void {
   const { panel, der } = loadPanel();
 
   const grid = buildGrid();
@@ -546,17 +515,10 @@ async function main(): Promise<void> {
   console.log(`Spread (data-implied median): ${fmt(dataSpread, 2)} bps — FLOORED to ${MIN_SPREAD_BPS} bps for cost (dataset records spread=0)`);
   console.log(`Vol target (vt=1 configs): ${(TARGET_ANNUAL_VOL * 100).toFixed(0)}% annualized`);
 
-  // Fan the grid sweep across worker threads — each config is independent and
-  // trials is fixed, so sharding is exact. Opt out with PORT_SERIAL=1.
-  const serial = process.env.PORT_SERIAL === "1" || grid.length <= 1;
-  const nWorkers = serial ? 1 : Math.min(availableParallelism(), grid.length);
-  console.log(`Parallelism       : ${serial ? "serial (1 core)" : `${nWorkers} workers / ${availableParallelism()} cores, ${grid.length} configs`}`);
   console.log("");
 
   const allIdxs = Array.from({ length: grid.length }, (_v, i) => i);
-  const rows: Row[] = serial
-    ? scoreConfigSlice(panel, der, allIdxs, trials)
-    : await runShardedConfigs(grid.length, trials);
+  const rows: Row[] = scoreConfigSlice(panel, der, allIdxs, trials);
 
   // Rank by OOS bar Sharpe.
   rows.sort((a, b) => {
@@ -669,4 +631,4 @@ async function main(): Promise<void> {
   console.log("");
 }
 
-if (isMainThread) void main();
+main();
