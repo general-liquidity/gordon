@@ -546,3 +546,13 @@ export {
   type DivergenceType,
   type DeltaDivergenceVerdict,
 } from "./delta-price-divergence.ts";
+
+export {
+  computeCryptoFactorModel,
+  STYLE_FACTORS,
+  type StyleFactor,
+  type CryptoTokenInput,
+  type TokenFactorScore,
+  type CryptoFactorModelResult,
+  type CryptoFactorModelOptions,
+} from "./crypto-factor-model.ts";
