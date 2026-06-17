@@ -28,14 +28,12 @@ import {
 /**
  * The 15 competition-tradeable instruments (FX majors + gold/silver + 5 crypto).
  *
- * ⚠️ BARUSD vs HBARUSD — VERIFY AT LOGIN (the platform symbol list is authoritative).
- * COMPETITION_BRIEF.md says the 5th crypto is HBARUSD (Hedera) and that "BARUSD" was an early
- * announcement error. On Binance "BAR" is the Barcelona fan-token — a DIFFERENT instrument — so
- * the scraped BARUSD data is likely the wrong token. We keep `BARUSD` here until the platform
- * confirms the ticker; if it lists HBARUSD, change it here AND in the sleeve/cluster universes
- * (barbellStrategy SLEEVE_UNIVERSE, pairsCompetitionStrategy PAIRS_CLUSTERS) and re-fetch data.
- * The data-availability guard drops any symbol with no live feed, and preflight/spread-check
- * surface a missing symbol, so a mismatch fails loud rather than trading the wrong thing silently.
+ * Note on `BARUSD`: the Syphonix MT5 catalog labels the 5th crypto symbol "BARUSD" (description
+ * "BAR vs USD", currency_base "BAR"), but Discord (Lotus) clarified the UNDERLYING is HBAR
+ * (Hedera), not the Barcelona fan-token. So `BARUSD` is the platform's TRADING SYMBOL and HBAR is
+ * the asset — our data-fetch maps BARUSD → Binance HBARUSDT, so data/momq/bars/BARUSD_M15.json is
+ * correctly Hedera. Keep the symbol as `BARUSD` to match the catalog. Only residual: confirm at
+ * login the live symbol string is still "BARUSD" (if they renamed it "HBARUSD", update the label).
  */
 export const COMPETITION_TRADEABLE: readonly string[] = [
   "EURUSD", "GBPUSD", "USDCHF", "USDJPY", "USDCAD", "AUDUSD", "EURGBP", "EURCHF",
