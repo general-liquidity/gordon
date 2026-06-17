@@ -35,6 +35,10 @@ import type { RvHysteresisState } from "./rvReversionCore.ts";
 import { marginCircuitBreaker } from "./survivalStop.ts";
 import { computeStanding, type CompetitionStanding } from "./standingMonitor.ts";
 import type { RiskSample } from "../../../core/risk-management/competition-scoring.ts";
+import { clampToDepth } from "./depthSizing.ts";
+import { SlippageTracker } from "./slippageTracker.ts";
+import type { Mt5Depth } from "../../broker/mt5/bridgeClient.ts";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { filterToAvailableSymbols, formatExcludedNote } from "./dataAvailability.ts";
 
 /** Mockable subset of the bridge the runner needs (same shape as liveTrader's Mt5Like). */
@@ -44,6 +48,8 @@ export interface Mt5Like {
   quote(symbol: string): Promise<Mt5Quote>;
   bars(params: { symbol: string; timeframe?: string; count?: number }): Promise<Mt5Bar[]>;
   placeOrder(req: Mt5OrderRequest): Promise<Mt5OrderResult>;
+  /** Optional L2 depth — when present, orders are sized to fillable depth (FOK/IOC safety). */
+  depth?(symbol: string): Promise<Mt5Depth>;
 }
 
 // ── Pure core: aggregate the barbell decision into per-symbol signed target notional ──
@@ -162,6 +168,17 @@ export interface BarbellRunnerConfig {
   cutPercentile?: number;
   /** Live peer-return leaderboard (rounds 1-3) for an EMPIRICAL return rank, if wired. */
   board?: () => { returns: number[] } | undefined;
+  /**
+   * Path to persist the equity + risk history (JSON) so a process RESTART mid-comp doesn't
+   * lose the standing/Sharpe history. Loaded on construction, rewritten each cycle. Omit → none.
+   */
+  statePath?: string;
+  /**
+   * Path to a manual KILL-SWITCH flag file. If it exists at cycle time, the whole book is
+   * flattened (operator panic-button, complementing the automatic margin breaker). Also tripped
+   * by `GORDON_COMP_FLATTEN=1`. Touch the file to flatten; remove it to resume.
+   */
+  flattenFlagPath?: string;
 }
 
 export interface BarbellCycleReport {
@@ -173,6 +190,8 @@ export interface BarbellCycleReport {
   marginLevelPct: number;
   /** True ⇒ the survival breaker fired and the book was flattened (targets forced to 0). */
   breakerTripped: boolean;
+  /** True ⇒ the manual kill-switch fired and the book was flattened. */
+  manualFlatten: boolean;
   orders: Array<ReconcileOrder & { action: "placed" | "dry" | "refused" | "error"; detail?: string }>;
   ordersPlaced: number;
   /** Live competition standing computed from the running equity curve (§11-17 + estimated rank). */
@@ -189,15 +208,49 @@ export class BarbellLiveRunner {
   /** 15-min equity samples + risk samples accumulated across cycles (for the standing monitor). */
   private readonly equityHistory: number[] = [];
   private readonly riskHistory: RiskSample[] = [];
+  /** Realized-slippage accountant — records every fill vs the pre-trade mid to validate cost live. */
+  private readonly slippage = new SlippageTracker();
 
   constructor(client: Mt5Like, cfg: BarbellRunnerConfig, log: (m: string) => void = (m) => console.log(m)) {
     this.client = client;
     this.cfg = cfg;
     this.log = log;
+    // Restart-safe: reload the equity + risk history so the standing/Sharpe survives a restart.
+    if (cfg.statePath && existsSync(cfg.statePath)) {
+      try {
+        const s = JSON.parse(readFileSync(cfg.statePath, "utf8")) as { equityHistory?: number[]; riskHistory?: RiskSample[] };
+        if (Array.isArray(s.equityHistory)) this.equityHistory.push(...s.equityHistory.filter((x) => Number.isFinite(x)));
+        if (Array.isArray(s.riskHistory)) this.riskHistory.push(...s.riskHistory);
+        this.log(`[barbell] restored ${this.equityHistory.length} equity samples from ${cfg.statePath}`);
+      } catch (err) {
+        this.log(`[barbell] could not restore state (${(err as Error).message}); starting fresh`);
+      }
+    }
   }
 
   private liveArmed(): boolean {
     return process.env.GORDON_LIVE_TRADING === "1";
+  }
+
+  /** Realized-slippage summary so far (validates the live execution-cost assumption). */
+  slippageSummary(): ReturnType<SlippageTracker["summary"]> {
+    return this.slippage.summary();
+  }
+
+  /** Manual kill-switch: env flag or a flag file the operator can touch mid-comp to flatten. */
+  private manualFlattenActive(): boolean {
+    if (process.env.GORDON_COMP_FLATTEN === "1") return true;
+    return this.cfg.flattenFlagPath ? existsSync(this.cfg.flattenFlagPath) : false;
+  }
+
+  /** Persist the equity + risk history (best-effort; never throws into the loop). */
+  private persistState(): void {
+    if (!this.cfg.statePath) return;
+    try {
+      writeFileSync(this.cfg.statePath, JSON.stringify({ equityHistory: this.equityHistory, riskHistory: this.riskHistory }));
+    } catch {
+      /* best-effort persistence — a write failure must never break the trading loop */
+    }
   }
 
   async runCycle(): Promise<BarbellCycleReport> {
@@ -223,6 +276,12 @@ export class BarbellLiveRunner {
     const availableBars: Record<string, Mt5Bar[]> = {};
     for (const s of available) availableBars[s] = barsBySymbol[s]!;
 
+    // Shared mid-price helper (order sizing, slippage reference, risk concentration).
+    const mid = (sym: string, fallback: number): number => {
+      const q = quoteBySymbol[sym];
+      return q && q.bid > 0 && q.ask > 0 ? (q.bid + q.ask) / 2 : fallback;
+    };
+
     // SURVIVAL circuit breaker runs FIRST. If the account margin level nears the 30% stop-out
     // (= elimination), flatten the WHOLE book (targets → 0) and skip the barbell decision
     // entirely — per-leg stops would un-hedge the core, and `barbellDecision` itself refuses
@@ -233,13 +292,15 @@ export class BarbellLiveRunner {
       usedMargin: account.margin,
       breakerLevelPct: this.cfg.breakerLevelPct,
     });
+    const manualFlatten = this.manualFlattenActive();
 
     let targets: Record<string, number>;
     let decisionReason: string;
-    if (breaker.tripped) {
-      this.log(`[barbell] SURVIVAL CIRCUIT BREAKER — ${breaker.reason}`);
+    if (breaker.tripped || manualFlatten) {
+      const why = manualFlatten ? "MANUAL KILL SWITCH — flatten all (operator)" : breaker.reason;
+      this.log(`[barbell] ${manualFlatten ? "KILL SWITCH" : "SURVIVAL CIRCUIT BREAKER"} — ${why}`);
       targets = {}; // flatten everything
-      decisionReason = breaker.reason;
+      decisionReason = why;
     } else {
       const decision = barbellDecision({
         barsBySymbol: availableBars,
@@ -268,24 +329,45 @@ export class BarbellLiveRunner {
         orders.push({ ...o, action: "dry" });
         continue;
       }
+      // Depth-aware sizing: clamp to fillable depth so a FOK/IOC order doesn't bounce above the
+      // book. Graceful — if no depth feed, place full size; the idempotent reconcile closes any
+      // remaining gap next cycle.
+      let lots = o.lots;
+      let detailSuffix = "";
+      if (this.client.depth) {
+        try {
+          const d = await this.client.depth(o.symbol);
+          const clamp = clampToDepth(o.lots, o.side, o.side === "buy" ? d.asks : d.bids, { fillFraction: 0.8 });
+          if (clamp.fillableLots <= 0) {
+            orders.push({ ...o, action: "refused", detail: "no depth to fill" });
+            continue;
+          }
+          if (clamp.capped) {
+            detailSuffix = ` (depth-capped ${o.lots}→${clamp.fillableLots})`;
+            lots = clamp.fillableLots;
+          }
+        } catch {
+          /* no depth → place full size */
+        }
+      }
+      const refMid = mid(o.symbol, 0);
       try {
-        const res = await this.client.placeOrder({ symbol: o.symbol, side: o.side, type: "market", volume: o.lots });
+        const res = await this.client.placeOrder({ symbol: o.symbol, side: o.side, type: "market", volume: lots });
         if (res.executed) {
           ordersPlaced += 1;
-          orders.push({ ...o, action: "placed", detail: `order=${res.order ?? "?"}` });
+          if (res.price && res.price > 0 && refMid > 0) {
+            this.slippage.record({ symbol: o.symbol, side: o.side, refPrice: refMid, fillPrice: res.price, volume: res.volume ?? lots });
+          }
+          orders.push({ ...o, lots, action: "placed", detail: `order=${res.order ?? "?"}${detailSuffix}` });
         } else {
-          orders.push({ ...o, action: "refused", detail: res.guard ?? res.comment ?? `retcode ${res.retcode ?? "?"}` });
+          orders.push({ ...o, lots, action: "refused", detail: res.guard ?? res.comment ?? `retcode ${res.retcode ?? "?"}` });
         }
       } catch (err) {
-        orders.push({ ...o, action: "error", detail: (err as Error).message });
+        orders.push({ ...o, lots, action: "error", detail: (err as Error).message });
       }
     }
 
     // ── Live risk sample (§13 inputs) + standing, computed from the actual book. ──
-    const mid = (sym: string, fallback: number): number => {
-      const q = quoteBySymbol[sym];
-      return q && q.bid > 0 && q.ask > 0 ? (q.bid + q.ask) / 2 : fallback;
-    };
     const signedBySym: Record<string, number> = {};
     let grossNotional = 0;
     for (const p of positions) {
@@ -313,6 +395,8 @@ export class BarbellLiveRunner {
       liveRisk: { marginUsage, leverage },
     });
 
+    this.persistState(); // restart-safe equity/risk history
+
     return {
       equity,
       ourReturnPct,
@@ -320,6 +404,7 @@ export class BarbellLiveRunner {
       decisionReason,
       marginLevelPct: account.margin_level,
       breakerTripped: breaker.tripped,
+      manualFlatten,
       orders,
       ordersPlaced,
       standing,
@@ -334,6 +419,8 @@ export class BarbellLiveRunner {
       try {
         const r = await this.runCycle();
         this.log(r.standing.summary); // live standing every cycle
+        const sl = this.slippage.summary();
+        if (sl.fills > 0) this.log(`[barbell] realized slippage: ${sl.fills} fills · mean ${sl.meanSlippageBps.toFixed(2)}bps · cost ${sl.totalCostQuote.toFixed(0)}`);
         onCycle?.(r);
       } catch (err) {
         this.log(`[barbell] cycle error (continuing): ${(err as Error).message}`);
