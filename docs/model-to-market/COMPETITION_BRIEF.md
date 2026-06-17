@@ -53,9 +53,10 @@ Authoritative dates from **[RULES]** §5, refined by **[DISCORD]**. Marketing pa
 
 **Account** **[RULES]** §2: simulated, $1,000,000 initial, **30:1 max leverage**, unified market environment (everyone sees the same quotes), zero principal risk.
 
-**Asset scope** **[RULES]** §3 + **[DISCORD]**: major FX pairs, **XAUUSD** (gold), **XAGUSD** (silver), **Oil**, **AUDJPY**, … and **5 crypto: BTCUSD, ETHUSD, SOLUSD, XRPUSD, HBARUSD** (HBAR = Hedera; first announced as "BARUSD" in error). **30+ instruments total**; the final list is released in the system at login / on the 18th. **No stocks, indices, or bonds.** **No options** (use stop-losses; no option hedging).
+**Asset scope** **[RULES]** §3 + **[DISCORD]**: major FX pairs, **XAUUSD** (gold), **XAGUSD** (silver), and **5 crypto: BTCUSD, ETHUSD, SOLUSD, XRPUSD, HBARUSD** (HBAR = Hedera; first announced as "BARUSD" in error — see the ⚠️ below). The **venue catalog may list 30+ symbols**, but only a **competition-tradeable subset (~15)** is in scope; **Gordon's live universe is the 15** (8 FX + XAUUSD + XAGUSD + 5 crypto) in `competitionStrategy.ts`. **No stocks, indices, or bonds.** **No options** (use stop-losses; no option hedging). The final tradeable list is released at login / on the 18th.
 
-> **[CONFIRM]** Pull the full 30+ instrument list from the console once logged in — contract specs, per-instrument leverage, tick size, and spreads feed Gordon's sizing.
+> **⚠️ [BLOCKER — verify at login]** The brief says the crypto is **HBARUSD** (Hedera), but the code/data still use **`BARUSD`** — which on Binance is the *Barcelona fan-token*, a DIFFERENT instrument. Our scraped "BARUSD" data is therefore likely the **wrong token**. **The platform symbol list is authoritative** — confirm the exact ticker at login; if HBARUSD, swap the symbol in `competitionStrategy.ts` (+ the sleeve/cluster universes) and re-fetch HBAR data. Preflight/spread-check will flag a missing symbol if the platform lists HBARUSD while we query BARUSD.
+> **[CONFIRM]** Pull the full instrument list from the console once logged in — contract specs, per-instrument leverage, tick size, and spreads feed Gordon's sizing.
 
 ---
 
@@ -83,7 +84,7 @@ Authoritative dates from **[RULES]** §5, refined by **[DISCORD]**. Marketing pa
 - **Maker and taker** both supported (limit + marketable orders).
 - The **real market order book is an INPUT to a per-account simulation**. You do **not** trade the live production book; other participants **cannot** interact with your orders (matching is internal/per-account; not yet transparent).
 - **Slippage, liquidity constraints, and market impact are simulated.** Validate in the test env from the 18th.
-- **Costs: NO commission, NO swap/financing charges.** Friction = **spread + slippage + market impact only**.
+- **Costs: NO commission. Swap/financing is TBD per the final specs** (early Discord said "no swap," the final rules left it unconfirmed — **confirm at login**; assume it may apply). Modelled friction = **spread + slippage + market impact** (+ swap if confirmed).
 - **Sub-millisecond execution; no trading-frequency limit** on the platform side (MT5 API layer may impose its own). Safe-harbor ≤ **500 requests/sec** (above that, only penalized if it causes system anomalies).
 
 > Implication: with zero commission/swap, high-frequency *diversified* compounding carries no per-trade drag — favourable for the chosen posture (§9). But the dry-run must model spread/slippage to stay honest.
@@ -236,16 +237,20 @@ Implemented in `competition-scoring.ts` (`selectBestSharpeAward` / `isBestSharpe
 
 ---
 
-## 9. Strategy posture (operator decision, 2026-06-16)
+## 9. Strategy posture (FROZEN — survive-and-rank + endgame sleeve, finalized 2026-06-17)
 
-**Goal:** prioritize **1st place** while keeping a real shot at **Best Sharpe** + **Best Tech**.
+> Supersedes the earlier "diversified aggressive compounding / prioritize 1st" framing. The exhaustive
+> alpha search found **no return edge** that clears realistic cost, so the return rank (70%) is a variance
+> lottery we can't *earn*. The authoritative, executable version of this posture — including the launch
+> sequence and the pre-committed decision tree — is **`OPERATIONS.md` §9 (Decision Playbook)**; the tech
+> framing is in `TECH_SETUP_DECK.md`. This section is the summary.
 
-**Approach — diversified aggressive compounding.** Make the return come *from a high-Sharpe engine*, not from big bets:
-- Deploy capital aggressively but across **many small, vol-targeted, diversified positions** over the 30+ instruments — not a few concentrated directional bets.
-- This competes on **return (70%)** while keeping the **15-min Sharpe** high (smooth equity), controlling **drawdown (15%)**, and **never concentrating enough to risk forced liquidation** (instant elimination).
-- All ceilings stay under the §13 discipline thresholds (leverage < 28×, margin < 90%, single-instrument < 90%, net-directional < 95%).
-- Zero commission/swap means high trade count carries no drag — reinforces the approach.
-- **Maintain ≥ 30 trades and a Top-50 overall finish** — both are hard gates for the Best Sharpe Award (§8.5). The diversified many-small-trades book clears the trade floor naturally; the return focus clears the Top-50 gate.
+**Goal:** maximize the **composite finish**, not chase 1st with variance. Bank the controllable ~25–30% (Drawdown 15% + Sharpe 10% + Risk-Discipline 5%) by surviving smoothly, and take the one sanctioned swing at the return rank at the *decisive* moment.
+
+**Approach — barbell: smooth core + ring-fenced one-shot sleeve.**
+- **Core (frozen `COMPETITION_RISK_SURVIVAL`):** a dollar-neutral discrete-hysteresis **RV-reversion** book over the within-cluster crypto + metals pairs — many small, low-variance, market-neutral trades. Smooth equity → wins the Sharpe (10%) + Drawdown (15%) ranks; breadth clears the **§17 ≥30-trade** floor.
+- **Sleeve (one-shot, ring-fenced reserve):** a single liquidation-safe leveraged bet that fires ONLY at the decisive moment — the **Round-3 endgame if we're below the Top-100 cut** (a median smooth book does NOT clear it alone), or the **finals if lagging**. Sized so a total loss can't red-line the core. Deployed on **real standing data only** (no auto-fire on the placeholder model).
+- All ceilings stay under the §13 thresholds (leverage < 28×, margin < 90%, single-instrument < 90%, net-directional < 95%); **never concentrate enough to risk forced liquidation** (instant elimination, the one unrecoverable error).
 - **Best Tech + Anthropic bounty are decoupled from the trading dial** — they ride on Gordon's architecture and the submission.
 
 Encoded as `COMPETITION_RISK_AGGRESSIVE` in `competition-risk-preset.ts` (a **starting** calibration to be tuned against the official objective via the dry-run, once the historical parquet lands).

@@ -116,11 +116,11 @@ The client defaults `baseUrl` to `http://127.0.0.1:${MT5_BRIDGE_PORT|8788}` and 
    python scripts/mt5-bridge/mt5_bridge.py
    ```
    At go-live, the sidecar env includes `MT5_BRIDGE_ALLOW_TRADING=1` (guard #1).
-3. **Preflight GO/NO-GO** — one read-only command runs every readiness check (bridge health, account, contract specs for all 15, spread sanity, guard state) → a single GO/NO-GO verdict:
+3. **Preflight (READY → GO)** — one read-only command runs every readiness check (bridge health, account, contract specs for all 15, spread sanity, guard state):
    ```
    bun run scripts/competition/preflight.ts
    ```
-   **Must read GO** (critical checks pass) before arming. Feed-off / disarmed-guards are expected pre-launch (noted, not failed).
+   Two phases: run it **before arming** → expect **READY** (critical checks pass; guards intentionally off). After arming both guards (Section 8), re-run → **GO**. **NO-GO** = a genuine critical blocker (bad bridge / missing specs). Feed-off pre-launch is noted, not failed.
 4. **Smoke test** — verify the Gordon↔MT5 transport against the real account:
    ```
    bun run scripts/dev/mt5/mt5-smoke.ts            # account + quote + L2 depth + bars + symbol spec
@@ -232,7 +232,8 @@ Run this immediately before **21 Jun 22:00 BST**. Arm the two guards **only at t
 - [ ] **MT5 terminal** logged into the competition account; live feed ticking (not bid/ask 0).
 - [ ] **Account creds in the sidecar env only** — `MT5_LOGIN` / `MT5_PASSWORD` / `MT5_SERVER` set on the sidecar; **not** present anywhere in Gordon's env.
 - [ ] **Bridge token matches** — `MT5_BRIDGE_TOKEN` identical on the sidecar and in Gordon's `apiKey`; `baseUrl` = `http://127.0.0.1:8788`.
-- [ ] **Preflight GO** — `bun run scripts/competition/preflight.ts` reads **GO** (critical checks pass).
+- [ ] **Preflight READY** — `bun run scripts/competition/preflight.ts` reads **READY** pre-arm (and **GO** after arming both guards).
+- [ ] **State dir created** — `mkdir -p .gordon` (holds `comp-state.json` + the `FLATTEN` kill-flag; the runner also auto-creates it, but make it explicitly).
 - [ ] **Smoke test green** — `bun run scripts/dev/mt5/mt5-smoke.ts` passes (account + quote + depth + bars + symbol spec).
 - [ ] **Spread check recorded** — `bun run scripts/dev/mt5/competition-spread-check.ts` run + verdict noted (drives the §9.1 posture).
 - [ ] **The 15 tradeable instruments confirmed** on the platform/console + per-instrument contract specs / tick size / spreads (released at login). Symbols are resolved from the venue catalog at runtime, never hardcoded.

@@ -1,3 +1,16 @@
+> ## ⚠️ DEPRECATED — DO NOT FOLLOW AS A RUNBOOK
+> This document predates the confirmed execution path. The competition is traded via the
+> **MetaTrader 5 bridge**, NOT a Syphonix HTTP API. The "No MT5 path / trade via API" assumptions
+> below are **obsolete and contradicted** by the current source of truth:
+> - **`docs/model-to-market/OPERATIONS.md`** — the authoritative live runbook + decision playbook (MT5).
+> - **`docs/model-to-market/COMPETITION_BRIEF.md`** — schedule, scoring, instruments.
+> - **`src/infra/broker/factory.ts`** — routes to the MT5 adapter.
+>
+> Kept only for historical context (the gated-off Syphonix scaffold). For anything actionable, use
+> OPERATIONS.md.
+
+---
+
 # Syphonix Integration Runbook (execute on June 15, after the API spec lands)
 
 The Syphonix adapter is the **one gating item** for the competition and the wire-level HTTP is *blocked on the API spec* (released at the kickoff, 15 June). The non-speculative parts are now **built as a gated-off scaffold** (commit f4e45cdd); this runbook makes June 15 mechanical.
