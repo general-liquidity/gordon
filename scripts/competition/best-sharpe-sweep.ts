@@ -287,7 +287,10 @@ function main(): void {
   console.log(`DIAG  trades min/med/max: ${q(trs, 0)} / ${q(trs, 0.5)} / ${q(trs, 1)}`);
   console.log(`DIAG  full Sharpe min/med/max: ${q(shs, 0).toFixed(4)} / ${q(shs, 0.5).toFixed(4)} / ${q(shs, 1).toFixed(4)}`);
 
-  const eligible = rows.filter((r) => r.full.trades >= 30 && Math.abs(r.full.maxDD) < 0.05);
+  // DD cap is on the FULL backtest curve; on long multi-regime data set MAX_DD=1 to rank by
+  // Sharpe/robustness (the comp-relevant DD is the 5-day survival MC below, not the full span).
+  const maxDdCap = Number(process.env.MAX_DD ?? 0.05);
+  const eligible = rows.filter((r) => r.full.trades >= 30 && Math.abs(r.full.maxDD) < maxDdCap);
   const fmt = (r: Row, sortKey: string) =>
     `  L${String(r.cfg.lookback).padStart(3)} e${r.cfg.entryZ.toFixed(2)} x${r.cfg.exitZ.toFixed(2)} p${String(r.cfg.maxPairs).padStart(2)} | ` +
     `OOS Sh ${r.oos.sharpe.toFixed(4).padStart(8)}  IS Sh ${r.is.sharpe.toFixed(4).padStart(8)}  robust ${r.robust.toFixed(4).padStart(8)} | ` +

@@ -43,14 +43,17 @@ export interface RvReversionConfig {
   minObs: number;
 }
 
-// Defaults from the best-Sharpe sweep (`scripts/competition/best-sharpe-sweep.ts`, scored on the
-// exact §12.5 metric, IS/OOS, most-robust pick): wide entry + long lookback minimize the cost
-// churn that binds this book, while clearing the §17 ≥30-trade floor (~49 trades over 5 days).
+// Defaults re-validated on the FULL 18-month extended crypto history (not just the 1-month comp
+// window, which was regime-specific) via `scripts/competition/best-sharpe-sweep.ts`, scored on the
+// exact §12.5 metric. Across 18 months the net Sharpe is ~0 for ALL configs (cost is the binding
+// constraint), so these params are chosen for ROBUSTNESS + the §17 floor, not a Sharpe delta:
+// the long lookback (144 ≈ 36h M15) + wide entry minimize the cost churn that dominates this book,
+// while entryZ 2.0 keeps ~45 trades over the 5-day window (safe margin over the ≥30 award floor).
 export const RV_REVERSION_CONFIG: RvReversionConfig = {
   clusters: PAIRS_CLUSTERS,
-  lookback: 96,
-  entryZ: 2.5,
-  exitZ: 0.75,
+  lookback: 144,
+  entryZ: 2.0,
+  exitZ: 0.5,
   perPairFraction: 0.03, // 3% per leg → many tiny dollar-neutral positions
   maxPairs: 11,
   minObs: 60,
