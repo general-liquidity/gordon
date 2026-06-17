@@ -179,6 +179,21 @@ describe("BarbellLiveRunner — survival circuit breaker", () => {
     expect(report.orders.find((o) => o.symbol === "BTCUSD")?.side).toBe("sell"); // flatten the long
   });
 
+  it("uses the live board (REAL data) for the standing when wired — not the placeholder model", async () => {
+    delete process.env.GORDON_LIVE_TRADING;
+    const client = new FakeClient(acct({ margin_level: 300, margin: 0 }), []);
+    const board = () => ({ returns: [-0.1, 0.0, 0.05, 0.2, -0.3] });
+    const report = await new BarbellLiveRunner(client, { ...runnerCfg, board, barsToCut: () => 24 }, () => {}).runCycle();
+    expect(report.standing.returnSource).toBe("board");
+  });
+
+  it("falls back to the MODEL standing when no board is wired (endgame sleeve stays gated off)", async () => {
+    delete process.env.GORDON_LIVE_TRADING;
+    const client = new FakeClient(acct({ margin_level: 300, margin: 0 }), []);
+    const report = await new BarbellLiveRunner(client, { ...runnerCfg, barsToCut: () => 24 }, () => {}).runCycle();
+    expect(report.standing.returnSource).toBe("model");
+  });
+
   it("persists equity history to statePath and reloads it on restart", async () => {
     delete process.env.GORDON_LIVE_TRADING;
     const statePath = join(tmpdir(), "barbell-persist-test.json");

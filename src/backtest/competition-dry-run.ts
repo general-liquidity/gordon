@@ -80,8 +80,9 @@ export interface CompetitionDryRunInput {
    *  spread (a rebate) but still pays slippage/impact, and entries are not guaranteed
    *  to fill. Omit for byte-for-byte-unchanged taker behavior. */
   execution?: "taker" | "maker";
-  /** Execution friction. The competition charges NO commission/swap — only spread +
-   *  slippage + impact — so this models exactly those. Omit for a frictionless run. */
+  /** Execution friction. The competition charges NO commission; swap/financing is TBD per the
+   *  final specs (confirm at login). This models spread + slippage + impact (add swap if it
+   *  applies). Omit for a frictionless run. */
   costs?: CostModel;
   /** Bars per year for THIS series — drives annualization of the judged Sharpe
    *  (FX/metals ≈ 252 daily; crypto ≈ 365 daily; intraday = bars/year). */

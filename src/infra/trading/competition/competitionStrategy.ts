@@ -25,7 +25,18 @@ import {
   type CompetitionRiskParams,
 } from "../../../core/risk-management/competition-risk-preset.ts";
 
-/** The 15 competition-tradeable instruments (FX majors + gold/silver + 5 crypto). */
+/**
+ * The 15 competition-tradeable instruments (FX majors + gold/silver + 5 crypto).
+ *
+ * ⚠️ BARUSD vs HBARUSD — VERIFY AT LOGIN (the platform symbol list is authoritative).
+ * COMPETITION_BRIEF.md says the 5th crypto is HBARUSD (Hedera) and that "BARUSD" was an early
+ * announcement error. On Binance "BAR" is the Barcelona fan-token — a DIFFERENT instrument — so
+ * the scraped BARUSD data is likely the wrong token. We keep `BARUSD` here until the platform
+ * confirms the ticker; if it lists HBARUSD, change it here AND in the sleeve/cluster universes
+ * (barbellStrategy SLEEVE_UNIVERSE, pairsCompetitionStrategy PAIRS_CLUSTERS) and re-fetch data.
+ * The data-availability guard drops any symbol with no live feed, and preflight/spread-check
+ * surface a missing symbol, so a mismatch fails loud rather than trading the wrong thing silently.
+ */
 export const COMPETITION_TRADEABLE: readonly string[] = [
   "EURUSD", "GBPUSD", "USDCHF", "USDJPY", "USDCAD", "AUDUSD", "EURGBP", "EURCHF",
   "XAUUSD", "XAGUSD", "BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "BARUSD",

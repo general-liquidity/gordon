@@ -191,26 +191,26 @@ function finish(armed = false): void {
   for (const n of notes) console.log(`  note: ${n}`);
   if (notes.length) console.log("");
 
+  // Three states: GO (armed + pass) · READY (pass but intentionally disarmed — the normal
+  // pre-arm result) · NO-GO (a genuine critical blocker). Run it BEFORE arming to confirm READY,
+  // then again AFTER arming both guards for the final GO.
+  console.log("══════════════════════════════════════════");
   if (criticalPass && armed) {
-    console.log("══════════════════════════════════════════");
-    console.log("  GO  ✓  — critical checks pass and guards are armed. Live trading is ready.");
+    console.log("  GO  ✓  — critical checks pass and BOTH guards are armed. Live trading is ready.");
     console.log("══════════════════════════════════════════\n");
     process.exit(0);
   }
-
-  console.log("══════════════════════════════════════════");
-  console.log("  NO-GO  ✗");
-  if (!criticalPass) {
-    console.log("  Critical blockers:");
-    for (const b of criticalBlockers) console.log(`    - ${b.label}: ${b.detail}`);
-  } else {
-    console.log("  Critical checks pass, but trading is not yet armed (expected pre-launch).");
-    console.log("    - arm GORDON_LIVE_TRADING here AND MT5_BRIDGE_ALLOW_TRADING on the sidecar when ready.");
+  if (criticalPass) {
+    console.log("  READY  ◷  — critical checks pass; guards intentionally OFF (expected pre-arm).");
+    console.log("    Next: arm GORDON_LIVE_TRADING here AND MT5_BRIDGE_ALLOW_TRADING on the sidecar,");
+    console.log("    then re-run this for the final GO.");
+    console.log("══════════════════════════════════════════\n");
+    process.exit(0); // READY is a clean, expected pre-launch state
   }
+  console.log("  NO-GO  ✗  — critical blockers:");
+  for (const b of criticalBlockers) console.log(`    - ${b.label}: ${b.detail}`);
   console.log("══════════════════════════════════════════\n");
-  // Exit 0 when the only thing missing is the deliberate arm (a clean, expected
-  // pre-launch state); exit 1 only when a genuine critical check failed.
-  process.exit(criticalPass ? 0 : 1);
+  process.exit(1);
 }
 
 main().catch((err) => {

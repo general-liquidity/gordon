@@ -21,7 +21,7 @@
 
 import {
   sizeCompetitionTrade,
-  COMPETITION_RISK_AGGRESSIVE,
+  COMPETITION_RISK_SURVIVAL,
   type CompetitionRiskParams,
 } from "../../../core/risk-management/competition-risk-preset.ts";
 import { survivalStopDistance } from "./survivalStop.ts";
@@ -103,7 +103,7 @@ export interface CompetitionLiveTraderOptions {
   /** Per-symbol contract specs for lot rounding. */
   contracts: Record<string, ContractSpec>;
   config: LiveTraderConfig;
-  /** Risk preset. Defaults to COMPETITION_RISK_AGGRESSIVE. */
+  /** Risk preset. Defaults to COMPETITION_RISK_SURVIVAL (the frozen competition posture). */
   riskParams?: CompetitionRiskParams;
   /** Injectable logger (defaults to console). */
   log?: (msg: string) => void;
@@ -152,7 +152,7 @@ export class CompetitionLiveTrader {
     this.signals = opts.signals;
     this.contracts = opts.contracts;
     this.config = opts.config;
-    this.riskParams = opts.riskParams ?? COMPETITION_RISK_AGGRESSIVE;
+    this.riskParams = opts.riskParams ?? COMPETITION_RISK_SURVIVAL;
     this.log = opts.log ?? ((m) => console.log(m));
   }
 

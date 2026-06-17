@@ -37,8 +37,11 @@ import { computeStanding, type CompetitionStanding } from "./standingMonitor.ts"
 import type { RiskSample } from "../../../core/risk-management/competition-scoring.ts";
 import { clampToDepth } from "./depthSizing.ts";
 import { SlippageTracker } from "./slippageTracker.ts";
+import { calibrateReturnField } from "./standingFieldCalibrator.ts";
+import type { FieldModel } from "./rankTracker.ts";
 import type { Mt5Depth } from "../../broker/mt5/bridgeClient.ts";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { filterToAvailableSymbols, formatExcludedNote } from "./dataAvailability.ts";
 
 /** Mockable subset of the bridge the runner needs (same shape as liveTrader's Mt5Like). */
@@ -229,6 +232,7 @@ export class BarbellLiveRunner {
   private alertedFlatten = false;
   private alertedMargin = false;
   private lastSleeveActive = false;
+  private persistWarned = false;
 
   constructor(client: Mt5Like, cfg: BarbellRunnerConfig, log: (m: string) => void = (m) => console.log(m)) {
     this.client = client;
@@ -272,9 +276,15 @@ export class BarbellLiveRunner {
   private persistState(): void {
     if (!this.cfg.statePath) return;
     try {
+      mkdirSync(dirname(this.cfg.statePath), { recursive: true }); // ensure the parent dir exists
       writeFileSync(this.cfg.statePath, JSON.stringify({ equityHistory: this.equityHistory, riskHistory: this.riskHistory }));
-    } catch {
-      /* best-effort persistence — a write failure must never break the trading loop */
+    } catch (err) {
+      // best-effort persistence — a write failure must never break the loop, but surface it ONCE
+      // (a silently-failing persist would mean a restart loses the standing without warning).
+      if (!this.persistWarned) {
+        this.persistWarned = true;
+        this.log(`[barbell] WARN: could not persist state to ${this.cfg.statePath} (${(err as Error).message}); standing will not survive a restart`);
+      }
     }
   }
 
@@ -306,6 +316,13 @@ export class BarbellLiveRunner {
       const q = quoteBySymbol[sym];
       return q && q.bid > 0 && q.ask > 0 ? (q.bid + q.ask) / 2 : fallback;
     };
+
+    // REAL standing: when a live peer-return board is wired, calibrate the field from it so the
+    // sleeve DECISION (and the standing) use actual rank — not the placeholder model. Without real
+    // data, `field` is undefined and we GATE the endgame sleeve off (finals-only) so the one-shot
+    // can never auto-deploy on a model alone (see OPERATIONS §9). The operator wires the board.
+    const board = this.cfg.board?.();
+    const field: FieldModel | undefined = board && board.returns.length >= 2 ? calibrateReturnField(board.returns) : undefined;
 
     // SURVIVAL circuit breaker runs FIRST. If the account margin level nears the 30% stop-out
     // (= elimination), flatten the WHOLE book (targets → 0) and skip the barbell decision
@@ -344,7 +361,10 @@ export class BarbellLiveRunner {
         startingEquity: this.cfg.startingEquity,
         ourReturnPct,
         barsToDeadline: this.cfg.barsToDeadline(),
-        barsToCut: this.cfg.barsToCut?.(), // enables the pre-finals endgame sleeve
+        // Endgame sleeve ONLY when we have real field data (board) — never auto-fire the one-shot
+        // on the placeholder model. No board ⇒ finals-only; the operator decides manually.
+        barsToCut: field ? this.cfg.barsToCut?.() : undefined,
+        field, // calibrated from the live board when present; else assessStanding falls back to the model
         phase: this.cfg.phase(),
         config: this.cfg.barbellConfig ?? BARBELL_CONFIG,
         rvState: this.rvState, // discrete hysteresis — hold through the reversion, don't churn
@@ -432,8 +452,10 @@ export class BarbellLiveRunner {
       phase: this.cfg.phase(),
       cutPercentile: this.cfg.cutPercentile,
       fieldN: this.cfg.fieldN,
-      barsToCut: this.cfg.barsToCut?.(),
-      board: this.cfg.board?.(),
+      // Match the decision: endgame readout only with real data; standing uses the calibrated field.
+      barsToCut: field ? this.cfg.barsToCut?.() : undefined,
+      field,
+      board,
       liveRisk: { marginUsage, leverage },
     });
 

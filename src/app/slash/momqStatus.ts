@@ -7,7 +7,7 @@
  * either of those files.
  */
 
-import { COMPETITION_RISK_AGGRESSIVE } from "../../core/risk-management/competition-risk-preset.ts";
+import { COMPETITION_RISK_SURVIVAL } from "../../core/risk-management/competition-risk-preset.ts";
 import { getTracingStatus, resolveExporterTarget } from "../../infra/platform/observability/tracing.ts";
 
 /**
@@ -23,18 +23,18 @@ export function buildTracingStatusLine(): string {
 
 /**
  * Read-only competition status panel for the "Model to Market" hack. Prints the
- * aggressive risk posture, env readiness as present/absent booleans (never the
+ * frozen SURVIVAL risk posture, env readiness as present/absent booleans (never the
  * secret values), the tracing target, and the bring-up checklist.
  */
 export function buildMomqStatusPanel(): string {
-  const p = COMPETITION_RISK_AGGRESSIVE;
+  const p = COMPETITION_RISK_SURVIVAL;
   const present = (name: string): string =>
     (process.env[name] ?? "").trim().length > 0 ? "present" : "absent";
 
   const lines = [
     "Model to Market — competition status (read-only)",
     "",
-    "Risk posture (COMPETITION_RISK_AGGRESSIVE):",
+    "Risk posture (COMPETITION_RISK_SURVIVAL — frozen):",
     `  maxLeverage:               ${p.maxLeverage}x`,
     `  maxRiskPerTradePct:        ${(p.maxRiskPerTradePct * 100).toFixed(2)}%`,
     `  dailyLossKillPct:          ${(p.dailyLossKillPct * 100).toFixed(1)}%`,
