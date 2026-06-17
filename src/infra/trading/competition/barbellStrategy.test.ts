@@ -56,9 +56,34 @@ describe("barbellDecision — gating + survival", () => {
     expect(d.ringFence.sleeveReserve).toBeCloseTo(BARBELL_CONFIG.sleeveFraction * 1_000_000, 0);
   });
 
-  it("NEVER deploys the sleeve pre-cut, even when lagging badly", () => {
+  it("NEVER deploys the sleeve pre-cut in the early rounds (no barsToCut → finals-only)", () => {
     const d = barbellDecision(base({ phase: "pre_cut", ourReturnPct: -0.4 }));
     expect(d.sleeve).toBeNull();
+  });
+
+  it("DEPLOYS the sleeve pre-cut in the ENDGAME when below the Top-100 cut (climb into the finals)", () => {
+    const d = barbellDecision(base({ phase: "pre_cut", ourReturnPct: -0.4, barsToCut: 24 }));
+    expect(d.standing.clearsCut).toBe(false);
+    expect(d.sleeve).not.toBeNull();
+    expect(d.sleeve!.reason).toContain("Top-100 cut");
+  });
+
+  it("HOLDS the sleeve pre-cut when below the cut but NOT yet in the endgame (preserve the one-shot)", () => {
+    const d = barbellDecision(base({ phase: "pre_cut", ourReturnPct: -0.4, barsToCut: 200 }));
+    expect(d.sleeve).toBeNull();
+  });
+
+  it("HOLDS the sleeve in the endgame when ALREADY clearing the cut (save it for the finals)", () => {
+    const d = barbellDecision(base({ phase: "pre_cut", ourReturnPct: 1.0, barsToCut: 24 }));
+    expect(d.standing.clearsCut).toBe(true);
+    expect(d.sleeve).toBeNull();
+  });
+
+  it("endgame sleeve loss can NEVER red-line the core (survival preserved on the new path)", () => {
+    const d = barbellDecision(base({ phase: "pre_cut", ourReturnPct: -0.4, barsToCut: 24 }));
+    expect(d.sleeve).not.toBeNull();
+    expect(d.sleeve!.margin).toBeLessThanOrEqual(d.ringFence.sleeveReserve + 1e-6);
+    expect(d.ringFence.totalEquity - d.sleeve!.margin).toBeGreaterThanOrEqual(d.ringFence.redLineEquity - 1e-6);
   });
 
   it("does NOT deploy the sleeve post-cut when LEADING (lock-in)", () => {

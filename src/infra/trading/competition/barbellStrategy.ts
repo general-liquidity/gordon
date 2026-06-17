@@ -57,6 +57,13 @@ export interface BarbellConfig {
   /** Max acceptable probability the sleeve liquidates before the deadline. Default 0.10. */
   sleeveMaxBreachProb: number;
   /**
+   * Pre-finals ENDGAME window (bars before the Top-100 cut) within which the one-shot sleeve
+   * may fire if we're BELOW the cut — because a ~0-edge core can't clear it organically and
+   * not reaching the finals wastes the sleeve. Only active when `input.barsToCut` is supplied;
+   * otherwise the sleeve stays finals-only (backward-compatible). Default 48 (≈12h M15).
+   */
+  sleeveEndgameWindow?: number;
+  /**
    * Core engine. "rv" (DEFAULT) = relaxed relative-value reversion over all within-cluster
    * ratio pairs — the validated ≥30-trade smooth Best-Sharpe vehicle. "strict" = the
    * cointegration gauntlet (`pairsCompetitionStrategy`) — fewer, higher-conviction pairs but
@@ -73,6 +80,7 @@ export const BARBELL_CONFIG: BarbellConfig = {
   sleeveFraction: 0.08,
   redLineFraction: 0.5,
   sleeveMaxBreachProb: 0.1,
+  sleeveEndgameWindow: 48,
   core: "rv",
   rvConfig: RV_REVERSION_CONFIG,
   pairsConfig: PAIRS_COMPETITION_CONFIG,
@@ -114,6 +122,11 @@ export interface BarbellInput {
   ourReturnPct: number;
   /** Bars remaining until the contest deadline (for liquidation horizon). */
   barsToDeadline: number;
+  /**
+   * Bars until the DECISIVE Top-100 cut (end of Round 3). When supplied, enables the pre-finals
+   * endgame sleeve (swing to climb into the Top-100 if below it). Omit → sleeve stays finals-only.
+   */
+  barsToCut?: number;
   /** Contest phase — the cut gate. */
   phase: "pre_cut" | "post_cut";
   /** Field model for percentile estimation (or supply a live leaderboard upstream). */
@@ -162,16 +175,28 @@ export function barbellDecision(input: BarbellInput): BarbellDecision {
   // ── STANDING: bang-bang stance. ──
   const standing = assessStanding({ ourReturn: input.ourReturnPct, field, phase: input.phase });
 
-  // ── SLEEVE: only when the stance says swing AND we're past the cut. ──
-  // The one-shot lottery is a POST-cut instrument: pre-cut, even when lagging
-  // (max_variance), we recover via the core and protect the cut — we do NOT burn the
-  // single leveraged bet early (no time-pressure yet, and a blow-up forfeits the cut).
+  // ── SLEEVE: spend the one-shot at a DECISIVE moment to climb a line the ~0-edge core can't. ──
+  // Two decisive moments (bang-bang: a laggard near a deadline swings):
+  //   1. the FINALS (post_cut) — swing for #1 when not already leading; and
+  //   2. the pre-finals ENDGAME — the last `sleeveEndgameWindow` bars before the Top-100 cut,
+  //      when we are BELOW it. A flat core will NOT clear the cut, and failing to reach the
+  //      finals wastes the sleeve entirely, so the one-shot must fire to climb in.
+  // Everywhere else pre-cut we HOLD: survive the lenient early rounds, preserve the one-shot.
+  // The endgame path only activates when `barsToCut` is supplied (else: finals-only, as before).
   let sleeve: SleeveOrder | null = null;
   let sleeveReason = "";
-  if (input.phase !== "post_cut") {
-    sleeveReason = `no sleeve — pre-cut (clear the Top-100 cut on the core first; sleeve is a final-days instrument)`;
-  } else if (standing.stance !== "max_variance") {
-    sleeveReason = `no sleeve — stance ${standing.stance} (leading/safe → lock in; swinging is dominated)`;
+  const inFinals = input.phase === "post_cut";
+  const endgameWindow = cfg.sleeveEndgameWindow ?? 48;
+  const nearCut = !inFinals && input.barsToCut !== undefined && input.barsToCut <= endgameWindow;
+  const swingForFinals = inFinals && standing.stance === "max_variance";
+  const swingToClearCut = nearCut && !standing.clearsCut;
+
+  if (!swingForFinals && !swingToClearCut) {
+    sleeveReason = inFinals
+      ? `no sleeve — finals & leading (stance ${standing.stance}); lock in the prize slot`
+      : nearCut
+        ? `no sleeve — endgame but clearing the cut (p${(standing.percentile * 100).toFixed(0)} ≥ cut); lock in the finals slot, save the one-shot`
+        : `no sleeve — pre-cut, not the endgame; survive + let the core run, preserve the one-shot for the Round-3 cut / finals`;
   } else {
     // Pick the highest-vol sleeve instrument with usable bars (most leaderboard leverage).
     let best: { symbol: string; vol: number; closes: number[] } | null = null;
@@ -185,11 +210,14 @@ export function barbellDecision(input: BarbellInput): BarbellDecision {
     if (!best) {
       sleeveReason = "no sleeve — no eligible high-vol instrument with usable bars";
     } else {
-      // Per-bar vol from the annualized realizedVol (de-annualize: ÷ √(bars/year, 15m)).
+      // Per-bar vol from the annualized realizedVol (de-annualize: ÷ √(bars/year, 15m)). The
+      // liquidation horizon is the time to the relevant deadline — for an endgame swing that's
+      // the cut, for a finals swing the contest deadline — so a closer deadline safely levers higher.
       const perBarVol = best.vol / Math.sqrt(96 * 365);
+      const horizon = swingToClearCut && input.barsToCut !== undefined ? input.barsToCut : input.barsToDeadline;
       const safeLev = maxSafeLeverage({
         perBarVol,
-        barsToDeadline: input.barsToDeadline,
+        barsToDeadline: horizon,
         maxBreachProb: cfg.sleeveMaxBreachProb,
       });
       const leverage = Math.max(1, Math.min(safeLev, 30)); // cap at the venue's 30×
@@ -203,13 +231,14 @@ export function barbellDecision(input: BarbellInput): BarbellDecision {
         const last = best.closes[best.closes.length - 1]!;
         const prior = best.closes[Math.max(0, best.closes.length - 12)]!;
         const side: "buy" | "sell" = last >= prior ? "buy" : "sell";
+        const ctx = swingForFinals ? "finals swing for #1" : "endgame swing to clear the Top-100 cut";
         sleeve = {
           symbol: best.symbol,
           side,
           notional,
           leverage,
           margin,
-          reason: `lagging post-cut swing: ${best.symbol} ${side} ${leverage.toFixed(1)}× (safe-lev ${Number.isFinite(safeLev) ? safeLev.toFixed(1) : "∞"}, worst-case ${margin.toFixed(0)} ≤ reserve)`,
+          reason: `${ctx}: ${best.symbol} ${side} ${leverage.toFixed(1)}× (safe-lev ${Number.isFinite(safeLev) ? safeLev.toFixed(1) : "∞"}, worst-case ${margin.toFixed(0)} ≤ reserve)`,
         };
         sleeveReason = sleeve.reason;
       }

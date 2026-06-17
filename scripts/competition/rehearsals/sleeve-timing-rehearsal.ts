@@ -40,7 +40,7 @@ function barsBySymbol(): Record<string, Mt5Bar[]> {
   return m;
 }
 
-interface Scenario { phase: "pre_cut" | "post_cut"; ourReturnPct: number; label: string }
+interface Scenario { phase: "pre_cut" | "post_cut"; ourReturnPct: number; label: string; barsToCut?: number }
 
 function assert(cond: boolean, msg: string): void {
   if (!cond) {
@@ -53,14 +53,19 @@ function main(): void {
   const bars = barsBySymbol();
   // Standings stay above the ring-fence red-line (−50%); below it `barbellDecision` refuses to
   // carve a sleeve and the live runner's margin circuit breaker flattens instead (proven in #3).
+  const W = BARBELL_CONFIG.sleeveEndgameWindow ?? 48;
   const scenarios: Scenario[] = [
-    { phase: "pre_cut", ourReturnPct: -0.4, label: "lagging" },
-    { phase: "pre_cut", ourReturnPct: 0.0, label: "flat" },
-    { phase: "pre_cut", ourReturnPct: 0.5, label: "just safe" },
-    { phase: "pre_cut", ourReturnPct: 0.8, label: "leading" },
+    // Pre-cut, NO barsToCut → early rounds: never fire (preserve the one-shot).
+    { phase: "pre_cut", ourReturnPct: -0.4, label: "lagging, early" },
+    { phase: "pre_cut", ourReturnPct: 0.0, label: "flat, early" },
+    { phase: "pre_cut", ourReturnPct: 0.8, label: "leading, early" },
+    // Pre-cut ENDGAME (barsToCut within the window) — the new path the standing-monitor insight added.
+    { phase: "pre_cut", ourReturnPct: -0.4, label: "lagging, ENDGAME", barsToCut: W - 1 }, // below cut → FIRE to climb in
+    { phase: "pre_cut", ourReturnPct: -0.4, label: "lagging, pre-endgame", barsToCut: W + 40 }, // not yet endgame → hold
+    { phase: "pre_cut", ourReturnPct: 0.8, label: "leading, ENDGAME", barsToCut: W - 1 }, // clears cut → hold (save it)
+    // Finals (post_cut).
     { phase: "post_cut", ourReturnPct: -0.4, label: "lagging" },
     { phase: "post_cut", ourReturnPct: 0.0, label: "flat / mid" },
-    { phase: "post_cut", ourReturnPct: 0.2, label: "mid" },
     { phase: "post_cut", ourReturnPct: 0.8, label: "leading (prize slot)" },
   ];
 
@@ -80,6 +85,7 @@ function main(): void {
       startingEquity: START_EQUITY,
       ourReturnPct: sc.ourReturnPct,
       barsToDeadline: 100,
+      barsToCut: sc.barsToCut,
       phase: sc.phase,
       config: BARBELL_CONFIG,
     });
@@ -89,12 +95,17 @@ function main(): void {
       ? `FIRE → ${sleeve.symbol} ${sleeve.side} ${sleeve.leverage.toFixed(1)}× (margin ${sleeve.margin.toFixed(0)} / notional ${sleeve.notional.toFixed(0)})`
       : "—";
     console.log(
-      `${sc.phase.padEnd(10)} ${sc.label.padEnd(14)} ${(st.percentile * 100).toFixed(0).padStart(5)}%  ${st.stance.padEnd(14)} ${(st.clearsCut ? "yes" : "no ").padEnd(4)} ${sleeveStr}`,
+      `${sc.phase.padEnd(10)} ${sc.label.padEnd(22)} ${(st.percentile * 100).toFixed(0).padStart(5)}%  ${st.stance.padEnd(14)} ${(st.clearsCut ? "yes" : "no ").padEnd(4)} ${sleeveStr}`,
     );
 
     // ── Invariants ──
-    // 1. Pre-cut NEVER fires the one-shot sleeve (protect the cut on the core first).
-    if (sc.phase === "pre_cut") assert(sleeve === null, `sleeve fired PRE-CUT (${sc.label}) — must never burn the one-shot before the cut`);
+    // 1. Pre-cut: the one-shot fires ONLY in the endgame AND when below the cut (climb into the
+    //    Top-100); otherwise it's held (early rounds, or already clearing the cut).
+    if (sc.phase === "pre_cut") {
+      const endgame = sc.barsToCut !== undefined && sc.barsToCut <= W;
+      if (endgame && !st.clearsCut) assert(sleeve !== null, `endgame + below-cut should FIRE the sleeve to climb in (${sc.label})`);
+      else assert(sleeve === null, `sleeve fired pre-cut outside the endgame/below-cut window (${sc.label})`);
+    }
     // 2. Post-cut leader (prize slot) locks in → no sleeve; post-cut non-leader swings → sleeve (if safe).
     if (sc.phase === "post_cut" && st.stance === "lock_in") assert(sleeve === null, `sleeve fired while LOCKING IN a prize slot (${sc.label})`);
     // 3. SURVIVAL GUARANTEE — losing the ENTIRE sleeve cannot drop core equity below the red-line.
@@ -106,7 +117,8 @@ function main(): void {
   }
 
   console.log("");
-  console.log("Bang-bang verified: pre-cut never fires; post-cut LEADERS lock in; post-cut LAGGARDS/MID swing.");
+  console.log("Bang-bang verified: early rounds hold; pre-finals ENDGAME fires to climb into the Top-100 when");
+  console.log("below it (the standing-monitor insight); post-cut LEADERS lock in; post-cut LAGGARDS/MID swing.");
   console.log("Survival verified: every fired sleeve's TOTAL loss leaves core equity ≥ the red-line (ring-fence holds).");
   console.log("\n✓ REHEARSAL PASSED — the sleeve fires exactly when tournament theory says, and never threatens survival.");
 }
