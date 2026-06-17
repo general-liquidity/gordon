@@ -34,13 +34,18 @@ const COST_BPS_PER_SIDE = Number(process.env.COST_BPS ?? 5);
 // "cont" = continuous fade every bar (the live rvReversionCore); "disc" = discrete entry/exit
 // hysteresis (the rehearsal) — flat→±1 at |z|≥entryZ, back to flat at |z|≤exitZ, no churn between.
 const MODE = (process.env.RV_MODE ?? "cont") as "cont" | "disc" | "hard";
+// "equal" = equal dollar per pair; "invvol" = inverse-vol (risk-parity) weights from the IS window.
+const WEIGHT = (process.env.RV_WEIGHT ?? "equal") as "equal" | "invvol";
 const PER_PAIR_FRACTION = 0.03; // magnitude knob (Sharpe-invariant); sets return/DD scale
 
 // Correlated clusters — ratio reversion only makes sense WITHIN a cluster.
-const CLUSTERS: Record<string, string[]> = {
+const ALL_CLUSTERS: Record<string, string[]> = {
   crypto: ["BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "BARUSD"],
   metals: ["XAUUSD", "XAGUSD"],
 };
+// RV_CLUSTERS=crypto drops the metals pair (its own decision); default keeps both.
+const CLUSTERS: Record<string, string[]> =
+  (process.env.RV_CLUSTERS ?? "all") === "crypto" ? { crypto: ALL_CLUSTERS.crypto! } : ALL_CLUSTERS;
 
 interface RawBar { time: number; close: number }
 const mean = (xs: number[]) => xs.reduce((s, v) => s + v, 0) / (xs.length || 1);
@@ -128,7 +133,7 @@ interface RunMetrics { sharpe: number; nObs: number; maxDD: number; totalReturn:
  * Portfolio backtest over the union timeline with the maxPairs cap applied per bar.
  * Returns the per-event-time portfolio return series (in chronological order) + trade count.
  */
-function portfolioReturns(pairs: PairSeries[], cfg: Config): { rets: number[]; trades: number } {
+function portfolioReturns(pairs: PairSeries[], cfg: Config, weights: number[]): { rets: number[]; trades: number } {
   const costFrac = (2 * COST_BPS_PER_SIDE) / 10_000; // both legs on a full alloc change
   // Events: time → list of {pairIdx, z, dSNext}.
   const events = new Map<number, Array<{ p: number; z: number; alloc: number; dSNext: number }>>();
@@ -165,11 +170,11 @@ function portfolioReturns(pairs: PairSeries[], cfg: Config): { rets: number[]; t
     for (const p of touched) {
       const prev = prevAlloc.get(p) ?? 0;
       const now = held.get(p)?.alloc ?? 0;
-      turnover += Math.abs(now - prev);
+      turnover += (weights[p] ?? 1) * Math.abs(now - prev); // cost on the risk-weighted notional
       // a "trade" = entering from flat or flipping sign
       if ((prev === 0 && now !== 0) || (prev !== 0 && now !== 0 && Math.sign(now) !== Math.sign(prev))) trades++;
     }
-    for (const { alloc, dSNext } of held.values()) grossRet += alloc * dSNext;
+    for (const [p, { alloc, dSNext }] of held) grossRet += (weights[p] ?? 1) * alloc * dSNext;
     // Both gross P&L and turnover cost are on the SAME per-pair notional (perPairFraction·equity),
     // so cost must scale by perPairFraction too — otherwise it's ~1/perPairFraction× too large.
     const ret = PER_PAIR_FRACTION * (grossRet - turnover * costFrac);
@@ -195,8 +200,8 @@ function score(rets: number[], trades: number): RunMetrics {
   };
 }
 
-function evalConfig(pairs: PairSeries[], cfg: Config): { is: RunMetrics; oos: RunMetrics; full: RunMetrics } {
-  const { rets, trades } = portfolioReturns(pairs, cfg);
+function evalConfig(pairs: PairSeries[], cfg: Config, weights: number[]): { is: RunMetrics; oos: RunMetrics; full: RunMetrics } {
+  const { rets, trades } = portfolioReturns(pairs, cfg, weights);
   const split = Math.floor(rets.length * IS_FRAC);
   // Trades attributed proportionally is wrong; recount per segment via a second pass is costly,
   // so approximate per-segment trades by the share of bars (the floor check uses the full count).
@@ -228,8 +233,26 @@ function main(): void {
     }
   }
 
+  // Inverse-vol (risk-parity) weights from the IS window — lower-vol pairs get more weight so no
+  // single pair dominates portfolio variance. Causal: estimated on IS only, applied to the whole
+  // series. "equal" → all 1. Normalized to mean 1 (Sharpe is scale-invariant; this keeps magnitude).
+  const weights = (() => {
+    if (WEIGHT === "equal") return pairs.map(() => 1);
+    const vols = pairs.map((p) => {
+      const split = Math.floor(p.spread.length * IS_FRAC);
+      const ds: number[] = [];
+      for (let i = 1; i < split; i++) ds.push(p.spread[i]! - p.spread[i - 1]!);
+      const m = mean(ds);
+      const v = ds.length > 1 ? Math.sqrt(ds.reduce((s, x) => s + (x - m) ** 2, 0) / (ds.length - 1)) : 0;
+      return v > 0 ? v : 1e-9;
+    });
+    const inv = vols.map((v) => 1 / v);
+    const meanInv = mean(inv);
+    return inv.map((x) => x / meanInv);
+  })();
+
   console.log("=".repeat(80));
-  console.log(`BEST-SHARPE SWEEP — RV-reversion core | ${BARS_DIR.split(/[\\/]/).slice(-2).join("/")} ${TF}`);
+  console.log(`BEST-SHARPE SWEEP — RV-reversion core | ${BARS_DIR.split(/[\\/]/).slice(-2).join("/")} ${TF} | mode ${MODE} | weight ${WEIGHT}`);
   console.log("=".repeat(80));
   console.log(`Pairs (${pairs.length}): ${pairs.map((p) => p.label).join(", ")}`);
   console.log(`Scored on the EXACT competition metric (non-annualized 15-min Sharpe), IS ${IS_FRAC * 100}% / OOS ${(1 - IS_FRAC) * 100}%.`);
@@ -249,7 +272,7 @@ function main(): void {
         if (exitZ >= entryZ) continue;
         for (const maxPairs of MAX_PAIRS) {
           const cfg = { lookback, entryZ, exitZ, maxPairs };
-          const r = evalConfig(pairs, cfg);
+          const r = evalConfig(pairs, cfg, weights);
           // Robustness score: OOS Sharpe penalized by the IS↔OOS gap (overfit guard).
           const robust = r.oos.sharpe - 0.5 * Math.abs(r.is.sharpe - r.oos.sharpe);
           rows.push({ cfg, ...r, robust });
@@ -292,7 +315,7 @@ function main(): void {
     // STEP 5 — per-pair OOS robustness under the recommended config (which pairs revert OOS).
     console.log("PER-PAIR OOS Sharpe under the recommended config (step 5 — which pairs carry it):");
     for (const ps of pairs) {
-      const { rets, trades } = portfolioReturns([ps], best.cfg);
+      const { rets, trades } = portfolioReturns([ps], best.cfg, [1]);
       const split = Math.floor(rets.length * IS_FRAC);
       const isM = score(rets.slice(0, split), 0);
       const oosM = score(rets.slice(split), 0);
@@ -302,7 +325,7 @@ function main(): void {
     console.log("");
     console.log("");
     // STEP 3 — survival: 5-day (480×M15) path-risk MC on the recommended book's per-bar returns.
-    const { rets } = portfolioReturns(pairs, best.cfg);
+    const { rets } = portfolioReturns(pairs, best.cfg, weights);
     const LIVE_BARS = 5 * 24 * 4; // 480 M15 bars ≈ the 5-day live window
     const mc = monteCarloPathRisk(rets, "stationary", { nPaths: 5000, pathLen: LIVE_BARS, seed: 7, ruinDrawdown: 0.2 });
     const liveTradeRate = (best.full.trades * LIVE_BARS) / (rets.length || 1);
