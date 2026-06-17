@@ -12,7 +12,7 @@
 
 | | |
 |---|---|
-| **What** | UK's first live AI-native trading competition. Solo (1-person teams). ~330 participants. |
+| **What** | UK's first live AI-native trading competition. Solo (1-person teams). **400+ registered** (Duncan, Discord). Round progression is a **fixed number** advancing (not a percentage) — exact counts TBC by the organizer. |
 | **Host** | AI Engine (Zoe Qin / Jamesin Seidel, Dawn Capital) × Syphonix |
 | **Capital** | $1,000,000 virtual per participant, **30:1 max leverage**, zero principal risk |
 | **Markets** | FX majors · Gold (XAUUSD) · Silver (XAGUSD) · Oil · 5 crypto. **No** stocks/indices/bonds. **No** options. |
@@ -67,7 +67,8 @@ Authoritative dates from **[RULES]** §5, refined by **[DISCORD]**. Marketing pa
 - **Resolution:** tick-level.
 - **Depth:** minimum **5 levels of order-book depth (L2)**.
 - **Format:** parquet (~20 GB), timestamped bid/ask levels, sizes, instrument metadata. Download from the Syphonix **"Backtest data"** tab after login.
-- **Gaps flagged by participants:** **crypto is missing** from the Syphonix parquet → source crypto yourself (Gordon's native feeds cover BTC/ETH/SOL/XRP/HBAR). Some instruments have partial coverage (Oil, AUDJPY, an "XAUKUSD"). MT5 feed initially lacked L2 (being fixed).
+- **Gaps flagged by participants:** **crypto (incl. BAR/USD) is missing** from the Syphonix parquet → source it yourself (done — we fetched BTC/ETH/SOL/XRP + BAR=HBAR from Binance). No further backtest-data update is coming (Duncan, Discord). Some non-tradable symbols had partial coverage (Oil, AUDJPY, "XAUKUSD") — **these are NOT in the final tradable list** (see below), so ignore them.
+- **FINAL tradable list confirmed (Duncan, Discord — "now final"):** exactly the **15** = FX(8) AUDUSD, EURCHF, EURGBP, EURUSD, GBPUSD, USDCAD, USDCHF, USDJPY · Metals(2) XAGUSD, XAUUSD · Crypto(5) **BARUSD**, BTCUSD, ETHUSD, SOLUSD, XRPUSD. This matches `COMPETITION_TRADEABLE` exactly, and confirms the symbol is literally **BAR/USD** (underlying HBAR/Hedera).
 - **Only 1 month is provided** (size + 1-week live window). More history → use your own sources.
 
 **External data is explicitly allowed** **[DISCORD]** — news APIs, prediction markets, public crypto feeds, etc. The platform does not provide these but does not restrict them.
@@ -81,7 +82,9 @@ Authoritative dates from **[RULES]** §5, refined by **[DISCORD]**. Marketing pa
 **[DISCORD]**, Duncan:
 
 - **Order-book matching model**, *not* dealing-desk. Limit orders rest as liquidity and fill by **queue position + available liquidity**; **partial fills** occur when volume is limited.
+- **TRUE DEPTH LADDER (Duncan, Discord):** "Large orders can consume multiple levels, and fills are calculated across the available liquidity." → an order bigger than top-of-book walks the book + partial-fills. **This validates the depth-aware order sizing** (`depthSizing.ts` / `clampToDepth`) — size to fillable depth so FOK/IOC orders fill instead of bouncing.
 - **Maker and taker** both supported (limit + marketable orders).
+- **ACCESS = native MT5 Desktop Terminal — NO REST/WebSocket gateway (Duncan, Discord, confirmed):** "Trading will be through the native MT5 Desktop Terminal. Please prepare your environment accordingly." You run the MT5 terminal yourself (Windows), driven via the official `MetaTrader5` Python package. **This confirms Gordon's topology exactly** (OPERATIONS §1: Windows VPS → MT5 terminal → `mt5_bridge.py` sidecar → `Mt5BridgeClient`). There is no hosted API to integrate against — prepare the always-on Windows box now.
 - The **real market order book is an INPUT to a per-account simulation**. You do **not** trade the live production book; other participants **cannot** interact with your orders (matching is internal/per-account; not yet transparent).
 - **Slippage, liquidity constraints, and market impact are simulated.** Validate in the test env from the 18th.
 - **Costs: NO commission. Swap/financing is TBD per the final specs** (early Discord said "no swap," the final rules left it unconfirmed — **confirm at login**; assume it may apply). Modelled friction = **spread + slippage + market impact** (+ swap if confirmed).
@@ -111,7 +114,7 @@ All ranks are **cross-sectional / relative**: each metric is converted to a 0–
 ### 6.2 Metrics
 
 - **Return** `Return_i = (Equity_final - 1,000,000) / 1,000,000` (off the fixed baseline; equity carries across rounds).
-- **Max Drawdown** `MaxDD_i = max_t (PeakEquity - Equity) / PeakEquity` — lower is better.
+- **Max Drawdown** `MaxDD_i = max_t (PeakEquity - Equity) / PeakEquity` — lower is better. **Measured CUMULATIVELY from the original $1M, NOT reset per round** (Lotus, Discord: MaxDD/return are tracked "from the original $1M"). So an early deep drawdown is permanent in the DD rank — which *reinforces* the survive-smoothly posture (every drawdown counts for the whole competition). Our standing monitor already computes DD on the full equity curve, so this matches; only Risk-Discipline (§13) resets per round.
 - **Sharpe (non-annualized)** on **15-minute equity returns**: `Sharpe_i = Mean(r) / Std(r)`, where `r_t = (E_t − E_{t-1}) / E_{t-1}`.
   - `Std = 0 → Sharpe = 0`. *(A perfectly smooth line has zero variance → Sharpe 0; you need positive mean **with** nonzero variance.)*
   - **< 8 valid 15-min observations → Sharpe Rank capped at 50.**
