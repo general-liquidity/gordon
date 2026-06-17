@@ -76,7 +76,7 @@ The orchestrator + executor + researcher all run on Claude (Anthropic) as the de
 - **Tri-judge cross-family panel** (Anthropic + OpenAI + Google) to wash out single-family self-preference.
 - **Deterministic process checks** over the signed audit trace (`risk_gate_before_order`, `denylist_without_approval`) — assertions, not vibes.
 - **pass^k reliability** — safety scenarios must pass on *every* run, not on average.
-- **Production-trace → regression loop** (`promoteTraceToScenario`) + a **CI gate** (`scripts/dev/eval-gate.ts`).
+- **Production-trace → regression loop** (`promoteTraceToScenario`) + a **CI gate** (`scripts/dev/eval/eval-gate.ts`).
 
 ### 3.4 Observability → Pydantic Logfire (OTel-native, drop-in)
 
@@ -109,7 +109,7 @@ We model **taker / spread-crossing fills** as the conservative baseline — we n
 
 ### 4.3 The honest empirical finding — *no signal showed a stable edge after costs*
 
-We tested every transparent, parameter-light signal family we could against the **real Model to Market bars** through the cost-honest dry-run under **taker execution** (the only Cypher-executable mode), IS 70% / OOS 30%, after costs — and, going further, swept the full signal library × param grid × instrument through a **walk-forward harness ranked with deflated-Sharpe / PSR multiple-testing correction** (`scripts/research/alpha-search.ts`). The families and their validators:
+We tested every transparent, parameter-light signal family we could against the **real Model to Market bars** through the cost-honest dry-run under **taker execution** (the only Cypher-executable mode), IS 70% / OOS 30%, after costs — and, going further, swept the full signal library × param grid × instrument through a **walk-forward harness ranked with deflated-Sharpe / PSR multiple-testing correction** (`scripts/research/searches/alpha-search.ts`). The families and their validators:
 
 | Signal family | Validator | OOS-after-costs verdict |
 |---|---|---|
@@ -118,9 +118,9 @@ We tested every transparent, parameter-light signal family we could against the 
 | Reversal — time-series (per-symbol z-band) | `momq-reversal-validate.ts` | failed OOS across lookbacks {7,14,21} |
 | Reversal — cross-sectional (rank, long losers/short winners) | `momq-cross-sectional-validate.ts` | IC did not hold OOS |
 | Q-7 factor composite (reversal + residual-vol; + funding on crypto) | `momq-factor-validate.ts`, `momq-crypto-q7-validate.ts` | IC not OOS-stable |
-| L2 order-book imbalance | `momq-imbalance-validate.ts` + `scripts/research/metals-microstructure-probe.ts` | no edge — *FX depth is **static** (imbalance ≡ 0, ≤18 distinct values/mo); metals depth **varies** (XAU std 0.079) but our metals probe still found no OOS edge (gold −2.7%). The operator confirmed why: the venue is **not** simulating participant-driven order flow — depth moves with the exogenous liquidity feed, not local flow, so depth-reactive microstructure is **structurally absent**, not merely weak* |
+| L2 order-book imbalance | `momq-imbalance-validate.ts` + `scripts/research/scans/metals-microstructure-probe.ts` | no edge — *FX depth is **static** (imbalance ≡ 0, ≤18 distinct values/mo); metals depth **varies** (XAU std 0.079) but our metals probe still found no OOS edge (gold −2.7%). The operator confirmed why: the venue is **not** simulating participant-driven order flow — depth moves with the exogenous liquidity feed, not local flow, so depth-reactive microstructure is **structurally absent**, not merely weak* |
 | Microstructure order-flow pressure | `momq-microstructure-validate.ts` | no edge after costs — same structural cause (no participant-flow simulation) |
-| Full library × params × instruments (systematic sweep) | `scripts/research/alpha-search.ts` | **0 of 620 cells** cleared the deflated-Sharpe bar (M15); repeated on **3yr extended crypto** (1h, 1d) — same verdict |
+| Full library × params × instruments (systematic sweep) | `scripts/research/searches/alpha-search.ts` | **0 of 620 cells** cleared the deflated-Sharpe bar (M15); repeated on **3yr extended crypto** (1h, 1d) — same verdict |
 
 > **The honest result:** across naive TA, momentum, time-series **and** cross-sectional reversal, the Q-7 factors, order-book imbalance, and microstructure order-flow, **no signal showed a stable directional edge after costs** — the signs flipped between in-sample and out-of-sample. We are **not** claiming "my bot found alpha." We *measured*, against the competition's exact objective, that the cheap directional edges are not there in this window.
 
@@ -198,18 +198,18 @@ python scripts/mt5-bridge/mt5_bridge.py
 # 2. Smoke-test the Gordon↔MT5 transport (terminal B).
 #    Reads account + quote + L2 depth + bars + symbol spec; health.tradingEnabled
 #    reflects the (unset) sidecar guard, proving the validate-only posture.
-bun run scripts/dev/mt5-smoke.ts
+bun run scripts/dev/mt5/mt5-smoke.ts
 
 # 3. The headline empirical finding — the SYSTEMATIC, multiple-testing-corrected sweep.
 #    Sweeps Gordon's signal library × param grid × instrument through the cost-honest
 #    money-path under walk-forward folds, ranked with deflated-Sharpe / PSR. Taker only.
-bun run scripts/research/alpha-search.ts
+bun run scripts/research/searches/alpha-search.ts
 #    → 0 of 620 (strategy×config×instrument) cells clear the deflated bar. Then the SAME
 #      null across every class we could test — exhaustive, not cherry-picked:
-bun run scripts/research/ensemble-search.ts          # signal ensembles
-bun run scripts/research/pairs-scan.ts               # cointegration pairs (Johansen+EG+OU)
-bun run scripts/research/cross-sectional-scan.ts     # long top / short bottom
-bun run scripts/research/portfolio-tsmom-scan.ts     # portfolio time-series momentum
+bun run scripts/research/searches/ensemble-search.ts          # signal ensembles
+bun run scripts/research/scans/pairs-scan.ts               # cointegration pairs (Johansen+EG+OU)
+bun run scripts/research/scans/cross-sectional-scan.ts     # long top / short bottom
+bun run scripts/research/scans/portfolio-tsmom-scan.ts     # portfolio time-series momentum
 #    Supporting per-instrument transparency (taker, IS/OOS):
 bun run scripts/dev/momq/momq-edge-validate.ts            # naive TA / momentum
 bun run scripts/dev/momq/momq-imbalance-validate.ts       # L2 imbalance (FX depth is static)

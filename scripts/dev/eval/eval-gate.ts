@@ -27,7 +27,7 @@
  * The eval UNIT suite (`bun test src/infra/domain/evals`) runs separately in
  * the Action and is another deterministic leg.
  *
- * Run: bun run scripts/dev/eval-gate.ts
+ * Run: bun run scripts/dev/eval/eval-gate.ts
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -38,14 +38,14 @@ import {
   detectRegressions,
   type EvalTrajectory,
   type RunVariantInput,
-} from "../../src/infra/domain/evals/harness/index.ts";
+} from "../../../src/infra/domain/evals/harness/index.ts";
 import {
   BASELINE_TRAJECTORIES_FIXTURE_PATH,
   GOLD_TRACES_FIXTURE_PATH,
   parseGoldTraces,
   parseTrajectoryFixture,
   type TrajectoryFixtureFile,
-} from "../../src/infra/domain/evals/fixtures/fixtureAdapter.ts";
+} from "../../../src/infra/domain/evals/fixtures/fixtureAdapter.ts";
 
 let failed = false;
 const fail = (msg: string) => {

@@ -19,10 +19,10 @@
  * Reuses Gordon's ranking primitives (`rankCrossSectionalMomentum`,
  * `sizeCrossSectionalContrarian`) and its anti-overfitting infra
  * (`deflatedSharpeRatio` / `probabilisticSharpeRatio`), matching the honesty
- * pattern in `scripts/research/alpha-search.ts`: the best raw Sharpe is upward-
+ * pattern in `scripts/research/searches/alpha-search.ts`: the best raw Sharpe is upward-
  * biased by selection, so a config only "clears the bar" at DSR > 0.95.
  *
- * Run:  bun run scripts/research/cross-sectional-scan.ts
+ * Run:  bun run scripts/research/scans/cross-sectional-scan.ts
  *
  * Pure data + Gordon primitives. Reads the committed crypto-extended momq bars.
  */
@@ -35,22 +35,22 @@ import { Worker, isMainThread, parentPort, workerData } from "node:worker_thread
 import {
   rankCrossSectionalMomentum,
   type AssetReturnSeries,
-} from "../../src/core/alpha/cross-sectional-momentum.ts";
+} from "../../../src/core/alpha/cross-sectional-momentum.ts";
 import {
   sizeCrossSectionalContrarian,
   type ContrarianAsset,
-} from "../../src/core/alpha/cross-sectional-contrarian.ts";
+} from "../../../src/core/alpha/cross-sectional-contrarian.ts";
 import {
   deflatedSharpeRatio,
   probabilisticSharpeRatio,
-} from "../../src/infra/trading/ops/backtestCredibility.ts";
+} from "../../../src/infra/trading/ops/backtestCredibility.ts";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
 // Default scope = the committed crypto-extended bars. Override the data dir to
 // re-run on a different committed universe (e.g. the stable momq competition bars
 // for parity tests) without touching code:
-//   XSCAN_DATA_DIR=data/momq/bars bun run scripts/research/cross-sectional-scan.ts
+//   XSCAN_DATA_DIR=data/momq/bars bun run scripts/research/scans/cross-sectional-scan.ts
 const DATA_DIR = join(process.cwd(), process.env.XSCAN_DATA_DIR ?? join("data", "momq", "crypto-extended"));
 
 // The 5 names that actually transfer to the Model-to-Market competition.

@@ -23,8 +23,8 @@
  *             and the equal-weight buy-&-hold benchmark per third (long-short must
  *             beat passive to count).
  *
- * Run:  bun run scripts/research/tsmom-regime-scan.ts
- *       ALPHA_BARS_DIR=data/momq/bars ALPHA_TF=M15 bun run scripts/research/tsmom-regime-scan.ts
+ * Run:  bun run scripts/research/scans/tsmom-regime-scan.ts
+ *       ALPHA_BARS_DIR=data/momq/bars ALPHA_TF=M15 bun run scripts/research/scans/tsmom-regime-scan.ts
  *
  * Pure data + Gordon's credibility primitives; reads only the committed momq bars.
  */
@@ -35,7 +35,7 @@ import { join } from "node:path";
 import {
   deflatedSharpeRatio,
   probabilisticSharpeRatio,
-} from "../../src/infra/trading/ops/backtestCredibility.ts";
+} from "../../../src/infra/trading/ops/backtestCredibility.ts";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const BARS_DIR = join(process.cwd(), process.env.ALPHA_BARS_DIR ?? join("data", "momq", "bars"));

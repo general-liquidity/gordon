@@ -7,8 +7,8 @@ import {
   getActionPromptExample,
   getCanonicalActions,
   getDerivedToolMetadata,
-} from "../../src/infra/runtime/actions/index.ts";
-import { loadConfig } from "../../src/infra/storage/config/config.ts";
+} from "../../../src/infra/runtime/actions/index.ts";
+import { loadConfig } from "../../../src/infra/storage/config/config.ts";
 
 async function main(): Promise<void> {
   const config = await loadConfig();

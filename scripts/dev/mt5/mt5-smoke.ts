@@ -5,15 +5,15 @@
  * Prereq: the sidecar is running (scripts/mt5-bridge/mt5_bridge.py) and the MT5
  * terminal is logged into your competition account.
  *
- *   bun run scripts/dev/mt5-smoke.ts                 # read-only: account, quote, depth, bars
- *   bun run scripts/dev/mt5-smoke.ts --symbol EURUSD
- *   bun run scripts/dev/mt5-smoke.ts --trade         # also place+cancel a tiny far-from-market limit
+ *   bun run scripts/dev/mt5/mt5-smoke.ts                 # read-only: account, quote, depth, bars
+ *   bun run scripts/dev/mt5/mt5-smoke.ts --symbol EURUSD
+ *   bun run scripts/dev/mt5/mt5-smoke.ts --trade         # also place+cancel a tiny far-from-market limit
  *
  * The --trade path only fires if the sidecar was started with
  * MT5_BRIDGE_ALLOW_TRADING=1; otherwise it reports the guard and does nothing.
  */
 
-import { Mt5BridgeClient } from "../../src/infra/broker/mt5/bridgeClient.ts";
+import { Mt5BridgeClient } from "../../../src/infra/broker/mt5/bridgeClient.ts";
 
 function arg(flag: string, fallback?: string): string | undefined {
   const i = process.argv.indexOf(flag);

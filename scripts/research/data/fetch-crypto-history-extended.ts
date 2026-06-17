@@ -10,7 +10,7 @@
  *
  * Read-only public data only. No keys, no orders. Safe to run.
  *
- *   bun run scripts/research/fetch-crypto-history-extended.ts
+ *   bun run scripts/research/data/fetch-crypto-history-extended.ts
  *
  * Speed: a concurrency POOL issues page requests in parallel, throttled by a single
  * GLOBAL rate-pacer (~3.5 req/s) so we ride the Binance weight ceiling without 429s —

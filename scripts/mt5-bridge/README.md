@@ -62,7 +62,7 @@ Gordon (Bun/TS)  ──HTTP──►  mt5_bridge.py  ──IPC──►  MT5 ter
 With the sidecar running, from the repo root:
 
 ```
-bun run scripts/dev/mt5-smoke.ts
+bun run scripts/dev/mt5/mt5-smoke.ts
 ```
 
 Reads account + a quote + L2 depth for a symbol (default `XAUUSD`); pass `--trade`

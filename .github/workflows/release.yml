@@ -133,7 +133,7 @@ jobs:
         # See: docs.npmjs.com/cli/v11/commands/npm-sbom
         run: |
           npm install --package-lock-only --ignore-scripts
-          node scripts/dev/generate-sbom.cjs --output gordon-sbom.json
+          node scripts/dev/codegen/generate-sbom.cjs --output gordon-sbom.json
 
       - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v1

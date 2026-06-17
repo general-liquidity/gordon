@@ -103,7 +103,7 @@ The client defaults `baseUrl` to `http://127.0.0.1:${MT5_BRIDGE_PORT|8788}` and 
    At go-live, the sidecar env includes `MT5_BRIDGE_ALLOW_TRADING=1` (guard #1).
 3. **Smoke test** — verify the Gordon↔MT5 transport against the real account before arming the loop:
    ```
-   bun run scripts/dev/mt5-smoke.ts
+   bun run scripts/dev/mt5/mt5-smoke.ts
    ```
    Reads account + quote + L2 depth + bars + symbol spec. `health.tradingEnabled` reflects the sidecar guard. Add `--symbol EURUSD` to check a specific pair; `--trade` places and immediately cancels a tiny far-from-market limit (only fires if the sidecar is armed). **Smoke must be green before proceeding.**
 4. **Live runner** — start the live execution loop with `GORDON_LIVE_TRADING=1` (guard #2):
@@ -188,7 +188,7 @@ Run this immediately before **21 Jun 22:00 BST**. Arm the two guards **only at t
 - [ ] **MT5 terminal** logged into the competition account; live feed ticking (not bid/ask 0).
 - [ ] **Account creds in the sidecar env only** — `MT5_LOGIN` / `MT5_PASSWORD` / `MT5_SERVER` set on the sidecar; **not** present anywhere in Gordon's env.
 - [ ] **Bridge token matches** — `MT5_BRIDGE_TOKEN` identical on the sidecar and in Gordon's `apiKey`; `baseUrl` = `http://127.0.0.1:8788`.
-- [ ] **Smoke test green** — `bun run scripts/dev/mt5-smoke.ts` passes (account + quote + depth + bars + symbol spec). Re-run with the final symbol list.
+- [ ] **Smoke test green** — `bun run scripts/dev/mt5/mt5-smoke.ts` passes (account + quote + depth + bars + symbol spec). Re-run with the final symbol list.
 - [ ] **Final tradeable instrument list confirmed** on the platform/console — the 30+ instruments + per-instrument contract specs / leverage / tick size / spreads (released at login). Symbols are resolved from the venue catalog at runtime, never hardcoded.
 - [ ] **Risk preset confirmed** — `COMPETITION_RISK_SURVIVAL` (the frozen default in `competitionStrategy.ts`); ceilings confirmed under §13 thresholds. Swap to `AGGRESSIVE` only as a deliberate gamble.
 - [ ] **Optional perks** — `LOGFIRE_TOKEN` set for tracing; `DOUBLEWORD_API_KEY` if used.

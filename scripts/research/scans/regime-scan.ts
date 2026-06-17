@@ -17,11 +17,11 @@
  * and validates that the regime stack survives 27 symbols × thousands of real bars
  * without choking. No edge is claimed.
  *
- * Run:  bun run scripts/research/regime-scan.ts
+ * Run:  bun run scripts/research/scans/regime-scan.ts
  *
  * Universe is auto-discovered from the bar dir (same convention as alpha-search.ts):
- *   ALPHA_BARS_DIR=data/momq/crypto-extended ALPHA_TF=1h bun run scripts/research/regime-scan.ts
- * Force single-core (debugging):  REGIME_SERIAL=1 bun run scripts/research/regime-scan.ts
+ *   ALPHA_BARS_DIR=data/momq/crypto-extended ALPHA_TF=1h bun run scripts/research/scans/regime-scan.ts
+ * Force single-core (debugging):  REGIME_SERIAL=1 bun run scripts/research/scans/regime-scan.ts
  *
  * Uses `RegimeClassifier` directly (the pure classifier) rather than the `RegimeDetector`
  * singleton: the singleton writes every detection to SQLite + caches, which would mean
@@ -33,9 +33,9 @@ import { join } from "node:path";
 import { availableParallelism } from "node:os";
 import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 
-import { RegimeClassifier } from "../../src/core/regime/classifier.ts";
-import { MarketRegimeSchema, type MarketRegime } from "../../src/core/regime/types.ts";
-import type { Candle } from "../../src/types/index.ts";
+import { RegimeClassifier } from "../../../src/core/regime/classifier.ts";
+import { MarketRegimeSchema, type MarketRegime } from "../../../src/core/regime/types.ts";
+import type { Candle } from "../../../src/types/index.ts";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 

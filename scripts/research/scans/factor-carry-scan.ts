@@ -39,8 +39,8 @@
  *     deployable competition strategy.
  *
  * Run:
- *   bun run scripts/research/factor-carry-scan.ts
- *   COST_BPS_PER_SIDE=2 bun run scripts/research/factor-carry-scan.ts
+ *   bun run scripts/research/scans/factor-carry-scan.ts
+ *   COST_BPS_PER_SIDE=2 bun run scripts/research/scans/factor-carry-scan.ts
  */
 
 import { readFileSync, existsSync, readdirSync } from "node:fs";
@@ -51,11 +51,11 @@ import {
   STYLE_FACTORS,
   type CryptoTokenInput,
   type StyleFactor,
-} from "../../src/core/alpha/crypto-factor-model.ts";
+} from "../../../src/core/alpha/crypto-factor-model.ts";
 import {
   deflatedSharpeRatio,
   probabilisticSharpeRatio,
-} from "../../src/infra/trading/ops/backtestCredibility.ts";
+} from "../../../src/infra/trading/ops/backtestCredibility.ts";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 

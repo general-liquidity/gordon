@@ -6,7 +6,7 @@
  * strong-learner ensemble premise (López de Prado AFML; reused here via
  * `src/core/alpha/ensemble-signal-combiner.ts`).
  *
- *   bun run scripts/research/ensemble-search.ts
+ *   bun run scripts/research/searches/ensemble-search.ts
  *
  * What it does:
  *   1. Defines 5 transparent, parameter-light base `SignalFn`s (RSI mean-reversion,
@@ -37,13 +37,13 @@ import {
   type DryRunBar,
   type SignalFn,
   type DryRunSignal,
-} from "../../src/backtest/competition-dry-run.ts";
-import { COMPETITION_RISK_AGGRESSIVE } from "../../src/core/risk-management/competition-risk-preset.ts";
-import { reversalSignal } from "../../src/core/alpha/reversal-strategy.ts";
+} from "../../../src/backtest/competition-dry-run.ts";
+import { COMPETITION_RISK_AGGRESSIVE } from "../../../src/core/risk-management/competition-risk-preset.ts";
+import { reversalSignal } from "../../../src/core/alpha/reversal-strategy.ts";
 import {
   combineEnsembleSignals,
   type EnsembleSignal,
-} from "../../src/core/alpha/ensemble-signal-combiner.ts";
+} from "../../../src/core/alpha/ensemble-signal-combiner.ts";
 
 const DIR = "data/momq/bars";
 const M15_PER_YEAR = 24 * 4 * 365;

@@ -17,8 +17,8 @@ on:
       - "src/infra/agents/prompt-sections/**"
       - "src/infra/agents/tools/**"
       - "src/app/**"
-      - "scripts/dev/eval-gate.ts"
-      - "scripts/dev/eval-live-runner.ts"
+      - "scripts/dev/eval/eval-gate.ts"
+      - "scripts/dev/eval/eval-live-runner.ts"
   workflow_dispatch: {}
 
 jobs:
@@ -57,7 +57,7 @@ jobs:
       # repo var GORDON_EVAL_BASELINE overrides. Activating without a key
       # fails the gate (no silent judge-fallback pass).
       - name: Eval gate
-        run: bun run scripts/dev/eval-gate.ts
+        run: bun run scripts/dev/eval/eval-gate.ts
         env:
           GORDON_EVAL_GOLD_TRACES: ${{ vars.GORDON_EVAL_GOLD_TRACES }}
           GORDON_EVAL_BASELINE: ${{ vars.GORDON_EVAL_BASELINE }}
@@ -65,4 +65,4 @@ jobs:
           DEDALUS_API_KEY: ${{ secrets.DEDALUS_API_KEY }}
 
       - name: Eval live runner dry-run (Phase 4)
-        run: GORDON_EVAL_DRY_RUN=1 bun run scripts/dev/eval-live-runner.ts --k 1
+        run: GORDON_EVAL_DRY_RUN=1 bun run scripts/dev/eval/eval-live-runner.ts --k 1

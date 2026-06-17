@@ -3,10 +3,10 @@
  * check_tool_tiers — lint that flags untiered tool spreads in agent definitions.
  *
  * Run:
- *   bun run scripts/dev/check_tool_tiers.ts
+ *   bun run scripts/dev/checks/check_tool_tiers.ts
  *
  * Wire as pre-commit hook (optional):
- *   echo 'bun run scripts/dev/check_tool_tiers.ts' >> .git/hooks/pre-commit
+ *   echo 'bun run scripts/dev/checks/check_tool_tiers.ts' >> .git/hooks/pre-commit
  *
  * What it catches: new `...instrumentedXTools` spreads in
  *   - src/infra/agents/definitions/gordon.ts

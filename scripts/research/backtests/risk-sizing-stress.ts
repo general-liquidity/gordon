@@ -17,7 +17,7 @@
  * distribution per preset — a sanity check on the frozen survival config (which
  * cap actually dominates the grid).
  *
- * Run:  bun run scripts/research/risk-sizing-stress.ts
+ * Run:  bun run scripts/research/backtests/risk-sizing-stress.ts
  *
  * Pure: no I/O, no disk, no network. Exercises Gordon's real preset code.
  */
@@ -31,7 +31,7 @@ import {
   type CompetitionTradeInput,
   type CompetitionTradeResult,
   type BindingConstraint,
-} from "../../src/core/risk-management/competition-risk-preset.ts";
+} from "../../../src/core/risk-management/competition-risk-preset.ts";
 
 // ── Numeric tolerance for the inequality + identity checks ──────────────────
 // leverageUsed/riskPct are rounded by the sizer (3 / 5 dp); ε must clear that

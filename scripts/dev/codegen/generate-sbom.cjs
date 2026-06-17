@@ -13,7 +13,7 @@
  * if one needs to be synthesized, or runs cleanly when invoked after
  * a build step that produced one.
  *
- * Run: `node scripts/dev/generate-sbom.cjs [--output <path>]`
+ * Run: `node scripts/dev/codegen/generate-sbom.cjs [--output <path>]`
  *
  * Output: CycloneDX 1.5 JSON. Downstream consumers can verify package
  * integrity hashes and trace the supply chain via the cdx:npm:package

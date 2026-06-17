@@ -47,7 +47,7 @@ export function buildMomqStatusPanel(): string {
     "",
     "Checklist:",
     "  1. Start the MT5 bridge:  scripts/mt5-bridge/mt5_bridge.py",
-    "  2. Verify the bridge:     bun run scripts/dev/mt5-smoke.ts",
+    "  2. Verify the bridge:     bun run scripts/dev/mt5/mt5-smoke.ts",
     "  3. Set DOUBLEWORD_API_KEY + LOGFIRE_TOKEN in .env",
   ];
   return lines.join("\n");

@@ -15,7 +15,7 @@
  * month of M15 bars, the prior is that NOTHING clears the deflated bar — and the
  * tool is built to say that plainly rather than launder noise into a "winner".
  *
- * Run:  bun run scripts/research/alpha-search.ts
+ * Run:  bun run scripts/research/searches/alpha-search.ts
  *
  * Pure data + Gordon primitives; no I/O beyond reading the committed momq bars.
  */
@@ -29,11 +29,11 @@ import {
   runCompetitionDryRun,
   type DryRunSignal,
   type SignalFn,
-} from "../../src/backtest/competition-dry-run.ts";
+} from "../../../src/backtest/competition-dry-run.ts";
 import {
   deflatedSharpeRatio,
   probabilisticSharpeRatio,
-} from "../../src/infra/trading/ops/backtestCredibility.ts";
+} from "../../../src/infra/trading/ops/backtestCredibility.ts";
 import { STRATEGY_REGISTRY, HISTORY_CAP, type ResearchBar, type StrategyFactory } from "./strategy-registry.ts";
 
 // ── Config ──────────────────────────────────────────────────────────────────
@@ -41,7 +41,7 @@ import { STRATEGY_REGISTRY, HISTORY_CAP, type ResearchBar, type StrategyFactory 
 const DATA_DIR = join(process.cwd(), "data", "momq");
 // Default scope = the competition M15 bars. Override to re-test leads on more
 // data (e.g. the extended multi-regime crypto history) without touching code:
-//   ALPHA_BARS_DIR=data/momq/crypto-extended ALPHA_TF=1h bun run scripts/research/alpha-search.ts
+//   ALPHA_BARS_DIR=data/momq/crypto-extended ALPHA_TF=1h bun run scripts/research/searches/alpha-search.ts
 const BARS_DIR = join(process.cwd(), process.env.ALPHA_BARS_DIR ?? join("data", "momq", "bars"));
 const L2_DIR = join(DATA_DIR, "l2");
 const MANIFEST = join(DATA_DIR, "manifest.json");

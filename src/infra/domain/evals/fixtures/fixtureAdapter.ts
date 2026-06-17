@@ -1,7 +1,7 @@
 /**
  * Fixture adapter — bridges the dry-run producer's output (ScenarioLiveResult:
  * EvalTrajectory + NormalizedTrace) into the two shapes the eval gate
- * (`scripts/dev/eval-gate.ts`) consumes:
+ * (`scripts/dev/eval/eval-gate.ts`) consumes:
  *   - AuditTrace[] for the gold-trace process-check leg, and
  *   - the trajectory-fixture file format for the LLM-judge regression leg.
  *

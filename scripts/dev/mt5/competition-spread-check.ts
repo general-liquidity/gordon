@@ -11,14 +11,14 @@
  *
  * Pure read-only: only `quote()` + `symbol()` are called — no orders, ever.
  *
- *   bun run scripts/dev/competition-spread-check.ts
+ *   bun run scripts/dev/mt5/competition-spread-check.ts
  *
  * Prereq: the sidecar (scripts/mt5-bridge/mt5_bridge.py) is running + MT5 logged into the
  * competition account. Doubles as the per-instrument ContractSpec collector for the live runner.
  */
 
-import { Mt5BridgeClient } from "../../src/infra/broker/mt5/bridgeClient.ts";
-import { COMPETITION_TRADEABLE } from "../../src/infra/trading/competition/competitionStrategy.ts";
+import { Mt5BridgeClient } from "../../../src/infra/broker/mt5/bridgeClient.ts";
+import { COMPETITION_TRADEABLE } from "../../../src/infra/trading/competition/competitionStrategy.ts";
 
 // Empirical break-even from best-sharpe-sweep.ts: gross per-bar edge ~+0.007 is consumed by
 // ~1bp/side cost ≈ a quoted spread of ~2bps. Quoted-spread bands → net-Sharpe expectation.

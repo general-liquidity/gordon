@@ -27,22 +27,22 @@
  *   - too-good-check, margin-of-error, trade-consistency, robustness-metrics  (diagnostics)
  */
 
-import type { DryRunBar, DryRunSignal, SignalFn } from "../../src/backtest/competition-dry-run.ts";
-import type { Candle } from "../../src/core/indicators/types.ts";
+import type { DryRunBar, DryRunSignal, SignalFn } from "../../../src/backtest/competition-dry-run.ts";
+import type { Candle } from "../../../src/core/indicators/types.ts";
 
-import { calculateRSI } from "../../src/core/indicators/rsi.ts";
-import { calculateMACD } from "../../src/core/indicators/macd.ts";
-import { calculateBollingerBands } from "../../src/core/indicators/bollinger.ts";
-import { calculateDonchian } from "../../src/core/indicators/donchian.ts";
-import { calculateSMA, calculateEMA } from "../../src/core/indicators/ema.ts";
-import { calculateStochastic } from "../../src/core/indicators/stochastic.ts";
-import { calculateWilliamsR } from "../../src/core/indicators/williams-r.ts";
-import { calculateCCI } from "../../src/core/indicators/cci.ts";
-import { calculateROC } from "../../src/core/indicators/momentum-roc.ts";
-import { calculateSupertrend } from "../../src/core/indicators/supertrend.ts";
-import { reversalSignal } from "../../src/core/alpha/reversal-strategy.ts";
-import { regimeAdaptiveSignal } from "../../src/core/alpha/regime-adaptive-strategy.ts";
-import { detectStreak } from "../../src/core/alpha/streak-detector.ts";
+import { calculateRSI } from "../../../src/core/indicators/rsi.ts";
+import { calculateMACD } from "../../../src/core/indicators/macd.ts";
+import { calculateBollingerBands } from "../../../src/core/indicators/bollinger.ts";
+import { calculateDonchian } from "../../../src/core/indicators/donchian.ts";
+import { calculateSMA, calculateEMA } from "../../../src/core/indicators/ema.ts";
+import { calculateStochastic } from "../../../src/core/indicators/stochastic.ts";
+import { calculateWilliamsR } from "../../../src/core/indicators/williams-r.ts";
+import { calculateCCI } from "../../../src/core/indicators/cci.ts";
+import { calculateROC } from "../../../src/core/indicators/momentum-roc.ts";
+import { calculateSupertrend } from "../../../src/core/indicators/supertrend.ts";
+import { reversalSignal } from "../../../src/core/alpha/reversal-strategy.ts";
+import { regimeAdaptiveSignal } from "../../../src/core/alpha/regime-adaptive-strategy.ts";
+import { detectStreak } from "../../../src/core/alpha/streak-detector.ts";
 
 // ── Bar carrying optional per-bar L2 imbalance (set by the loader for L2 instruments). ──
 export interface ResearchBar extends DryRunBar {

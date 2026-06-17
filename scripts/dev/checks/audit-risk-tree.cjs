@@ -10,7 +10,7 @@
  * point is to make the silenced advisories actionable: when an
  * upstream fix lands, you know exactly which top-level dep to bump.
  *
- * Run: `node scripts/dev/audit-risk-tree.cjs`
+ * Run: `node scripts/dev/checks/audit-risk-tree.cjs`
  *
  * Inspired by Bun's `bun why` doc — uses the dependency-tree
  * explanation rather than a generic advisory dump.

@@ -175,7 +175,7 @@ Gordon (Bun/TS, Windows)  ──►  MT5 bridge (MetaTrader5 Python pkg)  ──
 - **Python sidecar** `scripts/mt5-bridge/mt5_bridge.py` — wraps the `MetaTrader5` package behind a localhost JSON API. Endpoints: `/health /account /positions /orders /symbols /symbol /quote /depth (L2) /bars /order /cancel /close`. Binds to `127.0.0.1` only; **deny-first trading guard** (`/order`,`/cancel`,`/close` validate via `order_check` and refuse to fire unless `MT5_BRIDGE_ALLOW_TRADING=1`). MT5 API surface used: `account_info`, `positions_get`, `orders_get`, `symbols_get`/`symbol_info`, `symbol_info_tick`, `market_book_get` (L2), `copy_rates_*`, `order_send`/`order_check`.
 - **Typed client** `src/infra/broker/mt5/bridgeClient.ts` (`Mt5BridgeClient`) — Gordon-side transport, 8 tests.
 - **BrokerAdapter** `src/infra/broker/adapters/mt5.ts` (`Mt5Adapter`, brokerId `mt5`) — maps onto the normalized broker contract; registered in the factory + inclusion gate (approved). 7 adapter tests. `BrokerCredentials.apiKey` = bridge token, `baseUrl` = bridge URL; the MT5 account login/password/server live in the **sidecar env**, never in Gordon.
-- **Run it:** install MT5 terminal + log in → `pip install -r scripts/mt5-bridge/requirements.txt` → set `MT5_LOGIN/MT5_PASSWORD/MT5_SERVER`, `MT5_BRIDGE_TOKEN`, `MT5_BRIDGE_ALLOW_TRADING=1` → `python scripts/mt5-bridge/mt5_bridge.py` → `bun run scripts/dev/mt5-smoke.ts` to verify against the real account. See `scripts/mt5-bridge/README.md`.
+- **Run it:** install MT5 terminal + log in → `pip install -r scripts/mt5-bridge/requirements.txt` → set `MT5_LOGIN/MT5_PASSWORD/MT5_SERVER`, `MT5_BRIDGE_TOKEN`, `MT5_BRIDGE_ALLOW_TRADING=1` → `python scripts/mt5-bridge/mt5_bridge.py` → `bun run scripts/dev/mt5/mt5-smoke.ts` to verify against the real account. See `scripts/mt5-bridge/README.md`.
 
 ---
 
@@ -263,7 +263,7 @@ Encoded as `COMPETITION_RISK_AGGRESSIVE` in `competition-risk-preset.ts` (a **st
 - `core/pipeline/competition-runner.ts` — run config; `backtest/metrics.ts` annualization fix.
 
 **Built (this prep), cont'd:**
-- **MT5 bridge — DONE** (§7.2): Python sidecar + `Mt5BridgeClient` + `Mt5Adapter` (registered, gate-approved). 15 tests. Validate against the real account via `scripts/dev/mt5-smoke.ts`; wire to Syphonix's MT5 creds on the 18th (just swap the sidecar env).
+- **MT5 bridge — DONE** (§7.2): Python sidecar + `Mt5BridgeClient` + `Mt5Adapter` (registered, gate-approved). 15 tests. Validate against the real account via `scripts/dev/mt5/mt5-smoke.ts`; wire to Syphonix's MT5 creds on the 18th (just swap the sidecar env).
 
 **Open / TODO:**
 - **Dry-run cost layer** — add spread + slippage (no commission/swap) for fidelity.

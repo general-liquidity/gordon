@@ -20,8 +20,8 @@
  * of p2 — exactly the dollar-β-weighted dollar-neutral pair. So position×ΔS is the
  * honest spread return, with no spread-pct-change-through-zero pathology.
  *
- *   bun run scripts/research/pairs-scan.ts                       # FX/metals, comp M15
- *   ALPHA_BARS_DIR=data/momq/crypto-extended ALPHA_TF=1d bun run scripts/research/pairs-scan.ts
+ *   bun run scripts/research/scans/pairs-scan.ts                       # FX/metals, comp M15
+ *   ALPHA_BARS_DIR=data/momq/crypto-extended ALPHA_TF=1d bun run scripts/research/scans/pairs-scan.ts
  *
  * Honest scope: cointegration over one window is INDICATIVE; the IS/OOS split is the
  * real test of whether the relationship (and the edge) holds out of sample.
@@ -32,9 +32,9 @@ import { join } from "node:path";
 import { availableParallelism } from "node:os";
 import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 
-import { testCointegration } from "../../src/infra/trading/quant/cointegration.ts";
-import { johansenTest } from "../../src/infra/trading/quant/johansen.ts";
-import { calibrateOU, minimumEntryZScore, effectiveEntryZ } from "../../src/infra/trading/quant/ouCalibration.ts";
+import { testCointegration } from "../../../src/infra/trading/quant/cointegration.ts";
+import { johansenTest } from "../../../src/infra/trading/quant/johansen.ts";
+import { calibrateOU, minimumEntryZScore, effectiveEntryZ } from "../../../src/infra/trading/quant/ouCalibration.ts";
 
 const BARS_DIR = join(process.cwd(), process.env.ALPHA_BARS_DIR ?? join("data", "momq", "bars"));
 const TF = process.env.ALPHA_TF ?? "M15";

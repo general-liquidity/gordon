@@ -5,13 +5,13 @@
  * summary from deterministic process checks.
  *
  * Usage:
- *   bun run scripts/dev/eval-live-runner.ts [--k N] [--dry-run] [--scenario id]
+ *   bun run scripts/dev/eval/eval-live-runner.ts [--k N] [--dry-run] [--scenario id]
  *
  * CI without API keys:
- *   GORDON_EVAL_DRY_RUN=1 bun run scripts/dev/eval-live-runner.ts --k 5
+ *   GORDON_EVAL_DRY_RUN=1 bun run scripts/dev/eval/eval-live-runner.ts --k 5
  *
  * Live mode (requires LLM credentials):
- *   bun run scripts/dev/eval-live-runner.ts --k 3 --scenario gen-denylist-place_order
+ *   bun run scripts/dev/eval/eval-live-runner.ts --k 3 --scenario gen-denylist-place_order
  */
 
 import {
@@ -19,7 +19,7 @@ import {
   getScenarioById,
   produceKRuns,
   withEvalSandbox,
-} from "../../src/infra/domain/evals/harness/index.ts";
+} from "../../../src/infra/domain/evals/harness/index.ts";
 
 function parseArgs(argv: string[]): { k: number; dryRun: boolean; scenarioId?: string } {
   let k = 3;

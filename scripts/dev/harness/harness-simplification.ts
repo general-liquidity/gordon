@@ -29,9 +29,9 @@
  * benchmark itself.
  *
  * Usage:
- *   bun scripts/dev/harness-simplification.ts            # show next flag to test
- *   bun scripts/dev/harness-simplification.ts --status   # show full rotation state
- *   bun scripts/dev/harness-simplification.ts --record-outcome <flag> <outcome>
+ *   bun scripts/dev/harness/harness-simplification.ts            # show next flag to test
+ *   bun scripts/dev/harness/harness-simplification.ts --status   # show full rotation state
+ *   bun scripts/dev/harness/harness-simplification.ts --record-outcome <flag> <outcome>
  *     where <outcome> is one of: keep, remove, replace
  */
 
@@ -174,7 +174,7 @@ function renderReport(flag: HarnessFlag): string {
     "Once you've made the call:",
     "",
     "```sh",
-    `bun scripts/dev/harness-simplification.ts --record-outcome ${flag.name} <keep|remove|replace>`,
+    `bun scripts/dev/harness/harness-simplification.ts --record-outcome ${flag.name} <keep|remove|replace>`,
     "```",
     "",
     "If `remove`: open a PR deleting the flag-gated code path entirely.",

@@ -175,13 +175,13 @@ bun run scripts/dev/sweep-react-compiler.ts --verbose
 ## Smoke test
 
 A minimal end-to-end Babel-pipeline check lives at
-`scripts/dev/smoke-react-compiler.ts`. It compiles a tiny synthetic
+`scripts/dev/checks/smoke-react-compiler.ts`. It compiles a tiny synthetic
 component and asserts the output contains `react/compiler-runtime` and
 the `_c(...)` cache-hook call the compiler emits. Run with `--force`
 or `GORDON_REACT_COMPILER=1` set:
 
 ```
-bun run scripts/dev/smoke-react-compiler.ts --force
+bun run scripts/dev/checks/smoke-react-compiler.ts --force
 ```
 
 Expected output: `[smoke] PASS — React Compiler emitted memoized

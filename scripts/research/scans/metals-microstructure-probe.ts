@@ -14,7 +14,7 @@
  *   3. combined   — momentum DIRECTION, entered ONLY when the book imbalance agrees
  *                   (the intersection of the two independent leads).
  *
- *   bun run scripts/research/metals-microstructure-probe.ts
+ *   bun run scripts/research/scans/metals-microstructure-probe.ts
  *
  * Honest scope: one month, single IS(70%)/OOS(30%) split, FIXED params shown as a
  * full grid (no best-of cherry-pick). Imbalance is lagged to bar close, so same-bar
@@ -30,8 +30,8 @@ import {
   type DryRunBar,
   type DryRunSignal,
   type SignalFn,
-} from "../../src/backtest/competition-dry-run.ts";
-import { COMPETITION_RISK_AGGRESSIVE } from "../../src/core/risk-management/competition-risk-preset.ts";
+} from "../../../src/backtest/competition-dry-run.ts";
+import { COMPETITION_RISK_AGGRESSIVE } from "../../../src/core/risk-management/competition-risk-preset.ts";
 
 const BARS_DIR = "data/momq/bars";
 const L2_DIR = "data/momq/l2";

@@ -23,8 +23,8 @@
  * correction). Uses Gordon's own `backtestCredibility.ts` primitives and the
  * `vol-target-sizer.ts` book-level vol scaler.
  *
- * Run:   bun run scripts/research/portfolio-tsmom-scan.ts
- *        PORT_TF=1h bun run scripts/research/portfolio-tsmom-scan.ts
+ * Run:   bun run scripts/research/scans/portfolio-tsmom-scan.ts
+ *        PORT_TF=1h bun run scripts/research/scans/portfolio-tsmom-scan.ts
  *
  * Pure data + Gordon primitives. Reads only the committed extended bars.
  */
@@ -35,8 +35,8 @@ import { join } from "node:path";
 import {
   deflatedSharpeRatio,
   probabilisticSharpeRatio,
-} from "../../src/infra/trading/ops/backtestCredibility.ts";
-import { sizeWithVolTarget } from "../../src/core/alpha/vol-target-sizer.ts";
+} from "../../../src/infra/trading/ops/backtestCredibility.ts";
+import { sizeWithVolTarget } from "../../../src/core/alpha/vol-target-sizer.ts";
 
 // NOTE: this scan is intentionally SERIAL. The whole sweep — build the aligned
 // panel once, then score the ~120-config grid — runs in ~3s even on the 52-symbol
@@ -50,7 +50,7 @@ import { sizeWithVolTarget } from "../../src/core/alpha/vol-target-sizer.ts";
 // Default scope = the committed crypto-extended bars. Override the data dir to
 // re-run on a different committed universe (e.g. the stable momq competition
 // bars for parity tests) without touching code:
-//   PORT_DATA_DIR=data/momq/bars PORT_TF=M15 bun run scripts/research/portfolio-tsmom-scan.ts
+//   PORT_DATA_DIR=data/momq/bars PORT_TF=M15 bun run scripts/research/scans/portfolio-tsmom-scan.ts
 const DATA_DIR = join(process.cwd(), process.env.PORT_DATA_DIR ?? join("data", "momq", "crypto-extended"));
 const TF = process.env.PORT_TF ?? "1d"; // 1d | 1h | M15
 const PERIODS_PER_YEAR = TF === "1d" ? 365 : TF === "1h" ? 365 * 24 : 365 * 24 * 4;

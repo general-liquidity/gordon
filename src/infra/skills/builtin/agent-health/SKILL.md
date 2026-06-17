@@ -36,7 +36,7 @@ If a file is absent, say "no entries" and move on — absence is healthy, not an
 Run the deterministic checker and read the output (suggest the operator run it via `!` if the skill can't shell out):
 
 ```
-bun run scripts/dev/check_tool_tiers.ts              # untiered hot-tier additions
+bun run scripts/dev/checks/check_tool_tiers.ts              # untiered hot-tier additions
 ```
 
 Then eyeball the two manual signals (their standalone audit scripts were retired):

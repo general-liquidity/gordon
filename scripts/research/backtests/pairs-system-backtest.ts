@@ -20,7 +20,7 @@
  * pathology. Costs: crypto spread=0 in the data → floor 5 bps both legs, charged on
  * |Δallocation| (turnover-honest, so re-sizing pays too).
  *
- *   ALPHA_BARS_DIR=data/momq/crypto-extended ALPHA_TF=1d bun run scripts/research/pairs-system-backtest.ts
+ *   ALPHA_BARS_DIR=data/momq/crypto-extended ALPHA_TF=1d bun run scripts/research/backtests/pairs-system-backtest.ts
  *
  * IS(70)/OOS(30): the cointegration relationship and the edge must hold OUT of
  * sample. The honest verdict reports the AGGREGATED book's OOS Sharpe + smoothness.
@@ -31,7 +31,7 @@ import { join } from "node:path";
 import { availableParallelism } from "node:os";
 import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 
-import { runPairsSystem } from "../../src/infra/trading/quant/pairsSystem.ts";
+import { runPairsSystem } from "../../../src/infra/trading/quant/pairsSystem.ts";
 
 const BARS_DIR = join(process.cwd(), process.env.ALPHA_BARS_DIR ?? join("data", "momq", "crypto-extended"));
 const TF = process.env.ALPHA_TF ?? "1d";

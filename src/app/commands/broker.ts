@@ -371,7 +371,7 @@ function getBrokerSetupInstructions(type: BrokerId): string {
 3. Run the bridge sidecar: scripts/mt5-bridge (pip install -r requirements.txt; python mt5_bridge.py)
    — set MT5_LOGIN/MT5_PASSWORD/MT5_SERVER, MT5_BRIDGE_TOKEN, MT5_BRIDGE_ALLOW_TRADING=1
 4. Point Gordon at the bridge: apiKey = MT5_BRIDGE_TOKEN, baseUrl = http://127.0.0.1:8788, MT5_PAPER=true
-5. Verify: bun run scripts/dev/mt5-smoke.ts (see docs/model-to-market/COMPETITION_BRIEF.md §7)`,
+5. Verify: bun run scripts/dev/mt5/mt5-smoke.ts (see docs/model-to-market/COMPETITION_BRIEF.md §7)`,
   };
   return instructions[type];
 }
