@@ -31,6 +31,7 @@ import type {
 } from "../../broker/mt5/bridgeClient.ts";
 import type { ContractSpec } from "./liveTrader.ts";
 import { barbellDecision, type BarbellConfig, type BarbellDecision, BARBELL_CONFIG } from "./barbellStrategy.ts";
+import { marginCircuitBreaker } from "./survivalStop.ts";
 
 /** Mockable subset of the bridge the runner needs (same shape as liveTrader's Mt5Like). */
 export interface Mt5Like {
@@ -143,6 +144,12 @@ export interface BarbellRunnerConfig {
   barsLookback: number;
   timeframe: string;
   barbellConfig?: BarbellConfig;
+  /**
+   * Margin-level (percent) at which the survival circuit breaker flattens the entire book
+   * — must sit ABOVE the 30% stop-out (= elimination). Default 50 (see `survivalStop.ts`).
+   * Per-leg stops are deliberately NOT used: they would un-hedge the dollar-neutral core.
+   */
+  breakerLevelPct?: number;
 }
 
 export interface BarbellCycleReport {
@@ -150,6 +157,10 @@ export interface BarbellCycleReport {
   ourReturnPct: number;
   liveArmed: boolean;
   decisionReason: string;
+  /** Account margin level (percent) this cycle. */
+  marginLevelPct: number;
+  /** True ⇒ the survival breaker fired and the book was flattened (targets forced to 0). */
+  breakerTripped: boolean;
   orders: Array<ReconcileOrder & { action: "placed" | "dry" | "refused" | "error"; detail?: string }>;
   ordersPlaced: number;
 }
@@ -182,17 +193,37 @@ export class BarbellLiveRunner {
       quoteBySymbol[symbol] = await this.client.quote(symbol);
     }
 
-    const decision = barbellDecision({
-      barsBySymbol,
-      equity,
-      startingEquity: this.cfg.startingEquity,
-      ourReturnPct,
-      barsToDeadline: this.cfg.barsToDeadline(),
-      phase: this.cfg.phase(),
-      config: this.cfg.barbellConfig ?? BARBELL_CONFIG,
+    // SURVIVAL circuit breaker runs FIRST. If the account margin level nears the 30% stop-out
+    // (= elimination), flatten the WHOLE book (targets → 0) and skip the barbell decision
+    // entirely — per-leg stops would un-hedge the core, and `barbellDecision` itself refuses
+    // to carve a sleeve below the ring-fence red-line (it throws), so in a survival emergency
+    // we must NOT depend on it. Breaker level sits above the stop-out for buffer.
+    const breaker = marginCircuitBreaker({
+      marginLevelPct: account.margin_level,
+      usedMargin: account.margin,
+      breakerLevelPct: this.cfg.breakerLevelPct,
     });
 
-    const targets = aggregateTargetNotionals(decision);
+    let targets: Record<string, number>;
+    let decisionReason: string;
+    if (breaker.tripped) {
+      this.log(`[barbell] SURVIVAL CIRCUIT BREAKER — ${breaker.reason}`);
+      targets = {}; // flatten everything
+      decisionReason = breaker.reason;
+    } else {
+      const decision = barbellDecision({
+        barsBySymbol,
+        equity,
+        startingEquity: this.cfg.startingEquity,
+        ourReturnPct,
+        barsToDeadline: this.cfg.barsToDeadline(),
+        phase: this.cfg.phase(),
+        config: this.cfg.barbellConfig ?? BARBELL_CONFIG,
+      });
+      targets = aggregateTargetNotionals(decision);
+      decisionReason = decision.reason;
+    }
+
     const positions = await this.client.positions();
     const recon = reconcile(targets, positions, quoteBySymbol, this.cfg.contracts, this.cfg.symbols);
 
@@ -218,7 +249,16 @@ export class BarbellLiveRunner {
       }
     }
 
-    return { equity, ourReturnPct, liveArmed: armed, decisionReason: decision.reason, orders, ordersPlaced };
+    return {
+      equity,
+      ourReturnPct,
+      liveArmed: armed,
+      decisionReason,
+      marginLevelPct: account.margin_level,
+      breakerTripped: breaker.tripped,
+      orders,
+      ordersPlaced,
+    };
   }
 
   /** Run on a cadence; never throws out of the loop. Returns a stop fn. */

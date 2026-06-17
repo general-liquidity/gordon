@@ -24,6 +24,7 @@ import {
   COMPETITION_RISK_AGGRESSIVE,
   type CompetitionRiskParams,
 } from "../../../core/risk-management/competition-risk-preset.ts";
+import { survivalStopDistance } from "./survivalStop.ts";
 import type {
   Mt5Account,
   Mt5Position,
@@ -85,6 +86,12 @@ export interface LiveTraderConfig {
    * → buy at ask − 0.25·spread, sell at bid + 0.25·spread.
    */
   makerSpreadFraction?: number;
+  /**
+   * Survival-stop placement: fraction of the move-to-the-stop-out at which to cap the
+   * protective stop (see `survivalStop.ts`, default 0.6). The attached SL is always the
+   * TIGHTER of the strategy stop and this survival stop — it only ever tightens protection.
+   */
+  survivalStopFraction?: number;
 }
 
 export interface CompetitionLiveTraderOptions {
@@ -262,7 +269,7 @@ export class CompetitionLiveTrader {
         }
 
         const side: "buy" | "sell" = signal.side === "long" ? "buy" : "sell";
-        const order = this.buildOrder({ symbol, side, lots, signal, quote });
+        const order = this.buildOrder({ symbol, side, lots, signal, quote, equity });
 
         if (!armed) {
           decisions.push({
@@ -301,13 +308,25 @@ export class CompetitionLiveTrader {
     lots: number;
     signal: LiveSignal;
     quote: Mt5Quote;
+    equity: number;
   }): Mt5OrderRequest {
-    const { symbol, side, lots, signal, quote } = args;
+    const { symbol, side, lots, signal, quote, equity } = args;
     const clientOrderId = `gordon_comp_${symbol}_${Date.now()}`;
 
     // Entry reference: long fills at ask, short at bid (taker), maker posts inside.
     const entry = side === "buy" ? quote.ask : quote.bid;
-    const sl = side === "buy" ? entry - signal.stopDistance : entry + signal.stopDistance;
+
+    // Protective stop = the TIGHTER of the strategy stop and the SURVIVAL stop (the move that
+    // would drag the account toward the 30% margin stop-out = elimination). Only ever tightens:
+    // if there's no position/equity the survival distance is Infinity and the strategy stop wins.
+    const contractSize = this.contracts[symbol]?.contractSize ?? 1;
+    const survivalFrac = survivalStopDistance({
+      positionNotional: lots * contractSize * entry,
+      equity,
+      survivalFraction: this.config.survivalStopFraction,
+    });
+    const stopDistance = Math.min(signal.stopDistance, entry * survivalFrac);
+    const sl = side === "buy" ? entry - stopDistance : entry + stopDistance;
     const tp =
       signal.targetDistance === undefined
         ? undefined

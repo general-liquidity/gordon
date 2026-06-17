@@ -1,7 +1,7 @@
-import { describe, it, expect } from "bun:test";
-import { aggregateTargetNotionals, reconcile } from "./barbellLiveRunner.ts";
+import { afterEach, describe, it, expect } from "bun:test";
+import { aggregateTargetNotionals, reconcile, BarbellLiveRunner, type Mt5Like } from "./barbellLiveRunner.ts";
 import type { BarbellDecision } from "./barbellStrategy.ts";
-import type { Mt5Position, Mt5Quote } from "../../broker/mt5/bridgeClient.ts";
+import type { Mt5Account, Mt5Bar, Mt5OrderRequest, Mt5OrderResult, Mt5Position, Mt5Quote } from "../../broker/mt5/bridgeClient.ts";
 import type { ContractSpec } from "./liveTrader.ts";
 
 function decision(over: Partial<BarbellDecision>): BarbellDecision {
@@ -78,5 +78,71 @@ describe("reconcile", () => {
     const orders = reconcile({ BTCUSD: 50_000 }, [pos("BTCUSD", "long", 3.0)], { BTCUSD: quote("BTCUSD", 50_000) }, contracts, ["BTCUSD"]);
     expect(orders[0]!.side).toBe("sell");
     expect(orders[0]!.lots).toBeCloseTo(2.0, 6); // 3 → 1 = sell 2
+  });
+});
+
+describe("BarbellLiveRunner — survival circuit breaker", () => {
+  const acct = (over: Partial<Mt5Account>): Mt5Account => ({
+    login: 1, currency: "USD", balance: 1e6, equity: 1e6, margin: 0, margin_free: 1e6,
+    margin_level: 300, profit: 0, leverage: 30, ...over,
+  });
+  const bars = (): Mt5Bar[] =>
+    Array.from({ length: 120 }, (_, i) => ({ time: i, open: 100, high: 101, low: 99, close: 100 + Math.sin(i / 3), tickVolume: 1, spread: 1, realVolume: 0 }) as Mt5Bar);
+
+  class FakeClient implements Mt5Like {
+    placed: Mt5OrderRequest[] = [];
+    constructor(private acc: Mt5Account, private posList: Mt5Position[]) {}
+    async account(): Promise<Mt5Account> { return this.acc; }
+    async positions(): Promise<Mt5Position[]> { return this.posList; }
+    async quote(symbol: string): Promise<Mt5Quote> { return quote(symbol, 100); }
+    async bars(): Promise<Mt5Bar[]> { return bars(); }
+    async placeOrder(req: Mt5OrderRequest): Promise<Mt5OrderResult> { this.placed.push(req); return { executed: true, order: 1 }; }
+  }
+
+  const runnerCfg = {
+    symbols: ["BTCUSD", "ETHUSD"],
+    contracts: { BTCUSD: spec, ETHUSD: spec } as Record<string, ContractSpec>,
+    startingEquity: 1e6,
+    barsToDeadline: () => 200,
+    phase: () => "post_cut" as const,
+    barsLookback: 96,
+    timeframe: "M15",
+  };
+
+  const ORIGINAL = process.env.GORDON_LIVE_TRADING;
+  afterEach(() => {
+    if (ORIGINAL === undefined) delete process.env.GORDON_LIVE_TRADING;
+    else process.env.GORDON_LIVE_TRADING = ORIGINAL;
+  });
+
+  it("trips at a low margin level and FLATTENS the open book (targets → 0)", async () => {
+    delete process.env.GORDON_LIVE_TRADING; // dry — assert intent via the reconcile orders
+    const client = new FakeClient(
+      acct({ margin_level: 40, margin: 1e4, equity: 4e5 }), // 40% ≤ 50% breaker, has open margin
+      [pos("BTCUSD", "long", 1.0)], // an open position to flatten
+    );
+    const report = await new BarbellLiveRunner(client, runnerCfg, () => {}).runCycle();
+
+    expect(report.breakerTripped).toBe(true);
+    expect(report.marginLevelPct).toBe(40);
+    expect(report.decisionReason).toContain("FLATTEN");
+    const flatten = report.orders.find((o) => o.symbol === "BTCUSD");
+    expect(flatten?.side).toBe("sell"); // sell to close the long
+    expect(flatten?.action).toBe("dry");
+  });
+
+  it("does not trip when the margin level is healthy", async () => {
+    delete process.env.GORDON_LIVE_TRADING;
+    const client = new FakeClient(acct({ margin_level: 300, margin: 1e4 }), []);
+    const report = await new BarbellLiveRunner(client, runnerCfg, () => {}).runCycle();
+    expect(report.breakerTripped).toBe(false);
+    expect(report.marginLevelPct).toBe(300);
+  });
+
+  it("stays idle (no false trip) when there are no open positions, even at margin_level 0", async () => {
+    delete process.env.GORDON_LIVE_TRADING;
+    const client = new FakeClient(acct({ margin_level: 0, margin: 0 }), []);
+    const report = await new BarbellLiveRunner(client, runnerCfg, () => {}).runCycle();
+    expect(report.breakerTripped).toBe(false); // margin 0 ⇒ no positions ⇒ idle
   });
 });

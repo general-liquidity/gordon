@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { CompetitionLiveTrader, type Mt5Like, type SignalFn, type ContractSpec } from "./liveTrader.ts";
+import { survivalStopDistance } from "./survivalStop.ts";
 import type {
   Mt5Account,
   Mt5Position,
@@ -125,6 +126,23 @@ describe("CompetitionLiveTrader", () => {
 
     const placed = report.decisions.find((d) => d.symbol === "XAUUSD");
     expect(placed?.action).toBe("placed");
+  });
+
+  it("attaches an SL no looser than EITHER the strategy stop or the survival cap", async () => {
+    process.env.GORDON_LIVE_TRADING = "1";
+    const equity = 1_000_000;
+    const client = new MockMt5({ account: account(equity), positions: [], quote: quote(2000, 2001), bars: [bar(2000)] });
+    const trader = new CompetitionLiveTrader(baseOpts(client));
+    await trader.runCycle();
+
+    const order = client.placeOrderCalls[0]!;
+    const entry = 2001; // long fills at ask
+    const slDistance = entry - (order.sl as number);
+    // never looser than the strategy stop (10)…
+    expect(slDistance).toBeLessThanOrEqual(10 + 1e-6);
+    // …and never looser than the survival stop derived from the ACTUAL placed notional.
+    const survival = survivalStopDistance({ positionNotional: order.volume * (SPEC.contractSize ?? 1) * entry, equity });
+    expect(slDistance).toBeLessThanOrEqual(entry * survival + 1e-6);
   });
 
   it("halts new entries when the daily-loss kill triggers", async () => {
