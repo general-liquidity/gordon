@@ -28,7 +28,7 @@
  * Its value, IF ANY, is robustness across regimes + not taking the structurally
  * wrong bet — NOT a demonstrated positive expectancy. Validate per-instrument,
  * out-of-sample, after costs, before trusting it (see
- * `scripts/dev/momq-regime-adaptive-validate.ts`).
+ * `scripts/dev/momq/momq-regime-adaptive-validate.ts`).
  *
  * Pure: no I/O, no venue, no LLM. Defensive on short input (returns null).
  */

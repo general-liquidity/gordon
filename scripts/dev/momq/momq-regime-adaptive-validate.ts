@@ -9,7 +9,7 @@
  * often each regime classified and fired — so you can see WHICH branch is doing
  * the work.
  *
- *   bun run scripts/dev/momq-regime-adaptive-validate.ts
+ *   bun run scripts/dev/momq/momq-regime-adaptive-validate.ts
  *
  * HONEST CAVEATS (read these):
  *   - This is NOT a proven edge. No single signal showed stable post-cost edge in
@@ -28,12 +28,12 @@ import {
   type DryRunBar,
   type DryRunSignal,
   type SignalFn,
-} from "../../src/backtest/competition-dry-run.ts";
-import { COMPETITION_RISK_AGGRESSIVE } from "../../src/core/risk-management/competition-risk-preset.ts";
+} from "../../../src/backtest/competition-dry-run.ts";
+import { COMPETITION_RISK_AGGRESSIVE } from "../../../src/core/risk-management/competition-risk-preset.ts";
 import {
   regimeAdaptiveSignal,
   classifyRegime,
-} from "../../src/core/alpha/regime-adaptive-strategy.ts";
+} from "../../../src/core/alpha/regime-adaptive-strategy.ts";
 
 const DIR = "data/momq/bars";
 const M15_PER_YEAR = 24 * 4 * 365;

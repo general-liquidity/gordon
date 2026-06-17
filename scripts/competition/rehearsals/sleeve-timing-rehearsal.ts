@@ -9,11 +9,11 @@
  * sleeve fires exactly when it should — and, crucially, that a TOTAL loss of the sleeve can
  * never red-line the core (the ring-fence survival guarantee). Pure; no venue, no LLM.
  *
- *   bun run scripts/competition/sleeve-timing-rehearsal.ts
+ *   bun run scripts/competition/rehearsals/sleeve-timing-rehearsal.ts
  */
 
-import { barbellDecision, BARBELL_CONFIG, SLEEVE_UNIVERSE } from "../../src/infra/trading/competition/barbellStrategy.ts";
-import type { Mt5Bar } from "../../src/infra/broker/mt5/bridgeClient.ts";
+import { barbellDecision, BARBELL_CONFIG, SLEEVE_UNIVERSE } from "../../../src/infra/trading/competition/barbellStrategy.ts";
+import type { Mt5Bar } from "../../../src/infra/broker/mt5/bridgeClient.ts";
 
 const START_EQUITY = 1_000_000;
 const CLUSTER_SYMS = ["BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "BARUSD", "XAUUSD", "XAGUSD"];

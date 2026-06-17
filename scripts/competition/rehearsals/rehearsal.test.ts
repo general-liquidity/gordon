@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import type { Mt5Bar } from "../../src/infra/broker/mt5/bridgeClient.ts";
-import { CompetitionLiveTrader, type SignalFn, type ContractSpec } from "../../src/infra/trading/competition/liveTrader.ts";
-import { COMPETITION_RISK_AGGRESSIVE } from "../../src/core/risk-management/competition-risk-preset.ts";
+import type { Mt5Bar } from "../../../src/infra/broker/mt5/bridgeClient.ts";
+import { CompetitionLiveTrader, type SignalFn, type ContractSpec } from "../../../src/infra/trading/competition/liveTrader.ts";
+import { COMPETITION_RISK_AGGRESSIVE } from "../../../src/core/risk-management/competition-risk-preset.ts";
 import { ReplayMt5, type ReplaySymbolData } from "./rehearsal.ts";
 
 /** Build a flat bar at a given price, with a small symmetric range. */

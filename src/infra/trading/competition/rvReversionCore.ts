@@ -44,7 +44,7 @@ export interface RvReversionConfig {
 }
 
 // Defaults re-validated on the FULL 18-month extended crypto history (not just the 1-month comp
-// window, which was regime-specific) via `scripts/competition/best-sharpe-sweep.ts`, scored on the
+// window, which was regime-specific) via `scripts/competition/analysis/best-sharpe-sweep.ts`, scored on the
 // exact §12.5 metric. Across 18 months the net Sharpe is ~0 for ALL configs (cost is the binding
 // constraint), so these params are chosen for ROBUSTNESS + the §17 floor, not a Sharpe delta:
 // the long lookback (144 ≈ 36h M15) + wide entry minimize the cost churn that dominates this book,

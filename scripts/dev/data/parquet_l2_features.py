@@ -19,10 +19,10 @@ needs via pyarrow, so the dataset streams through without loading it all.
 HEAVY ONE-TIME JOB — the full dataset is ~21GB. DO NOT run this over the whole
 directory casually. To sanity-check, point it at a single small day, e.g.:
 
-    PYTHONIOENCODING=utf-8 python scripts/dev/parquet_l2_features.py \
+    PYTHONIOENCODING=utf-8 python scripts/dev/data/parquet_l2_features.py \
         data/pricer-output-2026-05-11_2026-06-10/AUDJPY_2026_05_17.parquet
 
-    python scripts/dev/parquet_l2_features.py [input_dir_or_file] [timeframe=15min] [tag=M15]
+    python scripts/dev/data/parquet_l2_features.py [input_dir_or_file] [timeframe=15min] [tag=M15]
 """
 
 import glob

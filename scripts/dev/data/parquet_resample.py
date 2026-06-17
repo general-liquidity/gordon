@@ -7,7 +7,7 @@ bridge pull: time epoch-sec, open/high/low/close, tickVolume, spread, realVolume
 Memory-safe: processes ONE daily file at a time, projecting only time/bid/ask
 (skips the heavy L2 ladder columns), so 21GB streams through fine.
 
-    python scripts/dev/parquet_resample.py [input_dir] [timeframe=15min] [tag=M15]
+    python scripts/dev/data/parquet_resample.py [input_dir] [timeframe=15min] [tag=M15]
 """
 
 import glob

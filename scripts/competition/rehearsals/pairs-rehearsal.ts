@@ -4,9 +4,9 @@
  * over historical M15 bars, and report the equity-curve quality that decides the
  * §17 Best-Sharpe Award.
  *
- *   bun run scripts/competition/pairs-rehearsal.ts
+ *   bun run scripts/competition/rehearsals/pairs-rehearsal.ts
  *
- * Distinct from `scripts/competition/rehearsal.ts` (which drives the per-symbol
+ * Distinct from `scripts/competition/rehearsals/rehearsal.ts` (which drives the per-symbol
  * `CompetitionLiveTrader` over the TSMOM `SignalFn`). PAIRS is two-leg /
  * cross-instrument, which does NOT fit that per-symbol loop — so this is a
  * pairs-specific driver. It reuses `ReplayMt5` + `loadBars` from rehearsal.ts as
@@ -30,7 +30,7 @@
  */
 
 import { ReplayMt5, loadBars, specFor, type ReplaySymbolData } from "./rehearsal.ts";
-import type { Mt5Bar } from "../../src/infra/broker/mt5/bridgeClient.ts";
+import type { Mt5Bar } from "../../../src/infra/broker/mt5/bridgeClient.ts";
 import {
   selectPairs,
   pairTargets,
@@ -38,12 +38,12 @@ import {
   PAIRS_CLUSTERS,
   type SelectedPair,
   type PairTarget,
-} from "../../src/infra/trading/competition/pairsCompetitionStrategy.ts";
+} from "../../../src/infra/trading/competition/pairsCompetitionStrategy.ts";
 import {
   computeNonAnnualizedSharpe,
   computeReturn,
   computeMaxDrawdown,
-} from "../../src/core/risk-management/competition-scoring.ts";
+} from "../../../src/core/risk-management/competition-scoring.ts";
 
 // ---------------------------------------------------------------------------
 // Stats helpers.

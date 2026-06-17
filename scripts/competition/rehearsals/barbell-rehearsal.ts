@@ -13,17 +13,17 @@
  * the account to confirm the survival circuit breaker actually flattens. Crypto-only (the 5
  * comp crypto share one M15 timeline; metals are dropped for timeline simplicity).
  *
- *   bun run scripts/competition/barbell-rehearsal.ts
+ *   bun run scripts/competition/rehearsals/barbell-rehearsal.ts
  *
  * SAFE: GORDON_LIVE_TRADING is armed against the in-process SimMt5 — never the real bridge.
  */
 
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { BarbellLiveRunner, type Mt5Like } from "../../src/infra/trading/competition/barbellLiveRunner.ts";
-import type { ContractSpec } from "../../src/infra/trading/competition/liveTrader.ts";
-import type { Mt5Account, Mt5Bar, Mt5OrderRequest, Mt5OrderResult, Mt5Position, Mt5Quote } from "../../src/infra/broker/mt5/bridgeClient.ts";
-import { computeNonAnnualizedSharpe, computeMaxDrawdown } from "../../src/core/risk-management/competition-scoring.ts";
+import { BarbellLiveRunner, type Mt5Like } from "../../../src/infra/trading/competition/barbellLiveRunner.ts";
+import type { ContractSpec } from "../../../src/infra/trading/competition/liveTrader.ts";
+import type { Mt5Account, Mt5Bar, Mt5OrderRequest, Mt5OrderResult, Mt5Position, Mt5Quote } from "../../../src/infra/broker/mt5/bridgeClient.ts";
+import { computeNonAnnualizedSharpe, computeMaxDrawdown } from "../../../src/core/risk-management/competition-scoring.ts";
 
 const BARS_DIR = join(process.cwd(), "data", "momq", "bars");
 const SYMBOLS = ["BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "BARUSD"];

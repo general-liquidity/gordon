@@ -49,7 +49,7 @@ MT5 is the competition's only programmatic path (no Syphonix REST API). Gordon's
 
 | Layer | Responsibility | Where it lives |
 |---|---|---|
-| **Perception** | market data, L2 microstructure, news, funding | `src/infra/data/`, `scripts/dev/parquet_l2_features.py`, `src/infra/news/` |
+| **Perception** | market data, L2 microstructure, news, funding | `src/infra/data/`, `scripts/dev/data/parquet_l2_features.py`, `src/infra/news/` |
 | **Reasoning** | Claude-native planning, extended thinking, critique | `src/infra/agents/cognition/` (`thinkingPhase`, `extendedThinking`, `critiquePhase`) |
 | **Strategy** | signals, regime, sizing, the dry-run | `src/core/alpha/`, `src/core/regime/`, `src/core/risk-management/`, `src/backtest/` |
 | **Execution & control** | risk gate, permission engine, MT5 bridge, audit | `src/infra/trading/risk/`, `src/runtime/permissions/`, `src/infra/broker/mt5/` |
@@ -113,7 +113,7 @@ We tested every transparent, parameter-light signal family we could against the 
 
 | Signal family | Validator | OOS-after-costs verdict |
 |---|---|---|
-| Naive trend / TA | `scripts/dev/momq-edge-validate.ts` | no stable edge — IS edges did not survive OOS |
+| Naive trend / TA | `scripts/dev/momq/momq-edge-validate.ts` | no stable edge — IS edges did not survive OOS |
 | Momentum (directional) | `momq-edge-validate.ts` | sign unstable IS↔OOS |
 | Reversal — time-series (per-symbol z-band) | `momq-reversal-validate.ts` | failed OOS across lookbacks {7,14,21} |
 | Reversal — cross-sectional (rank, long losers/short winners) | `momq-cross-sectional-validate.ts` | IC did not hold OOS |
@@ -162,10 +162,10 @@ So our headline result is a *refusal*: we measured that the cheap directional ed
 
 | Source | What | How ingested |
 |---|---|---|
-| **Syphonix tick + L2 parquet** (provided, ~21 GB, FX/metals) | tick-level, ≥5-level order-book depth, 1 month pre-launch | `scripts/dev/parquet_resample.py` → M15 bars; `scripts/dev/parquet_l2_features.py` → L2 microstructure (book imbalance, microprice-vs-mid, spread, tick count) per 15-min bucket. Memory-safe, one daily file at a time. |
-| **Native crypto price history** (Binance) | the 5 competition crypto (parquet has no crypto) | `scripts/dev/fetch-crypto-history.ts` → `data/momq/bars/<SYM>_M15.json` |
-| **Funding** (Binance perpetual `fapi`) | 8-hourly funding rates (real Q-7 funding factor) | `scripts/dev/fetch-crypto-funding.ts` (read-only public, no auth) |
-| **CoinGecko** (free public tier) | daily market-cap + volume for the 5 crypto | `scripts/dev/fetch-crypto-marketdata.ts` (read-only, no key) |
+| **Syphonix tick + L2 parquet** (provided, ~21 GB, FX/metals) | tick-level, ≥5-level order-book depth, 1 month pre-launch | `scripts/dev/data/parquet_resample.py` → M15 bars; `scripts/dev/data/parquet_l2_features.py` → L2 microstructure (book imbalance, microprice-vs-mid, spread, tick count) per 15-min bucket. Memory-safe, one daily file at a time. |
+| **Native crypto price history** (Binance) | the 5 competition crypto (parquet has no crypto) | `scripts/dev/data/fetch-crypto-history.ts` → `data/momq/bars/<SYM>_M15.json` |
+| **Funding** (Binance perpetual `fapi`) | 8-hourly funding rates (real Q-7 funding factor) | `scripts/dev/data/fetch-crypto-funding.ts` (read-only public, no auth) |
+| **CoinGecko** (free public tier) | daily market-cap + volume for the 5 crypto | `scripts/dev/data/fetch-crypto-marketdata.ts` (read-only, no key) |
 
 All external feeds are read-only public data, explicitly permitted by the organizers (§4: "external data is explicitly allowed"). Honestly scoped: **one month + a single IS/OOS split is indicative, not conclusive**, and it is the pre-competition window, not the live week — the validation scripts say so in their own headers.
 
@@ -211,21 +211,21 @@ bun run scripts/research/pairs-scan.ts               # cointegration pairs (Joha
 bun run scripts/research/cross-sectional-scan.ts     # long top / short bottom
 bun run scripts/research/portfolio-tsmom-scan.ts     # portfolio time-series momentum
 #    Supporting per-instrument transparency (taker, IS/OOS):
-bun run scripts/dev/momq-edge-validate.ts            # naive TA / momentum
-bun run scripts/dev/momq-imbalance-validate.ts       # L2 imbalance (FX depth is static)
+bun run scripts/dev/momq/momq-edge-validate.ts            # naive TA / momentum
+bun run scripts/dev/momq/momq-imbalance-validate.ts       # L2 imbalance (FX depth is static)
 
 # 4. The Best-Sharpe CORE — dollar-neutral relative-value reversion book.
 #    Smooth, low-DD, ≥30 trades (the curve the Sharpe + Drawdown ranks reward).
-bun run scripts/competition/rv-reversion-rehearsal.ts
+bun run scripts/competition/rehearsals/rv-reversion-rehearsal.ts
 
 # 5. PROTECT alpha — path-risk Monte Carlo (block bootstrap + GARCH, not vanilla shuffle).
 #    10,000 resampled paths → the 5th-percentile drawdown the median backtest hides.
-bun run scripts/competition/path-risk.ts
+bun run scripts/competition/analysis/path-risk.ts
 
 # 6. The live-trader REHEARSAL — drive the REAL CompetitionLiveTrader loop end-to-end over
 #    replayed M15 bars (ReplayMt5 stands in for the sidecar). Exercises sizing → lot-rounding
 #    → order-shape → daily-loss-kill on the live path. Proven: no crash, ≥30 trades.
-bun run scripts/competition/rehearsal.ts
+bun run scripts/competition/rehearsals/rehearsal.ts
 
 # 7. The live runner in DRY mode — GORDON_LIVE_TRADING UNSET.
 #    Connects to the real bridge, sizes every cycle through the FROZEN COMPETITION_RISK
@@ -263,7 +263,7 @@ bun run scripts/competition/live-runner.ts
 | `src/infra/trading/quant/pathRiskMonteCarlo.ts` | path-risk MC (block bootstrap + GARCH; 5th-pct path) |
 | `src/backtest/competition-dry-run.ts` | cost-honest taker money-path simulator (FOK/IOC, no commission) |
 | `src/core/alpha/` | candidate signal primitives (reversal, cross-sectional, factor model) |
-| `scripts/dev/momq-*.ts` | the IS/OOS, after-costs signal validators (the receipts) |
+| `scripts/dev/momq/momq-*.ts` | the IS/OOS, after-costs signal validators (the receipts) |
 | `scripts/competition/` | `rehearsal.ts` (replay live-trader) + `live-runner.ts` (real bridge) |
 | `src/infra/trading/risk/riskClassifier.ts`, `src/runtime/permissions/` | the governance plane |
 | `src/infra/domain/evals/harness/` | the eval harness (RULER judge, panel, process checks, CI gate) |
@@ -274,12 +274,12 @@ bun run scripts/competition/live-runner.ts
 ```bash
 bun install                                    # deps (Bun runtime)
 # Validation path (no venue, deterministic):
-bun run scripts/dev/momq-edge-validate.ts      # + the other momq-*-validate.ts
-bun run scripts/competition/rehearsal.ts       # live-trader loop over replayed bars
+bun run scripts/dev/momq/momq-edge-validate.ts      # + the other momq-*-validate.ts
+bun run scripts/competition/rehearsals/rehearsal.ts       # live-trader loop over replayed bars
 # Tests:
 bun test src/core/risk-management/competition-scoring.test.ts \
          src/backtest/competition-dry-run.test.ts \
-         scripts/competition/rehearsal.test.ts
+         scripts/competition/rehearsals/rehearsal.test.ts
 # Live path: see docs/model-to-market/OPERATIONS.md (Windows + MT5 terminal + both guards).
 ```
 

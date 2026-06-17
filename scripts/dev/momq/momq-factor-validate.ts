@@ -4,7 +4,7 @@
  * (data/momq/bars) via INFORMATION COEFFICIENT — self-contained, no trading /
  * dry-run.
  *
- *   bun run scripts/dev/momq-factor-validate.ts
+ *   bun run scripts/dev/momq/momq-factor-validate.ts
  *
  * Question answered: does the Q-7 composite (computeCryptoFactorModel) RANK the
  * 15 tradeable instruments such that high-composite names earn higher FORWARD
@@ -33,7 +33,7 @@ import { join } from "node:path";
 import {
   computeCryptoFactorModel,
   type CryptoTokenInput,
-} from "../../src/core/alpha/crypto-factor-model.ts";
+} from "../../../src/core/alpha/crypto-factor-model.ts";
 
 const DIR = "data/momq/bars";
 const BARS_PER_DAY = 96; // 96 × 15-min bars = ~1 trading day

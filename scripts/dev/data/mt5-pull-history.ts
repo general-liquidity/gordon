@@ -3,9 +3,9 @@
  * Pull the competition's tradable catalog + historical bars straight through the
  * MT5 bridge (no manual parquet download needed). Run once, with the sidecar up:
  *
- *   bun run scripts/dev/mt5-pull-history.ts                       # full catalog, M15, ~1 month
- *   bun run scripts/dev/mt5-pull-history.ts --timeframe M5 --count 8640
- *   bun run scripts/dev/mt5-pull-history.ts --symbols XAUUSD,EURUSD,BTCUSD
+ *   bun run scripts/dev/data/mt5-pull-history.ts                       # full catalog, M15, ~1 month
+ *   bun run scripts/dev/data/mt5-pull-history.ts --timeframe M5 --count 8640
+ *   bun run scripts/dev/data/mt5-pull-history.ts --symbols XAUUSD,EURUSD,BTCUSD
  *
  * Writes to data/momq/:
  *   catalog.json              — every tradable symbol + contract specs
@@ -17,7 +17,7 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { Mt5BridgeClient } from "../../src/infra/broker/mt5/bridgeClient.ts";
+import { Mt5BridgeClient } from "../../../src/infra/broker/mt5/bridgeClient.ts";
 
 function arg(flag: string, fallback?: string): string | undefined {
   const i = process.argv.indexOf(flag);

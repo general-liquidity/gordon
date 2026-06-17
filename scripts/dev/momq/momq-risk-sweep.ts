@@ -4,7 +4,7 @@
  * (data/momq/bars). Optimizes the SIZING parameters of the competition risk
  * preset against the official objective, for a FIXED baseline signal.
  *
- *   bun run scripts/dev/momq-risk-sweep.ts
+ *   bun run scripts/dev/momq/momq-risk-sweep.ts
  *
  * What it does: holds the signal constant (the transparent mean-reversion z-fade
  * from momq-edge-validate.ts) and sweeps the `CompetitionRiskParams` sizing knobs
@@ -31,12 +31,12 @@ import {
   runCompetitionDryRun,
   type DryRunBar,
   type SignalFn,
-} from "../../src/backtest/competition-dry-run.ts";
+} from "../../../src/backtest/competition-dry-run.ts";
 import {
   COMPETITION_RISK_AGGRESSIVE,
   type CompetitionRiskParams,
-} from "../../src/core/risk-management/competition-risk-preset.ts";
-import { COMPETITION_SCORE_WEIGHTS } from "../../src/core/risk-management/competition-scoring.ts";
+} from "../../../src/core/risk-management/competition-risk-preset.ts";
+import { COMPETITION_SCORE_WEIGHTS } from "../../../src/core/risk-management/competition-scoring.ts";
 
 const DIR = "data/momq/bars";
 const M15_PER_YEAR = 24 * 4 * 365;

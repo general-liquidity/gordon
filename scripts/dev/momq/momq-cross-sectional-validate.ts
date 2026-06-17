@@ -11,7 +11,7 @@
  * short the top-K, ACROSS the universe. This is the dispersion-mean-reversion the
  * literature actually documents.
  *
- *   bun run scripts/dev/momq-cross-sectional-validate.ts
+ *   bun run scripts/dev/momq/momq-cross-sectional-validate.ts
  *
  * Construction (the cross-sectional signal threaded through the per-symbol dry-run):
  *   1. Load all 15 tradeable instruments; align to the intersection of timestamps.
@@ -45,8 +45,8 @@ import {
   runCompetitionDryRun,
   type DryRunBar,
   type SignalFn,
-} from "../../src/backtest/competition-dry-run.ts";
-import { COMPETITION_RISK_AGGRESSIVE } from "../../src/core/risk-management/competition-risk-preset.ts";
+} from "../../../src/backtest/competition-dry-run.ts";
+import { COMPETITION_RISK_AGGRESSIVE } from "../../../src/core/risk-management/competition-risk-preset.ts";
 
 const DIR = "data/momq/bars";
 const M15_PER_YEAR = 24 * 4 * 365;

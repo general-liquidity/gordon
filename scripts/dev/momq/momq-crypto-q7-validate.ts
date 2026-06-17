@@ -3,12 +3,12 @@
  * Cross-sectional Q-7 factor-model validation on the 5 COMPETITION CRYPTO via
  * INFORMATION COEFFICIENT — self-contained, no trading / dry-run.
  *
- *   bun run scripts/dev/momq-crypto-q7-validate.ts
+ *   bun run scripts/dev/momq/momq-crypto-q7-validate.ts
  *
  * Distinct from momq-factor-validate.ts (15 instruments, price-only): this run
  * is crypto-ONLY and adds a GENUINELY-FETCHABLE factor the price-only run could
  * not — real perpetual FUNDING (Binance public history, fetched by
- * scripts/dev/fetch-crypto-funding.ts). So the composite here is:
+ * scripts/dev/data/fetch-crypto-funding.ts). So the composite here is:
  *     reversal   = z(−lookbackReturn)   (past losers tilt positive)
  *     volatility = residualVol           (high realized vol tilts positive)
  *     funding    = z(−fundingRate) ⊥ size,reversal  (crowded longs tilt NEGATIVE)
@@ -35,7 +35,7 @@ import { join } from "node:path";
 import {
   computeCryptoFactorModel,
   type CryptoTokenInput,
-} from "../../src/core/alpha/crypto-factor-model.ts";
+} from "../../../src/core/alpha/crypto-factor-model.ts";
 
 const BARS_DIR = "data/momq/bars";
 const FUNDING_DIR = "data/momq/funding";

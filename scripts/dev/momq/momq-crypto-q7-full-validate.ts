@@ -3,10 +3,10 @@
  * FULL cross-sectional Q-7 factor-model validation on the 5 COMPETITION CRYPTO
  * via INFORMATION COEFFICIENT — now with MORE factors genuinely populated.
  *
- *   bun run scripts/dev/momq-crypto-q7-full-validate.ts
+ *   bun run scripts/dev/momq/momq-crypto-q7-full-validate.ts
  *
  * Strengthens momq-crypto-q7-validate.ts (price + funding only) by adding REAL
- * free-tier CoinGecko market data (scripts/dev/fetch-crypto-marketdata.ts):
+ * free-tier CoinGecko market data (scripts/dev/data/fetch-crypto-marketdata.ts):
  *
  *   reversal      = z(−lookbackReturn)              [price]
  *   volatility    = residualVol ⊥ size              [price]
@@ -41,7 +41,7 @@ import {
   STYLE_FACTORS,
   type StyleFactor,
   type CryptoTokenInput,
-} from "../../src/core/alpha/crypto-factor-model.ts";
+} from "../../../src/core/alpha/crypto-factor-model.ts";
 
 const BARS_DIR = "data/momq/bars";
 const FUNDING_DIR = "data/momq/funding";

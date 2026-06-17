@@ -18,14 +18,14 @@
  * over lookback / entryZ / exitZ / maxPairs; perPairFraction only sets return/DD MAGNITUDE +
  * gross leverage (a survival knob), reported separately at a fixed 0.03.
  *
- *   bun run scripts/competition/best-sharpe-sweep.ts
- *   ALPHA_BARS_DIR=data/momq/crypto-extended ALPHA_TF=1h bun run scripts/competition/best-sharpe-sweep.ts
+ *   bun run scripts/competition/analysis/best-sharpe-sweep.ts
+ *   ALPHA_BARS_DIR=data/momq/crypto-extended ALPHA_TF=1h bun run scripts/competition/analysis/best-sharpe-sweep.ts
  */
 
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { computeNonAnnualizedSharpe, computeMaxDrawdown } from "../../src/core/risk-management/competition-scoring.ts";
-import { monteCarloPathRisk } from "../../src/infra/trading/quant/pathRiskMonteCarlo.ts";
+import { computeNonAnnualizedSharpe, computeMaxDrawdown } from "../../../src/core/risk-management/competition-scoring.ts";
+import { monteCarloPathRisk } from "../../../src/infra/trading/quant/pathRiskMonteCarlo.ts";
 
 const BARS_DIR = join(process.cwd(), process.env.ALPHA_BARS_DIR ?? join("data", "momq", "bars"));
 const TF = process.env.ALPHA_TF ?? "M15";

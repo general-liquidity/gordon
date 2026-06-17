@@ -8,7 +8,7 @@
  * return and the 95th/99th-pct drawdown. The block + GARCH methods preserve volatility
  * clustering, so their tails are the realistic ones — the numbers that decide "trade it or not".
  *
- *   bun run scripts/competition/path-risk.ts
+ *   bun run scripts/competition/analysis/path-risk.ts
  *
  * Honest scope: the input is ONE month of comp M15 returns; the MC explores the PATH space of
  * that return distribution (the right tool for "bad-streak survival"), not regime change beyond it.
@@ -16,7 +16,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { pathRiskComparison, type PathRiskResult } from "../../src/infra/trading/quant/pathRiskMonteCarlo.ts";
+import { pathRiskComparison, type PathRiskResult } from "../../../src/infra/trading/quant/pathRiskMonteCarlo.ts";
 
 const BARS_DIR = join(process.cwd(), "data", "momq", "bars");
 const TF = "M15";

@@ -5,12 +5,12 @@
  * window return, annualized vol (from 15-min returns), and trend cleanliness
  * (Kaufman efficiency ratio) — then runs the universe-wide breadth classifier.
  *
- *   bun run scripts/dev/momq-analyze.ts
+ *   bun run scripts/dev/momq/momq-analyze.ts
  */
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { classifyMarketBreadth } from "../../src/core/alpha/market-breadth-bias.ts";
+import { classifyMarketBreadth } from "../../../src/core/alpha/market-breadth-bias.ts";
 
 const DIR = "data/momq";
 const M15_PER_YEAR = 24 * 4 * 365;

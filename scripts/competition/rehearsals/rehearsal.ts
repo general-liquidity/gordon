@@ -4,7 +4,7 @@
  * (`CompetitionLiveTrader`) end-to-end through historical M15 bars via a replay
  * bridge that stands in for the MT5 sidecar.
  *
- *   bun run scripts/competition/rehearsal.ts
+ *   bun run scripts/competition/rehearsals/rehearsal.ts
  *
  * This is DISTINCT from the offline dry-run (`src/backtest/competition-dry-run.ts`),
  * which re-implements the sizing/fill spine as a standalone simulator. Here we
@@ -38,25 +38,25 @@ import type {
   Mt5Bar,
   Mt5OrderRequest,
   Mt5OrderResult,
-} from "../../src/infra/broker/mt5/bridgeClient.ts";
+} from "../../../src/infra/broker/mt5/bridgeClient.ts";
 import {
   CompetitionLiveTrader,
   type Mt5Like,
   type SignalFn,
   type ContractSpec,
-} from "../../src/infra/trading/competition/liveTrader.ts";
-import { type CompetitionRiskParams } from "../../src/core/risk-management/competition-risk-preset.ts";
+} from "../../../src/infra/trading/competition/liveTrader.ts";
+import { type CompetitionRiskParams } from "../../../src/core/risk-management/competition-risk-preset.ts";
 import {
   makeTsmomSignal,
   COMPETITION_TRADEABLE,
   COMPETITION_LIVE_CONFIG,
   COMPETITION_RISK,
-} from "../../src/infra/trading/competition/competitionStrategy.ts";
+} from "../../../src/infra/trading/competition/competitionStrategy.ts";
 import {
   computeNonAnnualizedSharpe,
   computeReturn,
   computeMaxDrawdown,
-} from "../../src/core/risk-management/competition-scoring.ts";
+} from "../../../src/core/risk-management/competition-scoring.ts";
 
 // ---------------------------------------------------------------------------
 // ReplayMt5 — an Mt5Like bridge backed by historical bars.

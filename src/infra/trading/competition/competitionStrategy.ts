@@ -1,7 +1,7 @@
 /**
  * FROZEN competition strategy — the single source of truth for the live week.
  *
- * Both the paper-mode rehearsal (`scripts/competition/rehearsal.ts`) and the live
+ * Both the paper-mode rehearsal (`scripts/competition/rehearsals/rehearsal.ts`) and the live
  * runner (`scripts/competition/live-runner.ts`) import this, so WHAT WE REHEARSE IS
  * EXACTLY WHAT GOES LIVE — no drift between the tested config and the armed config.
  *

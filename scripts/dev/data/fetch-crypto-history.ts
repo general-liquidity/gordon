@@ -5,8 +5,8 @@
  * no auth, no orders. Writes data/momq/bars/<SYM>_M15.json in the same shape as
  * the FX/metals resampler output so the analysis + dry-run consume them uniformly.
  *
- *   bun run scripts/dev/fetch-crypto-history.ts                 # default window = parquet window
- *   bun run scripts/dev/fetch-crypto-history.ts 2026-05-11 2026-06-10
+ *   bun run scripts/dev/data/fetch-crypto-history.ts                 # default window = parquet window
+ *   bun run scripts/dev/data/fetch-crypto-history.ts 2026-05-11 2026-06-10
  *
  * Comp ticker → Binance pair (USDT ≈ USD here). BARUSD = HBAR (Hedera) per the
  * organizers' Discord clarification.

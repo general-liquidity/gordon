@@ -4,7 +4,7 @@ Inspect the Model to Market parquet dataset WITHOUT loading 20GB into RAM.
 Reports the file layout, schema, row counts, and a few sample rows so we can
 write the right resampler (tick → 15-min bars + L2 snapshots).
 
-    python scripts/dev/parquet_inspect.py <path-to-parquet-file-or-dir>
+    python scripts/dev/data/parquet_inspect.py <path-to-parquet-file-or-dir>
 
 Only reads the first file's schema + first row group — fast even on huge data.
 """
@@ -36,7 +36,7 @@ def list_parquet(path):
 
 def main():
     if len(sys.argv) < 2:
-        print("usage: python scripts/dev/parquet_inspect.py <path>")
+        print("usage: python scripts/dev/data/parquet_inspect.py <path>")
         sys.exit(1)
     path = sys.argv[1]
     files = list_parquet(path)

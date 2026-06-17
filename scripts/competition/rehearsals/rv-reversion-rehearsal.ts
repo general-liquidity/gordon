@@ -15,7 +15,7 @@
  * fading the ratio's deviation is a many-small-trades, neutral, smooth book — exactly
  * the Best-Sharpe profile, and the breadth (many pairs) clears the 30-trade floor.
  *
- *   bun run scripts/competition/rv-reversion-rehearsal.ts
+ *   bun run scripts/competition/rehearsals/rv-reversion-rehearsal.ts
  *
  * NOT a return-alpha claim — ratio reversion didn't clear the deflated bar as durable
  * alpha. Its value is the SHAPE: a smooth, low-DD, ≥30-trade dollar-neutral curve, which
