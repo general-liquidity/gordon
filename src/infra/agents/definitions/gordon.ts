@@ -42,6 +42,7 @@ import {
   buildTaskDispatchTool,
   shouldRegisterTaskDispatchTool,
 } from "../tools/runtime/lifecycle/task-dispatch.ts";
+import { buildTaskFanoutTool } from "../tools/runtime/lifecycle/task-fanout.ts";
 import { getExecutor } from "./executor.ts";
 import { getResearcher } from "./researcher.ts";
 import { instrumentedAgentTools } from "../tooling/instrumentedTools.ts";
@@ -314,6 +315,7 @@ function buildTaskDispatchToolIfEnabled(): Record<string, unknown> {
   // the correct behavior at config-validation time.
   return {
     delegate_to_subagent: buildTaskDispatchTool(profiles, {}),
+    delegate_to_subagents_parallel: buildTaskFanoutTool(profiles, {}),
   };
 }
 

@@ -128,8 +128,12 @@ export function isDynamicSubagentsEnabled(
   return normalized === "1" || normalized === "true" || normalized === "yes";
 }
 
+// Monotonic counter so concurrent dispatches of the SAME profile within one
+// millisecond still get unique ids (the parallel fan-out relies on this — a
+// Date.now()-only id would collide in the AgentRegistry under concurrency).
+let subagentSeq = 0;
 function generateSubagentId(profileName: string): string {
-  return `subagent-${profileName}-${Date.now().toString(36)}`;
+  return `subagent-${profileName}-${Date.now().toString(36)}-${(subagentSeq++).toString(36)}`;
 }
 
 function composeInstructions(profile: SubagentProfile): string {
