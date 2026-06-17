@@ -20,6 +20,7 @@
  *
  *   bun run scripts/competition/analysis/best-sharpe-sweep.ts
  *   ALPHA_BARS_DIR=data/momq/crypto-extended ALPHA_TF=1h bun run scripts/competition/analysis/best-sharpe-sweep.ts
+ *   COMP_RV_PER_PAIR_FRACTION=0.006 RV_MODE=disc COST_BPS=5 bun run scripts/competition/analysis/best-sharpe-sweep.ts
  */
 
 import { readFileSync, existsSync, readdirSync } from "node:fs";
@@ -36,7 +37,10 @@ const COST_BPS_PER_SIDE = Number(process.env.COST_BPS ?? 5);
 const MODE = (process.env.RV_MODE ?? "cont") as "cont" | "disc" | "hard";
 // "equal" = equal dollar per pair; "invvol" = inverse-vol (risk-parity) weights from the IS window.
 const WEIGHT = (process.env.RV_WEIGHT ?? "equal") as "equal" | "invvol";
-const PER_PAIR_FRACTION = 0.03; // magnitude knob (Sharpe-invariant); sets return/DD scale
+const PER_PAIR_FRACTION = (() => {
+  const n = Number(process.env.COMP_RV_PER_PAIR_FRACTION ?? "0.03");
+  return Number.isFinite(n) && n > 0 ? n : 0.03;
+})(); // magnitude knob (Sharpe-invariant); sets return/DD scale
 
 // Correlated clusters — ratio reversion only makes sense WITHIN a cluster.
 const ALL_CLUSTERS: Record<string, string[]> = {
@@ -49,6 +53,18 @@ const CLUSTERS: Record<string, string[]> =
 
 interface RawBar { time: number; close: number }
 const mean = (xs: number[]) => xs.reduce((s, v) => s + v, 0) / (xs.length || 1);
+function barsPerDay(tf: string): number {
+  const normalized = tf.toLowerCase();
+  if (normalized === "m15" || normalized === "15m") return 96;
+  if (normalized === "h1" || normalized === "1h") return 24;
+  if (normalized === "d1" || normalized === "1d") return 1;
+  return 96;
+}
+const LIVE_BARS = 5 * barsPerDay(TF);
+const MIN_LIVE_TRADES = (() => {
+  const n = Number(process.env.MIN_LIVE_TRADES ?? "30");
+  return Number.isFinite(n) && n > 0 ? n : 30;
+})();
 
 function loadCloseByTime(symbol: string): Map<number, number> | null {
   const path = join(BARS_DIR, `${symbol}_${TF}.json`);
@@ -291,25 +307,33 @@ function main(): void {
   // Sharpe/robustness (the comp-relevant DD is the 5-day survival MC below, not the full span).
   const maxDdCap = Number(process.env.MAX_DD ?? 0.05);
   const eligible = rows.filter((r) => r.full.trades >= 30 && Math.abs(r.full.maxDD) < maxDdCap);
+  const liveTradeEstimate = (r: Row) => (r.full.trades * LIVE_BARS) / Math.max(1, r.full.nObs);
   const fmt = (r: Row, sortKey: string) =>
     `  L${String(r.cfg.lookback).padStart(3)} e${r.cfg.entryZ.toFixed(2)} x${r.cfg.exitZ.toFixed(2)} p${String(r.cfg.maxPairs).padStart(2)} | ` +
     `OOS Sh ${r.oos.sharpe.toFixed(4).padStart(8)}  IS Sh ${r.is.sharpe.toFixed(4).padStart(8)}  robust ${r.robust.toFixed(4).padStart(8)} | ` +
-    `DD ${(r.full.maxDD * 100).toFixed(2).padStart(5)}%  ret ${(r.full.totalReturn * 100).toFixed(2).padStart(7)}%  trades ${String(r.full.trades).padStart(5)}`;
+    `DD ${(r.full.maxDD * 100).toFixed(2).padStart(5)}%  ret ${(r.full.totalReturn * 100).toFixed(2).padStart(7)}%  trades ${String(r.full.trades).padStart(5)}  live~${String(Math.round(liveTradeEstimate(r))).padStart(3)}`;
+  const tradeFloorEligible = eligible.filter((r) => liveTradeEstimate(r) >= MIN_LIVE_TRADES);
 
-  console.log(`Configs: ${rows.length} | eligible (≥30 trades, DD<5%): ${eligible.length}`);
+  console.log(`Configs: ${rows.length} | eligible (≥30 trades, DD<5%): ${eligible.length} | est. ${MIN_LIVE_TRADES}+ live trades: ${tradeFloorEligible.length}`);
   console.log("");
   console.log("TOP 12 by OOS Sharpe (optimistic — overfits the OOS window):");
   [...eligible].sort((a, b) => b.oos.sharpe - a.oos.sharpe).slice(0, 12).forEach((r) => console.log(fmt(r, "oos")));
   console.log("");
-  console.log("TOP 12 by ROBUSTNESS (OOS Sharpe − ½·|IS−OOS| gap) — the config to actually run:");
+  console.log("TOP 12 by ROBUSTNESS (OOS Sharpe − ½·|IS−OOS| gap) — shape pick; check live trade floor:");
   const byRobust = [...eligible].sort((a, b) => b.robust - a.robust);
   byRobust.slice(0, 12).forEach((r) => console.log(fmt(r, "robust")));
   console.log("");
+  const byTradeFloorRobust = [...tradeFloorEligible].sort((a, b) => b.robust - a.robust);
+  if (byTradeFloorRobust.length > 0) {
+    console.log(`TOP 12 by TRADE-FLOOR-SAFE ROBUSTNESS (est. live trades ≥${MIN_LIVE_TRADES}):`);
+    byTradeFloorRobust.slice(0, 12).forEach((r) => console.log(fmt(r, "trade-floor")));
+    console.log("");
+  }
 
-  const best = byRobust[0];
+  const best = byTradeFloorRobust[0] ?? byRobust[0];
   if (best) {
     console.log("=".repeat(80));
-    console.log("RECOMMENDED CONFIG (most robust)");
+    console.log(`RECOMMENDED CONFIG (${byTradeFloorRobust[0] ? "trade-floor-safe robust" : "most robust; live trade floor at risk"})`);
     console.log("=".repeat(80));
     console.log(`  lookback ${best.cfg.lookback}, entryZ ${best.cfg.entryZ}, exitZ ${best.cfg.exitZ}, maxPairs ${best.cfg.maxPairs}`);
     console.log(`  IS  Sharpe ${best.is.sharpe.toFixed(4)} (n=${best.is.nObs}) | OOS Sharpe ${best.oos.sharpe.toFixed(4)} (n=${best.oos.nObs})`);
@@ -327,12 +351,11 @@ function main(): void {
     }
     console.log("");
     console.log("");
-    // STEP 3 — survival: 5-day (480×M15) path-risk MC on the recommended book's per-bar returns.
+    // STEP 3 — survival: 5-day path-risk MC on the recommended book's per-bar returns.
     const { rets } = portfolioReturns(pairs, best.cfg, weights);
-    const LIVE_BARS = 5 * 24 * 4; // 480 M15 bars ≈ the 5-day live window
     const mc = monteCarloPathRisk(rets, "stationary", { nPaths: 5000, pathLen: LIVE_BARS, seed: 7, ruinDrawdown: 0.2 });
-    const liveTradeRate = (best.full.trades * LIVE_BARS) / (rets.length || 1);
-    console.log("STEP 3 — SURVIVAL (5-day path-risk MC, block-bootstrap, @ perPairFraction 0.03):");
+    const liveTradeRate = liveTradeEstimate(best);
+    console.log(`STEP 3 — SURVIVAL (5-day path-risk MC, block-bootstrap, @ perPairFraction ${PER_PAIR_FRACTION}):`);
     console.log(`  5-day max-DD  p50 ${(mc.drawdownP50 * 100).toFixed(2)}%  p95 ${(mc.drawdownP95 * 100).toFixed(2)}%  p99 ${(mc.drawdownP99 * 100).toFixed(2)}%  worst ${(mc.drawdownWorst * 100).toFixed(2)}%`);
     console.log(`  P(DD>20%) ${(mc.probRuin * 100).toFixed(2)}%  → forced-liquidation/elimination risk at this size is ${mc.probRuin < 0.01 ? "negligible" : "NON-trivial — cut size"}.`);
     console.log(`  est. live trades in 5d: ~${Math.round(liveTradeRate)} (§17 ≥30 floor: ${liveTradeRate >= 30 ? "CLEARS" : "AT RISK — widen entry less / add pairs"})`);

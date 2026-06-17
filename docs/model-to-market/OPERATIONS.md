@@ -93,6 +93,8 @@ The client defaults `baseUrl` to `http://127.0.0.1:${MT5_BRIDGE_PORT|8788}` and 
 | `COMP_ALERT_PATH` | file the **critical-event alerts** append to (default `comp-alerts.log`) — `tail -f` it so you're not tied to the screen 24/7 |
 | `COMP_FIELD_N` / `COMP_CUT_PCT` | field size (default 500) + cut percentile (default 0.8) for the standing's rank estimates |
 | `COMP_PEER_RETURNS_PATH` | JSON file of peer return fractions from the leaderboard (operator-maintained). Calibrates the standing to **real** rank and **arms the Round-3 endgame sleeve**; absent ⇒ endgame gated off (§9.2) |
+| `COMP_RV_PROFILE` | optional RV core profile: `default` (frozen config), `wide` (17 Jun low-churn candidate), or `wide-crypto` (same candidate, crypto-only pairs). Use only after the spread check / soak. |
+| `COMP_RV_LOOKBACK` / `COMP_RV_ENTRY_Z` / `COMP_RV_EXIT_Z` / `COMP_RV_MAX_PAIRS` / `COMP_RV_PER_PAIR_FRACTION` / `COMP_RV_CLUSTERS` | optional explicit RV overrides (`COMP_RV_CLUSTERS=all|crypto`) for controlled live/dry experiments; leave unset unless intentionally testing. |
 | `GORDON_COMP_FLATTEN` | set to `1` as an alternative process-level kill-switch (flattens every cycle) |
 
 > Convert the BST round times to epoch-ms before launch. `COMP_CUT_MS = Date.parse("2026-06-24T22:00:00+01:00")`, `COMP_DEADLINE_MS = Date.parse("2026-06-26T22:00:00+01:00")`.
@@ -257,7 +259,7 @@ The finals are **blind** and the window is 5 days; the judgment calls must be pr
 ### 9.1 Launch read → posture (do once, when the feed opens)
 - **Run the spread check** (Section 4 step 5). Record per-instrument bps.
   - Crypto majors **< ~2 bps** → the RV book is plausibly **net-positive**; the latest sweep says a more active book can work, but do not hot-swap on one quote — run the conservative discrete core through a live soak first.
-  - **Wide (> ~4 bps)** → cost is binding. The 17 Jun local sweep favored the **low-churn discrete RV candidate** (`lookback 96`, `entryZ 2.5`, `exitZ 0.75`, `maxPairs 11`) and a crypto-only variant was slightly cleaner (`~270` trades, `~2.4%` full DD, 5-day p95 DD `<2%` at 3%/leg). If spreads are wide before arming, prefer widening/pruning over increasing size. **NB:** that sweep is the **1-month window** (the regime-specific data we distrust); the **frozen default stays `lookback 144 / entryZ 2.0 / exitZ 0.5`** (the 18-month-robust pick). All configs are ~0 net Sharpe (cost-bound), so treat `96/2.5/0.75` as a *candidate to re-validate on the 18-mo history* before swapping — do not hot-swap on the 1-month numbers alone.
+  - **Wide (> ~4 bps)** -> cost is binding. The 17 Jun 1-month sweep favored the **low-churn discrete RV candidate** (`lookback 96`, `entryZ 2.5`, `exitZ 0.75`, `maxPairs 11`), but the extended M15 crypto check is the better launch proxy: at 5bps/side and 0.5%/pair, 32 configs cleared full-period DD `<5%` and estimated 30+ trades over five days. The trade-floor-safe robust setting was `COMP_RV_PER_PAIR_FRACTION=0.005 COMP_RV_LOOKBACK=144 COMP_RV_ENTRY_Z=2.0 COMP_RV_EXIT_Z=0 COMP_RV_MAX_PAIRS=11` (`COMP_RV_CLUSTERS=crypto` if dropping metals). **NB:** keep the frozen default unless the live spread check / dry soak confirms the smaller wide-spread posture; do not hot-swap on the 1-month numbers alone.
 - **Confirm the survive-and-rank preset** (`COMPETITION_RISK_SURVIVAL`) — do NOT swap to AGGRESSIVE for the core; the sanctioned return-gamble is the *sleeve*, ring-fenced.
 
 ### 9.2 Calibrate the field (once Round-1/2 peer data is visible) — and ARM the endgame sleeve

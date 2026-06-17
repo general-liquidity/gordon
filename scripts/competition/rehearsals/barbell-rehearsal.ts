@@ -14,6 +14,7 @@
  * comp crypto share one M15 timeline; metals are dropped for timeline simplicity).
  *
  *   bun run scripts/competition/rehearsals/barbell-rehearsal.ts
+ *   SPREAD_BPS=5 bun run scripts/competition/rehearsals/barbell-rehearsal.ts
  *
  * SAFE: GORDON_LIVE_TRADING is armed against the in-process SimMt5 — never the real bridge.
  */
@@ -27,7 +28,10 @@ import { computeNonAnnualizedSharpe, computeMaxDrawdown } from "../../../src/cor
 
 const BARS_DIR = join(process.cwd(), "data", "momq", "bars");
 const SYMBOLS = ["BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "BARUSD"];
-const SPREAD_BPS = 2; // taker half-spread modelled at the plausible-real ~2bps quoted
+const SPREAD_BPS = (() => {
+  const n = Number(process.env.SPREAD_BPS ?? "2");
+  return Number.isFinite(n) && n >= 0 ? n : 2;
+})(); // quoted spread bps; taker fill crosses half on each side
 const CONTRACT_SIZE = 1;
 const START_EQUITY = 1_000_000;
 

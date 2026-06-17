@@ -19,6 +19,8 @@
  *   COMP_TIMEFRAME    MT5 timeframe                  (default "M15")
  *   COMP_STARTING_EQUITY  baseline for return calc   (default = account equity at boot)
  *   COMP_CUT_MS / COMP_DEADLINE_MS  epoch-ms of the Top-100 cut / contest end (barbell phase + horizon)
+ *   COMP_RV_PROFILE   "default" | "wide" | "wide-crypto" (default "default")
+ *   COMP_RV_*         optional RV overrides: LOOKBACK, ENTRY_Z, EXIT_Z, MAX_PAIRS, PER_PAIR_FRACTION, CLUSTERS=all|crypto
  *
  * DOUBLE SAFETY GUARD — both required for a real order to fill:
  *   GORDON_LIVE_TRADING=1      (this process)
@@ -40,11 +42,52 @@ import {
   COMPETITION_RISK,
 } from "../../src/infra/trading/competition/competitionStrategy.ts";
 import { BarbellLiveRunner } from "../../src/infra/trading/competition/barbellLiveRunner.ts";
+import { BARBELL_CONFIG, type BarbellConfig } from "../../src/infra/trading/competition/barbellStrategy.ts";
+import { PAIRS_CLUSTERS } from "../../src/infra/trading/competition/pairsCompetitionStrategy.ts";
 
 function envNum(name: string, fallback: number): number {
   const v = process.env[name];
   const n = v ? Number(v) : NaN;
   return Number.isFinite(n) ? n : fallback;
+}
+
+function envInt(name: string, fallback: number): number {
+  return Math.max(1, Math.floor(envNum(name, fallback)));
+}
+
+function rvClusters(mode: string): readonly (readonly string[])[] {
+  if (mode === "all") return PAIRS_CLUSTERS;
+  if (mode === "crypto") return PAIRS_CLUSTERS.filter((cluster) => cluster.includes("BTCUSD"));
+  throw new Error(`COMP_RV_CLUSTERS must be "all" or "crypto" (got ${mode})`);
+}
+
+function barbellConfigFromEnv(): { config: BarbellConfig; note: string } {
+  const profile = (process.env.COMP_RV_PROFILE ?? "default").toLowerCase();
+  if (!["default", "wide", "wide-crypto", "crypto-wide"].includes(profile)) {
+    throw new Error(`COMP_RV_PROFILE must be "default", "wide", or "wide-crypto" (got ${profile})`);
+  }
+
+  let rvConfig = { ...BARBELL_CONFIG.rvConfig };
+  if (profile === "wide" || profile === "wide-crypto" || profile === "crypto-wide") {
+    rvConfig = { ...rvConfig, lookback: 96, entryZ: 2.5, exitZ: 0.75, maxPairs: 11 };
+  }
+
+  const clusterMode = (process.env.COMP_RV_CLUSTERS ?? (profile === "wide-crypto" || profile === "crypto-wide" ? "crypto" : "all")).toLowerCase();
+  rvConfig = {
+    ...rvConfig,
+    clusters: rvClusters(clusterMode),
+    lookback: envInt("COMP_RV_LOOKBACK", rvConfig.lookback),
+    entryZ: envNum("COMP_RV_ENTRY_Z", rvConfig.entryZ),
+    exitZ: envNum("COMP_RV_EXIT_Z", rvConfig.exitZ),
+    perPairFraction: envNum("COMP_RV_PER_PAIR_FRACTION", rvConfig.perPairFraction),
+    maxPairs: envInt("COMP_RV_MAX_PAIRS", rvConfig.maxPairs),
+  };
+
+  const note =
+    `rvProfile=${profile} clusters=${clusterMode} ` +
+    `lookback=${rvConfig.lookback} entryZ=${rvConfig.entryZ} exitZ=${rvConfig.exitZ} ` +
+    `perPair=${rvConfig.perPairFraction} maxPairs=${rvConfig.maxPairs}`;
+  return { config: { ...BARBELL_CONFIG, rvConfig }, note };
 }
 
 /**
@@ -122,6 +165,7 @@ async function bootstrap(): Promise<void> {
   const cutMs = envNum("COMP_CUT_MS", 0);
   const deadlineMs = envNum("COMP_DEADLINE_MS", 0);
   const peerPath = process.env.COMP_PEER_RETURNS_PATH;
+  const barbell = barbellConfigFromEnv();
   // Endgame arming reflects whether the file ACTUALLY resolves to a valid board NOW (≥2 returns),
   // not merely that the env var is set — a missing/empty/malformed file leaves the sleeve gated.
   const peerBoardNow = peerPath ? readPeerReturns(peerPath) : undefined;
@@ -146,6 +190,7 @@ async function bootstrap(): Promise<void> {
     // Live peer-return board (operator-maintained) — REQUIRED for the endgame sleeve to auto-fire:
     // it calibrates the field to real rank. Without COMP_PEER_RETURNS_PATH the endgame stays gated.
     board: peerPath ? () => readPeerReturns(peerPath) : undefined,
+    barbellConfig: barbell.config,
     // Restart-safe state + manual kill-switch flag file (operator panic-button) + critical alerts.
     statePath: process.env.COMP_STATE_PATH,
     flattenFlagPath: process.env.COMP_FLATTEN_FLAG,
@@ -164,7 +209,7 @@ async function bootstrap(): Promise<void> {
     `barbell: startingEquity=${startingEquity.toFixed(0)} · ` +
       `phase gate ${cutMs > 0 ? `cut@${new Date(cutMs).toISOString()}` : "pre_cut (no COMP_CUT_MS)"} · ` +
       `${deadlineMs > 0 ? `deadline@${new Date(deadlineMs).toISOString()}` : "barsToDeadline=480 (no COMP_DEADLINE_MS)"} · ` +
-      `${peerBoardNote}\n`,
+      `${barbell.note} · ${peerBoardNote}\n`,
   );
 
   runner.runLoop(intervalMs, (r) => {
