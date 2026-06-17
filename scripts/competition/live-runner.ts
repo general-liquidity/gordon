@@ -121,6 +121,15 @@ async function bootstrap(): Promise<void> {
   const startingEquity = envNum("COMP_STARTING_EQUITY", acct.equity);
   const cutMs = envNum("COMP_CUT_MS", 0);
   const deadlineMs = envNum("COMP_DEADLINE_MS", 0);
+  const peerPath = process.env.COMP_PEER_RETURNS_PATH;
+  // Endgame arming reflects whether the file ACTUALLY resolves to a valid board NOW (≥2 returns),
+  // not merely that the env var is set — a missing/empty/malformed file leaves the sleeve gated.
+  const peerBoardNow = peerPath ? readPeerReturns(peerPath) : undefined;
+  const peerBoardNote = !peerPath
+    ? "no peer board → endgame sleeve GATED OFF (finals-only)"
+    : peerBoardNow
+      ? `peer board@${peerPath} (${peerBoardNow.returns.length} returns) → endgame sleeve ARMED on real data`
+      : `peer board@${peerPath} set but EMPTY/invalid (need ≥2 returns) → endgame GATED until populated (re-checked each cycle)`;
 
   const runner = new BarbellLiveRunner(client, {
     symbols,
@@ -136,7 +145,7 @@ async function bootstrap(): Promise<void> {
     barsToCut: () => (cutMs > 0 ? Math.max(0, Math.round((cutMs - Date.now()) / M15_MS)) : Number.POSITIVE_INFINITY),
     // Live peer-return board (operator-maintained) — REQUIRED for the endgame sleeve to auto-fire:
     // it calibrates the field to real rank. Without COMP_PEER_RETURNS_PATH the endgame stays gated.
-    board: process.env.COMP_PEER_RETURNS_PATH ? () => readPeerReturns(process.env.COMP_PEER_RETURNS_PATH!) : undefined,
+    board: peerPath ? () => readPeerReturns(peerPath) : undefined,
     // Restart-safe state + manual kill-switch flag file (operator panic-button) + critical alerts.
     statePath: process.env.COMP_STATE_PATH,
     flattenFlagPath: process.env.COMP_FLATTEN_FLAG,
@@ -155,7 +164,7 @@ async function bootstrap(): Promise<void> {
     `barbell: startingEquity=${startingEquity.toFixed(0)} · ` +
       `phase gate ${cutMs > 0 ? `cut@${new Date(cutMs).toISOString()}` : "pre_cut (no COMP_CUT_MS)"} · ` +
       `${deadlineMs > 0 ? `deadline@${new Date(deadlineMs).toISOString()}` : "barsToDeadline=480 (no COMP_DEADLINE_MS)"} · ` +
-      `${process.env.COMP_PEER_RETURNS_PATH ? `peer board@${process.env.COMP_PEER_RETURNS_PATH} (endgame sleeve ARMED on real data)` : "no peer board → endgame sleeve GATED OFF (finals-only)"}\n`,
+      `${peerBoardNote}\n`,
   );
 
   runner.runLoop(intervalMs, (r) => {
