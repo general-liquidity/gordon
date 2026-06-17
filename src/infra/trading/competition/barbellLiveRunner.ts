@@ -31,6 +31,7 @@ import type {
 } from "../../broker/mt5/bridgeClient.ts";
 import type { ContractSpec } from "./liveTrader.ts";
 import { barbellDecision, type BarbellConfig, type BarbellDecision, BARBELL_CONFIG } from "./barbellStrategy.ts";
+import type { RvHysteresisState } from "./rvReversionCore.ts";
 import { marginCircuitBreaker } from "./survivalStop.ts";
 import { filterToAvailableSymbols, formatExcludedNote } from "./dataAvailability.ts";
 
@@ -171,6 +172,8 @@ export class BarbellLiveRunner {
   private readonly cfg: BarbellRunnerConfig;
   private readonly log: (m: string) => void;
   private running = false;
+  /** Persistent per-pair hysteresis state for the RV core (held across cycles). */
+  private readonly rvState: RvHysteresisState = new Map();
 
   constructor(client: Mt5Like, cfg: BarbellRunnerConfig, log: (m: string) => void = (m) => console.log(m)) {
     this.client = client;
@@ -230,6 +233,7 @@ export class BarbellLiveRunner {
         barsToDeadline: this.cfg.barsToDeadline(),
         phase: this.cfg.phase(),
         config: this.cfg.barbellConfig ?? BARBELL_CONFIG,
+        rvState: this.rvState, // discrete hysteresis — hold through the reversion, don't churn
       });
       targets = aggregateTargetNotionals(decision);
       decisionReason = decision.reason;

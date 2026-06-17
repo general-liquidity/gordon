@@ -31,7 +31,7 @@ import {
   type PairTarget,
   type PairsCompetitionConfig,
 } from "./pairsCompetitionStrategy.ts";
-import { rvPairTargets, RV_REVERSION_CONFIG, type RvReversionConfig } from "./rvReversionCore.ts";
+import { rvPairTargets, RV_REVERSION_CONFIG, type RvReversionConfig, type RvHysteresisState } from "./rvReversionCore.ts";
 import {
   assessStanding,
   DEFAULT_FIELD,
@@ -119,6 +119,13 @@ export interface BarbellInput {
   /** Field model for percentile estimation (or supply a live leaderboard upstream). */
   field?: FieldModel;
   config?: BarbellConfig;
+  /**
+   * Per-pair hysteresis state for the "rv" core. When supplied, the RV book uses DISCRETE
+   * entry/exit hysteresis (hold through the reversion — validated as far cheaper than the
+   * continuous fade, which churns and bleeds on cost). The caller (live runner) owns and
+   * persists this Map across cycles; it is mutated in place. Omit → legacy continuous fade.
+   */
+  rvState?: RvHysteresisState;
 }
 
 /**
@@ -150,7 +157,7 @@ export function barbellDecision(input: BarbellInput): BarbellDecision {
   const core =
     cfg.core === "strict"
       ? pairTargets(input.barsBySymbol, selectPairs(input.barsBySymbol, { config: cfg.pairsConfig }), ringFence.coreEquity, { config: cfg.pairsConfig })
-      : rvPairTargets(input.barsBySymbol, ringFence.coreEquity, cfg.rvConfig);
+      : rvPairTargets(input.barsBySymbol, ringFence.coreEquity, cfg.rvConfig, input.rvState);
 
   // ── STANDING: bang-bang stance. ──
   const standing = assessStanding({ ourReturn: input.ourReturnPct, field, phase: input.phase });

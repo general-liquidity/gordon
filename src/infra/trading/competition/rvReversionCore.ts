@@ -43,11 +43,14 @@ export interface RvReversionConfig {
   minObs: number;
 }
 
+// Defaults from the best-Sharpe sweep (`scripts/competition/best-sharpe-sweep.ts`, scored on the
+// exact §12.5 metric, IS/OOS, most-robust pick): wide entry + long lookback minimize the cost
+// churn that binds this book, while clearing the §17 ≥30-trade floor (~49 trades over 5 days).
 export const RV_REVERSION_CONFIG: RvReversionConfig = {
   clusters: PAIRS_CLUSTERS,
-  lookback: 48,
-  entryZ: 1.5,
-  exitZ: 0.5,
+  lookback: 96,
+  entryZ: 2.5,
+  exitZ: 0.75,
   perPairFraction: 0.03, // 3% per leg → many tiny dollar-neutral positions
   maxPairs: 11,
   minObs: 60,
@@ -76,23 +79,41 @@ function logRatioSpread(barsA: Mt5Bar[], barsB: Mt5Bar[]): number[] {
 interface Candidate {
   symbolA: string;
   symbolB: string;
+  key: string;
   z: number;
   alloc: number; // signed: + = long spread (long A / short B), − = short spread
 }
 
+/** Per-pair discrete position state for hysteresis: pairKey → −1 | 0 | +1 (spread side held). */
+export type RvHysteresisState = Map<string, number>;
+
+const pairKey = (a: string, b: string): string => `${a}/${b}`;
+
 /**
  * Current dollar-neutral targets for the RV-reversion book. For every within-cluster pair
- * with enough aligned history, compute the trailing-window z of the log ratio and the
- * continuous fade allocation; keep the `maxPairs` most-stretched, size each leg at
- * |alloc|·perPairFraction·equity (dollar-matched legs → ≈ zero net directional exposure).
+ * with enough aligned history, compute the trailing-window z of the log ratio; keep the
+ * `maxPairs` most-stretched, size each leg at |alloc|·perPairFraction·equity (dollar-matched
+ * legs → ≈ zero net directional exposure).
+ *
+ * Two allocation modes:
+ *   - CONTINUOUS (no `state`): the OU-proportional fade ramp (legacy, stateless). Re-allocates
+ *     every bar — which, validated against the §12.5 metric, CHURNS and bleeds on the spread
+ *     cost (the per-bar reconciliation pays the spread on every small target change).
+ *   - DISCRETE HYSTERESIS (`state` passed): enter ±1 only at |z|≥entryZ, HOLD through the
+ *     reversion, exit only at |z|≤exitZ. This is what the best-Sharpe sweep validated as far
+ *     cheaper (it doesn't trade every bar) and the curve-shape we actually want. `state` is the
+ *     per-pair held side, mutated in place across cycles by the caller (the live runner owns it;
+ *     a capped-out or reverted pair is set back to 0 so the state never diverges from intent).
  */
 export function rvPairTargets(
   barsBySymbol: Record<string, Mt5Bar[]>,
   equity: number,
   config: RvReversionConfig = RV_REVERSION_CONFIG,
+  state?: RvHysteresisState,
 ): PairTarget[] {
   const denom = config.entryZ - config.exitZ;
   const candidates: Candidate[] = [];
+  const evaluated: string[] = []; // keys seen this cycle (for post-cap state cleanup)
 
   for (const cluster of config.clusters) {
     const present = cluster.filter((s) => (barsBySymbol[s]?.length ?? 0) > 0);
@@ -107,11 +128,26 @@ export function rvPairTargets(
         const sd = stdev(w);
         if (!(sd > 0)) continue;
         const z = (spread[spread.length - 1]! - mean(w)) / sd;
+        const key = pairKey(symbolA, symbolB);
+        evaluated.push(key);
 
-        const mag = denom > 0 ? Math.min(Math.max((Math.abs(z) - config.exitZ) / denom, 0), 1) : Math.abs(z) >= config.entryZ ? 1 : 0;
-        if (mag <= 0) continue; // inside the exit band → flat
-        const alloc = -Math.sign(z) * mag; // fade: z>0 (ratio rich) → short spread
-        candidates.push({ symbolA, symbolB, z, alloc });
+        let alloc: number;
+        if (state) {
+          // Discrete hysteresis: enter at entryZ, hold until |z|≤exitZ.
+          const cur = state.get(key) ?? 0;
+          let pos = cur;
+          if (cur === 0) {
+            if (Math.abs(z) >= config.entryZ) pos = -Math.sign(z); // fade: z>0 (rich) → short spread
+          } else if (Math.abs(z) <= config.exitZ) {
+            pos = 0; // reverted → exit
+          }
+          alloc = pos;
+        } else {
+          const mag = denom > 0 ? Math.min(Math.max((Math.abs(z) - config.exitZ) / denom, 0), 1) : Math.abs(z) >= config.entryZ ? 1 : 0;
+          alloc = -Math.sign(z) * mag;
+        }
+        if (alloc === 0) continue; // flat (inside the exit band / not yet entered)
+        candidates.push({ symbolA, symbolB, key, z, alloc });
       }
     }
   }
@@ -119,6 +155,13 @@ export function rvPairTargets(
   // Keep the most-stretched pairs (largest |z|) up to the breadth cap.
   candidates.sort((x, y) => Math.abs(y.z) - Math.abs(x.z));
   const kept = candidates.slice(0, config.maxPairs);
+
+  if (state) {
+    // Sync state to what we actually hold: kept → their side; everything else evaluated
+    // (flat, or capped out of the breadth limit) → 0, so state never diverges from intent.
+    const keptKeys = new Set(kept.map((c) => c.key));
+    for (const key of evaluated) state.set(key, keptKeys.has(key) ? Math.sign(candidates.find((c) => c.key === key)!.alloc) : 0);
+  }
 
   const out: PairTarget[] = [];
   for (const c of kept) {
