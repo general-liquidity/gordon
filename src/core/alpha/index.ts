@@ -570,3 +570,13 @@ export {
   efficiencyRatio,
   type RegimeAdaptiveOptions,
 } from "./regime-adaptive-strategy.ts";
+
+export {
+  retrieveAnalogs,
+  type AnalogState,
+  type MarketAnalogOptions,
+  type AnalogNeighbor,
+  type ForwardDistribution,
+  type AnalogConfidence,
+  type MarketAnalogResult,
+} from "./market-analog.ts";
