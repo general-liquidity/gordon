@@ -91,11 +91,11 @@ describe("BarbellLiveRunner — survival circuit breaker", () => {
 
   class FakeClient implements Mt5Like {
     placed: Mt5OrderRequest[] = [];
-    constructor(private acc: Mt5Account, private posList: Mt5Position[]) {}
+    constructor(private acc: Mt5Account, private posList: Mt5Position[], private thin: Set<string> = new Set()) {}
     async account(): Promise<Mt5Account> { return this.acc; }
     async positions(): Promise<Mt5Position[]> { return this.posList; }
     async quote(symbol: string): Promise<Mt5Quote> { return quote(symbol, 100); }
-    async bars(): Promise<Mt5Bar[]> { return bars(); }
+    async bars(params: { symbol: string }): Promise<Mt5Bar[]> { return this.thin.has(params.symbol) ? [] : bars(); }
     async placeOrder(req: Mt5OrderRequest): Promise<Mt5OrderResult> { this.placed.push(req); return { executed: true, order: 1 }; }
   }
 
@@ -144,5 +144,14 @@ describe("BarbellLiveRunner — survival circuit breaker", () => {
     const client = new FakeClient(acct({ margin_level: 0, margin: 0 }), []);
     const report = await new BarbellLiveRunner(client, runnerCfg, () => {}).runCycle();
     expect(report.breakerTripped).toBe(false); // margin 0 ⇒ no positions ⇒ idle
+  });
+
+  it("excludes an instrument whose live feed is empty and logs the exclusion note", async () => {
+    delete process.env.GORDON_LIVE_TRADING;
+    const logs: string[] = [];
+    const client = new FakeClient(acct({ margin_level: 300, margin: 0 }), [], new Set(["ETHUSD"]));
+    const report = await new BarbellLiveRunner(client, runnerCfg, (m) => logs.push(m)).runCycle();
+    expect(report.breakerTripped).toBe(false);
+    expect(logs.some((l) => l.includes("Excluded") && l.includes("ETHUSD"))).toBe(true);
   });
 });

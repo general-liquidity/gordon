@@ -32,6 +32,7 @@ import type {
 import type { ContractSpec } from "./liveTrader.ts";
 import { barbellDecision, type BarbellConfig, type BarbellDecision, BARBELL_CONFIG } from "./barbellStrategy.ts";
 import { marginCircuitBreaker } from "./survivalStop.ts";
+import { filterToAvailableSymbols, formatExcludedNote } from "./dataAvailability.ts";
 
 /** Mockable subset of the bridge the runner needs (same shape as liveTrader's Mt5Like). */
 export interface Mt5Like {
@@ -193,6 +194,16 @@ export class BarbellLiveRunner {
       quoteBySymbol[symbol] = await this.client.quote(symbol);
     }
 
+    // Data-availability guard: drop instruments whose live feed is missing/thin so the
+    // decision never sizes off a degenerate window. Derived from availability, not a hardcoded
+    // list. Reconcile still runs over the FULL universe below, so an excluded symbol we happen
+    // to hold is still flattened — we just won't open NEW exposure in it.
+    const { available, excluded } = filterToAvailableSymbols(this.cfg.symbols, barsBySymbol, this.cfg.barsLookback);
+    const note = formatExcludedNote(excluded);
+    if (note) this.log(`[barbell] ${note}`);
+    const availableBars: Record<string, Mt5Bar[]> = {};
+    for (const s of available) availableBars[s] = barsBySymbol[s]!;
+
     // SURVIVAL circuit breaker runs FIRST. If the account margin level nears the 30% stop-out
     // (= elimination), flatten the WHOLE book (targets → 0) and skip the barbell decision
     // entirely — per-leg stops would un-hedge the core, and `barbellDecision` itself refuses
@@ -212,7 +223,7 @@ export class BarbellLiveRunner {
       decisionReason = breaker.reason;
     } else {
       const decision = barbellDecision({
-        barsBySymbol,
+        barsBySymbol: availableBars,
         equity,
         startingEquity: this.cfg.startingEquity,
         ourReturnPct,
