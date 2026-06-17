@@ -88,7 +88,7 @@ The client defaults `baseUrl` to `http://127.0.0.1:${MT5_BRIDGE_PORT|8788}` and 
 | `COMP_STARTING_EQUITY` | the §12 baseline (set **`1000000`** explicitly — return is scored off the fixed $1M, not current equity) |
 | `COMP_CUT_MS` | epoch-ms of the **Top-100 finals cut** (24 Jun 22:00 BST). Drives the phase gate AND the **pre-finals endgame sleeve** + the standing readout. |
 | `COMP_DEADLINE_MS` | epoch-ms of the **contest end** (26 Jun 22:00 BST). Drives the liquidation horizon. |
-| `COMP_STATE_PATH` | file path for **restart-safe** equity/risk history (e.g. `.gordon/comp-state.json`) — survive a process restart without losing the standing/Sharpe history |
+| `COMP_STATE_PATH` | file path for **restart-safe** equity/risk history + RV hysteresis state (e.g. `.gordon/comp-state.json`) — survive a process restart without losing the standing/Sharpe history or low-churn pair holds |
 | `COMP_FLATTEN_FLAG` | path to the **kill-switch flag file** — `touch` it to flatten the whole book, `rm` it to resume (Section 7) |
 | `COMP_ALERT_PATH` | file the **critical-event alerts** append to (default `comp-alerts.log`) — `tail -f` it so you're not tied to the screen 24/7 |
 | `COMP_FIELD_N` / `COMP_CUT_PCT` | field size (default 500) + cut percentile (default 0.8) for the standing's rank estimates |
@@ -216,7 +216,7 @@ or set `GORDON_COMP_FLATTEN=1`. The runner flattens to zero targets (reconciles 
 **Escalating halt (stops NEW orders), fastest-first:**
 1. **Flag-file flatten** (above) — flattens + holds flat while the flag exists.
 2. **Disarm Gordon (guard #2)** — unset `GORDON_LIVE_TRADING` and restart the runner → read/validate-only.
-3. **Stop the live runner** — kill the process. Sidecar + terminal keep running so you retain read access to manage open positions. (The `COMP_STATE_PATH` history is preserved — a restart resumes the standing.)
+3. **Stop the live runner** — kill the process. Sidecar + terminal keep running so you retain read access to manage open positions. (The `COMP_STATE_PATH` state is preserved — a restart resumes the standing and RV hysteresis holds.)
 4. **Disarm the sidecar (guard #1)** — `MT5_BRIDGE_ALLOW_TRADING=0` + restart `mt5_bridge.py`. Hard stop at the transport: nothing fires even if Gordon is armed.
 
 To **flatten** via the venue directly: `POST /close` per ticket (or close in the MT5 UI) **then** disarm — order matters (disarming the sidecar first blocks `/close` too).
@@ -234,10 +234,10 @@ Run this immediately before **21 Jun 22:00 BST**. Arm the two guards **only at t
 - [ ] **Account creds in the sidecar env only** — `MT5_LOGIN` / `MT5_PASSWORD` / `MT5_SERVER` set on the sidecar; **not** present anywhere in Gordon's env.
 - [ ] **Bridge token matches** — `MT5_BRIDGE_TOKEN` identical on the sidecar and in Gordon's `apiKey`; `baseUrl` = `http://127.0.0.1:8788`.
 - [ ] **Preflight READY** — `bun run scripts/competition/preflight.ts` reads **READY** pre-arm (and **GO** after arming both guards).
-- [ ] **State dir created** — `mkdir -p .gordon` (holds `comp-state.json` + the `FLATTEN` kill-flag; the runner also auto-creates it, but make it explicitly).
+- [ ] **State dir created** — `mkdir -p .gordon` (holds `comp-state.json` with equity/risk/RV-state + the `FLATTEN` kill-flag; the runner also auto-creates it, but make it explicitly).
 - [ ] **Smoke test green** — `bun run scripts/dev/mt5/mt5-smoke.ts` passes (account + quote + depth + bars + symbol spec).
 - [ ] **Spread check recorded** — `bun run scripts/dev/mt5/competition-spread-check.ts` run + verdict noted (drives the §9.1 posture).
-- [ ] **The 15 tradeable instruments confirmed** on the platform/console + per-instrument contract specs / tick size / spreads (released at login). Symbols are resolved from the venue catalog at runtime, never hardcoded.
+- [ ] **The final 15-symbol competition universe matches the live catalog** + per-instrument contract specs / tick size / spreads confirmed at login. Symbols are resolved from the venue catalog at runtime, never hardcoded.
 - [ ] **Competition env set** — `COMP_STARTING_EQUITY=1000000`, `COMP_CUT_MS` (24 Jun 22:00 BST), `COMP_DEADLINE_MS` (26 Jun 22:00 BST), `COMP_STATE_PATH`, `COMP_FLATTEN_FLAG`, `COMP_ALERT_PATH` (Section 3).
 - [ ] **Risk preset confirmed** — `COMPETITION_RISK_SURVIVAL` (frozen default); ceilings under §13. Swap to `AGGRESSIVE` never — the ring-fenced sleeve is the only sanctioned return-gamble.
 - [ ] **Standing watch + alert tail running** — `standing-watch.ts` in a second terminal; `tail -f $COMP_ALERT_PATH`.
@@ -256,8 +256,8 @@ The finals are **blind** and the window is 5 days; the judgment calls must be pr
 
 ### 9.1 Launch read → posture (do once, when the feed opens)
 - **Run the spread check** (Section 4 step 5). Record per-instrument bps.
-  - Crypto majors **< ~2 bps** → the RV book is plausibly **net-positive**; run as-is.
-  - **Wide (> ~4 bps)** → it's the **~0 relative-rank play**: still run it (smooth + survive wins the DD/Sharpe ranks vs a gambling field), but consider pruning the widest-spread pairs from the RV clusters.
+  - Crypto majors **< ~2 bps** → the RV book is plausibly **net-positive**; the latest sweep says a more active book can work, but do not hot-swap on one quote — run the conservative discrete core through a live soak first.
+  - **Wide (> ~4 bps)** → cost is binding. The 17 Jun local sweep favored the **low-churn discrete RV candidate** (`lookback 96`, `entryZ 2.5`, `exitZ 0.75`, `maxPairs 11`) and a crypto-only variant was slightly cleaner (`~270` trades, `~2.4%` full DD, 5-day p95 DD `<2%` at 3%/leg). If spreads are wide before arming, prefer widening/pruning over increasing size. **NB:** that sweep is the **1-month window** (the regime-specific data we distrust); the **frozen default stays `lookback 144 / entryZ 2.0 / exitZ 0.5`** (the 18-month-robust pick). All configs are ~0 net Sharpe (cost-bound), so treat `96/2.5/0.75` as a *candidate to re-validate on the 18-mo history* before swapping — do not hot-swap on the 1-month numbers alone.
 - **Confirm the survive-and-rank preset** (`COMPETITION_RISK_SURVIVAL`) — do NOT swap to AGGRESSIVE for the core; the sanctioned return-gamble is the *sleeve*, ring-fenced.
 
 ### 9.2 Calibrate the field (once Round-1/2 peer data is visible) — and ARM the endgame sleeve

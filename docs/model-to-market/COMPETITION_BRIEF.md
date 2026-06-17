@@ -1,6 +1,6 @@
 # Model to Market: The Quantitative Hack — Competition Brief
 
-**The single reference for the competition.** Last updated **2026-06-16**.
+**The single reference for the competition.** Last updated **2026-06-17**.
 
 > **Source-of-truth hierarchy** (organizer-stated): the **Syphonix platform "Rules" tab** (left nav of the participant console) is authoritative — the rules were updated after the 15 Jun kickoff and supersede the marketing pages. Discord (`Duncan` = tech lead, `Lotus` = ops) is the live clarification channel. The public marketing pages (`aienginehack.com/momq`, Luma) are stale where they conflict.
 >
@@ -15,7 +15,7 @@
 | **What** | UK's first live AI-native trading competition. Solo (1-person teams). **400+ registered** (Duncan, Discord). Round progression is a **fixed number** advancing (not a percentage) — exact counts TBC by the organizer. |
 | **Host** | AI Engine (Zoe Qin / Jamesin Seidel, Dawn Capital) × Syphonix |
 | **Capital** | $1,000,000 virtual per participant, **30:1 max leverage**, zero principal risk |
-| **Markets** | FX majors · Gold (XAUUSD) · Silver (XAGUSD) · Oil · 5 crypto. **No** stocks/indices/bonds. **No** options. |
+| **Markets** | Final competition-tradeable set: FX(8) · Gold (XAUUSD) · Silver (XAGUSD) · 5 crypto. **No** stocks/indices/bonds/oil. **No** options. |
 | **Format** | 1 week build → 1 week live paper trade → knockout rounds → top-100 final |
 | **Live launch** | **21 Jun 2026, 22:00 BST** (Asia open) |
 | **Final** | 27 Jun 2026, London, in-person **required** for the top 100 |
@@ -53,7 +53,7 @@ Authoritative dates from **[RULES]** §5, refined by **[DISCORD]**. Marketing pa
 
 **Account** **[RULES]** §2: simulated, $1,000,000 initial, **30:1 max leverage**, unified market environment (everyone sees the same quotes), zero principal risk.
 
-**Asset scope** **[RULES]** §3 + **[DISCORD]**: major FX pairs, **XAUUSD** (gold), **XAGUSD** (silver), and **5 crypto: BTCUSD, ETHUSD, SOLUSD, XRPUSD, BARUSD** (the catalog symbol is `BARUSD` / "BAR vs USD", but the UNDERLYING is **HBAR — Hedera**, per Discord — see the note below). The **venue catalog may list 30+ symbols**, but only a **competition-tradeable subset (~15)** is in scope; **Gordon's live universe is the 15** (8 FX + XAUUSD + XAGUSD + 5 crypto) in `competitionStrategy.ts`. **No stocks, indices, or bonds.** **No options** (use stop-losses; no option hedging). The final tradeable list is released at login / on the 18th.
+**Asset scope** **[RULES]** §3 + **[DISCORD]**: major FX pairs, **XAUUSD** (gold), **XAGUSD** (silver), and **5 crypto: BTCUSD, ETHUSD, SOLUSD, XRPUSD, BARUSD** (the catalog symbol is `BARUSD` / "BAR vs USD", but the UNDERLYING is **HBAR — Hedera**, per Discord — see the note below). The **venue catalog may list 30+ symbols**, but only the **final competition-tradeable 15** are in scope; **Gordon's live universe is the 15** (8 FX + XAUUSD + XAGUSD + 5 crypto) in `competitionStrategy.ts`. **No stocks, indices, bonds, or oil.** **No options** (use stop-losses; no option hedging). The list is final; still confirm live symbol strings, contract specs, tick sizes, leverage, and spreads at login.
 
 > **[BARUSD = HBAR/Hedera — resolved]** The MT5 catalog symbol is `BARUSD` (description "BAR vs USD", base "BAR"), which is ambiguous — on Binance "BAR" is the Barcelona fan-token. Discord (**Lotus**, organizer) clarified the competition's "BAR" is **HBAR (Hedera)**. Our data-fetch maps `BARUSD → Binance HBARUSDT`, so `data/momq/bars/BARUSD_M15.json` is correctly Hedera. Keep the symbol `BARUSD` (it matches the catalog); the only residual is to confirm at login the live symbol string is still "BARUSD" (if renamed "HBARUSD", relabel).
 > **[CONFIRM]** Pull the full instrument list from the console once logged in — contract specs, per-instrument leverage, tick size, and spreads feed Gordon's sizing.
@@ -266,7 +266,7 @@ The core is the **frozen** `COMPETITION_RISK_SURVIVAL` preset in `competition-ri
 
 **Built (this prep):**
 - `core/risk-management/competition-scoring.ts` — exact §11–17 objective function (Final Score, ranks, non-annualized 15-min Sharpe + cap, §13 discipline, red-line DQ, tie-breakers) + the §17 Best Sharpe Award eligibility/winner selection (`selectBestSharpeAward`). 16 tests.
-- `backtest/competition-dry-run.ts` — money-path rehearsal; reports the official metrics. 6 tests.
+- `backtest/competition-dry-run.ts` — money-path rehearsal; reports the official metrics. 16 tests.
 - `core/risk-management/competition-risk-preset.ts` — the frozen `COMPETITION_RISK_SURVIVAL` default (the live core); `COMPETITION_RISK_AGGRESSIVE` retained but not used.
 - **Live execution: the MT5 barbell path** — `scripts/competition/live-runner.ts` → `barbellLiveRunner.ts` (RV core + ring-fenced sleeve + survival breaker + standing monitor + kill-switch). The single live entry point (NOT `competition-runner.ts`, which is legacy prep scaffolding).
 
@@ -282,7 +282,8 @@ The core is the **frozen** `COMPETITION_RISK_SURVIVAL` preset in `competition-ri
 
 **To CONFIRM on the platform:**
 - [x] Current scoring formula + risk limits on the Rules tab — **confirmed 2026-06-16**: 70/15/10/5 unchanged; §17 Best Sharpe Award added.
-- [ ] Full 30+ instrument list + per-instrument contract specs, leverage, tick size, spreads.
+- [x] Final competition-tradeable 15-symbol list — **confirmed by Duncan / Discord** and matches `COMPETITION_TRADEABLE`.
+- [ ] Per-instrument contract specs, leverage, tick size, spreads.
 - [ ] Exact launch time (21 Jun 22:00 vs 23:00 BST — both cited).
 - [ ] Finals cutoff terminology (24 Jun blind cut vs 26 Jun trading close).
 - [ ] MT5 API rate limits (frequency constraints live in the MT5 layer).
