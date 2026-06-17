@@ -33,6 +33,8 @@ import type { ContractSpec } from "./liveTrader.ts";
 import { barbellDecision, type BarbellConfig, type BarbellDecision, BARBELL_CONFIG } from "./barbellStrategy.ts";
 import type { RvHysteresisState } from "./rvReversionCore.ts";
 import { marginCircuitBreaker } from "./survivalStop.ts";
+import { computeStanding, type CompetitionStanding } from "./standingMonitor.ts";
+import type { RiskSample } from "../../../core/risk-management/competition-scoring.ts";
 import { filterToAvailableSymbols, formatExcludedNote } from "./dataAvailability.ts";
 
 /** Mockable subset of the bridge the runner needs (same shape as liveTrader's Mt5Like). */
@@ -152,6 +154,14 @@ export interface BarbellRunnerConfig {
    * Per-leg stops are deliberately NOT used: they would un-hedge the dollar-neutral core.
    */
   breakerLevelPct?: number;
+  /** Bars until the decisive Top-100 cut (enables the pre-finals endgame sleeve + standing). */
+  barsToCut?: () => number;
+  /** Field size for rank estimates (default 500). */
+  fieldN?: number;
+  /** Cut line as a percentile (default 0.8 = Top-100 of 500). */
+  cutPercentile?: number;
+  /** Live peer-return leaderboard (rounds 1-3) for an EMPIRICAL return rank, if wired. */
+  board?: () => { returns: number[] } | undefined;
 }
 
 export interface BarbellCycleReport {
@@ -165,6 +175,8 @@ export interface BarbellCycleReport {
   breakerTripped: boolean;
   orders: Array<ReconcileOrder & { action: "placed" | "dry" | "refused" | "error"; detail?: string }>;
   ordersPlaced: number;
+  /** Live competition standing computed from the running equity curve (§11-17 + estimated rank). */
+  standing: CompetitionStanding;
 }
 
 export class BarbellLiveRunner {
@@ -174,6 +186,9 @@ export class BarbellLiveRunner {
   private running = false;
   /** Persistent per-pair hysteresis state for the RV core (held across cycles). */
   private readonly rvState: RvHysteresisState = new Map();
+  /** 15-min equity samples + risk samples accumulated across cycles (for the standing monitor). */
+  private readonly equityHistory: number[] = [];
+  private readonly riskHistory: RiskSample[] = [];
 
   constructor(client: Mt5Like, cfg: BarbellRunnerConfig, log: (m: string) => void = (m) => console.log(m)) {
     this.client = client;
@@ -189,6 +204,7 @@ export class BarbellLiveRunner {
     const account = await this.client.account();
     const equity = account.equity;
     const ourReturnPct = this.cfg.startingEquity > 0 ? equity / this.cfg.startingEquity - 1 : 0;
+    this.equityHistory.push(equity); // 15-min sample for the standing monitor
 
     const barsBySymbol: Record<string, Mt5Bar[]> = {};
     const quoteBySymbol: Record<string, Mt5Quote> = {};
@@ -231,6 +247,7 @@ export class BarbellLiveRunner {
         startingEquity: this.cfg.startingEquity,
         ourReturnPct,
         barsToDeadline: this.cfg.barsToDeadline(),
+        barsToCut: this.cfg.barsToCut?.(), // enables the pre-finals endgame sleeve
         phase: this.cfg.phase(),
         config: this.cfg.barbellConfig ?? BARBELL_CONFIG,
         rvState: this.rvState, // discrete hysteresis — hold through the reversion, don't churn
@@ -264,6 +281,38 @@ export class BarbellLiveRunner {
       }
     }
 
+    // ── Live risk sample (§13 inputs) + standing, computed from the actual book. ──
+    const mid = (sym: string, fallback: number): number => {
+      const q = quoteBySymbol[sym];
+      return q && q.bid > 0 && q.ask > 0 ? (q.bid + q.ask) / 2 : fallback;
+    };
+    const signedBySym: Record<string, number> = {};
+    let grossNotional = 0;
+    for (const p of positions) {
+      const cs = this.cfg.contracts[p.symbol]?.contractSize ?? 1;
+      const notional = Math.abs(p.volume) * mid(p.symbol, p.price_current) * cs;
+      grossNotional += notional;
+      signedBySym[p.symbol] = (signedBySym[p.symbol] ?? 0) + (p.sideLabel === "long" ? notional : -notional);
+    }
+    const marginUsage = equity > 0 && account.margin > 0 ? account.margin / equity : 0;
+    const leverage = equity > 0 ? grossNotional / equity : 0;
+    const singleInstrumentExposure = grossNotional > 0 ? Math.max(0, ...Object.values(signedBySym).map(Math.abs)) / grossNotional : 0;
+    const netDirectionalExposure = grossNotional > 0 ? Math.abs(Object.values(signedBySym).reduce((s, v) => s + v, 0)) / grossNotional : 0;
+    this.riskHistory.push({ marginUsage, leverage, singleInstrumentExposure, netDirectionalExposure });
+
+    const standing = computeStanding({
+      equity15m: this.equityHistory,
+      riskSamples: this.riskHistory,
+      riskIntervalMinutes: 15,
+      startingEquity: this.cfg.startingEquity,
+      phase: this.cfg.phase(),
+      cutPercentile: this.cfg.cutPercentile,
+      fieldN: this.cfg.fieldN,
+      barsToCut: this.cfg.barsToCut?.(),
+      board: this.cfg.board?.(),
+      liveRisk: { marginUsage, leverage },
+    });
+
     return {
       equity,
       ourReturnPct,
@@ -273,6 +322,7 @@ export class BarbellLiveRunner {
       breakerTripped: breaker.tripped,
       orders,
       ordersPlaced,
+      standing,
     };
   }
 
@@ -283,6 +333,7 @@ export class BarbellLiveRunner {
     const tick = async () => {
       try {
         const r = await this.runCycle();
+        this.log(r.standing.summary); // live standing every cycle
         onCycle?.(r);
       } catch (err) {
         this.log(`[barbell] cycle error (continuing): ${(err as Error).message}`);

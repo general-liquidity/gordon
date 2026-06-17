@@ -107,7 +107,7 @@ describe("computeStanding — bang-bang stance + sleeve gating", () => {
     const s = computeStanding({ equity15m: eq, phase: "post_cut", board: at(0.5) });
     expect(s.stance).toBe("max_variance");
     expect(s.sleeveArmed).toBe(true);
-    expect(s.sleeveReason).toContain("eligible");
+    expect(s.sleeveReason).toContain("swing");
   });
   test("post-cut top of field → lock_in, no sleeve", () => {
     const s = computeStanding({ equity15m: eq, phase: "post_cut", board: at(0.95) });
@@ -117,6 +117,15 @@ describe("computeStanding — bang-bang stance + sleeve gating", () => {
   test("pre-cut comfortably above the cut → lock_in", () => {
     const s = computeStanding({ equity15m: eq, phase: "pre_cut", board: at(0.95) });
     expect(s.stance).toBe("lock_in");
+  });
+  test("pre-cut ENDGAME below the cut → sleeve eligible (climb into the Top-100)", () => {
+    const s = computeStanding({ equity15m: eq, phase: "pre_cut", board: at(0.5), barsToCut: 24 });
+    expect(s.sleeveArmed).toBe(true);
+    expect(s.sleeveReason).toContain("Top-100");
+  });
+  test("pre-cut below the cut but NOT yet endgame → sleeve held", () => {
+    const s = computeStanding({ equity15m: eq, phase: "pre_cut", board: at(0.5), barsToCut: 500 });
+    expect(s.sleeveArmed).toBe(false);
   });
 });
 

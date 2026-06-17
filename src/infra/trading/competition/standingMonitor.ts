@@ -70,6 +70,10 @@ export interface StandingInput {
   riskIntervalMinutes?: number;
   startingEquity?: number;
   phase: "pre_cut" | "post_cut";
+  /** Bars until the decisive Top-100 cut — enables the pre-finals endgame sleeve readout. */
+  barsToCut?: number;
+  /** Endgame window (bars before the cut) within which the sleeve may fire if below it. Default 48. */
+  sleeveEndgameWindow?: number;
   /** Cut line as a percentile (Top-100 of 500 ⇒ 0.8). Default 0.8. */
   cutPercentile?: number;
   field?: FieldModel; // return field
@@ -168,13 +172,23 @@ export function computeStanding(input: StandingInput): CompetitionStanding {
 
   // Bang-bang stance (mirrors rankTracker.assessStanding, driven by the RETURN percentile —
   // the only one that decides survival/standing in the tournament sense).
-  const { stance, stanceReason } = deriveStance(returnPercentile, cutPercentile, input.phase);
-  const sleeveArmed = input.phase === "post_cut" && stance === "max_variance";
-  const sleeveReason = sleeveArmed
-    ? "stance max_variance post-cut → sleeve eligible (final gating: ring-fence reserve + liquidation-safe)"
-    : input.phase !== "post_cut"
-      ? "pre-cut → sleeve held (clear the cut on the core first)"
-      : `stance ${stance} → no sleeve (protect the prize slot / dominated)`;
+  const { stance } = deriveStance(returnPercentile, cutPercentile, input.phase);
+  // Mirror barbellStrategy's sleeve gating: finals swing OR pre-finals endgame climb-into-cut.
+  const inFinals = input.phase === "post_cut";
+  const endgameWindow = input.sleeveEndgameWindow ?? 48;
+  const nearCut = !inFinals && input.barsToCut !== undefined && input.barsToCut <= endgameWindow;
+  const swingForFinals = inFinals && stance === "max_variance";
+  const swingToClearCut = nearCut && !clearsCut;
+  const sleeveArmed = swingForFinals || swingToClearCut;
+  const sleeveReason = swingForFinals
+    ? "finals & lagging → swing for #1 (final gating: reserve + liquidation-safe)"
+    : swingToClearCut
+      ? "endgame & below the cut → swing to climb into the Top-100"
+      : inFinals
+        ? `finals & ${stance} → lock in the prize slot`
+        : nearCut
+          ? "endgame but clearing the cut → lock in the finals slot, save the one-shot"
+          : "pre-cut, not the endgame → hold (preserve the one-shot)";
 
   const standing: CompetitionStanding = {
     return: ret,

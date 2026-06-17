@@ -108,10 +108,12 @@ async function bootstrap(): Promise<void> {
     startingEquity,
     barsLookback,
     timeframe,
-    // Phase: post-cut once we pass the cut time (sleeve eligible); pre-cut otherwise.
+    // Phase: post-cut once we pass the cut time (finals sleeve); pre-cut otherwise.
     phase: () => (cutMs > 0 && Date.now() >= cutMs ? "post_cut" : "pre_cut"),
     // Liquidation horizon: M15 bars remaining to the deadline (fallback ~5 trading days).
     barsToDeadline: () => (deadlineMs > 0 ? Math.max(1, Math.round((deadlineMs - Date.now()) / M15_MS)) : 480),
+    // Bars to the Top-100 cut — enables the pre-finals endgame sleeve + the standing readout.
+    barsToCut: () => (cutMs > 0 ? Math.max(0, Math.round((cutMs - Date.now()) / M15_MS)) : Number.POSITIVE_INFINITY),
   });
 
   console.log(
