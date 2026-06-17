@@ -26,7 +26,7 @@
  * Unset either ⇒ read-only: deltas are computed + logged (DRY), nothing is sent.
  */
 
-import { appendFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { Mt5BridgeClient } from "../../src/infra/broker/mt5/bridgeClient.ts";
 import {
   CompetitionLiveTrader,
@@ -45,6 +45,25 @@ function envNum(name: string, fallback: number): number {
   const v = process.env[name];
   const n = v ? Number(v) : NaN;
   return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * Live peer-return board from `COMP_PEER_RETURNS_PATH` — a JSON file the operator maintains from
+ * the Round-1–3 leaderboard (an array of peer return fractions, or `{ "returns": [...] }`). Read
+ * each cycle (best-effort). This is what unlocks the REAL-standing sleeve: without it the runner's
+ * field stays the placeholder model and the endgame sleeve is gated OFF (see barbellLiveRunner +
+ * OPERATIONS §9). Returns undefined when absent/malformed so the runner safely falls back.
+ */
+function readPeerReturns(path: string): { returns: number[] } | undefined {
+  try {
+    const raw = JSON.parse(readFileSync(path, "utf8")) as unknown;
+    const arr = Array.isArray(raw) ? raw : Array.isArray((raw as { returns?: unknown })?.returns) ? (raw as { returns: unknown[] }).returns : null;
+    if (!arr) return undefined;
+    const returns = arr.filter((x): x is number => typeof x === "number" && Number.isFinite(x));
+    return returns.length >= 2 ? { returns } : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 const strategy = (process.env.COMP_STRATEGY ?? "barbell").toLowerCase();
@@ -115,6 +134,9 @@ async function bootstrap(): Promise<void> {
     barsToDeadline: () => (deadlineMs > 0 ? Math.max(1, Math.round((deadlineMs - Date.now()) / M15_MS)) : 480),
     // Bars to the Top-100 cut — enables the pre-finals endgame sleeve + the standing readout.
     barsToCut: () => (cutMs > 0 ? Math.max(0, Math.round((cutMs - Date.now()) / M15_MS)) : Number.POSITIVE_INFINITY),
+    // Live peer-return board (operator-maintained) — REQUIRED for the endgame sleeve to auto-fire:
+    // it calibrates the field to real rank. Without COMP_PEER_RETURNS_PATH the endgame stays gated.
+    board: process.env.COMP_PEER_RETURNS_PATH ? () => readPeerReturns(process.env.COMP_PEER_RETURNS_PATH!) : undefined,
     // Restart-safe state + manual kill-switch flag file (operator panic-button) + critical alerts.
     statePath: process.env.COMP_STATE_PATH,
     flattenFlagPath: process.env.COMP_FLATTEN_FLAG,
@@ -132,7 +154,8 @@ async function bootstrap(): Promise<void> {
   console.log(
     `barbell: startingEquity=${startingEquity.toFixed(0)} · ` +
       `phase gate ${cutMs > 0 ? `cut@${new Date(cutMs).toISOString()}` : "pre_cut (no COMP_CUT_MS)"} · ` +
-      `${deadlineMs > 0 ? `deadline@${new Date(deadlineMs).toISOString()}` : "barsToDeadline=480 (no COMP_DEADLINE_MS)"}\n`,
+      `${deadlineMs > 0 ? `deadline@${new Date(deadlineMs).toISOString()}` : "barsToDeadline=480 (no COMP_DEADLINE_MS)"} · ` +
+      `${process.env.COMP_PEER_RETURNS_PATH ? `peer board@${process.env.COMP_PEER_RETURNS_PATH} (endgame sleeve ARMED on real data)` : "no peer board → endgame sleeve GATED OFF (finals-only)"}\n`,
   );
 
   runner.runLoop(intervalMs, (r) => {

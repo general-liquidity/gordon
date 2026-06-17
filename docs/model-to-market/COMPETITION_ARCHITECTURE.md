@@ -36,7 +36,7 @@ Multi-provider routing with same-provider retry (exponential backoff), a **cross
 - **Instruments:** FX, Gold/Silver, Crypto — symbols resolved from the Syphonix catalog at runtime (never hardcoded; FX/metals are structural).
 - **Sizing:** the **competition risk preset** — a *min-of-caps* survive-and-compound sizer composing per-trade-risk (0.5%) / vol-target (15%) / leverage (3×) / fractional-Kelly (0.25) / exposure-cap (60%) / daily-loss-kill (3%). The most conservative constraint always binds → a losing streak can't cause ruin while vol-targeting keeps Sharpe central.
 - **Signals:** the existing quant stack (regime detection, momentum incl. TSI, mean-reversion/cointegration, microstructure, A-S market-making) — systematic, not latency-arbitrage (this is **not** HFT; an LLM in the loop runs at human-to-second cadence, and MT5/chat are first-class trade methods).
-- **Single entry point:** `buildCompetitionRunConfig()` (`core/pipeline/competition-runner.ts`) wires preset + universe + mandate + guards; venue is pluggable (`paper` now → `syphonix` at kickoff).
+- **Live entry point:** `scripts/competition/live-runner.ts` → `BarbellLiveRunner` (`infra/trading/competition/barbellLiveRunner.ts`) over the **MT5 bridge** (`Mt5BridgeClient`) — the RV-reversion core + ring-fenced sleeve + survival breaker + standing monitor + kill-switch. This is the executable path. (`core/pipeline/competition-runner.ts` / `buildCompetitionRunConfig()` is **legacy prep scaffolding** from the earlier paper→syphonix plan, superseded by the MT5 path — kept for reference, not the live entry point.)
 
 ## What to demo
 

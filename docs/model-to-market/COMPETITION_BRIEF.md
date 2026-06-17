@@ -233,7 +233,7 @@ Implemented in `competition-scoring.ts` (`selectBestSharpeAward` / `isBestSharpe
 
 **Metric:** non-annualized 15-min-return Sharpe (`Mean(r)/Std(r)`) over the **entire competition period** (21–26 Jun), not just the finals. **Winner** = highest Sharpe among the eligible; ties break on **higher Final Return**, then **lower MaxDD**.
 
-> **Strategic consequence — this ALIGNS "go for 1st" with "Best Sharpe", it does not trade them off.** You cannot win the Sharpe award with a low-return smooth book: a Top-50 *overall* finish (return-driven) is a hard gate. So high return is a *prerequisite* for the Sharpe prize. Combined with the **≥30-trade floor**, this is exactly what the diversified-aggressive-compounding posture (§9) produces — high return from many small, smooth, diversified trades. A few-big-bets approach risks failing both the Top-50 gate (variance/blow-up) and the 30-trade floor.
+> **Strategic consequence — the Best Sharpe award is return-gated too.** You cannot win it with a low-return smooth book: a **Top-50 overall finish** (return-driven, §17) is a hard gate, alongside the **≥30-trade floor**. The smooth barbell core (§9) clears the trade floor and wins the Sharpe/Drawdown ranks — but, exactly as in the main competition, a *median-return* book may not reach Top-50 on its own. So the Best Sharpe prize rides on the same return lever: the **endgame sleeve** is what can push us into Top-50 territory. A few-big-bets approach risks failing both the Top-50 gate (blow-up) and the trade floor.
 
 ---
 
@@ -253,9 +253,9 @@ Implemented in `competition-scoring.ts` (`selectBestSharpeAward` / `isBestSharpe
 - All ceilings stay under the §13 thresholds (leverage < 28×, margin < 90%, single-instrument < 90%, net-directional < 95%); **never concentrate enough to risk forced liquidation** (instant elimination, the one unrecoverable error).
 - **Best Tech + Anthropic bounty are decoupled from the trading dial** — they ride on Gordon's architecture and the submission.
 
-Encoded as `COMPETITION_RISK_AGGRESSIVE` in `competition-risk-preset.ts` (a **starting** calibration to be tuned against the official objective via the dry-run, once the historical parquet lands).
+The core is the **frozen** `COMPETITION_RISK_SURVIVAL` preset in `competition-risk-preset.ts`; the sleeve is the only sanctioned return-gamble (ring-fenced, one-shot). `COMPETITION_RISK_AGGRESSIVE` remains in the file but is **NOT** the live posture.
 
-> Why not a few 30× bets? It's a relative tournament with attrition: most aggressive entrants blow up (forced liquidation = auto-elimination). Gordon's no-wipeout governance **survives by construction**, which is itself a ranking edge — and the skill prizes (Sharpe, Tech) are where a disciplined system dominates the field.
+> Why not a few 30× bets on the core? It's a relative tournament with attrition: most aggressive entrants blow up (forced liquidation = auto-elimination). Gordon's no-wipeout governance **survives by construction**, which is itself a ranking edge — and the skill prizes (Sharpe, Tech) are where a disciplined system dominates the field. The bounded return-swing lives in the ring-fenced sleeve, not the core.
 
 ---
 
@@ -264,17 +264,18 @@ Encoded as `COMPETITION_RISK_AGGRESSIVE` in `competition-risk-preset.ts` (a **st
 **Built (this prep):**
 - `core/risk-management/competition-scoring.ts` — exact §11–17 objective function (Final Score, ranks, non-annualized 15-min Sharpe + cap, §13 discipline, red-line DQ, tie-breakers) + the §17 Best Sharpe Award eligibility/winner selection (`selectBestSharpeAward`). 16 tests.
 - `backtest/competition-dry-run.ts` — money-path rehearsal; reports the official metrics. 6 tests.
-- `core/risk-management/competition-risk-preset.ts` — survive-and-compound default + `COMPETITION_RISK_AGGRESSIVE` posture.
-- `core/pipeline/competition-runner.ts` — run config; `backtest/metrics.ts` annualization fix.
+- `core/risk-management/competition-risk-preset.ts` — the frozen `COMPETITION_RISK_SURVIVAL` default (the live core); `COMPETITION_RISK_AGGRESSIVE` retained but not used.
+- **Live execution: the MT5 barbell path** — `scripts/competition/live-runner.ts` → `barbellLiveRunner.ts` (RV core + ring-fenced sleeve + survival breaker + standing monitor + kill-switch). The single live entry point (NOT `competition-runner.ts`, which is legacy prep scaffolding).
 
 **Built (this prep), cont'd:**
 - **MT5 bridge — DONE** (§7.2): Python sidecar + `Mt5BridgeClient` + `Mt5Adapter` (registered, gate-approved). 15 tests. Validate against the real account via `scripts/dev/mt5/mt5-smoke.ts`; wire to Syphonix's MT5 creds on the 18th (just swap the sidecar env).
 
 **Open / TODO:**
-- **Dry-run cost layer** — add spread + slippage (no commission/swap) for fidelity.
-- **Strategy selection (Track B)** — validate signals on the real historical parquet (+ own crypto data) with purged-CV / walk-forward / deflated-Sharpe.
-- **Posture tuning** — sweep `COMPETITION_RISK_AGGRESSIVE` against the official Final Score on real data.
+- **Wire the live peer-return board** — populate `$COMP_PEER_RETURNS_PATH` from the Round-1–3 leaderboard so the standing calibrates to real rank and the endgame sleeve arms (§9 / OPERATIONS §9.2). Launch-gated.
+- **Confirm at login** — exact tradeable list + contract specs, the `BARUSD` symbol string, and whether swap/financing applies (then enable it in the cost model).
 - **Tech-setup deck (Track C)** — structured to the 3 judging axes + Anthropic-bounty angle.
+
+> Done since the earlier draft: the dry-run cost layer (spread + slippage; swap gated on confirmation), the survive-and-rank posture freeze, and the full MT5 live path. Strategy selection ran (exhaustive alpha search → no cost-clearing edge → the survive-and-rank posture).
 
 **To CONFIRM on the platform:**
 - [x] Current scoring formula + risk limits on the Rules tab — **confirmed 2026-06-16**: 70/15/10/5 unchanged; §17 Best Sharpe Award added.

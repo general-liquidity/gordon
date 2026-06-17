@@ -92,6 +92,7 @@ The client defaults `baseUrl` to `http://127.0.0.1:${MT5_BRIDGE_PORT|8788}` and 
 | `COMP_FLATTEN_FLAG` | path to the **kill-switch flag file** — `touch` it to flatten the whole book, `rm` it to resume (Section 7) |
 | `COMP_ALERT_PATH` | file the **critical-event alerts** append to (default `comp-alerts.log`) — `tail -f` it so you're not tied to the screen 24/7 |
 | `COMP_FIELD_N` / `COMP_CUT_PCT` | field size (default 500) + cut percentile (default 0.8) for the standing's rank estimates |
+| `COMP_PEER_RETURNS_PATH` | JSON file of peer return fractions from the leaderboard (operator-maintained). Calibrates the standing to **real** rank and **arms the Round-3 endgame sleeve**; absent ⇒ endgame gated off (§9.2) |
 | `GORDON_COMP_FLATTEN` | set to `1` as an alternative process-level kill-switch (flattens every cycle) |
 
 > Convert the BST round times to epoch-ms before launch. `COMP_CUT_MS = Date.parse("2026-06-24T22:00:00+01:00")`, `COMP_DEADLINE_MS = Date.parse("2026-06-26T22:00:00+01:00")`.
@@ -259,8 +260,9 @@ The finals are **blind** and the window is 5 days; the judgment calls must be pr
   - **Wide (> ~4 bps)** → it's the **~0 relative-rank play**: still run it (smooth + survive wins the DD/Sharpe ranks vs a gambling field), but consider pruning the widest-spread pairs from the RV clusters.
 - **Confirm the survive-and-rank preset** (`COMPETITION_RISK_SURVIVAL`) — do NOT swap to AGGRESSIVE for the core; the sanctioned return-gamble is the *sleeve*, ring-fenced.
 
-### 9.2 Calibrate the field (once Round-1/2 peer data is visible)
-- Rounds 1–3 expose peer returns at 5-min latency (§8). Feed them through `standingFieldCalibrator.calibrateReturnField(peerReturns)` and pass the result as the standing's `field` (and, if peer equity curves are exposed, `sharpeField`/`drawdownField` via `calibrateMetricField`). This replaces the placeholder gambling-field models so **the standing's rank — and the clears-cut decision — become real, not modeled.** Until then, treat the rank estimates as indicative.
+### 9.2 Calibrate the field (once Round-1/2 peer data is visible) — and ARM the endgame sleeve
+- Rounds 1–3 expose peer returns at 5-min latency (§8). **Write those peer return fractions into `$COMP_PEER_RETURNS_PATH`** as a JSON array (e.g. `[0.021, -0.08, 0.15, ...]`) and keep it refreshed. The live runner reads it each cycle, calibrates the field via `standingFieldCalibrator`, and uses it for BOTH the standing readout and the sleeve decision — so **the rank and the clears-cut call become real, not modeled**, and the **endgame sleeve becomes armed**.
+- **This file is the switch for the Round-3 endgame sleeve.** No file ⇒ the runner keeps the placeholder model and the endgame stays gated OFF (finals-only) — a deliberate safety default so the one-shot never auto-deploys on a guess. Populate it before the Round-3 endgame.
 
 ### 9.3 The sleeve decision (the one controllable lever)
 
@@ -268,7 +270,7 @@ The finals are **blind** and the window is 5 days; the judgment calls must be pr
 |---|---|---|
 | **Rounds 1–2** | any | **HOLD the sleeve.** Survive, let the core run, preserve the one-shot. |
 | **Round 3 (endgame)** | clearing the Top-100 line | **HOLD** — you'll make the finals; save the sleeve for the #1 push. |
-| **Round 3 (endgame)** | BELOW the Top-100 line | **DEPLOY** — the core won't close the gap; the endgame sleeve fires automatically (driven by `COMP_CUT_MS`) to climb into the finals. |
+| **Round 3 (endgame)** | BELOW the Top-100 line | **DEPLOY** — the core won't close the gap. The endgame sleeve auto-fires **only when the peer-return board (`$COMP_PEER_RETURNS_PATH`) is wired** (it calibrates the standing to real rank); **without it the endgame is gated OFF** (finals-only) and clearing the cut is a manual call — so in Round 3, keep that file populated from the leaderboard (§9.2). |
 | **Finals** | in a prize slot (top of field) | **HOLD / lock in** — protect the slot; swinging is dominated. |
 | **Finals** | mid / lagging | **DEPLOY** — swing for #1; nothing to lose on rank. |
 
