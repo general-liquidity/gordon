@@ -238,13 +238,21 @@ export class BarbellLiveRunner {
     this.client = client;
     this.cfg = cfg;
     this.log = log;
-    // Restart-safe: reload the equity + risk history so the standing/Sharpe survives a restart.
+    // Restart-safe: reload the equity/risk history + RV hysteresis state so the standing/Sharpe
+    // and the low-churn pair holds survive a restart.
     if (cfg.statePath && existsSync(cfg.statePath)) {
       try {
-        const s = JSON.parse(readFileSync(cfg.statePath, "utf8")) as { equityHistory?: number[]; riskHistory?: RiskSample[] };
+        const s = JSON.parse(readFileSync(cfg.statePath, "utf8")) as { equityHistory?: number[]; riskHistory?: RiskSample[]; rvState?: unknown };
         if (Array.isArray(s.equityHistory)) this.equityHistory.push(...s.equityHistory.filter((x) => Number.isFinite(x)));
         if (Array.isArray(s.riskHistory)) this.riskHistory.push(...s.riskHistory);
-        this.log(`[barbell] restored ${this.equityHistory.length} equity samples from ${cfg.statePath}`);
+        if (Array.isArray(s.rvState)) {
+          for (const entry of s.rvState) {
+            if (!Array.isArray(entry) || typeof entry[0] !== "string" || typeof entry[1] !== "number" || !Number.isFinite(entry[1])) continue;
+            const side = Math.sign(entry[1]);
+            if (side !== 0) this.rvState.set(entry[0], side);
+          }
+        }
+        this.log(`[barbell] restored ${this.equityHistory.length} equity samples + ${this.rvState.size} RV states from ${cfg.statePath}`);
       } catch (err) {
         this.log(`[barbell] could not restore state (${(err as Error).message}); starting fresh`);
       }
@@ -272,12 +280,15 @@ export class BarbellLiveRunner {
     else this.log(`[ALERT:${level.toUpperCase()}] ${event} — ${detail}`);
   }
 
-  /** Persist the equity + risk history (best-effort; never throws into the loop). */
+  /** Persist the equity/risk history + RV hysteresis state (best-effort; never throws into the loop). */
   private persistState(): void {
     if (!this.cfg.statePath) return;
     try {
       mkdirSync(dirname(this.cfg.statePath), { recursive: true }); // ensure the parent dir exists
-      writeFileSync(this.cfg.statePath, JSON.stringify({ equityHistory: this.equityHistory, riskHistory: this.riskHistory }));
+      const rvState = [...this.rvState.entries()]
+        .filter(([, side]) => side !== 0)
+        .map(([key, side]) => [key, Math.sign(side)]);
+      writeFileSync(this.cfg.statePath, JSON.stringify({ equityHistory: this.equityHistory, riskHistory: this.riskHistory, rvState }));
     } catch (err) {
       // best-effort persistence — a write failure must never break the loop, but surface it ONCE
       // (a silently-failing persist would mean a restart loses the standing without warning).

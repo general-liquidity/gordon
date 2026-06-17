@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect } from "bun:test";
 import { aggregateTargetNotionals, reconcile, BarbellLiveRunner, type Mt5Like, type AlertEvent } from "./barbellLiveRunner.ts";
-import type { BarbellDecision } from "./barbellStrategy.ts";
+import { BARBELL_CONFIG, type BarbellDecision } from "./barbellStrategy.ts";
 import type { Mt5Account, Mt5Bar, Mt5OrderRequest, Mt5OrderResult, Mt5Position, Mt5Quote } from "../../broker/mt5/bridgeClient.ts";
 import type { ContractSpec } from "./liveTrader.ts";
 import { existsSync, readFileSync, rmSync } from "node:fs";
@@ -91,14 +91,28 @@ describe("BarbellLiveRunner — survival circuit breaker", () => {
   });
   const bars = (): Mt5Bar[] =>
     Array.from({ length: 120 }, (_, i) => ({ time: i, open: 100, high: 101, low: 99, close: 100 + Math.sin(i / 3), tickVolume: 1, spread: 1, realVolume: 0 }) as Mt5Bar);
+  const rvBarsForZ = (lastSpread: number): Record<string, Mt5Bar[]> => {
+    const spread: number[] = [];
+    for (let i = 0; i < 120; i++) spread.push((i % 2 === 0 ? 1 : -1) * 0.005);
+    spread[spread.length - 1] = lastSpread;
+    return {
+      BTCUSD: spread.map((s, i) => ({ time: i * 900, open: Math.exp(s), high: Math.exp(s), low: Math.exp(s), close: Math.exp(s), tickVolume: 1, spread: 1, realVolume: 0 }) as Mt5Bar),
+      ETHUSD: spread.map((_, i) => ({ time: i * 900, open: 1, high: 1, low: 1, close: 1, tickVolume: 1, spread: 1, realVolume: 0 }) as Mt5Bar),
+    };
+  };
 
   class FakeClient implements Mt5Like {
     placed: Mt5OrderRequest[] = [];
-    constructor(private acc: Mt5Account, private posList: Mt5Position[], private thin: Set<string> = new Set()) {}
+    constructor(
+      private acc: Mt5Account,
+      private posList: Mt5Position[],
+      private thin: Set<string> = new Set(),
+      private barsBySymbol: Record<string, Mt5Bar[]> = {},
+    ) {}
     async account(): Promise<Mt5Account> { return this.acc; }
     async positions(): Promise<Mt5Position[]> { return this.posList; }
     async quote(symbol: string): Promise<Mt5Quote> { return quote(symbol, 100); }
-    async bars(params: { symbol: string }): Promise<Mt5Bar[]> { return this.thin.has(params.symbol) ? [] : bars(); }
+    async bars(params: { symbol: string }): Promise<Mt5Bar[]> { return this.thin.has(params.symbol) ? [] : (this.barsBySymbol[params.symbol] ?? bars()); }
     async placeOrder(req: Mt5OrderRequest): Promise<Mt5OrderResult> { this.placed.push(req); return { executed: true, order: 1 }; }
   }
 
@@ -207,6 +221,39 @@ describe("BarbellLiveRunner — survival circuit breaker", () => {
     const logs: string[] = [];
     new BarbellLiveRunner(client, { ...runnerCfg, statePath }, (m) => logs.push(m));
     expect(logs.some((l) => l.includes("restored") && l.includes("equity samples"))).toBe(true);
+    rmSync(statePath, { force: true });
+  });
+
+  it("persists RV hysteresis state so a restart keeps holding through the reversion band", async () => {
+    delete process.env.GORDON_LIVE_TRADING;
+    const statePath = join(tmpdir(), "barbell-rv-state-test.json");
+    rmSync(statePath, { force: true });
+    const cfg = {
+      ...runnerCfg,
+      phase: () => "pre_cut" as const,
+      statePath,
+      barbellConfig: {
+        ...BARBELL_CONFIG,
+        sleeveFraction: 0,
+        core: "rv" as const,
+        rvConfig: {
+          ...BARBELL_CONFIG.rvConfig,
+          clusters: [["BTCUSD", "ETHUSD"]],
+          lookback: 48,
+          entryZ: 2.0,
+          exitZ: 0.5,
+          maxPairs: 1,
+          minObs: 60,
+        },
+      },
+    };
+
+    await new BarbellLiveRunner(new FakeClient(acct({ margin_level: 300, margin: 0 }), [], new Set(), rvBarsForZ(0.03)), cfg, () => {}).runCycle();
+    const saved = JSON.parse(readFileSync(statePath, "utf8")) as { rvState: Array<[string, number]> };
+    expect(saved.rvState).toContainEqual(["BTCUSD/ETHUSD", -1]);
+
+    const restarted = await new BarbellLiveRunner(new FakeClient(acct({ margin_level: 300, margin: 0 }), [], new Set(), rvBarsForZ(0.006)), cfg, () => {}).runCycle();
+    expect(restarted.orders.some((o) => o.symbol === "BTCUSD" && o.action === "dry")).toBe(true);
     rmSync(statePath, { force: true });
   });
 });

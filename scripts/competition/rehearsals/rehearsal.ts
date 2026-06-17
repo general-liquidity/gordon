@@ -321,7 +321,7 @@ export class ReplayMt5 implements Mt5Like {
 // Data loading + contract spec defaults.
 // ---------------------------------------------------------------------------
 
-const BARS_DIR = join(import.meta.dir, "..", "..", "data", "momq", "bars");
+const BARS_DIR = join(process.cwd(), "data", "momq", "bars");
 
 export function loadBars(symbol: string): Mt5Bar[] {
   const path = join(BARS_DIR, `${symbol}_M15.json`);
