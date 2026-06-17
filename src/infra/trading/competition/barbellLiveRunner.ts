@@ -179,6 +179,20 @@ export interface BarbellRunnerConfig {
    * by `GORDON_COMP_FLATTEN=1`. Touch the file to flatten; remove it to resume.
    */
   flattenFlagPath?: string;
+  /**
+   * Critical-event sink — fired on breaker trips, kill-switch, margin pressure, sleeve deploy, and
+   * order failures (so the operator doesn't have to watch 24/7). Omit → alerts fall back to `log`
+   * with a loud `[ALERT]` prefix. Alerts fire on TRANSITION into a condition, not every cycle.
+   */
+  alert?: (a: AlertEvent) => void;
+  /** Margin level (percent) below which a MARGIN_PRESSURE warn fires (above the breaker). Default 80. */
+  warnMarginLevelPct?: number;
+}
+
+export interface AlertEvent {
+  level: "warn" | "critical";
+  event: string;
+  detail: string;
 }
 
 export interface BarbellCycleReport {
@@ -210,6 +224,11 @@ export class BarbellLiveRunner {
   private readonly riskHistory: RiskSample[] = [];
   /** Realized-slippage accountant — records every fill vs the pre-trade mid to validate cost live. */
   private readonly slippage = new SlippageTracker();
+  /** Alert edge-detection state (fire on transition INTO a condition, not every cycle). */
+  private alertedBreaker = false;
+  private alertedFlatten = false;
+  private alertedMargin = false;
+  private lastSleeveActive = false;
 
   constructor(client: Mt5Like, cfg: BarbellRunnerConfig, log: (m: string) => void = (m) => console.log(m)) {
     this.client = client;
@@ -241,6 +260,12 @@ export class BarbellLiveRunner {
   private manualFlattenActive(): boolean {
     if (process.env.GORDON_COMP_FLATTEN === "1") return true;
     return this.cfg.flattenFlagPath ? existsSync(this.cfg.flattenFlagPath) : false;
+  }
+
+  /** Fire a critical-event alert (to the sink, or a loud log fallback). */
+  private emitAlert(level: AlertEvent["level"], event: string, detail: string): void {
+    if (this.cfg.alert) this.cfg.alert({ level, event, detail });
+    else this.log(`[ALERT:${level.toUpperCase()}] ${event} — ${detail}`);
   }
 
   /** Persist the equity + risk history (best-effort; never throws into the loop). */
@@ -294,6 +319,16 @@ export class BarbellLiveRunner {
     });
     const manualFlatten = this.manualFlattenActive();
 
+    // Critical-event alerts (edge-detected — fire on transition INTO the condition).
+    if (breaker.tripped && !this.alertedBreaker) this.emitAlert("critical", "SURVIVAL_BREAKER", breaker.reason);
+    this.alertedBreaker = breaker.tripped;
+    if (manualFlatten && !this.alertedFlatten) this.emitAlert("critical", "KILL_SWITCH", "manual flatten active — book being flattened");
+    this.alertedFlatten = manualFlatten;
+    const warnLevel = this.cfg.warnMarginLevelPct ?? 80;
+    const marginPressure = account.margin > 0 && account.margin_level > 0 && account.margin_level <= warnLevel && !breaker.tripped;
+    if (marginPressure && !this.alertedMargin) this.emitAlert("warn", "MARGIN_PRESSURE", `margin level ${account.margin_level.toFixed(1)}% ≤ ${warnLevel}% (stop-out 30% = elimination)`);
+    this.alertedMargin = marginPressure;
+
     let targets: Record<string, number>;
     let decisionReason: string;
     if (breaker.tripped || manualFlatten) {
@@ -301,6 +336,7 @@ export class BarbellLiveRunner {
       this.log(`[barbell] ${manualFlatten ? "KILL SWITCH" : "SURVIVAL CIRCUIT BREAKER"} — ${why}`);
       targets = {}; // flatten everything
       decisionReason = why;
+      this.lastSleeveActive = false;
     } else {
       const decision = barbellDecision({
         barsBySymbol: availableBars,
@@ -315,6 +351,9 @@ export class BarbellLiveRunner {
       });
       targets = aggregateTargetNotionals(decision);
       decisionReason = decision.reason;
+      const sleeveActive = decision.sleeve != null;
+      if (sleeveActive && !this.lastSleeveActive) this.emitAlert("warn", "SLEEVE_DEPLOYED", decision.sleeve!.reason);
+      this.lastSleeveActive = sleeveActive;
     }
 
     const positions = await this.client.positions();
@@ -366,6 +405,9 @@ export class BarbellLiveRunner {
         orders.push({ ...o, lots, action: "error", detail: (err as Error).message });
       }
     }
+
+    const orderIssues = orders.filter((o) => o.action === "refused" || o.action === "error").length;
+    if (orderIssues > 0 && armed) this.emitAlert("warn", "ORDER_ISSUE", `${orderIssues} order(s) refused/errored this cycle`);
 
     // ── Live risk sample (§13 inputs) + standing, computed from the actual book. ──
     const signedBySym: Record<string, number> = {};

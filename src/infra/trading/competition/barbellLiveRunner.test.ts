@@ -1,8 +1,11 @@
 import { afterEach, describe, it, expect } from "bun:test";
-import { aggregateTargetNotionals, reconcile, BarbellLiveRunner, type Mt5Like } from "./barbellLiveRunner.ts";
+import { aggregateTargetNotionals, reconcile, BarbellLiveRunner, type Mt5Like, type AlertEvent } from "./barbellLiveRunner.ts";
 import type { BarbellDecision } from "./barbellStrategy.ts";
 import type { Mt5Account, Mt5Bar, Mt5OrderRequest, Mt5OrderResult, Mt5Position, Mt5Quote } from "../../broker/mt5/bridgeClient.ts";
 import type { ContractSpec } from "./liveTrader.ts";
+import { existsSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 function decision(over: Partial<BarbellDecision>): BarbellDecision {
   return {
@@ -113,6 +116,7 @@ describe("BarbellLiveRunner — survival circuit breaker", () => {
   afterEach(() => {
     if (ORIGINAL === undefined) delete process.env.GORDON_LIVE_TRADING;
     else process.env.GORDON_LIVE_TRADING = ORIGINAL;
+    delete process.env.GORDON_COMP_FLATTEN;
   });
 
   it("trips at a low margin level and FLATTENS the open book (targets → 0)", async () => {
@@ -153,5 +157,41 @@ describe("BarbellLiveRunner — survival circuit breaker", () => {
     const report = await new BarbellLiveRunner(client, runnerCfg, (m) => logs.push(m)).runCycle();
     expect(report.breakerTripped).toBe(false);
     expect(logs.some((l) => l.includes("Excluded") && l.includes("ETHUSD"))).toBe(true);
+  });
+
+  it("fires a CRITICAL alert when the survival breaker trips", async () => {
+    delete process.env.GORDON_LIVE_TRADING;
+    const alerts: AlertEvent[] = [];
+    const client = new FakeClient(acct({ margin_level: 40, margin: 1e4, equity: 4e5 }), [pos("BTCUSD", "long", 1.0)]);
+    await new BarbellLiveRunner(client, { ...runnerCfg, alert: (a) => alerts.push(a) }, () => {}).runCycle();
+    expect(alerts.some((a) => a.level === "critical" && a.event === "SURVIVAL_BREAKER")).toBe(true);
+  });
+
+  it("kill-switch (GORDON_COMP_FLATTEN) flattens the book + fires a CRITICAL alert", async () => {
+    delete process.env.GORDON_LIVE_TRADING;
+    process.env.GORDON_COMP_FLATTEN = "1";
+    const alerts: AlertEvent[] = [];
+    const client = new FakeClient(acct({ margin_level: 300, margin: 1e4 }), [pos("BTCUSD", "long", 1.0)]);
+    const report = await new BarbellLiveRunner(client, { ...runnerCfg, alert: (a) => alerts.push(a) }, () => {}).runCycle();
+    expect(report.manualFlatten).toBe(true);
+    expect(report.decisionReason).toContain("KILL SWITCH");
+    expect(alerts.some((a) => a.event === "KILL_SWITCH")).toBe(true);
+    expect(report.orders.find((o) => o.symbol === "BTCUSD")?.side).toBe("sell"); // flatten the long
+  });
+
+  it("persists equity history to statePath and reloads it on restart", async () => {
+    delete process.env.GORDON_LIVE_TRADING;
+    const statePath = join(tmpdir(), "barbell-persist-test.json");
+    rmSync(statePath, { force: true });
+    const client = new FakeClient(acct({ margin_level: 300, margin: 0 }), []);
+    await new BarbellLiveRunner(client, { ...runnerCfg, statePath }, () => {}).runCycle();
+    expect(existsSync(statePath)).toBe(true);
+    const saved = JSON.parse(readFileSync(statePath, "utf8")) as { equityHistory: number[] };
+    expect(saved.equityHistory.length).toBeGreaterThan(0);
+    // a fresh runner with the same statePath restores the history (logged on construct)
+    const logs: string[] = [];
+    new BarbellLiveRunner(client, { ...runnerCfg, statePath }, (m) => logs.push(m));
+    expect(logs.some((l) => l.includes("restored") && l.includes("equity samples"))).toBe(true);
+    rmSync(statePath, { force: true });
   });
 });

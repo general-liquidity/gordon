@@ -26,6 +26,7 @@
  * Unset either ⇒ read-only: deltas are computed + logged (DRY), nothing is sent.
  */
 
+import { appendFileSync } from "node:fs";
 import { Mt5BridgeClient } from "../../src/infra/broker/mt5/bridgeClient.ts";
 import {
   CompetitionLiveTrader,
@@ -114,6 +115,18 @@ async function bootstrap(): Promise<void> {
     barsToDeadline: () => (deadlineMs > 0 ? Math.max(1, Math.round((deadlineMs - Date.now()) / M15_MS)) : 480),
     // Bars to the Top-100 cut — enables the pre-finals endgame sleeve + the standing readout.
     barsToCut: () => (cutMs > 0 ? Math.max(0, Math.round((cutMs - Date.now()) / M15_MS)) : Number.POSITIVE_INFINITY),
+    // Restart-safe state + manual kill-switch flag file (operator panic-button) + critical alerts.
+    statePath: process.env.COMP_STATE_PATH,
+    flattenFlagPath: process.env.COMP_FLATTEN_FLAG,
+    alert: (a) => {
+      const line = `${new Date().toISOString()} [${a.level.toUpperCase()}] ${a.event} — ${a.detail}`;
+      console.log(`\n🚨 ${line}\n`);
+      try {
+        appendFileSync(process.env.COMP_ALERT_PATH ?? "comp-alerts.log", line + "\n");
+      } catch {
+        /* alert file best-effort */
+      }
+    },
   });
 
   console.log(
