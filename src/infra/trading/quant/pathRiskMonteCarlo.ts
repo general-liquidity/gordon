@@ -122,6 +122,67 @@ export function garchPath(returns: number[], pathLen: number, rng: () => number)
   return out;
 }
 
+/**
+ * Antithetic GARCH pair (variance reduction). Generates two paths driven by NEGATIVELY
+ * CORRELATED innovations, so averaging over pairs cuts the variance of MEAN-type estimators
+ * (expected return, expected shortfall) — the classic antithetic win.
+ *
+ * The naive antithetic (reflect each return about μ: rₜ → 2μ − rₜ) is WRONG here: it is only
+ * unbiased when the innovation distribution is symmetric, and real standardized residuals are
+ * skewed — so the reflection biases the mean. Instead we antithetic the UNIFORM draw via the
+ * inverse-CDF: with the residual pool sorted ascending, path A draws residual zₛ[⌊u·L⌋] and
+ * path B draws zₛ[⌊(1−u)·L⌋]. Both u and 1−u are Uniform(0,1), so EACH path is still a valid
+ * draw from the empirical residual distribution (unbiased, fat tails + skew intact); but
+ * because the pool is sorted, u↔1−u pairs low residuals with high ones → the two paths are
+ * negatively correlated. Each path runs its own variance recursion (the realistic vol paths
+ * differ), which is correct.
+ *
+ * It does NOT meaningfully tighten the drawdown QUANTILES: max-drawdown is a non-monotone path
+ * functional, so the pair isn't negatively correlated in drawdown. That asymmetry is why this
+ * feeds only the mean-type outputs. (No antithetic for the iid / stationary bootstraps — they
+ * resample real returns by index; the inverse-CDF trick is GARCH-only.)
+ */
+export function garchAntitheticPair(returns: number[], pathLen: number, rng: () => number): [number[], number[]] {
+  const fit = fitGarch(returns);
+  if (!fit || !(fit.currentVariance > 0)) {
+    const mb = Math.max(2, Math.round(Math.sqrt(returns.length)));
+    return [stationaryBootstrap(returns, pathLen, mb, rng), stationaryBootstrap(returns, pathLen, mb, rng)];
+  }
+  const mu = returns.reduce((a, b) => a + b, 0) / returns.length;
+  const { omega, alpha, beta } = fit.params;
+  const z: number[] = [];
+  for (let i = 0; i < returns.length; i++) {
+    const sd = Math.sqrt(fit.conditionalVariance[i] ?? fit.currentVariance);
+    if (sd > 0) z.push((returns[i]! - mu) / sd);
+  }
+  z.sort((p, q) => p - q); // sorted pool → inverse-CDF antithetic on the uniform draw
+  const L = z.length;
+  const floorVar = (): number => (fit.longRunVariance > 0 ? fit.longRunVariance : 1e-12);
+
+  const a = new Array<number>(pathLen);
+  const b = new Array<number>(pathLen);
+  let varA = fit.currentVariance;
+  let varB = fit.currentVariance;
+  let ps2A = fit.currentVariance;
+  let ps2B = fit.currentVariance;
+  for (let i = 0; i < pathLen; i++) {
+    const u = rng();
+    const za = L > 1 ? z[Math.min(L - 1, Math.floor(u * L))]! : gauss(rng);
+    const zb = L > 1 ? z[Math.min(L - 1, Math.floor((1 - u) * L))]! : -za;
+    varA = omega + alpha * ps2A + beta * varA;
+    if (!(varA > 0)) varA = floorVar();
+    varB = omega + alpha * ps2B + beta * varB;
+    if (!(varB > 0)) varB = floorVar();
+    const shockA = Math.sqrt(varA) * za;
+    const shockB = Math.sqrt(varB) * zb;
+    a[i] = mu + shockA;
+    b[i] = mu + shockB;
+    ps2A = shockA * shockA;
+    ps2B = shockB * shockB;
+  }
+  return [a, b];
+}
+
 // ── Aggregation ────────────────────────────────────────────────────────────────
 
 export type ResampleMethod = "iid" | "stationary" | "garch";
@@ -137,6 +198,13 @@ export interface PathRiskConfig {
   ruinDrawdown?: number;
   /** RNG seed. Default 12345. */
   seed?: number;
+  /**
+   * Antithetic variance reduction (GARCH method only; ignored otherwise). Generates paths in
+   * mirrored pairs so the MEAN-type estimators (`expectedReturn`, `expectedShortfall5`)
+   * converge with a lower standard error for the same path count. Default false (off), so
+   * the drawdown distribution + all percentiles stay byte-identical to a plain run.
+   */
+  antithetic?: boolean;
 }
 
 export interface PathRiskResult {
@@ -155,12 +223,48 @@ export interface PathRiskResult {
   drawdownWorst: number;
   /** Fraction of paths whose drawdown exceeded `ruinDrawdown`. */
   probRuin: number;
+  /** Mean total return across paths (a mean estimator — sharpened by antithetic). */
+  expectedReturn: number;
+  /** Expected shortfall (CVaR) at 5%: the mean total return of the worst 5% of paths. */
+  expectedShortfall5: number;
+  /**
+   * Standard error of `expectedReturn`. With `antithetic`, computed over mirrored-pair
+   * means (the honest SE of the antithetic estimator), so it drops below the plain
+   * √-law SE for the same path count — that gap IS the variance reduction.
+   */
+  returnStdError: number;
+  /** Whether antithetic variance reduction was applied (GARCH only). */
+  antithetic: boolean;
 }
 
 function percentile(sorted: number[], q: number): number {
   if (sorted.length === 0) return NaN;
   const i = Math.min(sorted.length - 1, Math.max(0, Math.floor(q * (sorted.length - 1))));
   return sorted[i]!;
+}
+
+const arrMean = (xs: number[]): number => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+
+/** Standard error of the mean: √(sample-variance / n). */
+function plainStdError(xs: number[]): number {
+  if (xs.length < 2) return 0;
+  const m = arrMean(xs);
+  const v = xs.reduce((s, x) => s + (x - m) ** 2, 0) / (xs.length - 1);
+  return Math.sqrt(v / xs.length);
+}
+
+/**
+ * Standard error of the antithetic mean estimator: treat each mirrored pair's average as
+ * one iid observation, so the negative within-pair correlation is folded into a lower SE.
+ * `xs` must be in generation order [a₀, b₀, a₁, b₁, …].
+ */
+function pairedStdError(xs: number[]): number {
+  const pairMeans: number[] = [];
+  for (let k = 0; k + 1 < xs.length; k += 2) pairMeans.push((xs[k]! + xs[k + 1]!) / 2);
+  if (pairMeans.length < 2) return 0;
+  const m = arrMean(pairMeans);
+  const v = pairMeans.reduce((s, x) => s + (x - m) ** 2, 0) / (pairMeans.length - 1);
+  return Math.sqrt(v / pairMeans.length);
 }
 
 function resample(method: ResampleMethod, returns: number[], pathLen: number, meanBlock: number, rng: () => number): number[] {
@@ -171,24 +275,45 @@ function resample(method: ResampleMethod, returns: number[], pathLen: number, me
 
 /** Run the path-risk Monte Carlo for one resampling method. */
 export function monteCarloPathRisk(returns: number[], method: ResampleMethod, config: PathRiskConfig = {}): PathRiskResult {
-  const nPaths = config.nPaths ?? 10_000;
+  const nPathsReq = config.nPaths ?? 10_000;
   const pathLen = config.pathLen ?? returns.length;
   const meanBlock = config.meanBlock ?? Math.max(2, Math.round(Math.sqrt(returns.length)));
   const ruin = config.ruinDrawdown ?? 0.2;
   const rng = makeRng(config.seed ?? 12345);
+  const useAntithetic = (config.antithetic ?? false) && method === "garch";
 
-  const rets: number[] = [];
+  const retsRaw: number[] = []; // generation order — preserved for the paired SE
   const dds: number[] = [];
   let ruinCount = 0;
-  for (let p = 0; p < nPaths; p++) {
-    const path = resample(method, returns, pathLen, meanBlock, rng);
-    rets.push(pathTotalReturn(path));
+  const record = (path: number[]): void => {
+    retsRaw.push(pathTotalReturn(path));
     const dd = pathMaxDrawdown(path);
     dds.push(dd);
     if (dd > ruin) ruinCount++;
+  };
+
+  let nPaths: number;
+  if (useAntithetic) {
+    const nPairs = Math.max(1, Math.floor(nPathsReq / 2));
+    nPaths = nPairs * 2;
+    for (let p = 0; p < nPairs; p++) {
+      const [a, b] = garchAntitheticPair(returns, pathLen, rng);
+      record(a);
+      record(b);
+    }
+  } else {
+    nPaths = nPathsReq;
+    for (let p = 0; p < nPaths; p++) record(resample(method, returns, pathLen, meanBlock, rng));
   }
-  rets.sort((a, b) => a - b);
+
+  // Mean-type estimators (computed in generation order — this is where antithetic pays off).
+  const expectedReturn = arrMean(retsRaw);
+  const returnStdError = useAntithetic ? pairedStdError(retsRaw) : plainStdError(retsRaw);
+
+  const rets = [...retsRaw].sort((a, b) => a - b);
   dds.sort((a, b) => a - b);
+  const tailN = Math.max(1, Math.ceil(0.05 * rets.length));
+  const expectedShortfall5 = arrMean(rets.slice(0, tailN)); // CVaR₅: mean of the worst 5% paths
 
   return {
     method,
@@ -202,6 +327,10 @@ export function monteCarloPathRisk(returns: number[], method: ResampleMethod, co
     drawdownP99: percentile(dds, 0.99),
     drawdownWorst: dds[dds.length - 1]!,
     probRuin: ruinCount / nPaths,
+    expectedReturn,
+    expectedShortfall5,
+    returnStdError,
+    antithetic: useAntithetic,
   };
 }
 
