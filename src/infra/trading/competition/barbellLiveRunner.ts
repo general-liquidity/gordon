@@ -38,8 +38,9 @@ import type { RiskSample } from "../../../core/risk-management/competition-scori
 import { clampToDepth } from "./depthSizing.ts";
 import { SlippageTracker } from "./slippageTracker.ts";
 import { calibrateReturnField } from "./standingFieldCalibrator.ts";
+import { makerLimitPrice, unhedgeCompletion, type MakerLeg } from "./makerExecution.ts";
 import type { FieldModel } from "./rankTracker.ts";
-import type { Mt5Depth } from "../../broker/mt5/bridgeClient.ts";
+import type { Mt5Depth, Mt5Order } from "../../broker/mt5/bridgeClient.ts";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { filterToAvailableSymbols, formatExcludedNote } from "./dataAvailability.ts";
@@ -53,6 +54,9 @@ export interface Mt5Like {
   placeOrder(req: Mt5OrderRequest): Promise<Mt5OrderResult>;
   /** Optional L2 depth — when present, orders are sized to fillable depth (FOK/IOC safety). */
   depth?(symbol: string): Promise<Mt5Depth>;
+  /** Optional pending-order query + cancel — required for MAKER mode (rest/cancel limit orders). */
+  orders?(): Promise<Mt5Order[]>;
+  cancel?(ticket: number): Promise<Mt5OrderResult>;
 }
 
 // ── Pure core: aggregate the barbell decision into per-symbol signed target notional ──
@@ -190,6 +194,15 @@ export interface BarbellRunnerConfig {
   alert?: (a: AlertEvent) => void;
   /** Margin level (percent) below which a MARGIN_PRESSURE warn fires (above the breaker). Default 80. */
   warnMarginLevelPct?: number;
+  /**
+   * Execution mode (callback, evaluated per cycle so it can be switched live). "taker" (DEFAULT) =
+   * market orders. "maker" = rest LIMIT orders to EARN the spread — only when the book is acceptably
+   * hedged; partial-fill drift past the band falls back to taker that cycle (un-hedge guard). Requires
+   * the bridge's `orders()`+`cancel()`. Validate maker fills with `maker-probe.ts` before switching.
+   */
+  execution?: () => "taker" | "maker";
+  /** Maker only: improve the resting limit toward mid by this many bps (0 = rest at touch, max rebate). */
+  makerInsideBps?: number;
 }
 
 export interface AlertEvent {
@@ -394,6 +407,28 @@ export class BarbellLiveRunner {
     const orders: BarbellCycleReport["orders"] = [];
     let ordersPlaced = 0;
 
+    // ── Execution mode + un-hedge guard (maker only; taker is the default, go-live posture). ──
+    const execution = armed && this.client.orders && this.client.cancel ? (this.cfg.execution?.() ?? "taker") : "taker";
+    let makerActive = false;
+    if (execution === "maker") {
+      // Cancel our prior resting limits — re-post fresh toward the CURRENT targets each cycle.
+      try {
+        for (const p of await this.client.orders!()) await this.client.cancel!(p.ticket);
+      } catch (err) {
+        this.log(`[barbell] maker: cancel-pending failed (${(err as Error).message})`);
+      }
+      // Un-hedge guard (tested module): if partial fills left the book net-directional past the band,
+      // this returns completion orders → fall back to TAKER this cycle to lock neutrality; [] ⇒ rest as maker.
+      const signedPos = (sym: string): number => {
+        let n = 0;
+        for (const p of positions) if (p.symbol === sym) n += (p.sideLabel === "long" ? 1 : -1) * Math.abs(p.volume) * mid(sym, p.price_current) * (this.cfg.contracts[sym]?.contractSize ?? 1);
+        return n;
+      };
+      const legs: MakerLeg[] = this.cfg.symbols.map((s) => ({ symbol: s, targetNotional: targets[s] ?? 0, filledNotional: signedPos(s) }));
+      makerActive = unhedgeCompletion(legs).length === 0;
+      if (!makerActive) this.log(`[barbell] maker: net drift past band → taker-completing to restore neutrality this cycle`);
+    }
+
     for (const o of recon) {
       if (!armed) {
         orders.push({ ...o, action: "dry" });
@@ -421,19 +456,37 @@ export class BarbellLiveRunner {
         }
       }
       const refMid = mid(o.symbol, 0);
-      try {
-        const res = await this.client.placeOrder({ symbol: o.symbol, side: o.side, type: "market", volume: lots });
-        if (res.executed) {
-          ordersPlaced += 1;
-          if (res.price && res.price > 0 && refMid > 0) {
-            this.slippage.record({ symbol: o.symbol, side: o.side, refPrice: refMid, fillPrice: res.price, volume: res.volume ?? lots });
+      if (makerActive) {
+        // MAKER: rest a passive limit (earn the spread when crossed). "placed" = resting, NOT
+        // necessarily filled — fills appear as positions on a later cycle; no slippage recorded here.
+        const q = quoteBySymbol[o.symbol];
+        const limitPrice = q && q.bid > 0 && q.ask > 0 ? makerLimitPrice(o.side, q, { insideBps: this.cfg.makerInsideBps }) : refMid;
+        try {
+          const res = await this.client.placeOrder({ symbol: o.symbol, side: o.side, type: "limit", price: limitPrice, volume: lots, filling: "return" });
+          if (res.executed || res.order != null) {
+            ordersPlaced += 1;
+            orders.push({ ...o, lots, action: "placed", detail: `maker rest @${limitPrice.toFixed(5)}${detailSuffix}` });
+          } else {
+            orders.push({ ...o, lots, action: "refused", detail: res.guard ?? res.comment ?? "maker limit rejected" });
           }
-          orders.push({ ...o, lots, action: "placed", detail: `order=${res.order ?? "?"}${detailSuffix}` });
-        } else {
-          orders.push({ ...o, lots, action: "refused", detail: res.guard ?? res.comment ?? `retcode ${res.retcode ?? "?"}` });
+        } catch (err) {
+          orders.push({ ...o, lots, action: "error", detail: (err as Error).message });
         }
-      } catch (err) {
-        orders.push({ ...o, lots, action: "error", detail: (err as Error).message });
+      } else {
+        try {
+          const res = await this.client.placeOrder({ symbol: o.symbol, side: o.side, type: "market", volume: lots });
+          if (res.executed) {
+            ordersPlaced += 1;
+            if (res.price && res.price > 0 && refMid > 0) {
+              this.slippage.record({ symbol: o.symbol, side: o.side, refPrice: refMid, fillPrice: res.price, volume: res.volume ?? lots });
+            }
+            orders.push({ ...o, lots, action: "placed", detail: `order=${res.order ?? "?"}${detailSuffix}` });
+          } else {
+            orders.push({ ...o, lots, action: "refused", detail: res.guard ?? res.comment ?? `retcode ${res.retcode ?? "?"}` });
+          }
+        } catch (err) {
+          orders.push({ ...o, lots, action: "error", detail: (err as Error).message });
+        }
       }
     }
 

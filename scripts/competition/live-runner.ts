@@ -191,6 +191,10 @@ async function bootstrap(): Promise<void> {
     // it calibrates the field to real rank. Without COMP_PEER_RETURNS_PATH the endgame stays gated.
     board: peerPath ? () => readPeerReturns(peerPath) : undefined,
     barbellConfig: barbell.config,
+    // Execution: TAKER (default, go-live) | MAKER (rest limits, earn the spread) — switch ONLY after
+    // maker-probe.ts validates live fills. Evaluated per cycle so it can flip live (COMP_EXECUTION).
+    execution: () => (process.env.COMP_EXECUTION === "maker" ? "maker" : "taker"),
+    makerInsideBps: process.env.COMP_MAKER_INSIDE_BPS ? Number(process.env.COMP_MAKER_INSIDE_BPS) : undefined,
     // Restart-safe state + manual kill-switch flag file (operator panic-button) + critical alerts.
     statePath: process.env.COMP_STATE_PATH,
     flattenFlagPath: process.env.COMP_FLATTEN_FLAG,

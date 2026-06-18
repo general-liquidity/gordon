@@ -103,6 +103,8 @@ describe("BarbellLiveRunner — survival circuit breaker", () => {
 
   class FakeClient implements Mt5Like {
     placed: Mt5OrderRequest[] = [];
+    cancelled: number[] = [];
+    pending: { ticket: number }[] = [];
     constructor(
       private acc: Mt5Account,
       private posList: Mt5Position[],
@@ -114,6 +116,8 @@ describe("BarbellLiveRunner — survival circuit breaker", () => {
     async quote(symbol: string): Promise<Mt5Quote> { return quote(symbol, 100); }
     async bars(params: { symbol: string }): Promise<Mt5Bar[]> { return this.thin.has(params.symbol) ? [] : (this.barsBySymbol[params.symbol] ?? bars()); }
     async placeOrder(req: Mt5OrderRequest): Promise<Mt5OrderResult> { this.placed.push(req); return { executed: true, order: 1 }; }
+    async orders() { return this.pending as never[]; }
+    async cancel(ticket: number): Promise<Mt5OrderResult> { this.cancelled.push(ticket); return { executed: true }; }
   }
 
   const runnerCfg = {
@@ -255,5 +259,24 @@ describe("BarbellLiveRunner — survival circuit breaker", () => {
     const restarted = await new BarbellLiveRunner(new FakeClient(acct({ margin_level: 300, margin: 0 }), [], new Set(), rvBarsForZ(0.006)), cfg, () => {}).runCycle();
     expect(restarted.orders.some((o) => o.symbol === "BTCUSD" && o.action === "dry")).toBe(true);
     rmSync(statePath, { force: true });
+  });
+
+  it("TAKER mode (default) places MARKET orders", async () => {
+    process.env.GORDON_LIVE_TRADING = "1";
+    const client = new FakeClient(acct({ margin_level: 300, margin: 0 }), []);
+    await new BarbellLiveRunner(client, runnerCfg, () => {}).runCycle();
+    expect(client.placed.length).toBeGreaterThan(0);
+    expect(client.placed.every((r) => r.type === "market")).toBe(true);
+  });
+
+  it("MAKER mode rests LIMIT orders (filling:return) when the book is hedged, and cancels prior resting", async () => {
+    process.env.GORDON_LIVE_TRADING = "1";
+    const client = new FakeClient(acct({ margin_level: 300, margin: 0 }), []);
+    client.pending = [{ ticket: 99 }]; // a stale resting limit from a prior cycle
+    await new BarbellLiveRunner(client, { ...runnerCfg, execution: () => "maker" as const }, () => {}).runCycle();
+    expect(client.placed.length).toBeGreaterThan(0);
+    expect(client.placed.every((r) => r.type === "limit")).toBe(true);
+    expect(client.placed.every((r) => r.filling === "return")).toBe(true);
+    expect(client.cancelled).toContain(99); // re-posts fresh each cycle
   });
 });
