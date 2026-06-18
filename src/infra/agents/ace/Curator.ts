@@ -24,6 +24,7 @@ import {
 import { listActionLogEntries } from "../../action-log/store.ts";
 import type { ActionLogEntry } from "../../action-log/types.ts";
 import { recordRepropose, rejectedIds } from "./RejectedBuffer.ts";
+import { gateLessonCandidates } from "./regressionGate.ts";
 
 const logger = createModuleLogger("ace-curator");
 
@@ -174,6 +175,15 @@ export function runCurator(reflectorOutput: ReflectorOutput): ACELessonStore {
   });
   scoredCandidates.sort((a, b) => b.score - a.score);
 
+  // REGRESSION GATE (Self-Harness): a self-generated lesson can only promote into the cross-session
+  // prompt if it survives the held-out SAFETY check — reject any lesson that would weaken a
+  // safety-critical action or control BEFORE it can ship. Applies to NEW lessons; merges of
+  // already-curated lessons (which passed the gate when first promoted) are refreshes, not edits.
+  const gateRejected = new Map<string, string>();
+  for (const r of gateLessonCandidates(reflectorOutput.candidates).rejected) {
+    gateRejected.set(lessonId(r.candidate.category, r.candidate.text), r.reason);
+  }
+
   const editBudget = getEditBudget();
   let newAdded = 0;
 
@@ -207,6 +217,13 @@ export function runCurator(reflectorOutput: ReflectorOutput): ACELessonStore {
       // New lessons are budgeted. SkillOpt's "textual learning rate" —
       // takes only the top-N candidates this cycle.
       if (newAdded >= editBudget) continue;
+      // Safety regression gate: a new lesson that would weaken a safety-critical action/control
+      // is NEVER promoted into the cross-session prompt (logged + recorded as rejected).
+      const gateReason = gateRejected.get(id);
+      if (gateReason) {
+        logger.warn("ACE lesson REJECTED by safety regression gate", { id, reason: gateReason });
+        continue;
+      }
       byId.set(id, {
         ...candidate,
         id,
