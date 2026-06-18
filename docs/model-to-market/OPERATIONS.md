@@ -191,6 +191,8 @@ Every ceiling in both presets sits **well under** the §13 thresholds (leverage 
 
 The live runner's loop is **reconnect-tolerant by design** — wrapped in try/catch so a transient bridge/terminal hiccup never throws the loop dead; it logs, backs off, and retries on the next tick. The transport surfaces clear failures: `Mt5BridgeClient` throws `Mt5BridgeError` with `"MT5 bridge unreachable … is mt5_bridge.py running?"` when the sidecar is down, so a dropped sidecar is visible immediately.
 
+> **⚠️ DISCONNECT = NO SAFETY NET (Duncan, confirmed):** if the MT5 terminal disconnects, **open positions REMAIN OPEN — there is no auto-flattening on a client-side disconnect.** So while we're disconnected our **survival breaker cannot run**, and margin can drift toward the 30% stop-out (= elimination) unattended. ⇒ **connection uptime is survival-critical.** Run the box on stable power/network, keep the terminal logged in, and treat any prolonged `bridge unreachable` as a P0 — reconnect FAST, and if you can't, flatten from the MT5 terminal UI or another machine before margin runs down. The breaker only protects us *while connected*.
+
 Monitoring checklist (run continuously):
 
 - **Bridge health** — `GET /health` returns `{ ok, tradingEnabled, account }`. `ok:false` or a missing `account` means the terminal/sidecar lost the connection. `tradingEnabled` must read `true` during the live window (guard #1). The smoke test exercises this path.
