@@ -10,13 +10,21 @@ Launch timestamps (epoch-ms, pre-computed — BST = UTC+1):
 
 ---
 
-## A. Before 22:00 — stage everything (no live MT5 needed yet)
-1. **Windows box** up, clock synced to BST; MT5 terminal installed.
+## A. Before 22:00 — stage + USE THE SETUP WINDOW (live data + test account, trading disabled)
+> Duncan (Discord): tonight you get **live market data + a test account for connectivity/validation**, but **trading is NOT enabled until the competition starts (22:00)**. So the decisive spread read happens HERE, read-only, before any arming pressure.
+1. **Windows box** up, clock synced to BST; MT5 terminal installed + logged into the test account.
 2. **Console** (`https://quanthack.syphonix.com/` → Console): **select & confirm the trading channel (MT5)** → the $1M funds after this.
 3. **Sidecar deps**: `pip install -r scripts/mt5-bridge/requirements.txt` (first time).
-4. **Sidecar env set** (account creds live here ONLY): `MT5_LOGIN/PASSWORD/SERVER`, `MT5_BRIDGE_TOKEN`. Leave `MT5_BRIDGE_ALLOW_TRADING` **unset** for now.
+4. **Sidecar env set** (account creds live here ONLY): `MT5_LOGIN/PASSWORD/SERVER`, `MT5_BRIDGE_TOKEN`. Leave `MT5_BRIDGE_ALLOW_TRADING` **unset** (validate-only).
 5. **`mkdir -p .gordon`** (state + kill-flag + peer-returns live here; already gitignored).
-6. **Dry-run rehearsal** to refresh the muscle memory (safe — in-process sim, never the bridge):
+6. **Validate READ-ONLY against the live setup data** (this is the high-value pre-work):
+   ```
+   bun run scripts/competition/preflight.ts                  # expect READY
+   bun run scripts/dev/mt5/mt5-smoke.ts                      # account + quote + L2 depth + specs
+   bun run scripts/dev/mt5/competition-spread-check.ts       # ← THE DECISIVE READ, now before 22:00
+   ```
+   Record the spread verdict → it sets the §9.1 posture (frozen core vs wide-crypto/prune) calmly, not under the clock.
+7. **Dry-run rehearsal** for muscle memory (safe — in-process sim, never the bridge):
    ```
    bun run scripts/competition/rehearsals/barbell-rehearsal.ts      # money-path + survival
    bun run scripts/competition/rehearsals/sleeve-timing-rehearsal.ts # sleeve gating

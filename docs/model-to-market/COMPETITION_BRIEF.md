@@ -89,6 +89,9 @@ Authoritative dates from **[RULES]** §5, refined by **[DISCORD]**. Marketing pa
 - **Slippage, liquidity constraints, and market impact are simulated.** Validate in the test env from the 18th.
 - **Costs: NO commission. Swap/financing is TBD per the final specs** (early Discord said "no swap," the final rules left it unconfirmed — **confirm at login**; assume it may apply). Modelled friction = **spread + slippage + market impact** (+ swap if confirmed).
 - **Sub-millisecond execution; no trading-frequency limit** on the platform side (MT5 API layer may impose its own). Safe-harbor ≤ **500 requests/sec** (above that, only penalized if it causes system anomalies).
+- **SHORT-SELLING allowed — long AND short across all instruments (Duncan, Discord, confirmed).** ✅ Validates the dollar-neutral RV core, which *requires* shorting one leg of each pair.
+- **Strategy may be modified/adapted/changed at ANY time — manually OR via automated systems; an in-bot governor that autonomously de-risks or switches regime on live equity/standings is explicitly permitted (Duncan, Discord).** ✅ Validates Gordon's entire automated-governance stack (margin breaker, sleeve auto-deploy, RV-profile switching, standing-driven decisions). No restriction on switching strategy between/within rounds.
+- **Tonight = SETUP WINDOW (Duncan):** live market data + a **test account for connectivity/validation are available before the start, but TRADING is disabled until 22:00.** ⇒ run the read-only spread-check + smoke + preflight against live data NOW (OPERATIONS / LAUNCH_CARD §A), not under arming pressure. Platform agents have **no web/internet fetch** (we source our own data anyway).
 
 > Implication: with zero commission/swap, high-frequency *diversified* compounding carries no per-trade drag — favourable for the chosen posture (§9). But the dry-run must model spread/slippage to stay honest.
 
