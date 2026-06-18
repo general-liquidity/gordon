@@ -232,6 +232,7 @@ To **flatten** via the venue directly: `POST /close` per ticket (or close in the
 Run this immediately before **21 Jun 22:00 BST**. Arm the two guards **only at this point** — they are off until go-live.
 
 - [ ] **Windows box up** — always-on Windows machine/VPS confirmed reachable; clock synced to BST.
+- [ ] **Trading channel selected + account funded** — in the console (`https://quanthack.syphonix.com/` → Console), **select & confirm the trading channel (MT5)**; the $1M is funded only after this (Lotus, Discord). The live competition MT5 connection opens at the **21 Jun 22:00 launch** — have the box + sidecar staged to connect → preflight → arm the instant it's live (the 18 Jun test env is for earlier validation).
 - [ ] **MT5 terminal** logged into the competition account; live feed ticking (not bid/ask 0).
 - [ ] **Account creds in the sidecar env only** — `MT5_LOGIN` / `MT5_PASSWORD` / `MT5_SERVER` set on the sidecar; **not** present anywhere in Gordon's env.
 - [ ] **Bridge token matches** — `MT5_BRIDGE_TOKEN` identical on the sidecar and in Gordon's `apiKey`; `baseUrl` = `http://127.0.0.1:8788`.
