@@ -32,6 +32,7 @@ export interface ACELessonCandidate {
     | "user_preference"
     | "operational"
     | "agent_self_block"
+    | "operator_override"
     | "approved_plan_rationale"
     | "cancel_rationale"
     | "aggregate_pattern";
@@ -155,6 +156,27 @@ const PATTERN_RULES: Array<{
         return null;
       }
       return `Operator-level change observed (${e.entryType}) — confirm the change is reflected in the active session.`;
+    },
+  },
+  {
+    // OPERATOR OVERRIDE — the human countermanded a SPECIFIC agent decision (vetoed a proposed
+    // trade, downsized after a risk verdict, closed a position the agent wanted to hold). This is
+    // the highest-value learning signal: it means the agent's judgment diverged from the operator's
+    // on a *correct-looking* decision, which a generic execution_failure / user_preference does not
+    // capture. Distinct from `user_preference` (a standing rule) — this is an in-context correction
+    // of an action. (Issue-triage-loop "ground-truth-from-correction" pattern, weighted privileged.)
+    category: "operator_override",
+    match: (e) => {
+      if (e.entryType !== "user_message" && e.entryType !== "action_route") return null;
+      const text = e.content.toLowerCase();
+      if (text.length > 400) return null;
+      const countermand =
+        /\b(cancel that|close (it|that|the position)|don'?t (place|execute|open|enter|buy|sell|submit|do)|do not (place|execute|open|enter|buy|sell|submit)|reduce (the |it |that )?(size|risk|exposure)|down ?size|cut (the |that )?(size|risk)|too (risky|big|much|aggressive)|veto|override (that|this)|reject (that|the plan)|hold off|stop the|don'?t do (that|this))\b/.test(
+          text,
+        );
+      if (!countermand) return null;
+      const trimmed = e.content.trim();
+      return `OPERATOR OVERRIDE — the operator previously countermanded the agent's decision here ("${trimmed.slice(0, 140)}"). When proposing a similar action, surface this prior divergence and default toward the operator's correction rather than the agent's original judgment.`;
     },
   },
   {

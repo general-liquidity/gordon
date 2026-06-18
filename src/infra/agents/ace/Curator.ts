@@ -69,6 +69,10 @@ const MAX_RETAINED_LESSONS = 50;
 
 const CATEGORY_BASE_SCORE: Record<ACELessonCandidate["category"], number> = {
   risk_event: 0.95,
+  // Operator override — the human corrected the agent's judgment on a correct-looking decision.
+  // The strongest LEARNING signal (above self-blocks and failures): scored just under a realized
+  // risk event so it surfaces aggressively and is evicted last.
+  operator_override: 0.92,
   execution_failure: 0.85,
   strategy_decay: 0.80,
   // Self-reported agent blocks are high-signal — the agent explicitly named

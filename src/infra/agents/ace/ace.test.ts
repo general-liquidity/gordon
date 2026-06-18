@@ -158,6 +158,34 @@ function makeEntry(partial: Partial<AnyEntry>): AnyEntry {
   };
 }
 
+describe("ACE Reflector — operator_override rule", () => {
+  it("matches a user_message that countermands an agent decision", async () => {
+    const { _applyPatternRulesForTest } = await import("./Reflector.ts");
+    const entry = makeEntry({
+      entryType: "user_message",
+      content: "No, don't place that BTC long — too risky here, downsize it",
+    });
+    const matches = _applyPatternRulesForTest(entry as never);
+    const override = matches.find((m) => m.category === "operator_override");
+    expect(override).toBeDefined();
+    expect(override?.text).toContain("OPERATOR OVERRIDE");
+  });
+
+  it("does NOT fire on a non-countermand user message", async () => {
+    const { _applyPatternRulesForTest } = await import("./Reflector.ts");
+    const entry = makeEntry({ entryType: "user_message", content: "What's the BTC trend today?" });
+    const matches = _applyPatternRulesForTest(entry as never);
+    expect(matches.find((m) => m.category === "operator_override")).toBeUndefined();
+  });
+
+  it("is weighted ABOVE execution_failure (operator override is the strongest learning signal)", () => {
+    runCurator(makeOutput("An execution failed on Binance previously", "execution_failure"));
+    runCurator(makeOutput("Operator overrode the agent: close it, too risky", "operator_override"));
+    const store = loadACELessons();
+    expect(store.lessons[0]?.category).toBe("operator_override");
+  });
+});
+
 describe("ACE Reflector — agent_self_block rule", () => {
   it("matches a report_blocked-shaped run_status entry with intent + blocker", async () => {
     const { _applyPatternRulesForTest } = await import("./Reflector.ts");
