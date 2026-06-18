@@ -77,6 +77,19 @@ export function isACEEnabled(): boolean {
   return process.env.GORDON_ACE_ENABLED === "true";
 }
 
+/**
+ * Returns true when the text looks like a TRANSIENT infra/data error
+ * (network blip, parse failure, undefined ref, stale/missing data) rather
+ * than a genuine trading-signal failure. Used to keep infra noise from
+ * poisoning the execution_failure lesson memory ("memory-poisoning" trap).
+ * Pure — exported for testing.
+ */
+export function isInfraNoise(text: string): boolean {
+  return /(timeout|timed out|connection|econnrefused|enotfound|network|fetch failed|socket|503|502|504|parse error|json error|undefined|null reference|cannot read propert|stack trace|unhandled|bridge unreachable|data (missing|unavailable|stale)|no bars|empty (response|series))/i.test(
+    text,
+  );
+}
+
 const PATTERN_RULES: Array<{
   category: ACELessonCandidate["category"];
   match: (entry: ActionLogEntry) => string | null;
@@ -86,11 +99,15 @@ const PATTERN_RULES: Array<{
     match: (e) => {
       if (e.entryType !== "execution_result" && e.entryType !== "execution_attempt") return null;
       const text = `${e.title} ${e.content}`.toLowerCase();
-      if (/(rejected|blocked|failed|insufficient|denied|error)/.test(text)) {
-        const venue = (e.payload?.venue ?? e.payload?.exchange ?? "venue") as string;
-        return `Execution attempts on ${venue} have failed before — pre-validate balance and policy gates first.`;
-      }
-      return null;
+      if (!/(rejected|blocked|failed|insufficient|denied|error)/.test(text)) return null;
+      // A genuine trading-failure signal is always learnable. But if the only
+      // hit is generic "failed/error" AND the failure is transient infra/data
+      // NOISE (network timeout, parse error, undefined, stale data), don't
+      // poison the failure memory with a non-trading lesson.
+      const isTradingSignal = /(rejected|insufficient|denied|risk|blocked|margin|over.?size|policy)/.test(text);
+      if (!isTradingSignal && isInfraNoise(text)) return null;
+      const venue = (e.payload?.venue ?? e.payload?.exchange ?? "venue") as string;
+      return `Execution attempts on ${venue} have failed before — pre-validate balance and policy gates first.`;
     },
   },
   {

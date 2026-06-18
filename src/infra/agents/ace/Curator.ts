@@ -60,12 +60,49 @@ export interface ACELesson extends ACELessonCandidate {
 }
 
 export interface ACELessonStore {
+  /** SCHEMA version (file format) — bump only on a breaking shape change. */
   version: 1;
   updatedAt: string;
+  /**
+   * Monotonic CONTENT revision — distinct from `version` (which is the file
+   * schema). Increments by 1 each time a curation pass actually changes the
+   * promoted lesson set (a new lesson, or refreshed evidence on an existing
+   * one). Stable across reads and across no-op curation passes, so a live
+   * output can be stamped with "operating under ACE lesson-set rev N" for
+   * attribution — which lesson revision produced a given action.
+   */
+  revision: number;
   lessons: ACELesson[];
 }
 
 const MAX_RETAINED_LESSONS = 50;
+
+/**
+ * Repeated-signal promotion bar. A brand-new lesson must be backed by at least
+ * this many supporting events before it promotes into the cross-session prompt
+ * — a single noisy one-off shouldn't become a durable procedural rule (the
+ * memory-overfitting trap). The Reflector aggregates `evidenceCount` from the
+ * action log in one pass, so this is "≥2 log entries support it," not "seen
+ * across 2 curation cycles."
+ */
+const MIN_EVIDENCE_TO_PROMOTE = 2;
+
+/**
+ * Categories EXEMPT from the repeated-signal bar — promote on first occurrence.
+ * These are either safety-critical realized events or EXPLICIT operator-sourced
+ * signals (a stated preference, a logged rationale, an in-context correction),
+ * which are ground truth on first mention rather than noisy inferences. The
+ * inferred / recurring-pattern categories (venue_quirk, execution_*,
+ * strategy_decay, operational, aggregate_pattern) require ≥MIN_EVIDENCE.
+ */
+const PROMOTE_ON_FIRST: ReadonlySet<ACELessonCandidate["category"]> = new Set([
+  "risk_event",
+  "operator_override",
+  "agent_self_block",
+  "user_preference",
+  "approved_plan_rationale",
+  "cancel_rationale",
+]);
 
 const CATEGORY_BASE_SCORE: Record<ACELessonCandidate["category"], number> = {
   risk_event: 0.95,
@@ -112,7 +149,16 @@ function ensureParentDir(filePath: string): void {
 }
 
 function emptyStore(): ACELessonStore {
-  return { version: 1, updatedAt: new Date().toISOString(), lessons: [] };
+  return { version: 1, updatedAt: new Date().toISOString(), revision: 0, lessons: [] };
+}
+
+/** Stable content signature of a lesson set — id + evidence per lesson, order-independent.
+ *  Used to decide whether a curation pass actually changed content (→ bump the revision). */
+function lessonsSignature(lessons: ACELesson[]): string {
+  return lessons
+    .map((l) => `${l.id}:${l.evidenceCount}`)
+    .sort()
+    .join("|");
 }
 
 export function loadACELessons(): ACELessonStore {
@@ -127,6 +173,11 @@ export function loadACELessons(): ACELessonStore {
     return {
       version: 1,
       updatedAt: parsed.updatedAt ?? new Date().toISOString(),
+      // Backward-compat: files written before the content-revision field default to 0.
+      revision:
+        typeof parsed.revision === "number" && parsed.revision >= 0
+          ? Math.floor(parsed.revision)
+          : 0,
       lessons: parsed.lessons,
     };
   } catch (error) {
@@ -218,6 +269,22 @@ export function runCurator(reflectorOutput: ReflectorOutput): ACELessonStore {
       merged.score = scoreLesson(merged);
       byId.set(id, merged);
     } else {
+      // Repeated-signal bar: a brand-new lesson in an inferred/recurring
+      // category needs ≥MIN_EVIDENCE supporting events before it becomes a
+      // durable cross-session rule. Explicit / safety-critical categories
+      // (PROMOTE_ON_FIRST) are ground truth on first mention and skip the bar.
+      // Checked BEFORE the budget so a held one-off doesn't consume a slot.
+      if (
+        candidate.evidenceCount < MIN_EVIDENCE_TO_PROMOTE &&
+        !PROMOTE_ON_FIRST.has(candidate.category)
+      ) {
+        logger.debug("ACE lesson HELD below repeated-signal bar", {
+          id,
+          category: candidate.category,
+          evidenceCount: candidate.evidenceCount,
+        });
+        continue;
+      }
       // New lessons are budgeted. SkillOpt's "textual learning rate" —
       // takes only the top-N candidates this cycle.
       if (newAdded >= editBudget) continue;
@@ -249,9 +316,16 @@ export function runCurator(reflectorOutput: ReflectorOutput): ACELessonStore {
     .sort((a, b) => b.score - a.score || b.evidenceCount - a.evidenceCount)
     .slice(0, MAX_RETAINED_LESSONS);
 
+  // Bump the content revision only when this pass actually changed the promoted
+  // lesson set (new lesson or refreshed evidence). A no-op pass keeps the prior
+  // revision so the attribution stamp stays stable.
+  const contentChanged = lessonsSignature(store.lessons) !== lessonsSignature(ranked);
+  const revision = contentChanged ? store.revision + 1 : store.revision;
+
   const updated: ACELessonStore = {
     version: 1,
     updatedAt: now,
+    revision,
     lessons: ranked,
   };
 
@@ -324,7 +398,7 @@ export function formatACELessonsForPrompt(store: ACELessonStore, maxLessons = 12
   const top = store.lessons.slice(0, maxLessons);
   const lines = [
     "[GORDON_ACE_LESSONS]",
-    "Lessons accumulated across prior sessions (Reflector→Curator output):",
+    `Lessons accumulated across prior sessions (Reflector→Curator output) — lesson-set revision ${store.revision}:`,
     ...top.map((l) => `- [${l.category}] ${l.text} (evidence: ${l.evidenceCount}, score: ${l.score.toFixed(2)})`),
   ];
   return lines.join("\n");

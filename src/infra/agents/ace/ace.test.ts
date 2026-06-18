@@ -39,13 +39,13 @@ afterEach(() => {
   }
 });
 
-function makeOutput(text: string, category: string): ReflectorOutput {
+function makeOutput(text: string, category: string, evidenceCount = 1): ReflectorOutput {
   return {
     candidates: [
       {
         text,
         category: category as never,
-        evidenceCount: 1,
+        evidenceCount,
         firstSeenAt: Date.now(),
         lastSeenAt: Date.now(),
         evidenceEntryIds: [],
@@ -95,8 +95,10 @@ describe("ACE Curator persistence", () => {
   });
 
   it("merges duplicate candidates and increments evidenceCount", () => {
-    runCurator(makeOutput("Venue rate-limit observed", "venue_quirk"));
-    runCurator(makeOutput("Venue rate-limit observed", "venue_quirk"));
+    // risk_event promotes on first occurrence, so the merge path is exercised
+    // independent of the repeated-signal bar.
+    runCurator(makeOutput("Risk breach recurred on Binance", "risk_event"));
+    runCurator(makeOutput("Risk breach recurred on Binance", "risk_event"));
     const store = loadACELessons();
     expect(store.lessons.length).toBe(1);
     expect(store.lessons[0]?.evidenceCount).toBe(2);
@@ -122,6 +124,80 @@ describe("ACE Curator persistence", () => {
     const store = loadACELessons();
     delete process.env.GORDON_ACE_ENABLED;
     expect(formatACELessonsForPrompt(store)).toBe("");
+  });
+});
+
+describe("ACE Curator — repeated-signal promotion bar", () => {
+  it("HOLDS a single-occurrence inferred-category lesson (evidence 1)", () => {
+    runCurator(makeOutput("Venue rate-limit observed once", "venue_quirk"));
+    expect(loadACELessons().lessons.length).toBe(0);
+  });
+
+  it("promotes an inferred-category lesson once evidence reaches the bar (>=2)", () => {
+    runCurator(makeOutput("Venue rate-limit observed", "venue_quirk", 2));
+    const store = loadACELessons();
+    expect(store.lessons.length).toBe(1);
+    expect(store.lessons[0]?.category).toBe("venue_quirk");
+  });
+
+  it("promotes a safety/explicit category on the FIRST occurrence (evidence 1)", () => {
+    runCurator(makeOutput("Drawdown breached on Binance", "risk_event"));
+    expect(loadACELessons().lessons.length).toBe(1);
+    // user_preference is an explicit operator statement — ground truth on first mention.
+    runCurator(makeOutput("User prefers swing trades", "user_preference"));
+    expect(loadACELessons().lessons.some((l) => l.category === "user_preference")).toBe(true);
+  });
+
+  it("a held one-off does not consume the edit budget", () => {
+    // Two held one-offs then two promotable risk events: both risk events land.
+    runCurator({
+      candidates: [
+        makeOutput("blip A", "venue_quirk").candidates[0]!,
+        makeOutput("blip B", "operational").candidates[0]!,
+        makeOutput("Drawdown one", "risk_event").candidates[0]!,
+        makeOutput("Liquidation two", "risk_event").candidates[0]!,
+      ],
+      entriesAnalyzed: 4,
+      generatedAt: new Date().toISOString(),
+    });
+    const store = loadACELessons();
+    expect(store.lessons.every((l) => l.category === "risk_event")).toBe(true);
+    expect(store.lessons.length).toBe(2);
+  });
+});
+
+describe("ACE Curator — lesson-set content revision", () => {
+  it("starts at 0 for an empty store and bumps to 1 on the first promotion", () => {
+    expect(loadACELessons().revision).toBe(0);
+    runCurator(makeOutput("Drawdown breached", "risk_event"));
+    expect(loadACELessons().revision).toBe(1);
+  });
+
+  it("bumps again when evidence on an existing lesson is refreshed", () => {
+    runCurator(makeOutput("Drawdown breached", "risk_event"));
+    runCurator(makeOutput("Drawdown breached", "risk_event"));
+    expect(loadACELessons().revision).toBe(2);
+  });
+
+  it("does NOT bump when a curation pass changes nothing (held one-off)", () => {
+    runCurator(makeOutput("Drawdown breached", "risk_event"));
+    const rev = loadACELessons().revision;
+    runCurator(makeOutput("Some one-off venue blip", "venue_quirk"));
+    expect(loadACELessons().revision).toBe(rev);
+  });
+
+  it("stamps the revision into the formatted prompt block for attribution", () => {
+    runCurator(makeOutput("Drawdown breached", "risk_event"));
+    const block = formatACELessonsForPrompt(loadACELessons());
+    expect(block).toContain("revision 1");
+  });
+
+  it("is distinct from the schema version (which stays 1)", () => {
+    runCurator(makeOutput("Drawdown breached", "risk_event"));
+    runCurator(makeOutput("Liquidation hit", "risk_event"));
+    const store = loadACELessons();
+    expect(store.version).toBe(1);
+    expect(store.revision).toBe(2);
   });
 });
 
@@ -312,5 +388,45 @@ describe("ACE Reflector — existing rules still match", () => {
     });
     const matches = _applyPatternRulesForTest(entry as never);
     expect(matches.find((m) => m.category === "execution_failure")).toBeDefined();
+  });
+});
+
+describe("ACE Reflector — execution_failure infra-noise guard", () => {
+  it("does NOT emit a lesson when the failure is pure infra noise", async () => {
+    const { _applyPatternRulesForTest } = await import("./Reflector.ts");
+    const entry = makeEntry({
+      entryType: "execution_result",
+      title: "Order failed",
+      content: "Order failed: ECONNREFUSED bridge unreachable",
+      payload: { venue: "binance" },
+    });
+    const matches = _applyPatternRulesForTest(entry as never);
+    expect(matches.find((m) => m.category === "execution_failure")).toBeUndefined();
+  });
+
+  it("STILL emits a lesson for a genuine trading failure", async () => {
+    const { _applyPatternRulesForTest } = await import("./Reflector.ts");
+    const entry = makeEntry({
+      entryType: "execution_result",
+      title: "Order rejected",
+      content: "Order rejected: insufficient margin",
+      payload: { venue: "binance" },
+    });
+    const matches = _applyPatternRulesForTest(entry as never);
+    expect(matches.find((m) => m.category === "execution_failure")).toBeDefined();
+  });
+
+  it("isInfraNoise classifies transient infra/data errors as noise", async () => {
+    const { isInfraNoise } = await import("./Reflector.ts");
+    expect(isInfraNoise("connection reset / network unreachable")).toBe(true);
+    expect(isInfraNoise("fetch failed: ETIMEDOUT")).toBe(true);
+    expect(isInfraNoise("cannot read property 'price' of undefined")).toBe(true);
+    expect(isInfraNoise("data stale, no bars returned")).toBe(true);
+  });
+
+  it("isInfraNoise does NOT flag genuine trading failures", async () => {
+    const { isInfraNoise } = await import("./Reflector.ts");
+    expect(isInfraNoise("rejected: insufficient balance")).toBe(false);
+    expect(isInfraNoise("order denied by risk policy")).toBe(false);
   });
 });

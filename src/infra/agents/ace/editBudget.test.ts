@@ -76,11 +76,13 @@ describe("ACE edit budget + rejected filter", () => {
   });
 
   test("merges of existing lessons do NOT count against the budget", () => {
+    // Inferred categories (execution_failure, strategy_decay) carry evidence>=2
+    // so they clear the repeated-signal bar — this test isolates the BUDGET path.
     runCurator(
       makeOutput([
         candidate("risk_event", "alpha", 1),
         candidate("risk_event", "beta", 1),
-        candidate("execution_failure", "gamma", 1),
+        candidate("execution_failure", "gamma", 2),
         candidate("user_preference", "delta", 1),
       ]),
     );
@@ -89,13 +91,13 @@ describe("ACE edit budget + rejected filter", () => {
       makeOutput([
         candidate("risk_event", "alpha", 1),
         candidate("risk_event", "beta", 1),
-        candidate("execution_failure", "gamma", 1),
+        candidate("execution_failure", "gamma", 2),
         candidate("user_preference", "delta", 1),
-        candidate("strategy_decay", "new1", 1),
-        candidate("strategy_decay", "new2", 1),
-        candidate("strategy_decay", "new3", 1),
-        candidate("strategy_decay", "new4", 1),
-        candidate("strategy_decay", "new5", 1),
+        candidate("strategy_decay", "new1", 2),
+        candidate("strategy_decay", "new2", 2),
+        candidate("strategy_decay", "new3", 2),
+        candidate("strategy_decay", "new4", 2),
+        candidate("strategy_decay", "new5", 2),
       ]),
     );
     expect(loadACELessons().lessons.length).toBe(8);
