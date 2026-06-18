@@ -279,4 +279,18 @@ describe("BarbellLiveRunner — survival circuit breaker", () => {
     expect(client.placed.every((r) => r.filling === "return")).toBe(true);
     expect(client.cancelled).toContain(99); // re-posts fresh each cycle
   });
+
+  it("disconnect watchdog: a sustained dropout fires a CRITICAL CONNECTION_LOST alert", async () => {
+    delete process.env.GORDON_LIVE_TRADING;
+    const alerts: AlertEvent[] = [];
+    class DeadClient extends FakeClient {
+      override async account(): Promise<Mt5Account> { throw new Error("MT5 bridge unreachable"); }
+    }
+    const client = new DeadClient(acct({ margin_level: 300, margin: 0 }), []);
+    const runner = new BarbellLiveRunner(client, { ...runnerCfg, alert: (a) => alerts.push(a), disconnectAlertCycles: 2 }, () => {});
+    const stop = runner.runLoop(5); // 5ms tick → many failed cycles
+    await new Promise((r) => setTimeout(r, 80));
+    stop();
+    expect(alerts.some((a) => a.level === "critical" && a.event === "CONNECTION_LOST")).toBe(true);
+  });
 });

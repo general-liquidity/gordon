@@ -203,6 +203,8 @@ export interface BarbellRunnerConfig {
   execution?: () => "taker" | "maker";
   /** Maker only: improve the resting limit toward mid by this many bps (0 = rest at touch, max rebate). */
   makerInsideBps?: number;
+  /** Consecutive failed cycles before a CRITICAL CONNECTION_LOST alert (the disconnect watchdog). Default 3. */
+  disconnectAlertCycles?: number;
 }
 
 export interface AlertEvent {
@@ -246,6 +248,7 @@ export class BarbellLiveRunner {
   private alertedMargin = false;
   private lastSleeveActive = false;
   private persistWarned = false;
+  private consecutiveFailures = 0;
 
   constructor(client: Mt5Like, cfg: BarbellRunnerConfig, log: (m: string) => void = (m) => console.log(m)) {
     this.client = client;
@@ -546,12 +549,27 @@ export class BarbellLiveRunner {
     const tick = async () => {
       try {
         const r = await this.runCycle();
+        if (this.consecutiveFailures > 0) this.emitAlert("warn", "CONNECTION_RESTORED", `recovered after ${this.consecutiveFailures} failed cycle(s)`);
+        this.consecutiveFailures = 0;
         this.log(r.standing.summary); // live standing every cycle
         const sl = this.slippage.summary();
         if (sl.fills > 0) this.log(`[barbell] realized slippage: ${sl.fills} fills · mean ${sl.meanSlippageBps.toFixed(2)}bps · cost ${sl.totalCostQuote.toFixed(0)}`);
         onCycle?.(r);
       } catch (err) {
+        // DISCONNECT WATCHDOG: a sustained dropout is survival-critical — on a client-side disconnect
+        // positions stay open and the margin breaker CANNOT run, so margin can drift to the stop-out
+        // (= elimination) unattended. Escalate to a CRITICAL alert at the threshold + periodically after,
+        // so the operator reconnects FAST or flattens manually. (A single hiccup just logs + retries.)
+        this.consecutiveFailures += 1;
         this.log(`[barbell] cycle error (continuing): ${(err as Error).message}`);
+        const k = this.cfg.disconnectAlertCycles ?? 3;
+        if (this.consecutiveFailures >= k && this.consecutiveFailures % k === 0) {
+          this.emitAlert(
+            "critical",
+            "CONNECTION_LOST",
+            `${this.consecutiveFailures} consecutive failed cycles — the survival breaker CANNOT run while disconnected. Reconnect NOW or flatten from the MT5 terminal before margin runs to the stop-out (${(err as Error).message}).`,
+          );
+        }
       }
     };
     void tick();
