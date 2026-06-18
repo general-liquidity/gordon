@@ -103,6 +103,10 @@ export type {
 export { CATEGORY_RUBRIC_DATA, renderCategoryRubric } from "./categoryRubrics.ts";
 export type { CategoryRubricData } from "./categoryRubrics.ts";
 
+// Spec→eval orphan detection (reverse of prompt-drift; ANCHORS traceability).
+export { findOrphanRules, formatOrphans } from "./orphanCoverage.ts";
+export type { OrphanRule } from "./orphanCoverage.ts";
+
 // Process-level trajectory checks + pass^k reliability (Phase 3).
 export { checkTrajectory } from "./process/processChecks.ts";
 export type {
