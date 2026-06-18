@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { executeWithLogging, getDatabase } from "../storage/database.ts";
+// Leaf import (zero deps) — avoids a cycle back through Curator, which reads
+// this store. Stamps the active ACE lesson revision onto each logged action.
+import { stampAceLessonRevision } from "../agents/ace/activeRevision.ts";
 import type {
   ActionLogEntry,
   ActionLogEntryType,
@@ -73,7 +76,7 @@ export function appendActionLogEntry(input: AppendActionLogEntryInput): ActionLo
     entryType: input.entryType,
     title: input.title,
     content: input.content ?? "",
-    payload: input.payload ?? {},
+    payload: stampAceLessonRevision(input.payload ?? {}),
     label: input.label,
     bookmarked: input.bookmarked ?? false,
     createdAt: input.createdAt ?? new Date().toISOString(),

@@ -8,6 +8,7 @@ import { getThinkingDepthFromContext } from "../cognition/thinkingPhase.ts";
 import { getExecutionReadiness, getPlanningHandoff } from "../harness/runtimeHarness.ts";
 import { getMCPServerSummary } from "../../ai/mcp/client.ts";
 import { formatACELessonsForPrompt, isACEEnabled, loadACELessons } from "../ace/index.ts";
+import { setActiveACELessonRevision } from "../ace/activeRevision.ts";
 
 export type { PromptAgentRole };
 
@@ -92,7 +93,12 @@ const fallbackSectionContent = new Map<string, string | (() => string)>([
     "shared.ace-lessons",
     () => {
       if (!isACEEnabled()) return "";
-      return formatACELessonsForPrompt(loadACELessons());
+      const store = loadACELessons();
+      const block = formatACELessonsForPrompt(store);
+      // Record the revision the agent is actually operating under (only when a
+      // non-empty block was injected) so logged actions can be attributed to it.
+      if (block) setActiveACELessonRevision(store.revision);
+      return block;
     },
   ],
 ]);

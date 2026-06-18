@@ -27,6 +27,13 @@ export {
   type ACELessonStore,
 } from "./Curator.ts";
 
+export {
+  getActiveACELessonRevision,
+  setActiveACELessonRevision,
+  resetActiveACELessonRevision,
+  stampAceLessonRevision,
+} from "./activeRevision.ts";
+
 import { runReflector } from "./Reflector.ts";
 import { runCurator } from "./Curator.ts";
 
