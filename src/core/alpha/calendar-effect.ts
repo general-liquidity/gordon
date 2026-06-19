@@ -28,6 +28,7 @@
  */
 
 import { wilsonInterval } from "../../infra/safety/expectancyByTag.ts";
+import { normalCdf } from "../numerics/index.ts";
 
 export type CalendarSegmenter =
   | "day_of_week"
@@ -174,28 +175,6 @@ function sampleStd(values: number[]): number {
   let sumSq = 0;
   for (const v of values) sumSq += (v - m) * (v - m);
   return Math.sqrt(sumSq / (values.length - 1));
-}
-
-/**
- * Standard-normal CDF via Abramowitz-Stegun 26.2.17 polynomial
- * approximation. Accurate to ~7.5×10^-8 across the real line —
- * sufficient for the calendar-effect p-value reporting.
- */
-function normalCdf(x: number): number {
-  // From A&S 26.2.17: Φ(x) ≈ 1 − φ(x) × (b1·t + b2·t² + b3·t³ + b4·t⁴ + b5·t⁵) for x ≥ 0
-  // where t = 1 / (1 + 0.2316419·x), φ is the standard normal PDF.
-  const sign = x >= 0 ? 1 : -1;
-  const absX = Math.abs(x);
-  const t = 1 / (1 + 0.2316419 * absX);
-  const phi = Math.exp(-0.5 * absX * absX) / Math.sqrt(2 * Math.PI);
-  const poly =
-    t * (0.319381530 +
-    t * (-0.356563782 +
-    t * (1.781477937 +
-    t * (-1.821255978 +
-    t * 1.330274429))));
-  const upper = 1 - phi * poly;
-  return sign === 1 ? upper : 1 - upper;
 }
 
 /**

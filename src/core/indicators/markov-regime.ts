@@ -7,13 +7,14 @@
  */
 
 import type { Candle } from "./types.ts";
+import { chiSquarePValue } from "../numerics/index.ts";
 
 export interface MatrixStability {
   /** Pearson chi-square statistic comparing first-half vs second-half transition counts. */
   chiSquare: number;
   /** Degrees of freedom — (rows × cols) where row sum > 0 in either half. */
   degreesOfFreedom: number;
-  /** Two-sided p-value (approximate, computed from a chi-square reference table). */
+  /** Upper-tail p-value of the chi-square statistic at `degreesOfFreedom`. */
   pValue: number;
   /** Sample size used for each half. */
   sampleSizePerHalf: number;
@@ -285,43 +286,6 @@ export function calculateMarkovRegime(
 // Transition-matrix stability diagnostic
 // ============================================================================
 
-/**
- * Chi-square critical values for the 0.10 and 0.01 significance levels at
- * df = 1..9 (covers 3×3 matrix with up to 9 cells). Pre-tabulated so we
- * don't need a stats library. From standard chi-square tables.
- */
-const CHI2_CRIT_010: Record<number, number> = {
-  1: 2.706, 2: 4.605, 3: 6.251, 4: 7.779, 5: 9.236,
-  6: 10.645, 7: 12.017, 8: 13.362, 9: 14.684,
-};
-const CHI2_CRIT_001: Record<number, number> = {
-  1: 6.635, 2: 9.210, 3: 11.345, 4: 13.277, 5: 15.086,
-  6: 16.812, 7: 18.475, 8: 20.090, 9: 21.666,
-};
-
-/**
- * Approximate two-sided p-value from a chi-square statistic + df. Linear
- * interpolation between the 0.10 and 0.01 cutoffs; outside that band we
- * return the boundary value (close enough for "stable / drifting /
- * unstable" classification — we don't need exact p).
- */
-function approxChiSquarePValue(chi2: number, df: number): number {
-  const crit10 = CHI2_CRIT_010[df];
-  const crit01 = CHI2_CRIT_001[df];
-  if (crit10 === undefined || crit01 === undefined) return 0.5;
-  if (chi2 < crit10) {
-    // p > 0.10 — return a representative value
-    return 0.10 + (crit10 - chi2) / crit10 * 0.40; // scales toward 0.50 as chi2 → 0
-  }
-  if (chi2 > crit01) {
-    // p < 0.01 — return a small value
-    return Math.max(0.0001, 0.01 * (crit01 / Math.max(chi2, crit01)));
-  }
-  // Linear interpolation between 0.01 and 0.10
-  const t = (chi2 - crit10) / (crit01 - crit10);
-  return 0.10 - t * 0.09;
-}
-
 function countTransitions(
   states: number[],
   laplaceAlpha: number = 0,
@@ -435,7 +399,7 @@ export function assessMatrixStability(states: number[]): MatrixStability {
     };
   }
 
-  const pValue = approxChiSquarePValue(chiSquare, df);
+  const pValue = chiSquarePValue(chiSquare, df);
   const verdict: MatrixStability["verdict"] =
     pValue > 0.10 ? "stable" : pValue > 0.01 ? "drifting" : "unstable";
 

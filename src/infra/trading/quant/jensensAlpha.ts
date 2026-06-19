@@ -20,19 +20,10 @@
  */
 
 import { invert, multiply } from "../../../core/alpha/matrix.ts";
+import { normalCdf } from "../../../core/numerics/index.ts";
 
 const round = (x: number, p = 6): number => parseFloat(x.toFixed(p));
 
-function erf(x: number): number {
-  const t = 1 / (1 + 0.3275911 * Math.abs(x));
-  const y =
-    1 -
-    ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) *
-      t *
-      Math.exp(-x * x);
-  return x >= 0 ? y : -y;
-}
-const normalCdf = (x: number): number => 0.5 * (1 + erf(x / Math.SQRT2));
 /** Two-sided p-value from a t-stat under the normal (HAC asymptotic) approximation. */
 const twoSidedP = (t: number): number => round(2 * normalCdf(-Math.abs(t)), 4);
 

@@ -14,6 +14,8 @@
  * Pure; never throws.
  */
 
+import { normalCdf } from "../../../core/numerics/index.ts";
+
 // --- shared math ----------------------------------------------------------
 const round = (x: number, p = 4): number => parseFloat(x.toFixed(p));
 
@@ -22,16 +24,6 @@ function safeTerm(count: number, prob: number): number {
   return count > 0 && prob > 0 ? count * Math.log(prob) : 0;
 }
 
-function erf(x: number): number {
-  const t = 1 / (1 + 0.3275911 * Math.abs(x));
-  const y =
-    1 -
-    ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) *
-      t *
-      Math.exp(-x * x);
-  return x >= 0 ? y : -y;
-}
-const normalCdf = (x: number): number => 0.5 * (1 + erf(x / Math.SQRT2));
 /** Upper-tail χ² p-value. df=1: 2·Φ(−√x); df=2: exp(−x/2). */
 function chiSquareSF(x: number, df: 1 | 2): number {
   if (x <= 0) return 1;

@@ -27,6 +27,8 @@
  * Pure compute. No I/O.
  */
 
+import { normalCdf } from "../../../core/numerics/index.ts";
+
 export const OPTIMIZATION_QUALITY_FLAG_ENV = "GORDON_OPTIMIZATION_QUALITY";
 
 export function isOptimizationQualityEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -108,25 +110,6 @@ function kurtosis(xs: ReadonlyArray<number>): number {
     (3 * (n - 1) ** 2) / ((n - 2) * (n - 3)) +
     3
   );
-}
-
-// Abramowitz & Stegun 7.1.26 — error-function approximation good to ~1.5e-7.
-function erf(x: number): number {
-  const sign = x < 0 ? -1 : 1;
-  const a1 = 0.254829592;
-  const a2 = -0.284496736;
-  const a3 = 1.421413741;
-  const a4 = -1.453152027;
-  const a5 = 1.061405429;
-  const p = 0.3275911;
-  const ax = Math.abs(x);
-  const t = 1 / (1 + p * ax);
-  const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-ax * ax);
-  return sign * y;
-}
-
-function normalCdf(z: number): number {
-  return 0.5 * (1 + erf(z / Math.SQRT2));
 }
 
 /**

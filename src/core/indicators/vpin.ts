@@ -17,6 +17,7 @@
  */
 
 import type { Candle } from "./types.ts";
+import { normalCdf } from "../numerics/index.ts";
 
 export interface VpinResult {
   /** Latest VPIN value (4dp), null if not enough buckets */
@@ -37,22 +38,7 @@ export interface VpinResult {
   interpretation: string;
 }
 
-/**
- * Standard normal CDF Φ(x) via the Abramowitz–Stegun 7.1.26 erf approximation.
- * Max abs error ~1.5e-7 — ample for BVC.
- */
-function normalCdf(x: number): number {
-  const z = x / Math.SQRT2;
-  const t = 1 / (1 + 0.3275911 * Math.abs(z));
-  const y =
-    1 -
-    (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t +
-      0.254829592) *
-      t *
-      Math.exp(-z * z);
-  const erf = z >= 0 ? y : -y;
-  return 0.5 * (1 + erf);
-}
+// Φ(x) for BVC is provided by the shared @stdlib-backed core/numerics module.
 
 function neutralResult(window: number): VpinResult {
   return {

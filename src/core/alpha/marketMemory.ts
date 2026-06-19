@@ -28,6 +28,8 @@
  * test, direction from corrected H, horizon shape from the VR profile.
  */
 
+import { normalCdf as stdNormalCdf, gammaln } from "../numerics/index.ts";
+
 export type MemoryVerdict = "trending" | "mean_reverting" | "random_walk";
 
 export interface MarketMemoryInput {
@@ -188,27 +190,11 @@ function expectedRS(n: number): number {
   // numerically unstable.
   let middle: number;
   if (n <= 340) {
-    middle = Math.exp(lnGamma((n - 1) / 2) - lnGamma(n / 2)) / Math.sqrt(Math.PI);
+    middle = Math.exp(gammaln((n - 1) / 2) - gammaln(n / 2)) / Math.sqrt(Math.PI);
   } else {
     middle = 1 / Math.sqrt((n * Math.PI) / 2);
   }
   return front * middle * back;
-}
-
-/** Lanczos approximation of ln(Γ(x)). Accurate to ~1e-13 for x > 0. */
-function lnGamma(x: number): number {
-  const c = [
-    76.18009172947146, -86.50532032941677, 24.01409824083091,
-    -1.231739572450155, 0.001208650973866179, -0.000005395239384953,
-  ];
-  let y = x;
-  const t = x + 5.5 - (x + 0.5) * Math.log(x + 5.5);
-  let series = 1.000000000190015;
-  for (const ck of c) {
-    y += 1;
-    series += ck / y;
-  }
-  return -t + Math.log((2.5066282746310005 * series) / x);
 }
 
 function anisLloydHurst(returns: number[], rawRs: number[], sizes: number[]): number {
@@ -259,22 +245,6 @@ function surrogatePValue(
 // Variance-ratio (Lo-MacKinlay, heteroskedasticity-robust z)
 // ============================================================================
 
-function normalCdf(z: number): number {
-  // Abramowitz-Stegun 7.1.26
-  const t = 1 / (1 + 0.2316419 * Math.abs(z));
-  const d = 0.3989422804014327 * Math.exp(-(z * z) / 2);
-  const probLeft =
-    d *
-    t *
-    (0.319381530 +
-      t *
-        (-0.356563782 +
-          t *
-            (1.781477937 +
-              t * (-1.821255978 + t * 1.330274429))));
-  return z >= 0 ? 1 - probLeft : probLeft;
-}
-
 function varianceRatio(returns: number[], q: number): VarianceRatioPoint {
   const T = returns.length;
   if (q < 2 || q >= T) {
@@ -311,7 +281,7 @@ function varianceRatio(returns: number[], q: number): VarianceRatioPoint {
   }
   if (theta <= 0) return { horizon: q, ratio: vr, zScore: 0, pValue: 1 };
   const z = (vr - 1) / Math.sqrt(theta);
-  const pValue = 2 * (1 - normalCdf(Math.abs(z)));
+  const pValue = 2 * (1 - stdNormalCdf(Math.abs(z)));
   return { horizon: q, ratio: vr, zScore: z, pValue };
 }
 

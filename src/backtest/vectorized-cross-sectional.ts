@@ -18,10 +18,10 @@
  */
 
 import {
-  calculateSharpeRatio,
   calculateMaxDrawdown,
   calculateSortinoRatio,
 } from "./metrics.ts";
+import { mean as statsMean, sampleStd as statsSampleStd } from "../core/stats/index.ts";
 import type { EquityPoint } from "./types.ts";
 
 // ============================================================================
@@ -359,13 +359,9 @@ export function runCrossSectionalBacktest(
  */
 function annualizedSharpeOf(returns: number[], periodsPerYear: number): number {
   if (returns.length < 2) return 0;
-  const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
-  const variance =
-    returns.reduce((a, r) => a + (r - mean) * (r - mean), 0) /
-    (returns.length - 1);
-  const std = Math.sqrt(variance);
+  const std = statsSampleStd(returns);
   if (std === 0) return 0;
-  return (mean / std) * Math.sqrt(periodsPerYear);
+  return (statsMean(returns) / std) * Math.sqrt(periodsPerYear);
 }
 
 function buildInterpretation(

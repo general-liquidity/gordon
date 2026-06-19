@@ -63,6 +63,8 @@
  * Pure compute. No I/O. Deterministic.
  */
 
+import { normalCdf } from "../../../core/numerics/index.ts";
+
 export const BLACK_SCHOLES_GREEKS_FLAG_ENV = "GORDON_BLACK_SCHOLES_GREEKS";
 
 export function isBlackScholesGreeksEnabled(
@@ -126,24 +128,9 @@ function normalPDF(x: number): number {
   return Math.exp(-0.5 * x * x) / SQRT_2PI;
 }
 
-/**
- * Standard-normal CDF N(x). Abramowitz & Stegun 26.2.17 rational
- * approximation. Worst-case absolute error ~7.5e-8.
- */
+/** Standard-normal CDF N(x) — shared `@stdlib`-backed implementation. */
 function normalCDF(x: number): number {
-  const sign = x < 0 ? -1 : 1;
-  const ax = Math.abs(x);
-  // Constants
-  const b1 = 0.319381530;
-  const b2 = -0.356563782;
-  const b3 = 1.781477937;
-  const b4 = -1.821255978;
-  const b5 = 1.330274429;
-  const p = 0.2316419;
-  const t = 1 / (1 + p * ax);
-  const poly = ((((b5 * t + b4) * t + b3) * t + b2) * t + b1) * t;
-  const cdfPositive = 1 - normalPDF(ax) * poly;
-  return sign > 0 ? cdfPositive : 1 - cdfPositive;
+  return normalCdf(x);
 }
 
 export function computeBlackScholesGreeks(input: BSInput): BSResult {

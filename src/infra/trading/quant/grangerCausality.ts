@@ -19,6 +19,8 @@
  * Source: EPAT (Dr. Yves Hilpisch, The Python Quants)
  */
 
+import { normalCdf } from "../../../core/numerics/index.ts";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -165,13 +167,7 @@ function fPValue(fStat: number, df1: number, df2: number): number {
   if (a > 2 && b > 2) {
     const lambda = (a - 1) / (a + b - 2);
     const z = (x - lambda) / Math.sqrt(lambda * (1 - lambda) / (a + b - 1));
-    const normalCDF = (v: number) => {
-      const t = 1 / (1 + 0.2316419 * Math.abs(v));
-      const d = 0.3989422804 * Math.exp(-v * v / 2);
-      const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
-      return v > 0 ? 1 - p : p;
-    };
-    return 1 - normalCDF(z);
+    return 1 - normalCdf(z);
   }
 
   // Fallback: very rough approximation

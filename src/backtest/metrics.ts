@@ -6,6 +6,15 @@
  */
 
 import type { EquityPoint, ClosedTrade, BacktestMetrics, DrawdownPeriod } from "./types.ts";
+import {
+  volatility as statsVolatility,
+  sharpe as statsSharpe,
+  sortino as statsSortino,
+  maxDrawdown as statsMaxDrawdown,
+  cagr as statsCagr,
+  quantileSorted as statsQuantileSorted,
+  profitFactor as statsProfitFactor,
+} from "../core/stats/index.ts";
 
 // ============================================================================
 // Constants
@@ -106,19 +115,7 @@ export function calculateCAGR(
   finalCapital: number,
   years: number
 ): number {
-  if (initialCapital <= 0 || years <= 0) {
-    return 0;
-  }
-
-  const ratio = finalCapital / initialCapital;
-
-  // Handle negative or zero final capital
-  if (ratio <= 0) {
-    return -100;
-  }
-
-  const cagr = Math.pow(ratio, 1 / years) - 1;
-  return cagr * 100;
+  return statsCagr(initialCapital, finalCapital, years);
 }
 
 // ============================================================================
@@ -136,29 +133,7 @@ export function calculateCAGR(
  * @returns Maximum drawdown as a positive percentage (e.g., 15.5 for 15.5% drawdown)
  */
 export function calculateMaxDrawdown(equityCurve: EquityPoint[]): number {
-  if (equityCurve.length < 2) {
-    return 0;
-  }
-
-  let maxDrawdown = 0;
-  const firstPoint = equityCurve[0];
-  if (!firstPoint) return 0;
-  let peak = firstPoint.equity;
-
-  for (const point of equityCurve) {
-    if (point.equity > peak) {
-      peak = point.equity;
-    }
-
-    if (peak > 0) {
-      const drawdown = ((peak - point.equity) / peak) * 100;
-      if (drawdown > maxDrawdown) {
-        maxDrawdown = drawdown;
-      }
-    }
-  }
-
-  return maxDrawdown;
+  return statsMaxDrawdown(equityCurve.map((p) => p.equity));
 }
 
 /**
@@ -175,17 +150,7 @@ export function calculateVolatility(
   returns: number[],
   periodsPerYear: number = TRADING_DAYS_PER_YEAR,
 ): number {
-  if (returns.length < 2) {
-    return 0;
-  }
-
-  const mean = returns.reduce((sum, r) => sum + r, 0) / returns.length;
-  const squaredDiffs = returns.map((r) => Math.pow(r - mean, 2));
-  const variance = squaredDiffs.reduce((sum, d) => sum + d, 0) / (returns.length - 1);
-  const perBarStdDev = Math.sqrt(variance);
-
-  // Annualize the per-bar standard deviation.
-  return perBarStdDev * Math.sqrt(periodsPerYear);
+  return statsVolatility(returns, periodsPerYear);
 }
 
 /**
@@ -210,19 +175,7 @@ export function calculateSharpeRatio(
   riskFreeRate: number = DEFAULT_RISK_FREE_RATE,
   periodsPerYear: number = TRADING_DAYS_PER_YEAR,
 ): number {
-  if (returns.length < 2) {
-    return 0;
-  }
-
-  const meanReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
-  const annualizedMeanReturn = meanReturn * periodsPerYear;
-  const volatility = calculateVolatility(returns, periodsPerYear);
-
-  if (volatility === 0) {
-    return 0;
-  }
-
-  return (annualizedMeanReturn - riskFreeRate) / volatility;
+  return statsSharpe(returns, riskFreeRate, periodsPerYear);
 }
 
 /**
@@ -244,33 +197,7 @@ export function calculateSortinoRatio(
   riskFreeRate: number = DEFAULT_RISK_FREE_RATE,
   periodsPerYear: number = TRADING_DAYS_PER_YEAR,
 ): number {
-  if (returns.length < 2) {
-    return 0;
-  }
-
-  const meanReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
-  const annualizedMeanReturn = meanReturn * periodsPerYear;
-
-  // Calculate downside deviation (only negative returns)
-  const negativeReturns = returns.filter((r) => r < 0);
-
-  if (negativeReturns.length === 0) {
-    // No negative returns means infinite Sortino (return a large positive number)
-    return annualizedMeanReturn > riskFreeRate ? Infinity : 0;
-  }
-
-  const squaredNegativeReturns = negativeReturns.map((r) => Math.pow(r, 2));
-  const downsideVariance =
-    squaredNegativeReturns.reduce((sum, d) => sum + d, 0) / returns.length;
-  const perBarDownsideDeviation = Math.sqrt(downsideVariance);
-  const annualizedDownsideDeviation =
-    perBarDownsideDeviation * Math.sqrt(periodsPerYear);
-
-  if (annualizedDownsideDeviation === 0) {
-    return 0;
-  }
-
-  return (annualizedMeanReturn - riskFreeRate) / annualizedDownsideDeviation;
+  return statsSortino(returns, riskFreeRate, periodsPerYear);
 }
 
 /**
@@ -330,23 +257,7 @@ export function calculateWinRate(trades: ClosedTrade[]): number {
  * @returns Profit factor (0 if no losing trades)
  */
 export function calculateProfitFactor(trades: ClosedTrade[]): number {
-  if (trades.length === 0) {
-    return 0;
-  }
-
-  const grossProfit = trades
-    .filter((t) => t.pnl > 0)
-    .reduce((sum, t) => sum + t.pnl, 0);
-
-  const grossLoss = Math.abs(
-    trades.filter((t) => t.pnl < 0).reduce((sum, t) => sum + t.pnl, 0)
-  );
-
-  if (grossLoss === 0) {
-    return grossProfit > 0 ? Infinity : 0;
-  }
-
-  return grossProfit / grossLoss;
+  return statsProfitFactor(trades.map((t) => t.pnl));
 }
 
 /**
@@ -489,19 +400,8 @@ const DEFAULT_ROLLING_WINDOW = 63;
  * @returns interpolated value, or null when the array is empty
  */
 function percentile(sorted: number[], p: number): number | null {
-  const n = sorted.length;
-  if (n === 0) return null;
-  if (n === 1) return sorted[0] ?? null;
-
-  const rank = p * (n - 1);
-  const lo = Math.floor(rank);
-  const hi = Math.ceil(rank);
-  const loVal = sorted[lo];
-  const hiVal = sorted[hi];
-  if (loVal === undefined || hiVal === undefined) return null;
-  if (lo === hi) return loVal;
-  const frac = rank - lo;
-  return loVal + (hiVal - loVal) * frac;
+  if (sorted.length === 0) return null;
+  return statsQuantileSorted(sorted, p);
 }
 
 /**

@@ -8,6 +8,11 @@
 
 import type { BacktestMetrics, ParameterSet } from "../types.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
+import {
+  mean as statsMean,
+  median as statsMedian,
+  sampleStd as statsSampleStd,
+} from "../../core/stats/index.ts";
 
 const logger = createModuleLogger("overfitting-detection");
 
@@ -234,36 +239,9 @@ export function detectOverfitting(
 // Helper Functions
 // ============================================================================
 
-/**
- * Calculate median of sorted array.
- */
-function calculateMedian(sortedValues: number[]): number {
-  if (sortedValues.length === 0) return 0;
-  const mid = Math.floor(sortedValues.length / 2);
-  if (sortedValues.length % 2 === 0) {
-    return ((sortedValues[mid - 1] ?? 0) + (sortedValues[mid] ?? 0)) / 2;
-  }
-  return sortedValues[mid] ?? 0;
-}
-
-/**
- * Calculate mean of values.
- */
-function calculateMean(values: number[]): number {
-  if (values.length === 0) return 0;
-  return values.reduce((sum, v) => sum + v, 0) / values.length;
-}
-
-/**
- * Calculate standard deviation.
- */
-function calculateStdDev(values: number[]): number {
-  if (values.length < 2) return 0;
-  const mean = calculateMean(values);
-  const squaredDiffs = values.map((v) => Math.pow(v - mean, 2));
-  const variance = squaredDiffs.reduce((sum, v) => sum + v, 0) / (values.length - 1);
-  return Math.sqrt(variance);
-}
+const calculateMedian = statsMedian;
+const calculateMean = statsMean;
+const calculateStdDev = statsSampleStd;
 
 /**
  * Determine severity level from overfit score.

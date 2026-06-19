@@ -25,6 +25,7 @@
  */
 
 import { studentTTwoSidedPValue } from "../../../core/indicators/linearRegression.ts";
+import { normalCdf } from "../../../core/numerics/index.ts";
 
 /** Minimum per-sample size below which the tests are not meaningful. */
 export const MIN_SAMPLE = 5;
@@ -102,19 +103,9 @@ export function pairedTTest(a: number[], b: number[]): PairedTTestResult | null 
   };
 }
 
-/** Standard normal two-sided survival: 2 * (1 - Φ(|z|)) via erf. */
+/** Standard normal two-sided survival: 2 * (1 - Φ(|z|)). */
 function normalTwoSidedPValue(z: number): number {
-  const az = Math.abs(z);
-  // Abramowitz & Stegun 7.1.26 rational approximation for erf.
-  const t = 1 / (1 + 0.3275911 * (az / Math.SQRT2));
-  const erf =
-    1 -
-    (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t +
-      0.254829592) *
-      t *
-      Math.exp(-(az / Math.SQRT2) * (az / Math.SQRT2));
-  const phi = 0.5 * (1 + erf); // Φ(az)
-  const p = 2 * (1 - phi);
+  const p = 2 * (1 - normalCdf(Math.abs(z)));
   return Math.min(1, Math.max(0, p));
 }
 

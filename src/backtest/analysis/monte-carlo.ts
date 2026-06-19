@@ -9,6 +9,13 @@
 import type { Trade, BacktestMetrics, BacktestParams } from "../types.ts";
 import { DEFAULT_BACKTEST_PARAMS } from "../types.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
+import {
+  mean as statsMean,
+  median as statsMedian,
+  sampleStd as statsSampleStd,
+  maxDrawdown as statsMaxDrawdown,
+  quantileSorted as statsQuantileSorted,
+} from "../../core/stats/index.ts";
 
 const logger = createModuleLogger("monte-carlo");
 
@@ -442,22 +449,7 @@ function calculateReturn(equityCurve: number[], initialCapital: number): number 
  * Calculate maximum drawdown percentage.
  */
 function calculateMaxDrawdown(equityCurve: number[]): number {
-  if (equityCurve.length < 2) return 0;
-
-  let maxDrawdown = 0;
-  let peak = equityCurve[0] ?? 0;
-
-  for (const equity of equityCurve) {
-    if (equity > peak) {
-      peak = equity;
-    }
-    if (peak > 0) {
-      const drawdown = ((peak - equity) / peak) * 100;
-      maxDrawdown = Math.max(maxDrawdown, drawdown);
-    }
-  }
-
-  return maxDrawdown;
+  return statsMaxDrawdown(equityCurve);
 }
 
 /**
@@ -476,23 +468,17 @@ function calculateDistribution(
 
   const min = sorted[0] ?? 0;
   const max = sorted[n - 1] ?? 0;
-  const mean = values.reduce((sum, v) => sum + v, 0) / n;
-  const median = n % 2 === 0
-    ? ((sorted[n / 2 - 1] ?? 0) + (sorted[n / 2] ?? 0)) / 2
-    : sorted[Math.floor(n / 2)] ?? 0;
+  const mean = statsMean(values);
+  const median = statsMedian(values);
+  const stdDev = statsSampleStd(values);
 
-  // Calculate standard deviation
-  const squaredDiffs = values.map((v) => Math.pow(v - mean, 2));
-  const variance = squaredDiffs.reduce((sum, v) => sum + v, 0) / (n - 1);
-  const stdDev = Math.sqrt(variance);
-
-  // Calculate percentiles
+  // Calculate percentiles (type-7 interpolated — see core/stats quantile; this
+  // replaces the prior floor-index definition that diverged from metrics.ts).
   const percentiles: Record<number, number> = {};
   const percentilePoints = [1, 5, 10, 25, 50, 75, 90, 95, 99];
 
   for (const p of percentilePoints) {
-    const index = Math.floor((p / 100) * n);
-    percentiles[p] = sorted[Math.min(index, n - 1)] ?? 0;
+    percentiles[p] = statsQuantileSorted(sorted, p / 100);
   }
 
   // Calculate confidence intervals
@@ -500,13 +486,10 @@ function calculateDistribution(
     const lowerP = (1 - level) / 2;
     const upperP = 1 - lowerP;
 
-    const lowerIndex = Math.floor(lowerP * n);
-    const upperIndex = Math.floor(upperP * n);
-
     return {
       level,
-      lower: sorted[Math.max(0, lowerIndex)] ?? 0,
-      upper: sorted[Math.min(n - 1, upperIndex)] ?? 0,
+      lower: statsQuantileSorted(sorted, lowerP),
+      upper: statsQuantileSorted(sorted, upperP),
     };
   });
 

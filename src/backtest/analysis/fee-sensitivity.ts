@@ -25,6 +25,12 @@
  * fraction with a caller-supplied periodsPerYear.
  */
 
+import {
+  mean as statsMean,
+  sampleStd as statsSampleStd,
+  profitFactor as statsProfitFactor,
+} from "../../core/stats/index.ts";
+
 /** A fee tier to sweep. Either a flat round-trip cost OR maker+taker legs. */
 export interface FeeSchedule {
   /** Human-readable tier label, e.g. "VIP-0 taker/taker" or "maker rebate". */
@@ -99,44 +105,15 @@ function compoundTotalReturn(returns: number[]): number {
   return equity - 1;
 }
 
-/** Sample mean of a numeric array (caller guarantees non-empty). */
-function mean(xs: number[]): number {
-  let sum = 0;
-  for (let i = 0; i < xs.length; i++) {
-    sum = sum + (xs[i] ?? 0);
-  }
-  return sum / xs.length;
-}
-
 /**
  * Annualized Sharpe of a per-trade return series: mean/std * sqrt(periodsPerYear).
  * Sample (n-1) std. Returns 0 when fewer than 2 trades or zero dispersion.
  */
 function annualizedSharpe(returns: number[], periodsPerYear: number): number {
   if (returns.length < 2) return 0;
-  const m = mean(returns);
-  let sq = 0;
-  for (let i = 0; i < returns.length; i++) {
-    const d = (returns[i] ?? 0) - m;
-    sq = sq + d * d;
-  }
-  const std = Math.sqrt(sq / (returns.length - 1));
+  const std = statsSampleStd(returns);
   if (std === 0) return 0;
-  return (m / std) * Math.sqrt(periodsPerYear);
-}
-
-/** Profit factor = sum(positive) / |sum(negative)|. Inf when no losses & gains>0. */
-function profitFactor(returns: number[]): number {
-  let gain = 0;
-  let loss = 0;
-  for (let i = 0; i < returns.length; i++) {
-    const r = returns[i] ?? 0;
-    if (r > 0) gain = gain + r;
-    else if (r < 0) loss = loss + r;
-  }
-  const absLoss = Math.abs(loss);
-  if (absLoss === 0) return gain > 0 ? Infinity : 0;
-  return gain / absLoss;
+  return (statsMean(returns) / std) * Math.sqrt(periodsPerYear);
 }
 
 /**
@@ -154,7 +131,7 @@ export function runFeeSensitivitySweep(
   const periodsPerYear = input.periodsPerYear ?? 252;
 
   const tradeCount = grossReturns.length;
-  const grossMeanPerTrade = mean(grossReturns);
+  const grossMeanPerTrade = statsMean(grossReturns);
   const grossTotalReturn = compoundTotalReturn(grossReturns);
 
   // Break-even round-trip cost: the fee level at which the mean edge vanishes,
@@ -166,9 +143,9 @@ export function runFeeSensitivitySweep(
     const netReturns = grossReturns.map((g) => g - costFraction);
 
     const netTotalReturn = compoundTotalReturn(netReturns);
-    const netMeanPerTrade = mean(netReturns);
+    const netMeanPerTrade = statsMean(netReturns);
     const netSharpe = annualizedSharpe(netReturns, periodsPerYear);
-    const pf = profitFactor(netReturns);
+    const pf = statsProfitFactor(netReturns);
     const flippedToLoss = grossTotalReturn > 0 && netTotalReturn <= 0;
 
     return {

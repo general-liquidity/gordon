@@ -30,6 +30,8 @@
  * Pure compute. No I/O.
  */
 
+import { normalCdf } from "../../../core/numerics/index.ts";
+
 export const BARRIER_TRADING_THRESHOLDS_FLAG_ENV = "GORDON_BARRIER_TRADING_THRESHOLDS";
 
 export function isBarrierTradingThresholdsEnabled(
@@ -78,19 +80,9 @@ export interface BarrierTradingThresholdsResult {
 
 const DEFAULT_ZETA = 0.6;
 
-/** Survival function of a standard normal at x ≥ 0, via Abramowitz–Stegun 7.1.26. */
+/** Survival function of a standard normal: 1 − Φ(x). */
 function normalSurvivalFunction(x: number): number {
-  if (x === 0) return 0.5;
-  const absX = Math.abs(x);
-  const t = 1 / (1 + 0.3275911 * absX);
-  const y =
-    t *
-    (0.254829592 +
-      t *
-        (-0.284496736 +
-          t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
-  const tail = 0.5 * y * Math.exp(-(absX * absX) / 2);
-  return x >= 0 ? tail : 1 - tail;
+  return 1 - normalCdf(x);
 }
 
 export function computeBarrierTradingThresholds(

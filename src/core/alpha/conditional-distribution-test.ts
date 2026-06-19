@@ -28,68 +28,16 @@
  */
 
 // ---------------------------------------------------------------------------
-// Special functions (deterministic; standard numerical-recipes algorithms)
+// Special functions — χ² survival delegates to the shared `@stdlib`-backed
+// `core/numerics` module (SPEC Win #1). The KS asymptotic series below has no
+// `@stdlib` equivalent, so it stays hand-rolled.
 // ---------------------------------------------------------------------------
 
-/** Log Γ(x) via the Lanczos approximation. */
-function gammaln(x: number): number {
-  const cof = [
-    76.18009172947146, -86.50532032941677, 24.01409824083091,
-    -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5,
-  ];
-  let y = x;
-  let tmp = x + 5.5;
-  tmp -= (x + 0.5) * Math.log(tmp);
-  let ser = 1.000000000190015;
-  for (let j = 0; j < 6; j++) {
-    y += 1;
-    ser += cof[j]! / y;
-  }
-  return -tmp + Math.log((2.5066282746310005 * ser) / x);
-}
-
-/** Regularized lower incomplete gamma P(a,x) = γ(a,x)/Γ(a). */
-function gammaP(a: number, x: number): number {
-  if (x <= 0) return 0;
-  if (x < a + 1) {
-    // Series representation.
-    let ap = a;
-    let sum = 1 / a;
-    let del = sum;
-    for (let n = 0; n < 300; n++) {
-      ap += 1;
-      del *= x / ap;
-      sum += del;
-      if (Math.abs(del) < Math.abs(sum) * 1e-14) break;
-    }
-    return sum * Math.exp(-x + a * Math.log(x) - gammaln(a));
-  }
-  // Continued fraction for Q(a,x), then P = 1 − Q.
-  const FPMIN = 1e-300;
-  let b = x + 1 - a;
-  let c = 1 / FPMIN;
-  let d = 1 / b;
-  let h = d;
-  for (let i = 1; i < 300; i++) {
-    const an = -i * (i - a);
-    b += 2;
-    d = an * d + b;
-    if (Math.abs(d) < FPMIN) d = FPMIN;
-    c = b + an / c;
-    if (Math.abs(c) < FPMIN) c = FPMIN;
-    d = 1 / d;
-    const del = d * c;
-    h *= del;
-    if (Math.abs(del - 1) < 1e-14) break;
-  }
-  const q = Math.exp(-x + a * Math.log(x) - gammaln(a)) * h;
-  return 1 - q;
-}
+import { chiSquarePValue } from "../numerics/index.ts";
 
 /** Upper-tail (survival) of the χ² distribution with `df` degrees of freedom. */
 export function chiSquareSf(x: number, df: number): number {
-  if (x <= 0) return 1;
-  return 1 - gammaP(df / 2, x / 2);
+  return chiSquarePValue(x, df);
 }
 
 /**
