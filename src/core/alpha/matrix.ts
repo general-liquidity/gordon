@@ -1,25 +1,33 @@
 /**
  * Small matrix utilities for the portfolio optimizer + related
- * diagnostic primitives. Dependency-free; targets matrices of size
- * 2..50 (typical strategy-portfolio scale). For larger problems a
- * proper linear-algebra library would be appropriate.
+ * diagnostic primitives. Backed by `ml-matrix` (LU/inverse, eigen,
+ * SVD, Cholesky); targets matrices of size 2..50 (typical
+ * strategy-portfolio scale).
  *
- * Covariance matrices are symmetric positive-definite; Gauss-Jordan
- * with partial pivoting is fine at this scale. Singular matrices
- * return null so callers can fall back to shrinkage.
+ * Covariance matrices are symmetric positive-definite. Singular
+ * matrices return null so callers can fall back to shrinkage — that
+ * null contract is preserved on top of ml-matrix (which would
+ * otherwise yield Inf/NaN), via an LU singularity check before the
+ * inverse.
+ *
+ * Every exported function keeps its array-in / array-out shape: the
+ * `ml-matrix` objects never leak across the boundary, so the
+ * portfolio-optimizer / pc-method / HRP / quant consumers are
+ * unchanged.
  */
+
+import {
+  Matrix,
+  inverse as mlInverse,
+  LuDecomposition,
+  EigenvalueDecomposition,
+  SingularValueDecomposition,
+  CholeskyDecomposition,
+} from "ml-matrix";
 
 export function transpose(m: number[][]): number[][] {
   if (m.length === 0) return [];
-  const rows = m.length;
-  const cols = m[0]!.length;
-  const result: number[][] = [];
-  for (let i = 0; i < cols; i++) {
-    const row: number[] = [];
-    for (let j = 0; j < rows; j++) row.push(m[j]![i]!);
-    result.push(row);
-  }
-  return result;
+  return new Matrix(m).transpose().to2DArray();
 }
 
 export function multiply(a: number[][], b: number[][]): number[][] {
@@ -30,17 +38,7 @@ export function multiply(a: number[][], b: number[][]): number[][] {
   if (ac !== br) {
     throw new Error(`Matrix multiply: incompatible shapes ${ar}×${ac} and ${br}×${bc}`);
   }
-  const result: number[][] = [];
-  for (let i = 0; i < ar; i++) {
-    const row: number[] = [];
-    for (let j = 0; j < bc; j++) {
-      let sum = 0;
-      for (let k = 0; k < ac; k++) sum += a[i]![k]! * b[k]![j]!;
-      row.push(sum);
-    }
-    result.push(row);
-  }
-  return result;
+  return new Matrix(a).mmul(new Matrix(b)).to2DArray();
 }
 
 export function multiplyVector(m: number[][], v: number[]): number[] {
@@ -60,58 +58,17 @@ export function dot(a: number[], b: number[]): number {
 }
 
 /**
- * Invert a square matrix via Gauss-Jordan elimination with partial
- * pivoting. Returns null when the matrix is singular (within an
- * epsilon tolerance) — callers should regularize and retry.
+ * Invert a square matrix. Returns null when the matrix is singular —
+ * callers should regularize and retry. Singularity is detected with an
+ * LU decomposition (ml-matrix); this preserves the prior Gauss-Jordan
+ * `null`-on-singular contract that `inverse()` alone would not.
  */
 export function invert(m: number[][]): number[][] | null {
   const n = m.length;
   if (n === 0) return [];
-  // Build augmented [m | I]
-  const aug: number[][] = [];
-  for (let i = 0; i < n; i++) {
-    const row: number[] = [];
-    for (let j = 0; j < n; j++) row.push(m[i]![j]!);
-    for (let j = 0; j < n; j++) row.push(i === j ? 1 : 0);
-    aug.push(row);
-  }
-
-  for (let i = 0; i < n; i++) {
-    // Find pivot row (largest |value| in column i, rows i..n-1)
-    let pivotRow = i;
-    let pivotAbs = Math.abs(aug[i]![i]!);
-    for (let k = i + 1; k < n; k++) {
-      const val = Math.abs(aug[k]![i]!);
-      if (val > pivotAbs) {
-        pivotAbs = val;
-        pivotRow = k;
-      }
-    }
-    if (pivotAbs < 1e-12) return null; // singular
-    if (pivotRow !== i) {
-      const tmp = aug[i]!;
-      aug[i] = aug[pivotRow]!;
-      aug[pivotRow] = tmp;
-    }
-
-    // Normalize pivot row
-    const pivot = aug[i]![i]!;
-    for (let j = 0; j < 2 * n; j++) aug[i]![j] = aug[i]![j]! / pivot;
-
-    // Eliminate other rows
-    for (let k = 0; k < n; k++) {
-      if (k === i) continue;
-      const factor = aug[k]![i]!;
-      if (factor === 0) continue;
-      for (let j = 0; j < 2 * n; j++) {
-        aug[k]![j] = aug[k]![j]! - factor * aug[i]![j]!;
-      }
-    }
-  }
-
-  const inverse: number[][] = [];
-  for (let i = 0; i < n; i++) inverse.push(aug[i]!.slice(n));
-  return inverse;
+  const M = new Matrix(m);
+  if (new LuDecomposition(M).isSingular()) return null;
+  return mlInverse(M).to2DArray();
 }
 
 /**
@@ -141,7 +98,8 @@ export function shrinkToDiagonal(m: number[][], alpha: number): number[][] {
  * series must be equal length.
  *
  * Returns null when length mismatch, insufficient samples (<2), or
- * any non-finite value.
+ * any non-finite value. Centering + Xᵀ·X via ml-matrix; Bessel
+ * correction (T-1) preserved.
  */
 export function computeCovarianceMatrix(returns: number[][]): number[][] | null {
   const n = returns.length;
@@ -153,24 +111,65 @@ export function computeCovarianceMatrix(returns: number[][]): number[][] | null 
     for (const v of series) if (!Number.isFinite(v)) return null;
   }
 
-  const means: number[] = [];
-  for (const series of returns) {
-    let sum = 0;
-    for (const v of series) sum += v;
-    means.push(sum / T);
-  }
-
-  const cov: number[][] = [];
+  // Rows = series, columns = observations. Center each row on its mean,
+  // then Σ = (X_c · X_cᵀ) / (T - 1).
+  const X = new Matrix(returns);
   for (let i = 0; i < n; i++) {
-    const row: number[] = [];
-    for (let j = 0; j < n; j++) {
-      let sum = 0;
-      for (let t = 0; t < T; t++) {
-        sum += (returns[i]![t]! - means[i]!) * (returns[j]![t]! - means[j]!);
-      }
-      row.push(sum / (T - 1));
-    }
-    cov.push(row);
+    let sum = 0;
+    for (let t = 0; t < T; t++) sum += X.get(i, t);
+    const mean = sum / T;
+    for (let t = 0; t < T; t++) X.set(i, t, X.get(i, t) - mean);
   }
-  return cov;
+  return X.mmul(X.transpose()).div(T - 1).to2DArray();
+}
+
+/**
+ * Eigenvalue decomposition of a symmetric matrix (covariance /
+ * correlation). Returns real eigenvalues and the corresponding
+ * eigenvectors as columns of `eigenvectors`. Symmetric matrices have
+ * real spectra; the imaginary parts are dropped. Returns null on empty
+ * input.
+ */
+export function eigenDecomposition(
+  m: number[][],
+): { eigenvalues: number[]; eigenvectors: number[][] } | null {
+  if (m.length === 0) return null;
+  const evd = new EigenvalueDecomposition(new Matrix(m), { assumeSymmetric: true });
+  return {
+    eigenvalues: evd.realEigenvalues,
+    eigenvectors: evd.eigenvectorMatrix.to2DArray(),
+  };
+}
+
+/**
+ * Singular value decomposition: M = U · diag(S) · Vᵀ. Returns the
+ * singular values plus the left (U) and right (V) singular-vector
+ * matrices. Returns null on empty input.
+ */
+export function singularValueDecomposition(
+  m: number[][],
+): { u: number[][]; s: number[]; v: number[][] } | null {
+  if (m.length === 0) return null;
+  const svd = new SingularValueDecomposition(new Matrix(m), { autoTranspose: true });
+  return {
+    u: svd.leftSingularVectors.to2DArray(),
+    s: svd.diagonal,
+    v: svd.rightSingularVectors.to2DArray(),
+  };
+}
+
+/**
+ * Cholesky factor L of a symmetric positive-definite matrix, where
+ * M = L · Lᵀ. Returns null on empty input or when M is not positive
+ * definite (the contract callers can use to fall back to shrinkage).
+ */
+export function choleskyDecomposition(m: number[][]): number[][] | null {
+  if (m.length === 0) return null;
+  try {
+    const cho = new CholeskyDecomposition(new Matrix(m));
+    if (!cho.isPositiveDefinite()) return null;
+    return cho.lowerTriangularMatrix.to2DArray();
+  } catch {
+    return null;
+  }
 }

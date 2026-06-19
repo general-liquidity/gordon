@@ -27,6 +27,15 @@
         "@rezi-ui/node": "^0.1.0-alpha.60",
         "@solana-agent-kit/plugin-defi": "^2.0.8",
         "@solana-agent-kit/plugin-token": "^2.0.9",
+        "@stdlib/math-base-special-betainc": "^0.2.3",
+        "@stdlib/math-base-special-erf": "^0.2.6",
+        "@stdlib/math-base-special-erfinv": "^0.3.1",
+        "@stdlib/math-base-special-gammaln": "^0.3.1",
+        "@stdlib/random-base-mt19937": "^0.2.3",
+        "@stdlib/stats-base-dists-chisquare-cdf": "^0.3.1",
+        "@stdlib/stats-base-dists-normal-cdf": "^0.3.1",
+        "@stdlib/stats-base-dists-normal-quantile": "^0.3.1",
+        "@stdlib/stats-base-dists-t-cdf": "^0.2.3",
         "@types/react": "^19.2.10",
         "ai": "^5.0.0",
         "asciichart": "^1.5.25",
@@ -36,7 +45,12 @@
         "ink": "^6.6.0",
         "ink-text-input": "^6.0.0",
         "marked": "^18.0.0",
+        "ml-distance": "^4.0.1",
+        "ml-hclust": "^4.0.0",
+        "ml-matrix": "^6.12.2",
+        "ml-pca": "^4.1.1",
         "react": "^19.2.4",
+        "simple-statistics": "^7.9.0",
         "solana-agent-kit": "^2.0.10",
         "twitter-text": "^3.1.0",
         "zod": "^4.3.6",
@@ -1250,6 +1264,580 @@
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
+    "@stdlib/array-base-accessor-getter": ["@stdlib/array-base-accessor-getter@0.2.3", "", { "os": "!android" }, "sha512-/2tQbhLpgBMfAafB9I8MWFkn3dYUUGcUUiZcbPHaAloV22G6W2HU+gUk0l4i++w/34Y9HzxjF1pevMi9wPizMQ=="],
+
+    "@stdlib/array-base-accessor-setter": ["@stdlib/array-base-accessor-setter@0.2.3", "", { "os": "!android" }, "sha512-NMvp8JNmvI9mCWmenPX749j28IBvUflsQ9WVhCRwmzrBDgf1FMUvvFFyWpcjnZI+8luwW97o9e3EzWBUIxeLEA=="],
+
+    "@stdlib/array-base-arraylike2object": ["@stdlib/array-base-arraylike2object@0.2.2", "", { "dependencies": { "@stdlib/array-base-accessor-getter": "^0.2.2", "@stdlib/array-base-accessor-setter": "^0.2.3", "@stdlib/array-base-assert-is-accessor-array": "^0.2.3", "@stdlib/array-base-getter": "^0.2.3", "@stdlib/array-base-setter": "^0.2.3", "@stdlib/array-dtype": "^0.3.0" }, "os": "!android" }, "sha512-k5dDtnpL33vgSuHkIJjsMcNWT75SCD3daeU+S9Ucwb8GW9UJh8iWRmm1/F4OLD0dRlQx1Jrkf7Z3fUxIb8aaqA=="],
+
+    "@stdlib/array-base-assert-is-accessor-array": ["@stdlib/array-base-assert-is-accessor-array@0.2.3", "", { "os": "!android" }, "sha512-crAa2IZOPCqQMLRfIVkFMX6tJFnzTKfhCNzRXOGBmx7tOfoZoI/KHHVct1yZLv6uBD7v6hvegKdJcGk1BgMTEw=="],
+
+    "@stdlib/array-base-assert-is-complex128array": ["@stdlib/array-base-assert-is-complex128array@0.2.3", "", { "os": "!android" }, "sha512-C2B/mcZ9S1I2KSsWkAwIIoW0ekDXcMao0Eoa8moS6xlpX5sgDVhmB/DkL0sb+z0E3GRp6/axiqyNTmEl1dhKeA=="],
+
+    "@stdlib/array-base-assert-is-complex64array": ["@stdlib/array-base-assert-is-complex64array@0.2.3", "", { "os": "!android" }, "sha512-CtI7sc1pcXB2yqQxHbz6mglOHK243HV+/hO2jAqDBPpaRiY+/z6+NHuhd1lrynJBSJdFzDyTatQaLTsfhLPDfw=="],
+
+    "@stdlib/array-base-filled": ["@stdlib/array-base-filled@0.2.3", "", { "os": "!android" }, "sha512-+npZqPn297Gv+D6B/OUkDT/3JGFdrr31+d/SGTeCzm7JQ22tGCUDmixDXwqVp9fWwB+LbjrOWrXMKluUTLcNWg=="],
+
+    "@stdlib/array-base-getter": ["@stdlib/array-base-getter@0.2.3", "", { "os": "!android" }, "sha512-guM8IURCdDGEo71vvk4S0ZZUWVP3GvzdtYhWLJnDQPW4axLdfWTIUf13qcrUV5TRSMpfMOftSuQZf7dBGAOE2Q=="],
+
+    "@stdlib/array-base-setter": ["@stdlib/array-base-setter@0.2.3", "", { "os": "!android" }, "sha512-jq27dgj4h9YyT4ZUubG7jP0KrNQP1MY2aLyieHGXv9Yx+1ysf8FLBRkekbOl1MJXXE7o0bOGAsiywS+olCgBGA=="],
+
+    "@stdlib/array-base-zeros": ["@stdlib/array-base-zeros@0.2.3", "", { "dependencies": { "@stdlib/array-base-filled": "^0.2.2" }, "os": "!android" }, "sha512-C+eo5MFy37TR7BJ5EDK/5O83/x1n4pozCRj3fcL3ZrURTwUHq0nwRCVCmym/DrmZuxb7MM4xHyYto/suoQOm3A=="],
+
+    "@stdlib/array-bool": ["@stdlib/array-bool@0.1.2", "", { "dependencies": { "@stdlib/array-base-accessor-getter": "^0.2.2", "@stdlib/array-base-getter": "^0.2.3", "@stdlib/array-uint8": "^0.2.3", "@stdlib/assert-has-iterator-symbol-support": "^0.2.3", "@stdlib/assert-is-arraybuffer": "^0.2.3", "@stdlib/assert-is-boolean": "^0.2.3", "@stdlib/assert-is-collection": "^0.2.3", "@stdlib/assert-is-function": "^0.2.3", "@stdlib/assert-is-integer": "^0.2.3", "@stdlib/assert-is-nonnegative-integer": "^0.2.3", "@stdlib/assert-is-object": "^0.2.3", "@stdlib/assert-is-string": "^0.2.3", "@stdlib/assert-is-string-array": "^0.2.3", "@stdlib/boolean-ctor": "^0.2.3", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/math-base-special-floor": "^0.2.4", "@stdlib/string-format": "^0.2.3", "@stdlib/symbol-iterator": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-accessor": "^0.2.4", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-u+e5+u/zCSNM6914c+3dVjfR3HWJzZvME84FyuETS1WkSIueHYYjbL/Y3Mwrrj8UufOdQCJEFDsNHUPBRWSqmQ=="],
+
+    "@stdlib/array-complex128": ["@stdlib/array-complex128@0.3.2", "", { "dependencies": { "@stdlib/array-base-accessor-getter": "^0.2.2", "@stdlib/array-base-assert-is-complex128array": "^0.2.2", "@stdlib/array-base-assert-is-complex64array": "^0.2.3", "@stdlib/array-base-getter": "^0.2.3", "@stdlib/array-float64": "^0.2.3", "@stdlib/assert-has-iterator-symbol-support": "^0.2.3", "@stdlib/assert-is-array": "^0.2.3", "@stdlib/assert-is-array-like-object": "^0.2.3", "@stdlib/assert-is-arraybuffer": "^0.2.3", "@stdlib/assert-is-collection": "^0.2.3", "@stdlib/assert-is-complex-like": "^0.2.4", "@stdlib/assert-is-function": "^0.2.3", "@stdlib/assert-is-nonnegative-integer": "^0.2.3", "@stdlib/assert-is-object": "^0.2.3", "@stdlib/assert-is-string": "^0.2.3", "@stdlib/assert-is-string-array": "^0.2.3", "@stdlib/complex-float64-ctor": "^0.1.2", "@stdlib/complex-float64-imag": "^0.1.2", "@stdlib/complex-float64-real": "^0.1.2", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/math-base-assert-is-even": "^0.2.5", "@stdlib/math-base-assert-is-integer": "^0.2.7", "@stdlib/math-base-special-floor": "^0.2.4", "@stdlib/strided-base-reinterpret-complex128": "^0.2.3", "@stdlib/strided-base-reinterpret-complex64": "^0.2.2", "@stdlib/string-format": "^0.2.3", "@stdlib/symbol-iterator": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-accessor": "^0.2.4", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-DPmQ8+MIxJBvusFNXDJMxqHCvMezhq0BGHcZoPeQYn5EDr6PN27VhyxgSWALzmHl72432e6ukeg+KQPKJQ1fcg=="],
+
+    "@stdlib/array-complex64": ["@stdlib/array-complex64@0.3.2", "", { "dependencies": { "@stdlib/array-base-accessor-getter": "^0.2.2", "@stdlib/array-base-assert-is-complex128array": "^0.2.2", "@stdlib/array-base-assert-is-complex64array": "^0.2.3", "@stdlib/array-base-getter": "^0.2.3", "@stdlib/array-float32": "^0.2.3", "@stdlib/assert-has-iterator-symbol-support": "^0.2.3", "@stdlib/assert-is-array": "^0.2.3", "@stdlib/assert-is-array-like-object": "^0.2.3", "@stdlib/assert-is-arraybuffer": "^0.2.3", "@stdlib/assert-is-collection": "^0.2.3", "@stdlib/assert-is-complex-like": "^0.2.4", "@stdlib/assert-is-function": "^0.2.3", "@stdlib/assert-is-nonnegative-integer": "^0.2.3", "@stdlib/assert-is-object": "^0.2.3", "@stdlib/assert-is-string": "^0.2.3", "@stdlib/assert-is-string-array": "^0.2.3", "@stdlib/complex-float32-ctor": "^0.1.1", "@stdlib/complex-float32-imag": "^0.1.2", "@stdlib/complex-float32-real": "^0.1.2", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/math-base-assert-is-even": "^0.2.5", "@stdlib/math-base-assert-is-integer": "^0.2.7", "@stdlib/math-base-special-floor": "^0.2.4", "@stdlib/strided-base-reinterpret-complex128": "^0.2.3", "@stdlib/strided-base-reinterpret-complex64": "^0.2.2", "@stdlib/string-format": "^0.2.3", "@stdlib/symbol-iterator": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-accessor": "^0.2.4", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-gYh7d2yCq4EELHP/8PKNWz2NO+x6ln5VPXbd4logAVZg4EhYW3rl9jkU6W0KGPncwEDIw+QuHcIAogYmPFnFDQ=="],
+
+    "@stdlib/array-dtype": ["@stdlib/array-dtype@0.3.1", "", { "dependencies": { "@stdlib/array-bool": "^0.1.1", "@stdlib/array-complex128": "^0.3.1", "@stdlib/array-complex64": "^0.3.1", "@stdlib/array-float32": "^0.2.3", "@stdlib/array-float64": "^0.2.3", "@stdlib/array-int16": "^0.2.3", "@stdlib/array-int32": "^0.2.3", "@stdlib/array-int8": "^0.2.3", "@stdlib/array-uint16": "^0.2.3", "@stdlib/array-uint32": "^0.2.3", "@stdlib/array-uint8": "^0.2.3", "@stdlib/array-uint8c": "^0.2.3", "@stdlib/assert-is-array": "^0.2.3", "@stdlib/assert-is-buffer": "^0.2.3", "@stdlib/utils-constructor-name": "^0.2.3" }, "os": "!android" }, "sha512-D/tBahfw2W0gVKPX89YbUA52SYOeGS2kqdOMgf2lJD/U1vuJehLq145dajQEGhjc60wdigM2VMjfCrME2MGfSQ=="],
+
+    "@stdlib/array-float32": ["@stdlib/array-float32@0.2.3", "", { "dependencies": { "@stdlib/assert-has-float32array-support": "^0.2.3" }, "os": "!android" }, "sha512-LxdKGrpsCehFDgU+nw7r3/NL+g8pe9zcDn/6fvNwiuy0AiunX/+c8lin9qUy/FEhrbU6aFXepFM2Ql/9YQD+TA=="],
+
+    "@stdlib/array-float64": ["@stdlib/array-float64@0.2.3", "", { "dependencies": { "@stdlib/assert-has-float64array-support": "^0.2.3" }, "os": "!android" }, "sha512-LtQOcxfE2zX5QnYfLNfptSV9q3JUGkOvGhvtO94iPXEvYTvJSEWLK7G97AJR9MK3rdL1+USjGQzUPiUd1/kAbw=="],
+
+    "@stdlib/array-int16": ["@stdlib/array-int16@0.2.3", "", { "dependencies": { "@stdlib/assert-has-int16array-support": "^0.2.3" }, "os": "!android" }, "sha512-yNoSOvDGUwHlO5g3wyEM5KYIRaHB5N/PNQHhOTbuvjdsvBhPgmyJr/TQABnSipKsS6hOEveI1SxyONfZGD2QkQ=="],
+
+    "@stdlib/array-int32": ["@stdlib/array-int32@0.2.3", "", { "dependencies": { "@stdlib/assert-has-int32array-support": "^0.2.3" }, "os": "!android" }, "sha512-m+uRYfsP2XDMCgCN0EMsxUNha4SQ29htPqFC9KZPgnVvvmjr5gsTHiZ95Io/ErgLxFCjRajpi9stjZ7f9Xeiug=="],
+
+    "@stdlib/array-int8": ["@stdlib/array-int8@0.2.3", "", { "dependencies": { "@stdlib/assert-has-int8array-support": "^0.2.3" }, "os": "!android" }, "sha512-RZFDdqpFwNrIUob38519AL6tNWGQb/Nqo5TnocCgLPRVFa722DF2MI/DMjhQBbp9RhI2gHAz/gtqfa3CIhsM7Q=="],
+
+    "@stdlib/array-to-json": ["@stdlib/array-to-json@0.3.1", "", { "dependencies": { "@stdlib/array-bool": "^0.1.1", "@stdlib/array-complex128": "^0.3.1", "@stdlib/array-complex64": "^0.3.1", "@stdlib/array-float32": "^0.2.3", "@stdlib/array-float64": "^0.2.3", "@stdlib/array-int16": "^0.2.3", "@stdlib/array-int32": "^0.2.3", "@stdlib/array-int8": "^0.2.3", "@stdlib/array-uint16": "^0.2.3", "@stdlib/array-uint32": "^0.2.3", "@stdlib/array-uint8": "^0.2.3", "@stdlib/array-uint8c": "^0.2.3", "@stdlib/assert-instance-of": "^0.3.1", "@stdlib/assert-is-booleanarray": "^0.0.3", "@stdlib/assert-is-complex-typed-array": "^0.2.3", "@stdlib/assert-is-typed-array": "^0.2.3", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/strided-base-reinterpret-boolean": "^0.0.3", "@stdlib/strided-base-reinterpret-complex128": "^0.2.3", "@stdlib/strided-base-reinterpret-complex64": "^0.2.2", "@stdlib/string-format": "^0.2.3", "@stdlib/utils-constructor-name": "^0.2.3", "@stdlib/utils-get-prototype-of": "^0.2.3" }, "os": "!android" }, "sha512-ljAbjjIEaiKDbfDFbNElLcGVOYMRLZslXfKTE/HnkadZ6OgA/vb4wp4D9NFCNceOXgl9lWBGYJNLJiE53rogBA=="],
+
+    "@stdlib/array-uint16": ["@stdlib/array-uint16@0.2.3", "", { "dependencies": { "@stdlib/assert-has-uint16array-support": "^0.2.3" }, "os": "!android" }, "sha512-ceDGvNGOxR2kUO30USUWL8ezKw+R6wBwQNJmPOfT1HJRmCxio+eRMBygmxoRmWwoj2pj8IHC/GlC3N2kSNN0Iw=="],
+
+    "@stdlib/array-uint32": ["@stdlib/array-uint32@0.2.3", "", { "dependencies": { "@stdlib/assert-has-uint32array-support": "^0.2.3" }, "os": "!android" }, "sha512-zZGjkJjPsgp3WyKOCICOGaJ3OoVyzwgyZgyEHl3wlEqfPhUPpVJGLhy9mFx8WIoTGHsCWHs1COWZfh88bL/pSA=="],
+
+    "@stdlib/array-uint8": ["@stdlib/array-uint8@0.2.3", "", { "dependencies": { "@stdlib/assert-has-uint8array-support": "^0.2.3" }, "os": "!android" }, "sha512-+UVsdR94Qe1zXEbpE+rpXFxp/VB8+zGxH3d7RH2cUpy5eFeqcSQNvxaxfqZnbmqk2Gu5tJEv/ZBcTXkpeKH7HA=="],
+
+    "@stdlib/array-uint8c": ["@stdlib/array-uint8c@0.2.3", "", { "dependencies": { "@stdlib/assert-has-uint8clampedarray-support": "^0.2.3" }, "os": "!android" }, "sha512-bTK5NJeXPo3bpiSu7qebFjGogu9CJKCNmmooAjPcq1Kj/S5C+vVamJjHx/C32euvlynwRiF0fJjcerSVvggsZQ=="],
+
+    "@stdlib/assert-has-float32array-support": ["@stdlib/assert-has-float32array-support@0.2.3", "", { "dependencies": { "@stdlib/assert-is-float32array": "^0.2.3", "@stdlib/constants-float64-pinf": "^0.2.3" }, "os": "!android" }, "sha512-nNRO8I4dp3CtxFXCD901IBmVc+/otaFMr/Mx1jN956nkaXaL3GZR6p12IGgN535Nj3QILoKPmOG7gOjts+uQOA=="],
+
+    "@stdlib/assert-has-float64array-support": ["@stdlib/assert-has-float64array-support@0.2.3", "", { "dependencies": { "@stdlib/assert-is-float64array": "^0.2.3" }, "os": "!android" }, "sha512-BbHjShic68woFydK2s8ECn4uKM+Cr3lB6kBP+9wK7wkUGVzq4lo7n+Twt0cBbgwJOGLlQayJQOQAVVq/nu/wDg=="],
+
+    "@stdlib/assert-has-function-name-support": ["@stdlib/assert-has-function-name-support@0.2.3", "", { "os": "!android" }, "sha512-NJc03nnTjUqEzIrbX6EYSMw982f/0Zus2l5U54XBKnQ4ndISGYnbPfrJqswwkNNDa8TsRvGFL65aO2l6Qq/kwA=="],
+
+    "@stdlib/assert-has-generator-support": ["@stdlib/assert-has-generator-support@0.2.3", "", { "dependencies": { "@stdlib/utils-eval": "^0.2.3" }, "os": "!android" }, "sha512-wr4w9/ufSBHSj+x3WNGK2WdEA9u+itVeY2Tx6ExN7w5avBAFe5EF8/ndeta4iQd8Su6YKJCqCUXNVJ3Dq4gl5g=="],
+
+    "@stdlib/assert-has-has-instance-symbol-support": ["@stdlib/assert-has-has-instance-symbol-support@0.1.1", "", { "dependencies": { "@stdlib/assert-has-own-property": "^0.2.3", "@stdlib/symbol-ctor": "^0.2.3" }, "os": "!android" }, "sha512-X5+vFyCteVJzIEpFlWh1oelKrmOe7/FbLPcx5iQHslPlRcGfVhNfEF1DgB28YqIBzl74p+Q+SR0QzfEm5xF0oA=="],
+
+    "@stdlib/assert-has-int16array-support": ["@stdlib/assert-has-int16array-support@0.2.3", "", { "dependencies": { "@stdlib/assert-is-int16array": "^0.2.3", "@stdlib/constants-int16-max": "^0.2.3", "@stdlib/constants-int16-min": "^0.2.3" }, "os": "!android" }, "sha512-b/2LkEPpg4jmrZZYVF0kmjsThEolINpj7TkKLQORxWeFKlULHX+rEVBwnUxGqW7Z3P6xwklbSlzzhlCU0xXc4w=="],
+
+    "@stdlib/assert-has-int32array-support": ["@stdlib/assert-has-int32array-support@0.2.3", "", { "dependencies": { "@stdlib/assert-is-int32array": "^0.2.3", "@stdlib/constants-int32-max": "^0.3.1", "@stdlib/constants-int32-min": "^0.2.3" }, "os": "!android" }, "sha512-FjGlpOYwUV/DbWpX14ZirgxMRgkwe6KKsN+/DEllu/w0bLIR4uBVBOQk8XDnExSVd72CiOH9+HOx6QTjHlhnMg=="],
+
+    "@stdlib/assert-has-int8array-support": ["@stdlib/assert-has-int8array-support@0.2.3", "", { "dependencies": { "@stdlib/assert-is-int8array": "^0.2.3", "@stdlib/constants-int8-max": "^0.2.3", "@stdlib/constants-int8-min": "^0.2.3" }, "os": "!android" }, "sha512-DYq1D2vpVO9NnRQa+BQ6JeZy4SX4yps2Tusalnri7M9s9BNzgzH2rqB1gdcUmSLQ8vLLaHNVsHPGoiPqh9tJBw=="],
+
+    "@stdlib/assert-has-iterator-symbol-support": ["@stdlib/assert-has-iterator-symbol-support@0.2.3", "", { "dependencies": { "@stdlib/assert-has-own-property": "^0.2.3", "@stdlib/symbol-ctor": "^0.2.3" }, "os": "!android" }, "sha512-m06tXK3ErFF3O3pFrgfbCmtH7UpGDspqAoE260Gw+75JY7LkX6cl/uGoGOmxq0WZPyom/R4UJCdDkB7J15DKYQ=="],
+
+    "@stdlib/assert-has-own-property": ["@stdlib/assert-has-own-property@0.2.3", "", { "os": "!android" }, "sha512-BnX1Lpvd9YaucQLokQrf7ppLwa3V+nTUQ9qoys5SloYhjwbYWtO61SJVT2JK+cfsCxUAx/HAh3dN1qTKxx1PIg=="],
+
+    "@stdlib/assert-has-symbol-support": ["@stdlib/assert-has-symbol-support@0.2.3", "", { "os": "!android" }, "sha512-yNsJnCb7HWye5xhZ/eRIpp28HwOVFF5gUCKeT1p4haoDJOn+3YEPYaXMn4mYK6kRN96tUhovlJQv9H/9jwnLpA=="],
+
+    "@stdlib/assert-has-to-primitive-symbol-support": ["@stdlib/assert-has-to-primitive-symbol-support@0.1.1", "", { "dependencies": { "@stdlib/assert-has-own-property": "^0.2.3", "@stdlib/symbol-ctor": "^0.2.3" }, "os": "!android" }, "sha512-nobeU8aB76XlDtKCC4DZWRdWSbPCoOGOOwEuVoyJ058gNacR4lRPoCA/7cxAVl3UqqLwhX3E1MSOMxNTnMyTGA=="],
+
+    "@stdlib/assert-has-tostringtag-support": ["@stdlib/assert-has-tostringtag-support@0.2.3", "", { "dependencies": { "@stdlib/assert-has-symbol-support": "^0.2.3" }, "os": "!android" }, "sha512-9sULfRKYneF/Mq6F96xqeQrf0a9wdJc1lNZf2wfs1EtRwQHQfx5+QlYl7hp3gWI/iid5M4Npme86T0413eaBfA=="],
+
+    "@stdlib/assert-has-uint16array-support": ["@stdlib/assert-has-uint16array-support@0.2.3", "", { "dependencies": { "@stdlib/assert-is-uint16array": "^0.2.2", "@stdlib/constants-uint16-max": "^0.2.3" }, "os": "!android" }, "sha512-7PjQTyXmpIczUz7Vx8c7BcdroJmMmQjyNQDF9a46Ya+nZxqH7g9jRsxmvzqVrSyXhkIyAbw1Ao2QyKocz+hZhg=="],
+
+    "@stdlib/assert-has-uint32array-support": ["@stdlib/assert-has-uint32array-support@0.2.3", "", { "dependencies": { "@stdlib/assert-is-uint32array": "^0.2.2", "@stdlib/constants-uint32-max": "^0.2.3" }, "os": "!android" }, "sha512-xa/0yWs+fhp/yUZPD3/ZmQCXqv7haJGGJE75HBX9tw9CHgmqpgAihD4yGy982CtQaxEltH8icNOX8CQzZZS31w=="],
+
+    "@stdlib/assert-has-uint8array-support": ["@stdlib/assert-has-uint8array-support@0.2.3", "", { "dependencies": { "@stdlib/assert-is-uint8array": "^0.2.2", "@stdlib/constants-uint8-max": "^0.2.3" }, "os": "!android" }, "sha512-cgXcNtv5PS+LEV0tj8VOZ8WVjLJuvSzG0GolF+2M0u5le2hHk7BfKH9bqmrk0AzpipAEEdQgp4CGc/Mmji5s8g=="],
+
+    "@stdlib/assert-has-uint8clampedarray-support": ["@stdlib/assert-has-uint8clampedarray-support@0.2.3", "", { "dependencies": { "@stdlib/assert-is-uint8clampedarray": "^0.2.2" }, "os": "!android" }, "sha512-Lp2sWfsU5Saqm4IQ+ARuUFc3o6qOJoYxzhyI9nAHC1yy8bgvwNkjFiGs+fJcfrtFxeNDC8WIs+IbzuiT3HSoJw=="],
+
+    "@stdlib/assert-instance-of": ["@stdlib/assert-instance-of@0.3.1", "", { "dependencies": { "@stdlib/assert-has-has-instance-symbol-support": "^0.1.0", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/string-format": "^0.2.3", "@stdlib/symbol-has-instance": "^0.1.0" }, "os": "!android" }, "sha512-gO2d9oNGStxZ8OZvpP6w+dE869YDeU5IzkwWVVX5jYWVVAOLXhpSZjdtXQ9ejLdnnm9XeqFQbrU3NULzftSP/w=="],
+
+    "@stdlib/assert-is-array": ["@stdlib/assert-is-array@0.2.3", "", { "dependencies": { "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-ayRsLGmssNO+8SR63tPP2+LZCxFVsSXtdN0ToSdm0kAOaGT4e0FoQus+AlFdhW5xWtvoxL8r5WKTVqJ514/rvQ=="],
+
+    "@stdlib/assert-is-array-like-object": ["@stdlib/assert-is-array-like-object@0.2.3", "", { "dependencies": { "@stdlib/constants-array-max-array-length": "^0.2.2", "@stdlib/math-base-assert-is-integer": "^0.2.7" }, "os": "!android" }, "sha512-Vu+ekWIc3srgjwWZSUl7FK+kj0HVwWdcAHNDsUon6mcvzltkTm+fYS9q/233L9U8BanhfORMtVcQ6hLX0Cnnkw=="],
+
+    "@stdlib/assert-is-arraybuffer": ["@stdlib/assert-is-arraybuffer@0.2.3", "", { "dependencies": { "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-1uNY2fnLP1bsHDqydcuxhj3SdJrMMvKdZvGVCSoT8H0HRMoStED3FS/zXzSLTGHXcExYYSHXWyOrvieLWNIfQg=="],
+
+    "@stdlib/assert-is-big-endian": ["@stdlib/assert-is-big-endian@0.2.3", "", { "dependencies": { "@stdlib/array-uint16": "^0.2.2", "@stdlib/array-uint8": "^0.2.2" }, "os": "!android" }, "sha512-+/X7ZcXFdboHIKDtxnx25fKmf9EhPRyp37qp9H9tUb0RnPT8SgmQKtYZxovp7EeBbESZOKSousg0jZKLbPqRAg=="],
+
+    "@stdlib/assert-is-boolean": ["@stdlib/assert-is-boolean@0.2.3", "", { "dependencies": { "@stdlib/assert-has-tostringtag-support": "^0.2.3", "@stdlib/boolean-ctor": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3", "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-36BETlRDrBeCOBLowW1/vqk9wD+OA3Wp9eQxFij/7icKiMDURH+Fiw2hfbhaZ3c3Y9uEN0rAdOT7AJlwWhXc7Q=="],
+
+    "@stdlib/assert-is-booleanarray": ["@stdlib/assert-is-booleanarray@0.0.3", "", { "dependencies": { "@stdlib/array-bool": "^0.1.1", "@stdlib/utils-constructor-name": "^0.2.3" }, "os": "!android" }, "sha512-jtLjSfttfN5oPchvrpEtxcrdmEKxQ4gJ9krjH9WvulkSjQsHcidasWE5cN64gliBbDOIrVaDyYbQMAB4QHYFOw=="],
+
+    "@stdlib/assert-is-buffer": ["@stdlib/assert-is-buffer@0.2.3", "", { "dependencies": { "@stdlib/assert-is-object-like": "^0.2.2" }, "os": "!android" }, "sha512-ppnL0sC5XHSk221AYjT4zD33TDB/XuSkhbbbr5sviTH5+88KAqy7SjFlvcpqpvB2BvEVzqRE1fgVso8SjGQD+A=="],
+
+    "@stdlib/assert-is-collection": ["@stdlib/assert-is-collection@0.2.3", "", { "dependencies": { "@stdlib/constants-array-max-typed-array-length": "^0.2.3", "@stdlib/math-base-assert-is-integer": "^0.2.7" }, "os": "!android" }, "sha512-mAL86cRZhTeqCHiLDynOFm2S3DRUaB9NWPbUSFELmoWZ9wV0JeCIfNRYRyzWRPthMsyTYACAhLx8UV8IGJjsmQ=="],
+
+    "@stdlib/assert-is-complex-like": ["@stdlib/assert-is-complex-like@0.2.4", "", { "dependencies": { "@stdlib/complex-float32-ctor": "^0.1.0", "@stdlib/complex-float64-ctor": "^0.1.2" }, "os": "!android" }, "sha512-BTrhcwlCRb/6NRqlB6Ap5WpniqaawCZOWnJuAJy16lbrvYvFP09f7UNNmxrxFl8BCg9hhyZQTIfdaF9CMgN9wQ=="],
+
+    "@stdlib/assert-is-complex-typed-array": ["@stdlib/assert-is-complex-typed-array@0.2.3", "", { "dependencies": { "@stdlib/array-complex128": "^0.3.1", "@stdlib/array-complex64": "^0.3.1", "@stdlib/utils-constructor-name": "^0.2.3", "@stdlib/utils-get-prototype-of": "^0.2.3" }, "os": "!android" }, "sha512-vqRH5uAPzFlAoLlcL5YGqGmyWipoeJ7yRrLKXljmJgf8zUi87Q96LfoKuMFTBqVdPYf+d5BNiUUcUdFqXhNDEw=="],
+
+    "@stdlib/assert-is-float32array": ["@stdlib/assert-is-float32array@0.2.3", "", { "dependencies": { "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-fHPem8taZPd1YoYIB1lqju9HEPDUuY/UFKG0/PquCZtA/g32TEyMM7tb/GCcDQuxno9jnH4+6r7CTfHaa9758w=="],
+
+    "@stdlib/assert-is-float64array": ["@stdlib/assert-is-float64array@0.2.3", "", { "dependencies": { "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-GEuYmjWDT2PY530fIO4qBDr4xO9vYWTjyszkyma0RWKzyGBdCV6GYdMj8qO+W7bOVsqeuoYNTCNebOYfpgZbSQ=="],
+
+    "@stdlib/assert-is-function": ["@stdlib/assert-is-function@0.2.3", "", { "dependencies": { "@stdlib/utils-type-of": "^0.2.2" }, "os": "!android" }, "sha512-6EdSkdJ1KtILdGb84MhherNtitGgzHH+u6rs1gGj+294wg/9IzLYaaHDktJVRN/viD3XLEQjPGzSTq5x5DzPbQ=="],
+
+    "@stdlib/assert-is-int16array": ["@stdlib/assert-is-int16array@0.2.3", "", { "dependencies": { "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-H5OohxNtQJ/i6esWE5R01TmXl0M5gCdvHP3+02ahiXbq6PBOJ5bJQVvw2M/j0jO93tS6d+5OcVGAKGazSn76RQ=="],
+
+    "@stdlib/assert-is-int32array": ["@stdlib/assert-is-int32array@0.2.3", "", { "dependencies": { "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-ATPkqHYsQnOYs2Vz3KudJd/N79GFsiKzEOiTMzl5ILcN6bdW28ZNjfh2eIJ/o8NR22rfPQOiUCvxJHw2hpAYKw=="],
+
+    "@stdlib/assert-is-int8array": ["@stdlib/assert-is-int8array@0.2.3", "", { "dependencies": { "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-eK9SvSUVTTQ0yGgWF9BI/hvqs6pu77NoVRwfQLLvjzcpI3hRm5RyzhHyoNe6Q7FQ1obxvVYsCjysRmC+xmV36Q=="],
+
+    "@stdlib/assert-is-integer": ["@stdlib/assert-is-integer@0.2.3", "", { "dependencies": { "@stdlib/assert-is-number": "^0.2.2", "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/math-base-assert-is-integer": "^0.2.7", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-HfJg0x6YWW6aP3JSONoI5bNXFGqtiNqWj0L0ex+oDpzrVbXQOu9GNlRKP5P5cDgfI+3rpZMCINX52IGKyCiUJw=="],
+
+    "@stdlib/assert-is-little-endian": ["@stdlib/assert-is-little-endian@0.2.3", "", { "dependencies": { "@stdlib/array-uint16": "^0.2.2", "@stdlib/array-uint8": "^0.2.2" }, "os": "!android" }, "sha512-TvKdQhKwrWf0rik5iiurlI1hpJru+bbYGByoSJ6SScTvZIgf54MTYEsWgVyoNqMw8AQFxOyDbMRee+je65ZbMA=="],
+
+    "@stdlib/assert-is-nonnegative-integer": ["@stdlib/assert-is-nonnegative-integer@0.2.3", "", { "dependencies": { "@stdlib/assert-is-integer": "^0.2.2", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-3Goiu4Kum1Xm9NbvC23GZOj1a6aVrGF1D8CkZkKDNp8kiYgKSKonvcbf3JeVrr/fLxsdfjnprbzrPOYsMOsRYw=="],
+
+    "@stdlib/assert-is-number": ["@stdlib/assert-is-number@0.2.3", "", { "dependencies": { "@stdlib/assert-has-tostringtag-support": "^0.2.3", "@stdlib/number-ctor": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3", "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-6i2RoG5TYn7mfKnPmvAA1Gdhn3PxvQegb2bh2pi5k/+xXgEHoubpqBSVxZBTZ70GIkPwNFJQDRWqwOwHet6enQ=="],
+
+    "@stdlib/assert-is-object": ["@stdlib/assert-is-object@0.2.3", "", { "dependencies": { "@stdlib/assert-is-array": "^0.2.3" }, "os": "!android" }, "sha512-H9NaVGuPl4qA3J4gDAzy+sHCkTImVycoNd7izPF63JuAlEO6KTdpVK7stQBXgcWf1pyRHem7ZTJCzht2UMLzcA=="],
+
+    "@stdlib/assert-is-object-like": ["@stdlib/assert-is-object-like@0.2.3", "", { "dependencies": { "@stdlib/assert-tools-array-function": "^0.2.2", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-K6G58h5euEVSEZvFZSHADoYL7sixNTRy+ezHl/I3byJpC9PJdvTO0XWYD0CT0yVXIaqmCYU2NsPpgGdcPLELFg=="],
+
+    "@stdlib/assert-is-plain-object": ["@stdlib/assert-is-plain-object@0.2.3", "", { "dependencies": { "@stdlib/assert-has-own-property": "^0.2.3", "@stdlib/assert-is-function": "^0.2.3", "@stdlib/assert-is-object": "^0.2.2", "@stdlib/utils-get-prototype-of": "^0.2.3", "@stdlib/utils-native-class": "^0.2.3" }, "os": "!android" }, "sha512-MRdn9kuzC4Hf/2Z/911yZUso6s6f048Ck3dO1j9scHk9EKnU404XrC5NJHeZ9OaI/689Fs+JKDWyKyqyHYRV8A=="],
+
+    "@stdlib/assert-is-positive-integer": ["@stdlib/assert-is-positive-integer@0.2.3", "", { "dependencies": { "@stdlib/assert-is-integer": "^0.2.2", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-lGd068beyzC9O1cAlyI5vKlCEUyJwwTrSdLkfVqNdqppiX64lOngjoAhu4BmHScuWSiJz9Zz39YnQ/mA6cH/kg=="],
+
+    "@stdlib/assert-is-regexp": ["@stdlib/assert-is-regexp@0.2.3", "", { "dependencies": { "@stdlib/assert-has-tostringtag-support": "^0.2.3", "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-+QlQMHrmSmF++7gK0Jjgy7W5aa91gAfpFWPyY4gUwkrSc+mY+JPPYW4peAf+v6dXABOgfKH/JOaFPSv227SSTQ=="],
+
+    "@stdlib/assert-is-string": ["@stdlib/assert-is-string@0.2.3", "", { "dependencies": { "@stdlib/assert-has-tostringtag-support": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3", "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-KC2sHwnIo775uEPRG7miERHb3DMABf37jS6o2bmcMHyME+gl+HC/bnqgwYTfgOsM0YOvYMSgA1HJo6iPDXdFrw=="],
+
+    "@stdlib/assert-is-string-array": ["@stdlib/assert-is-string-array@0.2.3", "", { "dependencies": { "@stdlib/assert-is-string": "^0.2.2", "@stdlib/assert-tools-array-function": "^0.2.2", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-OZhH3sJ4xUP1iGEvpG4IGIr9B9pWWv1CsvK1bSsNunvCEa5fi6XPJvXeP5NbgTIgT4JhmM5fxgaoT74S/CW3Cw=="],
+
+    "@stdlib/assert-is-typed-array": ["@stdlib/assert-is-typed-array@0.2.3", "", { "dependencies": { "@stdlib/array-float32": "^0.2.3", "@stdlib/array-float64": "^0.2.3", "@stdlib/array-int16": "^0.2.3", "@stdlib/array-int32": "^0.2.3", "@stdlib/array-int8": "^0.2.3", "@stdlib/array-uint16": "^0.2.3", "@stdlib/array-uint32": "^0.2.3", "@stdlib/array-uint8": "^0.2.3", "@stdlib/array-uint8c": "^0.2.3", "@stdlib/assert-has-float64array-support": "^0.2.3", "@stdlib/utils-constructor-name": "^0.2.3", "@stdlib/utils-function-name": "^0.2.3", "@stdlib/utils-get-prototype-of": "^0.2.3" }, "os": "!android" }, "sha512-6b8JuewBPnKdrI4tQhN5I4/3vchxaKZgu3k7Xr3oz2sMe0CpuVazPPtjTaL9wCOz8dxKVUYhJfRVLYaSS8iDeQ=="],
+
+    "@stdlib/assert-is-uint16array": ["@stdlib/assert-is-uint16array@0.2.3", "", { "dependencies": { "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-gHnj9FpIpyiIgsDfA7exvfqqn91THgGJD6BAWqiBgQQccK++K5q3ARc31ysTBuIea1FqYfpy30vt2ZW46lIMcw=="],
+
+    "@stdlib/assert-is-uint32array": ["@stdlib/assert-is-uint32array@0.2.3", "", { "dependencies": { "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-Jt9hp3iolCoQC6zC/yisTvxcuxhZ9jyiYwNzyEzgoY4GdV/WETuTpQKwTKbgQkJdUbcl/3VIQaVopEJSUaoV5w=="],
+
+    "@stdlib/assert-is-uint8array": ["@stdlib/assert-is-uint8array@0.2.3", "", { "dependencies": { "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-a+CzS7ffk2D8oFsswqGJk3L8zpqcnzuB5rwolilRVQtrWjQT/s2ydv5b1HbMB2rEcT6h64rYJDNAITeetGmzBA=="],
+
+    "@stdlib/assert-is-uint8clampedarray": ["@stdlib/assert-is-uint8clampedarray@0.2.3", "", { "dependencies": { "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-tGyJ74IqIFczWUZAAaR/xlGSzh6vO8t8SYV33ruNPjah/d69uijXHRVohx/aO3xaQ7bbVapk/WbGosmILI7sIw=="],
+
+    "@stdlib/assert-napi-equal-typedarray-types": ["@stdlib/assert-napi-equal-typedarray-types@0.2.3", "", { "dependencies": { "@stdlib/assert-napi-status-ok": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-eBfODSc+zsPnsIXuO1cmWZ6AgGFXPpx0YEApBFzG6akllcPssYuOIJHuE9xBdgL2c8NAGKl91tMitlkmEulG8w=="],
+
+    "@stdlib/assert-napi-equal-types": ["@stdlib/assert-napi-equal-types@0.2.3", "", { "dependencies": { "@stdlib/assert-napi-status-ok": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-JfESREBknrUOorPQp6y0vQicG5oSrzopRs2/Uas4tXRWRWe8J+WI60W/HTNAbfow03a5k30M9b7Vg81N6zf2mw=="],
+
+    "@stdlib/assert-napi-is-type": ["@stdlib/assert-napi-is-type@0.2.3", "", { "dependencies": { "@stdlib/assert-napi-equal-types": "^0.2.2", "@stdlib/assert-napi-status-ok": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-EajA0tANjWepz0MVE0zZU45CXLA12/uuRpQ+680ZBfULsVc0plipSQfIMePBgHueJe9YMgyqm3r25RXzf98i7g=="],
+
+    "@stdlib/assert-napi-is-typedarray": ["@stdlib/assert-napi-is-typedarray@0.2.3", "", { "dependencies": { "@stdlib/assert-napi-status-ok": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-szTmOUQmxi7wi+sJjOpmqBeKdaTHXJAYaBAlrT4Lm8KPjIGr+RP2Fvi2CfFqQu4faekHEM/AXuKbujZnc/P7Xw=="],
+
+    "@stdlib/assert-napi-status-ok": ["@stdlib/assert-napi-status-ok@0.2.3", "", { "os": "!android" }, "sha512-rA+0Vo1ULn4uBHQ+FfagPAcikFT3W/t9I7HdP7SMjz71IZpkWyuxVFZi5MTv2+7hGMYA8be5FibLz20uzbZ9pA=="],
+
+    "@stdlib/assert-tools-array-function": ["@stdlib/assert-tools-array-function@0.2.3", "", { "dependencies": { "@stdlib/assert-is-array": "^0.2.2", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/string-format": "^0.2.3" }, "os": "!android" }, "sha512-z2a2G6f9Exz/V0UfE00TLm1sp6W+pOdYltekRRgdEgFNPPP66WxaJfFLkXwqZv0X75U6TuQ0pp7tFq6Ac0lf5A=="],
+
+    "@stdlib/blas-base-gcopy": ["@stdlib/blas-base-gcopy@0.2.3", "", { "dependencies": { "@stdlib/array-base-arraylike2object": "^0.2.2", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-W1vwLtEIfty7iCJZZ3OhcpNw6o0HwGMXdLWLEDlhYpQ+eBKPBpa8FQducrGSbYDI0sys+ZBMq/oRv9dGIyH2IA=="],
+
+    "@stdlib/boolean-ctor": ["@stdlib/boolean-ctor@0.2.3", "", { "os": "!android" }, "sha512-JmVu1SdJHYK5ubLl8nqi0gfYX5kAcSRRJYNQ7JuG8oU6WtkIMsC0ahQ8+3G673czRaQ7HGE+pL0IZiH/s8HSrQ=="],
+
+    "@stdlib/complex-float32-ctor": ["@stdlib/complex-float32-ctor@0.1.1", "", { "dependencies": { "@stdlib/assert-is-number": "^0.2.3", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/number-float64-base-to-float32": "^0.2.2", "@stdlib/string-format": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3", "@stdlib/utils-define-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-P5aJ7kJ3VkOCvtwIipYH2t/vENK8XnwQGDChQiZAgkJadrF2dKYOXa8t1vWEsy/AMVujAjamHlCXQffhafYm8A=="],
+
+    "@stdlib/complex-float32-imag": ["@stdlib/complex-float32-imag@0.1.2", "", { "dependencies": { "@stdlib/complex-float32-ctor": "^0.1.0" }, "os": "!android" }, "sha512-RwwHXMocm0/1wMB3NI7oJR2MNA1avqisqh58oFR95Kq35leSIrevSHw2HbW3P1QG1uyYCbOTp5V2zv1alwXAzg=="],
+
+    "@stdlib/complex-float32-real": ["@stdlib/complex-float32-real@0.1.2", "", { "dependencies": { "@stdlib/complex-float32-ctor": "^0.1.0" }, "os": "!android" }, "sha512-KyUfN8nm9zyfNwi9O37u1oq3hsAi8uG1sQX+lI49PGxqkxfIEoMwHclYrs2lgQ02EWD6t/Coj+8dbzKwuj21ug=="],
+
+    "@stdlib/complex-float32-reim": ["@stdlib/complex-float32-reim@0.1.4", "", { "dependencies": { "@stdlib/array-float32": "^0.2.3", "@stdlib/complex-float32-ctor": "^0.1.0" }, "os": "!android" }, "sha512-PXnims1rRAVGARrpoeiwxkYcThjCoXv3iLhUhz8oyulcHteGkJuBAmhnrLANfkh2ro+bFlk6lC9znLt13SOM2g=="],
+
+    "@stdlib/complex-float64-ctor": ["@stdlib/complex-float64-ctor@0.1.2", "", { "dependencies": { "@stdlib/assert-is-number": "^0.2.2", "@stdlib/complex-float32-ctor": "^0.1.0", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/string-format": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3", "@stdlib/utils-define-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-xCVE2Lv1/I7A/2mDloT3hDCpA9NP9XOqZKpyKhg3D/9D/vJnh1rnn9CK8+xzVfRborsyQbJF7OI+Ijc3szDI1A=="],
+
+    "@stdlib/complex-float64-imag": ["@stdlib/complex-float64-imag@0.1.2", "", { "dependencies": { "@stdlib/complex-float64-ctor": "^0.1.1" }, "os": "!android" }, "sha512-uYmpvw8723pXVMaPIyoDWh53OLBk3F5HQyCFrgJsFCfuM0e718yd778ltMOyl7kem3M87ealSuxBwFX5SLFxcA=="],
+
+    "@stdlib/complex-float64-real": ["@stdlib/complex-float64-real@0.1.2", "", { "dependencies": { "@stdlib/complex-float64-ctor": "^0.1.1" }, "os": "!android" }, "sha512-m8kJIckqStBS7WzmGe5X8A1CCooGmLToXRo1qq4EydA976FFMFuYrsI4XuByt1e9zp9HEGeoywyelaqyeeWtHw=="],
+
+    "@stdlib/complex-float64-reim": ["@stdlib/complex-float64-reim@0.1.4", "", { "dependencies": { "@stdlib/array-float64": "^0.2.3", "@stdlib/complex-float64-ctor": "^0.1.2" }, "os": "!android" }, "sha512-5IxS+GqkVezTGh57Gp7pIyAHS+obDqUpq5y7KpAjrH0s6gp6oN/m+tmPh7K6Yz8yX+7FLVn5b9lZxY1otBBEJQ=="],
+
+    "@stdlib/constants-array-max-array-length": ["@stdlib/constants-array-max-array-length@0.2.3", "", { "os": "!android" }, "sha512-f6X1YlF9RnN5HkeFZFr8V4iSpV5968/4V5j6RFKY7gwr3jxjiIBar4CFja8W0f5eRUsuAlxf3HQ+Y0syYKpLuQ=="],
+
+    "@stdlib/constants-array-max-typed-array-length": ["@stdlib/constants-array-max-typed-array-length@0.2.3", "", { "os": "!android" }, "sha512-Npc2GG28d1+dgdb2akvzDNZZpiGTIAEe1vvJzBLfmVnDkqxYSuTu55N9jcXtTvrPOLqxwWy7K8AMAKboMFEFVA=="],
+
+    "@stdlib/constants-float16-eps": ["@stdlib/constants-float16-eps@0.2.3", "", { "os": "!android" }, "sha512-gdDE9eYNuJqIxmpWFfFsTx24uJv3BV/S+MKi3vj/TgWFeGMnsqHP+xIf46Hby2OwRbr6yYzsVwfJMAzF7ItCQQ=="],
+
+    "@stdlib/constants-float16-exponent-bias": ["@stdlib/constants-float16-exponent-bias@0.3.1", "", { "os": "!android" }, "sha512-fUqcun9eGniI8sqsZf06qa064cKcp6cARfX9dXuGnCQWSWEwn8Q/LKr8zEgUVEu6cJCVyCMHgm8VPpkTpnFPAQ=="],
+
+    "@stdlib/constants-float16-exponent-mask": ["@stdlib/constants-float16-exponent-mask@0.1.1", "", { "os": "!android" }, "sha512-5J38bgxW+UlF9AHG+C9Z7ilx25aPSOr3ECyK0LThG9H8Kw2zL+9cNbt72vRnVr0BSCv3NKvgxPza+B/bB7IJpg=="],
+
+    "@stdlib/constants-float16-max": ["@stdlib/constants-float16-max@0.2.3", "", { "os": "!android" }, "sha512-M1Hgv/fUdnuV6uw9yyXXOAf7Bzf7I/8naaYolXGX4h7B6XSuCT6Of/0BRxXlU9D+V6zPniGo2zdBaXUGfek28g=="],
+
+    "@stdlib/constants-float16-num-significand-bits": ["@stdlib/constants-float16-num-significand-bits@0.0.2", "", { "os": "!android" }, "sha512-qml2Wmm1/gHOGmEfrR1w5G2wYsBHKfCLBaJ8idZ4IMcBfmR8Ez4I9K3uQ3EZ6mW8QU2nUIgp0Fc99lnzLoH+7A=="],
+
+    "@stdlib/constants-float16-sign-mask": ["@stdlib/constants-float16-sign-mask@0.1.1", "", { "os": "!android" }, "sha512-LpLyCmkhzwotXb1mAAkAZ4sTk5lh5lW3Q1pOp6jtepEFT/marQsoeTe+0r0mIwSncGbym/eEB455qUZQsdiTBg=="],
+
+    "@stdlib/constants-float16-significand-mask": ["@stdlib/constants-float16-significand-mask@0.1.1", "", { "os": "!android" }, "sha512-+IA0fHkBV7X00ZTqAo0ZZSSuh9fjLGB8+4ot8iR0irC0YxPLkvyPzFHujnWFu8UD1Eu3SZcyaCY20CLcgsGr9Q=="],
+
+    "@stdlib/constants-float16-smallest-normal": ["@stdlib/constants-float16-smallest-normal@0.2.3", "", { "os": "!android" }, "sha512-u/EzlthAeRba4TePLQzTyivIAp4GB9jLdOwE9FdxSYmqUwAbEIODkd7vft1ArzuCILRHM4NNNESJeaLlv9Qd7w=="],
+
+    "@stdlib/constants-float32-abs-mask": ["@stdlib/constants-float32-abs-mask@0.2.3", "", { "os": "!android" }, "sha512-owGGn8KvmHmne0u5ItTvOpHL6lUJP+tuUe2wzrKYiZuoUTg+7cOhNW4fPWCK8AFYxs11Ha3qPA7oAzjqlq+Log=="],
+
+    "@stdlib/constants-float32-eps": ["@stdlib/constants-float32-eps@0.2.3", "", { "dependencies": { "@stdlib/number-float64-base-to-float32": "^0.2.2" }, "os": "!android" }, "sha512-yJY7ipPOriceMh2zQvNVDYRrBJlQoBN+7cejox5DxTTn5zytyJn9sfdBQs2buGBqT7BiV+RJE7iE1vQdhuslcQ=="],
+
+    "@stdlib/constants-float32-exponent-bias": ["@stdlib/constants-float32-exponent-bias@0.2.3", "", { "os": "!android" }, "sha512-AdJFdh75o8cBwT/zjRebtZGGz0lYY2P/ITKrxHo4snqinm+DoMFRChkYM2s0QYn8ZgFBHQ1iEPB0cYzxTLk3tg=="],
+
+    "@stdlib/constants-float32-exponent-mask": ["@stdlib/constants-float32-exponent-mask@0.2.3", "", { "os": "!android" }, "sha512-mkSAIakaixXJy45Ss8G7QbrS6eQemGjfIZhwmwlWDHxCJEVcfpuIijO/N0gtlF/MnGSOACwgn3Qkt1t3Eg30IQ=="],
+
+    "@stdlib/constants-float32-ninf": ["@stdlib/constants-float32-ninf@0.2.3", "", { "dependencies": { "@stdlib/array-float32": "^0.2.3", "@stdlib/array-uint32": "^0.2.3" }, "os": "!android" }, "sha512-X0t2gw6UKfzDRRjYH8k8dqRv2C6iI2sn3UrunRIzCL4WYYR+QWn1UwjZWG4fviIE+QuEGTyoKKb4wG6gTiS8yw=="],
+
+    "@stdlib/constants-float32-num-significand-bits": ["@stdlib/constants-float32-num-significand-bits@0.1.1", "", { "os": "!android" }, "sha512-pb5IMIdVb22DP6yJc1PmsqTc3mmn02ze4P1oE5aZY/0v4bPUf9yegUmYIyCEWPfM1HX/xnW4GwXDZ3QptSgLqg=="],
+
+    "@stdlib/constants-float32-pinf": ["@stdlib/constants-float32-pinf@0.2.3", "", { "dependencies": { "@stdlib/array-float32": "^0.2.3", "@stdlib/array-uint32": "^0.2.3" }, "os": "!android" }, "sha512-ofzg0/NDAjALtXw0GPGzsfwpTEziENlSNln2PqoPphno6u7yfCD7BWblIinvDALFwbpsUVWuxAvarL8XnXl4mA=="],
+
+    "@stdlib/constants-float32-sign-mask": ["@stdlib/constants-float32-sign-mask@0.2.3", "", { "os": "!android" }, "sha512-CdGdK5nHesLEkS6TeQ/jdl3iThAZYrNCysRVshkpz15ORgvbFyHiXaYFIGkwt0a5RnA4i11e3nioHBNWxITGxQ=="],
+
+    "@stdlib/constants-float32-significand-mask": ["@stdlib/constants-float32-significand-mask@0.2.4", "", { "os": "!android" }, "sha512-6oBi94bfEEqEPHyzgS3YNBK0fjCRsh/8A6xyaPuHBP+ltGmGfNsZmsZ5vQ+vChszKVyJG1/Bd/j4wif7GGJ/3A=="],
+
+    "@stdlib/constants-float32-smallest-normal": ["@stdlib/constants-float32-smallest-normal@0.2.3", "", { "os": "!android" }, "sha512-NHUPJr9+Bwcr0lMZ2goX7T5jWpel9AQcv4fZfnlabQ3HSYDkAhLBmoCUJh2jxjItR4SbWXzpIEKL3RNDeiKEeQ=="],
+
+    "@stdlib/constants-float64-e": ["@stdlib/constants-float64-e@0.2.3", "", { "os": "!android" }, "sha512-8nQCMqyeLPdNN2Kzc+tSeoksZbvyfRpqUgB2xCujfWIxdsPKvAXclWpMQ0EZuk19MBpNPSOEbiXbUiAIrk1Ksg=="],
+
+    "@stdlib/constants-float64-eps": ["@stdlib/constants-float64-eps@0.2.3", "", { "os": "!android" }, "sha512-TB4+YU9vc9RwMmSrCt9+UuFeXp+a29Q1KrzcBTcxU8uB/2totg6yYAFwhs8+48Vr5T/bQOsTQpuxXA5KEaThrg=="],
+
+    "@stdlib/constants-float64-eulergamma": ["@stdlib/constants-float64-eulergamma@0.2.3", "", { "os": "!android" }, "sha512-8scw10W2H/rgE2gSmW3Ubp310dsxW0UGppUoDcm5aJNOu/KgCUMqStoPLU653f5AbPZ//hSBpRh2+Nv31WCieg=="],
+
+    "@stdlib/constants-float64-exponent-bias": ["@stdlib/constants-float64-exponent-bias@0.2.3", "", { "os": "!android" }, "sha512-GjhdDNlHP96WooqvgEvsCPcK64ZsfpU6DlAsjRMJAPuh/QJ+Ut4WC7vMxuLp/Qio/N3AEsRvCOWIqa5jTvEWUw=="],
+
+    "@stdlib/constants-float64-fourth-pi": ["@stdlib/constants-float64-fourth-pi@0.2.3", "", { "os": "!android" }, "sha512-Ib/W5K0Pf/sDLjnGclxigJkGQJ/1Jtb+id4kuyRrf1qrlQwiP7tZq60prd+czL14r+1r2y3MYE/7ow4Fc1chUA=="],
+
+    "@stdlib/constants-float64-gamma-lanczos-g": ["@stdlib/constants-float64-gamma-lanczos-g@0.2.3", "", { "os": "!android" }, "sha512-bAC0FhhxMDeU6UsCGsAzVZXjnJOc65StXINkvIzhKTw8SjrlQGifNNcanOVtrwKMnpq13MLsVcG+m0R7BmiUZA=="],
+
+    "@stdlib/constants-float64-half-ln-two": ["@stdlib/constants-float64-half-ln-two@0.2.3", "", { "os": "!android" }, "sha512-5FcB6dmhWYNSvCRIukJ3fdd5kNH2eTbpgKo1pYqksp3dwMD6GKR3i/832maewutCvcT72Baj95Si1bqX037AXQ=="],
+
+    "@stdlib/constants-float64-half-pi": ["@stdlib/constants-float64-half-pi@0.2.3", "", { "os": "!android" }, "sha512-JBDU7c03I5H0kvmOM0ZyxwVxK6kZTLogYSXAS8ho3jkHU8P+DFHXxn6X9DhGKKlTaCTHCAEYQ7zSmV8H886TMA=="],
+
+    "@stdlib/constants-float64-high-word-abs-mask": ["@stdlib/constants-float64-high-word-abs-mask@0.2.3", "", { "os": "!android" }, "sha512-AXa286EisR1y71U71M18QvzldmIWsh1TNimoBjrUdCQn5jELOJAQPriTKt0H8kngfOUYfy/+EJwCpuQEL/VWrg=="],
+
+    "@stdlib/constants-float64-high-word-exponent-mask": ["@stdlib/constants-float64-high-word-exponent-mask@0.2.3", "", { "os": "!android" }, "sha512-/q5YMZwugOvQGCXp2kusJY04/KHDzAKMv/QEFBB98fDhN6Ux2VWbVyBESJzn55zVGQvb9XhULwkBy/KdB6YuqQ=="],
+
+    "@stdlib/constants-float64-high-word-sign-mask": ["@stdlib/constants-float64-high-word-sign-mask@0.2.1", "", { "os": "!android" }, "sha512-Fep/Ccgvz5i9d5k96zJsDjgXGno8HJfmH7wihLmziFmA2z9t7NSacH4/BH4rPJ5yXFHLkacNLDxaF1gO1XpcLA=="],
+
+    "@stdlib/constants-float64-high-word-significand-mask": ["@stdlib/constants-float64-high-word-significand-mask@0.2.3", "", { "os": "!android" }, "sha512-SGQfHBnS71PFGQt7Tv6ptAHStJy0sTXmUEjOOXoJlnlClizsgdHXwkeho4xIvycxyNe7L4nT34cFPDMRFguT7w=="],
+
+    "@stdlib/constants-float64-ln-two": ["@stdlib/constants-float64-ln-two@0.2.3", "", { "os": "!android" }, "sha512-pCNVc7Cmr56sg+jOrN2yLSWNHdN0UECAZIJ79sDaLBpF2FqeL6EI52EJesLmD64oGSNUC4yZNdGBe+DpKc1ZXw=="],
+
+    "@stdlib/constants-float64-max": ["@stdlib/constants-float64-max@0.2.3", "", { "os": "!android" }, "sha512-UiN+AZ8FuWCq0vXjTYRzQVpMA5Dnx5lBGaYP46/XiT9DY5v4I4ooJiSGcRpnMa/AcFvM+ZLVq/K/2c1VdL8h3g=="],
+
+    "@stdlib/constants-float64-max-base2-exponent": ["@stdlib/constants-float64-max-base2-exponent@0.2.3", "", { "os": "!android" }, "sha512-DXOhw/QF63NCeB7o7zAgq2g6IeT7jGDT5kBoRP67qbOeHm+NpZdrFdHXo7acH+pwLJXf5iECnVdyQ/axDLQ5mQ=="],
+
+    "@stdlib/constants-float64-max-base2-exponent-subnormal": ["@stdlib/constants-float64-max-base2-exponent-subnormal@0.2.1", "", { "os": "!android" }, "sha512-D1wBNn54Hu2pK6P/yBz0FtPBI3/7HdgK8igYjWDKWUKzC92R/6PHZ9q5NzedcGxoBs8MUk1zNpP0tZyYj9Y4YQ=="],
+
+    "@stdlib/constants-float64-max-ln": ["@stdlib/constants-float64-max-ln@0.2.3", "", { "os": "!android" }, "sha512-M/qzo1CWhgX84vCuF6Nba/Jf+doaQKxQHNXr3yXKL7BEatz7MWweEMaU2pxfKWa5wADMDvLttskYm5jLWnkiNg=="],
+
+    "@stdlib/constants-float64-max-nth-factorial": ["@stdlib/constants-float64-max-nth-factorial@0.1.1", "", { "os": "!android" }, "sha512-krwhCczEOQQDllianEG3LMR7m887BBMZV/udK1/0bYhXJPA2joOEp3RNz3F+IOMJZgPwMnK/x5P66Yp44jeydg=="],
+
+    "@stdlib/constants-float64-max-safe-integer": ["@stdlib/constants-float64-max-safe-integer@0.2.3", "", { "os": "!android" }, "sha512-T1CHYahzAHGLEIS5NMiHjOkGzvgZ0KFtBvFB62shkfMbnkc2gHxVuUzmbxaIm8jQO9X4qafQkRpHFg8AE/e4kg=="],
+
+    "@stdlib/constants-float64-min-base2-exponent": ["@stdlib/constants-float64-min-base2-exponent@0.2.3", "", { "os": "!android" }, "sha512-N6Xh+ZCnSCMC+ImkgmYAPHFn4V+94pA5KM2ekhNUC3as1pZVJRkJVacogGnqJ9vnoAbZ0QgZpkJpap8Jy7Pldw=="],
+
+    "@stdlib/constants-float64-min-base2-exponent-subnormal": ["@stdlib/constants-float64-min-base2-exponent-subnormal@0.2.1", "", { "os": "!android" }, "sha512-fTXfvctXWj/48gK+gbRBrHuEHEKY4QOJoXSGp414Sz6vUxHusHJJ686p8ze3XqM7CY6fmL09ZgdGz/uhJl/7lw=="],
+
+    "@stdlib/constants-float64-min-ln": ["@stdlib/constants-float64-min-ln@0.2.3", "", { "os": "!android" }, "sha512-xiA2KS0yVt69fPehhEgl2glBJJrMLH/0q6eornMRkrZuG+o03wLKaqAqTcrkm2nhIMmhNXEVm+gQU0nfiI8Cmw=="],
+
+    "@stdlib/constants-float64-ninf": ["@stdlib/constants-float64-ninf@0.2.3", "", { "dependencies": { "@stdlib/number-ctor": "^0.2.3" }, "os": "!android" }, "sha512-1yBmgdNkvxWR0IfebDnhS4KOHPNgTpe3j6CCRt3qUW98l45tUkjuqyKKu8jNvjJCq+qKaNHNNk8xAl+/eDuABg=="],
+
+    "@stdlib/constants-float64-num-high-word-significand-bits": ["@stdlib/constants-float64-num-high-word-significand-bits@0.1.1", "", { "os": "!android" }, "sha512-qyZWHlGYIS6Hjxnt8TTBWlvkGQlFJT2UVQhaoBrQfp456YF8aghgiwHiaUTXzngMH1llcEq2tyPjCxBdTLs6Hg=="],
+
+    "@stdlib/constants-float64-pi": ["@stdlib/constants-float64-pi@0.2.3", "", { "os": "!android" }, "sha512-1s/4TBYzAj+tOgi2yRX6Iecos8SUn968Vymsl8U7+5pDpJzicfBpB9ZIbWNVMQVkBRWFnMx/T3BUzW1+g/dEsA=="],
+
+    "@stdlib/constants-float64-pinf": ["@stdlib/constants-float64-pinf@0.2.3", "", { "os": "!android" }, "sha512-8kRy0XOvW7QiJlxdy8MXx7rM3S4H/ZsUI+q9dNoarKVDBtWzkqnEG/u5QYouVjGHaSVL8C7b7qwL1FdpSD+24g=="],
+
+    "@stdlib/constants-float64-smallest-normal": ["@stdlib/constants-float64-smallest-normal@0.2.3", "", { "os": "!android" }, "sha512-z2IDWJD7s6QwrfzI5o4q3OnZ7mEzUIs1V1PdTuHDofyWkpFGEr7GgwGI/0cZbuhW3aY3xydvM3rZ5SxT+6KQoQ=="],
+
+    "@stdlib/constants-float64-sqrt-eps": ["@stdlib/constants-float64-sqrt-eps@0.2.3", "", { "os": "!android" }, "sha512-N6ga0XNLkDgrGCs1cgajXzTYFgl6gDrgWOJW3AQhZPaFEswTtD+yMmcw3p4ye1LZpU3JyDr8hcY2iwL8whX+nA=="],
+
+    "@stdlib/constants-float64-sqrt-two": ["@stdlib/constants-float64-sqrt-two@0.2.3", "", { "os": "!android" }, "sha512-vehmaN+P1IYJ6HhbH70ebhLAZOYnuTm1ezWpFBm/IEC9NGiKKmyrtO+z1xp6iWGl1VrAAhWJE+bBQEP4wVQsCw=="],
+
+    "@stdlib/constants-float64-sqrt-two-pi": ["@stdlib/constants-float64-sqrt-two-pi@0.2.3", "", { "os": "!android" }, "sha512-XVCJ0voDf2U/MMqqnLOo9CB8IEC4odQoercGolrJBud6MXmWp1eVrRYM6y0ocJuyaAPgsYSoPKp0+Gc907InTQ=="],
+
+    "@stdlib/constants-float64-two-pi": ["@stdlib/constants-float64-two-pi@0.2.3", "", { "os": "!android" }, "sha512-KoNeAgq+jSDT0lYYHAYosZJwRSH9VlykKjI7BK8TVox7z5QqlXG4Sa94NeGwP8qhp+g4N3Mb7BqXlol3t4vPfg=="],
+
+    "@stdlib/constants-int16-max": ["@stdlib/constants-int16-max@0.2.3", "", { "os": "!android" }, "sha512-mPHYy0jMD8ALGd5QDOAYU8mO57sbYsivYUVZq7+/mJDXldVprD+fUJFX8QOkuRW1LIsVSqHA1F4oGrnjFM+lVA=="],
+
+    "@stdlib/constants-int16-min": ["@stdlib/constants-int16-min@0.2.3", "", { "os": "!android" }, "sha512-FZrIJecQGw5qEYSrd4inQgx9xe5igDb+UmZZDKccv39xwWpPPfprt7Sr+zholUdcGGpoJdftBI9QbbLQRTOqcw=="],
+
+    "@stdlib/constants-int32-max": ["@stdlib/constants-int32-max@0.3.1", "", { "os": "!android" }, "sha512-ZAhWfNaBhVzDatkha1q0vu7tO6XRbP6kxJk/Erh4emgE/4JpC9WPlXfkZvhOoCWQ1Rsll7tevxN3rfu6oGN7OA=="],
+
+    "@stdlib/constants-int32-min": ["@stdlib/constants-int32-min@0.2.3", "", { "os": "!android" }, "sha512-xXa5t+tlRuwi+cHru4p8gFPnXqa2hI1bn+K6IoTd8Pj+ySKTkR0evSgNIrO6kcEf+kj2YuNXZZM3sqK33SH9vw=="],
+
+    "@stdlib/constants-int8-max": ["@stdlib/constants-int8-max@0.2.3", "", { "os": "!android" }, "sha512-TD5BzgiZshK/LD/3Ya4fp2mI0j/XGm+XH7TOWLjMWrH3JYbW/GIQfTTDsXTEu52Te0M64Xy5WBmvrXoObFkqSw=="],
+
+    "@stdlib/constants-int8-min": ["@stdlib/constants-int8-min@0.2.3", "", { "os": "!android" }, "sha512-sD5yCZIujDG0DKLBSj+r3UzxQ04yTyQ4yT/umQrtTHMHAGmZnNZ0Jab8VmxBxfZUC2PAVc841hS/XKQglw5Fsg=="],
+
+    "@stdlib/constants-uint16-max": ["@stdlib/constants-uint16-max@0.2.3", "", { "os": "!android" }, "sha512-QLqt85JMBnL8ozliswgAeR9oWrsmWeaeWjr10P0zbGV1dKhM2HoRK3VXjO4SCtNWUwiV4w8Wa5ylSYdJhORDjA=="],
+
+    "@stdlib/constants-uint32-max": ["@stdlib/constants-uint32-max@0.2.3", "", { "os": "!android" }, "sha512-NYQIGMA3Z8+1gp2qUfmr90whvZJLDq737ipNeujrFm98/RcbBlCRmXCLlj0WMwxniw2T35ysfclAcFSE7caUCA=="],
+
+    "@stdlib/constants-uint8-max": ["@stdlib/constants-uint8-max@0.2.3", "", { "os": "!android" }, "sha512-B4VzHho0T43dJk3m1x9V3GZ1OOK9AKNojo3jOweixBLLlofaEIe0E9f4Gihc2ef7+M4azYptsJdPY1jPy7kK2g=="],
+
+    "@stdlib/error-tools-fmtprodmsg": ["@stdlib/error-tools-fmtprodmsg@0.2.3", "", { "os": "!android" }, "sha512-mt4YRp52oCkNWhxkUIJkeGaFnSvZkyfl4rOJX8Drz99xFiIdanXcSacckhrXXu6NQvMDKidCGr6DvrhHHx15LQ=="],
+
+    "@stdlib/fs-exists": ["@stdlib/fs-exists@0.2.3", "", { "dependencies": { "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-kfHok9sKxvCftgWriVtNjqezNZA72Q/rJh78lcrGCLPvSHGIAL460olzl7D1OgAgQvM3Cwdoupay0o3dBCCwVQ=="],
+
+    "@stdlib/fs-resolve-parent-path": ["@stdlib/fs-resolve-parent-path@0.2.3", "", { "dependencies": { "@stdlib/assert-has-own-property": "^0.2.3", "@stdlib/assert-is-function": "^0.2.3", "@stdlib/assert-is-plain-object": "^0.2.3", "@stdlib/assert-is-string": "^0.2.3", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/fs-exists": "^0.2.3", "@stdlib/process-cwd": "^0.2.3", "@stdlib/string-format": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-bof7pQQewv8LLaSi2Ut77mkEv4v45Z/w/hYocG0UUzmXhu4lXIiCcXz9ZAMJC4tdN5hwBReJGfJ0mQryddhGGA=="],
+
+    "@stdlib/function-ctor": ["@stdlib/function-ctor@0.2.3", "", { "os": "!android" }, "sha512-/Ny143oEz3YAwauaPZ+J9A3IGFdE+0dam5/ATJPGLcl2nDj8P2shAsMp30coyEyzKDoMZqYSKTFFTV5rxyChAA=="],
+
+    "@stdlib/math-base-assert-is-even": ["@stdlib/math-base-assert-is-even@0.2.5", "", { "dependencies": { "@stdlib/math-base-assert-is-integer": "^0.2.7", "@stdlib/napi-argv": "^0.2.3", "@stdlib/napi-argv-double": "^0.2.2", "@stdlib/napi-create-int32": "^0.0.3", "@stdlib/napi-export": "^0.3.1", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-EtCGbIAnrhgYpCrCrYNQC6aqOPviTdU2Ui1t9grPG2e1eE8cMjzSpTg1TJmcZeMShzlWl9BcgeCS2GQPaYhkCQ=="],
+
+    "@stdlib/math-base-assert-is-finite": ["@stdlib/math-base-assert-is-finite@0.2.3", "", { "dependencies": { "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/napi-argv": "^0.2.3", "@stdlib/napi-argv-double": "^0.2.2", "@stdlib/napi-create-int32": "^0.0.3", "@stdlib/napi-export": "^0.3.1", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-PqqxkiubjHe9jdIfAf/PTHZLbYIk1wcFwPGALM+PR3kjRngEkti7NbbkTQX3sByZCCfRwOf7VxLPWDlGo3EmLw=="],
+
+    "@stdlib/math-base-assert-is-finitef": ["@stdlib/math-base-assert-is-finitef@0.2.3", "", { "dependencies": { "@stdlib/constants-float32-ninf": "^0.2.2", "@stdlib/constants-float32-pinf": "^0.2.2", "@stdlib/napi-argv": "^0.2.3", "@stdlib/napi-argv-float": "^0.2.3", "@stdlib/napi-create-int32": "^0.0.3", "@stdlib/napi-export": "^0.3.1", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-FiP4w+PjwD6zapXgrD0hLEtnUMi+uCcBQw+tU9cAGyB+7NrhnUoKSWgHsjtLGLMD08gWsFOIjZzZRavx4PocfA=="],
+
+    "@stdlib/math-base-assert-is-infinite": ["@stdlib/math-base-assert-is-infinite@0.2.3", "", { "dependencies": { "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-tWQoN9z7j56DIop5cBnbdkP/o1MGQ0K8bX4v6Nxsgqngk7YBXYlxGRVw+46FVyxNButJY20VwxpMhrv4fQg35g=="],
+
+    "@stdlib/math-base-assert-is-integer": ["@stdlib/math-base-assert-is-integer@0.2.7", "", { "dependencies": { "@stdlib/math-base-special-floor": "^0.2.4", "@stdlib/napi-argv": "^0.2.3", "@stdlib/napi-argv-double": "^0.2.2", "@stdlib/napi-create-int32": "^0.0.3", "@stdlib/napi-export": "^0.3.1", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-rsxiM7N9Y5kd9elTEJpx1kAcHBeHETH46vn2s5FoKyNt7oZLqv9iE5oKF3oNznA3H47o7SNyQSdcJpUDqS1W3w=="],
+
+    "@stdlib/math-base-assert-is-nan": ["@stdlib/math-base-assert-is-nan@0.2.3", "", { "dependencies": { "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-mj1p+JUSfbsiBI3+hwRV7bS0qgI2nWdzrFtBJUSLk+17MJSdA4aboUsXM12wIV1kg5JNfEAn+5eh4NF/sMvaoQ=="],
+
+    "@stdlib/math-base-assert-is-nanf": ["@stdlib/math-base-assert-is-nanf@0.2.3", "", { "dependencies": { "@stdlib/napi-argv": "^0.2.3", "@stdlib/napi-argv-float": "^0.2.3", "@stdlib/napi-create-int32": "^0.0.3", "@stdlib/napi-export": "^0.3.1", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-sWMMFhTrkeYu/t5bv7KZ8Rm7H4pD+O1+wYYNu1CsJ4y1Q6HwSDeHBNIH7Z4zHOOSFiOidb04jnqMGSsL5UCFRg=="],
+
+    "@stdlib/math-base-assert-is-negative-zero": ["@stdlib/math-base-assert-is-negative-zero@0.2.3", "", { "dependencies": { "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-5XzTwloDrG60ZRd5vgbw/lXKn794s2q8Hb0pT2LUy0WG2j98LhAQNEv0f0a7brhHlGOMTX5Hmg1DZXw+ve2u5Q=="],
+
+    "@stdlib/math-base-assert-is-odd": ["@stdlib/math-base-assert-is-odd@0.3.2", "", { "dependencies": { "@stdlib/math-base-assert-is-even": "^0.2.4", "@stdlib/napi-argv": "^0.2.3", "@stdlib/napi-argv-double": "^0.2.2", "@stdlib/napi-create-int32": "^0.0.3", "@stdlib/napi-export": "^0.3.1", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-AVtda9LMQ7WgracZDygZzh7rBDys8KKn4qzAIVv2hWG3ns8X8btQ46plekP44iRyGjYagXMzLJn2jo/Irkf71Q=="],
+
+    "@stdlib/math-base-assert-is-positive-zero": ["@stdlib/math-base-assert-is-positive-zero@0.2.3", "", { "dependencies": { "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-V+f8enSK2dEk2V/nHMezyJaUfSC0QJNUD8+mQYON7JtFaxq/+xURnPMllF9h84cFqQ9SAuxWXP+Y7MoE+ENORw=="],
+
+    "@stdlib/math-base-napi-binary": ["@stdlib/math-base-napi-binary@0.3.3", "", { "dependencies": { "@stdlib/complex-float32-ctor": "^0.1.0", "@stdlib/complex-float32-reim": "^0.1.3", "@stdlib/complex-float64-ctor": "^0.1.1", "@stdlib/complex-float64-reim": "^0.1.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-rLBojVTK0GRhy5v0MEKLmamggOrosEMaDcMS5ITuUe6Jgz4DM3lsiB/EHhd0TamPdqo+5HPjqSo10zpFVbLZbA=="],
+
+    "@stdlib/math-base-napi-ternary": ["@stdlib/math-base-napi-ternary@0.3.2", "", { "dependencies": { "@stdlib/complex-float32-ctor": "^0.1.0", "@stdlib/complex-float32-reim": "^0.1.3", "@stdlib/complex-float64-ctor": "^0.1.1", "@stdlib/complex-float64-reim": "^0.1.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-DUu7zbd692l86VnUaav4dgIVIkYnxklDMMKpmGT+mi30QH959324tjl3dsthYy5iySnKWg/V0z54opu0FC8jXA=="],
+
+    "@stdlib/math-base-napi-unary": ["@stdlib/math-base-napi-unary@0.2.7", "", { "dependencies": { "@stdlib/complex-float32-ctor": "^0.1.0", "@stdlib/complex-float32-reim": "^0.1.3", "@stdlib/complex-float64-ctor": "^0.1.1", "@stdlib/complex-float64-reim": "^0.1.3", "@stdlib/number-float16-base-to-float64": "^0.1.1", "@stdlib/number-float16-ctor": "^0.1.1", "@stdlib/number-float64-base-to-float16": "^0.1.1", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-eEu0nAq8WzCGe15ppGJWtLGhKOoG4OcMJQpsfbjwaa3sZ9h1sREmV1iiAFWyi/mHy8C0y6PiG2szx4D/F0ywmg=="],
+
+    "@stdlib/math-base-special-abs": ["@stdlib/math-base-special-abs@0.2.3", "", { "dependencies": { "@stdlib/constants-float64-high-word-abs-mask": "^0.2.2", "@stdlib/math-base-napi-unary": "^0.2.6", "@stdlib/number-float64-base-to-words": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-0n2Jb1NQv/siPL5EJFf6/cCuK63zqgqFjQwPujJI8B+dDizlHJKF4jR6yOtavrB5RvVf37/3Ibpdjf8UPf3uzA=="],
+
+    "@stdlib/math-base-special-absf": ["@stdlib/math-base-special-absf@0.2.3", "", { "dependencies": { "@stdlib/constants-float32-abs-mask": "^0.2.2", "@stdlib/math-base-napi-unary": "^0.2.6", "@stdlib/number-float32-base-to-word": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-lUEEnIo6jpR397bn4mphlihPBMncdgKYQQYZ8nwnL/wGNE9InwqLqrO6otM+CO2nkG/kOyt0dSAhSSffqBZU6g=="],
+
+    "@stdlib/math-base-special-asin": ["@stdlib/math-base-special-asin@0.2.4", "", { "dependencies": { "@stdlib/constants-float64-fourth-pi": "^0.2.2", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/math-base-special-sqrt": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-HM/x7n25umG0plZrAil2wq21m6+9rA9TDTXErYXAv27HEM5NZGCZn9i+kpTog5/IDSdM58OkTsEB5FOfaBCjuw=="],
+
+    "@stdlib/math-base-special-beta": ["@stdlib/math-base-special-beta@0.3.1", "", { "dependencies": { "@stdlib/constants-float64-e": "^0.2.3", "@stdlib/constants-float64-eps": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-binary": "^0.3.3", "@stdlib/math-base-special-abs": "^0.2.3", "@stdlib/math-base-special-exp": "^0.2.4", "@stdlib/math-base-special-log1p": "^0.2.4", "@stdlib/math-base-special-pow": "^0.3.0", "@stdlib/math-base-special-sqrt": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-DabfQZifUcNF529IYtj/9A5oAmZD6g4JhQt1drx8sMMLUJ89r8TZLIyMZU/bgp4cpzSkRGRSPjfXWL/98y5Y7w=="],
+
+    "@stdlib/math-base-special-betainc": ["@stdlib/math-base-special-betainc@0.2.3", "", { "dependencies": { "@stdlib/math-base-special-kernel-betainc": "^0.2.2" }, "os": "!android" }, "sha512-yTGYcCptTWVFxL9hv4Uc221kb7tULU5JkRp5oklPhZmg2uj/eRIvaGYtYvzuTnEU2HpdgWcTVwdDaWsG68F6NQ=="],
+
+    "@stdlib/math-base-special-binomcoef": ["@stdlib/math-base-special-binomcoef@0.3.1", "", { "dependencies": { "@stdlib/constants-float64-max-safe-integer": "^0.2.2", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/math-base-assert-is-integer": "^0.2.7", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-assert-is-odd": "^0.3.2", "@stdlib/math-base-napi-binary": "^0.3.3", "@stdlib/math-base-special-floor": "^0.2.4", "@stdlib/math-base-special-gcd": "^0.3.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-ywcno89Y7ntRdj3NdAVfVzYoIrJb5lILhq+K+NqhgrJBOcrE8ZF+/yPhyVwjUvksfGy990tBnyhx+06VLVFAQg=="],
+
+    "@stdlib/math-base-special-ceil": ["@stdlib/math-base-special-ceil@0.2.3", "", { "dependencies": { "@stdlib/math-base-napi-unary": "^0.2.6", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-QJsGAxftN8RLjDkqKqyOcWh8tGFauyXMvqLxoq4C22tm+1ABJ+1rU5wEATOgvOHaDVc7HvHA7fakHTB0UsDUyw=="],
+
+    "@stdlib/math-base-special-copysign": ["@stdlib/math-base-special-copysign@0.2.3", "", { "dependencies": { "@stdlib/constants-float64-high-word-abs-mask": "^0.2.3", "@stdlib/constants-float64-high-word-sign-mask": "^0.2.1", "@stdlib/math-base-napi-binary": "^0.3.3", "@stdlib/number-float64-base-from-words": "^0.2.2", "@stdlib/number-float64-base-get-high-word": "^0.2.3", "@stdlib/number-float64-base-to-words": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-kOPVuWHQht53FcFXO4L1yqXSZy4emdI6qITJAWRENDuW9YZ6QRTONBqOaDC5uU/dRZg3LcMUpQ7iuqYqa/pbeQ=="],
+
+    "@stdlib/math-base-special-cos": ["@stdlib/math-base-special-cos@0.3.1", "", { "dependencies": { "@stdlib/constants-float64-high-word-abs-mask": "^0.2.3", "@stdlib/constants-float64-high-word-exponent-mask": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/math-base-special-kernel-cos": "^0.2.4", "@stdlib/math-base-special-kernel-sin": "^0.2.4", "@stdlib/math-base-special-rempio2": "^0.3.0", "@stdlib/number-float64-base-get-high-word": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-efthz58G0wf8rXh4+jbYeRuRCagNlYb8AL3es1GxwV9P9/8ZpKAlkQiRPY3AI3ZJMB17aR/KHpVw7Pz+rw4Fhg=="],
+
+    "@stdlib/math-base-special-erf": ["@stdlib/math-base-special-erf@0.2.6", "", { "dependencies": { "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/math-base-special-exp": "^0.2.4", "@stdlib/number-float64-base-set-low-word": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-9ruhEMTEcAWshj1FK10pYDR+/jQlZSZAsQp31xuRHv5Iq6TE725Ybk9c7anzUp6iyMMQaDCVyvJ9VpW2OeGufg=="],
+
+    "@stdlib/math-base-special-erfc": ["@stdlib/math-base-special-erfc@0.2.5", "", { "dependencies": { "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/math-base-special-exp": "^0.2.4", "@stdlib/number-float64-base-set-low-word": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-qA2iPLKr8SjYpI9TCT7LoQCbUrbx17kmiRidDewWk/aHL0pcpSm8KITCjBUtsmletSEUNUS+8MyAPqisXT3N1g=="],
+
+    "@stdlib/math-base-special-erfinv": ["@stdlib/math-base-special-erfinv@0.3.1", "", { "dependencies": { "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/math-base-special-ln": "^0.2.5", "@stdlib/math-base-special-sqrt": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-BJxcF6nicIU6ZTybfJMQaWC2VeeyQJ8PgR9AxcY0eaK4gsr04dvfCA7Rs/MDGhRozZGA6y8HcmmQk6XbF78Jag=="],
+
+    "@stdlib/math-base-special-exp": ["@stdlib/math-base-special-exp@0.2.5", "", { "dependencies": { "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/math-base-special-ldexp": "^0.2.4", "@stdlib/math-base-special-trunc": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-1xZWUc+uDQHRD/mHJMsAjenRq7w6ZZqAUc8Jtxwcd5Ccv23CckP0TvDNkC6RqVWWPJploxoxDArQ+BUXgHbpeA=="],
+
+    "@stdlib/math-base-special-expm1": ["@stdlib/math-base-special-expm1@0.2.4", "", { "dependencies": { "@stdlib/constants-float64-exponent-bias": "^0.2.3", "@stdlib/constants-float64-half-ln-two": "^0.2.3", "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/number-float64-base-from-words": "^0.2.2", "@stdlib/number-float64-base-get-high-word": "^0.2.3", "@stdlib/number-float64-base-set-high-word": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-/2HSORRdM0vAdiEEILreYV8cKtnUfW2OrxKLc5dbkCMHe895gURlrpTA507lF3x02uAnHh8PiasMsYTOXcGeCA=="],
+
+    "@stdlib/math-base-special-factorial": ["@stdlib/math-base-special-factorial@0.3.2", "", { "dependencies": { "@stdlib/constants-float64-max-nth-factorial": "^0.1.1", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/math-base-assert-is-integer": "^0.2.7", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/math-base-special-gamma": "^0.3.0", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-YOqPZBtZPP+Pa6jQn/IY0JjGx1sShxQ27XYbpgupg9yZCvabLzhHg+J6/mnjqf4eti6UcVtCITFUZOZ671GyOQ=="],
+
+    "@stdlib/math-base-special-floor": ["@stdlib/math-base-special-floor@0.2.4", "", { "dependencies": { "@stdlib/math-base-napi-unary": "^0.2.6", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-YSDt9gHSp8SeVBVzHfpZZ1HFEQDPihHUF92zTDCRGKeKBC4BTFlw9Q4/fNWqS1mtuBGli1zgpRbiTv3atQ5EjQ=="],
+
+    "@stdlib/math-base-special-fmod": ["@stdlib/math-base-special-fmod@0.1.1", "", { "dependencies": { "@stdlib/constants-float64-exponent-bias": "^0.2.2", "@stdlib/constants-float64-high-word-abs-mask": "^0.2.2", "@stdlib/constants-float64-high-word-exponent-mask": "^0.2.2", "@stdlib/constants-float64-high-word-sign-mask": "^0.2.1", "@stdlib/constants-float64-high-word-significand-mask": "^0.2.2", "@stdlib/constants-float64-min-base2-exponent": "^0.2.2", "@stdlib/math-base-napi-binary": "^0.3.2", "@stdlib/number-float64-base-from-words": "^0.2.2", "@stdlib/number-float64-base-to-words": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-pW0Jn1S9D8Eh34tEmEJUzZlkfN2nhOmi0dCO8xDWhgdit3+qG/U85t0bULT+/5kRezy8SspnTFkGOoopHztzQQ=="],
+
+    "@stdlib/math-base-special-gamma": ["@stdlib/math-base-special-gamma@0.3.1", "", { "dependencies": { "@stdlib/constants-float64-eulergamma": "^0.2.3", "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/constants-float64-pi": "^0.2.3", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/constants-float64-sqrt-two-pi": "^0.2.3", "@stdlib/math-base-assert-is-integer": "^0.2.7", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-assert-is-negative-zero": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/math-base-special-abs": "^0.2.3", "@stdlib/math-base-special-exp": "^0.2.5", "@stdlib/math-base-special-floor": "^0.2.4", "@stdlib/math-base-special-pow": "^0.3.1", "@stdlib/math-base-special-sin": "^0.3.0", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-WONtgh00BdeBbgvhjjmn4kviBXb2ybFa4IDOhknxvKS3m8mIVJU59tzLHVa9XiGcomq1H7Mm6CeGPmjmkD+Rpw=="],
+
+    "@stdlib/math-base-special-gamma-delta-ratio": ["@stdlib/math-base-special-gamma-delta-ratio@0.3.1", "", { "dependencies": { "@stdlib/constants-float64-e": "^0.2.3", "@stdlib/constants-float64-eps": "^0.2.3", "@stdlib/constants-float64-gamma-lanczos-g": "^0.2.3", "@stdlib/constants-float64-max-nth-factorial": "^0.1.1", "@stdlib/math-base-napi-binary": "^0.3.3", "@stdlib/math-base-special-abs": "^0.2.3", "@stdlib/math-base-special-exp": "^0.2.5", "@stdlib/math-base-special-factorial": "^0.3.2", "@stdlib/math-base-special-floor": "^0.2.4", "@stdlib/math-base-special-gamma": "^0.3.0", "@stdlib/math-base-special-gamma-lanczos-sum": "^0.3.2", "@stdlib/math-base-special-log1p": "^0.2.4", "@stdlib/math-base-special-pow": "^0.3.1", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-Tekp7Flw36nZPZ8fQilkPRiGyMbYyzWjRV/HZWuBaqqDWE3+J2W68qflGFCad0M6qkWDxLV65TJ9E8yJiTYxAQ=="],
+
+    "@stdlib/math-base-special-gamma-lanczos-sum": ["@stdlib/math-base-special-gamma-lanczos-sum@0.3.2", "", { "dependencies": { "@stdlib/math-base-napi-unary": "^0.2.6", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-wIH23KUPBKhu0nCraZ3aY882ICDtLIDxeiiBY4F1hNeBBrMeODcCWJc3+jwXvzjigBXPRFHWJqjOyL57FyoGBQ=="],
+
+    "@stdlib/math-base-special-gamma-lanczos-sum-expg-scaled": ["@stdlib/math-base-special-gamma-lanczos-sum-expg-scaled@0.2.2", "", { "dependencies": { "@stdlib/math-base-napi-unary": "^0.2.6", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-P8exugMuGijA+9FzG1krmfPIHWqRolFm9xws+H1OGTw9lq6c+sPAny/1KNLo/QbL/UaKrjhbeUDVHOjN3wj2Hw=="],
+
+    "@stdlib/math-base-special-gamma1pm1": ["@stdlib/math-base-special-gamma1pm1@0.3.1", "", { "dependencies": { "@stdlib/constants-float64-eps": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/math-base-special-expm1": "^0.2.4", "@stdlib/math-base-special-gamma": "^0.3.0", "@stdlib/math-base-special-ln": "^0.2.5", "@stdlib/math-base-special-log1p": "^0.2.4", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-cZ6m+qn350Hi6nBXoqH/4WLRInDRJ4cZLVgfzuP/49waT9iOGX+kszKAVnMjvp4AYe96ZEBJ1DwUcMYDrX3S1A=="],
+
+    "@stdlib/math-base-special-gammainc": ["@stdlib/math-base-special-gammainc@0.3.1", "", { "dependencies": { "@stdlib/constants-float32-smallest-normal": "^0.2.3", "@stdlib/constants-float64-e": "^0.2.3", "@stdlib/constants-float64-eps": "^0.2.3", "@stdlib/constants-float64-gamma-lanczos-g": "^0.2.3", "@stdlib/constants-float64-max": "^0.2.3", "@stdlib/constants-float64-max-ln": "^0.2.3", "@stdlib/constants-float64-max-nth-factorial": "^0.1.1", "@stdlib/constants-float64-min-ln": "^0.2.3", "@stdlib/constants-float64-pi": "^0.2.3", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/constants-float64-sqrt-eps": "^0.2.3", "@stdlib/constants-float64-sqrt-two-pi": "^0.2.3", "@stdlib/constants-float64-two-pi": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-special-abs": "^0.2.3", "@stdlib/math-base-special-erfc": "^0.2.5", "@stdlib/math-base-special-exp": "^0.2.5", "@stdlib/math-base-special-floor": "^0.2.4", "@stdlib/math-base-special-gamma": "^0.3.0", "@stdlib/math-base-special-gamma-lanczos-sum-expg-scaled": "^0.2.2", "@stdlib/math-base-special-gamma1pm1": "^0.3.0", "@stdlib/math-base-special-gammaln": "^0.3.0", "@stdlib/math-base-special-ln": "^0.2.5", "@stdlib/math-base-special-log1pmx": "^0.2.4", "@stdlib/math-base-special-max": "^0.3.1", "@stdlib/math-base-special-min": "^0.2.4", "@stdlib/math-base-special-pow": "^0.3.1", "@stdlib/math-base-special-powm1": "^0.3.2", "@stdlib/math-base-special-sqrt": "^0.2.3", "@stdlib/math-base-tools-continued-fraction": "^0.2.3", "@stdlib/math-base-tools-evalpoly": "^0.2.3", "@stdlib/math-base-tools-sum-series": "^0.2.3", "@stdlib/napi-argv": "^0.2.3", "@stdlib/napi-argv-bool": "^0.1.1", "@stdlib/napi-argv-double": "^0.2.2", "@stdlib/napi-create-double": "^0.0.3", "@stdlib/napi-export": "^0.3.1", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-w9R2wnk+5gvZaWiPsnlpZVELYvQ+6ZccgBY2JmRmwBLbvj5t/u8M0jC7MM3CaMCIt5jBmocCD4kCtconzx4WuQ=="],
+
+    "@stdlib/math-base-special-gammaln": ["@stdlib/math-base-special-gammaln@0.3.1", "", { "dependencies": { "@stdlib/constants-float64-pi": "^0.2.3", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/math-base-assert-is-infinite": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/math-base-special-abs": "^0.2.3", "@stdlib/math-base-special-ln": "^0.2.5", "@stdlib/math-base-special-sinpi": "^0.3.0", "@stdlib/math-base-special-trunc": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-ptzVz18xkfxzgekgAbk6ytMoDc7MYAUY4xZuAW/SyFGO6sCPVbwU4GH1/1IQAGLrDKYizKeVoTsO5NGK5Zpvyw=="],
+
+    "@stdlib/math-base-special-gcd": ["@stdlib/math-base-special-gcd@0.3.2", "", { "dependencies": { "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/constants-int32-max": "^0.3.1", "@stdlib/math-base-assert-is-integer": "^0.2.7", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-binary": "^0.3.3", "@stdlib/math-base-special-fmod": "^0.1.1", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-eQKqRFOlHGw5Ce4mo91uilqywONEp/7L4d/bDEUqL1sRj3bTAIZeCa6ap7wl8vnMXCHLGI0ve7xp6wxVHo4Bdg=="],
+
+    "@stdlib/math-base-special-kernel-betainc": ["@stdlib/math-base-special-kernel-betainc@0.2.3", "", { "dependencies": { "@stdlib/constants-float64-e": "^0.2.3", "@stdlib/constants-float64-eps": "^0.2.3", "@stdlib/constants-float64-gamma-lanczos-g": "^0.2.3", "@stdlib/constants-float64-half-pi": "^0.2.3", "@stdlib/constants-float64-max": "^0.2.3", "@stdlib/constants-float64-max-ln": "^0.2.3", "@stdlib/constants-float64-min-ln": "^0.2.3", "@stdlib/constants-float64-pi": "^0.2.3", "@stdlib/constants-float64-smallest-normal": "^0.2.3", "@stdlib/constants-int32-max": "^0.3.1", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-special-abs": "^0.2.3", "@stdlib/math-base-special-asin": "^0.2.4", "@stdlib/math-base-special-beta": "^0.3.1", "@stdlib/math-base-special-binomcoef": "^0.3.1", "@stdlib/math-base-special-exp": "^0.2.5", "@stdlib/math-base-special-expm1": "^0.2.4", "@stdlib/math-base-special-factorial": "^0.3.2", "@stdlib/math-base-special-floor": "^0.2.4", "@stdlib/math-base-special-gamma": "^0.3.0", "@stdlib/math-base-special-gamma-delta-ratio": "^0.3.0", "@stdlib/math-base-special-gamma-lanczos-sum-expg-scaled": "^0.2.2", "@stdlib/math-base-special-gammainc": "^0.3.0", "@stdlib/math-base-special-gammaln": "^0.3.0", "@stdlib/math-base-special-ln": "^0.2.5", "@stdlib/math-base-special-log1p": "^0.2.4", "@stdlib/math-base-special-max": "^0.3.1", "@stdlib/math-base-special-maxabs": "^0.3.1", "@stdlib/math-base-special-min": "^0.2.4", "@stdlib/math-base-special-minabs": "^0.2.4", "@stdlib/math-base-special-pow": "^0.3.1", "@stdlib/math-base-special-sqrt": "^0.2.3", "@stdlib/math-base-tools-continued-fraction": "^0.2.3", "@stdlib/math-base-tools-sum-series": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-ho7hVn2GAnHsoj+SKJxrgo5rvftmIinE2H2J9/NWXYU6ubjQJ1EmJAzZ6fMSED++lK+eARS1kUl8hUeKRuIbDQ=="],
+
+    "@stdlib/math-base-special-kernel-cos": ["@stdlib/math-base-special-kernel-cos@0.2.4", "", { "dependencies": { "@stdlib/math-base-napi-binary": "^0.3.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-DFaoDJCFhPXiOuiGPSU1tmlUQ2UzRWMMB7lKKARjUoxbFpNLwB1TAqAnlx/rguQcCMf7uSZYALpTfxYlJHDPyg=="],
+
+    "@stdlib/math-base-special-kernel-sin": ["@stdlib/math-base-special-kernel-sin@0.2.4", "", { "dependencies": { "@stdlib/math-base-napi-binary": "^0.3.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-mMXh47MXZd4gB45747Y+6Z5G4oQW0Uaqo5sx+HmJ7JPol/Sp3B6JSqahT+OtAf7oZVBAJ7qWmNlmib6IiueosQ=="],
+
+    "@stdlib/math-base-special-ldexp": ["@stdlib/math-base-special-ldexp@0.2.5", "", { "dependencies": { "@stdlib/constants-float64-exponent-bias": "^0.2.3", "@stdlib/constants-float64-max-base2-exponent": "^0.2.3", "@stdlib/constants-float64-max-base2-exponent-subnormal": "^0.2.1", "@stdlib/constants-float64-min-base2-exponent-subnormal": "^0.2.1", "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/math-base-assert-is-infinite": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-special-copysign": "^0.2.3", "@stdlib/number-float64-base-exponent": "^0.2.3", "@stdlib/number-float64-base-from-words": "^0.2.2", "@stdlib/number-float64-base-normalize": "^0.2.4", "@stdlib/number-float64-base-to-words": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-ZbuCayeY8zsmptOxDsTnDmRGmEt10wjOXOdsKTCNGZwLP7h7e0ImTRbJ8wpKiLWv8JKef/xE+rp61wQrjZHS3A=="],
+
+    "@stdlib/math-base-special-ln": ["@stdlib/math-base-special-ln@0.2.5", "", { "dependencies": { "@stdlib/constants-float64-exponent-bias": "^0.2.3", "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/number-float64-base-get-high-word": "^0.2.2", "@stdlib/number-float64-base-set-high-word": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-ki+/tyoi767DsNyaw95O5NDMt1MbmRp5PI5ZfZo11AE6yUDKeS1H5cm3N3SE2GdwtuKyT3ZBc5/d8MtWzTPObA=="],
+
+    "@stdlib/math-base-special-log1p": ["@stdlib/math-base-special-log1p@0.2.4", "", { "dependencies": { "@stdlib/constants-float64-exponent-bias": "^0.2.3", "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/number-float64-base-get-high-word": "^0.2.2", "@stdlib/number-float64-base-set-high-word": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-x7YYsmM3NqfcZlDwZ4x88e5MtkXHTtUAroPhuDgDk2Ez9J/ZWQY4/t3RHb+wwEYtZU1WG4PQ7VMDlHOJUvEhBQ=="],
+
+    "@stdlib/math-base-special-log1pmx": ["@stdlib/math-base-special-log1pmx@0.2.4", "", { "dependencies": { "@stdlib/constants-float64-eps": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/math-base-special-abs": "^0.2.3", "@stdlib/math-base-special-ln": "^0.2.5", "@stdlib/math-base-special-log1p": "^0.2.4", "@stdlib/math-base-tools-sum-series": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-CrF4ucxzA1hkR4zSHaXWZGhfFuHS9A80nZP8cvIBvrtU8Dl21fHqCegOSSZBNvzL7WPssCXNzgkfdf5GUGvwlw=="],
+
+    "@stdlib/math-base-special-max": ["@stdlib/math-base-special-max@0.3.1", "", { "dependencies": { "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-assert-is-positive-zero": "^0.2.3", "@stdlib/math-base-napi-binary": "^0.3.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-TV4GK3gt5BCy4se6Rn59zSbcL2EQBYynJ4g15KeniZWrQbvpm7WdjdJRJk/Ly78ESAoM6Qd2KEaP/bTGukGTqA=="],
+
+    "@stdlib/math-base-special-maxabs": ["@stdlib/math-base-special-maxabs@0.3.1", "", { "dependencies": { "@stdlib/math-base-napi-binary": "^0.3.3", "@stdlib/math-base-special-abs": "^0.2.3", "@stdlib/math-base-special-max": "^0.3.0", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-nvlh0Pkwrmh3E6Nva+o0dbAksJ7BErsp9v3Q783TGNlwsRNovOc8FmrkqvmuDhWkSoUUuYtefYyxz1HZ+CzvDg=="],
+
+    "@stdlib/math-base-special-min": ["@stdlib/math-base-special-min@0.2.4", "", { "dependencies": { "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-assert-is-negative-zero": "^0.2.2", "@stdlib/math-base-napi-binary": "^0.3.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-RjwMYI+CqdD8Pg41RBsvv0g50nl3d2a5SJBXDcjzHIs0Lj4+qdOXSYQYbn2IQH0dVCNlZrBwaGX3L8O9tu5umQ=="],
+
+    "@stdlib/math-base-special-minabs": ["@stdlib/math-base-special-minabs@0.2.4", "", { "dependencies": { "@stdlib/math-base-napi-binary": "^0.3.3", "@stdlib/math-base-special-abs": "^0.2.3", "@stdlib/math-base-special-min": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-aRQBXaoSBj026u90ZTreKa88GAF8SWSqm2WD43v22TFJVJ0qhjtSmQXRLs+tD2ug7LDUHa8Bf1Ui2DYuVw41uQ=="],
+
+    "@stdlib/math-base-special-pow": ["@stdlib/math-base-special-pow@0.3.1", "", { "dependencies": { "@stdlib/constants-float64-exponent-bias": "^0.2.3", "@stdlib/constants-float64-high-word-abs-mask": "^0.2.3", "@stdlib/constants-float64-high-word-significand-mask": "^0.2.3", "@stdlib/constants-float64-ln-two": "^0.2.3", "@stdlib/constants-float64-ninf": "^0.2.3", "@stdlib/constants-float64-num-high-word-significand-bits": "^0.1.1", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/math-base-assert-is-infinite": "^0.2.3", "@stdlib/math-base-assert-is-integer": "^0.2.7", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-assert-is-odd": "^0.3.2", "@stdlib/math-base-napi-binary": "^0.3.3", "@stdlib/math-base-special-abs": "^0.2.3", "@stdlib/math-base-special-copysign": "^0.2.3", "@stdlib/math-base-special-ldexp": "^0.2.4", "@stdlib/math-base-special-sqrt": "^0.2.3", "@stdlib/number-float64-base-get-high-word": "^0.2.3", "@stdlib/number-float64-base-set-high-word": "^0.2.3", "@stdlib/number-float64-base-set-low-word": "^0.2.3", "@stdlib/number-float64-base-to-words": "^0.2.3", "@stdlib/number-uint32-base-to-int32": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-8i5zbz0KfhnNeACMsT+94/iv1/zCNj5JurXvrNHfLg3eLwvKIvwI28G+anpaqGZdPX3aJq66M5+dKDMSWvUvyw=="],
+
+    "@stdlib/math-base-special-powm1": ["@stdlib/math-base-special-powm1@0.3.2", "", { "dependencies": { "@stdlib/math-base-assert-is-infinite": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-binary": "^0.3.3", "@stdlib/math-base-special-abs": "^0.2.3", "@stdlib/math-base-special-expm1": "^0.2.3", "@stdlib/math-base-special-fmod": "^0.1.1", "@stdlib/math-base-special-ln": "^0.2.5", "@stdlib/math-base-special-pow": "^0.3.0", "@stdlib/math-base-special-trunc": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-GwjXuzaKy4uO+DDFirt1HIKlvL5359ssx4AgMhYuPnwcHvq+B8NSo8gld/jgcshTXelzkSHvupOcgZrBO8gZVQ=="],
+
+    "@stdlib/math-base-special-rempio2": ["@stdlib/math-base-special-rempio2@0.3.1", "", { "dependencies": { "@stdlib/array-base-zeros": "^0.2.2", "@stdlib/constants-float64-high-word-abs-mask": "^0.2.3", "@stdlib/constants-float64-high-word-exponent-mask": "^0.2.3", "@stdlib/constants-float64-high-word-significand-mask": "^0.2.3", "@stdlib/math-base-special-floor": "^0.2.4", "@stdlib/math-base-special-ldexp": "^0.2.5", "@stdlib/math-base-special-round": "^0.3.1", "@stdlib/napi-argv": "^0.2.3", "@stdlib/napi-argv-double": "^0.2.2", "@stdlib/napi-argv-float64array": "^0.2.3", "@stdlib/napi-create-double": "^0.0.3", "@stdlib/napi-export": "^0.3.1", "@stdlib/number-float64-base-from-words": "^0.2.3", "@stdlib/number-float64-base-get-high-word": "^0.2.3", "@stdlib/number-float64-base-get-low-word": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-tHqU2T0ewJKOUhlAqV5hc1iQzPC2KoBn88ahOBndQqfJUKUG0vg/sDPfi6LF35RVo+yW03pDMzeZlAmCi4bSzg=="],
+
+    "@stdlib/math-base-special-round": ["@stdlib/math-base-special-round@0.3.1", "", { "dependencies": { "@stdlib/math-base-assert-is-nan": "^0.2.2", "@stdlib/math-base-assert-is-negative-zero": "^0.2.2", "@stdlib/math-base-napi-unary": "^0.2.6", "@stdlib/math-base-special-floor": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-YoFhBJb0J21QLG1sEHoC8Pxnb+eMfu+pAeT40jF1vlC6p18MFEDVgcX/iBpJg52jPal7CHJF86X6XxlbJCh3Yg=="],
+
+    "@stdlib/math-base-special-sin": ["@stdlib/math-base-special-sin@0.3.1", "", { "dependencies": { "@stdlib/constants-float64-high-word-abs-mask": "^0.2.3", "@stdlib/constants-float64-high-word-exponent-mask": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/math-base-special-kernel-cos": "^0.2.4", "@stdlib/math-base-special-kernel-sin": "^0.2.4", "@stdlib/math-base-special-rempio2": "^0.3.0", "@stdlib/number-float64-base-get-high-word": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-t1mU2N6muFdXaafeYtxB3NQ9udxzL7gwFtKyph+GaMWJKLg1EAZ9G31StMFh5dqxmY0IjHLdkDUhwwh3pXxgPQ=="],
+
+    "@stdlib/math-base-special-sinpi": ["@stdlib/math-base-special-sinpi@0.3.1", "", { "dependencies": { "@stdlib/constants-float64-pi": "^0.2.3", "@stdlib/math-base-assert-is-infinite": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-unary": "^0.2.7", "@stdlib/math-base-special-abs": "^0.2.3", "@stdlib/math-base-special-copysign": "^0.2.3", "@stdlib/math-base-special-cos": "^0.3.0", "@stdlib/math-base-special-fmod": "^0.1.1", "@stdlib/math-base-special-sin": "^0.3.0", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-IHBiUy9KmG0pR6nqCaVktw/7j0IestUk6gIqMIQtQSyC11sgByhNJFKEBbIwqLgPGnLJ10B8Y3iN5jgBC7lRpQ=="],
+
+    "@stdlib/math-base-special-sqrt": ["@stdlib/math-base-special-sqrt@0.2.3", "", { "dependencies": { "@stdlib/math-base-napi-unary": "^0.2.6", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-Pdgq9Imx4lxsmM4jouu4b2ynB1osgrKLkJtdsaNUjrA3kTxc16FALkAJVEdKA9/7FxEFLji9CvJ0VBOWXzoyTQ=="],
+
+    "@stdlib/math-base-special-trunc": ["@stdlib/math-base-special-trunc@0.2.3", "", { "dependencies": { "@stdlib/math-base-napi-unary": "^0.2.6", "@stdlib/math-base-special-ceil": "^0.2.2", "@stdlib/math-base-special-floor": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-ga3rqr82G7Q3eqpF/aFR4v2Bj3meKhbuWRiEWrJwWARTqQa0e8aWTI7p9qYeQ0mFsKVoXH21oESjAHuJ1WfsQg=="],
+
+    "@stdlib/math-base-tools-continued-fraction": ["@stdlib/math-base-tools-continued-fraction@0.2.3", "", { "dependencies": { "@stdlib/assert-has-generator-support": "^0.2.2", "@stdlib/constants-float32-smallest-normal": "^0.2.3", "@stdlib/constants-float64-eps": "^0.2.3", "@stdlib/math-base-special-abs": "^0.2.3" }, "os": "!android" }, "sha512-EyzelNGzuL7wFfzbpuDFbf7//a3Z9iSRtIEbVbulduXQ8uYbB3YGMbbuKES2nG+WBeawpKFAgMDTC6siPdo1Vw=="],
+
+    "@stdlib/math-base-tools-evalpoly": ["@stdlib/math-base-tools-evalpoly@0.2.3", "", { "dependencies": { "@stdlib/function-ctor": "^0.2.2", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-SJFnTcVUeDqVp+wJIZe9yj6Ddxn7kaf+aCepbmnxqdJLtvOtCsEyvOYX5q26x6Ik/JJULTNiOMQqWm2VInNAzQ=="],
+
+    "@stdlib/math-base-tools-sum-series": ["@stdlib/math-base-tools-sum-series@0.2.3", "", { "dependencies": { "@stdlib/assert-has-generator-support": "^0.2.2", "@stdlib/constants-float64-eps": "^0.2.3", "@stdlib/math-base-special-abs": "^0.2.3" }, "os": "!android" }, "sha512-2Tc5fjKCXizXLb266n+AxNu0tTXau3DLd2lVPDhyBSqXoCqT0N/PZBmxWujaRuTpr7WxmEMzoMTxegwz487oaA=="],
+
+    "@stdlib/napi-argv": ["@stdlib/napi-argv@0.2.3", "", { "dependencies": { "@stdlib/assert-napi-status-ok": "^0.2.2" }, "os": "!android" }, "sha512-JQe8cqcCmxVhAMZ6z7Ysx0hmY8DtIGEXcM7Ymmjxl5VNaVXq/grw3HEQm5Fcb+TdqJIb7xEbsRHCiowRzvk0Pg=="],
+
+    "@stdlib/napi-argv-bool": ["@stdlib/napi-argv-bool@0.1.1", "", { "dependencies": { "@stdlib/assert-napi-is-type": "^0.2.2", "@stdlib/assert-napi-status-ok": "^0.2.2", "@stdlib/napi-argv": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-xW+BJ8wYeJAs3GPhu8SdlZur9WgzfKwFESJR8gzsaKkUy9+1POMs3jZA++I+Ote7CNY0AmFgC3/5v+qLNcb+Xw=="],
+
+    "@stdlib/napi-argv-double": ["@stdlib/napi-argv-double@0.2.2", "", { "dependencies": { "@stdlib/assert-napi-is-type": "^0.2.2", "@stdlib/assert-napi-status-ok": "^0.2.2", "@stdlib/napi-argv": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-QJrnt4CTS8x7WHny4s8eHvGT2u5x8BSH6RWVaPg6ZrnHwqz9Jz48JGTawFKLgcyvZyeE9kCwKDkPIN7MbXcHKQ=="],
+
+    "@stdlib/napi-argv-float": ["@stdlib/napi-argv-float@0.2.3", "", { "dependencies": { "@stdlib/assert-napi-is-type": "^0.2.2", "@stdlib/assert-napi-status-ok": "^0.2.2", "@stdlib/napi-argv": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-2hNFgenY7M5iVfIbRw+xccutxtKfk89VQb1RMGbSAOrRcR53J5OENAaddohrCp1zT1FKe14LCG/k+LlZR5jEdA=="],
+
+    "@stdlib/napi-argv-float64array": ["@stdlib/napi-argv-float64array@0.2.3", "", { "dependencies": { "@stdlib/assert-napi-equal-typedarray-types": "^0.2.2", "@stdlib/assert-napi-is-typedarray": "^0.2.2", "@stdlib/assert-napi-status-ok": "^0.2.2", "@stdlib/napi-argv": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-0uZaYZC/sV6UN/rDNJxQVn5U4CsdjPGztT2c0D7i0bPPwLscv4THKyLge6x41acHx1kjPuEvq03l+Wg94/DL+A=="],
+
+    "@stdlib/napi-argv-int32": ["@stdlib/napi-argv-int32@0.2.3", "", { "dependencies": { "@stdlib/assert-napi-is-type": "^0.2.2", "@stdlib/assert-napi-status-ok": "^0.2.2", "@stdlib/napi-argv": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-Set5AdSIUePU/Y0gT+WC4lerzahwaAQJd1USCgnKQD55xmDfXAPMyJliZnZPNUyjQ6SsWN6PaiOfJluq+oVcVQ=="],
+
+    "@stdlib/napi-create-double": ["@stdlib/napi-create-double@0.0.3", "", { "dependencies": { "@stdlib/assert-napi-status-ok": "^0.2.2", "@stdlib/napi-argv": "^0.2.2", "@stdlib/napi-argv-double": "^0.2.1", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-6JcSG40t8HQGOgRaaxpxMWKrkqqZbSnUIKi9qx8R4g1gWWzbP5/aRMmMcLpanmXP61PjryfpnjhtUC27WMFNfQ=="],
+
+    "@stdlib/napi-create-int32": ["@stdlib/napi-create-int32@0.0.3", "", { "dependencies": { "@stdlib/assert-napi-status-ok": "^0.2.2", "@stdlib/napi-argv": "^0.2.2", "@stdlib/napi-argv-int32": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-tIT9BWA3jmOjzz4XTwVplkKETI3dyTK4BZoMtbQGnTxfsHz+pNdgepbp8hEx7wJADHKO2L8YTqddTHij4H3Ptw=="],
+
+    "@stdlib/napi-export": ["@stdlib/napi-export@0.3.1", "", { "os": "!android" }, "sha512-JQaR2FYyIGprLgjg02JwgGGbjaYgRsWJpF72T748AiUQMd8SEN/mjUkqPq4zYLRjYATpKxnDUQNvP642z9JnIg=="],
+
+    "@stdlib/number-ctor": ["@stdlib/number-ctor@0.2.3", "", { "os": "!android" }, "sha512-T4xeLGny/gBRe4ZJcS5ugluT8E7Y/LCEHycTQingYWqbBK+5XJED7zJrcawkneewXd7CgqypCtVuI0BOxBBzcQ=="],
+
+    "@stdlib/number-float16-base-to-float32": ["@stdlib/number-float16-base-to-float32@0.1.2", "", { "dependencies": { "@stdlib/constants-float16-exponent-bias": "^0.3.1", "@stdlib/constants-float16-exponent-mask": "^0.1.1", "@stdlib/constants-float16-num-significand-bits": "^0.0.2", "@stdlib/constants-float16-sign-mask": "^0.1.1", "@stdlib/constants-float16-significand-mask": "^0.1.1", "@stdlib/constants-float32-exponent-bias": "^0.2.3", "@stdlib/constants-float32-exponent-mask": "^0.2.3", "@stdlib/constants-float32-num-significand-bits": "^0.1.1", "@stdlib/number-float16-ctor": "^0.1.2", "@stdlib/number-float32-base-to-float16": "^0.1.0", "@stdlib/number-float64-base-to-float16": "^0.1.2", "@stdlib/number-float64-base-to-float32": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-OClMQYz6GJEiSxrzhNp2LK4K8j75Rq6HCk+ReRBNQjXYdvNfzzaYoqnv3ZSzrXdvqUoGz+19XaVTLLzkKT1GCg=="],
+
+    "@stdlib/number-float16-base-to-float64": ["@stdlib/number-float16-base-to-float64@0.1.2", "", { "dependencies": { "@stdlib/number-float16-base-to-float32": "^0.1.1", "@stdlib/number-float16-ctor": "^0.1.1", "@stdlib/number-float64-base-to-float16": "^0.1.1", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-1MNdMfThDFEIMeJHKmum343x9sbiRplRmsjEHojVGyMQNuxOamzbzw+Gw3xl04GrfOIUG673KZEljwUwDFgtUA=="],
+
+    "@stdlib/number-float16-ctor": ["@stdlib/number-float16-ctor@0.1.2", "", { "dependencies": { "@stdlib/assert-has-to-primitive-symbol-support": "^0.1.0", "@stdlib/assert-is-number": "^0.2.3", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/number-float64-base-to-float16": "^0.1.2", "@stdlib/string-format": "^0.2.3", "@stdlib/symbol-to-primitive": "^0.1.1", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3", "@stdlib/utils-define-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-bdBhgwgtRClxBU9Ef8puY/WQ+DMqUr0oXfkfCrYKUATmqVQghv3bDw/dMggz01AguJo2ZtdjGp3PjQwNZlmHcg=="],
+
+    "@stdlib/number-float32-base-exponent": ["@stdlib/number-float32-base-exponent@0.2.4", "", { "dependencies": { "@stdlib/constants-float32-exponent-bias": "^0.2.3", "@stdlib/constants-float32-exponent-mask": "^0.2.3", "@stdlib/number-float32-base-to-word": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-JUuSZCPD6yWA2jJhtS5MIYSZGerJJCXfwStz0Mqsh76x166mSkiZ4dH3VpDz2OMrZk6rvt35UB2HhAZecTqFAw=="],
+
+    "@stdlib/number-float32-base-to-float16": ["@stdlib/number-float32-base-to-float16@0.1.1", "", { "dependencies": { "@stdlib/constants-float16-eps": "^0.2.3", "@stdlib/constants-float16-max": "^0.2.3", "@stdlib/constants-float16-smallest-normal": "^0.2.3", "@stdlib/constants-float32-eps": "^0.2.3", "@stdlib/constants-float32-exponent-mask": "^0.2.3", "@stdlib/constants-float32-num-significand-bits": "^0.1.1", "@stdlib/constants-float32-pinf": "^0.2.2", "@stdlib/constants-float32-sign-mask": "^0.2.3", "@stdlib/constants-float32-significand-mask": "^0.2.4", "@stdlib/math-base-assert-is-finitef": "^0.2.2", "@stdlib/math-base-assert-is-nanf": "^0.2.3", "@stdlib/math-base-special-absf": "^0.2.3", "@stdlib/number-float16-ctor": "^0.1.2", "@stdlib/number-float32-base-exponent": "^0.2.4", "@stdlib/number-float64-base-to-float32": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-phYWBtfheX0c/pXtbiK/xr6lVwU5HKYVNgmol8y0HE8NvwXG3oCXLySa2p0jr+Xi7G9xtMdXW4Eq0rShs4lTmQ=="],
+
+    "@stdlib/number-float32-base-to-word": ["@stdlib/number-float32-base-to-word@0.2.3", "", { "dependencies": { "@stdlib/array-float32": "^0.2.3", "@stdlib/array-uint32": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-E42KOQ+jqVDElwvFtrDMEkXYl03btIPan3g/YAScCibfmYDkYRDT9iuaydyYS/O3+m/MPM1Jhn+U/B8+f+C1HQ=="],
+
+    "@stdlib/number-float64-base-exponent": ["@stdlib/number-float64-base-exponent@0.2.3", "", { "dependencies": { "@stdlib/constants-float64-exponent-bias": "^0.2.3", "@stdlib/constants-float64-high-word-exponent-mask": "^0.2.3", "@stdlib/number-float64-base-get-high-word": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-KRicBsOMrVCIB2veebT+mPpTrxyXCP6eknJTs8A59E/ATU2/gKYbMKzkdEX/FzxSBcdw5thvuuqmmwJKGZYSkA=="],
+
+    "@stdlib/number-float64-base-from-words": ["@stdlib/number-float64-base-from-words@0.2.3", "", { "dependencies": { "@stdlib/array-float64": "^0.2.3", "@stdlib/array-uint32": "^0.2.3", "@stdlib/assert-is-little-endian": "^0.2.3", "@stdlib/number-float64-base-to-words": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-7v0bOW1AjsoWqkiVFqljLxCWmGA+iZ3OA/NwuIFBsYOEOpZqMIevu6TkJkWYaP6YYUJUrSG0w6t7b1P9JuzBgw=="],
+
+    "@stdlib/number-float64-base-get-high-word": ["@stdlib/number-float64-base-get-high-word@0.2.3", "", { "dependencies": { "@stdlib/array-float64": "^0.2.2", "@stdlib/array-uint32": "^0.2.3", "@stdlib/assert-is-little-endian": "^0.2.2", "@stdlib/number-float64-base-to-words": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-yyJJR8+8BK88ldB5rM3GaM6S7vfUXZ3ib2VPse7Jb/ecd9r9gE6ojJv9v7N/M4STmKVrWWcggFEHzAVe/KMhrQ=="],
+
+    "@stdlib/number-float64-base-get-low-word": ["@stdlib/number-float64-base-get-low-word@0.2.3", "", { "dependencies": { "@stdlib/array-float64": "^0.2.2", "@stdlib/array-uint32": "^0.2.3", "@stdlib/assert-is-little-endian": "^0.2.2", "@stdlib/number-float64-base-to-words": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-e2OcnZ8wAYU5w/sFXY5d8bOFyjWYHW4UxdxLUsf24nVKyBPvS2Rhib8NbOETPeT8WYqFN6yrL2L4VlXO3Mz6ig=="],
+
+    "@stdlib/number-float64-base-normalize": ["@stdlib/number-float64-base-normalize@0.2.4", "", { "dependencies": { "@stdlib/constants-float64-smallest-normal": "^0.2.3", "@stdlib/math-base-assert-is-infinite": "^0.2.2", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-special-abs": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-WVtJYkAt1zZXRlcjmbGEYVlZUd6dpSsOKACmVLEWyI9kMlegRAwibAKGMRtAcuYFSOyRVONwJbYar35McmabHg=="],
+
+    "@stdlib/number-float64-base-set-high-word": ["@stdlib/number-float64-base-set-high-word@0.2.3", "", { "dependencies": { "@stdlib/array-float64": "^0.2.2", "@stdlib/array-uint32": "^0.2.3", "@stdlib/assert-is-little-endian": "^0.2.2", "@stdlib/number-float64-base-to-words": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-tWyEAJlbINvxcGMK5wgOlfFcZP9ILpqdBWLrc9HCpbUul41pmWEZi7+zI7dwe5zWIlACzguykdY0cEe7raceIw=="],
+
+    "@stdlib/number-float64-base-set-low-word": ["@stdlib/number-float64-base-set-low-word@0.2.3", "", { "dependencies": { "@stdlib/array-float64": "^0.2.2", "@stdlib/array-uint32": "^0.2.3", "@stdlib/assert-is-little-endian": "^0.2.2", "@stdlib/number-float64-base-to-words": "^0.2.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-lmZvzkVlPqM+viBpmI0lBzArRb2+ifBMhuZ/Rtla+O91bcXgBtx/+L4UuqofAfQ5PRRnCW82r3kzILEKsxSoaw=="],
+
+    "@stdlib/number-float64-base-to-float16": ["@stdlib/number-float64-base-to-float16@0.1.2", "", { "dependencies": { "@stdlib/constants-float16-eps": "^0.2.3", "@stdlib/constants-float16-max": "^0.2.3", "@stdlib/constants-float16-smallest-normal": "^0.2.3", "@stdlib/constants-float64-eps": "^0.2.2", "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/math-base-assert-is-finite": "^0.2.3", "@stdlib/math-base-special-abs": "^0.2.3", "@stdlib/number-float16-ctor": "^0.1.1", "@stdlib/number-float32-base-to-float16": "^0.1.0", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-d+ZJYGoykrzI3H0GRCI3qqyjspgNcIvECQ4OjyC1qdy1haT3cgoj1rwWkJS9uFKD/QgWlFGMrcmRzf0MVj17zg=="],
+
+    "@stdlib/number-float64-base-to-float32": ["@stdlib/number-float64-base-to-float32@0.2.3", "", { "dependencies": { "@stdlib/array-float32": "^0.2.3" }, "os": "!android" }, "sha512-+Lu8vk1oLCxO8RaRzw8pEY+BP2TWROweNFiML0w7TP4i9ZyG5E6EJdxZ2J3c29LVPfsf+oLOOxyySHH2kjwIsw=="],
+
+    "@stdlib/number-float64-base-to-words": ["@stdlib/number-float64-base-to-words@0.2.3", "", { "dependencies": { "@stdlib/array-float64": "^0.2.2", "@stdlib/array-uint32": "^0.2.3", "@stdlib/assert-is-little-endian": "^0.2.2", "@stdlib/os-byte-order": "^0.2.2", "@stdlib/os-float-word-order": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-G63YuysfTKRP3Tkn19zBxTseS+uYnnOYZSN9VRTWrx5iNE8IYDzanAJIolSBZ7PuFMoE+HmjEZ0E9SX3NsLKvg=="],
+
+    "@stdlib/number-uint32-base-mul": ["@stdlib/number-uint32-base-mul@0.1.1", "", { "dependencies": { "@stdlib/math-base-napi-binary": "^0.3.2", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-M6MixVn9GLg6CWh297kpANf1TdUAPOlQwuIl/tvtoH3XYpXYZO+bIPYvEEmUd8pjT3I9XTOxn+2ue8wNtlpCeg=="],
+
+    "@stdlib/number-uint32-base-to-int32": ["@stdlib/number-uint32-base-to-int32@0.2.3", "", { "os": "!android" }, "sha512-C6jGEzdnoiy9Er7mTwWO34r+6DVPRRVKRGVtxSQW3yAiQOnLS1ZvimqvgZtl0PYu1OnE02ReegpOMkpqSGO3vQ=="],
+
+    "@stdlib/object-ctor": ["@stdlib/object-ctor@0.2.2", "", { "os": "!android" }, "sha512-3zkUkzZ9LdX+J5fEyU/D7I2c+0qG+ejNI3tCtSFek35bezdqWs9tOAAUiU6HeQJcGgqOmkakB4apIxvN+eehCA=="],
+
+    "@stdlib/os-byte-order": ["@stdlib/os-byte-order@0.2.3", "", { "dependencies": { "@stdlib/assert-is-big-endian": "^0.2.2", "@stdlib/assert-is-little-endian": "^0.2.2" }, "os": "!android" }, "sha512-QU4JY7WN4inoLVz+ML92TOevgyxZa+d2RcA1EmaDC0y0TNrXez1GmIn1t7+L7UTJEdf39IUm6VfdMmYdcDwFTw=="],
+
+    "@stdlib/os-float-word-order": ["@stdlib/os-float-word-order@0.2.3", "", { "dependencies": { "@stdlib/os-byte-order": "^0.2.2" }, "os": "!android" }, "sha512-5dLZBCNn9Fge3kq7uHIh7S1qshfe5L7pjLYLSUGxxKa7gecAbsaQBPLxDkFiFwMytr6tnGGjWQfyVbhq/+RjlQ=="],
+
+    "@stdlib/process-cwd": ["@stdlib/process-cwd@0.2.3", "", { "os": "!android" }, "sha512-T/sYVJjs9iHAOK9B8yGymGY+59eAz20G7eL/G4cObT6sWssAF7s/2+KgzAvWB0maE9qX6qnP4zBg2msCsWwvVg=="],
+
+    "@stdlib/random-base-mt19937": ["@stdlib/random-base-mt19937@0.2.3", "", { "dependencies": { "@stdlib/array-to-json": "^0.3.1", "@stdlib/array-uint32": "^0.2.3", "@stdlib/assert-has-own-property": "^0.2.3", "@stdlib/assert-is-boolean": "^0.2.3", "@stdlib/assert-is-collection": "^0.2.3", "@stdlib/assert-is-plain-object": "^0.2.3", "@stdlib/assert-is-positive-integer": "^0.2.3", "@stdlib/assert-is-uint32array": "^0.2.3", "@stdlib/blas-base-gcopy": "^0.2.2", "@stdlib/constants-float64-max-safe-integer": "^0.2.3", "@stdlib/constants-uint32-max": "^0.2.3", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/math-base-special-floor": "^0.2.4", "@stdlib/math-base-special-max": "^0.3.1", "@stdlib/number-uint32-base-mul": "^0.1.1", "@stdlib/random-base-shared": "^0.1.2", "@stdlib/string-format": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-accessor": "^0.2.4", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-write-accessor": "^0.2.3" }, "os": "!android" }, "sha512-bFjYQfZAsXM6b06M5s81jMZqj0O56SYcnEhCcZE/JACW0y8So4J7Rl+LZ24G7zCtI8gbwuIzPyE1Z0Tl4Nj4aA=="],
+
+    "@stdlib/random-base-shared": ["@stdlib/random-base-shared@0.1.2", "", { "os": "!android" }, "sha512-5QLXOZOl/jjmy4uttsSgmXUjDza4XTW5zAHFsJ1mApg9lHnk/OTVJVF5gjQKqsjWMydJmuDR5T+jZzGgL93fLA=="],
+
+    "@stdlib/regexp-extended-length-path": ["@stdlib/regexp-extended-length-path@0.2.3", "", { "dependencies": { "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-3HYXiSzBpKz4nSOCtrYtMw9/OXN4EmTvq0owXv6HMvvDweFskieBcdNlVcOl0ViezjvUuvUL0DHJHdGp6SQEIw=="],
+
+    "@stdlib/regexp-function-name": ["@stdlib/regexp-function-name@0.2.3", "", { "dependencies": { "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-ER1C2rUW5Kzu5w4W0gbrJdIj5STNO5RfNy4GeiqycezeiXT99G393QeN4irqcOItYkeZhwbpY2ZzwlLxQvod1A=="],
+
+    "@stdlib/stats-base-dists-chisquare-cdf": ["@stdlib/stats-base-dists-chisquare-cdf@0.3.1", "", { "dependencies": { "@stdlib/math-base-napi-binary": "^0.3.3", "@stdlib/stats-base-dists-gamma-cdf": "^0.3.0", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-j0X9V9FO0kwpdmhaa38+JuEjkHws1b3SWJUGuCx9C/eUdTY4soi9EwjdXheDRu0ww9qRhrECpXobHUiLJEdnTw=="],
+
+    "@stdlib/stats-base-dists-degenerate-cdf": ["@stdlib/stats-base-dists-degenerate-cdf@0.3.1", "", { "dependencies": { "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-binary": "^0.3.3", "@stdlib/utils-constant-function": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-i6qu8JegKFJ/xJcnJH4x+wMTxKbHtMG2bOVjdFswxt5MHGEob0bmpZMCPaUQ99KDXx1ntntbAzqURt8Bwhi12g=="],
+
+    "@stdlib/stats-base-dists-degenerate-quantile": ["@stdlib/stats-base-dists-degenerate-quantile@0.3.1", "", { "dependencies": { "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-binary": "^0.3.3", "@stdlib/utils-constant-function": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.3" }, "os": "!android" }, "sha512-1KvjtzZIZ5zJVNFfjhFGagrwZA5YlYOT5+zfphdZUz0VXl0lHzLKnNToktwk8Frx/YdNGIdusTSAnmcr9yFOug=="],
+
+    "@stdlib/stats-base-dists-gamma-cdf": ["@stdlib/stats-base-dists-gamma-cdf@0.3.1", "", { "dependencies": { "@stdlib/constants-float64-pinf": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-ternary": "^0.3.2", "@stdlib/math-base-special-gammainc": "^0.3.0", "@stdlib/stats-base-dists-degenerate-cdf": "^0.3.1", "@stdlib/utils-constant-function": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-L+S2aLWixmdF+hHDt+R72yduF+jvDljTU1tpcevBD1CxMNuGliShgsbU9/w10odi30SW1HtaS9cRA99kWJmm/A=="],
+
+    "@stdlib/stats-base-dists-normal-cdf": ["@stdlib/stats-base-dists-normal-cdf@0.3.1", "", { "dependencies": { "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-ternary": "^0.3.2", "@stdlib/math-base-special-erfc": "^0.2.4", "@stdlib/math-base-special-sqrt": "^0.2.3", "@stdlib/stats-base-dists-degenerate-cdf": "^0.3.1", "@stdlib/utils-constant-function": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-a4xGRE5ZKaB1J9wGEXu7gforIA9mGkR3BqlHPaaUuasDBdYxsI6NH7mZr/zeWaT4c176iiZzJjYMPWUAdV4aFQ=="],
+
+    "@stdlib/stats-base-dists-normal-quantile": ["@stdlib/stats-base-dists-normal-quantile@0.3.1", "", { "dependencies": { "@stdlib/constants-float64-sqrt-two": "^0.2.3", "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-napi-ternary": "^0.3.2", "@stdlib/math-base-special-erfinv": "^0.3.0", "@stdlib/math-base-special-sqrt": "^0.2.3", "@stdlib/stats-base-dists-degenerate-quantile": "^0.3.1", "@stdlib/utils-constant-function": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3", "@stdlib/utils-library-manifest": "^0.2.4" }, "os": "!android" }, "sha512-c5CgbvkdG84yUmnAJp467Lc8g0DFxdghZ3JqzwfD2+iuqQwG6zjzmI0uV7LeNUavCr/DN/sCbGQ8Ar29WQnwlw=="],
+
+    "@stdlib/stats-base-dists-t-cdf": ["@stdlib/stats-base-dists-t-cdf@0.2.3", "", { "dependencies": { "@stdlib/math-base-assert-is-nan": "^0.2.3", "@stdlib/math-base-special-betainc": "^0.2.2", "@stdlib/math-base-special-pow": "^0.3.1", "@stdlib/utils-constant-function": "^0.2.3", "@stdlib/utils-define-nonenumerable-read-only-property": "^0.2.3" }, "os": "!android" }, "sha512-Y6LUuwknLaewhjnJgMwcZuiD4adx1hzEkbnnrwlqh7Qz+CFyh1D5Ov7ZoyHkcs5djAZcOTaVbn8Ktc+EQ6A7mA=="],
+
+    "@stdlib/strided-base-reinterpret-boolean": ["@stdlib/strided-base-reinterpret-boolean@0.0.3", "", { "dependencies": { "@stdlib/array-uint8": "^0.2.2" }, "os": "!android" }, "sha512-co8rBbg9FYbz4X2ZGMMlt/+MpC4gq/JhxaSYMby2n92hvK57Ru62L35Kq1nngBHFb6hshhCRbnFXMyVzL6OYwQ=="],
+
+    "@stdlib/strided-base-reinterpret-complex128": ["@stdlib/strided-base-reinterpret-complex128@0.2.3", "", { "dependencies": { "@stdlib/array-float64": "^0.2.2" }, "os": "!android" }, "sha512-7y/Phr1B+d2GBnyv9a0DQBwsZIvDstLXNuEfQ+Y9NOzl0NG7pQvzlTkm6MTtxIbsYoQO44GTpIHEK8ag/cpa/A=="],
+
+    "@stdlib/strided-base-reinterpret-complex64": ["@stdlib/strided-base-reinterpret-complex64@0.2.2", "", { "dependencies": { "@stdlib/array-float32": "^0.2.3" }, "os": "!android" }, "sha512-BgbLBqLqoc0GfdyHPI2xYuTOqQkAB2ivBw7rN35ev0J2GN0X9rnUtRKvl5V2H3WFqsvujieS6HwGZ+fmF2Tocg=="],
+
+    "@stdlib/string-base-format-interpolate": ["@stdlib/string-base-format-interpolate@0.2.4", "", { "os": "!android" }, "sha512-POG725+DPEmzEJbMFTFPdKM4vA5i+t7juNYs+H2cQz5JXiPV1+5+P3epnO+/DqHWzLhiMlsKDCZq03C3WcBkSA=="],
+
+    "@stdlib/string-base-format-tokenize": ["@stdlib/string-base-format-tokenize@0.2.4", "", { "os": "!android" }, "sha512-qYHSmqFv7vloLFvjBAbZCn5qtxj7M+Qru3VqBooJTxWMcUeZOEBZg18/PFgfUrZhji5MVWDXbRTAx5Bu5M5nQA=="],
+
+    "@stdlib/string-base-lowercase": ["@stdlib/string-base-lowercase@0.4.1", "", { "os": "!android" }, "sha512-3NcDy2j6HtvKrC2GRCt5mKiYaWWHLLSQRSbuu28WEzA98/2izmiHYkR0i9IeEd4Tqrxqof/FXP4gWj1f14RXTQ=="],
+
+    "@stdlib/string-base-replace": ["@stdlib/string-base-replace@0.2.3", "", { "os": "!android" }, "sha512-FJdh2GzIkgMlr0v/ZZKD5cWRs+SMOhBTWxAexmWoYFL3WL1YMDgwI5hRtYh/ySyOy94MjJmYwRMpIVdxeclrAw=="],
+
+    "@stdlib/string-format": ["@stdlib/string-format@0.2.3", "", { "dependencies": { "@stdlib/string-base-format-interpolate": "^0.2.3", "@stdlib/string-base-format-tokenize": "^0.2.4" }, "os": "!android" }, "sha512-uE0LHUUnWKfxFeipyfb9yWbs+iczz6dHaolSGC1WBzMVyeHqx8xvq+yP3f2POYWgEcknmxNgU21WSqToSNrxdA=="],
+
+    "@stdlib/string-replace": ["@stdlib/string-replace@0.2.3", "", { "dependencies": { "@stdlib/assert-is-function": "^0.2.3", "@stdlib/assert-is-regexp": "^0.2.3", "@stdlib/assert-is-string": "^0.2.3", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/string-base-replace": "^0.2.3", "@stdlib/string-format": "^0.2.3", "@stdlib/utils-escape-regexp-string": "^0.2.3" }, "os": "!android" }, "sha512-CXJhl/L2TfRrkVUNVp8OfNsKeuUzOZXzJLUDoopHtQalbWBww1fDSDj1fwGpzgZV4IODs8LCsiIxLBnLRP6emg=="],
+
+    "@stdlib/symbol-ctor": ["@stdlib/symbol-ctor@0.2.3", "", { "os": "!android" }, "sha512-wnuFrxnmhg2p6QQP0B/j97LD5ys2d1bHuwVvh9yuUSCLoX/GankaVyGSufk2ROlsxrcm2HPhSDB/ILBHeUmamA=="],
+
+    "@stdlib/symbol-has-instance": ["@stdlib/symbol-has-instance@0.1.1", "", { "dependencies": { "@stdlib/assert-has-has-instance-symbol-support": "^0.1.0" }, "os": "!android" }, "sha512-+CtWhgKOe0j1mEl8mJ6tvbQ4svxNtJ2kCWl70Em6odauTIpvbAgofiwhKMRZeWtulfUhXG2Q/whJQ5x5KTKQ0Q=="],
+
+    "@stdlib/symbol-iterator": ["@stdlib/symbol-iterator@0.2.3", "", { "dependencies": { "@stdlib/assert-has-iterator-symbol-support": "^0.2.2" }, "os": "!android" }, "sha512-HN609e5u8+O3VtiHbQeuGeKMgR1/bZ0E/qwObihTA5Yca5ATDJsTZOxY463JNU41x+6xlptO24l4OJE+t3IBAA=="],
+
+    "@stdlib/symbol-to-primitive": ["@stdlib/symbol-to-primitive@0.1.2", "", { "dependencies": { "@stdlib/assert-has-to-primitive-symbol-support": "^0.1.0", "@stdlib/symbol-ctor": "^0.2.3" }, "os": "!android" }, "sha512-//r52ighL35HprZrK5Pdiz1L27l47X9o+0LOJ84mTk5eB89i9shVRjOpHauKyx/uy9VkDoxUkMY0PwPrAIp4aw=="],
+
+    "@stdlib/types": ["@stdlib/types@0.4.3", "", { "os": "!android" }, "sha512-9GCqS2eni2VSwa5/CCniAJ4I1eWLtvior1z6hoPJp6VTNMgW9Lh4BiI84IO0xun/0qAclJ+mTGTiCTZxZLK13A=="],
+
+    "@stdlib/utils-constant-function": ["@stdlib/utils-constant-function@0.2.3", "", { "os": "!android" }, "sha512-mQ6606O8JKq4tgL508it1ro7hx+RK6j36URSjbRI7Dje72YYpdQJGnN6UJ183Im5TT0fN2s4oOCM6+SAGcQi2w=="],
+
+    "@stdlib/utils-constructor-name": ["@stdlib/utils-constructor-name@0.2.3", "", { "dependencies": { "@stdlib/assert-is-buffer": "^0.2.2", "@stdlib/regexp-function-name": "^0.2.3", "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-/ApogDUIFxndcmnEeI6ctsqWt66c40g1T7R0nS9aOoYgnDOdmpUFSflzf++MDWksBycGsqgm1UD7IU54m4u7jg=="],
+
+    "@stdlib/utils-convert-path": ["@stdlib/utils-convert-path@0.2.3", "", { "dependencies": { "@stdlib/assert-is-string": "^0.2.3", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/regexp-extended-length-path": "^0.2.3", "@stdlib/string-base-lowercase": "^0.4.1", "@stdlib/string-format": "^0.2.3", "@stdlib/string-replace": "^0.2.2" }, "os": "!android" }, "sha512-fmqJ6Qvce0HV7D+uYrram/+iAHB3u2gMys9zeh0uc/h411sB8Hw9X7i1w2cJevCpouMzqTnpzp75C+swkoQlKA=="],
+
+    "@stdlib/utils-define-nonenumerable-read-only-accessor": ["@stdlib/utils-define-nonenumerable-read-only-accessor@0.2.4", "", { "dependencies": { "@stdlib/types": "^0.4.3", "@stdlib/utils-define-property": "^0.2.5" }, "os": "!android" }, "sha512-ZxHDIuA6d1Wr10Nkav5ejS53LS0eAwXV9IijQLQ/vD/rCRMNnLYT1hC2a0ZpDRc+lHQ0xsyHQvmYQJy9GBFkpg=="],
+
+    "@stdlib/utils-define-nonenumerable-read-only-property": ["@stdlib/utils-define-nonenumerable-read-only-property@0.2.3", "", { "dependencies": { "@stdlib/types": "^0.4.3", "@stdlib/utils-define-property": "^0.2.5" }, "os": "!android" }, "sha512-W0rqnRsXgW3GjcwEcOMi0mI/CXn3TVqmFvcxItLUZPJNYmwrU6+t+9kGldhMw845DyOtv8uYASrnNoVE/VfiDw=="],
+
+    "@stdlib/utils-define-nonenumerable-read-write-accessor": ["@stdlib/utils-define-nonenumerable-read-write-accessor@0.2.3", "", { "dependencies": { "@stdlib/utils-define-property": "^0.2.4" }, "os": "!android" }, "sha512-PVDDjg1tobb+rEx8tyboK9KNQLUPOjSb5ZzvVnXPCmWe5YzUGHOpt1ucJqn8Xqit9h2FsE9knp+K3+8yXRW7rA=="],
+
+    "@stdlib/utils-define-property": ["@stdlib/utils-define-property@0.2.5", "", { "dependencies": { "@stdlib/error-tools-fmtprodmsg": "^0.2.2", "@stdlib/string-format": "^0.2.2" }, "os": "!android" }, "sha512-WpbXc2uq8vtSqmWFzVrFifNj6HGoGHIZHolxX5GfRFbj4RNme1u/wtklmiOvcHE0s6SwPX764tuFXIgHBR5Vag=="],
+
+    "@stdlib/utils-define-read-only-property": ["@stdlib/utils-define-read-only-property@0.2.3", "", { "dependencies": { "@stdlib/utils-define-property": "^0.2.4" }, "os": "!android" }, "sha512-3sGMpmmSlErHup+Y6YwIgN075GW3t1FD8ARS+zHaU1U1IKEaiOVKMH49WfBGiSsVfV7sfieoZC5B//MrSWQjaA=="],
+
+    "@stdlib/utils-escape-regexp-string": ["@stdlib/utils-escape-regexp-string@0.2.3", "", { "dependencies": { "@stdlib/assert-is-string": "^0.2.2", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/string-format": "^0.2.3" }, "os": "!android" }, "sha512-ZQAq5HHF+C1fmK+RvqeMO0iIQf5kGl2Ofx9LYloURUPZD2zVMX+2hxDLFBTPAusqYxffQAjj3ap4LE/J0+YiRQ=="],
+
+    "@stdlib/utils-eval": ["@stdlib/utils-eval@0.2.3", "", { "os": "!android" }, "sha512-T9rL6lEX58My6GcZ0bXD7reJoBEzoO/r5i3U/lj6dC94immyQtbqoz0djHfpCVrCnoK4Mzbq3t813cBQS7yfRg=="],
+
+    "@stdlib/utils-function-name": ["@stdlib/utils-function-name@0.2.3", "", { "dependencies": { "@stdlib/assert-has-function-name-support": "^0.2.2", "@stdlib/assert-is-function": "^0.2.3", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/regexp-function-name": "^0.2.3", "@stdlib/string-format": "^0.2.3" }, "os": "!android" }, "sha512-qgBzMs6Zd8ynJFXvQGeu/pi8k0TeKRBB90u72bJzA3WyrM9ECRerBWZrvNMkEEUUgrPJTFIVSTTNnpe4QEuRvw=="],
+
+    "@stdlib/utils-get-prototype-of": ["@stdlib/utils-get-prototype-of@0.2.3", "", { "dependencies": { "@stdlib/assert-is-function": "^0.2.2", "@stdlib/object-ctor": "^0.2.2", "@stdlib/utils-native-class": "^0.2.2" }, "os": "!android" }, "sha512-unEoKhhAnV4AbQ87oPo1v+4xLjd00nQxJLSvl43PkdoBn/GKNv/B6SMnQWmM5b62esWTbxBu/uWCYoglbprxkA=="],
+
+    "@stdlib/utils-global": ["@stdlib/utils-global@0.2.3", "", { "dependencies": { "@stdlib/assert-is-boolean": "^0.2.2", "@stdlib/error-tools-fmtprodmsg": "^0.2.3", "@stdlib/string-format": "^0.2.3" }, "os": "!android" }, "sha512-e8gyuENhSeF8udH7vlZMDbNVQ/ZxZ4vWOcpB2iw06z1HSFZWc31Coh19ScfgagLfofo2GQYPJI3tJtZQYsUS6A=="],
+
+    "@stdlib/utils-library-manifest": ["@stdlib/utils-library-manifest@0.2.4", "", { "dependencies": { "@stdlib/fs-resolve-parent-path": "^0.2.3", "@stdlib/utils-convert-path": "^0.2.2", "debug": "^2.6.9", "resolve": "^1.1.7" }, "os": "!android" }, "sha512-sNzEclCbpRRa35DBv8ZOcOjCesBLczkOFX8o7mMrG9VWhyZuJUCBtgSPmzGIIBLAsVEYJuguEk4iYoMqFnCwnw=="],
+
+    "@stdlib/utils-native-class": ["@stdlib/utils-native-class@0.2.3", "", { "dependencies": { "@stdlib/assert-has-own-property": "^0.2.2", "@stdlib/assert-has-tostringtag-support": "^0.2.3", "@stdlib/symbol-ctor": "^0.2.3" }, "os": "!android" }, "sha512-UGXCPhgmOjwMpEQ5fFiifcqrhUnP8ICyWzEkHphUrh2/0pHyK0zilZvcODfROgzoy6L9ivUUuR6NjrAI+j14hA=="],
+
+    "@stdlib/utils-type-of": ["@stdlib/utils-type-of@0.2.3", "", { "dependencies": { "@stdlib/utils-constructor-name": "^0.2.2", "@stdlib/utils-global": "^0.2.3" }, "os": "!android" }, "sha512-2KmDUfqIv0g4lrWtnyR5xw82NvdsEwUHON43JAe55XRlLWnk1V1troiyJiM9fccENtl524kVRBnD7RMohmUyyQ=="],
+
     "@subsquid/ss58": ["@subsquid/ss58@2.0.2", "", { "dependencies": { "@subsquid/ss58-codec": "^1.2.3", "@subsquid/util-internal-hex": "^1.2.2" } }, "sha512-2chHMJ7jXvZzYQiXiA5MYYAVBobPcnQxWt3/jsiiZT6vWorjlVElXoQjZ0G/FKRHCcJ4GD10zDd8sG+7sPp2fw=="],
 
     "@subsquid/ss58-codec": ["@subsquid/ss58-codec@1.2.3", "", { "dependencies": { "base-x": "^4.0.0", "blake2b": "^2.1.4" } }, "sha512-PFWGOYDVEa1F+u5NoH4pJcBRCe4vv6B0U4nvgmwTA+PShhVB8aC6TjZZmMOE8/BLEDjRIpT7avpz7VR7zI6H0A=="],
@@ -1603,6 +2191,8 @@
     "bigint-crypto-utils": ["bigint-crypto-utils@3.3.0", "", {}, "sha512-jOTSb+drvEDxEq6OuUybOAv/xxoh3cuYRUIPyu8sSHQNKM303UQ2R1DAo45o1AkcIXw6fzbaFI1+xGGdaXs2lg=="],
 
     "bignumber.js": ["bignumber.js@9.3.1", "", {}, "sha512-Ko0uX15oIUS7wJ3Rb30Fs6SkVbLmPBAKdlm7q9+ak9bbIeFf0MwuBsQV6z7+X768/cHsfg+WlysDWJcmthjsjQ=="],
+
+    "binary-search": ["binary-search@1.3.6", "", {}, "sha512-nbE1WxOTTrUWIfsfZ4aHGYu5DOuNkbxGokjV6Z2kxfJK3uaAb8zNK1muzOeipoLHZjInT4Br88BHpzevc681xA=="],
 
     "bindings": ["bindings@1.5.0", "", { "dependencies": { "file-uri-to-path": "1.0.0" } }, "sha512-p2q/t/mhvuOj/UeLlV6566GD/guowlr0hHxClI0W9m7MWYkL1F0hLo+0Aexs9HSPCtR1SXQ0TD3MMKrXZajbiQ=="],
 
@@ -2144,6 +2734,8 @@
 
     "headers-polyfill": ["headers-polyfill@4.0.3", "", {}, "sha512-IScLbePpkvO846sIwOtOTDjutRMWdXdJmXdMvk6gCBHxFO8d+QKOQedyZSxFTTFYRSmlgSTDtXqqq4pcenBXLQ=="],
 
+    "heap": ["heap@0.2.7", "", {}, "sha512-2bsegYkkHO+h/9MGbn6KWcE45cHZgPANo5LXF7EvWdT0yT2EguSVO1nDgU5c8+ZOPwp2vMNa7YFsJhVcDR9Sdg=="],
+
     "hi-base32": ["hi-base32@0.5.1", "", {}, "sha512-EmBBpvdYh/4XxsnUybsPag6VikPYnN30td+vQk+GI3qpahVEG9+gTkG0aXVxTjBqQ5T6ijbWIu77O+C5WFWsnA=="],
 
     "highlight.js": ["highlight.js@10.7.3", "", {}, "sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A=="],
@@ -2200,6 +2792,8 @@
 
     "iron-webcrypto": ["iron-webcrypto@1.2.1", "", {}, "sha512-feOM6FaSr6rEABp/eDfVseKyTMDt+KGpeB35SkVn9Tyn0CqvVsY3EwI0v5i8nMHyJnzCIQf7nsy3p41TPkJZhg=="],
 
+    "is-any-array": ["is-any-array@3.0.0", "", {}, "sha512-o4h+tylWykC4BD1vaejp6gDxoM13bwW8FGuNs4yIKpj8xbBJcRxJx8vZpq0dCr7ZDEfeKjmsi/euolKhX6f/ww=="],
+
     "is-arguments": ["is-arguments@1.2.0", "", { "dependencies": { "call-bound": "^1.0.2", "has-tostringtag": "^1.0.2" } }, "sha512-7bVbi0huj/wrIAOzb8U1aszg9kdi3KN/CyU19CTI7tAoZYEZoL9yCDXpbXN+uPsuWnP02cyug1gleqq+TU+YCA=="],
 
     "is-arrayish": ["is-arrayish@0.2.1", "", {}, "sha512-zz06S8t0ozoDXMG+ube26zeCTNXcKIPJZJi8hBrF4idCLms4CG9QtK7qBl1boi5ODzFpjswb5JPmHCbMpjaYzg=="],
@@ -2207,6 +2801,8 @@
     "is-buffer": ["is-buffer@1.1.6", "", {}, "sha512-NcdALwpXkTm5Zvvbk7owOUSvVvBKDgKP5/ewfXEznmQFfs4ZRmanOeKBTjRVjka3QFoN6XJ+9F3USqfHqTaU5w=="],
 
     "is-callable": ["is-callable@1.2.7", "", {}, "sha512-1BC0BVFhS/p0qtw6enp8e+8OD0UrK0oFLztSjNzhcKA3WDuJxxAPXzPuPtKkjEY9UUoEWlX/8fgKeu2S8i9JTA=="],
+
+    "is-core-module": ["is-core-module@2.16.2", "", { "dependencies": { "hasown": "^2.0.3" } }, "sha512-evOr8xfXKxE6qSR0hSXL2r3sd7ALj8+7jQEUvPYcm5sgZFdJ+AYzT6yNmJenvIYQBgIGwfwz08sL8zoL7yq2BA=="],
 
     "is-docker": ["is-docker@3.0.0", "", { "bin": { "is-docker": "cli.js" } }, "sha512-eljcgEDlEns/7AXFosB5K/2nCM4P7FQPkGc/DWLy5rmFEWvZayGrik1d9/QIY5nJ4f9YsVvBkA6kJpHn9rISdQ=="],
 
@@ -2458,6 +3054,30 @@
 
     "mkdirp-classic": ["mkdirp-classic@0.5.3", "", {}, "sha512-gKLcREMhtuZRwRAfqP3RFW+TK4JqApVBtOIftVgjuABpAtpxhPGaDcfvbhNvD0B8iD1oUr/txX35NjcaY6Ns/A=="],
 
+    "ml-array-max": ["ml-array-max@2.0.0", "", { "dependencies": { "is-any-array": "^3.0.0" } }, "sha512-QQZ4kENwpWmyNb98UXRDFXrmtIXuXtt1+bSbda/2KA85+F+rrJP8hZk6QOkCQXM2Th9mUDYdq/PNByPdT9ID4A=="],
+
+    "ml-array-mean": ["ml-array-mean@1.1.6", "", { "dependencies": { "ml-array-sum": "^1.1.6" } }, "sha512-MIdf7Zc8HznwIisyiJGRH9tRigg3Yf4FldW8DxKxpCCv/g5CafTw0RRu51nojVEOXuCQC7DRVVu5c7XXO/5joQ=="],
+
+    "ml-array-min": ["ml-array-min@2.0.0", "", { "dependencies": { "is-any-array": "^3.0.0" } }, "sha512-GRj6Ky6sW9vGL6yIjgsHmXZ9YgrdmcQ8nCxPqEGeKc6dkfYg1XDYxGFxADUjNuZyoCd5PUscWAS4N+cFaX6hFg=="],
+
+    "ml-array-rescale": ["ml-array-rescale@2.0.0", "", { "dependencies": { "is-any-array": "^3.0.0", "ml-array-max": "^2.0.0", "ml-array-min": "^2.0.0" } }, "sha512-2GGtKfSno94/kIloWGvpp/U5Q5vLvLrza+SAaGsLeo6Xj4mEbA6Gqx+oTfZFkxnd1grT2X007HfJNs3T5BsiVg=="],
+
+    "ml-array-sum": ["ml-array-sum@1.1.6", "", { "dependencies": { "is-any-array": "^2.0.0" } }, "sha512-29mAh2GwH7ZmiRnup4UyibQZB9+ZLyMShvt4cH4eTK+cL2oEMIZFnSyB3SS8MlsTh6q/w/yh48KmqLxmovN4Dw=="],
+
+    "ml-distance": ["ml-distance@4.0.1", "", { "dependencies": { "ml-array-mean": "^1.1.6", "ml-distance-euclidean": "^2.0.0", "ml-tree-similarity": "^1.0.0" } }, "sha512-feZ5ziXs01zhyFUUUeZV5hwc0f5JW0Sh0ckU1koZe/wdVkJdGxcP06KNQuF0WBTj8FttQUzcvQcpcrOp/XrlEw=="],
+
+    "ml-distance-euclidean": ["ml-distance-euclidean@2.0.0", "", {}, "sha512-yC9/2o8QF0A3m/0IXqCTXCzz2pNEzvmcE/9HFKOZGnTjatvBbsn4lWYJkxENkA4Ug2fnYl7PXQxnPi21sgMy/Q=="],
+
+    "ml-distance-matrix": ["ml-distance-matrix@2.0.1", "", {}, "sha512-6wt3bvK8WzAjyuBt9+wnyGanphrAZyqJGwiEEfuknfu8IQBtHYWpyLhjtQ8R7rjiPyXlF9eP7GcI5L7OA1NLEQ=="],
+
+    "ml-hclust": ["ml-hclust@4.0.0", "", { "dependencies": { "heap": "^0.2.7", "ml-distance-euclidean": "^3.0.1", "ml-distance-matrix": "^2.0.1", "ml-matrix": "^6.12.1" } }, "sha512-4zSxWo72P9aWsxXwuKJGMIerPkLIqkbGj88ozPYc1jJZ3xsEYriZBA4hNI7mEyGQKBw8LwCf4TNIxP1fkG1ZiQ=="],
+
+    "ml-matrix": ["ml-matrix@6.12.2", "", { "dependencies": { "is-any-array": "^3.0.0", "ml-array-rescale": "^2.0.0" } }, "sha512-GC+BnW+pBh8Auap8goAxY0senAmF0IEoc3HNVSfnfbvGw0buuDIYb9kAKMS1l+GiwJ1rfK2bzJ8IHhwjzATSFA=="],
+
+    "ml-pca": ["ml-pca@4.1.1", "", { "dependencies": { "ml-matrix": "^6.8.0" } }, "sha512-HQwswMK1dObj+ppk3EPcQMR2djWK0Cri8mAFd2nITtXHkLfO4DBBsEtiCT5KiR+2e3hQjp+lI0UyqZpdf04AlQ=="],
+
+    "ml-tree-similarity": ["ml-tree-similarity@1.0.0", "", { "dependencies": { "binary-search": "^1.3.5", "num-sort": "^2.0.0" } }, "sha512-XJUyYqjSuUQkNQHMscr6tcjldsOoAekxADTplt40QKfwW6nd++1wHWV9AArl0Zvw/TIHgNaZZNvr8QGvE8wLRg=="],
+
     "mlly": ["mlly@1.8.0", "", { "dependencies": { "acorn": "^8.15.0", "pathe": "^2.0.3", "pkg-types": "^1.3.1", "ufo": "^1.6.1" } }, "sha512-l8D9ODSRWLe2KHJSifWGwBqpTZXIXTeo8mlKjY+E2HAakaTeNpqAyBZ8GSqLzHgw4XmHmC8whvpjJNMbFZN7/g=="],
 
     "mobx": ["mobx@5.15.7", "", {}, "sha512-wyM3FghTkhmC+hQjyPGGFdpehrcX1KOXsDuERhfK2YbJemkUhEB+6wzEN639T21onxlfYBmriA1PFnvxTUhcKw=="],
@@ -2527,6 +3147,8 @@
     "normalize-path": ["normalize-path@3.0.0", "", {}, "sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA=="],
 
     "npm-run-path": ["npm-run-path@6.0.0", "", { "dependencies": { "path-key": "^4.0.0", "unicorn-magic": "^0.3.0" } }, "sha512-9qny7Z9DsQU8Ou39ERsPU4OZQlSTP47ShQzuKZ6PRXpYLtIFgl/DEBYEXKlvcEa+9tHVcK8CF81Y2V72qaZhWA=="],
+
+    "num-sort": ["num-sort@2.1.0", "", {}, "sha512-1MQz1Ed8z2yckoBeSfkQHHO9K1yDRxxtotKSJ9yvcTUUxSvfvzEq5GwBrjjHEpMlq/k5gvXdmJ1SbYxWtpNoVg=="],
 
     "number-to-bn": ["number-to-bn@1.7.0", "", { "dependencies": { "bn.js": "4.11.6", "strip-hex-prefix": "1.0.0" } }, "sha512-wsJ9gfSz1/s4ZsJN01lyonwuxA1tml6X1yBDnfpMglypcBRFZZkus26EdPSlqS5GJfYddVZa22p3VNb3z5m5Ig=="],
 
@@ -2617,6 +3239,8 @@
     "path-exists": ["path-exists@4.0.0", "", {}, "sha512-ak9Qy5Q7jYb2Wwcey5Fpvg2KoAc/ZIhLSLOSBmRmygPsGwkVVt0fZa0qrtMz+m6tJTAHfZQ8FnmB4MG4LWy7/w=="],
 
     "path-key": ["path-key@3.1.1", "", {}, "sha512-ojmeN0qd+y0jszEtoY48r0Peq5dwMEkIlCOu6Q5f41lfkswXuKtYrhgoTpLnyIcHm24Uhqx+5Tqm2InSwLhE6Q=="],
+
+    "path-parse": ["path-parse@1.0.7", "", {}, "sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw=="],
 
     "path-scurry": ["path-scurry@1.11.1", "", { "dependencies": { "lru-cache": "^10.2.0", "minipass": "^5.0.0 || ^6.0.2 || ^7.0.0" } }, "sha512-Xa4Nw17FS9ApQFJ9umLiJS4orGjm7ZzwUrwamcGQuHSzDyth9boKDaycYdDcZDuqYATXw4HFXgaqWTctW/v1HA=="],
 
@@ -2764,6 +3388,8 @@
 
     "require-main-filename": ["require-main-filename@2.0.0", "", {}, "sha512-NKN5kMDylKuldxYLSUfrbo5Tuzh4hd+2E8NPPX02mZtn1VuREQToYe/ZdlJy+J3uCpfaiGF05e7B8W0iXbQHmg=="],
 
+    "resolve": ["resolve@1.22.12", "", { "dependencies": { "es-errors": "^1.3.0", "is-core-module": "^2.16.1", "path-parse": "^1.0.7", "supports-preserve-symlinks-flag": "^1.0.0" }, "bin": { "resolve": "bin/resolve" } }, "sha512-TyeJ1zif53BPfHootBGwPRYT1RUt6oGWsaQr8UyZW/eAm9bKoijtvruSDEmZHm92CwS9nj7/fWttqPCgzep8CA=="],
+
     "resolve-from": ["resolve-from@4.0.0", "", {}, "sha512-pb/MYmXstAkysRFx8piNI1tGFNQIFA3vkE3Gq4EuA1dF6gHp/+vgZqsCGJapvy8N3Q+4o7FwvquPJcnZ7RYy4g=="],
 
     "restore-cursor": ["restore-cursor@4.0.0", "", { "dependencies": { "onetime": "^5.1.0", "signal-exit": "^3.0.2" } }, "sha512-I9fPXU9geO9bHOt9pHHOhOkYerIMsmVaWB0rA2AI9ERh/+x/i7MV5HKBNrg+ljO5eoPVgCcnFuRjJ9uH6I/3eg=="],
@@ -2855,6 +3481,8 @@
     "simple-concat": ["simple-concat@1.0.1", "", {}, "sha512-cSFtAPtRhljv69IK0hTVZQ+OfE9nePi/rtJmw5UjHeVyVroEqJXP1sFztKUy1qU+xvz3u/sfYJLa947b7nAN2Q=="],
 
     "simple-get": ["simple-get@4.0.1", "", { "dependencies": { "decompress-response": "^6.0.0", "once": "^1.3.1", "simple-concat": "^1.0.0" } }, "sha512-brv7p5WgH0jmQJr1ZDDfKDOSeWWg+OVypG99A/5vYGPqJ6pxiaHLy8nxtFjBA7oMa01ebA9gfh1uMCFqOuXxvA=="],
+
+    "simple-statistics": ["simple-statistics@7.9.0", "", {}, "sha512-OOF4uUZseYAC54r2/W58KxlIe4aA33GyPBrX4WMSxQq/NBNVNIOBlJerpGnb64jGH6cUIqKKOkMdhymtmKmpiA=="],
 
     "simple-wcswidth": ["simple-wcswidth@1.1.2", "", {}, "sha512-j7piyCjAeTDSjzTSQ7DokZtMNwNlEAyxqSZeCS+CXH7fJ4jx3FuJ/mTW3mE+6JLs4VJBbcll0Kjn+KXI5t21Iw=="],
 
@@ -2961,6 +3589,8 @@
     "superstruct": ["superstruct@2.0.2", "", {}, "sha512-uV+TFRZdXsqXTL2pRvujROjdZQ4RAlBUS5BTh9IGm+jTqQntYThciG/qu57Gs69yjnVUSqdxF9YLmSnpupBW9A=="],
 
     "supports-color": ["supports-color@7.2.0", "", { "dependencies": { "has-flag": "^4.0.0" } }, "sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw=="],
+
+    "supports-preserve-symlinks-flag": ["supports-preserve-symlinks-flag@1.0.0", "", {}, "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="],
 
     "sushi": ["sushi@6.2.1", "", { "dependencies": { "@uniswap/token-lists": "1.0.0-beta.33", "big.js": "6.1.1", "date-fns": "3.3.1", "seedrandom": "3.0.5", "tiny-invariant": "1.3.3", "toformat": "2.0.0" }, "peerDependencies": { "typescript": ">= 5.8.3 < 6", "viem": "*", "zod": "*" }, "optionalPeers": ["typescript", "viem", "zod"] }, "sha512-qg181ucsgVzfpSZ33/JqLc6xJrkfOJIROzcxyGsAqzmDvjj7nRZpctxKjgcLNmlllDn1OjA29ryqsWX/JS3IdA=="],
 
@@ -4164,6 +4794,8 @@
 
     "@solworks/soltoolkit-sdk/typescript": ["typescript@4.9.5", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-1FXk9E2Hm+QzZQ7z+McJiHL4NW1F2EzMu9Nq9i3zAaGqibafqYwCVU6WyWAuyQRRzOlxou8xZSyXLEN8oKj24g=="],
 
+    "@stdlib/utils-library-manifest/debug": ["debug@2.6.9", "", { "dependencies": { "ms": "2.0.0" } }, "sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA=="],
+
     "@subsquid/ss58-codec/base-x": ["base-x@4.0.1", "", {}, "sha512-uAZ8x6r6S3aUM9rbHGVOIsR15U/ZSc82b3ymnCPsT45Gk1DDvhDPdIgB5MrhirZWt+5K0EEPQH985kNqZgNPFw=="],
 
     "@substrate/connect/smoldot": ["smoldot@2.0.26", "", { "dependencies": { "ws": "^8.8.1" } }, "sha512-F+qYmH4z2s2FK+CxGj8moYcd1ekSIKH8ywkdqlOz88Dat35iB1DIYL11aILN46YSGMzQW/lbJNS307zBSDN5Ig=="],
@@ -4402,6 +5034,8 @@
 
     "inquirer/wrap-ansi": ["wrap-ansi@6.2.0", "", { "dependencies": { "ansi-styles": "^4.0.0", "string-width": "^4.1.0", "strip-ansi": "^6.0.0" } }, "sha512-r6lPcBGxZXlIcymEu7InxDMhdW0KDxpLgoFLcguasxCaJ/SOIZwINatK9KY/tf+ZrlywOKU0UDj3ATXUBfxJXA=="],
 
+    "is-core-module/hasown": ["hasown@2.0.4", "", { "dependencies": { "function-bind": "^1.1.2" } }, "sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A=="],
+
     "jayson/@types/node": ["@types/node@12.20.55", "", {}, "sha512-J8xLz7q2OFulZ2cyGTLE1TbbZcjpno7FaN6zdJNrgAdrJ+DZzh/uFR6YrTb4C+nXakvud8Q4+rbhoIWlYQbUFQ=="],
 
     "jayson/@types/ws": ["@types/ws@7.4.7", "", { "dependencies": { "@types/node": "*" } }, "sha512-JQbbmxZTZehdc2iszGKs5oC3NFnjeay7mtAWrdt7qNtAVK0g19muApzAy4bm9byz79xa2ZnO/BOBC2R8RC5Lww=="],
@@ -4441,6 +5075,10 @@
     "micro-sr25519/@noble/hashes": ["@noble/hashes@1.7.1", "", {}, "sha512-B8XBPsn4vT/KJAGqDzbwztd+6Yte3P4V7iafm24bxgDe/mlRuK6xmWPuCNrKt2vDafZ8MfJLlchDG/vYafQEjQ=="],
 
     "micromatch/picomatch": ["picomatch@2.3.1", "", {}, "sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA=="],
+
+    "ml-array-sum/is-any-array": ["is-any-array@2.0.1", "", {}, "sha512-UtilS7hLRu++wb/WBAw9bNuP1Eg04Ivn1vERJck8zJthEvXCBEBpGR/33u/xLKWEQf95803oalHrVDptcAvFdQ=="],
+
+    "ml-hclust/ml-distance-euclidean": ["ml-distance-euclidean@3.0.1", "", {}, "sha512-jEEu/1a73ArPmIiwOzrcah6TfhtV19dCKnnM7JvdR2xTzyVJFGgIIR78Vg8Pl9z2NVeSRoFOpzc0910sPMINsA=="],
 
     "msw/type-fest": ["type-fest@5.4.3", "", { "dependencies": { "tagged-tag": "^1.0.0" } }, "sha512-AXSAQJu79WGc79/3e9/CR77I/KQgeY1AhNvcShIH4PTcGYyC4xv6H4R4AUOwkPS5799KlVDAu8zExeCrkGquiA=="],
 
@@ -6157,6 +6795,8 @@
     "@solana/web3.js/rpc-websockets/ws": ["ws@8.19.0", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-blAT2mjOEIi0ZzruJfIhb3nps74PRWTCz1IjglWEEpQl5XS/UNama6u2/rjFkDDouqr4L67ry+1aGIALViWjDg=="],
 
     "@solworks/soltoolkit-sdk/@types/node/undici-types": ["undici-types@5.26.5", "", {}, "sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA=="],
+
+    "@stdlib/utils-library-manifest/debug/ms": ["ms@2.0.0", "", {}, "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A=="],
 
     "@substrate/connect/smoldot/ws": ["ws@8.19.0", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-blAT2mjOEIi0ZzruJfIhb3nps74PRWTCz1IjglWEEpQl5XS/UNama6u2/rjFkDDouqr4L67ry+1aGIALViWjDg=="],
 
