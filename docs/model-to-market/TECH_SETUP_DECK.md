@@ -9,9 +9,9 @@ Targets the **Best Technology Setup** prize ($10k) and the **Anthropic** + **NVI
 
 ## 1. Thesis
 
-**One line:** *Gordon is a governed, AI-native trading OS built on **bounded autonomy** — the agent reasons and proposes, a structural risk plane the strategy cannot override decides, and only human-approved decision objects reach the venue.*
+**One line:** *Gordon/MOMQ is a governed, AI-native trading OS built on **bounded autonomy** — the agent reasons and proposes, a structural risk plane the strategy cannot override decides, and only human-approved decision objects reach the venue.*
 
-Most entrants ship a strategy script wired to an API. Gordon ships the *system around* the strategy — a capital-safety plane, an eval harness, an MT5 execution bridge, and a self-correcting autonomy loop — and then a posture that was selected **honestly**, against the competition's exact objective function, after costs.
+Most entrants ship a strategy script wired to an API. Gordon ships the *system around* the strategy — a capital-safety plane, an eval harness, a native MT5 execution core, and a self-correcting autonomy loop — then packages the competition runner as `momq-python`, selected **honestly** against the competition's exact objective function after costs.
 
 The design thesis is not ours alone. **Hui Gong, "Bounded Autonomy" (UCL, arXiv 2603.13942)** argues the value of an AI agent **is not proportional to its autonomy** — the win comes from *structuring the reasoning a human acts on*, not from removing the human. That is precisely Gordon's `create_plan → verify_plan → approve_plan → execute_plan` spine: the LLM produces a typed **decision object**, the risk plane gates it, and execution is human-approved and idempotent. Autonomy is bounded *by construction*, not by policy a clever prompt can talk past.
 
@@ -36,14 +36,14 @@ Every state-changing action passes a deny-first gate the strategy layer cannot b
 
 The split is a **security boundary**, not an efficiency choice: only the executor can touch capital, every handoff is tracked, and the agents carry *different* tool subsets scoped by permission boundary. We deliberately did **not** collapse to a single agent — for a regulated, strict-verification money domain, centralized multi-agent is the recommended pattern for error containment, and the executor/researcher permission split is non-negotiable. The surface is a typed **22-tool** core plus two meta-dispatchers (`compute_indicator`, `compute_microstructure`) exposing ~60 quant ops — explicit-over-meta on the safety-critical surface, and **no arbitrary-code-execution tool by design** (a code tool dissolves the per-action money-gate).
 
-### 2.3 Execution bridge — MT5 with a deny-first trading guard
+### 2.3 Native MT5 execution — deny-first trading guard
 
-MT5 is the competition's only programmatic path (no Syphonix REST API). Gordon's bridge — **built**:
+MT5 is the competition's only programmatic path (no Syphonix REST API). The primary live product is `momq-python` — **built**:
 
-- **Python sidecar** `scripts/mt5-bridge/mt5_bridge.py` — wraps the `MetaTrader5` package behind a localhost-only JSON API (`/health /account /positions /orders /symbols /quote /depth(L2) /bars /order /cancel /close`). Binds to `127.0.0.1` only; a **deny-first trading guard** makes `/order /cancel /close` validate via `order_check` and refuse to fire unless `MT5_BRIDGE_ALLOW_TRADING=1`. MT5 login/password/server live in the sidecar env, never in Gordon.
-- **Typed client** `src/infra/broker/mt5/bridgeClient.ts` (`Mt5BridgeClient`, 8 tests).
-- **BrokerAdapter** `src/infra/broker/adapters/mt5.ts` (`Mt5Adapter`, brokerId `mt5`) — maps onto the normalized broker contract; registered in the factory + inclusion gate (approved), 7 adapter tests.
-- **Double safety guard (defense-in-depth):** orders fire only when **both** `MT5_BRIDGE_ALLOW_TRADING=1` (sidecar) **and** `GORDON_LIVE_TRADING=1` (runner) are set, in two separate processes. Either unset ⇒ the stack reads / validates / sizes but never submits. The resting state is *off*.
+- **Native client** `momq-python/src/momq/execution/mt5_client.py` — wraps the `MetaTrader5` package directly: health, account, positions, pending orders, symbol specs, quotes, L2 depth, bars, order/cancel/close.
+- **Native runner** `momq-python/run.py` — RV-reversion barbell core, ring-fenced sleeve, survival breaker, standing monitor, state persistence, kill flag, slippage/depth accounting, and maker/taker mode.
+- **Double safety guard (defense-in-depth):** orders fire only when **both** `MT5_BRIDGE_ALLOW_TRADING=1` (native MT5 transport guard) **and** `GORDON_LIVE_TRADING=1` (runner/probe guard) are set. Either unset => the stack reads / validates / sizes but never submits. The resting state is *off*.
+- **Fallback/reference path:** the earlier TS sidecar (`scripts/mt5-bridge/mt5_bridge.py`, `Mt5BridgeClient`, `Mt5Adapter`) remains tested, but it is no longer the primary live product.
 
 ### 2.4 Four-layer mapping
 
@@ -52,7 +52,7 @@ MT5 is the competition's only programmatic path (no Syphonix REST API). Gordon's
 | **Perception** | market data, L2 microstructure, news, funding | `src/infra/data/`, `scripts/dev/data/parquet_l2_features.py`, `src/infra/news/` |
 | **Reasoning** | Claude-native planning, extended thinking, critique | `src/infra/agents/cognition/` (`thinkingPhase`, `extendedThinking`, `critiquePhase`) |
 | **Strategy** | signals, regime, sizing, the dry-run | `src/core/alpha/`, `src/core/regime/`, `src/core/risk-management/`, `src/backtest/` |
-| **Execution & control** | risk gate, permission engine, MT5 bridge, audit | `src/infra/trading/risk/`, `src/runtime/permissions/`, `src/infra/broker/mt5/` |
+| **Execution & control** | risk gate, permission engine, native MT5 runner, audit | `src/infra/trading/risk/`, `src/runtime/permissions/`, `momq-python/src/momq/` |
 
 ---
 
@@ -103,9 +103,9 @@ Final Score = 0.70·ReturnRank + 0.15·DrawdownRank + 0.10·SharpeRank + 0.05·R
 
 ### 4.2 A cost-honest, platform-accurate dry-run
 
-`src/backtest/competition-dry-run.ts` is the keystone rehearsal — the full money-path (signal → `sizeCompetitionTrade` → fills → stop/target → daily-loss-kill + exposure-cap → equity curve → judged metrics), pure and deterministic. It models the competition's friction conservatively: **NO commission** (confirmed by the organisers); **swap/financing is per the final trading specs** (published with trading access — so we do *not* assume zero overnight cost, and the survive-and-compound core flattens rather than carrying stale risk). The modelled execution cost is the **bid-ask spread you cross** (+ slippage), the worst-case taker assumption.
+`src/backtest/competition-dry-run.ts` and the `momq-python` parity harness are the keystone rehearsals — the TS oracle plus the native Python money path. They model the competition's friction conservatively: **NO commission / NO swap / NO borrow fees** (confirmed by the organisers); execution friction is spread + slippage + market impact. The conservative baseline is the **bid-ask spread you cross** (+ slippage), the worst-case taker assumption.
 
-We model **taker / spread-crossing fills** as the conservative baseline — we never assume a passive/maker rebate, since none is confirmed. The final rules confirm **standard MT5 order functionality, including server-side stop-losses, is supported** (superseding the kickoff's narrower FOK/IOC framing) and that **participants may run their own infrastructure over the MT5 API** — which is exactly our bridge. Server-side stop-losses are a concrete survival lever: they enforce the no-forced-liquidation invariant (forced liquidation = instant elimination, §14) at the venue, not just in our sizer. Honest cost model in, honest verdict out.
+We model **taker / spread-crossing fills** as the conservative baseline, and now separately measure the legal passive/maker path with `momq-python/scripts/maker_probe.py`. The final rules confirm resting limit orders, cancel/replace, and liquidity-based sizing are permitted. That makes maker execution a valid upside switch, but only after live fill-rate/adverse-selection data confirms it. Honest cost model in, honest verdict out.
 
 ### 4.3 The honest empirical finding — *no signal showed a stable edge after costs*
 
@@ -179,26 +179,27 @@ All external feeds are read-only public data, explicitly permitted by the organi
 | **Pydantic Logfire** | OTel-native observability backend | drop-in OTel exporter target for agent/tool spans (`LOGFIRE_TOKEN` switch) | `src/infra/platform/observability/tracing.ts` |
 | **Doubleword** | OpenAI-compatible inference + Batch tier | bulk eval-harness judging on the cheap 24h batch tier | `src/infra/domain/evals/harness/doublewordBatchJudge.ts` |
 | **NVIDIA Nemotron** | Nemotron-3-Ultra via Doubleword gateway | failover + eval-judge model; NVIDIA compute drives the eval-judging leg | `src/core/pipeline/llmFailover.ts`, `src/infra/runtime/providers/registry.ts` |
-| **Northflank** | Linux container platform ($100 credit) | hosts Gordon's non-MT5 services (data fetch, dashboards); the MT5 terminal + sidecar + live runner stay on a Windows VPS (the `MetaTrader5` package is Windows-only) | deployment target; MT5 co-locates locally per §8.1 of the brief |
+| **Northflank** | Linux container platform ($100 credit) | hosts Gordon's non-MT5 services (data fetch, dashboards); the MT5 terminal + native MOMQ runner stay on a Windows VPS (the `MetaTrader5` package is Windows-only) | deployment target; MT5 co-locates locally per §8.1 of the brief |
 
 ---
 
 ## 7. Demo plan (§9 deliverable)
 
-The demo runs entirely **dry / validate-only** — no real orders. The two trading guards (`MT5_BRIDGE_ALLOW_TRADING`, `GORDON_LIVE_TRADING`) stay **unset** throughout, so the bridge `order_check`s and the runner reads/sizes but never submits.
+The demo runs entirely **dry / validate-only** — no real orders. The two trading guards (`MT5_BRIDGE_ALLOW_TRADING`, `GORDON_LIVE_TRADING`) stay **unset** throughout, so the native MT5 client refuses `order_send` and the runner reads/sizes but never submits.
 
 ### Demo script — exact commands, in order
 
 ```bash
-# 1. Start the MT5 bridge sidecar (terminal A) — validate-only (guard unset).
-#    Binds 127.0.0.1 only; /order /cancel /close will order_check, not fire.
-pip install -r scripts/mt5-bridge/requirements.txt        # first time only
-python scripts/mt5-bridge/mt5_bridge.py
+# 1. Install the native MOMQ product (first time only).
+cd momq-python
+pip install -e '.[mt5,halo]'
+cd ..
 
-# 2. Smoke-test the Gordon↔MT5 transport (terminal B).
-#    Reads account + quote + L2 depth + bars + symbol spec; health.tradingEnabled
-#    reflects the (unset) sidecar guard, proving the validate-only posture.
-bun run scripts/dev/mt5/mt5-smoke.ts
+# 2. Smoke-test native MT5 transport.
+#    Reads account + quote + L2 depth + bars + symbol spec; health.trading_enabled
+#    reflects the unset transport guard, proving the validate-only posture.
+python momq-python/scripts/smoke.py BTCUSD
+python momq-python/scripts/preflight.py
 
 # 3. The headline empirical finding — the SYSTEMATIC, multiple-testing-corrected sweep.
 #    Sweeps Gordon's signal library × param grid × instrument through the cost-honest
@@ -222,22 +223,24 @@ bun run scripts/competition/rehearsals/rv-reversion-rehearsal.ts
 #    10,000 resampled paths → the 5th-percentile drawdown the median backtest hides.
 bun run scripts/competition/analysis/path-risk.ts
 
-# 6. The live-trader REHEARSAL — drive the REAL CompetitionLiveTrader loop end-to-end over
-#    replayed M15 bars (ReplayMt5 stands in for the sidecar). Exercises sizing → lot-rounding
-#    → order-shape → daily-loss-kill on the live path. Proven: no crash, ≥30 trades.
+# 6. The live-trader REHEARSAL — drive the competition loop end-to-end over
+#    replayed M15 bars. Exercises sizing -> lot-rounding -> order shape -> survival guards.
 bun run scripts/competition/rehearsals/rehearsal.ts
 
 # 7. The live runner in DRY mode — GORDON_LIVE_TRADING UNSET.
-#    Connects to the real bridge and runs the default BARBELL path (discrete RV core +
+#    Connects to native MT5 and runs the default BARBELL path (discrete RV core +
 #    ring-fenced sleeve + breaker + standing monitor), logs intended (dry) orders, and
-#    submits nothing — the exact go-live process minus the two guards. `COMP_STRATEGY=tsmom`
-#    remains only as a simple single-leg bridge smoke mode.
-bun run scripts/competition/live-runner.ts
+#    submits nothing — the exact go-live process minus the two guards.
+python momq-python/run.py
+
+# 8. Operator decision aids: maker fill economics and sleeve rank-spread.
+python momq-python/scripts/maker_probe.py
+python momq-python/scripts/sleeve_what_if.py --current-equity 1000000 --per-bar-vol 0.01 --bars-held 48
 ```
 
 ### Three narrative beats for a live walkthrough
 
-1. **The money-gate:** submit an oversized / over-leveraged order → the 15-dim risk classifier **blocks** it before it reaches the venue, and the sidecar `order_check`s rather than fires.
+1. **The money-gate:** submit an oversized / over-leveraged order -> the risk plane blocks it before it reaches the venue, and the native MT5 guard refuses trading while unarmed.
 2. **The dry-run truth:** step 3 above — show every signal family failing OOS after costs, and the **systematic walk-forward sweep returning 0/620 past the deflated-Sharpe bar**, all scored on the *exact* competition metric under taker execution.
 3. **Express AND protect:** steps 4–5 — the dollar-neutral Best-Sharpe core's *smooth* curve (≥30 trades, 2.1% DD), then the path-risk Monte Carlo showing why high-churn settings are unsafe (23% clustered-tail DD) and why the low-churn discrete candidate is the sane live dial (<2% 5-day p95 DD in the sweep). This is "execution fidelity" as machinery — the exact dimension the organisers said they're judging.
 4. **The audit + observability:** show the signed audit log capturing rationale, and the same run's spans landing in Logfire (`LOGFIRE_TOKEN` set).
@@ -246,14 +249,15 @@ bun run scripts/competition/live-runner.ts
 
 ## 8. Reproducibility (§9 deliverable)
 
-**GitHub repo:** `[TBD — submission repo link]`
+**GitHub repo:** `https://github.com/ReverseZoom2151/momq-python`
 
 ### Repo layout (the bits a judge will open)
 
 | Path | What |
 |---|---|
-| `scripts/mt5-bridge/` | MT5 Python sidecar (`mt5_bridge.py`, `requirements.txt`, `README.md`) |
-| `src/infra/broker/mt5/` | typed bridge client + adapter |
+| `momq-python/src/momq/` | Python-native live product: MT5 client, barbell runner, risk, standing, execution, Claude halo, Logfire |
+| `momq-python/scripts/` | operator commands: preflight, smoke, spread check, maker probe, standing watch, sleeve what-if |
+| `momq-python/tests/parity/` | golden-output parity harness against the TypeScript oracle |
 | `src/core/risk-management/competition-scoring.ts` | exact §11–17 objective function (16 tests) |
 | `src/core/risk-management/competition-risk-preset.ts` | survive-and-rank sizer (`COMPETITION_RISK_SURVIVAL`) |
 | `src/infra/trading/competition/barbellStrategy.ts` | top-level barbell decision (neutral core + ring-fenced sleeve) |
@@ -264,7 +268,7 @@ bun run scripts/competition/live-runner.ts
 | `src/backtest/competition-dry-run.ts` | cost-honest taker money-path simulator (FOK/IOC, no commission) |
 | `src/core/alpha/` | candidate signal primitives (reversal, cross-sectional, factor model) |
 | `scripts/dev/momq/momq-*.ts` | the IS/OOS, after-costs signal validators (the receipts) |
-| `scripts/competition/` | `rehearsal.ts` (replay live-trader) + `live-runner.ts` (real bridge) |
+| `scripts/competition/` | TS research/rehearsal oracle + fallback live runner |
 | `src/infra/trading/risk/riskClassifier.ts`, `src/runtime/permissions/` | the governance plane |
 | `src/infra/domain/evals/harness/` | the eval harness (RULER judge, panel, process checks, CI gate) |
 | `docs/model-to-market/` | this deck, the competition brief, the live-week operations runbook |

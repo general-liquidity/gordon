@@ -34,9 +34,9 @@ Multi-provider routing with same-provider retry (exponential backoff), a **cross
 ## Competition execution approach
 
 - **Instruments:** FX, Gold/Silver, Crypto — symbols resolved from the Syphonix catalog at runtime (never hardcoded; FX/metals are structural).
-- **Sizing:** the **competition risk preset** — a *min-of-caps* survive-and-compound sizer composing per-trade-risk (0.5%) / vol-target (15%) / leverage (3×) / fractional-Kelly (0.25) / exposure-cap (60%) / daily-loss-kill (3%). The most conservative constraint always binds → a losing streak can't cause ruin while vol-targeting keeps Sharpe central.
+- **Sizing:** the native barbell runner sizes the RV core through low per-pair fractions, inverse-vol/ring-fence controls, live spread gates, depth clamping, and a whole-book margin breaker. The older min-of-caps competition preset remains a tested reference/fallback object, not the selected live sizing path.
 - **Signals:** the existing quant stack (regime detection, momentum incl. TSI, mean-reversion/cointegration, microstructure, A-S market-making) — systematic, not latency-arbitrage (this is **not** HFT; an LLM in the loop runs at human-to-second cadence, and MT5/chat are first-class trade methods).
-- **Live entry point:** `scripts/competition/live-runner.ts` → `BarbellLiveRunner` (`infra/trading/competition/barbellLiveRunner.ts`) over the **MT5 bridge** (`Mt5BridgeClient`) — the RV-reversion core + ring-fenced sleeve + survival breaker + standing monitor + kill-switch. This is the executable path. (`core/pipeline/competition-runner.ts` / `buildCompetitionRunConfig()` is **legacy prep scaffolding** from the earlier paper→syphonix plan, superseded by the MT5 path — kept for reference, not the live entry point.)
+- **Live entry point:** primary is `momq-python/run.py` over the native `MetaTrader5` Python client — RV-reversion core + ring-fenced sleeve + survival breaker + standing monitor + kill-switch. The TypeScript `scripts/competition/live-runner.ts` path remains the tested oracle/fallback; `core/pipeline/competition-runner.ts` is legacy prep scaffolding.
 
 ## What to demo
 

@@ -1,11 +1,12 @@
 # Gordon — Live-Week Operations Runbook (Model to Market)
 
-**The 24/7 operations runbook + decision playbook for the Model to Market live trading week.** Last updated **2026-06-17**.
+**The 24/7 operations runbook + decision playbook for the Model to Market live trading week.** Last updated **2026-06-19**.
 
 This is the operational companion to:
 - `docs/model-to-market/COMPETITION_BRIEF.md` — the single competition reference (schedule, scoring, rules).
 - `docs/model-to-market/COMPETITION_ARCHITECTURE.md` — Gordon's system design.
-- `scripts/mt5-bridge/README.md` — the bridge sidecar setup + endpoints.
+- `momq-python/README.md` — the primary Python-native live product + operator commands.
+- `scripts/mt5-bridge/README.md` — legacy TS fallback sidecar setup + endpoints.
 
 Scope: how to bring Gordon up for the live window, keep it healthy 24/7, watch the live risk limits, and kill it fast. **Operational only — no strategy tuning here.**
 
@@ -13,51 +14,49 @@ Scope: how to bring Gordon up for the live window, keep it healthy 24/7, watch t
 
 ## 1. Topology — one always-on Windows machine
 
-The `MetaTrader5` Python package is **Windows-only** and talks to a **locally-running MT5 terminal**. Northflank (the $100 credit) is **Linux** and therefore **cannot host the MT5 terminal**. So the execution path lives on **one always-on Windows machine / VPS**, running three co-located processes:
+The `MetaTrader5` Python package is **Windows-only** and talks to a **locally-running MT5 terminal**. Northflank (the $100 credit) is **Linux** and therefore **cannot host the MT5 terminal**. The primary live path is now **`momq-python`**, a single native Python process next to MT5. The TS bridge path remains a fallback/reference oracle, not the preferred launch path.
 
 ```
 Windows VPS (always-on)
 ├─ 1. MetaTrader 5 terminal      ── logged into the Syphonix competition account
-├─ 2. mt5_bridge.py (sidecar)    ── scripts/mt5-bridge/mt5_bridge.py
-│      └─ localhost JSON API on 127.0.0.1:8788, wraps the MetaTrader5 pkg
-└─ 3. Gordon live runner         ── scripts/competition/live-runner.ts (the live execution loop)
-       └─ Mt5BridgeClient (src/infra/broker/mt5/bridgeClient.ts) ──HTTP──► sidecar
+└─ 2. MOMQ native runner         ── momq-python/run.py
+       └─ Mt5Client (MetaTrader5 Python package) ──IPC──► terminal
 ```
 
 Data path:
 
 ```
-Gordon (Bun/TS) ──HTTP──► mt5_bridge.py ──IPC──► MT5 terminal ──► Syphonix per-account sim
+MOMQ (Python) ──MetaTrader5 pkg──► MT5 terminal ──► Syphonix per-account sim
 ```
 
-**Northflank hosts only non-MT5 services** — dashboards, data collection, auxiliary tooling. It must **never** run the MT5 terminal, the sidecar, or the live trade loop. Keep the money path on the Windows box.
+**Northflank hosts only non-MT5 services** — dashboards, data collection, auxiliary tooling. It must **never** run the MT5 terminal or the live trade loop. Keep the money path on the Windows box.
 
-The bridge binds to **`127.0.0.1` only** (not reachable off the machine), so all three processes must be on the same host. This is by design: the localhost-only bind is part of the safety posture.
+Fallback only: the old Bun runner can still use `scripts/mt5-bridge/mt5_bridge.py` + `Mt5BridgeClient` if the Python-native runner is unavailable.
 
 ---
 
 ## 2. The double safety guard (defense-in-depth)
 
-**Orders fire only when BOTH guards are deliberately set.** Two independent layers, each in a different process:
+**Orders fire only when BOTH guards are deliberately set.** In the native runner both guards are checked in-process; in the TS fallback they sit across Gordon + sidecar.
 
 | Guard | Where | Owner | Effect when set | Effect when unset |
 |---|---|---|---|---|
-| `MT5_BRIDGE_ALLOW_TRADING=1` | **Sidecar** env (`mt5_bridge.py`) | the bridge | `/order` `/cancel` `/close` actually call `order_send` | endpoints run `order_check` only and **refuse to fire** (validate-only) |
-| `GORDON_LIVE_TRADING=1` | **Gordon live runner** env | the live trader | the loop submits real orders through the bridge | the loop reads/validates/sizes only — never submits |
+| `MT5_BRIDGE_ALLOW_TRADING=1` | native `Mt5Client` env (or sidecar fallback) | MT5 transport | `order_send` is allowed after validation | trading calls are refused with `guard="trading-disabled"` |
+| `GORDON_LIVE_TRADING=1` | MOMQ live runner env | the live trader | the loop/probe may submit real orders | the loop reads/validates/sizes only — never submits |
 
-**If either is unset, no real order is placed.** The sidecar guard is the last line: even a fully-armed Gordon cannot fire if `MT5_BRIDGE_ALLOW_TRADING` is not `1`, because the bridge will only `order_check`. Conversely, an armed sidecar does nothing on its own — Gordon won't submit without `GORDON_LIVE_TRADING=1`.
+**If either is unset, no real order is placed.** `GORDON_LIVE_TRADING` arms the strategy process; `MT5_BRIDGE_ALLOW_TRADING` is the final MT5 transport guard. The variable name is kept for compatibility with the TS sidecar, but in `momq-python` it is enforced by the native client.
 
 This is **intentional defense-in-depth**, mirroring Gordon's deny-first permission philosophy: two processes, two operators-worth of intent, both required to move capital. The default for both is **off** — a fresh run reads state and price-checks orders but cannot trade. Arm both **only at go-live** (Section 8).
 
-> Note the smoke-test confirms this: `Mt5OrderResult.guard` is populated ("trading-disabled") when the sidecar guard blocks, and `health.tradingEnabled` reports the sidecar's state.
+> Note the smoke/preflight checks confirm this: `Mt5OrderResult.guard` is populated ("trading-disabled") when the transport guard blocks, and `health.trading_enabled` reports the guard state.
 
 ---
 
 ## 3. Environment configuration
 
-**Credential boundary (important):** the MT5 **account** credentials live in the **sidecar env only** — never in Gordon. Gordon points at the bridge, not at MT5.
+**Credential boundary (important):** in the primary native path the MT5 **account** credentials live in the local Windows process env for `momq-python` only. Do not put them in docs, commits, dashboards, or hosted Linux services.
 
-### Sidecar env (`mt5_bridge.py`) — holds the account creds
+### Native MT5 env — holds the account creds
 
 | Var | Purpose |
 |---|---|
@@ -65,21 +64,13 @@ This is **intentional defense-in-depth**, mirroring Gordon's deny-first permissi
 | `MT5_PASSWORD` | account password |
 | `MT5_SERVER` | broker server name (the Syphonix MT5 server) |
 | `MT5_TERMINAL_PATH` | path to `terminal64.exe` (optional; auto-detected if running) |
-| `MT5_BRIDGE_PORT` | default `8788` |
-| `MT5_BRIDGE_TOKEN` | shared secret; callers must send it as `X-Bridge-Token` |
 | `MT5_BRIDGE_ALLOW_TRADING` | **`1` to actually fire orders** — guard #1 (Section 2) |
 
-### Gordon live-runner env — points at the bridge, never sees the account creds
-
-`Mt5BridgeClient` (and the `Mt5Adapter` `BrokerCredentials`) describe the **bridge**:
+### MOMQ live-runner env
 
 | Setting | Value |
 |---|---|
-| `apiKey` (`BrokerCredentials.apiKey`) | `MT5_BRIDGE_TOKEN` — must match the sidecar's token |
-| `baseUrl` (`BrokerCredentials.baseUrl`) | `http://127.0.0.1:8788` (or `http://127.0.0.1:${MT5_BRIDGE_PORT}`) |
 | `GORDON_LIVE_TRADING` | **`1` to submit real orders** — guard #2 (Section 2) |
-
-The client defaults `baseUrl` to `http://127.0.0.1:${MT5_BRIDGE_PORT|8788}` and reads the token from `MT5_BRIDGE_TOKEN` if not passed explicitly.
 
 ### Competition env (the live-runner reads these) — set at launch
 
@@ -113,40 +104,47 @@ The client defaults `baseUrl` to `http://127.0.0.1:${MT5_BRIDGE_PORT|8788}` and 
 **Live window: 21 Jun 22:00 BST → 26 Jun 22:00 BST.** Bring up the stack **in order** — each layer depends on the one below it.
 
 1. **MT5 terminal** — launch on the Windows box; confirm it is logged into the competition account and the live feed is connected (price ticking).
-2. **Sidecar** — set the sidecar env (Section 3), then:
+2. **Python env** — install the native product once:
    ```
-   pip install -r scripts/mt5-bridge/requirements.txt   # first time only
-   python scripts/mt5-bridge/mt5_bridge.py
+   cd momq-python
+   pip install -e '.[mt5,halo]'
    ```
-   At go-live, the sidecar env includes `MT5_BRIDGE_ALLOW_TRADING=1` (guard #1).
-3. **Preflight (READY → GO)** — one read-only command runs every readiness check (bridge health, account, contract specs for all 15, spread sanity, guard state):
+   At go-live, the native env includes `MT5_BRIDGE_ALLOW_TRADING=1` (guard #1).
+3. **Preflight (READY -> GO)** — one read-only command runs every readiness check (MT5 health, account, contract specs for all 15, spread sanity, guard state):
    ```
-   bun run scripts/competition/preflight.ts
+   python momq-python/scripts/preflight.py
    ```
-   Two phases: run it **before arming** → expect **READY** (critical checks pass; guards intentionally off). After arming both guards (Section 8), re-run → **GO**. **NO-GO** = a genuine critical blocker (bad bridge / missing specs). Feed-off pre-launch is noted, not failed.
-4. **Smoke test** — verify the Gordon↔MT5 transport against the real account:
+   Two phases: run it **before arming** -> expect critical checks pass with guards intentionally off. After arming both guards (Section 8), re-run. **NO-GO** = a genuine critical blocker (bad MT5 / missing specs). Wide spreads are posture input, not an infrastructure failure.
+4. **Smoke test** — verify the native MT5 transport against the real account:
    ```
-   bun run scripts/dev/mt5/mt5-smoke.ts            # account + quote + L2 depth + bars + symbol spec
+   python momq-python/scripts/smoke.py BTCUSD      # account + quote + L2 depth + bars + symbol spec
    ```
-   `--trade` places + cancels a tiny far-from-market limit (only fires if the sidecar is armed).
+   This is read-only.
 5. **Spread check (the decisive read)** — the single biggest live unknown: real spreads decide whether the book is net-positive or the ~0 relative-rank play. Run the moment the feed is on:
    ```
-   bun run scripts/dev/mt5/competition-spread-check.ts
+   python momq-python/scripts/spread_check.py
    ```
    Verdict GOOD (<2bps) / MARGINAL / POOR per instrument vs the empirical break-even. Record it — it feeds the Decision Playbook (Section 9).
 6. **Live runner** — set the competition env (Section 3) + `GORDON_LIVE_TRADING=1` (guard #2), then:
    ```
    COMP_STARTING_EQUITY=1000000 COMP_CUT_MS=... COMP_DEADLINE_MS=... \
    COMP_STATE_PATH=.gordon/comp-state.json COMP_FLATTEN_FLAG=.gordon/FLATTEN \
-   GORDON_LIVE_TRADING=1 bun run scripts/competition/live-runner.ts
+   GORDON_LIVE_TRADING=1 python momq-python/run.py
    ```
    The runner: discrete-hysteresis RV core → depth-aware reconcile → fills (slippage tracked) → the **automatic margin breaker** + **standing monitor** each cycle. It logs the live standing + any alerts every cycle.
 7. **Standing watch (read-only dashboard)** — in a second terminal, monitor the standing WITHOUT arming trading:
    ```
    COMP_STARTING_EQUITY=1000000 COMP_CUT_MS=... COMP_DEADLINE_MS=... \
-   bun run scripts/competition/standing-watch.ts
+   COMP_STATE_PATH=.gordon/comp-state.json COMP_PEER_RETURNS_PATH=.gordon/peer-returns.json \
+   python momq-python/scripts/standing_watch.py
    ```
    And `tail -f comp-alerts.log` (or `$COMP_ALERT_PATH`) for critical-event alerts.
+8. **Maker fill probe (live Round 1 only, tiny and guarded)** — after the book is stable, measure whether resting limits actually fill and whether adverse selection is acceptable:
+   ```
+   PROBE_SYMBOLS=BTCUSD,ETHUSD PROBE_CYCLES=5 PROBE_WAIT_S=60 \
+   GORDON_LIVE_TRADING=1 python momq-python/scripts/maker_probe.py
+   ```
+   Switch `COMP_EXECUTION=maker` only if the probe shows useful fill rate and non-negative adverse selection.
 
 ### Round cadence (BST) — see COMPETITION_BRIEF.md §2 for the full table
 
@@ -179,29 +177,27 @@ The **Risk Discipline** score (§13) resets to 100 each round and is penalized f
 - **Forced liquidation (margin wipeout) → immediate elimination.** Never let margin run to a forced-liquidation. This is the single non-negotiable.
 - Also DQ: exploiting quote/latency/matching/settlement, API abuse / flooding (safe-harbor ≤ 500 req/s), multi-account, collusion / pre-arranged trading.
 
-**These are enforced in code, not just watched.** The **competition risk preset** (`src/core/risk-management/competition-risk-preset.ts`) sizes every order as a **min-of-caps** so the most conservative constraint always binds:
-- **`COMPETITION_RISK_SURVIVAL` (the FROZEN default — survive-and-rank):** 0.5% per-trade risk, 3× leverage, 12% vol target, 3% daily-loss kill, 3× gross exposure, 0.25 fractional Kelly. Chosen after the exhaustive search found no edge: concede the luck-dominated return rank, bank the controllable Drawdown/Sharpe ranks + survival.
-- `COMPETITION_RISK_AGGRESSIVE` (go-for-1st gamble — NOT the default): 1.5% per-trade, 6× per-position leverage, 35% vol target, 8% daily-loss kill, ~10× gross exposure, 0.4 fractional Kelly. Only swap in to gamble the return rank.
+**These are enforced in code, not just watched.** The selected live path is the barbell runner, not the legacy single-leg `liveTrader` path. Its risk controls are: low per-pair RV sizing, taker spread gates, depth clamping, ring-fenced one-shot sleeve, peer-board-gated endgame sleeve, the whole-book margin breaker, and the manual flatten flag. The old `COMPETITION_RISK_SURVIVAL` constants remain as the posture reference/parity object, but the native barbell runner sizes through `COMP_RV_*`, `BarbellConfig`, and the ring fence rather than `sizeCompetitionTrade`.
 
-Every ceiling in both presets sits **well under** the §13 thresholds (leverage < 28×, margin < 90%, single-instrument < 90%, net-directional < 95%) and never concentrates enough to risk forced liquidation. The `daily_loss_kill` constraint **halts trading for the day** (verdict `halt`) when the day's PnL hits the kill level — protecting drawdown rank and keeping the book away from the red line. The preset is **pure and never throws**; it is selected via the run config, not auto-wired.
+Every live ceiling sits **well under** the §13 thresholds (leverage < 28×, margin < 90%, single-instrument < 90%, net-directional < 95%). The non-negotiable hard guard is the native margin circuit breaker: flatten the whole book before margin can approach the 30% stop-out.
 
 ---
 
 ## 6. Reconnect, heartbeat & monitoring (24/7)
 
-The live runner's loop is **reconnect-tolerant by design** — wrapped in try/catch so a transient bridge/terminal hiccup never throws the loop dead; it logs, backs off, and retries on the next tick. The transport surfaces clear failures: `Mt5BridgeClient` throws `Mt5BridgeError` with `"MT5 bridge unreachable … is mt5_bridge.py running?"` when the sidecar is down, so a dropped sidecar is visible immediately.
+The live runner's loop is **reconnect-tolerant by design** — wrapped in try/catch so a transient terminal hiccup never throws the loop dead; it logs, backs off, and retries on the next tick. The native `Mt5Client` surfaces clear `Mt5ClientError` failures when the terminal/feed cannot satisfy a read.
 
-> **⚠️ DISCONNECT = NO SAFETY NET (Duncan, confirmed):** if the MT5 terminal disconnects, **open positions REMAIN OPEN — there is no auto-flattening on a client-side disconnect.** So while we're disconnected our **survival breaker cannot run**, and margin can drift toward the 30% stop-out (= elimination) unattended. ⇒ **connection uptime is survival-critical.** Run the box on stable power/network, keep the terminal logged in, and treat any prolonged `bridge unreachable` as a P0 — reconnect FAST, and if you can't, flatten from the MT5 terminal UI or another machine before margin runs down. The breaker only protects us *while connected*.
+> **DISCONNECT = NO SAFETY NET (Duncan, confirmed):** if the MT5 terminal disconnects, **open positions REMAIN OPEN — there is no auto-flattening on a client-side disconnect.** So while we're disconnected our **survival breaker cannot run**, and margin can drift toward the 30% stop-out (= elimination) unattended. Connection uptime is survival-critical. Run the box on stable power/network, keep the terminal logged in, and treat any prolonged MT5 read failure as a P0 — reconnect FAST, and if you can't, flatten from the MT5 terminal UI or another machine before margin runs down. The breaker only protects us *while connected*.
 
 Monitoring checklist (run continuously):
 
-- **Bridge health** — `GET /health` returns `{ ok, tradingEnabled, account }`. `ok:false` or a missing `account` means the terminal/sidecar lost the connection. `tradingEnabled` must read `true` during the live window (guard #1). The smoke test exercises this path.
-- **Account state** — `GET /account` (equity / balance / margin / free margin / **margin_level**). Watch `margin_level` as the early-warning for the forced-liquidation red line.
-- **Positions / orders** — `GET /positions`, `GET /orders` to reconcile what's open vs. what the runner thinks is open.
+- **Native health** — `python momq-python/scripts/preflight.py` reports MT5 health, account, feed, specs, spreads, and `trading_enabled`.
+- **Account state** — the runner/watch read `account_info` (equity / balance / margin / free margin / **margin_level**). Watch `margin_level` as the early-warning for the forced-liquidation red line.
+- **Positions / orders** — the runner reads native `positions_get` / `orders_get` to reconcile what's open vs. what the strategy targets.
 - **Logfire traces** — with `LOGFIRE_TOKEN` set, agent/tool traces export for live observability.
 - **Real-time leaderboard** — during Rounds 1–3 the platform shows a near-real-time leaderboard + peer logs + risk metrics at ~5-minute latency. **Finals (after 24 Jun) are blinded** — you see only your own account, so rely on `/account`, `/positions`, and Logfire then.
 - **Terminal liveness** — keep the MT5 terminal logged in; if the feed stops ticking (bid/ask 0), positions still need managing but new sizing is starved. The smoke test flags a dead feed explicitly.
-- **Live standing** — the runner (and the read-only `standing-watch.ts`) print our §11–17 standing every cycle: Return / 15-min Sharpe / max-DD / risk-discipline + estimated rank, stance, and whether the sleeve would arm. This is the primary decision surface (Section 9). Realized **slippage** is logged too — watch it vs the spread-check baseline.
+- **Live standing** — the runner and `python momq-python/scripts/standing_watch.py` print our §11–17 standing every cycle: Return / 15-min Sharpe / max-DD / risk-discipline + estimated rank, stance, and whether the sleeve would arm. This is the primary decision surface (Section 9). Realized **slippage** is logged too — watch it vs the spread-check baseline.
 - **Critical-event alerts** — the runner fires alerts (to `$COMP_ALERT_PATH` + console) on `SURVIVAL_BREAKER`, `KILL_SWITCH`, `MARGIN_PRESSURE` (margin level below the warn level, above the breaker), `SLEEVE_DEPLOYED`, and `ORDER_ISSUE`. `tail -f` the alert file so you don't have to watch the screen for 5 days.
 
 ---
@@ -220,12 +216,12 @@ or set `GORDON_COMP_FLATTEN=1`. The runner flattens to zero targets (reconciles 
 **Escalating halt (stops NEW orders), fastest-first:**
 1. **Flag-file flatten** (above) — flattens + holds flat while the flag exists.
 2. **Disarm Gordon (guard #2)** — unset `GORDON_LIVE_TRADING` and restart the runner → read/validate-only.
-3. **Stop the live runner** — kill the process. Sidecar + terminal keep running so you retain read access to manage open positions. (The `COMP_STATE_PATH` state is preserved — a restart resumes the standing and RV hysteresis holds.)
-4. **Disarm the sidecar (guard #1)** — `MT5_BRIDGE_ALLOW_TRADING=0` + restart `mt5_bridge.py`. Hard stop at the transport: nothing fires even if Gordon is armed.
+3. **Stop the live runner** — kill the process. The MT5 terminal keeps running so you retain manual read/close access. (The `COMP_STATE_PATH` state is preserved — a restart resumes the standing and RV hysteresis holds.)
+4. **Disarm the transport guard (guard #1)** — unset `MT5_BRIDGE_ALLOW_TRADING` and restart the native runner before any further automation. In the TS fallback, this means restart `mt5_bridge.py` with the guard unset.
 
-To **flatten** via the venue directly: `POST /close` per ticket (or close in the MT5 UI) **then** disarm — order matters (disarming the sidecar first blocks `/close` too).
+To **flatten** via the venue directly: close in the MT5 UI (or native client close tooling) **then** disarm.
 
-> Resting safe state: both guards unset. The flag-file flatten is the everyday panic-button; the sidecar disarm is the hard transport stop.
+> Resting safe state: both guards unset. The flag-file flatten is the everyday panic-button; the transport guard is the hard stop.
 
 ---
 
@@ -234,21 +230,22 @@ To **flatten** via the venue directly: `POST /close` per ticket (or close in the
 Run this immediately before **21 Jun 22:00 BST**. Arm the two guards **only at this point** — they are off until go-live.
 
 - [ ] **Windows box up** — always-on Windows machine/VPS confirmed reachable; clock synced to BST.
-- [ ] **Trading channel selected + account funded** — in the console (`https://quanthack.syphonix.com/` → Console), **select & confirm the trading channel (MT5)**; the $1M is funded only after this (Lotus, Discord). The live competition MT5 connection opens at the **21 Jun 22:00 launch** — have the box + sidecar staged to connect → preflight → arm the instant it's live (the 18 Jun test env is for earlier validation).
+- [ ] **Trading channel selected + account funded** — in the console (`https://quanthack.syphonix.com/` → Console), **select & confirm the trading channel (MT5)**; the $1M is funded only after this (Lotus, Discord). The live competition MT5 connection opens at the **21 Jun 22:00 launch** — have the box + native runner staged to connect -> preflight -> arm the instant it's live.
 - [ ] **MT5 terminal** logged into the competition account; live feed ticking (not bid/ask 0).
-- [ ] **Account creds in the sidecar env only** — `MT5_LOGIN` / `MT5_PASSWORD` / `MT5_SERVER` set on the sidecar; **not** present anywhere in Gordon's env.
-- [ ] **Bridge token matches** — `MT5_BRIDGE_TOKEN` identical on the sidecar and in Gordon's `apiKey`; `baseUrl` = `http://127.0.0.1:8788`.
-- [ ] **Preflight READY** — `bun run scripts/competition/preflight.ts` reads **READY** pre-arm (and **GO** after arming both guards).
+- [ ] **Account creds local only** — `MT5_LOGIN` / `MT5_PASSWORD` / `MT5_SERVER` set in the Windows native runtime env; **not** present in docs, commits, hosted services, or dashboards.
+- [ ] **Preflight green** — `python momq-python/scripts/preflight.py` passes pre-arm and after arming both guards.
 - [ ] **State dir created** — `mkdir -p .gordon` (holds `comp-state.json` with equity/risk/RV-state + the `FLATTEN` kill-flag; the runner also auto-creates it, but make it explicitly).
-- [ ] **Smoke test green** — `bun run scripts/dev/mt5/mt5-smoke.ts` passes (account + quote + depth + bars + symbol spec).
-- [ ] **Spread check recorded** — `bun run scripts/dev/mt5/competition-spread-check.ts` run + verdict noted (drives the §9.1 posture).
+- [ ] **Smoke test green** — `python momq-python/scripts/smoke.py BTCUSD` passes (account + quote + depth + bars + symbol spec).
+- [ ] **Spread check recorded** — `python momq-python/scripts/spread_check.py` run + verdict noted (drives the §9.1 posture).
 - [ ] **The final 15-symbol competition universe matches the live catalog** + per-instrument contract specs / tick size / spreads confirmed at login. Symbols are resolved from the venue catalog at runtime, never hardcoded.
 - [ ] **Competition env set** — `COMP_STARTING_EQUITY=1000000`, `COMP_CUT_MS` (24 Jun 22:00 BST), `COMP_DEADLINE_MS` (26 Jun 22:00 BST), `COMP_STATE_PATH`, `COMP_FLATTEN_FLAG`, `COMP_ALERT_PATH` (Section 3).
 - [ ] **Risk preset confirmed** — `COMPETITION_RISK_SURVIVAL` (frozen default); ceilings under §13. Swap to `AGGRESSIVE` never — the ring-fenced sleeve is the only sanctioned return-gamble.
-- [ ] **Standing watch + alert tail running** — `standing-watch.ts` in a second terminal; `tail -f $COMP_ALERT_PATH`.
+- [ ] **Standing watch + alert tail running** — `python momq-python/scripts/standing_watch.py` in a second terminal; `tail -f $COMP_ALERT_PATH`.
 - [ ] **Optional perks** — `LOGFIRE_TOKEN` for tracing; `DOUBLEWORD_API_KEY` if used.
-- [ ] **Both guards set — deliberately, at go-live** — `MT5_BRIDGE_ALLOW_TRADING=1` (sidecar) **and** `GORDON_LIVE_TRADING=1` (runner). Until both are `1`, the stack is validate-only.
-- [ ] **Kill switch rehearsed** — Section 7 confirmed: the flag-file flatten (`touch $COMP_FLATTEN_FLAG`) flattens + resumes, and the disarm/stop/sidecar-disarm escalation works, before capital is live.
+- [ ] **Both guards set — deliberately, at go-live** — `MT5_BRIDGE_ALLOW_TRADING=1` (native MT5 client transport guard) **and** `GORDON_LIVE_TRADING=1` (runner). Until both are `1`, the stack is validate-only.
+- [ ] **Maker probe ready** — `python momq-python/scripts/maker_probe.py` dry-runs pre-launch; live tiny-fill probe is reserved for Round 1 after arming.
+- [ ] **Sleeve what-if ready** — `python momq-python/scripts/sleeve_what_if.py --state .gordon/comp-state.json --symbol SOLUSD` works once state exists.
+- [ ] **Kill switch rehearsed** — Section 7 confirmed: the flag-file flatten (`touch $COMP_FLATTEN_FLAG`) flattens + resumes, and the disarm/stop/transport-guard escalation works, before capital is live.
 - [ ] **Decision Playbook (Section 9) reviewed** — the sleeve decision table + non-negotiables are pre-committed.
 
 > Resting safe state between sessions / after the close: **both guards unset.** The stack then reads and validates but cannot move capital.
@@ -279,13 +276,13 @@ The finals are **blind** and the window is 5 days; the judgment calls must be pr
 | **Finals** | in a prize slot (top of field) | **HOLD / lock in** — protect the slot; swinging is dominated. |
 | **Finals** | mid / lagging | **DEPLOY** — swing for #1; nothing to lose on rank. |
 
-- **Before deploying**, run `sleeveWhatIf` against the live standing to see the win/lose → rank spread (so you commit with the magnitude in front of you).
+- **Before deploying**, run `python momq-python/scripts/sleeve_what_if.py --state .gordon/comp-state.json --symbol SOLUSD` against the live standing to see the win/lose -> rank spread (so you commit with the magnitude in front of you).
 - **Sizing is automatic and non-overridable**: liquidation-safe (`maxSafeLeverage` over the relevant horizon) + ring-fenced (a total sleeve loss can't red-line the core). **Never hand-size the sleeve to risk forced liquidation** — that's elimination (§14), the one unrecoverable error.
 
 ### 9.4 When to hit the manual kill-switch (`touch $COMP_FLATTEN_FLAG`)
 The automatic margin breaker handles the *survival* case. Use the **manual** flatten for judgment calls the breaker won't catch:
 - anomalous book behavior / a suspected bug or fat-finger,
-- bridge/terminal instability you can't quickly resolve (flatten to a safe state, then debug),
+- MT5 terminal instability you can't quickly resolve (flatten to a safe state, then debug),
 - a `MARGIN_PRESSURE` alert that isn't self-resolving and you want to de-risk *now*,
 - end-of-round housekeeping if you want to go flat into an audit window.
 Remove the flag to resume. The book reconciles back to target on the next cycle.

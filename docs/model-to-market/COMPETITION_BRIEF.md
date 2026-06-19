@@ -87,10 +87,10 @@ Authoritative dates from **[RULES]** §5, refined by **[DISCORD]**. Marketing pa
   - **Plan:** go live **TAKER** (safe, hedged, rehearsed); validate the maker *workflow* in the setup window, but **fill-test maker in live Round 1** — Duncan notes the **test environment may DIFFER from live**, so real fill rates only come from the live env. Switch `COMP_EXECUTION=maker` if the probe validates. Cancel/replace is explicitly permitted, so the maker mode is DQ-safe.
 - **TRUE DEPTH LADDER (Duncan, Discord):** "Large orders can consume multiple levels, and fills are calculated across the available liquidity." → an order bigger than top-of-book walks the book + partial-fills. **This validates the depth-aware order sizing** (`depthSizing.ts` / `clampToDepth`) — size to fillable depth so FOK/IOC orders fill instead of bouncing.
 - **Maker and taker** both supported (limit + marketable orders).
-- **ACCESS = native MT5 Desktop Terminal — NO REST/WebSocket gateway (Duncan, Discord, confirmed):** "Trading will be through the native MT5 Desktop Terminal. Please prepare your environment accordingly." You run the MT5 terminal yourself (Windows), driven via the official `MetaTrader5` Python package. **This confirms Gordon's topology exactly** (OPERATIONS §1: Windows VPS → MT5 terminal → `mt5_bridge.py` sidecar → `Mt5BridgeClient`). There is no hosted API to integrate against — prepare the always-on Windows box now.
+- **ACCESS = native MT5 Desktop Terminal — NO REST/WebSocket gateway (Duncan, Discord, confirmed):** "Trading will be through the native MT5 Desktop Terminal. Please prepare your environment accordingly." You run the MT5 terminal yourself (Windows), driven via the official `MetaTrader5` Python package. **This confirms the native MOMQ topology** (OPERATIONS §1: Windows VPS -> MT5 terminal -> `momq-python` native runner). There is no hosted API to integrate against — prepare the always-on Windows box now.
 - The **real market order book is an INPUT to a per-account simulation**. You do **not** trade the live production book; other participants **cannot** interact with your orders (matching is internal/per-account; not yet transparent).
 - **Slippage, liquidity constraints, and market impact are simulated.** Validate in the test env from the 18th.
-- **Crypto reference price is a BLEND (Duncan, Discord, NEW 19 Jun):** "Crypto pricing is derived from multiple market data sources rather than a single exchange; execution outcomes are influenced by both market conditions and participant positioning." ⇒ the platform's crypto quote will **not** exactly track any one venue (e.g. Binance), so the **maker-probe and adverse-selection reference mid must come from the bridge `/quote` (the platform's own feed), not an external exchange** — else the measured edge is mis-referenced. Our external Binance bars stay fine for *signal/backtest* (relative dynamics), but the *execution* reference is the platform blend. ("participant positioning" = your own inventory/impact; other participants still can't interact with your orders, per the per-account sim above.)
+- **Crypto reference price is a BLEND (Duncan, Discord, NEW 19 Jun):** "Crypto pricing is derived from multiple market data sources rather than a single exchange; execution outcomes are influenced by both market conditions and participant positioning." ⇒ the platform's crypto quote will **not** exactly track any one venue (e.g. Binance), so the **maker-probe and adverse-selection reference mid must come from native MT5 `symbol_info_tick` / MOMQ `quote` (the platform's own feed), not an external exchange** — else the measured edge is mis-referenced. Our external Binance bars stay fine for *signal/backtest* (relative dynamics), but the *execution* reference is the platform blend. ("participant positioning" = your own inventory/impact; other participants still can't interact with your orders, per the per-account sim above.)
 - **Costs: NO commission, NO swap / overnight financing, and NO borrow fees on shorts (Duncan, Discord, CONFIRMED).** Friction = **spread + slippage + market impact only** — and the spread flips to a *rebate* if we make. Holds are free; **the dollar-neutral book (half short) carries zero borrow cost.**
 - **CANCEL/REPLACE and liquidity-based sizing are explicitly PERMITTED (Duncan, Discord)** — only platform-bug exploitation / out-of-rules behavior is prohibited. ✅ **Green-lights the MAKER path** (which cancels + re-posts resting limits each cycle) and the depth-aware sizing — no DQ risk. Just avoid abusive request patterns (stay well under 500 req/s). Slippage & market impact **vary with conditions, depth, and liquidity** (dynamic, not fixed) — reinforces depth-aware sizing.
 - **LEVERAGE is account-level (Duncan, Discord, confirmed)** — 30:1 on total notional/equity, not per-instrument. Matches our margin model (`leverage = grossNotional / equity`).
@@ -175,22 +175,23 @@ During Rounds 1–3, participants see a **near-real-time leaderboard + peer trad
 >
 > **Key correction:** there is **no Syphonix REST API**. The repo's `src/infra/broker/adapters/syphonix.ts` (a REST `BrokerAdapter` scaffold) is the **wrong abstraction** for execution and must be repurposed to an **MT5 adapter**. It stays gated-off and harmless until then.
 
-### 7.1 Gordon ↔ MT5 architecture
+### 7.1 MOMQ/Gordon -> MT5 architecture
 
 ```
-Gordon (Bun/TS, Windows)  ──►  MT5 bridge (MetaTrader5 Python pkg)  ──►  MT5 terminal  ──►  Syphonix sim
-   strategy · risk · scoring         order / quote / positions / account IPC          execution venue
+MOMQ (Python, Windows)  ──►  MetaTrader5 Python pkg  ──►  MT5 terminal  ──►  Syphonix sim
+ strategy · risk · scoring       order / quote / positions IPC          execution venue
 ```
 
-- The `MetaTrader5` Python package requires a **local Windows MT5 terminal** (not native Linux; Northflank is Linux). The operator runs **Windows 11**, so MT5 + bridge + Gordon co-locate locally for dev.
+- The `MetaTrader5` Python package requires a **local Windows MT5 terminal** (not native Linux; Northflank is Linux). The operator runs **Windows 11**, so MT5 + MOMQ co-locate locally for dev.
 - For the **24/7 live week**, run on an **always-on Windows VPS**. Northflank ($100 credit) hosts Gordon's non-MT5 services (data, dashboards), not the MT5 terminal.
 
-### 7.2 The bridge — BUILT
+### 7.2 Native MT5 path — BUILT
 
-- **Python sidecar** `scripts/mt5-bridge/mt5_bridge.py` — wraps the `MetaTrader5` package behind a localhost JSON API. Endpoints: `/health /account /positions /orders /symbols /symbol /quote /depth (L2) /bars /order /cancel /close`. Binds to `127.0.0.1` only; **deny-first trading guard** (`/order`,`/cancel`,`/close` validate via `order_check` and refuse to fire unless `MT5_BRIDGE_ALLOW_TRADING=1`). MT5 API surface used: `account_info`, `positions_get`, `orders_get`, `symbols_get`/`symbol_info`, `symbol_info_tick`, `market_book_get` (L2), `copy_rates_*`, `order_send`/`order_check`.
-- **Typed client** `src/infra/broker/mt5/bridgeClient.ts` (`Mt5BridgeClient`) — Gordon-side transport, 8 tests.
-- **BrokerAdapter** `src/infra/broker/adapters/mt5.ts` (`Mt5Adapter`, brokerId `mt5`) — maps onto the normalized broker contract; registered in the factory + inclusion gate (approved). 7 adapter tests. `BrokerCredentials.apiKey` = bridge token, `baseUrl` = bridge URL; the MT5 account login/password/server live in the **sidecar env**, never in Gordon.
-- **Run it:** install MT5 terminal + log in → `pip install -r scripts/mt5-bridge/requirements.txt` → set `MT5_LOGIN/MT5_PASSWORD/MT5_SERVER`, `MT5_BRIDGE_TOKEN`, `MT5_BRIDGE_ALLOW_TRADING=1` → `python scripts/mt5-bridge/mt5_bridge.py` → `bun run scripts/dev/mt5/mt5-smoke.ts` to verify against the real account. See `scripts/mt5-bridge/README.md`.
+- **Native Python client** `momq-python/src/momq/execution/mt5_client.py` — wraps the `MetaTrader5` package directly in-process. API surface used: `account_info`, `positions_get`, `orders_get`, `symbol_info`, `symbol_info_tick`, `market_book_get` (L2), `copy_rates_*`, `order_send`/`order_check`.
+- **Deny-first trading guard** — native `place_order` / `cancel` / `close` validate/refuse unless `MT5_BRIDGE_ALLOW_TRADING=1`; the runner/probe also require `GORDON_LIVE_TRADING=1`.
+- **Runner** `momq-python/run.py` — Python-native barbell live loop with RV core, ring fence, standing monitor, margin breaker, kill flag, depth clamp, maker/taker mode, Logfire hooks, and Claude advisory gates.
+- **Fallback** — the earlier TS bridge path (`scripts/mt5-bridge/mt5_bridge.py`, `Mt5BridgeClient`, `Mt5Adapter`) remains tested and can be used if the native runner is unavailable, but it is no longer the primary product path.
+- **Run it:** install MT5 terminal + log in -> `cd momq-python && pip install -e '.[mt5,halo]'` -> set `MT5_LOGIN/MT5_PASSWORD/MT5_SERVER`, `MT5_BRIDGE_ALLOW_TRADING=1`, `GORDON_LIVE_TRADING=1` -> `python run.py`.
 
 ---
 
@@ -279,15 +280,16 @@ The core is the **frozen** `COMPETITION_RISK_SURVIVAL` preset in `competition-ri
 - `core/risk-management/competition-scoring.ts` — exact §11–17 objective function (Final Score, ranks, non-annualized 15-min Sharpe + cap, §13 discipline, red-line DQ, tie-breakers) + the §17 Best Sharpe Award eligibility/winner selection (`selectBestSharpeAward`). 16 tests.
 - `backtest/competition-dry-run.ts` — money-path rehearsal; reports the official metrics. 16 tests.
 - `core/risk-management/competition-risk-preset.ts` — the frozen `COMPETITION_RISK_SURVIVAL` default (the live core); `COMPETITION_RISK_AGGRESSIVE` retained but not used.
-- **Live execution: the MT5 barbell path** — `scripts/competition/live-runner.ts` → `barbellLiveRunner.ts` (RV core + ring-fenced sleeve + survival breaker + standing monitor + kill-switch). The single live entry point (NOT `competition-runner.ts`, which is legacy prep scaffolding).
+- **Live execution: the MT5 barbell path** — primary: `momq-python/run.py` (native MT5 client + RV core + ring-fenced sleeve + survival breaker + standing monitor + kill-switch). Reference/fallback: `scripts/competition/live-runner.ts` -> `barbellLiveRunner.ts`. `competition-runner.ts` is legacy prep scaffolding.
 
 **Built (this prep), cont'd:**
-- **MT5 bridge — DONE** (§7.2): Python sidecar + `Mt5BridgeClient` + `Mt5Adapter` (registered, gate-approved). 15 tests. Validate against the real account via `scripts/dev/mt5/mt5-smoke.ts`; wire to Syphonix's MT5 creds on the 18th (just swap the sidecar env).
+- **Python-native MOMQ product — DONE** (§7.2): direct MT5 client, barbell runner, runtime env surface, preflight/smoke/spread-check, maker probe, standing watch, sleeve what-if, Claude advisory gates, Logfire hooks, and parity tests against the TS oracle. Validate against the real account via `python momq-python/scripts/preflight.py`, `smoke.py`, and `spread_check.py`.
+- **TS MT5 bridge fallback — DONE**: Python sidecar + `Mt5BridgeClient` + `Mt5Adapter` remain tested for fallback/reference.
 
 **Open / TODO:**
 - **Wire the live peer-return board** — populate `$COMP_PEER_RETURNS_PATH` from the Round-1–3 leaderboard so the standing calibrates to real rank and the endgame sleeve arms (§9 / OPERATIONS §9.2). Launch-gated.
-- **Confirm at login** — exact tradeable list + contract specs, the `BARUSD` symbol string, and whether swap/financing applies (then enable it in the cost model).
-- **Tech-setup deck (Track C)** — structured to the 3 judging axes + Anthropic-bounty angle.
+- **Confirm at login** — exact tradeable list + contract specs, `BARUSD` symbol string, tick sizes, spreads, and MT5 request behavior.
+- **Tech-setup deck (Track C)** — update to the `momq-python` repo/product narrative + Anthropic/Logfire/Nemotron angle.
 
 > Done since the earlier draft: the dry-run cost layer (spread + slippage; swap gated on confirmation), the survive-and-rank posture freeze, and the full MT5 live path. Strategy selection ran (exhaustive alpha search → no cost-clearing edge → the survive-and-rank posture).
 

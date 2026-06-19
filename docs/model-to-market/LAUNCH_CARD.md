@@ -12,16 +12,16 @@ Launch timestamps (epoch-ms, pre-computed — BST = UTC+1):
 
 ## A. Before 22:00 — stage + USE THE SETUP WINDOW (live data + test account, trading disabled)
 > Duncan (Discord): tonight you get **live market data + a test account for connectivity/validation**, but **trading is NOT enabled until the competition starts (22:00)**. So the decisive spread read happens HERE, read-only, before any arming pressure.
-1. **Windows box** up, clock synced to BST; **MT5 *desktop* terminal** installed + logged into the test account. **MT5 desktop client only** (the `MetaTrader5` Python package is Windows-only — fine, Gordon runs on Windows). Add account: File → Login to Trade Account → **Login = your account ID**, password, **Server = `3.11.134.149:443`** (the Syphonix MT5 server — NOT the default `MetaQuotes-Demo`, which is why connections fail). Green bottom-right = data feed up; error `10026` on a test order = trading disabled (expected pre-launch).
+1. **Windows box** up, clock synced to BST; **MT5 *desktop* terminal** installed + logged into the test account. **MT5 desktop client only** (the `MetaTrader5` Python package is Windows-only — fine, MOMQ runs on Windows). Add account: File -> Login to Trade Account -> **Login = your account ID**, password, **Server = `3.11.134.149:443`** (the Syphonix MT5 server — NOT the default `MetaQuotes-Demo`, which is why connections fail). Green bottom-right = data feed up; error `10026` on a test order = trading disabled (expected pre-launch).
 2. **Console** (`https://quanthack.syphonix.com/` → Console): **select & confirm the trading channel — MT5** → the $1M funds after this. **This is irreversible and the selection window closes 17:00 on the 19th** (MT5 is the default if unset). MT5 is *mandatory* for us: the **AI-Native channel has no API / no key creation / no agent customization** (organizer-confirmed) — it cannot drive Gordon.
-3. **Sidecar deps**: `pip install -r scripts/mt5-bridge/requirements.txt` (first time).
-4. **Sidecar env set** (account creds live here ONLY — never in Gordon): `MT5_LOGIN` (=account ID) / `MT5_PASSWORD` / `MT5_SERVER` (=`3.11.134.149:443`), `MT5_BRIDGE_TOKEN`. Leave `MT5_BRIDGE_ALLOW_TRADING` **unset** (validate-only).
+3. **Native Python deps**: `cd momq-python && pip install -e '.[mt5,halo]'` (first time).
+4. **Native MT5 env set** (account creds stay local on the Windows box): `MT5_LOGIN` (=account ID) / `MT5_PASSWORD` / `MT5_SERVER` (=`3.11.134.149:443`). Leave `MT5_BRIDGE_ALLOW_TRADING` **unset** (validate-only).
 5. **`mkdir -p .gordon`** (state + kill-flag + peer-returns live here; already gitignored).
 6. **Validate READ-ONLY against the live setup data** (this is the high-value pre-work):
    ```
-   bun run scripts/competition/preflight.ts                  # expect READY
-   bun run scripts/dev/mt5/mt5-smoke.ts                      # account + quote + L2 depth + specs
-   bun run scripts/dev/mt5/competition-spread-check.ts       # ← THE DECISIVE READ, now before 22:00
+   python momq-python/scripts/preflight.py                   # expect infrastructure green
+   python momq-python/scripts/smoke.py BTCUSD                # account + quote + L2 depth + specs
+   python momq-python/scripts/spread_check.py                # <- THE DECISIVE READ, now before 22:00
    ```
    Record the spread verdict → it sets the §9.1 posture (frozen core vs wide-crypto/prune) calmly, not under the clock.
 7. **Dry-run rehearsal** for muscle memory (safe — in-process sim, never the bridge):
@@ -32,20 +32,17 @@ Launch timestamps (epoch-ms, pre-computed — BST = UTC+1):
 
 ## B. At/after 22:00 — connect → validate → arm
 ```sh
-# 1. Start the sidecar (guard #1 still OFF — validate-only)
-python scripts/mt5-bridge/mt5_bridge.py
+# 1. PREFLIGHT (read-only) — expect critical checks pass, guards off
+python momq-python/scripts/preflight.py
 
-# 2. PREFLIGHT (read-only) — expect READY (critical checks pass, guards off)
-bun run scripts/competition/preflight.ts
+# 2. Transport smoke + the decisive spread read
+python momq-python/scripts/smoke.py BTCUSD
+python momq-python/scripts/spread_check.py              # record the verdict -> drives §9.1
 
-# 3. Transport smoke + the decisive spread read
-bun run scripts/dev/mt5/mt5-smoke.ts
-bun run scripts/dev/mt5/competition-spread-check.ts     # record the verdict → drives §9.1
+# 3. ARM both guards (deliberate): export MT5_BRIDGE_ALLOW_TRADING=1 and GORDON_LIVE_TRADING=1,
+#    then re-run preflight.
 
-# 4. ARM both guards (deliberate): MT5_BRIDGE_ALLOW_TRADING=1 on the sidecar (restart it),
-#    then re-run preflight → expect GO.
-
-# 5. START the live runner (the env below) — barbell core is the default posture
+# 4. START the live runner (the env below) — barbell core is the default posture
 export COMP_STARTING_EQUITY=1000000
 export COMP_CUT_MS=1782334800000
 export COMP_DEADLINE_MS=1782507600000
@@ -53,25 +50,34 @@ export COMP_STATE_PATH=.gordon/comp-state.json
 export COMP_FLATTEN_FLAG=.gordon/FLATTEN
 export COMP_ALERT_PATH=.gordon/comp-alerts.log
 export COMP_PEER_RETURNS_PATH=.gordon/peer-returns.json   # empty [] now → endgame gated (safe)
+export MT5_BRIDGE_ALLOW_TRADING=1                          # guard #1
 export GORDON_LIVE_TRADING=1                              # guard #2
-bun run scripts/competition/live-runner.ts
+python momq-python/run.py
 ```
 
 ## C. Monitor (second terminal, read-only)
 ```sh
 COMP_STARTING_EQUITY=1000000 COMP_CUT_MS=1782334800000 COMP_DEADLINE_MS=1782507600000 \
-  bun run scripts/competition/standing-watch.ts
+  COMP_STATE_PATH=.gordon/comp-state.json COMP_PEER_RETURNS_PATH=.gordon/peer-returns.json \
+  python momq-python/scripts/standing_watch.py
 tail -f .gordon/comp-alerts.log
+```
+
+Maker fill probe (Round 1 only, tiny and guarded):
+```sh
+PROBE_SYMBOLS=BTCUSD,ETHUSD PROBE_CYCLES=5 PROBE_WAIT_S=60 \
+  GORDON_LIVE_TRADING=1 python momq-python/scripts/maker_probe.py
 ```
 
 ## D. Kill / flatten (fastest first)
 - **Flatten now (no restart):** `touch .gordon/FLATTEN`  ·  resume: `rm .gordon/FLATTEN`
 - Disarm Gordon: unset `GORDON_LIVE_TRADING`, restart runner.
-- Hard stop: `MT5_BRIDGE_ALLOW_TRADING=0`, restart the sidecar.
+- Hard stop: unset `MT5_BRIDGE_ALLOW_TRADING`, restart the native runner before any automation resumes.
 
 ## E. Round 3 endgame (24 Jun, before the cut) — arm the sleeve on REAL data
 - Paste the leaderboard's peer **return fractions** into `.gordon/peer-returns.json` as a JSON array, e.g. `[0.021, -0.08, 0.15, ...]`, and keep it refreshed.
 - That calibrates the standing to real rank and **arms the endgame sleeve** if we're below the Top-100 line. Empty/absent ⇒ endgame stays gated (finals-only). See `OPERATIONS.md §9.3`.
+- Before sleeve deployment, run `python momq-python/scripts/sleeve_what_if.py --state .gordon/comp-state.json --symbol SOLUSD`.
 - Posture is `COMPETITION_RISK_SURVIVAL` (frozen). Only consider the wide RV candidate AFTER the spread check, via `COMP_RV_PROFILE=wide-crypto` — and re-validate on 18-mo data before trusting it (§9.1).
 
 ## Non-negotiables
