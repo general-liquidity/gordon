@@ -28,6 +28,7 @@
  */
 
 import { normalCdf } from "../../../core/numerics/index.ts";
+import { skewness, kurtosis as excessKurtosis } from "../../../core/stats/index.ts";
 
 export const OPTIMIZATION_QUALITY_FLAG_ENV = "GORDON_OPTIMIZATION_QUALITY";
 
@@ -86,30 +87,14 @@ function stddev(xs: ReadonlyArray<number>): number {
   return Math.sqrt(ss / (xs.length - 1));
 }
 
-function skewness(xs: ReadonlyArray<number>): number {
-  const n = xs.length;
-  if (n < 3) return 0;
-  const m = mean(xs);
-  const s = stddev(xs);
-  if (s === 0) return 0;
-  let acc = 0;
-  for (const x of xs) acc += ((x - m) / s) ** 3;
-  return (n / ((n - 1) * (n - 2))) * acc;
-}
-
+/** Non-excess (Pearson) kurtosis = excess kurtosis + 3; normal = 3. */
 function kurtosis(xs: ReadonlyArray<number>): number {
-  const n = xs.length;
-  if (n < 4) return 3;
-  const m = mean(xs);
-  const s = stddev(xs);
+  const arr = xs as number[];
+  if (arr.length < 4) return 3;
+  const m = mean(arr);
+  const s = stddev(arr);
   if (s === 0) return 3;
-  let acc = 0;
-  for (const x of xs) acc += ((x - m) / s) ** 4;
-  return (
-    ((n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))) * acc -
-    (3 * (n - 1) ** 2) / ((n - 2) * (n - 3)) +
-    3
-  );
+  return excessKurtosis(arr) + 3;
 }
 
 /**
@@ -127,7 +112,7 @@ function sharpeWithSE(
   if (s === 0) return { sharpeAnnual: 0, sePerPeriod: 0, sharpePerPeriod: 0 };
   const srPerPeriod = m / s;
   const sharpeAnnual = srPerPeriod * Math.sqrt(periodsPerYear);
-  const skew = skewness(returns);
+  const skew = skewness(returns as number[]);
   const kurt = kurtosis(returns);
   // Lo (2002) standard error with non-normal correction.
   const varSr = (1 - skew * srPerPeriod + ((kurt - 1) / 4) * srPerPeriod * srPerPeriod) / returns.length;

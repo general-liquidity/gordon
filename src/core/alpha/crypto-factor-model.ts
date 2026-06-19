@@ -29,6 +29,8 @@
  * per-token features, not a long-short book.
  */
 
+import { populationStd, zScore, linearRegression } from "../stats/index.ts";
+
 export type StyleFactor = "size" | "reversal" | "volatility" | "quality" | "value" | "funding";
 
 export const STYLE_FACTORS: StyleFactor[] = ["size", "reversal", "volatility", "quality", "value", "funding"];
@@ -93,11 +95,10 @@ function zscoreMasked(values: number[], mask: boolean[]): number[] {
   const idx = values.map((_, i) => i).filter((i) => mask[i]);
   const present = idx.map((i) => values[i]!);
   const m = mean(present);
-  const variance = present.length ? present.reduce((s, v) => s + (v - m) ** 2, 0) / present.length : 0;
-  const sd = Math.sqrt(variance);
+  const sd = populationStd(present);
   const out = new Array(values.length).fill(0);
   if (sd === 0) return out;
-  for (const i of idx) out[i] = (values[i]! - m) / sd;
+  for (const i of idx) out[i] = zScore(values[i]!, m, sd);
   return out;
 }
 
@@ -108,18 +109,16 @@ function residualizeMasked(y: number[], x: number[], mask: boolean[]): number[] 
   const idx = y.map((_, i) => i).filter((i) => mask[i]);
   const ys = idx.map((i) => y[i]!);
   const xs = idx.map((i) => x[i]!);
-  const my = mean(ys);
-  const mx = mean(xs);
-  let cov = 0;
-  let varx = 0;
-  for (let k = 0; k < idx.length; k++) {
-    cov += (xs[k]! - mx) * (ys[k]! - my);
-    varx += (xs[k]! - mx) ** 2;
+  let { slope, intercept } = linearRegression(xs, ys);
+  // var(x)=0 makes the OLS slope undefined; fall back to a flat fit
+  // (mean-removed passthrough), matching the prior varx===0 branch.
+  if (!Number.isFinite(slope)) {
+    slope = 0;
+    intercept = mean(ys);
   }
-  const slope = varx === 0 ? 0 : cov / varx;
   const out = new Array(y.length).fill(0);
   for (let k = 0; k < idx.length; k++) {
-    out[idx[k]!] = ys[k]! - (my + slope * (xs[k]! - mx));
+    out[idx[k]!] = ys[k]! - (intercept + slope * xs[k]!);
   }
   return out;
 }

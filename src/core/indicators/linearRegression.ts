@@ -61,6 +61,7 @@ export interface LinearRegressionResult {
 // ---------------------------------------------------------------------------
 
 import { studentTTwoSidedPValue } from "../numerics/index.ts";
+import { linearRegression as olsFit } from "../stats/index.ts";
 
 /**
  * Two-sided p-value for a t-statistic with `df` degrees of freedom:
@@ -99,25 +100,23 @@ export function linearRegression(values: number[]): LinearRegressionResult {
     }
   }
   const n = values.length;
-  // Sum reductions in a single pass.
+  // Sum reductions retained for the inference layer (Sxx, means feed the
+  // coefficient standard errors below); the slope/intercept fit itself is
+  // delegated to the shared OLS primitive.
   let sumX = 0;
   let sumY = 0;
-  let sumXY = 0;
   let sumXX = 0;
+  const xIndex: number[] = new Array(n);
   for (let i = 0; i < n; i++) {
+    xIndex[i] = i;
     sumX += i;
     sumY += values[i]!;
-    sumXY += i * values[i]!;
     sumXX += i * i;
   }
   const meanX = sumX / n;
   const meanY = sumY / n;
-  const ssXY = sumXY - n * meanX * meanY;
   const ssXX = sumXX - n * meanX * meanX;
-  // Guard against degenerate input (all identical x — impossible here
-  // since x is the index 0..n-1, but defensive anyway).
-  const slope = ssXX === 0 ? 0 : ssXY / ssXX;
-  const intercept = meanY - slope * meanX;
+  const { slope, intercept } = olsFit(xIndex, values);
 
   // Compute residuals + sum-squared-error and total-sum-of-squares.
   const residuals: number[] = new Array(n);

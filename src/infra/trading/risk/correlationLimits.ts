@@ -9,6 +9,8 @@
  * to position limits based on max correlation with existing positions.
  */
 
+import { sampleCorrelation } from "../../../core/stats/index.ts";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -40,24 +42,7 @@ export interface CorrelationCheck {
 export function pearsonCorrelation(a: number[], b: number[]): number {
   const n = Math.min(a.length, b.length);
   if (n < 10) return 0; // Not enough data
-
-  const sliceA = a.slice(-n);
-  const sliceB = b.slice(-n);
-
-  const meanA = sliceA.reduce((s, v) => s + v, 0) / n;
-  const meanB = sliceB.reduce((s, v) => s + v, 0) / n;
-
-  let cov = 0, varA = 0, varB = 0;
-  for (let i = 0; i < n; i++) {
-    const dA = sliceA[i]! - meanA;
-    const dB = sliceB[i]! - meanB;
-    cov += dA * dB;
-    varA += dA * dA;
-    varB += dB * dB;
-  }
-
-  const denom = Math.sqrt(varA * varB);
-  return denom > 0 ? cov / denom : 0;
+  return sampleCorrelation(a.slice(-n), b.slice(-n));
 }
 
 /**

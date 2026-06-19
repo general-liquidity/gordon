@@ -2,6 +2,8 @@
 // Distance correlation (Székely) and mutual information detect non-linear dependence
 // that Pearson misses (e.g. y = x^2 with x symmetric → pearson ≈ 0, dCor/MI > 0).
 
+import { sampleCorrelation } from "../stats/index.ts";
+
 export interface CodependenceResult {
   pearson: number;
   mutualInfo: number;
@@ -42,28 +44,7 @@ function capTail(xs: number[], ys: number[]): { xs: number[]; ys: number[] } {
 }
 
 function pearson(xs: number[], ys: number[]): number {
-  const n = xs.length;
-  let mx = 0;
-  let my = 0;
-  for (let i = 0; i < n; i++) {
-    mx += xs[i]!;
-    my += ys[i]!;
-  }
-  mx /= n;
-  my /= n;
-  let cov = 0;
-  let vx = 0;
-  let vy = 0;
-  for (let i = 0; i < n; i++) {
-    const dx = xs[i]! - mx;
-    const dy = ys[i]! - my;
-    cov += dx * dy;
-    vx += dx * dx;
-    vy += dy * dy;
-  }
-  const denom = Math.sqrt(vx * vy);
-  if (denom === 0) return 0;
-  return cov / denom;
+  return sampleCorrelation(xs, ys);
 }
 
 function binIndex(v: number, lo: number, width: number, bins: number): number {

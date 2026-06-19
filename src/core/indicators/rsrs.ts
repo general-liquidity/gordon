@@ -29,6 +29,8 @@
  * high-low geometry, which none of those capture.
  */
 
+import { linearRegression, rSquared, mean as statsMean, sampleStd } from "../stats/index.ts";
+
 export interface Candle {
   high: number;
   low: number;
@@ -93,28 +95,17 @@ function neutral(slopeWindow: number, zWindow: number, sampleSize: number, why: 
 function olsSlopeR2(x: number[], y: number[]): { beta: number; r2: number } | null {
   const n = x.length;
   if (n < 2) return null;
-  let meanX = 0;
-  let meanY = 0;
-  for (let i = 0; i < n; i++) {
-    meanX += x[i]!;
-    meanY += y[i]!;
-  }
-  meanX /= n;
-  meanY /= n;
 
+  const meanX = statsMean(x);
   let sxx = 0;
-  let sxy = 0;
-  let syy = 0;
   for (let i = 0; i < n; i++) {
     const dx = x[i]! - meanX;
-    const dy = y[i]! - meanY;
     sxx += dx * dx;
-    sxy += dx * dy;
-    syy += dy * dy;
   }
   if (sxx < 1e-300) return null;
-  const beta = sxy / sxx;
-  const r2 = syy < 1e-300 ? 0 : (sxy * sxy) / (sxx * syy);
+
+  const beta = linearRegression(x, y).slope;
+  const r2 = rSquared(x, y);
   return { beta, r2 };
 }
 
@@ -156,12 +147,8 @@ export function calculateRsrs(candles: ReadonlyArray<Candle>, options: RsrsOptio
   const zSlice = betas.slice(-zWindow);
   let standardized: number | null = null;
   if (zSlice.length >= 2) {
-    let mean = 0;
-    for (const b of zSlice) mean += b;
-    mean /= zSlice.length;
-    let varSum = 0;
-    for (const b of zSlice) varSum += (b - mean) * (b - mean);
-    const std = Math.sqrt(varSum / (zSlice.length - 1));
+    const mean = statsMean(zSlice);
+    const std = sampleStd(zSlice);
     if (std > 1e-300) standardized = (beta - mean) / std;
   }
 

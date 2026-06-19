@@ -14,6 +14,8 @@ import {
   cagr as statsCagr,
   quantileSorted as statsQuantileSorted,
   profitFactor as statsProfitFactor,
+  sampleCovariance as statsSampleCovariance,
+  variance as statsVariance,
 } from "../core/stats/index.ts";
 
 // ============================================================================
@@ -481,17 +483,10 @@ export function calculateRollingBeta(
   for (let end = window; end <= returns.length; end++) {
     const r = returns.slice(end - window, end);
     const b = benchmark.slice(end - window, end);
-    const meanR = r.reduce((s, x) => s + x, 0) / window;
-    const meanB = b.reduce((s, x) => s + x, 0) / window;
-    let cov = 0;
-    let varB = 0;
-    for (let i = 0; i < window; i++) {
-      const dr = (r[i] ?? 0) - meanR;
-      const db = (b[i] ?? 0) - meanB;
-      cov = cov + dr * db;
-      varB = varB + db * db;
-    }
-    const beta = varB === 0 ? 0 : cov / varB;
+    // beta = cov(r, b) / var(b). Both estimators share the n−1 factor, so it
+    // cancels in the ratio — identical to the prior raw-sum implementation.
+    const varB = statsVariance(b);
+    const beta = varB === 0 ? 0 : statsSampleCovariance(r, b) / varB;
     out.push(parseFloat(beta.toFixed(4)));
   }
   return out;

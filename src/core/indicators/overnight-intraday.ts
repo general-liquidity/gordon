@@ -14,6 +14,8 @@
  * close-from-open prediction) and from asymmetric up/down beta. Pure.
  */
 
+import { mean as statsMean, populationStd } from "../stats/index.ts";
+
 /** Minimal candle shape — only the open/close legs are needed. */
 export type OHLCBar = { open: number; close: number };
 
@@ -41,10 +43,7 @@ export interface OvernightIntradayInput {
 const round = (x: number, p = 4): number => parseFloat(x.toFixed(p));
 
 function meanStd(xs: number[]): { mean: number; std: number } {
-  if (xs.length === 0) return { mean: 0, std: 0 };
-  const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
-  const variance = xs.reduce((a, b) => a + (b - mean) ** 2, 0) / xs.length;
-  return { mean, std: Math.sqrt(variance) };
+  return { mean: statsMean(xs), std: populationStd(xs) };
 }
 
 export function calculateOvernightIntraday(candles: ReadonlyArray<OHLCBar>, input: OvernightIntradayInput = {}): OvernightIntradayResult {

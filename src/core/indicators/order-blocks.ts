@@ -7,6 +7,7 @@
  */
 
 import type { Candle } from "./types.ts";
+import { mean, populationStd, zScore } from "../stats/index.ts";
 
 export interface OrderBlock {
   /** Order block type */
@@ -59,18 +60,11 @@ function rollingZScore(values: number[], window: number): number[] {
       continue;
     }
     // Exclude current value from mean/std
-    let sum = 0;
-    for (let j = i - window; j < i; j++) sum += values[j]!;
-    const mean = sum / window;
+    const win = values.slice(i - window, i);
+    const mu = mean(win);
+    const std = populationStd(win);
 
-    let sumSq = 0;
-    for (let j = i - window; j < i; j++) {
-      const diff = values[j]! - mean;
-      sumSq += diff * diff;
-    }
-    const std = Math.sqrt(sumSq / window);
-
-    result.push(std > 1e-10 ? (values[i]! - mean) / std : 0);
+    result.push(std > 1e-10 ? zScore(values[i]!, mu, std) : 0);
   }
   return result;
 }

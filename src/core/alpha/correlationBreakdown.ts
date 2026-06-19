@@ -34,6 +34,8 @@
  *   - Decide what to do with the verdict
  */
 
+import { sampleCorrelation, populationStd } from "../stats/index.ts";
+
 export interface ReturnSeries {
   /** Asset / symbol identifier (e.g. "BTC", "ETH"). */
   symbol: string;
@@ -110,29 +112,9 @@ const DEFAULT_ELEVATED_Z = 1.0;
 const DEFAULT_BREAKDOWN_Z = 2.0;
 const DEFAULT_REGIME_SHIFT_Z = 3.0;
 
-function mean(arr: ReadonlyArray<number>): number {
-  if (arr.length === 0) return 0;
-  let s = 0;
-  for (const v of arr) s += v;
-  return s / arr.length;
-}
-
 function pearson(x: ReadonlyArray<number>, y: ReadonlyArray<number>): number {
-  if (x.length !== y.length || x.length === 0) return 0;
-  const mx = mean(x);
-  const my = mean(y);
-  let num = 0;
-  let denomX = 0;
-  let denomY = 0;
-  for (let i = 0; i < x.length; i++) {
-    const dx = x[i]! - mx;
-    const dy = y[i]! - my;
-    num += dx * dy;
-    denomX += dx * dx;
-    denomY += dy * dy;
-  }
-  const denom = Math.sqrt(denomX * denomY);
-  return denom === 0 ? 0 : num / denom;
+  if (x.length !== y.length) return 0;
+  return sampleCorrelation([...x], [...y]);
 }
 
 function rollingCorrelations(
@@ -151,14 +133,7 @@ function rollingCorrelations(
 }
 
 function stddev(arr: ReadonlyArray<number>): number {
-  if (arr.length === 0) return 0;
-  const m = mean(arr);
-  let sumSq = 0;
-  for (const v of arr) {
-    const d = v - m;
-    sumSq += d * d;
-  }
-  return Math.sqrt(sumSq / arr.length);
+  return populationStd([...arr]);
 }
 
 function classifySeverity(

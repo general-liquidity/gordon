@@ -37,6 +37,10 @@
  * Pure function. Caller supplies the return + benchmark series.
  */
 import { mean, sampleStd, pearsonCorrelation } from "./helpers.ts";
+import {
+  skewness as ssSkewness,
+  kurtosis as ssKurtosis,
+} from "../stats/index.ts";
 
 export interface StrategyClaim {
   /** Optional claim: beta to benchmark. e.g. 0 = market-neutral. */
@@ -174,32 +178,14 @@ function maxDrawdown(returns: ReadonlyArray<number>): number {
 
 function skewness(values: ReadonlyArray<number>): number {
   if (values.length < 3) return 0;
-  const m = mean([...values]);
-  const s = sampleStd([...values]);
-  if (s === 0) return 0;
-  let sum = 0;
-  for (const v of values) {
-    const z = (v - m) / s;
-    sum += z * z * z;
-  }
-  const n = values.length;
-  return (n / ((n - 1) * (n - 2))) * sum;
+  if (sampleStd([...values]) === 0) return 0;
+  return ssSkewness([...values]);
 }
 
 function excessKurtosis(values: ReadonlyArray<number>): number {
   if (values.length < 4) return 0;
-  const m = mean([...values]);
-  const s = sampleStd([...values]);
-  if (s === 0) return 0;
-  let sum = 0;
-  for (const v of values) {
-    const z = (v - m) / s;
-    sum += z * z * z * z;
-  }
-  const n = values.length;
-  const a = (n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3));
-  const b = (3 * (n - 1) * (n - 1)) / ((n - 2) * (n - 3));
-  return a * sum - b;
+  if (sampleStd([...values]) === 0) return 0;
+  return ssKurtosis([...values]);
 }
 
 function olsBeta(y: ReadonlyArray<number>, x: ReadonlyArray<number>): number {

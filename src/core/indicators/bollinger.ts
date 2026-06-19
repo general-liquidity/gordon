@@ -4,15 +4,15 @@
  */
 
 import { calculateSMA } from "./ema.ts";
+import { populationStd } from "../stats/index.ts";
 import type { BollingerResult } from "./types.ts";
 
 /**
- * Calculate standard deviation
+ * Population standard deviation (÷N) of the window. Bollinger bands use the
+ * population estimator — sample (÷N−1) would widen the bands.
  */
-function calculateStdDev(data: number[], mean: number): number {
-  const squaredDiffs = data.map(value => Math.pow(value - mean, 2));
-  const avgSquaredDiff = squaredDiffs.reduce((a, b) => a + b, 0) / data.length;
-  return Math.sqrt(avgSquaredDiff);
+function calculateStdDev(data: number[]): number {
+  return populationStd(data);
 }
 
 /**
@@ -72,7 +72,7 @@ export function calculateBollingerBands(
     } else {
       const window = closes.slice(i - period + 1, i + 1);
       const sma = middle[i]!;
-      const stdDev = calculateStdDev(window, sma);
+      const stdDev = calculateStdDev(window);
 
       const upperBand = sma + (stdDev * stdDevMultiplier);
       const lowerBand = sma - (stdDev * stdDevMultiplier);

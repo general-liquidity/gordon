@@ -1,4 +1,5 @@
 import type { Candle } from "./types.ts";
+import { sampleStd } from "../stats/index.ts";
 
 /**
  * López de Prado symmetric CUSUM filter — an event sampler that flags bars
@@ -11,15 +12,6 @@ export interface CusumFilterResult {
   lastEventIndex: number | null;
   firedThisBar: boolean;
   interpretation: string;
-}
-
-function stdev(values: number[]): number {
-  const n = values.length;
-  if (n < 2) return 0;
-  const mean = values.reduce((a, b) => a + b, 0) / n;
-  const variance =
-    values.reduce((a, b) => a + (b - mean) * (b - mean), 0) / (n - 1);
-  return Math.sqrt(variance);
 }
 
 export function calculateCusumFilter(
@@ -45,7 +37,7 @@ export function calculateCusumFilter(
   }
 
   const rawThreshold =
-    opts?.threshold != null ? opts.threshold : stdev(logReturns);
+    opts?.threshold != null ? opts.threshold : sampleStd(logReturns);
   const threshold = Number(rawThreshold.toFixed(8));
 
   const eventIndices: number[] = [];

@@ -16,6 +16,8 @@
  * Pure compute. No I/O.
  */
 
+import { sampleCorrelation, linearRegression, mean } from "../stats/index.ts";
+
 export interface VolResidualCorrelationInput {
   /** Aligned per-period return series keyed by strategy/symbol. Need >= 2. */
   returnsBySymbol: Record<string, ReadonlyArray<number>>;
@@ -55,51 +57,24 @@ export interface VolResidualCorrelationResult {
 function pearson(a: ReadonlyArray<number>, b: ReadonlyArray<number>): number {
   const n = Math.min(a.length, b.length);
   if (n < 3) return 0;
-  let mA = 0;
-  let mB = 0;
-  for (let i = 0; i < n; i++) {
-    mA += a[i]!;
-    mB += b[i]!;
-  }
-  mA /= n;
-  mB /= n;
-  let cov = 0;
-  let vA = 0;
-  let vB = 0;
-  for (let i = 0; i < n; i++) {
-    const dA = a[i]! - mA;
-    const dB = b[i]! - mB;
-    cov += dA * dB;
-    vA += dA * dA;
-    vB += dB * dB;
-  }
-  const denom = Math.sqrt(vA * vB);
-  return denom > 0 ? cov / denom : 0;
+  return sampleCorrelation(a.slice(0, n), b.slice(0, n));
 }
 
 /** Residuals of y after OLS regression on x: y_i − (a + b·x_i). */
 function residualize(y: ReadonlyArray<number>, x: ReadonlyArray<number>): number[] {
   const n = Math.min(y.length, x.length);
   if (n < 3) return y.slice(0, n);
-  let mX = 0;
-  let mY = 0;
-  for (let i = 0; i < n; i++) {
-    mX += x[i]!;
-    mY += y[i]!;
+  const ys = y.slice(0, n);
+  const xs = x.slice(0, n);
+  let { slope, intercept } = linearRegression(xs, ys);
+  // var(x)=0 makes the OLS slope undefined; fall back to a flat fit
+  // (mean-removed passthrough), matching the prior varX===0 branch.
+  if (!Number.isFinite(slope)) {
+    slope = 0;
+    intercept = mean(ys);
   }
-  mX /= n;
-  mY /= n;
-  let cov = 0;
-  let varX = 0;
-  for (let i = 0; i < n; i++) {
-    const dX = x[i]! - mX;
-    cov += dX * (y[i]! - mY);
-    varX += dX * dX;
-  }
-  const b = varX > 0 ? cov / varX : 0;
-  const a = mY - b * mX;
   const out = new Array<number>(n);
-  for (let i = 0; i < n; i++) out[i] = y[i]! - (a + b * x[i]!);
+  for (let i = 0; i < n; i++) out[i] = ys[i]! - (intercept + slope * xs[i]!);
   return out;
 }
 

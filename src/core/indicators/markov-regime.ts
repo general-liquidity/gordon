@@ -8,6 +8,7 @@
 
 import type { Candle } from "./types.ts";
 import { chiSquarePValue } from "../numerics/index.ts";
+import { mean as statsMean, sampleStd } from "../stats/index.ts";
 
 export interface MatrixStability {
   /** Pearson chi-square statistic comparing first-half vs second-half transition counts. */
@@ -73,32 +74,22 @@ function rollingMean(arr: number[], window: number): (number | null)[] {
     if (i < window - 1) {
       result.push(null);
     } else {
-      let sum = 0;
-      for (let j = i - window + 1; j <= i; j++) sum += arr[j]!;
-      result.push(sum / window);
+      result.push(statsMean(arr.slice(i - window + 1, i + 1)));
     }
   }
   return result;
 }
 
 /**
- * Calculate rolling standard deviation
+ * Calculate rolling standard deviation (sample, ÷N−1)
  */
 function rollingStd(arr: number[], window: number): (number | null)[] {
-  const means = rollingMean(arr, window);
   const result: (number | null)[] = [];
   for (let i = 0; i < arr.length; i++) {
-    const mean = means[i];
-    if (mean === null || mean === undefined || i < window - 1) {
+    if (i < window - 1) {
       result.push(null);
     } else {
-      const m = mean;
-      let sumSq = 0;
-      for (let j = i - window + 1; j <= i; j++) {
-        const diff = arr[j]! - m;
-        sumSq += diff * diff;
-      }
-      result.push(Math.sqrt(sumSq / (window - 1)));
+      result.push(sampleStd(arr.slice(i - window + 1, i + 1)));
     }
   }
   return result;

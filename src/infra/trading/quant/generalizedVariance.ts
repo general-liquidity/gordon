@@ -22,6 +22,8 @@
  * Pure; never throws.
  */
 
+import { choleskyDecomposition } from "../../../core/alpha/matrix.ts";
+
 export interface GeneralizedVarianceInput {
   /** k aligned return series (each same length). */
   returns: number[][];
@@ -50,22 +52,10 @@ const round = (x: number, p = 6): number => parseFloat(x.toFixed(p));
 
 /** log(det) of a symmetric PD matrix via Cholesky; null if not PD (rank-deficient). */
 function choleskyLogDet(M: number[][]): number | null {
-  const n = M.length;
-  const L: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j <= i; j++) {
-      let sum = M[i]![j]!;
-      for (let k = 0; k < j; k++) sum -= L[i]![k]! * L[j]![k]!;
-      if (i === j) {
-        if (sum <= 1e-12) return null; // not PD → det ≈ 0
-        L[i]![i] = Math.sqrt(sum);
-      } else {
-        L[i]![j] = sum / L[j]![j]!;
-      }
-    }
-  }
+  const L = choleskyDecomposition(M);
+  if (L === null) return null; // not PD → det ≈ 0
   let logDet = 0;
-  for (let i = 0; i < n; i++) logDet += 2 * Math.log(L[i]![i]!);
+  for (let i = 0; i < L.length; i++) logDet += 2 * Math.log(L[i]![i]!);
   return logDet;
 }
 

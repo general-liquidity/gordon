@@ -9,6 +9,8 @@
  * Gordon adaptation: works with any asset class (crypto, stocks, DeFi).
  */
 
+import { sampleStd } from "../../../core/stats/index.ts";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -48,9 +50,7 @@ export interface PositionSizeResult {
  */
 export function computeAnnualizedVol(dailyReturns: number[], tradingDaysPerYear: number = 365): number {
   if (dailyReturns.length < 2) return 0;
-  const mean = dailyReturns.reduce((s, r) => s + r, 0) / dailyReturns.length;
-  const variance = dailyReturns.reduce((s, r) => s + (r - mean) ** 2, 0) / (dailyReturns.length - 1);
-  return Math.sqrt(variance * tradingDaysPerYear);
+  return sampleStd(dailyReturns) * Math.sqrt(tradingDaysPerYear);
 }
 
 /**

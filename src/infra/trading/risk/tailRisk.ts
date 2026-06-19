@@ -9,6 +9,8 @@
  * From AI Hedge Fund's Nassim Taleb Agent.
  */
 
+import { skewness, kurtosis } from "../../../core/stats/index.ts";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -42,33 +44,6 @@ export interface TailRiskProfile {
 
 function mean(arr: number[]): number {
   return arr.reduce((s, v) => s + v, 0) / arr.length;
-}
-
-function stddev(arr: number[]): number {
-  const m = mean(arr);
-  return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / (arr.length - 1));
-}
-
-function skewness(arr: number[]): number {
-  const n = arr.length;
-  if (n < 3) return 0;
-  const m = mean(arr);
-  const s = stddev(arr);
-  if (s === 0) return 0;
-  const sum = arr.reduce((acc, v) => acc + ((v - m) / s) ** 3, 0);
-  return (n / ((n - 1) * (n - 2))) * sum;
-}
-
-function kurtosis(arr: number[]): number {
-  const n = arr.length;
-  if (n < 4) return 0;
-  const m = mean(arr);
-  const s = stddev(arr);
-  if (s === 0) return 0;
-  const sum = arr.reduce((acc, v) => acc + ((v - m) / s) ** 4, 0);
-  const rawKurt = ((n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))) * sum;
-  const correction = (3 * (n - 1) ** 2) / ((n - 2) * (n - 3));
-  return rawKurt - correction; // Excess kurtosis (normal = 0)
 }
 
 function maxDrawdown(prices: number[]): number {
