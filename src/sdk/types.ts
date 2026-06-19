@@ -137,6 +137,23 @@ export interface SendMessageOptions {
   resourceId?: string;
 }
 
+/**
+ * Options for `client.sendStructuredMessage()` — a run whose final output is a
+ * schema-validated typed object. Supply EITHER a built-in named schema OR an
+ * arbitrary JSON Schema (compiled server-side via jsonSchemaToZod). Exactly one
+ * is required.
+ */
+export interface SendStructuredMessageOptions {
+  /** Built-in named schema: tradeSignal | marketScan | analysis | portfolioStatus | agentDecision. */
+  schemaName?: string;
+  /** Arbitrary JSON Schema (draft-07 object subset) for the run's typed output. */
+  jsonSchema?: Record<string, unknown>;
+  /** Associate the message with a specific thread. */
+  threadId?: string;
+  /** Resource ID for scoping context. */
+  resourceId?: string;
+}
+
 // ============================================================================
 // Command Responses
 // ============================================================================

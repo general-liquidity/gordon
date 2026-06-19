@@ -1,6 +1,6 @@
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
-import { getSchemaByName } from "../../infra/agents/schemas/index.ts";
+import { resolveStructuredSchema } from "../../infra/agents/schemas/index.ts";
 import { z } from "zod";
 import type { GordonContext } from "../../infra/agents/types.ts";
 import { SessionRuntimeFactory } from "../../runtime/index.ts";
@@ -253,12 +253,12 @@ export class GatewayRuntime {
     });
 
     (this as unknown as { registerHandler(type: string, handler: (envelope: unknown) => Promise<unknown>): void }).registerHandler("chat.structured_message", async (envelope: unknown) => {
-      const env = envelope as { meta: { sessionId: string }; command: { payload: { text: string; schemaName: string; threadId?: string; resourceId?: string } } };
+      const env = envelope as { meta: { sessionId: string }; command: { payload: { text: string; schemaName?: string; jsonSchema?: unknown; threadId?: string; resourceId?: string } } };
       const payload = env.command.payload;
-      const schema = getSchemaByName(payload.schemaName);
-      if (!schema) {
-        throw new Error(`Unknown schema: "${payload.schemaName}". Available: tradeSignal, marketScan, analysis, portfolioStatus, agentDecision`);
-      }
+      // Either a built-in named schema OR an arbitrary caller-supplied JSON
+      // Schema (compiled via jsonSchemaToZod). Throws a clear error on neither /
+      // unknown / uncompilable.
+      const schema = resolveStructuredSchema(payload);
       return this.getSessionRuntime(env.meta.sessionId).processStructuredMessage(
         payload.text,
         schema as z.ZodSchema<Record<string, unknown>>,

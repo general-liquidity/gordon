@@ -82,6 +82,7 @@ import {
   type ReconcileOptions,
   type PluginReloadOptions,
   type SendMessageOptions,
+  type SendStructuredMessageOptions,
   type DaemonStatus,
   type ScheduledTaskInfo,
 } from "./types.ts";
@@ -389,6 +390,43 @@ export class GordonSDKClient {
     return this.send({
       type: "chat.send_message",
       payload: parsed.data,
+    });
+  }
+
+  /**
+   * Send a message and force the run's final answer to be a schema-validated
+   * typed object. Pass EITHER a built-in named schema OR an arbitrary JSON
+   * Schema (compiled server-side). Exactly one is required.
+   *
+   * @example
+   * ```typescript
+   * await client.sendStructuredMessage("Scan BTC", { schemaName: "tradeSignal" });
+   * await client.sendStructuredMessage("Risk check", {
+   *   jsonSchema: { type: "object", properties: { verdict: { type: "string" } }, required: ["verdict"] },
+   * });
+   * ```
+   */
+  async sendStructuredMessage(
+    text: string,
+    options: SendStructuredMessageOptions = {},
+  ): Promise<SDKCommandResponse> {
+    if (!text || text.trim().length === 0) {
+      throw new ValidationError("sendStructuredMessage requires non-empty text");
+    }
+    if (options.schemaName == null && options.jsonSchema == null) {
+      throw new ValidationError(
+        "sendStructuredMessage requires either schemaName or jsonSchema",
+      );
+    }
+    return this.send({
+      type: "chat.structured_message",
+      payload: {
+        text,
+        schemaName: options.schemaName,
+        jsonSchema: options.jsonSchema,
+        threadId: options.threadId,
+        resourceId: options.resourceId,
+      },
     });
   }
 

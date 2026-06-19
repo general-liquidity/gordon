@@ -3,6 +3,7 @@ import { EnvelopeMetaSchema } from "./envelope.ts";
 
 export const GatewayCommandTypeSchema = z.enum([
   "chat.send_message",
+  "chat.structured_message",
   "scan.run",
   "monitor.run_cycle",
   "system.set_permission_mode",
@@ -27,6 +28,19 @@ export type GatewayCommandType = z.infer<typeof GatewayCommandTypeSchema>;
 
 export const ChatSendMessagePayloadSchema = z.object({
   text: z.string().min(1),
+  threadId: z.string().optional(),
+  resourceId: z.string().optional(),
+});
+
+/**
+ * Structured-message run — final answer is a schema-validated typed object.
+ * Either a built-in `schemaName` OR an arbitrary `jsonSchema` (compiled
+ * server-side via jsonSchemaToZod). The handler enforces exactly-one.
+ */
+export const ChatStructuredMessagePayloadSchema = z.object({
+  text: z.string().min(1),
+  schemaName: z.string().optional(),
+  jsonSchema: z.record(z.string(), z.unknown()).optional(),
   threadId: z.string().optional(),
   resourceId: z.string().optional(),
 });
@@ -105,6 +119,7 @@ export const CapitalRefreshPayloadSchema = z.object({});
 
 export const GatewayCommandPayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("chat.send_message"), payload: ChatSendMessagePayloadSchema }),
+  z.object({ type: z.literal("chat.structured_message"), payload: ChatStructuredMessagePayloadSchema }),
   z.object({ type: z.literal("scan.run"), payload: ScanRunPayloadSchema }),
   z.object({ type: z.literal("monitor.run_cycle"), payload: MonitorRunCyclePayloadSchema }),
   z.object({ type: z.literal("system.set_permission_mode"), payload: SystemSetPermissionModePayloadSchema }),
