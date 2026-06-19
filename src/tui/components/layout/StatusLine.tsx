@@ -8,6 +8,7 @@ import { KillSwitchBadge } from "../status/KillSwitchBadge.tsx";
 import type { PermissionMode } from "../../state/types.ts";
 import type { KillSwitchStatus } from "../../state/killSwitchStatus.ts";
 import { useTheme } from "../../themes/ThemeProvider.tsx";
+import { useStatusLineHook } from "../../hooks/useStatusLineHook.ts";
 
 export function formatStatusTokenCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -35,6 +36,9 @@ export const StatusLine = React.memo(function StatusLine({
   killSwitches: KillSwitchStatus | null;
 }): React.ReactElement {
   const theme = useTheme();
+  // Operator-defined status segment (GORDON_STATUS_LINE_COMMAND). Renders only
+  // when set and the hook command produced safe output; otherwise null.
+  const statusLineSegment = useStatusLineHook();
   // Brighter than faint `dimColor` (which renders too dark on most terminals):
   // a medium gray that reads as secondary but stays legible, matching Claude
   // Code's status row. `sep` is the same color for the `·` dividers.
@@ -73,6 +77,12 @@ export const StatusLine = React.memo(function StatusLine({
           <>
             <Text color={muted}>{"·"}</Text>
             <MemoryUsageIndicator usageRatio={memoryUsageRatio} tokenLimit={contextLimit} />
+          </>
+        )}
+        {statusLineSegment && (
+          <>
+            <Text color={muted}>{"·"}</Text>
+            <Text color={muted}>{statusLineSegment}</Text>
           </>
         )}
       </Box>

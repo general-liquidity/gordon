@@ -22,6 +22,7 @@ import {
   instrumentedFinnhubFundamentalsTools,
   instrumentedFinnhubMarketsTools,
   instrumentedSecFilingTools,
+  instrumentedWebTools,
   gordonInputGuard,
   gordonOutputSanitizer,
   gordonToolCallReconciler,
@@ -92,6 +93,9 @@ export function getResearcher(): Agent {
       ...instrumentedFinnhubFundamentalsTools,
       ...instrumentedFinnhubMarketsTools,
       ...(isHotTierOnly() ? {} : instrumentedSecFilingTools),
+      // Open-web reach (web_fetch / web_search) — gated allowlist + injection-
+      // sanitized, COLD tier (DD/discovery, not the hot scan path).
+      ...(isHotTierOnly() ? {} : instrumentedWebTools),
 
       // Canonical 22-tool agent surface.
       ...instrumentedAgentTools,
