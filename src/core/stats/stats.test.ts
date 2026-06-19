@@ -38,6 +38,12 @@ import {
   quantile,
   quantileSorted,
   linearRegression,
+  populationVariance,
+  populationStd,
+  sampleCorrelation,
+  sampleCovariance,
+  zScore,
+  rSquared,
   volatility,
   sharpe,
   sortino,
@@ -141,6 +147,68 @@ describe("base primitives — parity with hand-rolled internals", () => {
     const got = linearRegression(xs, ys);
     expect(Math.abs(got.slope - slope)).toBeLessThan(TOL_LIB);
     expect(Math.abs(got.intercept - intercept)).toBeLessThan(TOL_LIB);
+  });
+});
+
+// --- dedup primitives (Wave 4 consolidation targets) -----------------------
+
+describe("dedup primitives — parity with inline hand-rolled copies", () => {
+  // Bollinger uses POPULATION std (÷N) — the load-bearing ddof note in 10-indicators.md.
+  function refPopVariance(x: number[]): number {
+    const m = refMean(x);
+    return x.reduce((s, v) => s + (v - m) ** 2, 0) / x.length;
+  }
+
+  test("populationVariance / populationStd (÷N, NOT n−1)", () => {
+    const refVar = refPopVariance(RETURNS);
+    expect(Math.abs(populationVariance(RETURNS) - refVar)).toBeLessThan(TOL_ARITH);
+    expect(Math.abs(populationStd(RETURNS) - Math.sqrt(refVar))).toBeLessThan(TOL_ARITH);
+    // population std must be SMALLER than sample std (divides by N not N−1).
+    expect(populationStd(RETURNS)).toBeLessThan(refSampleStd(RETURNS));
+  });
+
+  test("sampleCorrelation (Pearson) against manual cov/var", () => {
+    const xs = RETURNS.map((_, i) => i);
+    const ys = RETURNS.map((r, i) => 0.5 * i - r * 3);
+    const n = xs.length;
+    const mx = refMean(xs), my = refMean(ys);
+    let cov = 0, vx = 0, vy = 0;
+    for (let i = 0; i < n; i++) {
+      cov += (xs[i]! - mx) * (ys[i]! - my);
+      vx += (xs[i]! - mx) ** 2;
+      vy += (ys[i]! - my) ** 2;
+    }
+    const ref = cov / Math.sqrt(vx * vy);
+    expect(Math.abs(sampleCorrelation(xs, ys) - ref)).toBeLessThan(TOL_LIB);
+  });
+
+  test("sampleCorrelation — guards: <2 points and zero-variance → 0", () => {
+    expect(sampleCorrelation([1], [2])).toBe(0);
+    expect(sampleCorrelation([5, 5, 5], [1, 2, 3])).toBe(0); // flat x → 0, not NaN
+  });
+
+  test("sampleCovariance (n−1) against manual", () => {
+    const xs = RETURNS.map((_, i) => i);
+    const ys = RETURNS.map((r) => r * 10);
+    const n = xs.length;
+    const mx = refMean(xs), my = refMean(ys);
+    let cov = 0;
+    for (let i = 0; i < n; i++) cov += (xs[i]! - mx) * (ys[i]! - my);
+    cov /= n - 1;
+    expect(Math.abs(sampleCovariance(xs, ys) - cov)).toBeLessThan(TOL_LIB);
+  });
+
+  test("zScore — standardization + degenerate guard", () => {
+    expect(zScore(10, 4, 2)).toBeCloseTo(3, 12);
+    expect(zScore(10, 10, 0)).toBe(0); // σ=0 → 0, not NaN/Infinity
+  });
+
+  test("rSquared = Pearson² for simple OLS", () => {
+    const xs = RETURNS.map((_, i) => i);
+    const ys = RETURNS.map((r, i) => 2 * i + 1 + r);
+    const r = sampleCorrelation(xs, ys);
+    expect(Math.abs(rSquared(xs, ys) - r * r)).toBeLessThan(TOL_ARITH);
+    expect(rSquared(xs, ys)).toBeGreaterThan(0.99); // near-perfect linear
   });
 });
 

@@ -17,10 +17,14 @@
 import {
   mean as ssMean,
   median as ssMedian,
+  variance as ssPopVariance,
   sampleVariance as ssSampleVariance,
+  standardDeviation as ssPopStd,
   sampleStandardDeviation as ssSampleStd,
   sampleSkewness as ssSampleSkewness,
   sampleKurtosis as ssSampleKurtosis,
+  sampleCorrelation as ssSampleCorrelation,
+  sampleCovariance as ssSampleCovariance,
   quantileSorted as ssQuantileSorted,
   linearRegression as ssLinearRegression,
 } from "simple-statistics";
@@ -135,6 +139,73 @@ export function linearRegression(
 
 /** Alias for callers preferring the OLS name. */
 export const ols = linearRegression;
+
+/**
+ * Population variance (÷N, NOT Bessel-corrected). For the callers (Bollinger
+ * band-width, Knuteson leg-signature) that intentionally use the population
+ * estimator over a fixed window. Returns 0 for an empty array.
+ */
+export function populationVariance(x: number[]): number {
+  if (x.length === 0) return 0;
+  return ssPopVariance(x);
+}
+
+/**
+ * Population standard deviation (÷N). **Watch the ddof:** Bollinger bands use
+ * population std — routing them through `sampleStd` (÷N−1) would widen the bands.
+ * Returns 0 for an empty array.
+ */
+export function populationStd(x: number[]): number {
+  if (x.length === 0) return 0;
+  return ssPopStd(x);
+}
+
+/**
+ * Pearson product-moment correlation between two equal-length series.
+ * Returns 0 when either series has < 2 points or zero variance (matches the
+ * defensive guards in the inline `pearson()` copies being consolidated).
+ */
+export function sampleCorrelation(x: number[], y: number[]): number {
+  const n = Math.min(x.length, y.length);
+  if (n < 2) return 0;
+  const a = x.slice(0, n);
+  const b = y.slice(0, n);
+  const r = ssSampleCorrelation(a, b);
+  return Number.isFinite(r) ? r : 0;
+}
+
+/** Pearson correlation alias. */
+export const pearson = sampleCorrelation;
+
+/**
+ * Sample covariance (n−1) between two equal-length series. Returns 0 below 2
+ * points.
+ */
+export function sampleCovariance(x: number[], y: number[]): number {
+  const n = Math.min(x.length, y.length);
+  if (n < 2) return 0;
+  return ssSampleCovariance(x.slice(0, n), y.slice(0, n));
+}
+
+/**
+ * Standardized z-score (value − μ) / σ. Returns 0 when σ is 0 or non-finite, so
+ * a degenerate (flat) window yields 0 rather than NaN/Infinity — matching the
+ * inline rolling-z-score copies (order-blocks, crypto-factor-model).
+ */
+export function zScore(value: number, mu: number, sigma: number): number {
+  if (!Number.isFinite(sigma) || sigma === 0) return 0;
+  return (value - mu) / sigma;
+}
+
+/**
+ * Coefficient of determination R² for a SIMPLE (one-variable) OLS fit. For
+ * simple linear regression R² = Pearson(x, y)², which is exact and avoids
+ * re-deriving residual sums. Returns 0 below 2 points / zero variance.
+ */
+export function rSquared(x: number[], y: number[]): number {
+  const r = sampleCorrelation(x, y);
+  return r * r;
+}
 
 // ============================================================================
 // Composite trading metrics (mirror src/backtest/metrics.ts signatures)
