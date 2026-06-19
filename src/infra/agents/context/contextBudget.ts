@@ -123,10 +123,26 @@ export interface PromptEnvelope {
 
 const latestReports = new Map<string, PromptContextReport>();
 
-function estimateTokens(text: string): number {
+// JSON is denser than prose (~2.5 chars/token vs ~4) — punctuation, quotes, and
+// short numeric tokens pack tightly. Trading tool-results (order books, candle
+// arrays, account state) are JSON-heavy, so a flat /4 under-counts and lets
+// compaction stage-selection trip late. Detect JSON-ish content and use a
+// tighter ratio for it.
+const PROSE_CHARS_PER_TOKEN = 4;
+const JSON_CHARS_PER_TOKEN = 2.5;
+
+function looksLikeJson(trimmed: string): boolean {
+  const first = trimmed[0];
+  const last = trimmed[trimmed.length - 1];
+  return (first === "{" && last === "}") || (first === "[" && last === "]");
+}
+
+export function estimateTokens(text: string, kind: "auto" | "json" | "prose" = "auto"): number {
   const trimmed = text.trim();
   if (!trimmed) return 0;
-  return Math.ceil(trimmed.length / 4);
+  const isJson = kind === "json" || (kind === "auto" && looksLikeJson(trimmed));
+  const ratio = isJson ? JSON_CHARS_PER_TOKEN : PROSE_CHARS_PER_TOKEN;
+  return Math.ceil(trimmed.length / ratio);
 }
 
 function buildContextPiece(

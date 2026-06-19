@@ -43,6 +43,15 @@ import {
   type AgentRegistry,
 } from "../harness/subagentCoordination.ts";
 import {
+  drainSteers,
+  clearSteers,
+  createSteerStore,
+  applyQueuedSteers,
+  finalizeSteers,
+  STEER_PREFIX,
+  type SubagentSteerStore,
+} from "../harness/subagentSteer.ts";
+import {
   filterToolsForProfile,
   type ToolFilterResult,
 } from "./subagentToolFilter.ts";
@@ -86,6 +95,14 @@ export interface DispatchOptions {
    * memory, since dispatched profiles are stateless per call).
    */
   memoryFactory?: () => unknown;
+  /**
+   * Optional steer store override (used by tests). Production callers omit it
+   * and the dispatcher uses the process-singleton store via `drainSteers`.
+   * When provided, queued steer messages for this subagentId are woven into
+   * the task brief at spawn-step (before `.generate()`). Steering is plain
+   * text appended to the INPUT — it cannot grant new tools or escalate scope.
+   */
+  steerStore?: SubagentSteerStore;
 }
 
 /** Minimal contract the dispatcher relies on from a Mastra Agent. */
@@ -266,11 +283,22 @@ export async function dispatchSubagentTask(
       tools: allowedTools,
       maxSteps,
     });
-    const generated = await agent.generate(task, { maxSteps });
+
+    // Spawn-step steer delivery. Any operator steer messages queued for this
+    // subagent (via `steerSubagent`) are drained here and woven into the brief
+    // BEFORE `.generate()` runs. This is the one safe injection boundary: the
+    // dispatcher owns the input, and the steer flows through the SAME read-only
+    // tool filter + strict mode already applied — it cannot grant new powers.
+    // No-op (zero allocation, brief unchanged) when nothing is queued, so a
+    // non-steered dispatch is byte-identical to the prior behavior.
+    const taskWithSteers = applyQueuedSteers(task, subagentId, options.steerStore);
+
+    const generated = await agent.generate(taskWithSteers, { maxSteps });
 
     registry.setState(subagentId, "completed", {
       result: generated.text,
     });
+    finalizeSteers(subagentId, options.steerStore);
 
     return {
       status: "completed",

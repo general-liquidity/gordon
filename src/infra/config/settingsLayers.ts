@@ -1,14 +1,22 @@
 /**
- * 7-Level Settings Priority Chain
+ * Settings Priority Chain
  *
- * Claude Code pattern: settings merge from 7 layers, higher priority wins.
+ * Claude Code pattern: settings merge from layers, higher priority wins.
  *   1. CLI flags (--permissionMode auto)          — highest
  *   2. Session overrides (in-memory, not persisted)
  *   3. Policy settings (organization rules)
- *   4. Local settings (~/.gordon/settings.local.json)
- *   5. Project settings (.gordon/settings.json)
- *   6. Profile settings (~/.gordon/profiles/{name}.json)
- *   7. Defaults (built-in)                        — lowest
+ *   4. Synced settings (signed cross-machine snapshot — opt-in)
+ *   5. Local settings (~/.gordon/settings.local.json)
+ *   6. Project settings (.gordon/settings.json)
+ *   7. Profile settings (~/.gordon/profiles/{name}.json)
+ *   8. Defaults (built-in)                        — lowest
+ *
+ * The `synced` layer sits just below `policy` and above `local`: a verified
+ * remote snapshot overrides the per-host local/project/profile files (that's
+ * the point — keep risk limits consistent desktop↔VPS) but never overrides
+ * organization policy or live session/CLI controls. It is loaded only when
+ * GORDON_SETTINGS_SYNC is enabled (see config/settingsSync) — default OFF, so
+ * the chain is unchanged when the flag is unset.
  *
  * Each layer is a partial config. Merge is shallow per top-level key,
  * deep for nested objects (exchanges, risk, etc.).
@@ -17,6 +25,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GORDON_DIR } from "../storage/paths.ts";
+import { loadRemoteSyncLayer } from "./settingsSync/index.ts";
 
 // ============================================================================
 // Types
@@ -26,6 +35,7 @@ export type SettingsLayer =
   | "cli"
   | "session"
   | "policy"
+  | "synced"
   | "local"
   | "project"
   | "profile"
@@ -58,6 +68,7 @@ const LAYER_PRIORITY: SettingsLayer[] = [
   "profile",
   "project",
   "local",
+  "synced",
   "policy",
   "session",
   "cli",
@@ -191,6 +202,11 @@ export function loadLayeredSettings(options: LoadSettingsOptions = {}): MergedSe
 
   const local = loadLocalLayer();
   if (local) layers.push(local);
+
+  // Opt-in signed cross-machine layer. Returns null (no layer) unless
+  // GORDON_SETTINGS_SYNC is enabled AND a verified cached snapshot exists.
+  const synced = loadRemoteSyncLayer();
+  if (synced) layers.push(synced);
 
   const policy = loadPolicyLayer();
   if (policy) layers.push(policy);

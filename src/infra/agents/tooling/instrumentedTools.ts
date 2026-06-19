@@ -55,6 +55,7 @@ import {
   producerHealthTools,
   newsTools,
   stockNewsTools,
+  webTools,
   strategyRecipeTools,
   positionTrackingTools,
   checkRiskTool,
@@ -141,6 +142,8 @@ export const instrumentedInstitutionalAiTools = withToolsMetrics(institutionalAi
 export const instrumentedProducerHealthTools = withToolsMetrics(producerHealthTools);
 export const instrumentedNewsTools = withToolsMetrics(newsTools);
 export const instrumentedStockNewsTools = withToolsMetrics(stockNewsTools);
+/** Open-web reach (web_fetch / web_search). COLD TIER — register gated. */
+export const instrumentedWebTools = withToolsMetrics(webTools);
 export const instrumentedStrategyRecipeTools = withToolsMetrics(strategyRecipeTools);
 export const instrumentedEvalTools = withToolsMetrics(evalTools);
 export const instrumentedPositionTrackingTools = withToolsMetrics(positionTrackingTools);

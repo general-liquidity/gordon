@@ -111,6 +111,67 @@ export function supersede(oldId: string, newId: string): void {
   }
 }
 
+/** Normalize content for duplicate detection — case/whitespace-insensitive. */
+function normalizeContent(content: string): string {
+  return content.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+export interface DedupeResult {
+  /** Number of entries newly marked superseded by this pass. */
+  superseded: number;
+  /** Number of active (non-superseded) entries that remain after the pass. */
+  remaining: number;
+}
+
+/**
+ * Consolidate superseded/duplicate facts in the session-memory store.
+ *
+ * Within each category, entries whose normalized content collides are treated
+ * as restatements of the same fact (e.g. "max 2% per trade" logged across three
+ * sessions). The NEWEST entry (by extractedAt) wins; older collisions are
+ * pointed at it via the existing `supersededBy` pointer — non-destructive,
+ * reusing the same supersede semantics the manual paths already perform. No
+ * entry is deleted; superseded entries simply drop out of `getActiveMemories`.
+ *
+ * This is the consolidation half autoDream drives: it does NOT invent a parallel
+ * store — it curates the categorized JSON store in place. Idempotent: a second
+ * pass over an already-deduped store supersedes nothing.
+ *
+ * Returns counts for caller logging. Safe to call when the store is empty.
+ */
+export function dedupeSessionMemories(): DedupeResult {
+  const memories = loadSessionMemories();
+  const active = memories.filter((m) => !m.supersededBy);
+
+  // Group active entries by (category, normalized content). Keep the newest as
+  // the survivor; supersede the rest to point at it.
+  const groups = new Map<string, SessionMemoryEntry[]>();
+  for (const m of active) {
+    const key = `${m.category}::${normalizeContent(m.content)}`;
+    const list = groups.get(key);
+    if (list) list.push(m);
+    else groups.set(key, [m]);
+  }
+
+  let superseded = 0;
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    // Newest survives — sort descending by extraction time.
+    group.sort((a, b) => new Date(b.extractedAt).getTime() - new Date(a.extractedAt).getTime());
+    const survivor = group[0]!;
+    for (let i = 1; i < group.length; i++) {
+      group[i]!.supersededBy = survivor.id;
+      superseded += 1;
+    }
+  }
+
+  if (superseded > 0) saveSessionMemories(memories);
+  return {
+    superseded,
+    remaining: memories.filter((m) => !m.supersededBy).length,
+  };
+}
+
 /**
  * Get active (non-superseded) memories, optionally filtered by category.
  */

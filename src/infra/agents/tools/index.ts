@@ -87,6 +87,7 @@ export { institutionalAiTools } from "./runtime/institutionalAi.ts";
 export { producerHealthTools } from "./runtime/lifecycle/producer-health-tool.ts";
 export { newsTools } from "./news/news.ts";
 export { stockNewsTools } from "./news/stockNews.ts";
+export { webTools } from "./web/index.ts";
 export { strategyRecipeTools } from "./strategy/generation/strategy-recipes.ts";
 
 // Position tracking tools (v0.7)
