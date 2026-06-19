@@ -21,9 +21,9 @@ Gordon (Bun/TS)  ──HTTP──►  mt5_bridge.py  ──IPC──►  MT5 ter
 
    | Var | Purpose |
    |---|---|
-   | `MT5_LOGIN` | account number (optional if the terminal is already logged in) |
+   | `MT5_LOGIN` | account number = your Syphonix account ID (optional if the terminal is already logged in) |
    | `MT5_PASSWORD` | account password |
-   | `MT5_SERVER` | broker server name (e.g. the Syphonix MT5 server) |
+   | `MT5_SERVER` | broker server — for Model-to-Market this is `3.11.134.149:443` (NOT the default `MetaQuotes-Demo`; using that is the usual "Invalid account" cause). May differ between the test and live competition env — confirm at login. |
    | `MT5_TERMINAL_PATH` | path to `terminal64.exe` (optional; auto-detected if running) |
    | `MT5_BRIDGE_PORT` | default `8788` |
    | `MT5_BRIDGE_TOKEN` | shared secret; if set, callers must send `X-Bridge-Token` |

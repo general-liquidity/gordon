@@ -90,6 +90,7 @@ Authoritative dates from **[RULES]** §5, refined by **[DISCORD]**. Marketing pa
 - **ACCESS = native MT5 Desktop Terminal — NO REST/WebSocket gateway (Duncan, Discord, confirmed):** "Trading will be through the native MT5 Desktop Terminal. Please prepare your environment accordingly." You run the MT5 terminal yourself (Windows), driven via the official `MetaTrader5` Python package. **This confirms Gordon's topology exactly** (OPERATIONS §1: Windows VPS → MT5 terminal → `mt5_bridge.py` sidecar → `Mt5BridgeClient`). There is no hosted API to integrate against — prepare the always-on Windows box now.
 - The **real market order book is an INPUT to a per-account simulation**. You do **not** trade the live production book; other participants **cannot** interact with your orders (matching is internal/per-account; not yet transparent).
 - **Slippage, liquidity constraints, and market impact are simulated.** Validate in the test env from the 18th.
+- **Crypto reference price is a BLEND (Duncan, Discord, NEW 19 Jun):** "Crypto pricing is derived from multiple market data sources rather than a single exchange; execution outcomes are influenced by both market conditions and participant positioning." ⇒ the platform's crypto quote will **not** exactly track any one venue (e.g. Binance), so the **maker-probe and adverse-selection reference mid must come from the bridge `/quote` (the platform's own feed), not an external exchange** — else the measured edge is mis-referenced. Our external Binance bars stay fine for *signal/backtest* (relative dynamics), but the *execution* reference is the platform blend. ("participant positioning" = your own inventory/impact; other participants still can't interact with your orders, per the per-account sim above.)
 - **Costs: NO commission, NO swap / overnight financing, and NO borrow fees on shorts (Duncan, Discord, CONFIRMED).** Friction = **spread + slippage + market impact only** — and the spread flips to a *rebate* if we make. Holds are free; **the dollar-neutral book (half short) carries zero borrow cost.**
 - **CANCEL/REPLACE and liquidity-based sizing are explicitly PERMITTED (Duncan, Discord)** — only platform-bug exploitation / out-of-rules behavior is prohibited. ✅ **Green-lights the MAKER path** (which cancels + re-posts resting limits each cycle) and the depth-aware sizing — no DQ risk. Just avoid abusive request patterns (stay well under 500 req/s). Slippage & market impact **vary with conditions, depth, and liquidity** (dynamic, not fixed) — reinforces depth-aware sizing.
 - **LEVERAGE is account-level (Duncan, Discord, confirmed)** — 30:1 on total notional/equity, not per-instrument. Matches our margin model (`leverage = grossNotional / equity`).
@@ -167,10 +168,11 @@ During Rounds 1–3, participants see a **near-real-time leaderboard + peer trad
 
 | Surface | Reality |
 |---|---|
-| **MT5** | **The only programmatic path.** Full API for automation via the `MetaTrader5` Python package. Credentials open **18 Jun**. |
-| **Syphonix AI Agent** | Chat/AI-agent UI for non-coders. **No separate REST API** ("we will prepare one" — non-committal). Using it would sideline Gordon → out. |
-| **Chat interface** | Same as above — the organizers' agent, not ours. |
+| **MT5** | **The only programmatic path.** Full API for automation via the `MetaTrader5` Python package (Windows-only — fine, Gordon runs on Windows). Server `3.11.134.149:443`, login = account ID. Credentials open **18 Jun**. |
+| **AI-Native channel** | Conversational UI. **Confirmed (Lotus/Duncan, 19 Jun): NO API, no API-key creation, no agent customization (prompts/memory/tools/personas locked), no multi-agent.** Its built-in agents *can* run a configured strategy autonomously, but it cannot drive Gordon → **out**. |
 
+> **Channel choice (organizer, 19 Jun) — IRREVERSIBLE:** participants pick **one** channel in the console; the window is **08:00–17:00 on the 19th** and **MT5 is assigned by default** if unselected. Once confirmed it **cannot be changed**. **For us the choice is forced: MT5** (the AI-Native channel has no API). → **Action: confirm MT5 is selected in the console today.**
+>
 > **Key correction:** there is **no Syphonix REST API**. The repo's `src/infra/broker/adapters/syphonix.ts` (a REST `BrokerAdapter` scaffold) is the **wrong abstraction** for execution and must be repurposed to an **MT5 adapter**. It stays gated-off and harmless until then.
 
 ### 7.1 Gordon ↔ MT5 architecture

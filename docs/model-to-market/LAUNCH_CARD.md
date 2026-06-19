@@ -12,10 +12,10 @@ Launch timestamps (epoch-ms, pre-computed — BST = UTC+1):
 
 ## A. Before 22:00 — stage + USE THE SETUP WINDOW (live data + test account, trading disabled)
 > Duncan (Discord): tonight you get **live market data + a test account for connectivity/validation**, but **trading is NOT enabled until the competition starts (22:00)**. So the decisive spread read happens HERE, read-only, before any arming pressure.
-1. **Windows box** up, clock synced to BST; MT5 terminal installed + logged into the test account.
-2. **Console** (`https://quanthack.syphonix.com/` → Console): **select & confirm the trading channel (MT5)** → the $1M funds after this.
+1. **Windows box** up, clock synced to BST; **MT5 *desktop* terminal** installed + logged into the test account. **MT5 desktop client only** (the `MetaTrader5` Python package is Windows-only — fine, Gordon runs on Windows). Add account: File → Login to Trade Account → **Login = your account ID**, password, **Server = `3.11.134.149:443`** (the Syphonix MT5 server — NOT the default `MetaQuotes-Demo`, which is why connections fail). Green bottom-right = data feed up; error `10026` on a test order = trading disabled (expected pre-launch).
+2. **Console** (`https://quanthack.syphonix.com/` → Console): **select & confirm the trading channel — MT5** → the $1M funds after this. **This is irreversible and the selection window closes 17:00 on the 19th** (MT5 is the default if unset). MT5 is *mandatory* for us: the **AI-Native channel has no API / no key creation / no agent customization** (organizer-confirmed) — it cannot drive Gordon.
 3. **Sidecar deps**: `pip install -r scripts/mt5-bridge/requirements.txt` (first time).
-4. **Sidecar env set** (account creds live here ONLY): `MT5_LOGIN/PASSWORD/SERVER`, `MT5_BRIDGE_TOKEN`. Leave `MT5_BRIDGE_ALLOW_TRADING` **unset** (validate-only).
+4. **Sidecar env set** (account creds live here ONLY — never in Gordon): `MT5_LOGIN` (=account ID) / `MT5_PASSWORD` / `MT5_SERVER` (=`3.11.134.149:443`), `MT5_BRIDGE_TOKEN`. Leave `MT5_BRIDGE_ALLOW_TRADING` **unset** (validate-only).
 5. **`mkdir -p .gordon`** (state + kill-flag + peer-returns live here; already gitignored).
 6. **Validate READ-ONLY against the live setup data** (this is the high-value pre-work):
    ```
