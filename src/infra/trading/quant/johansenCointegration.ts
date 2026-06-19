@@ -42,7 +42,7 @@
  * series, or a singular moment matrix → verdict "insufficient_data".
  */
 
-import { invert, transpose, multiply } from "../../../core/alpha/matrix.ts";
+import { invert, transpose, multiply, eigenDecomposition } from "../../../core/alpha/matrix.ts";
 
 export type JohansenVerdict = "cointegrated" | "no_cointegration" | "stationary_system" | "insufficient_data";
 export type JohansenAlpha = 0.1 | 0.05 | 0.01;
@@ -194,48 +194,11 @@ function invertLowerTriangular(L: number[][]): number[][] {
   return inv;
 }
 
-/** Cyclic Jacobi eigenvalues for a symmetric matrix, descending order. */
+/** Symmetric-matrix eigenvalues (ml-matrix), descending order. */
 function symmetricEigenvalues(src: number[][]): number[] {
-  const n = src.length;
-  const a = src.map((row) => [...row]);
-  const tol = 1e-14;
-  for (let sweep = 0; sweep < 100; sweep++) {
-    let off = 0;
-    for (let p = 0; p < n - 1; p++) for (let q = p + 1; q < n; q++) off += a[p]![q]! * a[p]![q]!;
-    if (off < tol) break;
-    for (let p = 0; p < n - 1; p++) {
-      for (let q = p + 1; q < n; q++) {
-        const apq = a[p]![q]!;
-        if (Math.abs(apq) < tol) continue;
-        const app = a[p]![p]!;
-        const aqq = a[q]![q]!;
-        const theta = (aqq - app) / (2 * apq);
-        const t = theta >= 0
-          ? 1 / (theta + Math.sqrt(1 + theta * theta))
-          : 1 / (theta - Math.sqrt(1 + theta * theta));
-        const c = 1 / Math.sqrt(1 + t * t);
-        const s = t * c;
-        a[p]![p] = app - t * apq;
-        a[q]![q] = aqq + t * apq;
-        a[p]![q] = 0;
-        a[q]![p] = 0;
-        for (let i = 0; i < n; i++) {
-          if (i !== p && i !== q) {
-            const aip = a[i]![p]!;
-            const aiq = a[i]![q]!;
-            a[i]![p] = c * aip - s * aiq;
-            a[i]![q] = s * aip + c * aiq;
-            a[p]![i] = a[i]![p]!;
-            a[q]![i] = a[i]![q]!;
-          }
-        }
-      }
-    }
-  }
-  const eig = new Array<number>(n);
-  for (let i = 0; i < n; i++) eig[i] = a[i]![i]!;
-  eig.sort((x, y) => y - x);
-  return eig;
+  const evd = eigenDecomposition(src);
+  if (!evd) return [];
+  return [...evd.eigenvalues].sort((x, y) => y - x);
 }
 
 export function runJohansenTest(input: JohansenInput): JohansenResult {

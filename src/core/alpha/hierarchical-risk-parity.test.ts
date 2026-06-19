@@ -53,11 +53,13 @@ describe("single linkage", () => {
     ];
     const linkage = singleLinkage(dist);
     expect(linkage.length).toBe(2);
-    // First merge: the closest pair (0,1) at distance 0.1.
+    // First merge: the closest pair (0,1) at distance 0.1. ml-hclust's agnes
+    // orders the two children (higher-index first) so left/right may be swapped
+    // vs the original hand-rolled order — sort to assert the unordered pair.
     expect(linkage[0]!.distance).toBeCloseTo(0.1, 10);
-    expect([linkage[0]!.left, linkage[0]!.right].sort()).toEqual([0, 1]);
+    expect([linkage[0]!.left, linkage[0]!.right].sort((a, b) => a - b)).toEqual([0, 1]);
     expect(linkage[0]!.size).toBe(2);
-    // Second merge joins the {0,1} cluster (id 3) with leaf 2 at single-linkage
+    // Second merge joins the {0,1} cluster with leaf 2 at single-linkage
     // distance min(0.9, 0.8) = 0.8.
     expect(linkage[1]!.distance).toBeCloseTo(0.8, 10);
     expect(linkage[1]!.size).toBe(3);
@@ -139,6 +141,27 @@ describe("hierarchicalRiskParity", () => {
     expect(r).not.toBeNull();
     sums1(r!.weights);
     expect(r!.weights[0]!).toBeGreaterThan(r!.weights[1]!); // low-vol asset weighted more
+  });
+
+  test("seriation is reflection-stable: ml-hclust leaf order yields the golden HRP weights", () => {
+    // Parity lock for the ml-hclust (agnes, single-linkage) migration. agnes
+    // emits children higher-index-first, so the seriation is a within-block
+    // reflection of the old hand-rolled order — but recursive bisection is
+    // invariant to those reflections, so the weights are byte-identical to the
+    // pre-migration golden. This 6-asset matrix exercises nested blocks.
+    const cov = [
+      [0.04, 0.03, 0.002, 0.001, 0.015, 0.005],
+      [0.03, 0.05, 0.003, 0.002, 0.012, 0.004],
+      [0.002, 0.003, 0.01, 0.008, 0.001, 0.006],
+      [0.001, 0.002, 0.008, 0.012, 0.002, 0.007],
+      [0.015, 0.012, 0.001, 0.002, 0.03, 0.009],
+      [0.005, 0.004, 0.006, 0.007, 0.009, 0.02],
+    ];
+    const r = hierarchicalRiskParity({ covariance: cov });
+    expect(r).not.toBeNull();
+    expect(r!.weights).toEqual([0.066619, 0.053295, 0.271432, 0.226194, 0.148042, 0.234419]);
+    // Seriation keeps each correlated block contiguous (reflected vs the old order).
+    expect(r!.seriatedOrder).toEqual([5, 3, 2, 4, 1, 0]);
   });
 
   test("NULL on insufficient input", () => {

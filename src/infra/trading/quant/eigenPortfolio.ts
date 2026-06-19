@@ -25,9 +25,11 @@
  * overall concentration). This primitive gives the per-direction
  * breakdown those don't.
  *
- * Pure compute, no I/O. Eigendecomposition uses cyclic Jacobi rotations,
- * stable for small N (N ≤ ~50 portfolio constituents).
+ * Pure compute, no I/O. Eigendecomposition is delegated to the shared
+ * ml-matrix-backed helper, stable for small N (N ≤ ~50 constituents).
  */
+
+import { eigenDecomposition } from "../../../core/alpha/matrix.ts";
 
 export const EIGEN_PORTFOLIO_FLAG_ENV = "GORDON_EIGEN_PORTFOLIO";
 
@@ -45,10 +47,6 @@ export interface EigenPortfolioInput {
   weights: ReadonlyArray<number>;
   /** Optional asset symbols for traceability. */
   symbols?: ReadonlyArray<string>;
-  /** Max Jacobi sweeps. Default 50. */
-  maxSweeps?: number;
-  /** Off-diagonal convergence tolerance. Default 1e-12. */
-  tolerance?: number;
 }
 
 export interface PrincipalPortfolio {
@@ -79,94 +77,47 @@ export interface EigenPortfolioResult {
   reasoning: string;
 }
 
-const DEFAULT_MAX_SWEEPS = 50;
-const DEFAULT_TOL = 1e-12;
-
-function copyMatrix(m: ReadonlyArray<ReadonlyArray<number>>): number[][] {
-  return m.map((row) => [...row]);
-}
-
-function identity(n: number): number[][] {
-  const m: number[][] = [];
-  for (let i = 0; i < n; i++) {
-    const row = new Array<number>(n).fill(0);
-    row[i] = 1;
-    m.push(row);
+/**
+ * Force the largest-magnitude component of an eigenvector positive, so the
+ * sign is deterministic regardless of the solver's arbitrary sign choice
+ * (ml-matrix and the old hand-rolled Jacobi can disagree on sign). Resolves
+ * ties on |component| toward the earliest index.
+ */
+function canonicalizeSign(vec: number[]): number[] {
+  let maxIdx = 0;
+  let maxAbs = -1;
+  for (let i = 0; i < vec.length; i++) {
+    const a = Math.abs(vec[i]!);
+    if (a > maxAbs) {
+      maxAbs = a;
+      maxIdx = i;
+    }
   }
-  return m;
+  if (vec[maxIdx]! < 0) return vec.map((x) => -x);
+  return vec;
 }
 
 /**
- * Cyclic Jacobi eigendecomposition for symmetric matrices. Returns
- * eigenvalues + eigenvectors with eigenvalues in descending order.
+ * Symmetric eigendecomposition via the shared ml-matrix helper. Returns
+ * eigenvalues in DESCENDING order with `eigenvectors[i]` the i-th
+ * eigenvector (sign-canonicalized). ml-matrix yields ascending order with
+ * eigenvectors as matrix columns, so we reverse + transpose here.
  */
 function jacobiEigen(
   src: ReadonlyArray<ReadonlyArray<number>>,
-  maxSweeps: number,
-  tol: number,
 ): { eigenvalues: number[]; eigenvectors: number[][] } {
   const n = src.length;
-  const a = copyMatrix(src);
-  const v = identity(n);
+  const evd = eigenDecomposition(src.map((row) => [...row]));
+  if (!evd) return { eigenvalues: [], eigenvectors: [] };
 
-  for (let sweep = 0; sweep < maxSweeps; sweep++) {
-    // Off-diagonal Frobenius norm
-    let off = 0;
-    for (let p = 0; p < n - 1; p++) {
-      for (let q = p + 1; q < n; q++) {
-        off += a[p]![q]! * a[p]![q]!;
-      }
-    }
-    if (off < tol) break;
-
-    for (let p = 0; p < n - 1; p++) {
-      for (let q = p + 1; q < n; q++) {
-        const apq = a[p]![q]!;
-        if (Math.abs(apq) < tol) continue;
-        const app = a[p]![p]!;
-        const aqq = a[q]![q]!;
-        const theta = (aqq - app) / (2 * apq);
-        const t = theta >= 0
-          ? 1 / (theta + Math.sqrt(1 + theta * theta))
-          : 1 / (theta - Math.sqrt(1 + theta * theta));
-        const c = 1 / Math.sqrt(1 + t * t);
-        const s = t * c;
-
-        a[p]![p] = app - t * apq;
-        a[q]![q] = aqq + t * apq;
-        a[p]![q] = 0;
-        a[q]![p] = 0;
-
-        for (let i = 0; i < n; i++) {
-          if (i !== p && i !== q) {
-            const aip = a[i]![p]!;
-            const aiq = a[i]![q]!;
-            a[i]![p] = c * aip - s * aiq;
-            a[i]![q] = s * aip + c * aiq;
-            a[p]![i] = a[i]![p]!;
-            a[q]![i] = a[i]![q]!;
-          }
-          const vip = v[i]![p]!;
-          const viq = v[i]![q]!;
-          v[i]![p] = c * vip - s * viq;
-          v[i]![q] = s * vip + c * viq;
-        }
-      }
-    }
-  }
-
-  const eigenvalues = new Array<number>(n);
-  for (let i = 0; i < n; i++) eigenvalues[i] = a[i]![i]!;
-
-  // Sort descending by eigenvalue, permute eigenvectors (columns of v).
   const order = Array.from({ length: n }, (_, i) => i).sort(
-    (i, j) => eigenvalues[j]! - eigenvalues[i]!,
+    (i, j) => evd.eigenvalues[j]! - evd.eigenvalues[i]!,
   );
-  const sortedEigenvalues = order.map((i) => eigenvalues[i]!);
+  const sortedEigenvalues = order.map((i) => evd.eigenvalues[i]!);
   const sortedEigenvectors: number[][] = order.map((col) => {
     const vec = new Array<number>(n);
-    for (let row = 0; row < n; row++) vec[row] = v[row]![col]!;
-    return vec;
+    for (let row = 0; row < n; row++) vec[row] = evd.eigenvectors[row]![col]!;
+    return canonicalizeSign(vec);
   });
   return { eigenvalues: sortedEigenvalues, eigenvectors: sortedEigenvectors };
 }
@@ -180,7 +131,7 @@ export function computeEigenPortfolio(input: EigenPortfolioInput): EigenPortfoli
     throw new Error(`covariance must be ${n}×${n} to match weights of length ${n}`);
   }
   // Light symmetry check — explicit symmetrisation prevents tiny rounding
-  // asymmetries from upsetting Jacobi convergence.
+  // asymmetries from upsetting the eigensolver.
   const sym: number[][] = [];
   for (let i = 0; i < n; i++) {
     const row = new Array<number>(n);
@@ -188,9 +139,7 @@ export function computeEigenPortfolio(input: EigenPortfolioInput): EigenPortfoli
     sym.push(row);
   }
 
-  const maxSweeps = input.maxSweeps ?? DEFAULT_MAX_SWEEPS;
-  const tol = input.tolerance ?? DEFAULT_TOL;
-  const { eigenvalues, eigenvectors } = jacobiEigen(sym, maxSweeps, tol);
+  const { eigenvalues, eigenvectors } = jacobiEigen(sym);
 
   const projections = eigenvectors.map((vec) => {
     let p = 0;

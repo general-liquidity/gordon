@@ -54,6 +54,8 @@
  * Pure compute. No I/O. Deterministic.
  */
 
+import { eigenDecomposition } from "../../../core/alpha/matrix.ts";
+
 export const NEAREST_CORRELATION_MATRIX_FLAG_ENV = "GORDON_NEAREST_CORRELATION_MATRIX";
 
 export function isNearestCorrelationMatrixEnabled(
@@ -74,8 +76,6 @@ export interface NearestCorrelationInput {
   tolerance?: number;
   /** Maximum iterations. Default 200. */
   maxIterations?: number;
-  /** Tolerance for the inner Jacobi eigensolver. Default 1e-10. */
-  jacobiTolerance?: number;
 }
 
 export interface NearestCorrelationResult {
@@ -102,12 +102,6 @@ function cloneMatrix(M: Matrix): Matrix {
 
 function zeros(n: number): Matrix {
   return Array.from({ length: n }, () => new Array<number>(n).fill(0));
-}
-
-function identity(n: number): Matrix {
-  const m = zeros(n);
-  for (let i = 0; i < n; i++) m[i]![i] = 1;
-  return m;
 }
 
 function frobeniusNorm(M: Matrix): number {
@@ -150,91 +144,33 @@ function symmetrize(M: Matrix): Matrix {
   return S;
 }
 
-// ------------------------- Jacobi eigendecomposition --------------------
+// ------------------------- eigendecomposition ---------------------------
 
 /**
- * Cyclic Jacobi method for symmetric eigendecomposition.
- *   A = V · diag(λ) · V^T
+ * Symmetric eigendecomposition (ml-matrix): A = V · diag(λ) · V^T.
  * Returns eigenvalues + eigenvector matrix V (columns are eigenvectors).
+ *
+ * Both consumers below — the V·diag(λ)·V^T PSD reconstruction and the
+ * min-eigenvalue validity check — are invariant to eigenpair ORDER and
+ * eigenvector SIGN (the reconstruction sums V[i][k]·λ_k·V[j][k], where a
+ * column sign flip cancels and reordering is just summation reordering),
+ * so no sort/sign-canonicalization is needed here.
  */
 function jacobiEigendecomposition(
   A: Matrix,
-  tolerance: number,
-  maxSweeps = 100,
 ): { eigenvalues: number[]; eigenvectors: Matrix } {
-  const n = A.length;
-  const D = cloneMatrix(A);
-  const V = identity(n);
-
-  for (let sweep = 0; sweep < maxSweeps; sweep++) {
-    // Off-diagonal sum of squares
-    let off = 0;
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        off += D[i]![j]! * D[i]![j]!;
-      }
-    }
-    if (Math.sqrt(off) < tolerance) break;
-
-    for (let p = 0; p < n - 1; p++) {
-      for (let q = p + 1; q < n; q++) {
-        const apq = D[p]![q]!;
-        if (Math.abs(apq) < tolerance * 1e-3) continue;
-
-        const app = D[p]![p]!;
-        const aqq = D[q]![q]!;
-        const theta = (aqq - app) / (2 * apq);
-        let t: number;
-        if (Math.abs(theta) > 1e15) {
-          t = 0.5 / theta;
-        } else {
-          const sign = theta >= 0 ? 1 : -1;
-          t = sign / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
-        }
-        const c = 1 / Math.sqrt(1 + t * t);
-        const s = c * t;
-
-        // Update D[p][p], D[q][q], D[p][q]
-        D[p]![p] = app - t * apq;
-        D[q]![q] = aqq + t * apq;
-        D[p]![q] = 0;
-        D[q]![p] = 0;
-
-        // Update other rows/cols
-        for (let r = 0; r < n; r++) {
-          if (r !== p && r !== q) {
-            const drp = D[r]![p]!;
-            const drq = D[r]![q]!;
-            D[r]![p] = c * drp - s * drq;
-            D[p]![r] = D[r]![p]!;
-            D[r]![q] = s * drp + c * drq;
-            D[q]![r] = D[r]![q]!;
-          }
-        }
-
-        // Accumulate eigenvectors
-        for (let r = 0; r < n; r++) {
-          const vrp = V[r]![p]!;
-          const vrq = V[r]![q]!;
-          V[r]![p] = c * vrp - s * vrq;
-          V[r]![q] = s * vrp + c * vrq;
-        }
-      }
-    }
-  }
-
-  const eigenvalues = new Array<number>(n);
-  for (let i = 0; i < n; i++) eigenvalues[i] = D[i]![i]!;
-  return { eigenvalues, eigenvectors: V };
+  const evd = eigenDecomposition(A);
+  if (!evd) return { eigenvalues: [], eigenvectors: [] };
+  return { eigenvalues: evd.eigenvalues, eigenvectors: evd.eigenvectors };
 }
 
 /**
  * Project a symmetric matrix onto the PSD cone by truncating negative
  * eigenvalues. Reconstruct: V · diag(max(λ, 0)) · V^T.
  */
-function projectPSD(M: Matrix, jacobiTol: number): Matrix {
+function projectPSD(M: Matrix): Matrix {
   const n = M.length;
-  const { eigenvalues, eigenvectors: V } = jacobiEigendecomposition(M, jacobiTol);
+  const { eigenvalues, eigenvectors: V } = jacobiEigendecomposition(M);
   const truncated = eigenvalues.map((l) => Math.max(l, 0));
 
   // V · D · V^T
@@ -261,7 +197,7 @@ function projectUnitDiagonal(M: Matrix): Matrix {
 }
 
 /** Check unit diagonal + bounded |off-diagonal| ≤ 1 + ε + minimum eigenvalue ≥ −ε. */
-function isValidCorrelationMatrix(M: Matrix, tol: number, jacobiTol: number): boolean {
+function isValidCorrelationMatrix(M: Matrix, tol: number): boolean {
   const n = M.length;
   for (let i = 0; i < n; i++) {
     if (Math.abs(M[i]![i]! - 1) > tol) return false;
@@ -269,7 +205,7 @@ function isValidCorrelationMatrix(M: Matrix, tol: number, jacobiTol: number): bo
       if (Math.abs(M[i]![j]!) > 1 + tol) return false;
     }
   }
-  const { eigenvalues } = jacobiEigendecomposition(M, jacobiTol);
+  const { eigenvalues } = jacobiEigendecomposition(M);
   for (const l of eigenvalues) if (l < -tol) return false;
   return true;
 }
@@ -281,7 +217,6 @@ export function computeNearestCorrelationMatrix(
 ): NearestCorrelationResult {
   const tol = input.tolerance ?? 1e-7;
   const maxIter = input.maxIterations ?? 200;
-  const jacobiTol = input.jacobiTolerance ?? 1e-10;
 
   if (tol <= 0) throw new Error("tolerance must be positive");
   if (maxIter <= 0) throw new Error("maxIterations must be positive");
@@ -299,7 +234,7 @@ export function computeNearestCorrelationMatrix(
   }
 
   // Fast path: already a valid correlation matrix
-  if (isValidCorrelationMatrix(input.matrix, 1e-9, jacobiTol)) {
+  if (isValidCorrelationMatrix(input.matrix, 1e-9)) {
     return {
       matrix: cloneMatrix(input.matrix),
       iterations: 0,
@@ -325,7 +260,7 @@ export function computeNearestCorrelationMatrix(
       }
     }
 
-    const X = projectPSD(R, jacobiTol);
+    const X = projectPSD(R);
 
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n; j++) {

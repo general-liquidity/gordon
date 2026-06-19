@@ -48,9 +48,11 @@
  * sensitive to ε across reasonable values, while OPTICS auto-tunes ε per
  * cluster — supporting the upgrade-path comment above.
  *
- * Pure compute. No I/O. Cyclic Jacobi for eigendecomposition (same approach
- * as `eigenPortfolio.ts`, kept inline to avoid cross-file coupling).
+ * Pure compute. No I/O. Eigendecomposition is delegated to the shared
+ * ml-matrix-backed helper.
  */
+
+import { eigenDecomposition } from "../../../core/alpha/matrix.ts";
 
 export const PCA_PAIR_CLUSTERING_FLAG_ENV = "GORDON_PCA_PAIR_CLUSTERING";
 
@@ -77,8 +79,6 @@ export interface PcaPairClusteringInput {
   epsilon: number;
   /** DBSCAN minPts (minimum cluster size). Default 3. */
   minPoints?: number;
-  /** Max Jacobi sweeps for eigendecomposition. Default 50. */
-  maxSweeps?: number;
 }
 
 export interface PcaPairClusteringResult {
@@ -103,8 +103,6 @@ export interface PcaPairClusteringResult {
 }
 
 const DEFAULT_MIN_POINTS = 3;
-const DEFAULT_MAX_SWEEPS = 50;
-const TOL = 1e-12;
 const MAX_DIMENSIONS = 15; // Berkhin's curse-of-dimensionality bound
 
 function zScoreNormaliseRows(matrix: ReadonlyArray<ReadonlyArray<number>>): number[][] {
@@ -157,67 +155,45 @@ function correlationMatrix(normalised: number[][]): number[][] {
   return C;
 }
 
-function jacobiEigen(
-  src: ReadonlyArray<ReadonlyArray<number>>,
-  maxSweeps: number,
-): { eigenvalues: number[]; eigenvectors: number[][] } {
-  const n = src.length;
-  const a: number[][] = src.map((row) => [...row]);
-  const v: number[][] = Array.from({ length: n }, (_, i) => {
-    const row = new Array<number>(n).fill(0);
-    row[i] = 1;
-    return row;
-  });
-  for (let sweep = 0; sweep < maxSweeps; sweep++) {
-    let off = 0;
-    for (let p = 0; p < n - 1; p++) {
-      for (let q = p + 1; q < n; q++) off += a[p]![q]! * a[p]![q]!;
-    }
-    if (off < TOL) break;
-    for (let p = 0; p < n - 1; p++) {
-      for (let q = p + 1; q < n; q++) {
-        const apq = a[p]![q]!;
-        if (Math.abs(apq) < TOL) continue;
-        const app = a[p]![p]!;
-        const aqq = a[q]![q]!;
-        const theta = (aqq - app) / (2 * apq);
-        const t =
-          theta >= 0
-            ? 1 / (theta + Math.sqrt(1 + theta * theta))
-            : 1 / (theta - Math.sqrt(1 + theta * theta));
-        const c = 1 / Math.sqrt(1 + t * t);
-        const s = t * c;
-        a[p]![p] = app - t * apq;
-        a[q]![q] = aqq + t * apq;
-        a[p]![q] = 0;
-        a[q]![p] = 0;
-        for (let i = 0; i < n; i++) {
-          if (i !== p && i !== q) {
-            const aip = a[i]![p]!;
-            const aiq = a[i]![q]!;
-            a[i]![p] = c * aip - s * aiq;
-            a[i]![q] = s * aip + c * aiq;
-            a[p]![i] = a[i]![p]!;
-            a[q]![i] = a[i]![q]!;
-          }
-          const vip = v[i]![p]!;
-          const viq = v[i]![q]!;
-          v[i]![p] = c * vip - s * viq;
-          v[i]![q] = s * vip + c * viq;
-        }
-      }
+/**
+ * Force the largest-magnitude component of an eigenvector positive, so the
+ * sign is deterministic regardless of the solver's arbitrary sign choice.
+ * Embedding distances (and hence DBSCAN clusters) are sign-invariant; this
+ * only stabilizes the exposed embedding/eigenvector values.
+ */
+function canonicalizeSign(vec: number[]): number[] {
+  let maxIdx = 0;
+  let maxAbs = -1;
+  for (let i = 0; i < vec.length; i++) {
+    const a = Math.abs(vec[i]!);
+    if (a > maxAbs) {
+      maxAbs = a;
+      maxIdx = i;
     }
   }
-  const eigenvalues = new Array<number>(n);
-  for (let i = 0; i < n; i++) eigenvalues[i] = a[i]![i]!;
+  return vec[maxIdx]! < 0 ? vec.map((x) => -x) : vec;
+}
+
+/**
+ * Symmetric eigendecomposition via the shared ml-matrix helper. Returns
+ * eigenvalues in DESCENDING order with `eigenvectors[i]` the i-th
+ * eigenvector (sign-canonicalized). ml-matrix yields ascending order with
+ * eigenvectors as matrix columns, so we reverse + transpose here.
+ */
+function jacobiEigen(
+  src: ReadonlyArray<ReadonlyArray<number>>,
+): { eigenvalues: number[]; eigenvectors: number[][] } {
+  const n = src.length;
+  const evd = eigenDecomposition(src.map((row) => [...row]));
+  if (!evd) return { eigenvalues: [], eigenvectors: [] };
   const order = Array.from({ length: n }, (_, i) => i).sort(
-    (i, j) => eigenvalues[j]! - eigenvalues[i]!,
+    (i, j) => evd.eigenvalues[j]! - evd.eigenvalues[i]!,
   );
-  const sortedEigenvalues = order.map((i) => eigenvalues[i]!);
+  const sortedEigenvalues = order.map((i) => evd.eigenvalues[i]!);
   const sortedEigenvectors: number[][] = order.map((col) => {
     const vec = new Array<number>(n);
-    for (let row = 0; row < n; row++) vec[row] = v[row]![col]!;
-    return vec;
+    for (let row = 0; row < n; row++) vec[row] = evd.eigenvectors[row]![col]!;
+    return canonicalizeSign(vec);
   });
   return { eigenvalues: sortedEigenvalues, eigenvectors: sortedEigenvectors };
 }
@@ -299,12 +275,11 @@ export function computePcaPairClustering(
     );
   }
   const minPts = input.minPoints ?? DEFAULT_MIN_POINTS;
-  const maxSweeps = input.maxSweeps ?? DEFAULT_MAX_SWEEPS;
 
   // Normalize, correlate, eigendecompose
   const normalised = zScoreNormaliseRows(returns);
   const corr = correlationMatrix(normalised);
-  const { eigenvalues, eigenvectors } = jacobiEigen(corr, maxSweeps);
+  const { eigenvalues, eigenvectors } = jacobiEigen(corr);
 
   // Project: each asset's k-dim embedding is its row of the normalised
   // matrix times the top-k eigenvectors. Equivalently, since the correlation

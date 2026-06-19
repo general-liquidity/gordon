@@ -25,6 +25,7 @@
  * returns matrix.
  */
 
+import { agnes } from "ml-hclust";
 import { computeCovarianceMatrix } from "./matrix.ts";
 
 // ---------------------------------------------------------------------------
@@ -111,83 +112,46 @@ export function correlationDistance(corr: number[][]): number[][] {
 
 /**
  * Single-linkage agglomerative clustering on a symmetric distance matrix.
- * At each step merges the two closest *active* clusters; the merged cluster's
- * distance to any other is the MINIMUM over its members (single linkage).
- * Returns n-1 linkage nodes with cluster ids: leaves 0..n-1, internal n..2n-2.
+ * Delegates to `ml-hclust`'s tested `agnes` (method `"single"`) and projects
+ * its dendrogram into HRP's `LinkageNode[]` contract: leaves 0..n-1, internal
+ * n..2n-2 numbered in merge order (post-order = ascending merge height, since
+ * agnes builds bottom-up). The merged cluster's distance to any other is the
+ * minimum over its members (single linkage), so `node.distance` is the merge
+ * height. `left`/`right` follow the agnes child order, which is what
+ * `quasiDiagonalize` walks to recover the seriation.
  */
 export function singleLinkage(distance: number[][]): LinkageNode[] {
   const n = distance.length;
   if (n < 2) return [];
 
-  // Active clusters: id → list of original leaf indices.
-  const members = new Map<number, number[]>();
-  for (let i = 0; i < n; i++) members.set(i, [i]);
+  const root = agnes(distance, { method: "single", isDistanceMatrix: true });
 
-  // Pairwise cluster distances, keyed by active cluster id.
-  const d = new Map<number, Map<number, number>>();
-  for (let i = 0; i < n; i++) {
-    const row = new Map<number, number>();
-    for (let j = 0; j < n; j++) if (j !== i) row.set(j, distance[i]![j]!);
-    d.set(i, row);
-  }
-
+  // Post-order assignment of ids: leaves keep their original index, internal
+  // nodes get n, n+1, … in the order their subtrees complete (children before
+  // parent). Collect linkage nodes in that same order.
   const linkage: LinkageNode[] = [];
   let nextId = n;
 
-  for (let step = 0; step < n - 1; step++) {
-    // Find the closest pair of active clusters.
-    let bestA = -1;
-    let bestB = -1;
-    let bestDist = Infinity;
-    const ids = [...members.keys()];
-    for (let a = 0; a < ids.length; a++) {
-      for (let b = a + 1; b < ids.length; b++) {
-        const ida = ids[a]!;
-        const idb = ids[b]!;
-        const dd = d.get(ida)!.get(idb)!;
-        if (dd < bestDist) {
-          bestDist = dd;
-          bestA = ida;
-          bestB = idb;
-        }
-      }
-    }
-
-    const sizeA = members.get(bestA)!.length;
-    const sizeB = members.get(bestB)!.length;
-    const mergedMembers = [...members.get(bestA)!, ...members.get(bestB)!];
-    linkage.push({
-      left: bestA,
-      right: bestB,
-      distance: bestDist,
-      size: sizeA + sizeB,
-    });
-
-    // Build the new cluster.
-    const newRow = new Map<number, number>();
-    for (const idOther of members.keys()) {
-      if (idOther === bestA || idOther === bestB) continue;
-      const da = d.get(bestA)!.get(idOther)!;
-      const db = d.get(bestB)!.get(idOther)!;
-      const merged = Math.min(da, db); // single linkage
-      newRow.set(idOther, merged);
-      d.get(idOther)!.set(nextId, merged);
-      d.get(idOther)!.delete(bestA);
-      d.get(idOther)!.delete(bestB);
-    }
-    d.set(nextId, newRow);
-    members.set(nextId, mergedMembers);
-
-    // Retire the merged clusters.
-    members.delete(bestA);
-    members.delete(bestB);
-    d.delete(bestA);
-    d.delete(bestB);
-
-    nextId++;
-  }
+  const assignId = (cluster: AgnesCluster): number => {
+    if (cluster.isLeaf) return cluster.index;
+    const left = assignId(cluster.children[0]!);
+    const right = assignId(cluster.children[1]!);
+    const id = nextId++;
+    linkage.push({ left, right, distance: cluster.height, size: cluster.size });
+    return id;
+  };
+  assignId(root as AgnesCluster);
 
   return linkage;
+}
+
+/** Minimal structural view of `ml-hclust`'s `Cluster` used by the converter. */
+interface AgnesCluster {
+  children: AgnesCluster[];
+  height: number;
+  size: number;
+  index: number;
+  isLeaf: boolean;
 }
 
 // ---------------------------------------------------------------------------

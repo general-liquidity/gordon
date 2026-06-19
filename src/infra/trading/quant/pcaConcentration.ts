@@ -22,6 +22,8 @@
  * regime context), and the strategy-acceptance gate.
  */
 
+import { eigenDecomposition } from "../../../core/alpha/matrix.ts";
+
 export const PCA_CONCENTRATION_FLAG_ENV = "GORDON_PCA_CONCENTRATION";
 
 export function isPcaConcentrationEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -113,79 +115,40 @@ interface Eigen {
   vectors: number[][];
 }
 
-/** Jacobi eigendecomposition for small symmetric matrices. Returns eigenvalues + eigenvectors sorted descending. */
-function jacobiEigen(matrix: number[][], maxIter = 200, tol = 1e-10): Eigen {
+/**
+ * Symmetric eigendecomposition via the shared ml-matrix helper. Returns
+ * eigenvalues + eigenvectors sorted by eigenvalue DESCENDING, with vectors
+ * as matrix columns (`vectors[row][col]`). ml-matrix yields ascending order
+ * with arbitrary eigenvector signs, so each column is sign-canonicalized
+ * (largest-|component| forced positive) for deterministic loadings.
+ */
+function jacobiEigen(matrix: number[][]): Eigen {
   const n = matrix.length;
-  const a = matrix.map((row) => [...row]);
-  const v: number[][] = Array.from({ length: n }, (_, i) =>
-    Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)),
-  );
+  const evd = eigenDecomposition(matrix.map((row) => [...row]));
+  if (!evd) return { values: [], vectors: [] };
 
-  for (let iter = 0; iter < maxIter; iter++) {
-    let maxOff = 0;
-    let p = 0;
-    let q = 1;
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        const abs = Math.abs(a[i]![j]!);
-        if (abs > maxOff) {
-          maxOff = abs;
-          p = i;
-          q = j;
-        }
-      }
-    }
-    if (maxOff < tol) break;
-
-    const apq = a[p]![q]!;
-    const app = a[p]![p]!;
-    const aqq = a[q]![q]!;
-    const theta = (aqq - app) / (2 * apq);
-    let t: number;
-    if (Math.abs(theta) > 1e10) {
-      t = 1 / (2 * theta);
-    } else {
-      const sign = theta >= 0 ? 1 : -1;
-      t = sign / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
-    }
-    const c = 1 / Math.sqrt(t * t + 1);
-    const s = t * c;
-
-    a[p]![p] = app - t * apq;
-    a[q]![q] = aqq + t * apq;
-    a[p]![q] = 0;
-    a[q]![p] = 0;
-    for (let i = 0; i < n; i++) {
-      if (i === p || i === q) continue;
-      const aip = a[i]![p]!;
-      const aiq = a[i]![q]!;
-      a[i]![p] = c * aip - s * aiq;
-      a[i]![q] = s * aip + c * aiq;
-      a[p]![i] = a[i]![p]!;
-      a[q]![i] = a[i]![q]!;
-    }
-    for (let i = 0; i < n; i++) {
-      const vip = v[i]![p]!;
-      const viq = v[i]![q]!;
-      v[i]![p] = c * vip - s * viq;
-      v[i]![q] = s * vip + c * viq;
-    }
-  }
-
-  const eigenvalues = new Array<number>(n);
-  for (let i = 0; i < n; i++) eigenvalues[i] = a[i]![i]!;
-
-  const idx = eigenvalues
+  const idx = evd.eigenvalues
     .map((val, i) => ({ val, i }))
     .sort((x, y) => y.val - x.val)
     .map((p) => p.i);
 
-  const sortedValues = idx.map((i) => eigenvalues[i]!);
+  const sortedValues = idx.map((i) => evd.eigenvalues[i]!);
   const sortedVectors: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
   for (let col = 0; col < n; col++) {
     const src = idx[col]!;
+    // Sign-canonicalize this eigenvector column: largest-|component| positive.
+    let maxRow = 0;
+    let maxAbs = -1;
     for (let row = 0; row < n; row++) {
-      sortedVectors[row]![col] = v[row]![src]!;
+      const a = Math.abs(evd.eigenvectors[row]![src]!);
+      if (a > maxAbs) {
+        maxAbs = a;
+        maxRow = row;
+      }
+    }
+    const flip = evd.eigenvectors[maxRow]![src]! < 0 ? -1 : 1;
+    for (let row = 0; row < n; row++) {
+      sortedVectors[row]![col] = flip * evd.eigenvectors[row]![src]!;
     }
   }
   return { values: sortedValues, vectors: sortedVectors };
