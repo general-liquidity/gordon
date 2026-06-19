@@ -41,7 +41,27 @@ export interface RvReversionConfig {
   maxPairs: number;
   /** Min aligned observations before a pair is tradeable. */
   minObs: number;
+  /**
+   * Max quoted bid-ask spread (bps) for EITHER leg before a pair may be OPENED as taker. A pair
+   * whose live leg spread exceeds this is net-negative to enter, so the entry gate skips it.
+   * Applies to ENTRIES only — a pair already held can always HOLD/EXIT regardless of spread, and
+   * the gate is inert unless the caller passes live `spreadBps` (maker mode earns the spread, so
+   * it omits them and the gate stays off). Omit → no gate. Default = RV_NET_NEGATIVE_SPREAD_BPS.
+   */
+  maxEntrySpreadBps?: number;
 }
+
+/**
+ * Quoted-spread bands (bps) for the RV book, from the best-sharpe-sweep break-even (~1bp/side
+ * cost ≈ a ~2bps quoted spread). SHARED by the entry gate here AND the
+ * `competition-spread-check` diagnostic so the live gate and the readiness verdict use the SAME
+ * cutoffs:
+ *   - `< RV_GOOD_SPREAD_BPS`        → half-spread <1bp → net-positive plausible
+ *   - `GOOD .. NET_NEGATIVE`        → ≈break-even — STILL traded (adds breadth toward the §17 floor)
+ *   - `>= RV_NET_NEGATIVE_SPREAD_BPS` → clearly net-negative as taker → the entry gate skips it
+ */
+export const RV_GOOD_SPREAD_BPS = 2;
+export const RV_NET_NEGATIVE_SPREAD_BPS = 4;
 
 // Defaults re-validated on the FULL 18-month extended crypto history (not just the 1-month comp
 // window, which was regime-specific) via `scripts/competition/analysis/best-sharpe-sweep.ts`, scored on the
@@ -57,6 +77,7 @@ export const RV_REVERSION_CONFIG: RvReversionConfig = {
   perPairFraction: 0.03, // 3% per leg → many tiny dollar-neutral positions
   maxPairs: 11,
   minObs: 60,
+  maxEntrySpreadBps: RV_NET_NEGATIVE_SPREAD_BPS, // don't OPEN a pair whose leg is net-negative as taker
 };
 
 const mean = (xs: number[]) => xs.reduce((s, v) => s + v, 0) / (xs.length || 1);
@@ -113,8 +134,16 @@ export function rvPairTargets(
   equity: number,
   config: RvReversionConfig = RV_REVERSION_CONFIG,
   state?: RvHysteresisState,
+  spreadBps?: Record<string, number>,
 ): PairTarget[] {
   const denom = config.entryZ - config.exitZ;
+  // Entry gate: a leg is "too wide to open" when its live quoted spread exceeds the threshold.
+  // Inert unless BOTH a threshold and live spreads are supplied (maker mode omits spreads → off).
+  // A missing per-symbol spread defers to the upstream data-availability guard (treated as not-wide).
+  const legTooWide = (sym: string): boolean =>
+    config.maxEntrySpreadBps != null &&
+    spreadBps != null &&
+    (spreadBps[sym] ?? 0) > config.maxEntrySpreadBps;
   const candidates: Candidate[] = [];
   const evaluated: string[] = []; // keys seen this cycle (for post-cap state cleanup)
 
@@ -134,20 +163,25 @@ export function rvPairTargets(
         const key = pairKey(symbolA, symbolB);
         evaluated.push(key);
 
+        // A pair may only OPEN when neither leg is too wide; a HELD pair is never gated (it can
+        // always hold/exit even if a leg's spread blows out — we want OUT, not stuck).
+        const entryBlocked = legTooWide(symbolA) || legTooWide(symbolB);
+
         let alloc: number;
         if (state) {
           // Discrete hysteresis: enter at entryZ, hold until |z|≤exitZ.
           const cur = state.get(key) ?? 0;
           let pos = cur;
           if (cur === 0) {
-            if (Math.abs(z) >= config.entryZ) pos = -Math.sign(z); // fade: z>0 (rich) → short spread
+            if (Math.abs(z) >= config.entryZ && !entryBlocked) pos = -Math.sign(z); // fade: z>0 (rich) → short spread
           } else if (Math.abs(z) <= config.exitZ) {
             pos = 0; // reverted → exit
           }
           alloc = pos;
         } else {
           const mag = denom > 0 ? Math.min(Math.max((Math.abs(z) - config.exitZ) / denom, 0), 1) : Math.abs(z) >= config.entryZ ? 1 : 0;
-          alloc = -Math.sign(z) * mag;
+          // Continuous mode has no held-state, so gating to 0 = never carry a net-negative pair.
+          alloc = entryBlocked ? 0 : -Math.sign(z) * mag;
         }
         if (alloc === 0) continue; // flat (inside the exit band / not yet entered)
         candidates.push({ symbolA, symbolB, key, z, alloc });

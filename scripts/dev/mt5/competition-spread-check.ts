@@ -19,11 +19,14 @@
 
 import { Mt5BridgeClient } from "../../../src/infra/broker/mt5/bridgeClient.ts";
 import { COMPETITION_TRADEABLE } from "../../../src/infra/trading/competition/competitionStrategy.ts";
+import { RV_GOOD_SPREAD_BPS, RV_NET_NEGATIVE_SPREAD_BPS } from "../../../src/infra/trading/competition/rvReversionCore.ts";
 
 // Empirical break-even from best-sharpe-sweep.ts: gross per-bar edge ~+0.007 is consumed by
 // ~1bp/side cost ≈ a quoted spread of ~2bps. Quoted-spread bands → net-Sharpe expectation.
-const GOOD_BPS = 2; // < this → half-spread <1bp → potentially net-positive
-const MARGINAL_BPS = 4; // 2–4bps → ~break-even to slightly negative; > this → clearly negative
+// Sourced from the RV core so this diagnostic and the live entry gate use the SAME cutoffs:
+// `>= RV_NET_NEGATIVE_SPREAD_BPS` is exactly what the runner's RV gate refuses to open.
+const GOOD_BPS = RV_GOOD_SPREAD_BPS; // < this → half-spread <1bp → potentially net-positive
+const MARGINAL_BPS = RV_NET_NEGATIVE_SPREAD_BPS; // 2–4bps → ~break-even; >= this → clearly negative (gate skips)
 
 const client = new Mt5BridgeClient();
 

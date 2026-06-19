@@ -139,6 +139,12 @@ export interface BarbellInput {
    * persists this Map across cycles; it is mutated in place. Omit → legacy continuous fade.
    */
   rvState?: RvHysteresisState;
+  /**
+   * Live quoted bid-ask spread per symbol (bps), threaded to the RV core's entry gate so a pair
+   * with a net-negative leg isn't OPENED as taker. Supply ONLY in taker mode — in maker mode the
+   * spread is earned, so the caller omits this and the gate stays off. Omit → no spread gate.
+   */
+  rvSpreadBps?: Record<string, number>;
 }
 
 /**
@@ -170,7 +176,7 @@ export function barbellDecision(input: BarbellInput): BarbellDecision {
   const core =
     cfg.core === "strict"
       ? pairTargets(input.barsBySymbol, selectPairs(input.barsBySymbol, { config: cfg.pairsConfig }), ringFence.coreEquity, { config: cfg.pairsConfig })
-      : rvPairTargets(input.barsBySymbol, ringFence.coreEquity, cfg.rvConfig, input.rvState);
+      : rvPairTargets(input.barsBySymbol, ringFence.coreEquity, cfg.rvConfig, input.rvState, input.rvSpreadBps);
 
   // ── STANDING: bang-bang stance. ──
   const standing = assessStanding({ ourReturn: input.ourReturnPct, field, phase: input.phase });

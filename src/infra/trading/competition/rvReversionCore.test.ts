@@ -77,6 +77,52 @@ describe("rvPairTargets — discrete hysteresis (stateful)", () => {
   });
 });
 
+describe("rvPairTargets — taker entry spread gate", () => {
+  const GATED_CFG: RvReversionConfig = { ...CFG, maxEntrySpreadBps: 4 };
+  const gated = (lastSpread: number, spreadBps: Record<string, number> | undefined, state?: RvHysteresisState) => {
+    const { A, B } = barsForZ(lastSpread);
+    return rvPairTargets({ AAA: A, BBB: B }, 1_000_000, GATED_CFG, state, spreadBps);
+  };
+
+  test("BLOCKS opening a pair when a leg's spread ≥ maxEntrySpreadBps", () => {
+    const state: RvHysteresisState = new Map();
+    expect(gated(0.03, { AAA: 5, BBB: 1 }, state)).toHaveLength(0); // high-z but AAA 5 ≥ 4 → blocked
+    expect(state.get("AAA/BBB") ?? 0).toBe(0);
+  });
+
+  test("ALLOWS opening when both legs are tight (< threshold)", () => {
+    const state: RvHysteresisState = new Map();
+    expect(gated(0.03, { AAA: 1, BBB: 1.5 }, state)).toHaveLength(1);
+    expect(state.get("AAA/BBB")).not.toBe(0);
+  });
+
+  test("ONE wide leg blocks the whole pair (pair integrity — both legs pay the spread)", () => {
+    expect(gated(0.03, { AAA: 1, BBB: 9 }, new Map())).toHaveLength(0);
+  });
+
+  test("a HELD pair is NOT force-closed when a leg blows wide — it holds, then exits on reversion", () => {
+    const state: RvHysteresisState = new Map();
+    gated(0.03, { AAA: 1, BBB: 1 }, state); // enter while tight
+    expect(state.get("AAA/BBB")).toBe(-1);
+    // leg now wide, z still high → STILL held (gate blocks ENTRIES only, never forces an exit).
+    expect(gated(0.006, { AAA: 9, BBB: 1 }, state)).toHaveLength(1);
+    expect(state.get("AAA/BBB")).toBe(-1);
+    // z reverts → normal exit regardless of the wide spread.
+    expect(gated(0.0005, { AAA: 9, BBB: 1 }, state)).toHaveLength(0);
+    expect(state.get("AAA/BBB")).toBe(0);
+  });
+
+  test("gate is INERT in maker mode (no spreadBps supplied) — entry proceeds despite the threshold", () => {
+    const state: RvHysteresisState = new Map();
+    expect(gated(0.03, undefined, state)).toHaveLength(1);
+  });
+
+  test("continuous mode (no state) skips a wide pair entirely", () => {
+    expect(gated(0.006, { AAA: 5, BBB: 1 })).toHaveLength(0); // would be a partial fade, but gated
+    expect(gated(0.006, { AAA: 1, BBB: 1 })).toHaveLength(1); // tight → partial fade present
+  });
+});
+
 describe("rvPairTargets — continuous mode (no state) is unchanged", () => {
   test("a mid-z opens a PARTIAL fade position (the legacy behavior, no hysteresis)", () => {
     // Same mid-z that discrete leaves flat → continuous holds a partial fade. This is exactly

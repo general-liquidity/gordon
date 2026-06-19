@@ -344,6 +344,19 @@ export class BarbellLiveRunner {
       return q && q.bid > 0 && q.ask > 0 ? (q.bid + q.ask) / 2 : fallback;
     };
 
+    // Intended execution mode for THIS cycle (taker default). Evaluated once and reused below so
+    // the per-cycle `execution` callback isn't called twice. It drives the RV core's spread gate:
+    // in TAKER we pay the spread, so a net-negative pair must not OPEN; in MAKER we EARN it → gate off.
+    const armed = this.liveArmed();
+    const intendedExecution =
+      armed && this.client.orders && this.client.cancel ? (this.cfg.execution?.() ?? "taker") : "taker";
+    // Live quoted bid-ask spread per symbol (bps) — same formula as competition-spread-check.
+    const spreadBps: Record<string, number> = {};
+    for (const [sym, q] of Object.entries(quoteBySymbol)) {
+      const m = q.bid > 0 && q.ask > 0 ? (q.bid + q.ask) / 2 : 0;
+      if (m > 0) spreadBps[sym] = ((q.ask - q.bid) / m) * 10_000;
+    }
+
     // REAL standing: when a live peer-return board is wired, calibrate the field from it so the
     // sleeve DECISION (and the standing) use actual rank — not the placeholder model. Without real
     // data, `field` is undefined and we GATE the endgame sleeve off (finals-only) so the one-shot
@@ -395,6 +408,9 @@ export class BarbellLiveRunner {
         phase: this.cfg.phase(),
         config: this.cfg.barbellConfig ?? BARBELL_CONFIG,
         rvState: this.rvState, // discrete hysteresis — hold through the reversion, don't churn
+        // Spread gate (taker only): don't OPEN a pair whose live leg spread is net-negative.
+        // Omitted in maker mode (spread is earned) so the gate stays off there.
+        rvSpreadBps: intendedExecution === "taker" ? spreadBps : undefined,
       });
       targets = aggregateTargetNotionals(decision);
       decisionReason = decision.reason;
@@ -406,12 +422,12 @@ export class BarbellLiveRunner {
     const positions = await this.client.positions();
     const recon = reconcile(targets, positions, quoteBySymbol, this.cfg.contracts, this.cfg.symbols);
 
-    const armed = this.liveArmed();
     const orders: BarbellCycleReport["orders"] = [];
     let ordersPlaced = 0;
 
     // ── Execution mode + un-hedge guard (maker only; taker is the default, go-live posture). ──
-    const execution = armed && this.client.orders && this.client.cancel ? (this.cfg.execution?.() ?? "taker") : "taker";
+    // `intendedExecution` was resolved once at the top of the cycle (same callback, evaluated once).
+    const execution = intendedExecution;
     let makerActive = false;
     if (execution === "maker") {
       // Cancel our prior resting limits — re-post fresh toward the CURRENT targets each cycle.
