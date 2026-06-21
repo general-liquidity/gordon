@@ -48,3 +48,46 @@ jobs:
           else
             bunx @biomejs/biome ci .
           fi
+
+  slop:
+    name: AI-slop ratchet (slop-scan)
+    # Deterministic detector of AI-generated "slop" patterns (error-obscuring /
+    # empty catches, log-and-continue, pass-through wrappers, duplicated mocks).
+    # RATCHET gate on PRs: fails only if the PR ADDS or WORSENS slop vs the base
+    # — the existing 692-finding baseline never blocks. Existing findings are
+    # mostly intentional fail-safe patterns (e.g. risk-gate fails CLOSED), so the
+    # point is to not let NEW slop accrue, not to bulk-fix the baseline. If a
+    # large refactor trips a false "worsened", add `continue-on-error: true`.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun ci
+
+      - name: Materialize base ref
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          git worktree add ../gordon-base "origin/${{ github.base_ref }}"
+
+      - name: slop-scan delta (ratchet)
+        # Explicit --ignore on both sides so base + head are scoped identically
+        # regardless of whether the base ref predates slop-scan.config.json.
+        run: >
+          bunx slop-scan delta --base ../gordon-base --head .
+          --ignore 'claude-code-source-code/**'
+          --ignore 'agents/**'
+          --ignore 'margin-cli/**'
+          --ignore 'dist/**'
+          --ignore '.public-dist/**'
+          --ignore 'docs/generated/**'
+          --ignore '**/*.min.js'
+          --ignore '.site-index.js'
+          --fail-on added,worsened

@@ -1,0 +1,13 @@
+{
+  "ignores": [
+    "node_modules/**",
+    "dist/**",
+    ".public-dist/**",
+    "docs/generated/**",
+    "claude-code-source-code/**",
+    "agents/**",
+    "margin-cli/**",
+    "**/*.min.js",
+    ".site-index.js"
+  ]
+}

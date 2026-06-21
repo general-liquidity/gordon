@@ -66,6 +66,8 @@
     "format:check": "biome format .",
     "check": "biome check .",
     "check:fix": "biome check --write .",
+    "slop": "slop-scan scan .",
+    "slop:json": "slop-scan scan . --json",
     "postinstall": "node scripts/patches/patch-mastra.cjs && node scripts/patches/patch-ink.cjs"
   },
   "devDependencies": {
@@ -76,7 +78,8 @@
     "@types/node": "^25.1.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "react-devtools-core": "^6.1.5",
-    "shadcn": "^3.8.3"
+    "shadcn": "^3.8.3",
+    "slop-scan": "^0.3.0"
   },
   "peerDependencies": {
     "typescript": "^5"
