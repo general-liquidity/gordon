@@ -1,0 +1,50 @@
+name: Lint & Format
+
+# Biome format + lint. INFORMATIONAL for now (continue-on-error), and diff-aware
+# on PRs (only files the PR changed). The repo has NOT been reformatted yet —
+# doing that days before launch would bury the launch diff. To turn this into a
+# blocking gate POST-LAUNCH:
+#   1. run `bun run format` (one-time baseline reformat) in its own commit,
+#   2. fix/triage any `bun run lint` findings,
+#   3. drop the `continue-on-error: true` line below.
+# Config + thresholds live in biome.json (noExplicitAny / noNonNullAssertion are
+# off there to avoid drowning a large TS codebase in style noise).
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - v*
+
+jobs:
+  biome:
+    name: Biome (format + lint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so the diff-aware `--since` base ref is reachable.
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun ci
+
+      - name: Fetch PR base ref
+        if: github.event_name == 'pull_request'
+        run: git fetch origin "${{ github.base_ref }}" --depth=1
+
+      - name: Biome check (informational)
+        # continue-on-error keeps this non-blocking until the one-time format
+        # baseline lands post-launch (see header). Remove it to enforce.
+        continue-on-error: true
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            bunx @biomejs/biome ci --changed --since="origin/${{ github.base_ref }}" .
+          else
+            bunx @biomejs/biome ci .
+          fi

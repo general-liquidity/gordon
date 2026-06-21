@@ -60,10 +60,17 @@
     "prepublishOnly": "bun run build && node scripts/build/check-no-sourcemaps.cjs",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
     "postinstall": "node scripts/patches/patch-mastra.cjs && node scripts/patches/patch-ink.cjs"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
+    "@biomejs/biome": "^2.5.0",
     "@types/asciichart": "^1.5.8",
     "@types/bun": "latest",
     "@types/node": "^25.1.0",
