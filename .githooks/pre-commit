@@ -1,0 +1,19 @@
+#!/bin/sh
+# Block commits that introduce secrets. Scans only STAGED changes, so it's fast.
+# Enable once per clone:  git config core.hooksPath .githooks
+# Requires the gitleaks binary on PATH (scoop install gitleaks / brew install gitleaks).
+#
+# If gitleaks isn't installed the hook warns and lets the commit through rather
+# than blocking work — CI (.github/workflows/security-scan.yml) is the hard gate.
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks git --staged --config .gitleaks.toml --redact --no-banner --exit-code 1 || {
+    echo ""
+    echo "✋ gitleaks blocked this commit: a staged change looks like a secret."
+    echo "   If it's a false positive, allowlist the specific pattern in .gitleaks.toml."
+    exit 1
+  }
+else
+  echo "warning: gitleaks not found on PATH — skipping local secret scan." >&2
+  echo "         install with: scoop install gitleaks" >&2
+fi

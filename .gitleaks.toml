@@ -1,0 +1,31 @@
+# gitleaks config for gordon-cli — extends the built-in ruleset and allowlists
+# the handful of obviously-fake secrets that live in test fixtures and the
+# committed env template. Keep this list TIGHT: allowlist specific dummy
+# patterns, never whole directories — a real key committed in a test is still a
+# leak. When the CI gate fires on a genuine false positive, add the narrowest
+# possible rule here rather than weakening the gate.
+
+title = "gordon-cli gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known non-secrets: committed env template + obviously-fake test keys."
+
+# The env TEMPLATE carries placeholder values only; the real .env is gitignored.
+paths = [
+  '''\.env\.example$''',
+]
+
+regexes = [
+  # Anthropic-shaped dummy keys made of a single repeated char, e.g. the
+  # `sk-ant-api01-AAAA...` fixture in store.redaction.test.ts. (gitleaks' RE2
+  # engine has no backreferences, so repeated-char fixtures are matched by
+  # explicit filler runs rather than a generic \1 pattern.)
+  '''sk-ant-api01-A{16,}''',
+  '''A{20,}''',
+  '''(?i)x{20,}''',
+  # Common dummy/placeholder markers used in fixtures and docs.
+  '''(?i)(your[_-]?api[_-]?key|example|placeholder|dummy|test[_-]?secret|xxx+|changeme)''',
+]

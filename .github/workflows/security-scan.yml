@@ -1,0 +1,85 @@
+name: Security Scan
+
+# Pre-launch verification layer. Two legs:
+#   secret-scan — HARD gate. A committed exchange/broker/LLM key is catastrophic
+#                 for a money-handling agent, so any gitleaks finding fails the
+#                 build. False positives are silenced in .gitleaks.toml, never by
+#                 disabling the gate.
+#   sast        — INFORMATIONAL for now (like the `bun audit` job in ci.yml).
+#                 Establishes a clean Semgrep baseline first; flip to a hard gate
+#                 (drop the `|| true`) once the noise floor is triaged.
+#
+# gitleaks runs from its official image (ghcr.io/gitleaks/gitleaks) rather than
+# the GitHub Action because this repo is org-owned (general-liquidity), and the
+# Action requires a paid GITLEAKS_LICENSE for organizations. The binary/image is
+# license-free regardless of owner.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - v*
+
+jobs:
+  secret-scan:
+    name: Secret Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so a secret committed in ANY past commit is caught,
+          # not just the PR tip.
+          fetch-depth: 0
+
+      - name: gitleaks (hard gate)
+        # The committed .gitleaks-baseline.json accepts the 67 known-benign
+        # historic findings (env-var NAMES, test fixtures, the npm-pack
+        # detector's own samples, the publishable Supabase anon key). Any NEW
+        # secret in a future commit has a different fingerprint and fails here.
+        # Regenerate the baseline only after manually confirming a new finding
+        # is benign: gitleaks git . --config .gitleaks.toml --redact \
+        #   --report-path .gitleaks-baseline.json --report-format json
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/repo" \
+            ghcr.io/gitleaks/gitleaks:latest \
+            git /repo --config /repo/.gitleaks.toml \
+            --baseline-path /repo/.gitleaks-baseline.json \
+            --redact --verbose --exit-code 1
+
+  sast:
+    name: SAST (semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Semgrep
+        run: pip install --quiet semgrep
+
+      - name: Semgrep scan (informational baseline)
+        # No --error yet: surface findings in the log + SARIF artifact without
+        # blocking, until the baseline is triaged. Rulesets chosen for a
+        # TypeScript money CLI: injection, secrets, and the general audit packs.
+        run: >
+          semgrep scan
+          --config p/typescript
+          --config p/javascript
+          --config p/secrets
+          --config p/security-audit
+          --config p/command-injection
+          --sarif --output semgrep.sarif
+          --metrics off || true
+
+      - name: Upload SARIF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-sarif
+          path: semgrep.sarif
+          if-no-files-found: warn
