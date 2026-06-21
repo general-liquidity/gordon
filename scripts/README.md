@@ -218,18 +218,46 @@ Every release in `.github/workflows/release.yml` produces:
   + `id-token: write` permission in the workflow). Downstream
   installers can verify with `npm audit signatures`.
 
+### Two distinct integrity layers
+
+These cover different artifacts — do not conflate them:
+
+1. **npm wrapper tarball** — covered by Sigstore signatures + SLSA
+   provenance, verified with `npm audit signatures`. This proves the
+   small JS wrapper package on the npm registry is authentic. It does
+   **not** cover the native binary, which is downloaded separately from
+   a GitHub release at install time.
+2. **Native binary** — covered by committed SHA-256 checksums. Every
+   install path (`npm/scripts/postinstall.cjs`, `npm/lib/self-install.cjs`,
+   `scripts/install.sh`, `scripts/install.ps1`, and the Scoop manifest)
+   verifies the downloaded binary's SHA-256 against a committed manifest
+   (`npm/checksums.json` for the npm paths, `scripts/SHA256SUMS` for the
+   shell/PowerShell paths, the inline `hash` for Scoop) **before** it is
+   made executable or placed on PATH. On mismatch the temp file is
+   deleted and the install aborts non-zero. During the transition period,
+   a missing checksum entry prints a prominent warning and continues;
+   set `GORDON_REQUIRE_BINARY_CHECKSUM=1` to fail closed. An optional
+   best-effort minisign signature check runs when `npm/minisign.pub` and a
+   downloaded `.minisig` are present. Redirect-follow logic in the npm
+   paths is restricted to an HTTPS host allowlist (`github.com`,
+   `objects.githubusercontent.com`, plus any configured
+   `GORDON_BINARY_BASE_URL`/`GORDON_BINARY_URL` host).
+
 ### Downstream verification (for Gordon's users)
 
-After installing the npm wrapper, users can verify its authenticity:
+After installing the npm wrapper, users can verify the wrapper's
+authenticity:
 
 ```bash
 npm install -g @general-liquidity/gordon-cli
 npm audit signatures
 ```
 
-This checks Sigstore signatures + SLSA provenance attestations and
-returns non-zero if any installed package shows tampering. Pairs
-with the SBOM at the release page: cross-reference package hashes.
+This checks Sigstore signatures + SLSA provenance attestations on the
+**wrapper tarball** and returns non-zero if any installed package shows
+tampering. Pairs with the SBOM at the release page: cross-reference
+package hashes. The downloaded native binary is verified separately at
+install time via `checksums.json` / `SHA256SUMS` as described above.
 
 ### Bun-native primitives worth knowing
 

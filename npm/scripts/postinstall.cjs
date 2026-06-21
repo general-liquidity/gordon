@@ -8,7 +8,37 @@ const {
   getInstalledBinaryPath,
   getTarget
 } = require("../lib/platform.cjs");
+const { verifyBinaryIntegrity } = require("../lib/verify.cjs");
 const pkg = require("../package.json");
+
+function allowedRedirectHosts() {
+  const hosts = new Set(["github.com", "objects.githubusercontent.com"]);
+  for (const value of [process.env.GORDON_BINARY_BASE_URL, process.env.GORDON_BINARY_URL]) {
+    if (!value) continue;
+    try {
+      hosts.add(new URL(value).host);
+    } catch {
+      // ignore malformed override URLs
+    }
+  }
+  return hosts;
+}
+
+function assertAllowedRedirect(location) {
+  let parsed;
+  try {
+    parsed = new URL(location);
+  } catch {
+    throw new Error(`Refusing to follow malformed redirect: ${location}`);
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error(`Refusing to follow non-HTTPS redirect to ${parsed.protocol}//${parsed.host}`);
+  }
+  if (!allowedRedirectHosts().has(parsed.host)) {
+    throw new Error(`Refusing to follow redirect to untrusted host: ${parsed.host}`);
+  }
+  return location;
+}
 
 const packageRoot = path.resolve(__dirname, "..");
 const installDirectory = getInstallDirectory(packageRoot);
@@ -64,7 +94,8 @@ async function downloadBinary(url, destinationPath, redirectCount = 0) {
         ) {
           response.resume();
           try {
-            await downloadBinary(response.headers.location, destinationPath, redirectCount + 1);
+            const location = assertAllowedRedirect(response.headers.location);
+            await downloadBinary(location, destinationPath, redirectCount + 1);
             resolve();
           } catch (error) {
             reject(error);
@@ -110,6 +141,7 @@ async function main() {
   if (target.note) {
     log(target.note);
   }
+  const assetName = target.assetName;
 
   const targetPath = getInstalledBinaryPath(packageRoot);
   const tempPath = `${targetPath}.tmp`;
@@ -136,6 +168,13 @@ async function main() {
   } else {
     log(`Downloading ${source.value}`);
     await downloadBinary(source.value, tempPath);
+  }
+
+  try {
+    verifyBinaryIntegrity({ tempPath, version, assetName });
+  } catch (error) {
+    await fs.promises.rm(tempPath, { force: true }).catch(() => {});
+    throw error;
   }
 
   await finalizeBinary(tempPath, targetPath);

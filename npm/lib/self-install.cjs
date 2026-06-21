@@ -4,8 +4,38 @@ const path = require("path");
 const https = require("https");
 const { pipeline } = require("stream/promises");
 const { getDownloadUrl, getInstalledBinaryPath, getTarget } = require("./platform.cjs");
+const { verifyBinaryIntegrity } = require("./verify.cjs");
 const pkg = require("../package.json");
 const INSTALL_METADATA_FILENAME = "gordon-install.json";
+
+function allowedRedirectHosts() {
+  const hosts = new Set(["github.com", "objects.githubusercontent.com"]);
+  for (const value of [process.env.GORDON_BINARY_BASE_URL, process.env.GORDON_BINARY_URL]) {
+    if (!value) continue;
+    try {
+      hosts.add(new URL(value).host);
+    } catch {
+      // ignore malformed override URLs
+    }
+  }
+  return hosts;
+}
+
+function assertAllowedRedirect(location) {
+  let parsed;
+  try {
+    parsed = new URL(location);
+  } catch {
+    throw new Error(`Refusing to follow malformed redirect: ${location}`);
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error(`Refusing to follow non-HTTPS redirect to ${parsed.protocol}//${parsed.host}`);
+  }
+  if (!allowedRedirectHosts().has(parsed.host)) {
+    throw new Error(`Refusing to follow redirect to untrusted host: ${parsed.host}`);
+  }
+  return location;
+}
 
 function log(message) {
   console.log(`[gordon] ${message}`);
@@ -206,7 +236,8 @@ async function downloadBinary(url, destinationPath, redirectCount = 0) {
         ) {
           response.resume();
           try {
-            await downloadBinary(response.headers.location, destinationPath, redirectCount + 1);
+            const location = assertAllowedRedirect(response.headers.location);
+            await downloadBinary(location, destinationPath, redirectCount + 1);
             resolve();
           } catch (error) {
             reject(error);
@@ -298,6 +329,13 @@ async function installBinary({ targetDirectory, sourceBinaryPath, version }) {
     const downloadUrl = getDownloadUrl(version);
     log(`Downloading ${assetName} from ${downloadUrl}`);
     await downloadBinary(downloadUrl, tempPath);
+  }
+
+  try {
+    verifyBinaryIntegrity({ tempPath, version, assetName });
+  } catch (error) {
+    await fs.promises.rm(tempPath, { force: true }).catch(() => {});
+    throw error;
   }
 
   await finalizeBinary(tempPath, installPath);

@@ -26,8 +26,8 @@ Gordon (Bun/TS)  ──HTTP──►  mt5_bridge.py  ──IPC──►  MT5 ter
    | `MT5_SERVER` | broker server — for Model-to-Market this is `3.11.134.149:443` (NOT the default `MetaQuotes-Demo`; using that is the usual "Invalid account" cause). May differ between the test and live competition env — confirm at login. |
    | `MT5_TERMINAL_PATH` | path to `terminal64.exe` (optional; auto-detected if running) |
    | `MT5_BRIDGE_PORT` | default `8788` |
-   | `MT5_BRIDGE_TOKEN` | shared secret; if set, callers must send `X-Bridge-Token` |
-   | `MT5_BRIDGE_ALLOW_TRADING` | **must be `1`** to actually send orders; otherwise order endpoints validate only |
+   | `MT5_BRIDGE_TOKEN` | shared secret; if set, callers must send a matching `X-Bridge-Token`. **REQUIRED when `MT5_BRIDGE_ALLOW_TRADING=1`** — the bridge refuses to start (exit 1) if trading is armed without a token. Optional for read-only runs. |
+   | `MT5_BRIDGE_ALLOW_TRADING` | **must be `1`** to actually send orders; otherwise order endpoints validate only. When set, `MT5_BRIDGE_TOKEN` becomes mandatory. |
 
 4. Run it:
    ```
@@ -38,6 +38,8 @@ Gordon (Bun/TS)  ──HTTP──►  mt5_bridge.py  ──IPC──►  MT5 ter
 
 - Binds to **`127.0.0.1` only** — not reachable off the machine.
 - `/order`, `/cancel`, `/close` run `order_check` and **refuse to execute** unless `MT5_BRIDGE_ALLOW_TRADING=1`. A default run can read state and price-check orders but cannot fire them — deny-first, matching Gordon's permission philosophy.
+- **Token required when trading is armed.** If `MT5_BRIDGE_ALLOW_TRADING=1` and `MT5_BRIDGE_TOKEN` is empty, the bridge **refuses to start** (exits with an error) — it will not expose live `/order`/`/cancel`/`/close` to any local process or browser without a shared secret. Tokens are compared in constant time.
+- **Origin-bearing requests are rejected with `403`.** Browsers attach an `Origin` header on cross-site `fetch`/form POST; a legitimate local CLI client does not. This blocks CSRF from a malicious web page in a local browser. Applies to every endpoint.
 - Never logs request bodies or credentials.
 
 ## Endpoints

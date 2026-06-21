@@ -45,6 +45,7 @@
 
 import { createModuleLogger } from "../../../logger/index.ts";
 import { redactValues } from "../../../platform/observability/valueRedaction.ts";
+import { sanitizeUnicode } from "../../../safety/defense/unicodeSanitizer.ts";
 
 const logger = createModuleLogger("tool-result-sanitizer");
 
@@ -123,7 +124,11 @@ export interface SanitizeResult {
  * sanitizer over already-sanitized output produces no further changes.
  */
 export function sanitizeToolContent(content: string): SanitizeResult {
-  let sanitized = content;
+  // Structural Unicode pass first: NFKC-normalize + strip tag-plane /
+  // zero-width / format chars BEFORE keyword detection, so an attacker
+  // can't evade the patterns below with homoglyphs or zero-width splits.
+  // Additive to the keyword redaction — does not replace it.
+  let sanitized = sanitizeUnicode(content);
   const detected: { pattern: string; count: number }[] = [];
 
   for (const { pattern, description } of INJECTION_PATTERNS) {

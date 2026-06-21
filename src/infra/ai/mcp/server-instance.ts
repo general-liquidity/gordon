@@ -10,6 +10,7 @@ import type {
   MCPServerStatus,
 } from './types';
 import { credentialManager } from './credentials';
+import { wrapSandboxed } from '../../safety/subprocessSandbox.ts';
 
 // ============================================================================
 // Local Server Instance
@@ -77,7 +78,18 @@ export class LocalMCPServerInstance implements MCPServerInstance {
       const looksLikeShimAlias = /^(npm|npx|bun|bunx|pnpm|yarn|node|deno)$/i.test(this.manifest.command);
       const needsShell = process.platform === "win32" && (isShim || looksLikeShimAlias);
 
-      this.process = spawn(this.manifest.command, this.manifest.args || [], {
+      // Opt-in subprocess sandbox (no-op by default). When the operator sets
+      // GORDON_SANDBOX_SUBPROCESS and a host sandbox tool (bwrap/sandbox-exec)
+      // is available, this rewrites command/args to confine the child:
+      // read-only filesystem except a temp work dir. Network is ALLOWED here —
+      // most MCP servers call vendor APIs; flipping allowNetwork to false would
+      // break every network MCP server. Filesystem is the primary confinement.
+      // Disabled or unavailable → passthrough, byte-identical to the spawn above.
+      const sandboxed = wrapSandboxed(this.manifest.command, this.manifest.args || [], {
+        allowNetwork: true,
+      });
+
+      this.process = spawn(sandboxed.command, sandboxed.args, {
         env,
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: needsShell,

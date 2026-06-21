@@ -38,6 +38,52 @@ function Get-LatestVersion {
     }
 }
 
+function Verify-Checksum {
+    param(
+        [string]$FilePath,
+        [string]$Asset,
+        [string]$Version
+    )
+
+    $actual = (Get-FileHash -Algorithm SHA256 -Path $FilePath).Hash.ToLower()
+    $sumsUrl = "https://raw.githubusercontent.com/$Repo/v$Version/SHA256SUMS"
+    $expected = ""
+
+    try {
+        $sums = (Invoke-WebRequest -Uri $sumsUrl -UseBasicParsing -Headers @{ "User-Agent" = "gordon-installer" }).Content
+        foreach ($line in ($sums -split "`n")) {
+            $trimmed = $line.Trim()
+            if ($trimmed -match "^([0-9a-fA-F]{64})\s+(.+)$") {
+                if ($Matches[2].Trim() -eq $Asset) {
+                    $expected = $Matches[1].ToLower()
+                    break
+                }
+            }
+        }
+    }
+    catch {
+        # SHA256SUMS not reachable — fall through to transition behavior.
+    }
+
+    if (-not $expected) {
+        if ($env:GORDON_REQUIRE_BINARY_CHECKSUM) {
+            Remove-Item -Path $FilePath -Force -ErrorAction SilentlyContinue
+            Write-Err "No committed checksum for $Asset (v$Version) and GORDON_REQUIRE_BINARY_CHECKSUM is set. Refusing to install."
+        }
+        Write-Warn "Binary integrity could NOT be verified for $Asset (v$Version)."
+        Write-Warn "No expected checksum was found in SHA256SUMS. sha256=$actual"
+        Write-Warn "Set GORDON_REQUIRE_BINARY_CHECKSUM=1 to fail closed instead."
+        return
+    }
+
+    if ($actual -ne $expected) {
+        Remove-Item -Path $FilePath -Force -ErrorAction SilentlyContinue
+        Write-Err "Checksum mismatch for ${Asset}: expected $expected, got $actual. Refusing to install a binary that does not match the committed checksum."
+    }
+
+    Write-Info "Verified $Asset checksum (sha256=$actual)."
+}
+
 function Main {
     Write-Host ""
     Write-Host "  Gordon CLI Installer" -ForegroundColor White
@@ -88,6 +134,13 @@ function Main {
     catch {
         Write-Err "Failed to download Gordon CLI. Check version and platform. Error: $_"
     }
+
+    # Verify SHA-256 integrity before moving the binary into place. Expected
+    # hashes come from the committed SHA256SUMS published with the release,
+    # keyed by asset filename. Transition behavior: warn (and continue) when no
+    # expected hash is found, unless GORDON_REQUIRE_BINARY_CHECKSUM is set;
+    # hard-fail on mismatch.
+    Verify-Checksum -FilePath $TempPath -Asset $FileName -Version $Version
 
     # Move to install location
     Move-Item -Path $TempPath -Destination $InstallPath -Force

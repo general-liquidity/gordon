@@ -1,5 +1,6 @@
 import { installFilesystemWriteGuard } from "./filesystemWriteGuardInstaller.ts";
 import { installOutboundFetchGuard } from "./outboundFetchGuard.ts";
+import { installProcessHardening } from "./processHardening.ts";
 import {
   FILESYSTEM_WRITE_GUARD_FLAG_ENV,
   FILESYSTEM_WRITE_GUARD_MODE_ENV,
@@ -63,6 +64,7 @@ export function installProductionGuards(): void {
   if (installed) return;
   installed = true;
   applyProductionEnvDefaults();
+  installProcessHardening();
   installOutboundFetchGuard();
   installFilesystemWriteGuard();
 }

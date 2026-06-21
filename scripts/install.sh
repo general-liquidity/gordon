@@ -123,6 +123,60 @@ download() {
     fi
 }
 
+# Compute the SHA-256 of a file, printing the lowercase hex digest only.
+# Returns non-zero if no sha256 tool is available.
+sha256_of() {
+    file="$1"
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$file" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$file" | awk '{print $1}'
+    else
+        return 1
+    fi
+}
+
+# Verify a downloaded asset against the committed SHA256SUMS.
+# Transition behavior: warn (and continue) when no expected hash is found,
+# UNLESS GORDON_REQUIRE_BINARY_CHECKSUM is set; hard-fail on mismatch.
+verify_checksum() {
+    file="$1"
+    asset="$2"
+    version="$3"
+
+    actual=$(sha256_of "$file") || {
+        if [ -n "${GORDON_REQUIRE_BINARY_CHECKSUM:-}" ]; then
+            error "No sha256sum/shasum tool available and GORDON_REQUIRE_BINARY_CHECKSUM is set."
+        fi
+        warn "No sha256sum/shasum tool found — skipping integrity verification."
+        return 0
+    }
+
+    sums_url="https://raw.githubusercontent.com/${REPO}/v${version}/SHA256SUMS"
+    sums_file="${TMP_DIR}/SHA256SUMS"
+    expected=""
+    if download "$sums_url" "$sums_file" 2>/dev/null; then
+        expected=$(grep -E "[[:space:]]+${asset}\$" "$sums_file" 2>/dev/null | awk '{print $1}' | head -n 1)
+    fi
+
+    if [ -z "$expected" ]; then
+        if [ -n "${GORDON_REQUIRE_BINARY_CHECKSUM:-}" ]; then
+            error "No committed checksum for ${asset} (v${version}) and GORDON_REQUIRE_BINARY_CHECKSUM is set. Refusing to install."
+        fi
+        warn "Binary integrity could NOT be verified for ${asset} (v${version})."
+        warn "No expected checksum was found in SHA256SUMS. sha256=${actual}"
+        warn "Set GORDON_REQUIRE_BINARY_CHECKSUM=1 to fail closed instead."
+        return 0
+    fi
+
+    if [ "$actual" != "$expected" ]; then
+        rm -f "$file"
+        error "Checksum mismatch for ${asset}: expected ${expected}, got ${actual}. Refusing to install a binary that does not match the committed checksum."
+    fi
+
+    info "Verified ${asset} checksum (sha256=${actual})."
+}
+
 # Determine install directory
 get_install_dir() {
     if [ -n "${GORDON_INSTALL_DIR:-}" ]; then
@@ -201,6 +255,11 @@ main() {
     if ! download "$DOWNLOAD_URL" "$TMP_FILE"; then
         error "Failed to download Gordon CLI. Please check if the version and platform are correct."
     fi
+
+    # Verify SHA-256 integrity before making the binary executable.
+    # Expected hashes come from the committed SHA256SUMS published with the
+    # release. Fetched from the dist repo raw tree, keyed by asset filename.
+    verify_checksum "$TMP_FILE" "$ASSET_NAME" "$VERSION"
 
     # Make executable
     chmod +x "$TMP_FILE"

@@ -19,8 +19,10 @@ Safety: binds to 127.0.0.1 only. Order/cancel/close endpoints run a validation
 misconfigured run can read state and price-check orders but cannot fire them.
 """
 
+import hmac
 import json
 import os
+import sys
 import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -310,7 +312,10 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _authed(self):
-        return not TOKEN or self.headers.get("X-Bridge-Token") == TOKEN
+        if not TOKEN:
+            return True
+        header = self.headers.get("X-Bridge-Token") or ""
+        return hmac.compare_digest(header, TOKEN)
 
     def _qs(self):
         return {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
@@ -359,6 +364,10 @@ class Handler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(length) or b"{}")
 
     def _handle(self, method):
+        # CSRF: browsers attach Origin on cross-site fetch/form POST; a legit
+        # local CLI client does not. Reject any request that carries one.
+        if self.headers.get("Origin"):
+            return self._send(403, {"error": "Origin header not allowed"})
         if not self._authed():
             return self._send(401, {"error": "bad or missing X-Bridge-Token"})
         try:
@@ -378,6 +387,12 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    # When trading is armed, an empty token would authorize every local process
+    # (and browser CSRF) to fire live orders. Refuse to start rather than expose it.
+    if ALLOW_TRADING and not TOKEN:
+        print("MT5_BRIDGE_ALLOW_TRADING=1 requires MT5_BRIDGE_TOKEN to be set "
+              "(refusing to expose live trading without a token).", file=sys.stderr)
+        sys.exit(1)
     connect()
     acct = account()
     print(f"MT5 bridge on http://{HOST}:{PORT} — account {acct.get('login')} @ "

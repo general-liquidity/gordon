@@ -17,6 +17,18 @@ You'll get an acknowledgment within **2 business days**. We aim to triage within
 
 If you don't hear back in 3 business days, follow up at `tibi.toca@gmail.com`.
 
+## Security model documentation
+
+Two layered "parent" documents describe Gordon's security posture and map each risk to the
+control that already enforces it (documentation only — they add no enforcement):
+
+- [`docs/security/RISK-TAXONOMY.md`](docs/security/RISK-TAXONOMY.md) — the risk model: each
+  category (unauthorized order, oversize/leverage, fund transfer, credential exfiltration,
+  kill-switch bypass, market-data spoofing, prompt injection) mapped to its existing control.
+- [`docs/security/PERMISSION-PROFILES.md`](docs/security/PERMISSION-PROFILES.md) — three named
+  trust profiles (`read_only` → `paper_trading` → `live_trading`) as an inheritance chain. No
+  profile relaxes the safety-critical deny-list or risk gate.
+
 ## In scope
 
 The following are treated as security issues, not feature requests:
