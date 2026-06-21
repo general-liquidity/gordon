@@ -74,6 +74,7 @@ jobs:
           --config p/secrets
           --config p/security-audit
           --config p/command-injection
+          --config p/trailofbits
           --sarif --output semgrep.sarif
           --metrics off || true
 
