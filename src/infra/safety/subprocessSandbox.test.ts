@@ -1,4 +1,6 @@
 import { describe, expect, test, afterEach } from "bun:test";
+import os from "node:os";
+import path from "node:path";
 import {
   isSandboxEnabled,
   wrapSandboxed,
@@ -115,6 +117,73 @@ describe("subprocessSandbox", () => {
 
     expect(out!.command).toBe(cmd);
     expect(out!.args).toEqual(args);
+  });
+
+  test("default writable roots include tmp + cwd and EXCLUDE home root", () => {
+    setEnabled(true);
+    __setDetectOverrideForTesting(() => bwrap);
+
+    // No writableRoots supplied → default to tmp + cwd.
+    const out = wrapSandboxed("npx", ["mcp-server"], { allowNetwork: true });
+
+    const tmp = path.resolve(os.tmpdir());
+    const cwd = path.resolve(process.cwd());
+    const home = path.resolve(os.homedir());
+    const fsRoot = path.parse(home).root;
+
+    // Collect every `--bind SRC DEST` triple.
+    const boundRoots: string[] = [];
+    for (let i = 0; i < out.args.length; i++) {
+      if (out.args[i] === "--bind") boundRoots.push(out.args[i + 1]!);
+    }
+
+    expect(boundRoots).toContain(tmp);
+    expect(boundRoots).toContain(cwd);
+    // Home root and `/` must never be writable.
+    expect(boundRoots).not.toContain(home);
+    expect(boundRoots).not.toContain(fsRoot);
+  });
+
+  test("caller-supplied writable roots are filtered — home root + `/` dropped", () => {
+    setEnabled(true);
+    __setDetectOverrideForTesting(() => bwrap);
+
+    const home = path.resolve(os.homedir());
+    const fsRoot = path.parse(home).root;
+
+    const out = wrapSandboxed("node", ["s.js"], {
+      writableRoots: [home, fsRoot],
+      allowNetwork: true,
+    });
+
+    const boundRoots: string[] = [];
+    for (let i = 0; i < out.args.length; i++) {
+      if (out.args[i] === "--bind") boundRoots.push(out.args[i + 1]!);
+    }
+    // Both dangerous roots filtered → falls back to the safe default (tmp + cwd).
+    expect(boundRoots).not.toContain(home);
+    expect(boundRoots).not.toContain(fsRoot);
+    expect(boundRoots).toContain(path.resolve(os.tmpdir()));
+    expect(boundRoots).toContain(path.resolve(process.cwd()));
+  });
+
+  test("bwrap argv: --ro-bind / / present, --bind per writable root, --unshare-net only when network denied", () => {
+    setEnabled(true);
+    __setDetectOverrideForTesting(() => bwrap);
+
+    // Network DENIED → expect --unshare-net.
+    const denied = wrapSandboxed("python3", ["s.py"], { allowNetwork: false });
+    // --ro-bind / / read-only root so the child can still READ node_modules etc.
+    const roIdx = denied.args.indexOf("--ro-bind");
+    expect(roIdx).toBeGreaterThanOrEqual(0);
+    expect(denied.args[roIdx + 1]).toBe("/");
+    expect(denied.args[roIdx + 2]).toBe("/");
+    expect(denied.args).toContain("--unshare-net");
+
+    // Network ALLOWED (the MCP default) → no --unshare-net.
+    const allowed = wrapSandboxed("python3", ["s.py"], { allowNetwork: true });
+    expect(allowed.args).toContain("--ro-bind");
+    expect(allowed.args).not.toContain("--unshare-net");
   });
 
   test("isSandboxEnabled honors truthy values", () => {

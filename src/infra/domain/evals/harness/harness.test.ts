@@ -267,6 +267,36 @@ describe("runEvalSuite", () => {
     expect(good.scenarioCount).toBe(SAMPLE_IDS.length);
   });
 
+  it("derives genericAdviceRate from the judge's genericNonActionable flags", async () => {
+    const pinned = ALL_SCENARIOS.filter((s) => SAMPLE_IDS.includes(s.id));
+    const responses: Record<
+      string,
+      Array<{ id: string; score: number; genericNonActionable?: boolean }>
+    > = {};
+    // "vague" variant is flagged generic on every scenario; "sharp" never is.
+    SAMPLE_IDS.forEach((id) => {
+      responses[id] = [
+        { id: "sharp", score: 0.8, genericNonActionable: false },
+        { id: "vague", score: 0.6, genericNonActionable: true },
+      ];
+    });
+    const client = buildMockJudgeClient({ responses });
+    const result = await runEvalSuite({
+      scenarios: pinned,
+      variants: [buildVariant("sharp", SAMPLE_IDS), buildVariant("vague", SAMPLE_IDS)],
+      judgeOptions: { client },
+    });
+    const sharp = result.results.find((r) => r.variantLabel === "sharp")!;
+    const vague = result.results.find((r) => r.variantLabel === "vague")!;
+    expect(sharp.genericAdviceRate).toBe(0);
+    expect(vague.genericAdviceRate).toBe(1);
+    // Independent gate: vague scores LOWER on aggregate yet the gate is
+    // what makes the regression blocking when comparing sharp → vague.
+    const report = detectRegressions(sharp, vague);
+    expect(report.genericAdviceRegression).toBeDefined();
+    expect(report.hasBlockingRegression).toBe(true);
+  });
+
   it("skips scenarios where any variant is missing a trajectory", async () => {
     const missingId = SAMPLE_IDS[1]!;
     const presentIds = SAMPLE_IDS.filter((id) => id !== missingId);
@@ -388,6 +418,99 @@ describe("detectRegressions", () => {
     const report = detectRegressions(baseline, candidate);
     const formatted = formatRegressionReport(report);
     expect(formatted).toContain("PASS");
+  });
+});
+
+describe("detectRegressions — generic-advice anti-metric gate", () => {
+  function makeRateResult(
+    label: string,
+    perScenario: Array<{ id: string; score: number; flag?: boolean }>,
+    genericAdviceRate?: number,
+  ): VariantRunResult {
+    const aggregate =
+      perScenario.reduce((s, p) => s + p.score, 0) / Math.max(1, perScenario.length);
+    return {
+      variantLabel: label,
+      judgeModel: "test",
+      ranAt: "2026-04-26T00:00:00Z",
+      perScenario: perScenario.map((p) => ({
+        scenarioId: p.id,
+        score: p.score,
+        rank: 1,
+        explanation: "test",
+        genericNonActionable: p.flag,
+      })),
+      aggregate,
+      winCount: perScenario.length,
+      scenarioCount: perScenario.length,
+      genericAdviceRate,
+    };
+  }
+
+  it("blocks when generic-advice rate rises past tolerance EVEN as aggregate improves", () => {
+    // Candidate scores HIGHER on every scenario (aggregate up), but its
+    // generic-advice rate doubled from 0.10 → 0.40 (delta 0.30 ≥ 0.10).
+    const baseline = makeRateResult(
+      "baseline",
+      [
+        { id: "a", score: 0.6 },
+        { id: "b", score: 0.6 },
+      ],
+      0.1,
+    );
+    const candidate = makeRateResult(
+      "candidate",
+      [
+        { id: "a", score: 0.8 },
+        { id: "b", score: 0.8 },
+      ],
+      0.4,
+    );
+    const report = detectRegressions(baseline, candidate);
+    expect(report.aggregateDelta).toBeGreaterThan(0); // aggregate improved
+    expect(report.regressions.length).toBe(0); // no scalar regression
+    expect(report.hasBlockingRegression).toBe(true); // but blocked anyway
+    expect(report.genericAdviceRegression).toBeDefined();
+    expect(report.genericAdviceRegression?.delta).toBeCloseTo(0.3, 5);
+    const formatted = formatRegressionReport(report);
+    expect(formatted).toContain("FAIL");
+    expect(formatted).toContain("generic-advice gate");
+  });
+
+  it("does NOT block when generic-advice rate rises within tolerance", () => {
+    const baseline = makeRateResult("baseline", [{ id: "a", score: 0.6 }], 0.1);
+    const candidate = makeRateResult("candidate", [{ id: "a", score: 0.65 }], 0.15);
+    const report = detectRegressions(baseline, candidate); // default tolerance 0.10
+    expect(report.genericAdviceRegression).toBeUndefined();
+    expect(report.hasBlockingRegression).toBe(false);
+  });
+
+  it("treats a missing genericAdviceRate as 0 (backward compatible)", () => {
+    const baseline = makeRateResult("baseline", [{ id: "a", score: 0.6 }]); // rate undefined
+    const candidate = makeRateResult("candidate", [{ id: "a", score: 0.6 }]); // rate undefined
+    const report = detectRegressions(baseline, candidate);
+    expect(report.genericAdviceRegression).toBeUndefined();
+    expect(report.hasBlockingRegression).toBe(false);
+  });
+
+  it("blocks when baseline has no rate but candidate introduces generic advice past tolerance", () => {
+    const baseline = makeRateResult("baseline", [{ id: "a", score: 0.6 }]); // undefined → 0
+    const candidate = makeRateResult("candidate", [{ id: "a", score: 0.6 }], 0.5);
+    const report = detectRegressions(baseline, candidate);
+    expect(report.hasBlockingRegression).toBe(true);
+    expect(report.genericAdviceRegression?.baselineRate).toBe(0);
+    expect(report.genericAdviceRegression?.candidateRate).toBe(0.5);
+  });
+
+  it("honors a custom genericAdviceRateTolerance", () => {
+    const baseline = makeRateResult("baseline", [{ id: "a", score: 0.6 }], 0.1);
+    const candidate = makeRateResult("candidate", [{ id: "a", score: 0.6 }], 0.25);
+    // delta 0.15: blocks at default 0.10, passes at custom 0.20.
+    expect(detectRegressions(baseline, candidate).hasBlockingRegression).toBe(true);
+    expect(
+      detectRegressions(baseline, candidate, { genericAdviceRateTolerance: 0.2 })
+        .hasBlockingRegression,
+    ).toBe(false);
   });
 });
 

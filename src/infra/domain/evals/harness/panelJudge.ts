@@ -130,12 +130,17 @@ function averageScores(
     }));
   }
 
-  const sums = new Map<string, { total: number; count: number; explanations: string[] }>();
+  const sums = new Map<
+    string,
+    { total: number; count: number; explanations: string[]; flagVotes: number }
+  >();
   for (const entry of surviving) {
     for (const scored of entry.scored) {
-      const acc = sums.get(scored.id) ?? { total: 0, count: 0, explanations: [] };
+      const acc =
+        sums.get(scored.id) ?? { total: 0, count: 0, explanations: [], flagVotes: 0 };
       acc.total += scored.score;
       acc.count += 1;
+      if (scored.genericNonActionable) acc.flagVotes += 1;
       if (scored.explanation) acc.explanations.push(`[${entry.judgeModel}] ${scored.explanation}`);
       sums.set(scored.id, acc);
     }
@@ -156,6 +161,9 @@ function averageScores(
       score: Number((acc.total / acc.count).toFixed(4)),
       explanation: acc.explanations.join(" | "),
       rank: 0,
+      // Majority vote across surviving judges — flagged when more than
+      // half of the judges that scored this trajectory flagged it.
+      genericNonActionable: acc.flagVotes * 2 > acc.count,
     };
   });
 

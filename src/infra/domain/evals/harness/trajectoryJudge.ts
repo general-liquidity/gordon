@@ -71,6 +71,12 @@ const JudgeResponseSchema = z.object({
       trajectory_id: z.string(),
       score: z.number(),
       explanation: z.string(),
+      /**
+       * Independently-gated anti-metric. Optional so judges (or judge
+       * models) that don't emit it don't break parsing; missing is
+       * treated as `false` (not flagged) downstream.
+       */
+      generic_non_actionable: z.boolean().optional(),
     }),
   ),
 });
@@ -195,6 +201,11 @@ export function buildJudgePrompt(
     "Focus on OUTPUT QUALITY, not path efficiency. Different trajectories may take different paths to the same goal — that is fine. Score based on whether the final answer satisfies the user's request and the rubric, not on whether the path was the most direct. Penalize unusual paths ONLY when they degrade the final answer.",
   );
   lines.push("");
+  lines.push("# Anti-metric — generic non-actionable advice");
+  lines.push(
+    "SEPARATELY from the score, flag each trajectory with `generic_non_actionable: true` when its answer is generic non-actionable advice FOR TRADING. For trading, an answer is generic non-actionable when it recommends or implies an action but gives NO concrete trigger, stop, target, or size — i.e. \"buy when it looks good\" without a price/event trigger, stop level, target, or position size — OR when it retreats into platitudes (\"manage your risk\", \"wait for confirmation\", \"stay diversified\", \"do your own research\", \"keep an eye on it\") instead of a specific, executable call. A genuinely good answer that names a concrete trigger/stop/target/size, OR that honestly says \"nothing meets your criteria right now\" with reasoning, is NOT generic non-actionable. An answer that correctly declines to act (e.g. refuses a risk-breaching trade) and explains the specific reason is NOT generic non-actionable. Set the flag `false` (or omit it) when none of the above apply. This flag is tracked independently of the score — a fluent, well-structured answer can still be generic non-actionable.",
+  );
+  lines.push("");
   lines.push("# Agent system prompt (the rubric)");
   lines.push("```");
   lines.push(scenario.systemPrompt);
@@ -238,6 +249,7 @@ export function buildJudgePrompt(
           trajectory_id: t.id,
           score: "<float 0..1>",
           explanation: "<one-sentence rationale>",
+          generic_non_actionable: "<true|false — see anti-metric section>",
         })),
       },
       null,
@@ -255,10 +267,17 @@ function normalizeAndRank(
   rawScores: JudgeResponse["scores"],
   trajectories: ReadonlyArray<EvalTrajectory>,
 ): ScoredTrajectory[] {
-  const scoreById = new Map<string, { score: number; explanation: string }>();
+  const scoreById = new Map<
+    string,
+    { score: number; explanation: string; genericNonActionable?: boolean }
+  >();
   for (const s of rawScores) {
     const score = clamp01(s.score);
-    scoreById.set(s.trajectory_id, { score, explanation: s.explanation || "" });
+    scoreById.set(s.trajectory_id, {
+      score,
+      explanation: s.explanation || "",
+      genericNonActionable: s.generic_non_actionable,
+    });
   }
 
   const scored: ScoredTrajectory[] = trajectories.map((t) => {
@@ -268,6 +287,7 @@ function normalizeAndRank(
       score: entry?.score ?? 0.5,
       explanation: entry?.explanation ?? "Judge returned no score for this trajectory.",
       rank: 0, // filled after sort
+      genericNonActionable: entry?.genericNonActionable,
     };
   });
 
@@ -318,7 +338,10 @@ function errMessage(err: unknown): string {
 /** Build a mock LLM client that returns canned judge responses. */
 export interface MockJudgeOptions {
   /** Map from scenarioId → array of (trajId, score). */
-  responses: Record<string, Array<{ id: string; score: number; explanation?: string }>>;
+  responses: Record<
+    string,
+    Array<{ id: string; score: number; explanation?: string; genericNonActionable?: boolean }>
+  >;
   /**
    * Optional per-model overrides. When the judge call's `config.model`
    * appears in this map, those responses win over the default ones.
@@ -326,7 +349,10 @@ export interface MockJudgeOptions {
    */
   byModel?: Record<
     string,
-    Record<string, Array<{ id: string; score: number; explanation?: string }>>
+    Record<
+      string,
+      Array<{ id: string; score: number; explanation?: string; genericNonActionable?: boolean }>
+    >
   >;
   /** Set true to make the mock throw on call. */
   throwOnCall?: boolean;
@@ -363,6 +389,7 @@ export function buildMockJudgeClient(options: MockJudgeOptions): LLMClient {
           trajectory_id: s.id,
           score: s.score,
           explanation: s.explanation ?? `mock score ${s.score}`,
+          generic_non_actionable: s.genericNonActionable,
         })),
       };
       return payload as T;

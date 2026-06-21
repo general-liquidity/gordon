@@ -30,6 +30,14 @@ export interface DetectOptions {
   writeReviewQueue?: boolean | string;
   /** Optional metadata stamped onto each review-queue entry. */
   reviewQueueMetadata?: Record<string, string | number | boolean>;
+  /**
+   * Independent anti-metric gate. Minimum RISE in the candidate's
+   * `genericAdviceRate` over the baseline's to count as a blocking
+   * regression — checked SEPARATELY from the scalar score, so a
+   * candidate that lifts the aggregate while doubling its rate of
+   * generic non-actionable advice is still blocked. Default 0.10.
+   */
+  genericAdviceRateTolerance?: number;
 }
 
 /**
@@ -42,6 +50,7 @@ export function detectRegressions(
   options: DetectOptions = {},
 ): RegressionReport {
   const tolerance = options.toleranceDelta ?? 0.05;
+  const genericAdviceRateTolerance = options.genericAdviceRateTolerance ?? 0.1;
 
   // Build lookup maps so we can match scenarios across the two runs.
   const baselineByScenario = new Map(
@@ -79,6 +88,22 @@ export function detectRegressions(
   regressions.sort((a, b) => a.delta - b.delta);
   improvements.sort((a, b) => b.delta - a.delta);
 
+  // Independent anti-metric gate — checked separately from per-scenario
+  // score so an aggregate improvement can't mask a rise in generic
+  // non-actionable advice. Missing rate (older runs) treated as 0.
+  const baselineRate = baseline.genericAdviceRate ?? 0;
+  const candidateRate = candidate.genericAdviceRate ?? 0;
+  const genericAdviceDelta = Number((candidateRate - baselineRate).toFixed(4));
+  const genericAdviceRegression =
+    genericAdviceDelta >= genericAdviceRateTolerance
+      ? {
+          baselineRate,
+          candidateRate,
+          delta: genericAdviceDelta,
+          tolerance: genericAdviceRateTolerance,
+        }
+      : undefined;
+
   if (options.writeReviewQueue && regressions.length > 0) {
     const path =
       typeof options.writeReviewQueue === "string"
@@ -105,7 +130,8 @@ export function detectRegressions(
     ),
     regressions,
     improvements,
-    hasBlockingRegression: regressions.length > 0,
+    genericAdviceRegression,
+    hasBlockingRegression: regressions.length > 0 || genericAdviceRegression !== undefined,
   };
 }
 
@@ -122,6 +148,13 @@ export function formatRegressionReport(report: RegressionReport): string {
   lines.push(
     `  aggregate: ${formatDelta(report.aggregateDelta)} (tolerance ${report.toleranceDelta})`,
   );
+
+  if (report.genericAdviceRegression) {
+    const g = report.genericAdviceRegression;
+    lines.push(
+      `  generic-advice gate: BLOCK — rate ${g.baselineRate.toFixed(3)} → ${g.candidateRate.toFixed(3)} (${formatDelta(g.delta)}, tolerance ${g.tolerance})`,
+    );
+  }
 
   if (report.regressions.length > 0) {
     lines.push(`  regressions (${report.regressions.length}):`);

@@ -17,6 +17,7 @@
 
 import type { RuntimePermissionScope } from "../contracts/types.ts";
 import { SAFETY_CRITICAL_PATTERNS, isSafetyCritical } from "./trustTrajectory.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
 
 export type PermissionProfileName = "read_only" | "paper_trading" | "live_trading";
 
@@ -159,3 +160,87 @@ export function resolveProfileAutoAllowTools(name: PermissionProfileName): strin
 
 /** Re-export so the docs + test reference a single deny-list source of truth. */
 export { SAFETY_CRITICAL_PATTERNS, isSafetyCritical };
+
+// ============================================================================
+// PermissionEngine integration — DEFAULT-PRESERVING profile selection
+// ============================================================================
+
+const logger = createModuleLogger("permission-profiles");
+
+/**
+ * Resolve the operator-selected profile, default OFF.
+ *
+ * Source of selection: env `GORDON_PERMISSION_PROFILE`. When the value is
+ * unset / empty (after trim) this returns `undefined` and NO profile is
+ * applied — the PermissionEngine then behaves byte-identically to a build
+ * without profiles. An unknown id is treated as "no profile" (fail-safe) and
+ * emits a warning; it is NEVER coerced to the most-privileged profile.
+ *
+ * `override` exists for deterministic testing; production passes nothing.
+ */
+export function resolveSelectedProfile(
+  override?: string,
+): PermissionProfileName | undefined {
+  const raw = override ?? process.env.GORDON_PERMISSION_PROFILE;
+  const trimmed = raw?.trim();
+  if (!trimmed) return undefined; // unset/empty → no profile → today's behavior
+  if (trimmed in PERMISSION_PROFILES) {
+    return trimmed as PermissionProfileName;
+  }
+  logger.warn("Unknown GORDON_PERMISSION_PROFILE — ignoring (no profile applied)", {
+    component: "permissionProfiles",
+    value: trimmed,
+    known: PERMISSION_PROFILE_CHAIN,
+  });
+  return undefined;
+}
+
+/**
+ * Build a permission hook that auto-allows the tools a selected profile marks
+ * auto-allow — and ONLY those. Designed to be `prependHook`'d so its allow
+ * decision can short-circuit the human-required queue for benign tools.
+ *
+ * Safety invariants (each independently sufficient):
+ *   1. With no profile selected the hook ABSTAINS unconditionally → the engine
+ *      does exactly what it does today. This is the default and is tested.
+ *   2. A profile can only ever ADD an allow for a tool in its resolved
+ *      auto-allow set. It cannot deny, queue, or relax anything.
+ *   3. `isSafetyCritical(toolName)` is re-checked here as a hard floor: even if
+ *      a profile's auto-allow list somehow named a deny-listed tool, the hook
+ *      abstains for it — it can never widen permissions for safety-critical
+ *      tools. (The deny-list / rule suppression in `evaluate()` already runs
+ *      BEFORE any hook, so this is belt-and-braces.)
+ *   4. `approvalClass === "always_require_human"` is honored — the hook
+ *      abstains, matching the trust-trajectory hook's belt-and-braces check.
+ *
+ * The hook abstains for everything not explicitly auto-allowed, leaving
+ * downstream hooks (default classifier, trust trajectory) to decide.
+ */
+export function buildPermissionProfileHook(
+  options: { profileOverride?: string } = {},
+): (input: {
+  toolName: string;
+  policy: { approvalClass?: string };
+}) => { decision: "allow" | "abstain"; actor?: string; reason?: string } {
+  const profileName = resolveSelectedProfile(options.profileOverride);
+  // No profile → a hook that abstains for everything. Behavior is unchanged.
+  if (!profileName) {
+    return () => ({ decision: "abstain" });
+  }
+
+  const autoAllow = new Set(resolveProfileAutoAllowTools(profileName));
+  return (input) => {
+    // Belt-and-braces: never auto-allow a safety-critical / deny-list tool,
+    // regardless of what the profile table says.
+    if (isSafetyCritical(input.toolName)) return { decision: "abstain" };
+    if (input.policy.approvalClass === "always_require_human") {
+      return { decision: "abstain" };
+    }
+    if (!autoAllow.has(input.toolName)) return { decision: "abstain" };
+    return {
+      decision: "allow",
+      actor: "classifier:permission-profile",
+      reason: `auto-allowed by "${profileName}" profile`,
+    };
+  };
+}

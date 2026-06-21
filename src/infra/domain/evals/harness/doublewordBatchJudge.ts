@@ -245,6 +245,8 @@ const JudgeResponseSchema = z.object({
       trajectory_id: z.string(),
       score: z.number(),
       explanation: z.string(),
+      /** Independently-gated anti-metric; optional, missing = false. */
+      generic_non_actionable: z.boolean().optional(),
     }),
   ),
 });
@@ -421,9 +423,16 @@ function normalizeAndRank(
   rawScores: z.infer<typeof JudgeResponseSchema>["scores"],
   trajectories: JudgeRequest["trajectories"],
 ): ScoredTrajectory[] {
-  const scoreById = new Map<string, { score: number; explanation: string }>();
+  const scoreById = new Map<
+    string,
+    { score: number; explanation: string; genericNonActionable?: boolean }
+  >();
   for (const s of rawScores) {
-    scoreById.set(s.trajectory_id, { score: clamp01(s.score), explanation: s.explanation || "" });
+    scoreById.set(s.trajectory_id, {
+      score: clamp01(s.score),
+      explanation: s.explanation || "",
+      genericNonActionable: s.generic_non_actionable,
+    });
   }
   const scored: ScoredTrajectory[] = trajectories.map((t) => {
     const entry = scoreById.get(t.id);
@@ -432,6 +441,7 @@ function normalizeAndRank(
       score: entry?.score ?? 0.5,
       explanation: entry?.explanation ?? "Judge returned no score for this trajectory.",
       rank: 0,
+      genericNonActionable: entry?.genericNonActionable,
     };
   });
   scored.sort((a, b) => b.score - a.score);

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createModuleLogger } from "../logger/index.ts";
 
 // Best-effort process hardening for a money-handling agent. Goal: reduce the
@@ -15,14 +16,16 @@ import { createModuleLogger } from "../logger/index.ts";
 //     - Strips `--report-*` flags from `process.env.NODE_OPTIONS` so a child
 //       Bun/Node process can't be told to write a report either.
 //
-//   NOT ENFORCED HERE — needs the launcher or a native layer:
+//   NOT ENFORCED HERE — enforced by the launcher / operator, NOT this file:
 //     - True RLIMIT_CORE=0 (core dumps). Bun does not expose setrlimit to JS,
 //       so we CANNOT zero the core-dump limit from this file. A real core dump
-//       on SIGSEGV/SIGABRT will still contain process memory. To enforce, the
-//       launcher must do it: `ulimit -c 0` (sh) before exec, a systemd unit
-//       `LimitCORE=0`, or a native wrapper calling setrlimit(RLIMIT_CORE, 0).
-//       Codex's `process-hardening` crate does this in Rust; we have no JS
-//       equivalent. See scripts note in the launcher; do NOT assume it's on.
+//       on SIGSEGV/SIGABRT will still contain process memory. This IS now
+//       enforced on POSIX by the npm launcher, which execs the binary via
+//       `sh -c 'ulimit -c 0; exec "$@"'` (see npm/bin/gordon.cjs). Operators
+//       running the binary directly should enforce it themselves via a systemd
+//       unit `LimitCORE=0` or a shell `ulimit -c 0` — see
+//       docs/security/PROCESS-HARDENING.md. We only DETECT (at debug) whether
+//       the limit is already zero below; we never claim to set it from here.
 //     - ptrace / PTRACE_ATTACH hardening (anti-debugger). Requires prctl(
 //       PR_SET_DUMPABLE, 0) on Linux — native-only, not reachable from Bun.
 //     - LD_PRELOAD stripping for child processes — environment-policy concern,
@@ -90,6 +93,32 @@ function stripReportFlagsFromNodeOptions(env: NodeJS.ProcessEnv): void {
   }
 }
 
+// Detect — WITHOUT enforcing — whether the core-dump limit is already 0.
+// Pure observation for an operator-visible debug line; never throws, never
+// mutates anything. Linux exposes the soft/hard core limit in the "Max core
+// file size" row of /proc/self/limits; "0" means core dumps are off. Other
+// platforms (macOS, Windows) have no equivalent cheap probe, so we stay silent
+// rather than guess. The actual enforcement lives in the launcher / systemd —
+// see the header comment.
+function logCoreDumpStatus(): void {
+  try {
+    if (process.platform !== "linux") return;
+    const limits = readFileSync("/proc/self/limits", "utf8");
+    const line = limits.split("\n").find((l) => l.startsWith("Max core file size"));
+    if (!line) return;
+    // Columns: "Max core file size   <soft>   <hard>   bytes"
+    const soft = line.slice("Max core file size".length).trim().split(/\s+/)[0];
+    const disabled = soft === "0";
+    logger.debug("core-dump limit detected (not enforced here)", {
+      softLimit: soft,
+      disabled,
+      enforcedBy: disabled ? "launcher/systemd/ulimit" : "none-detected",
+    });
+  } catch (err) {
+    logger.debug("logCoreDumpStatus failed (ignored)", { error: String(err) });
+  }
+}
+
 /**
  * Install best-effort process hardening. Idempotent. Never throws.
  *
@@ -102,6 +131,7 @@ export function installProcessHardening(env: NodeJS.ProcessEnv = process.env): v
   installed = true;
 
   suppressDiagnosticReports();
+  logCoreDumpStatus();
 
   if (isAggressiveEnabled(env)) {
     stripReportFlagsFromNodeOptions(env);

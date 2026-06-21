@@ -8,6 +8,7 @@ import { RuntimeHistoryManager } from "../history/RuntimeHistoryManager.ts";
 import { PermissionEngine } from "../permissions/PermissionEngine.ts";
 import { registerPermissionEngine } from "../permissions/defaultPermissionEngine.ts";
 import { buildTrustTrajectoryHook, getDefaultTrustTrajectory } from "../permissions/trustTrajectory.ts";
+import { buildPermissionProfileHook } from "../permissions/profiles.ts";
 import { RuntimePluginManager } from "../plugins/RuntimePluginManager.ts";
 import { CompactionManager } from "../transcript/CompactionManager.ts";
 import { ReplayManager } from "../transcript/ReplayManager.ts";
@@ -127,6 +128,9 @@ export class SessionRuntimeFactory {
     const toolRegistry = new ToolRegistry(this.capabilityRegistry);
     const permissionEngine = new PermissionEngine(runtimeStore);
     permissionEngine.prependHook(buildTrustTrajectoryHook(getDefaultTrustTrajectory()));
+    // Profile hook: abstains entirely when GORDON_PERMISSION_PROFILE is unset
+    // → default gating behavior is byte-identical.
+    permissionEngine.prependHook(buildPermissionProfileHook());
     registerPermissionEngine(permissionEngine);
     const bridge = new RuntimeBridge(runtimeStore);
     const historyManager = new RuntimeHistoryManager(this.persistence);

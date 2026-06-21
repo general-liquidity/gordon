@@ -74,7 +74,13 @@ export async function runEvalSuite(input: RunSuiteInput): Promise<RunSuiteResult
   // Build accumulators per variant.
   const perVariantScenarios: Map<
     string,
-    Array<{ scenarioId: string; score: number; rank: number; explanation: string }>
+    Array<{
+      scenarioId: string;
+      score: number;
+      rank: number;
+      explanation: string;
+      genericNonActionable?: boolean;
+    }>
   > = new Map();
   for (const v of input.variants) perVariantScenarios.set(v.variantLabel, []);
 
@@ -115,6 +121,7 @@ export async function runEvalSuite(input: RunSuiteInput): Promise<RunSuiteResult
           score: scored.score,
           rank: scored.rank,
           explanation: scored.explanation,
+          genericNonActionable: scored.genericNonActionable,
         });
       }
     } else {
@@ -131,6 +138,7 @@ export async function runEvalSuite(input: RunSuiteInput): Promise<RunSuiteResult
           score: scored.score,
           rank: scored.rank,
           explanation: scored.explanation,
+          genericNonActionable: scored.genericNonActionable,
         });
       }
     }
@@ -143,6 +151,15 @@ export async function runEvalSuite(input: RunSuiteInput): Promise<RunSuiteResult
         ? 0
         : perScenario.reduce((s, p) => s + p.score, 0) / perScenario.length;
     const winCount = perScenario.filter((p) => p.rank === 1).length;
+    const genericAdviceRate =
+      perScenario.length === 0
+        ? 0
+        : Number(
+            (
+              perScenario.filter((p) => p.genericNonActionable === true).length /
+              perScenario.length
+            ).toFixed(4),
+          );
     return {
       variantLabel: v.variantLabel,
       judgeModel: judgeModelSeen,
@@ -151,6 +168,7 @@ export async function runEvalSuite(input: RunSuiteInput): Promise<RunSuiteResult
       aggregate: Number(aggregate.toFixed(4)),
       winCount,
       scenarioCount: perScenario.length,
+      genericAdviceRate,
     };
   });
 

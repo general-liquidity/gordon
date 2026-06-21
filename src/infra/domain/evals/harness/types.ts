@@ -87,6 +87,15 @@ export interface ScoredTrajectory {
   explanation: string;
   /** Rank within the group (1 = best). */
   rank: number;
+  /**
+   * Independently-gated anti-metric: true when the answer is generic
+   * non-actionable trading advice (recommends action with no concrete
+   * trigger/stop/target/size, or falls back to platitudes). OPTIONAL —
+   * judges that don't emit it leave it undefined, treated as false
+   * downstream. Tracked SEPARATELY from `score` so a candidate can't
+   * mask a rise in this rate by lifting the aggregate.
+   */
+  genericNonActionable?: boolean;
 }
 
 export interface JudgeResult {
@@ -153,6 +162,8 @@ export interface VariantRunResult {
     score: number;
     rank: number;
     explanation: string;
+    /** Anti-metric carried from the judge; missing = not flagged (false). */
+    genericNonActionable?: boolean;
   }>;
   /** Mean score across scenarios. */
   aggregate: number;
@@ -160,6 +171,15 @@ export interface VariantRunResult {
   winCount: number;
   /** Total scenarios run. */
   scenarioCount: number;
+  /**
+   * Fraction of scored scenarios flagged `genericNonActionable`
+   * (0..1). DERIVED from `perScenario`; missing flags count as false.
+   * Gated INDEPENDENTLY of `aggregate` by `detectRegressions` so a
+   * doubling of generic-advice rate is caught even when the aggregate
+   * score improves. Optional for backward compatibility — absent on
+   * VariantRunResults built before this field existed (treated as 0).
+   */
+  genericAdviceRate?: number;
 }
 
 /**
@@ -185,6 +205,24 @@ export interface RegressionReport {
     candidateScore: number;
     delta: number;
   }>;
-  /** True when at least one regression exceeded the tolerance threshold. */
+  /**
+   * Independent anti-metric gate. Set when the candidate's
+   * `genericAdviceRate` rose past `genericAdviceRateTolerance` relative
+   * to the baseline — a BLOCKING regression even if `aggregateDelta` is
+   * positive. Undefined when within tolerance (or neither run carried
+   * the field). The lesson from the creative-strategy eval write-up:
+   * aggregate score can improve while a specific bad-behavior rate
+   * doubles, and only a separately-gated metric catches it.
+   */
+  genericAdviceRegression?: {
+    baselineRate: number;
+    candidateRate: number;
+    delta: number;
+    tolerance: number;
+  };
+  /**
+   * True when at least one per-scenario regression exceeded the
+   * tolerance threshold, OR the independent generic-advice gate tripped.
+   */
   hasBlockingRegression: boolean;
 }
