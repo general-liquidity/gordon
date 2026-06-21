@@ -106,6 +106,20 @@ describe("GordonAcpAgent — newSession", () => {
     );
   });
 
+  it("loadSession rejects a path-traversal sessionId before touching the filesystem", async () => {
+    const { agent } = makeAgent();
+    await expect(
+      agent.loadSession({ sessionId: "../../x", cwd: "/", mcpServers: [] }),
+    ).rejects.toThrow(/Invalid sessionId/);
+    // A bare ".." and an absolute-ish id are rejected the same way.
+    await expect(
+      agent.loadSession({ sessionId: "..", cwd: "/", mcpServers: [] }),
+    ).rejects.toThrow(/Invalid sessionId/);
+    await expect(
+      agent.loadSession({ sessionId: "a/b/c", cwd: "/", mcpServers: [] }),
+    ).rejects.toThrow(/Invalid sessionId/);
+  });
+
   it("setSessionMode returns empty (v1 no-op)", async () => {
     const { agent } = makeAgent();
     const result = await agent.setSessionMode({ sessionId: "00".repeat(16), modeId: "default" });

@@ -40,6 +40,24 @@ const ALLOWED_LAUNCHERS = new Set(['npx', 'npm', 'bun', 'bunx', 'node', 'python'
 const SHELL_METACHAR = /[;|&$`><\n\r]/;
 
 /**
+ * Plugin id pattern — the install path is built from the id, so it must be a
+ * single safe path segment (no separators, no `..`). Mirrors the `manifest.id`
+ * check in `validatePlugin`.
+ */
+const PLUGIN_ID_PATTERN = /^[a-z0-9-]+$/;
+
+/**
+ * Validate a plugin id used to build a filesystem path. Returns an error
+ * string when unsafe, or `null` when safe.
+ */
+function validatePluginId(id: unknown): string | null {
+  if (typeof id !== 'string' || !PLUGIN_ID_PATTERN.test(id)) {
+    return `Plugin ID "${String(id)}" must contain only lowercase letters, numbers, and hyphens`;
+  }
+  return null;
+}
+
+/**
  * Validate a plugin's launch command + args before it can be spawned.
  *
  * Returns an error string when the command or any arg is unsafe, or `null`
@@ -129,6 +147,13 @@ export class PluginInstaller {
    */
   async install(listing: MarketplaceListing): Promise<InstalledPlugin> {
     await this.initialize();
+
+    // The install path is derived from listing.id (distinct from manifest.id) —
+    // validate it before building any filesystem path.
+    const idError = validatePluginId(listing.id);
+    if (idError) {
+      throw new Error(idError);
+    }
 
     // Check if already installed
     if (this.installedPlugins.has(listing.id)) {
@@ -238,6 +263,12 @@ export class PluginInstaller {
       enabled: true,
     };
 
+    // Guard the path segment derived from manifest.id before building the path.
+    const idError = validatePluginId(manifest.id);
+    if (idError) {
+      throw new Error(idError);
+    }
+
     // Create plugin directory and copy manifest
     const pluginDir = path.join(this.pluginsDir, manifest.id);
     await fs.mkdir(pluginDir, { recursive: true });
@@ -289,6 +320,12 @@ export class PluginInstaller {
    */
   async update(pluginId: string): Promise<InstalledPlugin> {
     await this.initialize();
+
+    // pluginId feeds path.join below — validate before any filesystem path.
+    const idError = validatePluginId(pluginId);
+    if (idError) {
+      throw new Error(idError);
+    }
 
     const current = this.installedPlugins.get(pluginId);
     if (!current) {
@@ -483,6 +520,12 @@ export class PluginInstaller {
 
       this.installedPlugins.clear();
       for (const plugin of data.plugins) {
+        // A poisoned installed.json could carry a traversal id (the path is
+        // later rebuilt from plugin.id) — skip ids that aren't a safe segment.
+        if (validatePluginId(plugin.id) !== null) {
+          console.warn(`Skipping installed plugin with invalid id: ${String(plugin.id)}`);
+          continue;
+        }
         this.installedPlugins.set(plugin.id, plugin);
       }
     } catch {

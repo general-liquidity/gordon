@@ -26,8 +26,45 @@ import type { McpServer } from "@agentclientprotocol/sdk";
 import { MCPClient } from "@mastra/mcp";
 import type { MastraMCPServerDefinition } from "@mastra/mcp";
 import { createModuleLogger } from "../logger/index.ts";
+import { validatePluginCommand } from "../ai/mcp/marketplace/installer.ts";
 
 const logger = createModuleLogger("acp-mcp-spinup");
+
+/**
+ * Guard against SSRF on ACP-peer-forwarded HTTP/SSE MCP server URLs.
+ * Rejects non-http(s) schemes and loopback / private / link-local /
+ * metadata hosts so a malicious peer can't pivot into the local network
+ * or the cloud metadata endpoint (169.254.169.254).
+ */
+export function isSafeForwardedUrl(raw: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+
+  const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (
+    host === "localhost" ||
+    host === "::1" ||
+    host === "0.0.0.0" ||
+    host.endsWith(".internal") ||
+    host.endsWith(".local")
+  ) {
+    return false;
+  }
+
+  // IPv4 private / loopback / link-local ranges
+  if (/^127\./.test(host)) return false; // 127.0.0.0/8 loopback
+  if (/^10\./.test(host)) return false; // 10.0.0.0/8
+  if (/^192\.168\./.test(host)) return false; // 192.168.0.0/16
+  if (/^169\.254\./.test(host)) return false; // 169.254.0.0/16 link-local (incl. 169.254.169.254 metadata)
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host)) return false; // 172.16.0.0/12
+
+  return true;
+}
 
 // One MCPClient per ACP sessionId; tracked so closeAcpMcpClient knows
 // what to tear down.
@@ -38,7 +75,7 @@ const sessionClients = new Map<string, MCPClient>();
  * Returns `null` when the server's transport isn't supported (e.g.
  * `acp` type — UNSTABLE per the SDK spec).
  */
-function acpServerToMastraDefinition(
+export function acpServerToMastraDefinition(
   server: McpServer,
 ): { name: string; def: MastraMCPServerDefinition } | null {
   const peek = server as {
@@ -56,6 +93,12 @@ function acpServerToMastraDefinition(
   // HTTP / SSE — URL-based remote MCP servers
   if (transport === "http" || transport === "sse") {
     if (!peek.url) return null;
+    if (!isSafeForwardedUrl(peek.url)) {
+      console.warn(
+        `[acp-mcp-spinup] Skipping ACP-forwarded MCP server "${name}": unsafe URL "${peek.url}" (scheme or host blocked)`,
+      );
+      return null;
+    }
     const headers: Record<string, string> = {};
     for (const h of peek.headers ?? []) headers[h.name] = h.value;
     return {
@@ -71,6 +114,13 @@ function acpServerToMastraDefinition(
   // (The discriminator field is missing on stdio variant per ACP spec;
   // we detect by presence of `command` when transport is absent.)
   if (peek.command) {
+    const cmdError = validatePluginCommand(peek.command, peek.args);
+    if (cmdError) {
+      console.warn(
+        `[acp-mcp-spinup] Skipping ACP-forwarded MCP server "${name}": ${cmdError}`,
+      );
+      return null;
+    }
     const env: Record<string, string> = {};
     for (const e of peek.env ?? []) env[e.name] = e.value;
     return {

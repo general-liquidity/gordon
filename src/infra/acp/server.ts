@@ -94,6 +94,7 @@ import {
   appendSessionTurn,
   loadSessionTurns,
   sessionExists,
+  SESSION_ID_PATTERN,
 } from "./sessions.ts";
 import {
   captureSessionMcpServers,
@@ -316,6 +317,11 @@ export class GordonAcpAgent implements Agent {
   }
 
   async loadSession(params: LoadSessionRequest): Promise<LoadSessionResponse> {
+    // Reject a malformed/path-traversing sessionId BEFORE any filesystem
+    // access — the id is peer-supplied and otherwise lands in a file path.
+    if (typeof params.sessionId !== "string" || !SESSION_ID_PATTERN.test(params.sessionId)) {
+      throw new Error(`Invalid sessionId: ${JSON.stringify(params.sessionId)}`);
+    }
     // V2: rehydrate session history from disk so the editor's session
     // chooser can resume conversations across process restarts.
     if (!sessionExists(params.sessionId)) {

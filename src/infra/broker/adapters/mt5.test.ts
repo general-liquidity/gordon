@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { Mt5Adapter } from "./mt5.ts";
+import { resetAllKillSwitches, tripKillSwitch } from "../../safety/killSwitches.ts";
 
 const realFetch = globalThis.fetch;
 
@@ -80,6 +81,35 @@ describe("Mt5Adapter", () => {
     await expect(
       adapter.placeOrder({ symbol: "XAUUSD", side: "buy", type: "market", timeInForce: "gtc", qty: 0.1 }),
     ).rejects.toThrow(/MT5_BRIDGE_ALLOW_TRADING/);
+  });
+
+  it("placeOrder: rejects when a venue kill switch is tripped, and passes once reset", async () => {
+    stubBridge({ "/order": { executed: true, retcode: 10009, order: 778, volume: 0.1 } });
+    const order = { symbol: "XAUUSD", side: "buy" as const, type: "market" as const, timeInForce: "gtc" as const, qty: 0.1 };
+
+    tripKillSwitch({ scope: "venue", id: "mt5" }, "manual halt for test");
+    try {
+      await expect(adapter.placeOrder(order)).rejects.toThrow(/kill switch/i);
+    } finally {
+      resetAllKillSwitches("test cleanup of venue switch");
+    }
+
+    // Untripped: the same order goes through.
+    const o = await adapter.placeOrder(order);
+    expect(o.id).toBe("778");
+    expect(o.status).toBe("filled");
+  });
+
+  it("placeOrder: rejects when a firm-wide kill switch is tripped", async () => {
+    stubBridge({ "/order": { executed: true, retcode: 10009, order: 779, volume: 0.1 } });
+    tripKillSwitch({ scope: "firm" }, "firm-wide halt for test");
+    try {
+      await expect(
+        adapter.placeOrder({ symbol: "EURUSD", side: "sell", type: "market", timeInForce: "gtc", qty: 0.1 }),
+      ).rejects.toThrow(/Reset the relevant kill switch/);
+    } finally {
+      resetAllKillSwitches("test cleanup of firm switch");
+    }
   });
 
   it("testConnection reflects bridge health", async () => {

@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 
 import { PluginInstaller, validatePluginCommand } from "./installer.ts";
 import type { MCPServerManifest } from "../types.ts";
+import type { MarketplaceListing } from "./types.ts";
 
 function benignManifest(overrides: Partial<MCPServerManifest> = {}): MCPServerManifest {
   return {
@@ -87,6 +88,48 @@ describe("PluginInstaller command validation", () => {
       const installed = await installer.installFromLocal(manifestPath);
       expect(installed.id).toBe("some-mcp");
       expect(installer.isInstalled("some-mcp")).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+function benignListing(overrides: Partial<MarketplaceListing> = {}): MarketplaceListing {
+  return {
+    id: "some-mcp",
+    manifest: benignManifest(),
+    repository: "https://example.com/some-mcp",
+    verified: false,
+    officialProvider: false,
+    lastUpdated: new Date().toISOString(),
+    pricing: { type: "free" } as MarketplaceListing["pricing"],
+    ...overrides,
+  };
+}
+
+describe("PluginInstaller listing.id path-traversal", () => {
+  it("rejects a listing whose id is a traversal sequence", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "gordon-installer-"));
+    try {
+      const installer = new PluginInstaller(join(dir, "plugins"));
+      const listing = benignListing({ id: "../../x" });
+
+      await expect(installer.install(listing)).rejects.toThrow(/must contain only/i);
+      expect(installer.isInstalled("../../x")).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("installs a listing with a valid id", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "gordon-installer-"));
+    try {
+      const installer = new PluginInstaller(join(dir, "plugins"));
+      const listing = benignListing({ id: "good-mcp", manifest: benignManifest({ id: "good-mcp" }) });
+
+      const installed = await installer.install(listing);
+      expect(installed.id).toBe("good-mcp");
+      expect(installer.isInstalled("good-mcp")).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

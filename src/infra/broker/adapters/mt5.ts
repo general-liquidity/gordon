@@ -12,6 +12,7 @@
  */
 
 import type { Candle } from "../../../types/index.ts";
+import { isKillSwitchesEnabled, isExecutionAllowed } from "../../safety/killSwitches.ts";
 import { Mt5BridgeClient, type Mt5OrderResult } from "../mt5/bridgeClient.ts";
 import type {
   BrokerAccount,
@@ -125,6 +126,15 @@ export class Mt5Adapter implements BrokerAdapter {
   }
 
   async placeOrder(params: BrokerOrderRequest): Promise<BrokerOrder> {
+    // Kill-switch chokepoint — read-only, idempotent. Mt5Adapter implements
+    // BrokerAdapter directly (not RestBrokerAdapter), so it needs the same
+    // adapter-level guard the REST adapters get.
+    if (isKillSwitchesEnabled()) {
+      const decision = isExecutionAllowed({ venue: this.brokerId, instrument: params.symbol });
+      if (!decision.allowed) {
+        throw new Error(`${decision.reason}. Reset the relevant kill switch before placing this order.`);
+      }
+    }
     if (params.qty === undefined) {
       throw new Error("MT5 orders require an explicit qty (lots); notional sizing is not supported");
     }

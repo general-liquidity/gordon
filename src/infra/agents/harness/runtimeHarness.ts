@@ -863,7 +863,9 @@ export async function optimizeToolResultForContext(
     };
   }
 
-  const dir = path.join(os.tmpdir(), "gordon-tool-results", getThreadKey(context));
+  // threadId is peer-supplied on the ACP path (`acp-${sessionId}`); basename
+  // it so a traversal id like `acp-../../x` cannot escape the scratch root.
+  const dir = path.join(os.tmpdir(), "gordon-tool-results", path.basename(getThreadKey(context)));
   await mkdir(dir, { recursive: true });
   const filename = `${Date.now()}-${toolName}.json`;
   const scratchFile = path.join(dir, filename);

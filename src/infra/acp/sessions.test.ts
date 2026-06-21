@@ -6,9 +6,12 @@ import {
   appendSessionTurn,
   loadSessionTurns,
   sessionExists,
+  sanitizeSessionId,
   getAcpSessionsDir,
   ACP_SESSIONS_PATH_ENV,
 } from "./sessions.ts";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 
 let tempDir: string;
 let originalEnv: string | undefined;
@@ -99,5 +102,40 @@ describe("sessionExists", () => {
   it("returns true after the first append", () => {
     appendSessionTurn("populated", { role: "user", content: "x", ts: 1 });
     expect(sessionExists("populated")).toBe(true);
+  });
+});
+
+describe("sessionId path-traversal hardening", () => {
+  const TRAVERSAL = "../../../../etc/passwd";
+
+  it("sanitizeSessionId accepts safe ids and rejects traversal", () => {
+    expect(sanitizeSessionId("abc-123_DEF")).toBe("abc-123_DEF");
+    expect(() => sanitizeSessionId(TRAVERSAL)).toThrow();
+    expect(() => sanitizeSessionId("a/b")).toThrow();
+    expect(() => sanitizeSessionId("..")).toThrow();
+    expect(() => sanitizeSessionId("")).toThrow();
+  });
+
+  it("loadSessionTurns rejects a traversal id (does not read outside the dir)", () => {
+    expect(() => loadSessionTurns(TRAVERSAL)).toThrow();
+  });
+
+  it("appendSessionTurn does not write outside the sessions dir for a traversal id", () => {
+    // appendSessionTurn is best-effort (swallows errors), so it must not
+    // throw — but it also must not create a file outside tempDir.
+    appendSessionTurn(TRAVERSAL, { role: "user", content: "pwn", ts: 1 });
+    const escaped = resolve(tempDir, "..", "..", "..", "..", "etc", "passwd.jsonl");
+    expect(existsSync(escaped)).toBe(false);
+  });
+
+  it("sessionExists rejects a traversal id", () => {
+    expect(() => sessionExists(TRAVERSAL)).toThrow();
+  });
+
+  it("a normal id still round-trips", () => {
+    appendSessionTurn("normal-id_1", { role: "user", content: "hi", ts: 1 });
+    const turns = loadSessionTurns("normal-id_1");
+    expect(turns).toHaveLength(1);
+    expect(turns[0]!.content).toBe("hi");
   });
 });

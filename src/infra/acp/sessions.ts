@@ -30,8 +30,25 @@ export function getAcpSessionsDir(env: NodeJS.ProcessEnv = process.env): string 
   return env[ACP_SESSIONS_PATH_ENV] ?? join(homedir(), ".gordon", "acp-sessions");
 }
 
+/** Session ids that map 1:1 to a filename component — no path separators,
+ *  no `..`, no drive/UNC tricks. Mirrors the validation in the ACP server. */
+export const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * Reject any session id that isn't a single safe path component. A peer
+ * supplies the id over the wire, so an unsanitized value like
+ * `"../../../../etc/passwd"` would otherwise escape the sessions dir on
+ * both read (loadSessionTurns) and append-write (appendSessionTurn).
+ */
+export function sanitizeSessionId(sessionId: string): string {
+  if (typeof sessionId !== "string" || !SESSION_ID_PATTERN.test(sessionId)) {
+    throw new Error(`Invalid ACP sessionId: ${JSON.stringify(sessionId)}`);
+  }
+  return sessionId;
+}
+
 function sessionPath(sessionId: string, env: NodeJS.ProcessEnv = process.env): string {
-  return join(getAcpSessionsDir(env), `${sessionId}.jsonl`);
+  return join(getAcpSessionsDir(env), `${sanitizeSessionId(sessionId)}.jsonl`);
 }
 
 function ensureDir(env: NodeJS.ProcessEnv = process.env): void {

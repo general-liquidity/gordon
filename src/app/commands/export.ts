@@ -83,7 +83,7 @@ function nowStamp(): string {
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
-function resolveOutputPath(type: string, ext: string, filename?: string): { filePath: string; dir: string } {
+export function resolveOutputPath(type: string, ext: string, filename?: string): { filePath: string; dir: string } {
   const baseDir = path.join(process.cwd(), EXPORT_DIR);
   if (!filename) {
     return {
@@ -94,7 +94,9 @@ function resolveOutputPath(type: string, ext: string, filename?: string): { file
 
   const hasExt = path.extname(filename).length > 0;
   const finalName = hasExt ? filename : `${filename}.${ext}`;
-  const filePath = path.isAbsolute(finalName) ? finalName : path.join(baseDir, finalName);
+  // Confine the output to baseDir — strip any directory components (incl. `..`)
+  // and absolute paths from the user-supplied filename.
+  const filePath = path.join(baseDir, path.basename(finalName));
   return { filePath, dir: path.dirname(filePath) };
 }
 

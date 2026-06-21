@@ -85,6 +85,47 @@ describe("PermissionEngine", () => {
     }]);
   });
 
+  it("a wildcard allow rule does NOT auto-allow a deny-listed tool, but does allow a benign one", async () => {
+    const store = new RuntimeStore(createDefaultRuntimeSessionState("app"));
+    store.setSession({ runtimeId: "app", sessionId: "app", resourceId: "user-1", threadId: "thread-1" });
+    // Broad, scope-less wildcard allow rule (matches any tool name / scope).
+    store.setApprovalState({
+      rules: [{
+        id: "wildcard-allow",
+        decision: "allow",
+        scope: "persistent",
+        createdAt: new Date().toISOString(),
+        createdBy: "operator",
+      }],
+    });
+    const engine = new PermissionEngine(store);
+
+    // Safety-critical tool: the wildcard allow must be suppressed; it routes
+    // to the human/confirmation queue instead of auto-allowing.
+    const denyListed = await engine.evaluate("place_order", context, createPolicy({
+      tool: { ...createPolicy().tool, id: "place_order" },
+    }));
+    expect(denyListed.status).toBe("pending");
+    expect(denyListed.source).not.toBe("rule");
+
+    // Non-safety-critical tool under the same wildcard rule IS allowed by it.
+    const benign = await engine.evaluate("get_portfolio", context, createPolicy({
+      tool: {
+        ...createPolicy().tool,
+        id: "get_portfolio",
+        category: "monitoring",
+        riskClass: "low",
+        permissionScope: "portfolio.read",
+        sideEffectLevel: "read",
+        requiresTradePermission: false,
+        idempotent: true,
+        auditEventType: "portfolio_read",
+      },
+    }));
+    expect(benign.status).toBe("allowed");
+    expect(benign.source).toBe("rule");
+  });
+
   it("auto-allows low-risk read-only actions via the classifier", async () => {
     const store = new RuntimeStore(createDefaultRuntimeSessionState("app"));
     const engine = new PermissionEngine(store);

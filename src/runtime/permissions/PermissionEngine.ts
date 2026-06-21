@@ -8,7 +8,7 @@ import type {
 } from "../contracts/types.ts";
 import { RuntimeStore } from "../state/RuntimeStore.ts";
 import type { RuntimeToolPolicyDecision } from "../tools/ToolPolicy.ts";
-import { getDefaultTrustTrajectory, recordPermissionEvaluation } from "./trustTrajectory.ts";
+import { getDefaultTrustTrajectory, isSafetyCritical, recordPermissionEvaluation } from "./trustTrajectory.ts";
 
 export interface PermissionHookInput {
   policy: RuntimeToolPolicyDecision;
@@ -237,7 +237,20 @@ export class PermissionEngine {
     }
 
     const matchingRule = this.findMatchingRule(tool, toolName, runtimeState.approvals.rules);
-    if (matchingRule) {
+    // Safety-critical deny-list precedes persisted *allow* rules: a broad or
+    // wildcard `allow` rule must NOT auto-allow a deny-listed tool (place_order,
+    // execute_trade, cancel_*, wallet_transfer, …). Such tools always require
+    // the human/confirmation path. A `deny` rule still wins (more restrictive),
+    // so only the allow-shortcut is skipped here — never weakened.
+    // Suppress only a BROAD allow (matched via a wildcard `toolNamePattern` or a
+    // scope-only catch-all — i.e. not an exact `toolName` match for this tool)
+    // for a deny-listed tool. An explicit, exact-tool "approve and remember"
+    // rule is still honored.
+    const safetyCriticalAllowSuppressed =
+      matchingRule?.decision === "allow" &&
+      matchingRule.toolName !== toolName &&
+      isSafetyCritical(toolName);
+    if (matchingRule && !safetyCriticalAllowSuppressed) {
       const now = new Date().toISOString();
       if (matchingRule.decision === "deny") {
         return {
