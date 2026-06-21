@@ -24,6 +24,7 @@ import {
   verifyAuditChain,
   type AuditChainVerification,
 } from "./signing.ts";
+import { redactString } from "../../infra/platform/observability/valueRedaction.ts";
 import type {
   AuditTrace,
   AuditAgentStep,
@@ -324,9 +325,18 @@ export function saveTrace(inputTrace: AuditTrace): AuditTrace {
   try {
     ensureTable();
     const db = getDatabase();
+
+    // Redact credential/PII-shaped values out of free-text summary fields
+    // BEFORE signing. Redacting after signing would break the tamper chain:
+    // the content hash would be computed over unredacted text while the
+    // stored (redacted) rows recompute to a different hash. Redacting the
+    // content up-front keeps the hash consistent and guarantees no secret
+    // ever reaches disk. Only an already-signed trace is left untouched.
+    const trace0 = inputTrace.signature ? inputTrace : redactTraceContent(inputTrace);
+
     // Resolve key outside the transaction — it may touch the filesystem.
-    const key = inputTrace.signature ? null : resolveAuditHmacKey();
-    let trace = inputTrace;
+    const key = trace0.signature ? null : resolveAuditHmacKey();
+    let trace = trace0;
 
     withTransaction(() => {
       if (!trace.signature) {
@@ -801,6 +811,35 @@ export function pruneOldTraces(olderThanDays: number): number {
 
 function ensureTable(): void {
   initAuditTables();
+}
+
+/**
+ * Return a copy of the trace with credential/PII-shaped values redacted out
+ * of every free-text summary field that gets persisted: the outcome details,
+ * the trigger payload summary, and each tool call's input/output summary and
+ * error. Runs before signing so the tamper chain stays consistent.
+ */
+function redactTraceContent(trace: AuditTrace): AuditTrace {
+  return {
+    ...trace,
+    trigger: {
+      ...trace.trigger,
+      payload_summary: redactString(trace.trigger.payload_summary),
+    },
+    outcome: {
+      ...trace.outcome,
+      details: redactString(trace.outcome.details),
+    },
+    agent_steps: trace.agent_steps.map((step) => ({
+      ...step,
+      tool_calls: step.tool_calls.map((tc) => ({
+        ...tc,
+        input_summary: redactString(tc.input_summary),
+        output_summary: redactString(tc.output_summary),
+        ...(tc.error !== undefined ? { error: redactString(tc.error) } : {}),
+      })),
+    })),
+  };
 }
 
 /**

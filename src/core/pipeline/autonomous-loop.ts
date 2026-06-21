@@ -18,6 +18,7 @@ import {
   isMandateExpired,
   isMandateBreached,
   validateMandate,
+  updateMandateTracking,
 } from "../safety/swing-mandate.ts";
 import {
   createSprintContract,
@@ -47,6 +48,9 @@ import type { CoinAnalysis } from "../../types/index.ts";
 import { runSharedScan } from "../lifecycle/market-data-coordinator.ts";
 
 const logger = createModuleLogger("autonomous-loop");
+
+/** Hard ceiling on autonomous cycles per run. Override via GORDON_MAX_LOOP_CYCLES. */
+const MAX_CYCLES = Number(process.env.GORDON_MAX_LOOP_CYCLES) || 200;
 
 // ============================================================================
 // Types
@@ -108,6 +112,10 @@ interface LoopState {
   symbolsTouched: Set<string>;
   /** Per-cycle goal progressPct history, for no-progress stall detection. */
   goalProgressHistory: number[];
+  /** Per-symbol fill count for this run, enforced against maxTradesPerSessionPerSymbol. */
+  tradesPerSymbol: Map<string, number>;
+  /** Account equity (USD) captured on the first cycle; basis for live PnL%. */
+  equityBaselineUsd: number | null;
 }
 
 let loopState: LoopState = {
@@ -124,6 +132,8 @@ let loopState: LoopState = {
   sprintContract: null,
   symbolsTouched: new Set<string>(),
   goalProgressHistory: [],
+  tradesPerSymbol: new Map<string, number>(),
+  equityBaselineUsd: null,
 };
 let cycleInFlight: Promise<CycleReport | null> | null = null;
 
@@ -197,8 +207,43 @@ async function runCycle(): Promise<CycleReport | null> {
 
   const { exchange, mandate, onOpportunityFound, onMandateBreach, onCycleComplete } = loopState.config;
 
+  // Hard cycle ceiling — bound an autonomous run regardless of mandate
+  // expiry/breach so a misconfigured short interval can't loop forever.
+  if (loopState.cycleCount >= MAX_CYCLES) {
+    logger.warn("Max autonomous cycles reached, stopping", { maxCycles: MAX_CYCLES });
+    stopAutonomousLoop("max cycles reached");
+    return null;
+  }
+
+  // Live PnL: capture account equity as the baseline on the first cycle,
+  // then express PnL as a % drift from that baseline and fold it into the
+  // mandate via updateMandateTracking — the only writer of currentPnl /
+  // peakPnl / dailyPnl / consecutiveLosses — so isMandateBreached sees the
+  // real drawdown rather than a never-updated zero.
+  try {
+    const accountDetails = await exchange.getFullAccountDetails();
+    const currentEquity = accountDetails.totalUsdtValue;
+    if (loopState.equityBaselineUsd === null) {
+      loopState.equityBaselineUsd = currentEquity;
+    } else if (loopState.equityBaselineUsd > 0) {
+      const pnlPercent = ((currentEquity - loopState.equityBaselineUsd) / loopState.equityBaselineUsd) * 100;
+      const pnlDelta = pnlPercent - mandate.currentPnl;
+      const updated = updateMandateTracking(mandate, pnlDelta);
+      loopState.mandate = updated;
+      loopState.config.mandate = updated;
+      saveMandateState(updated);
+    }
+  } catch (equityError) {
+    logger.warn("Live PnL update failed for this cycle", {
+      error: equityError instanceof Error ? equityError.message : String(equityError),
+    });
+  }
+
+  // Read back the (possibly PnL-updated) mandate for expiry/breach checks.
+  const liveMandate = loopState.mandate!;
+
   // Check mandate expiry
-  if (isMandateExpired(mandate)) {
+  if (isMandateExpired(liveMandate)) {
     logger.warn("Mandate expired, stopping autonomous loop");
     loopState.mandate!.status = "completed";
     saveMandateState(loopState.mandate!);
@@ -206,15 +251,17 @@ async function runCycle(): Promise<CycleReport | null> {
     return null;
   }
 
-  // Check mandate breach
-  const breach = isMandateBreached(mandate);
+  // Check mandate breach — hard stop (not pause). A breached drawdown /
+  // daily-loss / consecutive-loss limit terminates the run; the operator
+  // re-arms deliberately rather than the loop silently resuming.
+  const breach = isMandateBreached(liveMandate);
   if (breach.breached) {
     logger.warn("Mandate breached", { reason: breach.reason });
     loopState.mandate!.status = "paused";
     saveMandateState(loopState.mandate!);
     onMandateBreach?.(breach.reason!);
-    await emitEvent("autonomous:mandate_breached", { reason: breach.reason ?? "Unknown breach", mandateId: mandate.id });
-    pauseAutonomousLoop();
+    await emitEvent("autonomous:mandate_breached", { reason: breach.reason ?? "Unknown breach", mandateId: liveMandate.id });
+    stopAutonomousLoop(breach.reason);
     return null;
   }
 
@@ -270,6 +317,13 @@ async function runCycle(): Promise<CycleReport | null> {
       opportunities: opportunities.length,
     });
 
+    // Whether a positive onOpportunityFound result counts as an actual fill.
+    // When the mandate requires approval or is signal-only, a true result is
+    // not an autonomous execution, so it must not advance the per-symbol cap
+    // or the mandate trade tracking.
+    const executesAutonomously = !mandate.requireApproval && !mandate.signalOnly;
+    const perSymbolCap = mandate.maxTradesPerSessionPerSymbol;
+
     // Notify on each opportunity
     for (const opp of opportunities) {
       // Track for sprint-contract diff (no-op when contract not active).
@@ -285,8 +339,21 @@ async function runCycle(): Promise<CycleReport | null> {
 
       if (onOpportunityFound) {
         const shouldExecute = await onOpportunityFound(report);
-        if (shouldExecute) {
-          logger.info("Opportunity approved for execution", { symbol: opp.symbol });
+        if (shouldExecute && executesAutonomously) {
+          const filled = (loopState.tradesPerSymbol.get(opp.symbol) ?? 0) + 1;
+          loopState.tradesPerSymbol.set(opp.symbol, filled);
+          logger.info("Opportunity executed", { symbol: opp.symbol, fillsThisSession: filled });
+
+          if (perSymbolCap !== undefined && filled >= perSymbolCap) {
+            logger.warn("Per-symbol trade cap reached, stopping autonomous loop", {
+              symbol: opp.symbol,
+              cap: perSymbolCap,
+            });
+            stopAutonomousLoop("per-symbol trade cap reached");
+            return null;
+          }
+        } else if (shouldExecute) {
+          logger.info("Opportunity approved (awaiting approval / signal-only)", { symbol: opp.symbol });
         }
       }
     }
@@ -432,6 +499,8 @@ export function startAutonomousLoop(config: AutonomousLoopConfig): { success: bo
   loopState.symbolsTouched = new Set<string>();
   loopState.sprintContract = null;
   loopState.goalProgressHistory = [];
+  loopState.tradesPerSymbol = new Map<string, number>();
+  loopState.equityBaselineUsd = null;
 
   // Sprint contract: when GORDON_SPRINT_CONTRACT=1, record the loop's
   // scope (mandate symbols + venues) and verification standards
@@ -551,6 +620,8 @@ export function stopAutonomousLoop(reason?: string): void {
 
   loopState.isRunning = false;
   loopState.isPaused = false;
+  loopState.tradesPerSymbol = new Map<string, number>();
+  loopState.equityBaselineUsd = null;
 
   clearMandateState();
 

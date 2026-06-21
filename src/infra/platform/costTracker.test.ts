@@ -5,6 +5,9 @@ import {
   resetCostTracker,
   getCostTracker,
   recordPhaseLLMCost,
+  setCostBudget,
+  isCostHalted,
+  clearCostHalt,
 } from "./costTracker.ts";
 import { getEventBus } from "../../events/bus.ts";
 import type { GordonEvent } from "../../events/types.ts";
@@ -211,6 +214,52 @@ describe("CostTracker — snapshot cacheRead visibility", () => {
     });
     const output = tracker.formatDisplay();
     expect(output).not.toContain("cacheRead:");
+  });
+});
+
+describe("cost budget halt", () => {
+  beforeEach(() => {
+    resetCostBudgetState();
+    setCostBudget(null);
+    clearCostHalt();
+  });
+
+  it("sets isCostHalted() after a record exceeds an action:halt session budget", () => {
+    // A tiny session budget so a single recorded call exceeds it.
+    setCostBudget({ sessionUsd: 0.0001, action: "halt", warnThresholds: [] });
+    expect(isCostHalted()).toBe(false);
+
+    const tracker = new CostTracker("halt-session-1");
+    tracker.record({
+      modelId: "claude-opus-4-6",
+      inputTokens: 100_000,
+      outputTokens: 100_000,
+    });
+
+    expect(isCostHalted()).toBe(true);
+  });
+
+  it("does not halt under a warn-only budget even when exceeded", () => {
+    setCostBudget({ sessionUsd: 0.0001, action: "warn", warnThresholds: [0.5] });
+    const tracker = new CostTracker("halt-session-2");
+    tracker.record({
+      modelId: "claude-opus-4-6",
+      inputTokens: 100_000,
+      outputTokens: 100_000,
+    });
+    expect(isCostHalted()).toBe(false);
+  });
+
+  it("clearCostHalt() resets the halt flag", () => {
+    setCostBudget({ sessionUsd: 0.0001, action: "halt", warnThresholds: [] });
+    new CostTracker("halt-session-3").record({
+      modelId: "claude-opus-4-6",
+      inputTokens: 100_000,
+      outputTokens: 100_000,
+    });
+    expect(isCostHalted()).toBe(true);
+    clearCostHalt();
+    expect(isCostHalted()).toBe(false);
   });
 });
 

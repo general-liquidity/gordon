@@ -21,6 +21,8 @@ import type {
   BrokerQuote,
   BrokerTimeInForce,
 } from "../types.ts";
+import { isKillSwitchesEnabled, isExecutionAllowed } from "../../safety/killSwitches.ts";
+import { redactString } from "../../platform/observability/valueRedaction.ts";
 
 const DEFAULT_ALPACA_TRADING_BASE_URL = "https://api.alpaca.markets";
 const DEFAULT_ALPACA_PAPER_TRADING_BASE_URL = "https://paper-api.alpaca.markets";
@@ -234,7 +236,8 @@ export class AlpacaAdapter implements BrokerAdapter {
 
     if (!response.ok) {
       const body = await response.text();
-      const details = body.trim().length > 0 ? `: ${body}` : "";
+      const safeBody = redactString(body).slice(0, 500);
+      const details = safeBody.trim().length > 0 ? `: ${safeBody}` : "";
       throw new Error(`Alpaca API ${response.status} ${response.statusText}${details}`);
     }
 
@@ -327,6 +330,14 @@ export class AlpacaAdapter implements BrokerAdapter {
   async placeOrder(params: BrokerOrderRequest): Promise<BrokerOrder> {
     if (params.qty === undefined && params.notional === undefined) {
       throw new Error("Broker order requires either qty or notional");
+    }
+
+    // Kill-switch chokepoint — read-only, idempotent.
+    if (isKillSwitchesEnabled()) {
+      const decision = isExecutionAllowed({ venue: this.brokerId, instrument: params.symbol.toUpperCase() });
+      if (!decision.allowed) {
+        throw new Error(`${decision.reason}. Reset the relevant kill switch before placing this order.`);
+      }
     }
 
     const body: AlpacaOrderRequestBody = {

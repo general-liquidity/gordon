@@ -133,7 +133,10 @@ export async function evaluateOrderRisk(
     envRiskMode === "paper" && !sandboxActive ? ("paper" as const) : undefined;
 
   // -- Evaluate ----------------------------------------------------------
-  const decision = await riskKernel.evaluate(orderRequest, portfolioContext, { modeOverride });
+  const decision = await riskKernel.evaluate(orderRequest, portfolioContext, {
+    modeOverride,
+    sandboxActive,
+  });
 
   // Collect warning-level checks
   for (const check of decision.checks) {

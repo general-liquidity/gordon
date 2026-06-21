@@ -61,7 +61,8 @@ function defaultCapabilities(): Set<GatewayCapability> {
 }
 
 async function ensureGordonDir(): Promise<void> {
-  await mkdir(GORDON_DIR, { recursive: true });
+  // mode 0o700 restricts the dir to owner-only on Unix; no-op on Windows (ACLs).
+  await mkdir(GORDON_DIR, { recursive: true, mode: 0o700 });
 }
 
 function generateToken(): string {

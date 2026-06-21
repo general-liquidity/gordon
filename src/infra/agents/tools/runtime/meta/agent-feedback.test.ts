@@ -93,6 +93,28 @@ describe("agent-feedback path helpers", () => {
   });
 });
 
+describe("agent-feedback redaction", () => {
+  it("redacts credential-shaped values from blocker + approachesTried on disk", () => {
+    const secret = "sk-ant-api01-AAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    const result = appendAgentFeedback(
+      {
+        intent: "Place a BTC long",
+        approachesTried: [`exported key ${secret} into the request header`],
+        blocker: `Broker rejected the call carrying ${secret} in the auth header`,
+        severity: "high",
+      },
+      feedbackPath,
+    );
+    expect(result.written).toBe(true);
+    const raw = require("node:fs").readFileSync(feedbackPath, "utf-8") as string;
+    expect(raw).not.toContain(secret);
+    expect(raw).toContain("[REDACTED]");
+    const back = readAgentFeedback(feedbackPath);
+    expect(back[0]?.blocker).not.toContain(secret);
+    expect(back[0]?.approachesTried.join(" ")).not.toContain(secret);
+  });
+});
+
 describe("report_blocked tool", () => {
   it("acknowledges + persists the report", async () => {
     const result = await runTool({

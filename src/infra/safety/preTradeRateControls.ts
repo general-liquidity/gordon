@@ -14,12 +14,21 @@
  */
 
 export const PRETRADE_RATE_CONTROLS_FLAG_ENV = "GORDON_PRETRADE_RATE_CONTROLS";
+export const PRETRADE_RATE_CONTROLS_DISABLE_ENV =
+  "GORDON_PRETRADE_RATE_CONTROLS_DISABLE";
 
+/**
+ * Pre-trade rate controls are DEFAULT-ON. They stay enabled unless the
+ * operator explicitly opts out via GORDON_PRETRADE_RATE_CONTROLS_DISABLE.
+ * The legacy GORDON_PRETRADE_RATE_CONTROLS flag is retained as an explicit
+ * affirmative — setting it never disables the controls — so existing
+ * enable-it configs keep working.
+ */
 export function isPreTradeRateControlsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[PRETRADE_RATE_CONTROLS_FLAG_ENV] === "1" ||
-    env[PRETRADE_RATE_CONTROLS_FLAG_ENV] === "true"
-  );
+  const disabled =
+    env[PRETRADE_RATE_CONTROLS_DISABLE_ENV] === "1" ||
+    env[PRETRADE_RATE_CONTROLS_DISABLE_ENV] === "true";
+  return !disabled;
 }
 
 export type MessageKind = "submit" | "modify" | "cancel" | "fill";
@@ -77,7 +86,7 @@ export interface RateCheckResult {
   reason: string;
 }
 
-const DEFAULT_LIMITS: Required<RateLimits> = {
+export const DEFAULT_LIMITS: Required<RateLimits> = {
   maxMessagesPerSecond: 20,
   maxModificationsPerSecond: 10,
   maxCancellationsPerSecond: 10,
@@ -154,6 +163,82 @@ export function checkPreTradeRate(input: RateCheckInput): RateCheckResult {
     },
     reason,
   };
+}
+
+// ============================================================================
+// In-process sliding-window event recorder
+// ============================================================================
+
+/**
+ * The trade ledger (tradeLedger.ts) is async and flag-gated, so it is not a
+ * reliable source of recent-event history for a synchronous pre-trade gate.
+ * This recorder keeps a small, always-on in-process ring of recent order
+ * messages so `evaluatePreTradeRate` has a real event window at the exact
+ * moment execute_plan is about to submit. Pure in-memory; lost on restart
+ * (which is the safe direction — a fresh process starts with no rate debt).
+ */
+const RATE_EVENT_HISTORY: RateEvent[] = [];
+
+/** Hard cap on retained events so a long session cannot grow this unbounded. */
+const MAX_RATE_EVENTS = 2_000;
+
+/** Open-order counts per instrument, maintained alongside the event ring. */
+const OPEN_ORDERS_PER_INSTRUMENT: Record<string, number> = {};
+
+/** Record a single order-message event into the in-process window. */
+export function recordRateEvent(
+  kind: MessageKind,
+  instrument?: string,
+  nowMs: number = Date.now(),
+): void {
+  RATE_EVENT_HISTORY.push({ t: nowMs, kind, ...(instrument ? { instrument } : {}) });
+
+  // Keep the ring bounded and trimmed to a few windows of history.
+  const cutoff = nowMs - DEFAULT_LIMITS.windowMs * 4;
+  while (
+    RATE_EVENT_HISTORY.length > 0 &&
+    (RATE_EVENT_HISTORY.length > MAX_RATE_EVENTS || RATE_EVENT_HISTORY[0]!.t < cutoff)
+  ) {
+    RATE_EVENT_HISTORY.shift();
+  }
+
+  if (instrument) {
+    if (kind === "submit") {
+      OPEN_ORDERS_PER_INSTRUMENT[instrument] =
+        (OPEN_ORDERS_PER_INSTRUMENT[instrument] ?? 0) + 1;
+    } else if (kind === "fill" || kind === "cancel") {
+      const next = (OPEN_ORDERS_PER_INSTRUMENT[instrument] ?? 0) - 1;
+      OPEN_ORDERS_PER_INSTRUMENT[instrument] = next > 0 ? next : 0;
+    }
+  }
+}
+
+/**
+ * Evaluate a proposed order against the in-process window + default limits.
+ * This is the gate execute_plan calls immediately before submit.
+ */
+export function evaluatePreTradeRate(input?: {
+  proposedKind?: MessageKind;
+  proposedInstrument?: string;
+  nowMs?: number;
+  limits?: RateLimits;
+}): RateCheckResult {
+  return checkPreTradeRate({
+    events: RATE_EVENT_HISTORY,
+    openOrdersPerInstrument: OPEN_ORDERS_PER_INSTRUMENT,
+    proposedKind: input?.proposedKind ?? "submit",
+    proposedInstrument: input?.proposedInstrument,
+    nowMs: input?.nowMs,
+    limits: input?.limits,
+  });
+}
+
+/** Test/maintenance hook: clear the in-process window. */
+export function resetRateEvents(): void {
+  RATE_EVENT_HISTORY.length = 0;
+  for (const k of Object.keys(OPEN_ORDERS_PER_INSTRUMENT)) {
+    delete OPEN_ORDERS_PER_INSTRUMENT[k];
+  }
 }
 
 export function rateCheckToPayload(result: RateCheckResult): Record<string, unknown> {

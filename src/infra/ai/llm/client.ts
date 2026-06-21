@@ -16,6 +16,7 @@ import type {
 } from "./types.ts";
 import { API_ENDPOINTS, GORDON_MODELS } from "./types.ts";
 import { getDirectClientRoute } from "../../runtime/providers/registry.ts";
+import { isCostHalted } from "../../platform/costTracker.ts";
 
 // Default configuration values
 const DEFAULT_PROVIDER: LLMProvider = "dedalus";
@@ -232,6 +233,9 @@ export class LLMClient {
     body: OpenAIRequestBody,
     attempt: number = 0
   ): Promise<OpenAIResponse> {
+    if (isCostHalted()) {
+      throw new LLMError("Cost budget halted — LLM dispatch blocked", 402, "cost_halt", provider);
+    }
     const baseUrl = this.getBaseUrl(provider);
     const apiKey = this.getApiKey(provider);
     const url = `${baseUrl}/chat/completions`;

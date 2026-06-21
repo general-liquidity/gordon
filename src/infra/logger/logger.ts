@@ -4,6 +4,10 @@
  */
 
 import { isGordonError, type GordonError } from "../../errors/index.ts";
+import {
+  redactDeep,
+  redactString,
+} from "../platform/observability/valueRedaction.ts";
 
 /**
  * Log levels
@@ -207,14 +211,14 @@ export class Logger {
 
     const mergedContext = { ...this.defaultContext, ...context };
     if (Object.keys(mergedContext).length > 0) {
-      entry.context = mergedContext;
+      entry.context = redactDeep(mergedContext) as Record<string, unknown>;
     }
 
     if (error) {
       entry.error = {
         name: error.name,
-        message: error.message,
-        stack: error.stack,
+        message: redactString(error.message),
+        stack: error.stack ? redactString(error.stack) : undefined,
       };
       if (isGordonError(error)) {
         entry.error.code = error.code;

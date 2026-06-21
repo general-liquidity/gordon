@@ -82,6 +82,7 @@ import { normalizePemSecret } from "../types.ts";
 import type { Candle } from "../../../types/index.ts";
 import { CcxtWebSocketImpl } from "./ccxt-websocket.ts";
 import { SandboxNotSupportedError } from "../sandboxSupport.ts";
+import { isKillSwitchesEnabled, isExecutionAllowed } from "../../safety/killSwitches.ts";
 
 // ---------------------------------------------------------------------------
 // Symbol normalization
@@ -160,8 +161,29 @@ function mapOrderStatusFromCcxt(ccxtStatus: string | undefined): OrderStatus {
   }
 }
 
+/**
+ * Coerce a CCXT numeric field to a finite number or throw. Money-path
+ * fields (`filled`, `price`, `amount`) must never silently degrade to 0
+ * on a malformed response — a missing fill would understate exposure and
+ * a NaN price would corrupt downstream risk math. Raise instead so the
+ * caller fails loud rather than acting on a fabricated zero.
+ */
+function requireFiniteOrderField(value: unknown, field: string): number {
+  const n = Number(value ?? NaN);
+  if (!Number.isFinite(n)) {
+    throw new Error(`CCXT order response has malformed '${field}' (got ${String(value)})`);
+  }
+  return n;
+}
+
 function ccxtOrderToOrder(ccxtOrder: Record<string, unknown>): Order {
   const orderId = String(ccxtOrder.id ?? "");
+  if (orderId.length === 0) {
+    throw new Error("CCXT order response is missing an order id");
+  }
+  if (ccxtOrder.status === undefined || ccxtOrder.status === null) {
+    throw new Error(`CCXT order response is missing status (order ${orderId})`);
+  }
   const symbol = String(ccxtOrder.symbol ?? "");
   const sideRaw = String(ccxtOrder.side ?? "buy").toLowerCase();
   return {
@@ -171,9 +193,9 @@ function ccxtOrderToOrder(ccxtOrder: Record<string, unknown>): Order {
     side: sideRaw === "sell" ? "SELL" : "BUY",
     type: mapOrderTypeFromCcxt(ccxtOrder.type as string | undefined),
     status: mapOrderStatusFromCcxt(ccxtOrder.status as string | undefined),
-    price: Number(ccxtOrder.price ?? 0),
-    quantity: Number(ccxtOrder.amount ?? 0),
-    executedQty: Number(ccxtOrder.filled ?? 0),
+    price: requireFiniteOrderField(ccxtOrder.price ?? 0, "price"),
+    quantity: requireFiniteOrderField(ccxtOrder.amount ?? 0, "amount"),
+    executedQty: requireFiniteOrderField(ccxtOrder.filled ?? 0, "filled"),
     cummulativeQuoteQty: Number(ccxtOrder.cost ?? 0),
     stopPrice: ccxtOrder.stopPrice !== undefined ? Number(ccxtOrder.stopPrice) : undefined,
     time: ccxtOrder.timestamp !== undefined ? Number(ccxtOrder.timestamp) : undefined,
@@ -334,6 +356,12 @@ export class CcxtAdapter
   readonly displayName: string;
   readonly isSandbox: boolean;
   readonly ccxtSubId: string;
+  /**
+   * Hard cap on leverage this adapter will ever request. Defaults to
+   * `GORDON_RISK_MAX_LEVERAGE` (else Infinity = no clamp). `setLeverage`
+   * silently floors any request above the cap rather than forwarding it.
+   */
+  private readonly maxLeverage: number;
   /** WebSocket adapter — lazily constructed on first getWebSocket() call. */
   private wsAdapter?: ExchangeWebSocket;
   /** Approximate count of calls since last reset, used for synthesizing
@@ -348,8 +376,13 @@ export class CcxtAdapter
     ccxtSubId: string,
     credentials: CcxtAdapterCredentials,
     sandbox?: boolean,
+    options?: { maxLeverage?: number },
   ) {
     const Klass = resolveCcxtClass(ccxtSubId);
+
+    const envMaxLeverage = Number(process.env.GORDON_RISK_MAX_LEVERAGE);
+    this.maxLeverage = options?.maxLeverage
+      ?? (Number.isFinite(envMaxLeverage) && envMaxLeverage > 0 ? envMaxLeverage : Infinity);
 
     const config: Record<string, unknown> = {
       enableRateLimit: true,
@@ -397,6 +430,7 @@ export class CcxtAdapter
     ccxtSubId: string,
     mockClient: unknown,
     sandbox = false,
+    config?: { maxLeverage?: number },
   ): CcxtAdapter {
     const adapter = Object.create(CcxtAdapter.prototype) as CcxtAdapter;
     (adapter as unknown as { client: unknown }).client = mockClient;
@@ -404,6 +438,7 @@ export class CcxtAdapter
     (adapter as unknown as { exchangeId: ExchangeId }).exchangeId = `ccxt:${ccxtSubId}` as ExchangeId;
     (adapter as unknown as { displayName: string }).displayName = `${ccxtSubId} (via CCXT)`;
     (adapter as unknown as { isSandbox: boolean }).isSandbox = sandbox;
+    (adapter as unknown as { maxLeverage: number }).maxLeverage = config?.maxLeverage ?? Infinity;
     (adapter as unknown as { callCount: number }).callCount = 0;
     (adapter as unknown as { lastCallReset: number }).lastCallReset = Date.now();
     (adapter as unknown as { cbState: string }).cbState = "closed";
@@ -517,13 +552,28 @@ export class CcxtAdapter
       return ohlcv.map((row: unknown) => {
         const r = row as unknown[];
         const openTime = Number(r[0]);
+        const open = Number(r[1]);
+        const high = Number(r[2]);
+        const low = Number(r[3]);
+        const close = Number(r[4]);
+        const volume = Number(r[5]);
+        if (
+          !Number.isFinite(open) ||
+          !Number.isFinite(high) ||
+          !Number.isFinite(low) ||
+          !Number.isFinite(close)
+        ) {
+          throw new Error(
+            `CCXT OHLCV row for ${symbol} has a malformed OHLC value (o=${String(r[1])} h=${String(r[2])} l=${String(r[3])} c=${String(r[4])})`,
+          );
+        }
         return {
           openTime,
-          open: Number(r[1]),
-          high: Number(r[2]),
-          low: Number(r[3]),
-          close: Number(r[4]),
-          volume: Number(r[5]),
+          open,
+          high,
+          low,
+          close,
+          volume,
           closeTime: openTime + durationMs - 1,
         };
       }) as Candle[];
@@ -675,6 +725,20 @@ export class CcxtAdapter
 
   async placeOrder(params: OrderParams): Promise<Order> {
     return this.withCallTracking(async () => {
+      // Kill-switch chokepoint — last line before this adapter creates an
+      // order. Idempotent: a read-only check against the trip map, so re-running
+      // after a passed preflight is a no-op; it only adds a rejection on paths
+      // that reached the adapter without one. Kill-switch + enabled-flag only —
+      // the risk classifier lives upstream, not here.
+      if (isKillSwitchesEnabled()) {
+        const decision = isExecutionAllowed({ venue: this.exchangeId, instrument: params.symbol });
+        if (!decision.allowed) {
+          throw new Error(
+            `${decision.reason}. Reset the relevant kill switch before placing this order.`,
+          );
+        }
+      }
+
       const ccxtType = mapOrderTypeToCcxt(params.type);
       const side = params.side.toLowerCase() as "buy" | "sell";
       const symbol = toCcxtSymbol(params.symbol);
@@ -959,7 +1023,9 @@ export class CcxtAdapter
       const ccxtClient = this.client as unknown as {
         setLeverage: (l: number, s: string) => Promise<unknown>;
       };
-      await ccxtClient.setLeverage(leverage, toCcxtSymbol(symbol));
+      const cap = this.maxLeverage;
+      const clamped = Number.isFinite(cap) ? Math.min(leverage, cap) : leverage;
+      await ccxtClient.setLeverage(clamped, toCcxtSymbol(symbol));
     });
   }
 

@@ -9,6 +9,8 @@
 import { Buffer } from "node:buffer";
 import type { Candle } from "../../../types/index.ts";
 import { TokenManager, type TokenConfig } from "../auth/tokenRefresh.ts";
+import { isKillSwitchesEnabled, isExecutionAllowed } from "../../safety/killSwitches.ts";
+import { redactString } from "../../platform/observability/valueRedaction.ts";
 import type {
   BrokerAdapter,
   BrokerAccount,
@@ -57,10 +59,31 @@ export interface RestBrokerAdapterConfig {
   };
 }
 
+/** Thrown when a broker order payload is missing required fields or carries
+ *  non-finite numeric fields — the caller must fail loud rather than act on a
+ *  fabricated zero quantity / price. */
+export class MalformedBrokerOrderError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MalformedBrokerOrderError";
+  }
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
+}
+
+/** Coerce a present numeric broker field to a finite number or throw. */
+function requireFiniteBrokerField(value: unknown, field: string, brokerLabel: string): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    throw new MalformedBrokerOrderError(
+      `${brokerLabel} order response has non-finite '${field}' (got ${String(value)})`,
+    );
+  }
+  return n;
 }
 
 function parseNumber(value: unknown): number {
@@ -387,7 +410,8 @@ export class RestBrokerAdapter implements BrokerAdapter {
     const response = await fetch(url, { ...init, headers });
     if (!response.ok) {
       const body = await response.text();
-      const details = body.trim().length > 0 ? `: ${body}` : "";
+      const safeBody = redactString(body).slice(0, 500);
+      const details = safeBody.trim().length > 0 ? `: ${safeBody}` : "";
       throw new Error(`${this.displayName} API ${response.status} ${response.statusText}${details}`);
     }
 
@@ -456,30 +480,40 @@ export class RestBrokerAdapter implements BrokerAdapter {
   protected toBrokerOrder(input: unknown): BrokerOrder {
     const raw = asRecord(input) || {};
 
+    const id = String(
+      raw.id
+        ?? raw.orderId
+        ?? raw.order_id
+        ?? raw.orderid
+        ?? raw.order_id_key
+        ?? raw.referenceNumber
+        ?? ""
+    ).trim();
+    if (id.length === 0) {
+      throw new MalformedBrokerOrderError(`${this.displayName} order response is missing an order id`);
+    }
+    if (raw.status === undefined && raw.orderStatus === undefined && raw.order_status === undefined) {
+      throw new MalformedBrokerOrderError(
+        `${this.displayName} order response is missing status (order ${id})`,
+      );
+    }
+
+    const limitPriceRaw = raw.limitPrice !== undefined ? raw.limitPrice : raw.price;
+
     return {
-      id: String(
-        raw.id
-          ?? raw.orderId
-          ?? raw.order_id
-          ?? raw.orderid
-          ?? raw.order_id_key
-          ?? raw.referenceNumber
-          ?? `order-${Date.now()}`
-      ),
+      id,
       clientOrderId: String(raw.clientOrderId ?? raw.client_order_id ?? raw.clientOrderID ?? "").trim() || undefined,
       symbol: String(raw.symbol ?? raw.ticker ?? raw.security ?? raw.instrument ?? ""),
       side: normalizeSide(raw.side ?? raw.orderAction ?? raw.action),
       type: normalizeOrderType(raw.type ?? raw.orderType ?? raw.order_type),
       timeInForce: normalizeTimeInForce(raw.timeInForce ?? raw.tif ?? raw.duration ?? raw.orderTerm),
       status: normalizeOrderStatus(raw.status ?? raw.orderStatus ?? raw.order_status),
-      qty: parseNumber(raw.qty ?? raw.quantity ?? raw.orderQty ?? raw.totalQuantity),
-      filledQty: parseNumber(raw.filledQty ?? raw.filled_quantity ?? raw.executedQuantity ?? raw.filledQuantity),
+      qty: requireFiniteBrokerField(raw.qty ?? raw.quantity ?? raw.orderQty ?? raw.totalQuantity ?? 0, "qty", this.displayName),
+      filledQty: requireFiniteBrokerField(raw.filledQty ?? raw.filled_quantity ?? raw.executedQuantity ?? raw.filledQuantity ?? 0, "filledQty", this.displayName),
       notional: raw.notional !== undefined ? parseNumber(raw.notional) : undefined,
-      limitPrice: raw.limitPrice !== undefined
-        ? parseNumber(raw.limitPrice)
-        : raw.price !== undefined
-          ? parseNumber(raw.price)
-          : undefined,
+      limitPrice: limitPriceRaw !== undefined
+        ? requireFiniteBrokerField(limitPriceRaw, "limitPrice", this.displayName)
+        : undefined,
       stopPrice: raw.stopPrice !== undefined ? parseNumber(raw.stopPrice) : undefined,
       extendedHours: parseBoolean(raw.extendedHours ?? raw.outsideRth ?? raw.marketSession),
       submittedAt: String(raw.submittedAt ?? raw.createdAt ?? raw.orderDate ?? raw.enteredTime ?? "").trim() || undefined,
@@ -610,6 +644,15 @@ export class RestBrokerAdapter implements BrokerAdapter {
   async placeOrder(params: BrokerOrderRequest): Promise<BrokerOrder> {
     if (params.qty === undefined && params.notional === undefined) {
       throw new Error("Broker order requires either qty or notional");
+    }
+
+    // Kill-switch chokepoint — read-only, idempotent. Rejects orders that
+    // reach the adapter while a venue/instrument/firm switch is tripped.
+    if (isKillSwitchesEnabled()) {
+      const decision = isExecutionAllowed({ venue: this.config.brokerId, instrument: params.symbol.toUpperCase() });
+      if (!decision.allowed) {
+        throw new Error(`${decision.reason}. Reset the relevant kill switch before placing this order.`);
+      }
     }
 
     const accountId = await this.resolveAccountId();

@@ -35,7 +35,7 @@ import {
 import { CorrelationChecker } from "./correlation.ts";
 import { RiskAuditLog, riskAuditLog } from "./audit.ts";
 import type { RiskKernelConfig } from "./config.ts";
-import { DEFAULT_RISK_CONFIG } from "./config.ts";
+import { DEFAULT_RISK_CONFIG, resolveLiveSafeMode } from "./config.ts";
 import type { PortfolioContext, OpenPosition } from "./portfolio-context.ts";
 import type { RiskCheck, RiskDecision, OrderRequest } from "./audit.ts";
 
@@ -83,7 +83,7 @@ export class RiskKernel {
   async evaluate(
     order: OrderRequest,
     context: PortfolioContext,
-    opts?: { modeOverride?: RiskKernelConfig["mode"] },
+    opts?: { modeOverride?: RiskKernelConfig["mode"]; sandboxActive?: boolean },
   ): Promise<RiskDecision> {
     const startTime = performance.now();
 
@@ -113,7 +113,14 @@ export class RiskKernel {
 
     let decision: RiskDecision;
 
-    const effectiveMode = opts?.modeOverride ?? this.config.mode;
+    // Resolve mode at the live boundary: an explicit modeOverride wins, but a
+    // `warn` mode (from config/env) is upgraded to `enforce` on a non-sandbox
+    // venue so hard sizing caps cannot be silently disabled on real capital.
+    const requestedMode = opts?.modeOverride ?? this.config.mode;
+    const effectiveMode = resolveLiveSafeMode(
+      requestedMode,
+      opts?.sandboxActive ?? false,
+    );
 
     if (effectiveMode === "paper") {
       // Paper mode: always approve

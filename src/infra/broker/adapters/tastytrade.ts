@@ -27,6 +27,8 @@ import {
   parseNumber,
   unwrapPayload,
 } from "./shared.ts";
+import { isKillSwitchesEnabled, isExecutionAllowed } from "../../safety/killSwitches.ts";
+import { redactString } from "../../platform/observability/valueRedaction.ts";
 
 const DEFAULT_TASTYTRADE_LIVE_BASE_URL = "https://api.tastyworks.com";
 const DEFAULT_TASTYTRADE_PAPER_BASE_URL = "https://api.cert.tastyworks.com";
@@ -128,7 +130,8 @@ export class TastytradeAdapter implements BrokerAdapter {
 
     if (!response.ok) {
       const body = await response.text();
-      const details = body.trim() ? `: ${body}` : "";
+      const safeBody = redactString(body).slice(0, 500);
+      const details = safeBody.trim() ? `: ${safeBody}` : "";
       throw new Error(`tastytrade session creation failed (${response.status} ${response.statusText})${details}`);
     }
 
@@ -173,7 +176,8 @@ export class TastytradeAdapter implements BrokerAdapter {
 
       if (!response.ok) {
         const body = await response.text();
-        const details = body.trim() ? `: ${body}` : "";
+        const safeBody = redactString(body).slice(0, 500);
+        const details = safeBody.trim() ? `: ${safeBody}` : "";
         throw new Error(`tastytrade API ${response.status} ${response.statusText}${details}`);
       }
 
@@ -351,6 +355,14 @@ export class TastytradeAdapter implements BrokerAdapter {
     }
     if ((params.type === "stop" || params.type === "stop_limit") && params.stopPrice === undefined) {
       throw new Error("tastytrade stop orders require stopPrice");
+    }
+
+    // Kill-switch chokepoint — read-only, idempotent.
+    if (isKillSwitchesEnabled()) {
+      const decision = isExecutionAllowed({ venue: this.brokerId, instrument: params.symbol.toUpperCase() });
+      if (!decision.allowed) {
+        throw new Error(`${decision.reason}. Reset the relevant kill switch before placing this order.`);
+      }
     }
 
     const accountId = await this.resolveAccountId();

@@ -28,6 +28,8 @@ import {
   parseNumber,
   unwrapPayload,
 } from "./shared.ts";
+import { isKillSwitchesEnabled, isExecutionAllowed } from "../../safety/killSwitches.ts";
+import { redactString } from "../../platform/observability/valueRedaction.ts";
 
 const DEFAULT_TRADING212_LIVE_BASE_URL = "https://live.trading212.com";
 const DEFAULT_TRADING212_PAPER_BASE_URL = "https://demo.trading212.com";
@@ -108,7 +110,8 @@ export class Trading212Adapter implements BrokerAdapter {
     const response = await fetch(url, { ...init, headers });
     if (!response.ok) {
       const body = await response.text();
-      const details = body.trim() ? `: ${body}` : "";
+      const safeBody = redactString(body).slice(0, 500);
+      const details = safeBody.trim() ? `: ${safeBody}` : "";
       throw new Error(`Trading 212 API ${response.status} ${response.statusText}${details}`);
     }
 
@@ -267,6 +270,14 @@ export class Trading212Adapter implements BrokerAdapter {
     }
     if ((params.type === "stop" || params.type === "stop_limit") && params.stopPrice === undefined) {
       throw new Error("Trading 212 stop orders require stopPrice");
+    }
+
+    // Kill-switch chokepoint — read-only, idempotent.
+    if (isKillSwitchesEnabled()) {
+      const decision = isExecutionAllowed({ venue: this.brokerId, instrument: params.symbol.toUpperCase() });
+      if (!decision.allowed) {
+        throw new Error(`${decision.reason}. Reset the relevant kill switch before placing this order.`);
+      }
     }
 
     const payload: Record<string, unknown> = {

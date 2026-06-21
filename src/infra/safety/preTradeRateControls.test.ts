@@ -4,14 +4,70 @@ import {
   isPreTradeRateControlsEnabled,
   checkPreTradeRate,
   rateCheckToPayload,
+  recordRateEvent,
+  evaluatePreTradeRate,
+  resetRateEvents,
+  DEFAULT_LIMITS,
   PRETRADE_RATE_CONTROLS_FLAG_ENV,
+  PRETRADE_RATE_CONTROLS_DISABLE_ENV,
   type RateEvent,
 } from "./preTradeRateControls.ts";
 
-describe("isPreTradeRateControlsEnabled", () => {
-  it("respects the flag", () => {
-    expect(isPreTradeRateControlsEnabled({})).toBe(false);
+describe("isPreTradeRateControlsEnabled — default-on", () => {
+  it("enabled by default (empty env)", () => {
+    expect(isPreTradeRateControlsEnabled({})).toBe(true);
+  });
+
+  it("stays enabled even when the legacy affirmative flag is set", () => {
     expect(isPreTradeRateControlsEnabled({ [PRETRADE_RATE_CONTROLS_FLAG_ENV]: "1" })).toBe(true);
+  });
+
+  it("disabled only by the explicit opt-out env", () => {
+    expect(isPreTradeRateControlsEnabled({ [PRETRADE_RATE_CONTROLS_DISABLE_ENV]: "1" })).toBe(false);
+    expect(isPreTradeRateControlsEnabled({ [PRETRADE_RATE_CONTROLS_DISABLE_ENV]: "true" })).toBe(false);
+  });
+});
+
+describe("in-process recorder — recordRateEvent / evaluatePreTradeRate", () => {
+  it("records submits and breaches the message-rate cap under a flood", () => {
+    resetRateEvents();
+    const t0 = Date.now();
+    // Push more than maxMessagesPerSecond * windowMs/1000 submits inside the window.
+    const flood = DEFAULT_LIMITS.maxMessagesPerSecond * (DEFAULT_LIMITS.windowMs / 1000) + 50;
+    for (let i = 0; i < flood; i++) recordRateEvent("submit", "BTC", t0 + i);
+    const r = evaluatePreTradeRate({ proposedKind: "submit", proposedInstrument: "BTC", nowMs: t0 + flood });
+    expect(r.allowed).toBe(false);
+    expect(r.breaches).toContain("messages_per_second");
+    resetRateEvents();
+  });
+
+  it("a quiet window is allowed", () => {
+    resetRateEvents();
+    const t0 = Date.now();
+    recordRateEvent("submit", "ETH", t0);
+    recordRateEvent("fill", "ETH", t0 + 1);
+    const r = evaluatePreTradeRate({ proposedKind: "submit", proposedInstrument: "ETH", nowMs: t0 + 2 });
+    expect(r.allowed).toBe(true);
+    resetRateEvents();
+  });
+
+  it("open-order count per instrument trips the cap", () => {
+    resetRateEvents();
+    const t0 = Date.now();
+    for (let i = 0; i < DEFAULT_LIMITS.maxOpenOrdersPerInstrument; i++) {
+      recordRateEvent("submit", "SOL", t0 + i);
+    }
+    const r = evaluatePreTradeRate({ proposedKind: "submit", proposedInstrument: "SOL", nowMs: t0 + 100 });
+    expect(r.breaches).toContain("open_orders_per_instrument");
+    resetRateEvents();
+  });
+
+  it("resetRateEvents clears the window", () => {
+    resetRateEvents();
+    recordRateEvent("submit", "BTC");
+    resetRateEvents();
+    const r = evaluatePreTradeRate({ proposedKind: "submit", proposedInstrument: "BTC", nowMs: Date.now() });
+    expect(r.observed.messagesPerSecond).toBe(0);
   });
 });
 

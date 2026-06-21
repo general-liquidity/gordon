@@ -33,6 +33,7 @@ import { dirname, join } from "node:path";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 
 import { recordStructuredObservation } from "../../../../platform/observability/index.ts";
+import { redactString } from "../../../../platform/observability/valueRedaction.ts";
 import { appendActionLogEntry } from "../../../../action-log/index.ts";
 import { createModuleLogger } from "../../../../logger/index.ts";
 
@@ -60,8 +61,12 @@ export function appendAgentFeedback(
   try {
     const dir = dirname(path);
     mkdirSync(dir, { recursive: true });
+    // Redact credential/PII-shaped values out of the free-text fields the
+    // agent supplies before they are written to disk.
     const row: AgentFeedbackEntry = {
       ...entry,
+      blocker: redactString(entry.blocker),
+      approachesTried: entry.approachesTried.map((a) => redactString(a)),
       appendedAt: new Date().toISOString(),
     };
     appendFileSync(path, JSON.stringify(row) + "\n", { encoding: "utf-8" });

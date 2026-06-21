@@ -27,6 +27,7 @@ import { createModuleLogger } from "../../../logger/index.ts";
 import { resolveMonitoredSymbols } from "../candleFetch.ts";
 import { fetchHeadlines, type NewsHeadline } from "../../../news/cryptoHeadlines.ts";
 import { scoreSentiment } from "../../../news/sentiment.ts";
+import { wrapUntrustedContent } from "../../../security/untrustedContent.ts";
 
 const logger = createModuleLogger("news-event-producer");
 
@@ -104,11 +105,13 @@ export const newsEventProducer: CandidateProducer = async (obs): Promise<Proacti
         ? `Consider whether the news strengthens an existing long thesis or unwinds a short on ${baseSymbol}.`
         : `Consider tightening stops on long ${baseSymbol} positions or pausing new entries until the dust settles.`;
 
+    const wrappedTitle = wrapUntrustedContent(best.headline.title, best.headline.source);
+
     candidates.push(
       buildCandidate(
         "news_event",
-        `${tone} news on ${baseSymbol}: ${best.headline.title}`,
-        `${best.headline.source} just ran "${best.headline.title}". Sentiment: ${best.score.sentiment} (${(best.score.confidence * 100).toFixed(0)}% confidence). Matched keywords: ${best.score.matchedKeywords.slice(0, 4).join(", ")}.`,
+        `${tone} news on ${baseSymbol}: ${wrappedTitle}`,
+        `${best.headline.source} just ran "${wrappedTitle}". Sentiment: ${best.score.sentiment} (${(best.score.confidence * 100).toFixed(0)}% confidence). Matched keywords: ${best.score.matchedKeywords.slice(0, 4).join(", ")}.`,
         {
           confidence: best.score.confidence,
           action,

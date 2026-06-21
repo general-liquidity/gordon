@@ -178,3 +178,29 @@ describe("Exfiltration scenario — pastebin.com", () => {
     ).toThrow(BlockedOutboundError);
   });
 });
+
+describe("Launch-hardening: Dedalus primary host + typo guard", () => {
+  it("allows the primary Dedalus router host api.dedaluslabs.ai", () => {
+    const r = checkOutbound({ url: "https://api.dedaluslabs.ai/v1/chat/completions" });
+    expect(r.allowed).toBe(true);
+    expect(r.host).toBe("api.dedaluslabs.ai");
+  });
+
+  it("allows a real exchange host api.binance.com", () => {
+    const r = checkOutbound({ url: "https://api.binance.com/api/v3/ping" });
+    expect(r.allowed).toBe(true);
+  });
+
+  it("blocks the old typo host api.dedalus.ai", () => {
+    const r = checkOutbound({ url: "https://api.dedalus.ai/v1/chat/completions" });
+    expect(r.allowed).toBe(false);
+    expect(() =>
+      enforceOutbound({ url: "https://api.dedalus.ai/v1/chat/completions" }, { mode: "block" }),
+    ).toThrow(BlockedOutboundError);
+  });
+
+  it("blocks pastebin.com", () => {
+    const r = checkOutbound({ url: "https://pastebin.com/raw/xyz" });
+    expect(r.allowed).toBe(false);
+  });
+});

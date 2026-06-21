@@ -38,6 +38,12 @@ import { appendActionLogEntry } from "../../../action-log/index.ts";
 import { appendExecutionRecordFresh, isTradeLedgerEnabled, readExecutionRecords, getExecutionRecord, executionRecordToPayload } from "../../../safety/tradeLedger.ts";
 import { checkKillSwitchForOrder } from "../../../safety/killSwitchGate.ts";
 import {
+  isPreTradeRateControlsEnabled,
+  evaluatePreTradeRate,
+  recordRateEvent,
+  rateCheckToPayload,
+} from "../../../safety/preTradeRateControls.ts";
+import {
   activeConstitutionHalt,
   passesConstitution,
 } from "../../../safety/defense/tradingConstitution.ts";
@@ -1190,11 +1196,48 @@ export const executePlanTool = createTool({
       }
     }
 
+    // Pre-trade order-frequency cap (default-on, LAST in the safety stack —
+    // runs only after every other gate has cleared, immediately before submit).
+    // Refuses explicitly on breach; never silently drops the order.
+    if (isPreTradeRateControlsEnabled()) {
+      const rateCheck = evaluatePreTradeRate({
+        proposedKind: "submit",
+        proposedInstrument: plan.symbol,
+      });
+      if (!rateCheck.allowed) {
+        recordStructuredObservation({
+          eventType: "execution.blocked",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "failure",
+          status: "rate_limit_exceeded",
+          controllability: classifyBlockedStatus("rate_limit_exceeded"),
+          mode: ctx.config.permissionMode,
+          planId,
+          symbol: plan.symbol,
+          reason: rateCheck.reason,
+          details: rateCheckToPayload(rateCheck),
+        });
+        return validateToolOutput(executePlanOutputSchema, {
+          success: false,
+          error: `Pre-trade rate limit exceeded: ${rateCheck.reason}. Slow down order submission and retry.`,
+        }, { toolName: "execute_plan" });
+      }
+    }
+
     const result = await executePlan(ctx.exchange, plan, ctx.config, {
       totalValue: ctx.portfolioValue,
       availableCash: ctx.availableCash,
       openPositions: getActiveTrades().length,
     });
+
+    // Record the submit into the in-process rate window so subsequent
+    // execute_plan calls see this order's contribution to the frequency cap.
+    if (isPreTradeRateControlsEnabled() && result.success) {
+      recordRateEvent("submit", plan.symbol);
+    }
 
     if (!result.success) {
       deactivateSessionPlan(planId);

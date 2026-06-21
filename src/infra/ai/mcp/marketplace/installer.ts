@@ -29,6 +29,54 @@ function getDefaultPluginsDir(): string {
 /** Installed plugins manifest file */
 const INSTALLED_MANIFEST = 'installed.json';
 
+/**
+ * Launchers a plugin manifest is permitted to spawn. An MCP server runs as a
+ * child process with the daemon's privileges — an arbitrary `command` is RCE.
+ * Constrain it to known package-runner / interpreter launchers.
+ */
+const ALLOWED_LAUNCHERS = new Set(['npx', 'npm', 'bun', 'bunx', 'node', 'python', 'python3', 'uvx']);
+
+/** Shell metacharacters that enable command chaining / injection. */
+const SHELL_METACHAR = /[;|&$`><\n\r]/;
+
+/**
+ * Validate a plugin's launch command + args before it can be spawned.
+ *
+ * Returns an error string when the command or any arg is unsafe, or `null`
+ * when safe (or when no command is present — manifests without a command
+ * never spawn a process, so there is nothing to validate).
+ */
+export function validatePluginCommand(command?: string, args?: string[]): string | null {
+  if (command === undefined) return null;
+
+  if (typeof command !== 'string' || command.length === 0) {
+    return 'Plugin command must be a non-empty string';
+  }
+  if (SHELL_METACHAR.test(command)) {
+    return `Plugin command contains shell metacharacters: "${command}"`;
+  }
+
+  if (!path.isAbsolute(command)) {
+    const base = path.basename(command).replace(/\.(exe|cmd|bat)$/i, '');
+    if (!ALLOWED_LAUNCHERS.has(base)) {
+      return `Plugin command launcher "${base}" is not in the allowlist (${[...ALLOWED_LAUNCHERS].join(', ')})`;
+    }
+  }
+
+  if (args !== undefined) {
+    for (const arg of args) {
+      if (typeof arg !== 'string') {
+        return 'Plugin command args must all be strings';
+      }
+      if (SHELL_METACHAR.test(arg)) {
+        return `Plugin command arg contains shell metacharacters: "${arg}"`;
+      }
+    }
+  }
+
+  return null;
+}
+
 // ============================================================================
 // Plugin Installer
 // ============================================================================
@@ -511,6 +559,12 @@ export class PluginInstaller {
           errors.push(`Tool "${tool.name}" missing "description" field`);
         }
       }
+    }
+
+    // Command validation — reject manifests that would spawn an unsafe process.
+    const commandError = validatePluginCommand(manifest.command, manifest.args);
+    if (commandError) {
+      errors.push(commandError);
     }
 
     // Authentication validation

@@ -1,5 +1,5 @@
 import net from "node:net";
-import { unlink } from "node:fs/promises";
+import { chmod, unlink } from "node:fs/promises";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { GORDON_DIR } from "../../infra/storage/paths.ts";
 import type { GatewayRuntime } from "../runtime/gateway-runtime.ts";
@@ -106,6 +106,12 @@ export async function startGatewayIpcServer(input: {
       resolve();
     });
   });
+
+  // Restrict the socket to owner-only so a local multi-user box can't connect
+  // to the daemon's unauthenticated IPC surface. No-op on Windows named pipes.
+  if (process.platform !== "win32") {
+    await chmod(socketPath, 0o600);
+  }
 
   logger.info("Gateway IPC server started", { socketPath });
 

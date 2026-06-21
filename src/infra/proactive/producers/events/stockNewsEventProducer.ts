@@ -24,6 +24,7 @@ import { createModuleLogger } from "../../../logger/index.ts";
 import { finnhub, isFinnhubConfigured } from "../../../data/providers/finnhub.ts";
 import { fetchStockHeadlines, type StockHeadline } from "../../../news/stockHeadlines.ts";
 import { scoreSentiment, type SentimentScore } from "../../../news/sentiment.ts";
+import { wrapUntrustedContent } from "../../../security/untrustedContent.ts";
 
 const logger = createModuleLogger("stock-news-event-producer");
 
@@ -161,12 +162,13 @@ export const stockNewsEventProducer: CandidateProducer = async (obs): Promise<Pr
         : `Consider tightening stops on long ${ticker} positions or pausing new entries until the dust settles.`;
 
     const confidence = isFiling ? Math.max(0.7, best.score.confidence) : best.score.confidence;
+    const wrappedTitle = wrapUntrustedContent(best.title, best.source);
 
     candidates.push(
       buildCandidate(
         "news_event",
-        `${tone} news on ${ticker}: ${best.title}`,
-        `${best.source} flagged "${best.title}". ${
+        `${tone} news on ${ticker}: ${wrappedTitle}`,
+        `${best.source} flagged "${wrappedTitle}". ${
           isFiling
             ? "8-K filings disclose unscheduled material events — read promptly."
             : `Sentiment: ${best.score.sentiment} (${(best.score.confidence * 100).toFixed(0)}% confidence). Matched: ${best.score.matchedKeywords.slice(0, 4).join(", ")}.`

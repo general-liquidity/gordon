@@ -11,12 +11,12 @@
  * `checkForInjection` machinery (the static-pattern leg of the SkillSpector
  * idea — not the heavier LLM intent-mismatch leg).
  *
- * Policy mirrors Gordon's other guards: warn-by-default, opt-in enforce.
+ * Policy: enforce-by-default for non-builtin skills, opt OUT to warn-only.
  *   - builtin skills are first-party (in-repo, vetted) → never scanned (no noise).
  *   - user / project / plugin skills are scanned. Injection in the DESCRIPTION
  *     is neutralized (wrapped as data, like a tool description). Injection in the
  *     BODY can't be wrapped-as-data (the body IS the instructions), so it is
- *     flagged on the Skill and, under GORDON_SKILL_INJECTION_GUARD, blocks load.
+ *     flagged on the Skill and, unless GORDON_SKILL_INJECTION_GUARD=0, blocks load.
  */
 
 import { checkForInjection, sanitizeToolDescription } from "../safety/defense/injectionDefense.ts";
@@ -24,9 +24,15 @@ import type { SkillSecurityScan, SkillSource } from "./types.ts";
 
 export const SKILL_INJECTION_GUARD_ENV = "GORDON_SKILL_INJECTION_GUARD";
 
-/** When enabled, a body whose injection match is blocking-level refuses to load. */
+/**
+ * When enabled, a body whose injection match is blocking-level refuses to load.
+ * ON by default for non-builtin skills — a poisoned third-party SKILL.md body
+ * reaches a money agent's reasoning directly, so fail closed. Operators opt OUT
+ * with GORDON_SKILL_INJECTION_GUARD=0 (or "false").
+ */
 export function isSkillInjectionGuardEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[SKILL_INJECTION_GUARD_ENV] === "1" || env[SKILL_INJECTION_GUARD_ENV] === "true";
+  const value = env[SKILL_INJECTION_GUARD_ENV];
+  return value !== "0" && value !== "false";
 }
 
 export interface SkillSecurityResult {

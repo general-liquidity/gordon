@@ -138,6 +138,33 @@ export function loadConfigFromEnv(overrides?: Partial<RiskKernelConfig>): RiskKe
 // Helpers
 // ============================================================================
 
+/**
+ * Resolve the effective risk mode against live-venue state.
+ *
+ * `GORDON_RISK_MODE=warn` flows straight through `loadConfigFromEnv`, which
+ * means a misconfigured operator could silently disable the hard sizing caps
+ * on a LIVE venue (warn mode logs violations but lets every order through).
+ * That is acceptable on a sandbox/paper venue where fills are simulated, but
+ * never on real capital.
+ *
+ * Rule: when the venue is NOT sandbox/paper, `warn` is upgraded to `enforce`.
+ * `paper` mode is left untouched — operators may intentionally run paper
+ * evaluation logic, and the venue itself blocks real fills. Returns the mode
+ * unchanged on a sandbox venue.
+ */
+export function resolveLiveSafeMode(
+  mode: RiskKernelConfig["mode"],
+  sandboxActive: boolean,
+): RiskKernelConfig["mode"] {
+  if (mode === "warn" && !sandboxActive) {
+    logger.warn(
+      "GORDON_RISK_MODE=warn overridden to enforce on a live venue — hard risk caps stay active on real capital",
+    );
+    return "enforce";
+  }
+  return mode;
+}
+
 function parseEnvNumber(val: string | undefined): number | undefined {
   if (val === undefined || val === "") return undefined;
   const num = Number(val);

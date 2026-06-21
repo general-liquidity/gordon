@@ -82,7 +82,9 @@ export class GatewayRuntime {
 
   constructor(deps: GatewayRuntimeDeps) {
     this.deps = {
-      requireAuth: deps.requireAuth ?? false,
+      // Fail closed: an embedder that forgets to set requireAuth gets an
+      // authenticated gateway, not an open execution surface.
+      requireAuth: deps.requireAuth ?? true,
       resolveContext: deps.resolveContext,
       onDaemonShutdown: deps.onDaemonShutdown ?? (() => undefined),
     };

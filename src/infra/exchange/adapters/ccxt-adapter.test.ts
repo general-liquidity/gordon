@@ -1,9 +1,13 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, afterEach } from "bun:test";
 import {
   CcxtAdapter,
   toCcxtSymbol,
   fromCcxtSymbol,
 } from "./ccxt-adapter.ts";
+import {
+  tripKillSwitch,
+  resetAllKillSwitches,
+} from "../../safety/killSwitches.ts";
 
 // =================== symbol normalization ===================
 
@@ -765,5 +769,188 @@ describe("CcxtAdapter — capability introspection", () => {
     };
     const adapter = CcxtAdapter.__forTesting("bybit", mock);
     expect(adapter.getFeatures()).toEqual(features);
+  });
+});
+
+// =================== P1-5: kill-switch chokepoint ===================
+
+describe("CcxtAdapter — kill-switch chokepoint (P1-5)", () => {
+  afterEach(() => {
+    resetAllKillSwitches("test cleanup of kill switches");
+  });
+
+  it("placeOrder rejects when a venue kill switch is tripped", async () => {
+    const adapter = CcxtAdapter.__forTesting("binance", makeMockClient());
+    tripKillSwitch({ scope: "venue", id: "ccxt:binance" }, "manual halt for test");
+    await expect(
+      adapter.placeOrder({ symbol: "BTCUSDT", side: "BUY", type: "MARKET", quantity: 0.1 }),
+    ).rejects.toThrow(/kill switch/i);
+  });
+
+  it("placeOrder rejects when the firm-wide switch is tripped", async () => {
+    const adapter = CcxtAdapter.__forTesting("binance", makeMockClient());
+    tripKillSwitch({ scope: "firm" }, "firm-wide halt for test");
+    await expect(
+      adapter.placeOrder({ symbol: "BTCUSDT", side: "BUY", type: "MARKET", quantity: 0.1 }),
+    ).rejects.toThrow();
+  });
+
+  it("placeOrder proceeds when no switch is tripped", async () => {
+    const adapter = CcxtAdapter.__forTesting("binance", makeMockClient());
+    const order = await adapter.placeOrder({
+      symbol: "BTCUSDT",
+      side: "BUY",
+      type: "LIMIT",
+      quantity: 0.1,
+      price: 50000,
+    });
+    expect(order.orderId).toBe("order-123");
+  });
+});
+
+// =================== P1-5b: setLeverage clamp ===================
+
+describe("CcxtAdapter — setLeverage clamp (P1-5b)", () => {
+  it("clamps a request above maxLeverage down to the cap", async () => {
+    let leverageCall: number | undefined;
+    const mock = makeMockClient({
+      setLeverage: async (l: number, _s: string) => {
+        leverageCall = l;
+      },
+    });
+    const adapter = CcxtAdapter.__forTesting("bybit", mock, false, { maxLeverage: 10 });
+    await adapter.setLeverage(125, "BTCUSDT");
+    expect(leverageCall).toBe(10);
+  });
+
+  it("passes leverage through unchanged when below the cap", async () => {
+    let leverageCall: number | undefined;
+    const mock = makeMockClient({
+      setLeverage: async (l: number, _s: string) => {
+        leverageCall = l;
+      },
+    });
+    const adapter = CcxtAdapter.__forTesting("bybit", mock, false, { maxLeverage: 10 });
+    await adapter.setLeverage(5, "BTCUSDT");
+    expect(leverageCall).toBe(5);
+  });
+
+  it("does not clamp when no cap is configured (Infinity default)", async () => {
+    let leverageCall: number | undefined;
+    const mock = makeMockClient({
+      setLeverage: async (l: number, _s: string) => {
+        leverageCall = l;
+      },
+    });
+    const adapter = CcxtAdapter.__forTesting("bybit", mock);
+    await adapter.setLeverage(125, "BTCUSDT");
+    expect(leverageCall).toBe(125);
+  });
+});
+
+// =================== P1-9: malformed-response guards ===================
+
+describe("CcxtAdapter — malformed order responses throw (P1-9)", () => {
+  it("throws when the order id is missing", async () => {
+    const mock = makeMockClient({
+      createOrder: async (symbol: string, type: string, side: string, amount: number, price?: number) => ({
+        // no id
+        symbol,
+        type,
+        side,
+        amount,
+        price: price ?? 50000,
+        filled: 0,
+        cost: 0,
+        status: "open",
+      }),
+    });
+    const adapter = CcxtAdapter.__forTesting("binance", mock);
+    await expect(
+      adapter.placeOrder({ symbol: "BTCUSDT", side: "BUY", type: "MARKET", quantity: 0.1 }),
+    ).rejects.toThrow(/order id/i);
+  });
+
+  it("throws when status is missing", async () => {
+    const mock = makeMockClient({
+      createOrder: async (symbol: string, type: string, side: string, amount: number, price?: number) => ({
+        id: "order-123",
+        symbol,
+        type,
+        side,
+        amount,
+        price: price ?? 50000,
+        filled: 0,
+        cost: 0,
+        // no status
+      }),
+    });
+    const adapter = CcxtAdapter.__forTesting("binance", mock);
+    await expect(
+      adapter.placeOrder({ symbol: "BTCUSDT", side: "BUY", type: "MARKET", quantity: 0.1 }),
+    ).rejects.toThrow(/status/i);
+  });
+
+  it("throws when filled coerces to NaN", async () => {
+    const mock = makeMockClient({
+      createOrder: async (symbol: string, type: string, side: string, amount: number, price?: number) => ({
+        id: "order-123",
+        symbol,
+        type,
+        side,
+        amount,
+        price: price ?? 50000,
+        filled: "not-a-number",
+        cost: 0,
+        status: "open",
+      }),
+    });
+    const adapter = CcxtAdapter.__forTesting("binance", mock);
+    await expect(
+      adapter.placeOrder({ symbol: "BTCUSDT", side: "BUY", type: "MARKET", quantity: 0.1 }),
+    ).rejects.toThrow(/filled/i);
+  });
+
+  it("throws when price coerces to NaN", async () => {
+    const mock = makeMockClient({
+      createOrder: async (symbol: string, type: string, side: string, amount: number) => ({
+        id: "order-123",
+        symbol,
+        type,
+        side,
+        amount,
+        price: "garbage",
+        filled: 0,
+        cost: 0,
+        status: "open",
+      }),
+    });
+    const adapter = CcxtAdapter.__forTesting("binance", mock);
+    await expect(
+      adapter.placeOrder({ symbol: "BTCUSDT", side: "BUY", type: "MARKET", quantity: 0.1 }),
+    ).rejects.toThrow(/price/i);
+  });
+
+  it("parses a well-formed order without throwing", async () => {
+    const adapter = CcxtAdapter.__forTesting("binance", makeMockClient());
+    const order = await adapter.placeOrder({
+      symbol: "BTCUSDT",
+      side: "BUY",
+      type: "LIMIT",
+      quantity: 0.1,
+      price: 50000,
+    });
+    expect(order.orderId).toBe("order-123");
+    expect(order.status).toBe("NEW");
+  });
+
+  it("getCandles throws on a malformed OHLC value", async () => {
+    const mock = makeMockClient({
+      fetchOHLCV: async () => [
+        [Date.now(), 100, "bad-high", 90, 105, 1000],
+      ],
+    });
+    const adapter = CcxtAdapter.__forTesting("binance", mock);
+    await expect(adapter.getCandles("BTCUSDT", "1m", 1)).rejects.toThrow(/malformed OHLC/i);
   });
 });

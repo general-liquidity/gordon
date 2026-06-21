@@ -35,6 +35,7 @@ import {
   BackgroundDispatchManager,
   type CompletedBackgroundTask,
 } from "../background/backgroundDispatch.ts";
+import { isCostHalted } from "../../platform/costTracker.ts";
 
 const logger = createModuleLogger("orchestrator-stream");
 
@@ -144,6 +145,25 @@ export async function validateToolCall(
   currentAgent: string | undefined,
   context: GordonContext,
 ): Promise<ToolCallValidationResult> {
+  // 0. Cost-budget halt — block all tool dispatch when the session/daily
+  // LLM cost budget has been exceeded (action="halt"). Checked before loop
+  // detection so a halted session stops spending immediately.
+  if (isCostHalted()) {
+    return {
+      allowed: false,
+      shouldReturn: true,
+      event: {
+        type: "error",
+        error: formatRecoveryGuidance({
+          category: "policy_block",
+          title: "Cost budget halted",
+          detail: "Daily/session LLM cost budget exceeded",
+          nextSteps: ["/cost reset to resume"],
+        }),
+      },
+    };
+  }
+
   // 1. Loop detection
   const loopState = recordToolCallFingerprint(context, toolName, toolArgs ?? {});
   // Per-turn tool-friction telemetry — distinct from loop detection:

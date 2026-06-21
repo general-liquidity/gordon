@@ -145,17 +145,27 @@ export class BirdeyeDataSource implements DataSource {
       const body = (await response.json()) as BirdeyeOhlcvResponse;
       const items = body.data?.items ?? [];
 
-      const candles: Candle[] = items.map((item) => {
+      const candles: Candle[] = items.flatMap((item) => {
         const openTime = item.unixTime * 1000;
-        return {
+        // Drop malformed bars rather than emitting a candle with a NaN OHLC —
+        // a corrupt price would silently poison downstream indicators/risk.
+        if (
+          !Number.isFinite(item.o) ||
+          !Number.isFinite(item.h) ||
+          !Number.isFinite(item.l) ||
+          !Number.isFinite(item.c)
+        ) {
+          return [];
+        }
+        return [{
           openTime,
           open: item.o,
           high: item.h,
           low: item.l,
           close: item.c,
-          volume: item.v,
+          volume: Number.isFinite(item.v) ? item.v : 0,
           closeTime: openTime + intervalMs - 1,
-        };
+        }];
       });
 
       return candles

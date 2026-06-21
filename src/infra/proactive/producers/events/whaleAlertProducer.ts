@@ -13,6 +13,7 @@ import type { ProactiveSuggestion } from "../../types.ts";
 import { createModuleLogger } from "../../../logger/index.ts";
 import { resolveMonitoredSymbols } from "../candleFetch.ts";
 import { fetchHeadlines, type NewsHeadline } from "../../../news/cryptoHeadlines.ts";
+import { wrapUntrustedContent } from "../../../security/untrustedContent.ts";
 
 const logger = createModuleLogger("whale-alert-producer");
 
@@ -91,11 +92,13 @@ export const whaleAlertProducer: CandidateProducer = async (obs): Promise<Proact
 
     already.add(best.headline.link);
 
+    const wrappedTitle = wrapUntrustedContent(best.headline.title, best.headline.source);
+
     candidates.push(
       buildCandidate(
         "whale_alert",
-        `Whale activity on ${baseSymbol}: ${best.headline.title}`,
-        `${best.headline.source} flagged "${best.headline.title}" — matched ${best.labels.join(", ")}. ` +
+        `Whale activity on ${baseSymbol}: ${wrappedTitle}`,
+        `${best.headline.source} flagged "${wrappedTitle}" — matched ${best.labels.join(", ")}. ` +
           `Large-wallet flows can front-run positioning; review exposure on ${baseSymbol} and cross-check with wallet-intel MCP if installed.`,
         {
           confidence: best.confidence,

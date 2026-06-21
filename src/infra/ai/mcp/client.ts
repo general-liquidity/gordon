@@ -31,7 +31,7 @@ import { MCPClient } from "@mastra/mcp";
 import type { Tool } from "@mastra/core/tools";
 import type { MastraMCPServerDefinition } from "@mastra/mcp";
 
-import { pluginInstaller } from "./marketplace/installer.ts";
+import { pluginInstaller, validatePluginCommand } from "./marketplace/installer.ts";
 import { credentialManager } from "./credentials.ts";
 import type { MCPCategory, MCPServerManifest } from "./types.ts";
 import { withRetry, isServerCachedAsFailing, recordServerSuccess } from "./resilience.ts";
@@ -292,6 +292,11 @@ export async function initMCPTools(): Promise<Record<string, Tool>> {
       // Build server definitions from installed plugins
       const servers: Record<string, MastraMCPServerDefinition> = {};
       for (const plugin of installed) {
+        const commandError = validatePluginCommand(plugin.manifest.command, plugin.manifest.args);
+        if (commandError) {
+          console.warn(`[MCP] Skipping plugin "${plugin.id}" — unsafe command: ${commandError}`);
+          continue;
+        }
         const serverDef = manifestToServerDef(plugin.manifest);
         if (serverDef) {
           servers[plugin.id] = serverDef;

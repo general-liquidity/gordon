@@ -19,6 +19,7 @@ import {
   recordStructuredObservation,
 } from "../../infra/platform/observability/index.ts";
 import { getExecutionVenueMetadata, getIntegrationSurfaceMetadata } from "../../infra/domain/integrations/index.ts";
+import { setCostBudget } from "../../infra/platform/costTracker.ts";
 import type {
   GordonConfig,
   MultiBrokerConfig,
@@ -570,6 +571,26 @@ export function formatDoctorReport(report: DoctorReport): string {
 export async function applyBootstrap(options: BootstrapOptions): Promise<BootstrapResult> {
   let config = await loadConfig();
   const envKeys: Partial<EnvKeys> = {};
+
+  // Cost-budget enforcement: install a session (and optional daily) USD
+  // budget with action="halt" at boot. Once exceeded, LLM dispatch and tool
+  // calls are blocked until /cost reset. Disable via GORDON_COST_BUDGET_DISABLE=1
+  // or by setting the session budget to 0.
+  const sessionBudgetUsd = process.env.GORDON_COST_BUDGET_USD !== undefined
+    ? Number(process.env.GORDON_COST_BUDGET_USD)
+    : 25;
+  if (process.env.GORDON_COST_BUDGET_DISABLE === "1" || sessionBudgetUsd === 0) {
+    setCostBudget(null);
+  } else {
+    setCostBudget({
+      sessionUsd: sessionBudgetUsd,
+      dailyUsd: process.env.GORDON_DAILY_COST_BUDGET_USD
+        ? Number(process.env.GORDON_DAILY_COST_BUDGET_USD)
+        : undefined,
+      action: "halt",
+      warnThresholds: [0.5, 0.75, 0.9],
+    });
+  }
 
   if (options.llmProvider && options.llmKey) {
     if (options.llmProvider === "openai") envKeys.OPENAI_API_KEY = options.llmKey;

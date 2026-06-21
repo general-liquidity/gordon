@@ -149,6 +149,42 @@ describe("redactValues — PEM private keys", () => {
   });
 });
 
+describe("redactValues — launch-hardening patterns", () => {
+  test("redacts a scoped 64-hex api key", () => {
+    const hex = "a".repeat(64);
+    const result = redactValues(`api_key=${hex}`);
+    expect(result.matched.length).toBeGreaterThan(0);
+    expect(result.text).not.toContain(hex);
+    expect(result.text).toContain(REDACTION_PLACEHOLDER);
+  });
+
+  test("redacts a long high-entropy token (40 chars)", () => {
+    const token = "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0";
+    const result = redactValues(`opaque session ${token} end`);
+    expect(result.text).not.toContain(token);
+    expect(result.text).toContain(REDACTION_PLACEHOLDER);
+  });
+
+  test("redacts a scoped account number", () => {
+    const result = redactValues("account=ABC123XYZ extra");
+    expect(result.matched).toContain("account_number");
+    expect(result.text).not.toContain("ABC123XYZ");
+    expect(result.text).toContain("account=");
+  });
+
+  test("does NOT redact prices / quantities", () => {
+    const result = redactValues("price=64250.50 qty=0.5 size=12");
+    expect(result.text).toBe("price=64250.50 qty=0.5 size=12");
+    expect(result.redactionCount).toBe(0);
+  });
+
+  test("does NOT redact a short order id or symbol", () => {
+    const result = redactValues("symbol=BTCUSDT side=BUY ts=1718900000");
+    expect(result.text).toBe("symbol=BTCUSDT side=BUY ts=1718900000");
+    expect(result.redactionCount).toBe(0);
+  });
+});
+
 describe("redactValues — clean input", () => {
   test("returns text unchanged when no patterns match", () => {
     const text = "BTC price moved from 60000 to 62500 today, +4.2%";

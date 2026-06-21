@@ -111,6 +111,33 @@ const PATTERNS: ReadonlyArray<{
       /-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----[\s\S]+?-----END (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g,
     strategy: "full",
   },
+  // Scoped 64-hex API key / secret — match only when prefixed with an
+  // obvious key-name so a 64-hex transaction hash in prose survives.
+  // Capture group 1 is the secret value.
+  {
+    name: "hex64_keyed_secret",
+    pattern:
+      /(?:api[-_]?key|secret|token|apikey)["']?\s*[:=]\s*["']?([a-fA-F0-9]{64})["']?/gi,
+    strategy: "group1",
+  },
+  // Scoped account number — keyed on an account-name prefix. NO bare
+  // numeric matcher: must not redact prices / quantities. Group 1 is the
+  // account identifier.
+  {
+    name: "account_number",
+    pattern:
+      /(?:account|acct|account[-_]?number|account[-_]?id)["']?\s*[:=]\s*["']?([A-Za-z0-9-]{6,})["']?/gi,
+    strategy: "group1",
+  },
+  // High-entropy opaque token — long base64url/secret-shaped run. Full
+  // redaction. Ported from HandoffCoordinator's secret scrubber. Runs
+  // LAST so scoped patterns above keep their narrower behavior; the
+  // `{32,}` floor avoids eating prices/quantities/short identifiers.
+  {
+    name: "high_entropy_token",
+    pattern: /\b[A-Za-z0-9+/_-]{32,}={0,2}\b/g,
+    strategy: "full",
+  },
 ];
 
 export interface RedactionResult {

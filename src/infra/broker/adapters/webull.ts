@@ -25,6 +25,8 @@ import type {
   BrokerQuote,
   BrokerTimeInForce,
 } from "../types.ts";
+import { isKillSwitchesEnabled, isExecutionAllowed } from "../../safety/killSwitches.ts";
+import { redactString } from "../../platform/observability/valueRedaction.ts";
 
 const DEFAULT_WEBULL_LIVE_BASE_URL = "https://api.webull.com";
 const DEFAULT_WEBULL_PAPER_BASE_URL = "https://us-openapi-alb.uat.webullbroker.com";
@@ -395,7 +397,8 @@ export class WebullAdapter implements BrokerAdapter {
 
     if (!response.ok) {
       const bodyText = await response.text();
-      const details = bodyText.trim().length > 0 ? `: ${bodyText}` : "";
+      const safeBody = redactString(bodyText).slice(0, 500);
+      const details = safeBody.trim().length > 0 ? `: ${safeBody}` : "";
       throw new WebullApiError(response.status, `Webull API ${response.status} ${response.statusText}${details}`);
     }
 
@@ -644,6 +647,14 @@ export class WebullAdapter implements BrokerAdapter {
   async placeOrder(params: BrokerOrderRequest): Promise<BrokerOrder> {
     if (params.qty === undefined && params.notional === undefined) {
       throw new Error("Broker order requires either qty or notional");
+    }
+
+    // Kill-switch chokepoint — read-only, idempotent.
+    if (isKillSwitchesEnabled()) {
+      const decision = isExecutionAllowed({ venue: this.brokerId, instrument: params.symbol.toUpperCase() });
+      if (!decision.allowed) {
+        throw new Error(`${decision.reason}. Reset the relevant kill switch before placing this order.`);
+      }
     }
 
     const accountId = await this.resolveAccountId();

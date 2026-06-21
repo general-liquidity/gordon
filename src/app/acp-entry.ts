@@ -15,18 +15,23 @@
 import { installProductionGuards } from "../infra/safety/installProductionGuards.ts";
 import { getDefaultPermissionEngine } from "../runtime/permissions/defaultPermissionEngine.ts";
 import { startAcpServerOnStdio } from "../infra/acp/server.ts";
+import { redactString } from "../infra/platform/observability/valueRedaction.ts";
 
 installProductionGuards();
 getDefaultPermissionEngine();
 
 // Surface fatal errors on stderr — keeps stdout clean for ACP traffic.
+// Redact the message and drop the stack: a stack trace to an editor's stderr
+// can leak absolute paths, env values, and secrets interpolated into errors.
 process.on("uncaughtException", (err) => {
-  process.stderr.write(`[gordon-acp] uncaught: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
+  const message = err instanceof Error ? err.message : String(err);
+  process.stderr.write(`[gordon-acp] uncaught: ${redactString(message)}\n`);
   process.exit(1);
 });
 
 process.on("unhandledRejection", (reason) => {
-  process.stderr.write(`[gordon-acp] unhandled rejection: ${reason instanceof Error ? reason.stack ?? reason.message : String(reason)}\n`);
+  const message = reason instanceof Error ? reason.message : String(reason);
+  process.stderr.write(`[gordon-acp] unhandled rejection: ${redactString(message)}\n`);
   process.exit(1);
 });
 

@@ -1,5 +1,11 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, afterEach } from "bun:test";
 import { budgetSignalToStopReason, probeBudgetHalt } from "./token-budget.ts";
+import {
+  CostTracker,
+  setCostBudget,
+  clearCostHalt,
+  resetCostBudgetState,
+} from "../platform/costTracker.ts";
 
 describe("budgetSignalToStopReason", () => {
   it("no-halt → undefined", () => {
@@ -20,12 +26,30 @@ describe("budgetSignalToStopReason", () => {
 });
 
 describe("probeBudgetHalt", () => {
-  it("returns halt:false when cost tracker is unavailable / shape mismatch", async () => {
-    // The current module's expected getCostTracker shape may not be
-    // present in this build; probe should fall through to no-halt.
-    const result = await probeBudgetHalt();
-    expect(result.halt === false || result.halt === true).toBe(true);
-    // Whichever path is taken, it should be a structured BudgetSignal
-    expect(typeof result.halt).toBe("boolean");
+  afterEach(() => {
+    setCostBudget(null);
+    clearCostHalt();
+    resetCostBudgetState();
+  });
+
+  it("returns halt:false when the cost tracker is not halted", () => {
+    setCostBudget(null);
+    clearCostHalt();
+    const result = probeBudgetHalt();
+    expect(result.halt).toBe(false);
+  });
+
+  it("returns { halt: true, reason: daily_budget } after a cost halt", () => {
+    setCostBudget({ sessionUsd: 0.0001, action: "halt", warnThresholds: [] });
+    new CostTracker("token-budget-halt").record({
+      modelId: "claude-opus-4-6",
+      inputTokens: 100_000,
+      outputTokens: 100_000,
+    });
+    const result = probeBudgetHalt();
+    expect(result.halt).toBe(true);
+    if (result.halt) {
+      expect(result.reason).toBe("daily_budget");
+    }
   });
 });

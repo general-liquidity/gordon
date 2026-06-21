@@ -125,6 +125,7 @@ export class ExchangeFactory {
       throw new Error("Hyperliquid requires a wallet private key for authentication");
     }
 
+    const envMaxLeverage = Number(process.env.GORDON_RISK_MAX_LEVERAGE);
     const exchange = new CcxtAdapter(
       subId,
       {
@@ -135,6 +136,9 @@ export class ExchangeFactory {
         walletAddress: credentials.walletAddress,
       },
       credentials.sandbox,
+      Number.isFinite(envMaxLeverage) && envMaxLeverage > 0
+        ? { maxLeverage: envMaxLeverage }
+        : undefined,
     );
 
     this.instanceCache.set(cacheKey, exchange);

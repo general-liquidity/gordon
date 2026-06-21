@@ -18,6 +18,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { GORDON_DIR } from "../storage/paths.ts";
+import { redactString } from "../platform/observability/valueRedaction.ts";
 
 /** Per-result cap: anything larger gets spilled to disk. */
 export const MAX_TOOL_RESULT_CHARS = 50_000;
@@ -51,12 +52,16 @@ export function persistLargeResult(
   ensureDir();
   const sanitized = `${toolName}_${toolCallId}`.replace(/[^a-zA-Z0-9_-]/g, "_");
   const filePath = join(RESULTS_DIR, `${sanitized}.txt`);
-  writeFileSync(filePath, result, { encoding: "utf-8", mode: 0o600 });
+  // Redact credential/PII-shaped values before anything touches disk or the
+  // in-context preview — large tool results (orderbook dumps, broker API
+  // responses, scrape content) can carry credential-shaped strings.
+  const redacted = redactString(result);
+  writeFileSync(filePath, redacted, { encoding: "utf-8", mode: 0o600 });
 
   return {
-    preview: result.slice(0, PREVIEW_CHARS),
+    preview: redacted.slice(0, PREVIEW_CHARS),
     filePath,
-    originalSize: result.length,
+    originalSize: redacted.length,
   };
 }
 

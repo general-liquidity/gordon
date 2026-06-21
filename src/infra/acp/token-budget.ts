@@ -13,6 +13,7 @@
  */
 
 import type { StopReason } from "@agentclientprotocol/sdk";
+import { isCostHalted } from "../platform/costTracker.ts";
 
 export type BudgetSignal =
   | { halt: false }
@@ -43,28 +44,10 @@ export function budgetSignalToStopReason(signal: BudgetSignal): StopReason | und
 
 /**
  * Probe Gordon's cost tracker for a halt signal. Returns BudgetSignal
- * shape. Returns `{ halt: false }` when the cost-tracker module isn't
- * present (e.g., during tests with a mocked context).
- *
- * The lazy require keeps this module loadable without forcing the
- * observability subsystem to initialize in test environments.
+ * shape. Surfaces the cost tracker's process-wide halt flag (set when a
+ * session/daily budget with action="halt" is exceeded) so ACP turns stop
+ * with the appropriate StopReason instead of silently truncating.
  */
-export async function probeBudgetHalt(): Promise<BudgetSignal> {
-  try {
-    const mod = await import("../platform/costTracker.ts");
-    const tracker = (mod as {
-      getCostTracker?: () => { shouldHalt?: () => boolean };
-      shouldHaltOnBudget?: () => boolean;
-    });
-    if (typeof tracker.shouldHaltOnBudget === "function" && tracker.shouldHaltOnBudget()) {
-      return { halt: true, reason: "daily_budget" };
-    }
-    const instance = tracker.getCostTracker?.();
-    if (instance?.shouldHalt && instance.shouldHalt()) {
-      return { halt: true, reason: "daily_budget" };
-    }
-  } catch {
-    // Cost tracker module not present or shape changed — return no-halt
-  }
-  return { halt: false };
+export function probeBudgetHalt(): BudgetSignal {
+  return isCostHalted() ? { halt: true, reason: "daily_budget" } : { halt: false };
 }
