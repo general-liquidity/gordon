@@ -157,9 +157,9 @@ Real adapters, not mock quotes. Gordon is model-, venue-, and editor-agnostic: i
 
 | Exchange | Markets | Connection |
 |:--|:--|:--|
-| <img height="16" align="top" src="./assets/integrations/binance.svg" alt="" /> &nbsp;Binance | Spot | native |
-| <img height="16" align="top" src="./assets/integrations/hyperliquid.png" alt="" /> &nbsp;Hyperliquid | Perpetuals | native |
-| <img height="16" align="top" src="./assets/integrations/coinbase.svg" alt="" /> &nbsp;Coinbase | Spot | ccxt |
+| <img height="16" align="top" src="./assets/integrations/binance.svg" alt="" /> &nbsp;Binance | Spot | ccxt |
+| <img height="16" align="top" src="./assets/integrations/hyperliquid.png" alt="" /> &nbsp;Hyperliquid | Perpetuals | ccxt · wallet |
+| <img height="16" align="top" src="./assets/integrations/coinbase.png" alt="" /> &nbsp;Coinbase | Spot | ccxt |
 | <img height="16" align="top" src="./assets/integrations/kraken.png" alt="" /> &nbsp;Kraken | Spot | ccxt |
 | <img height="16" align="top" src="./assets/integrations/okx.svg" alt="" /> &nbsp;OKX | Spot | ccxt |
 | <img height="16" align="top" src="./assets/integrations/gemini-exchange.png" alt="" /> &nbsp;Gemini | Spot | ccxt |
