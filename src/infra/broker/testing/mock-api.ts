@@ -193,34 +193,6 @@ const BROKER_RULES: Record<BrokerId, BrokerPathRules> = {
     cancelAll: [],
     quote: [/^\/v1\/api\/iserver\/marketdata\/snapshot$/i],
   },
-  // Syphonix endpoints are filled from the API spec at the 2026-06-15 kickoff;
-  // empty until then (the adapter is gated off, so the mock is unused).
-  syphonix: {
-    accountDiscovery: [],
-    clock: [],
-    account: [],
-    positions: [],
-    listOrders: [],
-    getOrder: [],
-    placeOrder: [],
-    cancelOrder: [],
-    cancelAll: [],
-    quote: [],
-  },
-  // MT5 routes through the bridge sidecar (local HTTP), not this REST mock — the
-  // adapter is tested directly against a stubbed Mt5BridgeClient. Empty here.
-  mt5: {
-    accountDiscovery: [],
-    clock: [],
-    account: [],
-    positions: [],
-    listOrders: [],
-    getOrder: [],
-    placeOrder: [],
-    cancelOrder: [],
-    cancelAll: [],
-    quote: [],
-  },
 };
 
 function delay(ms: number): Promise<void> {

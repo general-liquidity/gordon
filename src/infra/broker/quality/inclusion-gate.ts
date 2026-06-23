@@ -139,34 +139,6 @@ export const BROKER_INCLUSION_GATE: Record<BrokerId, BrokerInclusionDecision> = 
     },
     rationale: "Client-portal style execution APIs support retail/pro accounts and TS adapter abstraction.",
   },
-  syphonix: {
-    brokerId: "syphonix",
-    segment: "b2c",
-    approved: false,
-    criteria: {
-      retailB2COnboarding: false, // competition/institutional venue, not retail onboarding
-      documentedExecutionEndpoints: false, // spec released at the kickoff (2026-06-15)
-      apiTermsAllowCustomerExecution: true, // competition explicitly provides an execution API
-      paperOrSafeDryRunPath: true, // the competition is a paper sim
-      tsRuntimeAuthMaintainable: true,
-    },
-    rationale:
-      "Model to Market competition venue (FX/metals/crypto). Adapter scaffold is in place but GATED OFF until the Syphonix API spec is filled in at the 2026-06-15 kickoff (documentedExecutionEndpoints). Flip to approved once endpoints/auth are wired + smoke-tested — see docs/model-to-market/SYPHONIX_INTEGRATION.md.",
-  },
-  mt5: {
-    brokerId: "mt5",
-    segment: "b2c",
-    approved: true,
-    criteria: {
-      retailB2COnboarding: true, // MT5 is the canonical retail trading platform
-      documentedExecutionEndpoints: true, // MetaTrader5 Python API is fully documented
-      apiTermsAllowCustomerExecution: true, // designed for automated customer execution
-      paperOrSafeDryRunPath: true, // paper account + deny-first sidecar trading guard
-      tsRuntimeAuthMaintainable: true, // auth handled in the sidecar; bridge is maintainable
-    },
-    rationale:
-      "MetaTrader 5 via the bridge sidecar (scripts/mt5-bridge) — the Model to Market execution path (Syphonix has no REST API). The MetaTrader5 Python API is documented and the sidecar enforces a deny-first trading guard (MT5_BRIDGE_ALLOW_TRADING). See docs/model-to-market/COMPETITION_BRIEF.md §7.",
-  },
 };
 
 export function getBrokerInclusionDecision(brokerId: BrokerId): BrokerInclusionDecision {

@@ -34,7 +34,13 @@
  */
 
 import { reversalSignal, type ReversalSignalOptions } from "./reversal-strategy.ts";
-import type { DryRunSignal } from "../../backtest/competition-dry-run.ts";
+/** Signal shape produced by this strategy (previously shared via the removed competition dry-run harness). */
+type DryRunSignal = {
+  side: "long" | "short";
+  stopDistance: number;
+  targetDistance?: number;
+  edge?: { winProb: number; payoffRatio: number };
+};
 
 /** Population standard deviation. Fewer than 2 points → 0. */
 function std(xs: ReadonlyArray<number>): number {

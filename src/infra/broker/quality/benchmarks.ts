@@ -4,11 +4,10 @@ import { installMockBrokerApi } from "../testing/mock-api.ts";
 
 /**
  * Brokers whose transport is NOT the REST mock and so cannot be measured by this
- * latency/reliability harness (it mocks REST endpoints). `mt5` routes through a
- * local sidecar (scripts/mt5-bridge) whose latency depends on a running terminal
- * absent in CI — benchmarking it through a fake REST mock would be meaningless.
+ * latency/reliability harness (it mocks REST endpoints). Currently empty — every
+ * supported broker speaks REST.
  */
-export const NON_REST_BENCHMARK_BROKERS = new Set<BrokerId>(["mt5"]);
+export const NON_REST_BENCHMARK_BROKERS = new Set<BrokerId>([]);
 
 /** REST brokers the benchmark harness can measure. */
 export function getBenchmarkableBrokers(): BrokerId[] {

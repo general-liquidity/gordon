@@ -6,7 +6,7 @@
 import { buildGeneratedPrompt } from "../../infra/runtime/actions/surfaces.ts";
 import { BrokerFactory } from "../../infra/broker/index.ts";
 import { getSkillSlashCommandIds } from "../../infra/skills/slashCommands.ts";
-import { buildMomqStatusPanel, buildTracingStatusLine } from "./momqStatus.ts";
+import { buildTracingStatusLine } from "./tracingStatus.ts";
 import type { SlashCommand } from "./slashCommands.ts";
 
 // Cache the skill-id set on first call. Discovery is memoized by registry.ts
@@ -32,8 +32,6 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
   }
 
   switch (command.name) {
-    case "momq":
-      return `Display the following Model to Market competition status to the operator exactly as written, then stop:\n\n${buildMomqStatusPanel()}`;
     case "flags": {
       const trimmed = args.trim();
       if (!trimmed || trimmed === "list") {
