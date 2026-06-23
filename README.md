@@ -1,7 +1,7 @@
 <!-- prettier-ignore -->
 <div align="center">
 
-<img src="./assets/gordon_banner.png" alt="Gordon" height="96" />
+<img src="./assets/gordon-banner.gif" alt="GORDON" width="520" />
 
 ### The Frontier Trading Agent
 
