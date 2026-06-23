@@ -13,7 +13,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
 
-**[Why Gordon](#why-gordon) · [Install](#install) · [Quick start](#quick-start) · [Safety](#how-gordon-keeps-you-safe) · [How it works](#how-it-works) · [Capabilities](#whats-in-the-box) · [Architecture](#architecture)**
+**[Why Gordon](#why-gordon) · [Install](#install) · [Quick start](#quick-start) · [Safety](#how-gordon-keeps-you-safe) · [How it works](#how-it-works) · [Integrations](#integrations) · [Architecture](#architecture)**
 
 </div>
 
@@ -27,7 +27,7 @@ Since late 2022 we have watched AI get unnervingly good at *talking* about marke
 
 A model that can read a chart is not therefore able to size a position, respect a limit, recover from a failed order, or preserve capital through a drawdown. In most software, being slightly wrong is survivable. In markets, being *nearly* right is often just being wrong, with a settlement attached. The hard part was never the intelligence. It is the reasoning under uncertainty, the permissions, the approvals, the durable memory, the disciplined execution, and the clear failure modes that let a human safely delegate capital to software.
 
-**Gordon is that missing harness.** It is a terminal-native trading agent for crypto and stocks that turns a plain-language intent — *"find me a clean BTC long for the NY session, ~1R"* — into a previewed, risk-checked, fully-audited trade. The model proposes. The harness disposes. Capital safety is not a feature bolted on at the end; it is the architecture.
+**Gordon is that missing harness.** It is a terminal-native trading agent for crypto and stocks that turns a plain-language intent, *"find me a clean BTC long for the NY session, ~1R"*, into a previewed, risk-checked, fully-audited trade. The model proposes. The harness disposes. Capital safety is not a feature bolted on at the end; it is the architecture.
 
 ```
 you › find me a clean BTC long for the NY session, ~1R risk
@@ -58,7 +58,7 @@ Three convictions the whole codebase is built around.
 
 **The model proposes, the harness disposes.** Intelligence and authority are separated by design. The agent that *reasons* about a trade is not the agent that *places* it, and neither can reach a venue without clearing a wall of deterministic checks. Capability is necessary. It is nowhere near sufficient.
 
-**Plan-first, always.** Nothing touches a venue until you have seen it as a structured diff and approved it. Gordon's job is to make you a *better decision-maker, faster* — not to fire orders and explain itself afterward. Approvals are content-bound: change a single leg of a plan and it has to be approved again.
+**Plan-first, always.** Nothing touches a venue until you have seen it as a structured diff and approved it. Gordon's job is to make you a *better decision-maker, faster*, not to fire orders and explain itself afterward. Approvals are content-bound: change a single leg of a plan and it has to be approved again.
 
 **Deny-first, not trust-first.** The default answer to "may this run?" is no. Every order earns its way to a venue through a permission engine, a 15-dimension risk classifier, a hard deny-list, and scoped kill switches. An agent cannot talk, charm, or hallucinate its way past a limit it is structurally forbidden to cross.
 
@@ -71,7 +71,7 @@ Three convictions the whole codebase is built around.
 npm install -g @general-liquidity/gordon-cli
 ```
 
-The wrapper fetches the prebuilt binary for your platform (macOS arm64/x64, Linux x64/arm64 glibc + musl, Windows x64/arm64). The `gordon` command *is* the binary — no resident Node process.
+The wrapper fetches the prebuilt binary for your platform (macOS arm64/x64, Linux x64/arm64 glibc + musl, Windows x64/arm64). The `gordon` command *is* the binary; no resident Node process.
 
 <details>
 <summary>Bun, or from source</summary>
@@ -137,34 +137,86 @@ Rationale is structural, not advisory: `execute_plan` and every `cancel_*` deman
 
 Gordon is **three agents split along a security boundary**, not one model wearing many hats:
 
-- **Gordon** — the orchestrator. Routes, supervises, and reasons, but never trades directly.
-- **Executor** — holds the *only* execution tools, behind the full risk gate.
-- **Researcher** — a read-only, time-boxed parallel clone for scans, backtests, and deep dives. It cannot place an order even if it tries to.
+- **Gordon:** the orchestrator. Routes, supervises, and reasons, but never trades directly.
+- **Executor:** holds the *only* execution tools, behind the full risk gate.
+- **Researcher:** a read-only, time-boxed parallel clone for scans, backtests, and deep dives. It cannot place an order even if it tries to.
 
 Around them sits the runtime that makes a long session trustworthy:
 
-- **Cognition in phases** — a tool-free thinking pass, in-band extended thinking, and an optional adversarial self-critique at high depth.
-- **A canonical 22-tool surface** — 5 data, 4 analytics (two of them meta-dispatchers over ~94 indicator and 9 microstructure ops), 6 plan/exec, 3 memory/audit, 4 workflow. Integration feeds (Finnhub, X, MCP, onchain) spread on top.
-- **A doom-loop harness** — dual-layer fingerprinting catches both identical-call loops and A-B-A-B cycles; oversized tool results are offloaded to scratch.
-- **5-stage memory compaction** — masking → pruning → aggressive → collapse → full, triggered by context pressure, with a reversible read-time collapse before any lossy summary.
-- **A proactive radar** — 21 producers (regime flips, vol spikes, funding, whale alerts, news/earnings/insider flow, stop/TP alerts) scored by a tri-judge panel before they ever interrupt you.
+- **Cognition in phases:** a tool-free thinking pass, in-band extended thinking, and an optional adversarial self-critique at high depth.
+- **A canonical 22-tool surface:** 5 data, 4 analytics (two of them meta-dispatchers over ~94 indicator and 9 microstructure ops), 6 plan/exec, 3 memory/audit, 4 workflow. Integration feeds (Finnhub, X, MCP, onchain) spread on top.
+- **A doom-loop harness:** dual-layer fingerprinting catches both identical-call loops and A-B-A-B cycles; oversized tool results are offloaded to scratch.
+- **5-stage memory compaction:** masking → pruning → aggressive → collapse → full, triggered by context pressure, with a reversible read-time collapse before any lossy summary.
+- **A proactive radar:** 21 producers (regime flips, vol spikes, funding, whale alerts, news/earnings/insider flow, stop/TP alerts) scored by a tri-judge panel before they ever interrupt you.
+
+## Integrations
+
+Real adapters, not mock quotes. Gordon connects to the models, venues, data feeds, and editors you already use, and every market adapter passes an **inclusion gate** and a **conformance matrix** in CI, so broker quality is measured, not assumed.
+
+**Models**
+
+![Anthropic](https://img.shields.io/badge/Anthropic-191919?style=flat-square&logo=anthropic&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=flat-square&logo=openai&logoColor=white)
+![Google Gemini](https://img.shields.io/badge/Gemini-8E75B2?style=flat-square&logo=googlegemini&logoColor=white)
+![Dedalus](https://img.shields.io/badge/Dedalus-0B0F0C?style=flat-square) *(multi-model router)*
+
+**Crypto exchanges** &nbsp;·&nbsp; native Binance + Hyperliquid, the rest over [ccxt](https://ccxt.com)
+
+![Binance](https://img.shields.io/badge/Binance-181A20?style=flat-square&logo=binance&logoColor=F0B90B)
+![Hyperliquid](https://img.shields.io/badge/Hyperliquid-072723?style=flat-square)
+![Coinbase](https://img.shields.io/badge/Coinbase-0052FF?style=flat-square&logo=coinbase&logoColor=white)
+![Kraken](https://img.shields.io/badge/Kraken-5741D9?style=flat-square&logo=kraken&logoColor=white)
+![OKX](https://img.shields.io/badge/OKX-000000?style=flat-square&logo=okx&logoColor=white)
+![Bitfinex](https://img.shields.io/badge/Bitfinex-16B157?style=flat-square)
+![Gemini](https://img.shields.io/badge/Gemini-00DCFA?style=flat-square&logoColor=black)
+
+**Equity & options brokers**
+
+![Alpaca](https://img.shields.io/badge/Alpaca-FCD535?style=flat-square&logoColor=black)
+![Charles Schwab](https://img.shields.io/badge/Charles_Schwab-00A0DF?style=flat-square)
+![Interactive Brokers](https://img.shields.io/badge/Interactive_Brokers-D81222?style=flat-square)
+![E*TRADE](https://img.shields.io/badge/E*TRADE-6633CC?style=flat-square)
+![tastytrade](https://img.shields.io/badge/tastytrade-00C9A7?style=flat-square)
+![TradeStation](https://img.shields.io/badge/TradeStation-0A2342?style=flat-square)
+![Tradier](https://img.shields.io/badge/Tradier-1A6DFF?style=flat-square)
+![Trading 212](https://img.shields.io/badge/Trading_212-00AAD2?style=flat-square)
+![Webull](https://img.shields.io/badge/Webull-0066FF?style=flat-square)
+
+**Onchain data & wallet intelligence**
+
+![DexScreener](https://img.shields.io/badge/DexScreener-0B0F0C?style=flat-square)
+![DefiLlama](https://img.shields.io/badge/DefiLlama-2A37FF?style=flat-square)
+![CoinGecko](https://img.shields.io/badge/CoinGecko-8DC63F?style=flat-square&logo=coingecko&logoColor=white)
+![Birdeye](https://img.shields.io/badge/Birdeye-FFB800?style=flat-square&logoColor=black)
+![Codex](https://img.shields.io/badge/Codex-111111?style=flat-square)
+![1inch](https://img.shields.io/badge/1inch-1B314F?style=flat-square)
+![Nansen](https://img.shields.io/badge/Nansen-6C5CE7?style=flat-square)
+![Arkham](https://img.shields.io/badge/Arkham-111827?style=flat-square)
+![Covalent](https://img.shields.io/badge/Covalent-FF4C8B?style=flat-square)
+![Moralis](https://img.shields.io/badge/Moralis-1450F5?style=flat-square)
+![Zerion](https://img.shields.io/badge/Zerion-2962EF?style=flat-square)
+![DeBank](https://img.shields.io/badge/DeBank-FF6238?style=flat-square)
+
+**Fundamentals & news**
+
+![Finnhub](https://img.shields.io/badge/Finnhub-1DB954?style=flat-square)
+![SEC EDGAR](https://img.shields.io/badge/SEC_EDGAR-1A4480?style=flat-square)
+![X](https://img.shields.io/badge/X-000000?style=flat-square&logo=x&logoColor=white)
+
+**Rails**
+
+![MoonPay](https://img.shields.io/badge/MoonPay-7D00FF?style=flat-square)
+![Polygon x402](https://img.shields.io/badge/Polygon_x402-7B3FE4?style=flat-square&logo=polygon&logoColor=white)
+
+**Editors & protocols** &nbsp;·&nbsp; drive Gordon from your IDE over ACP, extend it with external tool servers over MCP
+
+![Zed](https://img.shields.io/badge/Zed-084CCF?style=flat-square&logo=zedindustries&logoColor=white)
+![Cursor](https://img.shields.io/badge/Cursor-000000?style=flat-square)
+![Athas](https://img.shields.io/badge/Athas-1E1E2E?style=flat-square)
+![Agent Client Protocol](https://img.shields.io/badge/Agent_Client_Protocol-15803D?style=flat-square)
+![Model Context Protocol](https://img.shields.io/badge/Model_Context_Protocol-15803D?style=flat-square)
 
 ## What's in the box
-
-<details>
-<summary><strong>Venues & data</strong> — real adapters, no mock quotes</summary>
-
-| Kind | Integrations |
-|------|--------------|
-| CEX (native) | Binance (spot), Hyperliquid (perps) |
-| CEX (ccxt) | Coinbase, Kraken, Bitfinex, Gemini, OKX, + the ccxt fleet |
-| Brokers | Alpaca, Schwab, Interactive Brokers, E*TRADE, tastytrade, TradeStation, Tradier, Trading 212, Webull |
-| Onchain data | DexScreener, DefiLlama, CoinGecko-Onchain, Birdeye, Codex, 1inch |
-| Wallet intel | Nansen, Arkham, Covalent, Moralis, Zerion, DeBank |
-| Rails | MoonPay (on-ramp), Polygon x402 |
-
-Every adapter passes an **inclusion gate** and a **conformance matrix** in CI — broker quality is measured, not assumed.
-</details>
 
 <details>
 <summary><strong>Analysis & strategy</strong></summary>
@@ -177,9 +229,9 @@ Every adapter passes an **inclusion gate** and a **conformance matrix** in CI �
 <details>
 <summary><strong>Backtesting & evaluation</strong></summary>
 
-- **Backtest engine** — historical replay, walk-forward, Monte Carlo, grid/random optimization, alpha-decay detection, fee-sensitivity sweeps, market-impact modeling, cross-sectional overfitting guards.
+- **Backtest engine:** historical replay, walk-forward, Monte Carlo, grid/random optimization, alpha-decay detection, fee-sensitivity sweeps, market-impact modeling, cross-sectional overfitting guards.
 - **Event-replay** with a `pass^k` verdict store for reliability across runs.
-- **Eval harness** — scenarios *generated* from the trading constitution, risk dimensions, deny-list, and rubrics; deterministic process checks; a tri-judge panel to wash out self-preference; a CI regression gate.
+- **Eval harness:** scenarios *generated* from the trading constitution, risk dimensions, deny-list, and rubrics; deterministic process checks; a tri-judge panel to wash out self-preference; a CI regression gate.
 </details>
 
 ## Permission modes
@@ -196,7 +248,7 @@ The same truth table is enforced in the preflight, the runtime engine, and every
 | `auto` | ✓ | ✓ | ✓ | ✓ | Autonomous within risk gates. For systematic slots. |
 
 > [!IMPORTANT]
-> `auto` is not "no guardrails." Every order still clears the full `execute_plan` gauntlet — it only drops the per-order human confirmation.
+> `auto` is not "no guardrails." Every order still clears the full `execute_plan` gauntlet; it only drops the per-order human confirmation.
 
 ## Run surfaces
 
@@ -205,7 +257,7 @@ One engine, several front ends:
 | Surface | Start with | What it is |
 |---------|-----------|------------|
 | TUI | `gordon` | The full Ink terminal desk (Desk / Market / Plan / Lab / Monitor workspaces, vim mode). |
-| Headless | `gordon --headless "prompt"` | One prompt in, response out — for scripts and pipes. |
+| Headless | `gordon --headless "prompt"` | One prompt in, response out, for scripts and pipes. |
 | Daemon | `gordon daemon start` | A long-running gateway over IPC: scheduled slots, circuit breakers, reconciliation. |
 | ACP / IDE | `bun acp` | A JSON-RPC server over stdio implementing the [Agent Client Protocol](https://agentclientprotocol.com) for editors like Zed. |
 | Schedules | `gordon schedule add …` | Cron-style autonomous mandates. |
@@ -228,7 +280,7 @@ venues & data   exchanges · brokers · onchain · wallet intel · news
 infrastructure  LibSQL (SQL + vector) · SQLite · OpenTelemetry · event bus
 ```
 
-Built on [Bun](https://bun.sh), TypeScript 5 (strict), [Ink](https://github.com/vadimdemedes/ink) 6 + React 19, [Mastra](https://mastra.ai), [LibSQL](https://turso.tech/libsql), and [Zod](https://zod.dev) — with [MCP](https://modelcontextprotocol.io) and [ACP](https://agentclientprotocol.com) on the edges and OpenTelemetry throughout.
+Built on [Bun](https://bun.sh), TypeScript 5 (strict), [Ink](https://github.com/vadimdemedes/ink) 6 + React 19, [Mastra](https://mastra.ai), [LibSQL](https://turso.tech/libsql), and [Zod](https://zod.dev), with [MCP](https://modelcontextprotocol.io) and [ACP](https://agentclientprotocol.com) on the edges and OpenTelemetry throughout.
 
 ## Development
 
@@ -247,5 +299,5 @@ CI runs the suite, `tsc --noEmit`, Biome, broker conformance, the eval-harness r
 ---
 
 <div align="center">
-<sub><em>"The most valuable commodity I know of is information."</em> — Gordon Gekko</sub>
+<sub><em>"The most valuable commodity I know of is information."</em><br />Gordon Gekko</sub>
 </div>
