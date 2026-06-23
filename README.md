@@ -151,70 +151,69 @@ Around them sits the runtime that makes a long session trustworthy:
 
 ## Integrations
 
-Real adapters, not mock quotes. Gordon connects to the models, venues, data feeds, and editors you already use, and every market adapter passes an **inclusion gate** and a **conformance matrix** in CI, so broker quality is measured, not assumed.
+Real adapters, not mock quotes. Gordon is model-, venue-, and editor-agnostic: it talks to the exchanges, brokers, data feeds, models, and editors you already use, and every market adapter passes an **inclusion gate** and a **conformance matrix** in CI, so broker quality is measured, not assumed.
 
-**Models**
+#### Crypto exchanges
 
-![Anthropic](https://img.shields.io/badge/Anthropic-191919?style=flat-square&logo=anthropic&logoColor=white)
-![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=flat-square&logo=openai&logoColor=white)
-![Google Gemini](https://img.shields.io/badge/Gemini-8E75B2?style=flat-square&logo=googlegemini&logoColor=white)
-![Dedalus](https://img.shields.io/badge/Dedalus-0B0F0C?style=flat-square) *(multi-model router)*
+| Exchange | Markets | Connection |
+|:--|:--|:--|
+| <img height="16" align="top" src="./assets/integrations/binance.svg" alt="" /> &nbsp;Binance | Spot | native |
+| <img height="16" align="top" src="./assets/integrations/hyperliquid.png" alt="" /> &nbsp;Hyperliquid | Perpetuals | native |
+| <img height="16" align="top" src="./assets/integrations/coinbase.svg" alt="" /> &nbsp;Coinbase | Spot | ccxt |
+| <img height="16" align="top" src="./assets/integrations/kraken.png" alt="" /> &nbsp;Kraken | Spot | ccxt |
+| <img height="16" align="top" src="./assets/integrations/okx.svg" alt="" /> &nbsp;OKX | Spot | ccxt |
+| <img height="16" align="top" src="./assets/integrations/gemini-exchange.png" alt="" /> &nbsp;Gemini | Spot | ccxt |
+| <img height="16" align="top" src="./assets/integrations/robinhood.svg" alt="" /> &nbsp;Robinhood | Crypto | adapter |
 
-**Crypto exchanges** &nbsp;·&nbsp; native Binance + Hyperliquid, the rest over [ccxt](https://ccxt.com)
+<sub>Plus the wider [ccxt](https://ccxt.com) fleet (Bybit, KuCoin, MEXC, and more).</sub>
 
-![Binance](https://img.shields.io/badge/Binance-181A20?style=flat-square&logo=binance&logoColor=F0B90B)
-![Hyperliquid](https://img.shields.io/badge/Hyperliquid-072723?style=flat-square)
-![Coinbase](https://img.shields.io/badge/Coinbase-0052FF?style=flat-square&logo=coinbase&logoColor=white)
-![Kraken](https://img.shields.io/badge/Kraken-5741D9?style=flat-square&logo=kraken&logoColor=white)
-![OKX](https://img.shields.io/badge/OKX-000000?style=flat-square&logo=okx&logoColor=white)
-![Bitfinex](https://img.shields.io/badge/Bitfinex-16B157?style=flat-square)
-![Gemini](https://img.shields.io/badge/Gemini-00DCFA?style=flat-square&logoColor=black)
+#### Equity &amp; options brokers
 
-**Equity & options brokers**
+| Broker | Coverage |
+|:--|:--|
+| <img height="16" align="top" src="./assets/integrations/alpaca.png" alt="" /> &nbsp;Alpaca | US equities · options · crypto |
+| <img height="16" align="top" src="./assets/integrations/schwab.png" alt="" /> &nbsp;Charles Schwab | US equities · options · ETFs |
+| <img height="16" align="top" src="./assets/integrations/ibkr.png" alt="" /> &nbsp;Interactive Brokers | Global equities · options · futures |
+| <img height="16" align="top" src="./assets/integrations/etrade.png" alt="" /> &nbsp;E\*TRADE | US equities · options |
+| <img height="16" align="top" src="./assets/integrations/tastytrade.png" alt="" /> &nbsp;tastytrade | Options · futures |
+| <img height="16" align="top" src="./assets/integrations/tradestation.png" alt="" /> &nbsp;TradeStation | US equities · options · futures |
+| <img height="16" align="top" src="./assets/integrations/tradier.png" alt="" /> &nbsp;Tradier | US equities · options |
+| <img height="16" align="top" src="./assets/integrations/trading212.jpeg" alt="" /> &nbsp;Trading 212 | UK/EU equities · ETFs |
+| <img height="16" align="top" src="./assets/integrations/webull.png" alt="" /> &nbsp;Webull | US equities · options |
 
-![Alpaca](https://img.shields.io/badge/Alpaca-FCD535?style=flat-square&logoColor=black)
-![Charles Schwab](https://img.shields.io/badge/Charles_Schwab-00A0DF?style=flat-square)
-![Interactive Brokers](https://img.shields.io/badge/Interactive_Brokers-D81222?style=flat-square)
-![E*TRADE](https://img.shields.io/badge/E*TRADE-6633CC?style=flat-square)
-![tastytrade](https://img.shields.io/badge/tastytrade-00C9A7?style=flat-square)
-![TradeStation](https://img.shields.io/badge/TradeStation-0A2342?style=flat-square)
-![Tradier](https://img.shields.io/badge/Tradier-1A6DFF?style=flat-square)
-![Trading 212](https://img.shields.io/badge/Trading_212-00AAD2?style=flat-square)
-![Webull](https://img.shields.io/badge/Webull-0066FF?style=flat-square)
+#### Onchain data &amp; intelligence
 
-**Onchain data & wallet intelligence**
+| Source | Provides |
+|:--|:--|
+| <img height="16" align="top" src="./assets/integrations/nansen.png" alt="" /> &nbsp;Nansen | Wallet intelligence |
+| <img height="16" align="top" src="./assets/integrations/arkham.png" alt="" /> &nbsp;Arkham | Wallet intelligence |
+| <img height="16" align="top" src="./assets/integrations/birdeye.png" alt="" /> &nbsp;Birdeye | Solana DEX data |
+| <img height="16" align="top" src="./assets/integrations/defillama.png" alt="" /> &nbsp;DeFiLlama | TVL · yields |
+| <img height="16" align="top" src="./assets/integrations/glassnode.png" alt="" /> &nbsp;Glassnode | On-chain metrics |
+| <img height="16" align="top" src="./assets/integrations/dexscreener.png" alt="" /> &nbsp;DexScreener | DEX pairs |
 
-![DexScreener](https://img.shields.io/badge/DexScreener-0B0F0C?style=flat-square)
-![DefiLlama](https://img.shields.io/badge/DefiLlama-2A37FF?style=flat-square)
-![CoinGecko](https://img.shields.io/badge/CoinGecko-8DC63F?style=flat-square&logo=coingecko&logoColor=white)
-![Birdeye](https://img.shields.io/badge/Birdeye-FFB800?style=flat-square&logoColor=black)
-![Codex](https://img.shields.io/badge/Codex-111111?style=flat-square)
-![1inch](https://img.shields.io/badge/1inch-1B314F?style=flat-square)
-![Nansen](https://img.shields.io/badge/Nansen-6C5CE7?style=flat-square)
-![Arkham](https://img.shields.io/badge/Arkham-111827?style=flat-square)
-![Covalent](https://img.shields.io/badge/Covalent-FF4C8B?style=flat-square)
-![Moralis](https://img.shields.io/badge/Moralis-1450F5?style=flat-square)
-![Zerion](https://img.shields.io/badge/Zerion-2962EF?style=flat-square)
-![DeBank](https://img.shields.io/badge/DeBank-FF6238?style=flat-square)
+#### Models &nbsp;<sub>provider-agnostic</sub>
 
-**Fundamentals & news**
+| Provider | Models |
+|:--|:--|
+| <img height="16" align="top" src="./assets/integrations/anthropic.svg" alt="" /> &nbsp;Anthropic | Claude |
+| <img height="16" align="top" src="./assets/integrations/openai.png" alt="" /> &nbsp;OpenAI | GPT |
+| <img height="16" align="top" src="./assets/integrations/google-gemini.svg" alt="" /> &nbsp;Google | Gemini |
 
-![Finnhub](https://img.shields.io/badge/Finnhub-1DB954?style=flat-square)
-![SEC EDGAR](https://img.shields.io/badge/SEC_EDGAR-1A4480?style=flat-square)
-![X](https://img.shields.io/badge/X-000000?style=flat-square&logo=x&logoColor=white)
+<sub>Routed through Dedalus for single-key, multi-model access.</sub>
 
-**Rails**
+#### Editors &amp; hosts &nbsp;<sub>run Gordon from</sub>
 
-![MoonPay](https://img.shields.io/badge/MoonPay-7D00FF?style=flat-square)
-![Polygon x402](https://img.shields.io/badge/Polygon_x402-7B3FE4?style=flat-square&logo=polygon&logoColor=white)
+| Editor / host | Connection |
+|:--|:--|
+| <img height="16" align="top" src="./assets/integrations/zed.png" alt="" /> &nbsp;Zed | Editor panel · ACP |
+| <img height="16" align="top" src="./assets/integrations/athas.png" alt="" /> &nbsp;Athas | Editor panel · ACP |
+| <img height="16" align="top" src="./assets/integrations/cursor.png" alt="" /> &nbsp;Cursor | MCP |
+| <img height="16" align="top" src="./assets/integrations/warp.png" alt="" /> &nbsp;Warp | MCP |
+| <img height="16" align="top" src="./assets/integrations/claude.png" alt="" /> &nbsp;Claude Desktop | MCP |
+| <img height="16" align="top" src="./assets/integrations/devin.png" alt="" /> &nbsp;Devin | MCP |
 
-**Editors & protocols** &nbsp;·&nbsp; drive Gordon from your IDE over ACP, extend it with external tool servers over MCP
-
-![Zed](https://img.shields.io/badge/Zed-084CCF?style=flat-square&logo=zedindustries&logoColor=white)
-![Cursor](https://img.shields.io/badge/Cursor-000000?style=flat-square)
-![Athas](https://img.shields.io/badge/Athas-1E1E2E?style=flat-square)
-![Agent Client Protocol](https://img.shields.io/badge/Agent_Client_Protocol-15803D?style=flat-square)
-![Model Context Protocol](https://img.shields.io/badge/Model_Context_Protocol-15803D?style=flat-square)
+<sub>Also wired: Finnhub fundamentals, SEC/EDGAR filings, X sentiment, MoonPay on-ramp, and Polygon x402 rails.</sub>
 
 ## What's in the box
 
