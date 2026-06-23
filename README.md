@@ -13,7 +13,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
 
-**[Why Gordon](#why-gordon) · [Install](#install) · [Quick start](#quick-start) · [Safety](#how-gordon-keeps-you-safe) · [How it works](#how-it-works) · [Integrations](#integrations) · [Architecture](#architecture)**
+**[Why Gordon](#why-gordon) · [Install](#install) · [Quick start](#quick-start) · [Safety](#how-gordon-keeps-you-safe) · [How it works](#how-it-works) · [Integrations](#integrations) · [Architecture](#architecture) · [Tech stack](#tech-stack)**
 
 </div>
 
@@ -279,7 +279,24 @@ venues & data   exchanges · brokers · onchain · wallet intel · news
 infrastructure  LibSQL (SQL + vector) · SQLite · OpenTelemetry · event bus
 ```
 
-Built on [Bun](https://bun.sh), TypeScript 5 (strict), [Ink](https://github.com/vadimdemedes/ink) 6 + React 19, [Mastra](https://mastra.ai), [LibSQL](https://turso.tech/libsql), and [Zod](https://zod.dev), with [MCP](https://modelcontextprotocol.io) and [ACP](https://agentclientprotocol.com) on the edges and OpenTelemetry throughout.
+## Tech stack
+
+| Technology | Role |
+|:--|:--|
+| <img height="16" align="top" src="./assets/stack/bun.png" alt="" /> &nbsp;[Bun](https://bun.sh) | Runtime, bundler, test runner |
+| <img height="16" align="top" src="./assets/stack/typescript.svg" alt="" /> &nbsp;TypeScript | Language, strict mode |
+| <img height="16" align="top" src="./assets/stack/node.svg" alt="" /> &nbsp;Node.js | npm-wrapper runtime (>= 18) |
+| <img height="16" align="top" src="./assets/stack/react.svg" alt="" /> &nbsp;React 19 | TUI component model |
+| Ink 6 | Terminal renderer + custom framebuffer |
+| <img height="16" align="top" src="./assets/stack/mastra.png" alt="" /> &nbsp;[Mastra](https://mastra.ai) | Multi-agent framework |
+| <img height="16" align="top" src="./assets/stack/aisdk.png" alt="" /> &nbsp;AI SDK | Model calls (Anthropic, OpenAI, Google, Dedalus) |
+| <img height="16" align="top" src="./assets/stack/libsql.png" alt="" /> &nbsp;[LibSQL / Turso](https://turso.tech/libsql) | SQL + vector memory; SQLite for the audit log |
+| <img height="16" align="top" src="./assets/stack/zod.svg" alt="" /> &nbsp;[Zod](https://zod.dev) | Schema validation on every tool I/O and config |
+| <img height="16" align="top" src="./assets/stack/ccxt.png" alt="" /> &nbsp;[ccxt](https://ccxt.com) | Crypto exchange connectivity |
+| <img height="16" align="top" src="./assets/stack/mcp.png" alt="" /> &nbsp;[MCP](https://modelcontextprotocol.io) | External tool servers |
+| <img height="16" align="top" src="./assets/stack/acp.png" alt="" /> &nbsp;[ACP](https://agentclientprotocol.com) | Editor / IDE integration |
+| <img height="16" align="top" src="./assets/stack/biome.svg" alt="" /> &nbsp;Biome | Lint + format |
+| <img height="16" align="top" src="./assets/stack/opentelemetry.svg" alt="" /> &nbsp;OpenTelemetry | Tracing + metrics |
 
 ## Development
 
