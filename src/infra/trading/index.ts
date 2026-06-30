@@ -297,3 +297,5 @@ export type { SignalSource, WeightedPrediction, BlendedRecommendation, EmergentR
 // Synthetic Futures Generator (Monte Carlo)
 export { generateSyntheticFutures, formatFuturesSummary } from "./signals/syntheticFutures.ts";
 export type { AssetConfig, CorrelationPair, ScenarioEvent, FuturesConfig, FuturesResult, ScenarioType } from "./signals/syntheticFutures.ts";
+export { validateScenarioRealism } from "./signals/scenarioRealism.ts";
+export type { ScenarioRealism } from "./signals/scenarioRealism.ts";

@@ -57,9 +57,12 @@ export interface FuturesConfig {
   events?: ScenarioEvent[];
   /** Trading days per year. Default 365 (crypto). */
   tradingDaysPerYear?: number;
+  /** Optional observed market regime used to condition all scenario branches. */
+  regime?: MarketRegime;
 }
 
 export type ScenarioType = "base" | "bull" | "bear" | "tail_down" | "tail_up" | "vol_spike";
+export type MarketRegime = "trending_up" | "trending_down" | "range" | "high_volatility";
 
 export interface SimulatedPath {
   /** Daily prices for each asset. paths[assetIndex][dayIndex]. */
@@ -185,6 +188,20 @@ function getScenarioModifiers(scenario: ScenarioType): { driftMult: number; volM
   }
 }
 
+function getRegimeModifiers(regime: MarketRegime | undefined): {
+  driftScale: number;
+  driftOffset: number;
+  volMult: number;
+} {
+  switch (regime) {
+    case "trending_up": return { driftScale: 1, driftOffset: 0.75, volMult: 0.95 };
+    case "trending_down": return { driftScale: 1, driftOffset: -1.35, volMult: 1.15 };
+    case "range": return { driftScale: 0.25, driftOffset: 0, volMult: 0.75 };
+    case "high_volatility": return { driftScale: 0.7, driftOffset: 0, volMult: 1.8 };
+    case undefined: return { driftScale: 1, driftOffset: 0, volMult: 1 };
+  }
+}
+
 // ============================================================================
 // Main Generator
 // ============================================================================
@@ -229,7 +246,11 @@ export function generateSyntheticFutures(
   let totalPaths = 0;
 
   for (const scenario of config.scenarios) {
-    const { driftMult, volMult } = getScenarioModifiers(scenario);
+    const scenarioModifiers = getScenarioModifiers(scenario);
+    const regimeModifiers = getRegimeModifiers(config.regime);
+    const driftMult = scenarioModifiers.driftMult * regimeModifiers.driftScale
+      + regimeModifiers.driftOffset;
+    const volMult = scenarioModifiers.volMult * regimeModifiers.volMult;
 
     for (let p = 0; p < pathsPerScenario; p++) {
       const prices: number[][] = Array.from({ length: n }, () => new Array(horizonDays + 1).fill(0) as number[]);
