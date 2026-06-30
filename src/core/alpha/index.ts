@@ -99,8 +99,16 @@ export {
   dot,
   invert,
   shrinkToDiagonal,
+  ledoitWolfCovariance,
   computeCovarianceMatrix,
+  eigenDecomposition,
 } from "./matrix.ts";
+
+export {
+  computeResidualSScore,
+  computeResidualSScores,
+  type ResidualSScore,
+} from "./eigenportfolio-residual.ts";
 
 export {
   analyzeReversalTiming,

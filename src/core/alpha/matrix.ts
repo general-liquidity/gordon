@@ -93,6 +93,46 @@ export function shrinkToDiagonal(m: number[][], alpha: number): number[][] {
 }
 
 /**
+ * Ledoit-Wolf (2004) optimal-intensity shrinkage toward a scaled identity.
+ * Input rows are asset return series and columns are observations.
+ */
+export function ledoitWolfCovariance(
+  returns: number[][],
+): { covariance: number[][]; intensity: number } | null {
+  const sample = computeCovarianceMatrix(returns);
+  if (!sample || sample.length === 0) return sample ? { covariance: [], intensity: 0 } : null;
+  const n = returns.length;
+  const t = returns[0]!.length;
+  const mu = sample.reduce((sum, row, i) => sum + row[i]!, 0) / n;
+  const target = sample.map((row, i) => row.map((_, j) => i === j ? mu : 0));
+  const centered = returns.map((series) => {
+    const mean = series.reduce((sum, value) => sum + value, 0) / t;
+    return series.map((value) => value - mean);
+  });
+  let phi = 0;
+  for (let k = 0; k < t; k++) {
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        const outer = centered[i]![k]! * centered[j]![k]!;
+        phi += (outer - sample[i]![j]!) ** 2;
+      }
+    }
+  }
+  phi /= t;
+  let gamma = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) gamma += (sample[i]![j]! - target[i]![j]!) ** 2;
+  }
+  const intensity = gamma <= Number.EPSILON ? 0 : Math.max(0, Math.min(1, phi / (t * gamma)));
+  return {
+    intensity,
+    covariance: sample.map((row, i) =>
+      row.map((value, j) => (1 - intensity) * value + intensity * target[i]![j]!),
+    ),
+  };
+}
+
+/**
  * Compute the sample covariance matrix from per-series return arrays.
  * `returns[i]` is the time series of returns for strategy i. All
  * series must be equal length.

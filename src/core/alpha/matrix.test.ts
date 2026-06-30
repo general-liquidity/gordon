@@ -6,6 +6,7 @@ import {
   dot,
   invert,
   shrinkToDiagonal,
+  ledoitWolfCovariance,
   computeCovarianceMatrix,
 } from "./matrix.ts";
 
@@ -24,6 +25,24 @@ describe("transpose", () => {
 
   it("handles empty input", () => {
     expect(transpose([])).toEqual([]);
+  });
+});
+
+describe("ledoitWolfCovariance", () => {
+  it("selects a bounded data-driven intensity and preserves symmetry", () => {
+    const result = ledoitWolfCovariance([
+      [0.01, 0.02, -0.01, 0.03, -0.02, 0.01],
+      [0.012, 0.018, -0.008, 0.025, -0.015, 0.006],
+      [-0.01, 0.005, 0.014, -0.004, 0.009, -0.006],
+    ])!;
+    expect(result.intensity).toBeGreaterThanOrEqual(0);
+    expect(result.intensity).toBeLessThanOrEqual(1);
+    expect(result.covariance[0]![1]).toBeCloseTo(result.covariance[1]![0]!, 12);
+  });
+
+  it("rejects invalid return panels", () => {
+    expect(ledoitWolfCovariance([[0.1], [0.2]])).toBeNull();
+    expect(ledoitWolfCovariance([[0.1, 0.2], [0.1]])).toBeNull();
   });
 });
 
