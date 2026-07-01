@@ -65,6 +65,26 @@ export {
   type AtrBreakoutVerdict,
 } from "./atrBreakout.ts";
 
+export {
+  evaluateFollowThroughDay,
+  formatFollowThroughDay,
+  type FtdBar,
+  type FollowThroughDayOptions,
+  type FollowThroughDayResult,
+  type FtdPhase,
+  type FtdDetail,
+} from "./followThroughDay.ts";
+
+export {
+  evaluateDistributionDays,
+  formatDistributionDays,
+  type DistributionBar,
+  type DistributionDayOptions,
+  type DistributionDayResult,
+  type DistributionSeverity,
+  type DistributionDayDetail,
+} from "./distributionDay.ts";
+
 import type { MarketRegime } from "../../regime/types.ts";
 import { regimeRsiSignal, type RegimeRsiSettings } from "./regimeRsi.ts";
 import { applyBounceCounter, type BounceCounterState } from "./bounceCounter.ts";
