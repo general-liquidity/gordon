@@ -111,6 +111,37 @@ export interface EvalScenario {
 }
 
 /**
+ * Fixed failure-mode taxonomy (SWE-bench-Pro error_analysis analog),
+ * trading-flavored. Judge-assigned on a FAILED / low-scoring trajectory to
+ * name the dominant reasoning failure — a categorical dimension the scalar
+ * score and the `genericNonActionable` anti-metric don't capture.
+ *
+ *   misread_regime         — traded against the prevailing regime / trend.
+ *   over_sized             — position size breached risk budget / vol-adjusted sizing.
+ *   hallucinated_fill      — claimed a fill / price / holding that never existed.
+ *   ignored_news           — acted against material news / event the context surfaced.
+ *   generic_non_actionable — platitudes with no concrete trigger/stop/target/size.
+ *   other                  — a real failure that fits none of the above.
+ */
+export type FailureMode =
+  | "misread_regime"
+  | "over_sized"
+  | "hallucinated_fill"
+  | "ignored_news"
+  | "generic_non_actionable"
+  | "other";
+
+/** All taxonomy members, for validation / rollup seeding. */
+export const FAILURE_MODES: ReadonlyArray<FailureMode> = [
+  "misread_regime",
+  "over_sized",
+  "hallucinated_fill",
+  "ignored_news",
+  "generic_non_actionable",
+  "other",
+];
+
+/**
  * A trajectory is one variant's response to a scenario. The variant
  * label distinguishes which model / prompt-version / flag combo
  * produced it, so downstream reports can attribute regressions.
@@ -142,6 +173,14 @@ export interface ScoredTrajectory {
    * mask a rise in this rate by lifting the aggregate.
    */
   genericNonActionable?: boolean;
+  /**
+   * Judge-assigned failure-mode label from the fixed taxonomy. Only
+   * meaningful on a FAILED / low-scoring trajectory; judges omit it for
+   * good trajectories. OPTIONAL — undefined means the judge did not (or
+   * had no reason to) classify a failure. Rolled up in the review queue
+   * for a suite-level error-mode view.
+   */
+  failureMode?: FailureMode;
 }
 
 export interface JudgeResult {
@@ -210,6 +249,8 @@ export interface VariantRunResult {
     explanation: string;
     /** Anti-metric carried from the judge; missing = not flagged (false). */
     genericNonActionable?: boolean;
+    /** Failure-mode label carried from the judge; missing = unclassified. */
+    failureMode?: FailureMode;
   }>;
   /** Mean score across scenarios. */
   aggregate: number;

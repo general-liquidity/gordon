@@ -33,9 +33,11 @@ export type {
   PanelJudgeEntry,
   PanelJudgeResult,
   ScoredTrajectory,
+  FailureMode,
   VariantRunResult,
   RegressionReport,
 } from "./types.ts";
+export { FAILURE_MODES } from "./types.ts";
 
 export {
   judgeTrajectories,
@@ -63,6 +65,7 @@ export {
   appendToReviewQueue,
   readReviewQueue,
   defaultReviewQueuePath,
+  rollupFailureModes,
 } from "./reviewQueue.ts";
 export type { ReviewQueueEntry } from "./reviewQueue.ts";
 

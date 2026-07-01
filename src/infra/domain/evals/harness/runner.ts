@@ -20,7 +20,7 @@ import { judgeTrajectories } from "./trajectoryJudge.ts";
 import type { JudgeOptions } from "./trajectoryJudge.ts";
 import { judgeTrajectoriesPanel } from "./panelJudge.ts";
 import type { PanelJudgeOptions } from "./panelJudge.ts";
-import type { EvalScenario, EvalTrajectory, VariantRunResult } from "./types.ts";
+import type { EvalScenario, EvalTrajectory, FailureMode, VariantRunResult } from "./types.ts";
 
 export interface RunVariantInput {
   /** Stable label for this variant — used in reports + regression diffs. */
@@ -80,6 +80,7 @@ export async function runEvalSuite(input: RunSuiteInput): Promise<RunSuiteResult
       rank: number;
       explanation: string;
       genericNonActionable?: boolean;
+      failureMode?: FailureMode;
     }>
   > = new Map();
   for (const v of input.variants) perVariantScenarios.set(v.variantLabel, []);
@@ -122,6 +123,7 @@ export async function runEvalSuite(input: RunSuiteInput): Promise<RunSuiteResult
           rank: scored.rank,
           explanation: scored.explanation,
           genericNonActionable: scored.genericNonActionable,
+          failureMode: scored.failureMode,
         });
       }
     } else {
@@ -139,6 +141,7 @@ export async function runEvalSuite(input: RunSuiteInput): Promise<RunSuiteResult
           rank: scored.rank,
           explanation: scored.explanation,
           genericNonActionable: scored.genericNonActionable,
+          failureMode: scored.failureMode,
         });
       }
     }

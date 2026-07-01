@@ -20,6 +20,7 @@ import type { JudgeOptions } from "./trajectoryJudge.ts";
 import { createModuleLogger } from "../../../logger/index.ts";
 import type {
   EvalTrajectory,
+  FailureMode,
   JudgeRequest,
   PanelJudgeEntry,
   PanelJudgeResult,
@@ -130,17 +131,25 @@ function averageScores(
     }));
   }
 
-  const sums = new Map<
-    string,
-    { total: number; count: number; explanations: string[]; flagVotes: number }
-  >();
+  interface ScoreAccumulator {
+    total: number;
+    count: number;
+    explanations: string[];
+    flagVotes: number;
+    failureVotes: Map<FailureMode, number>;
+  }
+  const sums = new Map<string, ScoreAccumulator>();
   for (const entry of surviving) {
     for (const scored of entry.scored) {
-      const acc =
-        sums.get(scored.id) ?? { total: 0, count: 0, explanations: [], flagVotes: 0 };
+      const acc: ScoreAccumulator =
+        sums.get(scored.id) ??
+        { total: 0, count: 0, explanations: [], flagVotes: 0, failureVotes: new Map() };
       acc.total += scored.score;
       acc.count += 1;
       if (scored.genericNonActionable) acc.flagVotes += 1;
+      if (scored.failureMode) {
+        acc.failureVotes.set(scored.failureMode, (acc.failureVotes.get(scored.failureMode) ?? 0) + 1);
+      }
       if (scored.explanation) acc.explanations.push(`[${entry.judgeModel}] ${scored.explanation}`);
       sums.set(scored.id, acc);
     }
@@ -164,6 +173,9 @@ function averageScores(
       // Majority vote across surviving judges — flagged when more than
       // half of the judges that scored this trajectory flagged it.
       genericNonActionable: acc.flagVotes * 2 > acc.count,
+      // Plurality vote — the most common failure mode among judges that
+      // assigned one; undefined when no judge classified a failure.
+      failureMode: pluralityFailureMode(acc.failureVotes),
     };
   });
 
@@ -172,4 +184,18 @@ function averageScores(
     s.rank = i + 1;
   });
   return consensus;
+}
+
+/** Most-voted failure mode; undefined when no judge assigned one. Ties break
+ *  by first-seen insertion order (deterministic given a stable iteration). */
+function pluralityFailureMode(votes: Map<FailureMode, number>): FailureMode | undefined {
+  let best: FailureMode | undefined;
+  let bestCount = 0;
+  for (const [mode, count] of votes) {
+    if (count > bestCount) {
+      best = mode;
+      bestCount = count;
+    }
+  }
+  return best;
 }
