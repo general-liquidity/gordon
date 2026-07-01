@@ -11,3 +11,22 @@ export {
   DEFAULT_TEMPORAL_DECAY,
 } from "./temporalDecay.ts";
 export type { TemporalDecayConfig, DecayableItem } from "./temporalDecay.ts";
+
+export {
+  tuneRagConfig,
+  makeRecallScorer,
+  recallAtK,
+  DEFAULT_KNOB_ORDER,
+} from "./ragConfigTuner.ts";
+export type {
+  RagConfig,
+  RagKnob,
+  RagKnobSpace,
+  RagScorer,
+  LabeledQuery,
+  RetrievalFn,
+  RagTunerOptions,
+  RagTrial,
+  RagTunerStopReason,
+  RagTunerResult,
+} from "./ragConfigTuner.ts";

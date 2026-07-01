@@ -242,6 +242,16 @@ export function buildJudgePrompt(
     lines.push("# Extra evaluation criteria");
     lines.push(scenario.extraRubric);
   }
+  if (scenario.expectedAnswer) {
+    lines.push("");
+    lines.push("# Expected (known-correct)");
+    lines.push(
+      "The following is a known-correct reference answer for this scenario. Anchor your scoring to it: a trajectory whose facts, numbers, and conclusion match the reference should rank high; one that contradicts it should rank low, however fluent it reads. This is ground truth for CORRECTNESS, not a style guide — do not penalize a trajectory merely for wording or ordering that differs from the reference.",
+    );
+    lines.push("```");
+    lines.push(scenario.expectedAnswer);
+    lines.push("```");
+  }
   const turns = scenario.turns ?? [];
   if (turns.length > 0) {
     const constraints = turns
