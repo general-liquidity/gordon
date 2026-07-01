@@ -50,3 +50,13 @@ export {
   type DrawdownStatus,
   type DrawdownEvent,
 } from "./drawdown-tracker.ts";
+
+// Exposure Coach — top-down net-exposure ceiling
+export {
+  computeExposureCeiling,
+  formatExposureCoach,
+  type ExposureCoachInput,
+  type ExposureCoachOptions,
+  type ExposureCoachResult,
+  type ExposurePosture,
+} from "./exposure-coach.ts";

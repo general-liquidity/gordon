@@ -588,3 +588,14 @@ export {
   type AnalogConfidence,
   type MarketAnalogResult,
 } from "./market-analog.ts";
+
+export {
+  evaluateDeleveragingVeto,
+  formatDeleveragingVeto,
+  type OversoldAsset,
+  type DeleveragingVetoOptions,
+  type DeleveragingVetoResult,
+  type OversoldAssetResult,
+  type OversoldStatus,
+  type DeleveragingVetoVerdict,
+} from "./deleveraging-veto.ts";
