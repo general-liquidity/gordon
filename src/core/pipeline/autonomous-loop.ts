@@ -68,6 +68,17 @@ export interface AutonomousLoopConfig {
   onTradeIntent?: (intent: TradeIntent) => void;
   onMandateBreach?: (reason: string) => void;
   onCycleComplete?: (report: CycleReport) => void;
+  /**
+   * Optional live budget ceiling (USD) for this run. When set alongside
+   * `getCostSoFarUsd`, the loop halts with a `budget_exceeded` stop reason
+   * once reported spend reaches the ceiling. Omit to never budget-stop.
+   */
+  budgetCeilingUsd?: number;
+  /**
+   * Injected per-run cost-so-far provider (USD). Called live at the start of
+   * each cycle to compare against `budgetCeilingUsd`. Omit to never budget-stop.
+   */
+  getCostSoFarUsd?: () => number;
 }
 
 export interface OpportunityReport {
@@ -211,6 +222,26 @@ async function runCycle(): Promise<CycleReport | null> {
   }
 
   const { exchange, mandate, onOpportunityFound, onMandateBreach, onCycleComplete } = loopState.config;
+
+  // Live budget-ceiling stop (LB1). When a USD ceiling is configured and an
+  // injected cost-so-far provider reports spend at/above it, halt the run
+  // before doing more work — mirrors the Rust gordon-supervision
+  // StopReason::BudgetExceeded. Checked here, ahead of the equity fetch and
+  // scan, so the loop never buys more work it can't afford. Additive: with no
+  // ceiling (or no cost provider) configured, this never fires and behavior is
+  // identical to today.
+  const budgetCeilingUsd = loopState.config.budgetCeilingUsd;
+  if (budgetCeilingUsd !== undefined && loopState.config.getCostSoFarUsd) {
+    const costSoFarUsd = loopState.config.getCostSoFarUsd();
+    if (Number.isFinite(costSoFarUsd) && costSoFarUsd >= budgetCeilingUsd) {
+      logger.warn("Budget ceiling exceeded, stopping autonomous loop", {
+        costSoFarUsd: costSoFarUsd.toFixed(2),
+        budgetCeilingUsd: budgetCeilingUsd.toFixed(2),
+      });
+      stopAutonomousLoop("budget_exceeded");
+      return null;
+    }
+  }
 
   // Hard cycle ceiling — bound an autonomous run regardless of mandate
   // expiry/breach so a misconfigured short interval can't loop forever.
