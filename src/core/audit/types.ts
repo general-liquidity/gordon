@@ -105,6 +105,39 @@ export const AuditOutcomeSchema = z.object({
 export type AuditOutcome = z.infer<typeof AuditOutcomeSchema>;
 
 /**
+ * Whether the parent actually took up a child's returned result.
+ *
+ *   "observed" — parent saw the child deliverable land in its context.
+ *   "absorbed" — parent incorporated it into its own reasoning/decision.
+ *   "dropped"  — deliverable arrived but was NOT taken up (silently discarded).
+ *
+ * The distinction matters on resume: without it you cannot tell an absorbed
+ * child result from one that was silently dropped.
+ */
+export const AbsorptionStatusSchema = z.enum(["observed", "absorbed", "dropped"]);
+export type AbsorptionStatus = z.infer<typeof AbsorptionStatusSchema>;
+
+/**
+ * Explicit link from a parent step to the child trace it delegated, recording
+ * whether the child's result was absorbed vs dropped.
+ *
+ * This is a boundary-durability payload (reuses the "absorption" handoff kind →
+ * DurabilityClass "boundary"; see durability.ts) so it is stored lossless. It is
+ * carried on the trace OUTSIDE the signed content (see SIGNING_FIELDS in
+ * signing.ts): it is a post-hoc annotation, added when the parent resumes, so it
+ * must never disturb the tamper-evidence hash of the already-signed trace.
+ */
+export const ParentAbsorptionRecordSchema = z.object({
+  parent_step_id: z.string(),
+  child_trace_id: z.string(),
+  status: AbsorptionStatusSchema,
+  durability_class: DurabilityClassSchema,
+  note: z.string().optional(),
+  recorded_at: z.string().datetime(),
+});
+export type ParentAbsorptionRecord = z.infer<typeof ParentAbsorptionRecordSchema>;
+
+/**
  * A complete decision trace — one end-to-end flow from trigger to outcome.
  */
 export const AuditTraceSchema = z.object({
@@ -120,6 +153,13 @@ export const AuditTraceSchema = z.object({
   duration_ms: z.number().optional(),
 
   risk_check_id: z.string().optional(),
+
+  // Parent-absorption records: parent step → child trace, absorbed vs dropped.
+  // ADDITIVE and UNSIGNED — listed in SIGNING_FIELDS so it is excluded from the
+  // content hash. A trace hashes identically whether this field is absent or
+  // populated, so annotating a signed trace with absorption never breaks the
+  // tamper chain. See signing.ts.
+  absorptions: z.array(ParentAbsorptionRecordSchema).optional(),
 
   // Tamper-evidence chain (see signing.ts). Optional so traces recorded
   // before signing shipped still parse — verification treats them as broken.
