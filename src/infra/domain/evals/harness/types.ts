@@ -68,6 +68,14 @@ export interface EvalScenario {
   notes?: string;
   /** Optional explicit rubric the judge layers ON TOP OF the system prompt. */
   extraRubric?: string;
+  /**
+   * Optional known-correct expected answer. When present, the judge prompt gains
+   * a "# Expected (known-correct)" block so scoring anchors to FACT for numeric /
+   * analysis scenarios — "assess quality" becomes "check against the known
+   * answer". Absent => existing behavior (system prompt + rubric are the only
+   * reference); scoring is unchanged. Additive.
+   */
+  expectedAnswer?: string;
   /** Optional eval category — drives category-conditioned rubric. */
   category?: EvalCategory;
   /**
