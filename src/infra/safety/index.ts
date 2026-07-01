@@ -223,6 +223,17 @@ export type {
   WipRegistry,
 } from "./wipLimit.ts";
 
+// Risk-state undo-lineage governance (B6 — additive limit-param governance)
+export { RiskStateLineage } from "./riskStateLineage.ts";
+export type {
+  RiskDimension,
+  RiskState,
+  SaferDirection,
+  ProposalResult,
+  ProposalVerdict,
+  ChangeClass,
+} from "./riskStateLineage.ts";
+
 // Three-layer termination (L9 + L10 port)
 export {
   isTerminationLayersEnabled,

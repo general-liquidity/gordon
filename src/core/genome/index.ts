@@ -30,6 +30,17 @@ export { FitnessCalculator } from "./fitness.ts";
 export { EvolutionLoop } from "./evolution-loop.ts";
 export type { EvolutionTickResult } from "./evolution-loop.ts";
 
+// Stagnation detector (anti-overfitting pivot guardrail)
+export {
+  detectStagnation,
+  stagnationToPayload,
+} from "./stagnationDetector.ts";
+export type {
+  StagnationInput,
+  StagnationResult,
+  StagnationRecommendation,
+} from "./stagnationDetector.ts";
+
 // Store
 export {
   initGenomeTables,
