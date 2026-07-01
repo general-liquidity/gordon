@@ -13,6 +13,22 @@ import { z } from "zod";
 // ============================================================================
 
 /**
+ * Durability tiering for a stored payload.
+ *
+ *   "boundary"   — cross-agent handoff payloads (dispatch-in, child deliverable,
+ *                  absorption): the one record you most need to resume a
+ *                  handed-off unit. Stored LOSSLESS, exempt from offload
+ *                  truncation.
+ *   "bestEffort" — process chatter / routine logs, truncatable like any log line.
+ *
+ * Left OPTIONAL and treated as "bestEffort" when absent so existing (unclassified)
+ * records are unaffected and their tamper-chain hashes stay identical. See
+ * durability.ts for the truncation-exemption logic.
+ */
+export const DurabilityClassSchema = z.enum(["boundary", "bestEffort"]);
+export type DurabilityClass = z.infer<typeof DurabilityClassSchema>;
+
+/**
  * A single tool invocation within an agent step.
  */
 export const AuditToolCallSchema = z.object({
@@ -22,6 +38,7 @@ export const AuditToolCallSchema = z.object({
   duration_ms: z.number(),
   success: z.boolean(),
   error: z.string().optional(),
+  durability_class: DurabilityClassSchema.optional(),
 });
 
 export type AuditToolCall = z.infer<typeof AuditToolCallSchema>;
@@ -41,6 +58,12 @@ export const AuditAgentStepSchema = z.object({
 
   handed_off_to: z.string().optional(),
   handoff_reason: z.string().optional(),
+
+  // Durability tier for this step's handoff payload. "boundary" marks a
+  // dispatch-in / child-deliverable step whose reasoning + tool summaries must
+  // survive lossless. Absent => bestEffort. HMAC-safe: undefined is dropped
+  // from the canonical hash, so unclassified steps hash identically.
+  durability_class: DurabilityClassSchema.optional(),
 });
 
 export type AuditAgentStep = z.infer<typeof AuditAgentStepSchema>;

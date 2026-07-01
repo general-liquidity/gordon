@@ -11,6 +11,7 @@
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { enhanceRankedResults } from "../../infra/memory/hybrid/index.ts";
 import type { EmbeddingProvider } from "./embeddings.ts";
+import type { Thesis } from "./thesisLifecycle.ts";
 import {
   extractTokens,
   type MemoryEntry,
@@ -172,6 +173,69 @@ export class TradeJournal {
       pnl: params.pnl.toFixed(2),
     });
 
+    return id;
+  }
+
+  /**
+   * Persist a snapshot of a thesis (see thesisLifecycle.ts) into the journal.
+   *
+   * Rides the existing memory store as a `strategy_note` entry — the thesis FSM
+   * is not a parallel store (journal_is_substrate). The full serialized thesis
+   * is stashed in metadata (the metadata schema is open via `.catchall`), so a
+   * later session can reconstruct state, review schedule, realized PnL and
+   * MAE/MFE. The thesis id rides `positionId`, so snapshots for one thesis are
+   * retrievable as a history via the store's position lookup.
+   */
+  async recordThesis(thesis: Thesis): Promise<string> {
+    const realizedPct =
+      thesis.entryPrice && thesis.initialQuantity
+        ? (thesis.realizedPnl / (thesis.entryPrice * thesis.initialQuantity)) * 100
+        : 0;
+
+    const content = [
+      `[THESIS ${thesis.state}] ${thesis.symbol} ${thesis.side.toUpperCase()}`,
+      `Rationale: ${thesis.rationale}`,
+      thesis.entryPrice ? `Entry: $${thesis.entryPrice} x ${thesis.initialQuantity ?? 0}` : null,
+      `Open qty: ${thesis.openQuantity} | Realized PnL: $${thesis.realizedPnl.toFixed(2)} (${realizedPct.toFixed(2)}%)`,
+      `MFE: ${thesis.mfe.toFixed(4)} | MAE: ${thesis.mae.toFixed(4)}`,
+      thesis.nextReviewAt ? `Next review: ${thesis.nextReviewAt}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const tokens = extractTokens(content);
+
+    let embedding: number[] | undefined;
+    try {
+      embedding = await this.embedder.embed(content);
+    } catch (err) {
+      logger.warn("Failed to generate embedding for thesis snapshot", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    const id = await this.store.add({
+      type: "strategy_note",
+      content,
+      metadata: {
+        symbol: thesis.symbol,
+        direction: thesis.side === "long" ? "bullish" : "bearish",
+        pnl: thesis.realizedPnl,
+        tags: ["thesis", thesis.state.toLowerCase(), thesis.side],
+        thesis,
+      },
+      embedding,
+      tokens,
+      positionId: thesis.id,
+      symbols: [thesis.symbol],
+      importance: 0.6,
+    });
+
+    logger.debug("Thesis snapshot recorded", {
+      id,
+      symbol: thesis.symbol,
+      state: thesis.state,
+    });
     return id;
   }
 

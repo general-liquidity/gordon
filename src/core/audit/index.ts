@@ -12,6 +12,7 @@ export {
   AuditToolCallSchema,
   AuditTriggerSchema,
   AuditOutcomeSchema,
+  DurabilityClassSchema,
 } from "./types.ts";
 export type {
   AuditTrace,
@@ -23,7 +24,18 @@ export type {
   StepBuilder,
   AuditQueryFilters,
   AuditStats,
+  DurabilityClass,
 } from "./types.ts";
+
+// Durability tiering (boundary payloads stored lossless)
+export {
+  DEFAULT_OFFLOAD_LIMIT,
+  classifyHandoffPayload,
+  isLossless,
+  resolveDurabilityClass,
+  applyDurabilityTruncation,
+} from "./durability.ts";
+export type { BoundaryHandoffKind } from "./durability.ts";
 
 // Builder
 export { createTraceBuilder } from "./builder.ts";
