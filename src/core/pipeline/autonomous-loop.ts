@@ -42,6 +42,7 @@ import {
 } from "./goalMode.ts";
 import { getCompletionVerifier } from "./completionVerifier.ts";
 import { summarizeGaps } from "./goalGapFinding.ts";
+import { buildCompletionProof, completionProofToPayload } from "./completionProof.ts";
 import {
   isTradingFeatureListEnabled,
   loadFeatureList,
@@ -422,6 +423,19 @@ async function runCycle(): Promise<CycleReport | null> {
           persistGoalState(finalize.state);
 
           if (isGoalComplete(finalize.state)) {
+            // A3: seal an inspectable handoff artifact on the verified-complete
+            // path. Pure composition of already-decided pieces — the seal
+            // decision was made by finalizeGoalCompletion above.
+            const proof = buildCompletionProof({
+              state: finalize.state,
+              score,
+              requirements: finalize.requirements,
+              verdict: finalize.verdict,
+              stopReason: "achieved",
+              cyclesElapsed: goal.iterations + 1,
+              auditChainRef: loopState.sessionId,
+            });
+            logger.info("Completion proof sealed", completionProofToPayload(proof));
             logger.info("Goal complete (verified) — stopping autonomous loop", {
               goalId: finalize.state.id,
               status: finalize.state.status,
@@ -455,6 +469,19 @@ async function runCycle(): Promise<CycleReport | null> {
                 "goal stalled — no progress",
               );
               persistGoalState(sealed);
+              // A3: seal the handoff artifact on the acknowledged-gaps path too,
+              // so a stalled stop hands off the named open gaps + verdict rather
+              // than only free-text log lines. Additive; decision unchanged.
+              const proof = buildCompletionProof({
+                state: sealed,
+                score,
+                requirements: finalize.requirements,
+                verdict: finalize.verdict,
+                stopReason: "achieved_with_acknowledged_gaps",
+                cyclesElapsed: goal.iterations + 1,
+                auditChainRef: loopState.sessionId,
+              });
+              logger.info("Completion proof sealed", completionProofToPayload(proof));
               logger.warn("Goal stalled — sealing acknowledged gaps and stopping", {
                 goalId: sealed.id,
                 status: sealed.status,
