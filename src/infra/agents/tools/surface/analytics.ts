@@ -140,6 +140,7 @@ import {
   type AutocutOptions,
 } from "../../../../core/alpha/score-autocut.ts";
 import { computeSinglePrints } from "../../../trading/quant/singlePrints.ts";
+import { computeKalmanTrend } from "../../../trading/quant/kalmanTrend.ts";
 import { computeMAMA } from "../../../trading/quant/mamaMovingAverage.ts";
 import { computeInverseConvexity } from "../../../trading/quant/inverseConvexity.ts";
 import { computePriceDiscovery } from "../../../trading/quant/priceDiscovery.ts";
@@ -525,6 +526,7 @@ const INDICATOR_NAMES = [
   "camarilla_pivots",
   "parabolic_sar",
   "kalman",
+  "kalman_trend",
   "markov_regime",
   "elliott_wave",
   "order_blocks",
@@ -731,6 +733,14 @@ function dispatchIndicator(
       return calculateParabolicSAR(candles);
     case "kalman":
       return calculateKalmanFilter(candles);
+    case "kalman_trend":
+      return computeKalmanTrend({
+        prices: closes,
+        ...(typeof params.processNoise === "number" && { processNoise: params.processNoise }),
+        ...(typeof params.measurementNoise === "number" && { measurementNoise: params.measurementNoise }),
+        ...(typeof params.initialErrorVariance === "number" && { initialErrorVariance: params.initialErrorVariance }),
+        ...(typeof params.velocityThreshold === "number" && { velocityThreshold: params.velocityThreshold }),
+      });
     case "markov_regime":
       return calculateMarkovRegime(candles);
     case "elliott_wave":
@@ -1121,6 +1131,7 @@ export const computeIndicatorTool = createTool({
     "Levels: fibonacci, camarilla_pivots, supply_demand_zones, order_blocks, fvg",
     "Trend systems: ichimoku, supertrend, parabolic_sar",
     "Stats: kalman, nadaraya_watson, markov_regime",
+    "Trend velocity: kalman_trend (2-state constant-velocity Kalman filter — jointly tracks [level, velocity] via F=[[1,1],[0,1]], emits the filtered per-bar velocity + a velocity zero-crossing REVERSAL signal (up-cross=bullish_reversal, down-cross=bearish_reversal); distinct from kalman, which only smooths the level and reports a first-difference slope with no velocity state; params { processNoise?, measurementNoise?, initialErrorVariance?, velocityThreshold? } — noise knobs default to scale-invariant values derived from first-difference variance)",
     "SMC patterns: smc_patterns (combined), smc_order_blocks, smc_fvg, smc_choch, smc_liquidity_sweeps, smc_premium_discount; alternate ops: order_blocks, fvg, divergence, false_breakout, squeeze_momentum, angled_market_structure",
     "Geometric chart patterns: lmw_patterns (Lo-Mamaysky-Wang kernel-extrema detector — head-and-shoulders/inverse, broadening top/bottom, triangle top/bottom, rectangle top/bottom, double top/bottom; params { bandwidth?, doubleMinSeparation? }; pair with compute_microstructure signal_informativeness to test whether a pattern moves returns)",
     "Setup detection: tight_consolidation (bull-flag / pennant scorer), undercut_rally (shakeout-and-reclaim)",
