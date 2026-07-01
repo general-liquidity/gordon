@@ -103,3 +103,23 @@ export {
   comparePlaybooksTool,
   protocolTools,
 } from "./protocol-tools.ts";
+
+// Scenario-contingency plan + deterministic trigger resolver
+export {
+  resolveContingency,
+  validateContingencyPlan,
+  formatContingencyResolution,
+} from "./contingency.ts";
+export type {
+  BranchName,
+  TriggerOperator,
+  ContingencyTrigger,
+  AllocationLeg,
+  ContingencyBranch,
+  ContingencyPlan,
+  MarketReading,
+  TriggerEvaluation,
+  BranchEvaluation,
+  ContingencyResolution,
+  ContingencyValidationResult,
+} from "./contingency.ts";
