@@ -157,6 +157,32 @@ export function pairRegimeMonitor(
 }
 
 // ============================================================================
+// Complementary health input (Kalman P_trace)
+// ============================================================================
+
+/**
+ * A second, complementary pair-health verdict derived OUTSIDE the ADF/half-life
+ * test — currently the Kalman covariance-trace percentile signal. "degraded"
+ * means the hedge-ratio filter is unusually uncertain right now.
+ */
+export type PairHealthSignal = "healthy" | "degraded";
+
+/**
+ * Fold a complementary health signal into the ADF-driven 3-state regime WITHOUT
+ * replacing the ADF input. It can only make the regime stricter, never looser:
+ * a degraded filter caps ACTIVE at WARNING (hold, open nothing new) but never
+ * forces HALTED on its own — flattening stays reserved for genuine cointegration
+ * decay measured by the ADF statistic. WARNING/HALTED pass through unchanged.
+ */
+export function combineRegimeWithHealth(
+  adfRegime: PairRegimeStatus,
+  health: PairHealthSignal,
+): PairRegimeStatus {
+  if (health === "degraded" && adfRegime === "ACTIVE") return "WARNING";
+  return adfRegime;
+}
+
+// ============================================================================
 // Formatting
 // ============================================================================
 
