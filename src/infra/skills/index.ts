@@ -27,7 +27,23 @@ export type {
   SkillInvocation,
   SkillStatus,
   SkillValidationIssue,
+  SkillWorkflowManifest,
+  SkillWorkflowStep,
+  SkillWorkflowCadence,
+  DataContract,
+  DataContractField,
+  DataContractType,
+  WorkflowValidationIssue,
+  WorkflowValidationResult,
 } from "./types.ts";
+
+// ── Skill-workflow manifests (B3) ─────────────────────────────
+export {
+  validateWorkflowManifest,
+  validateWorkflowManifests,
+  field,
+} from "./workflowValidator.ts";
+export { BUILTIN_WORKFLOWS, getWorkflow } from "./workflows/index.ts";
 
 // ── Governance ────────────────────────────────────────────────
 export {
