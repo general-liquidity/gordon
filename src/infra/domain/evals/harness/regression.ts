@@ -109,15 +109,19 @@ export function detectRegressions(
       typeof options.writeReviewQueue === "string"
         ? options.writeReviewQueue
         : defaultReviewQueuePath();
-    const entries: ReviewQueueEntry[] = regressions.map((r) => ({
-      scenarioId: r.scenarioId,
-      baselineLabel: baseline.variantLabel,
-      candidateLabel: candidate.variantLabel,
-      baselineScore: r.baselineScore,
-      candidateScore: r.candidateScore,
-      delta: r.delta,
-      metadata: options.reviewQueueMetadata,
-    }));
+    const entries: ReviewQueueEntry[] = regressions.map((r) => {
+      const candFailureMode = candidateByScenario.get(r.scenarioId)?.failureMode;
+      return {
+        scenarioId: r.scenarioId,
+        baselineLabel: baseline.variantLabel,
+        candidateLabel: candidate.variantLabel,
+        baselineScore: r.baselineScore,
+        candidateScore: r.candidateScore,
+        delta: r.delta,
+        ...(candFailureMode && { failureMode: candFailureMode }),
+        metadata: options.reviewQueueMetadata,
+      };
+    });
     appendToReviewQueue(entries, path);
   }
 

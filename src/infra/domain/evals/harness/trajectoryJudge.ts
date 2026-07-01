@@ -30,6 +30,7 @@ import { getCategoryRubric } from "./categoryRubrics.ts";
 import type {
   EvalScenario,
   EvalTrajectory,
+  FailureMode,
   JudgeRequest,
   JudgeResult,
   ScoredTrajectory,
@@ -77,6 +78,21 @@ const JudgeResponseSchema = z.object({
        * treated as `false` (not flagged) downstream.
        */
       generic_non_actionable: z.boolean().optional(),
+      /**
+       * Fixed failure-mode taxonomy label. Optional so judges that don't
+       * emit it don't break parsing; only meaningful on a failed / low
+       * trajectory. Unknown strings are dropped downstream.
+       */
+      failure_mode: z
+        .enum([
+          "misread_regime",
+          "over_sized",
+          "hallucinated_fill",
+          "ignored_news",
+          "generic_non_actionable",
+          "other",
+        ])
+        .optional(),
     }),
   ),
 });
@@ -206,6 +222,11 @@ export function buildJudgePrompt(
     "SEPARATELY from the score, flag each trajectory with `generic_non_actionable: true` when its answer is generic non-actionable advice FOR TRADING. For trading, an answer is generic non-actionable when it recommends or implies an action but gives NO concrete trigger, stop, target, or size — i.e. \"buy when it looks good\" without a price/event trigger, stop level, target, or position size — OR when it retreats into platitudes (\"manage your risk\", \"wait for confirmation\", \"stay diversified\", \"do your own research\", \"keep an eye on it\") instead of a specific, executable call. A genuinely good answer that names a concrete trigger/stop/target/size, OR that honestly says \"nothing meets your criteria right now\" with reasoning, is NOT generic non-actionable. An answer that correctly declines to act (e.g. refuses a risk-breaching trade) and explains the specific reason is NOT generic non-actionable. Set the flag `false` (or omit it) when none of the above apply. This flag is tracked independently of the score — a fluent, well-structured answer can still be generic non-actionable.",
   );
   lines.push("");
+  lines.push("# Failure-mode taxonomy");
+  lines.push(
+    "For any trajectory you score in the FAILING / low half (roughly the bottom, a materially worse answer), ALSO set `failure_mode` to the single dominant reasoning failure from this fixed list: `misread_regime` (traded against the prevailing regime/trend), `over_sized` (size breaches risk budget / vol-adjusted sizing), `hallucinated_fill` (claims a fill, price, or holding that never existed), `ignored_news` (acts against material news/event the context surfaced), `generic_non_actionable` (platitudes, no concrete trigger/stop/target/size), or `other` (a real failure fitting none of these). OMIT `failure_mode` for a good trajectory — it is only for failures. Pick exactly one — the dominant cause.",
+  );
+  lines.push("");
   lines.push("# Agent system prompt (the rubric)");
   lines.push("```");
   lines.push(scenario.systemPrompt);
@@ -220,6 +241,25 @@ export function buildJudgePrompt(
     lines.push("");
     lines.push("# Extra evaluation criteria");
     lines.push(scenario.extraRubric);
+  }
+  const turns = scenario.turns ?? [];
+  if (turns.length > 0) {
+    const constraints = turns
+      .map((t) => t.expectedElicitation)
+      .filter((c): c is string => typeof c === "string" && c.length > 0);
+    lines.push("");
+    lines.push("# Multi-turn elicitation");
+    lines.push(
+      "This is a progressive-disclosure scenario: the user's request is underspecified and constraints are revealed across turns. Judge whether the agent ELICITED the missing constraint(s) before taking any material or irreversible action. Reward a trajectory that asked the clarifying question first; penalize one that acted before the necessary constraint was surfaced.",
+    );
+    if (constraints.length > 0) {
+      lines.push(`Constraints the agent should have elicited before acting: ${constraints.join("; ")}.`);
+    }
+    lines.push("");
+    lines.push("# User turns (in order)");
+    turns.forEach((t, i) => {
+      lines.push(`Turn ${i + 1}: ${t.user}`);
+    });
   }
   lines.push("");
   lines.push("# User input");
@@ -250,6 +290,7 @@ export function buildJudgePrompt(
           score: "<float 0..1>",
           explanation: "<one-sentence rationale>",
           generic_non_actionable: "<true|false — see anti-metric section>",
+          failure_mode: "<one of the taxonomy labels, or omit for a good trajectory>",
         })),
       },
       null,
@@ -269,7 +310,12 @@ function normalizeAndRank(
 ): ScoredTrajectory[] {
   const scoreById = new Map<
     string,
-    { score: number; explanation: string; genericNonActionable?: boolean }
+    {
+      score: number;
+      explanation: string;
+      genericNonActionable?: boolean;
+      failureMode?: FailureMode;
+    }
   >();
   for (const s of rawScores) {
     const score = clamp01(s.score);
@@ -277,6 +323,7 @@ function normalizeAndRank(
       score,
       explanation: s.explanation || "",
       genericNonActionable: s.generic_non_actionable,
+      failureMode: s.failure_mode,
     });
   }
 
@@ -288,6 +335,7 @@ function normalizeAndRank(
       explanation: entry?.explanation ?? "Judge returned no score for this trajectory.",
       rank: 0, // filled after sort
       genericNonActionable: entry?.genericNonActionable,
+      failureMode: entry?.failureMode,
     };
   });
 
@@ -340,7 +388,13 @@ export interface MockJudgeOptions {
   /** Map from scenarioId → array of (trajId, score). */
   responses: Record<
     string,
-    Array<{ id: string; score: number; explanation?: string; genericNonActionable?: boolean }>
+    Array<{
+      id: string;
+      score: number;
+      explanation?: string;
+      genericNonActionable?: boolean;
+      failureMode?: FailureMode;
+    }>
   >;
   /**
    * Optional per-model overrides. When the judge call's `config.model`
@@ -351,7 +405,13 @@ export interface MockJudgeOptions {
     string,
     Record<
       string,
-      Array<{ id: string; score: number; explanation?: string; genericNonActionable?: boolean }>
+      Array<{
+        id: string;
+        score: number;
+        explanation?: string;
+        genericNonActionable?: boolean;
+        failureMode?: FailureMode;
+      }>
     >
   >;
   /** Set true to make the mock throw on call. */
@@ -390,6 +450,7 @@ export function buildMockJudgeClient(options: MockJudgeOptions): LLMClient {
           score: s.score,
           explanation: s.explanation ?? `mock score ${s.score}`,
           generic_non_actionable: s.genericNonActionable,
+          failure_mode: s.failureMode,
         })),
       };
       return payload as T;

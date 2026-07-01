@@ -20,6 +20,7 @@ import {
   judgeTrajectories,
   judgeTrajectoriesPanel,
   readReviewQueue,
+  rollupFailureModes,
   runEvalSuite,
   scenariosByTag,
   scenariosByProvenance,
@@ -295,6 +296,30 @@ describe("runEvalSuite", () => {
     const report = detectRegressions(sharp, vague);
     expect(report.genericAdviceRegression).toBeDefined();
     expect(report.hasBlockingRegression).toBe(true);
+  });
+
+  it("carries the judge's failureMode through the runner into perScenario", async () => {
+    const pinned = ALL_SCENARIOS.filter((s) => SAMPLE_IDS.includes(s.id));
+    const responses: Record<
+      string,
+      Array<{ id: string; score: number; failureMode?: import("./index.ts").FailureMode }>
+    > = {};
+    SAMPLE_IDS.forEach((id) => {
+      responses[id] = [
+        { id: "good", score: 0.9 },
+        { id: "bad", score: 0.2, failureMode: "misread_regime" },
+      ];
+    });
+    const client = buildMockJudgeClient({ responses });
+    const result = await runEvalSuite({
+      scenarios: pinned,
+      variants: [buildVariant("good", SAMPLE_IDS), buildVariant("bad", SAMPLE_IDS)],
+      judgeOptions: { client },
+    });
+    const bad = result.results.find((r) => r.variantLabel === "bad")!;
+    expect(bad.perScenario.every((p) => p.failureMode === "misread_regime")).toBe(true);
+    const good = result.results.find((r) => r.variantLabel === "good")!;
+    expect(good.perScenario.every((p) => p.failureMode === undefined)).toBe(true);
   });
 
   it("skips scenarios where any variant is missing a trajectory", async () => {
@@ -588,6 +613,44 @@ describe("category rubrics", () => {
     ];
     const prompt = buildJudgePrompt(scenario, trajectories);
     expect(prompt).toContain("OUTPUT QUALITY, not path efficiency");
+  });
+
+  it("buildJudgePrompt adds the multi-turn elicitation rubric when turns are set", () => {
+    const scenario: EvalScenario = {
+      id: "multi-turn",
+      tags: [],
+      systemPrompt: "agent prompt",
+      userInput: "clean up my crypto exposure",
+      turns: [
+        { user: "clean up my crypto exposure", expectedElicitation: "which venue" },
+        { user: "on Coinbase", expectedElicitation: "keep BTC?" },
+      ],
+    };
+    const trajectories: EvalTrajectory[] = [
+      { id: "a", messages: [{ role: "assistant", content: "x" }] },
+      { id: "b", messages: [{ role: "assistant", content: "y" }] },
+    ];
+    const prompt = buildJudgePrompt(scenario, trajectories);
+    expect(prompt).toContain("Multi-turn elicitation");
+    expect(prompt).toContain("ELICITED the missing constraint");
+    expect(prompt).toContain("which venue");
+    expect(prompt).toContain("Turn 1:");
+    expect(prompt).toContain("Turn 2:");
+  });
+
+  it("buildJudgePrompt omits the multi-turn rubric when turns are absent", () => {
+    const scenario: EvalScenario = {
+      id: "single-turn",
+      tags: [],
+      systemPrompt: "agent prompt",
+      userInput: "single request",
+    };
+    const trajectories: EvalTrajectory[] = [
+      { id: "a", messages: [{ role: "assistant", content: "x" }] },
+      { id: "b", messages: [{ role: "assistant", content: "y" }] },
+    ];
+    const prompt = buildJudgePrompt(scenario, trajectories);
+    expect(prompt).not.toContain("Multi-turn elicitation");
   });
 });
 
@@ -891,5 +954,43 @@ describe("review queue", () => {
     };
     detectRegressions(baseline, candidate, { writeReviewQueue: path });
     expect(existsSync(path)).toBe(false);
+  });
+
+  it("carries the candidate failureMode onto the review-queue entry", () => {
+    const path = tmpPath();
+    const baseline: VariantRunResult = {
+      variantLabel: "baseline",
+      judgeModel: "test",
+      ranAt: "2026-05-11T00:00:00Z",
+      perScenario: [{ scenarioId: "x", score: 0.9, rank: 1, explanation: "" }],
+      aggregate: 0.9,
+      winCount: 1,
+      scenarioCount: 1,
+    };
+    const candidate: VariantRunResult = {
+      ...baseline,
+      variantLabel: "candidate",
+      perScenario: [
+        { scenarioId: "x", score: 0.3, rank: 1, explanation: "", failureMode: "over_sized" },
+      ],
+      aggregate: 0.3,
+    };
+    detectRegressions(baseline, candidate, { writeReviewQueue: path });
+    const back = readReviewQueue(path);
+    expect(back[0]?.failureMode).toBe("over_sized");
+  });
+
+  it("rollupFailureModes counts by taxonomy member with an unclassified bucket", () => {
+    const rollup = rollupFailureModes([
+      { failureMode: "over_sized" },
+      { failureMode: "over_sized" },
+      { failureMode: "misread_regime" },
+      {},
+    ]);
+    expect(rollup.total).toBe(4);
+    expect(rollup.byMode.over_sized).toBe(2);
+    expect(rollup.byMode.misread_regime).toBe(1);
+    expect(rollup.byMode.hallucinated_fill).toBe(0);
+    expect(rollup.unclassified).toBe(1);
   });
 });

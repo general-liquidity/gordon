@@ -23,6 +23,8 @@ import { join } from "node:path";
 import { appendFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { createModuleLogger } from "../../../logger/index.ts";
+import { FAILURE_MODES } from "./types.ts";
+import type { FailureMode } from "./types.ts";
 
 const logger = createModuleLogger("eval-review-queue");
 
@@ -33,6 +35,12 @@ export interface ReviewQueueEntry {
   baselineScore: number;
   candidateScore: number;
   delta: number;
+  /**
+   * Judge-assigned failure-mode label for the regressed (candidate)
+   * trajectory, from the fixed taxonomy. Optional — absent when the judge
+   * did not classify a failure. Rolled up by `rollupFailureModes`.
+   */
+  failureMode?: FailureMode;
   /** Free-form metadata: judge model, prompt hash, env flags, etc. */
   metadata?: Record<string, string | number | boolean>;
 }
@@ -103,4 +111,29 @@ export function readReviewQueue(
     });
     return [];
   }
+}
+
+/**
+ * Suite-level error-mode rollup (SWE-bench-Pro error_analysis analog). Counts
+ * review-queue entries by their judge-assigned `failureMode`, giving an
+ * at-a-glance view of WHICH reasoning failures dominate the regressions.
+ *
+ * Returns a count for every taxonomy member (zero when unseen) plus an
+ * `unclassified` bucket for entries the judge left unlabeled and a `total`.
+ * Reads the default queue when no entries are supplied.
+ */
+export function rollupFailureModes(
+  entries?: ReadonlyArray<Pick<ReviewQueueEntry, "failureMode">>,
+): { byMode: Record<FailureMode, number>; unclassified: number; total: number } {
+  const rows = entries ?? readReviewQueue();
+  const byMode = Object.fromEntries(FAILURE_MODES.map((m) => [m, 0])) as Record<
+    FailureMode,
+    number
+  >;
+  let unclassified = 0;
+  for (const row of rows) {
+    if (row.failureMode) byMode[row.failureMode] += 1;
+    else unclassified += 1;
+  }
+  return { byMode, unclassified, total: rows.length };
 }

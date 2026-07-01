@@ -32,6 +32,22 @@ export type EvalCategory =
   | "recovery";
 
 /**
+ * One user turn in a multi-turn / progressive-disclosure scenario. Models a
+ * real trader's clarification dialogue: the initial request is underspecified
+ * and constraints get revealed over turns. `expectedElicitation` names the
+ * constraint the agent SHOULD have elicited (asked about) at/after this turn
+ * before taking a material action — a judge hint + documentation, NOT a hard
+ * assertion (deterministic action assertions live in `expectedActions`).
+ */
+export interface ScenarioTurn {
+  /** The user message for this turn. */
+  user: string;
+  /** Optional: the missing constraint the agent should elicit before acting
+   *  (e.g. "venue", "risk budget", "keep BTC"). */
+  expectedElicitation?: string;
+}
+
+/**
  * A scenario is a fixed test case: system prompt + user input + tags.
  * Hand-curated and version-controlled — these define what "good
  * behavior" means for Gordon. Initial set is small; grow as evidence
@@ -62,7 +78,68 @@ export interface EvalScenario {
    * spec line that motivated the test (ASSERT-style traceability).
    */
   derivedFrom?: string;
+  /**
+   * Required-action assertions (SWE-bench-Pro F2P analog). Each string is a
+   * tool-name SUBSTRING that MUST appear among the trajectory's successfully
+   * executed tool calls for the scenario to pass its deterministic assertion
+   * check. e.g. `["downsize", "close_trade"]` asserts the downsize actually
+   * happened. Absent => no required-action gate (existing behavior).
+   *
+   * Checked by `checkScenarioAssertions` and folded into the process-check
+   * `passed` conjunction as block-severity violations. Distinct from the 5
+   * GLOBAL process rules, which stay unchanged.
+   */
+  expectedActions?: ReadonlyArray<string>;
+  /**
+   * Forbidden-action assertions (P2P no-regression analog). Each string is a
+   * tool-name SUBSTRING that MUST NOT appear anywhere in the trajectory's tool
+   * calls (executed OR attempted). e.g. `["flip_short", "cancel_order"]`
+   * asserts the agent did not touch an unrelated holding / cancel a standing
+   * order while downsizing. Absent => no forbidden-action gate.
+   */
+  forbiddenActions?: ReadonlyArray<string>;
+  /**
+   * Multi-turn / progressive-disclosure representation. When present, the
+   * scenario is a clarification dialogue: `userInput` remains the primary
+   * (first) request for single-turn callers, and `turns` carries the full
+   * ordered sequence so the trace adapter can preserve every user turn
+   * instead of collapsing to one, and the judge can score whether the agent
+   * ELICITED the missing constraint before acting. Absent => single-turn
+   * (existing `userInput`-only behavior).
+   */
+  turns?: ReadonlyArray<ScenarioTurn>;
 }
+
+/**
+ * Fixed failure-mode taxonomy (SWE-bench-Pro error_analysis analog),
+ * trading-flavored. Judge-assigned on a FAILED / low-scoring trajectory to
+ * name the dominant reasoning failure — a categorical dimension the scalar
+ * score and the `genericNonActionable` anti-metric don't capture.
+ *
+ *   misread_regime         — traded against the prevailing regime / trend.
+ *   over_sized             — position size breached risk budget / vol-adjusted sizing.
+ *   hallucinated_fill      — claimed a fill / price / holding that never existed.
+ *   ignored_news           — acted against material news / event the context surfaced.
+ *   generic_non_actionable — platitudes with no concrete trigger/stop/target/size.
+ *   other                  — a real failure that fits none of the above.
+ */
+export type FailureMode =
+  | "misread_regime"
+  | "over_sized"
+  | "hallucinated_fill"
+  | "ignored_news"
+  | "generic_non_actionable"
+  | "other";
+
+/** All taxonomy members, for validation / rollup seeding. */
+export const FAILURE_MODES: ReadonlyArray<FailureMode> = [
+  "misread_regime",
+  "over_sized",
+  "hallucinated_fill",
+  "ignored_news",
+  "generic_non_actionable",
+  "other",
+];
 
 /**
  * A trajectory is one variant's response to a scenario. The variant
@@ -96,6 +173,14 @@ export interface ScoredTrajectory {
    * mask a rise in this rate by lifting the aggregate.
    */
   genericNonActionable?: boolean;
+  /**
+   * Judge-assigned failure-mode label from the fixed taxonomy. Only
+   * meaningful on a FAILED / low-scoring trajectory; judges omit it for
+   * good trajectories. OPTIONAL — undefined means the judge did not (or
+   * had no reason to) classify a failure. Rolled up in the review queue
+   * for a suite-level error-mode view.
+   */
+  failureMode?: FailureMode;
 }
 
 export interface JudgeResult {
@@ -164,6 +249,8 @@ export interface VariantRunResult {
     explanation: string;
     /** Anti-metric carried from the judge; missing = not flagged (false). */
     genericNonActionable?: boolean;
+    /** Failure-mode label carried from the judge; missing = unclassified. */
+    failureMode?: FailureMode;
   }>;
   /** Mean score across scenarios. */
   aggregate: number;

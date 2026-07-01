@@ -26,15 +26,18 @@
 export type {
   EvalCategory,
   EvalScenario,
+  ScenarioTurn,
   EvalTrajectory,
   JudgeResult,
   JudgeRequest,
   PanelJudgeEntry,
   PanelJudgeResult,
   ScoredTrajectory,
+  FailureMode,
   VariantRunResult,
   RegressionReport,
 } from "./types.ts";
+export { FAILURE_MODES } from "./types.ts";
 
 export {
   judgeTrajectories,
@@ -62,6 +65,7 @@ export {
   appendToReviewQueue,
   readReviewQueue,
   defaultReviewQueuePath,
+  rollupFailureModes,
 } from "./reviewQueue.ts";
 export type { ReviewQueueEntry } from "./reviewQueue.ts";
 
@@ -108,7 +112,7 @@ export { findOrphanRules, formatOrphans } from "./orphanCoverage.ts";
 export type { OrphanRule } from "./orphanCoverage.ts";
 
 // Process-level trajectory checks + pass^k reliability (Phase 3).
-export { checkTrajectory } from "./process/processChecks.ts";
+export { checkTrajectory, checkScenarioAssertions } from "./process/processChecks.ts";
 export type {
   NormalizedTrace,
   NormalizedToolCall,
@@ -125,7 +129,7 @@ export {
   auditTraceToTrajectory,
   promoteTraceToScenario,
 } from "./traces/traceAdapter.ts";
-export type { PromoteOptions } from "./traces/traceAdapter.ts";
+export type { PromoteOptions, TrajectoryFromTraceOptions } from "./traces/traceAdapter.ts";
 export { scoreTrace, scoreRecentTraces } from "./traces/traceScorer.ts";
 export type { TraceScore, ScoreTracesOptions, ScoreTracesResult } from "./traces/traceScorer.ts";
 export {
