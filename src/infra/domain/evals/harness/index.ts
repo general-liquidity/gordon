@@ -58,6 +58,20 @@ export {
 export { runEvalSuite } from "./runner.ts";
 export type { RunVariantInput, RunSuiteInput, RunSuiteResult } from "./runner.ts";
 
+// Prompt-optimization loop — rewrite/score/keep-best against a labeled set,
+// gated train/holdout + plateau brake. Thin orchestration over holdoutAccessGate
+// + detectStagnation.
+export { optimizePrompt, appendFragmentMutator } from "./promptOptimizer.ts";
+export type {
+  PromptCandidate,
+  PromptMutator,
+  PromptScorer,
+  PromptOptimizerOptions,
+  PromptTrial,
+  PromptOptimizerStopReason,
+  PromptOptimizerResult,
+} from "./promptOptimizer.ts";
+
 export { detectRegressions, formatRegressionReport } from "./regression.ts";
 export type { DetectOptions } from "./regression.ts";
 
