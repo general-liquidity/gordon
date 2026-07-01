@@ -15,7 +15,7 @@
  */
 
 import type { AuditTrace } from "../../../../../core/audit/types.ts";
-import type { EvalCategory, EvalScenario, EvalTrajectory } from "../types.ts";
+import type { EvalCategory, EvalScenario, EvalTrajectory, ScenarioTurn } from "../types.ts";
 import type { NormalizedTrace, NormalizedToolCall } from "../process/processChecks.ts";
 import { GORDON_SYSTEM_PROMPT } from "../generator/prompts.ts";
 
@@ -43,15 +43,32 @@ export function auditTraceToNormalized(trace: AuditTrace): NormalizedTrace {
   };
 }
 
+export interface TrajectoryFromTraceOptions {
+  /**
+   * The real, ordered user turns from the captured multi-turn session. A single
+   * AuditTrace carries only one `trigger.payload_summary`; a real
+   * progressive-disclosure session (trader clarifies venue / risk budget / keep-BTC
+   * across turns) knows the individual messages. When supplied and non-empty,
+   * every turn is preserved as its own user message instead of collapsing to the
+   * single payload summary. These come from REAL captures, never a simulator.
+   */
+  userTurns?: ReadonlyArray<string>;
+}
+
 /**
  * Build the judge-facing trajectory. Tool calls don't fit the content-only
  * Message shape, so the assistant turn summarizes the agent's reasoning +
  * outcome, and the tool-call sequence is preserved in metadata (and via the
  * NormalizedTrace for process checks).
+ *
+ * Multi-turn: when `opts.userTurns` is supplied, each turn is preserved as its
+ * own user message (progressive-disclosure preservation) rather than collapsing
+ * to `trigger.payload_summary`. Absent => single user turn (existing behavior).
  */
 export function auditTraceToTrajectory(
   trace: AuditTrace,
   variantLabel?: string,
+  opts: TrajectoryFromTraceOptions = {},
 ): EvalTrajectory {
   const reasoning = trace.agent_steps
     .map((s) => s.reasoning_summary)
@@ -62,6 +79,12 @@ export function auditTraceToTrajectory(
     .join("\n\n");
   const toolNames = trace.agent_steps.flatMap((s) => s.tool_calls.map((t) => t.tool_name));
 
+  const userTurns =
+    opts.userTurns && opts.userTurns.length > 0
+      ? opts.userTurns
+      : [trace.trigger.payload_summary];
+  const userMessages = userTurns.map((content) => ({ role: "user" as const, content }));
+
   return {
     id: variantLabel ?? trace.trace_id,
     messages: [
@@ -69,7 +92,7 @@ export function auditTraceToTrajectory(
         role: "system",
         content: `Captured decision trace (${trace.trigger.type} from ${trace.trigger.source}).`,
       },
-      { role: "user", content: trace.trigger.payload_summary },
+      ...userMessages,
       { role: "assistant", content: assistant || "[no reasoning recorded]" },
     ],
     metadata: {
@@ -77,6 +100,7 @@ export function auditTraceToTrajectory(
       outcomeType: trace.outcome.type,
       agentId: trace.agent_steps[0]?.agent_id ?? "unknown",
       toolCalls: toolNames.join(","),
+      turnCount: userTurns.length,
     },
   };
 }
@@ -104,6 +128,13 @@ export interface PromoteOptions {
   tags?: ReadonlyArray<string>;
   /** Rubric describing the behavior the promoted scenario should NOT repeat. */
   extraRubric?: string;
+  /**
+   * The real, ordered user turns from the captured session. When supplied
+   * (non-empty), the promoted scenario becomes multi-turn: `turns` carries the
+   * sequence and `userInput` is the first turn. Absent => single-turn scenario
+   * whose `userInput` is `trigger.payload_summary` (existing behavior).
+   */
+  turns?: ReadonlyArray<ScenarioTurn>;
 }
 
 /**
@@ -117,12 +148,15 @@ export function promoteTraceToScenario(
 ): EvalScenario {
   const shortId = trace.trace_id.slice(0, 8);
   const category = opts.category ?? inferCategory(trace);
+  const hasTurns = opts.turns !== undefined && opts.turns.length > 0;
+  const userInput = hasTurns ? opts.turns![0]!.user : trace.trigger.payload_summary;
   return {
     id: `gen-trace-${shortId}`,
     tags: ["trace", "promoted", ...(opts.tags ?? [])],
     category,
     systemPrompt: GORDON_SYSTEM_PROMPT,
-    userInput: trace.trigger.payload_summary,
+    userInput,
+    ...(hasTurns && { turns: opts.turns }),
     derivedFrom: `trace:${trace.trace_id}`,
     notes: `Promoted from captured trace ${shortId} (outcome: ${trace.outcome.type}). ${opts.reason}`,
     extraRubric:

@@ -32,6 +32,22 @@ export type EvalCategory =
   | "recovery";
 
 /**
+ * One user turn in a multi-turn / progressive-disclosure scenario. Models a
+ * real trader's clarification dialogue: the initial request is underspecified
+ * and constraints get revealed over turns. `expectedElicitation` names the
+ * constraint the agent SHOULD have elicited (asked about) at/after this turn
+ * before taking a material action — a judge hint + documentation, NOT a hard
+ * assertion (deterministic action assertions live in `expectedActions`).
+ */
+export interface ScenarioTurn {
+  /** The user message for this turn. */
+  user: string;
+  /** Optional: the missing constraint the agent should elicit before acting
+   *  (e.g. "venue", "risk budget", "keep BTC"). */
+  expectedElicitation?: string;
+}
+
+/**
  * A scenario is a fixed test case: system prompt + user input + tags.
  * Hand-curated and version-controlled — these define what "good
  * behavior" means for Gordon. Initial set is small; grow as evidence
@@ -82,6 +98,16 @@ export interface EvalScenario {
    * order while downsizing. Absent => no forbidden-action gate.
    */
   forbiddenActions?: ReadonlyArray<string>;
+  /**
+   * Multi-turn / progressive-disclosure representation. When present, the
+   * scenario is a clarification dialogue: `userInput` remains the primary
+   * (first) request for single-turn callers, and `turns` carries the full
+   * ordered sequence so the trace adapter can preserve every user turn
+   * instead of collapsing to one, and the judge can score whether the agent
+   * ELICITED the missing constraint before acting. Absent => single-turn
+   * (existing `userInput`-only behavior).
+   */
+  turns?: ReadonlyArray<ScenarioTurn>;
 }
 
 /**

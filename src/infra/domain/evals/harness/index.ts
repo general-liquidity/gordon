@@ -26,6 +26,7 @@
 export type {
   EvalCategory,
   EvalScenario,
+  ScenarioTurn,
   EvalTrajectory,
   JudgeResult,
   JudgeRequest,
@@ -125,7 +126,7 @@ export {
   auditTraceToTrajectory,
   promoteTraceToScenario,
 } from "./traces/traceAdapter.ts";
-export type { PromoteOptions } from "./traces/traceAdapter.ts";
+export type { PromoteOptions, TrajectoryFromTraceOptions } from "./traces/traceAdapter.ts";
 export { scoreTrace, scoreRecentTraces } from "./traces/traceScorer.ts";
 export type { TraceScore, ScoreTracesOptions, ScoreTracesResult } from "./traces/traceScorer.ts";
 export {

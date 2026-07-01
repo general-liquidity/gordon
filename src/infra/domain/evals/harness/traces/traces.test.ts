@@ -70,6 +70,44 @@ describe("traceAdapter", () => {
     expect(s.tags).toContain("promoted");
     expect(s.category).toBe("execution");
     expect(s.userInput).toContain("long BTC");
+    expect(s.turns).toBeUndefined();
+  });
+
+  it("collapses to a single user turn by default (payload_summary)", () => {
+    const t = makeTrace("t3", [tc("get_market_data")]);
+    const traj = auditTraceToTrajectory(t);
+    const userMsgs = traj.messages.filter((m) => m.role === "user");
+    expect(userMsgs.length).toBe(1);
+    expect(userMsgs[0]!.content).toContain("long BTC");
+    expect(traj.metadata?.turnCount).toBe(1);
+  });
+
+  it("preserves multiple real user turns instead of collapsing", () => {
+    const t = makeTrace("t4", [tc("get_market_data")]);
+    const traj = auditTraceToTrajectory(t, undefined, {
+      userTurns: ["clean up my crypto exposure", "on Coinbase", "keep my BTC"],
+    });
+    const userMsgs = traj.messages.filter((m) => m.role === "user");
+    expect(userMsgs.map((m) => m.content)).toEqual([
+      "clean up my crypto exposure",
+      "on Coinbase",
+      "keep my BTC",
+    ]);
+    expect(traj.metadata?.turnCount).toBe(3);
+  });
+
+  it("promotes a multi-turn scenario when turns are supplied", () => {
+    const t = makeTrace("beadfeed99", [tc("place_market_order")], { outcome: "trade_executed" });
+    const s = promoteTraceToScenario(t, {
+      reason: "acted before eliciting venue",
+      turns: [
+        { user: "clean up my crypto exposure", expectedElicitation: "which venue" },
+        { user: "on Coinbase" },
+      ],
+    });
+    expect(s.turns?.length).toBe(2);
+    expect(s.userInput).toBe("clean up my crypto exposure");
+    expect(s.turns?.[0]!.expectedElicitation).toBe("which venue");
   });
 });
 

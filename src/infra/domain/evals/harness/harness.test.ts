@@ -589,6 +589,44 @@ describe("category rubrics", () => {
     const prompt = buildJudgePrompt(scenario, trajectories);
     expect(prompt).toContain("OUTPUT QUALITY, not path efficiency");
   });
+
+  it("buildJudgePrompt adds the multi-turn elicitation rubric when turns are set", () => {
+    const scenario: EvalScenario = {
+      id: "multi-turn",
+      tags: [],
+      systemPrompt: "agent prompt",
+      userInput: "clean up my crypto exposure",
+      turns: [
+        { user: "clean up my crypto exposure", expectedElicitation: "which venue" },
+        { user: "on Coinbase", expectedElicitation: "keep BTC?" },
+      ],
+    };
+    const trajectories: EvalTrajectory[] = [
+      { id: "a", messages: [{ role: "assistant", content: "x" }] },
+      { id: "b", messages: [{ role: "assistant", content: "y" }] },
+    ];
+    const prompt = buildJudgePrompt(scenario, trajectories);
+    expect(prompt).toContain("Multi-turn elicitation");
+    expect(prompt).toContain("ELICITED the missing constraint");
+    expect(prompt).toContain("which venue");
+    expect(prompt).toContain("Turn 1:");
+    expect(prompt).toContain("Turn 2:");
+  });
+
+  it("buildJudgePrompt omits the multi-turn rubric when turns are absent", () => {
+    const scenario: EvalScenario = {
+      id: "single-turn",
+      tags: [],
+      systemPrompt: "agent prompt",
+      userInput: "single request",
+    };
+    const trajectories: EvalTrajectory[] = [
+      { id: "a", messages: [{ role: "assistant", content: "x" }] },
+      { id: "b", messages: [{ role: "assistant", content: "y" }] },
+    ];
+    const prompt = buildJudgePrompt(scenario, trajectories);
+    expect(prompt).not.toContain("Multi-turn elicitation");
+  });
 });
 
 describe("judgeTrajectoriesPanel", () => {
