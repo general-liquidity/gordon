@@ -309,11 +309,13 @@ describe("recordGoalProgress", () => {
     expect(updated.iterations).toBe(1);
   });
 
-  it("transitions to achieved when end state met + constraints held", () => {
+  it("does NOT self-seal achieved even when end state met (A1: verifier gates the seal)", () => {
     const state = createGoalState("trade until Sharpe >= 1.5");
     const score = scoreGoal(state.parsedGoal, { sharpe: 2.0 }, 1);
     const updated = recordGoalProgress(state, score);
-    expect(updated.status).toBe("achieved");
+    // Self-score is a completion candidate, not done — status stays active
+    // until finalizeGoalCompletion runs the independent verifier.
+    expect(updated.status).toBe("active");
   });
 
   it("stays active when end state not yet met", () => {
