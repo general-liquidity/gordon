@@ -221,16 +221,49 @@ Real adapters, not mock quotes. Gordon is model-, venue-, and editor-agnostic: i
 <summary><strong>Analysis & strategy</strong></summary>
 
 - **~94 indicator ops** (RSI, MACD, Ichimoku, Supertrend, ATR, ADX, VWAP, plus exotics: SADF, frac-diff, Hurst, RSRS, Amihud) and **9 microstructure ops** (VPIN, footprint imbalance, order blocks, naked POC, displacement breaks).
-- **Six-class regime classifier** from a 10-metric model.
+- **Six-class regime classifier** from a 10-metric model, plus a **market-timing pair**, an O'Neil Follow-Through-Day confirmation and a Distribution-Day cluster counter, that generalizes from equity indices to crypto majors.
 - **41-strategy library** (5 tier-1, 22 tier-2, a weighted ensemble, a condition DSL), plus markdown **playbooks** and **Edge-Driven Development** (`EDGE.md` specs that auto-retire when live metrics stop matching the backtest).
+- **Cross-sectional risk:** a complex-wide deleveraging veto (one broad risk-off flush vetoes the whole oversold set, not N independent dips), an exposure-ceiling coach (regime + breadth → a deployable-capital cap), and an Avellaneda-Lee eigenportfolio-residual stat-arb signal.
+- **Portfolio math:** Random-Matrix-Theory covariance denoising (Marchenko-Pastur), optimal-intensity Ledoit-Wolf shrinkage, HRP, Black-Litterman.
+- **Options:** full Greeks (vanna / charm / vomma, dealer GEX) plus a held-position drawdown-cause classifier (delta- / theta- / IV-driven → a deterministic rebuy verdict).
+- **Equity methodologies:** a CANSLIM 7-factor composite with bear-market gating, a parabolic-short exhaustion scorer, a PEAD gap-up grader, and an N-th-order scenario-impact analyzer.
 </details>
 
 <details>
-<summary><strong>Backtesting & evaluation</strong></summary>
+<summary><strong>Planning, execution & market microstructure</strong></summary>
 
-- **Backtest engine:** historical replay, walk-forward, Monte Carlo, grid/random optimization, alpha-decay detection, fee-sensitivity sweeps, market-impact modeling, cross-sectional overfitting guards.
+- **Contingency planning:** the model authors bull / base / bear / tail branches once, each with a pre-committed allocation and declared trigger levels; a deterministic resolver picks the live branch each cycle, with no LLM in the execution loop.
+- **Settled-cash / GFV ledger:** buys clear only against settled cash with a T+1 pending bucket, so a Good-Faith-Violation is structurally impossible on a cash-account broker.
+- **Resting-stop liveness watchdog:** flags any position whose protective stop has lapsed (day-order expiry, cancel, reject) and needs re-arming.
+- **Order-book primitives:** a deterministic continuous-double-auction matching engine (price-time priority, partial fills, cancels) and a call-auction uncross for open / close equilibrium pricing.
+</details>
+
+<details>
+<summary><strong>Autonomy & completion discipline</strong></summary>
+
+- **Verified-completion gate:** an autonomous goal is never sealed on the agent's own say-so; an independent verifier has to fail to invalidate "done" first, closing the premature-completion failure mode.
+- **Per-cycle gap-finding + just-in-time replanning:** each cycle re-derives the unmet-requirement set and regenerates the work list from the current state instead of trusting a fixed upfront plan; when it stops short it seals an honest *achieved-with-acknowledged-gaps* instead of a clean success.
+- **Rotating self-audit:** a per-run deep pass over a rotating theme (script health, discovery coverage, dead weight, guardrail integrity, API budgets) that hunts the agent's own silent failures.
+- **Bounded autonomous-loop driver** with mandate breach / expiry hard-stops, per-symbol caps, and goal-stall detection.
+</details>
+
+<details>
+<summary><strong>Memory, governance & audit</strong></summary>
+
+- **Thesis-lifecycle FSM:** every idea is a tracked object (IDEA → ENTRY_READY → ACTIVE → PARTIALLY_CLOSED → CLOSED) with scheduled review-due dates and an MAE / MFE postmortem, extending the trade journal rather than forking it.
+- **Belief-tension counter:** a contradicting observation opens a for / against tally that flips or reconfirms a stored belief once the evidence crosses an adjustable bar.
+- **Governance primitives:** named approval presets; a risk-state undo-lineage (a tightening auto-applies, a loosening into never-held territory is staged for approval and can never breach the compiled safety floor); an approval implementation-lifecycle ledger (approvals re-surface until actually applied); and temperament dials that tune decision thresholds within hard caps they can never loosen.
+- **Boundary-durable audit:** handoff payloads are stored lossless (exempt from truncation) alongside an explicit parent-absorption record, both kept outside the signed content hash so the HMAC chain is unchanged.
+- **5-stage compaction:** masking → pruning → aggressive → collapse → full, with a reversible read-time collapse before any lossy summary, and ACE lesson distillation across sessions.
+</details>
+
+<details>
+<summary><strong>Backtesting, evaluation & learning</strong></summary>
+
+- **Backtest engine:** historical replay, walk-forward, Monte Carlo, grid/random optimization, alpha-decay detection, fee-sensitivity sweeps, market-impact modeling, cross-sectional overfitting guards, and a scenario-realism validator, the full Cont stylized-facts battery (fat tails, vol clustering, Zumbach timescale asymmetry, gain/loss skew, aggregational Gaussianity).
 - **Event-replay** with a `pass^k` verdict store for reliability across runs.
 - **Eval harness:** scenarios *generated* from the trading constitution, risk dimensions, deny-list, and rubrics; deterministic process checks; a tri-judge panel to wash out self-preference; a CI regression gate.
+- **Learning loop:** a regret ledger (rejected candidates reviewed at T+5 / T+20 to score whether the gate saved a loss or cost a gain), a setup model-book with forward-outcome cohort stats, counterfactual / inaction-value analysis, and a strategy-pivot stagnation detector.
 </details>
 
 ## Permission modes
