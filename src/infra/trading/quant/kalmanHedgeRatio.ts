@@ -37,6 +37,13 @@ export interface KalmanHedgeStep {
   innovation: number;
   /** Innovation variance (forecast error variance) — H·P_prior·Hᵀ + R. */
   innovationVar: number;
+  /**
+   * Trace of the POSTERIOR state covariance P (= P_ββ + P_αα) after the update.
+   * A scalar proxy for filter uncertainty: high while the filter is still learning
+   * or just after a structural shock, low once β has settled. Consumed by the
+   * pairs confidence gate / sizing / health signal.
+   */
+  pTrace: number;
 }
 
 export interface KalmanHedgeOptions {
@@ -160,7 +167,7 @@ export function kalmanHedgeRatio(
 
     const spread = y - bx * h0 - ax * h1;
 
-    steps[t] = { beta: bx, alpha: ax, spread, innovation, innovationVar: S };
+    steps[t] = { beta: bx, alpha: ax, spread, innovation, innovationVar: S, pTrace: p00 + p11 };
   }
 
   return {
