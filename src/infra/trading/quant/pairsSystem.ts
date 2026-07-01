@@ -18,6 +18,13 @@
  *   WARNING → hold existing, open nothing new.
  *   HALTED  → flatten (the cointegration relationship has decayed).
  *
+ * Kalman-confidence layer (opt-in via config.confidence, K4/K5/K6): the hedge-ratio
+ * filter's covariance trace P_trace measures how uncertain the dynamic β is. K4
+ * pauses new entries above a P_trace gate; K5 confidence-scales the OU size by
+ * (1 - P_trace/max); K6 folds a rolling-percentile P_trace health signal into the
+ * regime as a COMPLEMENTARY input (caps ACTIVE at WARNING, never replaces the ADF
+ * decay test). All three are inert unless configured — legacy behavior by default.
+ *
  * Spread convention: LOG prices in, so the per-bar spread change ΔS is the
  * dollar-neutral pair return (long 1 of p1, short β of p2). The caller passes raw
  * prices; this module logs them internally.
@@ -29,7 +36,12 @@ import { johansenTest } from "./johansen.ts";
 import { testCointegration } from "./cointegration.ts";
 import { calibrateOU, minimumEntryZScore, effectiveEntryZ, recommendedExitZ } from "./ouCalibration.ts";
 import { kalmanHedgeRatio } from "./kalmanHedgeRatio.ts";
-import { pairRegimeMonitor, type PairRegimeStatus } from "./cointegrationMonitor.ts";
+import {
+  pairRegimeMonitor,
+  combineRegimeWithHealth,
+  type PairRegimeStatus,
+  type PairHealthSignal,
+} from "./cointegrationMonitor.ts";
 
 // ============================================================================
 // Types
@@ -55,8 +67,23 @@ export interface PairsBar {
    * spread (long p1 / short β·p2), −ve = short spread. OU-proportional magnitude.
    */
   allocation: number;
-  /** Pair-health regime gating this bar's entries. */
+  /**
+   * Effective pair-health regime gating this bar's entries — the ADF regime after
+   * the Kalman P_trace health signal has been folded in (K6). Equal to `adfRegime`
+   * when the health input is disabled.
+   */
   regime: PairRegimeStatus;
+  /** ADF/half-life regime BEFORE the P_trace health downgrade (observability). */
+  adfRegime: PairRegimeStatus;
+  /** Trace of the Kalman posterior covariance at this bar — filter uncertainty. */
+  pTrace: number;
+  /** K6 health verdict from the rolling P_trace percentile ("healthy" when disabled). */
+  pTraceHealth: PairHealthSignal;
+  /**
+   * K5 confidence-sizing multiplier in [floor, 1] applied on top of OU conviction
+   * (1 when confidence sizing is disabled).
+   */
+  confidenceFactor: number;
 }
 
 export interface PairsSelection {
@@ -71,6 +98,38 @@ export interface PairsSelection {
   staticHedgeRatio: number;
   /** Reason the pair was rejected, when !selected. */
   rejectReason: string | null;
+}
+
+/**
+ * Kalman-confidence controls (K4/K5/K6). All opt-in — when a field is left unset
+ * the corresponding feature is inert and the system behaves exactly as before.
+ * They read the hedge-ratio filter's covariance trace P_trace as a scalar proxy
+ * for how uncertain the dynamic β currently is.
+ */
+export interface PairsConfidenceConfig {
+  /**
+   * K4 entry gate: pause opening NEW positions while P_trace exceeds this absolute
+   * threshold (the filter is too uncertain to trust a fresh entry). Existing
+   * positions are unaffected. Unset = no gate.
+   */
+  entryGate?: number;
+  /**
+   * K5 sizing normalizer `max` in the confidence factor (1 - P_trace/max), clamped
+   * to [sizeFloor, 1] and multiplied into the OU-conviction size. Unset = no
+   * confidence sizing (factor stays 1).
+   */
+  sizeMax?: number;
+  /** K5 clamp floor for the confidence factor so an uncertain filter still trades a minimum. Default 0. */
+  sizeFloor?: number;
+  /**
+   * K6 health: trailing window (bars) for the rolling P_trace percentile. When the
+   * current P_trace sits at/above `healthPct` of its window it flags "degraded",
+   * which caps the ADF regime at WARNING via combineRegimeWithHealth. Unset = no
+   * health downgrade.
+   */
+  healthWindow?: number;
+  /** K6 percentile in (0,1) for the P_trace health flag. Default 0.8. */
+  healthPct?: number;
 }
 
 export interface PairsSystemConfig {
@@ -92,6 +151,8 @@ export interface PairsSystemConfig {
   kalmanDelta?: number;
   /** Kalman observation variance. Default 1e-3. */
   kalmanObsVar?: number;
+  /** Kalman-confidence controls (K4/K5/K6). All opt-in; omit for legacy behavior. */
+  confidence?: PairsConfidenceConfig;
 }
 
 export interface PairsSystemResult {
@@ -142,6 +203,44 @@ function hurstOfSpread(series: number[], maxLag = 50): number {
     den += (logLag[i]! - mx) ** 2;
   }
   return den > 0 ? num / den : 0.5;
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return v < lo ? lo : v > hi ? hi : v;
+}
+
+/** Linear-interpolated quantile of an already-sorted ascending window. q in [0,1]. */
+function quantileSorted(sorted: number[], q: number): number {
+  const m = sorted.length;
+  if (m === 0) return NaN;
+  if (m === 1) return sorted[0]!;
+  const pos = clamp(q, 0, 1) * (m - 1);
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  if (lo === hi) return sorted[lo]!;
+  const frac = pos - lo;
+  return sorted[lo]! * (1 - frac) + sorted[hi]! * frac;
+}
+
+/**
+ * K6: per-bar P_trace health via a trailing rolling percentile. A bar is
+ * "degraded" when its P_trace sits at/above the `pct` quantile of the trailing
+ * `window` — i.e. the filter is unusually uncertain RIGHT NOW relative to its
+ * recent history (a genuine loss of confidence / covariance re-widening). On a
+ * cleanly converging filter P_trace only shrinks, so the current value stays at
+ * the bottom of its window and the signal correctly stays "healthy". Warmup bars
+ * (fewer than `window` samples) are "healthy" — the regime monitor's own warmup
+ * already HALTS those.
+ */
+export function pTraceHealthSeries(pTrace: number[], window: number, pct: number): PairHealthSignal[] {
+  const n = pTrace.length;
+  const out: PairHealthSignal[] = new Array(n).fill("healthy");
+  for (let i = window - 1; i < n; i++) {
+    const w = pTrace.slice(i - window + 1, i + 1).sort((x, y) => x - y);
+    const threshold = quantileSorted(w, pct);
+    if (pTrace[i]! >= threshold) out[i] = "degraded";
+  }
+  return out;
 }
 
 /** Rolling z-score with a fixed lookback; NaN until the window fills. */
@@ -255,6 +354,16 @@ export function runPairsSystem(
   // ── Layer 5: rolling cointegration monitor (computed per-bar on trailing window) ──
   const monitorWindow = config.monitorWindow ?? Math.min(252, Math.floor(n / 2));
 
+  // ── Kalman-confidence controls (K4/K5/K6) — all inert unless configured. ──
+  const conf = config.confidence ?? {};
+  const pTraceSeries = kalman.steps.map((s) => s.pTrace);
+  const sizeFloor = conf.sizeFloor ?? 0;
+  const healthPct = conf.healthPct ?? 0.8;
+  const health: PairHealthSignal[] =
+    conf.healthWindow !== undefined && conf.healthWindow > 0
+      ? pTraceHealthSeries(pTraceSeries, conf.healthWindow, healthPct)
+      : new Array(n).fill("healthy");
+
   const bars: PairsBar[] = new Array(n);
   let state: PositionState = "flat";
 
@@ -262,28 +371,38 @@ export function runPairsSystem(
     const zi = z[i]!;
     const step = kalman.steps[i]!;
 
-    // Regime gate from the trailing window ending at i (needs full window of history).
-    let regime: PairRegimeStatus = "HALTED";
+    const pTrace = step.pTrace;
+
+    // ADF/half-life regime from the trailing window ending at i (needs full window).
+    let adfRegime: PairRegimeStatus = "HALTED";
     if (i + 1 >= monitorWindow) {
       const wx = lp1.slice(i + 1 - monitorWindow, i + 1);
       const wy = lp2.slice(i + 1 - monitorWindow, i + 1);
-      regime = pairRegimeMonitor(wx, wy, {
+      adfRegime = pairRegimeMonitor(wx, wy, {
         window: monitorWindow,
         halfLifeMin,
         halfLifeMax,
       }).status;
     }
 
+    // K6: fold the Kalman P_trace health signal in as a COMPLEMENTARY input — it
+    // can only tighten the regime (ACTIVE→WARNING), never loosen or force HALTED.
+    const pTraceHealth = health[i]!;
+    const regime = combineRegimeWithHealth(adfRegime, pTraceHealth);
+
+    // K4: pause NEW entries while the filter is too uncertain (P_trace above gate).
+    const entryAllowed = conf.entryGate === undefined || pTrace <= conf.entryGate;
+
     // State machine. Entries only when ACTIVE; HALTED forces flat; WARNING holds.
     if (regime === "HALTED") {
       state = "flat";
     } else if (!Number.isNaN(zi)) {
       if (state === "flat") {
-        if (regime === "ACTIVE") {
+        if (regime === "ACTIVE" && entryAllowed) {
           if (zi > entryZ) state = "short"; // spread rich → short the spread
           else if (zi < -entryZ) state = "long"; // spread cheap → long the spread
         }
-        // WARNING + flat → stay flat (open nothing new).
+        // WARNING + flat, or gated by P_trace → stay flat (open nothing new).
       } else if (state === "short" && zi < exitZ) {
         state = "flat";
       } else if (state === "long" && zi > -exitZ) {
@@ -293,7 +412,12 @@ export function runPairsSystem(
 
     // OU-proportional sizing: scale by |z|/entryZ, capped at 1.
     const conviction = entryZ > 0 ? Math.min(Math.abs(zi) / entryZ, 1) : 0;
-    const sized = Number.isNaN(zi) ? 0 : maxFraction * conviction;
+    // K5: confidence-scale the size by (1 - P_trace/max), clamped to [floor, 1].
+    const confidenceFactor =
+      conf.sizeMax !== undefined && conf.sizeMax > 0
+        ? clamp(1 - pTrace / conf.sizeMax, sizeFloor, 1)
+        : 1;
+    const sized = Number.isNaN(zi) ? 0 : maxFraction * conviction * confidenceFactor;
     const allocation = state === "long" ? sized : state === "short" ? -sized : 0;
 
     bars[i] = {
@@ -305,6 +429,10 @@ export function runPairsSystem(
       state,
       allocation,
       regime,
+      adfRegime,
+      pTrace,
+      pTraceHealth,
+      confidenceFactor,
     };
   }
 
