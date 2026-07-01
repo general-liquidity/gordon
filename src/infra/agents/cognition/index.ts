@@ -66,3 +66,16 @@ export type {
   EffortBudget,
   ReasoningDepth,
 } from "./effortCalibration.ts";
+
+export {
+  params as temperamentParams,
+  normalizeDials,
+  neutralTemperament,
+  maxAggressionDials,
+  paramsToPayload as temperamentParamsToPayload,
+  TEMPERAMENT_CAPS,
+} from "./temperament.ts";
+export type {
+  TemperamentDials,
+  TemperamentParams,
+} from "./temperament.ts";
