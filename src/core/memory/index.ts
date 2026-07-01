@@ -64,3 +64,27 @@ export {
   resetMemoryManager,
   type EventBus,
 } from "./manager.ts";
+
+// Thesis-lifecycle FSM (idea -> entry -> active -> partial -> closed/terminated)
+export {
+  canTransition,
+  transition,
+  createThesis,
+  markEntryReady,
+  enterPosition,
+  recordPartialClose,
+  closePosition,
+  terminate,
+  updateExcursion,
+  completeReview,
+  isReviewDue,
+  reviewsDue,
+  isTerminal,
+  type Thesis,
+  type ThesisState,
+  type PartialClose,
+  type ThesisTransition,
+  type CreateThesisParams,
+  type EnterPositionParams,
+  type CloseParams,
+} from "./thesisLifecycle.ts";
