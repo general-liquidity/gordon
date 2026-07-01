@@ -220,7 +220,7 @@ Real adapters, not mock quotes. Gordon is model-, venue-, and editor-agnostic: i
 <details>
 <summary><strong>Analysis & strategy</strong></summary>
 
-- **~94 indicator ops** (RSI, MACD, Ichimoku, Supertrend, ATR, ADX, VWAP, plus exotics: SADF, frac-diff, Hurst, RSRS, Amihud) and **9 microstructure ops** (VPIN, footprint imbalance, order blocks, naked POC, displacement breaks).
+- **~94 indicator ops** (RSI, MACD, Ichimoku, Supertrend, ATR, ADX, VWAP, plus exotics: SADF, frac-diff, Hurst, RSRS, Amihud) and **microstructure ops** (VPIN, footprint imbalance, order blocks, naked POC, displacement breaks, plus triangular-arbitrage-parity, a 3-leg no-arbitrage-breakdown dislocation signal).
 - **Six-class regime classifier** from a 10-metric model, plus a **market-timing pair**, an O'Neil Follow-Through-Day confirmation and a Distribution-Day cluster counter, that generalizes from equity indices to crypto majors.
 - **41-strategy library** (5 tier-1, 22 tier-2, a weighted ensemble, a condition DSL), plus markdown **playbooks** and **Edge-Driven Development** (`EDGE.md` specs that auto-retire when live metrics stop matching the backtest).
 - **Cross-sectional risk:** a complex-wide deleveraging veto (one broad risk-off flush vetoes the whole oversold set, not N independent dips), an exposure-ceiling coach (regime + breadth → a deployable-capital cap), and an Avellaneda-Lee eigenportfolio-residual stat-arb signal.
@@ -262,7 +262,7 @@ Real adapters, not mock quotes. Gordon is model-, venue-, and editor-agnostic: i
 
 - **Backtest engine:** historical replay, walk-forward, Monte Carlo, grid/random optimization, alpha-decay detection, fee-sensitivity sweeps, market-impact modeling, cross-sectional overfitting guards, and a scenario-realism validator, the full Cont stylized-facts battery (fat tails, vol clustering, Zumbach timescale asymmetry, gain/loss skew, aggregational Gaussianity).
 - **Event-replay** with a `pass^k` verdict store for reliability across runs.
-- **Eval harness:** scenarios *generated* from the trading constitution, risk dimensions, deny-list, and rubrics; deterministic process checks; a tri-judge panel to wash out self-preference; a CI regression gate.
+- **Eval harness:** scenarios *generated* from the trading constitution, risk dimensions, deny-list, and rubrics; deterministic process checks with per-scenario required/forbidden-action assertions (did the downsize happen, and did nothing unrelated break?); multi-turn scenarios that score a session spanning real clarification turns; a failure-mode taxonomy over failed runs; a tri-judge panel to wash out self-preference; and a CI regression gate.
 - **Learning loop:** a regret ledger (rejected candidates reviewed at T+5 / T+20 to score whether the gate saved a loss or cost a gain), a setup model-book with forward-outcome cohort stats, counterfactual / inaction-value analysis, and a strategy-pivot stagnation detector.
 </details>
 
