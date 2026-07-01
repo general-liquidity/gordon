@@ -9,6 +9,11 @@
 import type { Candle } from "../../types/index.ts";
 import type { MarketRegime, RegimeSignal, RegimeHistory } from "./types.ts";
 import { RegimeClassifier } from "./classifier.ts";
+import {
+  RegimeHysteresisGate,
+  isRegimeHysteresisEnabled,
+  regimeHysteresisConfigFromEnv,
+} from "./hysteresisGate.ts";
 import { getDatabase } from "../../infra/storage/database.ts";
 import { playbookRegistry } from "../playbooks/registry.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
@@ -75,6 +80,8 @@ export class RegimeDetector {
   private classifier = new RegimeClassifier();
   private cache = new Map<string, CachedRegimeSignal>();
   private initialized = false;
+  /** A5: opt-in dwell-time hysteresis over raw classifications (GORDON_REGIME_HYSTERESIS). */
+  private hysteresis = new RegimeHysteresisGate(regimeHysteresisConfigFromEnv());
 
   private constructor() {}
 
@@ -116,7 +123,8 @@ export class RegimeDetector {
     symbol: string,
     timeframe = "1h",
   ): RegimeSignal {
-    const signal = this.classifier.classify(candles, symbol, timeframe);
+    const raw = this.classifier.classify(candles, symbol, timeframe);
+    const signal = this.applyHysteresisIfEnabled(raw);
 
     // Update cache
     this.cache.set(`${symbol}:${timeframe}`, { signal, cachedAtMs: Date.now() });
@@ -140,6 +148,21 @@ export class RegimeDetector {
     });
 
     return signal;
+  }
+
+  /**
+   * A5: opt-in dwell-time hysteresis. When GORDON_REGIME_HYSTERESIS is on, a
+   * freshly-classified regime that differs from the accepted one must persist
+   * before it is accepted; an unconfirmed boundary flicker holds the prior
+   * regime. Only the `regime` label is stabilized — the live metrics/confidence
+   * of the current bar are preserved. The underlying classifier is untouched.
+   */
+  private applyHysteresisIfEnabled(raw: RegimeSignal): RegimeSignal {
+    if (!isRegimeHysteresisEnabled()) return raw;
+    const key = `${raw.symbol}:${raw.timeframe}`;
+    const result = this.hysteresis.accept(key, raw.regime);
+    if (result.regime === raw.regime) return raw;
+    return { ...raw, regime: result.regime };
   }
 
   // ---------- Cache ----------
