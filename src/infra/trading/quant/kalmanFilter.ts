@@ -187,3 +187,114 @@ export function kalmanSignal(
     filtered: result.filtered,
   };
 }
+
+// ============================================================================
+// Adaptive-Q variant (K3)
+// ============================================================================
+
+/**
+ * Result of the adaptive-Q filter: the standard fields plus the per-step
+ * process variance actually used, so the vol-conditioning is inspectable.
+ */
+export interface AdaptiveKalmanResult extends KalmanResult {
+  /** Process variance Q applied at each step. */
+  qSeries: number[];
+}
+
+export interface AdaptiveKalmanConfig extends KalmanConfig {
+  /**
+   * Reference volatility the injected series is normalized against. When the
+   * trailing realized vol equals this reference, Q equals the base
+   * processVariance. Default: the median of the finite, positive realized-vol
+   * values (robust to spikes).
+   */
+  referenceVol?: number;
+  /** Clamp on the per-step vol scale factor (vol / referenceVol). Default 10. */
+  maxScale?: number;
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1]! + sorted[mid]!) / 2
+    : sorted[mid]!;
+}
+
+/**
+ * Kalman filter with a process noise Q that is scaled per step by an injected
+ * trailing realized-vol series. In calm regimes (low vol) Q shrinks and the
+ * filter is smooth / trusts its model; in volatile regimes Q grows and the
+ * filter becomes responsive / tracks price more closely. This is the same
+ * single-state predict-correct filter as `kalmanFilter`, but with a
+ * time-varying Q instead of a constant one.
+ *
+ * The scale is variance-consistent: since realized vol is a standard deviation,
+ * Q_t = processVariance * (vol_t / referenceVol)^2. The injected series is the
+ * caller's responsibility (e.g. a trailing stdev of returns, ATR/price, or the
+ * kalmanVolatility estimate) and is aligned by index to `prices`; if it is
+ * shorter than the price series, the last value is carried forward.
+ *
+ * @param prices        Raw price observations.
+ * @param realizedVol   Trailing realized-vol per step (a standard deviation).
+ * @param config        Filter parameters; processVariance is the BASE Q.
+ */
+export function kalmanFilterAdaptiveQ(
+  prices: number[],
+  realizedVol: ReadonlyArray<number>,
+  config: AdaptiveKalmanConfig = DEFAULT_KALMAN_CONFIG,
+): AdaptiveKalmanResult {
+  if (prices.length === 0) {
+    return {
+      filtered: [],
+      gains: [],
+      slopes: [],
+      qSeries: [],
+      state: { estimate: 0, errorVariance: 1, kalmanGain: 0 },
+    };
+  }
+
+  const baseQ = config.processVariance;
+  const R = config.measurementVariance;
+  const maxScale = config.maxScale ?? 10;
+
+  // Reference vol: explicit, else the median of the finite positive vols.
+  const positiveVols = realizedVol.filter(
+    (v) => Number.isFinite(v) && v > 0,
+  ) as number[];
+  const referenceVol =
+    config.referenceVol ?? (positiveVols.length > 0 ? median(positiveVols) : 0);
+
+  let state: KalmanState = {
+    estimate: config.initialEstimate ?? prices[0]!,
+    errorVariance: config.initialErrorVariance ?? 1.0,
+    kalmanGain: 0,
+  };
+
+  const filtered: number[] = [];
+  const gains: number[] = [];
+  const slopes: number[] = [];
+  const qSeries: number[] = [];
+
+  for (let i = 0; i < prices.length; i++) {
+    // Align the vol series by index; carry the last value forward if shorter.
+    const rawVol =
+      realizedVol.length > 0
+        ? realizedVol[Math.min(i, realizedVol.length - 1)]!
+        : referenceVol;
+    let scale = 1;
+    if (referenceVol > 0 && Number.isFinite(rawVol) && rawVol > 0) {
+      scale = Math.min(rawVol / referenceVol, maxScale);
+    }
+    const Q = baseQ * scale * scale;
+    qSeries.push(Q);
+
+    state = kalmanUpdate(state, prices[i]!, Q, R);
+    filtered.push(state.estimate);
+    gains.push(state.kalmanGain);
+    slopes.push(i > 0 ? filtered[i]! - filtered[i - 1]! : 0);
+  }
+
+  return { filtered, gains, slopes, qSeries, state };
+}
