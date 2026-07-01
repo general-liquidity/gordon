@@ -42,6 +42,13 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import type { GoalRequirement } from "./goalGapFinding.ts";
+import { deriveRequirements } from "./goalGapFinding.ts";
+import {
+  verifyCompletion,
+  type CompletionVerifier,
+  type CompletionVerdict,
+} from "./completionVerifier.ts";
 
 export const GOAL_MODE_FLAG_ENV = "GORDON_GOAL_MODE";
 export const GOAL_STATE_PATH_ENV = "GORDON_GOAL_STATE_PATH";
@@ -81,7 +88,13 @@ export interface ParsedGoal {
   constraints: string[];
 }
 
-export type GoalStatus = "active" | "paused" | "achieved" | "failed" | "cleared";
+export type GoalStatus =
+  | "active"
+  | "paused"
+  | "achieved"
+  | "achieved_with_acknowledged_gaps"
+  | "failed"
+  | "cleared";
 
 export interface GoalScore {
   iteration: number;
@@ -109,6 +122,12 @@ export interface GoalState {
   lastScore: GoalScore | null;
   /** Free-form notes the operator (or agent) appended. */
   notes: string[];
+  /**
+   * Requirements sealed as explicitly-acknowledged gaps (C1). Set only when a
+   * goal terminates as `achieved_with_acknowledged_gaps` — an honest seal of
+   * what was left unmet, instead of a clean `achieved` or a silent cancel.
+   */
+  acknowledgedGaps?: GoalRequirement[];
 }
 
 export interface GoalObservation {
@@ -412,17 +431,117 @@ export function createGoalState(text: string, now?: string): GoalState {
 }
 
 /**
- * Record a score, increment the iteration counter, and update status.
- * Returns a NEW state object — input is not mutated.
+ * Record a score and increment the iteration counter. Returns a NEW state
+ * object — input is not mutated.
+ *
+ * A1: this NO LONGER seals `achieved` on the self-score alone. Meeting the
+ * self-scored end state makes a goal a *completion candidate*, not done — the
+ * seal is gated on an independent verifier via {@link finalizeGoalCompletion}.
+ * Self-report is necessary but not sufficient for completion.
  */
 export function recordGoalProgress(state: GoalState, score: GoalScore): GoalState {
-  const nextStatus: GoalStatus =
-    score.endStateMet && score.constraintsHeld ? "achieved" : state.status;
   return {
     ...state,
     iterations: state.iterations + 1,
-    status: nextStatus,
     lastScore: score,
+  };
+}
+
+/**
+ * True when the self-score proposes completion (end state met + constraints
+ * held). This is the completion *candidate* signal — it must still clear the
+ * verifier gate before the goal is sealed `achieved`.
+ */
+export function isCompletionCandidate(score: GoalScore): boolean {
+  return score.endStateMet && score.constraintsHeld;
+}
+
+export interface FinalizeCompletionResult {
+  /** Possibly-sealed state. `achieved` only when the verifier confirmed. */
+  state: GoalState;
+  /** The requirement set derived this cycle (A2). */
+  requirements: GoalRequirement[];
+  /** The unmet subset. */
+  unmet: GoalRequirement[];
+  /** The verifier verdict, or null when the self-score did not even propose completion. */
+  verdict: CompletionVerdict | null;
+  /** True when the goal was sealed `achieved` this call. */
+  sealed: boolean;
+  /**
+   * True when the self-score proposed completion but the verifier refused to
+   * confirm — a premature completion was blocked and the loop should continue.
+   */
+  blockedPrematureCompletion: boolean;
+}
+
+/**
+ * A1 + A2: the single place `achieved` is sealed. Re-derives the
+ * unmet-requirement set for this cycle (A2), then consults an INDEPENDENT
+ * completion verifier (A1). Only seals `achieved` when the self-score proposes
+ * completion AND the verifier confirms. Otherwise leaves the goal `active`
+ * (unless it was already terminal via another path) so the loop keeps working.
+ *
+ * Additive: this only adds a stop condition before `achieved`; it never
+ * seals a goal the self-score did not already propose as complete.
+ */
+export async function finalizeGoalCompletion(
+  state: GoalState,
+  score: GoalScore,
+  observation: GoalObservation,
+  verifier: CompletionVerifier,
+  cycle: number,
+): Promise<FinalizeCompletionResult> {
+  const requirements = deriveRequirements(state.parsedGoal, observation, score);
+  const unmet = requirements.filter((r) => !r.met);
+
+  if (!isCompletionCandidate(score)) {
+    return { state, requirements, unmet, verdict: null, sealed: false, blockedPrematureCompletion: false };
+  }
+
+  const verdict = await verifyCompletion(verifier, {
+    goal: state.parsedGoal,
+    score,
+    observation,
+    requirements,
+    cycle,
+  });
+
+  if (verdict.confirmed) {
+    const sealedState: GoalState = {
+      ...state,
+      status: "achieved",
+      notes: [...state.notes, `completion verified by ${verdict.verifierId}: ${verdict.rationale}`],
+    };
+    return { state: sealedState, requirements, unmet, verdict, sealed: true, blockedPrematureCompletion: false };
+  }
+
+  const blockedState: GoalState = {
+    ...state,
+    notes: [...state.notes, `self-scored completion blocked by ${verdict.verifierId}: ${verdict.rationale}`],
+  };
+  return { state: blockedState, requirements, unmet, verdict, sealed: false, blockedPrematureCompletion: true };
+}
+
+/**
+ * C1: seal a goal that is stopping with KNOWN unmet requirements as
+ * `achieved_with_acknowledged_gaps` — an honest terminal state that records
+ * exactly what was left outstanding, instead of a clean `achieved` or a silent
+ * cancel. Used when the loop halts for another reason (stall / budget / mandate)
+ * while requirements remain open.
+ */
+export function sealAcknowledgedGaps(
+  state: GoalState,
+  unmet: GoalRequirement[],
+  reason: string,
+): GoalState {
+  return {
+    ...state,
+    status: "achieved_with_acknowledged_gaps",
+    acknowledgedGaps: unmet,
+    notes: [
+      ...state.notes,
+      `sealed with ${unmet.length} acknowledged gap(s) (${reason}): ${unmet.map((r) => r.id).join(", ") || "none"}`,
+    ],
   };
 }
 
@@ -445,7 +564,12 @@ export function failGoal(state: GoalState, reason: string): GoalState {
 }
 
 export function isGoalComplete(state: GoalState): boolean {
-  return state.status === "achieved" || state.status === "failed" || state.status === "cleared";
+  return (
+    state.status === "achieved" ||
+    state.status === "achieved_with_acknowledged_gaps" ||
+    state.status === "failed" ||
+    state.status === "cleared"
+  );
 }
 
 export function appendGoalNote(state: GoalState, note: string): GoalState {
@@ -557,5 +681,6 @@ export function goalStateToPayload(state: GoalState): Record<string, unknown> {
     constraintsHeld: state.lastScore?.constraintsHeld ?? true,
     parsedEndState: state.parsedGoal.endState?.type ?? null,
     constraintCount: state.parsedGoal.constraints.length,
+    acknowledgedGapCount: state.acknowledgedGaps?.length ?? 0,
   };
 }

@@ -32,12 +32,16 @@ import {
   loadActiveGoal,
   scoreGoal,
   recordGoalProgress,
+  finalizeGoalCompletion,
+  sealAcknowledgedGaps,
   appendProgressLog,
   persistGoalState,
   isGoalComplete,
   failGoal,
   type GoalObservation,
 } from "./goalMode.ts";
+import { getCompletionVerifier } from "./completionVerifier.ts";
+import { summarizeGaps } from "./goalGapFinding.ts";
 import {
   isTradingFeatureListEnabled,
   loadFeatureList,
@@ -400,17 +404,39 @@ async function runCycle(): Promise<CycleReport | null> {
             constraintViolations: violations,
           };
           const score = scoreGoal(goal.parsedGoal, observation, goal.iterations + 1);
-          const next = recordGoalProgress(goal, score);
-          appendProgressLog(next, score);
-          persistGoalState(next);
-          if (isGoalComplete(next)) {
-            logger.info("Goal complete — stopping autonomous loop", {
-              goalId: next.id,
-              status: next.status,
+          const recorded = recordGoalProgress(goal, score);
+          appendProgressLog(recorded, score);
+
+          // A1 + A2: gate the `achieved` seal on an INDEPENDENT verifier that
+          // re-derives the unmet-requirement set each cycle. A self-scored
+          // completion is only a candidate; the verifier must confirm before
+          // the goal is sealed done. This ADDS a stop condition before
+          // achieved — it does not weaken the stall / breach / cap stops below.
+          const finalize = await finalizeGoalCompletion(
+            recorded,
+            score,
+            observation,
+            getCompletionVerifier(),
+            goal.iterations + 1,
+          );
+          persistGoalState(finalize.state);
+
+          if (isGoalComplete(finalize.state)) {
+            logger.info("Goal complete (verified) — stopping autonomous loop", {
+              goalId: finalize.state.id,
+              status: finalize.state.status,
               progressPct: score.progressPct,
+              verifier: finalize.verdict?.verifierId,
             });
             loopState.isRunning = false;
           } else {
+            if (finalize.blockedPrematureCompletion) {
+              logger.warn("Self-scored completion blocked by verifier — continuing", {
+                goalId: finalize.state.id,
+                unmet: summarizeGaps(finalize.unmet),
+                rationale: finalize.verdict?.rationale,
+              });
+            }
             // No-progress stall guard: halt a loop that keeps making varied moves
             // without advancing the goal (the gap fingerprint doom-loops + budget
             // caps miss). Patience tunable via GORDON_GOAL_STALL_PATIENCE.
@@ -420,9 +446,20 @@ async function runCycle(): Promise<CycleReport | null> {
               ...(Number.isFinite(patienceEnv) && patienceEnv >= 2 && { patience: patienceEnv }),
             });
             if (stall.recommendation === "halt") {
-              logger.warn("Goal stalled — stopping autonomous loop (no progress)", {
-                goalId: next.id,
+              // C1: stopping with known unmet requirements — seal them
+              // explicitly as acknowledged gaps instead of leaving the goal
+              // active and letting the mandate go silently `cancelled`.
+              const sealed = sealAcknowledgedGaps(
+                finalize.state,
+                finalize.unmet,
+                "goal stalled — no progress",
+              );
+              persistGoalState(sealed);
+              logger.warn("Goal stalled — sealing acknowledged gaps and stopping", {
+                goalId: sealed.id,
+                status: sealed.status,
                 progressPct: score.progressPct,
+                acknowledgedGaps: summarizeGaps(finalize.unmet),
                 cyclesSinceImprovement: stall.cyclesSinceImprovement,
                 windowGain: stall.windowGain,
               });
