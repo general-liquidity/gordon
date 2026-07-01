@@ -149,3 +149,92 @@ export interface SkillInvocation {
   /** Execution mode. */
   context: "inline" | "fork";
 }
+
+// ────────────────────────────────────────────────────────────────
+// Declarative skill-workflow manifests (B3)
+//
+// A workflow chains several skills into a scheduled, ordered pipeline
+// with a typed data contract between steps. Individually strong skills
+// become composable + contract-checked: each step declares what it
+// consumes and produces, and the validator proves every consumed field
+// is satisfied by an upstream producer (or a workflow-level input)
+// before the workflow can run. This catches broken handoffs at author
+// time instead of mid-run.
+// ────────────────────────────────────────────────────────────────
+
+/** How often a workflow is intended to run. Documentation + scheduling hint. */
+export type SkillWorkflowCadence =
+  | "on-demand"
+  | "session-start"
+  | "daily"
+  | "weekly"
+  | "pre-trade"
+  | "post-trade";
+
+/** Primitive types a data-contract field may carry. */
+export type DataContractType = "string" | "number" | "boolean" | "object" | "array";
+
+/** A single named field in an inter-skill data contract. */
+export interface DataContractField {
+  /** Field name. Must be non-empty and unique within its contract. */
+  name: string;
+  /** Declared type of the field. */
+  type: DataContractType;
+  /** Whether a downstream consumer must receive this field. Default true. */
+  required?: boolean;
+  /** Human-readable purpose of the field. */
+  description?: string;
+}
+
+/** An ordered set of fields exchanged between workflow steps. */
+export type DataContract = DataContractField[];
+
+/** One step in a workflow: a skill plus its consumed/produced contract. */
+export interface SkillWorkflowStep {
+  /** ID of a skill that must resolve in the registry. */
+  skillId: string;
+  /** Fields this step reads from upstream producers or workflow inputs. */
+  consumes?: DataContract;
+  /** Fields this step makes available to downstream steps. */
+  produces?: DataContract;
+  /** Documentation-only marker; an optional step still contributes its produces. */
+  optional?: boolean;
+}
+
+/** A declarative manifest chaining skills into a scheduled pipeline. */
+export interface SkillWorkflowManifest {
+  /** Unique workflow ID (kebab-case). */
+  id: string;
+  /** Display name. */
+  name: string;
+  /** WHAT the workflow does + WHEN it runs. */
+  description: string;
+  /** Intended run cadence. */
+  cadence: SkillWorkflowCadence;
+  /** Fields available to the first step before any skill has run. */
+  inputs?: DataContract;
+  /** Ordered required-skill chain. Must be non-empty. */
+  steps: SkillWorkflowStep[];
+  /** Categorization tags. */
+  tags?: string[];
+  /** Version string. */
+  version?: string;
+}
+
+/** Severity-tagged issue from validating a workflow manifest. */
+export interface WorkflowValidationIssue {
+  severity: "error" | "warning";
+  /** skillId of the offending step, when applicable. */
+  step?: string;
+  /** Field name the issue concerns, when applicable. */
+  field?: string;
+  message: string;
+}
+
+/** Result of validating a single workflow manifest. */
+export interface WorkflowValidationResult {
+  workflowId: string;
+  /** True when no error-severity issues were found. */
+  ok: boolean;
+  issues: WorkflowValidationIssue[];
+}
