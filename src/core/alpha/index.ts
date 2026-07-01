@@ -599,3 +599,14 @@ export {
   type OversoldStatus,
   type DeleveragingVetoVerdict,
 } from "./deleveraging-veto.ts";
+
+export {
+  gradePeadGapUp,
+  formatPeadGapGrade,
+  type PeadGrade,
+  type PeadGapInput,
+  type ComponentRamp,
+  type PeadGapGraderOptions,
+  type ComponentScore,
+  type PeadGapGradeResult,
+} from "./pead-gap-grader.ts";
