@@ -108,7 +108,7 @@ export { findOrphanRules, formatOrphans } from "./orphanCoverage.ts";
 export type { OrphanRule } from "./orphanCoverage.ts";
 
 // Process-level trajectory checks + pass^k reliability (Phase 3).
-export { checkTrajectory } from "./process/processChecks.ts";
+export { checkTrajectory, checkScenarioAssertions } from "./process/processChecks.ts";
 export type {
   NormalizedTrace,
   NormalizedToolCall,

@@ -62,6 +62,26 @@ export interface EvalScenario {
    * spec line that motivated the test (ASSERT-style traceability).
    */
   derivedFrom?: string;
+  /**
+   * Required-action assertions (SWE-bench-Pro F2P analog). Each string is a
+   * tool-name SUBSTRING that MUST appear among the trajectory's successfully
+   * executed tool calls for the scenario to pass its deterministic assertion
+   * check. e.g. `["downsize", "close_trade"]` asserts the downsize actually
+   * happened. Absent => no required-action gate (existing behavior).
+   *
+   * Checked by `checkScenarioAssertions` and folded into the process-check
+   * `passed` conjunction as block-severity violations. Distinct from the 5
+   * GLOBAL process rules, which stay unchanged.
+   */
+  expectedActions?: ReadonlyArray<string>;
+  /**
+   * Forbidden-action assertions (P2P no-regression analog). Each string is a
+   * tool-name SUBSTRING that MUST NOT appear anywhere in the trajectory's tool
+   * calls (executed OR attempted). e.g. `["flip_short", "cancel_order"]`
+   * asserts the agent did not touch an unrelated holding / cancel a standing
+   * order while downsizing. Absent => no forbidden-action gate.
+   */
+  forbiddenActions?: ReadonlyArray<string>;
 }
 
 /**

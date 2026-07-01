@@ -1,5 +1,9 @@
 import { describe, it, expect } from "bun:test";
-import { checkTrajectory, type NormalizedTrace } from "./processChecks.ts";
+import {
+  checkTrajectory,
+  checkScenarioAssertions,
+  type NormalizedTrace,
+} from "./processChecks.ts";
 import { computePassK, passKFromChecks } from "./passK.ts";
 
 function trace(
@@ -96,6 +100,86 @@ describe("checkTrajectory", () => {
     );
     expect(r.passed).toBe(true);
     expect(r.violations.length).toBe(0);
+  });
+});
+
+describe("checkScenarioAssertions (F2P / P2P)", () => {
+  it("returns no violations when the scenario declares neither field", () => {
+    const v = checkScenarioAssertions(trace([{ name: "place_market_order" }]), {});
+    expect(v).toEqual([]);
+  });
+
+  it("BLOCKS when a required (expected) action never executed", () => {
+    const v = checkScenarioAssertions(trace([{ name: "get_market_data" }]), {
+      expectedActions: ["downsize"],
+    });
+    expect(v.some((x) => x.rule === "scenario_expected_action_missing" && x.severity === "block")).toBe(true);
+  });
+
+  it("passes when every expected action executed successfully", () => {
+    const v = checkScenarioAssertions(
+      trace([{ name: "downsize_position" }, { name: "close_trade" }]),
+      { expectedActions: ["downsize", "close_trade"] },
+    );
+    expect(v).toEqual([]);
+  });
+
+  it("does NOT credit an expected action that failed", () => {
+    const v = checkScenarioAssertions(
+      trace([{ name: "downsize_position", ok: false }]),
+      { expectedActions: ["downsize"] },
+    );
+    expect(v.some((x) => x.rule === "scenario_expected_action_missing")).toBe(true);
+  });
+
+  it("BLOCKS when a forbidden action appears (even if it failed)", () => {
+    const v = checkScenarioAssertions(
+      trace([{ name: "flip_short_order", ok: false }]),
+      { forbiddenActions: ["flip_short"] },
+    );
+    expect(v.some((x) => x.rule === "scenario_forbidden_action_present" && x.severity === "block")).toBe(true);
+  });
+
+  it("passes when no forbidden action appears", () => {
+    const v = checkScenarioAssertions(trace([{ name: "downsize_position" }]), {
+      forbiddenActions: ["cancel_order", "flip_short"],
+    });
+    expect(v).toEqual([]);
+  });
+});
+
+describe("checkTrajectory with scenario assertions", () => {
+  it("folds an unmet expected-action into the block conjunction (passed=false)", () => {
+    const r = checkTrajectory(
+      trace([{ name: "classify_trade_risk" }, { name: "place_market_order" }]),
+      { expectedActions: ["downsize"] },
+    );
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.rule === "scenario_expected_action_missing")).toBe(true);
+  });
+
+  it("folds a forbidden-action into the block conjunction (passed=false)", () => {
+    const r = checkTrajectory(
+      trace([{ name: "classify_trade_risk" }, { name: "downsize_position" }, { name: "cancel_order" }]),
+      { expectedActions: ["downsize"], forbiddenActions: ["cancel_order"] },
+    );
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.rule === "scenario_forbidden_action_present")).toBe(true);
+  });
+
+  it("passes when expected present and forbidden absent", () => {
+    const r = checkTrajectory(
+      trace([{ name: "classify_trade_risk" }, { name: "downsize_position" }]),
+      { expectedActions: ["downsize"], forbiddenActions: ["cancel_order", "flip_short"] },
+    );
+    expect(r.passed).toBe(true);
+  });
+
+  it("leaves global-rule behavior unchanged when no scenario is passed", () => {
+    const r = checkTrajectory(trace([{ name: "place_market_order" }]));
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.rule === "risk_gate_before_order")).toBe(true);
+    expect(r.violations.some((v) => v.rule.startsWith("scenario_"))).toBe(false);
   });
 });
 
