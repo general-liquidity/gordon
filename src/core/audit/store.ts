@@ -30,7 +30,13 @@ import type {
   AuditAgentStep,
   AuditToolCall,
   AuditStats,
+  DurabilityClass,
 } from "./types.ts";
+
+/** Coerce a stored durability_class column into the typed value or undefined. */
+function toDurabilityClass(value: string | null): DurabilityClass | undefined {
+  return value === "boundary" || value === "bestEffort" ? value : undefined;
+}
 
 const logger = createModuleLogger("audit-store");
 
@@ -129,6 +135,7 @@ export function initAuditTables(): void {
           reasoning_summary TEXT NOT NULL DEFAULT '',
           handed_off_to TEXT,
           handoff_reason TEXT,
+          durability_class TEXT,
           step_order INTEGER NOT NULL DEFAULT 0,
           FOREIGN KEY (trace_id) REFERENCES audit_traces(trace_id)
         )
@@ -164,6 +171,7 @@ export function initAuditTables(): void {
           duration_ms REAL NOT NULL DEFAULT 0,
           success INTEGER NOT NULL DEFAULT 1,
           error TEXT,
+          durability_class TEXT,
           call_order INTEGER NOT NULL DEFAULT 0,
           FOREIGN KEY (step_id) REFERENCES audit_agent_steps(step_id)
         )
@@ -186,6 +194,10 @@ export function initAuditTables(): void {
     "CREATE INDEX idx_audit_tools_tool_name"
   );
 
+  // Migration for databases created before durability tiering shipped.
+  addColumnIfMissing(db, "audit_agent_steps", "durability_class", "durability_class TEXT");
+  addColumnIfMissing(db, "audit_tool_calls", "durability_class", "durability_class TEXT");
+
   tablesInitialized = true;
   logger.debug("Audit tables initialized");
 }
@@ -195,13 +207,22 @@ function addTraceColumnIfMissing(
   column: string,
   columnDef: string
 ): void {
+  addColumnIfMissing(db, "audit_traces", column, columnDef);
+}
+
+function addColumnIfMissing(
+  db: ReturnType<typeof getDatabase>,
+  table: string,
+  column: string,
+  columnDef: string
+): void {
   const cols = db
-    .prepare("PRAGMA table_info(audit_traces)")
+    .prepare(`PRAGMA table_info(${table})`)
     .all() as { name: string }[];
   if (cols.some((c) => c.name === column)) return;
   executeWithLogging(
-    () => db.run(`ALTER TABLE audit_traces ADD COLUMN ${columnDef}`),
-    `ALTER TABLE audit_traces ADD ${column}`
+    () => db.run(`ALTER TABLE ${table} ADD COLUMN ${columnDef}`),
+    `ALTER TABLE ${table} ADD ${column}`
   );
 }
 
@@ -237,6 +258,7 @@ interface RawStepRow {
   reasoning_summary: string;
   handed_off_to: string | null;
   handoff_reason: string | null;
+  durability_class: string | null;
   step_order: number;
 }
 
@@ -249,6 +271,7 @@ interface RawToolCallRow {
   duration_ms: number;
   success: number;
   error: string | null;
+  durability_class: string | null;
   call_order: number;
 }
 
@@ -264,6 +287,7 @@ function rowToToolCall(row: RawToolCallRow): AuditToolCall {
     duration_ms: row.duration_ms,
     success: row.success === 1,
     error: row.error ?? undefined,
+    durability_class: toDurabilityClass(row.durability_class),
   };
 }
 
@@ -277,6 +301,7 @@ function rowToStep(row: RawStepRow, toolCalls: AuditToolCall[]): AuditAgentStep 
     tool_calls: toolCalls,
     handed_off_to: row.handed_off_to ?? undefined,
     handoff_reason: row.handoff_reason ?? undefined,
+    durability_class: toDurabilityClass(row.durability_class),
   };
 }
 
@@ -380,15 +405,15 @@ export function saveTrace(inputTrace: AuditTrace): AuditTrace {
       const stepStmt = db.prepare(`
         INSERT OR REPLACE INTO audit_agent_steps
           (step_id, trace_id, agent_id, started_at, ended_at,
-           reasoning_summary, handed_off_to, handoff_reason, step_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           reasoning_summary, handed_off_to, handoff_reason, durability_class, step_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       const toolStmt = db.prepare(`
         INSERT INTO audit_tool_calls
           (step_id, tool_name, input_summary, output_summary,
-           duration_ms, success, error, call_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           duration_ms, success, error, durability_class, call_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       for (let si = 0; si < trace.agent_steps.length; si++) {
@@ -405,6 +430,7 @@ export function saveTrace(inputTrace: AuditTrace): AuditTrace {
               step.reasoning_summary,
               step.handed_off_to ?? null,
               step.handoff_reason ?? null,
+              step.durability_class ?? null,
               si
             ),
           "INSERT audit_agent_step"
@@ -422,6 +448,7 @@ export function saveTrace(inputTrace: AuditTrace): AuditTrace {
                 tc.duration_ms,
                 tc.success ? 1 : 0,
                 tc.error ?? null,
+                tc.durability_class ?? null,
                 ti
               ),
             "INSERT audit_tool_call"
