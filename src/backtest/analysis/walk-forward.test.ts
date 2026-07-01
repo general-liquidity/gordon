@@ -113,3 +113,85 @@ describe("walkForwardTest — purge/embargo splitting", () => {
     expect(w1.trainEnd).toBe(testStartIdx - 1 - purgeBars);
   });
 });
+
+describe("walkForwardTest — expanding / anchored mode", () => {
+  const N = 300; // numWindows=3 → windowSize=100, trainSize=70, testSize=30
+
+  it("mode omitted defaults to rolling (fixed-size train slides forward)", async () => {
+    const rolling = await walkForwardTest(holdStrategy, makeBars(N), {
+      trainRatio: 0.7,
+      numWindows: 3,
+      parameterRanges: {},
+      optimizeFor: "sharpeRatio",
+    });
+    const explicitRolling = await walkForwardTest(holdStrategy, makeBars(N), {
+      trainRatio: 0.7,
+      numWindows: 3,
+      parameterRanges: {},
+      optimizeFor: "sharpeRatio",
+      mode: "rolling",
+    });
+
+    // Rolling train windows step forward: start 0, 100, 200.
+    expect(rolling.windows.map((w) => w.trainStart)).toEqual([0, 100, 200]);
+    // Explicit "rolling" is identical to the default.
+    expect(explicitRolling.windows.map((w) => w.trainStart)).toEqual([0, 100, 200]);
+  });
+
+  it("anchors trainStart at 0 and grows the train window each fold", async () => {
+    const result = await walkForwardTest(holdStrategy, makeBars(N), {
+      trainRatio: 0.7,
+      numWindows: 3,
+      parameterRanges: {},
+      optimizeFor: "sharpeRatio",
+      mode: "expanding",
+    });
+
+    expect(result.windows.length).toBe(3);
+    // Every fold's train window starts at index 0.
+    for (const w of result.windows) expect(w.trainStart).toBe(0);
+    // Train END grows fold over fold (window keeps expanding).
+    expect(result.windows[0]!.trainEnd).toBeLessThan(result.windows[1]!.trainEnd);
+    expect(result.windows[1]!.trainEnd).toBeLessThan(result.windows[2]!.trainEnd);
+  });
+
+  it("keeps the SAME test-window stepping as rolling", async () => {
+    const rolling = await walkForwardTest(holdStrategy, makeBars(N), {
+      trainRatio: 0.7,
+      numWindows: 3,
+      parameterRanges: {},
+      optimizeFor: "sharpeRatio",
+    });
+    const expanding = await walkForwardTest(holdStrategy, makeBars(N), {
+      trainRatio: 0.7,
+      numWindows: 3,
+      parameterRanges: {},
+      optimizeFor: "sharpeRatio",
+      mode: "expanding",
+    });
+
+    // Test windows are identical between modes; only the train side differs.
+    expect(expanding.windows.map((w) => w.testStart)).toEqual(rolling.windows.map((w) => w.testStart));
+    expect(expanding.windows.map((w) => w.testEnd)).toEqual(rolling.windows.map((w) => w.testEnd));
+    // Fold 0 is identical in both modes (rolling trainStart is already 0).
+    expect(expanding.windows[0]!.trainStart).toBe(rolling.windows[0]!.trainStart);
+    expect(expanding.windows[0]!.trainEnd).toBe(rolling.windows[0]!.trainEnd);
+  });
+
+  it("expanding mode preserves the purge gap before each test window", async () => {
+    const purgeBars = 5;
+    const expanding = await walkForwardTest(holdStrategy, makeBars(N), {
+      trainRatio: 0.7,
+      numWindows: 3,
+      parameterRanges: {},
+      optimizeFor: "sharpeRatio",
+      mode: "expanding",
+      purgeBars,
+    });
+
+    const w1 = expanding.windows[1]!;
+    expect(w1.trainStart).toBe(0);
+    // Train ends purgeBars before the test window opens (testStart - 1 - purge).
+    expect(w1.trainEnd).toBe(w1.testStart - 1 - purgeBars);
+  });
+});

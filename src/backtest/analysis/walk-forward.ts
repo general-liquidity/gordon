@@ -64,6 +64,18 @@ export interface WalkForwardConfig {
    */
   embargoBars?: number;
 
+  /**
+   * Train-window geometry.
+   *   "rolling"   (default) — fixed-size train window that slides forward with
+   *               each fold (unchanged legacy behavior).
+   *   "expanding" — anchored walk-forward: trainStart is pinned at 0 and the
+   *               train window grows each fold as the test window steps forward,
+   *               so every fold trains on all history up to the (purged) test
+   *               boundary. Test-window stepping + purge/embargo are unchanged.
+   * Default "rolling".
+   */
+  mode?: "rolling" | "expanding";
+
   /** Optional callback for progress updates */
   onProgress?: (progress: WalkForwardProgress) => void;
 }
@@ -77,6 +89,7 @@ export const DEFAULT_WALK_FORWARD_CONFIG: Omit<WalkForwardConfig, "parameterRang
   optimizeFor: "sharpeRatio",
   purgeBars: 0,
   embargoBars: 0,
+  mode: "rolling",
 };
 
 /**
@@ -306,10 +319,13 @@ export async function walkForwardTest(
   // previous test window ends (López de Prado embargo).
   for (let i = 0; i < fullConfig.numWindows; i++) {
     const windowStart = i * windowSize + i * embargoBars;
-    const trainStart = windowStart;
     const trainEnd = windowStart + trainSize;
     const testStart = trainEnd;
     const testEnd = Math.min(windowStart + windowSize, totalPoints);
+    // Anchored / expanding mode pins the train window at 0 so it grows each
+    // fold; rolling mode keeps the fixed-size sliding window. Test-window
+    // stepping and purge/embargo are identical in both modes.
+    const trainStart = fullConfig.mode === "expanding" ? 0 : windowStart;
 
     // Purge: drop the last `purgeBars` observations from the train window —
     // their forward-return labels overlap the test window.
