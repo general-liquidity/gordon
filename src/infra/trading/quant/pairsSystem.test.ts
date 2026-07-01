@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
-import { runPairsSystem } from "./pairsSystem.ts";
+import { runPairsSystem, pTraceHealthSeries } from "./pairsSystem.ts";
+import { combineRegimeWithHealth } from "./cointegrationMonitor.ts";
 
 // Deterministic LCG + Box-Muller (no Math.random / Date.now).
 function makeLcg(seed: number): () => number {
@@ -146,6 +147,117 @@ describe("runPairsSystem", () => {
     const res = runPairsSystem(a, b, SEL_CFG);
     for (const bar of res.bars) {
       if (bar.regime === "HALTED") expect(bar.state).toBe("flat");
+    }
+  });
+
+  it("is ADDITIVE by default — confidence fields are inert with no config.confidence", () => {
+    const { a, b } = makeCointegratedPair(55, 800, 1.0, 0.4, 0.06, 0.02);
+    const res = runPairsSystem(a, b, SEL_CFG);
+    expect(res.selection.selected).toBe(true);
+    for (const bar of res.bars) {
+      // No confidence config → factor 1, healthy, regime unchanged from the ADF regime.
+      expect(bar.confidenceFactor).toBe(1);
+      expect(bar.pTraceHealth).toBe("healthy");
+      expect(bar.regime).toBe(bar.adfRegime);
+      // P_trace is always exposed and strictly positive.
+      expect(bar.pTrace).toBeGreaterThan(0);
+    }
+  });
+
+  it("K4 confidence entry gate pauses ALL new entries when P_trace exceeds the gate", () => {
+    const { a, b } = makeCointegratedPair(55, 800, 1.0, 0.4, 0.06, 0.02);
+    const baseline = runPairsSystem(a, b, SEL_CFG);
+    expect(baseline.selection.selected).toBe(true);
+    expect(baseline.bars.some((x) => x.state !== "flat")).toBe(true);
+
+    // P_trace is always > 0, so an entryGate of 0 can never be cleared → no entry
+    // ever opens and every bar stays flat (existing positions are unaffected, but
+    // none is ever opened here).
+    const gated = runPairsSystem(a, b, { ...SEL_CFG, confidence: { entryGate: 0 } });
+    expect(gated.selection.selected).toBe(true);
+    expect(gated.bars.length).toBe(baseline.bars.length);
+    expect(gated.bars.every((x) => x.state === "flat")).toBe(true);
+    expect(gated.bars.every((x) => x.allocation === 0)).toBe(true);
+  });
+
+  it("K5 confidence-scaled sizing multiplies OU conviction by clamp(1 - P_trace/max)", () => {
+    const { a, b } = makeCointegratedPair(201, 800, 1.0, 0.2, 0.06, 0.02);
+    const baseline = runPairsSystem(a, b, { ...SEL_CFG, maxFraction: 1.0 });
+    expect(baseline.selection.selected).toBe(true);
+
+    // Pick a normalizer above every observed P_trace so the factor is strictly in
+    // (0, 1) — P_trace is identical across runs (unaffected by the confidence config).
+    const maxPTrace = Math.max(...baseline.bars.map((x) => x.pTrace));
+    const sizeMax = 2 * maxPTrace;
+    const scaled = runPairsSystem(a, b, {
+      ...SEL_CFG,
+      maxFraction: 1.0,
+      confidence: { sizeMax },
+    });
+    expect(scaled.selection.selected).toBe(true);
+
+    for (let i = 0; i < scaled.bars.length; i++) {
+      const bar = scaled.bars[i]!;
+      const expectedFactor = Math.max(0, Math.min(1, 1 - bar.pTrace / sizeMax));
+      expect(bar.confidenceFactor).toBeCloseTo(expectedFactor, 12);
+      expect(bar.confidenceFactor).toBeGreaterThan(0);
+      expect(bar.confidenceFactor).toBeLessThan(1);
+      if (bar.state !== "flat" && !Number.isNaN(bar.z)) {
+        const conviction = Math.min(Math.abs(bar.z) / scaled.entryZ, 1);
+        expect(Math.abs(bar.allocation)).toBeCloseTo(conviction * expectedFactor, 9);
+        // Confidence sizing can only shrink exposure vs the unscaled baseline.
+        expect(Math.abs(bar.allocation)).toBeLessThanOrEqual(Math.abs(baseline.bars[i]!.allocation) + 1e-12);
+      }
+    }
+  });
+
+  it("K5 sizeFloor clamps the confidence factor from below", () => {
+    const { a, b } = makeCointegratedPair(201, 800, 1.0, 0.2, 0.06, 0.02);
+    // sizeMax tiny so 1 - P_trace/max would go deeply negative → clamped to floor.
+    const floor = 0.25;
+    const res = runPairsSystem(a, b, {
+      ...SEL_CFG,
+      confidence: { sizeMax: 1e-9, sizeFloor: floor },
+    });
+    expect(res.selection.selected).toBe(true);
+    for (const bar of res.bars) {
+      expect(bar.confidenceFactor).toBe(floor);
+    }
+  });
+
+  it("K6 pTraceHealthSeries flags a P_trace SPIKE as degraded, decreasing runs as healthy", () => {
+    // Monotone-decreasing prefix (converging filter) → current value is the window
+    // minimum → always healthy. The injected spike at index 5 sits above its
+    // trailing 0.8-quantile → degraded.
+    const window = 5;
+    const pct = 0.8;
+    const series = [10, 8, 6, 4, 2, 20, 3, 2, 1, 1];
+    const health = pTraceHealthSeries(series, window, pct);
+    // Warmup (indices < window-1) are healthy.
+    for (let i = 0; i < window - 1; i++) expect(health[i]).toBe("healthy");
+    // Steadily-decreasing bar at index 4 (window [10,8,6,4,2], current=2=min) → healthy.
+    expect(health[4]).toBe("healthy");
+    // Spike at index 5 (window [8,6,4,2,20], current=20=max) → degraded.
+    expect(health[5]).toBe("degraded");
+    // Back to the window minimum after the spike → healthy again.
+    expect(health[8]).toBe("healthy");
+  });
+
+  it("K6 P_trace health feeds the regime COMPLEMENTARILY (never looser than the ADF regime)", () => {
+    const { a, b } = makeCointegratedPair(55, 800, 1.0, 0.4, 0.06, 0.02);
+    const res = runPairsSystem(a, b, {
+      ...SEL_CFG,
+      confidence: { healthWindow: 60, healthPct: 0.8 },
+    });
+    expect(res.selection.selected).toBe(true);
+
+    for (const bar of res.bars) {
+      // The effective regime is EXACTLY the ADF regime folded with the health flag.
+      expect(bar.regime).toBe(combineRegimeWithHealth(bar.adfRegime, bar.pTraceHealth));
+      // Health only TIGHTENS — it never loosens or forces HALTED on its own.
+      if (bar.adfRegime === "HALTED") expect(bar.regime).toBe("HALTED");
+      if (bar.adfRegime === "WARNING") expect(bar.regime).toBe("WARNING");
+      if (bar.adfRegime === "ACTIVE") expect(["ACTIVE", "WARNING"]).toContain(bar.regime);
     }
   });
 

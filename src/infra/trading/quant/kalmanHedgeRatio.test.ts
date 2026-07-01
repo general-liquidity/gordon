@@ -111,7 +111,30 @@ describe("kalmanHedgeRatio", () => {
       expect(Number.isFinite(s.spread)).toBe(true);
       expect(Number.isFinite(s.innovation)).toBe(true);
       expect(s.innovationVar).toBeGreaterThan(0);
+      // Posterior covariance trace: strictly positive filter-uncertainty proxy.
+      expect(s.pTrace).toBeGreaterThan(0);
+      expect(Number.isFinite(s.pTrace)).toBe(true);
     }
+  });
+
+  it("P_trace (covariance trace) shrinks as the filter gains confidence", () => {
+    // Clean, structurally-stable pair: the filter should grow more confident over
+    // time, so late-sample P_trace sits well below the initial burn-in value.
+    const g = makeGaussian(123);
+    const n = 500;
+    const p2: number[] = [];
+    const p1: number[] = [];
+    let lvl = 100;
+    for (let i = 0; i < n; i++) {
+      lvl += g();
+      p2.push(lvl);
+      p1.push(1.5 * lvl + 2 + 0.01 * g());
+    }
+    const res = kalmanHedgeRatio(p1, p2, { delta: 1e-6, observationVar: 1e-4 });
+    const early = res.steps[5]!.pTrace;
+    const late = res.steps[n - 1]!.pTrace;
+    expect(late).toBeLessThan(early);
+    expect(late).toBeGreaterThan(0);
   });
 
   it("is deterministic — same input yields identical output", () => {

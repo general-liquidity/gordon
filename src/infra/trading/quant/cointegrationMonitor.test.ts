@@ -3,6 +3,7 @@ import {
   rollingCointegration,
   pairRegimeMonitor,
   formatPairRegime,
+  combineRegimeWithHealth,
 } from "./cointegrationMonitor.ts";
 
 // ============================================================================
@@ -184,6 +185,19 @@ describe("rollingCointegration / pairRegimeMonitor", () => {
     const roll = rollingCointegration(p1, p2, WINDOW);
     expect(roll.length).toBe(short);
     expect(roll.every((r) => Number.isNaN(r.adfStat) && !r.cointegrated)).toBe(true);
+  });
+
+  test("combineRegimeWithHealth: degraded only tightens (ACTIVE→WARNING), never loosens or HALTS", () => {
+    // healthy is a pass-through for all three states.
+    expect(combineRegimeWithHealth("ACTIVE", "healthy")).toBe("ACTIVE");
+    expect(combineRegimeWithHealth("WARNING", "healthy")).toBe("WARNING");
+    expect(combineRegimeWithHealth("HALTED", "healthy")).toBe("HALTED");
+
+    // degraded caps ACTIVE at WARNING; WARNING/HALTED pass through (never forced
+    // to HALTED by health alone — flattening stays reserved for ADF decay).
+    expect(combineRegimeWithHealth("ACTIVE", "degraded")).toBe("WARNING");
+    expect(combineRegimeWithHealth("WARNING", "degraded")).toBe("WARNING");
+    expect(combineRegimeWithHealth("HALTED", "degraded")).toBe("HALTED");
   });
 
   test("formatPairRegime renders a short summary", () => {
