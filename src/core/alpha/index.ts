@@ -610,3 +610,14 @@ export {
   type ComponentScore,
   type PeadGapGradeResult,
 } from "./pead-gap-grader.ts";
+
+export {
+  computeCrowdedFragility,
+  crowdedFragilityFromVerdict,
+  formatCrowdedFragility,
+  type CrowdedFragilityInputs,
+  type CrowdedFragilityOptions,
+  type CrowdedFragilityResult,
+  type FragilitySeverity,
+  type FlushDirection,
+} from "./crowdedFragility.ts";
