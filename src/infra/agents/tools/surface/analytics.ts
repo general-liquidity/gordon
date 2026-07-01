@@ -204,6 +204,7 @@ import { RegimeDetector } from "../../../../core/regime/index.ts";
 import { checkRiskTool as implCheckRisk } from "../trading/risk-gate.ts";
 import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
 import { queuePositionSignal, spreadCrossingProbability } from "../../../../core/microstructure/queue-dynamics.ts";
+import { computeTriangularArbitrageParity } from "../../../trading/signals/triangularArbitrageParity.ts";
 import { computeDealerGreeksExposure } from "../../../trading/quant/dealerGreeksExposure.ts";
 import { fetchOptionsChain } from "../../../data/options/index.ts";
 import {
@@ -1494,6 +1495,7 @@ const MICROSTRUCTURE_OPS = [
   "forensic_screen",
   "dupont",
   "weighted_book_imbalance",
+  "triangular_arbitrage_parity",
   "queue_dynamics",
   "dealer_exposure",
   "filing_diff",
@@ -1738,6 +1740,13 @@ export const computeMicrostructureTool = createTool({
     "                              deep size. Comparing the two locates WHERE pressure sits — at_touch (|WDI|>|flat|, actionable),",
     "                              in_depth (deep wall, possible spoof), or touch_vs_depth_conflict. Distinct from microprice",
     "                              (touch-only fair price) and flat order-book imbalance (equal-weight depth).",
+    "    - 'triangular_arbitrage_parity' — params: { legAB: number[], legBC: number[], directAC: number[], rollingWindow? (20), zScoreThreshold? (2), labels? }",
+    "                              Triangular no-arbitrage-parity deviation (BIS WP 1291): for a 3-leg triangle (A/B, B/C, A/C via a vehicle asset B) the",
+    "                              implied A/C = (A/B)·(B/C), so the per-observation log loop-closure deviation ln(directAC)−ln(legAB)−ln(legBC) sits ~0",
+    "                              when price formation is healthy. Aggregates the intraday deviations to their STD (not mean — opposite-direction breaks",
+    "                              don't cancel) + an optional rising-dislocation z-score (latest rolling-std window vs its history). High/rising TAP-std =",
+    "                              impaired loop closure, a leading market-stress marker. Canonical crypto triangle: legAB=ETH/BTC, legBC=BTC/USDT,",
+    "                              directAC=ETH/USDT (FX triangles map the same way). DISTINCT from crossVenueDivergence (2-node same-instrument mid).",
     "    - 'filing_diff'         — params: { prior: string, current: string, section?: 'risk_factors'|'mdna', similarityThreshold? }",
     "                              Year-over-year filing-section diff (equities): surfaces only the NEW and REMOVED",
     "                              language between two filings' sections, ignoring carried-over boilerplate. Pass the",
@@ -2018,6 +2027,16 @@ export const computeMicrostructureTool = createTool({
             (p.snapshot ?? p) as Parameters<typeof computeWeightedBookImbalance>[0],
             p as Parameters<typeof computeWeightedBookImbalance>[1],
           ),
+      },
+      triangular_arbitrage_parity: {
+        execute: async (p: Record<string, unknown>) => {
+          if (!Array.isArray(p.legAB) || !Array.isArray(p.legBC) || !Array.isArray(p.directAC)) {
+            return { error: "triangular_arbitrage_parity: `legAB` (A/B), `legBC` (B/C), and `directAC` (A/C) number[] rate series are required" };
+          }
+          return computeTriangularArbitrageParity(
+            p as unknown as Parameters<typeof computeTriangularArbitrageParity>[0],
+          );
+        },
       },
       time_under_water: {
         execute: async (p: Record<string, unknown>) =>
