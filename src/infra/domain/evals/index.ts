@@ -105,6 +105,40 @@ export {
 } from "./feedbackLoop.ts";
 
 // ============================================================================
+// Regret Ledger (rejected-candidate falsification loop)
+// ============================================================================
+
+export {
+  // Schemas
+  RegretSideSchema,
+  HypotheticalBracketSchema,
+  RejectedCandidateSchema,
+  HorizonObservationSchema,
+  RegretOutcomeSchema,
+  DEFAULT_HORIZON_DAYS,
+
+  // Types
+  type RegretSide,
+  type HypotheticalBracket,
+  type RejectedCandidate,
+  type HorizonObservation,
+  type RegretOutcome,
+  type RegretEntry,
+  type AmendmentSignal,
+  type GateRegretSummary,
+  type RegretReview,
+  type SummarizeOptions,
+  type ReviewParams,
+
+  // Functions
+  buildRejectedCandidate,
+  elapsedDays,
+  scoreCandidateAtHorizon,
+  reviewRegret,
+  summarizeByGate,
+} from "./regretLedger.ts";
+
+// ============================================================================
 // Tools
 // ============================================================================
 

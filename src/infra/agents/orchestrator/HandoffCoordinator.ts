@@ -3,6 +3,8 @@ import { validateHandoffBudget } from "../../../gateway/handoffs/index.ts";
 import { recordNetworkRouting } from "../../platform/observability/index.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { WorkerRegistry } from "../../../runtime/workers/WorkerRegistry.ts";
+import { classifyHandoffPayload } from "../../../core/audit/durability.ts";
+import type { AbsorptionStatus, ParentAbsorptionRecord } from "../../../core/audit/types.ts";
 
 const logger = createModuleLogger("handoff-coordinator");
 
@@ -126,6 +128,8 @@ export class HandoffCoordinator {
   private readonly leastContextAgents: Set<string>;
   /** Pending post-delegation feedback, keyed by lowercased supervisor agent id. */
   private readonly delegationFeedback = new Map<string, DelegationFeedbackNote[]>();
+  /** Parent-absorption records: parent step -> child trace, absorbed vs dropped. */
+  private readonly absorptions: ParentAbsorptionRecord[] = [];
 
   constructor(workerRegistry: WorkerRegistry = new WorkerRegistry()) {
     this.workerRegistry = workerRegistry;
@@ -310,6 +314,56 @@ export class HandoffCoordinator {
     return queue;
   }
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // Parent-absorption records
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Record that a parent step took up (or dropped) a delegated child's result.
+   *
+   * Today absorption is implicit — when `delegate_subagent`'s return lands in
+   * context you cannot tell, on resume, an absorbed result from one silently
+   * dropped. This makes the link explicit: parent step -> child trace, with an
+   * `observed | absorbed | dropped` status.
+   *
+   * The record is tagged boundary-durable (reuses the "absorption" handoff kind)
+   * so downstream persistence stores it lossless. Attach the returned record to
+   * a trace via its unsigned `absorptions` field — it never disturbs the
+   * tamper-evidence hash (see types.ts / signing.ts).
+   */
+  recordAbsorption(
+    parentStepId: string,
+    childTraceId: string,
+    status: AbsorptionStatus,
+    note?: string,
+  ): ParentAbsorptionRecord {
+    const record: ParentAbsorptionRecord = {
+      parent_step_id: parentStepId,
+      child_trace_id: childTraceId,
+      status,
+      durability_class: classifyHandoffPayload("absorption"),
+      recorded_at: new Date().toISOString(),
+      ...(note !== undefined ? { note } : {}),
+    };
+    this.absorptions.push(record);
+    logger.info("Parent absorption recorded", {
+      parentStepId,
+      childTraceId,
+      status,
+    });
+    return record;
+  }
+
+  /** All recorded absorption links (most-recent last). */
+  getAbsorptions(): ParentAbsorptionRecord[] {
+    return [...this.absorptions];
+  }
+
+  /** Absorption links for a specific parent step. */
+  getAbsorptionsForStep(parentStepId: string): ParentAbsorptionRecord[] {
+    return this.absorptions.filter((a) => a.parent_step_id === parentStepId);
+  }
+
   getValidHandoffRules(): Record<string, string[]> {
     return this.workerRegistry.list().reduce<Record<string, string[]>>((acc, definition) => {
       acc[definition.name] = [...definition.handoffTargets];
@@ -436,6 +490,7 @@ export class HandoffCoordinator {
     this.history.length = 0;
     this.counter = 0;
     this.delegationFeedback.clear();
+    this.absorptions.length = 0;
   }
 }
 

@@ -33,7 +33,17 @@ export const AUDIT_HMAC_KEY_PATH_ENV = "GORDON_AUDIT_HMAC_KEY_PATH";
 /** prev_signature of the first trace in a chain. */
 export const GENESIS_SIGNATURE = "genesis";
 
-const SIGNING_FIELDS = new Set(["content_hash", "prev_signature", "signature"]);
+// Fields excluded from the content hash. The three signing fields, plus
+// `absorptions`: a post-hoc, unsigned annotation (parent → child absorption)
+// that is added AFTER a trace is signed. Excluding it keeps the content hash
+// identical whether it is absent or populated, so annotating a signed trace
+// never breaks the tamper chain. See types.ts (ParentAbsorptionRecord).
+const SIGNING_FIELDS = new Set([
+  "content_hash",
+  "prev_signature",
+  "signature",
+  "absorptions",
+]);
 
 /**
  * Deterministic JSON: sorted object keys, undefined-valued keys dropped.

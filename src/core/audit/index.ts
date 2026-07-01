@@ -13,6 +13,8 @@ export {
   AuditTriggerSchema,
   AuditOutcomeSchema,
   DurabilityClassSchema,
+  AbsorptionStatusSchema,
+  ParentAbsorptionRecordSchema,
 } from "./types.ts";
 export type {
   AuditTrace,
@@ -25,6 +27,8 @@ export type {
   AuditQueryFilters,
   AuditStats,
   DurabilityClass,
+  AbsorptionStatus,
+  ParentAbsorptionRecord,
 } from "./types.ts";
 
 // Durability tiering (boundary payloads stored lossless)
