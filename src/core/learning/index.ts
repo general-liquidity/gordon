@@ -39,3 +39,13 @@ export type {
   LeverAttributionReport,
   LeverAttributionOptions,
 } from "./lever-attribution.ts";
+
+export { analyzeChangeAttribution, CHANGE_TYPES } from "./change-attribution.ts";
+export type {
+  ChangeType,
+  StrategyChange,
+  ChangeTypeAggregate,
+  ChangeTypeVerdict,
+  ChangeAttributionReport,
+  ChangeAttributionOptions,
+} from "./change-attribution.ts";
