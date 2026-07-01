@@ -208,6 +208,19 @@ export {
 // Result Storage Exports
 // ============================================================================
 
+// ============================================================================
+// Order-Level LOB Matching Engine Exports
+// ============================================================================
+
+export {
+  OrderBook,
+  type LobSide,
+  type LobOrder,
+  type Transaction,
+  type BookLevel,
+  type BookSnapshot,
+} from "./lob.ts";
+
 export {
   initBacktestResultsTable,
   saveBacktestResult,
