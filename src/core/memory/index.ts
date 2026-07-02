@@ -39,6 +39,14 @@ export {
   type MemoryStats,
 } from "./store.ts";
 
+// Point-in-time (as-of) recall guard — no-lookahead correctness (E5)
+export {
+  isVisibleAsOf,
+  filterAsOf,
+  toEpochMs,
+  type KnownAt,
+} from "./asOf.ts";
+
 // Embeddings (vector generation)
 export {
   OpenAIEmbeddingProvider,

@@ -67,6 +67,14 @@ export interface SearchOptions {
   symbol?: string;
   since?: string;
   minImportance?: number;
+  /**
+   * Point-in-time (as-of) recall bound — ISO date string. When set, excludes
+   * records LEARNED after this instant (`created_at > asOf`), enforcing
+   * no-lookahead for a decision made at `asOf`. Opt-in: omitting it leaves
+   * recall unchanged. See core/memory/asOf.ts. The write timestamp doubles as
+   * the known-at / transaction time.
+   */
+  asOf?: string;
 }
 
 export interface QueryOptions {
@@ -482,6 +490,10 @@ export class MemoryStore {
       sql += " AND m.importance >= ?";
       params.push(options.minImportance);
     }
+    if (options.asOf) {
+      sql += " AND m.created_at <= ?";
+      params.push(options.asOf);
+    }
 
     sql += " ORDER BY fts.rank LIMIT ? OFFSET ?";
     params.push(limit, offset);
@@ -537,6 +549,10 @@ export class MemoryStore {
       sql += " AND importance >= ?";
       params.push(options.minImportance);
     }
+    if (options.asOf) {
+      sql += " AND created_at <= ?";
+      params.push(options.asOf);
+    }
 
     sql += " ORDER BY importance DESC, created_at DESC LIMIT ? OFFSET ?";
     params.push(limit, offset);
@@ -580,6 +596,10 @@ export class MemoryStore {
     if (options.minImportance !== undefined) {
       sql += " AND importance >= ?";
       params.push(options.minImportance);
+    }
+    if (options.asOf) {
+      sql += " AND created_at <= ?";
+      params.push(options.asOf);
     }
 
     // Limit candidates to avoid loading too many embeddings into memory.

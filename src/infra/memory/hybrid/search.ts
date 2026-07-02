@@ -16,12 +16,22 @@
 
 import { applyTemporalDecay, DEFAULT_TEMPORAL_DECAY, type TemporalDecayConfig } from "./temporalDecay.ts";
 import { mmrRerank, DEFAULT_MMR_CONFIG, type MMRConfig } from "./mmr.ts";
+import { filterAsOf, type KnownAt } from "../../../core/memory/asOf.ts";
 
 export interface MemoryEntry {
   id: string;
   content: string;
-  /** Unix ms timestamp, or null if the entry is evergreen. */
+  /**
+   * Unix ms timestamp (VALID time — when the fact was true), or null if the
+   * entry is evergreen. Drives temporal decay.
+   */
   timestamp: number | null;
+  /**
+   * Known-at / transaction time (Unix ms) — when this record was LEARNED.
+   * Used only by the opt-in as-of guard for no-lookahead recall. Defaults to
+   * `timestamp` when omitted; null means evergreen (always visible).
+   */
+  knownAt?: number | null;
   tags?: string[];
   metadata?: Record<string, unknown>;
 }
@@ -43,6 +53,14 @@ export interface HybridSearchConfig {
   mmr: MMRConfig;
   /** Minimum score (after decay) to include in results. */
   minScore: number;
+  /**
+   * Point-in-time (as-of) recall bound — Unix ms, ISO string, or null/unset.
+   * When set, excludes any entry LEARNED after this instant (known-at > asOf),
+   * enforcing no-lookahead for a decision made at `asOf`. An entry's known-at
+   * falls back to its `timestamp` when `knownAt` is absent; evergreen entries
+   * (null) stay visible. Opt-in: unset leaves recall unchanged.
+   */
+  asOf?: KnownAt;
 }
 
 export const DEFAULT_HYBRID_CONFIG: HybridSearchConfig = {
@@ -137,6 +155,16 @@ export function hybridSearch(
 
   const queryTokens = tokenize(query);
   if (queryTokens.length === 0) return [];
+
+  // No-lookahead guard: drop entries learned after the as-of decision time.
+  // Known-at falls back to the valid-time `timestamp` when unset.
+  const visible = filterAsOf(
+    entries,
+    cfg.asOf,
+    (e) => (e.knownAt !== undefined ? e.knownAt : e.timestamp),
+  );
+  if (visible.length === 0) return [];
+  entries = visible;
 
   const idf = buildIdfMap(entries);
   const queryVec = tfidfVector(queryTokens, idf);
