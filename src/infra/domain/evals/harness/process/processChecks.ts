@@ -223,7 +223,7 @@ export function checkTrajectory(trace: NormalizedTrace): ProcessCheckResult {
   const seenCallKeys = new Set<string>();
   let duplicateCalls = 0;
   for (const c of calls) {
-    const key = `${c.name} ${c.inputSummary ?? ""}`;
+    const key = `${c.name}\u0000${c.inputSummary ?? ""}`;
     if (seenCallKeys.has(key)) duplicateCalls += 1;
     else seenCallKeys.add(key);
   }
