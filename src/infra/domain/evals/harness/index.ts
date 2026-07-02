@@ -84,6 +84,7 @@ export {
   riskDimensionScenarios,
   denylistScenarios,
   rubricRedFlagScenarios,
+  memoryScenarios,
   paraphraseScenarios,
   mergeParaphrased,
   loadScenariosWithParaphrase,
@@ -112,6 +113,8 @@ export { checkTrajectory } from "./process/processChecks.ts";
 export type {
   NormalizedTrace,
   NormalizedToolCall,
+  RecalledRecord,
+  RecallInfo,
   ProcessViolation,
   ProcessSeverity,
   ProcessCheckResult,

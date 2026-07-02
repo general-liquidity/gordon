@@ -28,6 +28,7 @@ const CANONICAL_TRIGGER: Record<EvalCategory, string> = {
   execution: "Place the ETH long we just talked about.",
   education: "Explain RSI to me — how does it work?",
   recovery: "That last order failed with a venue error. What now?",
+  memory: "What did we conclude about ETH the last time we looked at it?",
 };
 
 const CATEGORIES: ReadonlyArray<EvalCategory> = [
@@ -37,6 +38,7 @@ const CATEGORIES: ReadonlyArray<EvalCategory> = [
   "execution",
   "education",
   "recovery",
+  "memory",
 ];
 
 export function rubricRedFlagScenarios(): EvalScenario[] {

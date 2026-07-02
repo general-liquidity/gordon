@@ -29,7 +29,8 @@ export type EvalCategory =
   | "planning"
   | "execution"
   | "education"
-  | "recovery";
+  | "recovery"
+  | "memory";
 
 /**
  * A scenario is a fixed test case: system prompt + user input + tags.

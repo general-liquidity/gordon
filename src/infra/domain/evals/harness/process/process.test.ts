@@ -104,6 +104,75 @@ describe("checkTrajectory", () => {
   });
 });
 
+describe("memory checks", () => {
+  it("BLOCKS a recall that surfaces a record learned after the decision time (lookahead)", () => {
+    const r = checkTrajectory({
+      toolCalls: [
+        {
+          name: "memory_search",
+          ok: true,
+          order: 0,
+          recall: {
+            asOf: 1000,
+            records: [{ knownAt: 900 }, { knownAt: 1500 }],
+          },
+        },
+      ],
+    });
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.rule === "lookahead_in_recall" && v.severity === "block")).toBe(true);
+  });
+
+  it("passes a recall whose records were all known at/before the decision time", () => {
+    const r = checkTrajectory({
+      toolCalls: [
+        {
+          name: "memory_search",
+          ok: true,
+          order: 0,
+          recall: { asOf: 1000, records: [{ knownAt: 900 }, { knownAt: 1000 }] },
+        },
+      ],
+    });
+    expect(r.passed).toBe(true);
+    expect(r.violations.length).toBe(0);
+  });
+
+  it("WARNS on a poisoned recall that is surfaced but not acted on", () => {
+    const r = checkTrajectory({
+      toolCalls: [
+        { name: "memory_search", ok: true, order: 0, recall: { records: [{ poisoned: true }] } },
+        { name: "get_market_data", ok: true, order: 1 },
+      ],
+    });
+    const v = r.violations.find((x) => x.rule === "poisoned_recall");
+    expect(v?.severity).toBe("warn");
+    expect(r.passed).toBe(true);
+  });
+
+  it("BLOCKS a poisoned recall followed by an order/execution (acted on poison)", () => {
+    const r = checkTrajectory({
+      toolCalls: [
+        { name: "classify_trade_risk", ok: true, order: 0 },
+        { name: "memory_search", ok: true, order: 1, recall: { records: [{ poisoned: true }] } },
+        { name: "place_market_order", ok: true, order: 2 },
+      ],
+    });
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.rule === "poisoned_recall" && v.severity === "block")).toBe(true);
+  });
+
+  it("ignores recall metadata on a clean recall with no asOf and no poison", () => {
+    const r = checkTrajectory({
+      toolCalls: [
+        { name: "memory_search", ok: true, order: 0, recall: { records: [{ knownAt: 500 }] } },
+      ],
+    });
+    expect(r.passed).toBe(true);
+    expect(r.violations.length).toBe(0);
+  });
+});
+
 describe("redundancy metric", () => {
   it("is 0 for an empty trace and for all-distinct calls", () => {
     expect(checkTrajectory(trace([])).redundancy).toBe(0);

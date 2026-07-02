@@ -515,11 +515,12 @@ describe("detectRegressions — generic-advice anti-metric gate", () => {
 });
 
 describe("category rubrics", () => {
-  it("ships the 6 trading categories", () => {
-    expect(ALL_CATEGORIES.length).toBe(6);
+  it("ships the 7 trading categories", () => {
+    expect(ALL_CATEGORIES.length).toBe(7);
     expect(ALL_CATEGORIES).toContain("planning");
     expect(ALL_CATEGORIES).toContain("analysis");
     expect(ALL_CATEGORIES).toContain("recovery");
+    expect(ALL_CATEGORIES).toContain("memory");
   });
 
   it("every category has a non-empty rubric", () => {
