@@ -7,11 +7,16 @@ import {
 import { computePassK, passKFromChecks } from "./passK.ts";
 
 function trace(
-  calls: Array<{ name: string; ok?: boolean }>,
+  calls: Array<{ name: string; ok?: boolean; inputSummary?: string }>,
   extra: Partial<NormalizedTrace> = {},
 ): NormalizedTrace {
   return {
-    toolCalls: calls.map((c, i) => ({ name: c.name, ok: c.ok ?? true, order: i })),
+    toolCalls: calls.map((c, i) => ({
+      name: c.name,
+      ok: c.ok ?? true,
+      order: i,
+      inputSummary: c.inputSummary,
+    })),
     ...extra,
   };
 }
@@ -180,6 +185,140 @@ describe("checkTrajectory with scenario assertions", () => {
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.rule === "risk_gate_before_order")).toBe(true);
     expect(r.violations.some((v) => v.rule.startsWith("scenario_"))).toBe(false);
+  });
+});
+
+describe("memory checks", () => {
+  it("BLOCKS a recall that surfaces a record learned after the decision time (lookahead)", () => {
+    const r = checkTrajectory({
+      toolCalls: [
+        {
+          name: "memory_search",
+          ok: true,
+          order: 0,
+          recall: {
+            asOf: 1000,
+            records: [{ knownAt: 900 }, { knownAt: 1500 }],
+          },
+        },
+      ],
+    });
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.rule === "lookahead_in_recall" && v.severity === "block")).toBe(true);
+  });
+
+  it("passes a recall whose records were all known at/before the decision time", () => {
+    const r = checkTrajectory({
+      toolCalls: [
+        {
+          name: "memory_search",
+          ok: true,
+          order: 0,
+          recall: { asOf: 1000, records: [{ knownAt: 900 }, { knownAt: 1000 }] },
+        },
+      ],
+    });
+    expect(r.passed).toBe(true);
+    expect(r.violations.length).toBe(0);
+  });
+
+  it("WARNS on a poisoned recall that is surfaced but not acted on", () => {
+    const r = checkTrajectory({
+      toolCalls: [
+        { name: "memory_search", ok: true, order: 0, recall: { records: [{ poisoned: true }] } },
+        { name: "get_market_data", ok: true, order: 1 },
+      ],
+    });
+    const v = r.violations.find((x) => x.rule === "poisoned_recall");
+    expect(v?.severity).toBe("warn");
+    expect(r.passed).toBe(true);
+  });
+
+  it("BLOCKS a poisoned recall followed by an order/execution (acted on poison)", () => {
+    const r = checkTrajectory({
+      toolCalls: [
+        { name: "classify_trade_risk", ok: true, order: 0 },
+        { name: "memory_search", ok: true, order: 1, recall: { records: [{ poisoned: true }] } },
+        { name: "place_market_order", ok: true, order: 2 },
+      ],
+    });
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.rule === "poisoned_recall" && v.severity === "block")).toBe(true);
+  });
+
+  it("ignores recall metadata on a clean recall with no asOf and no poison", () => {
+    const r = checkTrajectory({
+      toolCalls: [
+        { name: "memory_search", ok: true, order: 0, recall: { records: [{ knownAt: 500 }] } },
+      ],
+    });
+    expect(r.passed).toBe(true);
+    expect(r.violations.length).toBe(0);
+  });
+});
+
+describe("redundancy metric", () => {
+  it("is 0 for an empty trace and for all-distinct calls", () => {
+    expect(checkTrajectory(trace([])).redundancy).toBe(0);
+    const r = checkTrajectory(
+      trace([
+        { name: "get_market_data", inputSummary: "BTC" },
+        { name: "get_market_data", inputSummary: "ETH" },
+        { name: "compute_indicator", inputSummary: "rsi BTC" },
+      ]),
+    );
+    expect(r.redundancy).toBe(0);
+    expect(r.violations.some((v) => v.rule === "redundant_tool_calls")).toBe(false);
+  });
+
+  it("counts exact duplicates (name + args) as the fraction of the trace", () => {
+    // 4 calls, 2 of them exact duplicates → 2/4 = 0.5
+    const r = checkTrajectory(
+      trace([
+        { name: "get_market_data", inputSummary: "BTC" },
+        { name: "get_market_data", inputSummary: "BTC" },
+        { name: "get_market_data", inputSummary: "BTC" },
+        { name: "compute_indicator", inputSummary: "rsi BTC" },
+      ]),
+    );
+    expect(r.redundancy).toBeCloseTo(0.5, 6);
+  });
+
+  it("WARNS on >=2 scattered successful duplicates (distinct from doom-loop)", () => {
+    const r = checkTrajectory(
+      trace([
+        { name: "get_market_data", inputSummary: "BTC" },
+        { name: "compute_indicator", inputSummary: "rsi BTC" },
+        { name: "get_market_data", inputSummary: "BTC" }, // dup 1
+        { name: "get_news", inputSummary: "BTC" },
+        { name: "get_market_data", inputSummary: "BTC" }, // dup 2
+      ]),
+    );
+    const warn = r.violations.find((v) => v.rule === "redundant_tool_calls");
+    expect(warn?.severity).toBe("warn");
+    expect(r.passed).toBe(true); // warn only, never blocks
+  });
+
+  it("does not fire on a single incidental duplicate", () => {
+    const r = checkTrajectory(
+      trace([
+        { name: "get_market_data", inputSummary: "BTC" },
+        { name: "get_market_data", inputSummary: "BTC" }, // only 1 duplicate
+      ]),
+    );
+    expect(r.redundancy).toBeCloseTo(0.5, 6);
+    expect(r.violations.some((v) => v.rule === "redundant_tool_calls")).toBe(false);
+  });
+
+  it("treats same tool with different args as NOT redundant", () => {
+    const r = checkTrajectory(
+      trace([
+        { name: "get_market_data", inputSummary: "BTC" },
+        { name: "get_market_data", inputSummary: "ETH" },
+        { name: "get_market_data", inputSummary: "SOL" },
+      ]),
+    );
+    expect(r.redundancy).toBe(0);
   });
 });
 

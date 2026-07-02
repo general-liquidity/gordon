@@ -31,6 +31,36 @@ export const MemoryTypeSchema = z.enum([
 ]);
 export type MemoryType = z.infer<typeof MemoryTypeSchema>;
 
+/**
+ * CoALA memory kind (Cognitive Architectures for Language Agents).
+ *   - episodic: a specific past experience ("we longed ETH at 3400 and it worked")
+ *   - semantic: a general learned fact ("ETH tends to lead alt rotations")
+ *   - procedural: a skill / rule / how-to ("scale out in thirds into resistance")
+ * Procedural is the genuinely-missing kind — it lets recall route to
+ * skill-shaped memory distinctly from episodes and facts.
+ */
+export const MemoryKindSchema = z.enum(["episodic", "semantic", "procedural"]);
+export type MemoryKind = z.infer<typeof MemoryKindSchema>;
+
+/**
+ * Default CoALA kind derived from the coarser storage `type`, so existing
+ * write paths get labeled without change. Callers can override (notably to tag
+ * procedural skills/rules explicitly).
+ */
+export function defaultKindForType(type: MemoryType): MemoryKind {
+  switch (type) {
+    case "strategy_note":
+      return "procedural";
+    case "agent_insight":
+    case "user_note":
+      return "semantic";
+    case "trade_journal":
+    case "market_observation":
+    case "analysis":
+      return "episodic";
+  }
+}
+
 export const MemoryMetadataSchema = z
   .object({
     symbol: z.string().optional(),
@@ -47,6 +77,8 @@ export type MemoryMetadata = z.infer<typeof MemoryMetadataSchema>;
 export const MemoryEntrySchema = z.object({
   id: z.string(),
   type: MemoryTypeSchema,
+  /** CoALA memory kind — episodic / semantic / procedural. */
+  kind: MemoryKindSchema.optional(),
   content: z.string(),
   metadata: MemoryMetadataSchema,
   embedding: z.array(z.number()).optional(),
@@ -64,9 +96,19 @@ export interface SearchOptions {
   limit?: number;
   offset?: number;
   type?: MemoryType;
+  /** CoALA-kind filter — route recall to episodic / semantic / procedural memory. */
+  kind?: MemoryKind;
   symbol?: string;
   since?: string;
   minImportance?: number;
+  /**
+   * Point-in-time (as-of) recall bound — ISO date string. When set, excludes
+   * records LEARNED after this instant (`created_at > asOf`), enforcing
+   * no-lookahead for a decision made at `asOf`. Opt-in: omitting it leaves
+   * recall unchanged. See core/memory/asOf.ts. The write timestamp doubles as
+   * the known-at / transaction time.
+   */
+  asOf?: string;
 }
 
 export interface QueryOptions {
@@ -100,6 +142,7 @@ export interface MemoryStats {
 interface MemoryRow {
   id: string;
   type: string;
+  kind: string | null;
   content: string;
   metadata: string;
   embedding: Buffer | null;
@@ -191,6 +234,7 @@ function rowToEntry(row: MemoryRow): MemoryEntry {
   return {
     id: row.id,
     type: row.type as MemoryType,
+    kind: (row.kind as MemoryKind | null) ?? undefined,
     content: row.content,
     metadata: JSON.parse(row.metadata) as MemoryMetadata,
     embedding: row.embedding ? deserializeEmbedding(row.embedding) : undefined,
@@ -237,6 +281,7 @@ export class MemoryStore {
       CREATE TABLE IF NOT EXISTS memories (
         id TEXT PRIMARY KEY,
         type TEXT NOT NULL,
+        kind TEXT,
         content TEXT NOT NULL,
         metadata TEXT NOT NULL DEFAULT '{}',
         embedding BLOB,
@@ -250,8 +295,18 @@ export class MemoryStore {
       )
     `);
 
+    // Migration: add the CoALA `kind` column to pre-existing databases whose
+    // memories table was created before this field existed.
+    const hasKind = (
+      this.db.prepare("PRAGMA table_info(memories)").all() as { name: string }[]
+    ).some((c) => c.name === "kind");
+    if (!hasKind) {
+      this.db.run("ALTER TABLE memories ADD COLUMN kind TEXT");
+    }
+
     // Indexes for filtered queries
     this.db.run("CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type)");
+    this.db.run("CREATE INDEX IF NOT EXISTS idx_memories_kind ON memories(kind)");
     this.db.run("CREATE INDEX IF NOT EXISTS idx_memories_agent_id ON memories(agent_id)");
     this.db.run("CREATE INDEX IF NOT EXISTS idx_memories_position_id ON memories(position_id)");
     this.db.run("CREATE INDEX IF NOT EXISTS idx_memories_importance ON memories(importance)");
@@ -317,13 +372,14 @@ export class MemoryStore {
     const now = new Date().toISOString();
 
     const stmt = db.prepare(`
-      INSERT INTO memories (id, type, content, metadata, embedding, tokens, agent_id, position_id, symbols, importance, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO memories (id, type, kind, content, metadata, embedding, tokens, agent_id, position_id, symbols, importance, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
       id,
       entry.type,
+      entry.kind ?? defaultKindForType(entry.type),
       entry.content,
       JSON.stringify(entry.metadata),
       entry.embedding ? serializeEmbedding(entry.embedding) : null,
@@ -389,6 +445,10 @@ export class MemoryStore {
       updates.push("type = ?");
       params.push(data.type);
     }
+    if (data.kind !== undefined) {
+      updates.push("kind = ?");
+      params.push(data.kind);
+    }
 
     if (updates.length === 0) return;
 
@@ -406,6 +466,32 @@ export class MemoryStore {
     const db = this.getDb();
     db.prepare("DELETE FROM memories WHERE id = ?").run(id);
     logger.debug("Memory deleted", { id });
+  }
+
+  /**
+   * Additively bump a memory's importance by `delta`, clamped to [0, 1].
+   * Powers the outcome->memory reinforcement loop (TradeJournal.reinforce):
+   * importance is otherwise set once at write and never updated, so a memory
+   * that led to a winning decision has no way to survive temporal decay.
+   * Returns the new importance, or null if the id does not exist.
+   */
+  async reinforceImportance(id: string, delta: number): Promise<number | null> {
+    const db = this.getDb();
+    const existing = await this.get(id);
+    if (!existing) return null;
+
+    const next = Math.max(0, Math.min(1, existing.importance + delta));
+    db.prepare("UPDATE memories SET importance = ?, updated_at = ? WHERE id = ?").run(
+      next,
+      new Date().toISOString(),
+      id,
+    );
+    logger.debug("Memory importance reinforced", {
+      id,
+      from: existing.importance,
+      to: next,
+    });
+    return next;
   }
 
   // --------------------------------------------------------------------------
@@ -444,6 +530,10 @@ export class MemoryStore {
       sql += " AND m.type = ?";
       params.push(options.type);
     }
+    if (options.kind) {
+      sql += " AND m.kind = ?";
+      params.push(options.kind);
+    }
     if (options.symbol) {
       sql += " AND m.symbols LIKE ?";
       params.push(`%"${options.symbol}"%`);
@@ -455,6 +545,10 @@ export class MemoryStore {
     if (options.minImportance !== undefined) {
       sql += " AND m.importance >= ?";
       params.push(options.minImportance);
+    }
+    if (options.asOf) {
+      sql += " AND m.created_at <= ?";
+      params.push(options.asOf);
     }
 
     sql += " ORDER BY fts.rank LIMIT ? OFFSET ?";
@@ -499,6 +593,10 @@ export class MemoryStore {
       sql += " AND type = ?";
       params.push(options.type);
     }
+    if (options.kind) {
+      sql += " AND kind = ?";
+      params.push(options.kind);
+    }
     if (options.symbol) {
       sql += " AND symbols LIKE ?";
       params.push(`%"${options.symbol}"%`);
@@ -510,6 +608,10 @@ export class MemoryStore {
     if (options.minImportance !== undefined) {
       sql += " AND importance >= ?";
       params.push(options.minImportance);
+    }
+    if (options.asOf) {
+      sql += " AND created_at <= ?";
+      params.push(options.asOf);
     }
 
     sql += " ORDER BY importance DESC, created_at DESC LIMIT ? OFFSET ?";
@@ -543,6 +645,10 @@ export class MemoryStore {
       sql += " AND type = ?";
       params.push(options.type);
     }
+    if (options.kind) {
+      sql += " AND kind = ?";
+      params.push(options.kind);
+    }
     if (options.symbol) {
       sql += " AND symbols LIKE ?";
       params.push(`%"${options.symbol}"%`);
@@ -554,6 +660,10 @@ export class MemoryStore {
     if (options.minImportance !== undefined) {
       sql += " AND importance >= ?";
       params.push(options.minImportance);
+    }
+    if (options.asOf) {
+      sql += " AND created_at <= ?";
+      params.push(options.asOf);
     }
 
     // Limit candidates to avoid loading too many embeddings into memory.
@@ -652,6 +762,11 @@ export class MemoryStore {
 
   async getByType(type: MemoryType, options: QueryOptions = {}): Promise<MemoryEntry[]> {
     return this.queryEntries("type = ?", [type], options);
+  }
+
+  /** Type-routed recall by CoALA kind (episodic / semantic / procedural). */
+  async getByKind(kind: MemoryKind, options: QueryOptions = {}): Promise<MemoryEntry[]> {
+    return this.queryEntries("kind = ?", [kind], options);
   }
 
   async getBySymbol(symbol: string, options: QueryOptions = {}): Promise<MemoryEntry[]> {

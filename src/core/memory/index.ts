@@ -28,9 +28,12 @@ export {
   MemoryStore,
   extractTokens,
   MemoryTypeSchema,
+  MemoryKindSchema,
+  defaultKindForType,
   MemoryMetadataSchema,
   MemoryEntrySchema,
   type MemoryType,
+  type MemoryKind,
   type MemoryMetadata,
   type MemoryEntry,
   type SearchOptions,
@@ -38,6 +41,14 @@ export {
   type MemorySearchResult,
   type MemoryStats,
 } from "./store.ts";
+
+// Point-in-time (as-of) recall guard — no-lookahead correctness (E5)
+export {
+  isVisibleAsOf,
+  filterAsOf,
+  toEpochMs,
+  type KnownAt,
+} from "./asOf.ts";
 
 // Embeddings (vector generation)
 export {

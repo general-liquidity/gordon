@@ -29,7 +29,8 @@ export type EvalCategory =
   | "planning"
   | "execution"
   | "education"
-  | "recovery";
+  | "recovery"
+  | "memory";
 
 /**
  * One user turn in a multi-turn / progressive-disclosure scenario. Models a
@@ -161,6 +162,16 @@ export interface EvalTrajectory {
   messages: ReadonlyArray<Message>;
   /** Free-form metadata (model name, env flags, prompt hash, etc.). */
   metadata?: Record<string, string | number | boolean>;
+  /**
+   * Retrieved tool-output summaries produced along this trajectory, grounded
+   * on the audit trace's `NormalizedToolCall.outputSummary`. Surfaced to the
+   * judge so it can score Information Utilization — whether the final answer
+   * actually reflects/uses the data the agent retrieved, rather than ignoring
+   * or misinterpreting it (FinTrace's universal-bottleneck finding). Absent
+   * for pure-text trajectories that called no tools; when absent the judge
+   * simply skips the dimension.
+   */
+  toolOutputs?: ReadonlyArray<{ name: string; outputSummary?: string }>;
 }
 
 /** A single trajectory's score after the judge has ranked the group. */
@@ -189,6 +200,17 @@ export interface ScoredTrajectory {
    * for a suite-level error-mode view.
    */
   failureMode?: FailureMode;
+  /**
+   * Information Utilization score in [0, 1] — how well the final answer
+   * reflects/uses the retrieved tool-output data (1 = fully grounded in and
+   * consistent with the data, 0 = ignores or misinterprets it). OPTIONAL:
+   * only meaningful when the trajectory carried `toolOutputs`; judges that
+   * don't emit it (or trajectories with no retrieved data) leave it
+   * undefined. Tracked alongside `score` as a distinct quality dimension —
+   * FinTrace's headline finding is that data-utilization, not retrieval or
+   * planning, is the universal bottleneck.
+   */
+  informationUtilization?: number;
 }
 
 export interface JudgeResult {

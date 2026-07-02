@@ -20,18 +20,21 @@ import { constitutionScenarios } from "./constitution-source.ts";
 import { riskDimensionScenarios } from "./risk-dimension-source.ts";
 import { denylistScenarios } from "./denylist-source.ts";
 import { rubricRedFlagScenarios } from "./rubric-source.ts";
+import { memoryScenarios } from "./memory-source.ts";
 
 export type GeneratorSource =
   | "constitution"
   | "risk-dimension"
   | "denylist"
-  | "rubric";
+  | "rubric"
+  | "memory";
 
 export const ALL_GENERATOR_SOURCES: ReadonlyArray<GeneratorSource> = [
   "constitution",
   "risk-dimension",
   "denylist",
   "rubric",
+  "memory",
 ];
 
 const SOURCE_FNS: Record<GeneratorSource, () => EvalScenario[]> = {
@@ -39,10 +42,11 @@ const SOURCE_FNS: Record<GeneratorSource, () => EvalScenario[]> = {
   "risk-dimension": riskDimensionScenarios,
   denylist: denylistScenarios,
   rubric: rubricRedFlagScenarios,
+  memory: memoryScenarios,
 };
 
 export interface GenerateOptions {
-  /** Restrict to a subset of sources. Defaults to all four. */
+  /** Restrict to a subset of sources. Defaults to all sources. */
   sources?: ReadonlyArray<GeneratorSource>;
 }
 
@@ -71,6 +75,7 @@ export {
   riskDimensionScenarios,
   denylistScenarios,
   rubricRedFlagScenarios,
+  memoryScenarios,
 };
 
 export {

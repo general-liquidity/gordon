@@ -102,6 +102,7 @@ export {
   riskDimensionScenarios,
   denylistScenarios,
   rubricRedFlagScenarios,
+  memoryScenarios,
   paraphraseScenarios,
   mergeParaphrased,
   loadScenariosWithParaphrase,
@@ -130,6 +131,8 @@ export { checkTrajectory, checkScenarioAssertions } from "./process/processCheck
 export type {
   NormalizedTrace,
   NormalizedToolCall,
+  RecalledRecord,
+  RecallInfo,
   ProcessViolation,
   ProcessSeverity,
   ProcessCheckResult,

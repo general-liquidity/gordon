@@ -42,6 +42,13 @@ interface PositionClosedEvent {
   pnlPercent: number;
   strategy?: string;
   reason?: string;
+  /**
+   * Ids of the specific memories (past trades, insights, analyses) that
+   * were cited when this position was opened. On a winning close they get
+   * reinforced (importance bumped) so the lineage that actually worked
+   * survives temporal decay. Absent when the open wasn't memory-informed.
+   */
+  citedMemoryIds?: string[];
 }
 
 /** Shape of an ANALYSIS_COMPLETE event payload */
@@ -176,6 +183,15 @@ export class MemoryManager {
         : "Loss trade — review what could be improved",
       rating: event.pnl >= 0 ? 3 : 2, // Default ratings, agents can update later
     });
+
+    // Outcome -> memory reinforcement: on a winning close, bump the importance
+    // of the memories that informed the open. Reward is the win magnitude,
+    // normalized against a 20% move (mirrors recordTrade's pnl factor). Losses
+    // (reward <= 0) are a no-op — decay handles losing lineage.
+    if (event.citedMemoryIds && event.citedMemoryIds.length > 0) {
+      const reward = event.pnl > 0 ? Math.min(1, Math.abs(event.pnlPercent) / 20) : 0;
+      await this._journal.reinforce(event.citedMemoryIds, reward);
+    }
   }
 
   private async handleAnalysisComplete(event: AnalysisCompleteEvent): Promise<void> {

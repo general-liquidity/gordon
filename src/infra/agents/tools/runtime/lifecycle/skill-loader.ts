@@ -14,6 +14,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { listSkillSummaries, loadSkill } from "../../../skills/index.ts";
+import { hybridSearch, type MemoryEntry } from "../../../../memory/hybrid/search.ts";
 
 // ============================================================================
 // 1. list_skills
@@ -86,10 +87,70 @@ export const loadSkillTool = createTool({
 });
 
 // ============================================================================
+// 3. search_skills
+// ============================================================================
+
+export const searchSkillsTool = createTool({
+  id: "search_skills",
+  description:
+    "Rank Gordon's workflow skills by relevance to a free-text query and " +
+    "return the top matches. Prefer this over list_skills when you know what " +
+    "you're trying to do (e.g. 'validate a backtest', 'analyze a filing', " +
+    "'recover from a failed order') — list_skills enumerates the full catalog " +
+    "unranked, while search_skills BM25-ranks the summaries and returns only " +
+    "the best few. Then call load_skill on the id you want.",
+  inputSchema: z.object({
+    query: z.string().describe("What you're trying to do, in natural language."),
+    top_k: z
+      .number()
+      .int()
+      .min(1)
+      .max(20)
+      .default(5)
+      .describe("Maximum number of skills to return (default 5)."),
+  }),
+  outputSchema: z.object({
+    total: z.number(),
+    matches: z.array(
+      z.object({
+        id: z.string(),
+        summary: z.string(),
+        score: z.number(),
+      }),
+    ),
+  }),
+  execute: async ({ query, top_k }) => {
+    const summaries = listSkillSummaries();
+    const summaryById = new Map(summaries.map((s) => [s.id, s.summary]));
+
+    // Index the skill id + summary together so id tokens ("backtest-validate")
+    // are searchable alongside the description. Skills are evergreen — no
+    // temporal decay (timestamp null).
+    const entries: MemoryEntry[] = summaries.map((s) => ({
+      id: s.id,
+      content: `${s.id} ${s.summary}`,
+      timestamp: null,
+    }));
+
+    const ranked = hybridSearch(query, entries, { limit: top_k });
+
+    return {
+      total: ranked.length,
+      matches: ranked.map((r) => ({
+        id: r.id,
+        summary: summaryById.get(r.id) ?? "",
+        score: r.score,
+      })),
+    };
+  },
+});
+
+// ============================================================================
 // Export
 // ============================================================================
 
 export const skillLoaderTools = {
   list_skills: listSkillsTool,
   load_skill: loadSkillTool,
+  search_skills: searchSkillsTool,
 };

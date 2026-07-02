@@ -93,6 +93,12 @@ const JudgeResponseSchema = z.object({
           "other",
         ])
         .optional(),
+      /**
+       * Information Utilization dimension in [0, 1] - how well the answer
+       * uses the retrieved tool-output data. Optional; only meaningful when
+       * the trajectory carried retrieved data. Missing is left undefined.
+       */
+      information_utilization: z.number().optional(),
     }),
   ),
 });
@@ -226,6 +232,10 @@ export function buildJudgePrompt(
   lines.push(
     "For any trajectory you score in the FAILING / low half (roughly the bottom, a materially worse answer), ALSO set `failure_mode` to the single dominant reasoning failure from this fixed list: `misread_regime` (traded against the prevailing regime/trend), `over_sized` (size breaches risk budget / vol-adjusted sizing), `hallucinated_fill` (claims a fill, price, or holding that never existed), `ignored_news` (acts against material news/event the context surfaced), `generic_non_actionable` (platitudes, no concrete trigger/stop/target/size), or `other` (a real failure fitting none of these). OMIT `failure_mode` for a good trajectory — it is only for failures. Pick exactly one — the dominant cause.",
   );
+  lines.push("# Information Utilization dimension");
+  lines.push(
+    "When a trajectory includes a \"Retrieved data (tool outputs)\" block, judge how well its final answer ACTUALLY USES that data. This is a primary component of output quality: reward answers whose conclusions are grounded in and consistent with the retrieved numbers/facts; penalize answers that ignore the retrieved data, contradict it, or misread it (e.g. calls a level 'oversold' when the retrieved RSI is 65, cites a price the data doesn't support, or gives a generic answer that could have been written without ever fetching the data). This is NOT a path-length or step-efficiency metric — do not penalize longer or unusual paths; judge only whether the FINAL answer reflects the data that was retrieved. SEPARATELY from the ranking score, return `information_utilization` as a float 0..1 for each trajectory that has a retrieved-data block (1 = fully grounded in the data, 0 = ignores or misinterprets it). Omit it for trajectories with no retrieved-data block.",
+  );
   lines.push("");
   lines.push("# Agent system prompt (the rubric)");
   lines.push("```");
@@ -280,6 +290,15 @@ export function buildJudgePrompt(
   lines.push("# Trajectories to rank");
   trajectories.forEach((traj, idx) => {
     lines.push(`## Trajectory ${idx + 1} (id: ${traj.id})`);
+    if (traj.toolOutputs && traj.toolOutputs.length > 0) {
+      lines.push("Retrieved data (tool outputs):");
+      lines.push("```");
+      for (const t of traj.toolOutputs) {
+        lines.push(`- ${t.name}: ${t.outputSummary ?? "[no output summary]"}`);
+      }
+      lines.push("```");
+      lines.push("Final answer:");
+    }
     const assistantMessages = traj.messages.filter((m) => m.role === "assistant");
     const responseBody =
       assistantMessages.length > 0
@@ -301,6 +320,8 @@ export function buildJudgePrompt(
           explanation: "<one-sentence rationale>",
           generic_non_actionable: "<true|false — see anti-metric section>",
           failure_mode: "<one of the taxonomy labels, or omit for a good trajectory>",
+          information_utilization:
+            "<float 0..1 — see Information Utilization section; omit if no retrieved-data block>",
         })),
       },
       null,
@@ -325,6 +346,7 @@ function normalizeAndRank(
       explanation: string;
       genericNonActionable?: boolean;
       failureMode?: FailureMode;
+      informationUtilization?: number;
     }
   >();
   for (const s of rawScores) {
@@ -334,6 +356,8 @@ function normalizeAndRank(
       explanation: s.explanation || "",
       genericNonActionable: s.generic_non_actionable,
       failureMode: s.failure_mode,
+      informationUtilization:
+        s.information_utilization === undefined ? undefined : clamp01(s.information_utilization),
     });
   }
 
@@ -346,6 +370,7 @@ function normalizeAndRank(
       rank: 0, // filled after sort
       genericNonActionable: entry?.genericNonActionable,
       failureMode: entry?.failureMode,
+      informationUtilization: entry?.informationUtilization,
     };
   });
 
@@ -404,6 +429,7 @@ export interface MockJudgeOptions {
       explanation?: string;
       genericNonActionable?: boolean;
       failureMode?: FailureMode;
+      informationUtilization?: number;
     }>
   >;
   /**
@@ -421,6 +447,7 @@ export interface MockJudgeOptions {
         explanation?: string;
         genericNonActionable?: boolean;
         failureMode?: FailureMode;
+        informationUtilization?: number;
       }>
     >
   >;
@@ -461,6 +488,7 @@ export function buildMockJudgeClient(options: MockJudgeOptions): LLMClient {
           explanation: s.explanation ?? `mock score ${s.score}`,
           generic_non_actionable: s.genericNonActionable,
           failure_mode: s.failureMode,
+          information_utilization: s.informationUtilization,
         })),
       };
       return payload as T;

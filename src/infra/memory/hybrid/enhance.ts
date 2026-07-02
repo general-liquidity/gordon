@@ -16,6 +16,15 @@ export interface RankedEntry {
   score: number;
   /** Unix ms. null = evergreen (no decay). */
   timestamp: number | null;
+  /**
+   * Stored importance in [0, 1] (MemoryEntry.importance). Optional so
+   * callers that don't carry it fall back to neutral weighting. Folded
+   * multiplicatively into the enhance score (importance x recency x
+   * relevance) — this is what lets the outcome->memory reinforcement loop
+   * (trade-journal.ts::reinforce) actually change ranking: bumping a
+   * winning memory's importance lifts it here.
+   */
+  importance?: number;
 }
 
 export interface EnhanceConfig {
@@ -31,6 +40,19 @@ export const DEFAULT_ENHANCE_CONFIG: EnhanceConfig = {
 };
 
 /**
+ * Map a stored importance in [0, 1] to a multiplicative weight centered on
+ * neutral. importance 0.5 (the default write value) → 1.0 (no change);
+ * importance 1.0 → 1.5 (boost); importance 0 → 0.5 (penalty). Undefined
+ * importance is neutral so this is a strict no-op for callers that don't
+ * pass it.
+ */
+export function importanceMultiplier(importance: number | undefined): number {
+  if (importance == null || !Number.isFinite(importance)) return 1;
+  const clamped = Math.max(0, Math.min(1, importance));
+  return 0.5 + clamped;
+}
+
+/**
  * Apply temporal decay + MMR re-ranking to already-scored results.
  *
  * Safe to use as a drop-in tail after any existing scoring pipeline —
@@ -44,13 +66,19 @@ export function enhanceRankedResults<T extends RankedEntry>(
   const cfg = { ...DEFAULT_ENHANCE_CONFIG, ...config };
   if (results.length === 0) return results;
 
-  // 1. Temporal decay
+  // 1. Temporal decay (recency x relevance)
   const decayed = applyTemporalDecay(results, cfg.decay);
 
-  // 2. Re-sort after decay
-  const sorted = [...decayed].sort((a, b) => b.score - a.score);
+  // 2. Fold in stored importance (importance x recency x relevance)
+  const weighted = decayed.map((r) => ({
+    ...r,
+    score: r.score * importanceMultiplier(r.importance),
+  }));
 
-  // 3. MMR re-ranking (diversification)
+  // 3. Re-sort after decay + importance weighting
+  const sorted = [...weighted].sort((a, b) => b.score - a.score);
+
+  // 4. MMR re-ranking (diversification)
   const reranked = mmrRerank(
     sorted.map((r) => ({ id: r.id, score: r.score, content: r.content })),
     cfg.mmr,
