@@ -35,11 +35,13 @@ export const CATEGORY_RUBRIC_DATA: Record<EvalCategory, CategoryRubricData> = {
       'Generic "stay diversified" non-answer',
       "Citing tools / data the agent did not actually call",
       "Reciting trending tickers without commentary or filtering",
+      "Ignoring the retrieved scan/market data — candidates or verdict that don't follow from the numbers actually fetched",
     ],
     goodSignals: [
       "Concrete filter logic (volume, breakout, regime fit) with reasoning",
       'Honest "nothing meets your criteria right now" when applicable',
       'Surface 3–7 candidates with one-line "why now"',
+      "Candidates and rankings visibly grounded in the retrieved data (the fetched volumes/levels/regime, not generic priors)",
     ],
   },
   analysis: {
@@ -49,12 +51,15 @@ export const CATEGORY_RUBRIC_DATA: Record<EvalCategory, CategoryRubricData> = {
       'Hand-waving causation ("BTC dipped because of market sentiment")',
       "Missing the regime or structural context",
       "Ignoring or contradicting data the user already supplied",
+      "Ignoring or misinterpreting the retrieved tool-output data (e.g. calls a level 'oversold' when the fetched RSI is 65, or cites a price the data doesn't support)",
+      "A conclusion that could have been written without ever calling the tools — retrieved data fetched but not used",
     ],
     goodSignals: [
       "Acknowledges user-supplied context before answering",
       "Names the regime / structure explicitly",
       "Distinguishes what's observable from what's speculation",
       "Flags which prior assumptions are now invalidated",
+      "Conclusions are grounded in and consistent with the specific numbers the tools returned",
     ],
   },
   planning: {
@@ -65,6 +70,7 @@ export const CATEGORY_RUBRIC_DATA: Record<EvalCategory, CategoryRubricData> = {
       "Missing position-sizing math",
       "Claims to have placed an order it did not place",
       "Recommends circumventing the user's stated risk cap",
+      "Trigger / stop / target levels that ignore the retrieved price/indicator data (numbers pulled from thin air, not from what was fetched)",
     ],
     goodSignals: [
       "Entry trigger condition stated as a price/event, not a vibe",
@@ -81,6 +87,7 @@ export const CATEGORY_RUBRIC_DATA: Record<EvalCategory, CategoryRubricData> = {
       "Skips the pre-trade risk check",
       'Silent failure (says "done" when the order didn\'t fill)',
       "Mismatched venue / symbol / side from what the user asked for",
+      "Reports a fill / status that contradicts the retrieved order-status data",
     ],
     goodSignals: [
       "Echoes back the exact order before executing",

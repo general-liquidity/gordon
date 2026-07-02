@@ -77,6 +77,12 @@ const JudgeResponseSchema = z.object({
        * treated as `false` (not flagged) downstream.
        */
       generic_non_actionable: z.boolean().optional(),
+      /**
+       * Information Utilization dimension in [0, 1] — how well the answer
+       * uses the retrieved tool-output data. Optional; only meaningful when
+       * the trajectory carried retrieved data. Missing is left undefined.
+       */
+      information_utilization: z.number().optional(),
     }),
   ),
 });
@@ -206,6 +212,11 @@ export function buildJudgePrompt(
     "SEPARATELY from the score, flag each trajectory with `generic_non_actionable: true` when its answer is generic non-actionable advice FOR TRADING. For trading, an answer is generic non-actionable when it recommends or implies an action but gives NO concrete trigger, stop, target, or size — i.e. \"buy when it looks good\" without a price/event trigger, stop level, target, or position size — OR when it retreats into platitudes (\"manage your risk\", \"wait for confirmation\", \"stay diversified\", \"do your own research\", \"keep an eye on it\") instead of a specific, executable call. A genuinely good answer that names a concrete trigger/stop/target/size, OR that honestly says \"nothing meets your criteria right now\" with reasoning, is NOT generic non-actionable. An answer that correctly declines to act (e.g. refuses a risk-breaching trade) and explains the specific reason is NOT generic non-actionable. Set the flag `false` (or omit it) when none of the above apply. This flag is tracked independently of the score — a fluent, well-structured answer can still be generic non-actionable.",
   );
   lines.push("");
+  lines.push("# Information Utilization dimension");
+  lines.push(
+    "When a trajectory includes a \"Retrieved data (tool outputs)\" block, judge how well its final answer ACTUALLY USES that data. This is a primary component of output quality: reward answers whose conclusions are grounded in and consistent with the retrieved numbers/facts; penalize answers that ignore the retrieved data, contradict it, or misread it (e.g. calls a level 'oversold' when the retrieved RSI is 65, cites a price the data doesn't support, or gives a generic answer that could have been written without ever fetching the data). This is NOT a path-length or step-efficiency metric — do not penalize longer or unusual paths; judge only whether the FINAL answer reflects the data that was retrieved. SEPARATELY from the ranking score, return `information_utilization` as a float 0..1 for each trajectory that has a retrieved-data block (1 = fully grounded in the data, 0 = ignores or misinterprets it). Omit it for trajectories with no retrieved-data block.",
+  );
+  lines.push("");
   lines.push("# Agent system prompt (the rubric)");
   lines.push("```");
   lines.push(scenario.systemPrompt);
@@ -230,6 +241,15 @@ export function buildJudgePrompt(
   lines.push("# Trajectories to rank");
   trajectories.forEach((traj, idx) => {
     lines.push(`## Trajectory ${idx + 1} (id: ${traj.id})`);
+    if (traj.toolOutputs && traj.toolOutputs.length > 0) {
+      lines.push("Retrieved data (tool outputs):");
+      lines.push("```");
+      for (const t of traj.toolOutputs) {
+        lines.push(`- ${t.name}: ${t.outputSummary ?? "[no output summary]"}`);
+      }
+      lines.push("```");
+      lines.push("Final answer:");
+    }
     const assistantMessages = traj.messages.filter((m) => m.role === "assistant");
     const responseBody =
       assistantMessages.length > 0
@@ -250,6 +270,8 @@ export function buildJudgePrompt(
           score: "<float 0..1>",
           explanation: "<one-sentence rationale>",
           generic_non_actionable: "<true|false — see anti-metric section>",
+          information_utilization:
+            "<float 0..1 — see Information Utilization section; omit if no retrieved-data block>",
         })),
       },
       null,
@@ -269,7 +291,12 @@ function normalizeAndRank(
 ): ScoredTrajectory[] {
   const scoreById = new Map<
     string,
-    { score: number; explanation: string; genericNonActionable?: boolean }
+    {
+      score: number;
+      explanation: string;
+      genericNonActionable?: boolean;
+      informationUtilization?: number;
+    }
   >();
   for (const s of rawScores) {
     const score = clamp01(s.score);
@@ -277,6 +304,8 @@ function normalizeAndRank(
       score,
       explanation: s.explanation || "",
       genericNonActionable: s.generic_non_actionable,
+      informationUtilization:
+        s.information_utilization === undefined ? undefined : clamp01(s.information_utilization),
     });
   }
 
@@ -288,6 +317,7 @@ function normalizeAndRank(
       explanation: entry?.explanation ?? "Judge returned no score for this trajectory.",
       rank: 0, // filled after sort
       genericNonActionable: entry?.genericNonActionable,
+      informationUtilization: entry?.informationUtilization,
     };
   });
 
@@ -340,7 +370,13 @@ export interface MockJudgeOptions {
   /** Map from scenarioId → array of (trajId, score). */
   responses: Record<
     string,
-    Array<{ id: string; score: number; explanation?: string; genericNonActionable?: boolean }>
+    Array<{
+      id: string;
+      score: number;
+      explanation?: string;
+      genericNonActionable?: boolean;
+      informationUtilization?: number;
+    }>
   >;
   /**
    * Optional per-model overrides. When the judge call's `config.model`
@@ -351,7 +387,13 @@ export interface MockJudgeOptions {
     string,
     Record<
       string,
-      Array<{ id: string; score: number; explanation?: string; genericNonActionable?: boolean }>
+      Array<{
+      id: string;
+      score: number;
+      explanation?: string;
+      genericNonActionable?: boolean;
+      informationUtilization?: number;
+    }>
     >
   >;
   /** Set true to make the mock throw on call. */
@@ -390,6 +432,7 @@ export function buildMockJudgeClient(options: MockJudgeOptions): LLMClient {
           score: s.score,
           explanation: s.explanation ?? `mock score ${s.score}`,
           generic_non_actionable: s.genericNonActionable,
+          information_utilization: s.informationUtilization,
         })),
       };
       return payload as T;

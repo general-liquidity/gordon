@@ -591,6 +591,96 @@ describe("category rubrics", () => {
   });
 });
 
+describe("Information Utilization dimension", () => {
+  const scenario: EvalScenario = {
+    id: "info-util",
+    tags: [],
+    systemPrompt: "analyze the market",
+    userInput: "how does BTC look?",
+  };
+
+  it("buildJudgePrompt always ships the Information Utilization section", () => {
+    const prompt = buildJudgePrompt(scenario, [
+      { id: "a", messages: [{ role: "assistant", content: "x" }] },
+      { id: "b", messages: [{ role: "assistant", content: "y" }] },
+    ]);
+    expect(prompt).toContain("Information Utilization");
+    // Must NOT reintroduce a path-length / step-efficiency penalty.
+    expect(prompt).toContain("NOT a path-length or step-efficiency metric");
+  });
+
+  it("renders a retrieved-data block when the trajectory carries toolOutputs", () => {
+    const prompt = buildJudgePrompt(scenario, [
+      {
+        id: "grounded",
+        messages: [{ role: "assistant", content: "RSI is 65, not oversold" }],
+        toolOutputs: [{ name: "compute_indicator", outputSummary: "RSI=65" }],
+      },
+      { id: "b", messages: [{ role: "assistant", content: "y" }] },
+    ]);
+    expect(prompt).toContain("Retrieved data (tool outputs)");
+    expect(prompt).toContain("compute_indicator: RSI=65");
+    // Trajectory without toolOutputs gets no retrieved-data block header for it,
+    // but the answer body is still present.
+    expect(prompt).toContain("Final answer:");
+  });
+
+  it("threads information_utilization from the judge into the scored trajectories", async () => {
+    const client = buildMockJudgeClient({
+      responses: {
+        "info-util": [
+          { id: "grounded", score: 0.9, informationUtilization: 0.95 },
+          { id: "ignored", score: 0.4, informationUtilization: 0.1 },
+        ],
+      },
+    });
+    const r = await judgeTrajectories(
+      {
+        scenario,
+        trajectories: [
+          {
+            id: "grounded",
+            messages: [{ role: "assistant", content: "RSI 65, neutral" }],
+            toolOutputs: [{ name: "compute_indicator", outputSummary: "RSI=65" }],
+          },
+          {
+            id: "ignored",
+            messages: [{ role: "assistant", content: "deeply oversold, buy" }],
+            toolOutputs: [{ name: "compute_indicator", outputSummary: "RSI=65" }],
+          },
+        ],
+      },
+      { client },
+    );
+    const grounded = r.scored.find((s) => s.id === "grounded")!;
+    const ignored = r.scored.find((s) => s.id === "ignored")!;
+    expect(grounded.informationUtilization).toBeCloseTo(0.95, 6);
+    expect(ignored.informationUtilization).toBeCloseTo(0.1, 6);
+  });
+
+  it("leaves informationUtilization undefined when the judge omits it", async () => {
+    const client = buildMockJudgeClient({
+      responses: {
+        "info-util": [
+          { id: "a", score: 0.7 },
+          { id: "b", score: 0.5 },
+        ],
+      },
+    });
+    const r = await judgeTrajectories(
+      {
+        scenario,
+        trajectories: [
+          { id: "a", messages: [{ role: "assistant", content: "x" }] },
+          { id: "b", messages: [{ role: "assistant", content: "y" }] },
+        ],
+      },
+      { client },
+    );
+    expect(r.scored.every((s) => s.informationUtilization === undefined)).toBe(true);
+  });
+});
+
 describe("judgeTrajectoriesPanel", () => {
   const scenario: EvalScenario = {
     id: "panel-test",
