@@ -22,6 +22,14 @@ import {
 const logger = createModuleLogger("trade-journal");
 
 /**
+ * Maximum importance bump applied by a full-strength (reward >= 1)
+ * reinforcement. A marginal win (small reward) reinforces proportionally
+ * less. Kept modest so a single lucky trade can't pin a memory at the top;
+ * repeated wins on the same lineage compound toward the ceiling.
+ */
+const REINFORCE_MAX_DELTA = 0.2;
+
+/**
  * Post-process search results with temporal decay + MMR diversification.
  * Keeps Gordon's existing BM25+embedding scoring — only re-ranks the output.
  */
@@ -35,6 +43,7 @@ function applyEnhancement(
     content: r.entry.content,
     score: r.score,
     timestamp: r.entry.createdAt ? new Date(r.entry.createdAt).getTime() : null,
+    importance: r.entry.importance,
     _original: r,
   }));
   const enhanced = enhanceRankedResults(ranked, { limit });
@@ -261,6 +270,48 @@ export class TradeJournal {
       symbol: params.symbol ?? "none",
     });
     return id;
+  }
+
+  // --------------------------------------------------------------------------
+  // Outcome -> Memory Reinforcement
+  // --------------------------------------------------------------------------
+
+  /**
+   * Reinforce the specific memories that were cited in a resolved decision.
+   *
+   * When a decision resolves profitably (`reward > 0`), bump the stored
+   * importance of the exact memories that informed it, so winning lineage
+   * survives temporal decay and resurfaces on future retrieval. Losing or
+   * neutral lineage (`reward <= 0`) is deliberately left untouched — normal
+   * temporal decay lets it fade on its own, so the store drifts toward what
+   * actually worked.
+   *
+   * The bump scales with the (capped) reward magnitude, so a decisive win
+   * reinforces harder than a marginal one. Returns the number of memories
+   * whose importance was actually updated (missing ids are skipped).
+   */
+  async reinforce(ids: string[], reward: number): Promise<number> {
+    if (reward <= 0 || ids.length === 0) return 0;
+
+    const rewardFactor = Math.min(1, reward);
+    const delta = REINFORCE_MAX_DELTA * rewardFactor;
+
+    let updated = 0;
+    for (const id of ids) {
+      const next = await this.store.reinforceImportance(id, delta);
+      if (next !== null) updated += 1;
+    }
+
+    if (updated > 0) {
+      logger.info("Reinforced winning-lineage memories", {
+        updated,
+        cited: ids.length,
+        reward: reward.toFixed(3),
+        delta: delta.toFixed(3),
+      });
+    }
+
+    return updated;
   }
 
   // --------------------------------------------------------------------------

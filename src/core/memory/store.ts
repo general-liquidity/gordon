@@ -408,6 +408,32 @@ export class MemoryStore {
     logger.debug("Memory deleted", { id });
   }
 
+  /**
+   * Additively bump a memory's importance by `delta`, clamped to [0, 1].
+   * Powers the outcome->memory reinforcement loop (TradeJournal.reinforce):
+   * importance is otherwise set once at write and never updated, so a memory
+   * that led to a winning decision has no way to survive temporal decay.
+   * Returns the new importance, or null if the id does not exist.
+   */
+  async reinforceImportance(id: string, delta: number): Promise<number | null> {
+    const db = this.getDb();
+    const existing = await this.get(id);
+    if (!existing) return null;
+
+    const next = Math.max(0, Math.min(1, existing.importance + delta));
+    db.prepare("UPDATE memories SET importance = ?, updated_at = ? WHERE id = ?").run(
+      next,
+      new Date().toISOString(),
+      id,
+    );
+    logger.debug("Memory importance reinforced", {
+      id,
+      from: existing.importance,
+      to: next,
+    });
+    return next;
+  }
+
   // --------------------------------------------------------------------------
   // Full-Text Search (BM25)
   // --------------------------------------------------------------------------
