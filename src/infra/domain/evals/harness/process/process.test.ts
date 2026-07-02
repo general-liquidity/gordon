@@ -3,11 +3,16 @@ import { checkTrajectory, type NormalizedTrace } from "./processChecks.ts";
 import { computePassK, passKFromChecks } from "./passK.ts";
 
 function trace(
-  calls: Array<{ name: string; ok?: boolean }>,
+  calls: Array<{ name: string; ok?: boolean; inputSummary?: string }>,
   extra: Partial<NormalizedTrace> = {},
 ): NormalizedTrace {
   return {
-    toolCalls: calls.map((c, i) => ({ name: c.name, ok: c.ok ?? true, order: i })),
+    toolCalls: calls.map((c, i) => ({
+      name: c.name,
+      ok: c.ok ?? true,
+      order: i,
+      inputSummary: c.inputSummary,
+    })),
     ...extra,
   };
 }
@@ -96,6 +101,71 @@ describe("checkTrajectory", () => {
     );
     expect(r.passed).toBe(true);
     expect(r.violations.length).toBe(0);
+  });
+});
+
+describe("redundancy metric", () => {
+  it("is 0 for an empty trace and for all-distinct calls", () => {
+    expect(checkTrajectory(trace([])).redundancy).toBe(0);
+    const r = checkTrajectory(
+      trace([
+        { name: "get_market_data", inputSummary: "BTC" },
+        { name: "get_market_data", inputSummary: "ETH" },
+        { name: "compute_indicator", inputSummary: "rsi BTC" },
+      ]),
+    );
+    expect(r.redundancy).toBe(0);
+    expect(r.violations.some((v) => v.rule === "redundant_tool_calls")).toBe(false);
+  });
+
+  it("counts exact duplicates (name + args) as the fraction of the trace", () => {
+    // 4 calls, 2 of them exact duplicates → 2/4 = 0.5
+    const r = checkTrajectory(
+      trace([
+        { name: "get_market_data", inputSummary: "BTC" },
+        { name: "get_market_data", inputSummary: "BTC" },
+        { name: "get_market_data", inputSummary: "BTC" },
+        { name: "compute_indicator", inputSummary: "rsi BTC" },
+      ]),
+    );
+    expect(r.redundancy).toBeCloseTo(0.5, 6);
+  });
+
+  it("WARNS on >=2 scattered successful duplicates (distinct from doom-loop)", () => {
+    const r = checkTrajectory(
+      trace([
+        { name: "get_market_data", inputSummary: "BTC" },
+        { name: "compute_indicator", inputSummary: "rsi BTC" },
+        { name: "get_market_data", inputSummary: "BTC" }, // dup 1
+        { name: "get_news", inputSummary: "BTC" },
+        { name: "get_market_data", inputSummary: "BTC" }, // dup 2
+      ]),
+    );
+    const warn = r.violations.find((v) => v.rule === "redundant_tool_calls");
+    expect(warn?.severity).toBe("warn");
+    expect(r.passed).toBe(true); // warn only, never blocks
+  });
+
+  it("does not fire on a single incidental duplicate", () => {
+    const r = checkTrajectory(
+      trace([
+        { name: "get_market_data", inputSummary: "BTC" },
+        { name: "get_market_data", inputSummary: "BTC" }, // only 1 duplicate
+      ]),
+    );
+    expect(r.redundancy).toBeCloseTo(0.5, 6);
+    expect(r.violations.some((v) => v.rule === "redundant_tool_calls")).toBe(false);
+  });
+
+  it("treats same tool with different args as NOT redundant", () => {
+    const r = checkTrajectory(
+      trace([
+        { name: "get_market_data", inputSummary: "BTC" },
+        { name: "get_market_data", inputSummary: "ETH" },
+        { name: "get_market_data", inputSummary: "SOL" },
+      ]),
+    );
+    expect(r.redundancy).toBe(0);
   });
 });
 
