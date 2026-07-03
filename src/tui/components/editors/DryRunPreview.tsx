@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import { Pane } from "../../design-system/Pane.js";
+import { TitledBox } from "../../design-system/TitledBox.js";
 
 export interface ExchangeOrder {
   exchange: string;
@@ -28,7 +28,7 @@ export function DryRunPreview({ order }: Props) {
   const sideColor = p.side === "buy" ? "green" : "red";
 
   return (
-    <Pane title="DRY RUN — ORDER PREVIEW" tone="warning">
+    <TitledBox title="DRY RUN · ORDER PREVIEW" tone="warning">
       <Box flexDirection="column">
         <Box><Text dimColor>Exchange:    </Text><Text bold>{order.exchange}</Text></Box>
         <Box><Text dimColor>Endpoint:    </Text><Text>{order.method} {order.endpoint}</Text></Box>
@@ -52,6 +52,6 @@ export function DryRunPreview({ order }: Props) {
           <Text dimColor italic>This is exactly what will be sent. No modifications.</Text>
         </Box>
       </Box>
-    </Pane>
+    </TitledBox>
   );
 }
