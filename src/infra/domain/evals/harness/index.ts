@@ -93,6 +93,21 @@ export type {
   Leaderboard,
 } from "./ranking.ts";
 
+// Judge-vs-human agreement — Cohen's kappa + Spearman rho reliability report.
+export {
+  cohensKappa,
+  spearmanRho,
+  binarizeByThreshold,
+  computeJudgeAgreement,
+  agreementFromScores,
+  formatAgreementReport,
+} from "./judgeAgreement.ts";
+export type {
+  LabelPair,
+  JudgeAgreementInput,
+  JudgeAgreementReport,
+} from "./judgeAgreement.ts";
+
 export {
   appendToReviewQueue,
   readReviewQueue,
