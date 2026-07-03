@@ -6,6 +6,7 @@
  */
 
 import { useEffect } from "react";
+import { wrapForMultiplexer } from "../utils/osc.ts";
 
 /**
  * Sets the terminal tab title whenever `title` changes.
@@ -17,7 +18,8 @@ export function useTerminalTitle(title: string): void {
     if (!process.stdout.isTTY) return;
 
     try {
-      process.stdout.write(`\x1b]0;${title}\x07`);
+      // Wrap so tmux/screen carry the OSC to the outer terminal.
+      process.stdout.write(wrapForMultiplexer(`\x1b]0;${title}\x07`));
     } catch {
       // Non-critical — terminal may not support OSC sequences
     }

@@ -5,9 +5,14 @@ import { loadLabsFlagsIntoEnv } from "./ink-custom/loadLabsFlags.js";
 import { acquireInstanceLock, InstanceLockCollisionError } from "../infra/storage/instanceLock.ts";
 import { setInkInstance } from "./utils/inkInstance.ts";
 import { initTerminalTab } from "./terminalTab.js";
+import { applyTerminalColorLevel } from "./ink-custom/colorize.ts";
 
 export async function startGordonTUI(): Promise<void> {
   loadLabsFlagsIntoEnv();
+
+  // Match chalk's color level to the real terminal: boost xterm.js
+  // (VS Code / Cursor / code-server) to truecolor, clamp tmux to 256-color.
+  applyTerminalColorLevel();
 
   const lock = process.stdout.isTTY ? acquireTuiLockOrExit() : null;
   if (lock) process.once("exit", () => lock.release());

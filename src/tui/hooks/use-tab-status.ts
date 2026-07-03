@@ -10,6 +10,7 @@
  */
 
 import { useEffect } from "react";
+import { wrapForMultiplexer } from "../utils/osc.ts";
 
 interface TabStatusOpts {
   /** Tab label / iTerm2 badge text. */
@@ -27,7 +28,8 @@ interface TabStatusOpts {
 function writeOSC(seq: string): void {
   if (!process.stdout.isTTY) return;
   try {
-    process.stdout.write(seq);
+    // Wrap so tmux/screen DCS-passthrough carries the OSC to the outer terminal.
+    process.stdout.write(wrapForMultiplexer(seq));
   } catch {
     // Silent — non-critical
   }

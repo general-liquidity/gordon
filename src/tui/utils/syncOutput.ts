@@ -8,13 +8,30 @@
 // ESU: \x1b[?2026l (End Synchronized Update)
 //
 // Supported by: iTerm2, Ghostty, WezTerm, Kitty, foot, Contour
-// Unsupported terminals silently ignore these sequences.
+// Unsupported terminals silently ignore these sequences. tmux is the
+// exception — it parses DEC 2026 but doesn't implement it and has already
+// broken atomicity by chunking, so we must NOT emit BSU/ESU there. Capability
+// detection is delegated to the shared detectTerminalCapability so this path
+// stays in sync with the rest of the TUI instead of hardcoding enabled=true.
 // ============================================================================
+
+import { detectTerminalCapability } from "../ink-custom/syncTerminal.ts";
 
 const BSU = "\x1b[?2026h";
 const ESU = "\x1b[?2026l";
 
-let syncOutputEnabled = true;
+let syncOutputEnabled = detectTerminalCapability().supportsSyncUpdate;
+
+/** Recompute enablement from an env bag via the shared detector. Called once
+ *  at module load; exposed so tests can drive it with a mock env. */
+export function initSyncOutputFromEnv(env: NodeJS.ProcessEnv = process.env): void {
+  syncOutputEnabled = detectTerminalCapability(env).supportsSyncUpdate;
+}
+
+/** Whether BSU/ESU will be emitted for the detected terminal. */
+export function isSyncOutputEnabled(): boolean {
+  return syncOutputEnabled;
+}
 
 export function enableSyncOutput(): void {
   syncOutputEnabled = true;
