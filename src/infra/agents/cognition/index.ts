@@ -68,6 +68,18 @@ export type {
 } from "./effortCalibration.ts";
 
 export {
+  recursiveDecompose,
+  chunkText,
+} from "./recursiveDecompose.ts";
+export type {
+  DecomposeMessage,
+  DecomposeLLM,
+  RecursiveDecomposeRequest,
+  RecursiveDecomposeResult,
+  RecursiveDecomposeDeps,
+} from "./recursiveDecompose.ts";
+
+export {
   params as temperamentParams,
   normalizeDials,
   neutralTemperament,

@@ -72,6 +72,7 @@ import {
   systematicTools,
   withToolsMetrics,
   peerTools,
+  recursiveDecomposeTools,
 } from "../tools/index.ts";
 import { agentTools } from "../tools/surface/index.ts";
 import { tradingInfraTools } from "../tools/runtime/tradingInfra.ts";
@@ -162,4 +163,5 @@ export const instrumentedCheckRiskTool = withToolsMetrics({ check_risk: checkRis
 export const instrumentedExecutionCostTools = withToolsMetrics(executionCostTools);
 /** Canonical 22-tool surface — must go through metrics + permission gate like implementation tools. */
 export const instrumentedAgentTools = withToolsMetrics(agentTools);
+export const instrumentedRecursiveDecomposeTools = withToolsMetrics(recursiveDecomposeTools);
 export const instrumentedTradingInfraTools = withToolsMetrics(tradingInfraTools);
