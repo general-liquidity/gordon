@@ -50,7 +50,7 @@ gordon › BTC/USDT · $67,420 · 1H consolidation coiling on declining vol
 ```
 
 > [!WARNING]
-> Gordon places real orders on real venues when armed. Trading is risky, you can lose money, and nothing in this repo is investment advice. Read the source, start in `paper` or `strict` mode, and never arm capital you can't afford to lose.
+> Gordon places real orders on real venues when armed. Trading is risky, you can lose money, and nothing in this repo is investment advice. Read the source, start in `paper` or `strict` mode, and never arm capital you can't afford to lose. See [DISCLAIMER.md](./DISCLAIMER.md) and [TERMS.md](./TERMS.md); the first live arm asks you to acknowledge them once.
 
 ## Philosophy
 
@@ -120,6 +120,8 @@ This is the part most trading bots don't have, and the reason Gordon exists. An 
 
 | Layer | What it does |
 |-------|--------------|
+| **Safe defaults** | Brokers default to paper; crypto defaults to a venue's sandbox, or an explicit live opt-in when it has none (never a silent live route); leverage is capped at 5x by default (`GORDON_RISK_MAX_LEVERAGE`). |
+| **Live-trading consent** | The first live (non-paper) arm requires a one-time acknowledgment, your keys, your account, not investment advice, you can lose money, persisted so it shows exactly once. Paper and sandbox are never gated. |
 | **Permission engine** | Deny-first. Nothing runs without an explicit policy allow or a hook decision. Rejecting a parent trade cascade-denies its pending siblings. |
 | **Risk classifier** | 15 dimensions (size, concentration, drawdown, loss budget, frequency, volatility, hours, familiarity + correlation, MEV, regime-transition, fake-liquidity, tail risk, …) → `auto_approve` / `prompt_user` / `require_confirmation` / `block`. |
 | **Trust trajectory** | Consistently-approved tools can earn auto-approval, but a hard deny-list (`execute_plan`, `place_*_order`, `cancel_*`, `wallet_transfer`, `withdraw`, `exec_shell`, …) *always* bypasses trust. One rejection wipes accumulated trust. |
@@ -172,14 +174,10 @@ Real adapters, not mock quotes. Gordon is model-, venue-, and editor-agnostic: i
 | Broker | Coverage |
 |:--|:--|
 | <img height="16" align="top" src="./assets/integrations/alpaca.png" alt="" /> &nbsp;Alpaca | US equities · options · crypto |
-| <img height="16" align="top" src="./assets/integrations/schwab.png" alt="" /> &nbsp;Charles Schwab | US equities · options · ETFs |
 | <img height="16" align="top" src="./assets/integrations/ibkr.png" alt="" /> &nbsp;Interactive Brokers | Global equities · options · futures |
-| <img height="16" align="top" src="./assets/integrations/etrade.png" alt="" /> &nbsp;E\*TRADE | US equities · options |
 | <img height="16" align="top" src="./assets/integrations/tastytrade.png" alt="" /> &nbsp;tastytrade | Options · futures |
-| <img height="16" align="top" src="./assets/integrations/tradestation.png" alt="" /> &nbsp;TradeStation | US equities · options · futures |
-| <img height="16" align="top" src="./assets/integrations/tradier.png" alt="" /> &nbsp;Tradier | US equities · options |
-| <img height="16" align="top" src="./assets/integrations/trading212.jpeg" alt="" /> &nbsp;Trading 212 | UK/EU equities · ETFs |
-| <img height="16" align="top" src="./assets/integrations/webull.png" alt="" /> &nbsp;Webull | US equities · options |
+
+<sub>Curated to the brokers with a maintained native TypeScript SDK. Each still passes the same inclusion gate and conformance matrix, and defaults to paper, live needs an explicit opt-in.</sub>
 
 #### Onchain data &amp; intelligence
 
