@@ -24,6 +24,12 @@ export type Styles = {
 
   readonly position?: "absolute" | "relative";
 
+  // Offsets for positioned elements. Ignored when `position` is the default.
+  readonly top?: number | string;
+  readonly right?: number | string;
+  readonly bottom?: number | string;
+  readonly left?: number | string;
+
   readonly columnGap?: number;
   readonly rowGap?: number;
   readonly gap?: number;
@@ -52,6 +58,14 @@ export type Styles = {
 
   readonly alignItems?: "flex-start" | "center" | "flex-end" | "stretch";
   readonly alignSelf?: "flex-start" | "center" | "flex-end" | "auto";
+  readonly alignContent?:
+    | "flex-start"
+    | "flex-end"
+    | "center"
+    | "stretch"
+    | "space-between"
+    | "space-around"
+    | "space-evenly";
   readonly justifyContent?:
     | "flex-start"
     | "flex-end"
@@ -64,6 +78,9 @@ export type Styles = {
   readonly height?: number | string;
   readonly minWidth?: number | string;
   readonly minHeight?: number | string;
+  readonly maxWidth?: number | string;
+  readonly maxHeight?: number | string;
+  readonly aspectRatio?: number;
 
   readonly display?: "flex" | "none";
 
