@@ -14,6 +14,13 @@ import { installProductionGuards } from "./infra/safety/installProductionGuards.
 installProductionGuards();
 
 import {
+  profileCheckpoint,
+  foldParallelStartup,
+  printStartupProfile,
+} from "./infra/runtime/startupProfiler.ts";
+profileCheckpoint("guards");
+
+import {
   parseCommand,
   parseFlags,
   shouldUseColor,
@@ -32,6 +39,7 @@ import {
 
 const flags = parseFlags();
 const command = parseCommand();
+profileCheckpoint("cli-flags");
 
 if (command) {
   const { runCLICommand } = await import("./gateway/cli-commands.ts");
@@ -129,6 +137,7 @@ const updateResult = "skipped";
 
 import { checkLicense, shutdownLicense } from "./infra/external/license/index.ts";
 await checkLicense();
+profileCheckpoint("license");
 
 // ============================================================================
 // TUI Launch
@@ -284,6 +293,7 @@ try {
     configLoadTask(() => loadConfig()),
     memoryLoadTask(async () => formatMemoriesForPrompt()),
   ]);
+  foldParallelStartup(startupResult);
 
   const configTask = startupResult.tasks.find((t) => t.id === "config");
   if (configTask && !configTask.success) {
@@ -336,6 +346,9 @@ if (process.env.GORDON_PROACTIVE_AUTO_START === "1" || process.env.GORDON_PROACT
 
 // Launch the rebuilt cockpit shell
 process.env.GORDON_APP_READY = "1";
+
+profileCheckpoint("pre-tui");
+printStartupProfile();
 
 await startGordonTUI();
 

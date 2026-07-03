@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text } from "../ink-custom";
+import { Link } from "../design-system/Link.js";
 import { timeAgo } from "../components/charts/DataTable.tsx";
 
 /**
@@ -75,19 +76,13 @@ export function NewsRenderer({ data }: Props) {
             </Text>
           </Box>
 
-          {/* Title — with hyperlink if terminal supports OSC 8 */}
+          {/* Title — clickable OSC-8 hyperlink where the terminal supports it */}
           <Box width={52}>
-            <Text>
-              {item.url ? (
-                <Text>
-                  {"\u001B]8;;" + item.url + "\u0007"}
-                  {truncate(item.title, 50)}
-                  {"\u001B]8;;\u0007"}
-                </Text>
-              ) : (
-                truncate(item.title, 50)
-              )}
-            </Text>
+            {item.url ? (
+              <Link url={item.url}>{truncate(item.title, 50)}</Link>
+            ) : (
+              <Text>{truncate(item.title, 50)}</Text>
+            )}
           </Box>
 
           {/* Relative timestamp */}

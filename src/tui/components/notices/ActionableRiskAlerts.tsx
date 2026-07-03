@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
-import { Pane } from "../../design-system/Pane.js";
+import { TitledBox } from "../../design-system/TitledBox.js";
 
 export interface RiskAlert {
   id: string;
@@ -43,14 +43,14 @@ export function ActionableRiskAlerts({ alerts, onFix, onIgnore }: Props) {
 
   if (alerts.length === 0) {
     return (
-      <Pane title="RISK CHECKS" tone="success">
+      <TitledBox title="RISK CHECKS" tone="success">
         <Text color="green">✓ All risk checks passed</Text>
-      </Pane>
+      </TitledBox>
     );
   }
 
   return (
-    <Pane title="RISK ALERTS" tone="warning">
+    <TitledBox title="RISK ALERTS" tone="warning">
       <Box flexDirection="column">
         {alerts.map((alert) => {
           const color = SEVERITY_COLORS[alert.severity];
@@ -81,6 +81,6 @@ export function ActionableRiskAlerts({ alerts, onFix, onIgnore }: Props) {
         })}
         <Text dimColor>[i] ignore all</Text>
       </Box>
-    </Pane>
+    </TitledBox>
   );
 }

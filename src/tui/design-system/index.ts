@@ -3,6 +3,9 @@
 // ============================================================================
 
 export { Pane } from "./Pane.js";
+export { TitledBox, buildTopBorder, embedTitleInBorder, panelToneColor } from "./TitledBox.js";
+export type { PanelAlign, PanelTone, PanelBorderStyle } from "./TitledBox.js";
+export { Link, supportsHyperlinks, osc8Link, linkString } from "./Link.js";
 export { ThemedBox } from "./ThemedBox.js";
 export { ThemedText, toneColor } from "./ThemedText.js";
 export type { TextTone } from "./ThemedText.js";
