@@ -7,7 +7,7 @@ import type { Exchange, ExchangeId, NativeExchangeId, ExchangeCredentials } from
 import { isCcxtExchangeId, extractCcxtSubId, normalizeExchangeId, ccxtIdToNativeVenue } from "./types.ts";
 import { CcxtAdapter } from "./adapters/ccxt-adapter.ts";
 import { loadOAuthExchangeCredentials, exchangeSupportsOAuth } from "./oauth-bridge.ts";
-import { assertSandboxSupported } from "./sandboxSupport.ts";
+import { assertSandboxSupported, resolveSandboxMode } from "./sandboxSupport.ts";
 
 /**
  * First-class venue ids — popular venues with curated env-var names and
@@ -108,10 +108,21 @@ export class ExchangeFactory {
     const canonical = normalizeExchangeId(exchangeId);
     const subId = extractCcxtSubId(canonical);
 
+    // Safe-by-default sandbox resolution: an unset `sandbox` flag defaults to
+    // sandbox for venues that support one, and REFUSES (LiveOptInRequiredError)
+    // for no-sandbox venues unless the operator opted into live. An explicit
+    // `sandbox: false` is respected as a deliberate live choice. This closes the
+    // crypto-vs-broker asymmetry (brokers default `paper: true`).
+    const resolvedSandbox = resolveSandboxMode({
+      exchangeId: canonical,
+      requestedSandbox: credentials.sandbox,
+      live: credentials.live,
+    });
+
     // Guard: refuse to construct a sandbox adapter for a first-class venue that
     // doesn't offer one (resolves the underlying venue behind ccxt:*). Long-tail
     // CCXT venues defer to CCXT's own detection at construct time.
-    assertSandboxSupported(canonical, Boolean(credentials.sandbox));
+    assertSandboxSupported(canonical, resolvedSandbox);
 
     const cacheKey = getCacheKey(canonical, credentials);
     const cached = this.instanceCache.get(cacheKey);
@@ -135,7 +146,7 @@ export class ExchangeFactory {
         walletPrivateKey: credentials.walletPrivateKey,
         walletAddress: credentials.walletAddress,
       },
-      credentials.sandbox,
+      resolvedSandbox,
       Number.isFinite(envMaxLeverage) && envMaxLeverage > 0
         ? { maxLeverage: envMaxLeverage }
         : undefined,

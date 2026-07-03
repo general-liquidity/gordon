@@ -78,6 +78,8 @@ export interface ExchangeCredentials {
   passphrase?: string;
   /** Use sandbox/testnet mode */
   sandbox?: boolean;
+  /** Explicit opt-in to LIVE trading on a venue with no sandbox (see resolveSandboxMode). */
+  live?: boolean;
   /** Wallet private key for DEX exchanges (e.g., Hyperliquid) */
   walletPrivateKey?: string;
   /** Wallet/main-account address for DEX exchanges (Hyperliquid via CCXT — read endpoints key off the address, which CCXT does not derive from the private key) */
@@ -232,7 +234,7 @@ export function ccxtIdToNativeVenue(id: string): NativeExchangeId | undefined {
 }
 
 export function resolveExchangeCredentials(
-  config: { type: string; apiKey: string; apiSecret: string; passphrase?: string; walletPrivateKey?: string; sandbox?: boolean },
+  config: { type: string; apiKey: string; apiSecret: string; passphrase?: string; walletPrivateKey?: string; sandbox?: boolean; live?: boolean },
 ): ExchangeCredentials {
   // CCXT exchanges use their own env var pattern (CCXT_<UPPER>_*). For the
   // first-class venues (ccxt:binance, …) we ALSO fall back to their curated
@@ -265,7 +267,7 @@ export function resolveExchangeCredentials(
     const walletAddress = fromEnv(legacy?.walletAddress, envs.walletAddress, generic.walletAddress);
     apiSecret = normalizePemSecret(apiSecret);
     if (!passphrase) passphrase = undefined;
-    return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, walletPrivateKey, walletAddress };
+    return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, live: config.live, walletPrivateKey, walletAddress };
   }
 
   const envMap = config.type in EXCHANGE_ENV_MAP
@@ -296,7 +298,7 @@ export function resolveExchangeCredentials(
   apiSecret = normalizePemSecret(apiSecret);
   if (!passphrase) passphrase = undefined;
 
-  return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, walletPrivateKey, walletAddress };
+  return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, live: config.live, walletPrivateKey, walletAddress };
 }
 
 // ============================================================================

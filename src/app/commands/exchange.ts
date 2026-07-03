@@ -337,6 +337,7 @@ export async function exchangeStatus(): Promise<ExchangeCommandResult> {
           passphrase: exchangeConfig.passphrase,
           walletPrivateKey: exchangeConfig.walletPrivateKey,
           sandbox: exchangeConfig.sandbox,
+          live: exchangeConfig.live,
         });
 
         const connected = await exchange.testConnection();
@@ -417,6 +418,7 @@ export async function exchangeCompare(symbol: string): Promise<ExchangeCommandRe
           passphrase: exchangeConfig.passphrase,
           walletPrivateKey: exchangeConfig.walletPrivateKey,
           sandbox: exchangeConfig.sandbox,
+          live: exchangeConfig.live,
         });
 
         const price = await exchange.getPrice(normalizedSymbol);
