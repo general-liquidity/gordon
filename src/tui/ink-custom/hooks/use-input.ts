@@ -106,9 +106,41 @@ const useInput = (inputHandler: InputHandler, options: UseInputOptions = {}): vo
       }
     };
 
+    // Bracketed paste arrives pre-coalesced on the `paste` channel. Deliver it
+    // as ONE bulk text input with a neutral key (no parseKeypress) so an
+    // embedded newline never lands on the Enter/return handler and pasted text
+    // is inserted literally — the same delivery model every keypress uses, so
+    // it reaches whichever field is focused (composer, search box, dialog).
+    const handlePaste = (text: string): void => {
+      const key: Key = {
+        upArrow: false,
+        downArrow: false,
+        leftArrow: false,
+        rightArrow: false,
+        pageDown: false,
+        pageUp: false,
+        home: false,
+        end: false,
+        return: false,
+        escape: false,
+        ctrl: false,
+        shift: false,
+        tab: false,
+        backspace: false,
+        delete: false,
+        meta: false,
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (reconciler as any).batchedUpdates(() => {
+        inputHandler(text, key);
+      });
+    };
+
     internal_eventEmitter?.on("input", handleData);
+    internal_eventEmitter?.on("paste", handlePaste);
     return () => {
       internal_eventEmitter?.removeListener("input", handleData);
+      internal_eventEmitter?.removeListener("paste", handlePaste);
     };
   }, [options.isActive, stdin, internal_exitOnCtrlC, inputHandler, internal_eventEmitter]);
 };
