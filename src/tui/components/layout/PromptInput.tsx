@@ -19,6 +19,9 @@ import {
 import { useTheme } from "../../themes/ThemeProvider.tsx";
 import { markInteraction } from "../../diagnostics/performanceMonitor.ts";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
+import { argumentHintFor } from "../../utils/argumentHint.ts";
+import { PromptInputHelpMenu } from "./PromptInputHelpMenu.tsx";
+import type { FrecencyMap } from "../../utils/frecency.ts";
 
 // ============================================================================
 // PromptInput — Claude Code-style compact slash command picker
@@ -90,6 +93,8 @@ interface Props {
   onVimModeChange?: (mode: "insert" | "normal" | "visual") => void;
   effortLevel?: "low" | "medium" | "high" | "auto";
   tokenBudgetRatio?: number;
+  /** Command usage stats — folds a frecency signal into typeahead ordering. */
+  commandFrecency?: FrecencyMap;
 }
 
 // Fixed width for command name column — keeps descriptions aligned
@@ -111,6 +116,7 @@ export const PromptInput = React.memo(function PromptInput({
   onVimModeChange,
   effortLevel,
   tokenBudgetRatio,
+  commandFrecency,
 }: Props) {
   const { stdout } = useStdout();
   const theme = useTheme();
@@ -160,8 +166,17 @@ export const PromptInput = React.memo(function PromptInput({
   const suggestions = useSlashCommandTypeahead(slashQuery, {
     maxResults: 200,
     showAllOnEmpty: true,
+    frecency: commandFrecency,
   });
   const showSuggestions = isSlashMode && suggestions.length > 0;
+
+  // Inline argument-hint ghost text: when the buffer is an exact command match
+  // followed by a trailing space (menu closed), render the command's usage
+  // arguments as dim ghost text after the cursor.
+  const argHint = useMemo(
+    () => (showSuggestions ? null : argumentHintFor(value)),
+    [value, showSuggestions],
+  );
 
   // Force a clean repaint when the slash menu closes. Vanilla Ink's inline
   // reflow can't fully erase the tall menu frame as it collapses, leaving a
@@ -539,6 +554,14 @@ export const PromptInput = React.memo(function PromptInput({
           ) : (
             <Text color={theme.uiMuted}>{placeholder}</Text>
           )}
+          {argHint && (
+            <Text>
+              <Text color={theme.uiMuted}>{argHint.active}</Text>
+              {argHint.rest.length > 0 && (
+                <Text dimColor>{" " + argHint.rest.join(" ")}</Text>
+              )}
+            </Text>
+          )}
       </Box>
         {vimMode && (
           <Text
@@ -550,6 +573,11 @@ export const PromptInput = React.memo(function PromptInput({
         )}
         {/* Footer hints moved above input box — status bar handles mode/cost/shortcuts */}
       </Box>
+
+      {/* At-rest keyboard-affordance menu — shown on an empty, focused composer */}
+      {value === "" && !isStreaming && !showSuggestions && !locked && (
+        <PromptInputHelpMenu />
+      )}
     </Box>
   );
 });
