@@ -22,6 +22,13 @@ export interface LicenseFile {
   activatedAt: string;
   lastValidated: string;
   displayName: string;
+  /**
+   * Last known entitlement tier for this license, cached from the most
+   * recent heartbeat `plan` field. Read via getActivePlan() so plan-aware
+   * flows work offline (cached token, no network). Optional for backward
+   * compatibility with license files written before entitlements existed.
+   */
+  plan?: string;
 }
 
 // ============================================================================
@@ -56,6 +63,13 @@ export interface HeartbeatResponse {
    * shipping new code.
    */
   versionPolicy?: VersionPolicy;
+  /**
+   * Server-driven entitlement tier for this license (e.g. "free", "pro").
+   * The client caches it and exposes it via getActivePlan() / isPlanAtLeast()
+   * so cold-tier vs pro differentiation is one wire away. Free-form string —
+   * the client ranks known tiers and treats unknown values as the base tier.
+   */
+  plan?: string;
 }
 
 export interface VersionPolicy {

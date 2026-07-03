@@ -375,6 +375,8 @@ const RISK_DISCLOSURE_STEP: StepConfig = {
   title: "Risk Disclosure",
   description:
     "Gordon can place REAL trades with REAL money.\n" +
+    "- Gordon is not a broker and not investment advice; it trades your own\n" +
+    "  venue accounts under your own keys (see DISCLAIMER.md and TERMS.md)\n" +
     "- Always review orders before approving\n" +
     "- Use /strict for read-only mode when exploring\n" +
     "- Set stop losses — Gordon follows your risk rules\n" +

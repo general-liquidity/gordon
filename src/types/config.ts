@@ -94,6 +94,8 @@ export const MultiExchangeConfigSchema = z.object({
   isDefault: z.boolean().default(false),
   /** Use sandbox/testnet mode (optional) */
   sandbox: z.boolean().optional(),
+  /** Explicit opt-in to LIVE trading on a venue with no sandbox (optional) */
+  live: z.boolean().optional(),
   /** Optional passphrase for exchanges that require it (e.g., Coinbase) */
   passphrase: z.string().optional(),
   /** Wallet private key for DEX exchanges (e.g., Hyperliquid) */

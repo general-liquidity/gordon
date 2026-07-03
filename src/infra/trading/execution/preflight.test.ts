@@ -1,8 +1,12 @@
-import { beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import type { GordonContext } from "../../agents/types.ts";
 import type { Exchange, OrderParams } from "../../exchange/types.ts";
 import { resetAllKillSwitches } from "../../safety/killSwitches.ts";
+import { CONSENT_PATH_ENV, recordLiveConsent } from "../../safety/consent.ts";
 import { createSafeOrderSubmitter, runExecutionPreflight } from "./preflight.ts";
 
 // Kill-switch state is process-global and persisted; a switch tripped by
@@ -99,5 +103,51 @@ describe("execution preflight", () => {
     expect(order.orderId).toBe("order-1");
     expect(placed).toHaveLength(1);
     expect(placed[0]?.symbol).toBe("BTCUSDT");
+  });
+});
+
+describe("execution preflight — live consent gate", () => {
+  let dir: string;
+  const order: OrderParams = { symbol: "BTCUSDT", side: "BUY", type: "MARKET", quantity: 0.001 };
+
+  function liveContext(): GordonContext {
+    const ctx = mockContext();
+    (ctx.exchange as unknown as { isSandbox: boolean }).isSandbox = false;
+    return ctx;
+  }
+
+  beforeEach(() => {
+    resetAllKillSwitches("test isolation reset");
+    dir = mkdtempSync(join(tmpdir(), "gordon-preflight-consent-"));
+    process.env[CONSENT_PATH_ENV] = join(dir, "consent.json");
+  });
+
+  afterEach(() => {
+    delete process.env[CONSENT_PATH_ENV];
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("blocks a live order until consent is recorded", async () => {
+    const result = await runExecutionPreflight({
+      ctx: liveContext(),
+      source: "test.preflight.live",
+      rationale: "testing live consent gate blocks",
+      order,
+      skipRiskGate: true,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe("live_consent_required");
+  });
+
+  it("allows a live order after consent is recorded", async () => {
+    recordLiveConsent(process.env);
+    const result = await runExecutionPreflight({
+      ctx: liveContext(),
+      source: "test.preflight.live",
+      rationale: "testing live consent gate passes",
+      order,
+      skipRiskGate: true,
+    });
+    expect(result.ok).toBe(true);
   });
 });

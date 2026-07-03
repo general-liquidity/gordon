@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
 
     const { data: activation, error: lookupError } = await supabase
       .from("activations")
-      .select("id, status")
+      .select("id, status, plan")
       .eq("token", token)
       .single();
 
@@ -117,8 +117,10 @@ Deno.serve(async (req) => {
     // --- Announcements ---
     const announcements: string[] = [];
 
+    // Return the plan/tier so the client can gate features later. Not enforced
+    // here — the client decides what a plan unlocks.
     return new Response(
-      JSON.stringify({ ok: true, announcements }),
+      JSON.stringify({ ok: true, announcements, plan: activation.plan ?? "pro" }),
       { status: 200, headers: responseHeaders },
     );
   } catch (err) {
