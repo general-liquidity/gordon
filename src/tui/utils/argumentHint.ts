@@ -45,17 +45,30 @@ function commandUsageMap(): Map<string, string> {
   return map;
 }
 
+export interface ArgumentHint {
+  /** The next expected argument — highlighted so the user knows what to type. */
+  active: string;
+  /** Remaining argument tokens after the active one, shown dimmer. */
+  rest: string[];
+}
+
 /**
- * Given the raw composer buffer, return the argument-hint tokens to render, or
- * null when no hint applies. A hint applies only when the buffer is an exact
- * command match followed by a trailing space (i.e. the user is ready to type
- * arguments), so it disappears the moment they start typing an argument.
+ * Given the raw composer buffer, return the progressive argument hint, or null
+ * when no hint applies. A hint applies only when the buffer is an exact command
+ * match followed by a trailing space (i.e. the user is ready to type the next
+ * argument). Each already-typed argument is dropped from the front, so the
+ * "active" token always names the next expected argument; the hint disappears
+ * once every argument has been supplied.
  */
-export function argumentHintFor(buffer: string): string[] | null {
+export function argumentHintFor(buffer: string): ArgumentHint | null {
   if (!buffer.startsWith("/") || !buffer.endsWith(" ")) return null;
-  const name = buffer.trim().split(/\s+/)[0]!.slice(1).toLowerCase();
+  const parts = buffer.trim().split(/\s+/);
+  const name = parts[0]!.slice(1).toLowerCase();
   const usage = commandUsageMap().get(name);
   if (!usage) return null;
   const args = extractUsageArgs(usage);
-  return args.length ? args : null;
+  const typed = parts.length - 1; // tokens after the command name
+  const remaining = args.slice(typed);
+  if (remaining.length === 0) return null;
+  return { active: remaining[0]!, rest: remaining.slice(1) };
 }

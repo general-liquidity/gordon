@@ -32,11 +32,25 @@ describe("extractUsageArgs", () => {
 });
 
 describe("argumentHintFor", () => {
-  test("shows the argument portion on exact command + trailing space", () => {
-    expect(argumentHintFor("/chart ")).toEqual(["<symbol>", "[timeframe]"]);
+  test("shows the full argument list on exact command + trailing space", () => {
+    expect(argumentHintFor("/chart ")).toEqual({
+      active: "<symbol>",
+      rest: ["[timeframe]"],
+    });
   });
 
-  test("hint is hidden once the user types an argument", () => {
+  test("advances to the next argument once one is typed", () => {
+    expect(argumentHintFor("/chart BTC ")).toEqual({
+      active: "[timeframe]",
+      rest: [],
+    });
+  });
+
+  test("hint clears once every argument is supplied", () => {
+    expect(argumentHintFor("/chart BTC 1h ")).toBeNull();
+  });
+
+  test("hint is hidden while the user is typing an argument", () => {
     expect(argumentHintFor("/chart BTC")).toBeNull();
   });
 

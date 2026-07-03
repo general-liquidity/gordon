@@ -549,7 +549,12 @@ export const PromptInput = React.memo(function PromptInput({
             <Text color={theme.uiMuted}>{placeholder}</Text>
           )}
           {argHint && (
-            <Text dimColor>{argHint.join(" ")}</Text>
+            <Text>
+              <Text color={theme.uiMuted}>{argHint.active}</Text>
+              {argHint.rest.length > 0 && (
+                <Text dimColor>{" " + argHint.rest.join(" ")}</Text>
+              )}
+            </Text>
           )}
       </Box>
         {vimMode && (
