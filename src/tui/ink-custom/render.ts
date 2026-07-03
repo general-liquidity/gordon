@@ -77,6 +77,12 @@ export type RenderOptions = {
   maxFps?: number;
   /** Only re-paint changed lines (the Phase 5 target). @default false */
   incrementalRendering?: boolean;
+  /**
+   * Render into the terminal's alternate screen buffer. Enters the alt buffer
+   * on mount and restores the primary screen on exit / unmount. Only applies
+   * on a TTY. @default false
+   */
+  alternateScreen?: boolean;
 };
 
 /**
@@ -184,6 +190,62 @@ function resolveOptions(options?: NodeJS.WriteStream | RenderOptions): Required<
       opts.isScreenReaderEnabled ?? process.env["INK_SCREEN_READER"] === "true",
     maxFps: opts.maxFps ?? 30,
     incrementalRendering: opts.incrementalRendering ?? false,
+    alternateScreen: opts.alternateScreen ?? false,
+  };
+}
+
+/**
+ * Enter the alternate screen buffer for the life of an instance and restore
+ * the primary screen when the app exits, unmounts, or the process dies.
+ *
+ * Path-agnostic: wraps the returned Instance's teardown methods regardless of
+ * whether the custom or vanilla renderer produced it. A no-op when disabled or
+ * when stdout is not a TTY (alt screen is meaningless on a pipe/redirect).
+ *
+ * Exported for tests: pass a fake instance + stdout to assert the enter/exit
+ * sequences are emitted without spinning up a real renderer.
+ */
+export function installAlternateScreen(
+  instance: Instance,
+  stdout: NodeJS.WriteStream,
+  enabled: boolean,
+): Instance {
+  if (!enabled || !stdout.isTTY) return instance;
+
+  try {
+    stdout.write(ansiEscapes.enterAlternativeScreen);
+  } catch {
+    // startup must never throw on a stdout write
+  }
+
+  let restored = false;
+  const restore = (): void => {
+    if (restored) return;
+    restored = true;
+    try {
+      stdout.write(ansiEscapes.exitAlternativeScreen);
+    } catch {
+      // teardown must never throw
+    }
+    process.removeListener("exit", restore);
+  };
+  process.once("exit", restore);
+
+  const originalUnmount = instance.unmount;
+  const originalCleanup = instance.cleanup;
+  const originalWaitUntilExit = instance.waitUntilExit;
+
+  return {
+    ...instance,
+    unmount: () => {
+      originalUnmount();
+      restore();
+    },
+    cleanup: () => {
+      originalCleanup();
+      restore();
+    },
+    waitUntilExit: () => originalWaitUntilExit().finally(restore),
   };
 }
 
@@ -251,7 +313,8 @@ export const render = (
       resolved.isScreenReaderEnabled,
     )
   ) {
-    return startCustomRender(node, resolved);
+    const customInstance = startCustomRender(node, resolved);
+    return installAlternateScreen(customInstance, resolved.stdout, resolved.alternateScreen);
   }
 
   // Vanilla ink@6 path. Build a `suspendTerminal` bound to the ink instance
@@ -320,7 +383,7 @@ export const render = (
     options as NodeJS.WriteStream | undefined,
   ) as Instance;
   instanceHolder.instance = instance;
-  return instance;
+  return installAlternateScreen(instance, resolved.stdout, resolved.alternateScreen);
 };
 
 export default render;
