@@ -20,6 +20,7 @@ import { useTheme } from "../../themes/ThemeProvider.tsx";
 import { markInteraction } from "../../diagnostics/performanceMonitor.ts";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { argumentHintFor } from "../../utils/argumentHint.ts";
+import { PromptInputHelpMenu } from "./PromptInputHelpMenu.tsx";
 
 // ============================================================================
 // PromptInput — Claude Code-style compact slash command picker
@@ -567,6 +568,11 @@ export const PromptInput = React.memo(function PromptInput({
         )}
         {/* Footer hints moved above input box — status bar handles mode/cost/shortcuts */}
       </Box>
+
+      {/* At-rest keyboard-affordance menu — shown on an empty, focused composer */}
+      {value === "" && !isStreaming && !showSuggestions && !locked && (
+        <PromptInputHelpMenu />
+      )}
     </Box>
   );
 });
