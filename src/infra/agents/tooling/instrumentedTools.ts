@@ -60,6 +60,7 @@ import {
   positionTrackingTools,
   checkRiskTool,
   memoryTools,
+  selfHistoryTools,
   aceTools,
   agentFeedbackTools,
   playbookTools,
@@ -149,6 +150,8 @@ export const instrumentedStrategyRecipeTools = withToolsMetrics(strategyRecipeTo
 export const instrumentedEvalTools = withToolsMetrics(evalTools);
 export const instrumentedPositionTrackingTools = withToolsMetrics(positionTrackingTools);
 export const instrumentedMemoryTools = withToolsMetrics(memoryTools);
+/** Self-history recall (search_session_history). COLD TIER — register gated. */
+export const instrumentedSelfHistoryTools = withToolsMetrics(selfHistoryTools);
 export const instrumentedACETools = withToolsMetrics(aceTools);
 export const instrumentedAgentFeedbackTools = withToolsMetrics(agentFeedbackTools);
 export const instrumentedPlaybookTools = withToolsMetrics(playbookTools);

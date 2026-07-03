@@ -24,6 +24,7 @@ import {
   instrumentedSecFilingTools,
   instrumentedWebTools,
   instrumentedRecursiveDecomposeTools,
+  instrumentedSelfHistoryTools,
   gordonInputGuard,
   gordonOutputSanitizer,
   gordonToolCallReconciler,
@@ -104,6 +105,11 @@ export function getResearcher(): Agent {
       // RLM recursive decomposition for oversized inputs (10-K, trade
       // ledger, news history). COLD tier — deep-research path, not hot scan.
       ...(isHotTierOnly() ? {} : instrumentedRecursiveDecomposeTools),
+
+      // Self-history recall (search_session_history) — ranked, provenance-
+      // carrying search over Gordon's OWN past chat sessions. COLD tier —
+      // deep-recall path ("what did I conclude last time"), not hot scan.
+      ...(isHotTierOnly() ? {} : instrumentedSelfHistoryTools),
     },
     memory: createSubAgentMemory("researcher"),
     inputProcessors: [
