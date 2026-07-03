@@ -21,6 +21,7 @@ import { markInteraction } from "../../diagnostics/performanceMonitor.ts";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { argumentHintFor } from "../../utils/argumentHint.ts";
 import { PromptInputHelpMenu } from "./PromptInputHelpMenu.tsx";
+import type { FrecencyMap } from "../../utils/frecency.ts";
 
 // ============================================================================
 // PromptInput — Claude Code-style compact slash command picker
@@ -92,6 +93,8 @@ interface Props {
   onVimModeChange?: (mode: "insert" | "normal" | "visual") => void;
   effortLevel?: "low" | "medium" | "high" | "auto";
   tokenBudgetRatio?: number;
+  /** Command usage stats — folds a frecency signal into typeahead ordering. */
+  commandFrecency?: FrecencyMap;
 }
 
 // Fixed width for command name column — keeps descriptions aligned
@@ -113,6 +116,7 @@ export const PromptInput = React.memo(function PromptInput({
   onVimModeChange,
   effortLevel,
   tokenBudgetRatio,
+  commandFrecency,
 }: Props) {
   const { stdout } = useStdout();
   const theme = useTheme();
@@ -162,6 +166,7 @@ export const PromptInput = React.memo(function PromptInput({
   const suggestions = useSlashCommandTypeahead(slashQuery, {
     maxResults: 200,
     showAllOnEmpty: true,
+    frecency: commandFrecency,
   });
   const showSuggestions = isSlashMode && suggestions.length > 0;
 

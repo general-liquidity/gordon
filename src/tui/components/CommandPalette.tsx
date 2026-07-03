@@ -7,6 +7,7 @@ import {
 import type { GordonTheme } from "../themes/themes.ts";
 import { useTheme } from "../themes/ThemeProvider.tsx";
 import { fuzzyMatch } from "../utils/fuzzy.ts";
+import { frecencyScore, type FrecencyMap } from "../utils/frecency.ts";
 import { useRoutedInput, FOCUS_PRIORITY } from "../input/InputRouterContext.tsx";
 
 export interface PaletteItem {
@@ -29,19 +30,25 @@ interface Props {
   onSelect: (item: PaletteItem) => void;
   onClose: () => void;
   workspaceSection?: PaletteWorkspaceSection;
+  frecency?: FrecencyMap;
 }
 
 export function groupPaletteItems(
   items: PaletteItem[],
   query: string,
+  frecency?: FrecencyMap,
 ): Array<{ group: PaletteWorkflowId; items: PaletteItem[] }> {
   const trimmed = query.trim();
+  const now = Date.now();
+  const frec = (id: string) => (frecency ? frecencyScore(frecency.get(id), now) : 0);
   const scored = items
     .map((item, index) => {
       if (!trimmed) {
         const group = item.workflowId ?? "system";
         const config = PALETTE_WORKFLOW_CONFIG[group];
-        return { item, index, group, score: 1_000 - config.order * 10 - index / 1000 };
+        // Frecency nudges recently/frequently used commands up within their
+        // group; the config.order * 10 term keeps group ordering dominant.
+        return { item, index, group, score: 1_000 - config.order * 10 - index / 1000 + frec(item.id) };
       }
       const match =
         fuzzyMatch(trimmed, item.label) ??
@@ -51,7 +58,9 @@ export function groupPaletteItems(
       return { item, index, group: item.workflowId ?? "system", score: match.score };
     })
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-    .sort((a, b) => b.score - a.score || a.index - b.index)
+    // Frecency is only a tiebreaker for the query path: it breaks ties between
+    // equally-scored fuzzy matches without ever overriding a stronger match.
+    .sort((a, b) => b.score - a.score || frec(b.item.id) - frec(a.item.id) || a.index - b.index)
     .slice(0, 15);
 
   const byGroup = new Map<PaletteWorkflowId, PaletteItem[]>();
@@ -69,12 +78,12 @@ export function groupPaletteItems(
     .filter((entry) => entry.items.length > 0);
 }
 
-export function CommandPalette({ items, onSelect, onClose, workspaceSection }: Props) {
+export function CommandPalette({ items, onSelect, onClose, workspaceSection, frecency }: Props) {
   const theme = useTheme();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const grouped = useMemo(() => groupPaletteItems(items, query), [items, query]);
+  const grouped = useMemo(() => groupPaletteItems(items, query, frecency), [items, query, frecency]);
   const showWorkspace = query.trim() === "" && workspaceSection && workspaceSection.items.length > 0;
   const flat = useMemo(
     () => [

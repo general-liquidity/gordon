@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { SLASH_COMMANDS } from "../../app/slash/slashCommands.ts";
+import { frecencyScore, type FrecencyMap } from "../utils/frecency.ts";
 
 export interface TypeaheadMatch {
   name: string;
@@ -60,9 +61,9 @@ for (const cmd of SLASH_COMMANDS) {
 
 export function useSlashCommandTypeahead(
   query: string,
-  options: { maxResults?: number; showAllOnEmpty?: boolean } = {},
+  options: { maxResults?: number; showAllOnEmpty?: boolean; frecency?: FrecencyMap } = {},
 ): TypeaheadMatch[] {
-  const { maxResults = 50, showAllOnEmpty = true } = options;
+  const { maxResults = 50, showAllOnEmpty = true, frecency } = options;
   const [matches, setMatches] = useState<TypeaheadMatch[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -110,12 +111,20 @@ export function useSlashCommandTypeahead(
     timerRef.current = setTimeout(() => {
       const results: TypeaheadMatch[] = [];
 
-      // Pass 1: prefix match on name
-      for (const cmd of ALL_COMMANDS) {
-        if (cmd.name.toLowerCase().startsWith(lower)) {
-          results.push(cmd);
-        }
+      // Pass 1: prefix match on name. Frecency reorders equal-tier prefix
+      // matches (recently/frequently used rank up) but an exact-name match is
+      // always pinned first, so frecency never overrides an exact match.
+      const prefixMatches = ALL_COMMANDS.filter((cmd) => cmd.name.toLowerCase().startsWith(lower));
+      if (frecency) {
+        const now = Date.now();
+        prefixMatches.sort((a, b) => {
+          const aExact = a.name.toLowerCase() === lower ? 1 : 0;
+          const bExact = b.name.toLowerCase() === lower ? 1 : 0;
+          if (aExact !== bExact) return bExact - aExact;
+          return frecencyScore(frecency.get(b.name), now) - frecencyScore(frecency.get(a.name), now);
+        });
       }
+      results.push(...prefixMatches);
 
       // Pass 2: prefix match on aliases
       if (results.length < maxResults) {
@@ -146,7 +155,7 @@ export function useSlashCommandTypeahead(
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [query, maxResults, showAllOnEmpty]);
+  }, [query, maxResults, showAllOnEmpty, frecency]);
 
   return matches;
 }

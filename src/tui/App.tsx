@@ -203,6 +203,7 @@ function formatTokenCount(n: number): string {
 }
 import { useTerminalSize } from "./hooks/scroll/useTerminalSize.ts";
 import { useMergedCommands } from "./hooks/useMergedCommands.js";
+import { useSkillTracking } from "./hooks/useSkillTracking.ts";
 import { useScreenReader } from "./hooks/useScreenReader.js";
 import { useKillSwitchStatus } from "./hooks/useKillSwitchStatus.ts";
 import { getSessionTip } from "./boot/tips.ts";
@@ -816,6 +817,9 @@ function AppInner() {
   const ctrlC = useDoublePress(2000);
   const { elapsed: elapsedSeconds } = useElapsedTime(isStreaming);
   const paletteItems = useMergedCommands();
+  // Command frecency — recently/frequently used commands rank up in the palette
+  // and slash typeahead as an ordering tiebreaker. Recorded on submit below.
+  const { recordUsage: recordCommandUsage, metrics: commandFrecency } = useSkillTracking();
 
   useEffect(() => {
     const conflicts = validateKeybindings();
@@ -1377,6 +1381,12 @@ function AppInner() {
 
       dispatch({ type: "SET_SHOW_HELP", show: false });
 
+      // Record slash-command usage for frecency ordering (palette + typeahead).
+      if (trimmed.startsWith("/")) {
+        const commandName = trimmed.slice(1).split(/\s+/)[0]?.toLowerCase();
+        if (commandName) recordCommandUsage(commandName, true, 0);
+      }
+
       // ─��� Injection defense: check input BEFORE it reaches the agent ──
       const injectionCheck = checkForInjection(trimmed);
       if (injectionCheck.shouldBlock) {
@@ -1720,7 +1730,7 @@ function AppInner() {
       dispatch({ type: "ADD_MESSAGE", message: userMsg });
       handleInput(trimmed, stateUpdater);
     },
-    [isStreaming, dispatch, stateUpdater],
+    [isStreaming, dispatch, stateUpdater, recordCommandUsage],
   );
   submitRef.current = handleSubmit;
 
@@ -2486,6 +2496,7 @@ function AppInner() {
         <CommandPalette
           items={paletteItems}
           workspaceSection={paletteWorkspaceSection}
+          frecency={commandFrecency}
           onSelect={handlePaletteSelect}
           onClose={() => dispatch({ type: "SET_SHOW_PALETTE", show: false })}
         />
@@ -2857,6 +2868,7 @@ function AppInner() {
           autonomousStrategyCount={autonomousStrategyCount}
           vimMode={vimModeActive}
           locked={radarFocus !== null}
+          commandFrecency={commandFrecency}
           onShowShortcuts={pendingApprovals.length === 0 ? () => setShowShortcuts(true) : undefined}
           onVimModeChange={(mode) => {
             vimModeRef.current = mode;
