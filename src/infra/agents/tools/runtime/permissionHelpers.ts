@@ -98,7 +98,7 @@ export function checkTradingPermission(
     return {
       allowed: false,
       modeLabel: label,
-      reason: `Cannot ${operationLabel(operation)}: permissionMode is 'paper' but the active venue is not a sandbox/testnet adapter. Connect a venue with sandbox credentials (crypto: Binance testnet, Hyperliquid testnet, OKX demo, Coinbase sandbox, Gemini sandbox; stocks: Alpaca paper, Tradier sandbox, TradeStation sim, tastytrade cert, Trading 212 demo, E*TRADE sandbox) or switch to /auto / /ask.`,
+      reason: `Cannot ${operationLabel(operation)}: permissionMode is 'paper' but the active venue is not a sandbox/testnet adapter. Connect a venue with sandbox credentials (crypto: Binance testnet, Hyperliquid testnet, OKX demo, Coinbase sandbox, Gemini sandbox; stocks: Alpaca paper, tastytrade cert, IBKR paper) or switch to /auto / /ask.`,
     };
   }
 

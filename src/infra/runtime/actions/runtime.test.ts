@@ -61,8 +61,8 @@ describe("action runtime", () => {
       createContext({
         exchange: null,
         broker: {
-          brokerId: "webull",
-          displayName: "Webull",
+          brokerId: "alpaca",
+          displayName: "Alpaca",
           getLatestQuote: async () => ({ symbol: "AAPL", bidPrice: 210, askPrice: 211, lastPrice: 210.5, timestamp: Date.now() }),
           getAccount: async () => ({
             accountId: "acct-1",
@@ -79,7 +79,7 @@ describe("action runtime", () => {
     expect(plan.actionId).toBe("trading.preview_market_order");
     expect(plan.preview?.symbol).toBe("AAPL");
     expect(plan.preview?.marketFamily).toBe("stocks");
-    expect(plan.preview?.venue).toBe("webull");
+    expect(plan.preview?.venue).toBe("alpaca");
     expect(plan.preview?.venueRoute).toBe("broker");
     expect(plan.preview?.resolutionSource).toBe("broker_quote");
     expect(plan.preview?.quoteAsset).toBe("USD");

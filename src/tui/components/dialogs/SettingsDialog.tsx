@@ -126,8 +126,6 @@ const TAB_FIELDS: Record<Tab, Field[]> = {
       options: [
         { label: "None", value: "" },
         { label: "Alpaca", value: "alpaca" },
-        { label: "Schwab", value: "schwab" },
-        { label: "Webull", value: "webull" },
         { label: "Interactive Brokers", value: "ibkr" },
         { label: "Tastytrade", value: "tastytrade" },
       ],

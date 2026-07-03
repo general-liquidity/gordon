@@ -11,10 +11,7 @@
 import type { OAuthFlowConfig } from "./oauth-flow.ts";
 
 export type OAuthVenueId =
-  | "schwab"
-  | "tradier"
   | "alpaca"
-  | "tradestation"
   | "tastytrade"
   | "gemini";
 
@@ -40,21 +37,6 @@ export interface OAuthVenueConfig {
 
 export const OAUTH_VENUES: Record<OAuthVenueId, OAuthVenueConfig> = {
   // ─────────────────────────── Brokers (US) ───────────────────────────
-  schwab: {
-    venue: "schwab",
-    displayName: "Charles Schwab",
-    kind: "broker",
-    authorizationUrl: "https://api.schwabapi.com/v1/oauth/authorize",
-    tokenUrl: "https://api.schwabapi.com/v1/oauth/token",
-    defaultScopes: [], // Schwab does not use configurable scopes
-    clientAuthMethod: "basic",
-    usePKCE: false,
-    docsUrl: "https://developer.schwab.com/user-guides/get-started/authenticate-with-oauth",
-    setupNote:
-      "Access token: 30m. Refresh token: 7-day hard cap (must re-auth weekly). Register app at developer.schwab.com.",
-    accessTokenLifetimeSec: 1800,
-    refreshTokenNote: "7-day hard cap",
-  },
   alpaca: {
     venue: "alpaca",
     displayName: "Alpaca",
@@ -66,44 +48,6 @@ export const OAUTH_VENUES: Record<OAuthVenueId, OAuthVenueConfig> = {
     usePKCE: false,
     docsUrl: "https://docs.alpaca.markets/docs/using-oauth2-and-trading-api",
     setupNote: "Redirect URIs must be pre-whitelisted on your OAuth app.",
-  },
-  tradier: {
-    venue: "tradier",
-    displayName: "Tradier",
-    kind: "broker",
-    authorizationUrl: "https://api.tradier.com/v1/oauth/authorize",
-    tokenUrl: "https://api.tradier.com/v1/oauth/accesstoken",
-    defaultScopes: ["read", "write", "market", "trade", "stream"],
-    clientAuthMethod: "basic",
-    usePKCE: false,
-    docsUrl: "https://docs.tradier.com/docs/authentication",
-    setupNote:
-      "Auth codes expire in 10m; access tokens 24h. Refresh tokens are partner-only (non-expiring).",
-    accessTokenLifetimeSec: 86400,
-  },
-  tradestation: {
-    venue: "tradestation",
-    displayName: "TradeStation",
-    kind: "broker",
-    authorizationUrl: "https://signin.tradestation.com/authorize",
-    tokenUrl: "https://signin.tradestation.com/oauth/token",
-    // openid + offline_access required for refresh tokens
-    defaultScopes: [
-      "openid",
-      "offline_access",
-      "profile",
-      "MarketData",
-      "ReadAccount",
-      "Trade",
-    ],
-    clientAuthMethod: "body",
-    usePKCE: false,
-    // Auth0 requires audience param
-    extraAuthParams: { audience: "https://api.tradestation.com" },
-    docsUrl: "https://api.tradestation.com/docs/fundamentals/authentication/auth-code",
-    setupNote:
-      "Auth0-backed. Access token: 20m. Localhost redirect ports restricted to 80/3000/3001/8080/31022.",
-    accessTokenLifetimeSec: 1200,
   },
   tastytrade: {
     venue: "tastytrade",
@@ -154,12 +98,6 @@ export const PARTNER_GATED_VENUES: Array<{
   docsUrl: string;
 }> = [
   {
-    id: "webull",
-    displayName: "Webull",
-    reason: "Requires partner approval via api@webull-us.com",
-    docsUrl: "https://developer.webull.com/apis/docs/connect-api/authentication/",
-  },
-  {
     id: "kraken",
     displayName: "Kraken Connect",
     reason: "Partner application + approval required",
@@ -209,10 +147,8 @@ export const NON_OAUTH_VENUES: Record<string, string> = {
   kraken_api: "HMAC-SHA512 API key+secret (Connect OAuth is partner-gated)",
   bitfinex: "HMAC-SHA384 API key+secret only",
   hyperliquid: "Wallet private key signing only",
-  trading212: "HTTP Basic with API key",
   robinhood: "Ed25519 API-key signing (crypto only, no equities API)",
   ibkr: "OAuth 1.0a with RSA-SHA256 (vendor-approved only)",
-  etrade: "OAuth 1.0a with HMAC-SHA1 (daily token expiry)",
 };
 
 export function getOAuthVenueConfig(venue: OAuthVenueId): OAuthVenueConfig {
@@ -243,9 +179,7 @@ export function buildOAuthFlowConfig(
 ): OAuthFlowConfig {
   const venueCfg = getOAuthVenueConfig(venue);
 
-  // TradeStation restricts localhost ports to 80/3000/3001/8080/31022.
-  const port = overrides?.callbackPort
-    ?? (venue === "tradestation" ? 3000 : 8745);
+  const port = overrides?.callbackPort ?? 8745;
 
   return {
     venue: venueCfg.venue,

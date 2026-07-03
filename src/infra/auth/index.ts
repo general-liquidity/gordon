@@ -2,7 +2,7 @@
  * OAuth 2.0 Authentication Infrastructure
  *
  * Generic OAuth flow runner, per-venue registry, and persistent token store.
- * Used by brokers (Schwab, Tradier, Alpaca, TradeStation) and exchanges
+ * Used by brokers (Alpaca, tastytrade) and exchanges
  * (Coinbase) that support OAuth 2.0 authorization code flow.
  */
 

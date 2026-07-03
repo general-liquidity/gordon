@@ -4,13 +4,7 @@
  */
 
 import { AlpacaAdapter } from "./adapters/alpaca.ts";
-import { WebullAdapter } from "./adapters/webull.ts";
-import { SchwabAdapter } from "./adapters/schwab.ts";
-import { TradierAdapter } from "./adapters/tradier.ts";
-import { TradeStationAdapter } from "./adapters/tradestation.ts";
 import { TastytradeAdapter } from "./adapters/tastytrade.ts";
-import { Trading212Adapter } from "./adapters/trading212.ts";
-import { EtradeAdapter } from "./adapters/etrade.ts";
 import { IbkrAdapter } from "./adapters/ibkr.ts";
 import {
   assertBrokerPassesInclusionGate,
@@ -23,13 +17,7 @@ import type { BrokerAdapter, BrokerCredentials, BrokerId } from "./types.ts";
 
 const SUPPORTED_BROKERS: BrokerId[] = [
   "alpaca",
-  "webull",
-  "schwab",
-  "tradier",
-  "tradestation",
   "tastytrade",
-  "trading212",
-  "etrade",
   "ibkr",
 ];
 
@@ -64,26 +52,8 @@ export class BrokerFactory {
       case "alpaca":
         broker = new AlpacaAdapter(credentials);
         break;
-      case "webull":
-        broker = new WebullAdapter(credentials);
-        break;
-      case "schwab":
-        broker = new SchwabAdapter(credentials);
-        break;
-      case "tradier":
-        broker = new TradierAdapter(credentials);
-        break;
-      case "tradestation":
-        broker = new TradeStationAdapter(credentials);
-        break;
       case "tastytrade":
         broker = new TastytradeAdapter(credentials);
-        break;
-      case "trading212":
-        broker = new Trading212Adapter(credentials);
-        break;
-      case "etrade":
-        broker = new EtradeAdapter(credentials);
         break;
       case "ibkr":
         broker = new IbkrAdapter(credentials);

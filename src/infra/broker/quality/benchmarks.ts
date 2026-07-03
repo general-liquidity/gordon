@@ -79,7 +79,7 @@ function createCredentials(brokerId: BrokerId): BrokerCredentials {
   return {
     apiKey: `key-${brokerId}`,
     apiSecret: `secret-${brokerId}`,
-    accountId: brokerId === "webull" ? "WB-ACC-1" : undefined,
+    accountId: undefined,
     paper: true,
     baseUrl: `https://${brokerId}.benchmark`,
     dataBaseUrl: `https://${brokerId}.benchmark`,

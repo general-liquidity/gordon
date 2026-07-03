@@ -266,14 +266,8 @@ const BROKER_STEP: StepConfig = {
   dynamicOptions: (_d, p) => {
     const base = [
       { label: "Alpaca", value: "alpaca" },
-      { label: "Schwab", value: "schwab" },
-      { label: "Tradier", value: "tradier" },
-      { label: "TradeStation", value: "tradestation" },
       { label: "tastytrade", value: "tastytrade" },
-      { label: "Trading 212", value: "trading212" },
-      { label: "E*TRADE", value: "etrade" },
       { label: "Interactive Brokers", value: "ibkr" },
-      { label: "Webull", value: "webull" },
     ].map((opt) => ({
       ...opt,
       label: p.brokers.includes(opt.value) ? `${opt.label} (configured)` : opt.label,

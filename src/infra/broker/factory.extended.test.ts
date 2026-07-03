@@ -10,13 +10,7 @@ describe("BrokerFactory extended broker support", () => {
   test("lists all supported B2C stock brokers", () => {
     const supported = BrokerFactory.getSupportedBrokers();
     expect(supported).toContain("alpaca");
-    expect(supported).toContain("webull");
-    expect(supported).toContain("schwab");
-    expect(supported).toContain("tradier");
-    expect(supported).toContain("tradestation");
     expect(supported).toContain("tastytrade");
-    expect(supported).toContain("trading212");
-    expect(supported).toContain("etrade");
     expect(supported).toContain("ibkr");
   });
 

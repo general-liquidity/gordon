@@ -90,15 +90,8 @@ export const GORDON_DEFAULT_ALLOWLIST: readonly AllowlistRule[] = [
   // Stock / equity brokers
   { hostPattern: "*.alpaca.markets", reason: "Alpaca" },
   { hostPattern: "*.interactivebrokers.com", reason: "Interactive Brokers" },
-  { hostPattern: "*.trading212.com", reason: "Trading 212" },
   { hostPattern: "*.tastytrade.com", reason: "Tastytrade" },
   { hostPattern: "*.tastyworks.com", reason: "Tastyworks" },
-  { hostPattern: "*.tradier.com", reason: "Tradier" },
-  { hostPattern: "*.tradestation.com", reason: "TradeStation" },
-  { hostPattern: "*.webull.com", reason: "Webull" },
-  { hostPattern: "*.webullbroker.com", reason: "Webull broker" },
-  { hostPattern: "*.etrade.com", reason: "E*TRADE" },
-  { hostPattern: "*.schwabapi.com", reason: "Charles Schwab" },
   { hostPattern: "*.robinhood.com", reason: "Robinhood" },
   // Data / news (passive read-only)
   { hostPattern: "finnhub.io", reason: "Finnhub" },
