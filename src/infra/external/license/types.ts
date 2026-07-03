@@ -56,6 +56,11 @@ export interface HeartbeatResponse {
    * shipping new code.
    */
   versionPolicy?: VersionPolicy;
+  /**
+   * Subscription plan/tier for this activation (e.g. "pro"). Returned so the
+   * client can gate features later. Not enforced by the license gate today.
+   */
+  plan?: string;
 }
 
 export interface VersionPolicy {

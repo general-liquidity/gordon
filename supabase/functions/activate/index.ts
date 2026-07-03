@@ -89,6 +89,13 @@ Deno.serve(async (req) => {
 
     const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
 
+    // claim_invite returns the invite_codes row (returns *). Carry the
+    // purchased plan onto the activation so the heartbeat can report the tier.
+    const claimedRow = Array.isArray(claimed) ? claimed[0] : claimed;
+    const plan = (claimedRow && typeof claimedRow === "object" && typeof claimedRow.plan === "string")
+      ? claimedRow.plan
+      : "pro";
+
     const { error: activationError } = await supabase
       .from("activations")
       .insert({
@@ -99,6 +106,7 @@ Deno.serve(async (req) => {
         cli_version: cliVersion,
         os,
         arch,
+        plan,
       });
 
     if (activationError) {
