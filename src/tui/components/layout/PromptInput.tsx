@@ -11,9 +11,10 @@ import {
   VimMode,
   INITIAL_VIM_STATE,
   transition as vimTransition,
-  applyMotion as vimApplyMotion,
-  applyOperator as vimApplyOperator,
+  replayChange as vimReplayChange,
+  createInitialPersistentState,
   type VimState,
+  type VimContext,
 } from "../../vim/index.js";
 import { useTheme } from "../../themes/ThemeProvider.tsx";
 import { markInteraction } from "../../diagnostics/performanceMonitor.ts";
@@ -119,6 +120,13 @@ export const PromptInput = React.memo(function PromptInput({
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [cursorPos, setCursorPos] = useState(0);
   const [vimState, setVimState] = useState<VimState>(INITIAL_VIM_STATE);
+  // Persistent vim state that survives across commands and mode switches:
+  // the yank register, last find (for ; / ,) and last change (for .). Kept in
+  // refs so updates don't trigger re-renders on their own — the buffer/cursor
+  // setState calls drive the repaint.
+  const vimPersistent = useRef(createInitialPersistentState());
+  // Text typed during the current INSERT session, captured for dot-repeat.
+  const vimInsertBuffer = useRef("");
   const history = useInputHistory();
   const stashedInputRef = useRef("");
   // The last submitted input — restored to the composer if the user stops the
@@ -208,32 +216,67 @@ export const PromptInput = React.memo(function PromptInput({
       return;
     }
 
-    // Vim mode routing — intercept keys when vim is enabled and we're not in Insert mode.
-    // Enter/Ctrl+C always pass through (REPL convention: Enter submits in any mode).
-    if (vimMode && vimState.mode !== VimMode.Insert && !key.return && !key.ctrl) {
-      const vimKey = key.escape ? "escape" : (input || "");
-      if (!vimKey) return;
-      const result = vimTransition(vimState, vimKey, key.ctrl ?? false, key.shift ?? false);
-      if (result.action) {
-        const a = result.action;
-        if (a.type === "insert" && a.motion) {
-          const newCursor = vimApplyMotion(value, cursorPos, a.motion, a.count ?? 1);
-          setCursorPos(newCursor);
-        } else if (a.type === "delete" || a.type === "change" || a.type === "yank") {
-          const op = a.type === "delete" ? "d" : a.type === "change" ? "c" : "y";
-          const r = vimApplyOperator(value, cursorPos, op, a.motion ?? "l", a.count ?? 1);
-          setValue(r.newText);
-          setCursorPos(r.newCursor);
-        }
+    // Vim mode routing — intercept keys when vim is enabled and we're in Normal
+    // mode. Enter/Ctrl+C always pass through (REPL convention: Enter submits in
+    // any mode). Escape resets the pending command; a literal key drives the
+    // NORMAL-mode command parser, which owns the buffer via a VimContext.
+    if (vimMode && vimState.mode === VimMode.Normal && !key.return && !key.ctrl) {
+      if (key.escape) {
+        setVimState({ mode: VimMode.Normal, command: { type: "idle" } });
+        return;
       }
-      if (result.newState.mode !== vimState.mode) onVimModeChange?.(vimModeName(result.newState.mode));
-      setVimState(result.newState);
+      const vimKey = input || "";
+      if (!vimKey) return;
+
+      // Mutable draft seeded from live React state. Executors write through the
+      // VimContext callbacks; we flush the draft to setState after the parser
+      // runs so a single keystroke produces one coherent update.
+      const draft: { text: string; cursor: number; mode: VimMode } = {
+        text: value,
+        cursor: cursorPos,
+        mode: VimMode.Normal,
+      };
+      const ctx: VimContext = {
+        get text() { return draft.text; },
+        get cursor() { return draft.cursor; },
+        setText(t) { draft.text = t; },
+        setCursor(c) { draft.cursor = c; },
+        enterInsert(c) { draft.cursor = c; draft.mode = VimMode.Insert; vimInsertBuffer.current = ""; },
+        getRegister() { return vimPersistent.current.register; },
+        setRegister(content, linewise) { vimPersistent.current.register = { content, linewise }; },
+        getLastFind() { return vimPersistent.current.lastFind; },
+        setLastFind(type, char) { vimPersistent.current.lastFind = { type, char }; },
+        recordChange(change) { vimPersistent.current.lastChange = change; },
+        onDotRepeat() {
+          const last = vimPersistent.current.lastChange;
+          if (last) vimReplayChange(last, ctx);
+        },
+      };
+
+      const result = vimTransition(vimState.command, vimKey, ctx);
+      result.execute?.();
+      const nextCommand = result.next ?? { type: "idle" };
+
+      if (draft.text !== value) setValue(draft.text);
+      const gLen = graphemeCount(draft.text);
+      let finalCursor = draft.cursor;
+      if (draft.mode === VimMode.Normal && finalCursor >= gLen && gLen > 0) finalCursor = gLen - 1;
+      finalCursor = Math.max(0, Math.min(finalCursor, gLen));
+      setCursorPos(finalCursor);
+      setVimState({ mode: draft.mode, command: draft.mode === VimMode.Insert ? { type: "idle" } : nextCommand });
+      if (draft.mode !== vimState.mode) onVimModeChange?.(vimModeName(draft.mode));
+      setSelectedIdx(0);
       return;
     }
 
-    // Insert-mode Escape: transition to Normal without clearing the buffer
+    // Insert-mode Escape: transition to Normal without clearing the buffer.
     if (vimMode && vimState.mode === VimMode.Insert && key.escape) {
-      setVimState({ ...vimState, mode: VimMode.Normal, count: null, pendingOperator: null });
+      // Capture the text typed this session for dot-repeat, then reset it.
+      if (vimInsertBuffer.current) {
+        vimPersistent.current.lastChange = { type: "insert", text: vimInsertBuffer.current };
+      }
+      vimInsertBuffer.current = "";
+      setVimState({ mode: VimMode.Normal, command: { type: "idle" } });
       onVimModeChange?.("normal");
       // Keep cursor inside the buffer in Normal mode (cursor lives on a
       // grapheme, not past end). graphemeCount handles CJK / emoji correctly.
@@ -362,6 +405,8 @@ export const PromptInput = React.memo(function PromptInput({
         return;
       }
       const inputGraphemes = graphemeCount(input);
+      // Record text typed during a vim INSERT session so `.` can replay it.
+      if (vimMode && vimState.mode === VimMode.Insert) vimInsertBuffer.current += input;
       // Always insert at cursor position. Left/right-arrow navigation must
       // produce real edits at the caret, not append-to-end. Slice by code
       // units at the grapheme boundary so we don't split surrogate pairs.
