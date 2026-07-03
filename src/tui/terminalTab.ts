@@ -49,9 +49,23 @@ function writeOSC(sequence: string): void {
   }
 }
 
+// Strip ANSI/escape sequences so dynamic title content (a symbol or model
+// string carrying an embedded ESC) can't inject its own terminal sequence.
+// Standard ansi-regex pattern (covers CSI/SGR and BEL-terminated OSC), built
+// via RegExp() with \u escapes so the source carries no raw control bytes.
+const TITLE_ANSI = new RegExp(
+  "[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|[a-zA-Z\\d]+(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-ntqry=><~]))",
+  "g",
+);
+
+/** Remove ANSI/escape sequences from a title string before it is written. */
+export function stripTitleAnsi(title: string): string {
+  return title.replace(TITLE_ANSI, "");
+}
+
 /** Set window/tab title (universal). */
 function setTitle(title: string): void {
-  writeOSC(`\x1b]0;${title}\x07`);
+  writeOSC(`\x1b]0;${stripTitleAnsi(title)}\x07`);
 }
 
 /** Set iTerm2 badge text. */
