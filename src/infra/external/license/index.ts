@@ -32,10 +32,38 @@ import {
   trackEvent,
   onVersionPolicy,
   getLatestVersionPolicy,
+  getLatestPlan,
+  recordHeartbeatPlan,
 } from "./telemetry.ts";
+import { planAtLeast, DEFAULT_PLAN } from "./entitlements.ts";
 
 const LICENSE_FILE = path.join(GORDON_DIR, "license.json");
 const MACHINE_ID_FILE = path.join(GORDON_DIR, ".machine-id");
+
+/**
+ * Where a stranger goes to request access / purchase a code. Printed in the
+ * activation prompt so a first-run user who has no invite code knows how to
+ * get one instead of hitting a dead-end "Enter invite code:" prompt.
+ * Override via GORDON_SIGNUP_URL for staging or a custom landing page.
+ */
+export const GORDON_SIGNUP_URL = process.env.GORDON_SIGNUP_URL ?? "https://gordoncli.com";
+
+/**
+ * The activation banner shown before the invite-code prompt. Extracted as a
+ * pure function so the signup guidance is testable without a TTY.
+ */
+export function activationBanner(): string {
+  return [
+    "",
+    "  Gordon CLI - Private Alpha",
+    "  -----------------------------",
+    "  This build requires an invite code.",
+    "",
+    `  Need a code? Request access at ${GORDON_SIGNUP_URL}`,
+    "  Already have a code? Enter it below.",
+    "",
+  ].join("\n");
+}
 
 // ============================================================================
 // Machine Fingerprint
@@ -103,11 +131,7 @@ async function promptInviteCode(): Promise<string> {
       output: process.stdout,
     });
 
-    console.log("");
-    console.log("  Gordon CLI — Private Alpha");
-    console.log("  ─────────────────────────────");
-    console.log("  This build requires an invite code.");
-    console.log("");
+    console.log(activationBanner());
 
     // Handle unexpected close (e.g. ctrl+C, pipe closed)
     let answered = false;
@@ -213,6 +237,9 @@ async function validateToken(token: string): Promise<"valid" | "revoked" | "offl
           // heartbeat uses.
           enforceVersionPolicy(data.versionPolicy);
         }
+        // Capture entitlement tier so getActivePlan() is current before the
+        // TUI loads, without waiting for the first recurring heartbeat.
+        recordHeartbeatPlan(data?.plan);
       } catch {
         // Non-JSON or parse error — ignore, treat as valid
       }
@@ -340,6 +367,47 @@ function wireVersionPolicyListener(): void {
 }
 
 // ============================================================================
+// Entitlement Read + Gating Seam
+// ============================================================================
+
+/**
+ * The active entitlement tier for this install.
+ *
+ * Source of truth, in order: the plan captured from the most recent heartbeat
+ * (in-memory, freshest), then the plan cached in the license file (survives
+ * restarts / offline), then DEFAULT_PLAN. Never throws — a missing license or
+ * a server that doesn't send `plan` yields the base tier.
+ */
+export function getActivePlan(): string {
+  const fromHeartbeat = getLatestPlan();
+  if (fromHeartbeat) return fromHeartbeat;
+  const cached = readLicense()?.plan;
+  if (cached) return cached;
+  return DEFAULT_PLAN;
+}
+
+/**
+ * Gating seam: true when the active plan meets or exceeds `tier`.
+ *
+ * This is the single wire point for cold-tier vs pro differentiation. It does
+ * NOT gate anything on its own — call it at a feature site (e.g.
+ * `if (!isPlanAtLeast("pro")) return;`) to gate that feature. Left un-called by
+ * default so entitlements ship as a read + seam without changing behavior.
+ */
+export function isPlanAtLeast(tier: string): boolean {
+  return planAtLeast(getActivePlan(), tier);
+}
+
+/**
+ * Persist the freshest known plan onto a license object before it is written
+ * back, preferring the in-memory heartbeat value over the stale cached one.
+ */
+function applyLatestPlan(license: LicenseFile): void {
+  const latest = getLatestPlan();
+  if (latest) license.plan = latest;
+}
+
+// ============================================================================
 // Main Entry Point
 // ============================================================================
 
@@ -369,7 +437,8 @@ export async function checkLicense(): Promise<void> {
     try {
       const code = await promptInviteCode();
       if (!code) {
-        console.error("\n  No invite code provided. Exiting.");
+        console.error("\n  No invite code provided.");
+        console.error(`  Request access at ${GORDON_SIGNUP_URL}, then run Gordon again.`);
         process.exit(1);
       }
 
@@ -399,6 +468,11 @@ export async function checkLicense(): Promise<void> {
       // enforce it now.
       const captured = getLatestVersionPolicy();
       if (captured) enforceVersionPolicy(captured);
+
+      // Persist the entitlement tier captured by the fresh validateToken so
+      // it is available offline on the next run.
+      applyLatestPlan(license);
+      writeLicense(license);
       return;
     } catch (err) {
       console.error(`\n  ${(err as Error).message}`);
@@ -429,6 +503,7 @@ export async function checkLicense(): Promise<void> {
 
   // Valid or offline — refresh cache timestamp and continue
   existing.lastValidated = new Date().toISOString();
+  applyLatestPlan(existing);
   writeLicense(existing);
   startHeartbeat(existing.token);
   trackEvent("startup");

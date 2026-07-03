@@ -62,6 +62,28 @@ function captureVersionPolicy(policy: VersionPolicy): void {
 }
 
 // ============================================================================
+// Entitlement (Plan) Capture
+// ============================================================================
+
+/**
+ * Latest entitlement tier reported by the server. Captured on every heartbeat
+ * so the license module can answer getActivePlan() without a fresh network
+ * call. Empty/blank values are ignored so a malformed response never downgrades
+ * a known plan mid-session.
+ */
+let latestPlan: string | null = null;
+
+export function getLatestPlan(): string | null {
+  return latestPlan;
+}
+
+export function recordHeartbeatPlan(plan: string | null | undefined): void {
+  if (typeof plan === "string" && plan.trim().length > 0) {
+    latestPlan = plan.trim();
+  }
+}
+
+// ============================================================================
 // Constants
 // ============================================================================
 
@@ -173,6 +195,10 @@ async function flush(): Promise<void> {
       if (data.versionPolicy) {
         captureVersionPolicy(data.versionPolicy);
       }
+
+      // Capture entitlement tier so getActivePlan() reflects the latest
+      // heartbeat without another round-trip.
+      recordHeartbeatPlan(data.plan);
     } else {
       // Re-queue on failure, respecting the cap
       requeue(batch);
