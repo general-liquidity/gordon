@@ -20,7 +20,13 @@ import { judgeTrajectories } from "./trajectoryJudge.ts";
 import type { JudgeOptions } from "./trajectoryJudge.ts";
 import { judgeTrajectoriesPanel } from "./panelJudge.ts";
 import type { PanelJudgeOptions } from "./panelJudge.ts";
-import type { EvalScenario, EvalTrajectory, FailureMode, VariantRunResult } from "./types.ts";
+import type {
+  EvalScenario,
+  EvalTrajectory,
+  FailureMode,
+  TrajectoryCost,
+  VariantRunResult,
+} from "./types.ts";
 
 export interface RunVariantInput {
   /** Stable label for this variant — used in reports + regression diffs. */
@@ -85,6 +91,30 @@ export async function runEvalSuite(input: RunSuiteInput): Promise<RunSuiteResult
   > = new Map();
   for (const v of input.variants) perVariantScenarios.set(v.variantLabel, []);
 
+  // Cost accumulators — only fold in trajectories from scenarios that were
+  // actually judged (skipped scenarios don't count). `metered` tracks whether
+  // ANY trajectory carried the field, so an unmetered run reports `undefined`
+  // rather than a misleading zero.
+  interface CostAccumulator {
+    costUsd: number;
+    tokens: number;
+    latencyMs: number;
+    meteredCost: boolean;
+    meteredTokens: boolean;
+    meteredLatency: boolean;
+  }
+  const perVariantCost = new Map<string, CostAccumulator>();
+  for (const v of input.variants) {
+    perVariantCost.set(v.variantLabel, {
+      costUsd: 0,
+      tokens: 0,
+      latencyMs: 0,
+      meteredCost: false,
+      meteredTokens: false,
+      meteredLatency: false,
+    });
+  }
+
   const skipped: Array<{ scenarioId: string; missingVariants: string[] }> = [];
   const ranAt = new Date().toISOString();
   let judgeModelSeen = "";
@@ -92,17 +122,37 @@ export async function runEvalSuite(input: RunSuiteInput): Promise<RunSuiteResult
   for (const scenario of input.scenarios) {
     const missing: string[] = [];
     const trajectories: EvalTrajectory[] = [];
+    const contributions: Array<{ label: string; cost?: TrajectoryCost }> = [];
     for (const v of input.variants) {
       const traj = v.trajectoriesByScenario.get(scenario.id);
       if (!traj) {
         missing.push(v.variantLabel);
       } else {
         trajectories.push({ ...traj, id: v.variantLabel });
+        contributions.push({ label: v.variantLabel, cost: traj.cost });
       }
     }
     if (trajectories.length < 2) {
       skipped.push({ scenarioId: scenario.id, missingVariants: missing });
       continue;
+    }
+
+    // Fold this scenario's per-variant cost in (only now that it's judged).
+    for (const c of contributions) {
+      const acc = perVariantCost.get(c.label);
+      if (!acc || !c.cost) continue;
+      if (typeof c.cost.costUsd === "number") {
+        acc.costUsd += c.cost.costUsd;
+        acc.meteredCost = true;
+      }
+      if (typeof c.cost.tokens === "number") {
+        acc.tokens += c.cost.tokens;
+        acc.meteredTokens = true;
+      }
+      if (typeof c.cost.latencyMs === "number") {
+        acc.latencyMs += c.cost.latencyMs;
+        acc.meteredLatency = true;
+      }
     }
 
     if (input.panelOptions) {
@@ -163,6 +213,18 @@ export async function runEvalSuite(input: RunSuiteInput): Promise<RunSuiteResult
               perScenario.length
             ).toFixed(4),
           );
+    const costAcc = perVariantCost.get(v.variantLabel);
+    let cost: TrajectoryCost | undefined;
+    if (
+      costAcc &&
+      (costAcc.meteredCost || costAcc.meteredTokens || costAcc.meteredLatency)
+    ) {
+      cost = {
+        ...(costAcc.meteredCost && { costUsd: Number(costAcc.costUsd.toFixed(6)) }),
+        ...(costAcc.meteredTokens && { tokens: costAcc.tokens }),
+        ...(costAcc.meteredLatency && { latencyMs: costAcc.latencyMs }),
+      };
+    }
     return {
       variantLabel: v.variantLabel,
       judgeModel: judgeModelSeen,
@@ -172,6 +234,7 @@ export async function runEvalSuite(input: RunSuiteInput): Promise<RunSuiteResult
       winCount,
       scenarioCount: perScenario.length,
       genericAdviceRate,
+      ...(cost && { cost }),
     };
   });
 

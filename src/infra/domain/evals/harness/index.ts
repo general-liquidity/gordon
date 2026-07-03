@@ -28,6 +28,7 @@ export type {
   EvalScenario,
   ScenarioTurn,
   EvalTrajectory,
+  TrajectoryCost,
   JudgeResult,
   JudgeRequest,
   PanelJudgeEntry,
@@ -74,6 +75,38 @@ export type {
 
 export { detectRegressions, formatRegressionReport } from "./regression.ts";
 export type { DetectOptions } from "./regression.ts";
+
+// Statistical ranking of N variants — Bradley-Terry strength + Wilson-score
+// CIs over per-scenario pairwise judgments, with an overlap->tie flag.
+export {
+  rankVariants,
+  rankVariantResults,
+  formatLeaderboard,
+  wilsonInterval,
+  bradleyTerry,
+  zForConfidence,
+} from "./ranking.ts";
+export type {
+  RankingVariant,
+  RankingInput,
+  RankedVariant,
+  Leaderboard,
+} from "./ranking.ts";
+
+// Judge-vs-human agreement — Cohen's kappa + Spearman rho reliability report.
+export {
+  cohensKappa,
+  spearmanRho,
+  binarizeByThreshold,
+  computeJudgeAgreement,
+  agreementFromScores,
+  formatAgreementReport,
+} from "./judgeAgreement.ts";
+export type {
+  LabelPair,
+  JudgeAgreementInput,
+  JudgeAgreementReport,
+} from "./judgeAgreement.ts";
 
 export {
   appendToReviewQueue,

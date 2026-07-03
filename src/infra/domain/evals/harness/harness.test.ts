@@ -539,6 +539,134 @@ describe("detectRegressions — generic-advice anti-metric gate", () => {
   });
 });
 
+describe("detectRegressions — cost gate", () => {
+  function makeCostResult(
+    label: string,
+    score: number,
+    cost?: { costUsd?: number; tokens?: number; latencyMs?: number },
+  ): VariantRunResult {
+    return {
+      variantLabel: label,
+      judgeModel: "test",
+      ranAt: "2026-04-26T00:00:00Z",
+      perScenario: [{ scenarioId: "a", score, rank: 1, explanation: "test" }],
+      aggregate: score,
+      winCount: 1,
+      scenarioCount: 1,
+      ...(cost && { cost }),
+    };
+  }
+
+  it("trips on equal score but 2x tokens, and blocks when opted in", () => {
+    const baseline = makeCostResult("baseline", 0.7, { tokens: 1000 });
+    const candidate = makeCostResult("candidate", 0.7, { tokens: 2000 });
+    const report = detectRegressions(baseline, candidate, {
+      blockOnCostRegression: true,
+    });
+    expect(report.regressions.length).toBe(0); // score is equal
+    expect(report.costRegression).toBeDefined();
+    expect(report.costRegression?.metric).toBe("tokens");
+    expect(report.costRegression?.ratio).toBeCloseTo(1.0, 5);
+    expect(report.costRegression?.blocking).toBe(true);
+    expect(report.hasBlockingRegression).toBe(true);
+    const formatted = formatRegressionReport(report);
+    expect(formatted).toContain("cost gate");
+    expect(formatted).toContain("BLOCK");
+  });
+
+  it("passes when the candidate uses equal cost", () => {
+    const baseline = makeCostResult("baseline", 0.7, { tokens: 1000 });
+    const candidate = makeCostResult("candidate", 0.7, { tokens: 1000 });
+    const report = detectRegressions(baseline, candidate, {
+      blockOnCostRegression: true,
+    });
+    expect(report.costRegression).toBeUndefined();
+    expect(report.hasBlockingRegression).toBe(false);
+  });
+
+  it("records the cost regression as warn-only by default (non-blocking)", () => {
+    const baseline = makeCostResult("baseline", 0.7, { tokens: 1000 });
+    const candidate = makeCostResult("candidate", 0.7, { tokens: 2000 });
+    const report = detectRegressions(baseline, candidate);
+    expect(report.costRegression).toBeDefined();
+    expect(report.costRegression?.blocking).toBe(false);
+    expect(report.hasBlockingRegression).toBe(false); // advisory only
+    expect(formatRegressionReport(report)).toContain("WARN");
+  });
+
+  it("exempts a candidate that improved the score even when it costs more", () => {
+    const baseline = makeCostResult("baseline", 0.6, { tokens: 1000 });
+    const candidate = makeCostResult("candidate", 0.8, { tokens: 5000 });
+    const report = detectRegressions(baseline, candidate, {
+      blockOnCostRegression: true,
+    });
+    expect(report.costRegression).toBeUndefined();
+    expect(report.hasBlockingRegression).toBe(false);
+  });
+
+  it("prefers dollars over tokens when both runs are metered", () => {
+    const baseline = makeCostResult("baseline", 0.7, { costUsd: 0.1, tokens: 1000 });
+    const candidate = makeCostResult("candidate", 0.7, { costUsd: 0.3, tokens: 1100 });
+    const report = detectRegressions(baseline, candidate);
+    expect(report.costRegression?.metric).toBe("costUsd");
+    expect(report.costRegression?.ratio).toBeCloseTo(2.0, 5);
+  });
+
+  it("honors a custom costToleranceRatio", () => {
+    const baseline = makeCostResult("baseline", 0.7, { tokens: 1000 });
+    const candidate = makeCostResult("candidate", 0.7, { tokens: 1300 }); // +30%
+    expect(detectRegressions(baseline, candidate).costRegression).toBeDefined(); // default 20%
+    expect(
+      detectRegressions(baseline, candidate, { costToleranceRatio: 0.5 })
+        .costRegression,
+    ).toBeUndefined();
+  });
+
+  it("disables the gate when either run is unmetered", () => {
+    const baseline = makeCostResult("baseline", 0.7); // no cost
+    const candidate = makeCostResult("candidate", 0.7, { tokens: 5000 });
+    const report = detectRegressions(baseline, candidate, {
+      blockOnCostRegression: true,
+    });
+    expect(report.costRegression).toBeUndefined();
+    expect(report.hasBlockingRegression).toBe(false);
+  });
+
+  it("runEvalSuite aggregates trajectory cost onto the variant result", async () => {
+    const scenario: EvalScenario = {
+      id: "cost-agg",
+      tags: [],
+      systemPrompt: "be helpful and accurate for trading",
+      userInput: "how does BTC look right now?",
+    };
+    const client = buildMockJudgeClient({
+      responses: { "cost-agg": [{ id: "cheap", score: 0.8 }, { id: "pricey", score: 0.8 }] },
+    });
+    function variant(label: string, tokens: number): RunVariantInput {
+      const map = new Map<string, EvalTrajectory>();
+      map.set("cost-agg", {
+        id: label,
+        messages: [{ role: "assistant", content: `${label} answer` }],
+        cost: { tokens, costUsd: tokens / 10000, latencyMs: 100 },
+      });
+      return { variantLabel: label, trajectoriesByScenario: map };
+    }
+    const result = await runEvalSuite({
+      scenarios: [scenario],
+      variants: [variant("cheap", 1000), variant("pricey", 2000)],
+      judgeOptions: { client },
+    });
+    const cheap = result.results.find((r) => r.variantLabel === "cheap")!;
+    const pricey = result.results.find((r) => r.variantLabel === "pricey")!;
+    expect(cheap.cost?.tokens).toBe(1000);
+    expect(pricey.cost?.tokens).toBe(2000);
+    // The aggregated cost drives the end-to-end gate.
+    const report = detectRegressions(cheap, pricey, { blockOnCostRegression: true });
+    expect(report.costRegression?.metric).toBe("costUsd");
+    expect(report.hasBlockingRegression).toBe(true);
+  });
+});
+
 describe("category rubrics", () => {
   it("ships the 7 trading categories", () => {
     expect(ALL_CATEGORIES.length).toBe(7);
