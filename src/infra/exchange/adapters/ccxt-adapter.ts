@@ -84,6 +84,16 @@ import { CcxtWebSocketImpl } from "./ccxt-websocket.ts";
 import { SandboxNotSupportedError } from "../sandboxSupport.ts";
 import { isKillSwitchesEnabled, isExecutionAllowed } from "../../safety/killSwitches.ts";
 
+/**
+ * Conservative default leverage cap when the operator has not set
+ * `GORDON_RISK_MAX_LEVERAGE`. 5x keeps a mistaken or model-driven leverage
+ * request survivable for a retail account: a ~20% adverse move is the
+ * liquidation boundary rather than <1% at venue-max (often 100-125x).
+ * Operators who trade with more leverage raise it explicitly via the env
+ * var. This is a floor on blast radius, not a strategy limit.
+ */
+export const DEFAULT_MAX_LEVERAGE = 5;
+
 // ---------------------------------------------------------------------------
 // Symbol normalization
 // ---------------------------------------------------------------------------
@@ -358,8 +368,9 @@ export class CcxtAdapter
   readonly ccxtSubId: string;
   /**
    * Hard cap on leverage this adapter will ever request. Defaults to
-   * `GORDON_RISK_MAX_LEVERAGE` (else Infinity = no clamp). `setLeverage`
-   * silently floors any request above the cap rather than forwarding it.
+   * `GORDON_RISK_MAX_LEVERAGE` (else `DEFAULT_MAX_LEVERAGE` = 5x).
+   * `setLeverage` silently floors any request above the cap rather than
+   * forwarding it.
    */
   private readonly maxLeverage: number;
   /** WebSocket adapter — lazily constructed on first getWebSocket() call. */
@@ -382,7 +393,7 @@ export class CcxtAdapter
 
     const envMaxLeverage = Number(process.env.GORDON_RISK_MAX_LEVERAGE);
     this.maxLeverage = options?.maxLeverage
-      ?? (Number.isFinite(envMaxLeverage) && envMaxLeverage > 0 ? envMaxLeverage : Infinity);
+      ?? (Number.isFinite(envMaxLeverage) && envMaxLeverage > 0 ? envMaxLeverage : DEFAULT_MAX_LEVERAGE);
 
     const config: Record<string, unknown> = {
       enableRateLimit: true,
@@ -438,7 +449,7 @@ export class CcxtAdapter
     (adapter as unknown as { exchangeId: ExchangeId }).exchangeId = `ccxt:${ccxtSubId}` as ExchangeId;
     (adapter as unknown as { displayName: string }).displayName = `${ccxtSubId} (via CCXT)`;
     (adapter as unknown as { isSandbox: boolean }).isSandbox = sandbox;
-    (adapter as unknown as { maxLeverage: number }).maxLeverage = config?.maxLeverage ?? Infinity;
+    (adapter as unknown as { maxLeverage: number }).maxLeverage = config?.maxLeverage ?? DEFAULT_MAX_LEVERAGE;
     (adapter as unknown as { callCount: number }).callCount = 0;
     (adapter as unknown as { lastCallReset: number }).lastCallReset = Date.now();
     (adapter as unknown as { cbState: string }).cbState = "closed";

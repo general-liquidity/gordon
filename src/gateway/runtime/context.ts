@@ -96,6 +96,7 @@ export class GatewayContextResolver {
             apiSecret: active.apiSecret,
             passphrase: active.passphrase,
             sandbox: useSandbox,
+            live: active.live,
             walletPrivateKey: active.walletPrivateKey,
           });
         } catch (error) {

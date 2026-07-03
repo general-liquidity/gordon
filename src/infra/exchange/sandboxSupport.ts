@@ -110,6 +110,73 @@ export function assertSandboxSupported(exchangeId: ExchangeId, sandboxRequested:
 }
 
 /**
+ * Env flag that lets an operator opt into LIVE crypto trading on a venue
+ * that has NO sandbox, without setting `sandbox: false` per-venue. Accepts
+ * "1" or "true".
+ */
+export const ALLOW_LIVE_ENV = "GORDON_ALLOW_LIVE";
+
+function isLiveAllowedByEnv(env: NodeJS.ProcessEnv): boolean {
+  const raw = env[ALLOW_LIVE_ENV];
+  return raw === "1" || raw === "true";
+}
+
+/**
+ * Thrown when a no-sandbox venue is left un-chosen (sandbox undefined) and
+ * the operator has not opted into live. Refusing here closes the asymmetry
+ * with brokers (which default `paper: true`): crypto must not silently
+ * default to LIVE.
+ */
+export class LiveOptInRequiredError extends Error {
+  readonly exchangeId: ExchangeId;
+
+  constructor(exchangeId: ExchangeId) {
+    super(
+      `Refusing to trade LIVE on "${exchangeId}" by default. This venue has no ` +
+        `sandbox/testnet, so Gordon cannot fall back to paper trading, and you ` +
+        `have not chosen live. Live trading moves REAL money in your own venue ` +
+        `account (see DISCLAIMER.md). To proceed deliberately, set "sandbox": false ` +
+        `on this exchange, or "live": true, or export ${ALLOW_LIVE_ENV}=1.`,
+    );
+    this.name = "LiveOptInRequiredError";
+    this.exchangeId = exchangeId;
+  }
+}
+
+export interface SandboxResolutionInput {
+  exchangeId: ExchangeId;
+  /** The `sandbox` flag as configured: true/false explicit, undefined = unset. */
+  requestedSandbox?: boolean;
+  /** Explicit per-venue live opt-in (config `live: true`). */
+  live?: boolean;
+  env?: NodeJS.ProcessEnv;
+}
+
+/**
+ * Resolve the effective sandbox flag, applying a SAFE-BY-DEFAULT policy that
+ * mirrors the broker `paper: true` default:
+ *
+ *  - Explicit choice always wins: `sandbox: true` -> sandbox,
+ *    `sandbox: false` -> live (a deliberate live choice, respected).
+ *  - `sandbox` unset (undefined): default to sandbox for venues that support
+ *    one. For venues with NO sandbox, require an explicit live opt-in
+ *    (`live: true` or {@link ALLOW_LIVE_ENV}); otherwise throw
+ *    {@link LiveOptInRequiredError} rather than silently routing to LIVE.
+ */
+export function resolveSandboxMode(input: SandboxResolutionInput): boolean {
+  const { exchangeId, requestedSandbox, live, env = process.env } = input;
+
+  if (requestedSandbox === true) return true;
+  if (requestedSandbox === false) return false;
+
+  // requestedSandbox === undefined: apply the safe default.
+  if (isSandboxSupported(exchangeId)) return true;
+
+  if (live === true || isLiveAllowedByEnv(env)) return false;
+  throw new LiveOptInRequiredError(exchangeId);
+}
+
+/**
  * Is this exchange able to run in sandbox mode?
  *
  * For native exchanges: consults the static support matrix.
