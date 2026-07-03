@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Text } from "../../ink-custom";
-import { Select, TextInput } from "@inkjs/ui";
+import { Select, TextInput, PasswordInput } from "@inkjs/ui";
 import { loadConfig, saveConfig } from "../../../infra/storage/config/config.ts";
 import { saveEnvKeys } from "../../../infra/storage/config/env.ts";
 import { exchangeSwitch } from "../../../app/commands/exchange.ts";
@@ -346,7 +346,7 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
             : "Get from your exchange's sandbox/demo account"
         : "Paste your exchange API key:",
       render: (ctx) => (
-        <TextInput
+        <PasswordInput
           placeholder="API key..."
           onSubmit={(value) => {
             setAdd((prev) => ({ ...prev, apiKey: value }));
@@ -362,7 +362,7 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
         ? "For CDP keys: paste the full EC private key (-----BEGIN EC PRIVATE KEY-----...)"
         : "Paste your exchange API secret:",
       render: (ctx) => (
-        <TextInput
+        <PasswordInput
           placeholder="API secret..."
           onSubmit={(value) => {
             const next = { ...add, apiSecret: value };
@@ -383,7 +383,7 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
       title: `Passphrase - ${add.exchangeType}`,
       hint: "This venue requires a passphrase in addition to key + secret.",
       render: (ctx) => (
-        <TextInput
+        <PasswordInput
           placeholder="Passphrase..."
           onSubmit={(value) => {
             const next = { ...add, passphrase: value };
@@ -400,7 +400,7 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
         ? "Use a dedicated TEST wallet. Get testnet funds from the faucet after setup."
         : "IMPORTANT: use a DEDICATED trading wallet, never your main wallet.",
       render: (ctx) => (
-        <TextInput
+        <PasswordInput
           placeholder="0x... or base58..."
           onSubmit={(value) => {
             const next = { ...add, walletKey: value };

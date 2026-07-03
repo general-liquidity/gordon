@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import { Select, TextInput } from "@inkjs/ui";
+import { Select, PasswordInput } from "@inkjs/ui";
 import { MultiStepPicker, type PickerStep } from "../../design-system/MultiStepPicker.tsx";
 
 /**
@@ -66,7 +66,7 @@ export function BrokerPicker({ activeBroker, configuredBrokers, onComplete, onCa
       render: (ctx) => (
         <>
           <Text bold>Enter {ctx.data.broker} API key:</Text>
-          <TextInput
+          <PasswordInput
             placeholder="API key..."
             onSubmit={(value) => {
               ctx.set("apiKey", value);
@@ -80,7 +80,7 @@ export function BrokerPicker({ activeBroker, configuredBrokers, onComplete, onCa
       render: (ctx) => (
         <>
           <Text bold>Enter {ctx.data.broker} API secret:</Text>
-          <TextInput
+          <PasswordInput
             placeholder="API secret..."
             onSubmit={(value) => {
               onComplete(ctx.data.action ?? "", ctx.data.broker ?? "", {
