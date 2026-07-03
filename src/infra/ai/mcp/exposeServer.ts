@@ -52,6 +52,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { registerGordonResources } from "./resources.ts";
 import { registerGordonPrompts } from "./prompts.ts";
 import { buildTaskAnnotations } from "./tasks.ts";
+import { deriveToolHints } from "./hints.ts";
 import type { ZodObject, ZodRawShape } from "zod";
 import { evaluateGordonToolAccess } from "../../agents/tools/wrappers/withMetrics.ts";
 import { getGordonContext, type MastraExecutionContext } from "../../agents/tools/types.ts";
@@ -306,6 +307,11 @@ export function buildGordonMcpServer(
     const config: Record<string, unknown> = {
       description: tool.description,
       inputSchema: fieldShape as Record<string, never>,
+      // Standard MCP behavioral hints — advisory to the consuming host's
+      // approval UX (auto-approve reads, force-confirm destructive). Derived
+      // from Gordon's existing safety signals (deny-list + tool-domain
+      // shape); Gordon's own gates still fire regardless.
+      annotations: deriveToolHints(tool.id),
     };
     if (taskAnnotations) {
       config.execution = taskAnnotations.execution;
