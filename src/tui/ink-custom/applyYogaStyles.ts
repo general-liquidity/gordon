@@ -14,11 +14,28 @@ import type { Styles } from "./styles.ts";
 
 type PartialStyles = Partial<Styles> & Record<string, unknown>;
 
+const positionEdges = [
+  ["top", Yoga.EDGE_TOP],
+  ["right", Yoga.EDGE_RIGHT],
+  ["bottom", Yoga.EDGE_BOTTOM],
+  ["left", Yoga.EDGE_LEFT],
+] as const;
+
 function applyPositionStyles(node: YogaNode, style: PartialStyles): void {
   if ("position" in style) {
     node.setPositionType(
       style.position === "absolute" ? Yoga.POSITION_TYPE_ABSOLUTE : Yoga.POSITION_TYPE_RELATIVE,
     );
+  }
+
+  for (const [property, edge] of positionEdges) {
+    if (!(property in style)) continue;
+    const value = style[property];
+    if (typeof value === "string") {
+      node.setPositionPercent(edge, Number.parseFloat(value));
+    } else if (typeof value === "number") {
+      node.setPosition(edge, value);
+    }
   }
 }
 
@@ -81,6 +98,17 @@ function applyFlexStyles(node: YogaNode, style: PartialStyles): void {
     if (style.alignSelf === "center") node.setAlignSelf(Yoga.ALIGN_CENTER);
     if (style.alignSelf === "flex-end") node.setAlignSelf(Yoga.ALIGN_FLEX_END);
   }
+  if ("alignContent" in style) {
+    if (style.alignContent === "flex-start" || !style.alignContent) {
+      node.setAlignContent(Yoga.ALIGN_FLEX_START);
+    }
+    if (style.alignContent === "flex-end") node.setAlignContent(Yoga.ALIGN_FLEX_END);
+    if (style.alignContent === "center") node.setAlignContent(Yoga.ALIGN_CENTER);
+    if (style.alignContent === "stretch") node.setAlignContent(Yoga.ALIGN_STRETCH);
+    if (style.alignContent === "space-between") node.setAlignContent(Yoga.ALIGN_SPACE_BETWEEN);
+    if (style.alignContent === "space-around") node.setAlignContent(Yoga.ALIGN_SPACE_AROUND);
+    if (style.alignContent === "space-evenly") node.setAlignContent(Yoga.ALIGN_SPACE_EVENLY);
+  }
   if ("justifyContent" in style) {
     if (style.justifyContent === "flex-start" || !style.justifyContent) {
       node.setJustifyContent(Yoga.JUSTIFY_FLEX_START);
@@ -117,6 +145,23 @@ function applyDimensionStyles(node: YogaNode, style: PartialStyles): void {
     } else {
       node.setMinHeight(style.minHeight ?? 0);
     }
+  }
+  if ("maxWidth" in style) {
+    if (typeof style.maxWidth === "string") {
+      node.setMaxWidthPercent(Number.parseInt(style.maxWidth, 10));
+    } else if (typeof style.maxWidth === "number") {
+      node.setMaxWidth(style.maxWidth);
+    }
+  }
+  if ("maxHeight" in style) {
+    if (typeof style.maxHeight === "string") {
+      node.setMaxHeightPercent(Number.parseInt(style.maxHeight, 10));
+    } else if (typeof style.maxHeight === "number") {
+      node.setMaxHeight(style.maxHeight);
+    }
+  }
+  if ("aspectRatio" in style && typeof style.aspectRatio === "number") {
+    node.setAspectRatio(style.aspectRatio);
   }
 }
 
