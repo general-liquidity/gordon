@@ -2890,8 +2890,10 @@ function coerceWorkspace(value: string | null): WorkspaceId {
 export function App() {
   // Import ThemeProvider dynamically to avoid circular deps
   const { ThemeProvider } = require("./themes/ThemeProvider.js");
+  const { GordonInkUITheme } = require("./themes/inkUiTheme.js");
   return (
     <ThemeProvider>
+    <GordonInkUITheme>
     <SettingsProvider>
       <MemoryProvider>
         <StatsProvider>
@@ -2905,6 +2907,7 @@ export function App() {
         </StatsProvider>
       </MemoryProvider>
     </SettingsProvider>
+    </GordonInkUITheme>
     </ThemeProvider>
   );
 }
