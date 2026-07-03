@@ -79,6 +79,7 @@ const TICK_INTERVALS = {
   insider_flow: 4 * 60 * 60 * 1000, // 4 hours — insider transaction clusters
   analyst: 6 * 60 * 60 * 1000,      // 6 hours — analyst rating shifts
   congressional: 24 * 60 * 60 * 1000, // 24 hours — STOCK Act disclosures are already lagged
+  sleep_precompute: 5 * 60 * 1000,  // 5 min — idle pre-computation (GORDON_SLEEP_TIME=1)
 };
 
 const lastTickAt: Partial<Record<keyof typeof TICK_INTERVALS, number>> = {};
@@ -133,6 +134,11 @@ export function startProactiveObserver(): { started: boolean; subscriptions: num
     for (const evType of SUBSCRIBED_EVENTS) {
       const unsub = bus.on(evType, (event: GordonEvent) => {
         try {
+          // Trade/alert bus traffic is genuine operator activity — reset the
+          // sleep-time idle clock so idle precompute waits for a quiet window.
+          void import("./sleepTimeCompute.ts")
+            .then(({ recordSleepTimeActivity }) => recordSleepTimeActivity())
+            .catch(() => {});
           const obs = eventToObservation(event);
           if (obs) void engine.observe(obs);
         } catch (err) {
@@ -212,6 +218,30 @@ export function startProactiveObserver(): { started: boolean; subscriptions: num
             })
             .catch((err) => {
               logger.warn("shadow-divergence tick failed", { err: String(err) });
+            });
+          continue;
+        }
+
+        if (key === "sleep_precompute") {
+          // Sleep-time compute: on an idle tick, precompute + cache the set of
+          // likely-next analyses so a follow-up query returns instantly. Opt-in
+          // (GORDON_SLEEP_TIME=1) + idle-gated inside tickSleepTimePrecompute.
+          void import("./sleepTimeCompute.ts")
+            .then(async ({
+              isSleepTimeEnabled,
+              getRegisteredSleepAnalyses,
+              registerSleepAnalyses,
+              tickSleepTimePrecompute,
+            }) => {
+              if (!isSleepTimeEnabled()) return;
+              if (getRegisteredSleepAnalyses().length === 0) {
+                const { buildDefaultSleepAnalyses } = await import("./sleepTimeAnalyses.ts");
+                registerSleepAnalyses(await buildDefaultSleepAnalyses());
+              }
+              await tickSleepTimePrecompute({ now });
+            })
+            .catch((err) => {
+              logger.warn("sleep-time precompute tick failed", { err: String(err) });
             });
           continue;
         }

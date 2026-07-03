@@ -23,6 +23,7 @@ import {
   instrumentedFinnhubMarketsTools,
   instrumentedSecFilingTools,
   instrumentedWebTools,
+  instrumentedRecursiveDecomposeTools,
   gordonInputGuard,
   gordonOutputSanitizer,
   gordonToolCallReconciler,
@@ -99,6 +100,10 @@ export function getResearcher(): Agent {
 
       // Canonical 22-tool agent surface.
       ...instrumentedAgentTools,
+
+      // RLM recursive decomposition for oversized inputs (10-K, trade
+      // ledger, news history). COLD tier — deep-research path, not hot scan.
+      ...(isHotTierOnly() ? {} : instrumentedRecursiveDecomposeTools),
     },
     memory: createSubAgentMemory("researcher"),
     inputProcessors: [
