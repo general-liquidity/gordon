@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
-import { Select, TextInput } from "@inkjs/ui";
+import { Select, TextInput, PasswordInput } from "@inkjs/ui";
 import type { SetupWizardSection } from "../../../app/setup/setup-flow.ts";
 
 // ============================================================================
@@ -520,6 +520,11 @@ export function SetupWizard({ onComplete, onSkip, preflight }: Props) {
 
       {step.inputType === "select" && stepOptions ? (
         <Select options={stepOptions} onChange={handleValue} />
+      ) : step.inputType === "password" ? (
+        <PasswordInput
+          placeholder={step.placeholder ?? ""}
+          onSubmit={handleValue}
+        />
       ) : (
         <TextInput
           placeholder={step.placeholder ?? ""}

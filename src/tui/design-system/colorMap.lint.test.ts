@@ -146,7 +146,6 @@ const ALLOWLIST = [
   "src/tui/design-system/KeybindingWarnings.tsx",
   "src/tui/design-system/ListItem.tsx",
   "src/tui/design-system/SearchBox.tsx",
-  "src/tui/design-system/SelectMulti.tsx",
   "src/tui/design-system/StatusIcon.tsx",
 ] as const;
 
