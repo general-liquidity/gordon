@@ -2,6 +2,7 @@ import type { GordonContext } from "../../agents/types.ts";
 import type { Order, OrderParams } from "../../exchange/types.ts";
 import { recordStructuredObservation } from "../../platform/observability/index.ts";
 import { checkKillSwitchForOrder } from "../../safety/killSwitchGate.ts";
+import { requireLiveConsent } from "../../safety/consent.ts";
 import { checkTradingPermission } from "../../agents/tools/runtime/permissionHelpers.ts";
 
 export interface ExecutionPreflightInput {
@@ -128,8 +129,10 @@ export async function runExecutionPreflight(
     return fail(input, preflightId, "kill_switch_tripped", killBlock.error);
   }
 
+  const sandboxActive = input.ctx.exchange?.isSandbox ?? input.ctx.broker?.isPaper ?? false;
+
   const permission = checkTradingPermission(input.ctx.config?.permissionMode, "execute", {
-    sandboxActive: input.ctx.exchange?.isSandbox ?? input.ctx.broker?.isPaper,
+    sandboxActive,
   });
   if (!permission.allowed) {
     return fail(
@@ -138,6 +141,13 @@ export async function runExecutionPreflight(
       "permission_mode_blocked",
       permission.reason ?? "Execution blocked by permission mode.",
     );
+  }
+
+  // One-time live-trading consent: block the FIRST live order until the
+  // operator has acknowledged the disclaimer. Paper / sandbox never gated.
+  const consent = requireLiveConsent({ sandboxActive });
+  if (!consent.ok) {
+    return fail(input, preflightId, "live_consent_required", consent.reason ?? "Live-trading consent required.");
   }
 
   let warnings: string[] = [];

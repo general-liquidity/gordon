@@ -36,10 +36,12 @@ export async function routeToolCommand(
 
   switch (command.name) {
     // ── Config mutations — NEVER go through the model ──────────────────────
+    // Live-capable modes (auto/ask/live) accept an ARM token that acknowledges
+    // the one-time live-trading consent gate.
     case "paper":    return handlePermissionModeCommand("paper");
-    case "live":     return handlePermissionModeCommand("ask");   // exit paper → ask
-    case "auto":     return handlePermissionModeCommand("auto");
-    case "ask":      return handlePermissionModeCommand("ask");
+    case "live":     return handlePermissionModeCommand("ask", { ackToken: args }); // exit paper → ask
+    case "auto":     return handlePermissionModeCommand("auto", { ackToken: args });
+    case "ask":      return handlePermissionModeCommand("ask", { ackToken: args });
     case "strict":   return handlePermissionModeCommand("strict");
     case "observe":  return handlePermissionModeCommand("observe");
     case "planmode": return handlePermissionModeCommand("plan");
