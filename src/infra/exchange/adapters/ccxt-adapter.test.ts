@@ -3,6 +3,7 @@ import {
   CcxtAdapter,
   toCcxtSymbol,
   fromCcxtSymbol,
+  DEFAULT_MAX_LEVERAGE,
 } from "./ccxt-adapter.ts";
 import {
   tripKillSwitch,
@@ -586,7 +587,7 @@ describe("CcxtAdapter — derivatives (ExchangeDerivatives)", () => {
         modeCall = { m, s };
       },
     });
-    const adapter = CcxtAdapter.__forTesting("bybit", mock);
+    const adapter = CcxtAdapter.__forTesting("bybit", mock, false, { maxLeverage: 20 });
     await adapter.setLeverage(10, "BTCUSDT");
     expect(leverageCall.l).toBe(10);
     expect(leverageCall.s).toBe("BTC/USDT");
@@ -835,7 +836,7 @@ describe("CcxtAdapter — setLeverage clamp (P1-5b)", () => {
     expect(leverageCall).toBe(5);
   });
 
-  it("does not clamp when no cap is configured (Infinity default)", async () => {
+  it("clamps to the conservative 5x default when no cap is explicitly configured", async () => {
     let leverageCall: number | undefined;
     const mock = makeMockClient({
       setLeverage: async (l: number, _s: string) => {
@@ -844,7 +845,20 @@ describe("CcxtAdapter — setLeverage clamp (P1-5b)", () => {
     });
     const adapter = CcxtAdapter.__forTesting("bybit", mock);
     await adapter.setLeverage(125, "BTCUSDT");
-    expect(leverageCall).toBe(125);
+    expect(leverageCall).toBe(DEFAULT_MAX_LEVERAGE);
+    expect(leverageCall).toBe(5);
+  });
+
+  it("lets an explicit cap raise leverage above the 5x default", async () => {
+    let leverageCall: number | undefined;
+    const mock = makeMockClient({
+      setLeverage: async (l: number, _s: string) => {
+        leverageCall = l;
+      },
+    });
+    const adapter = CcxtAdapter.__forTesting("bybit", mock, false, { maxLeverage: 20 });
+    await adapter.setLeverage(20, "BTCUSDT");
+    expect(leverageCall).toBe(20);
   });
 });
 
