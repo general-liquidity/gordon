@@ -12,7 +12,7 @@
 //   * Expose `toAnsiString()` for a simple fallback path that doesn't need
 //     the PatchEmitter (useful for first-paint + debug/CI).
 
-import sliceAnsi from "slice-ansi";
+import sliceAnsi from "./sliceAnsi.ts";
 import stringWidth from "string-width";
 import widestLine from "widest-line";
 import {
