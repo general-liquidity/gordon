@@ -28,6 +28,7 @@ export type {
   EvalScenario,
   ScenarioTurn,
   EvalTrajectory,
+  TrajectoryCost,
   JudgeResult,
   JudgeRequest,
   PanelJudgeEntry,

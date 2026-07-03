@@ -151,6 +151,22 @@ export const FAILURE_MODES: ReadonlyArray<FailureMode> = [
 ];
 
 /**
+ * Runtime cost of producing a trajectory (or the aggregate cost of a whole
+ * variant run). All fields optional so pure-text / fixture trajectories that
+ * were never metered carry nothing — a missing field is treated as "unknown"
+ * and disables the cost gate rather than counting as zero. Populated from the
+ * runtime `costTracker.ts` snapshot when trajectories are captured live.
+ */
+export interface TrajectoryCost {
+  /** Dollar cost of the API calls that produced this trajectory. */
+  costUsd?: number;
+  /** Total tokens (input + output + cache) consumed. */
+  tokens?: number;
+  /** Wall-clock latency in milliseconds. */
+  latencyMs?: number;
+}
+
+/**
  * A trajectory is one variant's response to a scenario. The variant
  * label distinguishes which model / prompt-version / flag combo
  * produced it, so downstream reports can attribute regressions.
@@ -172,6 +188,14 @@ export interface EvalTrajectory {
    * simply skips the dimension.
    */
   toolOutputs?: ReadonlyArray<{ name: string; outputSummary?: string }>;
+  /**
+   * Runtime cost of producing this trajectory (tokens / dollars / latency),
+   * grounded on the `costTracker.ts` snapshot captured while the trajectory
+   * ran. Surfaced so `detectRegressions` can gate an equal-or-worse candidate
+   * that costs materially more — the token/cost/latency axis the score-only
+   * gate is blind to. Absent for fixtures that were never metered.
+   */
+  cost?: TrajectoryCost;
 }
 
 /** A single trajectory's score after the judge has ranked the group. */
@@ -297,6 +321,16 @@ export interface VariantRunResult {
    * VariantRunResults built before this field existed (treated as 0).
    */
   genericAdviceRate?: number;
+  /**
+   * Aggregate runtime cost across all scored scenarios for this variant —
+   * tokens / dollars summed, latency summed (total wall-clock). DERIVED from
+   * the per-scenario trajectories' `cost` fields; absent when no trajectory
+   * was metered. Consumed by `detectRegressions`'s cost leg so a candidate
+   * that matches the baseline's quality while burning materially more tokens
+   * or dollars is caught. A field that is missing on either run disables that
+   * metric's comparison rather than counting as zero.
+   */
+  cost?: TrajectoryCost;
 }
 
 /**
@@ -338,8 +372,30 @@ export interface RegressionReport {
     tolerance: number;
   };
   /**
+   * Independent cost gate. Set when the candidate scored equal-or-worse than
+   * the baseline yet consumed materially more (tokens or dollars) than the
+   * `costToleranceRatio` allows — the token/cost/latency axis the scalar score
+   * is blind to. `blocking` reflects the opt-in `blockOnCostRegression` option:
+   * true makes it a blocking regression, false leaves it advisory (warn-only).
+   * Undefined when within tolerance, when the candidate improved (extra spend
+   * is justified by a better score), or when neither run carried metered cost.
+   */
+  costRegression?: {
+    /** Which axis tripped — dollars preferred when both runs are metered. */
+    metric: "costUsd" | "tokens";
+    baselineValue: number;
+    candidateValue: number;
+    /** candidateValue / baselineValue - 1 (fractional overspend). */
+    ratio: number;
+    tolerance: number;
+    /** candidate.aggregate - baseline.aggregate (<= 0 to trip the gate). */
+    scoreDelta: number;
+    blocking: boolean;
+  };
+  /**
    * True when at least one per-scenario regression exceeded the
-   * tolerance threshold, OR the independent generic-advice gate tripped.
+   * tolerance threshold, OR the independent generic-advice gate tripped,
+   * OR a blocking cost regression fired.
    */
   hasBlockingRegression: boolean;
 }
