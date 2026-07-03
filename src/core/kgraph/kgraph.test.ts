@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { FinancialGraph, seedGraph } from "./graph.ts";
+import { FinancialGraph } from "./graph.ts";
+import { seedGraph } from "./seed.fixture.ts";
 import { ImpactEngine } from "./impact.ts";
 import { GraphQueryEngine, toPromptBlock } from "./query.ts";
 import {

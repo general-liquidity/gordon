@@ -17,7 +17,6 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import {
   FinancialGraph,
-  seedGraph,
   ImpactEngine,
   GraphQueryEngine,
   toPromptBlock,
@@ -81,7 +80,6 @@ export const graphImpactTool = createTool({
       .describe("Signed shock in [-1,1] (e.g. +0.2 = up 20%). Default +0.1."),
     maxHops: z.number().int().min(1).max(6).optional().describe("Propagation depth. Default 3."),
     topN: z.number().int().min(1).max(50).optional().describe("Max ranked impacts to return. Default 15."),
-    useSeed: z.boolean().optional().describe("Include the builtin structural seed graph. Default true."),
     correlations: correlationsSchema
       .optional()
       .describe("Data-derived edges from a correlation matrix + optional sector map."),
@@ -117,7 +115,6 @@ export const graphImpactTool = createTool({
     shockMagnitude?: number;
     maxHops?: number;
     topN?: number;
-    useSeed?: boolean;
     correlations?: {
       symbols: string[];
       matrix: number[][];
@@ -148,27 +145,24 @@ export const graphImpactTool = createTool({
     const shock = args.shockMagnitude ?? 0.1;
     const maxHops = args.maxHops ?? 3;
     const topN = args.topN ?? 15;
-    const useSeed = args.useSeed ?? true;
 
-    // Assemble the graph from the requested sources.
-    let graph: FinancialGraph;
-    if (useSeed) {
-      graph = seedGraph();
-    } else if (args.correlations) {
-      graph = buildGraphFromCorrelations(args.correlations);
-    } else {
-      graph = new FinancialGraph();
+    // The graph is built from caller-supplied data only: an empirical correlation
+    // matrix (+ optional sector map) and/or an extracted ontology. No hardcoded
+    // entity universe is seeded at runtime.
+    if (!args.correlations && !args.ontology) {
+      return {
+        source: args.source,
+        shockMagnitude: shock,
+        graphStats: { entities: 0, relationships: 0 },
+        impacts: [],
+        context: "",
+        note: "graph_impact needs graph structure to reason over: supply `correlations` (a returns-correlation matrix + optional sector map) and/or an `ontology` of typed entities/edges. Both are derived from data you already compute; there is no builtin symbol universe.",
+      };
     }
 
-    if (useSeed && args.correlations) {
-      // Merge data-derived edges on top of the seed graph.
-      const derived = buildGraphFromCorrelations(args.correlations);
-      const dump = derived.toJSON();
-      for (const node of dump.nodes) graph.upsertEntity(node as EntityNode);
-      for (const edge of dump.edges) {
-        graph.addRelationship(edge.from, edge.to, edge.relationship);
-      }
-    }
+    const graph: FinancialGraph = args.correlations
+      ? buildGraphFromCorrelations(args.correlations)
+      : new FinancialGraph();
 
     if (args.ontology) {
       mergeOntology(
@@ -206,7 +200,7 @@ export const graphImpactTool = createTool({
       ? scores.length === 0
         ? `'${args.source}' has no outgoing relationships in the assembled graph — no contagion path.`
         : undefined
-      : `'${args.source}' is not in the assembled graph. Seed ids are uppercase (e.g. OIL_WTI, NVIDIA, FED_FUNDS_RATE), or supply your own via 'correlations'/'ontology'.`;
+      : `'${args.source}' is not in the assembled graph. Entity ids come from the 'correlations' symbols or the 'ontology' you supplied.`;
 
     return {
       source: args.source,

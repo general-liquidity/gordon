@@ -12,7 +12,6 @@
 
 export {
   FinancialGraph,
-  seedGraph,
   relationshipLabel,
   propagationSign,
   type EntityId,
