@@ -27,6 +27,7 @@ import {
   gordonOutputSanitizer,
   gordonToolCallReconciler,
 } from "../tooling/instrumentedTools.ts";
+import { instrumentedKgraphTools } from "../tooling/instrumentedTools.ts";
 import { researcherContextFilter, isResearcherLeastContextEnabled } from "../processors/researcher-context-filter.ts";
 import { createSubAgentMemory } from "../memory/memoryFactory.ts";
 import { createModelResolver, registerObservability, resolveRuntimeModel } from "../agentHelpers.ts";
@@ -96,6 +97,9 @@ export function getResearcher(): Agent {
       // Open-web reach (web_fetch / web_search) — gated allowlist + injection-
       // sanitized, COLD tier (DD/discovery, not the hot scan path).
       ...(isHotTierOnly() ? {} : instrumentedWebTools),
+      // Knowledge-graph contagion (graph_impact) — GraphRAG cross-entity
+      // impact-path reasoning. COLD tier (DD/analysis, not the hot scan path).
+      ...(isHotTierOnly() ? {} : instrumentedKgraphTools),
 
       // Canonical 22-tool agent surface.
       ...instrumentedAgentTools,

@@ -78,6 +78,7 @@ import { tradingInfraTools } from "../tools/runtime/tradingInfra.ts";
 import { evalTools } from "../../domain/evals/index.ts";
 import { executionCostTools } from "../tools/trading/execution-cost.ts";
 import { secFilingTools } from "../tools/providers/sec-filing-tools.ts";
+import { kgraphTools } from "../tools/analytics/kgraph.ts";
 // Binance Skills Hub + binance-cli moved to MCP marketplace listings —
 // see src/infra/ai/mcp/marketplace/catalog.json (binance-cli, binance-
 // skills-hub) and wrappers/{binance-cli-mcp,binance-skills-mcp}.
@@ -163,3 +164,5 @@ export const instrumentedExecutionCostTools = withToolsMetrics(executionCostTool
 /** Canonical 22-tool surface — must go through metrics + permission gate like implementation tools. */
 export const instrumentedAgentTools = withToolsMetrics(agentTools);
 export const instrumentedTradingInfraTools = withToolsMetrics(tradingInfraTools);
+/** Knowledge-graph contagion (graph_impact). COLD TIER — DD/analysis, not hot scan. */
+export const instrumentedKgraphTools = withToolsMetrics(kgraphTools);
