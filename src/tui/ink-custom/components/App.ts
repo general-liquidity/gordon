@@ -35,10 +35,15 @@ import StderrContext from "../contexts/StderrContext.ts";
 import FocusContext from "../contexts/FocusContext.ts";
 import ErrorOverview from "./ErrorOverview.ts";
 import {
-  parseMouseSequence,
   MOUSE_ENABLE,
   MOUSE_DISABLE,
 } from "../parse-mouse.ts";
+import {
+  createInputPipeline,
+  type InputPipeline,
+  ENABLE_BRACKETED_PASTE,
+  DISABLE_BRACKETED_PASTE,
+} from "../stdin-tokenizer.ts";
 
 const tab = "\t";
 // eslint-disable-next-line no-control-regex
@@ -96,6 +101,17 @@ export default class App extends PureComponent<Props, State> {
   // mouse-mode bytes leaking into the line buffer, plus the events would
   // be ignored anyway).
   mouseModeActive = false;
+
+  // True iff we wrote ENABLE_BRACKETED_PASTE on mount and owe the disable
+  // on unmount. Bracketed paste lets the tokenizer coalesce a multi-line
+  // paste into one event instead of letting embedded newlines fire Enter.
+  bracketedPasteActive = false;
+
+  // Streaming stdin front-end: buffers incomplete escape/mouse sequences
+  // across reads and coalesces bracketed pastes before anything reaches the
+  // keypress parser. Created lazily so tests that never dispatch input pay
+  // nothing. Disposed on unmount to clear pending ESC/paste timers.
+  inputPipeline: InputPipeline | null = null;
 
   // Determines if TTY is supported on the provided stdin.
   isRawModeSupported(): boolean {
@@ -168,11 +184,14 @@ export default class App extends PureComponent<Props, State> {
   override componentDidMount(): void {
     cliCursor.hide(this.props.stdout);
     this.enableMouseMode();
+    this.enableBracketedPaste();
   }
 
   override componentWillUnmount(): void {
     cliCursor.show(this.props.stdout);
     this.disableMouseMode();
+    this.disableBracketedPaste();
+    this.inputPipeline?.dispose();
     // ignore calling setRawMode on a stdin handle that doesn't support it
     if (this.isRawModeSupported()) {
       this.handleSetRawMode(false);
@@ -215,6 +234,55 @@ export default class App extends PureComponent<Props, State> {
     } catch {
       // See enableMouseMode — best-effort.
     }
+  }
+
+  enableBracketedPaste(): void {
+    if (this.bracketedPasteActive) return;
+    if (!this.props.stdout?.isTTY) return;
+    try {
+      this.props.stdout.write(ENABLE_BRACKETED_PASTE);
+      this.bracketedPasteActive = true;
+    } catch {
+      // Non-essential — degrade silently if the write is rejected.
+    }
+  }
+
+  disableBracketedPaste(): void {
+    if (!this.bracketedPasteActive) return;
+    this.bracketedPasteActive = false;
+    try {
+      this.props.stdout.write(DISABLE_BRACKETED_PASTE);
+    } catch {
+      // See enableBracketedPaste — best-effort.
+    }
+  }
+
+  getInputPipeline(): InputPipeline {
+    if (!this.inputPipeline) {
+      this.inputPipeline = createInputPipeline(
+        {
+          onKey: (seq) => {
+            this.handleInput(seq);
+            this.internal_eventEmitter.emit("input", seq);
+          },
+          onMouse: (event) => {
+            this.internal_eventEmitter.emit("mouse", event);
+          },
+          onPaste: (text) => {
+            this.internal_eventEmitter.emit("paste", text);
+          },
+        },
+        {
+          // Only claim `ESC [ <` sequences as mouse when tracking is on —
+          // otherwise they fall through to the keypress path (parity with the
+          // old dispatch and with App.mouse.test's "mouse mode off" case).
+          mouseEnabled: () => this.mouseModeActive,
+          getReadableLength: () =>
+            (this.props.stdin as unknown as { readableLength?: number }).readableLength ?? 0,
+        },
+      );
+    }
+    return this.inputPipeline;
   }
 
   override componentDidCatch(error: Error): void {
@@ -262,33 +330,15 @@ export default class App extends PureComponent<Props, State> {
   };
 
   /**
-   * Split a raw stdin chunk into mouse events and keypress bytes.
-   *
-   * Mouse mode (when active) emits CSI sequences starting with `\x1b[<`.
-   * We peel those off the front of the buffer and emit them as `mouse`
-   * events on the internal emitter. Anything that isn't a complete mouse
-   * sequence falls through to the existing keypress path so we never
-   * lose bytes — a partial mouse sequence at end-of-chunk would emit as
-   * keypress, which is benign for downstream consumers.
+   * Feed a raw stdin chunk through the streaming tokenizer, which buffers an
+   * incomplete escape/mouse sequence across reads, splits embedded control
+   * sequences out of text, and coalesces bracketed pastes. Complete tokens are
+   * routed to `input` (keypress), `mouse`, or `paste` events on the internal
+   * emitter. Keypress tokens also pass through `handleInput` for the Ctrl+C /
+   * Esc-focus-reset / Tab-focus behavior.
    */
   dispatchChunk = (chunk: string): void => {
-    if (!this.mouseModeActive) {
-      this.handleInput(chunk);
-      this.internal_eventEmitter.emit("input", chunk);
-      return;
-    }
-    let remaining = chunk;
-    while (remaining.length > 0 && remaining.startsWith("\x1b[<")) {
-      const { event, consumed } = parseMouseSequence(remaining);
-      if (consumed === 0) break;
-      if (event) {
-        this.internal_eventEmitter.emit("mouse", event);
-      }
-      remaining = remaining.slice(consumed);
-    }
-    if (remaining.length === 0) return;
-    this.handleInput(remaining);
-    this.internal_eventEmitter.emit("input", remaining);
+    this.getInputPipeline().feed(chunk);
   };
 
   handleInput = (input: string): void => {
