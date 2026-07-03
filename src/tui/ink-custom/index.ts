@@ -30,6 +30,7 @@ export type { MouseEvent, MouseHandler } from "./hooks/use-mouse.ts";
 export { default as useMouse } from "./hooks/use-mouse.ts";
 
 export { default as useApp } from "./hooks/use-app.ts";
+export type { SuspendTerminal, TerminalSuspension } from "./suspendTerminal.ts";
 
 export { default as useStdout } from "./hooks/use-stdout.ts";
 

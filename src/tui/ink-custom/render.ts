@@ -21,6 +21,7 @@
 
 import React, { type ReactNode } from "react";
 import process from "node:process";
+import ansiEscapes from "ansi-escapes";
 import {
   render as inkRender,
   useApp as inkUseApp,
@@ -29,6 +30,7 @@ import {
   useStderr as inkUseStderr,
 } from "ink";
 import { startCustomRender } from "./customRender.ts";
+import { createSuspendTerminal, type SuspendTerminal } from "./suspendTerminal.ts";
 import { loadLabsFlagsIntoEnv } from "./loadLabsFlags.ts";
 import OurAppContext from "./contexts/AppContext.ts";
 import OurStdinContext from "./contexts/StdinContext.ts";
@@ -199,14 +201,20 @@ function resolveOptions(options?: NodeJS.WriteStream | RenderOptions): Required<
  * The four context shapes were ported 1-to-1 from Ink, so plumbing the
  * values straight through is type-safe.
  */
-function VanillaInkContextBridge({ children }: { children: ReactNode }): React.ReactElement {
+function VanillaInkContextBridge({
+  suspendTerminal,
+  children,
+}: {
+  suspendTerminal: SuspendTerminal;
+  children?: ReactNode;
+}): React.ReactElement {
   const app = inkUseApp();
   const stdin = inkUseStdin();
   const stdout = inkUseStdout();
   const stderr = inkUseStderr();
   return React.createElement(
     OurAppContext.Provider,
-    { value: app },
+    { value: { ...app, suspendTerminal } },
     React.createElement(
       OurStdinContext.Provider,
       { value: stdin },
@@ -245,8 +253,74 @@ export const render = (
   ) {
     return startCustomRender(node, resolved);
   }
-  const bridged = React.createElement(VanillaInkContextBridge, null, node);
-  return inkRender(bridged, options as NodeJS.WriteStream | undefined) as Instance;
+
+  // Vanilla ink@6 path. Build a `suspendTerminal` bound to the ink instance
+  // (created below) + the underlying TTY, and thread it through the bridge so
+  // `useApp().suspendTerminal(fn)` works exactly like on the custom path.
+  const instanceHolder: { instance: Instance | null } = { instance: null };
+  const rawStdin = resolved.stdin;
+  const isRawModeSupported = Boolean(rawStdin.isTTY) && typeof rawStdin.setRawMode === "function";
+
+  const buildBridged = (): React.ReactElement =>
+    React.createElement(VanillaInkContextBridge, { suspendTerminal }, node);
+
+  const suspendTerminal: SuspendTerminal = createSuspendTerminal({
+    pauseRender: () => {
+      // Erase ink's live frame and show the cursor so the child starts clean.
+      try {
+        instanceHolder.instance?.clear();
+      } catch {
+        // best-effort
+      }
+      try {
+        resolved.stdout.write(ansiEscapes.cursorShow);
+      } catch {
+        // best-effort
+      }
+    },
+    resumeRender: () => {
+      // Hide the cursor again and force ink to recommit a full frame. ink@6
+      // exposes no private lastOutput reset, so we remount a fresh bridged
+      // element — the app's next render repaints from a cleared baseline.
+      try {
+        resolved.stdout.write(ansiEscapes.cursorHide);
+      } catch {
+        // best-effort
+      }
+      try {
+        instanceHolder.instance?.rerender(buildBridged());
+      } catch {
+        // best-effort
+      }
+    },
+    // Force raw mode off/on directly on the TTY so the child truly owns stdin
+    // regardless of ink's internal raw-mode ref count.
+    pauseInput: () => {
+      if (isRawModeSupported) {
+        try {
+          rawStdin.setRawMode(false);
+        } catch {
+          // best-effort
+        }
+      }
+    },
+    resumeInput: () => {
+      if (isRawModeSupported) {
+        try {
+          rawStdin.setRawMode(true);
+        } catch {
+          // best-effort
+        }
+      }
+    },
+  });
+
+  const instance = inkRender(
+    buildBridged(),
+    options as NodeJS.WriteStream | undefined,
+  ) as Instance;
+  instanceHolder.instance = instance;
+  return instance;
 };
 
 export default render;

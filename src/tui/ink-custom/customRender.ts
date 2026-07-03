@@ -73,6 +73,7 @@ import { createSelectionOverlay } from "./selectionOverlay.ts";
 import { createCursorDeclarationManager } from "./cursorDeclaration.ts";
 import { createPoolMigrator } from "./poolMigration.ts";
 import { createMigrationScheduler } from "./migrationScheduler.ts";
+import { createSuspendTerminal } from "./suspendTerminal.ts";
 import type { DOMElement } from "./dom.ts";
 import type { RenderOptions, Instance, SelectionRange } from "./render.ts";
 import type {
@@ -118,6 +119,9 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
   void ansiPatcher;
 
   let isUnmounted = false;
+  // Set while suspendTerminal() has handed the terminal to a child process:
+  // onRender becomes a no-op so we never paint over the child's output.
+  let isSuspended = false;
   let lastPaintedAnsi = "";
   let lastPrintedHeight = 0;
   // Track the width the last full repaint was sized to. A width change
@@ -193,7 +197,7 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
   }
 
   const onRender = (): void => {
-    if (isUnmounted) return;
+    if (isUnmounted || isSuspended) return;
     const startTime = performance.now();
     isRendering = true;
 
@@ -391,6 +395,40 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
     process.once("SIGINT", handleSigint);
   }
 
+  // suspendTerminal — hand the terminal to a child process ($EDITOR / pager /
+  // shell), then reclaim it and repaint. The App component owns the raw-mode
+  // ref count, so it registers its force-off/force-on input controls here on
+  // mount; the render loop owns pause/resume of painting.
+  let pauseInputControl: () => void = noop;
+  let resumeInputControl: () => void = noop;
+  const registerInputControl = (pause: () => void, resume: () => void): void => {
+    pauseInputControl = pause;
+    resumeInputControl = resume;
+  };
+
+  const suspendTerminal = createSuspendTerminal({
+    pauseRender: () => {
+      if (isSuspended) return;
+      isSuspended = true;
+      // Erase the live frame and show the cursor so the child starts clean.
+      const erase = lastPrintedHeight > 0 ? ansiEscapes.eraseLines(lastPrintedHeight) : "";
+      writeToStdout(erase + ansiEscapes.cursorShow);
+      lastPaintedAnsi = "";
+      lastPrintedHeight = 0;
+    },
+    resumeRender: () => {
+      if (!isSuspended) return;
+      isSuspended = false;
+      // Force a full redraw against a blank baseline — the child process may
+      // have overwritten whatever was on screen.
+      lastPaintedAnsi = "";
+      lastPrintedHeight = 0;
+      onRender();
+    },
+    pauseInput: () => pauseInputControl(),
+    resumeInput: () => resumeInputControl(),
+  });
+
   // Mount: wrap with our owned App (context providers + raw-mode + input
   // keypress listener) so useInput / useApp / useStdout / useStderr / useFocus
   // work for any component mounted under the custom renderer.
@@ -407,6 +445,8 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
         },
         exitOnCtrlC: options.exitOnCtrlC,
         onExit: (error?: Error) => unmount(error),
+        suspendTerminal,
+        registerInputControl,
       },
       currentNode,
     );

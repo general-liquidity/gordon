@@ -39,6 +39,7 @@ import {
   MOUSE_ENABLE,
   MOUSE_DISABLE,
 } from "../parse-mouse.ts";
+import { noopSuspendTerminal, type SuspendTerminal } from "../suspendTerminal.ts";
 
 const tab = "\t";
 // eslint-disable-next-line no-control-regex
@@ -55,6 +56,20 @@ type Props = {
   readonly writeToStderr: (data: string) => void;
   readonly exitOnCtrlC: boolean;
   readonly onExit: (error?: Error) => void;
+  /**
+   * Renderer-owned `suspendTerminal` implementation, exposed to descendants
+   * via `useApp()`. Defaults to a no-op when the host doesn't wire one.
+   */
+  readonly suspendTerminal?: SuspendTerminal;
+  /**
+   * Hand the renderer force-off/force-on input controls so its
+   * `suspendTerminal` can release and reclaim raw mode around a child process,
+   * without disturbing the raw-mode ref count the components still own.
+   */
+  readonly registerInputControl?: (
+    pauseInput: () => void,
+    resumeInput: () => void,
+  ) => void;
 };
 
 type Focusable = {
@@ -108,6 +123,7 @@ export default class App extends PureComponent<Props, State> {
       {
         value: {
           exit: this.handleExit,
+          suspendTerminal: this.props.suspendTerminal ?? noopSuspendTerminal,
         },
       },
       React.createElement(
@@ -165,9 +181,15 @@ export default class App extends PureComponent<Props, State> {
     );
   }
 
+  // Raw mode active at the moment suspendTerminal() paused input, so resume
+  // reinstates exactly what was on without touching rawModeEnabledCount (the
+  // components still "own" raw mode across the suspension).
+  suspendedRawMode = false;
+
   override componentDidMount(): void {
     cliCursor.hide(this.props.stdout);
     this.enableMouseMode();
+    this.props.registerInputControl?.(this.pauseInput, this.resumeInput);
   }
 
   override componentWillUnmount(): void {
@@ -251,6 +273,30 @@ export default class App extends PureComponent<Props, State> {
       stdin.removeListener("readable", this.handleReadable);
       stdin.unref();
     }
+  };
+
+  // Hand raw-mode input back to the terminal for a suspendTerminal() window.
+  // Forces raw mode off regardless of the ref count so the child process
+  // actually owns stdin; remembers whether it was on so resume is symmetric.
+  pauseInput = (): void => {
+    const wasRawMode = this.isRawModeSupported() && this.rawModeEnabledCount > 0;
+    this.suspendedRawMode = wasRawMode;
+    if (wasRawMode) {
+      const { stdin } = this.props;
+      stdin.setRawMode(false);
+      stdin.removeListener("readable", this.handleReadable);
+      stdin.unref();
+    }
+  };
+
+  resumeInput = (): void => {
+    if (!this.suspendedRawMode) return;
+    this.suspendedRawMode = false;
+    const { stdin } = this.props;
+    stdin.setEncoding("utf8");
+    stdin.ref();
+    stdin.setRawMode(true);
+    stdin.addListener("readable", this.handleReadable);
   };
 
   handleReadable = (): void => {
