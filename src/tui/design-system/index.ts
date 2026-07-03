@@ -40,11 +40,6 @@ export {
 } from "./colorMap.js";
 export type { RiskLevel, SignalSide } from "./colorMap.js";
 
-// Composable select primitives
-export { Select } from "./select.js";
-export type { SelectOption } from "./select.js";
-export { SelectMulti } from "./SelectMulti.js";
-
 // Keyboard shortcut components
 export { ConfigurableShortcutHint } from "./ConfigurableShortcutHint.js";
 export { KeybindingWarnings } from "./KeybindingWarnings.js";
