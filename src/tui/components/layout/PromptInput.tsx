@@ -19,6 +19,7 @@ import {
 import { useTheme } from "../../themes/ThemeProvider.tsx";
 import { markInteraction } from "../../diagnostics/performanceMonitor.ts";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
+import { argumentHintFor } from "../../utils/argumentHint.ts";
 
 // ============================================================================
 // PromptInput — Claude Code-style compact slash command picker
@@ -162,6 +163,14 @@ export const PromptInput = React.memo(function PromptInput({
     showAllOnEmpty: true,
   });
   const showSuggestions = isSlashMode && suggestions.length > 0;
+
+  // Inline argument-hint ghost text: when the buffer is an exact command match
+  // followed by a trailing space (menu closed), render the command's usage
+  // arguments as dim ghost text after the cursor.
+  const argHint = useMemo(
+    () => (showSuggestions ? null : argumentHintFor(value)),
+    [value, showSuggestions],
+  );
 
   // Force a clean repaint when the slash menu closes. Vanilla Ink's inline
   // reflow can't fully erase the tall menu frame as it collapses, leaving a
@@ -538,6 +547,9 @@ export const PromptInput = React.memo(function PromptInput({
             <Text color="rgb(52,238,176)">{"█"}</Text>
           ) : (
             <Text color={theme.uiMuted}>{placeholder}</Text>
+          )}
+          {argHint && (
+            <Text dimColor>{argHint.join(" ")}</Text>
           )}
       </Box>
         {vimMode && (
