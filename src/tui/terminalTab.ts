@@ -16,6 +16,8 @@
  *   - kitty: ESC ] 30 ; title ESC \
  */
 
+import { wrapForMultiplexer } from "./utils/osc.ts";
+
 // ============================================================================
 // Terminal Detection
 // ============================================================================
@@ -40,7 +42,8 @@ function detectTerminal(): TerminalType {
 function writeOSC(sequence: string): void {
   if (!process.stdout.isTTY) return;
   try {
-    process.stdout.write(sequence);
+    // Wrap so tmux/screen DCS-passthrough carries the OSC to the outer terminal.
+    process.stdout.write(wrapForMultiplexer(sequence));
   } catch {
     // Non-critical — terminal may not support
   }
