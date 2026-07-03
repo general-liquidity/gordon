@@ -8,8 +8,7 @@
  *  - "paper_url"   — dedicated paper-trading base URL (separate from live)
  *  - "sim_url"     — simulation/certification URL (functionally equivalent)
  *  - "account"     — same URL; paper mode is a separate account type at
- *                    the broker (IBKR paper uses same gateway, different port;
- *                    Schwab paper is account-type-gated)
+ *                    the broker (IBKR paper uses same gateway, different port)
  *  - "unsupported" — broker doesn't expose a developer-accessible paper env
  */
 
@@ -32,39 +31,10 @@ export const BROKER_PAPER_SUPPORT: Record<BrokerId, BrokerPaperSupportEntry> = {
     paperBaseUrl: "https://paper-api.alpaca.markets",
     docs: "Alpaca paper trading requires the same API key set — no separate signup. Set ALPACA_PAPER=true.",
   },
-  webull: {
-    kind: "paper_url",
-    paperBaseUrl: "https://us-openapi-alb.uat.webullbroker.com",
-    docs: "Webull paper trading uses the UAT environment. Set WEBULL_PAPER=true.",
-  },
-  tradier: {
-    kind: "paper_url",
-    paperBaseUrl: "https://sandbox.tradier.com",
-    docs: "Tradier sandbox uses separate API keys — register at developer.tradier.com. Set TRADIER_PAPER=true.",
-  },
-  tradestation: {
-    kind: "sim_url",
-    paperBaseUrl: "https://sim-api.tradestation.com",
-    docs: "TradeStation simulation environment. Set TRADESTATION_PAPER=true.",
-  },
   tastytrade: {
     kind: "sim_url",
     paperBaseUrl: "https://api.cert.tastyworks.com",
     docs: "tastytrade certification environment mirrors production. Set TASTYTRADE_PAPER=true.",
-  },
-  trading212: {
-    kind: "paper_url",
-    paperBaseUrl: "https://demo.trading212.com",
-    docs: "Trading 212 demo account. Requires a separate demo API key from Trading 212. Set TRADING212_PAPER=true.",
-  },
-  etrade: {
-    kind: "sim_url",
-    paperBaseUrl: "https://apisb.etrade.com",
-    docs: "E*TRADE sandbox API. Requires sandbox API keys from the E*TRADE developer portal. Set ETRADE_PAPER=true.",
-  },
-  schwab: {
-    kind: "account",
-    docs: "Charles Schwab paper trading is account-type-gated — use a paper account's account ID with the same API keys. Set SCHWAB_PAPER=true.",
   },
   ibkr: {
     kind: "account",

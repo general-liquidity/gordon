@@ -14,14 +14,10 @@ import type { BrokerCredentials, BrokerId } from "../types.ts";
  * Map broker id → OAuth venue id. Only brokers that support OAuth 2.0
  * (verified against live docs as of April 2026).
  *
- * Excluded: etrade (OAuth 1.0a only), ibkr (OAuth 1.0a vendor-gated),
- * webull (partner-gated), trading212 (HTTP Basic only).
+ * Excluded: ibkr (OAuth 1.0a vendor-gated).
  */
 const BROKER_TO_OAUTH: Partial<Record<BrokerId, OAuthVenueId>> = {
-  schwab: "schwab",
-  tradier: "tradier",
   alpaca: "alpaca",
-  tradestation: "tradestation",
   tastytrade: "tastytrade",
 };
 

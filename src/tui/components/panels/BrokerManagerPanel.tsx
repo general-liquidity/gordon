@@ -37,14 +37,8 @@ interface Props {
 
 export const DEFAULT_BROKERS: BrokerInfo[] = [
   { id: "alpaca", name: "Alpaca", connected: false, accountType: "margin", buyingPower: 0, orderTypes: ["market", "limit", "stop", "trailing_stop"] },
-  { id: "etrade", name: "E*Trade", connected: false, accountType: "cash", buyingPower: 0, orderTypes: ["market", "limit", "stop"] },
   { id: "ibkr", name: "IBKR", connected: false, accountType: "margin", buyingPower: 0, orderTypes: ["market", "limit", "stop", "algo", "bracket"] },
-  { id: "schwab", name: "Schwab", connected: false, accountType: "cash", buyingPower: 0, orderTypes: ["market", "limit", "stop"] },
   { id: "tastytrade", name: "Tastytrade", connected: false, accountType: "margin", buyingPower: 0, orderTypes: ["market", "limit", "stop", "options"] },
-  { id: "tradestation", name: "TradeStation", connected: false, accountType: "margin", buyingPower: 0, orderTypes: ["market", "limit", "stop", "bracket"] },
-  { id: "tradier", name: "Tradier", connected: false, accountType: "margin", buyingPower: 0, orderTypes: ["market", "limit", "stop"] },
-  { id: "trading212", name: "Trading212", connected: false, accountType: "cash", buyingPower: 0, orderTypes: ["market", "limit"] },
-  { id: "webull", name: "Webull", connected: false, accountType: "margin", buyingPower: 0, orderTypes: ["market", "limit", "stop", "trailing_stop"] },
 ];
 
 // ============================================================================

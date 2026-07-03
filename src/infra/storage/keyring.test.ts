@@ -113,7 +113,7 @@ describe("KEYRING_SUPPORTED_KEYS", () => {
     expect(KEYRING_SUPPORTED_KEYS).toContain("BINANCE_API_SECRET");
     expect(KEYRING_SUPPORTED_KEYS).toContain("KRAKEN_API_KEY");
     expect(KEYRING_SUPPORTED_KEYS).toContain("COINBASE_API_KEY");
-    expect(KEYRING_SUPPORTED_KEYS).toContain("TRADING212_API_KEY");
+    expect(KEYRING_SUPPORTED_KEYS).toContain("IBKR_API_KEY");
   });
 
   test("contains expected LLM keys", () => {

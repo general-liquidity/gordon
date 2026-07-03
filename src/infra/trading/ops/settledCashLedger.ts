@@ -15,7 +15,7 @@
  *   - `canBuy` is pure (no mutation). `recordBuy` mutates and first promotes
  *     any pending credits that have matured as of the trade date.
  *
- * Applies to the cash-account brokers Gordon trades (Alpaca / Trading212 / IBKR).
+ * Applies to the cash-account brokers Gordon trades (Alpaca / IBKR).
  */
 
 export interface PendingCredit {

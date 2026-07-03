@@ -73,13 +73,7 @@ export function migrateExchangeConfigTypes(raw: Record<string, unknown>): Record
  */
 export const BrokerTypeSchema = z.enum([
   "alpaca",
-  "webull",
-  "schwab",
-  "tradier",
-  "tradestation",
   "tastytrade",
-  "trading212",
-  "etrade",
   "ibkr",
 ]);
 

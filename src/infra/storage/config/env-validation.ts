@@ -149,60 +149,6 @@ export const AlpacaSecretSchema = z
   .min(1, "Alpaca API secret cannot be empty")
   .min(16, "Alpaca API secret must be at least 16 characters");
 
-export const SchwabKeySchema = z
-  .string()
-  .trim()
-  .min(1, "Schwab API key cannot be empty")
-  .refine(
-    (val) => BEARER_TOKEN_PATTERN.test(val),
-    "Schwab API key/token contains invalid characters"
-  );
-
-export const SchwabSecretSchema = z
-  .string()
-  .trim()
-  .min(1, "Schwab API secret cannot be empty")
-  .refine(
-    (val) => BEARER_TOKEN_PATTERN.test(val),
-    "Schwab API secret/token contains invalid characters"
-  );
-
-export const TradierKeySchema = z
-  .string()
-  .trim()
-  .min(1, "Tradier API key cannot be empty")
-  .refine(
-    (val) => BEARER_TOKEN_PATTERN.test(val),
-    "Tradier API key/token contains invalid characters"
-  );
-
-export const TradierSecretSchema = z
-  .string()
-  .trim()
-  .min(1, "Tradier API secret cannot be empty")
-  .refine(
-    (val) => BEARER_TOKEN_PATTERN.test(val),
-    "Tradier API secret/token contains invalid characters"
-  );
-
-export const TradeStationKeySchema = z
-  .string()
-  .trim()
-  .min(1, "TradeStation API key cannot be empty")
-  .refine(
-    (val) => BEARER_TOKEN_PATTERN.test(val),
-    "TradeStation API key/token contains invalid characters"
-  );
-
-export const TradeStationSecretSchema = z
-  .string()
-  .trim()
-  .min(1, "TradeStation API secret cannot be empty")
-  .refine(
-    (val) => BEARER_TOKEN_PATTERN.test(val),
-    "TradeStation API secret/token contains invalid characters"
-  );
-
 export const TastytradeKeySchema = z
   .string()
   .trim()
@@ -212,28 +158,6 @@ export const TastytradeSecretSchema = z
   .string()
   .trim()
   .min(1, "tastytrade password cannot be empty");
-
-export const Trading212KeySchema = z
-  .string()
-  .trim()
-  .min(1, "Trading 212 API key cannot be empty")
-  .min(8, "Trading 212 API key appears too short");
-
-export const Trading212SecretSchema = z
-  .string()
-  .trim()
-  .min(1, "Trading 212 API secret cannot be empty")
-  .min(8, "Trading 212 API secret appears too short");
-
-export const EtradeKeySchema = z
-  .string()
-  .trim()
-  .min(1, "E*TRADE API key cannot be empty");
-
-export const EtradeSecretSchema = z
-  .string()
-  .trim()
-  .min(1, "E*TRADE API secret cannot be empty");
 
 export const IbkrKeySchema = z
   .string()
@@ -255,42 +179,18 @@ export const RobinhoodSecretSchema = z
   .trim()
   .min(1, "Robinhood API secret/private key cannot be empty");
 
-export const WebullKeySchema = z
-  .string()
-  .trim()
-  .min(1, "Webull API key cannot be empty")
-  .min(8, "Webull API key appears too short");
-
-export const WebullSecretSchema = z
-  .string()
-  .trim()
-  .min(1, "Webull API secret cannot be empty")
-  .min(8, "Webull API secret appears too short");
-
 // Combined environment schema
 export const EnvKeysSchema = z.object({
   OPENAI_API_KEY: OpenAIKeySchema.optional(),
   DEDALUS_API_KEY: DedalusKeySchema.optional(),
   ALPACA_API_KEY: AlpacaKeySchema.optional(),
   ALPACA_API_SECRET: AlpacaSecretSchema.optional(),
-  SCHWAB_API_KEY: SchwabKeySchema.optional(),
-  SCHWAB_API_SECRET: SchwabSecretSchema.optional(),
-  TRADIER_API_KEY: TradierKeySchema.optional(),
-  TRADIER_API_SECRET: TradierSecretSchema.optional(),
-  TRADESTATION_API_KEY: TradeStationKeySchema.optional(),
-  TRADESTATION_API_SECRET: TradeStationSecretSchema.optional(),
   TASTYTRADE_API_KEY: TastytradeKeySchema.optional(),
   TASTYTRADE_API_SECRET: TastytradeSecretSchema.optional(),
-  TRADING212_API_KEY: Trading212KeySchema.optional(),
-  TRADING212_API_SECRET: Trading212SecretSchema.optional(),
-  ETRADE_API_KEY: EtradeKeySchema.optional(),
-  ETRADE_API_SECRET: EtradeSecretSchema.optional(),
   IBKR_API_KEY: IbkrKeySchema.optional(),
   IBKR_API_SECRET: IbkrSecretSchema.optional(),
   ROBINHOOD_API_KEY: RobinhoodKeySchema.optional(),
   ROBINHOOD_API_SECRET: RobinhoodSecretSchema.optional(),
-  WEBULL_API_KEY: WebullKeySchema.optional(),
-  WEBULL_API_SECRET: WebullSecretSchema.optional(),
   BINANCE_API_KEY: BinanceKeySchema.optional(),
   BINANCE_API_SECRET: BinanceSecretSchema.optional(),
   COINBASE_API_KEY: CoinbaseKeySchema.optional(),
@@ -419,45 +319,6 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
     validateApiKeyWarn("ALPACA_API_SECRET", keys.ALPACA_API_SECRET, AlpacaSecretSchema, warnings, validated);
   }
 
-  // Validate Schwab keys (must be paired) — bearer token format
-  const hasSchwabKey = !!keys.SCHWAB_API_KEY;
-  const hasSchwabSecret = !!keys.SCHWAB_API_SECRET;
-  if (hasSchwabKey !== hasSchwabSecret) {
-    errors.push({
-      key: hasSchwabKey ? "SCHWAB_API_SECRET" : "SCHWAB_API_KEY",
-      message: "Schwab API key and secret must both be provided",
-    });
-  } else if (hasSchwabKey && hasSchwabSecret) {
-    validateApiKeyWarn("SCHWAB_API_KEY", keys.SCHWAB_API_KEY, SchwabKeySchema, warnings, validated);
-    validateApiKeyWarn("SCHWAB_API_SECRET", keys.SCHWAB_API_SECRET, SchwabSecretSchema, warnings, validated);
-  }
-
-  // Validate Tradier keys (must be paired) — bearer token format
-  const hasTradierKey = !!keys.TRADIER_API_KEY;
-  const hasTradierSecret = !!keys.TRADIER_API_SECRET;
-  if (hasTradierKey !== hasTradierSecret) {
-    errors.push({
-      key: hasTradierKey ? "TRADIER_API_SECRET" : "TRADIER_API_KEY",
-      message: "Tradier API key and secret must both be provided",
-    });
-  } else if (hasTradierKey && hasTradierSecret) {
-    validateApiKeyWarn("TRADIER_API_KEY", keys.TRADIER_API_KEY, TradierKeySchema, warnings, validated);
-    validateApiKeyWarn("TRADIER_API_SECRET", keys.TRADIER_API_SECRET, TradierSecretSchema, warnings, validated);
-  }
-
-  // Validate TradeStation keys (must be paired) — bearer token format
-  const hasTradeStationKey = !!keys.TRADESTATION_API_KEY;
-  const hasTradeStationSecret = !!keys.TRADESTATION_API_SECRET;
-  if (hasTradeStationKey !== hasTradeStationSecret) {
-    errors.push({
-      key: hasTradeStationKey ? "TRADESTATION_API_SECRET" : "TRADESTATION_API_KEY",
-      message: "TradeStation API key and secret must both be provided",
-    });
-  } else if (hasTradeStationKey && hasTradeStationSecret) {
-    validateApiKeyWarn("TRADESTATION_API_KEY", keys.TRADESTATION_API_KEY, TradeStationKeySchema, warnings, validated);
-    validateApiKeyWarn("TRADESTATION_API_SECRET", keys.TRADESTATION_API_SECRET, TradeStationSecretSchema, warnings, validated);
-  }
-
   // Validate tastytrade keys (must be paired)
   const hasTastytradeKey = !!keys.TASTYTRADE_API_KEY;
   const hasTastytradeSecret = !!keys.TASTYTRADE_API_SECRET;
@@ -479,43 +340,6 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
       errors.push({ key: "TASTYTRADE_API_SECRET", message: secretResult.error! });
     } else {
       validated.TASTYTRADE_API_SECRET = keys.TASTYTRADE_API_SECRET!.trim();
-    }
-  }
-
-  // Validate Trading 212 keys (must be paired) — non-empty with min length
-  const hasTrading212Key = !!keys.TRADING212_API_KEY;
-  const hasTrading212Secret = !!keys.TRADING212_API_SECRET;
-  if (hasTrading212Key !== hasTrading212Secret) {
-    errors.push({
-      key: hasTrading212Key ? "TRADING212_API_SECRET" : "TRADING212_API_KEY",
-      message: "Trading 212 API key and secret must both be provided",
-    });
-  } else if (hasTrading212Key && hasTrading212Secret) {
-    validateApiKeyWarn("TRADING212_API_KEY", keys.TRADING212_API_KEY, Trading212KeySchema, warnings, validated);
-    validateApiKeyWarn("TRADING212_API_SECRET", keys.TRADING212_API_SECRET, Trading212SecretSchema, warnings, validated);
-  }
-
-  // Validate E*TRADE keys (must be paired)
-  const hasEtradeKey = !!keys.ETRADE_API_KEY;
-  const hasEtradeSecret = !!keys.ETRADE_API_SECRET;
-  if (hasEtradeKey !== hasEtradeSecret) {
-    errors.push({
-      key: hasEtradeKey ? "ETRADE_API_SECRET" : "ETRADE_API_KEY",
-      message: "E*TRADE API key and secret must both be provided",
-    });
-  } else if (hasEtradeKey && hasEtradeSecret) {
-    const keyResult = validateApiKey("ETRADE_API_KEY", keys.ETRADE_API_KEY, EtradeKeySchema);
-    if (!keyResult.valid) {
-      errors.push({ key: "ETRADE_API_KEY", message: keyResult.error! });
-    } else {
-      validated.ETRADE_API_KEY = keys.ETRADE_API_KEY!.trim();
-    }
-
-    const secretResult = validateApiKey("ETRADE_API_SECRET", keys.ETRADE_API_SECRET, EtradeSecretSchema);
-    if (!secretResult.valid) {
-      errors.push({ key: "ETRADE_API_SECRET", message: secretResult.error! });
-    } else {
-      validated.ETRADE_API_SECRET = keys.ETRADE_API_SECRET!.trim();
     }
   }
 
@@ -565,19 +389,6 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
     } else {
       validated.ROBINHOOD_API_SECRET = keys.ROBINHOOD_API_SECRET!.trim();
     }
-  }
-
-  // Validate Webull keys (must be paired) — non-empty with min length
-  const hasWebullKey = !!keys.WEBULL_API_KEY;
-  const hasWebullSecret = !!keys.WEBULL_API_SECRET;
-  if (hasWebullKey !== hasWebullSecret) {
-    errors.push({
-      key: hasWebullKey ? "WEBULL_API_SECRET" : "WEBULL_API_KEY",
-      message: "Webull API key and secret must both be provided",
-    });
-  } else if (hasWebullKey && hasWebullSecret) {
-    validateApiKeyWarn("WEBULL_API_KEY", keys.WEBULL_API_KEY, WebullKeySchema, warnings, validated);
-    validateApiKeyWarn("WEBULL_API_SECRET", keys.WEBULL_API_SECRET, WebullSecretSchema, warnings, validated);
   }
 
   // Validate Binance keys (must be paired)

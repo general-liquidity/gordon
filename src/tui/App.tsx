@@ -2085,7 +2085,7 @@ function AppInner() {
                   }
                   config.brokers.push({
                     id: brokerId,
-                    type: brokerType as "alpaca" | "webull" | "schwab" | "tradier" | "tradestation" | "tastytrade" | "trading212" | "etrade" | "ibkr",
+                    type: brokerType as "alpaca" | "tastytrade" | "ibkr",
                     apiKey,
                     apiSecret,
                     isDefault: config.brokers.length === 0,

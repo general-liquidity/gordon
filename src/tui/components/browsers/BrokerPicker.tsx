@@ -16,14 +16,8 @@ interface Props {
 
 const BROKERS = [
   { label: "Alpaca", value: "alpaca" },
-  { label: "Charles Schwab", value: "schwab" },
-  { label: "Tradier", value: "tradier" },
-  { label: "TradeStation", value: "tradestation" },
   { label: "tastytrade", value: "tastytrade" },
   { label: "Interactive Brokers", value: "ibkr" },
-  { label: "E*TRADE", value: "etrade" },
-  { label: "Webull", value: "webull" },
-  { label: "Trading212", value: "trading212" },
 ];
 
 const ACTIONS = [

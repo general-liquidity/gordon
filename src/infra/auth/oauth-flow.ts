@@ -12,7 +12,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
 export interface OAuthFlowConfig {
-  /** Venue identifier (e.g. "schwab", "coinbase") */
+  /** Venue identifier (e.g. "alpaca", "coinbase") */
   venue: string;
   /** OAuth authorization endpoint (where user logs in) */
   authorizationUrl: string;

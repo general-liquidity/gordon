@@ -169,9 +169,7 @@ function getExchangeSessionMode(exchangeId: ExchangeId): ProviderCredentialStatu
 
 function getBrokerSessionMode(brokerId: BrokerId): ProviderCredentialStatus["sessionMode"] {
   if (brokerId === "tastytrade") return "session";
-  if (brokerId === "schwab" || brokerId === "tradestation" || brokerId === "etrade" || brokerId === "ibkr") {
-    return "oauth";
-  }
+  if (brokerId === "ibkr") return "oauth";
   return "static";
 }
 

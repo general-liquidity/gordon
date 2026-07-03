@@ -5,13 +5,7 @@ import { installMockBrokerApi } from "../testing/mock-api.ts";
 
 const BROKER_CASES: BrokerId[] = [
   "alpaca",
-  "webull",
-  "schwab",
-  "tradier",
-  "tradestation",
   "tastytrade",
-  "trading212",
-  "etrade",
   "ibkr",
 ];
 
@@ -19,7 +13,7 @@ function createCredentials(brokerId: BrokerId): BrokerCredentials {
   return {
     apiKey: `key-${brokerId}`,
     apiSecret: `secret-${brokerId}`,
-    accountId: brokerId === "webull" ? "WB-ACC-1" : undefined,
+    accountId: undefined,
     paper: true,
     baseUrl: `https://${brokerId}.mock`,
     dataBaseUrl: `https://${brokerId}.mock`,

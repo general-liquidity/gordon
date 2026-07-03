@@ -77,7 +77,7 @@ const LLM_PROVIDERS = ["openai", "dedalus"] as const;
 
 const NATIVE_EXCHANGES = EXCHANGE_IDS;
 
-const BROKERS = ["ibkr", "alpaca", "trading212", "schwab"] as const;
+const BROKERS = ["ibkr", "alpaca", "tastytrade"] as const;
 
 const PEER_AGENTS_REGISTERED = ["cursor", "warp"] as const;
 const PEER_AGENTS_AVAILABLE = ["cursor", "warp", "hermes", "claude_code", "codex", "openclaw"] as const;

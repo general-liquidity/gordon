@@ -11,27 +11,20 @@ import type { Candle } from "../../types/index.ts";
 
 /**
  * Supported broker identifiers.
- * Start with Alpaca; expand with IBKR/Tradier/Schwab/E*TRADE later.
+ * Limited to brokers with a trustworthy native TS SDK: Alpaca, tastytrade, IBKR.
  */
 export type BrokerId =
   | "alpaca"
-  | "webull"
-  | "schwab"
-  | "tradier"
-  | "tradestation"
   | "tastytrade"
-  | "trading212"
-  | "etrade"
   | "ibkr";
 
 /**
  * Runtime array of all supported broker IDs. Kept in sync with BrokerId via
- * the `satisfies` constraint — the compiler errors if this drifts from the
+ * the `satisfies` constraint. The compiler errors if this drifts from the
  * type union.
  */
 export const BROKER_IDS = [
-  "alpaca", "webull", "schwab", "tradier", "tradestation",
-  "tastytrade", "trading212", "etrade", "ibkr",
+  "alpaca", "tastytrade", "ibkr",
 ] as const satisfies readonly BrokerId[];
 
 /**
@@ -68,32 +61,11 @@ export interface BrokerCredentials {
  */
 export const BROKER_ENV_MAP: Record<BrokerId, { key: string; secret: string; paper?: string; accountId?: string }> = {
   alpaca: { key: "ALPACA_API_KEY", secret: "ALPACA_API_SECRET", paper: "ALPACA_PAPER" },
-  webull: { key: "WEBULL_API_KEY", secret: "WEBULL_API_SECRET", paper: "WEBULL_PAPER", accountId: "WEBULL_ACCOUNT_ID" },
-  schwab: { key: "SCHWAB_API_KEY", secret: "SCHWAB_API_SECRET", paper: "SCHWAB_PAPER", accountId: "SCHWAB_ACCOUNT_ID" },
-  tradier: { key: "TRADIER_API_KEY", secret: "TRADIER_API_SECRET", paper: "TRADIER_PAPER", accountId: "TRADIER_ACCOUNT_ID" },
-  tradestation: {
-    key: "TRADESTATION_API_KEY",
-    secret: "TRADESTATION_API_SECRET",
-    paper: "TRADESTATION_PAPER",
-    accountId: "TRADESTATION_ACCOUNT_ID",
-  },
   tastytrade: {
     key: "TASTYTRADE_API_KEY",
     secret: "TASTYTRADE_API_SECRET",
     paper: "TASTYTRADE_PAPER",
     accountId: "TASTYTRADE_ACCOUNT_ID",
-  },
-  trading212: {
-    key: "TRADING212_API_KEY",
-    secret: "TRADING212_API_SECRET",
-    paper: "TRADING212_PAPER",
-    accountId: "TRADING212_ACCOUNT_ID",
-  },
-  etrade: {
-    key: "ETRADE_API_KEY",
-    secret: "ETRADE_API_SECRET",
-    paper: "ETRADE_PAPER",
-    accountId: "ETRADE_ACCOUNT_ID",
   },
   ibkr: {
     key: "IBKR_API_KEY",

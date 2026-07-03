@@ -22,9 +22,7 @@ describe("broker command routing", () => {
     const message = await handleBrokerCommand("add unsupported-broker");
     expect(message).toContain("Error: Unsupported broker type");
     expect(message).toContain("alpaca");
-    expect(message).toContain("webull");
-    expect(message).toContain("schwab");
-    expect(message).toContain("tradier");
+    expect(message).toContain("tastytrade");
     expect(message).toContain("ibkr");
   });
 });

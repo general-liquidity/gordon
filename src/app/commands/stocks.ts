@@ -82,21 +82,6 @@ async function resolveActiveBroker(): Promise<ActiveBrokerResolution> {
     };
   }
 
-  if (env.hasWebullKeys && env.keys.WEBULL_API_KEY && env.keys.WEBULL_API_SECRET) {
-    const paper = (env.keys.WEBULL_PAPER || "true").toLowerCase() !== "false";
-    return {
-      broker: BrokerFactory.create("webull", {
-        apiKey: env.keys.WEBULL_API_KEY,
-        apiSecret: env.keys.WEBULL_API_SECRET,
-        paper,
-        accountId: env.keys.WEBULL_ACCOUNT_ID,
-      }),
-      brokerId: "webull_env",
-      brokerType: "webull",
-      paper,
-    };
-  }
-
   const fallbackCandidates: Array<{
     brokerId: BrokerId;
     key?: string;
@@ -105,46 +90,11 @@ async function resolveActiveBroker(): Promise<ActiveBrokerResolution> {
     accountId?: string;
   }> = [
     {
-      brokerId: "schwab",
-      key: env.keys.SCHWAB_API_KEY,
-      secret: env.keys.SCHWAB_API_SECRET,
-      paper: env.keys.SCHWAB_PAPER,
-      accountId: env.keys.SCHWAB_ACCOUNT_ID,
-    },
-    {
-      brokerId: "tradier",
-      key: env.keys.TRADIER_API_KEY,
-      secret: env.keys.TRADIER_API_SECRET,
-      paper: env.keys.TRADIER_PAPER,
-      accountId: env.keys.TRADIER_ACCOUNT_ID,
-    },
-    {
-      brokerId: "tradestation",
-      key: env.keys.TRADESTATION_API_KEY,
-      secret: env.keys.TRADESTATION_API_SECRET,
-      paper: env.keys.TRADESTATION_PAPER,
-      accountId: env.keys.TRADESTATION_ACCOUNT_ID,
-    },
-    {
       brokerId: "tastytrade",
       key: env.keys.TASTYTRADE_API_KEY,
       secret: env.keys.TASTYTRADE_API_SECRET,
       paper: env.keys.TASTYTRADE_PAPER,
       accountId: env.keys.TASTYTRADE_ACCOUNT_ID,
-    },
-    {
-      brokerId: "trading212",
-      key: env.keys.TRADING212_API_KEY,
-      secret: env.keys.TRADING212_API_SECRET,
-      paper: env.keys.TRADING212_PAPER,
-      accountId: env.keys.TRADING212_ACCOUNT_ID,
-    },
-    {
-      brokerId: "etrade",
-      key: env.keys.ETRADE_API_KEY,
-      secret: env.keys.ETRADE_API_SECRET,
-      paper: env.keys.ETRADE_PAPER,
-      accountId: env.keys.ETRADE_ACCOUNT_ID,
     },
     {
       brokerId: "ibkr",

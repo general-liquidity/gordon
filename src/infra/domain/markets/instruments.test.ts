@@ -59,7 +59,7 @@ describe("market instrument resolution", () => {
           }),
         } as never,
         broker: {
-          brokerId: "webull",
+          brokerId: "alpaca",
           capabilities: {
             supportsExtendedHours: true,
             supportsHistoricalBars: false,
