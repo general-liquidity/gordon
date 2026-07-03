@@ -98,7 +98,7 @@ export { positionTrackingTools } from "./account/position-tracking.ts";
 export { checkRiskTool, evaluateOrderRisk } from "./trading/risk-gate.ts";
 
 // Memory tools (v0.7)
-export { memoryTools } from "./runtime/meta/memory-tools.ts";
+export { memoryTools, selfHistoryTools } from "./runtime/meta/memory-tools.ts";
 
 // ACE (Agentic Context Engineering) tools
 export { aceTools } from "./runtime/meta/ace-tools.ts";

@@ -13,6 +13,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getMemoryManager } from "../../../../../core/memory/index.ts";
+import { searchSessionHistory } from "../../../../memory/selfHistory/index.ts";
 import { createModuleLogger } from "../../../../logger/index.ts";
 
 const logger = createModuleLogger("memory-tools");
@@ -251,6 +252,80 @@ export const getMemoryContextTool = createTool({
 });
 
 // ============================================================================
+// Search Session History Tool (self-history recall)
+// ============================================================================
+
+/**
+ * Ranked recall over Gordon's OWN past chat sessions. Unlike `search_memory`
+ * (which searches the extracted-fact journal), this searches the raw
+ * transcripts of prior sessions — "when did I last analyze this setup", "what
+ * did I conclude about SOL microstructure", "show the last time this playbook
+ * fired". Backed by the incremental staleness catalog + the hybrid retrieval
+ * stack, so every hit carries why it matched and a citation cursor
+ * (session id + message offset) back to the exact turn.
+ */
+export const searchSessionHistoryTool = createTool({
+  id: "search_session_history",
+  description:
+    "Search Gordon's own PAST CHAT SESSIONS (raw transcripts) with ranked, " +
+    "provenance-carrying recall. Use to recall your prior analysis or the " +
+    "operator's past questions: 'when did I last analyze this setup', 'what " +
+    "did I conclude about SOL microstructure', 'the last time this playbook " +
+    "fired'. Each result includes why it matched and a citation (session id + " +
+    "message offset) to the exact turn. Distinct from search_memory, which " +
+    "searches extracted durable facts, not transcripts.",
+  inputSchema: z.object({
+    query: z.string().describe("Search query (natural language or keywords)"),
+    limit: z
+      .number()
+      .min(1)
+      .max(20)
+      .default(5)
+      .describe("Max past-session turns to return"),
+  }),
+  outputSchema: z.object({
+    results: z.array(
+      z.object({
+        content: z.string(),
+        role: z.string(),
+        agent: z.string().optional(),
+        score: z.number(),
+        age: z.string(),
+        whyMatched: z.array(z.string()),
+        citation: z.object({
+          sessionId: z.string(),
+          messageIndex: z.number(),
+          timestamp: z.string().nullable(),
+        }),
+      })
+    ),
+    count: z.number(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ query, limit }) => {
+    try {
+      const hits = searchSessionHistory(query, { limit: limit ?? 5 });
+      return {
+        results: hits.map((h) => ({
+          content: h.content,
+          role: h.role,
+          ...(h.agent ? { agent: h.agent } : {}),
+          score: h.score,
+          age: h.timestamp !== null ? formatAge(new Date(h.timestamp).toISOString()) : "unknown",
+          whyMatched: h.whyMatched,
+          citation: h.citation,
+        })),
+        count: hits.length,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error("search_session_history failed", { error: message });
+      return { results: [], count: 0, error: message };
+    }
+  },
+});
+
+// ============================================================================
 // Helpers
 // ============================================================================
 
@@ -280,4 +355,13 @@ export const memoryTools = {
   record_insight: recordInsightTool,
   get_lessons: getLessonsTool,
   get_memory_context: getMemoryContextTool,
+};
+
+/**
+ * Self-history recall tools — a separate object so they can be tier-gated
+ * independently of the hot-tier memory tools. Registered COLD on the
+ * researcher (self-recall is a deep-work path, not the hot scan loop).
+ */
+export const selfHistoryTools = {
+  search_session_history: searchSessionHistoryTool,
 };
