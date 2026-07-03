@@ -19,7 +19,8 @@
 // paid by vanilla ink (react-reconciler, yoga-layout) so there is no
 // measurable startup penalty for the fallback code path.
 
-import React, { type ReactNode } from "react";
+import React, { type ReactNode, useEffect, useMemo, useRef } from "react";
+import { EventEmitter } from "node:events";
 import process from "node:process";
 import {
   render as inkRender,
@@ -34,6 +35,11 @@ import OurAppContext from "./contexts/AppContext.ts";
 import OurStdinContext from "./contexts/StdinContext.ts";
 import OurStdoutContext from "./contexts/StdoutContext.ts";
 import OurStderrContext from "./contexts/StderrContext.ts";
+import {
+  createInputPipeline,
+  ENABLE_BRACKETED_PASTE,
+  DISABLE_BRACKETED_PASTE,
+} from "./stdin-tokenizer.ts";
 
 // Merge persisted experimental flags into process.env at module load.
 // Env var wins over persisted; persisted wins over unset. Idempotent.
@@ -204,12 +210,76 @@ function VanillaInkContextBridge({ children }: { children: ReactNode }): React.R
   const stdin = inkUseStdin();
   const stdout = inkUseStdout();
   const stderr = inkUseStderr();
+
+  // Ink's own App emits RAW stdin chunks on `internal_eventEmitter`. Re-provide
+  // a wrapper emitter that carries COMPLETE tokens instead: run every raw chunk
+  // through the streaming pipeline (cross-read escape/mouse buffering + ESC
+  // disambiguation + bracketed-paste coalescing) so our `useInput` shim never
+  // sees a split arrow key, an embedded control sequence, or a multi-line paste
+  // that fires Enter. This is the vanilla-render counterpart to the custom App's
+  // dispatchChunk wiring; the parser is live on both paths.
+  const bridgedEmitter = useRef<EventEmitter | null>(null);
+  if (bridgedEmitter.current === null) bridgedEmitter.current = new EventEmitter();
+  const emitter = bridgedEmitter.current;
+
+  const inkEmitter = stdin.internal_eventEmitter;
+  const inkStream = stdin.stdin;
+  const stdoutStream = stdout.stdout;
+
+  useEffect(() => {
+    const pipeline = createInputPipeline(
+      {
+        onKey: (seq) => emitter.emit("input", seq),
+        onMouse: (event) => emitter.emit("mouse", event),
+        onPaste: (text) => emitter.emit("paste", text),
+      },
+      {
+        // Vanilla ink does not enable mouse tracking, so no `ESC [ <` bytes
+        // arrive; keep them on the keypress path for byte-exact parity.
+        mouseEnabled: () => false,
+        getReadableLength: () =>
+          (inkStream as unknown as { readableLength?: number }).readableLength ?? 0,
+      },
+    );
+    const onRawChunk = (chunk: string | Buffer): void => {
+      pipeline.feed(typeof chunk === "string" ? chunk : String(chunk));
+    };
+    inkEmitter?.on("input", onRawChunk);
+
+    let pasteEnabled = false;
+    if (stdoutStream?.isTTY) {
+      try {
+        stdoutStream.write(ENABLE_BRACKETED_PASTE);
+        pasteEnabled = true;
+      } catch {
+        // Non-essential — degrade silently.
+      }
+    }
+
+    return () => {
+      inkEmitter?.removeListener("input", onRawChunk);
+      pipeline.dispose();
+      if (pasteEnabled) {
+        try {
+          stdoutStream.write(DISABLE_BRACKETED_PASTE);
+        } catch {
+          // Best-effort on teardown.
+        }
+      }
+    };
+  }, [emitter, inkEmitter, inkStream, stdoutStream]);
+
+  const bridgedStdin = useMemo(
+    () => ({ ...stdin, internal_eventEmitter: emitter }),
+    [stdin, emitter],
+  );
+
   return React.createElement(
     OurAppContext.Provider,
     { value: app },
     React.createElement(
       OurStdinContext.Provider,
-      { value: stdin },
+      { value: bridgedStdin },
       React.createElement(
         OurStdoutContext.Provider,
         { value: stdout },

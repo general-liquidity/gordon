@@ -1,37 +1,33 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useEffect, useRef, useCallback } from "react";
+import useStdin from "../../ink-custom/hooks/use-stdin.ts";
 
 // ============================================================================
-// usePasteHandler — Detects bracketed paste mode and content types
+// usePasteHandler — subscribes to the coalesced bracketed-paste channel.
+//
+// The stdin tokenizer (src/tui/ink-custom/stdin-tokenizer.ts) recognizes the
+// DEC-2004 paste markers, buffers the content across chunk boundaries, and
+// emits a single `paste` event on the App's internal emitter. This hook is a
+// thin subscriber over that channel. It deliberately does NOT attach its own
+// `process.stdin` listener — a second reader competes with the App's readable
+// handler and drops characters (the failure mode Claude Code documents).
 // ============================================================================
 
 export function usePasteHandler(onPaste: (text: string) => void) {
-  const bufferRef = useRef("");
-  const inBracketPasteRef = useRef(false);
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const { internal_eventEmitter } = useStdin();
+  const onPasteRef = useRef(onPaste);
+  onPasteRef.current = onPaste;
 
   useEffect(() => {
-    const onData = (data: Buffer) => {
-      const str = data.toString();
-      if (str.includes("\x1b[200~")) {
-        inBracketPasteRef.current = true;
-        bufferRef.current = "";
-        return;
-      }
-      if (str.includes("\x1b[201~")) {
-        inBracketPasteRef.current = false;
-        if (bufferRef.current) {
-          onPaste(bufferRef.current);
-          bufferRef.current = "";
-        }
-        return;
-      }
-      if (inBracketPasteRef.current) {
-        bufferRef.current += str;
-      }
+    if (!internal_eventEmitter) return;
+    const handler = (text: string): void => {
+      onPasteRef.current(text);
     };
-
-    process.stdin.on("data", onData);
-    return () => { process.stdin.off("data", onData); };
-  }, [onPaste]);
+    internal_eventEmitter.on("paste", handler);
+    return () => {
+      internal_eventEmitter.removeListener("paste", handler);
+    };
+  }, [internal_eventEmitter]);
 
   const detectContentType = useCallback((text: string): "csv" | "path" | "text" => {
     if (/\.(png|jpg|jpeg|gif|webp|svg)$/i.test(text.trim())) return "path";
