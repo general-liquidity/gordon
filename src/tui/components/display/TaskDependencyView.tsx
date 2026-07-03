@@ -11,6 +11,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
+import { OrderedList } from "../../design-system/OrderedList.js";
 import type { TaskNode } from "../../services/taskDependencyGraph.js";
 
 // ============================================================================
@@ -137,36 +138,34 @@ export function TaskDependencyView({ tasks, onStart, onCancel, onClose }: Props)
       </Box>
       <Text> </Text>
 
-      {/* Task list */}
-      <Box flexDirection="column">
+      {/* Task list: numbering + column alignment come from OrderedList */}
+      <OrderedList>
         {tasks.map((task, i) => {
           const isFocused = i === cursor;
           const icon = STATUS_ICON[task.status];
           const color = STATUS_COLOR[task.status];
           const blockedLabel = buildBlockedByLabel(task, tasks);
           const pointer = isFocused ? "\u25B8 " : "  ";
-          const idx = `${i + 1}.`;
 
           return (
-            <Box key={task.id} paddingLeft={1}>
-              <Text color={isFocused ? "cyanBright" : undefined}>{pointer}</Text>
-              <Box width={4}>
-                <Text dimColor>{idx}</Text>
+            <OrderedList.Item key={task.id}>
+              <Box>
+                <Text color={isFocused ? "cyanBright" : undefined}>{pointer}</Text>
+                <Text color={color}>{icon} </Text>
+                <Text bold={isFocused} color={isFocused ? color : undefined}>
+                  {task.title}
+                </Text>
+                {blockedLabel && (
+                  <Text dimColor> ({blockedLabel})</Text>
+                )}
+                {task.error && (
+                  <Text color="red"> [{task.error}]</Text>
+                )}
               </Box>
-              <Text color={color}>{icon} </Text>
-              <Text bold={isFocused} color={isFocused ? color : undefined}>
-                {task.title}
-              </Text>
-              {blockedLabel && (
-                <Text dimColor> ({blockedLabel})</Text>
-              )}
-              {task.error && (
-                <Text color="red"> [{task.error}]</Text>
-              )}
-            </Box>
+            </OrderedList.Item>
           );
         })}
-      </Box>
+      </OrderedList>
 
       {/* Focused task details */}
       {tasks[cursor] && (
