@@ -14,6 +14,7 @@ export { LoadingState } from "./LoadingState.js";
 export { Tabs } from "./Tabs.js";
 export { ProgressBar } from "./ProgressBar.js";
 export { ListItem } from "./ListItem.js";
+export { OrderedList, OrderedListItem, orderedListMarker, orderedMarkerColor } from "./OrderedList.js";
 export { Dialog } from "./Dialog.js";
 export { FuzzyPicker } from "./FuzzyPicker.js";
 export type { PickerItem } from "./FuzzyPicker.js";
