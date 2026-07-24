@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { HeuristicJudge, ORCHESTRATION_BACKPRESSURE_ENV } from "./proposalJudge.ts";
 import { getSuggestionStore } from "../storage/suggestionStore.ts";
+import { getProactiveEngine } from "../engine/proactiveEngine.ts";
 import type { ProactiveCategory, ProactiveSuggestion } from "../types.ts";
 
 function suggestion(
@@ -32,10 +33,17 @@ function floodPending(n: number): void {
 const originalFlag = process.env[ORCHESTRATION_BACKPRESSURE_ENV];
 
 beforeEach(() => {
+  // Backpressure is computed from the process-wide suggestion-store pending
+  // count. Another suite that left the proactive engine running could tick
+  // fresh cards into that shared store after we clear it, skewing the count
+  // and flipping the overloaded/slack verdict. Stop the engine first, then
+  // clear, so the pending count reflects only what each test floods.
+  getProactiveEngine().stop();
   getSuggestionStore().clear();
 });
 
 afterEach(() => {
+  getProactiveEngine().stop();
   getSuggestionStore().clear();
   if (originalFlag === undefined) delete process.env[ORCHESTRATION_BACKPRESSURE_ENV];
   else process.env[ORCHESTRATION_BACKPRESSURE_ENV] = originalFlag;

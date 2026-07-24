@@ -6,6 +6,7 @@ import {
   createModelResolver,
   type AgentRole,
 } from "./agentHelpers.ts";
+import { resetProviderRegistry } from "../runtime/providers/registry.ts";
 
 // Save and restore env so tests don't leak state into the rest of the suite.
 const ENV_KEYS = [
@@ -17,11 +18,28 @@ const ENV_KEYS = [
 ];
 const savedEnv: Record<string, string | undefined> = {};
 
+// Route resolution needs *a* provider key to return a default route string; in
+// CI no real key is set. Supply a dummy ANTHROPIC_API_KEY only when none is
+// present so `getDefaultRoute` resolves a first-party route without a live key.
+// The registry caches env at first read, so reset it after mutating the key.
+let injectedDummyKey = false;
+
 beforeEach(() => {
   for (const key of ENV_KEYS) {
     savedEnv[key] = process.env[key];
     delete process.env[key];
   }
+  injectedDummyKey = false;
+  if (
+    !process.env.ANTHROPIC_API_KEY &&
+    !process.env.OPENAI_API_KEY &&
+    !process.env.GOOGLE_GENERATIVE_AI_API_KEY &&
+    !process.env.XAI_API_KEY
+  ) {
+    process.env.ANTHROPIC_API_KEY = "test-dummy-key";
+    injectedDummyKey = true;
+  }
+  resetProviderRegistry();
 });
 
 afterEach(() => {
@@ -32,6 +50,11 @@ afterEach(() => {
       process.env[key] = savedEnv[key];
     }
   }
+  if (injectedDummyKey) {
+    delete process.env.ANTHROPIC_API_KEY;
+    injectedDummyKey = false;
+  }
+  resetProviderRegistry();
 });
 
 describe("parseModelOverride", () => {

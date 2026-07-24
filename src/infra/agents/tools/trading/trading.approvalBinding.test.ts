@@ -13,6 +13,7 @@ import {
   getApprovedContentHash,
 } from "../../../storage/entities/plans.ts";
 import { resetAllKillSwitches } from "../../../safety/killSwitches.ts";
+import { resetSessionWipRegistryForTesting } from "../../../safety/wipSessionRegistry.ts";
 import { approvePlanTool, executePlanTool } from "./trading.ts";
 
 const dbPath = join(tmpdir(), `gordon-trading-binding-${process.pid}-${Date.now()}.db`);
@@ -31,6 +32,13 @@ afterAll(() => {
 
 beforeEach(() => {
   resetAllKillSwitches();
+  // The WIP-limit gate is default-ON and consults a process-wide session
+  // registry singleton. A prior suite that executes a plan leaves activated
+  // entries there; under a shared-process run that leak can trip execute_plan's
+  // WIP gate (which fires before the allocation/price gates these tests assert
+  // on) and mask the expected error. Reset it so each test starts with a clean
+  // registry — this does not touch the approval-binding guard, only WIP state.
+  resetSessionWipRegistryForTesting();
 });
 
 const RATIONALE = "User confirmed plan, entry trigger hit, no regime conflict";

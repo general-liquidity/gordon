@@ -23,17 +23,27 @@ describe("scanSkillSecurity", () => {
     expect(r.block).toBe(false);
   });
 
-  it("flags injection in a non-builtin body but does not block in warn mode", () => {
-    const r = scanSkillSecurity("Momentum read", INJECTED, "plugin");
+  it("flags AND blocks a blocking-level body injection by default (fail-closed)", () => {
+    // Guard is default-on: a poisoned non-builtin body reaches a money agent's
+    // reasoning directly, so an unset guard blocks rather than merely warns.
+    // Pass an explicit env with the guard unset so shared-process leaks can't sway it.
+    const r = scanSkillSecurity("Momentum read", INJECTED, "plugin", {});
     expect(r.scan.injectionDetected).toBe(true);
     expect(r.scan.riskLevel).toBe("critical");
     expect(r.scan.categories).toContain("instruction_override");
-    expect(r.block).toBe(false); // guard off
+    expect(r.block).toBe(true); // default-on
   });
 
-  it("blocks a blocking-level body injection when the guard is enabled", () => {
+  it("blocks a blocking-level body injection when the guard is explicitly enabled", () => {
     const r = scanSkillSecurity("Momentum read", INJECTED, "plugin", { GORDON_SKILL_INJECTION_GUARD: "1" });
     expect(r.block).toBe(true);
+  });
+
+  it("warns only (does not block) when the operator opts OUT of the guard", () => {
+    const r = scanSkillSecurity("Momentum read", INJECTED, "plugin", { GORDON_SKILL_INJECTION_GUARD: "0" });
+    expect(r.scan.injectionDetected).toBe(true);
+    expect(r.scan.riskLevel).toBe("critical");
+    expect(r.block).toBe(false); // guard opted out → warn mode
   });
 
   it("neutralizes injection in the DESCRIPTION (wrap-as-data), not just the body", () => {
@@ -69,10 +79,29 @@ describe("loadSkillFromFile — injection scan integration", () => {
     expect(skill!.security).toBeUndefined();
   });
 
-  it("loads an injected user skill in warn mode but attaches the security flag", () => {
-    const skill = loadSkillFromFile(writeSkill("evil-skill", INJECTED), "user");
-    expect(skill).not.toBeNull(); // warn mode: still loads
-    expect(skill!.security?.injectionDetected).toBe(true);
-    expect(skill!.security?.riskLevel).toBe("critical");
+  it("blocks an injected user skill by default (fail-closed → returns null)", () => {
+    const prev = process.env.GORDON_SKILL_INJECTION_GUARD;
+    delete process.env.GORDON_SKILL_INJECTION_GUARD; // default-on
+    try {
+      const skill = loadSkillFromFile(writeSkill("evil-skill", INJECTED), "user");
+      expect(skill).toBeNull(); // default-on: poisoned body refuses to load
+    } finally {
+      if (prev === undefined) delete process.env.GORDON_SKILL_INJECTION_GUARD;
+      else process.env.GORDON_SKILL_INJECTION_GUARD = prev;
+    }
+  });
+
+  it("loads an injected user skill in warn mode (guard opted out) but attaches the security flag", () => {
+    const prev = process.env.GORDON_SKILL_INJECTION_GUARD;
+    process.env.GORDON_SKILL_INJECTION_GUARD = "0"; // operator opts out → warn mode
+    try {
+      const skill = loadSkillFromFile(writeSkill("evil-skill", INJECTED), "user");
+      expect(skill).not.toBeNull(); // warn mode: still loads
+      expect(skill!.security?.injectionDetected).toBe(true);
+      expect(skill!.security?.riskLevel).toBe("critical");
+    } finally {
+      if (prev === undefined) delete process.env.GORDON_SKILL_INJECTION_GUARD;
+      else process.env.GORDON_SKILL_INJECTION_GUARD = prev;
+    }
   });
 });

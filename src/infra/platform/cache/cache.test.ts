@@ -33,13 +33,20 @@ describe("Cache", () => {
   });
 
   test("supports updateTtlOnAccess", async () => {
-    const cache = new Cache<number>({ defaultTtl: 60, updateTtlOnAccess: true });
+    // TTL and sleeps are sized so the two sleeps SUM to more than the TTL
+    // (240ms > 200ms): without the on-access extension the entry would be
+    // expired by the second read, so a passing second read genuinely proves
+    // the access reset the TTL window. Each sleep keeps ~80ms of headroom
+    // under its own deadline, tolerant of timer jitter on a loaded CI box.
+    const cache = new Cache<number>({ defaultTtl: 200, updateTtlOnAccess: true });
     cache.set("rolling", 7);
 
-    await sleep(25);
-    expect(cache.get("rolling")).toBe(7); // extends TTL
-    await sleep(25);
+    await sleep(120);
+    expect(cache.get("rolling")).toBe(7); // within the window → read extends TTL
+    await sleep(120);
 
+    // Total elapsed (~240ms) exceeds the original 200ms TTL; still present only
+    // because the prior read reset the window.
     expect(cache.get("rolling")).toBe(7);
   });
 
