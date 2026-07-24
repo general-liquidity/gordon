@@ -32,10 +32,9 @@
 export const REVENGE_TRADE_GUARD_FLAG_ENV = "GORDON_REVENGE_TRADE_GUARD";
 
 export function isRevengeTradeGuardEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[REVENGE_TRADE_GUARD_FLAG_ENV] === "1" ||
-    env[REVENGE_TRADE_GUARD_FLAG_ENV] === "true"
-  );
+  // Default-on protective gate: absence = enabled. Explicit "0"/"false" opts out.
+  const raw = env[REVENGE_TRADE_GUARD_FLAG_ENV];
+  return raw !== "0" && raw !== "false";
 }
 
 export type GuardMode = "informational" | "active";

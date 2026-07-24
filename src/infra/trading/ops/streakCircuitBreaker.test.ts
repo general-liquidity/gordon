@@ -9,9 +9,11 @@ import {
 } from "./streakCircuitBreaker.ts";
 
 describe("isStreakCircuitBreakerEnabled", () => {
-  it("respects the flag", () => {
-    expect(isStreakCircuitBreakerEnabled({})).toBe(false);
+  it("respects the flag (default-on, explicit opt-out)", () => {
+    expect(isStreakCircuitBreakerEnabled({})).toBe(true);
     expect(isStreakCircuitBreakerEnabled({ [STREAK_CIRCUIT_BREAKER_FLAG_ENV]: "1" })).toBe(true);
+    expect(isStreakCircuitBreakerEnabled({ [STREAK_CIRCUIT_BREAKER_FLAG_ENV]: "0" })).toBe(false);
+    expect(isStreakCircuitBreakerEnabled({ [STREAK_CIRCUIT_BREAKER_FLAG_ENV]: "false" })).toBe(false);
   });
 });
 

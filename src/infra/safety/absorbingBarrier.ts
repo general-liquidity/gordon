@@ -27,10 +27,11 @@ export const ABSORBING_BARRIER_FLAG_ENV = "GORDON_ABSORBING_BARRIER";
 export function isAbsorbingBarrierEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-  return (
-    env[ABSORBING_BARRIER_FLAG_ENV] === "1" ||
-    env[ABSORBING_BARRIER_FLAG_ENV] === "true"
-  );
+  // Default-on protective gate: absence = enabled. Explicit "0"/"false" opts out.
+  // Dormant unless the operator supplies barrier inputs (equity/limits), so it
+  // never fires spuriously with no configuration.
+  const raw = env[ABSORBING_BARRIER_FLAG_ENV];
+  return raw !== "0" && raw !== "false";
 }
 
 export type BarrierKind = "broker" | "prop_firm" | "psychological";

@@ -59,7 +59,9 @@ export interface WipGateResult {
 }
 
 export function isWipLimitEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[WIP_FLAG_ENV] === "1" || env[WIP_FLAG_ENV] === "true";
+  // Default-on protective gate: absence = enabled. Explicit "0"/"false" opts out.
+  const raw = env[WIP_FLAG_ENV];
+  return raw !== "0" && raw !== "false";
 }
 
 function parsePositiveIntOrInfinity(raw: string | undefined, fallback: number): number {

@@ -9,10 +9,12 @@ import {
 } from "./absorbingBarrier.ts";
 
 describe("isAbsorbingBarrierEnabled", () => {
-  it("respects the flag", () => {
-    expect(isAbsorbingBarrierEnabled({})).toBe(false);
+  it("respects the flag (default-on, explicit opt-out)", () => {
+    expect(isAbsorbingBarrierEnabled({})).toBe(true);
     expect(isAbsorbingBarrierEnabled({ [ABSORBING_BARRIER_FLAG_ENV]: "1" })).toBe(true);
     expect(isAbsorbingBarrierEnabled({ [ABSORBING_BARRIER_FLAG_ENV]: "true" })).toBe(true);
+    expect(isAbsorbingBarrierEnabled({ [ABSORBING_BARRIER_FLAG_ENV]: "0" })).toBe(false);
+    expect(isAbsorbingBarrierEnabled({ [ABSORBING_BARRIER_FLAG_ENV]: "false" })).toBe(false);
   });
 });
 

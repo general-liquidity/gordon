@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "bun:test";
+import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import {
   activateSessionPlan,
   deactivateSessionPlan,
@@ -9,14 +9,30 @@ import {
 import { WIP_FLAG_ENV } from "./wipLimit.ts";
 
 describe("wipSessionRegistry", () => {
+  const prev = process.env[WIP_FLAG_ENV];
+
   beforeEach(() => {
     resetSessionWipRegistryForTesting();
     delete process.env[WIP_FLAG_ENV];
   });
 
-  it("passes through when WIP limit is disabled", () => {
+  afterEach(() => {
+    if (prev === undefined) delete process.env[WIP_FLAG_ENV];
+    else process.env[WIP_FLAG_ENV] = prev;
+  });
+
+  it("passes through when WIP limit is explicitly disabled", () => {
+    process.env[WIP_FLAG_ENV] = "0";
     const gate = gateSessionPlan("BTC/USD", "rsi");
     expect(gate.allowed).toBe(true);
+    expect(gate.message).toBe("WIP limit disabled.");
+  });
+
+  it("gates by default (protective posture on out-of-box)", () => {
+    activateSessionPlan("p0", "BTC/USD", "rsi");
+    const gate = gateSessionPlan("BTC/USD", "macd");
+    expect(gate.allowed).toBe(false);
+    expect(gate.reason).toBe("per-symbol");
   });
 
   it("blocks second active plan per symbol when enabled", () => {

@@ -7,11 +7,17 @@ import {
 } from "./revengeTradeGuard.ts";
 
 describe("isRevengeTradeGuardEnabled", () => {
-  it("respects the flag", () => {
-    expect(isRevengeTradeGuardEnabled({})).toBe(false);
+  it("respects the flag (default-on, explicit opt-out)", () => {
+    expect(isRevengeTradeGuardEnabled({})).toBe(true);
     expect(
       isRevengeTradeGuardEnabled({ [REVENGE_TRADE_GUARD_FLAG_ENV]: "1" }),
     ).toBe(true);
+    expect(
+      isRevengeTradeGuardEnabled({ [REVENGE_TRADE_GUARD_FLAG_ENV]: "0" }),
+    ).toBe(false);
+    expect(
+      isRevengeTradeGuardEnabled({ [REVENGE_TRADE_GUARD_FLAG_ENV]: "false" }),
+    ).toBe(false);
   });
 });
 

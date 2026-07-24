@@ -8,9 +8,11 @@ import {
 } from "./giveBackStop.ts";
 
 describe("isGiveBackStopEnabled", () => {
-  it("respects the flag", () => {
-    expect(isGiveBackStopEnabled({})).toBe(false);
+  it("respects the flag (default-on, explicit opt-out)", () => {
+    expect(isGiveBackStopEnabled({})).toBe(true);
     expect(isGiveBackStopEnabled({ [GIVE_BACK_STOP_FLAG_ENV]: "1" })).toBe(true);
+    expect(isGiveBackStopEnabled({ [GIVE_BACK_STOP_FLAG_ENV]: "0" })).toBe(false);
+    expect(isGiveBackStopEnabled({ [GIVE_BACK_STOP_FLAG_ENV]: "false" })).toBe(false);
   });
 });
 

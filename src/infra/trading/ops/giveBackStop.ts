@@ -21,10 +21,9 @@ export const GIVE_BACK_STOP_FLAG_ENV = "GORDON_GIVE_BACK_STOP";
 export function isGiveBackStopEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-  return (
-    env[GIVE_BACK_STOP_FLAG_ENV] === "1" ||
-    env[GIVE_BACK_STOP_FLAG_ENV] === "true"
-  );
+  // Default-on protective gate: absence = enabled. Explicit "0"/"false" opts out.
+  const raw = env[GIVE_BACK_STOP_FLAG_ENV];
+  return raw !== "0" && raw !== "false";
 }
 
 export type GiveBackState = "ok" | "warn" | "triggered";

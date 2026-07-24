@@ -18,10 +18,12 @@ const allClear: KillListInput = {
 };
 
 describe("isPreExecKillListEnabled", () => {
-  it("respects the flag", () => {
-    expect(isPreExecKillListEnabled({})).toBe(false);
+  it("respects the flag (default-on, explicit opt-out)", () => {
+    expect(isPreExecKillListEnabled({})).toBe(true);
     expect(isPreExecKillListEnabled({ [PRE_EXEC_KILL_LIST_FLAG_ENV]: "1" })).toBe(true);
     expect(isPreExecKillListEnabled({ [PRE_EXEC_KILL_LIST_FLAG_ENV]: "true" })).toBe(true);
+    expect(isPreExecKillListEnabled({ [PRE_EXEC_KILL_LIST_FLAG_ENV]: "0" })).toBe(false);
+    expect(isPreExecKillListEnabled({ [PRE_EXEC_KILL_LIST_FLAG_ENV]: "false" })).toBe(false);
   });
 });
 

@@ -22,10 +22,12 @@ const plan = (id: string, symbol: string, strategy: string, t = 0): ActivePlan =
 });
 
 describe("isWipLimitEnabled", () => {
-  it("respects the flag", () => {
-    expect(isWipLimitEnabled({})).toBe(false);
+  it("respects the flag (default-on, explicit opt-out)", () => {
+    expect(isWipLimitEnabled({})).toBe(true);
     expect(isWipLimitEnabled({ [WIP_FLAG_ENV]: "1" })).toBe(true);
     expect(isWipLimitEnabled({ [WIP_FLAG_ENV]: "true" })).toBe(true);
+    expect(isWipLimitEnabled({ [WIP_FLAG_ENV]: "0" })).toBe(false);
+    expect(isWipLimitEnabled({ [WIP_FLAG_ENV]: "false" })).toBe(false);
   });
 });
 

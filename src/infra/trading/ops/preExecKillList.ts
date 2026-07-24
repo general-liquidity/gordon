@@ -29,10 +29,10 @@ export const PRE_EXEC_KILL_LIST_FLAG_ENV = "GORDON_PRE_EXEC_KILL_LIST";
 export function isPreExecKillListEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-  return (
-    env[PRE_EXEC_KILL_LIST_FLAG_ENV] === "1" ||
-    env[PRE_EXEC_KILL_LIST_FLAG_ENV] === "true"
-  );
+  // Default-on protective gate: absence = enabled. Explicit "0"/"false" opts out.
+  // Operator-state self-checks default to false → pass, so it never fires spuriously.
+  const raw = env[PRE_EXEC_KILL_LIST_FLAG_ENV];
+  return raw !== "0" && raw !== "false";
 }
 
 export interface KillListInput {
