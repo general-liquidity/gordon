@@ -10,8 +10,36 @@ permissions:
 
 jobs:
   test:
-    name: Test
+    # Sharded test matrix. The full 840-file suite is split across disjoint
+    # path subsets so each shard is a FRESH `bun test` process over far fewer
+    # files. This eliminates the cross-file contamination that flaked the
+    # money-path DB tests (global sqlite singleton via setDatabasePathForTesting)
+    # when the whole suite ran in one process, and it runs faster in parallel.
+    # Each shard picks up bunfig [test].preload (the global reset) automatically.
+    #
+    # COVERAGE INVARIANT: the union of every shard's `paths` MUST cover every
+    # *.test.ts file under src/ (plus the 2 script tests) with NO file matched
+    # by zero shards and NONE matched by two. `infra-rest` in particular must
+    # list EVERY src/infra subdir that is NOT already claimed by `agents` or
+    # `money-path` — bun test path args cannot express "src/infra MINUS those",
+    # so new src/infra subdirs must be added here by hand. A missed subdir =
+    # untested code shipping. Verified by enumerating find src -name '*.test.ts'.
+    name: Test (${{ matrix.shard-name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard-name: core
+            paths: src/core
+          - shard-name: agents
+            paths: src/infra/agents
+          - shard-name: money-path
+            paths: src/infra/trading src/infra/safety src/infra/storage src/infra/exchange src/infra/broker
+          - shard-name: infra-rest
+            paths: src/infra/acp src/infra/action-log src/infra/ai src/infra/auth src/infra/calibration src/infra/cli src/infra/config src/infra/context src/infra/data src/infra/diagnostics src/infra/domain src/infra/execution src/infra/hooks src/infra/logger src/infra/memory src/infra/news src/infra/observability src/infra/permissions src/infra/platform src/infra/proactive src/infra/protocols src/infra/runtime src/infra/scheduler src/infra/security src/infra/skills src/infra/testing src/infra/tools src/infra/venues
+          - shard-name: app-ui
+            paths: src/tui src/app src/runtime src/backtest src/services src/gateway src/utils src/events src/types src/cli.test.ts scripts/dev/harness scripts/research/scans
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,8 +64,34 @@ jobs:
       - name: Patch Bun-incompatible dependencies
         run: node scripts/patches/patch-mastra.cjs
 
-      - name: Run tests
-        run: bun test
+      - name: Run tests (shard ${{ matrix.shard-name }})
+        run: bun test ${{ matrix.paths }}
+
+  # Single-shard gates: broker conformance, latency, and typecheck are
+  # suite-wide and must run exactly ONCE, not redundantly per test shard.
+  test-gates:
+    name: Test Gates (conformance + typecheck)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Patch Bun-incompatible dependencies
+        run: node scripts/patches/patch-mastra.cjs
 
       - name: Run broker conformance matrix
         run: bun run test:broker-conformance
@@ -50,7 +104,7 @@ jobs:
 
   verify-npm-wrapper:
     name: Verify npm Wrapper (${{ matrix.os }})
-    needs: test
+    needs: [test, test-gates]
     runs-on: ${{ matrix.os }}
     env:
       GORDON_NPM_VERSION: ${{ github.ref_name }}
@@ -91,7 +145,7 @@ jobs:
 
   verify-public-dist:
     name: Verify Public Dist Bundle
-    needs: test
+    needs: [test, test-gates]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -112,6 +166,7 @@ jobs:
     name: Create Source Release
     needs:
       - test
+      - test-gates
       - verify-npm-wrapper
       - verify-public-dist
     runs-on: ubuntu-latest
