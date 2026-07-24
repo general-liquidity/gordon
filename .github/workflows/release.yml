@@ -396,11 +396,22 @@ jobs:
           git checkout "${SOURCE_BRANCH}"
 
       - name: Commit source manifest updates
+        # Bookkeeping: refresh the brew/scoop/npm manifests on the source
+        # branch. This must never block a publish, so it tolerates failure,
+        # for example when the branch moved on while the release was running.
+        continue-on-error: true
         run: |
           git config user.name "Tiberiu Toca"
           git config user.email "tibi.toca@gmail.com"
-          git add Formula/gordon.rb scripts/scoop/gordon.json scripts/SHA256SUMS npm/package.json npm/README.md npm/LICENSE
-          git diff --cached --quiet || git commit -m "chore: publish assets for ${VERSION}"
+          # npm/LICENSE is generated at publish time and gitignored, so adding
+          # it here aborts the whole job under `bash -e`.
+          git add Formula/gordon.rb scripts/scoop/gordon.json scripts/SHA256SUMS npm/package.json npm/README.md
+          if git diff --cached --quiet; then
+            echo "No manifest changes to commit."
+            exit 0
+          fi
+          git commit -m "chore: publish assets for ${VERSION}"
+          git pull --rebase origin "${SOURCE_BRANCH}" || true
           git push origin "HEAD:${SOURCE_BRANCH}"
 
       - name: Upload SHA256SUMS to release
