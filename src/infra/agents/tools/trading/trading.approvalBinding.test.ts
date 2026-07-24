@@ -31,13 +31,19 @@ afterAll(() => {
 });
 
 beforeEach(() => {
+  // Re-assert this file's DB path before every test. The database path is a
+  // process-global; on CI a concurrently-scheduled test file can swap it out
+  // from under us between our tests, which would point our reads at the wrong
+  // (or a missing-schema) database and fail approval/execution. Re-setting it
+  // per test makes this file immune to any cross-file global-path stomping.
+  setDatabasePathForTesting(dbPath);
   resetAllKillSwitches();
   // The WIP-limit gate is default-ON and consults a process-wide session
   // registry singleton. A prior suite that executes a plan leaves activated
   // entries there; under a shared-process run that leak can trip execute_plan's
   // WIP gate (which fires before the allocation/price gates these tests assert
   // on) and mask the expected error. Reset it so each test starts with a clean
-  // registry — this does not touch the approval-binding guard, only WIP state.
+  // registry, this does not touch the approval-binding guard, only WIP state.
   resetSessionWipRegistryForTesting();
 });
 
