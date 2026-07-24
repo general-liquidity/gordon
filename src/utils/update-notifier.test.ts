@@ -125,7 +125,7 @@ describe("update command selection", () => {
 
     expect(command).not.toBeNull();
     expect(command?.command).toBe("brew");
-    expect(command?.args).toEqual(["upgrade", "general-liquidity/gordon-dist/gordon"]);
+    expect(command?.args).toEqual(["upgrade", "general-liquidity/gordon/gordon"]);
   });
 
   it("detects the dist-tag from the version string", () => {

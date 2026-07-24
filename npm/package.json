@@ -6,10 +6,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/general-liquidity/gordon-dist.git"
+    "url": "https://github.com/general-liquidity/gordon.git"
   },
   "homepage": "https://gordoncli.com",
-  "bugs": "https://github.com/general-liquidity/gordon-dist/issues",
+  "bugs": "https://github.com/general-liquidity/gordon/issues",
   "keywords": [
     "trading",
     "crypto",

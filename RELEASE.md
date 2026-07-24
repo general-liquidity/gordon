@@ -34,7 +34,7 @@ We publish **`0.9.0`**, not `1.0.0-rc.1`, because:
 The published artifact is the thin wrapper in `npm/` (it downloads the
 platform binary on install); its version is stamped from the git tag via
 `GORDON_NPM_VERSION`. Everything is driven by pushing a tag — CI does the
-build, the SBOM, the public-dist sync, and the `npm publish`.
+build, the SBOM, the release-manifest sync, and the `npm publish`.
 
 ```bash
 # 1. Land the version bump (this change) on main.

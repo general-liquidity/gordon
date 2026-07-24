@@ -1,11 +1,11 @@
 #!/bin/sh
 # Gordon CLI installer script
-# Usage: curl -fsSL https://raw.githubusercontent.com/general-liquidity/gordon-dist/main/install.sh | sh
-# Custom dir: GORDON_INSTALL_DIR="$HOME/.local/bin" curl -fsSL https://raw.githubusercontent.com/general-liquidity/gordon-dist/main/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/general-liquidity/gordon/main/scripts/install.sh | sh
+# Custom dir: GORDON_INSTALL_DIR="$HOME/.local/bin" curl -fsSL https://raw.githubusercontent.com/general-liquidity/gordon/main/scripts/install.sh | sh
 
 set -e
 
-REPO="${GORDON_DIST_REPO:-general-liquidity/gordon-dist}"
+REPO="${GORDON_DIST_REPO:-general-liquidity/gordon}"
 BINARY_NAME="gordon"
 INSTALL_METADATA_NAME="gordon-install.json"
 
@@ -258,7 +258,7 @@ main() {
 
     # Verify SHA-256 integrity before making the binary executable.
     # Expected hashes come from the committed SHA256SUMS published with the
-    # release. Fetched from the dist repo raw tree, keyed by asset filename.
+    # release. Fetched from the repo raw tree, keyed by asset filename.
     verify_checksum "$TMP_FILE" "$ASSET_NAME" "$VERSION"
 
     # Make executable
@@ -317,7 +317,7 @@ EOF
             echo "        echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
         fi
         echo "    - For native Windows install, use PowerShell instead:"
-        echo "        irm https://raw.githubusercontent.com/general-liquidity/gordon-dist/main/install.ps1 | iex"
+        echo "        irm https://raw.githubusercontent.com/general-liquidity/gordon/main/scripts/install.ps1 | iex"
         echo ""
     fi
 

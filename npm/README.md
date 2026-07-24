@@ -8,7 +8,7 @@
   <a href="https://www.npmjs.com/package/@general-liquidity/gordon">npm</a> •
   <a href="https://gordoncli.com">Website</a> •
   <a href="https://docs.gordon.trade">Docs</a> •
-  <a href="https://github.com/general-liquidity/gordon-dist/releases">Downloads</a>
+  <a href="https://github.com/general-liquidity/gordon/releases">Downloads</a>
 </p>
 
 ## Install
@@ -36,27 +36,27 @@ bun add -g @general-liquidity/gordon
 `Homebrew`:
 
 ```bash
-brew tap general-liquidity/gordon-dist https://github.com/general-liquidity/gordon-dist
-brew install general-liquidity/gordon-dist/gordon
+brew tap general-liquidity/gordon https://github.com/general-liquidity/gordon
+brew install general-liquidity/gordon/gordon
 ```
 
 `Scoop`:
 
 ```powershell
-scoop bucket add gordon https://github.com/general-liquidity/gordon-dist
+scoop bucket add gordon https://github.com/general-liquidity/gordon
 scoop install gordon/gordon
 ```
 
 Standalone install script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/general-liquidity/gordon-dist/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/general-liquidity/gordon/main/scripts/install.sh | sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/general-liquidity/gordon-dist/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/general-liquidity/gordon/main/scripts/install.ps1 | iex
 ```
 
 The npm package is a thin wrapper. It downloads the matching prebuilt binary for your platform during install.
@@ -91,7 +91,7 @@ That now resolves through the active install channel for npm, the user-local `np
 
 Release binaries and package manager manifests are published at:
 
-- `https://github.com/general-liquidity/gordon-dist/releases`
+- `https://github.com/general-liquidity/gordon/releases`
 
 ## Setup
 
@@ -123,4 +123,4 @@ gordon
 
 - Website: `https://gordoncli.com`
 - Docs: `https://docs.gordon.trade`
-- Public distribution repo: `https://github.com/general-liquidity/gordon-dist`
+- Public distribution repo: `https://github.com/general-liquidity/gordon`

@@ -33,8 +33,8 @@ export function detectDistTag(version: string = VERSION): string {
 function npmRegistryUrl(tag: string = detectDistTag()): string {
   return `https://registry.npmjs.org/${PACKAGE_NAME}/${encodeURIComponent(tag)}`;
 }
-const PUBLIC_INSTALL_SH_URL = "https://raw.githubusercontent.com/general-liquidity/gordon-dist/main/install.sh";
-const PUBLIC_INSTALL_PS1_URL = "https://raw.githubusercontent.com/general-liquidity/gordon-dist/main/install.ps1";
+const PUBLIC_INSTALL_SH_URL = "https://raw.githubusercontent.com/general-liquidity/gordon/main/scripts/install.sh";
+const PUBLIC_INSTALL_PS1_URL = "https://raw.githubusercontent.com/general-liquidity/gordon/main/scripts/install.ps1";
 const NPM_WRAPPER_INSTALL_MANIFEST = "install.json";
 const INSTALL_CHANNEL_METADATA_FILE = "gordon-install.json";
 
@@ -296,8 +296,8 @@ export function getUpdateCommand(context: InstallContext): UpdateCommand | null 
     case "homebrew":
       return {
         command: "brew",
-        args: ["upgrade", "general-liquidity/gordon-dist/gordon"],
-        display: "brew upgrade general-liquidity/gordon-dist/gordon",
+        args: ["upgrade", "general-liquidity/gordon/gordon"],
+        display: "brew upgrade general-liquidity/gordon/gordon",
         publicDisplay: "gordon --upgrade",
       };
     case "scoop":
