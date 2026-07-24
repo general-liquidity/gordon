@@ -29,8 +29,13 @@ function seedLesson(text: string, category: string): void {
     candidates: [
       {
         text,
+        // evidenceCount 2 clears the Curator's MIN_EVIDENCE_TO_PROMOTE bar so
+        // inferred/recurring categories (operational, execution_failure,
+        // strategy_decay) promote deterministically — PROMOTE_ON_FIRST
+        // categories (risk_event, user_preference) would pass at 1, but the
+        // suite seeds a mix, so the helper seeds above the bar for all.
         category: category as never,
-        evidenceCount: 1,
+        evidenceCount: 2,
         firstSeenAt: Date.now(),
         lastSeenAt: Date.now(),
         evidenceEntryIds: [],
