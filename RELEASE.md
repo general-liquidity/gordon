@@ -1,66 +1,105 @@
 # Releasing Gordon CLI
 
-Gordon ships in two channels off the same tag-driven pipeline in
-`.github/workflows/release.yml`:
+Gordon ships from a single tag-driven pipeline in `.github/workflows/release.yml`.
+One tag builds the platform matrix once, publishes the npm packages, and uploads
+the same binaries as GitHub Release assets for the curl / Homebrew / Scoop
+channels. There is no separate dist repo and no install-time download.
 
-- **`@friends`** — private-alpha builds. Any git tag matching
-  `friends | alpha | beta | rc` publishes here (e.g. `v0.9.0-friends.9`).
-- **`@latest`** — the public stable channel. Any tag that does *not* match
-  those pre-release markers publishes here (e.g. `v0.9.0`).
+## Distribution model (codex-style optionalDependencies)
 
-The dist-tag is chosen automatically by the `Determine npm dist-tag` step in
-`release.yml`. You do not pass `--tag` by hand in CI.
+The published root package is `@general-liquidity/gordon`. It carries **no
+binary of its own**. Instead it declares one `optionalDependencies` entry per
+platform, and npm installs only the sub-package that matches the host via its
+`os` / `cpu` / `libc` fields:
 
-## Version decision for the first public release
+| Sub-package | Target |
+|---|---|
+| `@general-liquidity/gordon-linux-x64` | Linux x64 (glibc) |
+| `@general-liquidity/gordon-linux-arm64` | Linux arm64 (glibc) |
+| `@general-liquidity/gordon-linux-x64-musl` | Linux x64 (musl / Alpine) |
+| `@general-liquidity/gordon-linux-arm64-musl` | Linux arm64 (musl / Alpine) |
+| `@general-liquidity/gordon-darwin-x64` | macOS Intel |
+| `@general-liquidity/gordon-darwin-arm64` | macOS Apple Silicon |
+| `@general-liquidity/gordon-win32-x64` | Windows x64 |
+| `@general-liquidity/gordon-win32-arm64` | Windows arm64 |
 
-The friends line is `0.9.0-friends.9`. In semver, `0.9.0-friends.9` is a
-*pre-release of* `0.9.0`, so the natural graduation is the clean `0.9.0`.
-
-We publish **`0.9.0`**, not `1.0.0-rc.1`, because:
-
-1. `release.yml` routes any tag containing `rc` to the `@friends` dist-tag.
-   Tagging `v1.0.0-rc.1` would keep the build off `@latest` — the opposite of
-   a public release. `v0.9.0` is the only shape that reaches `@latest` without
-   editing the workflow.
-2. `0.9.0` is the exact stable version the friends builds were pre-releasing.
-   It signals "the alpha line is now public," not a 1.0 maturity promise we
-   are not making yet.
-
-`package.json` is therefore set to `version: 0.9.0` and `private: false`
-(the `@friends` builds carried `private: true`, which blocks `npm publish`).
-
-## Publish flow (operator, from a clean `main`)
-
-The published artifact is the thin wrapper in `npm/` (it downloads the
-platform binary on install); its version is stamped from the git tag via
-`GORDON_NPM_VERSION`. Everything is driven by pushing a tag — CI does the
-build, the SBOM, the release-manifest sync, and the `npm publish`.
+All nine packages (root + eight platforms) are versioned together and published
+in the same release. `bin/gordon.cjs` resolves the installed platform
+sub-package at runtime and execs its vendored binary — nothing is fetched on
+install, so there is **no postinstall step**.
 
 ```bash
-# 1. Land the version bump (this change) on main.
+npm i -g @general-liquidity/gordon
+```
+
+npm selects the matching platform package automatically. If no sub-package
+matches the host (unsupported platform), the install degrades gracefully:
+`bin/gordon.cjs` emits a clear error naming the missing package instead of
+crashing.
+
+## Versioning
+
+Fresh semver starting at **`0.1.0`**. The dist-tag is chosen automatically by
+the `Determine npm dist-tag` step in `release.yml` — you do not pass `--tag` by
+hand:
+
+- **Pre-release tags** (`v0.1.0-alpha.N`, `v0.1.0-beta.N`, `v0.1.0-rc.N`) route
+  to the `@friends` / prerelease dist-tag.
+- **Stable tags** (`vX.Y.Z` with no pre-release suffix) route to `@latest`.
+
+`package.json` is set to `version: 0.1.0` and `private: false` (a `private: true`
+package blocks `npm publish`).
+
+## Release flow (operator, from a clean `main`)
+
+Everything is driven by pushing a tag. CI builds the 8-target matrix, stages the
+per-platform sub-packages, publishes the root plus every sub-package to npm with
+`--provenance`, and uploads the binaries as GitHub Release assets.
+
+```bash
+# 1. Land the version bump on main.
 git checkout main && git pull
 
-# 2. Tag the public release. No pre-release suffix => @latest.
-git tag v0.9.0
-git push origin v0.9.0
+# 2. Tag the release. No pre-release suffix => @latest.
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
-That tag push runs `release.yml`, which builds all platform binaries and, in
-the `Publish to npm` job, runs the equivalent of:
+That tag push runs `release.yml`, which:
 
-```bash
-# (executed by CI in the npm/ wrapper dir — shown for reference only)
-npm publish --access public --tag latest --provenance
-```
+1. Builds all eight platform binaries once from the single repo
+   (`general-liquidity/gordon`).
+2. Stages each binary into its `@general-liquidity/gordon-<platform>`
+   sub-package, all stamped with the tag version.
+3. Publishes the root package and all eight sub-packages to npm
+   (`npm publish --access public --provenance`, dist-tag chosen per the
+   versioning rules above).
+4. Uploads the same binaries as assets on the GitHub Release for the tag, which
+   feed the curl / Homebrew / Scoop channels.
+
+## Install channels
+
+All channels pull from the **same** GitHub Release assets — the npm binaries and
+the standalone downloads are byte-identical builds from one matrix run.
+
+- **npm** (primary): `npm i -g @general-liquidity/gordon` — resolves `@latest`,
+  so a stranger installs the public build by default.
+- **curl**: `install.sh` (Unix) / `install.ps1` (Windows) download the matching
+  binary from the GitHub Release.
+- **Homebrew**: formula points at the Release asset.
+- **Scoop**: manifest points at the Release asset.
 
 ## Flipping `@friends` -> `@latest` for an already-published version
 
-If a version was already pushed to `@friends` and you want to promote that
-exact tarball to the public default channel (no rebuild), move the dist-tag:
+To promote an exact tarball already on `@friends` to the public default channel
+without a rebuild, move the dist-tag. Do this for the root package **and** every
+platform sub-package so the whole set resolves consistently:
 
 ```bash
-# Point @latest at the version currently on @friends.
-npm dist-tag add @general-liquidity/gordon@0.9.0 latest
+# Point @latest at the version currently on @friends (repeat per package).
+npm dist-tag add @general-liquidity/gordon@0.1.0 latest
+npm dist-tag add @general-liquidity/gordon-linux-x64@0.1.0 latest
+# ... repeat for each @general-liquidity/gordon-<platform> package ...
 
 # Optional: retire the friends pointer once latest is live.
 npm dist-tag rm @general-liquidity/gordon friends
@@ -69,13 +108,12 @@ npm dist-tag rm @general-liquidity/gordon friends
 npm dist-tag ls @general-liquidity/gordon
 ```
 
-`npm install -g @general-liquidity/gordon` resolves `@latest`, so after the
-flip a stranger installs the public build by default.
-
 ## Do NOT
 
-- Do not run `npm publish` from the repo root — the root package is the source
-  tree, not the shippable wrapper (`files` differ, and publishing it would leak
-  source). CI publishes from `npm/`.
-- Do not tag a public release with an `rc` / `beta` / `alpha` / `friends`
-  suffix; it silently lands on `@friends`.
+- Do not tag a public release with a `-rc` / `-beta` / `-alpha` suffix; it lands
+  on `@friends` instead of `@latest`.
+- Do not publish a single platform sub-package out of band. The root package's
+  `optionalDependencies` pin the exact matching version, so a version skew
+  between root and sub-packages breaks resolution. Publish the whole set from CI.
+- Do not reintroduce a postinstall download. Binaries ship inside the platform
+  sub-packages; `bin/gordon.cjs` resolves them locally.
