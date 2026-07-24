@@ -51,6 +51,10 @@ import {
 import type { ScanOptions } from "./scanner.ts";
 import type { CoinAnalysis } from "../../types/index.ts";
 import { runSharedScan } from "../lifecycle/market-data-coordinator.ts";
+import {
+  isDurableAgentsEnabled,
+  type DurableAutonomousRunner,
+} from "../../infra/agents/harness/durableRunner.ts";
 
 const logger = createModuleLogger("autonomous-loop");
 
@@ -79,6 +83,16 @@ export interface AutonomousLoopConfig {
    * each cycle to compare against `budgetCeilingUsd`. Omit to never budget-stop.
    */
   getCostSoFarUsd?: () => number;
+  /**
+   * ADDITIVE, flag-gated (default-off). When `GORDON_DURABLE_AGENTS=1` AND this
+   * runner is supplied by the caller (coordinator wiring), the loop delegates to
+   * Mastra's native durable-agent + goal + background-task path instead of the
+   * interval scan cadence. When the flag is off OR no runner is supplied, this
+   * field is ignored and the interval loop runs unchanged — behavior IDENTICAL.
+   */
+  durableRunner?: DurableAutonomousRunner;
+  /** Objective for the native goal loop. Required only for the durable path. */
+  durableObjective?: string;
 }
 
 export interface OpportunityReport {
@@ -573,6 +587,64 @@ async function runCycle(): Promise<CycleReport | null> {
 // Public API
 // ============================================================================
 
+/**
+ * Native durable-agent entry (flag-gated). Kicks off the durable, goal-driven run
+ * fire-and-forget and marks loop state as running so status/stop surfaces work.
+ * The runner enforces the kill-switch preflight and refuses on a tripped switch.
+ */
+function startDurableAutonomousLoop(
+  config: AutonomousLoopConfig,
+  runner: DurableAutonomousRunner,
+): { success: boolean; error?: string } {
+  const gate = runner.preflight();
+  if (!gate.allowed) {
+    return { success: false, error: gate.reason };
+  }
+
+  loopState.config = config;
+  loopState.mandate = config.mandate;
+  loopState.sessionId = `session_${Date.now()}`;
+  loopState.isRunning = true;
+  loopState.isPaused = false;
+  loopState.cycleCount = 0;
+  loopState.totalOpportunities = 0;
+  loopState.symbolsTouched = new Set<string>();
+  loopState.sprintContract = null;
+  loopState.goalProgressHistory = [];
+  loopState.tradesPerSymbol = new Map<string, number>();
+  loopState.equityBaselineUsd = null;
+
+  const objective =
+    config.durableObjective ?? `Run autonomous mandate ${config.mandate.id} to completion within its constraints.`;
+
+  logger.info("Starting autonomous loop (native durable path)", {
+    mandateId: config.mandate.id,
+    sessionId: loopState.sessionId,
+  });
+
+  void runner
+    .start(objective)
+    .then((result) => {
+      if (!result.ok) {
+        logger.warn("Durable autonomous run did not start", { reason: result.reason });
+        stopAutonomousLoop(result.reason);
+      } else {
+        logger.info("Durable autonomous run active", { runId: result.runId });
+      }
+    })
+    .catch((error) => {
+      logger.error("Durable autonomous run failed to start", error as Error);
+      stopAutonomousLoop("durable run start failed");
+    });
+
+  emitEvent("autonomous:started", {
+    mandateId: config.mandate.id,
+    intervalMs: 0,
+  }).catch((err) => { logger.error("Failed to emit event", err instanceof Error ? err : { error: String(err) }); });
+
+  return { success: true };
+}
+
 export function startAutonomousLoop(config: AutonomousLoopConfig): { success: boolean; error?: string } {
   if (loopState.isRunning) {
     return { success: false, error: "Autonomous loop is already running" };
@@ -582,6 +654,17 @@ export function startAutonomousLoop(config: AutonomousLoopConfig): { success: bo
   const validation = validateMandate(config.mandate);
   if (!validation.valid) {
     return { success: false, error: `Invalid mandate: ${validation.errors.join(", ")}` };
+  }
+
+  // Native durable path (flag-gated, default-off). Only taken when
+  // GORDON_DURABLE_AGENTS=1 AND the coordinator supplied a durable runner.
+  // Delegates the long-running loop to Mastra's durable-agent + native-goal +
+  // background-task surface; the runner runs the same money-path preflight
+  // (kill switch) and seals its own sprint contract. WIP-limit gating stays
+  // downstream in execute_plan (unchanged). When the flag is off or no runner is
+  // supplied, this branch is skipped and the interval loop below runs identically.
+  if (isDurableAgentsEnabled() && config.durableRunner) {
+    return startDurableAutonomousLoop(config, config.durableRunner);
   }
 
   loopState.config = config;
