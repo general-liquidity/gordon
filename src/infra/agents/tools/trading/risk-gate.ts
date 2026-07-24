@@ -14,6 +14,7 @@ import { riskKernel } from "../../../../core/risk-kernel/index.ts";
 import { PortfolioContextBuilder } from "../../../../core/risk-kernel/portfolio-context.ts";
 import type { OrderRequest } from "../../../../core/risk-kernel/audit.ts";
 import { StrategyRuntime } from "../../../../core/runtime/engine.ts";
+import { resolveFlag } from "../../../config/flagResolver.ts";
 import { getGordonContext, type MastraExecutionContext } from "../types.ts";
 import type { GordonContext } from "../types.ts";
 import { createModuleLogger } from "../../../logger/index.ts";
@@ -128,7 +129,7 @@ export async function evaluateOrderRisk(
 
   const sandboxActive =
     (ctx.exchange as { isSandbox?: boolean } | null)?.isSandbox ?? ctx.broker?.isPaper ?? false;
-  const envRiskMode = process.env.GORDON_RISK_MODE;
+  const envRiskMode = resolveFlag("GORDON_RISK_MODE");
   const modeOverride =
     envRiskMode === "paper" && !sandboxActive ? ("paper" as const) : undefined;
 

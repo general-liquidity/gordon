@@ -19,6 +19,8 @@
  * gate makes the gate testable.
  */
 
+import { flagEnv } from "../config/flagResolver.ts";
+
 export const WIP_FLAG_ENV = "GORDON_WIP_LIMIT_ENABLED";
 export const WIP_PER_SYMBOL_ENV = "GORDON_WIP_LIMIT_PER_SYMBOL";
 export const WIP_PER_STRATEGY_ENV = "GORDON_WIP_LIMIT_PER_STRATEGY";
@@ -58,8 +60,9 @@ export interface WipGateResult {
   blockingPlanIds: string[];
 }
 
-export function isWipLimitEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isWipLimitEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   // Default-on protective gate: absence = enabled. Explicit "0"/"false" opts out.
+  // Read via flagEnv() so settings.json + /flags can toggle it (env still wins).
   const raw = env[WIP_FLAG_ENV];
   return raw !== "0" && raw !== "false";
 }
@@ -72,7 +75,7 @@ function parsePositiveIntOrInfinity(raw: string | undefined, fallback: number): 
   return Math.floor(n);
 }
 
-export function readWipLimitsFromEnv(env: NodeJS.ProcessEnv = process.env): WipLimits {
+export function readWipLimitsFromEnv(env: NodeJS.ProcessEnv = flagEnv()): WipLimits {
   return {
     perSymbol: parsePositiveIntOrInfinity(env[WIP_PER_SYMBOL_ENV], 1),
     perStrategy: parsePositiveIntOrInfinity(env[WIP_PER_STRATEGY_ENV], Infinity),

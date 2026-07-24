@@ -14,10 +14,12 @@
  * daily-loss cap) and WW1 pathDependentSizer (the 50% multiplier).
  */
 
+import { flagEnv } from "../../config/flagResolver.ts";
+
 export const STREAK_CIRCUIT_BREAKER_FLAG_ENV = "GORDON_STREAK_CIRCUIT_BREAKER";
 
 export function isStreakCircuitBreakerEnabled(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): boolean {
   // Default-on protective gate: absence = enabled. Explicit "0"/"false" opts out.
   const raw = env[STREAK_CIRCUIT_BREAKER_FLAG_ENV];

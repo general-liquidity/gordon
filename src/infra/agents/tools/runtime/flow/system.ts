@@ -19,6 +19,7 @@ import { loadConfig, loadConfigBundle, saveResolvedConfig } from "../../../../st
 import { ExchangeFactory } from "../../../../exchange/index.ts";
 import { BrokerFactory } from "../../../../broker/factory.ts";
 import { getToolCacheStats, clearToolCache, pruneToolCache } from "../cache.ts";
+import { resolveFlag, writeFlagSetting } from "../../../../config/flagResolver.ts";
 import {
   getAgentHealthReport,
   getAgentMetrics,
@@ -503,54 +504,180 @@ const KEEPER_FLAGS = [
     description:
       "ACE (Agentic Context Engineering): /reflect distills the action log into lessons, injected into the system prompt of future sessions. Writes across sessions — opt-in for safety.",
     truthy: ["true", "1", "yes", "on"],
+    defaultOn: false,
   },
   {
     name: "GORDON_DYNAMIC_SUBAGENTS",
     description:
       "Enables the FW7 delegate_subagent dispatcher. Requires operator-authored .claude/subagents/*.json profiles.",
     truthy: ["1", "true"],
+    defaultOn: false,
   },
   {
     name: "GORDON_DEFER_WORKING_MEMORY",
     description:
       "Buffer mid-session working-memory writes to preserve prompt-cache stability; flush at session boundaries.",
     truthy: ["1", "true"],
+    defaultOn: false,
   },
   {
     name: "GORDON_SUPERVISION_RUST_RATE",
     description:
       "Periodic flawed-plan injection rate (0–1). Calibrated threshold; operators set their own cadence.",
     truthy: [],
+    defaultOn: false,
   },
   {
     name: "GORDON_COMPACTION_STAGE",
     description:
       "Force a specific compaction stage during debugging. Values: 'masking' | 'pruning' | 'aggressive' | 'full'.",
     truthy: [],
+    defaultOn: false,
+  },
+  // --- Reasoning passes (default-on architecture; disable to save latency) ---
+  {
+    name: "GORDON_TOOL_FREE_THINKING",
+    description: "Tool-free pre-action reasoning pass on non-trivial requests.",
+    truthy: ["true", "1"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_ADVERSARIAL_EVALUATOR",
+    description: "Hostile-review critique prompt at HIGH thinking depth.",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_CITATION_AGENT",
+    description: "Post-hoc claim→evidence citation manifest over tool results.",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_PEER_DELEGATION",
+    description: "Peer-agent delegation dispatcher. Default-on; set 0/false to disable.",
+    truthy: ["1", "true"],
+    defaultOn: true,
+  },
+  {
+    name: "GORDON_AUTODREAM_ENABLED",
+    description: "Background memory consolidation (ACE distill + session dedupe) on cadence.",
+    truthy: ["true", "1"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_REFLECTION_ENABLED",
+    description: "Warm the post-trade reflection store at boot.",
+    truthy: ["true", "1"],
+    defaultOn: false,
+  },
+  // --- Trade-halt gates ---
+  {
+    name: "GORDON_WIP_LIMIT_ENABLED",
+    description: "Work-in-progress plan gate (WIP=N per symbol / M per strategy).",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_STREAK_CIRCUIT_BREAKER",
+    description: "Consecutive-loss cooldown lockout (Rule of Three).",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_REVENGE_TRADE_GUARD",
+    description: "Blocks re-entry immediately after a loss (revenge-trade guard).",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_GIVE_BACK_STOP",
+    description: "Flatten when session gives back >50% of intraday high-water P&L.",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_ABSORBING_BARRIER",
+    description: "Distance-to-ruin classifier (broker / prop-firm / psychological barriers).",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  // --- Cost / risk config (value flags) ---
+  {
+    name: "GORDON_COST_BUDGET_USD",
+    description: "Session USD cost budget; dispatch halts once exceeded (default 25).",
+    truthy: [],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_RISK_MODE",
+    description: "Risk-gate mode override, e.g. 'paper' to force paper evaluation.",
+    truthy: [],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_RISK_MAX_LEVERAGE",
+    description: "Max leverage cap applied at the exchange adapter.",
+    truthy: [],
+    defaultOn: false,
+  },
+  // --- Safety flags ---
+  {
+    name: "GORDON_ALLOW_LIVE",
+    description: "Opt into LIVE trading on a venue with no sandbox/testnet. Money-path — leave off unless deliberate.",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_RISK_ACK",
+    description: "Anti-rubber-stamp risk-acknowledgement gate on medium+ tier execute_plan.",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_MEMORY_WRITE_GUARD",
+    description: "Enforce (not just log) the working-memory sensitive-field guard on untrusted writes.",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_SPRINT_CONTRACT",
+    description: "Record scope/actuals for autonomous-loop sessions; inspect via /sprint-status.",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_AGENT_READINESS_GATE",
+    description: "Boot-time readiness checks before agent spawn.",
+    truthy: ["1", "true"],
+    defaultOn: false,
   },
 ] as const;
 
-function flagIsOn(name: string, truthy: ReadonlyArray<string>): boolean {
-  const raw = process.env[name];
-  if (raw === undefined || raw === "") return false;
+function flagIsOn(
+  name: string,
+  truthy: ReadonlyArray<string>,
+  defaultOn: boolean,
+): boolean {
+  const raw = resolveFlag(name);
+  if (raw === undefined || raw === "") return defaultOn;
   if (truthy.length === 0) return true; // value-flags: any set value is "on"
+  if (defaultOn) return raw !== "0" && raw.toLowerCase() !== "false";
   return truthy.includes(raw.toLowerCase());
 }
 
 export const manageFlagsTool = createTool({
   id: "manage_flags",
   description: [
-    "Inspect or toggle Gordon's opt-in behavior flags at runtime. Five flags",
-    "remain explicit (everything else is defaults-on as part of the architecture):",
-    "  - GORDON_ACE_ENABLED            — cross-session lesson injection",
-    "  - GORDON_DYNAMIC_SUBAGENTS      — FW7 subagent dispatch",
-    "  - GORDON_DEFER_WORKING_MEMORY   — prompt-cache-friendly memory writes",
-    "  - GORDON_SUPERVISION_RUST_RATE  — flawed-plan calibration rate",
-    "  - GORDON_COMPACTION_STAGE       — debug override of compaction stage",
+    "Inspect or toggle Gordon's operator-toggleable flags at runtime. Covers the",
+    "opt-in behavior flags (ACE, subagents, memory deferral, supervision, compaction),",
+    "the reasoning passes, the trade-halt gates, cost/risk config, and the safety flags.",
     "",
-    "action='list' returns the current state of each. action='set' mutates",
-    "process.env for the current process only — restart loses the change.",
-    "For persistent changes, edit .env in the project root.",
+    "Resolution precedence: process.env override > settings.json (flags) > built-in default.",
+    "action='list' returns the resolved state of each.",
+    "action='set' persists to the local settings layer (~/.gordon/settings.local.json)",
+    "AND applies to the current process, so the change survives restart. An explicit",
+    "env var still overrides the stored value.",
   ].join("\n"),
   inputSchema: z.object({
     action: z.enum(["list", "set"]),
@@ -582,8 +709,8 @@ export const manageFlagsTool = createTool({
       return {
         flags: KEEPER_FLAGS.map((f) => ({
           name: f.name,
-          on: flagIsOn(f.name, f.truthy),
-          value: process.env[f.name],
+          on: flagIsOn(f.name, f.truthy, f.defaultOn),
+          value: resolveFlag(f.name),
           description: f.description,
         })),
       };
@@ -593,15 +720,17 @@ export const manageFlagsTool = createTool({
     }
     if (!KEEPER_FLAGS.some((f) => f.name === name)) {
       return {
-        error: `Unknown flag '${name}'. Use action='list' to see the 5 supported flags.`,
+        error: `Unknown flag '${name}'. Use action='list' to see the supported flags.`,
       };
     }
-    const previous = process.env[name];
+    const previous = resolveFlag(name);
     if (value === undefined || value === "") {
       delete process.env[name];
+      writeFlagSetting(name, undefined);
       return { changed: { name, previous, current: undefined } };
     }
     process.env[name] = value;
+    writeFlagSetting(name, value);
     return { changed: { name, previous, current: value } };
   },
 });

@@ -12,6 +12,7 @@ import type { GordonContext } from "../types.ts";
 import { resolveWorkflowPhaseModelRoute } from "./workflowPhase.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { recordPhaseLLMCost } from "../../platform/costTracker.ts";
+import { resolveFlag } from "../../config/flagResolver.ts";
 import {
   isPlanRubricEnabled,
   emptyRubric,

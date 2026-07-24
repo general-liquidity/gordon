@@ -79,6 +79,7 @@ import type {
   FundingHistoryEntry,
 } from "../types.ts";
 import { normalizePemSecret } from "../types.ts";
+import { resolveFlag } from "../../config/flagResolver.ts";
 import type { Candle } from "../../../types/index.ts";
 import { CcxtWebSocketImpl } from "./ccxt-websocket.ts";
 import { SandboxNotSupportedError } from "../sandboxSupport.ts";
@@ -391,7 +392,7 @@ export class CcxtAdapter
   ) {
     const Klass = resolveCcxtClass(ccxtSubId);
 
-    const envMaxLeverage = Number(process.env.GORDON_RISK_MAX_LEVERAGE);
+    const envMaxLeverage = Number(resolveFlag("GORDON_RISK_MAX_LEVERAGE"));
     this.maxLeverage = options?.maxLeverage
       ?? (Number.isFinite(envMaxLeverage) && envMaxLeverage > 0 ? envMaxLeverage : DEFAULT_MAX_LEVERAGE);
 

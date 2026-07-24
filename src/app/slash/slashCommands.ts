@@ -1248,12 +1248,12 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "flags",
     aliases: ["behavior", "feature-flags"],
-    description: "Show or toggle Gordon's opt-in behavior flags (ACE, subagents, memory deferral, supervision rate, compaction stage)",
+    description: "Show or toggle Gordon's operator flags (reasoning passes, trade-halt gates, cost/risk config, safety flags, ACE/subagents/memory)",
     usage: "/flags [set <name> <value>]",
     category: "system",
     level: 2,
     action: "agent",
-    whenToUse: `Inspect the 5 remaining opt-in behavior flags or change them for the current session. Persistent changes require editing .env. (${buildTracingStatusLine()})`,
+    whenToUse: `Inspect or change Gordon's operator-toggleable flags. Resolution is env override > settings.json > default; /flags set persists to the settings layer so changes survive restart. (${buildTracingStatusLine()})`,
   },
   {
     name: "config",

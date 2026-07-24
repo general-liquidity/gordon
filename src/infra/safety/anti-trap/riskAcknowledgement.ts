@@ -11,9 +11,10 @@
  */
 
 import type { RiskAssessment, RiskDimension } from "../../trading/risk/riskClassifier.ts";
+import { flagEnv } from "../../config/flagResolver.ts";
 
 export function isRiskAckEnabled(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): boolean {
   return env.GORDON_RISK_ACK === "1" || env.GORDON_RISK_ACK === "true";
 }

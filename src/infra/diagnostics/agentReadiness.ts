@@ -7,6 +7,7 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { flagEnv } from "../config/flagResolver.ts";
 
 export const AGENT_READINESS_FLAG_ENV = "GORDON_AGENT_READINESS_GATE";
 export const AGENT_READINESS_OVERRIDE_ENV = "GORDON_AGENT_READINESS_OVERRIDE";
@@ -29,11 +30,11 @@ export interface ReadinessResult {
   blockingMessage?: string;
 }
 
-export function isAgentReadinessEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isAgentReadinessEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   return env[AGENT_READINESS_FLAG_ENV] === "1" || env[AGENT_READINESS_FLAG_ENV] === "true";
 }
 
-export function isAgentReadinessOverridden(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isAgentReadinessOverridden(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   return env[AGENT_READINESS_OVERRIDE_ENV] === "1" || env[AGENT_READINESS_OVERRIDE_ENV] === "true";
 }
 

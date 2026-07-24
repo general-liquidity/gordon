@@ -22,3 +22,12 @@ export type {
   MergedSettings,
   LoadSettingsOptions,
 } from "./settingsLayers.ts";
+
+// Flag resolver — env → settings.json → default accessor for GORDON_* flags
+export {
+  resolveFlag,
+  flagEnv,
+  writeFlagSetting,
+  readResolvedFlags,
+  resetFlagCache,
+} from "./flagResolver.ts";

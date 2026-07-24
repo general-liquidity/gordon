@@ -30,6 +30,7 @@
 import { existsSync, mkdirSync, appendFileSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import { flagEnv } from "../../config/flagResolver.ts";
 
 export const CITATION_AGENT_FLAG_ENV = "GORDON_CITATION_AGENT";
 export const CITATION_MANIFEST_PATH_ENV = "GORDON_CITATION_MANIFEST_PATH";
@@ -82,9 +83,10 @@ export interface BuildManifestInput {
   now?: string;
 }
 
-export function isCitationAgentEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isCitationAgentEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   // Default-on: the evidence-trail audit ships on out-of-box, throttled by the
   // cost budget. Operators force-off via GORDON_CITATION_AGENT=0.
+  // Read via flagEnv() so settings.json + /flags can toggle it (env still wins).
   const raw = env[CITATION_AGENT_FLAG_ENV];
   return raw !== "0" && raw !== "false";
 }

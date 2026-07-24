@@ -22,6 +22,7 @@
 
 import type { ExchangeId, NativeExchangeId } from "./types.ts";
 import { ccxtIdToNativeVenue } from "./types.ts";
+import { flagEnv } from "../config/flagResolver.ts";
 
 export type SandboxKind = "testnet_url" | "demo_header" | "credential" | "unsupported";
 
@@ -164,7 +165,7 @@ export interface SandboxResolutionInput {
  *    {@link LiveOptInRequiredError} rather than silently routing to LIVE.
  */
 export function resolveSandboxMode(input: SandboxResolutionInput): boolean {
-  const { exchangeId, requestedSandbox, live, env = process.env } = input;
+  const { exchangeId, requestedSandbox, live, env = flagEnv() } = input;
 
   if (requestedSandbox === true) return true;
   if (requestedSandbox === false) return false;

@@ -16,6 +16,7 @@ import {
 } from "./workflowPhase.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { recordPhaseLLMCost } from "../../platform/costTracker.ts";
+import { resolveFlag } from "../../config/flagResolver.ts";
 import {
   withTimelineEntry,
   generateTimelineAgentId,
@@ -94,7 +95,7 @@ export function resolveThinkingDepth(
     return { depth: configDepth, source: "config", reason: `config.thinkingDepth=${configDepth}` };
   }
 
-  const envDepth = normalizeThinkingDepth(process.env.GORDON_THINKING_DEPTH);
+  const envDepth = normalizeThinkingDepth(resolveFlag("GORDON_THINKING_DEPTH"));
   if (envDepth) {
     return { depth: envDepth, source: "env", reason: `GORDON_THINKING_DEPTH=${envDepth}` };
   }
@@ -124,7 +125,8 @@ export function shouldRunToolFreeThinking(
 ): { run: boolean; reason: string } {
   // Default-on: reasoning passes ship on out-of-box, throttled by the cost
   // budget. Operators force-off for a cheap run via GORDON_TOOL_FREE_THINKING=0.
-  const flag = process.env.GORDON_TOOL_FREE_THINKING;
+  // Read via resolveFlag so settings.json + /flags can toggle it (env still wins).
+  const flag = resolveFlag("GORDON_TOOL_FREE_THINKING");
   if (flag === "0" || flag === "false") {
     return { run: false, reason: "GORDON_TOOL_FREE_THINKING disabled (=0/false)" };
   }

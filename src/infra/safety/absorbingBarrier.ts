@@ -22,10 +22,12 @@
  * summary. Callers can decide whether to gate, warn, or annotate.
  */
 
+import { flagEnv } from "../config/flagResolver.ts";
+
 export const ABSORBING_BARRIER_FLAG_ENV = "GORDON_ABSORBING_BARRIER";
 
 export function isAbsorbingBarrierEnabled(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): boolean {
   // Default-on protective gate: absence = enabled. Explicit "0"/"false" opts out.
   // Dormant unless the operator supplies barrier inputs (equity/limits), so it

@@ -1,6 +1,7 @@
 import { createKeyringProvider, KEYRING_SUPPORTED_KEYS } from "../../infra/storage/keyring.ts";
 import { checkEnvStatus, createEnvFile, saveEnvKeys, type EnvKeys } from "../../infra/storage/config/env.ts";
 import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
+import { resolveFlag } from "../../infra/config/flagResolver.ts";
 import { getProviderCredentialStatuses, type ProviderCredentialStatus } from "../../infra/runtime/actions/index.ts";
 import { BROKER_ENV_MAP, type BrokerId } from "../../infra/broker/types.ts";
 import {
@@ -500,17 +501,15 @@ export async function applyBootstrap(options: BootstrapOptions): Promise<Bootstr
   // budget with action="halt" at boot. Once exceeded, LLM dispatch and tool
   // calls are blocked until /cost reset. Disable via GORDON_COST_BUDGET_DISABLE=1
   // or by setting the session budget to 0.
-  const sessionBudgetUsd = process.env.GORDON_COST_BUDGET_USD !== undefined
-    ? Number(process.env.GORDON_COST_BUDGET_USD)
-    : 25;
-  if (process.env.GORDON_COST_BUDGET_DISABLE === "1" || sessionBudgetUsd === 0) {
+  const costBudgetRaw = resolveFlag("GORDON_COST_BUDGET_USD");
+  const sessionBudgetUsd = costBudgetRaw !== undefined ? Number(costBudgetRaw) : 25;
+  const dailyBudgetRaw = resolveFlag("GORDON_DAILY_COST_BUDGET_USD");
+  if (resolveFlag("GORDON_COST_BUDGET_DISABLE") === "1" || sessionBudgetUsd === 0) {
     setCostBudget(null);
   } else {
     setCostBudget({
       sessionUsd: sessionBudgetUsd,
-      dailyUsd: process.env.GORDON_DAILY_COST_BUDGET_USD
-        ? Number(process.env.GORDON_DAILY_COST_BUDGET_USD)
-        : undefined,
+      dailyUsd: dailyBudgetRaw ? Number(dailyBudgetRaw) : undefined,
       action: "halt",
       warnThresholds: [0.5, 0.75, 0.9],
     });

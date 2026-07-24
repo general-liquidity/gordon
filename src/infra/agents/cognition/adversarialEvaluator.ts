@@ -31,6 +31,8 @@
  * structured `AdversarialReport`.
  */
 
+import { flagEnv } from "../../config/flagResolver.ts";
+
 export const ADVERSARIAL_EVALUATOR_FLAG_ENV = "GORDON_ADVERSARIAL_EVALUATOR";
 
 export type FailureCategory =
@@ -98,9 +100,10 @@ const SEVERITY_RANK: Record<FailureSeverity, number> = {
   critical: 3,
 };
 
-export function isAdversarialEvaluatorEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isAdversarialEvaluatorEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   // Default-on: the hostile-review discipline ships on out-of-box, throttled by
   // the cost budget. Operators force-off via GORDON_ADVERSARIAL_EVALUATOR=0.
+  // Read via flagEnv() so settings.json + /flags can toggle it (env still wins).
   const raw = env[ADVERSARIAL_EVALUATOR_FLAG_ENV];
   return raw !== "0" && raw !== "false";
 }

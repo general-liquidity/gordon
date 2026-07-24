@@ -35,14 +35,14 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
     case "flags": {
       const trimmed = args.trim();
       if (!trimmed || trimmed === "list") {
-        return `Call manage_flags with action='list' and show me the current state of each opt-in behavior flag in a table. For each, indicate whether it's on, its raw value, and a one-line summary of what enabling it does. Then show this OpenTelemetry export status verbatim: "${buildTracingStatusLine()}". Note that persistent changes require editing .env in the project root.`;
+        return `Call manage_flags with action='list' and show me the current state of each operator-toggleable flag in a table. For each, indicate whether it's on, its resolved value, and a one-line summary of what it does. Then show this OpenTelemetry export status verbatim: "${buildTracingStatusLine()}". Note that values resolve as env override > settings.json > default, and /flags set persists to the settings layer.`;
       }
       if (trimmed.startsWith("set ")) {
         const rest = trimmed.slice(4).trim();
         const parts = rest.split(/\s+/);
         const flagName = parts[0] ?? "";
         const flagValue = parts.slice(1).join(" ");
-        return `Call manage_flags with action='set', name='${flagName}', value='${flagValue}'. Then confirm the change and remind me that the new value is for this session only — to persist, I need to add it to .env.`;
+        return `Call manage_flags with action='set', name='${flagName}', value='${flagValue}'. Then confirm the change and note that it is persisted to the settings layer (survives restart) and that an explicit env var still overrides it.`;
       }
       return `Call manage_flags with action='list' first, then interpret this instruction in the context of those flags: "${trimmed}". If the operator is asking to enable/disable a specific flag, call manage_flags with action='set' accordingly.`;
     }

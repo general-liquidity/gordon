@@ -42,13 +42,14 @@
 
 import { spawn as nodeSpawn, type SpawnOptionsWithoutStdio } from "node:child_process";
 import { createModuleLogger } from "../../logger/index.ts";
+import { flagEnv } from "../../config/flagResolver.ts";
 
 const logger = createModuleLogger("peer-delegation");
 
 export const PEER_DELEGATION_FLAG_ENV = "GORDON_PEER_DELEGATION";
 
 export function isPeerDelegationEnabled(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): boolean {
   // Default-on. Operators disable via env=0 / env=false. Cold-toggleable
   // matches the pattern of tradeLedger / withResultSanitizer.

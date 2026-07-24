@@ -29,10 +29,13 @@
  * Pure compute. No I/O.
  */
 
+import { flagEnv } from "../../config/flagResolver.ts";
+
 export const REVENGE_TRADE_GUARD_FLAG_ENV = "GORDON_REVENGE_TRADE_GUARD";
 
-export function isRevengeTradeGuardEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isRevengeTradeGuardEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   // Default-on protective gate: absence = enabled. Explicit "0"/"false" opts out.
+  // Read via flagEnv() so settings.json + /flags can toggle it (env still wins).
   const raw = env[REVENGE_TRADE_GUARD_FLAG_ENV];
   return raw !== "0" && raw !== "false";
 }

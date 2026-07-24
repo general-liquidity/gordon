@@ -7,6 +7,7 @@ import type { Exchange, ExchangeId, NativeExchangeId, ExchangeCredentials } from
 import { isCcxtExchangeId, extractCcxtSubId, normalizeExchangeId, ccxtIdToNativeVenue } from "./types.ts";
 import { CcxtAdapter } from "./adapters/ccxt-adapter.ts";
 import { loadOAuthExchangeCredentials, exchangeSupportsOAuth } from "./oauth-bridge.ts";
+import { resolveFlag } from "../config/flagResolver.ts";
 import { assertSandboxSupported, resolveSandboxMode } from "./sandboxSupport.ts";
 
 /**
@@ -136,7 +137,7 @@ export class ExchangeFactory {
       throw new Error("Hyperliquid requires a wallet private key for authentication");
     }
 
-    const envMaxLeverage = Number(process.env.GORDON_RISK_MAX_LEVERAGE);
+    const envMaxLeverage = Number(resolveFlag("GORDON_RISK_MAX_LEVERAGE"));
     const exchange = new CcxtAdapter(
       subId,
       {

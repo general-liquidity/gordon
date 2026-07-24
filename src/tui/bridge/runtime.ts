@@ -25,6 +25,7 @@ import {
   type SlashCommand,
 } from "../../app/slash/slashCommands.ts";
 import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
+import { resolveFlag } from "../../infra/config/flagResolver.ts";
 import { loadEnvFile } from "../../infra/storage/config/env.ts";
 import { GatewayContextResolver } from "../../gateway/runtime/context.ts";
 import {
@@ -189,7 +190,8 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
   try {
     // GORDON_AUTODREAM_ENABLED — default-on periodic memory consolidation (24h
     // gated internally). Operators force-off via GORDON_AUTODREAM_ENABLED=0.
-    if (process.env.GORDON_AUTODREAM_ENABLED !== "0" && process.env.GORDON_AUTODREAM_ENABLED !== "false") {
+    // Read via resolveFlag so settings.json + /flags can toggle it (env still wins).
+    if (resolveFlag("GORDON_AUTODREAM_ENABLED") !== "0" && resolveFlag("GORDON_AUTODREAM_ENABLED") !== "false") {
       const { AutoDreamManager } = await import("../services/workflow/autoDream.ts");
       const dream = new AutoDreamManager();
       void dream.checkAndConsolidate(0, null).catch(() => {});
@@ -200,7 +202,8 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
   try {
     // GORDON_REFLECTION_ENABLED — default-on; warm post-trade reflection store
     // from disk. Operators force-off via GORDON_REFLECTION_ENABLED=0.
-    if (process.env.GORDON_REFLECTION_ENABLED !== "0" && process.env.GORDON_REFLECTION_ENABLED !== "false") {
+    // Read via resolveFlag so settings.json + /flags can toggle it (env still wins).
+    if (resolveFlag("GORDON_REFLECTION_ENABLED") !== "0" && resolveFlag("GORDON_REFLECTION_ENABLED") !== "false") {
       const { getReflectionStore } = await import("../services/workflow/tradeReflection.ts");
       getReflectionStore();
     }
@@ -209,7 +212,7 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
   }
   try {
     // GORDON_DENIAL_MEMORY_ENABLED=true — warm denial-audit memory from disk
-    if (process.env.GORDON_DENIAL_MEMORY_ENABLED === "true") {
+    if (resolveFlag("GORDON_DENIAL_MEMORY_ENABLED") === "true") {
       const { getDenialMemory } = await import("../services/memory/denialMemory.ts");
       getDenialMemory();
     }

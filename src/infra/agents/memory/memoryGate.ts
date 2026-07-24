@@ -25,6 +25,7 @@
 
 import type { Memory } from "@mastra/memory";
 import { createModuleLogger } from "../../logger/logger.ts";
+import { flagEnv, resolveFlag } from "../../config/flagResolver.ts";
 
 const logger = createModuleLogger("memory-gate");
 
@@ -46,7 +47,7 @@ const DEFER_FLAG_ENV = "GORDON_DEFER_WORKING_MEMORY";
  */
 const WRITE_GUARD_FLAG_ENV = "GORDON_MEMORY_WRITE_GUARD";
 
-export function isWriteGuardEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isWriteGuardEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   return env[WRITE_GUARD_FLAG_ENV] === "1";
 }
 
@@ -230,7 +231,7 @@ export function detectSensitiveFieldChanges(
 }
 
 export function isDeferralEnabled(): boolean {
-  return process.env[DEFER_FLAG_ENV] === "1";
+  return resolveFlag(DEFER_FLAG_ENV) === "1";
 }
 
 export function truncateWorkingMemoryValue(value: string): string {
@@ -410,7 +411,7 @@ export function getLastWorkingMemoryFlush(): {
  *   - DEFER flag set + at least one flush has happened → flushed at flush time
  *   - DEFER flag set + no flush yet → buffer may hold writes → not durable
  */
-export function isWorkingMemoryDurable(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isWorkingMemoryDurable(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   if (env[DEFER_FLAG_ENV] !== "1") return true;
   return _lastFlushAt !== null;
 }
