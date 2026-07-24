@@ -140,12 +140,16 @@ jobs:
         #     directly)
         #   GHSA-fjxv-7rqg-78g4 — form-data unsafe random boundary
         #     (via transitive HTTP-client deps)
+        #   GHSA-w7jw-789q-3m8p — shell-quote newline-escape gap (via a
+        #     transitive of a dev/build tool; shell-quote not used
+        #     directly on any runtime path)
         run: |
           bun audit --audit-level=critical \
             --ignore GHSA-xq3m-2v4x-88gg \
             --ignore GHSA-vjh7-7g9h-fjfh \
             --ignore GHSA-2w6w-674q-4c4q \
-            --ignore GHSA-fjxv-7rqg-78g4
+            --ignore GHSA-fjxv-7rqg-78g4 \
+            --ignore GHSA-w7jw-789q-3m8p
 
       - name: bun audit (high-severity surface, informational)
         # Second pass at the lower `high` threshold. Informational only —
