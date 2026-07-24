@@ -148,7 +148,8 @@ Gordon is **three agents split along a security boundary**, not one model wearin
 
 Around them sits the runtime that makes a long session trustworthy:
 
-- **Cognition in phases:** a tool-free thinking pass, in-band extended thinking, and an optional adversarial self-critique at high depth.
+- **Cognition in phases:** a tool-free thinking pass, in-band extended thinking, an adversarial self-critique at high depth, and a citation audit. These reasoning passes are on by default and throttled by the session cost budget (`GORDON_COST_BUDGET_USD`); set any of them to `0` for a cheaper run.
+- **Protective halts on by default:** the streak circuit breaker, revenge-trade guard, give-back stop, WIP limit, and absorbing barrier all arm themselves out of the box, with their thresholds left tunable. Only the WIP limit hard-blocks an execution; the rest report.
 - **A canonical 22-tool surface:** 5 data, 4 analytics (two of them meta-dispatchers over ~94 indicator and 9 microstructure ops), 6 plan/exec, 3 memory/audit, 4 workflow. Integration feeds (Finnhub, X, MCP, onchain) spread on top.
 - **A doom-loop harness:** dual-layer fingerprinting catches both identical-call loops and A-B-A-B cycles; oversized tool results are offloaded to scratch.
 - **5-stage memory compaction:** masking → pruning → aggressive → collapse → full, triggered by context pressure, with a reversible read-time collapse before any lossy summary.
