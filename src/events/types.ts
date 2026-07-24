@@ -224,13 +224,6 @@ export interface AgentStreamChunkEvent extends BaseEvent {
   chunkIndex: number;
 }
 
-export interface AgentNetworkRoutedEvent extends BaseEvent {
-  type: "agent:network_routed";
-  fromAgent: string;
-  toAgent: string;
-  reason?: string;
-}
-
 export interface AgentReflectionEvent extends BaseEvent {
   type: "agent:reflection";
   agent: string;
@@ -681,7 +674,6 @@ export type GordonEvent =
   | AgentMessageProcessedEvent
   | AgentStreamCompletedEvent
   | AgentStreamChunkEvent
-  | AgentNetworkRoutedEvent
   | AgentReflectionEvent
   | ToolStartedEvent
   | ToolCompletedEvent
