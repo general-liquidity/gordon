@@ -6,12 +6,12 @@
   "architecture": {
     "64bit": {
       "url": "https://github.com/general-liquidity/gordon/releases/download/v0.1.0/gordon-windows-x64.exe",
-      "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "5ac5b65323d8d9e64175ebd89569f9dac2ecb6c2ba919eb982568dbd8a35fad8",
       "pre_install": "Rename-Item -Path \"$dir\\gordon-windows-x64.exe\" -NewName \"gordon.exe\" -ErrorAction SilentlyContinue"
     },
     "arm64": {
       "url": "https://github.com/general-liquidity/gordon/releases/download/v0.1.0/gordon-windows-arm64.exe",
-      "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "5a985b1d0ef25c4aaa512f3812ecf2233c4a0705e5c179fcddf66cf6b3abab93",
       "pre_install": "Rename-Item -Path \"$dir\\gordon-windows-arm64.exe\" -NewName \"gordon.exe\" -ErrorAction SilentlyContinue"
     }
   },
