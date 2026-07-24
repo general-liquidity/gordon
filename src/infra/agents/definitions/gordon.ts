@@ -46,6 +46,13 @@ import { buildTaskFanoutTool } from "../tools/runtime/lifecycle/task-fanout.ts";
 import { getExecutor } from "./executor.ts";
 import { getResearcher } from "./researcher.ts";
 import { instrumentedAgentTools } from "../tooling/instrumentedTools.ts";
+import { applyNativeApprovalMarkers } from "../harness/nativeToolApproval.ts";
+import {
+  nativeInputProcessorsForAgent,
+  nativeOutputProcessorsForAgent,
+  gordonGoalConfig,
+  registerDurableMastra,
+} from "../nativeWiring.ts";
 
 const logger = createModuleLogger("agents");
 
@@ -327,6 +334,56 @@ export function getGordon(): Agent {
   const modelLabel = formatModelLabel(initialModel);
   logger.info("Initializing agent", { model: modelLabel });
 
+  // Gordon's tool surface — extracted so native tool-approval markers
+  // (GORDON_NATIVE_TOOL_APPROVAL) can be applied before construction. The
+  // marker call is a no-op when the flag is unset (identical construction).
+  const tools = {
+    // System info + agent self-feedback (no generalized-surface equivalent)
+    ...instrumentedSystemTools,
+    ...instrumentedAgentFeedbackTools,
+
+    // Vision tools — not in the generalized surface.
+    ...instrumentedMultiModalChartTools,
+
+    // Anti-hallucination quote verification — meta utility, no surface tool.
+    ...instrumentedQuoteVerifyTools,
+
+    // Producer health — observability, no surface tool.
+    ...instrumentedProducerHealthTools,
+
+    // Social sentiment — INTEGRATION tier. Always on.
+    ...instrumentedXSocialTools,
+
+    // Finnhub — INTEGRATION tier.
+    ...instrumentedFinnhubTools,
+    ...(isHotTierOnly() ? {} : instrumentedFinnhubFundamentalsTools),
+    ...(isHotTierOnly() ? {} : instrumentedSecFilingTools),
+    ...instrumentedFinnhubMarketsTools,
+
+    // MCP plugin tools — external, never gated.
+    ...getScopedMCPTools({
+      categories: ["data-provider", "analytics", "research", "portfolio", "utility", "infrastructure"],
+    }),
+
+    // FW7 — operator-authored subagent delegation. Surface-level
+    // delegate_subagent calls dispatchSubagentTask directly with an
+    // empty parent-tool registry; the full-registry `delegate_to_subagent`
+    // tool kept here has full passthrough to Gordon's live registry.
+    ...buildTaskDispatchToolIfEnabled(),
+
+    // Canonical 22-tool agent surface — spread last so its tool IDs
+    // win on any collision with integration spreads above.
+    ...instrumentedAgentTools,
+  };
+
+  // Native tool-approval (GORDON_NATIVE_TOOL_APPROVAL): mark execute_plan +
+  // cancel_* with a `requireApproval` predicate that DEFERS to the existing
+  // deny-first gate (riskClassifier + PermissionEngine + kill switch). No-op
+  // when the flag is unset; never replaces or bypasses the deny-first gate.
+  applyNativeApprovalMarkers(
+    tools as Record<string, { id?: string; requireApproval?: unknown }>,
+  );
+
   const agent = new Agent({
     id: "gordon",
     name: "Gordon",
@@ -338,6 +395,11 @@ export function getGordon(): Agent {
         : undefined,
     }),
     model: createModelResolver("orchestrator"),
+
+    // Native goal loop (GORDON_DURABLE_AGENTS): supplies the judge model + run
+    // budget for the durable-agent objective loop. Empty object (no `goal` key)
+    // when the flag is unset — identical construction.
+    ...gordonGoalConfig(),
 
     // Cap maxOutputTokens for ALL internal calls. Without this, Mastra
     // defaults to the model's catalog max (e.g. 100000 for Haiku 4.5) and
@@ -367,52 +429,27 @@ export function getGordon(): Agent {
     // The full implementation-module catalog lives behind agentTools —
     // not exposed to the LLM directly. If you ever need to surface an
     // implementation tool by name, re-spread it here with a justification comment.
-    tools: {
-      // System info + agent self-feedback (no generalized-surface equivalent)
-      ...instrumentedSystemTools,
-      ...instrumentedAgentFeedbackTools,
-
-      // Vision tools — not in the generalized surface.
-      ...instrumentedMultiModalChartTools,
-
-      // Anti-hallucination quote verification — meta utility, no surface tool.
-      ...instrumentedQuoteVerifyTools,
-
-      // Producer health — observability, no surface tool.
-      ...instrumentedProducerHealthTools,
-
-      // Social sentiment — INTEGRATION tier. Always on.
-      ...instrumentedXSocialTools,
-
-      // Finnhub — INTEGRATION tier.
-      ...instrumentedFinnhubTools,
-      ...(isHotTierOnly() ? {} : instrumentedFinnhubFundamentalsTools),
-      ...(isHotTierOnly() ? {} : instrumentedSecFilingTools),
-      ...instrumentedFinnhubMarketsTools,
-
-      // MCP plugin tools — external, never gated.
-      ...getScopedMCPTools({
-        categories: ["data-provider", "analytics", "research", "portfolio", "utility", "infrastructure"],
-      }),
-
-      // FW7 — operator-authored subagent delegation. Surface-level
-      // delegate_subagent calls dispatchSubagentTask directly with an
-      // empty parent-tool registry; the full-registry `delegate_to_subagent`
-      // tool kept here has full passthrough to Gordon's live registry.
-      ...buildTaskDispatchToolIfEnabled(),
-
-      // Canonical 22-tool agent surface — spread last so its tool IDs
-      // win on any collision with integration spreads above.
-      ...instrumentedAgentTools,
-    },
+    tools,
 
     // Memory for full conversation context
     memory: createMemory(),
 
-    // Token limiter to prevent context window overflow in long sessions
-    inputProcessors: [gordonToolCallReconciler, gordonInputGuard, new TokenLimiterProcessor({ limit: 64000 })],
-    outputProcessors: [gordonOutputSanitizer],
+    // Token limiter to prevent context window overflow in long sessions.
+    // Native processors (GORDON_MASTRA_PROCESSORS) append AFTER Gordon's own
+    // reconciler/guard/token-limiter so structural repair runs first; empty
+    // when the flag is unset (CostGuard excluded — see nativeWiring.ts).
+    inputProcessors: [
+      gordonToolCallReconciler,
+      gordonInputGuard,
+      new TokenLimiterProcessor({ limit: 64000 }),
+      ...nativeInputProcessorsForAgent(),
+    ],
+    outputProcessors: [gordonOutputSanitizer, ...nativeOutputProcessorsForAgent()],
   });
   registerObservability(agent);
+  // Durable Mastra instance (GORDON_DURABLE_AGENTS): register the agent with
+  // libSQL storage + background tasks so durable-run snapshots persist. No-op
+  // when the flag is unset.
+  registerDurableMastra(agent);
   return agent;
 }

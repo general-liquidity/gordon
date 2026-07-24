@@ -30,6 +30,11 @@ import {
   getHarnessSuffixForModel,
   isHarnessProfilesEnabled,
 } from "../profiles/harnessProfile.ts";
+import { applyNativeApprovalMarkers } from "../harness/nativeToolApproval.ts";
+import {
+  nativeInputProcessorsForAgent,
+  nativeOutputProcessorsForAgent,
+} from "../nativeWiring.ts";
 
 const EXECUTOR_INSTRUCTIONS = `You are Gordon's trade executor agent.
 
@@ -118,22 +123,9 @@ After order execution:
 - During halts: explain what triggered it, when it resets, and suggest alternatives (reduce size, wait, switch strategy)`;
 
 export function getExecutor(): Agent {
-  const agent = new Agent({
-    id: "executor",
-    name: "Executor",
-    description:
-      "Specialist in executing trades, placing orders, and managing positions. " +
-      "Use when user wants to execute a plan, place a market or limit order, " +
-      "swap/convert crypto, buy or sell a symbol, cancel an order, or change permissionMode via /auto, /ask, /strict.",
-    instructions: composeAgentInstructionsWithSlots("executor", {
-      user: EXECUTOR_INSTRUCTIONS,
-      suffix: isHarnessProfilesEnabled()
-        ? getHarnessSuffixForModel(resolveRuntimeModel(undefined, "executor"))
-        : undefined,
-    }),
-    model: createModelResolver("executor"),
-    defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },
-    tools: {
+  // Extracted so native tool-approval markers (GORDON_NATIVE_TOOL_APPROVAL) can
+  // be applied to execute_plan + the cancel_* family before construction.
+  const tools = {
       execute_plan: instrumentedTradingTools.execute_plan,
       close_trade: instrumentedTradingTools.close_trade,
       set_permission_mode: instrumentedTradingTools.set_permission_mode,
@@ -170,10 +162,43 @@ export function getExecutor(): Agent {
       simulate_order_bundle: instrumentedAdvancedTools.simulate_order_bundle,
       verify_circuit_breaker_proof: instrumentedAdvancedTools.verify_circuit_breaker_proof,
       ...getRoutingToolsForAgent("Executor"),
-    },
+  };
+
+  // Native tool-approval (GORDON_NATIVE_TOOL_APPROVAL): mark execute_plan +
+  // cancel_* with a `requireApproval` predicate that DEFERS to the existing
+  // deny-first gate (riskClassifier + PermissionEngine + kill switch). No-op
+  // when the flag is unset; the deny-first gate still runs first and this
+  // never approves anything the gate would block.
+  applyNativeApprovalMarkers(
+    tools as Record<string, { id?: string; requireApproval?: unknown }>,
+  );
+
+  const agent = new Agent({
+    id: "executor",
+    name: "Executor",
+    description:
+      "Specialist in executing trades, placing orders, and managing positions. " +
+      "Use when user wants to execute a plan, place a market or limit order, " +
+      "swap/convert crypto, buy or sell a symbol, cancel an order, or change permissionMode via /auto, /ask, /strict.",
+    instructions: composeAgentInstructionsWithSlots("executor", {
+      user: EXECUTOR_INSTRUCTIONS,
+      suffix: isHarnessProfilesEnabled()
+        ? getHarnessSuffixForModel(resolveRuntimeModel(undefined, "executor"))
+        : undefined,
+    }),
+    model: createModelResolver("executor"),
+    defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },
+    tools,
     memory: createSubAgentMemory("executor"),
-    inputProcessors: [gordonToolCallReconciler, gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
-    outputProcessors: [gordonOutputSanitizer],
+    // Native processors (GORDON_MASTRA_PROCESSORS) append AFTER the executor's
+    // own reconciler/guard/token-limiter; empty when the flag is unset.
+    inputProcessors: [
+      gordonToolCallReconciler,
+      gordonInputGuard,
+      new TokenLimiterProcessor({ limit: 32000 }),
+      ...nativeInputProcessorsForAgent(),
+    ],
+    outputProcessors: [gordonOutputSanitizer, ...nativeOutputProcessorsForAgent()],
   });
   registerObservability(agent);
   return agent;

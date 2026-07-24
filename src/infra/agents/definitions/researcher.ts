@@ -37,6 +37,11 @@ import {
   getHarnessSuffixForModel,
   isHarnessProfilesEnabled,
 } from "../profiles/harnessProfile.ts";
+import { applyNativeApprovalMarkers } from "../harness/nativeToolApproval.ts";
+import {
+  nativeInputProcessorsForAgent,
+  nativeOutputProcessorsForAgent,
+} from "../nativeWiring.ts";
 
 const RESEARCHER_INSTRUCTIONS = `You are a Researcher agent within Gordon, a trading CLI.
 
@@ -63,27 +68,13 @@ function isHotTierOnly(): boolean {
 }
 
 export function getResearcher(): Agent {
-  const agent = new Agent({
-    id: "researcher",
-    name: "Researcher",
-    description:
-      "On-demand parallel research agent. Spawned for background tasks like " +
-      "multi-symbol scans, backtests, deep dives. Read-only — cannot trade.",
-    instructions: composeAgentInstructionsWithSlots("researcher" as any, {
-      user: RESEARCHER_INSTRUCTIONS,
-      suffix: isHarnessProfilesEnabled()
-        ? getHarnessSuffixForModel(resolveRuntimeModel(undefined, "researcher"))
-        : undefined,
-    }),
-    model: createModelResolver("researcher"),
-    defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },
-    // Researcher = read-only inheritor of the agent surface.
-    // The canonical 22-tool set + integration data feeds + quote-verify +
-    // producer health. Mastra's runtime tool-filtering enforces read-only
-    // at the subagent boundary (execute_plan / approve_plan / cancel
-    // surface through but get rejected by the permission engine for this
-    // subagent profile).
-    tools: {
+  // Researcher = read-only inheritor of the agent surface.
+  // The canonical 22-tool set + integration data feeds + quote-verify +
+  // producer health. Mastra's runtime tool-filtering enforces read-only
+  // at the subagent boundary (execute_plan / approve_plan / cancel
+  // surface through but get rejected by the permission engine for this
+  // subagent profile). Extracted so native tool-approval markers apply.
+  const tools = {
       // Anti-hallucination quote verification.
       ...instrumentedQuoteVerifyTools,
       // Producer health observability.
@@ -110,7 +101,31 @@ export function getResearcher(): Agent {
       // carrying search over Gordon's OWN past chat sessions. COLD tier —
       // deep-recall path ("what did I conclude last time"), not hot scan.
       ...(isHotTierOnly() ? {} : instrumentedSelfHistoryTools),
-    },
+  };
+
+  // Native tool-approval (GORDON_NATIVE_TOOL_APPROVAL): mark any execute_plan /
+  // cancel_* that surface through the shared agent surface. No-op when the flag
+  // is unset. The researcher is read-only regardless — the permission engine
+  // rejects execution here — so this is defense-in-depth, never a widening.
+  applyNativeApprovalMarkers(
+    tools as Record<string, { id?: string; requireApproval?: unknown }>,
+  );
+
+  const agent = new Agent({
+    id: "researcher",
+    name: "Researcher",
+    description:
+      "On-demand parallel research agent. Spawned for background tasks like " +
+      "multi-symbol scans, backtests, deep dives. Read-only — cannot trade.",
+    instructions: composeAgentInstructionsWithSlots("researcher" as any, {
+      user: RESEARCHER_INSTRUCTIONS,
+      suffix: isHarnessProfilesEnabled()
+        ? getHarnessSuffixForModel(resolveRuntimeModel(undefined, "researcher"))
+        : undefined,
+    }),
+    model: createModelResolver("researcher"),
+    defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },
+    tools,
     memory: createSubAgentMemory("researcher"),
     inputProcessors: [
       gordonToolCallReconciler,
@@ -119,8 +134,10 @@ export function getResearcher(): Agent {
       ...(isResearcherLeastContextEnabled() ? [researcherContextFilter] : []),
       gordonInputGuard,
       new TokenLimiterProcessor({ limit: 32000 }),
+      // Native processors (GORDON_MASTRA_PROCESSORS) append last; empty off.
+      ...nativeInputProcessorsForAgent(),
     ],
-    outputProcessors: [gordonOutputSanitizer],
+    outputProcessors: [gordonOutputSanitizer, ...nativeOutputProcessorsForAgent()],
   });
   registerObservability(agent);
   return agent;
