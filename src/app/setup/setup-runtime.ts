@@ -13,11 +13,7 @@ import {
   type NativeExchangeId,
 } from "../../infra/exchange/types.ts";
 import { pluginInstaller } from "../../infra/ai/mcp/marketplace/installer.ts";
-import {
-  getStructuredAxiomPrivacyStatus,
-  getTracingConfig,
-  recordStructuredObservation,
-} from "../../infra/platform/observability/index.ts";
+import { recordStructuredObservation } from "../../infra/platform/observability/index.ts";
 import { getExecutionVenueMetadata, getIntegrationSurfaceMetadata } from "../../infra/domain/integrations/index.ts";
 import { setCostBudget } from "../../infra/platform/costTracker.ts";
 import type {
@@ -50,14 +46,6 @@ export interface DoctorReport {
     keyringAvailable: boolean;
     installedMcpPlugins: number;
     enabledMcpPlugins: number;
-    structuredAxiomRequested: boolean;
-    structuredAxiomEnabled: boolean;
-    structuredAxiomConsentEnabled: boolean;
-    structuredAxiomHashSaltConfigured: boolean;
-    tracingEnabled: boolean;
-    tracingRequested: boolean;
-    tracingReviewed: boolean;
-    tracingConsentEnabled: boolean;
   };
   checks: DoctorCheck[];
   providerStatuses: ProviderCredentialStatus[];
@@ -66,7 +54,7 @@ export interface DoctorReport {
 
 export interface BootstrapOptions {
   profile: SetupWizardMode;
-  llmProvider?: "openai" | "dedalus";
+  llmProvider?: "anthropic" | "openai";
   llmKey?: string;
   exchange?: ExchangeId;
   exchangeKey?: string;
@@ -157,7 +145,7 @@ export function parseBootstrapArgs(args: string[]): BootstrapOptions {
     profile,
     llmProvider:
       parsed["llm-provider"] === "openai"
-      || parsed["llm-provider"] === "dedalus"
+      || parsed["llm-provider"] === "anthropic"
         ? parsed["llm-provider"]
         : undefined,
     llmKey: typeof parsed["llm-key"] === "string" ? parsed["llm-key"] : undefined,
@@ -195,12 +183,12 @@ export function resolveBootstrapExchangeSandbox(
   return hasExistingEntry ? undefined : true;
 }
 
-function getProviderDefaultModel(provider: "openai" | "dedalus"): string {
+function getProviderDefaultModel(provider: "anthropic" | "openai"): string {
   switch (provider) {
+    case "anthropic":
+      return "anthropic/claude-opus-4-8";
     case "openai":
-      return "openai/gpt-5.4";
-    case "dedalus":
-      return "anthropic/claude-opus-4-6";
+      return "openai/gpt-5.6";
   }
 }
 
@@ -306,16 +294,6 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
   const keyring = createKeyringProvider();
   const keyringAvailable = await keyring.isAvailable();
   const providerStatuses = await getProviderCredentialStatuses(config);
-  const structuredPrivacy = getStructuredAxiomPrivacyStatus();
-  const tracingConfig = getTracingConfig();
-  const structuredRequested = envStatus.hasStructuredAxiomEnabled || structuredPrivacy.requested;
-  const structuredConsentEnabled = structuredPrivacy.consentEnabled;
-  const structuredEnabled = structuredRequested && structuredConsentEnabled;
-  const structuredHashSaltConfigured = envStatus.hasAxiomHashSalt || structuredPrivacy.hashSaltConfigured;
-  const tracingRequested = envStatus.tracingRequested || tracingConfig.requested;
-  const tracingReviewed = envStatus.tracingReviewed || tracingConfig.reviewed;
-  const tracingConsentEnabled = tracingConfig.consentEnabled;
-  const tracingEnabled = tracingRequested && tracingReviewed && tracingConsentEnabled;
 
   let installedMcpPlugins = 0;
   let enabledMcpPlugins = 0;
@@ -385,30 +363,6 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
       severity: installedMcpPlugins > 0 ? "info" : "info",
       message: `${enabledMcpPlugins}/${installedMcpPlugins} ${getIntegrationSurfaceMetadata("gordon_mcp").displayName} plugins are enabled.`,
     },
-    {
-      id: "axiom_privacy",
-      ok: !structuredEnabled || structuredHashSaltConfigured,
-      severity: !structuredEnabled || structuredHashSaltConfigured ? "info" : "warn",
-      message: !structuredRequested
-        ? "Structured Axiom export is disabled unless GORDON_AXIOM_STRUCTURED_ENABLED=true."
-        : !structuredConsentEnabled
-          ? "Structured Axiom export is configured but blocked until telemetry consent is enabled."
-        : structuredHashSaltConfigured
-          ? "Structured Axiom export is enabled with GORDON_AXIOM_HASH_SALT configured."
-          : "Structured Axiom export is enabled without GORDON_AXIOM_HASH_SALT. Configure a salt before collecting tester data.",
-    },
-    {
-      id: "otel_review",
-      ok: !tracingRequested || (tracingReviewed && tracingConsentEnabled),
-      severity: !tracingRequested || tracingReviewed ? "info" : "warn",
-      message: !tracingRequested
-        ? "OTEL tracing is disabled by default."
-        : !tracingReviewed
-          ? "OTEL tracing was requested but is blocked until GORDON_TRACING_REVIEWED=true is set."
-        : tracingConsentEnabled
-          ? "OTEL tracing review gate is acknowledged."
-          : "OTEL tracing is reviewed but blocked until telemetry consent is enabled.",
-    },
   ];
 
   const nextActions: string[] = [];
@@ -416,18 +370,6 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
   if (!activeExchange) nextActions.push("Run `gordon configure exchange` to add a primary trading venue.");
   if (config.useKeyring && !keyringAvailable) nextActions.push("Disable keyring or install a supported OS keyring backend.");
   if (!config.onboardingComplete) nextActions.push("Finish QuickStart or Advanced onboarding so Gordon can skip first-run setup next time.");
-  if (structuredEnabled && !structuredHashSaltConfigured) {
-    nextActions.push("Set `GORDON_AXIOM_HASH_SALT` before collecting structured Axiom telemetry from external testers.");
-  }
-  if (structuredRequested && !structuredConsentEnabled) {
-    nextActions.push("Run `/telemetry enable` if you want structured Axiom export to activate for this install.");
-  }
-  if (tracingRequested && !tracingReviewed) {
-    nextActions.push("Keep OTEL tracing disabled or explicitly acknowledge review with `GORDON_TRACING_REVIEWED=true` after checking trace payloads.");
-  }
-  if (tracingRequested && tracingReviewed && !tracingConsentEnabled) {
-    nextActions.push("Run `/telemetry enable` if you want reviewed OTEL tracing to activate for this install.");
-  }
 
   // Harness wires (A3 + A4 + sandbox + kv-cache + claude.md linter):
   // cold by default, surface in doctor report when their flags are on.
@@ -466,14 +408,6 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
       keyringAvailable,
       installedMcpPlugins,
       enabledMcpPlugins,
-      structuredAxiomRequested: structuredRequested,
-      structuredAxiomEnabled: structuredEnabled,
-      structuredAxiomConsentEnabled: structuredConsentEnabled,
-      structuredAxiomHashSaltConfigured: structuredHashSaltConfigured,
-      tracingEnabled,
-      tracingRequested,
-      tracingReviewed,
-      tracingConsentEnabled,
     },
     checks,
     providerStatuses,
@@ -500,14 +434,6 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
       keyringAvailable: report.summary.keyringAvailable,
       installedMcpPlugins: report.summary.installedMcpPlugins,
       enabledMcpPlugins: report.summary.enabledMcpPlugins,
-      structuredAxiomRequested: structuredRequested,
-      structuredAxiomEnabled: structuredEnabled,
-      structuredAxiomConsentEnabled: structuredConsentEnabled,
-      structuredHashSaltConfigured,
-      tracingEnabled,
-      tracingRequested,
-      tracingReviewed,
-      tracingConsentEnabled,
       failingChecks: checks.filter((check) => !check.ok).map((check) => check.id),
       blockedProviders: providerStatuses
         .filter((status) => !status.ready)
@@ -536,8 +462,6 @@ export function formatDoctorReport(report: DoctorReport): string {
     `Active broker: ${report.summary.activeBroker ?? "none"}`,
     `Keyring: ${report.summary.keyringEnabled ? "enabled" : "disabled"} (${report.summary.keyringAvailable ? "available" : "unavailable"})`,
     `MCP plugins: ${report.summary.enabledMcpPlugins}/${report.summary.installedMcpPlugins} enabled`,
-    `Structured Axiom: ${report.summary.structuredAxiomRequested ? (report.summary.structuredAxiomEnabled ? (report.summary.structuredAxiomHashSaltConfigured ? "enabled" : "enabled (hash salt missing)") : "requested but blocked by telemetry consent") : "disabled"}`,
-    `OTEL tracing: ${report.summary.tracingRequested ? (!report.summary.tracingReviewed ? "requested but blocked by review gate" : report.summary.tracingEnabled ? "enabled/reviewed" : "reviewed but blocked by telemetry consent") : "disabled"}`,
     "",
     "**Checks**",
   ];
@@ -593,8 +517,8 @@ export async function applyBootstrap(options: BootstrapOptions): Promise<Bootstr
   }
 
   if (options.llmProvider && options.llmKey) {
+    if (options.llmProvider === "anthropic") envKeys.ANTHROPIC_API_KEY = options.llmKey;
     if (options.llmProvider === "openai") envKeys.OPENAI_API_KEY = options.llmKey;
-    if (options.llmProvider === "dedalus") envKeys.DEDALUS_API_KEY = options.llmKey;
     envKeys.GORDON_PROVIDER = options.llmProvider;
     envKeys.GORDON_MODEL = getProviderDefaultModel(options.llmProvider);
   }

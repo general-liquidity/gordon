@@ -106,7 +106,7 @@ export interface CreatePostToolOutputHookOptions<T> {
    * the model with the reprompt rather than fail hard. Default false.
    */
   repromptInsteadOfBlock?: boolean;
-  /** Optional observer for structured failures (for axiom/telemetry). */
+  /** Optional observer for structured failures (for telemetry). */
   onFailure?: (
     payload: PostToolUsePayload,
     result: StructuredValidationFail,

@@ -17,8 +17,8 @@
  * Output is twofold:
  *   1. Appended to ~/.gordon/agent-feedback.jsonl (review-queue pattern,
  *      same as the eval-failures bucket) so the user can grep/triage.
- *   2. Recorded as a structured observation so the audit log + Axiom
- *      see it correlated with the surrounding trace.
+ *   2. Recorded as a structured observation so the audit log + structured
+ *      sink see it correlated with the surrounding trace.
  *
  * Recovery-tier integration: when this tool fires, callers (recovery
  * tiers, /context surface, supervisor logic) can skip the "Notify" tier

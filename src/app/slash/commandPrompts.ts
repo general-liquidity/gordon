@@ -608,9 +608,9 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
           return "Export types: scan, analysis, backtest, session";
       }
     case "telemetry":
-      if (!args || args === "status") return "Show my current telemetry status — anonymous telemetry, structured Axiom export, OTEL tracing, and research data collection";
-      if (args === "enable") return "Enable telemetry consent. This allows anonymous telemetry and also unlocks structured Axiom export or reviewed OTEL tracing if the operator configured them.";
-      if (args === "disable") return "Disable telemetry consent and stop anonymous telemetry, structured Axiom export, and reviewed OTEL tracing";
+      if (!args || args === "status") return "Show my current telemetry status — anonymous telemetry and research data collection";
+      if (args === "enable") return "Enable telemetry consent. This allows anonymous telemetry.";
+      if (args === "disable") return "Disable telemetry consent and stop anonymous telemetry";
       if (args === "research-enable" || args === "research enable") return "Enable anonymized trading data collection for AI model training. This collects: trade outcomes (% P&L, strategy, duration, exit reason), backtest results (metrics only), market context (indicators, trend, bias). NO absolute prices, balances, quantities, or wallet addresses are ever collected. Data is stored locally in ~/.gordon/research/ and uploaded only when you choose.";
       if (args === "research-disable" || args === "research disable") return "Disable anonymized trading data collection";
       if (args === "research-status" || args === "research status") return "Show research data collection status: how many records collected locally, file sizes, and whether upload is pending";

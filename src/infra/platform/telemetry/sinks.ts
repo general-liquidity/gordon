@@ -13,7 +13,7 @@
  *   - New sinks can be added without changing the recording call sites.
  *
  * Built-in sinks live below (LocalCrashSink, LocalUsageSink). External sinks
- * (Datadog, Axiom, custom) register via registerSink() at startup.
+ * (custom) register via registerSink() at startup.
  */
 
 import * as fs from "node:fs";

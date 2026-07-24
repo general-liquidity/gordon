@@ -6,7 +6,7 @@ describe("setup runtime helpers", () => {
   test("parses bootstrap flags into structured options", () => {
     const parsed = parseBootstrapArgs([
       "--profile", "advanced",
-      "--llm-provider", "dedalus",
+      "--llm-provider", "anthropic",
       "--llm-key", "test-key",
       "--exchange", "binance",
       "--exchange-key", "key",
@@ -19,7 +19,7 @@ describe("setup runtime helpers", () => {
     ]);
 
     expect(parsed.profile).toBe("advanced");
-    expect(parsed.llmProvider).toBe("dedalus");
+    expect(parsed.llmProvider).toBe("anthropic");
     expect(parsed.exchange).toBe("binance");
     expect(parsed.broker).toBe("alpaca");
     expect(parsed.brokerPaper).toBe(false);
@@ -40,14 +40,6 @@ describe("setup runtime helpers", () => {
         keyringAvailable: true,
         installedMcpPlugins: 2,
         enabledMcpPlugins: 1,
-        structuredAxiomRequested: false,
-        structuredAxiomEnabled: false,
-        structuredAxiomConsentEnabled: false,
-        structuredAxiomHashSaltConfigured: false,
-        tracingEnabled: false,
-        tracingRequested: false,
-        tracingReviewed: false,
-        tracingConsentEnabled: false,
       },
       checks: [
         { id: "llm", ok: false, severity: "error", message: "No LLM provider key is configured." },

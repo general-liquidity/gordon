@@ -1,19 +1,13 @@
 /**
- * OpenTelemetry Tracing Module (Mastra Native Observability)
+ * Tracing seam (local no-op).
  *
- * Uses Mastra's Observability framework with OtelExporter for Axiom.
- * Creates a minimal Mastra instance to wire observability into agents,
- * enabling automatic agent-level span creation (agent_run, tool_call, etc.)
- * with SensitiveDataFilter for redacting API keys from exported traces.
- *
- * Environment Variables:
- * - OTEL_TRACING_ENABLED: Enable/disable tracing (default: false)
- * - GORDON_TRACING_REVIEWED: Secondary explicit review gate required for export (default: false)
- * - OTEL_EXPORTER_OTLP_ENDPOINT: OTLP endpoint URL (default: https://api.axiom.co/v1/traces)
- * - OTEL_EXPORTER_OTLP_HEADERS: Auth headers (e.g. "Authorization=Bearer xxx,X-Axiom-Dataset=gordon-traces")
- * - OTEL_SERVICE_NAME: Service name for traces (default: gordon-trading)
- *
- * Tracing also follows the user's telemetry consent state from `/telemetry enable`.
+ * External telemetry export (Mastra Observability + OTLP exporter to Axiom /
+ * Logfire) has been removed from this open-source build. The module keeps its
+ * exported surface — span-context helpers, id generators, `getMastraInstance`,
+ * `initializeTracing`/`shutdownTracing`, `getTracingConfig`/`getTracingStatus`
+ * — so callers keep compiling, but nothing is exported off-box.
+ * `getMastraInstance()` always returns null and `initializeTracing()` is inert.
+ * Local structured logging lives in `src/infra/logger/logger.ts`.
  */
 
 import { createModuleLogger } from "../../logger/index.ts";
@@ -53,10 +47,9 @@ export interface TracingOptions {
 
 let tracingInitialized = false;
 let tracingConfig: TracingConfig | null = null;
-let tracingReviewWarningShown = false;
-let tracingConsentWarningShown = false;
 
-// Mastra instance for wiring observability to agents
+// Retained for API compatibility with getMastraInstance()/getTracingStatus().
+// Always null now that external observability export is removed.
 let _mastraInstance: import("@mastra/core").Mastra | null = null;
 
 // Track active spans for context propagation (backward compat)
@@ -67,61 +60,22 @@ const activeSpans = new Map<string, SpanContext>();
 // ============================================================================
 
 /**
- * Parse OTLP headers from comma-separated "Key=Value" string
- */
-function parseOtlpHeaders(raw?: string): Record<string, string> {
-  if (!raw) return {};
-  const headers: Record<string, string> = {};
-  for (const pair of raw.split(",")) {
-    const idx = pair.indexOf("=");
-    if (idx > 0) {
-      headers[pair.slice(0, idx).trim()] = pair.slice(idx + 1).trim();
-    }
-  }
-  return headers;
-}
-
-export type TracingTarget = "custom" | "logfire" | "axiom";
-
-/**
- * Resolve the OTLP export destination + auth headers. Precedence:
- *   1. Explicit `OTEL_EXPORTER_OTLP_ENDPOINT` — any OTLP backend, full control.
- *   2. Pydantic Logfire — set `LOGFIRE_TOKEN` (write token). Region via
- *      `LOGFIRE_BASE_URL` (default US `https://logfire-us.pydantic.dev`). Gordon's
- *      OTel spans (agent_run, tool_call, LLM calls) then land in Logfire with no
- *      hand-crafted OTLP env strings.
- *   3. Axiom default.
- */
-export function resolveExporterTarget(): { target: TracingTarget; endpoint: string; headers: Record<string, string> } {
-  const explicit = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
-  if (explicit) {
-    return { target: "custom", endpoint: explicit, headers: parseOtlpHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS) };
-  }
-  const logfireToken = process.env.LOGFIRE_TOKEN;
-  if (logfireToken) {
-    const base = (process.env.LOGFIRE_BASE_URL || "https://logfire-us.pydantic.dev").replace(/\/+$/, "");
-    return { target: "logfire", endpoint: `${base}/v1/traces`, headers: { Authorization: logfireToken } };
-  }
-  return {
-    target: "axiom",
-    endpoint: "https://api.axiom.co/v1/traces",
-    headers: parseOtlpHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS),
-  };
-}
-
-/**
- * Get tracing configuration from environment
+ * Get tracing configuration from environment.
+ *
+ * External export has been removed, so `enabled` is always false and
+ * `endpoint`/`headers` are empty. The `requested`/`reviewed`/`consentEnabled`
+ * fields are retained so the doctor/telemetry status readouts still reflect
+ * operator env, but nothing is ever exported.
  */
 export function getTracingConfig(): TracingConfig {
   const requested = process.env.OTEL_TRACING_ENABLED === "true";
   const reviewed = process.env.GORDON_TRACING_REVIEWED === "true";
   const consentEnabled = isTelemetryConsentEnabled();
-  const { endpoint, headers } = resolveExporterTarget();
   return {
     serviceName: process.env.OTEL_SERVICE_NAME || "gordon-trading",
-    endpoint,
-    headers,
-    enabled: requested && reviewed && consentEnabled,
+    endpoint: "",
+    headers: {},
+    enabled: false,
     requested,
     reviewed,
     consentEnabled,
@@ -255,153 +209,18 @@ export function getMastraInstance(): import("@mastra/core").Mastra | null {
 // ============================================================================
 
 /**
- * Initialize Mastra-native observability tracing.
+ * Initialize tracing.
  *
- * Creates an Observability instance with:
- * - OtelExporter: Sends Mastra spans to Axiom via OTLP
- * - SensitiveDataFilter: Redacts API keys/secrets from exported spans
- *
- * Then creates a minimal Mastra instance so agents can be registered
- * and automatically produce traced spans.
- *
- * Set these env vars to enable:
- *   OTEL_TRACING_ENABLED=true
- *   GORDON_TRACING_REVIEWED=true
- *   OTEL_EXPORTER_OTLP_ENDPOINT=https://api.axiom.co/v1/traces
- *   OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer <AXIOM_TOKEN>,X-Axiom-Dataset=gordon-traces
- *
- * The local install must also have telemetry consent enabled.
+ * External telemetry export (Mastra observability + OTLP exporter to Axiom /
+ * Logfire) has been removed from this open-source build. This is now a no-op
+ * that records local span context only; nothing is exported off-box.
+ * Retained so existing callers (`index.tsx`, `/telemetry enable`) still resolve.
  */
 export async function initializeTracing(): Promise<void> {
-  const nextConfig = getTracingConfig();
-  const hadMastraInstance = _mastraInstance !== null;
-  const configChanged = !tracingConfig
-    || tracingConfig.enabled !== nextConfig.enabled
-    || tracingConfig.requested !== nextConfig.requested
-    || tracingConfig.reviewed !== nextConfig.reviewed
-    || tracingConfig.consentEnabled !== nextConfig.consentEnabled
-    || tracingConfig.serviceName !== nextConfig.serviceName
-    || tracingConfig.endpoint !== nextConfig.endpoint
-    || JSON.stringify(tracingConfig.headers) !== JSON.stringify(nextConfig.headers);
-
-  if (hadMastraInstance && configChanged) {
-    await shutdownTracing();
-  } else if (tracingInitialized && !configChanged) {
-    logger.debug("Tracing already initialized");
-    return;
-  }
-
-  tracingConfig = nextConfig;
-
-  if (!tracingConfig.enabled) {
-    if (tracingConfig.requested && !tracingConfig.reviewed && !tracingReviewWarningShown) {
-      logger.warn(
-        "OTEL tracing was requested but remains disabled until GORDON_TRACING_REVIEWED=true is set.",
-      );
-      tracingReviewWarningShown = true;
-    } else if (
-      tracingConfig.requested
-      && tracingConfig.reviewed
-      && !tracingConfig.consentEnabled
-      && !tracingConsentWarningShown
-    ) {
-      logger.warn(
-        "OTEL tracing was requested and reviewed, but remains blocked until telemetry consent is enabled.",
-      );
-      tracingConsentWarningShown = true;
-    } else {
-      logger.debug(
-        "Tracing disabled (set OTEL_TRACING_ENABLED=true, GORDON_TRACING_REVIEWED=true, and enable telemetry consent to export)",
-      );
-    }
-    tracingInitialized = true;
-    return;
-  }
-
-  logger.info("Initializing Mastra observability tracing", {
-    serviceName: tracingConfig.serviceName,
-    endpoint: tracingConfig.endpoint,
-  });
-
-  try {
-    // Lazy imports to avoid loading heavy OTEL deps when tracing is disabled
-    const [
-      { Observability, SensitiveDataFilter },
-      { OtelExporter },
-      { Mastra },
-    ] = await Promise.all([
-      import("@mastra/observability"),
-      import("@mastra/otel-exporter"),
-      import("@mastra/core"),
-    ]);
-
-    const otelExporter = new OtelExporter({
-      provider: {
-        custom: {
-          endpoint: tracingConfig.endpoint,
-          headers: tracingConfig.headers,
-          protocol: "http/protobuf" as const,
-        },
-      },
-      resourceAttributes: {
-        "service.name": tracingConfig.serviceName,
-        "service.version": process.env.npm_package_version || "unknown",
-      },
-    });
-
-    const observability = new Observability({
-      configs: {
-        default: {
-          serviceName: tracingConfig.serviceName,
-          exporters: [otelExporter],
-          spanOutputProcessors: [
-            new SensitiveDataFilter({
-              sensitiveFields: [
-                "apikey", "secret", "token", "authorization",
-                "bearer", "password", "privatekey", "credential",
-              ],
-              redactionStyle: "partial",
-            }),
-          ],
-        },
-      },
-    });
-
-    // Create Mastra instance with observability + storage.
-    // Storage is required for agent approval snapshots (per Mastra docs:
-    // "Configure a storage provider on your Mastra instance or you'll see
-    // a 'snapshot not found' error").
-    // Agents are registered later via getMastraInstance().addAgent().
-    let storageProvider: import("@mastra/core/storage").MastraCompositeStore | undefined;
-    try {
-      const { createMastraStorageConfig } = await import("../../agents/memory/mastraStorage.ts");
-      const dbUrl = process.env.DATABASE_URL || "file:gordon.db";
-      const config = createMastraStorageConfig({ storeId: "gordon-mastra", dbUrl, enableVector: false });
-      storageProvider = config.storage;
-    } catch {
-      // Storage optional — approval snapshots won't persist but agent still works
-    }
-    _mastraInstance = new Mastra({
-      observability,
-      ...(storageProvider ? { storage: storageProvider } : {}),
-    });
-
-    try {
-      const { registerAllAgentsForTracing } = await import("../../agents/agentHelpers.ts");
-      await registerAllAgentsForTracing();
-    } catch {
-      // Agent registration is best-effort when tracing starts before agents load
-    }
-
-    tracingInitialized = true;
-    logger.info("Mastra observability tracing initialized");
-  } catch (err) {
-    logger.error(
-      "Failed to initialize Mastra observability",
-      err instanceof Error ? err : new Error(String(err)),
-    );
-    tracingInitialized = true; // Mark as initialized to avoid retries
-  }
+  tracingConfig = getTracingConfig();
+  _mastraInstance = null;
+  tracingInitialized = true;
+  logger.debug("Tracing disabled — external export removed from this build");
 }
 
 /**

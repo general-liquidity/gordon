@@ -211,7 +211,7 @@ export function redactString(text: string): string {
  * them (e.g. webhook payloads, broker API responses).
  *
  * Max depth bounded at 8 to match the existing structured-log convention
- * (`MAX_DEPTH=4` for Axiom, doubled here since this runs locally).
+ * (`MAX_DEPTH=4` for the structured sink, doubled here since this runs locally).
  */
 const MAX_DEPTH = 8;
 const MAX_ITEMS = 200;

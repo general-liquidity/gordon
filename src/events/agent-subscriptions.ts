@@ -317,13 +317,13 @@ export class AgentSubscriptionRegistry {
  */
 /**
  * Emit a shadow-verdict observation to BOTH the application logger
- * (for human-readable trace in console / log file) AND to Axiom via
- * recordStructuredObservation (for queryable history).
+ * (for human-readable trace in console / log file) AND the structured
+ * observation sink via recordStructuredObservation (for queryable history).
  *
  * Closing the gap from the harness-assessment doc §3.1: shadow verdicts
- * weren't reaching Axiom because they were going to logger.info only.
- * Every WW shadow wire that calls this helper now feeds the
- * calibration-data pipeline.
+ * weren't reaching the structured sink because they were going to
+ * logger.info only. Every WW shadow wire that calls this helper now feeds
+ * the calibration-data pipeline.
  */
 function shadowVerdict(
   component: string,

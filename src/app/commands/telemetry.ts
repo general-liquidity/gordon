@@ -4,15 +4,6 @@ import * as path from "node:path";
 import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
 import { GORDON_DIR } from "../../infra/storage/paths.ts";
 import {
-  getStructuredAxiomPrivacyStatus,
-  getStructuredAxiomStatus,
-  getTracingConfig,
-  getTracingStatus,
-  initializeTracing,
-  refreshStructuredAxiomState,
-  shutdownTracing,
-} from "../../infra/platform/observability/index.ts";
-import {
   clearResearchData,
   disable,
   disableResearch,
@@ -34,59 +25,14 @@ export interface TelemetryCommandResult {
 }
 
 function formatStructuredAxiomSummary(): string[] {
-  const status = getStructuredAxiomStatus();
-  const privacy = getStructuredAxiomPrivacyStatus();
-
-  let summary = "Disabled";
-  if (status.requested) {
-    if (!status.consentEnabled) {
-      summary = "Requested but blocked by telemetry consent";
-    } else if (!status.configured) {
-      summary = "Requested but missing Axiom token";
-    } else if (!privacy.hashSaltConfigured) {
-      summary = "Enabled (hash salt missing)";
-    } else {
-      summary = "Enabled";
-    }
-  }
-
-  const lines = [
-    `Structured Axiom: ${summary}`,
-    `Axiom token: ${status.configured ? "Configured" : "Missing"}`,
-    `Hash salt: ${privacy.hashSaltConfigured ? "Set" : "Missing"}`,
+  return [
+    "Structured export: Disabled (external export removed from this build)",
   ];
-
-  if (status.eventsDataset && status.auditDataset) {
-    lines.push(`Datasets: events=${status.eventsDataset}, audit=${status.auditDataset}`);
-  }
-
-  if (status.requested) {
-    lines.push(`Queued structured events: ${status.queuedEvents}`);
-    lines.push(`Queued audit events: ${status.queuedAudit}`);
-  }
-
-  return lines;
 }
 
 function formatTracingSummary(): string[] {
-  const config = getTracingConfig();
-  const status = getTracingStatus();
-
-  let summary = "Disabled";
-  if (config.requested) {
-    if (!config.reviewed) {
-      summary = "Requested but blocked by review gate";
-    } else if (!config.consentEnabled) {
-      summary = "Reviewed but blocked by telemetry consent";
-    } else {
-      summary = status.mastraWired ? "Enabled" : "Configured (Mastra trace export pending)";
-    }
-  }
-
   return [
-    `OTEL tracing: ${summary}`,
-    `Tracing review gate: ${config.reviewed ? "Acknowledged" : "Missing"}`,
-    `Tracing runtime wired: ${status.mastraWired ? "Yes" : "No"}`,
+    "OTEL tracing: Disabled (external export removed from this build)",
   ];
 }
 
@@ -118,11 +64,7 @@ function formatTelemetryStatus(): string {
   lines.push("");
   lines.push(...formatTracingSummary());
   lines.push("");
-  if (status.envDisabled) {
-    lines.push("Note: DO_NOT_TRACK/GORDON_TELEMETRY_DISABLED also blocks Axiom export and reviewed tracing that follow telemetry consent.");
-  } else {
-    lines.push("Note: Structured Axiom export and OTEL tracing follow the same telemetry consent when operator env enables them.");
-  }
+  lines.push("Note: External trace/observability export (Axiom/Logfire/OTLP) has been removed from this build.");
   lines.push("");
   lines.push("Note: Gordon still stores local config, sessions, memory, and logs under ~/.gordon.");
   return lines.join("\n");
@@ -148,22 +90,18 @@ export async function handleTelemetryCommand(args: string): Promise<TelemetryCom
       await updateTelemetryConfig((config) => {
         config.telemetry.enabled = true;
       });
-      refreshStructuredAxiomState();
-      await initializeTracing();
       return {
         success: true,
-        message: `${formatTelemetryStatus()}\n\nTelemetry enabled. Structured Axiom export and reviewed OTEL tracing will now run if operator environment configuration is present.`,
+        message: `${formatTelemetryStatus()}\n\nAnonymous telemetry enabled. External trace/observability export has been removed from this build; only local config, sessions, memory, and logs are kept under ~/.gordon.`,
       };
     case "disable":
       disable();
       await updateTelemetryConfig((config) => {
         config.telemetry.enabled = false;
       });
-      refreshStructuredAxiomState({ clearQueueOnDisable: true });
-      await shutdownTracing();
       return {
         success: true,
-        message: `${formatTelemetryStatus()}\n\nTelemetry disabled. Anonymous telemetry stopped, structured Axiom export was blocked, and reviewed OTEL tracing was shut down for this install.`,
+        message: `${formatTelemetryStatus()}\n\nAnonymous telemetry disabled for this install.`,
       };
     case "research-enable":
       enableResearch();

@@ -212,7 +212,7 @@ function formatStatus(args: {
     },
     {
       name: "Harness",
-      flags: ["GORDON_TERMINATION_LAYERS", "GORDON_SHADOW_MODE", "GORDON_AXIOM_STRUCTURED_ENABLED"],
+      flags: ["GORDON_TERMINATION_LAYERS", "GORDON_SHADOW_MODE"],
     },
   ];
   for (const group of flagGroups) {

@@ -13,7 +13,7 @@
  *   1. Append a `tool_friction_observed` entry to ~/.gordon/tool-friction.jsonl
  *      (review-queue pattern, matches agent-feedback.ts).
  *   2. Emit a structured observation with eventType `agent.tool_friction_observed`
- *      so the audit log + Axiom see it correlated with the surrounding trace.
+ *      so the audit log + structured sink see it correlated with the trace.
  *
  * The skill /tool-friction-report consumes the jsonl + observations to
  * surface "which user questions cost the most tool calls" so the operator

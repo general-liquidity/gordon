@@ -6,7 +6,7 @@
  * fill → cancellation → replacement → related execution → cross-venue
  * activity → position change → PnL impact.
  *
- * Gordon already emits structured observations per gate verdict (Axiom)
+ * Gordon already emits structured observations per gate verdict
  * and decisionLog JSONL per decision. This module provides the *query
  * layer* that stitches those streams into a per-order or per-plan
  * forensic timeline, with toxicity scoring per the article's "intent
