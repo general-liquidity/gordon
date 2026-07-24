@@ -14,6 +14,10 @@ import { createModuleLogger } from "../../logger/logger.ts";
 import { WORKING_MEMORY_LABELS } from "../capabilityTruth.ts";
 import { getMemoryConfig } from "./memoryConfig.ts";
 import { wrapMemoryWithGate, MAX_WORKING_MEMORY_CHARS } from "./memoryGate.ts";
+import {
+  isObservationalMemoryEnabled,
+  buildObservationalMemoryOptions,
+} from "./observationalMemory.ts";
 
 const logger = createModuleLogger("agents");
 
@@ -89,8 +93,13 @@ function createMastraLocalEmbedder(): MastraLegacyEmbeddingModel<string> {
  * `semanticRecall` is disabled — the model issues cold-recall queries
  * explicitly through the tools in memory-tools.ts.
  *
- * Background: observationalMemory still runs (observation + reflection
- * passes) so session summaries accumulate for later retrieval.
+ * Compaction: OPT-IN. When GORDON_OBSERVATIONAL_MEMORY=1, Mastra's native
+ * Observational Memory (observation + reflection passes, prompt-cache
+ * stable) is wired via `observationalMemory`. With the flag unset the key
+ * is omitted and Gordon's hand-rolled 5-stage summarizer + contextCollapse
+ * (src/infra/domain/memory/) stay the default — behavior is unchanged.
+ * The memoryGate char-cap applies in both paths (Mastra never caps
+ * working-memory chars).
  */
 export function createMemory(): Memory {
   const _memoryConfig = getMemoryConfig();
@@ -105,10 +114,12 @@ export function createMemory(): Memory {
   });
 
   const lastMessages = _memoryConfig.lastMessages;
+  const observationalMemoryEnabled = isObservationalMemoryEnabled();
   logger.info("Creating memory", {
     lastMessages,
     mode,
     hotTierCap: MAX_WORKING_MEMORY_CHARS,
+    observationalMemory: observationalMemoryEnabled,
   });
 
   // Semantic recall is explicitly disabled (Hermes pattern: cold recall
@@ -127,21 +138,15 @@ export function createMemory(): Memory {
         template: WORKING_MEMORY_TEMPLATE,
       },
       generateTitle: true,
-      observationalMemory: {
-        model: getFastMastraModel(),
-        scope: "thread",
-        observation: {
-          messageTokens: 30_000,
-          bufferTokens: 0.2,
-          bufferActivation: 0.8,
-          blockAfter: 1.2,
-        },
-        reflection: {
-          observationTokens: 40_000,
-          bufferActivation: 0.5,
-          blockAfter: 1.2,
-        },
-      },
+      // Opt-in: native Mastra Observational Memory. Omitted entirely when
+      // the flag is off so Gordon's custom summarizer stays the default.
+      ...(observationalMemoryEnabled
+        ? {
+            observationalMemory: buildObservationalMemoryOptions({
+              model: getFastMastraModel(),
+            }),
+          }
+        : {}),
     },
   });
 
