@@ -19,15 +19,15 @@
 
 ---
 
-## Why Gordon
+**Gordon is an open-source (MIT) AI trading agent for crypto and equities that runs in your terminal.** You state the intent in plain language, it drafts a structured plan, you approve it, and a deny-first risk harness gates every order before it reaches a venue.
 
-Since late 2022 we have watched AI get unnervingly good at *talking* about markets. A model will explain a setup, narrate a chart, and argue a thesis as fluently as a senior trader. Almost none of it is something you would actually hand your money to.
+The model proposes. The harness disposes.
 
-**In markets, AI does not have a capabilities problem. It has a trust problem.**
+Local-first: your keys, your machine, no account, no phone-home, every feature free.
 
-A model that can read a chart is not therefore able to size a position, respect a limit, recover from a failed order, or preserve capital through a drawdown. In most software, being slightly wrong is survivable. In markets, being *nearly* right is often just being wrong, with a settlement attached. The hard part was never the intelligence. It is the reasoning under uncertainty, the permissions, the approvals, the durable memory, the disciplined execution, and the clear failure modes that let a human safely delegate capital to software.
+<!-- demo: a terminal cast (asciinema/GIF) of a real /plan → approve → fill cycle belongs here once recorded; the block below is a hand-written mock-up, not a capture. -->
 
-**Gordon is that missing harness.** It is a terminal-native trading agent for crypto and stocks that turns a plain-language intent, *"find me a clean BTC long for the NY session, ~1R"*, into a previewed, risk-checked, fully-audited trade. The model proposes. The harness disposes. Capital safety is not a feature bolted on at the end; it is the architecture.
+*Illustrative output (a mock-up of a plan cycle, not a recorded session):*
 
 ```
 you › find me a clean BTC long for the NY session, ~1R risk
@@ -52,6 +52,20 @@ gordon › BTC/USDT · $67,420 · 1H consolidation coiling on declining vol
 > [!WARNING]
 > Gordon places real orders on real venues when armed. Trading is risky, you can lose money, and nothing in this repo is investment advice. Read the source, start in `paper` or `strict` mode, and never arm capital you can't afford to lose. See [DISCLAIMER.md](./DISCLAIMER.md) and [TERMS.md](./TERMS.md); the first live arm asks you to acknowledge them once.
 
+## Why Gordon
+
+**In markets, AI does not have a capabilities problem. It has a trust problem.** A model that reads a chart fluently still cannot be trusted to size a position, respect a limit, or recover from a failed order. Gordon is the missing harness: permissions, approvals, durable memory, disciplined execution, and clear failure modes. Capital safety is not bolted on at the end; it is the architecture.
+
+<details>
+<summary><strong>The longer argument</strong></summary>
+
+Since late 2022 we have watched AI get unnervingly good at *talking* about markets. A model will explain a setup, narrate a chart, and argue a thesis as fluently as a senior trader. Almost none of it is something you would actually hand your money to.
+
+A model that can read a chart is not therefore able to size a position, respect a limit, recover from a failed order, or preserve capital through a drawdown. In most software, being slightly wrong is survivable. In markets, being *nearly* right is often just being wrong, with a settlement attached. The hard part was never the intelligence. It is the reasoning under uncertainty, the permissions, the approvals, the durable memory, the disciplined execution, and the clear failure modes that let a human safely delegate capital to software.
+
+Gordon turns a plain-language intent, *"find me a clean BTC long for the NY session, ~1R"*, into a previewed, risk-checked, fully-audited trade.
+</details>
+
 ## Philosophy
 
 Three convictions the whole codebase is built around.
@@ -61,6 +75,23 @@ Three convictions the whole codebase is built around.
 **Plan-first, always.** Nothing touches a venue until you have seen it as a structured diff and approved it. Gordon's job is to make you a *better decision-maker, faster*, not to fire orders and explain itself afterward. Approvals are content-bound: change a single leg of a plan and it has to be approved again.
 
 **Deny-first, not trust-first.** The default answer to "may this run?" is no. Every order earns its way to a venue through a permission engine, a 15-dimension risk classifier, a hard deny-list, and scoped kill switches. An agent cannot talk, charm, or hallucinate its way past a limit it is structurally forbidden to cross.
+
+### How that compares
+
+Gordon is not a faster bot. It is a different shape: a supervised agent, where the classic bots are rule engines and the DIY route is an LLM you wire to a broker yourself.
+
+| | Gordon | Freqtrade | Hummingbot | LLM + broker API by hand |
+|:--|:--:|:--:|:--:|:--:|
+| Driven by natural-language intent | ✓ | Rule/strategy code | Rule/strategy config | ✓ |
+| Plan shown as a diff and approved before any order | ✓ | ✗ | ✗ | You build it |
+| Deny-first permission gate on every tool call | ✓ | ✗ | ✗ | You build it |
+| Multi-dimension pre-trade risk classifier | ✓ (15 dims) | Strategy-level limits | Strategy-level limits | You build it |
+| Tamper-evident (HMAC-chained) audit trail | ✓ | Logs | Logs | You build it |
+| Venue coverage | Crypto + equities/options | Crypto | Crypto | Whatever you wire |
+| Terminal front end | Full TUI | CLI + web UI | CLI client | Your own |
+| Open source | ✓ MIT | ✓ | ✓ | n/a |
+
+<sub>Competitor cells state only well-established, publicly documented facts about those projects. Where a project solves a problem differently rather than not at all, the cell says so instead of a cross.</sub>
 
 ## Install
 
@@ -183,7 +214,8 @@ Real adapters, not mock quotes. Gordon is model-, venue-, and editor-agnostic: i
 
 <sub>Curated to the brokers with a maintained native TypeScript SDK. Each still passes the same inclusion gate and conformance matrix, and defaults to paper, live needs an explicit opt-in.</sub>
 
-#### Onchain data &amp; intelligence
+<details>
+<summary><strong>Onchain data &amp; intelligence</strong></summary>
 
 | Source | Provides |
 |:--|:--|
@@ -193,6 +225,7 @@ Real adapters, not mock quotes. Gordon is model-, venue-, and editor-agnostic: i
 | <img height="16" align="top" src="./assets/integrations/defillama.png" alt="" /> &nbsp;DeFiLlama | TVL · yields |
 | <img height="16" align="top" src="./assets/integrations/glassnode.png" alt="" /> &nbsp;Glassnode | On-chain metrics |
 | <img height="16" align="top" src="./assets/integrations/dexscreener.png" alt="" /> &nbsp;DexScreener | DEX pairs |
+</details>
 
 #### Models &nbsp;<sub>provider-agnostic, via Mastra's native model router</sub>
 
@@ -205,7 +238,8 @@ Real adapters, not mock quotes. Gordon is model-, venue-, and editor-agnostic: i
 
 <sub>These four first-party families have native tool-calling and drive the default agent roles. Pick any `provider/model` and Gordon routes it: frontier labs native in the catalogue (DeepSeek, Qwen/Alibaba, Kimi/Moonshot, z.ai and Zhipu GLM, MiniMax, StepFun, Mistral), gateways for one-key multi-model access (OpenRouter, Hugging Face, Together, Fireworks, SiliconFlow, DeepInfra), and local OpenAI-compatible hosts (Ollama, LM Studio). Defaults: orchestrator and executor on `claude-opus-4-8`, researcher on `claude-haiku-4-5`. Override per role with `GORDON_MODEL_ORCHESTRATOR` / `_EXECUTOR` / `_RESEARCHER` (`provider:model`), or globally with `GORDON_PROVIDER` / `GORDON_MODEL`. The trade-driving executor stays pinned to a first-party provider by default for tool-calling reliability; frontier and gateway models are freely selectable for research and analysis roles.</sub>
 
-#### Editors &amp; hosts &nbsp;<sub>run Gordon from</sub>
+<details>
+<summary><strong>Editors &amp; hosts</strong> &nbsp;<sub>run Gordon from</sub></summary>
 
 | Editor / host | Connection |
 |:--|:--|
@@ -217,56 +251,83 @@ Real adapters, not mock quotes. Gordon is model-, venue-, and editor-agnostic: i
 | <img height="16" align="top" src="./assets/integrations/devin.png" alt="" /> &nbsp;Devin | MCP |
 
 <sub>Also wired: Finnhub fundamentals, SEC/EDGAR filings, X sentiment, MoonPay on-ramp, and Polygon x402 rails.</sub>
+</details>
 
 ## What's in the box
 
 <details>
 <summary><strong>Analysis & strategy</strong></summary>
 
-- **~94 indicator ops** (RSI, MACD, Ichimoku, Supertrend, ATR, ADX, VWAP, plus exotics: SADF, frac-diff, Hurst, RSRS, Amihud) and **microstructure ops** (VPIN, footprint imbalance, order blocks, naked POC, displacement breaks, plus triangular-arbitrage-parity, a 3-leg no-arbitrage-breakdown dislocation signal).
-- **Six-class regime classifier** from a 10-metric model, plus a **market-timing pair**, an O'Neil Follow-Through-Day confirmation and a Distribution-Day cluster counter, that generalizes from equity indices to crypto majors.
-- **41-strategy library** (5 tier-1, 22 tier-2, a weighted ensemble, a condition DSL), plus markdown **playbooks** and **Edge-Driven Development** (`EDGE.md` specs that auto-retire when live metrics stop matching the backtest).
-- **Cross-sectional risk:** a complex-wide deleveraging veto (one broad risk-off flush vetoes the whole oversold set, not N independent dips), a forward-looking crowded-equilibrium fragility index (the pre-flush coordination-cascade setup, distinct from the reactive veto), a positive/zero/negative-sum game-type classifier (who funds this edge?), an exposure-ceiling coach (regime + breadth to a deployable-capital cap), and an Avellaneda-Lee eigenportfolio-residual stat-arb signal.
-- **Portfolio math:** Random-Matrix-Theory covariance denoising (Marchenko-Pastur), optimal-intensity Ledoit-Wolf shrinkage, HRP, Black-Litterman, and a Kalman family (hedge-ratio with confidence-gated sizing, a constant-velocity trend filter, and adaptive process-noise scaled by realized vol).
-- **Options:** full Greeks (vanna / charm / vomma, dealer GEX) plus a held-position drawdown-cause classifier (delta- / theta- / IV-driven → a deterministic rebuy verdict).
-- **Equity methodologies:** a CANSLIM 7-factor composite with bear-market gating, a parabolic-short exhaustion scorer, a PEAD gap-up grader, and an N-th-order scenario-impact analyzer.
+- **~94 indicator ops:** RSI, MACD, Ichimoku, Supertrend, ATR, ADX, VWAP, plus exotics (SADF, frac-diff, Hurst, RSRS, Amihud).
+- **Microstructure ops:** VPIN, footprint imbalance, order blocks, naked POC, displacement breaks.
+- **Triangular-arbitrage parity:** a 3-leg no-arbitrage-breakdown dislocation signal.
+- **Six-class regime classifier** over a 10-metric model, generalizing from equity indices to crypto majors.
+- **Market-timing pair:** an O'Neil Follow-Through-Day confirmation and a Distribution-Day cluster counter.
+- **41-strategy library:** 5 tier-1, 22 tier-2, a weighted ensemble, and a condition DSL.
+- **Playbooks and Edge-Driven Development:** markdown `EDGE.md` specs that auto-retire when live metrics stop matching the backtest.
+- **Complex-wide deleveraging veto:** one broad risk-off flush vetoes the whole oversold set, not N independent dips.
+- **Crowded-equilibrium fragility index:** forward-looking pre-flush cascade setup, distinct from the reactive veto.
+- **Game-type classifier:** positive / zero / negative-sum, answering who funds this edge.
+- **Exposure-ceiling coach:** regime plus breadth resolved into a deployable-capital cap.
+- **Avellaneda-Lee stat-arb:** eigenportfolio-residual signal.
+- **Covariance denoising:** Random-Matrix-Theory (Marchenko-Pastur) and optimal-intensity Ledoit-Wolf shrinkage.
+- **Allocation:** HRP and Black-Litterman.
+- **Kalman family:** hedge-ratio with confidence-gated sizing, constant-velocity trend filter, vol-scaled adaptive process noise.
+- **Options:** full Greeks including vanna, charm, vomma, and dealer GEX.
+- **Drawdown-cause classifier:** delta- / theta- / IV-driven attribution on held positions, with a deterministic rebuy verdict.
+- **Equity methodologies:** CANSLIM 7-factor composite with bear-market gating, parabolic-short exhaustion scorer.
+- **Event grading:** a PEAD gap-up grader and an N-th-order scenario-impact analyzer.
 </details>
 
 <details>
 <summary><strong>Planning, execution & market microstructure</strong></summary>
 
-- **Contingency planning:** the model authors bull / base / bear / tail branches once, each with a pre-committed allocation and declared trigger levels; a deterministic resolver picks the live branch each cycle, with no LLM in the execution loop.
-- **Settled-cash / GFV ledger:** buys clear only against settled cash with a T+1 pending bucket, so a Good-Faith-Violation is structurally impossible on a cash-account broker.
-- **Resting-stop liveness watchdog:** flags any position whose protective stop has lapsed (day-order expiry, cancel, reject) and needs re-arming.
-- **Order-book primitives:** a deterministic continuous-double-auction matching engine (price-time priority, partial fills, cancels) and a call-auction uncross for open / close equilibrium pricing.
+- **Contingency planning:** bull / base / bear / tail branches authored once, each with a pre-committed allocation and trigger levels.
+- **Deterministic branch resolver:** picks the live branch each cycle, with no LLM in the execution loop.
+- **Settled-cash / GFV ledger:** buys clear only against settled cash with a T+1 pending bucket.
+- **Resting-stop liveness watchdog:** flags positions whose protective stop lapsed via expiry, cancel, or reject.
+- **Matching engine:** deterministic continuous double auction with price-time priority, partial fills, and cancels.
+- **Call-auction uncross:** open and close equilibrium pricing.
 </details>
 
 <details>
 <summary><strong>Autonomy & completion discipline</strong></summary>
 
-- **Verified-completion gate:** an autonomous goal is never sealed on the agent's own say-so; an independent verifier has to fail to invalidate "done" first, closing the premature-completion failure mode.
-- **Per-cycle gap-finding + just-in-time replanning:** each cycle re-derives the unmet-requirement set and regenerates the work list from the current state instead of trusting a fixed upfront plan; when it stops short it seals an honest *achieved-with-acknowledged-gaps* instead of a clean success.
-- **Rotating self-audit:** a per-run deep pass over a rotating theme (script health, discovery coverage, dead weight, guardrail integrity, API budgets) that hunts the agent's own silent failures.
-- **Bounded autonomous-loop driver** with mandate breach / expiry hard-stops, per-symbol caps, and goal-stall detection.
+- **Verified-completion gate:** no goal seals on the agent's say-so; an independent verifier must fail to invalidate "done".
+- **Per-cycle gap-finding:** each cycle re-derives the unmet-requirement set from current state, not a fixed upfront plan.
+- **Just-in-time replanning:** the work list regenerates each cycle; falling short seals an honest *achieved-with-acknowledged-gaps*.
+- **Rotating self-audit:** a per-run deep pass over script health, discovery coverage, dead weight, guardrail integrity, API budgets.
+- **Bounded autonomous-loop driver:** mandate breach and expiry hard-stops, per-symbol caps, goal-stall detection.
 </details>
 
 <details>
 <summary><strong>Memory, governance & audit</strong></summary>
 
-- **Thesis-lifecycle FSM:** every idea is a tracked object (IDEA → ENTRY_READY → ACTIVE → PARTIALLY_CLOSED → CLOSED) with scheduled review-due dates and an MAE / MFE postmortem, extending the trade journal rather than forking it.
-- **Belief-tension counter:** a contradicting observation opens a for / against tally that flips or reconfirms a stored belief once the evidence crosses an adjustable bar.
-- **Governance primitives:** named approval presets; a risk-state undo-lineage (a tightening auto-applies, a loosening into never-held territory is staged for approval and can never breach the compiled safety floor); an approval implementation-lifecycle ledger (approvals re-surface until actually applied); and temperament dials that tune decision thresholds within hard caps they can never loosen.
-- **Boundary-durable audit:** handoff payloads are stored lossless (exempt from truncation) alongside an explicit parent-absorption record, both kept outside the signed content hash so the HMAC chain is unchanged.
-- **5-stage compaction:** masking → pruning → aggressive → collapse → full, with a reversible read-time collapse before any lossy summary, and ACE lesson distillation across sessions.
+- **Thesis-lifecycle FSM:** IDEA → ENTRY_READY → ACTIVE → PARTIALLY_CLOSED → CLOSED, with review-due dates and MAE / MFE postmortems.
+- **Belief-tension counter:** contradicting observations open a for / against tally that flips or reconfirms a stored belief.
+- **Approval presets:** named, reusable permission bundles.
+- **Risk-state undo-lineage:** tightening auto-applies; loosening is staged for approval and can never breach the compiled safety floor.
+- **Approval lifecycle ledger:** approvals re-surface until they are actually applied.
+- **Temperament dials:** tune decision thresholds within hard caps they can never loosen.
+- **Boundary-durable audit:** handoff payloads stored lossless with a parent-absorption record, outside the signed content hash.
+- **5-stage compaction:** masking → pruning → aggressive → collapse → full, reversible before any lossy summary.
+- **ACE lesson distillation** across sessions.
 </details>
 
 <details>
 <summary><strong>Backtesting, evaluation & learning</strong></summary>
 
-- **Backtest engine:** historical replay, walk-forward, Monte Carlo, grid/random optimization, alpha-decay detection, fee-sensitivity sweeps, market-impact modeling, cross-sectional overfitting guards, and a scenario-realism validator, the full Cont stylized-facts battery (fat tails, vol clustering, Zumbach timescale asymmetry, gain/loss skew, aggregational Gaussianity).
+- **Backtest engine:** historical replay, walk-forward, Monte Carlo, grid and random optimization.
+- **Overfitting guards:** alpha-decay detection, fee-sensitivity sweeps, market-impact modeling, cross-sectional guards.
+- **Scenario-realism validator:** the Cont stylized-facts battery (fat tails, vol clustering, Zumbach asymmetry, gain/loss skew, aggregational Gaussianity).
 - **Event-replay** with a `pass^k` verdict store for reliability across runs.
-- **Eval harness:** scenarios *generated* from the trading constitution, risk dimensions, deny-list, and rubrics; deterministic process checks with per-scenario required/forbidden-action assertions (did the downsize happen, and did nothing unrelated break?); multi-turn scenarios that score a session spanning real clarification turns; a failure-mode taxonomy over failed runs; a tri-judge panel to wash out self-preference; and a CI regression gate.
-- **Learning loop:** a regret ledger (rejected candidates reviewed at T+5 / T+20 to score whether the gate saved a loss or cost a gain), a setup model-book with forward-outcome cohort stats, counterfactual / inaction-value analysis, and a strategy-pivot stagnation detector.
+- **Generated eval scenarios:** derived from the trading constitution, risk dimensions, deny-list, and category rubrics.
+- **Deterministic process checks:** per-scenario required and forbidden-action assertions over the recorded tool sequence.
+- **Multi-turn scenarios:** score a session spanning real clarification turns.
+- **Failure-mode taxonomy** over failed runs, plus a tri-judge panel to wash out self-preference, gated in CI.
+- **Regret ledger:** rejected candidates reviewed at T+5 / T+20, scoring whether the gate saved a loss or cost a gain.
+- **Setup model-book:** forward-outcome cohort stats per setup.
+- **Counterfactual analysis:** inaction value, plus a strategy-pivot stagnation detector.
 </details>
 
 <details>
@@ -298,6 +359,14 @@ The same truth table is enforced in the preflight, the runtime engine, and every
 
 > [!IMPORTANT]
 > `auto` is not "no guardrails." Every order still clears the full `execute_plan` gauntlet; it only drops the per-order human confirmation.
+
+## What Gordon is not
+
+- **Not an HFT or low-latency engine.** It reasons in seconds, not microseconds, and is built for discretionary and swing timeframes.
+- **Not a signal service or alpha-in-a-box.** It ships analysis, strategy scaffolding, and gates. The edge is still yours to find.
+- **Not a hosted product.** It runs on your machine, with your keys, against your accounts. There is nothing to log into.
+- **Not a substitute for your own risk judgement.** The harness blocks known-bad actions; it cannot know what you can afford to lose.
+- **Not financial advice, and not audited.** Read [DISCLAIMER.md](./DISCLAIMER.md) and [TERMS.md](./TERMS.md) before arming capital.
 
 ## Run surfaces
 
@@ -364,12 +433,33 @@ CI runs the suite, `tsc --noEmit`, Biome, broker conformance, the eval-harness r
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for conventions before opening a PR.
 
-## Related projects
+## Ecosystem
 
-Sibling open-source projects from the same team:
+Open-source projects from the same team, meant to be used together.
 
-- **[SharpeArena](https://github.com/general-liquidity/sharpearena)**: a reinforcement-learning environment for trading agents.
-- **[SharpeBench](https://github.com/general-liquidity/sharpebench)**: a reliability benchmark for trading agents (deflated Sharpe, `pass^k`, deterministic process checks).
+| Project | What it is |
+|:--|:--|
+| **[Gordon](https://github.com/general-liquidity/gordon)** | The trading agent itself: plan-first, deny-first, terminal-native. |
+| **[SharpeArena](https://github.com/general-liquidity/sharpearena)** | A reinforcement-learning environment for trading agents. |
+| **[SharpeBench](https://github.com/general-liquidity/sharpebench)** | A reliability benchmark for trading agents: deflated Sharpe, `pass^k`, deterministic process checks. |
+
+## Honest limitations
+
+- **A backtest is not an edge.** Walk-forward, Monte Carlo, and the overfitting guards reduce self-deception; they do not create live alpha.
+- **LLM inference costs real money** and scales with session length. Cap it with `GORDON_COST_BUDGET_USD` and disable reasoning passes for cheaper runs.
+- **Venue coverage is uneven.** Some brokers need account enrollment, market-data entitlements, or a running gateway before anything works.
+- **The agent can be wrong.** That is why every order needs your approval by default. Do not run `auto` on capital you have not sized for being wrong.
+- **The windows-arm64 prebuilt binary is best-effort.** Other platforms are built and smoke-tested on every release.
+- **This is young software.** v0.1.0, MIT, no warranty. Start in `paper` or `strict` and read the source on the paths that touch money.
+
+## Community & contributing
+
+Issues and pull requests are welcome, especially from people who actually trade.
+
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** covers setup, conventions, and the bar for money-touching changes.
+- **[Open an issue](https://github.com/general-liquidity/gordon/issues)** for bugs, venue gaps, or ideas. Security issues go through [SECURITY.md](./SECURITY.md) instead.
+- **Good first contributions:** a new venue adapter, an indicator or microstructure op, a playbook, an eval scenario, or docs fixes.
+- If Gordon is useful to you, a star on the repo genuinely helps other traders find it.
 
 ## License & safety docs
 
