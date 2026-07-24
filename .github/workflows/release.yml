@@ -8,9 +8,6 @@ on:
 permissions:
   contents: write
 
-env:
-  DIST_REPO: general-liquidity/gordon-dist
-
 jobs:
   test:
     name: Test
@@ -143,13 +140,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create or update public dist release
-        env:
-          GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
-        run: |
-          gh release view "${{ github.ref_name }}" --repo "${DIST_REPO}" >/dev/null 2>&1 \
-            || gh release create "${{ github.ref_name }}" --repo "${DIST_REPO}" --title "${{ github.ref_name }}" --notes "Public Gordon CLI binaries"
-
   build:
     name: Build ${{ matrix.target }}
     needs:
@@ -234,12 +224,12 @@ jobs:
             sleep 10
           done
 
-      - name: Upload binary to public dist release
+      - name: Upload binary to release
         shell: pwsh
         env:
-          GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          & gh release upload "${env:GITHUB_REF_NAME}" "${{ matrix.binary_name }}#${{ matrix.binary_name }}" --repo "${env:DIST_REPO}" --clobber
+          & gh release upload "${env:GITHUB_REF_NAME}" "${{ matrix.binary_name }}#${{ matrix.binary_name }}" --clobber
 
   publish-public-dist:
     name: Publish Public Dist Repo
@@ -259,13 +249,12 @@ jobs:
         with:
           node-version: 20
 
-      - name: Download public release assets
+      - name: Download release assets
         env:
-          GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p dist-assets
           gh release download "${VERSION}" \
-            --repo "${DIST_REPO}" \
             --dir dist-assets \
             --pattern "gordon-*"
 
@@ -315,30 +304,11 @@ jobs:
 
       - name: Commit source manifest updates
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "Tiberiu Toca"
+          git config user.email "tibi.toca@gmail.com"
           git add Formula/gordon.rb scripts/scoop/gordon.json npm/package.json npm/README.md
           git diff --cached --quiet || git commit -m "chore: publish assets for ${VERSION}"
           git push origin "HEAD:${SOURCE_BRANCH}"
-
-      - name: Checkout public dist repo
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.DIST_REPO }}
-          token: ${{ secrets.DIST_REPO_TOKEN }}
-          path: public-dist
-
-      - name: Prepare public dist repo contents
-        run: node scripts/build/prepare-public-dist.cjs --out-dir public-dist
-
-      - name: Commit public dist repo updates
-        working-directory: public-dist
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add README.md LICENSE install.sh install.ps1 Formula/gordon.rb bucket/gordon.json
-          git diff --cached --quiet || git commit -m "chore: sync public install assets for ${VERSION}"
-          git push origin HEAD:main
 
   publish-npm:
     name: Publish to npm
