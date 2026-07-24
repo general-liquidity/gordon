@@ -82,7 +82,7 @@ import { normalizePemSecret } from "../types.ts";
 import { resolveFlag } from "../../config/flagResolver.ts";
 import type { Candle } from "../../../types/index.ts";
 import { CcxtWebSocketImpl } from "./ccxt-websocket.ts";
-import { SandboxNotSupportedError } from "../sandboxSupport.ts";
+import { SandboxNotSupportedError, assertSandboxSupported } from "../sandboxSupport.ts";
 import { isKillSwitchesEnabled, isExecutionAllowed } from "../../safety/killSwitches.ts";
 
 /**
@@ -417,14 +417,18 @@ export class CcxtAdapter
     this.isSandbox = Boolean(sandbox);
 
     if (sandbox) {
+      // CAPITAL-SAFETY: refuse to construct a sandbox adapter for a venue known
+      // to have no sandbox, rather than silently run against LIVE while
+      // isSandbox is true. This static check is the authoritative guard for
+      // first-class venues (kraken, coinbase, binance_us, robinhood): CCXT no
+      // longer throws NotSupported for them — current CCXT ships an (often
+      // empty) `test` URL entry for every exchange, so setSandboxMode succeeds
+      // silently. The NotSupported catch below stays as a secondary net for
+      // long-tail CCXT venues that have no first-class matrix entry.
+      assertSandboxSupported(this.exchangeId, true);
       try {
         this.client.setSandboxMode(true);
       } catch (err) {
-        // CAPITAL-SAFETY: if CCXT cannot switch this venue to sandbox, REFUSE
-        // to construct rather than silently run against LIVE while isSandbox is
-        // true. (CCXT throws NotSupported for venues without a sandbox — e.g.
-        // coinbase. Failing loud here is the authoritative guard; the factory's
-        // static matrix is only an early, friendlier check.)
         if (err instanceof NotSupported) {
           throw new SandboxNotSupportedError(this.exchangeId);
         }
