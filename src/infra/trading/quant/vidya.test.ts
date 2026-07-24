@@ -1,12 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { isVidyaEnabled, computeVidya, vidyaToPayload, VIDYA_FLAG_ENV } from "./vidya.ts";
-
-describe("isVidyaEnabled", () => {
-  it("respects the flag", () => {
-    expect(isVidyaEnabled({})).toBe(false);
-    expect(isVidyaEnabled({ [VIDYA_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
+import { computeVidya, vidyaToPayload } from "./vidya.ts";
 
 describe("computeVidya", () => {
   it("short series → NaN", () => {

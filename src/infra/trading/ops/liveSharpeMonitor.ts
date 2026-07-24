@@ -27,12 +27,6 @@
  * data pipelines still healthy? Pure; injected; never throws.
  */
 
-export const LIVE_SHARPE_FLAG_ENV = "GORDON_LIVE_SHARPE_MONITOR";
-
-export function isLiveSharpeMonitorEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[LIVE_SHARPE_FLAG_ENV] === "1" || env[LIVE_SHARPE_FLAG_ENV] === "true";
-}
-
 export type LiveSharpeStatus = "HEALTHY" | "WATCH" | "HUMAN_REVIEW" | "WARMING_UP";
 
 export interface SignalHealthInput {

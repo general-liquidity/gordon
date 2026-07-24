@@ -34,17 +34,6 @@
  * more realistic decaying-impact cost model is needed.
  */
 
-export const TRANSIENT_IMPACT_FLAG_ENV = "GORDON_TRANSIENT_IMPACT";
-
-export function isTransientImpactEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[TRANSIENT_IMPACT_FLAG_ENV] === "1" ||
-    env[TRANSIENT_IMPACT_FLAG_ENV] === "true"
-  );
-}
-
 export interface Fill {
   /** Time of the fill (any consistent units — seconds, ms, "trade number"). */
   time: number;

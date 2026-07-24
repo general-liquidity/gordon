@@ -28,15 +28,6 @@
  * Pure compute. No I/O. Deterministic seeded LCG RNG for reproducibility.
  */
 
-export const GENETIC_OPTIMIZER_FLAG_ENV = "GORDON_GENETIC_OPTIMIZER";
-
-export function isGeneticOptimizerEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[GENETIC_OPTIMIZER_FLAG_ENV] === "1" ||
-    env[GENETIC_OPTIMIZER_FLAG_ENV] === "true"
-  );
-}
-
 export interface GeneticOptimizerInput {
   /** Objective to MAXIMISE. */
   objective: (x: ReadonlyArray<number>) => number;

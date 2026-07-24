@@ -1,19 +1,10 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isMevDetectionEnabled,
   detectMev,
   mevDetectionToPayload,
-  MEV_DETECTION_FLAG_ENV,
   type MevTrade,
   type MevSpoofEvent,
 } from "./mevDetection.ts";
-
-describe("isMevDetectionEnabled", () => {
-  it("respects the flag", () => {
-    expect(isMevDetectionEnabled({})).toBe(false);
-    expect(isMevDetectionEnabled({ [MEV_DETECTION_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("detectMev — sandwich", () => {
   it("classic sandwich: small buy → large buy → small sell with impact", () => {

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import {
-  isTraderBehaviorEnabled,
-  _detectPatternsForTest,
-} from "./traderBehaviorPatterns.ts";
+import { _detectPatternsForTest } from "./traderBehaviorPatterns.ts";
 import type { ActionLogEntry } from "../../action-log/types.ts";
 
 function entry(
@@ -21,14 +18,6 @@ function entry(
     sessionId: overrides.sessionId,
   };
 }
-
-describe("isTraderBehaviorEnabled", () => {
-  it("respects the flag", () => {
-    expect(isTraderBehaviorEnabled({})).toBe(false);
-    expect(isTraderBehaviorEnabled({ GORDON_TRADER_BEHAVIOR_PATTERNS: "1" })).toBe(true);
-    expect(isTraderBehaviorEnabled({ GORDON_TRADER_BEHAVIOR_PATTERNS: "true" })).toBe(true);
-  });
-});
 
 describe("detectStopReversal", () => {
   it("surfaces when >=3 cancels mention stop-reversal language", () => {

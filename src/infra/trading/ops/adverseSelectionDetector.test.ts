@@ -1,19 +1,10 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isAdverseSelectionEnabled,
   detectAdverseSelection,
   aggregateFills,
   detectorToPayload,
-  ADVERSE_SELECTION_FLAG_ENV,
 } from "./adverseSelectionDetector.ts";
-
-describe("isAdverseSelectionEnabled", () => {
-  it("respects the flag", () => {
-    expect(isAdverseSelectionEnabled({})).toBe(false);
-    expect(isAdverseSelectionEnabled({ [ADVERSE_SELECTION_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("detectAdverseSelection — clean fill", () => {
   it("slow fill with no adverse move → clean", () => {

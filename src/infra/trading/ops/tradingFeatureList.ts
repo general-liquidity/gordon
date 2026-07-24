@@ -32,7 +32,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
-export const TRADING_FEATURE_LIST_FLAG_ENV = "GORDON_TRADING_FEATURE_LIST";
 export const TRADING_FEATURE_LIST_PATH_ENV = "GORDON_TRADING_FEATURE_LIST_PATH";
 
 export type FeatureCategory =
@@ -96,13 +95,6 @@ export interface ApplyEditResult {
   ok: boolean;
   applied: FeatureList | null;
   violations: EditViolation[];
-}
-
-export function isTradingFeatureListEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[TRADING_FEATURE_LIST_FLAG_ENV] === "1" ||
-    env[TRADING_FEATURE_LIST_FLAG_ENV] === "true"
-  );
 }
 
 export function defaultTradingFeatureListPath(env: NodeJS.ProcessEnv = process.env): string {

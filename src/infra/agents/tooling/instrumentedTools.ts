@@ -88,8 +88,7 @@ import { secFilingTools } from "../tools/providers/sec-filing-tools.ts";
 export const gordonInputGuard = new GordonInputGuard();
 export const gordonOutputSanitizer = new GordonOutputSanitizer();
 /**
- * FW1 — pre-turn tool-call reconciler. No-op unless
- * GORDON_TOOLCALL_RECONCILER env flag is set. Wired into each agent's
+ * FW1 — pre-turn tool-call reconciler. Wired into each agent's
  * inputProcessors array BEFORE gordonInputGuard so structural repair
  * happens before content guardrails see the messages.
  */

@@ -1,20 +1,11 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isElderMomentumEnabled,
   computeForceIndex,
   computeElderRay,
   forceIndexToPayload,
   elderRayToPayload,
-  ELDER_MOMENTUM_FLAG_ENV,
   type OhlcvBar,
 } from "./elderMomentum.ts";
-
-describe("isElderMomentumEnabled", () => {
-  it("respects the flag", () => {
-    expect(isElderMomentumEnabled({})).toBe(false);
-    expect(isElderMomentumEnabled({ [ELDER_MOMENTUM_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 function bars(samples: Array<[number, number, number, number]>): OhlcvBar[] {
   return samples.map(([high, low, close, volume]) => ({ high, low, close, volume }));

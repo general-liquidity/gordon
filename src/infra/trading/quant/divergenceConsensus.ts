@@ -16,15 +16,6 @@
  * Pure compute. No I/O.
  */
 
-export const DIVERGENCE_CONSENSUS_FLAG_ENV = "GORDON_DIVERGENCE_CONSENSUS";
-
-export function isDivergenceConsensusEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[DIVERGENCE_CONSENSUS_FLAG_ENV] === "1" ||
-    env[DIVERGENCE_CONSENSUS_FLAG_ENV] === "true"
-  );
-}
-
 export type DivergenceVerdict =
   | "regular_bullish"
   | "regular_bearish"

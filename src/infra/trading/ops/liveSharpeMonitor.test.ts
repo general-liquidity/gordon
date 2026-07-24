@@ -3,7 +3,6 @@ import {
   evaluateLiveSharpe,
   liveSharpeToPayload,
   requiresHumanReview,
-  isLiveSharpeMonitorEnabled,
   type SignalHealthInput,
 } from "./liveSharpeMonitor.ts";
 
@@ -156,10 +155,5 @@ describe("liveSharpeToPayload + flag", () => {
     expect(p.kind).toBe("live_sharpe.evaluated");
     expect(p.strategyId).toBe("abc");
     expect(typeof p.sharpeZScore).toBe("number");
-  });
-
-  it("reads the enable flag", () => {
-    expect(isLiveSharpeMonitorEnabled({} as NodeJS.ProcessEnv)).toBe(false);
-    expect(isLiveSharpeMonitorEnabled({ GORDON_LIVE_SHARPE_MONITOR: "1" } as unknown as NodeJS.ProcessEnv)).toBe(true);
   });
 });

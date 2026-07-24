@@ -1,19 +1,10 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isPerformanceDecompositionEnabled,
   decomposeReturns,
   formatDecomposition,
   decompositionToPayload,
-  PERFORMANCE_DECOMPOSITION_FLAG_ENV,
 } from "./performanceDecomposition.ts";
-
-describe("isPerformanceDecompositionEnabled", () => {
-  it("respects the flag", () => {
-    expect(isPerformanceDecompositionEnabled({})).toBe(false);
-    expect(isPerformanceDecompositionEnabled({ [PERFORMANCE_DECOMPOSITION_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("decomposeReturns — Wright's worked example", () => {
   it("35% return decomposes to 24% beta + 6.4% factors + 4.6% alpha", () => {

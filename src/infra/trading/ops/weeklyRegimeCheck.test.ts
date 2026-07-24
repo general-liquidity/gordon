@@ -1,20 +1,11 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isWeeklyRegimeCheckEnabled,
   evaluateRegimeCheck,
   classifyVolatilityLevel,
   formatRegimeCheck,
   regimeCheckToPayload,
-  WEEKLY_REGIME_CHECK_FLAG_ENV,
 } from "./weeklyRegimeCheck.ts";
-
-describe("isWeeklyRegimeCheckEnabled", () => {
-  it("respects the flag", () => {
-    expect(isWeeklyRegimeCheckEnabled({})).toBe(false);
-    expect(isWeeklyRegimeCheckEnabled({ [WEEKLY_REGIME_CHECK_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("classifyVolatilityLevel — Wright Ch 16 bands", () => {
   it("matches the documented thresholds", () => {

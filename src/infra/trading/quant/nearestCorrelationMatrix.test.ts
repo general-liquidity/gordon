@@ -1,22 +1,9 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isNearestCorrelationMatrixEnabled,
   computeNearestCorrelationMatrix,
   nearestCorrelationMatrixToPayload,
-  NEAREST_CORRELATION_MATRIX_FLAG_ENV,
   type Matrix,
 } from "./nearestCorrelationMatrix.ts";
-
-describe("isNearestCorrelationMatrixEnabled", () => {
-  it("respects the flag", () => {
-    expect(isNearestCorrelationMatrixEnabled({})).toBe(false);
-    expect(
-      isNearestCorrelationMatrixEnabled({
-        [NEAREST_CORRELATION_MATRIX_FLAG_ENV]: "1",
-      }),
-    ).toBe(true);
-  });
-});
 
 // ---------------- helpers for tests ----------------
 

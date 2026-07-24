@@ -1,19 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isPcaPairClusteringEnabled,
   computePcaPairClustering,
   pcaPairClusteringToPayload,
-  PCA_PAIR_CLUSTERING_FLAG_ENV,
 } from "./pcaPairClustering.ts";
-
-describe("isPcaPairClusteringEnabled", () => {
-  it("respects the flag", () => {
-    expect(isPcaPairClusteringEnabled({})).toBe(false);
-    expect(isPcaPairClusteringEnabled({ [PCA_PAIR_CLUSTERING_FLAG_ENV]: "1" })).toBe(
-      true,
-    );
-  });
-});
 
 // Deterministic seeded RNG for reproducible test data
 function makeRng(seed: number): () => number {

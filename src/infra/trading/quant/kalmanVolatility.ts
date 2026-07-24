@@ -25,15 +25,6 @@
  * matches the article's responsive-vol-tracking example.
  */
 
-export const KALMAN_VOLATILITY_FLAG_ENV = "GORDON_KALMAN_VOLATILITY";
-
-export function isKalmanVolatilityEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[KALMAN_VOLATILITY_FLAG_ENV] === "1" ||
-    env[KALMAN_VOLATILITY_FLAG_ENV] === "true"
-  );
-}
-
 export interface KalmanVolatilityInput {
   returns: ReadonlyArray<number>;
   /** Process noise. Higher = faster response. Default 0.1. */

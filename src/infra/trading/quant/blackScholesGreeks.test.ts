@@ -1,19 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isBlackScholesGreeksEnabled,
   computeBlackScholesGreeks,
   blackScholesGreeksToPayload,
-  BLACK_SCHOLES_GREEKS_FLAG_ENV,
 } from "./blackScholesGreeks.ts";
-
-describe("isBlackScholesGreeksEnabled", () => {
-  it("respects the flag", () => {
-    expect(isBlackScholesGreeksEnabled({})).toBe(false);
-    expect(
-      isBlackScholesGreeksEnabled({ [BLACK_SCHOLES_GREEKS_FLAG_ENV]: "1" }),
-    ).toBe(true);
-  });
-});
 
 // Reference values cross-checked against Hull (2017) "Options, Futures,
 // and Other Derivatives" Ch 15 examples + multiple online BS calculators.

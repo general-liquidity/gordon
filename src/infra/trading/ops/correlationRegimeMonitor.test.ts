@@ -1,19 +1,10 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isCorrelationRegimeEnabled,
   evaluateCorrelationRegime,
   computeCorrelationMatrix,
   correlationToPayload,
-  CORRELATION_REGIME_FLAG_ENV,
 } from "./correlationRegimeMonitor.ts";
-
-describe("isCorrelationRegimeEnabled", () => {
-  it("respects the flag", () => {
-    expect(isCorrelationRegimeEnabled({})).toBe(false);
-    expect(isCorrelationRegimeEnabled({ [CORRELATION_REGIME_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("evaluateCorrelationRegime — diverse", () => {
   it("low average → diverse, diversification intact", () => {

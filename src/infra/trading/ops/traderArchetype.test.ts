@@ -1,18 +1,9 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isTraderArchetypeEnabled,
   classifyTrader,
   archetypeToPayload,
-  TRADER_ARCHETYPE_FLAG_ENV,
 } from "./traderArchetype.ts";
-
-describe("isTraderArchetypeEnabled", () => {
-  it("respects the flag", () => {
-    expect(isTraderArchetypeEnabled({})).toBe(false);
-    expect(isTraderArchetypeEnabled({ [TRADER_ARCHETYPE_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("classifyTrader — pure archetypes", () => {
   it("all anxious signals → anxious_overthinker", () => {

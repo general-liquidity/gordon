@@ -15,12 +15,6 @@
  * speeds it up.
  */
 
-export const VIDYA_FLAG_ENV = "GORDON_VIDYA";
-
-export function isVidyaEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[VIDYA_FLAG_ENV] === "1" || env[VIDYA_FLAG_ENV] === "true";
-}
-
 export interface VidyaInput {
   prices: ReadonlyArray<number>;
   /** Short stdev window. Default 9. */

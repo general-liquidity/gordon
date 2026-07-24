@@ -21,12 +21,6 @@
  *      non-trending (flat).
  */
 
-export const MARKET_PROFILE_FLAG_ENV = "GORDON_MARKET_PROFILE";
-
-export function isMarketProfileEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[MARKET_PROFILE_FLAG_ENV] === "1" || env[MARKET_PROFILE_FLAG_ENV] === "true";
-}
-
 export interface ProfileBar {
   high: number;
   low: number;

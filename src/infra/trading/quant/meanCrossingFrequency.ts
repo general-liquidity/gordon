@@ -24,17 +24,6 @@
  * Pure compute. No I/O.
  */
 
-export const MEAN_CROSSING_FREQUENCY_FLAG_ENV = "GORDON_MEAN_CROSSING_FREQUENCY";
-
-export function isMeanCrossingFrequencyEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[MEAN_CROSSING_FREQUENCY_FLAG_ENV] === "1" ||
-    env[MEAN_CROSSING_FREQUENCY_FLAG_ENV] === "true"
-  );
-}
-
 export interface MeanCrossingFrequencyInput {
   /** Time series (e.g. a cointegration spread). */
   series: ReadonlyArray<number>;

@@ -65,17 +65,6 @@
 
 import { normalCdf } from "../../../core/numerics/index.ts";
 
-export const BLACK_SCHOLES_GREEKS_FLAG_ENV = "GORDON_BLACK_SCHOLES_GREEKS";
-
-export function isBlackScholesGreeksEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[BLACK_SCHOLES_GREEKS_FLAG_ENV] === "1" ||
-    env[BLACK_SCHOLES_GREEKS_FLAG_ENV] === "true"
-  );
-}
-
 export type OptionType = "call" | "put";
 
 export interface BSInput {

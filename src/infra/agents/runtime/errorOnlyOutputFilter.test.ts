@@ -1,22 +1,12 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isErrorOnlyFilterEnabled,
   filterOutput,
   filterOutputForAgent,
   resultToPayload,
   DEFAULT_ERROR_PATTERNS,
-  ERROR_ONLY_FILTER_FLAG_ENV,
   type FilterRule,
 } from "./errorOnlyOutputFilter.ts";
-
-describe("isErrorOnlyFilterEnabled", () => {
-  it("respects the flag", () => {
-    expect(isErrorOnlyFilterEnabled({})).toBe(false);
-    expect(isErrorOnlyFilterEnabled({ [ERROR_ONLY_FILTER_FLAG_ENV]: "1" })).toBe(true);
-    expect(isErrorOnlyFilterEnabled({ [ERROR_ONLY_FILTER_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
 
 describe("DEFAULT_ERROR_PATTERNS", () => {
   it("includes both surface and suppress rules", () => {

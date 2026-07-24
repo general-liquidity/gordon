@@ -1,10 +1,8 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isEdgeDecayEnabled,
   evaluateDecay,
   decayToPayload,
-  EDGE_DECAY_FLAG_ENV,
 } from "./edgeDecayMonitor.ts";
 
 const goodRuns = (n: number): number[] => {
@@ -19,13 +17,6 @@ const decayingRuns = (recent: number, baseline: number): number[] => {
   for (let i = 0; i < baseline; i++) out.push(i % 3 === 0 ? -1.0 : 1.5);
   return out;
 };
-
-describe("isEdgeDecayEnabled", () => {
-  it("respects the flag", () => {
-    expect(isEdgeDecayEnabled({})).toBe(false);
-    expect(isEdgeDecayEnabled({ [EDGE_DECAY_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("evaluateDecay — sample size", () => {
   it("returns stable when insufficient sample", () => {

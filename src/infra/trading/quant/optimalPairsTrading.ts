@@ -56,17 +56,6 @@
  * estimates upstream.
  */
 
-export const OPTIMAL_PAIRS_TRADING_FLAG_ENV = "GORDON_OPTIMAL_PAIRS_TRADING";
-
-export function isOptimalPairsTradingEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[OPTIMAL_PAIRS_TRADING_FLAG_ENV] === "1" ||
-    env[OPTIMAL_PAIRS_TRADING_FLAG_ENV] === "true"
-  );
-}
-
 export interface OptimalPairsTradingInput {
   /** Current spread value X_t. */
   currentSpread: number;

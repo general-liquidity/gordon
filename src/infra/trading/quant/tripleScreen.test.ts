@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isTripleScreenEnabled,
   evaluateTripleScreen,
   tripleScreenToPayload,
-  TRIPLE_SCREEN_FLAG_ENV,
 } from "./tripleScreen.ts";
-
-describe("isTripleScreenEnabled", () => {
-  it("respects the flag", () => {
-    expect(isTripleScreenEnabled({})).toBe(false);
-    expect(isTripleScreenEnabled({ [TRIPLE_SCREEN_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("evaluateTripleScreen — gating", () => {
   it("flat major trend → no_trade", () => {

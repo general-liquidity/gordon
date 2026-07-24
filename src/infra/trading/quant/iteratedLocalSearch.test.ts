@@ -1,20 +1,9 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isIteratedLocalSearchEnabled,
   computeIteratedLocalSearch,
   iteratedLocalSearchToPayload,
-  ITERATED_LOCAL_SEARCH_FLAG_ENV,
   type LocalSearchOutcome,
 } from "./iteratedLocalSearch.ts";
-
-describe("isIteratedLocalSearchEnabled", () => {
-  it("respects the flag", () => {
-    expect(isIteratedLocalSearchEnabled({})).toBe(false);
-    expect(
-      isIteratedLocalSearchEnabled({ [ITERATED_LOCAL_SEARCH_FLAG_ENV]: "1" }),
-    ).toBe(true);
-  });
-});
 
 // A simple deterministic "local search" — gradient-descent-like step on a known surface.
 function quadraticLocalSearch(

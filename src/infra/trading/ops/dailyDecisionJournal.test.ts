@@ -4,13 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  isDecisionJournalEnabled,
   recordJournalEntry,
   readJournalLog,
   evaluateVerdict,
   formatEntry,
   entryToPayload,
-  DECISION_JOURNAL_FLAG_ENV,
   DECISION_JOURNAL_PATH_ENV,
   type PreMortemChecks,
   type ThesisSection,
@@ -50,14 +48,6 @@ const noFlags: PreMortemChecks = {
   liquidityTrap: false,
   correlationBlindSpot: false,
 };
-
-describe("isDecisionJournalEnabled", () => {
-  it("respects the flag", () => {
-    expect(isDecisionJournalEnabled({})).toBe(false);
-    expect(isDecisionJournalEnabled({ [DECISION_JOURNAL_FLAG_ENV]: "1" })).toBe(true);
-    expect(isDecisionJournalEnabled({ [DECISION_JOURNAL_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
 
 describe("evaluateVerdict — clean entry", () => {
   it("returns go when all sections clean and no pre-mortem flags", () => {
@@ -137,25 +127,8 @@ describe("evaluateVerdict — pre-mortem failures", () => {
 });
 
 describe("recordJournalEntry", () => {
-  it("no-op when flag is off", () => {
-    const r = recordJournalEntry(
-      {
-        symbol: "CL",
-        direction: "short",
-        thesis: cleanThesis,
-        math: cleanMath,
-        preMortem: noFlags,
-      },
-      {},
-      logPath,
-    );
-    expect(r).toBeNull();
-    expect(existsSync(logPath)).toBe(false);
-    cleanup();
-  });
-
-  it("writes JSONL when flag is on", () => {
-    const env = { [DECISION_JOURNAL_FLAG_ENV]: "1" };
+  it("writes JSONL", () => {
+    const env = {};
     const entry = recordJournalEntry(
       {
         symbol: "CL",
@@ -178,7 +151,7 @@ describe("recordJournalEntry", () => {
   });
 
   it("records no_go verdict + blockers when pre-mortem fails", () => {
-    const env = { [DECISION_JOURNAL_FLAG_ENV]: "1" };
+    const env = {};
     const entry = recordJournalEntry(
       {
         symbol: "CL",
@@ -198,7 +171,6 @@ describe("recordJournalEntry", () => {
   it("respects path override", () => {
     const customPath = join(workDir, "custom.jsonl");
     const env = {
-      [DECISION_JOURNAL_FLAG_ENV]: "1",
       [DECISION_JOURNAL_PATH_ENV]: customPath,
     };
     recordJournalEntry(
@@ -218,7 +190,7 @@ describe("recordJournalEntry", () => {
 
 describe("readJournalLog + formatEntry + entryToPayload", () => {
   it("reads what was written and formats it", () => {
-    const env = { [DECISION_JOURNAL_FLAG_ENV]: "1" };
+    const env = {};
     recordJournalEntry(
       {
         symbol: "CL",
@@ -250,7 +222,7 @@ describe("readJournalLog + formatEntry + entryToPayload", () => {
 
 describe("Wright Ch 16 Protocol 1 scenario", () => {
   it("end-to-end: clean crude oil short → go verdict", () => {
-    const env = { [DECISION_JOURNAL_FLAG_ENV]: "1" };
+    const env = {};
     const entry = recordJournalEntry(
       {
         symbol: "CL",

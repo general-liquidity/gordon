@@ -36,12 +36,6 @@
  * in the worst case (typically 3-10 in practice).
  */
 
-export const TRENDLINE_DETECTION_FLAG_ENV = "GORDON_TRENDLINE_DETECTION";
-
-export function isTrendlineDetectionEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[TRENDLINE_DETECTION_FLAG_ENV] === "1" || env[TRENDLINE_DETECTION_FLAG_ENV] === "true";
-}
-
 export type TrendlineMethod = "peel_off" | "ols";
 export type TrendlineSide = "upper" | "lower";
 

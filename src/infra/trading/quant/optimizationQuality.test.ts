@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isOptimizationQualityEnabled,
   computeOptimizationQuality,
   optimizationQualityToPayload,
-  OPTIMIZATION_QUALITY_FLAG_ENV,
 } from "./optimizationQuality.ts";
-
-describe("isOptimizationQualityEnabled", () => {
-  it("respects the flag", () => {
-    expect(isOptimizationQualityEnabled({})).toBe(false);
-    expect(isOptimizationQualityEnabled({ [OPTIMIZATION_QUALITY_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 // Deterministic pseudo-random Gaussian via Box-Muller.
 function makeGaussian(seed: number): () => number {

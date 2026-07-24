@@ -19,12 +19,6 @@
  * Pure compute. No I/O.
  */
 
-export const LOGIT_RSI_FLAG_ENV = "GORDON_LOGIT_RSI";
-
-export function isLogitRsiEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[LOGIT_RSI_FLAG_ENV] === "1" || env[LOGIT_RSI_FLAG_ENV] === "true";
-}
-
 export interface LogitRsiInput {
   prices: ReadonlyArray<number>;
   /** RSI period. Default 14 (Wilder). */

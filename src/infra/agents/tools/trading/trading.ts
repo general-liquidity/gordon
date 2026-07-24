@@ -35,7 +35,7 @@ import { TradeSchema } from "../../../../types/trade.ts";
 import { emitEvent } from "../../../../events/index.ts";
 import { recordStructuredObservation } from "../../../platform/observability/index.ts";
 import { appendActionLogEntry } from "../../../action-log/index.ts";
-import { appendExecutionRecordFresh, isTradeLedgerEnabled, readExecutionRecords, getExecutionRecord, executionRecordToPayload } from "../../../safety/tradeLedger.ts";
+import { appendExecutionRecordFresh, readExecutionRecords, getExecutionRecord, executionRecordToPayload } from "../../../safety/tradeLedger.ts";
 import { checkKillSwitchForOrder } from "../../../safety/killSwitchGate.ts";
 import {
   isPreTradeRateControlsEnabled,
@@ -86,12 +86,10 @@ import {
 import { classifyBlockedStatus } from "../../../observability/blockedClassification.ts";
 import { recordDecision } from "../../memory/decisionLog.ts";
 import {
-  isConfluenceScorerEnabled,
   scoreConfluences,
   scoreToPayload,
 } from "../../../trading/ops/confluenceScorer.ts";
 import {
-  isExecutionPlaybookEnabled,
   selectPlaybookForStrategy,
   attachExecution,
   planToPayload,
@@ -105,7 +103,6 @@ import {
 import { buildTerminationPreTradeFromPlan } from "../../../trading/ops/terminationPreTrade.ts";
 import { recordExecutedPlanPosition } from "../../../../core/positions/executionSync.ts";
 import {
-  isFrictionTrackerEnabled,
   recordFriction,
 } from "../../../trading/ops/frictionTracker.ts";
 import {
@@ -413,7 +410,7 @@ export const createPlanTool = createTool({
       });
     }
 
-    if (isConfluenceScorerEnabled()) {
+    {
       const confluence = scoreConfluences({
         observations: [
           { kind: "regime_fit", present: reflectionResult.isValid, evidence: savedPlan.strategy },
@@ -435,7 +432,7 @@ export const createPlanTool = createTool({
       });
     }
 
-    if (isExecutionPlaybookEnabled()) {
+    {
       const playbook = selectPlaybookForStrategy(savedPlan.strategy);
       const entryPrice = savedPlan.entry.price ?? analysis.price ?? 0;
       if (entryPrice > 0) {
@@ -1329,7 +1326,7 @@ export const executePlanTool = createTool({
       const exchangeId = ctx.exchange?.exchangeId ?? "unknown";
       void recordExecutedPlanPosition(plan, result.trade, exchangeId);
 
-      if (isFrictionTrackerEnabled()) {
+      {
         const fillPrice = result.trade.averageEntry ?? plan.entry.price ?? 0;
         const refPrice = referencePrice ?? fillPrice;
         const slipBps =
@@ -1380,7 +1377,7 @@ export const executePlanTool = createTool({
       // execute_plan outcomes into ~/.gordon/trade-ledger.jsonl for /history
       // navigation. State snapshots are placeholder-empty for now — a future
       // wire can capture pre/post account state via ctx.exchange.
-      if (isTradeLedgerEnabled()) {
+      {
         try {
           const trade = result.trade;
           await appendExecutionRecordFresh({

@@ -2,18 +2,7 @@ import { describe, it, expect } from "bun:test";
 import {
   computeCarteaJaimungalSignalSpeed,
   carteaJaimungalSignalToPayload,
-  isCarteaJaimungalSignalEnabled,
-  CARTEA_JAIMUNGAL_SIGNAL_FLAG_ENV,
 } from "./carteaJaimungalSignal.ts";
-
-describe("isCarteaJaimungalSignalEnabled", () => {
-  it("respects the flag", () => {
-    expect(isCarteaJaimungalSignalEnabled({})).toBe(false);
-    expect(
-      isCarteaJaimungalSignalEnabled({ [CARTEA_JAIMUNGAL_SIGNAL_FLAG_ENV]: "1" }),
-    ).toBe(true);
-  });
-});
 
 describe("computeCarteaJaimungalSignalSpeed — validation", () => {
   const base = {

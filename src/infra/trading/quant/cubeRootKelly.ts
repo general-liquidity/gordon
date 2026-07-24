@@ -26,15 +26,6 @@
  * Pure compute. No I/O.
  */
 
-export const CUBE_ROOT_KELLY_FLAG_ENV = "GORDON_CUBE_ROOT_KELLY";
-
-export function isCubeRootKellyEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[CUBE_ROOT_KELLY_FLAG_ENV] === "1" ||
-    env[CUBE_ROOT_KELLY_FLAG_ENV] === "true"
-  );
-}
-
 export interface CubeRootKellyInput {
   /** Expected return (alpha). */
   alpha: number;

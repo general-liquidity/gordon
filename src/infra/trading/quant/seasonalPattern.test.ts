@@ -1,19 +1,10 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isSeasonalPatternEnabled,
   computeSeasonalPattern,
   computeHolidayEffect,
   seasonalReportToPayload,
-  SEASONAL_PATTERN_FLAG_ENV,
   type DailyReturn,
 } from "./seasonalPattern.ts";
-
-describe("isSeasonalPatternEnabled", () => {
-  it("respects the flag", () => {
-    expect(isSeasonalPatternEnabled({})).toBe(false);
-    expect(isSeasonalPatternEnabled({ [SEASONAL_PATTERN_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 

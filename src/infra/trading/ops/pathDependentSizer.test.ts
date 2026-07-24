@@ -1,20 +1,10 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isPathDependentSizerEnabled,
   sizePosition,
   classifyPerformanceState,
   sizingToPayload,
-  PATH_DEPENDENT_SIZER_FLAG_ENV,
 } from "./pathDependentSizer.ts";
-
-describe("isPathDependentSizerEnabled", () => {
-  it("respects the flag", () => {
-    expect(isPathDependentSizerEnabled({})).toBe(false);
-    expect(isPathDependentSizerEnabled({ [PATH_DEPENDENT_SIZER_FLAG_ENV]: "1" })).toBe(true);
-    expect(isPathDependentSizerEnabled({ [PATH_DEPENDENT_SIZER_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
 
 describe("sizePosition — Type I (standard)", () => {
   it("neutral state: 0.75% of adjusted RC", () => {

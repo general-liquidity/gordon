@@ -1,21 +1,11 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isEffortCalibrationEnabled,
   classifyComplexity,
   budgetFor,
   buildCalibrationBlock,
   budgetToPayload,
-  EFFORT_CALIBRATION_FLAG_ENV,
 } from "./effortCalibration.ts";
-
-describe("isEffortCalibrationEnabled", () => {
-  it("respects the flag", () => {
-    expect(isEffortCalibrationEnabled({})).toBe(false);
-    expect(isEffortCalibrationEnabled({ [EFFORT_CALIBRATION_FLAG_ENV]: "1" })).toBe(true);
-    expect(isEffortCalibrationEnabled({ [EFFORT_CALIBRATION_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
 
 describe("classifyComplexity — explicit level", () => {
   it("honors explicit `level` hint over all heuristics", () => {

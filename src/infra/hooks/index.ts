@@ -17,8 +17,6 @@ export {
 } from "./engine.ts";
 export type { HookStatusEvent } from "./engine.ts";
 export {
-  STRUCTURED_OUTPUT_ENFORCEMENT_FLAG_ENV,
-  isStructuredOutputEnforcementEnabled,
   validateStructuredOutput,
   createPostToolOutputSchemaHook,
   createPreToolInputSchemaHook,

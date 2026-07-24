@@ -2,18 +2,7 @@ import { describe, it, expect } from "bun:test";
 import {
   computeMultiInstrumentHedgeRatio,
   multiInstrumentHedgeRatioToPayload,
-  isMultiInstrumentHedgeRatioEnabled,
-  HEDGE_RATIO_FLAG_ENV,
 } from "./multiInstrumentHedgeRatio.ts";
-
-describe("isMultiInstrumentHedgeRatioEnabled", () => {
-  it("respects the flag", () => {
-    expect(isMultiInstrumentHedgeRatioEnabled({})).toBe(false);
-    expect(
-      isMultiInstrumentHedgeRatioEnabled({ [HEDGE_RATIO_FLAG_ENV]: "1" }),
-    ).toBe(true);
-  });
-});
 
 // Deterministic PRNG so tests don't flake.
 function lcg(seed: number) {

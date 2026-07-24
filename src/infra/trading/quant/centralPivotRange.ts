@@ -21,12 +21,6 @@
  * Pure compute. No I/O.
  */
 
-export const CPR_FLAG_ENV = "GORDON_CPR";
-
-export function isCprEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[CPR_FLAG_ENV] === "1" || env[CPR_FLAG_ENV] === "true";
-}
-
 export interface CprDailyOhlc {
   high: number;
   low: number;

@@ -24,8 +24,6 @@
  * enforcement is the *expensive* one. Use both.
  */
 
-export const EFFORT_CALIBRATION_FLAG_ENV = "GORDON_EFFORT_CALIBRATION";
-
 export type ComplexityLevel = "trivial" | "normal" | "deep";
 export type ReasoningDepth = "shallow" | "medium" | "high";
 
@@ -82,13 +80,6 @@ const DEEP_KEYWORDS = [
   "cross-correlation",
   "regression",
 ];
-
-export function isEffortCalibrationEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[EFFORT_CALIBRATION_FLAG_ENV] === "1" ||
-    env[EFFORT_CALIBRATION_FLAG_ENV] === "true"
-  );
-}
 
 /**
  * Map task signals to a `ComplexityLevel`. Order of precedence:

@@ -2,16 +2,7 @@ import { describe, it, expect } from "bun:test";
 import {
   computeTransientImpact,
   transientImpactToPayload,
-  isTransientImpactEnabled,
-  TRANSIENT_IMPACT_FLAG_ENV,
 } from "./transientImpact.ts";
-
-describe("isTransientImpactEnabled", () => {
-  it("respects the flag", () => {
-    expect(isTransientImpactEnabled({})).toBe(false);
-    expect(isTransientImpactEnabled({ [TRANSIENT_IMPACT_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeTransientImpact — validation", () => {
   it("rejects non-positive half-life", () => {

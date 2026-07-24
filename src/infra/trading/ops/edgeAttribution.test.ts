@@ -1,18 +1,9 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isEdgeAttributionEnabled,
   attributeEdge,
   attributionToPayload,
-  EDGE_ATTRIBUTION_FLAG_ENV,
 } from "./edgeAttribution.ts";
-
-describe("isEdgeAttributionEnabled", () => {
-  it("respects the flag", () => {
-    expect(isEdgeAttributionEnabled({})).toBe(false);
-    expect(isEdgeAttributionEnabled({ [EDGE_ATTRIBUTION_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("attributeEdge — valid edge cases", () => {
   it("Wright's structural example: panic seller margin call", () => {

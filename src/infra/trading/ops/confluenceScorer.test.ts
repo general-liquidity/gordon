@@ -1,24 +1,14 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isConfluenceScorerEnabled,
   scoreConfluences,
   sizeForTier,
   applyAdversarialDowngrade,
   formatScore,
   scoreToPayload,
   DEFAULT_RISK_MULTIPLIERS,
-  CONFLUENCE_SCORER_FLAG_ENV,
   type ConfluenceObservation,
 } from "./confluenceScorer.ts";
-
-describe("isConfluenceScorerEnabled", () => {
-  it("respects the flag", () => {
-    expect(isConfluenceScorerEnabled({})).toBe(false);
-    expect(isConfluenceScorerEnabled({ [CONFLUENCE_SCORER_FLAG_ENV]: "1" })).toBe(true);
-    expect(isConfluenceScorerEnabled({ [CONFLUENCE_SCORER_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
 
 describe("scoreConfluences — tier mapping", () => {
   const allPresent = (kinds: string[]): ConfluenceObservation[] =>

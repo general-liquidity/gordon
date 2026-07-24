@@ -28,15 +28,6 @@
  * Pure compute. No I/O.
  */
 
-export const RECOVERY_FACTOR_FLAG_ENV = "GORDON_RECOVERY_FACTOR";
-
-export function isRecoveryFactorEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[RECOVERY_FACTOR_FLAG_ENV] === "1" ||
-    env[RECOVERY_FACTOR_FLAG_ENV] === "true"
-  );
-}
-
 export interface RecoveryFactorInput {
   /** Per-period returns. e.g. [0.01, -0.02, 0.005, ...]. */
   returns: ReadonlyArray<number>;

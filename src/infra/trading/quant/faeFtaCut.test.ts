@@ -2,16 +2,7 @@ import { describe, it, expect } from "bun:test";
 import {
   computeFaeFtaCut,
   faeFtaCutToPayload,
-  isFaeFtaCutEnabled,
-  FAE_FTA_CUT_FLAG_ENV,
 } from "./faeFtaCut.ts";
-
-describe("isFaeFtaCutEnabled", () => {
-  it("respects the flag", () => {
-    expect(isFaeFtaCutEnabled({})).toBe(false);
-    expect(isFaeFtaCutEnabled({ [FAE_FTA_CUT_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeFaeFtaCut — validation", () => {
   const base = {

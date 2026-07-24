@@ -19,17 +19,6 @@
  * signal ("trading into HFT-dominated flow with no observed edge").
  */
 
-export const MARGINAL_PARTICIPANT_FLAG_ENV = "GORDON_MARGINAL_PARTICIPANT";
-
-export function isMarginalParticipantEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[MARGINAL_PARTICIPANT_FLAG_ENV] === "1" ||
-    env[MARGINAL_PARTICIPANT_FLAG_ENV] === "true"
-  );
-}
-
 export type MarginalState = "typical" | "opportunity" | "uncertain";
 
 export type DriverKind =

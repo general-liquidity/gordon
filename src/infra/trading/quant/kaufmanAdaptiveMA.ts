@@ -21,15 +21,6 @@
 
 import { computeEfficiencyRatio } from "./efficiencyRatio.ts";
 
-export const KAUFMAN_ADAPTIVE_MA_FLAG_ENV = "GORDON_KAUFMAN_ADAPTIVE_MA";
-
-export function isKaufmanAdaptiveMaEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[KAUFMAN_ADAPTIVE_MA_FLAG_ENV] === "1" ||
-    env[KAUFMAN_ADAPTIVE_MA_FLAG_ENV] === "true"
-  );
-}
-
 export interface KamaInput {
   prices: ReadonlyArray<number>;
   /** Efficiency-ratio lookback. Default 10. */

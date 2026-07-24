@@ -23,17 +23,6 @@
  * called repeatedly on simulated mean-reverting paths.
  */
 
-export const SHANNONS_DEMON_FLAG_ENV = "GORDON_SHANNONS_DEMON";
-
-export function isShannonsDemonEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[SHANNONS_DEMON_FLAG_ENV] === "1" ||
-    env[SHANNONS_DEMON_FLAG_ENV] === "true"
-  );
-}
-
 export interface Allocation {
   symbol: string;
   /** Current market value of the position in account currency. */

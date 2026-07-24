@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isOptimalTradingOracleEnabled,
   computeOptimalTradingOracle,
   optimalTradingOracleToPayload,
-  OPTIMAL_TRADING_ORACLE_FLAG_ENV,
 } from "./optimalTradingOracle.ts";
-
-describe("isOptimalTradingOracleEnabled", () => {
-  it("respects the flag", () => {
-    expect(isOptimalTradingOracleEnabled({})).toBe(false);
-    expect(isOptimalTradingOracleEnabled({ [OPTIMAL_TRADING_ORACLE_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeOptimalTradingOracle — gross mode", () => {
   it("sign-of-return oracle has h_t = sign(r_t)", () => {

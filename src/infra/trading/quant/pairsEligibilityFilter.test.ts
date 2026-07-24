@@ -1,20 +1,9 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isPairsEligibilityFilterEnabled,
   computePairsEligibilityFilter,
   pairsEligibilityFilterToPayload,
-  PAIRS_ELIGIBILITY_FILTER_FLAG_ENV,
   DEFAULT_THRESHOLDS,
 } from "./pairsEligibilityFilter.ts";
-
-describe("isPairsEligibilityFilterEnabled", () => {
-  it("respects the flag", () => {
-    expect(isPairsEligibilityFilterEnabled({})).toBe(false);
-    expect(
-      isPairsEligibilityFilterEnabled({ [PAIRS_ELIGIBILITY_FILTER_FLAG_ENV]: "1" }),
-    ).toBe(true);
-  });
-});
 
 describe("computePairsEligibilityFilter — eligible path", () => {
   it("all four conditions pass → eligible", () => {

@@ -24,8 +24,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-export const BOUNDARY_FLAG_ENV = "GORDON_BOUNDARY_CHECK";
-
 export interface BoundaryRule {
   /** Glob-style prefix the rule applies to (e.g. "src/core"). */
   from: string;
@@ -65,10 +63,6 @@ export interface BoundaryCheckOptions {
    * `node_modules`, `dist`, `.git`.
    */
   skipDirs?: string[];
-}
-
-export function isBoundaryCheckEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[BOUNDARY_FLAG_ENV] === "1" || env[BOUNDARY_FLAG_ENV] === "true";
 }
 
 /**

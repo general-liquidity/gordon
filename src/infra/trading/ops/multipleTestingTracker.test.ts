@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  isMultipleTestingTrackerEnabled,
   defaultAttemptsLogPath,
   recordAttempt,
   readAttempts,
@@ -13,7 +12,6 @@ import {
   dynamicDeflatedThreshold,
   attemptToPayload,
   resetAttemptCounterForTesting,
-  MULTIPLE_TESTING_FLAG_ENV,
   ATTEMPTS_LOG_PATH_ENV,
 } from "./multipleTestingTracker.ts";
 
@@ -24,14 +22,6 @@ beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), "gordon-mtt-test-"));
   logPath = join(tempDir, "attempts.jsonl");
   resetAttemptCounterForTesting();
-});
-
-describe("isMultipleTestingTrackerEnabled", () => {
-  it("respects the flag", () => {
-    expect(isMultipleTestingTrackerEnabled({})).toBe(false);
-    expect(isMultipleTestingTrackerEnabled({ [MULTIPLE_TESTING_FLAG_ENV]: "1" })).toBe(true);
-    expect(isMultipleTestingTrackerEnabled({ [MULTIPLE_TESTING_FLAG_ENV]: "true" })).toBe(true);
-  });
 });
 
 describe("defaultAttemptsLogPath", () => {

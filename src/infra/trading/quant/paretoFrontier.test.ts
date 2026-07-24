@@ -4,17 +4,8 @@ import {
   dominates,
   weaklyDominates,
   paretoFrontierToPayload,
-  isParetoFrontierEnabled,
-  PARETO_FRONTIER_FLAG_ENV,
   type ParetoCandidate,
 } from "./paretoFrontier.ts";
-
-describe("isParetoFrontierEnabled", () => {
-  it("respects the flag", () => {
-    expect(isParetoFrontierEnabled({})).toBe(false);
-    expect(isParetoFrontierEnabled({ [PARETO_FRONTIER_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 const dirs = { sharpe: "maximize", drawdown: "minimize" } as const;
 

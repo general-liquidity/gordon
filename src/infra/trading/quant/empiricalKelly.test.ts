@@ -1,18 +1,9 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isEmpiricalKellyEnabled,
   empiricalKelly,
   empiricalKellyToPayload,
-  EMPIRICAL_KELLY_FLAG_ENV,
 } from "./empiricalKelly.ts";
-
-describe("isEmpiricalKellyEnabled", () => {
-  it("respects the flag", () => {
-    expect(isEmpiricalKellyEnabled({})).toBe(false);
-    expect(isEmpiricalKellyEnabled({ [EMPIRICAL_KELLY_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("empiricalKelly — Kelly formula correctness", () => {
   it("p=0.6, b=1 → f_kelly = 0.2", () => {

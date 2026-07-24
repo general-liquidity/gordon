@@ -1,21 +1,12 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isShannonsDemonEnabled,
   rebalance,
   simulateDoubleHalfPath,
   formatRebalance,
   rebalanceToPayload,
   TargetWeightSumError,
-  SHANNONS_DEMON_FLAG_ENV,
 } from "./shannonsDemonRebalancer.ts";
-
-describe("isShannonsDemonEnabled", () => {
-  it("respects the flag", () => {
-    expect(isShannonsDemonEnabled({})).toBe(false);
-    expect(isShannonsDemonEnabled({ [SHANNONS_DEMON_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("rebalance — input validation", () => {
   it("throws when target weights don't sum to 1", () => {

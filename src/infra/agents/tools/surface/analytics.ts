@@ -184,7 +184,6 @@ import {
   computeBlackScholesGreeks,
   blackScholesGreeksToPayload,
   impliedVolatility,
-  isBlackScholesGreeksEnabled,
 } from "../../../trading/quant/blackScholesGreeks.ts";
 import { computeOptionsPayoff } from "../../../../core/alpha/options-payoff.ts";
 import { twoSamplePnlTest } from "../../../trading/quant/twoSampleTest.ts";
@@ -2370,9 +2369,6 @@ export const computeMicrostructureTool = createTool({
       },
       black_scholes: {
         execute: async (p: Record<string, unknown>) => {
-          if (!isBlackScholesGreeksEnabled()) {
-            return { error: "black_scholes: module disabled. Set GORDON_BLACK_SCHOLES_GREEKS=1 to enable." };
-          }
           const num = (k: string): number | null => (typeof p[k] === "number" ? (p[k] as number) : null);
           const spot = num("spot");
           const strike = num("strike");

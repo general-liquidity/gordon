@@ -1,10 +1,8 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isHurstExponentEnabled,
   calculateHurst,
   hurstToPayload,
-  HURST_EXPONENT_FLAG_ENV,
 } from "./hurstExponent.ts";
 
 function trendingSeries(n: number): number[] {
@@ -34,13 +32,6 @@ function randomWalkLike(n: number, seed = 1): number[] {
   }
   return out;
 }
-
-describe("isHurstExponentEnabled", () => {
-  it("respects the flag", () => {
-    expect(isHurstExponentEnabled({})).toBe(false);
-    expect(isHurstExponentEnabled({ [HURST_EXPONENT_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("calculateHurst — small sample handling", () => {
   it("returns 0.5 random_walk for n<16", () => {

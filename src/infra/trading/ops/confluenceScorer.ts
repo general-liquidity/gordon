@@ -27,8 +27,6 @@
  * A* but is just a B tier setup."
  */
 
-export const CONFLUENCE_SCORER_FLAG_ENV = "GORDON_CONFLUENCE_SCORER";
-
 /**
  * Canonical confluence types Gordon recognises. Extend by registering
  * additional names; unknown names still contribute to the count.
@@ -99,10 +97,6 @@ export const DEFAULT_RISK_MULTIPLIERS: Record<ConfluenceTier, number> = {
   B: 0.5,
   C: 0.25,
 };
-
-export function isConfluenceScorerEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[CONFLUENCE_SCORER_FLAG_ENV] === "1" || env[CONFLUENCE_SCORER_FLAG_ENV] === "true";
-}
 
 export function scoreConfluences(input: ScoreInput): ConfluenceScore {
   const thresholds = input.thresholds ?? DEFAULT_THRESHOLDS;

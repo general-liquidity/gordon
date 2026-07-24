@@ -6,24 +6,14 @@ import {
   currentTheme,
   formatSelfAuditPass,
   initRotationState,
-  isSelfAuditEnabled,
   nextTheme,
   runSelfAuditPass,
   selfAuditPassToPayload,
-  SELF_AUDIT_FLAG_ENV,
   type SelfAuditInputs,
 } from "./rotatingSelfAudit.ts";
 
 const FIXED_NOW = 1_000_000_000_000;
 const nowFn = () => FIXED_NOW;
-
-describe("isSelfAuditEnabled", () => {
-  it("respects the flag", () => {
-    expect(isSelfAuditEnabled({})).toBe(false);
-    expect(isSelfAuditEnabled({ [SELF_AUDIT_FLAG_ENV]: "1" })).toBe(true);
-    expect(isSelfAuditEnabled({ [SELF_AUDIT_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
 
 describe("rotation pointer", () => {
   it("starts at the requested index and wraps negatives", () => {

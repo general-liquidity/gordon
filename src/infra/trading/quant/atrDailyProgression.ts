@@ -17,12 +17,6 @@
  * Pure compute. No I/O.
  */
 
-export const ATR_PROGRESSION_FLAG_ENV = "GORDON_ATR_PROGRESSION";
-
-export function isAtrProgressionEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[ATR_PROGRESSION_FLAG_ENV] === "1" || env[ATR_PROGRESSION_FLAG_ENV] === "true";
-}
-
 export interface AtrProgressionCandle {
   /** Epoch milliseconds. */
   timestamp: number;

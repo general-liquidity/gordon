@@ -44,7 +44,6 @@ import { getCompletionVerifier } from "./completionVerifier.ts";
 import { summarizeGaps } from "./goalGapFinding.ts";
 import { buildCompletionProof, completionProofToPayload } from "./completionProof.ts";
 import {
-  isTradingFeatureListEnabled,
   loadFeatureList,
   pickHighestPriority,
 } from "../../infra/trading/ops/tradingFeatureList.ts";
@@ -547,9 +546,9 @@ async function runCycle(): Promise<CycleReport | null> {
     }
 
     // A1 wire: surface the next-priority feature from the trading feature
-    // list when the flag is on. Observation-only — does not change cycle
-    // behavior, just logs what the agent should pick up next.
-    if (isTradingFeatureListEnabled()) {
+    // list. Observation-only — does not change cycle behavior, just logs
+    // what the agent should pick up next.
+    {
       try {
         const list = loadFeatureList();
         if (list) {

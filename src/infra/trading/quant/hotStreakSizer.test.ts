@@ -2,16 +2,7 @@ import { describe, it, expect } from "bun:test";
 import {
   computeHotStreakSizing,
   hotStreakSizerToPayload,
-  isHotStreakSizerEnabled,
-  HOT_STREAK_SIZER_FLAG_ENV,
 } from "./hotStreakSizer.ts";
-
-describe("isHotStreakSizerEnabled", () => {
-  it("respects the flag", () => {
-    expect(isHotStreakSizerEnabled({})).toBe(false);
-    expect(isHotStreakSizerEnabled({ [HOT_STREAK_SIZER_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeHotStreakSizing — validation", () => {
   it("rejects non-finite P&L", () => {

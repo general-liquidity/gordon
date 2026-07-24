@@ -30,15 +30,6 @@
 import { normalCdf } from "../../../core/numerics/index.ts";
 import { skewness, kurtosis as excessKurtosis } from "../../../core/stats/index.ts";
 
-export const OPTIMIZATION_QUALITY_FLAG_ENV = "GORDON_OPTIMIZATION_QUALITY";
-
-export function isOptimizationQualityEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[OPTIMIZATION_QUALITY_FLAG_ENV] === "1" ||
-    env[OPTIMIZATION_QUALITY_FLAG_ENV] === "true"
-  );
-}
-
 export interface OptimizationQualityInput {
   /** Baseline strategy per-period returns (decimals, not %). */
   baselineReturns: ReadonlyArray<number>;

@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  isTradeLedgerEnabled,
   buildExecutionRecord,
   appendExecutionRecord,
   appendExecutionRecordFresh,
@@ -11,18 +10,9 @@ import {
   getExecutionRecord,
   lastRecordId,
   executionRecordToPayload,
-  TRADE_LEDGER_FLAG_ENV,
   type ExecutionOperation,
   type ExecutionResult,
 } from "./tradeLedger.ts";
-
-describe("isTradeLedgerEnabled", () => {
-  it("respects the flag", () => {
-    expect(isTradeLedgerEnabled({})).toBe(false);
-    expect(isTradeLedgerEnabled({ [TRADE_LEDGER_FLAG_ENV]: "1" })).toBe(true);
-    expect(isTradeLedgerEnabled({ [TRADE_LEDGER_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
 
 const OPS: ExecutionOperation[] = [
   { action: "place_order", symbol: "BTC", side: "buy", qty: 0.5, price: 60000 },

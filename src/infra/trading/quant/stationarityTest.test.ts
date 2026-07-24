@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isStationarityTestEnabled,
   runAdfTest,
   adfToPayload,
-  STATIONARITY_TEST_FLAG_ENV,
 } from "./stationarityTest.ts";
-
-describe("isStationarityTestEnabled", () => {
-  it("respects the flag", () => {
-    expect(isStationarityTestEnabled({})).toBe(false);
-    expect(isStationarityTestEnabled({ [STATIONARITY_TEST_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 function lcg(seed: number) {
   let s = seed;

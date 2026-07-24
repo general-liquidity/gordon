@@ -31,17 +31,6 @@
  * to prices.
  */
 
-export const IMPLEMENTATION_SHORTFALL_FLAG_ENV = "GORDON_IMPLEMENTATION_SHORTFALL";
-
-export function isImplementationShortfallEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[IMPLEMENTATION_SHORTFALL_FLAG_ENV] === "1" ||
-    env[IMPLEMENTATION_SHORTFALL_FLAG_ENV] === "true"
-  );
-}
-
 export type Side = "BUY" | "SELL";
 
 export interface ImplementationShortfallInput {

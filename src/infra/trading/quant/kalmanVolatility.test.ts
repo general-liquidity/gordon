@@ -1,10 +1,8 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isKalmanVolatilityEnabled,
   kalmanVolatility,
   kalmanVolatilityToPayload,
-  KALMAN_VOLATILITY_FLAG_ENV,
 } from "./kalmanVolatility.ts";
 
 function makeRng(seed: number): () => number {
@@ -29,13 +27,6 @@ function simulateReturns(n: number, sigma: number, seed = 1): number[] {
   for (let t = 0; t < n; t++) out.push(rng() * sigma);
   return out;
 }
-
-describe("isKalmanVolatilityEnabled", () => {
-  it("respects the flag", () => {
-    expect(isKalmanVolatilityEnabled({})).toBe(false);
-    expect(isKalmanVolatilityEnabled({ [KALMAN_VOLATILITY_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("kalmanVolatility — constant-vol recovery", () => {
   it("converges to ~10% annualized for σ_daily = 10%/sqrt(252)", () => {

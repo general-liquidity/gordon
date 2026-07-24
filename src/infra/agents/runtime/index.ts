@@ -26,7 +26,6 @@ export type {
 } from "./durableStep.ts";
 
 export {
-  isErrorOnlyFilterEnabled,
   filterOutput,
   filterOutputForAgent,
   resultToPayload as filterResultToPayload,
@@ -40,7 +39,6 @@ export type {
 } from "./errorOnlyOutputFilter.ts";
 
 export {
-  isKvCacheMetricEnabled,
   defaultKvCacheMetricPath,
   recordCacheCall,
   readCacheCalls,
@@ -55,7 +53,6 @@ export type {
 } from "./kvCacheHitMetric.ts";
 
 export {
-  isSilentToolFormatterEnabled,
   formatSilent,
   formatSilentPipeline,
   resultToPayload as silentResultToPayload,

@@ -17,12 +17,6 @@
  * conclusive.
  */
 
-export const SEASONAL_PATTERN_FLAG_ENV = "GORDON_SEASONAL_PATTERN";
-
-export function isSeasonalPatternEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[SEASONAL_PATTERN_FLAG_ENV] === "1" || env[SEASONAL_PATTERN_FLAG_ENV] === "true";
-}
-
 export interface DailyReturn {
   /** Trading-day timestamp in ms. */
   t: number;

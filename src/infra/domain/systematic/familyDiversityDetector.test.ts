@@ -1,19 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isFamilyDiversityDetectorEnabled,
   detectFamilyClustering,
   diversityHintToPayload,
-  FAMILY_DIVERSITY_DETECTOR_FLAG_ENV,
 } from "./familyDiversityDetector.ts";
-
-describe("isFamilyDiversityDetectorEnabled", () => {
-  it("respects the flag", () => {
-    expect(isFamilyDiversityDetectorEnabled({})).toBe(false);
-    expect(
-      isFamilyDiversityDetectorEnabled({ [FAMILY_DIVERSITY_DETECTOR_FLAG_ENV]: "1" }),
-    ).toBe(true);
-  });
-});
 
 interface Exp {
   tags: string[];

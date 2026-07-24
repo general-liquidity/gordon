@@ -2,8 +2,6 @@ import { describe, expect, test } from "bun:test";
 import {
   reconcileToolCalls,
   formatReconciliationReport,
-  isToolCallReconcilerEnabled,
-  TOOLCALL_RECONCILER_FLAG_ENV,
   type InterruptionReason,
 } from "./toolCallReconciler.ts";
 
@@ -312,20 +310,5 @@ describe("reconcileToolCalls", () => {
     // Should only produce one dangling entry for "dup"
     expect(r.dangling.length).toBe(1);
     expect(r.repairCount).toBe(1);
-  });
-});
-
-describe("isToolCallReconcilerEnabled", () => {
-  test("respects flag", () => {
-    expect(isToolCallReconcilerEnabled({})).toBe(false);
-    expect(
-      isToolCallReconcilerEnabled({ [TOOLCALL_RECONCILER_FLAG_ENV]: "1" }),
-    ).toBe(true);
-    expect(
-      isToolCallReconcilerEnabled({ [TOOLCALL_RECONCILER_FLAG_ENV]: "true" }),
-    ).toBe(true);
-    expect(
-      isToolCallReconcilerEnabled({ [TOOLCALL_RECONCILER_FLAG_ENV]: "0" }),
-    ).toBe(false);
   });
 });

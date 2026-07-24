@@ -29,16 +29,6 @@
  * to one and the hedge weights free.
  */
 
-export const HEDGE_RATIO_FLAG_ENV = "GORDON_MULTI_INSTRUMENT_HEDGE_RATIO";
-
-export function isMultiInstrumentHedgeRatioEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[HEDGE_RATIO_FLAG_ENV] === "1" || env[HEDGE_RATIO_FLAG_ENV] === "true"
-  );
-}
-
 export interface HedgeRatioInput {
   /** Return series of the position to hedge (length T). */
   positionReturns: ReadonlyArray<number>;

@@ -1,19 +1,10 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isManufacturedImbalanceEnabled,
   detectManufacturedImbalance,
   imbalanceToPayload,
-  MANUFACTURED_IMBALANCE_FLAG_ENV,
   type DepthSnapshot,
 } from "./manufacturedImbalance.ts";
-
-describe("isManufacturedImbalanceEnabled", () => {
-  it("respects the flag", () => {
-    expect(isManufacturedImbalanceEnabled({})).toBe(false);
-    expect(isManufacturedImbalanceEnabled({ [MANUFACTURED_IMBALANCE_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 const snap = (t: number, bid: number, ask: number, executed = 0): DepthSnapshot => ({
   t,

@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isHilbertTransformEnabled,
   computeHilbertTransform,
   hilbertToPayload,
-  HILBERT_TRANSFORM_FLAG_ENV,
 } from "./hilbertTransform.ts";
-
-describe("isHilbertTransformEnabled", () => {
-  it("respects the flag", () => {
-    expect(isHilbertTransformEnabled({})).toBe(false);
-    expect(isHilbertTransformEnabled({ [HILBERT_TRANSFORM_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeHilbertTransform", () => {
   it("short series → NaN with reason", () => {

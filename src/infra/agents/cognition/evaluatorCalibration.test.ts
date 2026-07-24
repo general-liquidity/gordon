@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  isEvaluatorCalibrationEnabled,
   defaultEvaluatorCalibrationPath,
   registerCalibrationExample,
   loadCalibrationSet,
@@ -13,7 +12,6 @@ import {
   detectDrift,
   formatDriftReport,
   driftToPayload,
-  EVALUATOR_CALIBRATION_FLAG_ENV,
   EVALUATOR_CALIBRATION_PATH_ENV,
   type CalibrationExample,
 } from "./evaluatorCalibration.ts";
@@ -39,18 +37,6 @@ function ex(
     ...overrides,
   };
 }
-
-describe("isEvaluatorCalibrationEnabled", () => {
-  it("respects the flag", () => {
-    expect(isEvaluatorCalibrationEnabled({})).toBe(false);
-    expect(
-      isEvaluatorCalibrationEnabled({ [EVALUATOR_CALIBRATION_FLAG_ENV]: "1" }),
-    ).toBe(true);
-    expect(
-      isEvaluatorCalibrationEnabled({ [EVALUATOR_CALIBRATION_FLAG_ENV]: "true" }),
-    ).toBe(true);
-  });
-});
 
 describe("defaultEvaluatorCalibrationPath", () => {
   it("honors env override", () => {

@@ -54,17 +54,6 @@
 
 import { eigenDecomposition } from "../../../core/alpha/matrix.ts";
 
-export const PCA_PAIR_CLUSTERING_FLAG_ENV = "GORDON_PCA_PAIR_CLUSTERING";
-
-export function isPcaPairClusteringEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[PCA_PAIR_CLUSTERING_FLAG_ENV] === "1" ||
-    env[PCA_PAIR_CLUSTERING_FLAG_ENV] === "true"
-  );
-}
-
 export interface PcaPairClusteringInput {
   /**
    * Returns matrix: returns[i][t] is asset i's return at time t.

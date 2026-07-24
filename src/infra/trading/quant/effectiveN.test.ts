@@ -1,20 +1,10 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isEffectiveNEnabled,
   computeEffectiveN,
   simpleEffectiveN,
   effectiveNToPayload,
-  EFFECTIVE_N_FLAG_ENV,
 } from "./effectiveN.ts";
-
-describe("isEffectiveNEnabled", () => {
-  it("respects the flag", () => {
-    expect(isEffectiveNEnabled({})).toBe(false);
-    expect(isEffectiveNEnabled({ [EFFECTIVE_N_FLAG_ENV]: "1" })).toBe(true);
-    expect(isEffectiveNEnabled({ [EFFECTIVE_N_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
 
 const identity = (n: number): number[][] => {
   const m: number[][] = [];

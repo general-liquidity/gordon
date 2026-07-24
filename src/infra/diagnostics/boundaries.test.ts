@@ -4,13 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  isBoundaryCheckEnabled,
   extractImports,
   checkBoundaries,
   formatBoundaryResult,
   boundaryResultToPayload,
   GORDON_DEFAULT_RULES,
-  BOUNDARY_FLAG_ENV,
   type BoundaryRule,
 } from "./boundaries.ts";
 
@@ -25,13 +23,6 @@ function writeFile(repoRel: string, content: string): void {
   mkdirSync(join(full, ".."), { recursive: true });
   writeFileSync(full, content);
 }
-
-describe("isBoundaryCheckEnabled", () => {
-  it("respects the flag", () => {
-    expect(isBoundaryCheckEnabled({})).toBe(false);
-    expect(isBoundaryCheckEnabled({ [BOUNDARY_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("GORDON_DEFAULT_RULES", () => {
   it("includes core/ purity rule", () => {

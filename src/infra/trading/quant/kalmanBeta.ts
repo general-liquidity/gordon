@@ -21,12 +21,6 @@
  * match the article's example values (Q = 1e-5, R = 1e-3).
  */
 
-export const KALMAN_BETA_FLAG_ENV = "GORDON_KALMAN_BETA";
-
-export function isKalmanBetaEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[KALMAN_BETA_FLAG_ENV] === "1" || env[KALMAN_BETA_FLAG_ENV] === "true";
-}
-
 export interface KalmanBetaInput {
   assetReturns: ReadonlyArray<number>;
   marketReturns: ReadonlyArray<number>;

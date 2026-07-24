@@ -44,12 +44,6 @@
  * overnight gaps, prefer Yang-Zhang over Garman-Klass.
  */
 
-export const RANGE_VOLATILITY_FLAG_ENV = "GORDON_RANGE_VOLATILITY";
-
-export function isRangeVolatilityEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[RANGE_VOLATILITY_FLAG_ENV] === "1" || env[RANGE_VOLATILITY_FLAG_ENV] === "true";
-}
-
 export interface OhlcBar {
   open: number;
   high: number;

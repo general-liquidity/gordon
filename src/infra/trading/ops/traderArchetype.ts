@@ -18,12 +18,6 @@
  * dominant archetype plus a confidence number.
  */
 
-export const TRADER_ARCHETYPE_FLAG_ENV = "GORDON_TRADER_ARCHETYPE";
-
-export function isTraderArchetypeEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[TRADER_ARCHETYPE_FLAG_ENV] === "1" || env[TRADER_ARCHETYPE_FLAG_ENV] === "true";
-}
-
 export type Archetype = "anxious_overthinker" | "impulsive_action_taker" | "emotional_empath" | "balanced";
 
 export interface BehaviorSignals {

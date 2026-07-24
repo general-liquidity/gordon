@@ -20,8 +20,6 @@
  * Deterministic is better than non-deterministic.
  */
 
-export const SILENT_TOOL_FORMATTER_FLAG_ENV = "GORDON_SILENT_TOOL_FORMATTER";
-
 export interface SilentFormatInput {
   /** Human-friendly summary of what the tool did. */
   description: string;
@@ -50,13 +48,6 @@ export interface SilentFormatResult {
   truncated: boolean;
   /** Bytes removed by the formatter. */
   bytesSaved: number;
-}
-
-export function isSilentToolFormatterEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[SILENT_TOOL_FORMATTER_FLAG_ENV] === "1" ||
-    env[SILENT_TOOL_FORMATTER_FLAG_ENV] === "true"
-  );
 }
 
 /**

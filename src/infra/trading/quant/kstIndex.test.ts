@@ -1,12 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { isKstIndexEnabled, computeKst, kstToPayload, KST_INDEX_FLAG_ENV } from "./kstIndex.ts";
-
-describe("isKstIndexEnabled", () => {
-  it("respects the flag", () => {
-    expect(isKstIndexEnabled({})).toBe(false);
-    expect(isKstIndexEnabled({ [KST_INDEX_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
+import { computeKst, kstToPayload } from "./kstIndex.ts";
 
 describe("computeKst", () => {
   it("short series → NaN with reason", () => {

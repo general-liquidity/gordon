@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isVolScaledSizingEnabled,
   computeVolScaledSizing,
   volScaledSizingToPayload,
-  VOL_SCALED_SIZING_FLAG_ENV,
 } from "./volScaledSizing.ts";
-
-describe("isVolScaledSizingEnabled", () => {
-  it("respects the flag", () => {
-    expect(isVolScaledSizingEnabled({})).toBe(false);
-    expect(isVolScaledSizingEnabled({ [VOL_SCALED_SIZING_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeVolScaledSizing — scale_down (default)", () => {
   it("calm vol → 1×, normal size", () => {

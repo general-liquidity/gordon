@@ -1,5 +1,5 @@
 /**
- * Tool Result Sanitizer (GORDON_TOOL_RESULT_SANITIZE).
+ * Tool Result Sanitizer.
  *
  * Closes the prompt-injection gap surfaced by the Hermes Agent v0.14
  * release-note item "tool error strings are now sanitized before being
@@ -32,8 +32,7 @@
  *     relies on for `recordToolCall(tool.id, false)`).
  *   - Composes cleanly with `withToolsMetrics`: outer metrics wrapper
  *     sees the sanitized result/error, records accurately.
- *   - Default-on. Disable via `GORDON_TOOL_RESULT_SANITIZE=0` for
- *     debugging only.
+ *   - Always on — runs on every tool result and error.
  *
  * Detection-only signals are emitted via the structured-observation log
  * so operators can audit which tools surfaced injection attempts. The
@@ -48,18 +47,6 @@ import { redactValues } from "../../../platform/observability/valueRedaction.ts"
 import { sanitizeUnicode } from "../../../safety/defense/unicodeSanitizer.ts";
 
 const logger = createModuleLogger("tool-result-sanitizer");
-
-export const RESULT_SANITIZE_FLAG_ENV = "GORDON_TOOL_RESULT_SANITIZE";
-
-/**
- * Default-on. Operators disable for debugging via env=0 / env=false.
- */
-export function isResultSanitizerEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  const raw = env[RESULT_SANITIZE_FLAG_ENV];
-  return raw !== "0" && raw !== "false";
-}
 
 // -------------------- injection patterns --------------------
 
@@ -235,8 +222,7 @@ function logDetection(toolId: string, outcome: SanitizationOutcome, kind: "resul
 
 /**
  * Wrap a single Mastra tool's execute fn so results and error messages
- * are sanitized before re-entering the agent context. Pass-through when
- * the env flag is off.
+ * are sanitized before re-entering the agent context.
  *
  * Composes with `withToolMetrics`: apply this INNERMOST so the metrics
  * layer sees the sanitized result/error.
@@ -246,7 +232,6 @@ function logDetection(toolId: string, outcome: SanitizationOutcome, kind: "resul
 export function withResultSanitizer<T extends { id: string; execute?: unknown }>(
   tool: T,
 ): T {
-  if (!isResultSanitizerEnabled()) return tool;
   const origExecute = tool.execute as
     | ((...args: unknown[]) => Promise<unknown> | unknown)
     | undefined;
@@ -281,13 +266,11 @@ export function withResultSanitizer<T extends { id: string; execute?: unknown }>
 }
 
 /**
- * Bulk variant — wraps every tool in a registry. Pass-through when env
- * flag is off (returns the same object reference).
+ * Bulk variant — wraps every tool in a registry.
  */
 export function withToolsResultSanitizer<
   T extends Record<string, { id: string; execute?: unknown }>,
 >(tools: T): T {
-  if (!isResultSanitizerEnabled()) return tools;
   const wrapped: Record<string, unknown> = {};
   for (const [key, tool] of Object.entries(tools)) {
     wrapped[key] = withResultSanitizer(tool);

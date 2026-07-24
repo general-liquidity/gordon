@@ -35,15 +35,6 @@
  * Pure compute. No I/O. Deterministic seeded LCG RNG for reproducibility.
  */
 
-export const SIMULATED_ANNEALING_FLAG_ENV = "GORDON_SIMULATED_ANNEALING";
-
-export function isSimulatedAnnealingEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[SIMULATED_ANNEALING_FLAG_ENV] === "1" ||
-    env[SIMULATED_ANNEALING_FLAG_ENV] === "true"
-  );
-}
-
 export interface SimulatedAnnealingInput {
   /** Objective function to MAXIMISE. */
   objective: (x: ReadonlyArray<number>) => number;

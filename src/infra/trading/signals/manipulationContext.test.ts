@@ -1,10 +1,8 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isManipulationContextEnabled,
   classifyManipulationContext,
   manipulationContextToPayload,
-  MANIPULATION_CONTEXT_FLAG_ENV,
 } from "./manipulationContext.ts";
 import type { ToxicityResult } from "./microstructureToxicity.ts";
 
@@ -22,13 +20,6 @@ const makeToxicity = (regime: "quiet" | "elevated" | "active", score: number, ov
   displayedHalfLifeMs: 1000,
   depthTurnoverRatio: 10,
   reasoning: "test",
-});
-
-describe("isManipulationContextEnabled", () => {
-  it("respects the flag", () => {
-    expect(isManipulationContextEnabled({})).toBe(false);
-    expect(isManipulationContextEnabled({ [MANIPULATION_CONTEXT_FLAG_ENV]: "1" })).toBe(true);
-  });
 });
 
 describe("classifyManipulationContext — regime mapping", () => {

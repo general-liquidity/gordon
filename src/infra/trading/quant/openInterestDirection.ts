@@ -29,12 +29,6 @@
  * Pure compute. No I/O.
  */
 
-export const OI_DIRECTION_FLAG_ENV = "GORDON_OI_DIRECTION";
-
-export function isOiDirectionEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[OI_DIRECTION_FLAG_ENV] === "1" || env[OI_DIRECTION_FLAG_ENV] === "true";
-}
-
 export interface OiDirectionInput {
   /** Price series, oldest-first. */
   prices: ReadonlyArray<number>;

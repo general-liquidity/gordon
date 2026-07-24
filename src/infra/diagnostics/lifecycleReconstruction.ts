@@ -16,15 +16,6 @@
  * whatever audit data is already flowing.
  */
 
-export const LIFECYCLE_RECONSTRUCTION_FLAG_ENV = "GORDON_LIFECYCLE_RECONSTRUCTION";
-
-export function isLifecycleReconstructionEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[LIFECYCLE_RECONSTRUCTION_FLAG_ENV] === "1" ||
-    env[LIFECYCLE_RECONSTRUCTION_FLAG_ENV] === "true"
-  );
-}
-
 export type LifecycleEventKind =
   | "plan_emitted"
   | "permission_checked"

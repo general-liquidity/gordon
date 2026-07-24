@@ -21,15 +21,6 @@
  *     end of the sizing chain
  */
 
-export const VOL_SCALED_SIZING_FLAG_ENV = "GORDON_VOL_SCALED_SIZING";
-
-export function isVolScaledSizingEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[VOL_SCALED_SIZING_FLAG_ENV] === "1" ||
-    env[VOL_SCALED_SIZING_FLAG_ENV] === "true"
-  );
-}
-
 export type SizingMode = "scale_up" | "scale_down";
 
 export interface VolBand {

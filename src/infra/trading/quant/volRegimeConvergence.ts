@@ -39,15 +39,6 @@
 import type { KalmanVolatilityResult } from "./kalmanVolatility.ts";
 import type { MarkovRegimeResult, MarkovState } from "./markovRegime.ts";
 
-export const VOL_REGIME_CONVERGENCE_FLAG_ENV = "GORDON_VOL_REGIME_CONVERGENCE";
-
-export function isVolRegimeConvergenceEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[VOL_REGIME_CONVERGENCE_FLAG_ENV] === "1" ||
-    env[VOL_REGIME_CONVERGENCE_FLAG_ENV] === "true"
-  );
-}
-
 export type ConvergenceVerdict =
   | "aligned_calm"
   | "aligned_storm"

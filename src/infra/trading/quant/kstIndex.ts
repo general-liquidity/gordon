@@ -16,12 +16,6 @@
  * horizons while filtering high-frequency noise.
  */
 
-export const KST_INDEX_FLAG_ENV = "GORDON_KST_INDEX";
-
-export function isKstIndexEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[KST_INDEX_FLAG_ENV] === "1" || env[KST_INDEX_FLAG_ENV] === "true";
-}
-
 export interface KstInput {
   prices: ReadonlyArray<number>;
   /** ROC periods (length 4). Default [10, 15, 20, 30]. */

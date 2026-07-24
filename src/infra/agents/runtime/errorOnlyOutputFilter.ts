@@ -30,8 +30,6 @@
  * "What was being attempted?" context.
  */
 
-export const ERROR_ONLY_FILTER_FLAG_ENV = "GORDON_ERROR_ONLY_FILTER";
-
 export type FilterAction = "surface" | "suppress";
 
 export interface FilterRule {
@@ -130,13 +128,6 @@ export const DEFAULT_ERROR_PATTERNS: readonly FilterRule[] = [
     priority: 40,
   },
 ];
-
-export function isErrorOnlyFilterEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[ERROR_ONLY_FILTER_FLAG_ENV] === "1" ||
-    env[ERROR_ONLY_FILTER_FLAG_ENV] === "true"
-  );
-}
 
 interface LineDecision {
   line: string;

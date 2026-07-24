@@ -23,17 +23,6 @@
 
 import type { MarketRegime } from "../../../core/regime/types.ts";
 
-export const WEEKLY_REGIME_CHECK_FLAG_ENV = "GORDON_WEEKLY_REGIME_CHECK";
-
-export function isWeeklyRegimeCheckEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[WEEKLY_REGIME_CHECK_FLAG_ENV] === "1" ||
-    env[WEEKLY_REGIME_CHECK_FLAG_ENV] === "true"
-  );
-}
-
 export type Quadrant = "quiet_trend" | "volatile_trend" | "quiet_range" | "volatile_chop";
 export type VolatilityLevel = "low" | "normal" | "elevated" | "crisis";
 

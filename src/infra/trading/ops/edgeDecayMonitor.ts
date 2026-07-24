@@ -17,12 +17,6 @@
  * specifically: is my edge eroding?
  */
 
-export const EDGE_DECAY_FLAG_ENV = "GORDON_EDGE_DECAY";
-
-export function isEdgeDecayEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[EDGE_DECAY_FLAG_ENV] === "1" || env[EDGE_DECAY_FLAG_ENV] === "true";
-}
-
 export type DecayState = "stable" | "degraded" | "retire";
 
 export interface DecayInput {

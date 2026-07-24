@@ -17,12 +17,6 @@
  * Pure compute. No I/O.
  */
 
-export const MTF_RSI_FLAG_ENV = "GORDON_MTF_RSI";
-
-export function isMtfRsiEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[MTF_RSI_FLAG_ENV] === "1" || env[MTF_RSI_FLAG_ENV] === "true";
-}
-
 export type Timeframe = "5m" | "15m" | "1h" | "4h" | "1d" | "1w";
 
 export interface MtfRsiInput {

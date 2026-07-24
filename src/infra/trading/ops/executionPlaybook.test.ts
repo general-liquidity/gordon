@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 
 import {
-  isExecutionPlaybookEnabled,
   listPlaybooks,
   getPlaybook,
   registerPlaybook,
@@ -11,20 +10,11 @@ import {
   resetRegistryForTesting,
   BUILTIN_PLAYBOOKS,
   PlaybookNotFoundError,
-  EXECUTION_PLAYBOOK_FLAG_ENV,
   type ExecutionPlaybook,
 } from "./executionPlaybook.ts";
 
 beforeEach(() => {
   resetRegistryForTesting();
-});
-
-describe("isExecutionPlaybookEnabled", () => {
-  it("respects the flag", () => {
-    expect(isExecutionPlaybookEnabled({})).toBe(false);
-    expect(isExecutionPlaybookEnabled({ [EXECUTION_PLAYBOOK_FLAG_ENV]: "1" })).toBe(true);
-    expect(isExecutionPlaybookEnabled({ [EXECUTION_PLAYBOOK_FLAG_ENV]: "true" })).toBe(true);
-  });
 });
 
 describe("BUILTIN_PLAYBOOKS — invariants", () => {

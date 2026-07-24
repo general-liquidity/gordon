@@ -21,8 +21,6 @@
  * attached to the trade record by name.
  */
 
-export const EXECUTION_PLAYBOOK_FLAG_ENV = "GORDON_EXECUTION_PLAYBOOK";
-
 /** Single entry clip in a scaled-entry schedule. */
 export interface EntryClip {
   /** Fraction of total intended size (sums to 1.0 across all clips). */
@@ -211,13 +209,6 @@ export function registerPlaybook(playbook: ExecutionPlaybook): void {
     }
   }
   _registry.set(playbook.id, playbook);
-}
-
-export function isExecutionPlaybookEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[EXECUTION_PLAYBOOK_FLAG_ENV] === "1" ||
-    env[EXECUTION_PLAYBOOK_FLAG_ENV] === "true"
-  );
 }
 
 // ============================================================================

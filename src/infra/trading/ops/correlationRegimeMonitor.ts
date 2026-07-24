@@ -18,17 +18,6 @@
  * the regime signal that broke the textbook hedge.
  */
 
-export const CORRELATION_REGIME_FLAG_ENV = "GORDON_CORRELATION_REGIME";
-
-export function isCorrelationRegimeEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[CORRELATION_REGIME_FLAG_ENV] === "1" ||
-    env[CORRELATION_REGIME_FLAG_ENV] === "true"
-  );
-}
-
 export type CorrelationRegime = "diverse" | "elevated" | "crisis";
 
 export interface CorrelationInput {

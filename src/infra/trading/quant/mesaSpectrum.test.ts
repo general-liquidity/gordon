@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isMesaSpectrumEnabled,
   computeMesaSpectrum,
   mesaToPayload,
-  MESA_SPECTRUM_FLAG_ENV,
 } from "./mesaSpectrum.ts";
-
-describe("isMesaSpectrumEnabled", () => {
-  it("respects the flag", () => {
-    expect(isMesaSpectrumEnabled({})).toBe(false);
-    expect(isMesaSpectrumEnabled({ [MESA_SPECTRUM_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeMesaSpectrum", () => {
   it("short input → NaN with reason", () => {

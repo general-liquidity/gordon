@@ -1,11 +1,9 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isInitProbeEnabled,
   runInitProbes,
   formatProbeReport,
   probeReportToPayload,
-  INIT_PROBE_FLAG_ENV,
   type Probe,
 } from "./initProbe.ts";
 
@@ -28,14 +26,6 @@ function mkProbe(
     },
   };
 }
-
-describe("isInitProbeEnabled", () => {
-  it("respects the flag", () => {
-    expect(isInitProbeEnabled({})).toBe(false);
-    expect(isInitProbeEnabled({ [INIT_PROBE_FLAG_ENV]: "1" })).toBe(true);
-    expect(isInitProbeEnabled({ [INIT_PROBE_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
 
 describe("runInitProbes — empty input", () => {
   it("returns ready=true with zero probes", async () => {

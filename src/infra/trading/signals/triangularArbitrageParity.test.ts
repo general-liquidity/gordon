@@ -1,23 +1,9 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isTriangularArbitrageParityEnabled,
   computeTriangularArbitrageParity,
   triangularArbitrageParityToPayload,
-  TRIANGULAR_ARBITRAGE_PARITY_FLAG_ENV,
 } from "./triangularArbitrageParity.ts";
-
-describe("isTriangularArbitrageParityEnabled", () => {
-  it("respects the flag", () => {
-    expect(isTriangularArbitrageParityEnabled({})).toBe(false);
-    expect(
-      isTriangularArbitrageParityEnabled({ [TRIANGULAR_ARBITRAGE_PARITY_FLAG_ENV]: "1" }),
-    ).toBe(true);
-    expect(
-      isTriangularArbitrageParityEnabled({ [TRIANGULAR_ARBITRAGE_PARITY_FLAG_ENV]: "true" }),
-    ).toBe(true);
-  });
-});
 
 /** Build a perfectly-consistent triangle: directAC = legAB * legBC exactly. */
 function consistentTriangle(n: number): { legAB: number[]; legBC: number[]; directAC: number[] } {

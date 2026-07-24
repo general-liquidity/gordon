@@ -2,21 +2,7 @@ import { describe, it, expect } from "bun:test";
 import {
   computeImplementationShortfall,
   implementationShortfallToPayload,
-  isImplementationShortfallEnabled,
-  IMPLEMENTATION_SHORTFALL_FLAG_ENV,
 } from "./implementationShortfall.ts";
-
-describe("isImplementationShortfallEnabled", () => {
-  it("respects the flag", () => {
-    expect(isImplementationShortfallEnabled({})).toBe(false);
-    expect(
-      isImplementationShortfallEnabled({ [IMPLEMENTATION_SHORTFALL_FLAG_ENV]: "1" }),
-    ).toBe(true);
-    expect(
-      isImplementationShortfallEnabled({ [IMPLEMENTATION_SHORTFALL_FLAG_ENV]: "true" }),
-    ).toBe(true);
-  });
-});
 
 describe("computeImplementationShortfall — basic invariants", () => {
   it("zero cost when decision = arrival = fill = close and no fees", () => {

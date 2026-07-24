@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isCprEnabled,
   computeCpr,
   cprToPayload,
-  CPR_FLAG_ENV,
 } from "./centralPivotRange.ts";
-
-describe("isCprEnabled", () => {
-  it("respects the flag", () => {
-    expect(isCprEnabled({})).toBe(false);
-    expect(isCprEnabled({ [CPR_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeCpr — formula correctness", () => {
   it("CP = (H + L + C) / 3", () => {

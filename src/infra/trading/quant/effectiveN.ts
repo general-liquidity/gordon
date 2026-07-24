@@ -19,12 +19,6 @@
  * (whose naive confluence count this metric replaces or contextualizes).
  */
 
-export const EFFECTIVE_N_FLAG_ENV = "GORDON_EFFECTIVE_N";
-
-export function isEffectiveNEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[EFFECTIVE_N_FLAG_ENV] === "1" || env[EFFECTIVE_N_FLAG_ENV] === "true";
-}
-
 export interface SignalSeries {
   signalId: string;
   values: ReadonlyArray<number>;

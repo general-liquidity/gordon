@@ -56,17 +56,6 @@
 
 import { eigenDecomposition } from "../../../core/alpha/matrix.ts";
 
-export const NEAREST_CORRELATION_MATRIX_FLAG_ENV = "GORDON_NEAREST_CORRELATION_MATRIX";
-
-export function isNearestCorrelationMatrixEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[NEAREST_CORRELATION_MATRIX_FLAG_ENV] === "1" ||
-    env[NEAREST_CORRELATION_MATRIX_FLAG_ENV] === "true"
-  );
-}
-
 export type Matrix = number[][];
 
 export interface NearestCorrelationInput {

@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isDivergenceIndexEnabled,
   computeDivergenceIndex,
   divergenceIndexToPayload,
-  DIVERGENCE_INDEX_FLAG_ENV,
 } from "./divergenceIndex.ts";
-
-describe("isDivergenceIndexEnabled", () => {
-  it("respects the flag", () => {
-    expect(isDivergenceIndexEnabled({})).toBe(false);
-    expect(isDivergenceIndexEnabled({ [DIVERGENCE_INDEX_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeDivergenceIndex", () => {
   it("short series → NaN with reason", () => {

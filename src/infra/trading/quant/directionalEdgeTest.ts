@@ -31,15 +31,6 @@
  * resampling is fragile to specific path realizations.
  */
 
-export const DIRECTIONAL_EDGE_TEST_FLAG_ENV = "GORDON_DIRECTIONAL_EDGE_TEST";
-
-export function isDirectionalEdgeTestEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[DIRECTIONAL_EDGE_TEST_FLAG_ENV] === "1" ||
-    env[DIRECTIONAL_EDGE_TEST_FLAG_ENV] === "true"
-  );
-}
-
 export interface DirectionalEdgeTestInput {
   /** Per-period strategy returns (decimals). */
   returns: ReadonlyArray<number>;

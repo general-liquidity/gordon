@@ -1,19 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isTradingConfusionMatrixEnabled,
   computeTradingConfusionMatrix,
   tradingConfusionMatrixToPayload,
-  TRADING_CONFUSION_MATRIX_FLAG_ENV,
 } from "./tradingConfusionMatrix.ts";
-
-describe("isTradingConfusionMatrixEnabled", () => {
-  it("respects the flag", () => {
-    expect(isTradingConfusionMatrixEnabled({})).toBe(false);
-    expect(
-      isTradingConfusionMatrixEnabled({ [TRADING_CONFUSION_MATRIX_FLAG_ENV]: "1" }),
-    ).toBe(true);
-  });
-});
 
 describe("computeTradingConfusionMatrix — perfect agreement", () => {
   it("identical sequences yield accuracy = 1", () => {

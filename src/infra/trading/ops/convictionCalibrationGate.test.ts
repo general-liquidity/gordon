@@ -1,11 +1,9 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isConvictionCalibrationEnabled,
   evaluateCalibration,
   clampTierToCalibration,
   calibrationToPayload,
-  CONVICTION_CALIBRATION_FLAG_ENV,
   type CalibrationTrade,
 } from "./convictionCalibrationGate.ts";
 
@@ -19,13 +17,6 @@ function makeTrades(n: number, correlated: boolean, noiseScale = 0.3): Calibrati
   }
   return out;
 }
-
-describe("isConvictionCalibrationEnabled", () => {
-  it("respects the flag", () => {
-    expect(isConvictionCalibrationEnabled({})).toBe(false);
-    expect(isConvictionCalibrationEnabled({ [CONVICTION_CALIBRATION_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("evaluateCalibration — sample size gate", () => {
   it("insufficient_data when below minTrades", () => {

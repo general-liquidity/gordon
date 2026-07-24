@@ -25,12 +25,6 @@
  * Pure compute. No I/O.
  */
 
-export const USD_VOLUME_GATE_FLAG_ENV = "GORDON_USD_VOLUME_GATE";
-
-export function isUsdVolumeGateEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[USD_VOLUME_GATE_FLAG_ENV] === "1" || env[USD_VOLUME_GATE_FLAG_ENV] === "true";
-}
-
 export interface VolumeGateCandle {
   /** Closing price for the candle (any currency). */
   close: number;

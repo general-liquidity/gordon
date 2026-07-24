@@ -1,23 +1,10 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isOpeningRangeBreakoutEnabled,
   evaluateORBSetup,
   simulateORBTrade,
   openingRangeBreakoutToPayload,
-  OPENING_RANGE_BREAKOUT_FLAG_ENV,
   type OHLCBar,
 } from "./openingRangeBreakout.ts";
-
-describe("isOpeningRangeBreakoutEnabled", () => {
-  it("respects the flag", () => {
-    expect(isOpeningRangeBreakoutEnabled({})).toBe(false);
-    expect(
-      isOpeningRangeBreakoutEnabled({
-        [OPENING_RANGE_BREAKOUT_FLAG_ENV]: "1",
-      }),
-    ).toBe(true);
-  });
-});
 
 const goodEligibility = {
   dailyATR: 5,

@@ -1,21 +1,10 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isVolRegimeConvergenceEnabled,
   evaluateVolRegimeConvergence,
   convergenceToPayload,
-  VOL_REGIME_CONVERGENCE_FLAG_ENV,
 } from "./volRegimeConvergence.ts";
 import type { KalmanVolatilityResult } from "./kalmanVolatility.ts";
 import type { MarkovRegimeResult, MarkovState } from "./markovRegime.ts";
-
-describe("isVolRegimeConvergenceEnabled", () => {
-  it("respects the flag", () => {
-    expect(isVolRegimeConvergenceEnabled({})).toBe(false);
-    expect(
-      isVolRegimeConvergenceEnabled({ [VOL_REGIME_CONVERGENCE_FLAG_ENV]: "1" }),
-    ).toBe(true);
-  });
-});
 
 function mkVol(opts: { current: number; mean: number; min: number; max: number }): KalmanVolatilityResult {
   return {

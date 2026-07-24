@@ -1,18 +1,9 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isAtrProgressionEnabled,
   computeAtrProgression,
   atrProgressionToPayload,
-  ATR_PROGRESSION_FLAG_ENV,
   type AtrProgressionCandle,
 } from "./atrDailyProgression.ts";
-
-describe("isAtrProgressionEnabled", () => {
-  it("respects the flag", () => {
-    expect(isAtrProgressionEnabled({})).toBe(false);
-    expect(isAtrProgressionEnabled({ [ATR_PROGRESSION_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;

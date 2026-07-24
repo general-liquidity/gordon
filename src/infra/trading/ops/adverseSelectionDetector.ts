@@ -16,17 +16,6 @@
  * is an implicit friction cost the marketImpact model can't see.
  */
 
-export const ADVERSE_SELECTION_FLAG_ENV = "GORDON_ADVERSE_SELECTION";
-
-export function isAdverseSelectionEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[ADVERSE_SELECTION_FLAG_ENV] === "1" ||
-    env[ADVERSE_SELECTION_FLAG_ENV] === "true"
-  );
-}
-
 export type FillVerdict = "clean" | "neutral" | "adversely_selected";
 
 export interface FillEvent {

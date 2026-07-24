@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isOptimalFEnabled,
   computeOptimalF,
   optimalFToPayload,
-  OPTIMAL_F_FLAG_ENV,
 } from "./optimalF.ts";
-
-describe("isOptimalFEnabled", () => {
-  it("respects the flag", () => {
-    expect(isOptimalFEnabled({})).toBe(false);
-    expect(isOptimalFEnabled({ [OPTIMAL_F_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeOptimalF — basic mechanics", () => {
   it("finds an f in (0, 1) for a sequence with wins and losses", () => {

@@ -14,10 +14,8 @@
  *   - timeout / process crash / manual cancel during tool exec
  *   - network drop between tool_call emission and tool_result
  *
- * Behavior is gated by the GORDON_TOOLCALL_RECONCILER env var. When the
- * flag is off (default), the processor is a no-op and returns messages
- * unchanged. When on, it scans the incoming messages array and applies
- * repairs.
+ * The processor scans the incoming messages array and applies repairs;
+ * when there is nothing dangling it returns the messages unchanged.
  *
  * Wired into all three agents' inputProcessors. Order matters: this
  * processor runs BEFORE the input guard (no upstream guard can act on
@@ -38,7 +36,6 @@ import type {
   ProcessInputResult,
 } from "@mastra/core/processors";
 import {
-  isToolCallReconcilerEnabled,
   reconcileToolCalls,
   type InterruptionReason,
 } from "../runtime/toolCallReconciler.ts";
@@ -162,13 +159,9 @@ export class GordonToolCallReconciler
   readonly id = "gordon-toolcall-reconciler" as const;
   readonly name = "Gordon Tool-Call Reconciler";
   readonly description =
-    "Repairs dangling tool_use blocks pre-turn by synthesizing minimal tool_result blocks so providers accept the next turn. No-op unless GORDON_TOOLCALL_RECONCILER is set.";
+    "Repairs dangling tool_use blocks pre-turn by synthesizing minimal tool_result blocks so providers accept the next turn.";
 
   async processInput(args: ProcessInputArgs): Promise<ProcessInputResult> {
-    if (!isToolCallReconcilerEnabled()) {
-      return args.messages;
-    }
-
     const messages = args.messages as unknown as MessageLike[];
     if (!Array.isArray(messages) || messages.length === 0) {
       return args.messages;

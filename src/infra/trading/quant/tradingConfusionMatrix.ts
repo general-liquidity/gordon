@@ -32,17 +32,6 @@
  * Pure compute. No I/O.
  */
 
-export const TRADING_CONFUSION_MATRIX_FLAG_ENV = "GORDON_TRADING_CONFUSION_MATRIX";
-
-export function isTradingConfusionMatrixEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[TRADING_CONFUSION_MATRIX_FLAG_ENV] === "1" ||
-    env[TRADING_CONFUSION_MATRIX_FLAG_ENV] === "true"
-  );
-}
-
 export interface TradingConfusionMatrixInput {
   /** Actual strategy positions per period (any continuous values; sign is what counts). */
   actualPositions: ReadonlyArray<number>;

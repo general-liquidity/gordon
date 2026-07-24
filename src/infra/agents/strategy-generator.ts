@@ -24,12 +24,10 @@ import { createModuleLogger } from "../logger/index.ts";
 import { DSLStrategyAdapter } from "../../strategies/dsl/adapter.ts";
 import {
   validateStrategyCode,
-  isStrategyCodeValidatorEnabled,
 } from "../trading/ops/strategyCodeValidator.ts";
 import {
   recordAttempt,
   dynamicDeflatedThreshold,
-  isMultipleTestingTrackerEnabled,
 } from "../trading/ops/multipleTestingTracker.ts";
 import { capacitySweep } from "../../backtest/analysis/marketImpact.ts";
 
@@ -222,7 +220,7 @@ export class StrategyGeneratorAgent {
       // Catches expression-string anti-patterns (e.g. "signal * returns" without
       // shift) that survive DSL schema validation but would still imply a
       // leakage-prone strategy. Warn-only — DSL schema is the primary gate.
-      if (isStrategyCodeValidatorEnabled()) {
+      {
         const codeScan = validateStrategyCode(JSON.stringify(strategy));
         if (codeScan.violations.length > 0) {
           logger.warn("strategy DSL anti-pattern scan", {
@@ -275,7 +273,7 @@ export class StrategyGeneratorAgent {
 
           // Q4: log this iteration as a multiple-testing attempt and surface
           // the dynamic DSR verdict alongside the static thresholds.
-          if (isMultipleTestingTrackerEnabled()) {
+          {
             const family = `${intent.style}/${options.symbol}`;
             const codeHash = quickHashDsl(JSON.stringify(strategy));
             recordAttempt({

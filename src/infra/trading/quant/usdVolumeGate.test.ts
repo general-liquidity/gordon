@@ -2,16 +2,7 @@ import { describe, it, expect } from "bun:test";
 import {
   evaluateUsdVolumeGate,
   usdVolumeGateToPayload,
-  isUsdVolumeGateEnabled,
-  USD_VOLUME_GATE_FLAG_ENV,
 } from "./usdVolumeGate.ts";
-
-describe("isUsdVolumeGateEnabled", () => {
-  it("respects the flag", () => {
-    expect(isUsdVolumeGateEnabled({})).toBe(false);
-    expect(isUsdVolumeGateEnabled({ [USD_VOLUME_GATE_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 function mkCandle(close: number, volume: number) {
   return { close, volume };

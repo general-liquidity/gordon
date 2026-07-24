@@ -21,12 +21,6 @@
 
 import { existsSync, readFileSync } from "node:fs";
 
-export const DAILY_ROLLUP_FLAG_ENV = "GORDON_DAILY_ROLLUP";
-
-export function isDailyRollupEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[DAILY_ROLLUP_FLAG_ENV] === "1" || env[DAILY_ROLLUP_FLAG_ENV] === "true";
-}
-
 export interface DailyRollupInput {
   /** Path to decisionLog JSONL. */
   decisionsPath?: string;

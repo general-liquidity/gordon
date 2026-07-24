@@ -1,20 +1,10 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isSilentToolFormatterEnabled,
   formatSilent,
   formatSilentPipeline,
   resultToPayload,
-  SILENT_TOOL_FORMATTER_FLAG_ENV,
 } from "./silentToolResultFormatter.ts";
-
-describe("isSilentToolFormatterEnabled", () => {
-  it("respects the flag", () => {
-    expect(isSilentToolFormatterEnabled({})).toBe(false);
-    expect(isSilentToolFormatterEnabled({ [SILENT_TOOL_FORMATTER_FLAG_ENV]: "1" })).toBe(true);
-    expect(isSilentToolFormatterEnabled({ [SILENT_TOOL_FORMATTER_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
 
 describe("formatSilent — success path", () => {
   it("collapses all output to a single ✓ line on exitCode 0", () => {

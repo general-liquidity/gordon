@@ -17,15 +17,6 @@
  * score thresholded into quiet / elevated / hot.
  */
 
-export const TOUCH_DYNAMICS_FLAG_ENV = "GORDON_TOUCH_DYNAMICS";
-
-export function isTouchDynamicsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[TOUCH_DYNAMICS_FLAG_ENV] === "1" ||
-    env[TOUCH_DYNAMICS_FLAG_ENV] === "true"
-  );
-}
-
 export interface TouchSnapshot {
   t: number;
   bestBid: number;

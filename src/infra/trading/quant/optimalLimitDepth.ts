@@ -32,17 +32,6 @@
  * Pure compute. No side effects.
  */
 
-export const OPTIMAL_LIMIT_DEPTH_FLAG_ENV = "GORDON_OPTIMAL_LIMIT_DEPTH";
-
-export function isOptimalLimitDepthEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[OPTIMAL_LIMIT_DEPTH_FLAG_ENV] === "1" ||
-    env[OPTIMAL_LIMIT_DEPTH_FLAG_ENV] === "true"
-  );
-}
-
 export interface OptimalLimitDepthInput {
   /** Time remaining in the execution horizon. Must be > 0. */
   timeRemaining: number;

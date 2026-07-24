@@ -14,12 +14,6 @@
  * Cleanest "is this window trendy?" gate Kaufman provides.
  */
 
-export const EFFICIENCY_RATIO_FLAG_ENV = "GORDON_EFFICIENCY_RATIO";
-
-export function isEfficiencyRatioEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[EFFICIENCY_RATIO_FLAG_ENV] === "1" || env[EFFICIENCY_RATIO_FLAG_ENV] === "true";
-}
-
 export interface EfficiencyRatioInput {
   prices: ReadonlyArray<number>;
   /** Lookback period. Default 10. */

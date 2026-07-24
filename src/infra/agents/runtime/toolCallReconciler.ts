@@ -40,19 +40,8 @@
  * `type === "tool-result"` or `type === "tool_result"`. Both pair on
  * an `id` / `toolCallId` / `tool_use_id` / `toolUseId` field.
  *
- * Pure function. No I/O. Feature flag: GORDON_TOOLCALL_RECONCILER.
+ * Pure function. No I/O.
  */
-
-export const TOOLCALL_RECONCILER_FLAG_ENV = "GORDON_TOOLCALL_RECONCILER";
-
-export function isToolCallReconcilerEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[TOOLCALL_RECONCILER_FLAG_ENV] === "1" ||
-    env[TOOLCALL_RECONCILER_FLAG_ENV] === "true"
-  );
-}
 
 export type InterruptionReason =
   | "timeout"

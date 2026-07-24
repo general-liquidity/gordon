@@ -1,18 +1,9 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isBarPermutationEnabled,
   permuteOHLCBars,
   barPermutationToPayload,
-  BAR_PERMUTATION_FLAG_ENV,
   type OHLCBar,
 } from "./barPermutation.ts";
-
-describe("isBarPermutationEnabled", () => {
-  it("respects the flag", () => {
-    expect(isBarPermutationEnabled({})).toBe(false);
-    expect(isBarPermutationEnabled({ [BAR_PERMUTATION_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 // Deterministic RNG for synthetic data.
 function makeRng(seed: number): () => number {

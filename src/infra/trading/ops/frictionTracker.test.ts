@@ -4,13 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  isFrictionTrackerEnabled,
   recordFriction,
   readFrictionLog,
   auditFriction,
   formatAudit,
   auditToPayload,
-  FRICTION_TRACKER_FLAG_ENV,
   FRICTION_TRACKER_PATH_ENV,
   type FrictionEvent,
 } from "./frictionTracker.ts";
@@ -27,28 +25,9 @@ function cleanup() {
   try { rmSync(workDir, { recursive: true, force: true }); } catch { /* ignore */ }
 }
 
-describe("isFrictionTrackerEnabled", () => {
-  it("respects the flag", () => {
-    expect(isFrictionTrackerEnabled({})).toBe(false);
-    expect(isFrictionTrackerEnabled({ [FRICTION_TRACKER_FLAG_ENV]: "1" })).toBe(true);
-    expect(isFrictionTrackerEnabled({ [FRICTION_TRACKER_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
-
 describe("recordFriction", () => {
-  it("no-op when flag is off", () => {
-    const r = recordFriction(
-      { tradeId: "t1", kind: "slippage", costUsd: 5 },
-      {},
-      logPath,
-    );
-    expect(r).toBeNull();
-    expect(existsSync(logPath)).toBe(false);
-    cleanup();
-  });
-
-  it("writes JSONL when flag is on", () => {
-    const env = { [FRICTION_TRACKER_FLAG_ENV]: "1" };
+  it("writes JSONL", () => {
+    const env = {};
     recordFriction(
       { tradeId: "t1", kind: "commission", costUsd: 2.5 },
       env,
@@ -69,7 +48,7 @@ describe("recordFriction", () => {
   });
 
   it("auto-classifies kind → component for all three columns", () => {
-    const env = { [FRICTION_TRACKER_FLAG_ENV]: "1" };
+    const env = {};
     const ev1 = recordFriction({ tradeId: "t1", kind: "commission", costUsd: 1 }, env, logPath)!;
     const ev2 = recordFriction({ tradeId: "t1", kind: "slippage", costUsd: 1 }, env, logPath)!;
     const ev3 = recordFriction({ tradeId: "t1", kind: "moved_stop", costUsd: 1 }, env, logPath)!;
@@ -82,7 +61,6 @@ describe("recordFriction", () => {
   it("uses GORDON_FRICTION_TRACKER_PATH override", () => {
     const customPath = join(workDir, "custom.jsonl");
     const env = {
-      [FRICTION_TRACKER_FLAG_ENV]: "1",
       [FRICTION_TRACKER_PATH_ENV]: customPath,
     };
     recordFriction({ tradeId: "t1", kind: "commission", costUsd: 1 }, env);
@@ -98,7 +76,7 @@ describe("readFrictionLog", () => {
   });
 
   it("skips malformed lines", () => {
-    const env = { [FRICTION_TRACKER_FLAG_ENV]: "1" };
+    const env = {};
     recordFriction({ tradeId: "t1", kind: "commission", costUsd: 1 }, env, logPath);
     const fs = require("node:fs");
     fs.appendFileSync(logPath, "not-json\n", "utf8");

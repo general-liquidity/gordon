@@ -23,15 +23,6 @@ import type { ImbalanceResult } from "./manufacturedImbalance.ts";
 import type { TouchDynamicsResult } from "./touchDynamics.ts";
 import type { DivergenceResult } from "./crossVenueDivergence.ts";
 
-export const MICROSTRUCTURE_TOXICITY_FLAG_ENV = "GORDON_MICROSTRUCTURE_TOXICITY";
-
-export function isMicrostructureToxicityEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[MICROSTRUCTURE_TOXICITY_FLAG_ENV] === "1" ||
-    env[MICROSTRUCTURE_TOXICITY_FLAG_ENV] === "true"
-  );
-}
-
 export interface LevelLifecycle {
   /** Time the size first appeared at the level. */
   appearedAt: number;

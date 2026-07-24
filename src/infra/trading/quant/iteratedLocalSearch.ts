@@ -27,17 +27,6 @@
  * Pure compute. No I/O. Deterministic seeded LCG RNG.
  */
 
-export const ITERATED_LOCAL_SEARCH_FLAG_ENV = "GORDON_ITERATED_LOCAL_SEARCH";
-
-export function isIteratedLocalSearchEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[ITERATED_LOCAL_SEARCH_FLAG_ENV] === "1" ||
-    env[ITERATED_LOCAL_SEARCH_FLAG_ENV] === "true"
-  );
-}
-
 export type AcceptanceRule = "improve-only" | "metropolis";
 
 export interface LocalSearchOutcome {

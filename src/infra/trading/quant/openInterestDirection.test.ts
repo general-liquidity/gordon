@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isOiDirectionEnabled,
   computeOiDirection,
   oiDirectionToPayload,
-  OI_DIRECTION_FLAG_ENV,
 } from "./openInterestDirection.ts";
-
-describe("isOiDirectionEnabled", () => {
-  it("respects the flag", () => {
-    expect(isOiDirectionEnabled({})).toBe(false);
-    expect(isOiDirectionEnabled({ [OI_DIRECTION_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeOiDirection — regime classification", () => {
   it("price ↑ + OI ↑ → longs_building", () => {

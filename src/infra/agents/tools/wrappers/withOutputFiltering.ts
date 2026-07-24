@@ -9,10 +9,8 @@
  * wrapper is safe to apply to any tool — unrecognized tools see no
  * behavioral change.
  *
- * Activation: gated by `GORDON_TOOL_OUTPUT_FILTERS` env flag. When
- * unset, the wrapper is a no-op identity that returns raw results
- * unchanged. This lets the wiring ship cold so it can be toggled on
- * after eval coverage exists.
+ * Always on — the dispatcher passes through for any tool without a
+ * registered filter, so wrapping is safe for the whole tool surface.
  */
 
 import { applyToolOutputFilter } from "../../toolOutputFilters/index.ts";
@@ -24,10 +22,6 @@ interface ToolLike {
   id?: string;
   execute?: (...args: unknown[]) => Promise<unknown> | unknown;
   [key: string]: unknown;
-}
-
-function isEnabled(): boolean {
-  return true;
 }
 
 /**
@@ -42,7 +36,6 @@ export function withOutputFiltering<T extends ToolLike>(tool: T): T {
 
   const wrapped = async (...args: unknown[]): Promise<unknown> => {
     const result = await originalExecute(...args);
-    if (!isEnabled()) return result;
     try {
       const filterResult = applyToolOutputFilter(toolId, result);
       if (filterResult.filterTag === "passthrough") return result;

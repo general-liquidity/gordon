@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  isTradingFeatureListEnabled,
   defaultTradingFeatureListPath,
   makeEntry,
   createFeatureList,
@@ -18,7 +17,6 @@ import {
   formatFeatureList,
   featureListToPayload,
   MUTABLE_FEATURE_FIELDS,
-  TRADING_FEATURE_LIST_FLAG_ENV,
   TRADING_FEATURE_LIST_PATH_ENV,
   type FeatureEntry,
   type FeatureList,
@@ -55,14 +53,6 @@ function entryB(): FeatureEntry {
 function freshList(): FeatureList {
   return createFeatureList([entryB(), entryA()], "2026-05-13T00:00:00.000Z");
 }
-
-describe("isTradingFeatureListEnabled", () => {
-  it("respects the flag", () => {
-    expect(isTradingFeatureListEnabled({})).toBe(false);
-    expect(isTradingFeatureListEnabled({ [TRADING_FEATURE_LIST_FLAG_ENV]: "1" })).toBe(true);
-    expect(isTradingFeatureListEnabled({ [TRADING_FEATURE_LIST_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
 
 describe("defaultTradingFeatureListPath", () => {
   it("honors env override", () => {

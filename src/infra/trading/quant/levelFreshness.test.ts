@@ -2,19 +2,10 @@ import { describe, it, expect } from "bun:test";
 import {
   evaluateLevelFreshness,
   levelFreshnessToPayload,
-  isLevelFreshnessEnabled,
-  LEVEL_FRESHNESS_FLAG_ENV,
 } from "./levelFreshness.ts";
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
-
-describe("isLevelFreshnessEnabled", () => {
-  it("respects the flag", () => {
-    expect(isLevelFreshnessEnabled({})).toBe(false);
-    expect(isLevelFreshnessEnabled({ [LEVEL_FRESHNESS_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 function mkCandle(timestamp: number, high: number, low: number) {
   return { timestamp, high, low };

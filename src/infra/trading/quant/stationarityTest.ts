@@ -34,12 +34,6 @@
  *     sense. If it fails, the relationship is spurious.
  */
 
-export const STATIONARITY_TEST_FLAG_ENV = "GORDON_STATIONARITY_TEST";
-
-export function isStationarityTestEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[STATIONARITY_TEST_FLAG_ENV] === "1" || env[STATIONARITY_TEST_FLAG_ENV] === "true";
-}
-
 export type AdfRegression = "c" | "ct";
 
 export interface AdfInput {

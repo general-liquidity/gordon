@@ -17,17 +17,6 @@
  * `ResearchExperimentRecord` shape without requiring schema changes.
  */
 
-export const FAMILY_DIVERSITY_DETECTOR_FLAG_ENV = "GORDON_FAMILY_DIVERSITY_DETECTOR";
-
-export function isFamilyDiversityDetectorEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[FAMILY_DIVERSITY_DETECTOR_FLAG_ENV] === "1" ||
-    env[FAMILY_DIVERSITY_DETECTOR_FLAG_ENV] === "true"
-  );
-}
-
 export interface DiversityHint {
   dominantFamily: string;
   /** Fraction of the recent window occupied by the dominant family (0..1). */

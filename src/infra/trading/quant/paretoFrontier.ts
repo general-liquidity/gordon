@@ -32,12 +32,6 @@
  * thousand candidates with K small.
  */
 
-export const PARETO_FRONTIER_FLAG_ENV = "GORDON_PARETO_FRONTIER";
-
-export function isParetoFrontierEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[PARETO_FRONTIER_FLAG_ENV] === "1" || env[PARETO_FRONTIER_FLAG_ENV] === "true";
-}
-
 export type ObjectiveDirection = "maximize" | "minimize";
 
 export interface ParetoCandidate {

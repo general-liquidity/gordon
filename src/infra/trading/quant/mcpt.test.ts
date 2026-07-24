@@ -1,18 +1,9 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isMCPTEnabled,
   computeMCPT,
   mcptToPayload,
-  MCPT_FLAG_ENV,
 } from "./mcpt.ts";
 import type { OHLCBar } from "./barPermutation.ts";
-
-describe("isMCPTEnabled", () => {
-  it("respects the flag", () => {
-    expect(isMCPTEnabled({})).toBe(false);
-    expect(isMCPTEnabled({ [MCPT_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 // Deterministic RNG.
 function makeRng(seed: number): () => number {

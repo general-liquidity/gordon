@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isEfficiencyRatioEnabled,
   computeEfficiencyRatio,
   efficiencyRatioToPayload,
-  EFFICIENCY_RATIO_FLAG_ENV,
 } from "./efficiencyRatio.ts";
-
-describe("isEfficiencyRatioEnabled", () => {
-  it("respects the flag", () => {
-    expect(isEfficiencyRatioEnabled({})).toBe(false);
-    expect(isEfficiencyRatioEnabled({ [EFFICIENCY_RATIO_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeEfficiencyRatio", () => {
   it("monotone rise → ER ≈ 1, trending", () => {

@@ -24,15 +24,6 @@
  * Pure compute. No I/O.
  */
 
-export const MARKET_BREADTH_BIAS_FLAG_ENV = "GORDON_MARKET_BREADTH_BIAS";
-
-export function isMarketBreadthBiasEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[MARKET_BREADTH_BIAS_FLAG_ENV] === "1" ||
-    env[MARKET_BREADTH_BIAS_FLAG_ENV] === "true"
-  );
-}
-
 export interface MarketBreadthBiasInput {
   /** Recent returns, one per symbol in the chosen universe (e.g. fractional 24h returns). */
   returns: ReadonlyArray<number>;

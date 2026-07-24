@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isFundamentalLawAMEnabled,
   computeFundamentalLawAM,
   fundamentalLawAMToPayload,
-  FUNDAMENTAL_LAW_AM_FLAG_ENV,
 } from "./fundamentalLawActiveManagement.ts";
-
-describe("isFundamentalLawAMEnabled", () => {
-  it("respects the flag", () => {
-    expect(isFundamentalLawAMEnabled({})).toBe(false);
-    expect(isFundamentalLawAMEnabled({ [FUNDAMENTAL_LAW_AM_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeFundamentalLawAM — formula", () => {
   it("Sharpe = IC × √breadth", () => {

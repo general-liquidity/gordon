@@ -1,5 +1,5 @@
 /**
- * Trader behavior pattern detector (GORDON_TRADER_BEHAVIOR_PATTERNS).
+ * Trader behavior pattern detector.
  *
  * Single-trader analog of Sentra's "company brain" framing applied to
  * Gordon's threat model. Scans the action log for cross-session
@@ -39,15 +39,6 @@ export interface BehaviorPattern {
   firstSeenAt: number;
   /** Latest event timestamp (ms epoch). */
   lastSeenAt: number;
-}
-
-export function isTraderBehaviorEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env.GORDON_TRADER_BEHAVIOR_PATTERNS === "1" ||
-    env.GORDON_TRADER_BEHAVIOR_PATTERNS === "true"
-  );
 }
 
 const DEFAULT_LOOKBACK_ENTRIES = 500;
@@ -239,13 +230,9 @@ export interface TraderBehaviorReport {
  * when the feature flag is unset.
  */
 export function detectTraderBehaviorPatterns(
-  options: { lookbackEntries?: number; threadId?: string; env?: NodeJS.ProcessEnv } = {},
+  options: { lookbackEntries?: number; threadId?: string } = {},
 ): TraderBehaviorReport {
   const generatedAt = new Date().toISOString();
-  const env = options.env ?? process.env;
-  if (!isTraderBehaviorEnabled(env)) {
-    return { patterns: [], entriesAnalyzed: 0, generatedAt };
-  }
   const lookback = options.lookbackEntries ?? DEFAULT_LOOKBACK_ENTRIES;
   let entries: ActionLogEntry[] = [];
   try {
@@ -272,8 +259,8 @@ export function detectTraderBehaviorPatterns(
 
 /**
  * Pure-function variant for tests: takes pre-built entries instead of
- * reading from the action-log store. Bypasses the feature flag so tests
- * can exercise detection logic directly.
+ * reading from the action-log store, so tests can exercise detection
+ * logic directly.
  */
 export function _detectPatternsForTest(
   entries: ActionLogEntry[],

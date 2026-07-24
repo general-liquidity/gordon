@@ -2,16 +2,7 @@ import { describe, it, expect } from "bun:test";
 import {
   computeBrierScore,
   brierScoreToPayload,
-  isBrierScoreEnabled,
-  BRIER_SCORE_FLAG_ENV,
 } from "./brierScore.ts";
-
-describe("isBrierScoreEnabled", () => {
-  it("respects the flag", () => {
-    expect(isBrierScoreEnabled({})).toBe(false);
-    expect(isBrierScoreEnabled({ [BRIER_SCORE_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeBrierScore — validation", () => {
   it("rejects empty predictions", () => {

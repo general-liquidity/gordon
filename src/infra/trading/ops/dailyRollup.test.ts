@@ -4,11 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  isDailyRollupEnabled,
   buildRollup,
   formatRollup,
   rollupToPayload,
-  DAILY_ROLLUP_FLAG_ENV,
 } from "./dailyRollup.ts";
 
 let workDir: string;
@@ -29,13 +27,6 @@ const cleanup = () => {
 
 const writeRow = (path: string, row: Record<string, unknown>) =>
   appendFileSync(path, JSON.stringify(row) + "\n", "utf8");
-
-describe("isDailyRollupEnabled", () => {
-  it("respects the flag", () => {
-    expect(isDailyRollupEnabled({})).toBe(false);
-    expect(isDailyRollupEnabled({ [DAILY_ROLLUP_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("buildRollup — empty inputs", () => {
   it("returns zero counts when no files exist", () => {

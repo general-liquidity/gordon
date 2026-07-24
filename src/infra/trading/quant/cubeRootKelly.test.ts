@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isCubeRootKellyEnabled,
   computeCubeRootKelly,
   cubeRootKellyToPayload,
-  CUBE_ROOT_KELLY_FLAG_ENV,
 } from "./cubeRootKelly.ts";
-
-describe("isCubeRootKellyEnabled", () => {
-  it("respects the flag", () => {
-    expect(isCubeRootKellyEnabled({})).toBe(false);
-    expect(isCubeRootKellyEnabled({ [CUBE_ROOT_KELLY_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeCubeRootKelly — formula", () => {
   it("β = 1 recovers linear Kelly", () => {

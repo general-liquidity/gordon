@@ -30,12 +30,6 @@
  * Pure compute. No I/O.
  */
 
-export const BRIER_SCORE_FLAG_ENV = "GORDON_BRIER_SCORE";
-
-export function isBrierScoreEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[BRIER_SCORE_FLAG_ENV] === "1" || env[BRIER_SCORE_FLAG_ENV] === "true";
-}
-
 export interface BrierScoreInput {
   /** Predicted probabilities, each in [0, 1]. */
   predictions: ReadonlyArray<number>;

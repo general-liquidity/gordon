@@ -1,7 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isVolatilityDragEnabled,
   volatilityDrag,
   geometricFromArithmetic,
   recoveryReturn,
@@ -9,16 +8,7 @@ import {
   leveragePrivilege,
   compareStrategies,
   dragToPayload,
-  VOLATILITY_DRAG_FLAG_ENV,
 } from "./volatilityDrag.ts";
-
-describe("isVolatilityDragEnabled", () => {
-  it("respects the flag", () => {
-    expect(isVolatilityDragEnabled({})).toBe(false);
-    expect(isVolatilityDragEnabled({ [VOLATILITY_DRAG_FLAG_ENV]: "1" })).toBe(true);
-    expect(isVolatilityDragEnabled({ [VOLATILITY_DRAG_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
 
 describe("volatilityDrag", () => {
   it("is σ²/2", () => {

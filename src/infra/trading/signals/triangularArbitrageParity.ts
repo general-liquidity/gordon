@@ -30,15 +30,6 @@
  * as a market-functioning / price-formation stress indicator).
  */
 
-export const TRIANGULAR_ARBITRAGE_PARITY_FLAG_ENV = "GORDON_TRIANGULAR_ARBITRAGE_PARITY";
-
-export function isTriangularArbitrageParityEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[TRIANGULAR_ARBITRAGE_PARITY_FLAG_ENV] === "1" ||
-    env[TRIANGULAR_ARBITRAGE_PARITY_FLAG_ENV] === "true"
-  );
-}
-
 export interface TriangleInput {
   /** A/B rate series (e.g. ETH/BTC): price of A quoted in B, parallel timestamp index. */
   legAB: ReadonlyArray<number>;

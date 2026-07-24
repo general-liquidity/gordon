@@ -31,7 +31,6 @@ import { existsSync, mkdirSync, readFileSync, appendFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
-export const EVALUATOR_CALIBRATION_FLAG_ENV = "GORDON_EVALUATOR_CALIBRATION";
 export const EVALUATOR_CALIBRATION_PATH_ENV = "GORDON_EVALUATOR_CALIBRATION_PATH";
 
 export interface CalibrationExample {
@@ -65,13 +64,6 @@ export interface DriftReport {
   maxDrift: number;
   totalDrift: number;
   hasDrift: boolean;
-}
-
-export function isEvaluatorCalibrationEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[EVALUATOR_CALIBRATION_FLAG_ENV] === "1" ||
-    env[EVALUATOR_CALIBRATION_FLAG_ENV] === "true"
-  );
 }
 
 export function defaultEvaluatorCalibrationPath(env: NodeJS.ProcessEnv = process.env): string {

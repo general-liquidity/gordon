@@ -1,10 +1,8 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isKalmanBetaEnabled,
   kalmanBeta,
   kalmanBetaToPayload,
-  KALMAN_BETA_FLAG_ENV,
 } from "./kalmanBeta.ts";
 
 function makeRng(seed: number): () => number {
@@ -40,14 +38,6 @@ function simulateBeta(n: number, betaSeries: number[], seed = 1): {
   }
   return { market, asset };
 }
-
-describe("isKalmanBetaEnabled", () => {
-  it("respects the flag", () => {
-    expect(isKalmanBetaEnabled({})).toBe(false);
-    expect(isKalmanBetaEnabled({ [KALMAN_BETA_FLAG_ENV]: "1" })).toBe(true);
-    expect(isKalmanBetaEnabled({ [KALMAN_BETA_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
 
 describe("kalmanBeta — constant-beta recovery", () => {
   it("recovers beta = 1.2 from synthetic series", () => {

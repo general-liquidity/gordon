@@ -64,12 +64,6 @@
 
 import { permuteOHLCBars, type OHLCBar } from "./barPermutation.ts";
 
-export const MCPT_FLAG_ENV = "GORDON_MCPT";
-
-export function isMCPTEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[MCPT_FLAG_ENV] === "1" || env[MCPT_FLAG_ENV] === "true";
-}
-
 export interface MCPTInput {
   /** Original OHLC bars. */
   ohlc: ReadonlyArray<OHLCBar>;

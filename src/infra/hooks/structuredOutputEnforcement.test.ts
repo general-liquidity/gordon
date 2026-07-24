@@ -2,8 +2,6 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { z } from "zod";
 
 import {
-  STRUCTURED_OUTPUT_ENFORCEMENT_FLAG_ENV,
-  isStructuredOutputEnforcementEnabled,
   validateStructuredOutput,
   createPostToolOutputSchemaHook,
   createPreToolInputSchemaHook,
@@ -12,17 +10,6 @@ import { registerHook, runHooks, clearHooks } from "./engine.ts";
 
 beforeEach(() => {
   clearHooks();
-});
-
-describe("isStructuredOutputEnforcementEnabled", () => {
-  it("respects the flag", () => {
-    expect(isStructuredOutputEnforcementEnabled({})).toBe(false);
-    expect(
-      isStructuredOutputEnforcementEnabled({
-        [STRUCTURED_OUTPUT_ENFORCEMENT_FLAG_ENV]: "1",
-      }),
-    ).toBe(true);
-  });
 });
 
 const planSchema = z.object({

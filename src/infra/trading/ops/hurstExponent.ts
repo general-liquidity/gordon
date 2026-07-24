@@ -18,17 +18,6 @@
  * recommended for stability.
  */
 
-export const HURST_EXPONENT_FLAG_ENV = "GORDON_HURST_EXPONENT";
-
-export function isHurstExponentEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[HURST_EXPONENT_FLAG_ENV] === "1" ||
-    env[HURST_EXPONENT_FLAG_ENV] === "true"
-  );
-}
-
 export type HurstRegime = "mean_reverting" | "random_walk" | "trending";
 
 export interface HurstResult {

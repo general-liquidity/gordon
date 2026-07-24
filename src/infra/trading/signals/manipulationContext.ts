@@ -17,15 +17,6 @@
 
 import type { ToxicityResult, ToxicityRegime } from "./microstructureToxicity.ts";
 
-export const MANIPULATION_CONTEXT_FLAG_ENV = "GORDON_MANIPULATION_CONTEXT";
-
-export function isManipulationContextEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[MANIPULATION_CONTEXT_FLAG_ENV] === "1" ||
-    env[MANIPULATION_CONTEXT_FLAG_ENV] === "true"
-  );
-}
-
 export type TradePosture = "trade_normal" | "size_down" | "refuse";
 
 export interface ManipulationContextResult {

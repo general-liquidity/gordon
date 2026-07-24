@@ -24,12 +24,6 @@
 
 import { eigenDecomposition } from "../../../core/alpha/matrix.ts";
 
-export const PCA_CONCENTRATION_FLAG_ENV = "GORDON_PCA_CONCENTRATION";
-
-export function isPcaConcentrationEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[PCA_CONCENTRATION_FLAG_ENV] === "1" || env[PCA_CONCENTRATION_FLAG_ENV] === "true";
-}
-
 export interface ReturnSeries {
   strategyId: string;
   returns: ReadonlyArray<number>;

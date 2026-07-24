@@ -1,18 +1,9 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isDualVwapEnabled,
   computeDualVwap,
   dualVwapToPayload,
-  DUAL_VWAP_FLAG_ENV,
   type DualVwapCandle,
 } from "./dualSessionVwap.ts";
-
-describe("isDualVwapEnabled", () => {
-  it("respects the flag", () => {
-    expect(isDualVwapEnabled({})).toBe(false);
-    expect(isDualVwapEnabled({ [DUAL_VWAP_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;

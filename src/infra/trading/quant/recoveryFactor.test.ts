@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isRecoveryFactorEnabled,
   computeRecoveryFactor,
   recoveryFactorToPayload,
-  RECOVERY_FACTOR_FLAG_ENV,
 } from "./recoveryFactor.ts";
-
-describe("isRecoveryFactorEnabled", () => {
-  it("respects the flag", () => {
-    expect(isRecoveryFactorEnabled({})).toBe(false);
-    expect(isRecoveryFactorEnabled({ [RECOVERY_FACTOR_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeRecoveryFactor — basic formulae", () => {
   it("monotonically rising equity → recovery factor = ∞ (drawdown = 0)", () => {

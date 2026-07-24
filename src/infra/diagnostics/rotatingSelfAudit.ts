@@ -25,12 +25,6 @@
  * them in; the module only reasons over them.
  */
 
-export const SELF_AUDIT_FLAG_ENV = "GORDON_SELF_AUDIT";
-
-export function isSelfAuditEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[SELF_AUDIT_FLAG_ENV] === "1" || env[SELF_AUDIT_FLAG_ENV] === "true";
-}
-
 export const AUDIT_THEMES = [
   "script_health",
   "discovery_coverage",

@@ -22,7 +22,6 @@ import { existsSync, mkdirSync, appendFileSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
-export const KV_CACHE_METRIC_FLAG_ENV = "GORDON_KV_CACHE_METRIC";
 export const KV_CACHE_METRIC_PATH_ENV = "GORDON_KV_CACHE_METRIC_PATH";
 
 export interface CacheCallRecord {
@@ -65,10 +64,6 @@ export interface RecordCallInput {
   totalInputTokens: number;
   modelId?: string;
   now?: string;
-}
-
-export function isKvCacheMetricEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[KV_CACHE_METRIC_FLAG_ENV] === "1" || env[KV_CACHE_METRIC_FLAG_ENV] === "true";
 }
 
 export function defaultKvCacheMetricPath(env: NodeJS.ProcessEnv = process.env): string {

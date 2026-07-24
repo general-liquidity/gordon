@@ -40,12 +40,6 @@
  * Pure compute. No I/O.
  */
 
-export const FAE_FTA_CUT_FLAG_ENV = "GORDON_FAE_FTA_CUT";
-
-export function isFaeFtaCutEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[FAE_FTA_CUT_FLAG_ENV] === "1" || env[FAE_FTA_CUT_FLAG_ENV] === "true";
-}
-
 export type Side = "BUY" | "SELL";
 
 export interface FaeFtaCutInput {

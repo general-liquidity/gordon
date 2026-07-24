@@ -44,17 +44,7 @@ import { appendFile, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { GORDON_DIR } from "../storage/paths.ts";
 
-export const TRADE_LEDGER_FLAG_ENV = "GORDON_TRADE_LEDGER";
 export const TRADE_LEDGER_PATH_ENV = "GORDON_TRADE_LEDGER_PATH";
-
-export function isTradeLedgerEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[TRADE_LEDGER_FLAG_ENV] === "1" ||
-    env[TRADE_LEDGER_FLAG_ENV] === "true"
-  );
-}
 
 export function defaultTradeLedgerPath(): string {
   return process.env[TRADE_LEDGER_PATH_ENV] ?? join(GORDON_DIR, "trade-ledger.jsonl");

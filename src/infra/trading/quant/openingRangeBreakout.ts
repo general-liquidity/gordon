@@ -47,17 +47,6 @@
  * Pure compute. No I/O. Deterministic.
  */
 
-export const OPENING_RANGE_BREAKOUT_FLAG_ENV = "GORDON_OPENING_RANGE_BREAKOUT";
-
-export function isOpeningRangeBreakoutEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[OPENING_RANGE_BREAKOUT_FLAG_ENV] === "1" ||
-    env[OPENING_RANGE_BREAKOUT_FLAG_ENV] === "true"
-  );
-}
-
 export interface OHLCBar {
   open: number;
   high: number;

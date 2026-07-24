@@ -20,17 +20,6 @@
  * A* setup with no attributable edge is suspect).
  */
 
-export const EDGE_ATTRIBUTION_FLAG_ENV = "GORDON_EDGE_ATTRIBUTION";
-
-export function isEdgeAttributionEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[EDGE_ATTRIBUTION_FLAG_ENV] === "1" ||
-    env[EDGE_ATTRIBUTION_FLAG_ENV] === "true"
-  );
-}
-
 export type EdgeType = "behavioral" | "analytical" | "informational" | "structural";
 
 export interface EdgeAttributionInput {

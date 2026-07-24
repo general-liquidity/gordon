@@ -2,8 +2,6 @@ import { describe, it, expect } from "bun:test";
 import {
   detectTrendlines,
   trendlineDetectionToPayload,
-  isTrendlineDetectionEnabled,
-  TRENDLINE_DETECTION_FLAG_ENV,
   type PriceBar,
 } from "./trendlineDetection.ts";
 
@@ -17,15 +15,6 @@ function risingLinear(n: number, h0: number, l0: number, dh: number, dl: number)
     low: l0 + dl * i,
   }));
 }
-
-describe("isTrendlineDetectionEnabled", () => {
-  it("respects the flag", () => {
-    expect(isTrendlineDetectionEnabled({})).toBe(false);
-    expect(isTrendlineDetectionEnabled({ [TRENDLINE_DETECTION_FLAG_ENV]: "1" })).toBe(true);
-    expect(isTrendlineDetectionEnabled({ [TRENDLINE_DETECTION_FLAG_ENV]: "true" })).toBe(true);
-    expect(isTrendlineDetectionEnabled({ [TRENDLINE_DETECTION_FLAG_ENV]: "0" })).toBe(false);
-  });
-});
 
 describe("detectTrendlines — validation", () => {
   it("rejects fewer than 3 bars", () => {

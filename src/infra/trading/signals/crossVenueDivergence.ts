@@ -20,15 +20,6 @@
  * "active manipulation" regime.
  */
 
-export const CROSS_VENUE_DIVERGENCE_FLAG_ENV = "GORDON_CROSS_VENUE_DIVERGENCE";
-
-export function isCrossVenueDivergenceEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[CROSS_VENUE_DIVERGENCE_FLAG_ENV] === "1" ||
-    env[CROSS_VENUE_DIVERGENCE_FLAG_ENV] === "true"
-  );
-}
-
 export interface VenueObservation {
   venue: string;
   /** Parallel timestamp index — caller aligns inputs. */

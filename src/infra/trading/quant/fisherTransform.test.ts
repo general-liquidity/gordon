@@ -1,18 +1,9 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isFisherTransformEnabled,
   computeFisherTransform,
   computeInverseFisher,
   fisherToPayload,
-  FISHER_TRANSFORM_FLAG_ENV,
 } from "./fisherTransform.ts";
-
-describe("isFisherTransformEnabled", () => {
-  it("respects the flag", () => {
-    expect(isFisherTransformEnabled({})).toBe(false);
-    expect(isFisherTransformEnabled({ [FISHER_TRANSFORM_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeFisherTransform", () => {
   it("short series → NaN current value", () => {

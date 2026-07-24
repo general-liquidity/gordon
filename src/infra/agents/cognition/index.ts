@@ -23,7 +23,6 @@ export type {
 } from "./adversarialEvaluator.ts";
 
 export {
-  isEvaluatorCalibrationEnabled,
   registerCalibrationExample,
   loadCalibrationSet,
   selectRelevantExamples,
@@ -54,7 +53,6 @@ export type {
 } from "./citationAgent.ts";
 
 export {
-  isEffortCalibrationEnabled,
   classifyComplexity,
   budgetFor,
   buildCalibrationBlock as buildEffortCalibrationBlock,

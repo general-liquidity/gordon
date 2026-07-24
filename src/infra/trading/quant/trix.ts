@@ -16,12 +16,6 @@
  * MA of comparable smoothness.
  */
 
-export const TRIX_FLAG_ENV = "GORDON_TRIX";
-
-export function isTrixEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[TRIX_FLAG_ENV] === "1" || env[TRIX_FLAG_ENV] === "true";
-}
-
 export interface TrixInput {
   prices: ReadonlyArray<number>;
   /** Equivalent EMA period for the smoothing constant α = 2/(n+1). Default 9. */

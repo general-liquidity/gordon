@@ -26,15 +26,6 @@
  *     is the most useful fragility readout.
  */
 
-export const STATIONARY_BOOTSTRAP_FLAG_ENV = "GORDON_STATIONARY_BOOTSTRAP";
-
-export function isStationaryBootstrapEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[STATIONARY_BOOTSTRAP_FLAG_ENV] === "1" ||
-    env[STATIONARY_BOOTSTRAP_FLAG_ENV] === "true"
-  );
-}
-
 export interface BootstrapInput {
   /** Period-by-period strategy returns (decimals, e.g. 0.012 = +1.2%). */
   returns: ReadonlyArray<number>;

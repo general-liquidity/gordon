@@ -32,17 +32,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-export const DECISION_JOURNAL_FLAG_ENV = "GORDON_DECISION_JOURNAL";
 export const DECISION_JOURNAL_PATH_ENV = "GORDON_DECISION_JOURNAL_PATH";
-
-export function isDecisionJournalEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[DECISION_JOURNAL_FLAG_ENV] === "1" ||
-    env[DECISION_JOURNAL_FLAG_ENV] === "true"
-  );
-}
 
 export function defaultJournalPath(env: NodeJS.ProcessEnv = process.env): string {
   return env[DECISION_JOURNAL_PATH_ENV] || join(homedir(), ".gordon", "decision-journal.jsonl");
@@ -143,7 +133,6 @@ export function recordJournalEntry(
   env: NodeJS.ProcessEnv = process.env,
   path: string = defaultJournalPath(env),
 ): JournalEntry | null {
-  if (!isDecisionJournalEnabled(env)) return null;
   const { verdict, blockers } = evaluateVerdict(input.thesis, input.math, input.preMortem);
   const entry: JournalEntry = {
     id: newJournalId(),

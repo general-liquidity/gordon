@@ -1,18 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isLogitRsiEnabled,
   computeLogitRsi,
   logitRsiToPayload,
-  LOGIT_RSI_FLAG_ENV,
 } from "./logitRsi.ts";
-
-describe("isLogitRsiEnabled", () => {
-  it("respects the flag", () => {
-    expect(isLogitRsiEnabled({})).toBe(false);
-    expect(isLogitRsiEnabled({ [LOGIT_RSI_FLAG_ENV]: "1" })).toBe(true);
-    expect(isLogitRsiEnabled({ [LOGIT_RSI_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
 
 describe("computeLogitRsi", () => {
   it("short series → NaN with reason", () => {

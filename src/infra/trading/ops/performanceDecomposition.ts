@@ -23,17 +23,6 @@
  * much was you and how much was the environment?
  */
 
-export const PERFORMANCE_DECOMPOSITION_FLAG_ENV = "GORDON_PERFORMANCE_DECOMPOSITION";
-
-export function isPerformanceDecompositionEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[PERFORMANCE_DECOMPOSITION_FLAG_ENV] === "1" ||
-    env[PERFORMANCE_DECOMPOSITION_FLAG_ENV] === "true"
-  );
-}
-
 export type FactorName = "momentum" | "value" | "carry" | "volatility_premium" | "size" | "sector";
 
 export interface FactorExposure {

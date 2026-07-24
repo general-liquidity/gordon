@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isStationaryBootstrapEnabled,
   runStationaryBootstrap,
   bootstrapToPayload,
-  STATIONARY_BOOTSTRAP_FLAG_ENV,
 } from "./stationaryBootstrap.ts";
-
-describe("isStationaryBootstrapEnabled", () => {
-  it("respects the flag", () => {
-    expect(isStationaryBootstrapEnabled({})).toBe(false);
-    expect(isStationaryBootstrapEnabled({ [STATIONARY_BOOTSTRAP_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 function lcg(seed: number) {
   let s = seed;

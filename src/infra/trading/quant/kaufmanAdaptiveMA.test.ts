@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isKaufmanAdaptiveMaEnabled,
   computeKama,
   kamaToPayload,
-  KAUFMAN_ADAPTIVE_MA_FLAG_ENV,
 } from "./kaufmanAdaptiveMA.ts";
-
-describe("isKaufmanAdaptiveMaEnabled", () => {
-  it("respects the flag", () => {
-    expect(isKaufmanAdaptiveMaEnabled({})).toBe(false);
-    expect(isKaufmanAdaptiveMaEnabled({ [KAUFMAN_ADAPTIVE_MA_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeKama — edge cases", () => {
   it("short series → NaN currentKama with reason", () => {

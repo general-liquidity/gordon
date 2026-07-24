@@ -31,15 +31,6 @@
  * Pure compute. No I/O.
  */
 
-export const OPTIMAL_TRADING_ORACLE_FLAG_ENV = "GORDON_OPTIMAL_TRADING_ORACLE";
-
-export function isOptimalTradingOracleEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[OPTIMAL_TRADING_ORACLE_FLAG_ENV] === "1" ||
-    env[OPTIMAL_TRADING_ORACLE_FLAG_ENV] === "true"
-  );
-}
-
 export type OracleMode = "gross" | "net";
 
 export interface OptimalTradingOracleInput {

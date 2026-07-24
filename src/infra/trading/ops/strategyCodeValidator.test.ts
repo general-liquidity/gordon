@@ -1,22 +1,12 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isStrategyCodeValidatorEnabled,
   validateStrategyCode,
   formatValidatorResult,
   validatorResultToPayload,
   DEFAULT_RULES,
-  STRATEGY_CODE_VALIDATOR_FLAG_ENV,
   type ValidatorRule,
 } from "./strategyCodeValidator.ts";
-
-describe("isStrategyCodeValidatorEnabled", () => {
-  it("respects the flag", () => {
-    expect(isStrategyCodeValidatorEnabled({})).toBe(false);
-    expect(isStrategyCodeValidatorEnabled({ [STRATEGY_CODE_VALIDATOR_FLAG_ENV]: "1" })).toBe(true);
-    expect(isStrategyCodeValidatorEnabled({ [STRATEGY_CODE_VALIDATOR_FLAG_ENV]: "true" })).toBe(true);
-  });
-});
 
 describe("DEFAULT_RULES", () => {
   it("covers all six leakage families", () => {

@@ -38,12 +38,6 @@
  * Pure compute. No I/O.
  */
 
-export const HOT_STREAK_SIZER_FLAG_ENV = "GORDON_HOT_STREAK_SIZER";
-
-export function isHotStreakSizerEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[HOT_STREAK_SIZER_FLAG_ENV] === "1" || env[HOT_STREAK_SIZER_FLAG_ENV] === "true";
-}
-
 export type StreakMode = "informational" | "active";
 export type StreakClassification =
   | "hot"

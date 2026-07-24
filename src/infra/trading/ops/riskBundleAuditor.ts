@@ -23,17 +23,6 @@
  * left as No without a hedge.
  */
 
-export const RISK_BUNDLE_AUDITOR_FLAG_ENV = "GORDON_RISK_BUNDLE_AUDITOR";
-
-export function isRiskBundleAuditorEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[RISK_BUNDLE_AUDITOR_FLAG_ENV] === "1" ||
-    env[RISK_BUNDLE_AUDITOR_FLAG_ENV] === "true"
-  );
-}
-
 export type RiskCategory =
   | "thesis"
   | "market"

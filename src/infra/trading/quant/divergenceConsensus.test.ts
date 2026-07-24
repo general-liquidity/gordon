@@ -1,18 +1,9 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isDivergenceConsensusEnabled,
   computeDivergenceConsensus,
   divergenceConsensusToPayload,
-  DIVERGENCE_CONSENSUS_FLAG_ENV,
   type IndicatorDivergence,
 } from "./divergenceConsensus.ts";
-
-describe("isDivergenceConsensusEnabled", () => {
-  it("respects the flag", () => {
-    expect(isDivergenceConsensusEnabled({})).toBe(false);
-    expect(isDivergenceConsensusEnabled({ [DIVERGENCE_CONSENSUS_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeDivergenceConsensus", () => {
   it("all none → direction none", () => {

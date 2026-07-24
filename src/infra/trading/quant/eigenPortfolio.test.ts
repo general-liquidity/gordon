@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isEigenPortfolioEnabled,
   computeEigenPortfolio,
   eigenPortfolioToPayload,
-  EIGEN_PORTFOLIO_FLAG_ENV,
 } from "./eigenPortfolio.ts";
-
-describe("isEigenPortfolioEnabled", () => {
-  it("respects the flag", () => {
-    expect(isEigenPortfolioEnabled({})).toBe(false);
-    expect(isEigenPortfolioEnabled({ [EIGEN_PORTFOLIO_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("computeEigenPortfolio — eigenvalue correctness", () => {
   it("diagonal covariance → eigenvalues = diagonal entries (sorted)", () => {

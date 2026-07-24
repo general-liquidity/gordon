@@ -6,7 +6,6 @@ import { listActionLogEntries } from "../../action-log/store.ts";
 import { digestLargeResult } from "./resultDigest.ts";
 import type { GordonContext } from "../types.ts";
 import { determineWorkflowPhase, getPhasePromptGuidance, isExecutionPhase, type WorkflowPhase } from "../cognition/workflowPhase.ts";
-import { shouldEmitTraderReminders } from "../reminders/traderReminders.ts";
 import { dedupeParallelTasks } from "../../../core/pipeline/parallel-task-dedup.ts";
 
 interface PlanningArtifact {
@@ -364,12 +363,8 @@ export function buildEventDrivenReminders(
   }
 
   // ─── Trading-specific reminder categories ──────────────────────────────────
-  // Gated by GORDON_TRADER_REMINDERS env var via shouldEmitTraderReminders().
-  // The "force_off" path lets operators temporarily suppress all six categories
-  // for diagnostic A/B comparisons without code changes.
-  const emitTraderReminders = shouldEmitTraderReminders();
   // 1. Plan lifecycle — no plan prepared yet for planning phase
-  if (emitTraderReminders && phase === "planning") {
+  if (phase === "planning") {
     const artifact = planningArtifacts.get(threadKey);
     if (!artifact || artifact.expiresAt < Date.now()) {
       if (!state.noPlanWarned && canFireReminder(state, "plan_missing", 1, true)) {
@@ -381,7 +376,7 @@ export function buildEventDrivenReminders(
   }
 
   // 2. Execution approval — artifact exists but not approved
-  if (emitTraderReminders && phase === "execution") {
+  if (phase === "execution") {
     const artifact = planningArtifacts.get(threadKey);
     if (artifact && artifact.expiresAt >= Date.now() && !artifact.approved) {
       if (canFireReminder(state, "execution_unapproved", 2)) {
@@ -400,7 +395,6 @@ export function buildEventDrivenReminders(
   // 3. Repeated venue failure (2+ failures within 5 minutes)
   const VENUE_FAILURE_WINDOW_MS = 5 * 60 * 1000;
   if (
-    emitTraderReminders &&
     state.venueFailureCount >= 2 &&
     Date.now() - state.lastVenueFailure < VENUE_FAILURE_WINDOW_MS
   ) {
@@ -411,7 +405,7 @@ export function buildEventDrivenReminders(
   }
 
   // 4. Stale mandate — execution phase with no active action ID
-  if (emitTraderReminders && phase === "execution" && !context.requestedActionId) {
+  if (phase === "execution" && !context.requestedActionId) {
     if (!state.staleMandateWarned && canFireReminder(state, "stale_mandate", 1, true)) {
       reminders.push("No active action mandate is set for this thread. Confirm the intended symbol and direction before proceeding with any execution step.");
       state.staleMandateWarned = true;
@@ -421,7 +415,7 @@ export function buildEventDrivenReminders(
 
   // 5. Repeated loop — fingerprint doom-loop detected in call log
   const callLog = loopCallLogs.get(threadKey) ?? [];
-  if (emitTraderReminders && callLog.length >= LOOP_WINDOW_CALL_COUNT) {
+  if (callLog.length >= LOOP_WINDOW_CALL_COUNT) {
     const fingerprints = new Map<string, number>();
     for (const fp of callLog) {
       fingerprints.set(fp, (fingerprints.get(fp) ?? 0) + 1);
@@ -467,7 +461,7 @@ export function buildEventDrivenReminders(
 
   // 6. Incomplete runtime task — approved plan with outstanding next-steps
   const artifact = planningArtifacts.get(threadKey);
-  if (emitTraderReminders && artifact?.approved && artifact.extractedTasks.length > 0 && canFireReminder(state, "task_lifecycle", 2)) {
+  if (artifact?.approved && artifact.extractedTasks.length > 0 && canFireReminder(state, "task_lifecycle", 2)) {
     reminders.push(`There is an approved trade artifact with outstanding next steps (${artifact.extractedTasks.slice(0, 3).join("; ")}). Do not claim completion until those steps are either executed or explicitly deferred.`);
     markReminderFired(state, "task_lifecycle");
   }
@@ -836,16 +830,15 @@ export async function optimizeToolResultForContext(
     serialized = String(result);
   }
 
-  // R2 wire: when the error-only filter flag is on AND this tool is in
-  // the conservative filterable allow-list, run the filter first so
-  // success-only output collapses to a single OK line and only error
-  // lines reach the agent. Failures here must not break the path —
-  // catch and fall through to the raw result.
+  // R2 wire: when this tool is in the conservative filterable allow-list,
+  // run the filter first so success-only output collapses to a single OK
+  // line and only error lines reach the agent. Failures here must not
+  // break the path — catch and fall through to the raw result.
   try {
-    const { isErrorOnlyFilterEnabled, filterOutputForAgent } = await import(
+    const { filterOutputForAgent } = await import(
       "../runtime/errorOnlyOutputFilter.ts"
     );
-    if (isErrorOnlyFilterEnabled() && ERROR_ONLY_FILTERABLE_TOOLS.has(toolName)) {
+    if (ERROR_ONLY_FILTERABLE_TOOLS.has(toolName)) {
       serialized = filterOutputForAgent(serialized, { contextBefore: 2, contextAfter: 1 });
     }
   } catch {

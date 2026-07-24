@@ -28,14 +28,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-export const DEBRIEF_MATRIX_FLAG_ENV = "GORDON_DEBRIEF_MATRIX";
 export const DEBRIEF_MATRIX_PATH_ENV = "GORDON_DEBRIEF_MATRIX_PATH";
-
-export function isDebriefMatrixEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[DEBRIEF_MATRIX_FLAG_ENV] === "1" || env[DEBRIEF_MATRIX_FLAG_ENV] === "true"
-  );
-}
 
 export function defaultDebriefPath(env: NodeJS.ProcessEnv = process.env): string {
   return env[DEBRIEF_MATRIX_PATH_ENV] || join(homedir(), ".gordon", "debriefs.jsonl");
@@ -134,7 +127,6 @@ export function recordDebrief(
   env: NodeJS.ProcessEnv = process.env,
   path: string = defaultDebriefPath(env),
 ): DebriefEntry | null {
-  if (!isDebriefMatrixEnabled(env)) return null;
   const classification = classifyDebrief({
     processScore: input.processScore,
     outcomeScore: input.outcomeScore,

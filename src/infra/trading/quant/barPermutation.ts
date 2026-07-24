@@ -53,15 +53,6 @@
  * Pure compute. No I/O. Deterministic seeded LCG RNG.
  */
 
-export const BAR_PERMUTATION_FLAG_ENV = "GORDON_BAR_PERMUTATION";
-
-export function isBarPermutationEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[BAR_PERMUTATION_FLAG_ENV] === "1" ||
-    env[BAR_PERMUTATION_FLAG_ENV] === "true"
-  );
-}
-
 export interface OHLCBar {
   open: number;
   high: number;

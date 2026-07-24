@@ -3,19 +3,12 @@
  *
  * The OPENDEV paper specifies 24 reminder categories used by general-purpose
  * coding agents. Gordon needs only a focused subset tuned for trading work.
- * This module defines the 6 trading-specific categories, their trigger
- * conditions, and a `gateTraderReminders()` helper that the runtime harness
- * uses to decide whether to surface the trading reminders at all.
- *
- * Behavior is gated by the `GORDON_TRADER_REMINDERS` env flag. When unset,
- * the legacy reminder logic (always-on) is used. When set to "true", the
- * categories below are activated explicitly so we can observe their effect
- * in isolation. When set to "false", trader reminders are suppressed
- * entirely (debug aid).
+ * This module defines the 6 trading-specific categories and their trigger
+ * conditions.
  *
  * Note: the actual reminder TEXT is emitted by buildEventDrivenReminders()
  * in runtimeHarness.ts. This module is the registry/contract that documents
- * each category and provides the feature gate.
+ * each category.
  */
 
 export type TraderReminderCategory =
@@ -72,31 +65,6 @@ export const TRADER_REMINDER_CATEGORIES: Record<TraderReminderCategory, TraderRe
     defaultMaxAttempts: 2,
   },
 };
-
-export type TraderReminderMode = "auto" | "force_on" | "force_off";
-
-/**
- * Read the GORDON_TRADER_REMINDERS env flag. Three modes:
- *   - unset / "auto"  → legacy behavior (always-on; default)
- *   - "true"          → trader-specific reminders explicitly activated
- *   - "false" / "0"   → trader-specific reminders suppressed (diagnostic)
- */
-export function getTraderReminderMode(): TraderReminderMode {
-  const raw = (process.env.GORDON_TRADER_REMINDERS ?? "").trim().toLowerCase();
-  if (raw === "true" || raw === "1" || raw === "on") return "force_on";
-  if (raw === "false" || raw === "0" || raw === "off") return "force_off";
-  return "auto";
-}
-
-/**
- * Decide whether the trader reminder block should be emitted.
- *
- * Returns `true` for the default ("auto") and explicit-on modes. Returns
- * `false` only when the operator explicitly suppressed them via env.
- */
-export function shouldEmitTraderReminders(): boolean {
-  return getTraderReminderMode() !== "force_off";
-}
 
 /** Validate that all 6 categories are registered. Used by tests as a smoke check. */
 export function listTraderReminderCategories(): TraderReminderCategory[] {

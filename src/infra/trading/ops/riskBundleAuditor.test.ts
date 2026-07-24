@@ -1,11 +1,9 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isRiskBundleAuditorEnabled,
   auditRiskBundle,
   formatAudit,
   auditToPayload,
-  RISK_BUNDLE_AUDITOR_FLAG_ENV,
   type RiskItem,
 } from "./riskBundleAuditor.ts";
 
@@ -19,13 +17,6 @@ const allCovered: RiskItem[] = [
   { category: "gap", tag: "no", hedge: "flat by Friday close" },
   { category: "operational", tag: "neutral" },
 ];
-
-describe("isRiskBundleAuditorEnabled", () => {
-  it("respects the flag", () => {
-    expect(isRiskBundleAuditorEnabled({})).toBe(false);
-    expect(isRiskBundleAuditorEnabled({ [RISK_BUNDLE_AUDITOR_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("auditRiskBundle — complete coverage", () => {
   it("go verdict when all categories covered and no unhedged 'no'", () => {

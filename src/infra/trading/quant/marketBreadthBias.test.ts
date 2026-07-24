@@ -2,18 +2,7 @@ import { describe, it, expect } from "bun:test";
 import {
   computeMarketBreadthBias,
   marketBreadthBiasToPayload,
-  isMarketBreadthBiasEnabled,
-  MARKET_BREADTH_BIAS_FLAG_ENV,
 } from "./marketBreadthBias.ts";
-
-describe("isMarketBreadthBiasEnabled", () => {
-  it("respects the flag", () => {
-    expect(isMarketBreadthBiasEnabled({})).toBe(false);
-    expect(
-      isMarketBreadthBiasEnabled({ [MARKET_BREADTH_BIAS_FLAG_ENV]: "1" }),
-    ).toBe(true);
-  });
-});
 
 describe("computeMarketBreadthBias — validation", () => {
   it("rejects empty returns", () => {

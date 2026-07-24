@@ -40,12 +40,10 @@ import { buildSynthesisManifest, summarizeManifest } from "../../observation/syn
 import { withPortfolioOverride } from "./portfolioOverride.ts";
 import { recordStructuredObservation } from "../../../platform/observability/index.ts";
 import {
-  isConfluenceScorerEnabled,
   scoreConfluences,
   scoreToPayload,
 } from "../../../trading/ops/confluenceScorer.ts";
 import {
-  isExecutionPlaybookEnabled,
   selectPlaybookForStrategy,
   attachExecution,
   planToPayload,
@@ -242,7 +240,7 @@ export const createPlanTool = createTool({
           });
       }
 
-      if (isConfluenceScorerEnabled()) {
+      {
         const confluence = scoreConfluences({
           observations: [
             { kind: "regime_fit", present: true, evidence: plan.strategy },
@@ -264,7 +262,7 @@ export const createPlanTool = createTool({
         });
       }
 
-      if (isExecutionPlaybookEnabled()) {
+      {
         const playbook = selectPlaybookForStrategy(plan.strategy);
         const entryPrice = plan.entry.price ?? args.entryPrice ?? 0;
         if (entryPrice > 0) {

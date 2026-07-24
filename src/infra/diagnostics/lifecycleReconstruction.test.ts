@@ -1,19 +1,10 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isLifecycleReconstructionEnabled,
   reconstructLifecycle,
   lifecycleToPayload,
-  LIFECYCLE_RECONSTRUCTION_FLAG_ENV,
   type LifecycleEvent,
 } from "./lifecycleReconstruction.ts";
-
-describe("isLifecycleReconstructionEnabled", () => {
-  it("respects the flag", () => {
-    expect(isLifecycleReconstructionEnabled({})).toBe(false);
-    expect(isLifecycleReconstructionEnabled({ [LIFECYCLE_RECONSTRUCTION_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("reconstructLifecycle — empty", () => {
   it("returns zero-event result for unknown correlationId", () => {

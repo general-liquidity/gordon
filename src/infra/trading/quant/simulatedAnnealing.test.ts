@@ -1,19 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isSimulatedAnnealingEnabled,
   computeSimulatedAnnealing,
   simulatedAnnealingToPayload,
-  SIMULATED_ANNEALING_FLAG_ENV,
 } from "./simulatedAnnealing.ts";
-
-describe("isSimulatedAnnealingEnabled", () => {
-  it("respects the flag", () => {
-    expect(isSimulatedAnnealingEnabled({})).toBe(false);
-    expect(isSimulatedAnnealingEnabled({ [SIMULATED_ANNEALING_FLAG_ENV]: "1" })).toBe(
-      true,
-    );
-  });
-});
 
 describe("computeSimulatedAnnealing — convex problem", () => {
   it("finds the maximum of a 1D quadratic", () => {

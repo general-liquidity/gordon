@@ -18,12 +18,6 @@
  * Apply both as independent shrinks for the most conservative sizing.
  */
 
-export const EMPIRICAL_KELLY_FLAG_ENV = "GORDON_EMPIRICAL_KELLY";
-
-export function isEmpiricalKellyEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[EMPIRICAL_KELLY_FLAG_ENV] === "1" || env[EMPIRICAL_KELLY_FLAG_ENV] === "true";
-}
-
 export type EdgeUncertainty = "low" | "medium" | "high" | "untradable";
 
 export interface EmpiricalKellyInput {

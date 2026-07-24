@@ -25,8 +25,6 @@
  *   - kill-switch          — fire a no-op trigger and observe the halt path
  */
 
-export const INIT_PROBE_FLAG_ENV = "GORDON_INIT_PROBE";
-
 export type ProbeStatus = "pass" | "fail" | "skip";
 
 export interface ProbeResult {
@@ -84,10 +82,6 @@ export interface RunProbesOptions {
   skipIds?: readonly string[];
   /** Override clock for tests. */
   now?: () => string;
-}
-
-export function isInitProbeEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[INIT_PROBE_FLAG_ENV] === "1" || env[INIT_PROBE_FLAG_ENV] === "true";
 }
 
 export async function runInitProbes(

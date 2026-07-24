@@ -40,12 +40,6 @@
  * Pure compute. No I/O.
  */
 
-export const OPTIMAL_F_FLAG_ENV = "GORDON_OPTIMAL_F";
-
-export function isOptimalFEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[OPTIMAL_F_FLAG_ENV] === "1" || env[OPTIMAL_F_FLAG_ENV] === "true";
-}
-
 export interface OptimalFInput {
   /** Signed per-trade P&L. Positive = win, negative = loss, units arbitrary. */
   trades: ReadonlyArray<number>;

@@ -2,18 +2,7 @@ import { describe, it, expect } from "bun:test";
 import {
   computeOptimalPairsTrading,
   optimalPairsTradingToPayload,
-  isOptimalPairsTradingEnabled,
-  OPTIMAL_PAIRS_TRADING_FLAG_ENV,
 } from "./optimalPairsTrading.ts";
-
-describe("isOptimalPairsTradingEnabled", () => {
-  it("respects the flag", () => {
-    expect(isOptimalPairsTradingEnabled({})).toBe(false);
-    expect(
-      isOptimalPairsTradingEnabled({ [OPTIMAL_PAIRS_TRADING_FLAG_ENV]: "1" }),
-    ).toBe(true);
-  });
-});
 
 describe("computeOptimalPairsTrading — validation", () => {
   const base = {

@@ -1,19 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isHedgeFundReplicationEnabled,
   computeHedgeFundReplication,
   replicationToPayload,
-  HEDGE_FUND_REPLICATION_FLAG_ENV,
 } from "./hedgeFundReplication.ts";
-
-describe("isHedgeFundReplicationEnabled", () => {
-  it("respects the flag", () => {
-    expect(isHedgeFundReplicationEnabled({})).toBe(false);
-    expect(
-      isHedgeFundReplicationEnabled({ [HEDGE_FUND_REPLICATION_FLAG_ENV]: "1" }),
-    ).toBe(true);
-  });
-});
 
 describe("computeHedgeFundReplication — edge cases", () => {
   it("insufficient observations → NaN with reason", () => {

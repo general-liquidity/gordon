@@ -21,12 +21,6 @@
  * Pure compute. No I/O.
  */
 
-export const DUAL_VWAP_FLAG_ENV = "GORDON_DUAL_VWAP";
-
-export function isDualVwapEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[DUAL_VWAP_FLAG_ENV] === "1" || env[DUAL_VWAP_FLAG_ENV] === "true";
-}
-
 export interface DualVwapCandle {
   timestamp: number;
   high: number;

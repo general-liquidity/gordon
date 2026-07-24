@@ -18,12 +18,6 @@
  * useful as a discrete entry/exit trigger.
  */
 
-export const FISHER_TRANSFORM_FLAG_ENV = "GORDON_FISHER_TRANSFORM";
-
-export function isFisherTransformEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[FISHER_TRANSFORM_FLAG_ENV] === "1" || env[FISHER_TRANSFORM_FLAG_ENV] === "true";
-}
-
 export interface FisherInput {
   prices: ReadonlyArray<number>;
   /** Lookback for the high/low channel. Default 10. */

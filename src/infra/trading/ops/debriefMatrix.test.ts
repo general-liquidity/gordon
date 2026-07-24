@@ -4,14 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  isDebriefMatrixEnabled,
   classifyDebrief,
   recordDebrief,
   readDebriefLog,
   aggregateQuadrants,
   formatDebrief,
   debriefToPayload,
-  DEBRIEF_MATRIX_FLAG_ENV,
   DEBRIEF_MATRIX_PATH_ENV,
   type DebriefEntry,
 } from "./debriefMatrix.ts";
@@ -27,13 +25,6 @@ beforeEach(() => {
 const cleanup = () => {
   try { rmSync(workDir, { recursive: true, force: true }); } catch { /* ignore */ }
 };
-
-describe("isDebriefMatrixEnabled", () => {
-  it("respects the flag", () => {
-    expect(isDebriefMatrixEnabled({})).toBe(false);
-    expect(isDebriefMatrixEnabled({ [DEBRIEF_MATRIX_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("classifyDebrief — four quadrants", () => {
   it("good process + good outcome → deserved_success / reinforce", () => {
@@ -84,19 +75,8 @@ describe("classifyDebrief — threshold + clamping", () => {
 });
 
 describe("recordDebrief", () => {
-  it("no-op when flag is off", () => {
-    const r = recordDebrief(
-      { tradeId: "t1", symbol: "BTC", pnlUsd: 100, processScore: 8, outcomeScore: 8 },
-      {},
-      logPath,
-    );
-    expect(r).toBeNull();
-    expect(existsSync(logPath)).toBe(false);
-    cleanup();
-  });
-
-  it("writes JSONL when flag is on", () => {
-    const env = { [DEBRIEF_MATRIX_FLAG_ENV]: "1" };
+  it("writes JSONL", () => {
+    const env = {};
     const r = recordDebrief(
       {
         tradeId: "t1",
@@ -121,7 +101,6 @@ describe("recordDebrief", () => {
   it("respects path override", () => {
     const customPath = join(workDir, "custom.jsonl");
     const env = {
-      [DEBRIEF_MATRIX_FLAG_ENV]: "1",
       [DEBRIEF_MATRIX_PATH_ENV]: customPath,
     };
     recordDebrief(
@@ -196,7 +175,7 @@ describe("aggregateQuadrants", () => {
 
 describe("readDebriefLog + formatDebrief + debriefToPayload", () => {
   it("reads what was written", () => {
-    const env = { [DEBRIEF_MATRIX_FLAG_ENV]: "1" };
+    const env = {};
     recordDebrief(
       { tradeId: "t1", symbol: "BTC", pnlUsd: 100, processScore: 8, outcomeScore: 8 },
       env,

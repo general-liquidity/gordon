@@ -37,12 +37,6 @@ import { v4 as uuidv4 } from "uuid";
 
 const logger = createModuleLogger("evolution-loop");
 
-/** Failed-mutation suppression is on unless explicitly disabled. */
-function isGenomeRejectionEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  const raw = env.GORDON_GENOME_REJECTION;
-  return raw !== "0" && raw !== "false";
-}
-
 /** Net composite-fitness-drop threshold for treating a mutation as failed. */
 function genomeRejectionMinDrop(env: NodeJS.ProcessEnv = process.env): number {
   const raw = env.GORDON_GENOME_REJECTION_MIN_DROP;
@@ -390,23 +384,21 @@ export class EvolutionLoop {
         if (mutations.length === 0) continue;
 
         // Don't repeat failed approaches (SIA). Suppress candidate mutations
-        // this lineage has already learned are net-regressive. Default-on;
-        // disable with GORDON_GENOME_REJECTION=0, tune via *_MIN_DROP.
-        if (isGenomeRejectionEnabled()) {
-          const rejections = deriveRejectedMutations(manager.getGenomes(slot.playbook_name), {
-            minFitnessDrop: genomeRejectionMinDrop(),
-          });
-          if (rejections.length > 0) {
-            const { kept, suppressed } = filterRejectedMutations(mutations, rejections);
-            if (suppressed.length > 0) {
-              logger.info("Suppressed known-regressive mutations", {
-                playbook: slot.playbook_name,
-                suppressed: suppressed.map((s) => `${s.mutation.field_path}:${s.rejection.direction}`),
-              });
-            }
-            mutations.length = 0;
-            mutations.push(...kept);
+        // this lineage has already learned are net-regressive. Tune the
+        // fitness-drop threshold via GORDON_GENOME_REJECTION_MIN_DROP.
+        const rejections = deriveRejectedMutations(manager.getGenomes(slot.playbook_name), {
+          minFitnessDrop: genomeRejectionMinDrop(),
+        });
+        if (rejections.length > 0) {
+          const { kept, suppressed } = filterRejectedMutations(mutations, rejections);
+          if (suppressed.length > 0) {
+            logger.info("Suppressed known-regressive mutations", {
+              playbook: slot.playbook_name,
+              suppressed: suppressed.map((s) => `${s.mutation.field_path}:${s.rejection.direction}`),
+            });
           }
+          mutations.length = 0;
+          mutations.push(...kept);
         }
 
         // If every candidate was a known-bad mutation, skip this fork tick —

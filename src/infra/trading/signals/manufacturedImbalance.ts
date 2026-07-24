@@ -15,15 +15,6 @@
  * trade prints. Outputs a per-window verdict + a confidence score.
  */
 
-export const MANUFACTURED_IMBALANCE_FLAG_ENV = "GORDON_MANUFACTURED_IMBALANCE";
-
-export function isManufacturedImbalanceEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[MANUFACTURED_IMBALANCE_FLAG_ENV] === "1" ||
-    env[MANUFACTURED_IMBALANCE_FLAG_ENV] === "true"
-  );
-}
-
 export interface DepthSnapshot {
   /** Timestamp in ms. */
   t: number;

@@ -1,19 +1,10 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isPcaConcentrationEnabled,
   computePcaConcentration,
   pcaConcentrationToPayload,
-  PCA_CONCENTRATION_FLAG_ENV,
   type ReturnSeries,
 } from "./pcaConcentration.ts";
-
-describe("isPcaConcentrationEnabled", () => {
-  it("respects the flag", () => {
-    expect(isPcaConcentrationEnabled({})).toBe(false);
-    expect(isPcaConcentrationEnabled({ [PCA_CONCENTRATION_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 function lcg(seed: number) {
   let s = seed;

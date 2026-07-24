@@ -31,15 +31,6 @@
 
 import { eigenDecomposition } from "../../../core/alpha/matrix.ts";
 
-export const EIGEN_PORTFOLIO_FLAG_ENV = "GORDON_EIGEN_PORTFOLIO";
-
-export function isEigenPortfolioEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[EIGEN_PORTFOLIO_FLAG_ENV] === "1" ||
-    env[EIGEN_PORTFOLIO_FLAG_ENV] === "true"
-  );
-}
-
 export interface EigenPortfolioInput {
   /** Symmetric NxN covariance matrix. Must be square. */
   covarianceMatrix: ReadonlyArray<ReadonlyArray<number>>;

@@ -23,12 +23,6 @@
  * Pure compute. No I/O.
  */
 
-export const LEVEL_FRESHNESS_FLAG_ENV = "GORDON_LEVEL_FRESHNESS";
-
-export function isLevelFreshnessEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[LEVEL_FRESHNESS_FLAG_ENV] === "1" || env[LEVEL_FRESHNESS_FLAG_ENV] === "true";
-}
-
 export interface LevelFreshnessCandle {
   /** Timestamp in milliseconds (ms epoch). */
   timestamp: number;

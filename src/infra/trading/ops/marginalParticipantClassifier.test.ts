@@ -1,18 +1,9 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isMarginalParticipantEnabled,
   classifyMarginalParticipant,
   marginalToPayload,
-  MARGINAL_PARTICIPANT_FLAG_ENV,
 } from "./marginalParticipantClassifier.ts";
-
-describe("isMarginalParticipantEnabled", () => {
-  it("respects the flag", () => {
-    expect(isMarginalParticipantEnabled({})).toBe(false);
-    expect(isMarginalParticipantEnabled({ [MARGINAL_PARTICIPANT_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("classifyMarginalParticipant — typical state (default)", () => {
   it("no drivers → typical with default confidence", () => {

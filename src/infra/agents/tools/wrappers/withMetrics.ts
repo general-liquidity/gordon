@@ -192,8 +192,7 @@ export function withToolsMetrics<T extends Record<string, { id: string; execute?
     // Compose sanitizer (inner) + metrics (outer). Sanitizer runs first
     // so injection patterns in tool results are redacted before metrics
     // sees them; metrics records hit/miss accurately on the sanitized
-    // value. When GORDON_TOOL_RESULT_SANITIZE=0, withResultSanitizer is
-    // a pass-through and the original tool reference is returned.
+    // value.
     wrapped[key] = withToolMetrics(withResultSanitizer(tool));
   }
 

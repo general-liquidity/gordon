@@ -1,19 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isMeanCrossingFrequencyEnabled,
   computeMeanCrossingFrequency,
   meanCrossingFrequencyToPayload,
-  MEAN_CROSSING_FREQUENCY_FLAG_ENV,
 } from "./meanCrossingFrequency.ts";
-
-describe("isMeanCrossingFrequencyEnabled", () => {
-  it("respects the flag", () => {
-    expect(isMeanCrossingFrequencyEnabled({})).toBe(false);
-    expect(
-      isMeanCrossingFrequencyEnabled({ [MEAN_CROSSING_FREQUENCY_FLAG_ENV]: "1" }),
-    ).toBe(true);
-  });
-});
 
 describe("computeMeanCrossingFrequency — counts", () => {
   it("zero crossings for a constant series", () => {

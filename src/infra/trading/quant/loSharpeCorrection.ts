@@ -33,17 +33,6 @@
  * Pure compute. No I/O.
  */
 
-export const LO_SHARPE_CORRECTION_FLAG_ENV = "GORDON_LO_SHARPE_CORRECTION";
-
-export function isLoSharpeCorrectionEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[LO_SHARPE_CORRECTION_FLAG_ENV] === "1" ||
-    env[LO_SHARPE_CORRECTION_FLAG_ENV] === "true"
-  );
-}
-
 export interface LoSharpeCorrectionInput {
   /** Per-period returns. Length must satisfy N ≥ periodsPerYear + 1 for full lag coverage. */
   returns: ReadonlyArray<number>;

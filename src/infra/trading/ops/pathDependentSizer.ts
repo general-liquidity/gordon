@@ -30,17 +30,6 @@
  * the formula itself forces defense. You cannot size up to make it back.
  */
 
-export const PATH_DEPENDENT_SIZER_FLAG_ENV = "GORDON_PATH_DEPENDENT_SIZER";
-
-export function isPathDependentSizerEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[PATH_DEPENDENT_SIZER_FLAG_ENV] === "1" ||
-    env[PATH_DEPENDENT_SIZER_FLAG_ENV] === "true"
-  );
-}
-
 export type TradeTier = "I" | "II" | "III";
 export type PerformanceState = "cold" | "neutral" | "hot";
 

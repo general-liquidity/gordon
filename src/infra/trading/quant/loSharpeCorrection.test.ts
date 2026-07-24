@@ -1,19 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isLoSharpeCorrectionEnabled,
   computeLoSharpeCorrection,
   loSharpeCorrectionToPayload,
-  LO_SHARPE_CORRECTION_FLAG_ENV,
 } from "./loSharpeCorrection.ts";
-
-describe("isLoSharpeCorrectionEnabled", () => {
-  it("respects the flag", () => {
-    expect(isLoSharpeCorrectionEnabled({})).toBe(false);
-    expect(isLoSharpeCorrectionEnabled({ [LO_SHARPE_CORRECTION_FLAG_ENV]: "1" })).toBe(
-      true,
-    );
-  });
-});
 
 // Deterministic RNG for synthetic returns.
 function makeRng(seed: number): () => number {

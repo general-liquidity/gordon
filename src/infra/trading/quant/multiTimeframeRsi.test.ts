@@ -1,17 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isMtfRsiEnabled,
   computeMtfRsi,
   mtfRsiToPayload,
-  MTF_RSI_FLAG_ENV,
 } from "./multiTimeframeRsi.ts";
-
-describe("isMtfRsiEnabled", () => {
-  it("respects the flag", () => {
-    expect(isMtfRsiEnabled({})).toBe(false);
-    expect(isMtfRsiEnabled({ [MTF_RSI_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 function rising(n: number, start = 100, step = 1): number[] {
   return Array.from({ length: n }, (_, i) => start + i * step);

@@ -25,17 +25,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-export const FRICTION_TRACKER_FLAG_ENV = "GORDON_FRICTION_TRACKER";
 export const FRICTION_TRACKER_PATH_ENV = "GORDON_FRICTION_TRACKER_PATH";
-
-export function isFrictionTrackerEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[FRICTION_TRACKER_FLAG_ENV] === "1" ||
-    env[FRICTION_TRACKER_FLAG_ENV] === "true"
-  );
-}
 
 export function defaultFrictionLogPath(
   env: NodeJS.ProcessEnv = process.env,
@@ -96,7 +86,6 @@ export function recordFriction(
   env: NodeJS.ProcessEnv = process.env,
   path: string = defaultFrictionLogPath(env),
 ): FrictionEvent | null {
-  if (!isFrictionTrackerEnabled(env)) return null;
   const event: FrictionEvent = {
     id: newFrictionId(),
     recordedAt: input.now ?? new Date().toISOString(),

@@ -581,9 +581,9 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { isPathDependentSizerEnabled, sizePosition, classifyPerformanceState } =
+          const { sizePosition, classifyPerformanceState } =
             await import("../infra/trading/ops/pathDependentSizer.ts");
-          if (isPathDependentSizerEnabled()) {
+          {
             const initialRC = Number(process.env.GORDON_INITIAL_RISK_CAPITAL_USD ?? 0);
             const ytdPnL = Number(process.env.GORDON_YTD_PNL_USD ?? 0);
             const equityFracOfPeak = Number(process.env.GORDON_EQUITY_FRACTION_OF_PEAK ?? 1);
@@ -620,10 +620,10 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { isDecisionJournalEnabled, recordJournalEntry } = await import(
+          const { recordJournalEntry } = await import(
             "../infra/trading/ops/dailyDecisionJournal.ts"
           );
-          if (isDecisionJournalEnabled()) {
+          {
             const stopDistance = Math.abs(e.entry - e.stopLoss);
             const riskPercent = e.positionSizePct > 0 ? e.positionSizePct / 100 : 0.01;
             const freeCapital = Number(process.env.GORDON_FREE_CAPITAL_USD ?? 0);
@@ -688,13 +688,13 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { isConvictionCalibrationEnabled, evaluateCalibration } = await import(
+          const { evaluateCalibration } = await import(
             "../infra/trading/ops/convictionCalibrationGate.ts"
           );
           const { isDecisionsLogEnabled, defaultDecisionsLogPath } = await import(
             "../infra/agents/memory/decisionLog.ts"
           );
-          if (isConvictionCalibrationEnabled() && isDecisionsLogEnabled()) {
+          if (isDecisionsLogEnabled()) {
             const fs = await import("node:fs");
             const path = defaultDecisionsLogPath();
             const trades: Array<{ convictionRating: number; rMultiple: number }> = [];
@@ -735,10 +735,10 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { isRiskBundleAuditorEnabled, auditRiskBundle } = await import(
+          const { auditRiskBundle } = await import(
             "../infra/trading/ops/riskBundleAuditor.ts"
           );
-          if (isRiskBundleAuditorEnabled()) {
+          {
             const stopDistance = Math.abs(e.entry - e.stopLoss);
             const result = auditRiskBundle({
               items: [
@@ -768,10 +768,10 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { isMarginalParticipantEnabled, classifyMarginalParticipant } = await import(
+          const { classifyMarginalParticipant } = await import(
             "../infra/trading/ops/marginalParticipantClassifier.ts"
           );
-          if (isMarginalParticipantEnabled()) {
+          {
             const driverList = (process.env.GORDON_MARGINAL_DRIVERS ?? "")
               .split(",")
               .map((s) => s.trim())
@@ -797,10 +797,10 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { isEdgeAttributionEnabled, attributeEdge } = await import(
+          const { attributeEdge } = await import(
             "../infra/trading/ops/edgeAttribution.ts"
           );
-          if (isEdgeAttributionEnabled()) {
+          {
             const edgeType = (process.env.GORDON_EDGE_TYPE ?? "structural") as
               | "behavioral" | "analytical" | "informational" | "structural";
             const result = attributeEdge({
@@ -891,9 +891,9 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { isWeeklyRegimeCheckEnabled, evaluateRegimeCheck, classifyVolatilityLevel } =
+          const { evaluateRegimeCheck, classifyVolatilityLevel } =
             await import("../infra/trading/ops/weeklyRegimeCheck.ts");
-          if (isWeeklyRegimeCheckEnabled()) {
+          {
             const regime = (process.env.GORDON_CURRENT_REGIME ?? "ranging") as
               | "trending_up" | "trending_down" | "ranging" | "volatile" | "quiet" | "breakout";
             const volIndex = Number(process.env.GORDON_VOLATILITY_INDEX ?? 20);
@@ -912,10 +912,10 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { isTraderArchetypeEnabled, classifyTrader } = await import(
+          const { classifyTrader } = await import(
             "../infra/trading/ops/traderArchetype.ts"
           );
-          if (isTraderArchetypeEnabled()) {
+          {
             const result = classifyTrader({
               hesitatesAtEntry: process.env.GORDON_TRADER_HESITATES === "1",
               chasesAfterMissed: process.env.GORDON_TRADER_CHASES === "1",
@@ -939,10 +939,10 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { isLiquidityMapperEnabled, mapLiquidity } = await import(
+          const { mapLiquidity } = await import(
             "../infra/trading/ops/liquidityMapper.ts"
           );
-          if (isLiquidityMapperEnabled()) {
+          {
             const stopBuffer = Math.abs(e.entry - e.stopLoss) * 0.1;
             const result = mapLiquidity({
               currentPrice: e.entry,
@@ -1143,10 +1143,10 @@ export function createDefaultSubscriptions(
         );
 
         try {
-          const { isDebriefMatrixEnabled, recordDebrief } = await import(
+          const { recordDebrief } = await import(
             "../infra/trading/ops/debriefMatrix.ts"
           );
-          if (isDebriefMatrixEnabled()) {
+          {
             // Auto-debrief: process_score is high when the close reason is
             // a plan-defined exit (stop_loss, take_profit), low when the
             // operator force-closed or the broker liquidated. Outcome_score
@@ -1225,10 +1225,9 @@ export function createDefaultSubscriptions(
       description: "Aggregate last 24h decisionLog + debriefMatrix + frictionTracker into rollup",
       handler: async () => {
         try {
-          const { isDailyRollupEnabled, buildRollup, formatRollup } = await import(
+          const { buildRollup, formatRollup } = await import(
             "../infra/trading/ops/dailyRollup.ts"
           );
-          if (!isDailyRollupEnabled()) return;
           const { defaultDecisionsLogPath } = await import(
             "../infra/agents/memory/decisionLog.ts"
           );

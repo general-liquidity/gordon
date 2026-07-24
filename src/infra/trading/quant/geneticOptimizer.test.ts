@@ -1,19 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isGeneticOptimizerEnabled,
   computeGeneticOptimizer,
   geneticOptimizerToPayload,
-  GENETIC_OPTIMIZER_FLAG_ENV,
 } from "./geneticOptimizer.ts";
-
-describe("isGeneticOptimizerEnabled", () => {
-  it("respects the flag", () => {
-    expect(isGeneticOptimizerEnabled({})).toBe(false);
-    expect(isGeneticOptimizerEnabled({ [GENETIC_OPTIMIZER_FLAG_ENV]: "1" })).toBe(
-      true,
-    );
-  });
-});
 
 describe("computeGeneticOptimizer — convergence on convex problems", () => {
   it("finds 1D quadratic maximum", () => {

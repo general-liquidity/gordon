@@ -1,12 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { isTrixEnabled, computeTrix, trixToPayload, TRIX_FLAG_ENV } from "./trix.ts";
-
-describe("isTrixEnabled", () => {
-  it("respects the flag", () => {
-    expect(isTrixEnabled({})).toBe(false);
-    expect(isTrixEnabled({ [TRIX_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
+import { computeTrix, trixToPayload } from "./trix.ts";
 
 describe("computeTrix", () => {
   it("short series → NaN with reason", () => {

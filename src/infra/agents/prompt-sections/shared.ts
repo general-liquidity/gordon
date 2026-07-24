@@ -1,8 +1,5 @@
 import { formatCapabilityTruthSummary, GORDON_PRODUCT_TRUTH } from "../capabilityTruth.ts";
-import {
-  isEffortCalibrationEnabled,
-  buildCalibrationBlock,
-} from "../cognition/effortCalibration.ts";
+import { buildCalibrationBlock } from "../cognition/effortCalibration.ts";
 
 export interface PromptSectionDefinition {
   id: string;
@@ -45,10 +42,7 @@ export const SHARED_PROMPT_SECTIONS: PromptSectionDefinition[] = [
   {
     id: "shared.effort-calibration",
     priority: 35,
-    content: () =>
-      isEffortCalibrationEnabled()
-        ? buildCalibrationBlock("normal") // default to normal; callers can override per-task
-        : "",
+    content: () => buildCalibrationBlock("normal"), // default to normal; callers can override per-task
   },
   {
     id: "shared.recovery-discipline",

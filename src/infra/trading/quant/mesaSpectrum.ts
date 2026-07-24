@@ -19,12 +19,6 @@
  * (peak / median power) so callers can judge how cyclic the signal is.
  */
 
-export const MESA_SPECTRUM_FLAG_ENV = "GORDON_MESA_SPECTRUM";
-
-export function isMesaSpectrumEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[MESA_SPECTRUM_FLAG_ENV] === "1" || env[MESA_SPECTRUM_FLAG_ENV] === "true";
-}
-
 export interface MesaInput {
   /** Detrended price series (subtract a SMA before feeding in for best results). */
   prices: ReadonlyArray<number>;

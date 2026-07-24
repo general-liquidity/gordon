@@ -19,12 +19,6 @@
  * three per-frame signals; the gate returns a verdict.
  */
 
-export const TRIPLE_SCREEN_FLAG_ENV = "GORDON_TRIPLE_SCREEN";
-
-export function isTripleScreenEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[TRIPLE_SCREEN_FLAG_ENV] === "1" || env[TRIPLE_SCREEN_FLAG_ENV] === "true";
-}
-
 export type TrendDirection = "up" | "down" | "flat";
 export type OscillatorState = "overbought" | "oversold" | "neutral";
 export type EntryTrigger = "buy" | "sell" | "none";

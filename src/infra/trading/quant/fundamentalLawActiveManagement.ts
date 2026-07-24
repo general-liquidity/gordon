@@ -31,15 +31,6 @@
  * Pure compute. No I/O.
  */
 
-export const FUNDAMENTAL_LAW_AM_FLAG_ENV = "GORDON_FUNDAMENTAL_LAW_AM";
-
-export function isFundamentalLawAMEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[FUNDAMENTAL_LAW_AM_FLAG_ENV] === "1" ||
-    env[FUNDAMENTAL_LAW_AM_FLAG_ENV] === "true"
-  );
-}
-
 export interface FundamentalLawAMInput {
   /** Information coefficient (correlation between alpha forecast and realised return). */
   informationCoefficient: number;

@@ -1,19 +1,10 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isRangeVolatilityEnabled,
   computeRangeVolatility,
   rangeVolatilityToPayload,
-  RANGE_VOLATILITY_FLAG_ENV,
   type OhlcBar,
 } from "./rangeVolatility.ts";
-
-describe("isRangeVolatilityEnabled", () => {
-  it("respects the flag", () => {
-    expect(isRangeVolatilityEnabled({})).toBe(false);
-    expect(isRangeVolatilityEnabled({ [RANGE_VOLATILITY_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 function makeBar(open: number, high: number, low: number, close: number): OhlcBar {
   return { open, high, low, close };

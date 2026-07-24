@@ -17,7 +17,6 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import {
-  isInitProbeEnabled,
   runInitProbes,
   type Probe,
 } from "../../infra/diagnostics/initProbe.ts";
@@ -39,7 +38,6 @@ import {
 } from "../../infra/safety/filesystemWriteGuardInstaller.ts";
 import { buildTransportGuardCoverageReport } from "../../infra/safety/transportGuardCoverage.ts";
 import {
-  isKvCacheMetricEnabled,
   readCacheCalls,
   summarizeHitRate,
 } from "../../infra/agents/runtime/kvCacheHitMetric.ts";
@@ -134,11 +132,9 @@ export function defaultGordonProbes(): Probe[] {
 
 /**
  * Run init probes and convert results into DoctorCheck entries so they
- * surface alongside the existing checks. Returns [] when the flag is
- * off.
+ * surface alongside the existing checks.
  */
 export async function collectInitProbeChecks(extraProbes: readonly Probe[] = []): Promise<DoctorCheck[]> {
-  if (!isInitProbeEnabled()) return [];
   const probes: Probe[] = [...defaultGordonProbes(), ...extraProbes];
   const report = await runInitProbes(probes);
   return report.results.map((r) => ({
@@ -295,13 +291,12 @@ export function collectSandboxChecks(
 // --- KV-cache hit-rate metric + CLAUDE.md linter ----------------------------
 
 /**
- * Surface the KV-cache hit-rate over the last 100 recorded calls when
- * the metric is enabled. Manus calls this "the single most important
+ * Surface the KV-cache hit-rate over the last 100 recorded calls.
+ * Manus calls this "the single most important
  * metric for a production-stage AI agent" — surfacing it makes the
  * 10x cost lever visible.
  */
 export function collectKvCacheCheck(): DoctorCheck[] {
-  if (!isKvCacheMetricEnabled()) return [];
   try {
     const calls = readCacheCalls({ limit: 100 });
     if (calls.length === 0) {

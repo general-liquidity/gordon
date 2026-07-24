@@ -1,5 +1,5 @@
 /**
- * Structured Output Enforcement (GORDON_STRUCTURED_OUTPUT_ENFORCEMENT).
+ * Structured Output Enforcement.
  *
  * Schema-validates tool results or final agent payloads against a Zod
  * schema before they propagate. On mismatch the hook blocks with a
@@ -24,18 +24,6 @@ import type {
   HookResult,
   PostToolUsePayload,
 } from "./types.ts";
-
-export const STRUCTURED_OUTPUT_ENFORCEMENT_FLAG_ENV =
-  "GORDON_STRUCTURED_OUTPUT_ENFORCEMENT";
-
-export function isStructuredOutputEnforcementEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[STRUCTURED_OUTPUT_ENFORCEMENT_FLAG_ENV] === "1" ||
-    env[STRUCTURED_OUTPUT_ENFORCEMENT_FLAG_ENV] === "true"
-  );
-}
 
 export interface StructuredValidationOk<T> {
   ok: true;

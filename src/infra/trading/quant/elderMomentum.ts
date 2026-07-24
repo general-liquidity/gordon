@@ -20,12 +20,6 @@
  * of the moving average.
  */
 
-export const ELDER_MOMENTUM_FLAG_ENV = "GORDON_ELDER_MOMENTUM";
-
-export function isElderMomentumEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[ELDER_MOMENTUM_FLAG_ENV] === "1" || env[ELDER_MOMENTUM_FLAG_ENV] === "true";
-}
-
 export interface OhlcvBar {
   high: number;
   low: number;

@@ -1,19 +1,10 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isTouchDynamicsEnabled,
   evaluateTouchDynamics,
   touchDynamicsToPayload,
-  TOUCH_DYNAMICS_FLAG_ENV,
   type TouchSnapshot,
 } from "./touchDynamics.ts";
-
-describe("isTouchDynamicsEnabled", () => {
-  it("respects the flag", () => {
-    expect(isTouchDynamicsEnabled({})).toBe(false);
-    expect(isTouchDynamicsEnabled({ [TOUCH_DYNAMICS_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 function makeSnapshots(specs: Array<{ t: number; bid: number; ask: number; bs: number; as: number }>): TouchSnapshot[] {
   return specs.map((s) => ({ t: s.t, bestBid: s.bid, bestAsk: s.ask, bidSize: s.bs, askSize: s.as }));

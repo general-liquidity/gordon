@@ -19,12 +19,6 @@
  * Pure compute. No I/O.
  */
 
-export const MEV_DETECTION_FLAG_ENV = "GORDON_MEV_DETECTION";
-
-export function isMevDetectionEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[MEV_DETECTION_FLAG_ENV] === "1" || env[MEV_DETECTION_FLAG_ENV] === "true";
-}
-
 export type MevSide = "buy" | "sell";
 
 export interface MevTrade {

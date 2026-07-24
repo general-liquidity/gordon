@@ -1,19 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isDirectionalEdgeTestEnabled,
   runDirectionalEdgeTest,
   directionalEdgeTestToPayload,
-  DIRECTIONAL_EDGE_TEST_FLAG_ENV,
 } from "./directionalEdgeTest.ts";
-
-describe("isDirectionalEdgeTestEnabled", () => {
-  it("respects the flag", () => {
-    expect(isDirectionalEdgeTestEnabled({})).toBe(false);
-    expect(
-      isDirectionalEdgeTestEnabled({ [DIRECTIONAL_EDGE_TEST_FLAG_ENV]: "1" }),
-    ).toBe(true);
-  });
-});
 
 function lcg(seed: number) {
   let s = seed;

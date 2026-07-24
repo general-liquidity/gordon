@@ -1,18 +1,9 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isCrossVenueDivergenceEnabled,
   detectCrossVenueDivergence,
   divergenceToPayload,
-  CROSS_VENUE_DIVERGENCE_FLAG_ENV,
 } from "./crossVenueDivergence.ts";
-
-describe("isCrossVenueDivergenceEnabled", () => {
-  it("respects the flag", () => {
-    expect(isCrossVenueDivergenceEnabled({})).toBe(false);
-    expect(isCrossVenueDivergenceEnabled({ [CROSS_VENUE_DIVERGENCE_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("detectCrossVenueDivergence — aligned venues → no alert", () => {
   it("two venues with identical mids → no alert", () => {

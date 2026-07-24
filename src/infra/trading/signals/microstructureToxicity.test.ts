@@ -1,19 +1,10 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isMicrostructureToxicityEnabled,
   scoreMicrostructureToxicity,
   toxicityToPayload,
-  MICROSTRUCTURE_TOXICITY_FLAG_ENV,
   type LevelLifecycle,
 } from "./microstructureToxicity.ts";
-
-describe("isMicrostructureToxicityEnabled", () => {
-  it("respects the flag", () => {
-    expect(isMicrostructureToxicityEnabled({})).toBe(false);
-    expect(isMicrostructureToxicityEnabled({ [MICROSTRUCTURE_TOXICITY_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("scoreMicrostructureToxicity — quiet baseline", () => {
   it("no inputs → quiet regime with zero score", () => {

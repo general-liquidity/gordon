@@ -20,17 +20,6 @@
  * report so users see "your 30% headline compounds to 18% after drag."
  */
 
-export const VOLATILITY_DRAG_FLAG_ENV = "GORDON_VOLATILITY_DRAG";
-
-export function isVolatilityDragEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[VOLATILITY_DRAG_FLAG_ENV] === "1" ||
-    env[VOLATILITY_DRAG_FLAG_ENV] === "true"
-  );
-}
-
 /**
  * Drag term σ²/2. Stddev should be expressed as a decimal return per the
  * same period as the arithmetic return (e.g. annualized σ for annualized

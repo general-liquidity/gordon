@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test, beforeEach } from "bun:test";
 import {
   GordonToolCallReconciler,
   reportToolCallInterruption,
@@ -6,29 +6,9 @@ import {
   _resetKnownInterruptionsForTests,
   _knownInterruptionQueueSizeForTests,
 } from "./toolcall-reconciler.ts";
-import { TOOLCALL_RECONCILER_FLAG_ENV } from "../runtime/toolCallReconciler.ts";
-
-const savedFlag = process.env[TOOLCALL_RECONCILER_FLAG_ENV];
-
-function enableFlag() {
-  process.env[TOOLCALL_RECONCILER_FLAG_ENV] = "1";
-}
-
-function disableFlag() {
-  delete process.env[TOOLCALL_RECONCILER_FLAG_ENV];
-}
 
 beforeEach(() => {
   _resetKnownInterruptionsForTests();
-  disableFlag();
-});
-
-afterEach(() => {
-  if (savedFlag !== undefined) {
-    process.env[TOOLCALL_RECONCILER_FLAG_ENV] = savedFlag;
-  } else {
-    delete process.env[TOOLCALL_RECONCILER_FLAG_ENV];
-  }
 });
 
 function abortStub(_reason?: string): never {
@@ -45,24 +25,8 @@ function makeArgs(messages: unknown[]): {
   };
 }
 
-describe("GordonToolCallReconciler — flag gating", () => {
-  test("flag off → returns messages unchanged (no-op)", async () => {
-    const reconciler = new GordonToolCallReconciler();
-    const msgs = [
-      { role: "user", content: "hi" },
-      {
-        role: "assistant",
-        content: [{ type: "tool-call", toolCallId: "call_1", toolName: "x" }],
-      },
-    ];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = await reconciler.processInput(makeArgs(msgs) as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(result as any).toBe(msgs as any);
-  });
-
-  test("flag on → repairs dangling tool_use", async () => {
-    enableFlag();
+describe("GordonToolCallReconciler — repair", () => {
+  test("repairs dangling tool_use", async () => {
     const reconciler = new GordonToolCallReconciler();
     const msgs = [
       { role: "user", content: "hi" },
@@ -78,8 +42,7 @@ describe("GordonToolCallReconciler — flag gating", () => {
     expect((result as unknown[]).length).toBe(msgs.length + 1);
   });
 
-  test("flag on, no dangling calls → returns messages unchanged", async () => {
-    enableFlag();
+  test("no dangling calls → returns messages unchanged", async () => {
     const reconciler = new GordonToolCallReconciler();
     const msgs = [
       { role: "user", content: "hi" },
@@ -91,8 +54,7 @@ describe("GordonToolCallReconciler — flag gating", () => {
     expect(result as any).toBe(msgs as any);
   });
 
-  test("flag on, empty messages → returns input unchanged", async () => {
-    enableFlag();
+  test("empty messages → returns input unchanged", async () => {
     const reconciler = new GordonToolCallReconciler();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await reconciler.processInput(makeArgs([]) as any);
@@ -156,7 +118,6 @@ describe("reportToolCallInterruption + drainKnownInterruptions", () => {
 
 describe("GordonToolCallReconciler — interruption hint integration", () => {
   test("known interruption maps to synthesized tool_result reason", async () => {
-    enableFlag();
     reportToolCallInterruption("call_1", "force_stop", {
       side: "BUY",
       filled: 0,
@@ -186,7 +147,6 @@ describe("GordonToolCallReconciler — interruption hint integration", () => {
   });
 
   test("unknown dangling call falls back to reason='unknown'", async () => {
-    enableFlag();
     const reconciler = new GordonToolCallReconciler();
     const msgs = [
       { role: "user", content: "x" },
@@ -205,7 +165,6 @@ describe("GordonToolCallReconciler — interruption hint integration", () => {
   });
 
   test("only drains interruptions for ids actually present in messages", async () => {
-    enableFlag();
     reportToolCallInterruption("present_id", "force_stop");
     reportToolCallInterruption("absent_id", "timeout");
     const reconciler = new GordonToolCallReconciler();

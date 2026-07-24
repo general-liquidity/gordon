@@ -17,15 +17,6 @@
 
 import { studentTTwoSidedPValue } from "../../../core/indicators/linearRegression.ts";
 
-export const HEDGE_FUND_REPLICATION_FLAG_ENV = "GORDON_HEDGE_FUND_REPLICATION";
-
-export function isHedgeFundReplicationEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[HEDGE_FUND_REPLICATION_FLAG_ENV] === "1" ||
-    env[HEDGE_FUND_REPLICATION_FLAG_ENV] === "true"
-  );
-}
-
 export interface FactorSeries {
   id: string;
   returns: ReadonlyArray<number>;

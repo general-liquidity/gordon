@@ -31,7 +31,6 @@ import {
   isGoalModeEnabled,
 } from "../../core/pipeline/goalMode.ts";
 import {
-  isTradingFeatureListEnabled,
   loadFeatureList,
   formatFeatureList,
   pickHighestPriority,
@@ -1298,15 +1297,6 @@ export async function handleFeatureListMenuCommand(
   setState: StateUpdater,
 ): Promise<boolean> {
   if (target !== "features" && target !== "features-next") return false;
-
-  if (!isTradingFeatureListEnabled()) {
-    addMessage(
-      setState,
-      "system",
-      "Trading feature list is disabled. Set GORDON_TRADING_FEATURE_LIST=1 to enable.",
-    );
-    return true;
-  }
 
   const list = loadFeatureList();
   if (!list) {

@@ -2,18 +2,7 @@ import { describe, it, expect } from "bun:test";
 import {
   computeOptimalLimitDepth,
   optimalLimitDepthToPayload,
-  isOptimalLimitDepthEnabled,
-  OPTIMAL_LIMIT_DEPTH_FLAG_ENV,
 } from "./optimalLimitDepth.ts";
-
-describe("isOptimalLimitDepthEnabled", () => {
-  it("respects the flag", () => {
-    expect(isOptimalLimitDepthEnabled({})).toBe(false);
-    expect(
-      isOptimalLimitDepthEnabled({ [OPTIMAL_LIMIT_DEPTH_FLAG_ENV]: "1" }),
-    ).toBe(true);
-  });
-});
 
 describe("computeOptimalLimitDepth — validation", () => {
   const base = {

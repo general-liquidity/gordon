@@ -38,17 +38,6 @@
  * asset. See harness-deferred-wiring.md.
  */
 
-export const CARTEA_JAIMUNGAL_SIGNAL_FLAG_ENV = "GORDON_CARTEA_JAIMUNGAL_SIGNAL";
-
-export function isCarteaJaimungalSignalEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[CARTEA_JAIMUNGAL_SIGNAL_FLAG_ENV] === "1" ||
-    env[CARTEA_JAIMUNGAL_SIGNAL_FLAG_ENV] === "true"
-  );
-}
-
 export type Side = "BUY" | "SELL";
 
 export interface CarteaJaimungalSignalInput {

@@ -1,18 +1,9 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isLiquidityMapperEnabled,
   mapLiquidity,
   liquidityToPayload,
-  LIQUIDITY_MAPPER_FLAG_ENV,
 } from "./liquidityMapper.ts";
-
-describe("isLiquidityMapperEnabled", () => {
-  it("respects the flag", () => {
-    expect(isLiquidityMapperEnabled({})).toBe(false);
-    expect(isLiquidityMapperEnabled({ [LIQUIDITY_MAPPER_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("mapLiquidity — basic mapping", () => {
   it("support level → cluster below price minus buffer", () => {

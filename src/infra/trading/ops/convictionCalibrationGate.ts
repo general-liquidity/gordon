@@ -28,17 +28,6 @@
  *     effect; below this, your stars are noise)
  */
 
-export const CONVICTION_CALIBRATION_FLAG_ENV = "GORDON_CONVICTION_CALIBRATION";
-
-export function isConvictionCalibrationEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[CONVICTION_CALIBRATION_FLAG_ENV] === "1" ||
-    env[CONVICTION_CALIBRATION_FLAG_ENV] === "true"
-  );
-}
-
 export interface CalibrationTrade {
   /** Operator's pre-trade conviction rating. Free scale (1-5, 1-10, etc). */
   convictionRating: number;

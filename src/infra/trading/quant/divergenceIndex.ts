@@ -17,12 +17,6 @@
  * keeping the false-signal rate roughly constant across regimes.
  */
 
-export const DIVERGENCE_INDEX_FLAG_ENV = "GORDON_DIVERGENCE_INDEX";
-
-export function isDivergenceIndexEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[DIVERGENCE_INDEX_FLAG_ENV] === "1" || env[DIVERGENCE_INDEX_FLAG_ENV] === "true";
-}
-
 export interface DivergenceIndexInput {
   prices: ReadonlyArray<number>;
   fastPeriod?: number;

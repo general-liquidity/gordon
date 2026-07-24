@@ -29,7 +29,6 @@ import { existsSync, mkdirSync, appendFileSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
-export const MULTIPLE_TESTING_FLAG_ENV = "GORDON_MULTIPLE_TESTING_TRACKER";
 export const ATTEMPTS_LOG_PATH_ENV = "GORDON_ATTEMPTS_LOG_PATH";
 
 export type AttemptVerdict = "accepted" | "rejected" | "errored";
@@ -72,13 +71,6 @@ export interface TrialCount {
   distinctCount: number;
   /** Total attempts including duplicates. */
   totalCount: number;
-}
-
-export function isMultipleTestingTrackerEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[MULTIPLE_TESTING_FLAG_ENV] === "1" ||
-    env[MULTIPLE_TESTING_FLAG_ENV] === "true"
-  );
 }
 
 export function defaultAttemptsLogPath(env: NodeJS.ProcessEnv = process.env): string {

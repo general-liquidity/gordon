@@ -7,20 +7,16 @@
 
 import { assessBacktestCredibility } from "../../infra/trading/ops/backtestCredibility.ts";
 import {
-  isVolatilityDragEnabled,
   geometricFromArithmetic,
   volatilityDrag,
 } from "../../infra/trading/ops/volatilityDrag.ts";
 import {
-  isHurstExponentEnabled,
   calculateHurst,
 } from "../../infra/trading/ops/hurstExponent.ts";
 import {
-  isPerformanceDecompositionEnabled,
   decomposeReturns,
 } from "../../infra/trading/ops/performanceDecomposition.ts";
 import {
-  isEdgeDecayEnabled,
   evaluateDecay,
 } from "../../infra/trading/ops/edgeDecayMonitor.ts";
 import {
@@ -28,11 +24,9 @@ import {
   evaluateOperatorEquation,
 } from "../../infra/trading/ops/operatorEquation.ts";
 import {
-  isEmpiricalKellyEnabled,
   empiricalKelly,
 } from "../../infra/trading/quant/empiricalKelly.ts";
 import {
-  isKalmanVolatilityEnabled,
   kalmanVolatility,
 } from "../../infra/trading/quant/kalmanVolatility.ts";
 import {
@@ -485,7 +479,7 @@ export function formatBacktestSummary(result: BacktestResult): string {
         returns.reduce((s, r) => s + (r - mean) * (r - mean), 0) / returns.length;
       const sigma = Math.sqrt(variance);
 
-      if (isVolatilityDragEnabled()) {
+      {
         const periodsPerYear = 365;
         const arith = mean * periodsPerYear;
         const annualizedSigma = sigma * Math.sqrt(periodsPerYear);
@@ -494,12 +488,12 @@ export function formatBacktestSummary(result: BacktestResult): string {
         extra += `\n  Drag: arith ${(arith * 100).toFixed(1)}% → geo ${(geo * 100).toFixed(1)}% (σ=${(annualizedSigma * 100).toFixed(1)}%, drag ${(drag * 100).toFixed(1)}%)`;
       }
 
-      if (isHurstExponentEnabled() && returns.length >= 64) {
+      if (returns.length >= 64) {
         const h = calculateHurst(returns);
         extra += `\n  Hurst: ${h.hurst.toFixed(3)} → ${h.regime}${h.reliable ? "" : " (low confidence)"}`;
       }
 
-      if (isPerformanceDecompositionEnabled()) {
+      {
         const marketReturn = Number(process.env.GORDON_BENCHMARK_RETURN ?? "NaN");
         const marketBeta = Number(process.env.GORDON_PORTFOLIO_BETA ?? "NaN");
         if (Number.isFinite(marketReturn) && Number.isFinite(marketBeta)) {
@@ -513,7 +507,7 @@ export function formatBacktestSummary(result: BacktestResult): string {
         }
       }
 
-      if (isEdgeDecayEnabled() && returns.length >= 60) {
+      if (returns.length >= 60) {
         const rMultiples = returns.map((r) => r / Math.max(sigma, 1e-6));
         const decay = evaluateDecay({ setupId: result.strategyName, rMultiples });
         extra += `\n  Edge decay: recent ${decay.recentExpectancy.toFixed(2)}R vs baseline ${decay.baselineExpectancy.toFixed(2)}R → ${decay.state}`;
@@ -545,12 +539,12 @@ export function formatBacktestSummary(result: BacktestResult): string {
         }
       }
 
-      if (isKalmanVolatilityEnabled() && returns.length >= 60) {
+      if (returns.length >= 60) {
         const kv = kalmanVolatility({ returns, q: 0.1, r: 1.0 });
         extra += `\n  Kalman vol: current ${(kv.currentAnnualVol * 100).toFixed(1)}% annualized, range [${(kv.minAnnualVol * 100).toFixed(1)}%, ${(kv.maxAnnualVol * 100).toFixed(1)}%]`;
       }
 
-      if (isEmpiricalKellyEnabled() && metrics.totalTrades >= 10) {
+      if (metrics.totalTrades >= 10) {
         const wins = metrics.winningTrades;
         const losses = metrics.losingTrades;
         const winRate = wins / Math.max(wins + losses, 1);

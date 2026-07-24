@@ -35,17 +35,6 @@
  * Pure compute. No I/O.
  */
 
-export const PAIRS_ELIGIBILITY_FILTER_FLAG_ENV = "GORDON_PAIRS_ELIGIBILITY_FILTER";
-
-export function isPairsEligibilityFilterEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[PAIRS_ELIGIBILITY_FILTER_FLAG_ENV] === "1" ||
-    env[PAIRS_ELIGIBILITY_FILTER_FLAG_ENV] === "true"
-  );
-}
-
 export interface PairsEligibilityFilterInput {
   /** Engle-Granger cointegration p-value (lower of X→Y and Y→X). */
   cointegrationPValue: number;

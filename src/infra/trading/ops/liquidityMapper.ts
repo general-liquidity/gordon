@@ -16,17 +16,6 @@
  * exists — this is the producer for that signal).
  */
 
-export const LIQUIDITY_MAPPER_FLAG_ENV = "GORDON_LIQUIDITY_MAPPER";
-
-export function isLiquidityMapperEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[LIQUIDITY_MAPPER_FLAG_ENV] === "1" ||
-    env[LIQUIDITY_MAPPER_FLAG_ENV] === "true"
-  );
-}
-
 export type ZoneKind = "support" | "resistance" | "round_number" | "moving_average" | "session_high" | "session_low";
 
 export interface StructuralLevel {

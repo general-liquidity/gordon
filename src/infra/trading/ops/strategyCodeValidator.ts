@@ -25,8 +25,6 @@
  * runs BEFORE the sandbox so blatant anti-patterns never execute.
  */
 
-export const STRATEGY_CODE_VALIDATOR_FLAG_ENV = "GORDON_STRATEGY_CODE_VALIDATOR";
-
 export type RuleSeverity = "block" | "warn" | "info";
 export type LeakageFamily =
   | "centered_window"
@@ -68,13 +66,6 @@ export interface ValidatorResult {
   countsBySeverity: Record<RuleSeverity, number>;
   /** Aggregated fix instruction for blocked rules. */
   blockingFixInstruction: string | null;
-}
-
-export function isStrategyCodeValidatorEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[STRATEGY_CODE_VALIDATOR_FLAG_ENV] === "1" ||
-    env[STRATEGY_CODE_VALIDATOR_FLAG_ENV] === "true"
-  );
 }
 
 // ============================================================================

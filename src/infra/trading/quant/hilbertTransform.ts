@@ -19,12 +19,6 @@
  *     (signal: the regime is shifting to trend or noise).
  */
 
-export const HILBERT_TRANSFORM_FLAG_ENV = "GORDON_HILBERT_TRANSFORM";
-
-export function isHilbertTransformEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[HILBERT_TRANSFORM_FLAG_ENV] === "1" || env[HILBERT_TRANSFORM_FLAG_ENV] === "true";
-}
-
 export interface HilbertInput {
   prices: ReadonlyArray<number>;
   /** Pre-detrend the series by subtracting a SMA of this many bars. Default 0 (no detrend). */

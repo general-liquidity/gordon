@@ -1,18 +1,9 @@
 import { describe, it, expect } from "bun:test";
 import {
-  isMarketProfileEnabled,
   computeMarketProfile,
   marketProfileToPayload,
-  MARKET_PROFILE_FLAG_ENV,
   type ProfileBar,
 } from "./marketProfile.ts";
-
-describe("isMarketProfileEnabled", () => {
-  it("respects the flag", () => {
-    expect(isMarketProfileEnabled({})).toBe(false);
-    expect(isMarketProfileEnabled({ [MARKET_PROFILE_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 function bars(samples: Array<[number, number, number]>): ProfileBar[] {
   return samples.map(([t, low, high]) => ({ timestamp: t, low, high }));

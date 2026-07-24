@@ -4,14 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  isKvCacheMetricEnabled,
   defaultKvCacheMetricPath,
   recordCacheCall,
   readCacheCalls,
   summarizeHitRate,
   formatHitRateSummary,
   summaryToPayload,
-  KV_CACHE_METRIC_FLAG_ENV,
   KV_CACHE_METRIC_PATH_ENV,
 } from "./kvCacheHitMetric.ts";
 
@@ -21,14 +19,6 @@ let logPath: string;
 beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), "gordon-kv-cache-test-"));
   logPath = join(tempDir, "metrics.jsonl");
-});
-
-describe("isKvCacheMetricEnabled", () => {
-  it("respects the flag", () => {
-    expect(isKvCacheMetricEnabled({})).toBe(false);
-    expect(isKvCacheMetricEnabled({ [KV_CACHE_METRIC_FLAG_ENV]: "1" })).toBe(true);
-    expect(isKvCacheMetricEnabled({ [KV_CACHE_METRIC_FLAG_ENV]: "true" })).toBe(true);
-  });
 });
 
 describe("defaultKvCacheMetricPath", () => {
