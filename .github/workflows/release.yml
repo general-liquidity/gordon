@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  DIST_REPO: general-liquidity/gordon-cli-dist
+  DIST_REPO: general-liquidity/gordon-dist
 
 jobs:
   test:
@@ -376,7 +376,7 @@ jobs:
           # Pre-release tags like v0.9.0-friends.1 publish under @friends.
           # Stable tags like v0.9.0 publish under @latest.
           # This keeps friend-only releases out of the default channel so
-          # `npm install -g @general-liquidity/gordon-cli` won't pick them up.
+          # `npm install -g @general-liquidity/gordon` won't pick them up.
           if echo "${{ github.ref_name }}" | grep -qE 'friends|alpha|beta|rc'; then
             echo "tag=friends" >> "$GITHUB_OUTPUT"
           else
@@ -389,7 +389,7 @@ jobs:
         # tarball to this specific workflow run, so downstream installers
         # can verify the package was built by Gordon's CI (not a tampered
         # tarball). Public repo + public package are required for npm to
-        # accept provenance; both hold for @general-liquidity/gordon-cli.
+        # accept provenance; both hold for @general-liquidity/gordon.
         run: npm publish --access public --tag "${{ steps.dist-tag.outputs.tag }}" --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,4 +1,4 @@
-export const AGENT_TEMPLATE = `import { createGordonSDKClient } from "@general-liquidity/gordon-cli/sdk";
+export const AGENT_TEMPLATE = `import { createGordonSDKClient } from "@general-liquidity/gordon/sdk";
 
 const gordon = createGordonSDKClient({
   token: process.env.GORDON_AUTH_TOKEN!,

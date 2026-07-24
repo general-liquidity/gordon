@@ -321,7 +321,7 @@ export class LocalMCPServerInstance implements MCPServerInstance {
       protocolVersion: '2024-11-05',
       capabilities: {},
       clientInfo: {
-        name: 'gordon-cli',
+        name: 'gordon',
         version: '0.5.0',
       },
     });

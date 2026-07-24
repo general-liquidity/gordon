@@ -27,7 +27,7 @@ export class AutoUpdateChecker {
   async checkForUpdate(): Promise<UpdateInfo | null> {
     try {
       const tag = this.channel === "beta" ? "beta" : "latest";
-      const response = await fetch(`https://registry.npmjs.org/gordon-cli/${tag}`, {
+      const response = await fetch(`https://registry.npmjs.org/gordon/${tag}`, {
         signal: AbortSignal.timeout(5000),
         headers: { Accept: "application/json" },
       });

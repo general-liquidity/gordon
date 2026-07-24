@@ -14,7 +14,7 @@ import { Cache } from "../../../platform/cache/cache.ts";
 import { createModuleLogger } from "../../../logger/index.ts";
 
 const logger = createModuleLogger("sec-segments");
-const USER_AGENT = "Gordon-CLI/0.8 (trading terminal; contact@gordon-cli.dev)";
+const USER_AGENT = "Gordon/0.8 (trading terminal; contact@gordon-cli.dev)";
 
 const segmentCache = new Cache<SegmentBreakdown>({ defaultTtl: 24 * 60 * 60 * 1000 });
 const tickerCikCache = new Cache<string>({ defaultTtl: 24 * 60 * 60 * 1000 });

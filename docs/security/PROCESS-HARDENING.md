@@ -63,7 +63,7 @@ the native binary through a minimal shell that zeroes the core limit first:
 - **Windows is unaffected**: no core dumps exist there and there is no POSIX
   `ulimit`, so the wrapper keeps the original direct `spawn(binaryPath, args)`.
 
-This covers users who install via `npm i -g @general-liquidity/gordon-cli`.
+This covers users who install via `npm i -g @general-liquidity/gordon`.
 
 ### 2. Operators running the binary directly
 

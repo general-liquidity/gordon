@@ -63,7 +63,7 @@ function getInstalledBinaryPath(packageRoot = path.resolve(__dirname, ".."), pla
 function getDownloadUrl(version, platform = process.platform, arch = process.arch) {
   const { assetName } = getTarget(platform, arch);
   const cleanVersion = String(version).replace(/^v/, "");
-  const distRepo = process.env.GORDON_BINARY_DIST_REPO || "general-liquidity/gordon-cli-dist";
+  const distRepo = process.env.GORDON_BINARY_DIST_REPO || "general-liquidity/gordon-dist";
   const baseUrl =
     process.env.GORDON_BINARY_BASE_URL || `https://github.com/${distRepo}/releases/download/v${cleanVersion}`;
   return `${baseUrl.replace(/\/$/, "")}/${assetName}`;

@@ -16,7 +16,7 @@ const EFTS_BASE = "https://efts.sec.gov/LATEST";
 const SEC_ARCHIVES = "https://www.sec.gov/Archives/edgar/data";
 const SUBMISSIONS_BASE = "https://data.sec.gov/submissions";
 const COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json";
-const USER_AGENT = "Gordon-CLI/0.8 (trading terminal; contact@gordon-cli.dev)";
+const USER_AGENT = "Gordon/0.8 (trading terminal; contact@gordon-cli.dev)";
 
 // Rate-limiting: track last request time, enforce 100ms minimum gap
 let lastRequestTime = 0;

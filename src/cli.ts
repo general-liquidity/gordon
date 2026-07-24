@@ -282,8 +282,8 @@ OPERATIONS
   gordon bootstrap --profile quickstart --llm-provider openai --llm-key sk-...
 
 SUPPORT
-  GitHub:  https://github.com/general-liquidity/gordon-cli
-  Issues:  https://github.com/general-liquidity/gordon-cli/issues`);
+  GitHub:  https://github.com/general-liquidity/gordon
+  Issues:  https://github.com/general-liquidity/gordon/issues`);
 }
 
 export function printVersion(): void {
@@ -424,8 +424,8 @@ export async function runUninstall(): Promise<void> {
     const { rm } = await import("node:fs/promises");
     await rm(GORDON_DIR, { recursive: true, force: true });
     console.log(`\nRemoved ${GORDON_DIR}`);
-    console.log("To reinstall: npm install -g @general-liquidity/gordon-cli");
-    console.log("If global npm permissions are blocked: npx @general-liquidity/gordon-cli@latest install");
+    console.log("To reinstall: npm install -g @general-liquidity/gordon");
+    console.log("If global npm permissions are blocked: npx @general-liquidity/gordon@latest install");
   } catch (error) {
     console.error(`\nFailed to remove ${GORDON_DIR}:`, error);
     process.exit(1);

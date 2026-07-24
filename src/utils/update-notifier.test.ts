@@ -28,8 +28,8 @@ describe("update notifier prompt formatting", () => {
       "0.8.9",
       {
         command: "npm",
-        args: ["install", "-g", "@general-liquidity/gordon-cli@latest"],
-        display: "npm install -g @general-liquidity/gordon-cli@latest",
+        args: ["install", "-g", "@general-liquidity/gordon@latest"],
+        display: "npm install -g @general-liquidity/gordon@latest",
         publicDisplay: "gordon --upgrade",
       },
       { color: true },
@@ -47,8 +47,8 @@ describe("update notifier prompt formatting", () => {
       "0.8.9",
       {
         command: "bun",
-        args: ["update", "-g", "@general-liquidity/gordon-cli"],
-        display: "bun update -g @general-liquidity/gordon-cli",
+        args: ["update", "-g", "@general-liquidity/gordon"],
+        display: "bun update -g @general-liquidity/gordon",
         publicDisplay: "gordon --upgrade",
       },
       { color: false },
@@ -113,7 +113,7 @@ describe("update command selection", () => {
     expect(command?.command).toBe("npx");
     expect(command?.args).toEqual([
       "--yes",
-      `@general-liquidity/gordon-cli@${expectedTag}`,
+      `@general-liquidity/gordon@${expectedTag}`,
       "install",
       "--target-dir",
       "/home/george/.local/bin",
@@ -125,7 +125,7 @@ describe("update command selection", () => {
 
     expect(command).not.toBeNull();
     expect(command?.command).toBe("brew");
-    expect(command?.args).toEqual(["upgrade", "general-liquidity/gordon-cli-dist/gordon"]);
+    expect(command?.args).toEqual(["upgrade", "general-liquidity/gordon-dist/gordon"]);
   });
 
   it("detects the dist-tag from the version string", () => {

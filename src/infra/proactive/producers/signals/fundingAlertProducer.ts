@@ -59,7 +59,7 @@ async function fetchHyperliquidFunding(): Promise<Map<string, number>> {
   try {
     const res = await fetch("https://api.hyperliquid.xyz/info", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "User-Agent": "gordon-cli/0.7" },
+      headers: { "Content-Type": "application/json", "User-Agent": "gordon/0.7" },
       body: JSON.stringify({ type: "metaAndAssetCtxs" }),
       signal: AbortSignal.timeout(10_000),
     });

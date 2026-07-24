@@ -83,7 +83,7 @@ runNpm(
   { env: installEnv }
 );
 
-const installedRoot = path.join(smokeDirectory, "node_modules", "@general-liquidity", "gordon-cli");
+const installedRoot = path.join(smokeDirectory, "node_modules", "@general-liquidity", "gordon");
 const installedBinary = path.join(
   installedRoot,
   "vendor",

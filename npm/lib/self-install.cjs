@@ -72,7 +72,7 @@ function printHelp() {
 Install Gordon into a user-writable bin directory without requiring \`npm install -g\`.
 
 Usage:
-  npx @general-liquidity/gordon-cli@latest install
+  npx @general-liquidity/gordon@latest install
   gordon install --target-dir <directory>
 
 Options:

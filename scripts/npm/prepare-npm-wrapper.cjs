@@ -6,9 +6,9 @@ const rootPackagePath = path.join(rootDirectory, "package.json");
 const wrapperDirectory = path.join(rootDirectory, "npm");
 const wrapperPackagePath = path.join(wrapperDirectory, "package.json");
 const filesToCopy = ["LICENSE"];
-const WRAPPER_REPOSITORY_URL = "https://github.com/general-liquidity/gordon-cli-dist.git";
+const WRAPPER_REPOSITORY_URL = "https://github.com/general-liquidity/gordon-dist.git";
 const WRAPPER_HOMEPAGE = "https://gordoncli.com";
-const WRAPPER_BUGS_URL = "https://github.com/general-liquidity/gordon-cli-dist/issues";
+const WRAPPER_BUGS_URL = "https://github.com/general-liquidity/gordon-dist/issues";
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));

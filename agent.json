@@ -5,7 +5,7 @@
   "title": "Gordon — Trading Agent",
   "description": "AI trading agent for crypto and equities. Connects to crypto exchanges via CCXT (Binance, Coinbase, Kraken, OKX, Hyperliquid, and 90+ more) plus equity brokers. Read-only onchain data and wallet-intelligence adapters for DEX pools, yields, and address labels. Built-in risk classifier, trade ledger, and the Gordon safety stack. Runs proactive radar for news/regime/volatility/funding signals.",
   "homepage": "https://generalliquidity.com",
-  "repository": "https://github.com/general-liquidity/gordon-cli",
+  "repository": "https://github.com/general-liquidity/gordon",
   "license": "MIT",
   "categories": ["trading", "finance", "analysis"],
   "tags": ["trading", "crypto", "equities", "ccxt", "exchange", "binance", "coinbase", "kraken", "hyperliquid", "okx", "risk", "backtest"],

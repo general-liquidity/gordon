@@ -1,6 +1,6 @@
 # Gordon CLI Installer for Windows
-# Usage: irm https://raw.githubusercontent.com/general-liquidity/gordon-cli-dist/main/install.ps1 | iex
-# Custom dir: $env:GORDON_INSTALL_DIR="$env:LOCALAPPDATA\\Programs\\Gordon"; irm https://raw.githubusercontent.com/general-liquidity/gordon-cli-dist/main/install.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/general-liquidity/gordon-dist/main/install.ps1 | iex
+# Custom dir: $env:GORDON_INSTALL_DIR="$env:LOCALAPPDATA\\Programs\\Gordon"; irm https://raw.githubusercontent.com/general-liquidity/gordon-dist/main/install.ps1 | iex
 
 [CmdletBinding()]
 param(
@@ -9,7 +9,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$Repo = if ($env:GORDON_DIST_REPO) { $env:GORDON_DIST_REPO } else { "general-liquidity/gordon-cli-dist" }
+$Repo = if ($env:GORDON_DIST_REPO) { $env:GORDON_DIST_REPO } else { "general-liquidity/gordon-dist" }
 $BinaryName = "gordon"
 
 function Write-Info($msg) { Write-Host "info: $msg" -ForegroundColor Cyan }

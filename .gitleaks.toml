@@ -1,11 +1,11 @@
-# gitleaks config for gordon-cli — extends the built-in ruleset and allowlists
+# gitleaks config for gordon — extends the built-in ruleset and allowlists
 # the handful of obviously-fake secrets that live in test fixtures and the
 # committed env template. Keep this list TIGHT: allowlist specific dummy
 # patterns, never whole directories — a real key committed in a test is still a
 # leak. When the CI gate fires on a genuine false positive, add the narrowest
 # possible rule here rather than weakening the gate.
 
-title = "gordon-cli gitleaks config"
+title = "gordon gitleaks config"
 
 [extend]
 useDefault = true

@@ -25,7 +25,7 @@ scripts/
 
 | File | What it does |
 |---|---|
-| `prepare-npm-wrapper.cjs` | Builds the thin `@general-liquidity/gordon-cli` npm package that downloads the platform binary on install. |
+| `prepare-npm-wrapper.cjs` | Builds the thin `@general-liquidity/gordon` npm package that downloads the platform binary on install. |
 | `check-npm-wrapper.cjs` | Schema-checks the generated wrapper before publish. |
 | `smoke-npm-wrapper.cjs` | Installs the packed wrapper into a clean dir and exercises `gordon --version`. |
 | `audit-npm-pack.cjs` | Runs `npm pack --dry-run` + asserts only the whitelisted files ship. |
@@ -134,7 +134,7 @@ specifically searched for `bypass_2fa: true` tokens:
   Save the recovery codes in a password manager — these are the only
   way to recover the account if the 2FA device is lost.
 - **Set per-package MFA to `automation`** on the published package:
-  `npm access set mfa=automation @general-liquidity/gordon-cli`.
+  `npm access set mfa=automation @general-liquidity/gordon`.
   Forces every publish (interactive or token-based) to use either
   trusted-publisher OIDC or a granular automation-class token. Default
   `none` allows any token to publish — the worm's exact attack vector.
@@ -249,7 +249,7 @@ After installing the npm wrapper, users can verify the wrapper's
 authenticity:
 
 ```bash
-npm install -g @general-liquidity/gordon-cli
+npm install -g @general-liquidity/gordon
 npm audit signatures
 ```
 
@@ -301,7 +301,7 @@ If you discover malware in Gordon or in one of its dependencies:
    publishes a security placeholder, and posts an advisory. They
    may also ban the uploader account.
 2. **Notify users** by deprecating the affected Gordon release on
-   npm: `npm deprecate @general-liquidity/gordon-cli@<bad-version>
+   npm: `npm deprecate @general-liquidity/gordon@<bad-version>
    "Compromised — upgrade to <safe-version> immediately"`.
 3. **Rotate all credentials** that may have been accessible from
    the affected environment (AWS, GitHub, npm tokens, etc.).

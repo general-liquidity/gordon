@@ -8,7 +8,7 @@ export const PACKAGE_JSON_TEMPLATE = `{
     "dev": "{{RUN_CMD}} --watch src/index.ts"
   },
   "dependencies": {
-    "@general-liquidity/gordon-cli": "latest"
+    "@general-liquidity/gordon": "latest"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

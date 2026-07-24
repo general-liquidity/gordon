@@ -30,7 +30,7 @@ try {
 
 if (!fs.existsSync(binaryPath)) {
   console.error(
-    "[gordon] The Gordon binary is missing. Reinstall with `npm install -g @general-liquidity/gordon-cli` or run `npx @general-liquidity/gordon-cli@latest install` for a user-local install."
+    "[gordon] The Gordon binary is missing. Reinstall with `npm install -g @general-liquidity/gordon` or run `npx @general-liquidity/gordon@latest install` for a user-local install."
   );
   process.exit(1);
 }

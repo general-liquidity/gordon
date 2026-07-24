@@ -80,7 +80,7 @@ const COIN_ID_MAP: Record<string, string> = {
 };
 
 const BASE_URL = "https://api.coingecko.com/api/v3";
-const USER_AGENT = "gordon-cli/0.8";
+const USER_AGENT = "gordon/0.8";
 
 // ============================================================================
 // Rate Limiter

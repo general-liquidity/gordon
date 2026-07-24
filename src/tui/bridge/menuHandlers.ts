@@ -503,7 +503,7 @@ export async function handleRuntimeMenuCommand(
         `Tools: ${state.tooling.tools.length}\n` +
         `Plugins: ${state.tooling.plugins.length}\n` +
         `Last error: ${state.lastError ?? "none"}\n\n` +
-        `Paste this with your bug description at: https://github.com/gordon/gordon-cli/issues`
+        `Paste this with your bug description at: https://github.com/general-liquidity/gordon/issues`
       );
       return true;
     }

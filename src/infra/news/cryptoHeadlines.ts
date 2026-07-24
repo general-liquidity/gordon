@@ -136,7 +136,7 @@ async function fetchSource(src: NewsSource, signal?: AbortSignal): Promise<NewsH
   try {
     const res = await fetch(SOURCES[src].url, {
       signal: ctrl.signal,
-      headers: { "User-Agent": "gordon-cli/0.9 (crypto-news-radar)" },
+      headers: { "User-Agent": "gordon/0.9 (crypto-news-radar)" },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${src}`);
     const xml = await res.text();

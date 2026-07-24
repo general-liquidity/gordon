@@ -623,8 +623,8 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         : "Show the latest prompt grounding, context budget, and model-usage report for this thread";
     case "bugreport":
       return args
-        ? `Generate a bug report with this description: "${args}". Include system info: gordon version, Bun version, OS, active exchange, config directory, and mode. Format it as a pre-filled GitHub issue link for https://github.com/general-liquidity/gordon-cli/issues/new.`
-        : "Help me create a bug report. Ask what went wrong, then generate a pre-filled GitHub issue link with system diagnostics for https://github.com/general-liquidity/gordon-cli/issues/new.";
+        ? `Generate a bug report with this description: "${args}". Include system info: gordon version, Bun version, OS, active exchange, config directory, and mode. Format it as a pre-filled GitHub issue link for https://github.com/general-liquidity/gordon/issues/new.`
+        : "Help me create a bug report. Ask what went wrong, then generate a pre-filled GitHub issue link with system diagnostics for https://github.com/general-liquidity/gordon/issues/new.";
     case "whatsnew":
       return "Show me the recent changes, new features, and improvements in the latest Gordon version. Summarize the changelog highlights.";
     // Strategy Runtime commands

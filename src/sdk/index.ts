@@ -12,7 +12,7 @@
  *
  * @example
  * ```typescript
- * import { createGordonSDK } from "@general-liquidity/gordon-cli/sdk";
+ * import { createGordonSDK } from "@general-liquidity/gordon/sdk";
  *
  * const client = createGordonSDK({ token: "your-daemon-token" });
  *

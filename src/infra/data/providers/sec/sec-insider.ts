@@ -14,7 +14,7 @@ import { Cache } from "../../../platform/cache/cache.ts";
 import { createModuleLogger } from "../../../logger/index.ts";
 
 const logger = createModuleLogger("sec-insider");
-const USER_AGENT = "Gordon-CLI/0.8 (trading terminal; contact@gordon-cli.dev)";
+const USER_AGENT = "Gordon/0.8 (trading terminal; contact@gordon-cli.dev)";
 
 const submissionsCache = new Cache<InsiderTransaction[]>({ defaultTtl: 60 * 60 * 1000 });
 const tickerCikCache = new Cache<string>({ defaultTtl: 24 * 60 * 60 * 1000 });

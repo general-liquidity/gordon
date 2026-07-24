@@ -190,7 +190,7 @@ async function finnhubGet<T>(
 
   try {
     const res = await fetch(url, {
-      headers: { "User-Agent": "gordon-cli/0.7" },
+      headers: { "User-Agent": "gordon/0.7" },
       signal: AbortSignal.timeout(15_000),
     });
     if (res.ok) recordEndpointCall("finnhub", endpointKey);

@@ -14,7 +14,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { GORDON_DIR } from "./paths.ts";
 
-const SERVICE_NAME = "gordon-cli";
+const SERVICE_NAME = "gordon";
 const KEYRING_JSON_PATH = join(GORDON_DIR, "keyring.json");
 
 // Keys we support storing in keyring

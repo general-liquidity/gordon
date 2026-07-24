@@ -7,8 +7,8 @@
 
 *Talk to it like a desk partner. It can't talk its way past your risk limits.*
 
-[![npm version](https://img.shields.io/npm/v/@general-liquidity/gordon-cli?style=flat-square&color=34eeb0&label=npm)](https://www.npmjs.com/package/@general-liquidity/gordon-cli)
-[![Build](https://img.shields.io/github/actions/workflow/status/general-liquidity/gordon-cli/release.yml?style=flat-square&label=build)](https://github.com/general-liquidity/gordon-cli/actions)
+[![npm version](https://img.shields.io/npm/v/@general-liquidity/gordon?style=flat-square&color=34eeb0&label=npm)](https://www.npmjs.com/package/@general-liquidity/gordon)
+[![Build](https://img.shields.io/github/actions/workflow/status/general-liquidity/gordon/release.yml?style=flat-square&label=build)](https://github.com/general-liquidity/gordon/actions)
 [![Bun](https://img.shields.io/badge/Bun->=1.0-14151a?style=flat-square&logo=bun&logoColor=fbf0df)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
@@ -68,7 +68,7 @@ Three convictions the whole codebase is built around.
 > **Requirements:** Node.js ≥ 18 (for the npm wrapper) or [Bun](https://bun.sh) ≥ 1.0 (from source). A 64-bit, true-color terminal is strongly recommended.
 
 ```bash
-npm install -g @general-liquidity/gordon-cli
+npm install -g @general-liquidity/gordon
 ```
 
 The wrapper fetches the prebuilt binary for your platform (macOS arm64/x64, Linux x64/arm64 glibc + musl, Windows x64/arm64). The `gordon` command *is* the binary; no resident Node process.
@@ -77,10 +77,10 @@ The wrapper fetches the prebuilt binary for your platform (macOS arm64/x64, Linu
 <summary>Bun, or from source</summary>
 
 ```bash
-bun add -g @general-liquidity/gordon-cli      # Bun global
+bun add -g @general-liquidity/gordon      # Bun global
 
-git clone https://github.com/general-liquidity/gordon-cli.git
-cd gordon-cli && bun install && bun run build && bun start   # from source
+git clone https://github.com/general-liquidity/gordon.git
+cd gordon && bun install && bun run build && bun start   # from source
 ```
 </details>
 

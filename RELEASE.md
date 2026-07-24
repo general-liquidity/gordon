@@ -60,16 +60,16 @@ exact tarball to the public default channel (no rebuild), move the dist-tag:
 
 ```bash
 # Point @latest at the version currently on @friends.
-npm dist-tag add @general-liquidity/gordon-cli@0.9.0 latest
+npm dist-tag add @general-liquidity/gordon@0.9.0 latest
 
 # Optional: retire the friends pointer once latest is live.
-npm dist-tag rm @general-liquidity/gordon-cli friends
+npm dist-tag rm @general-liquidity/gordon friends
 
 # Verify the channel map.
-npm dist-tag ls @general-liquidity/gordon-cli
+npm dist-tag ls @general-liquidity/gordon
 ```
 
-`npm install -g @general-liquidity/gordon-cli` resolves `@latest`, so after the
+`npm install -g @general-liquidity/gordon` resolves `@latest`, so after the
 flip a stranger installs the public build by default.
 
 ## Do NOT

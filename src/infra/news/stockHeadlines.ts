@@ -38,7 +38,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 6_000;
 const TICKER_MAP_TTL_MS = 24 * 60 * 60 * 1000;
 
-const SEC_USER_AGENT = "gordon-cli/0.9 (crypto-news-radar; contact: oss@general-liquidity.com)";
+const SEC_USER_AGENT = "gordon/0.9 (crypto-news-radar; contact: oss@general-liquidity.com)";
 
 interface CacheEntry {
   fetchedAt: number;
@@ -167,7 +167,7 @@ async function fetchYahoo(ticker: string, signal?: AbortSignal): Promise<StockHe
     const url = `https://finance.yahoo.com/rss/headline?s=${encodeURIComponent(ticker)}`;
     const res = await fetch(url, {
       signal: ctrl.signal,
-      headers: { "User-Agent": "gordon-cli/0.9 (stock-news-radar)" },
+      headers: { "User-Agent": "gordon/0.9 (stock-news-radar)" },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status} fetching yahoo:${ticker}`);
     const xml = await res.text();
