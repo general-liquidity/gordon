@@ -157,7 +157,7 @@ export const estimateMarketImpactTool = createTool({
     fillPercentage: z.number(),
     interpretation: z.string(),
     error: z.string().optional(),
-  }),
+  }).partial(),
   execute: async ({ symbol, orderSizeUsd, side }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
@@ -237,7 +237,7 @@ export const scanBreakoutsTool = createTool({
     distanceToSupport: z.number(),
     interpretation: z.string(),
     error: z.string().optional(),
-  }),
+  }).partial(),
   execute: async ({ symbol, timeframe, lookbackBars }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
@@ -313,7 +313,7 @@ export const detectConsolidationTool = createTool({
     positionInRange: z.string(),
     interpretation: z.string(),
     error: z.string().optional(),
-  }),
+  }).partial(),
   execute: async ({ symbol, timeframe, consolidationThreshold }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
@@ -401,7 +401,7 @@ export const scoreMarketTool = createTool({
     }),
     interpretation: z.string(),
     error: z.string().optional(),
-  }),
+  }).partial(),
   execute: async ({ symbol, includeWhaleAnalysis }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {

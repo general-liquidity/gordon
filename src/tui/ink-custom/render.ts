@@ -277,7 +277,13 @@ function VanillaInkContextBridge({
   children?: ReactNode;
 }): React.ReactElement {
   const app = inkUseApp();
-  const stdin = inkUseStdin();
+  // Ink 7 narrowed `useStdin()`'s return type to `PublicProps`, but the runtime
+  // context value is still the full internal `Props` (the internal fields are not
+  // re-exported from "ink", so recover them by widening the returned object).
+  const stdin = inkUseStdin() as ReturnType<typeof inkUseStdin> & {
+    internal_eventEmitter: EventEmitter;
+    internal_exitOnCtrlC: boolean;
+  };
   const stdout = inkUseStdout();
   const stderr = inkUseStderr();
 

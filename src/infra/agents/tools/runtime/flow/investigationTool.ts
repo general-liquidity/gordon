@@ -104,7 +104,7 @@ export const investigateTool = createTool({
     durationMs: z.number(),
     rounds: z.number(),
     error: z.string().optional(),
-  }),
+  }).partial(),
   execute: async ({ task, maxToolCalls, allowedTools }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.llm) return errors.noLlm;
@@ -197,7 +197,7 @@ export const forkContextTool = createTool({
     durationMs: z.number(),
     rounds: z.number(),
     error: z.string().optional(),
-  }),
+  }).partial(),
   execute: async (
     { task, parentMessages, stripSafetyMessages, maxToolCalls, allowedTools },
     execContext: MastraExecutionContext,

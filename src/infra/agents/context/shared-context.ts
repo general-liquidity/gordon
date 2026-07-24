@@ -829,6 +829,16 @@ export function getMemoryStats(): {
 /**
  * Tool for agents to read shared context from other agents
  */
+type SharedContextReadResult = {
+  found: boolean;
+  context?: unknown;
+  summary: string;
+  age?: number;
+  version?: number;
+  author?: string;
+  history?: unknown[];
+};
+
 export const readSharedContextTool = createTool({
   id: "read_shared_context",
   description:
@@ -872,7 +882,7 @@ export const readSharedContextTool = createTool({
           return { found: false, summary: `No analysis found for ${input.symbol}` };
         }
         const ctx = versioned.data;
-        const result: Record<string, unknown> = {
+        const result: SharedContextReadResult = {
           found: true,
           context: ctx,
           summary: `${input.symbol}: ${ctx.overallBias} bias with ${Math.round(ctx.confidence * 100)}% confidence`,
@@ -924,7 +934,7 @@ export const readSharedContextTool = createTool({
         if (!bt) {
           return { found: false, summary: "No backtest data in context" };
         }
-        const result: Record<string, unknown> = {
+        const result: SharedContextReadResult = {
           found: true,
           context: ctx,
           summary:

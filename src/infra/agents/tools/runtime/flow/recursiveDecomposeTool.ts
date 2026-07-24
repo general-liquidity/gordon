@@ -65,7 +65,7 @@ export const recursiveDecomposeTool = createTool({
     depthReached: z.number(),
     llmCallCount: z.number(),
     error: z.string().optional(),
-  }),
+  }).partial(),
   execute: async (
     { query, input, maxChunkChars, maxFanOut, maxDepth },
     execContext: MastraExecutionContext,

@@ -631,7 +631,7 @@ export const getPositionSizeTool = createTool({
     }),
     note: z.string(),
     error: z.string().optional(),
-  }),
+  }).partial(),
   execute: async ({ symbol, riskAmount, interval, atrMultiplier }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {

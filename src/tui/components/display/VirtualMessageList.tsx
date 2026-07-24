@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useMemo } from "react";
-import { Box, Static, type DOMElement } from "../../ink-custom";
+import { Box, Static } from "../../ink-custom";
+import type { DOMElement } from "ink";
 import { MessageBubble, type Message } from "../messages/MessageBubble.tsx";
 import { OffscreenFreeze } from "../layout/OffscreenFreeze.tsx";
 import useMouse, { type MouseEvent } from "../../ink-custom/hooks/use-mouse.js";

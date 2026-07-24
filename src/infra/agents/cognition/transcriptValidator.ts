@@ -1,5 +1,5 @@
 import { listActionLogEntries } from "../../action-log/store.ts";
-import type { CoreSystemMessage, CoreUserMessage } from "ai";
+import type { SystemModelMessage, UserModelMessage } from "ai";
 import type { GroundedPromptMessage } from "../context/contextBudget.ts";
 import type { GordonContext } from "../types.ts";
 
@@ -44,7 +44,7 @@ function normalizeForDeduplication(message: string): string {
   return normalizeWhitespace(message).toLowerCase();
 }
 
-type GroundedProviderOptions = CoreSystemMessage["providerOptions"] | CoreUserMessage["providerOptions"];
+type GroundedProviderOptions = SystemModelMessage["providerOptions"] | UserModelMessage["providerOptions"];
 
 function getProviderOptions(message: GroundedPromptMessage): GroundedProviderOptions | undefined {
   return "providerOptions" in message

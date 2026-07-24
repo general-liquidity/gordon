@@ -1,4 +1,4 @@
-import type { CoreMessage } from "ai";
+import type { ModelMessage } from "ai";
 import type { GordonConfig } from "../../../types/index.ts";
 import { GORDON_PRODUCT_TRUTH } from "../capabilityTruth.ts";
 import { buildEventDrivenReminders, getExecutionReadiness } from "../harness/runtimeHarness.ts";
@@ -103,7 +103,7 @@ export interface AnthropicCacheBlock {
   cache_control?: { type: "ephemeral" };
 }
 
-export type GroundedPromptMessage = CoreMessage;
+export type GroundedPromptMessage = ModelMessage;
 
 export interface PromptEnvelope {
   prompt: string;

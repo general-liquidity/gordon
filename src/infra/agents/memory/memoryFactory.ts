@@ -6,6 +6,7 @@
  */
 
 import { Memory } from "@mastra/memory";
+import type { MastraLegacyEmbeddingModel } from "@mastra/core/vector";
 import { getFastMastraModel } from "../../runtime/providers/registry.ts";
 import { LocalEmbeddingProvider } from "../../../core/memory/embeddings.ts";
 import { createMastraStorageConfig } from "./mastraStorage.ts";
@@ -62,11 +63,15 @@ const WORKING_MEMORY_TEMPLATE = `
 - ${WORKING_MEMORY_LABELS.baseCurrency}
 `;
 
-function createMastraLocalEmbedder() {
+function createMastraLocalEmbedder(): MastraLegacyEmbeddingModel<string> {
   const provider = new LocalEmbeddingProvider();
 
   return {
+    specificationVersion: "v1",
+    provider: "gordon-local",
     modelId: provider.name,
+    maxEmbeddingsPerCall: undefined,
+    supportsParallelCalls: false,
     async doEmbed(args: { values: string[] }): Promise<{ embeddings: number[][] }> {
       const embeddings = await provider.embedBatch(args.values);
       return { embeddings };

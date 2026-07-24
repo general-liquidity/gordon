@@ -340,7 +340,10 @@ export function createCachedTool<
     description: tool.description,
     inputSchema: tool.inputSchema,
     outputSchema: tool.outputSchema,
-    execute: cachedExecute as typeof originalExecute,
+    execute: cachedExecute as (
+      input: TSchemaIn,
+      context: ToolExecutionContext<unknown, unknown, unknown>,
+    ) => Promise<TSchemaOut>,
   }) as Tool<TSchemaIn, TSchemaOut, TSuspend, TResume, TContext, TId>;
 }
 

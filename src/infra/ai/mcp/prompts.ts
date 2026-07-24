@@ -31,6 +31,10 @@ import { z } from "zod";
 import { discoverSkillsFromDir } from "../../skills/loader.ts";
 import type { Skill } from "../../skills/types.ts";
 
+type RegisterPromptArgsSchema = NonNullable<
+  Parameters<McpServer["registerPrompt"]>[1]["argsSchema"]
+>;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -120,7 +124,14 @@ export function registerGordonPrompts(server: McpServer): PromptRegistrationSumm
       {
         title,
         description: skill.description,
-        ...(argsSchema ? { argsSchema } : {}),
+        // The MCP SDK bundles its own nested zod (4.3.x) whose `$ZodType` base differs
+        // structurally from the app's zod 4.4 `ZodOptional<ZodString>` (cross-package
+        // zod-version identity skew), so the otherwise-valid raw shape needs a cast to the
+        // SDK's own expected shape type (extracted via `Parameters`, which keeps the
+        // generic `Args` inference — and thus the callback typing — intact).
+        ...(argsSchema
+          ? { argsSchema: argsSchema as unknown as RegisterPromptArgsSchema }
+          : {}),
       },
       (args) => {
         const rendered = renderSkillBodyWithArgs(skill, args ?? {});
