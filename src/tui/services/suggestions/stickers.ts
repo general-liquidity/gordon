@@ -4,11 +4,11 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { getGordonDir } from "../../../infra/storage/paths.ts";
 
 export interface Sticker { id: string; emoji: string; label: string; }
 
-const STICKERS_PATH = join(homedir(), ".gordon", "stickers.json");
+const STICKERS_PATH = join(getGordonDir(), "stickers.json");
 
 const AVAILABLE: Sticker[] = [
   { id: "revenge-trade", emoji: "\uD83D\uDCA2", label: "Revenge Trade" },

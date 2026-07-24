@@ -10,9 +10,9 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { getGordonDir } from "../../../infra/storage/paths.ts";
 
-const DENIALS_PATH = join(homedir(), ".gordon", "denials.json");
+const DENIALS_PATH = join(getGordonDir(), "denials.json");
 
 export interface DenialRecord {
   id: string;

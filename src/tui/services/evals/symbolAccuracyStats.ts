@@ -7,9 +7,9 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { getGordonDir } from "../../../infra/storage/paths.ts";
 
-const SYMBOL_STATS_PATH = join(homedir(), ".gordon", "symbol-accuracy.json");
+const SYMBOL_STATS_PATH = join(getGordonDir(), "symbol-accuracy.json");
 
 export interface SymbolPrediction {
   timestamp: number;

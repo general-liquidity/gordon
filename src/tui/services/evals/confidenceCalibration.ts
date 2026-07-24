@@ -7,9 +7,9 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { getGordonDir } from "../../../infra/storage/paths.ts";
 
-const CALIBRATION_PATH = join(homedir(), ".gordon", "calibration.json");
+const CALIBRATION_PATH = join(getGordonDir(), "calibration.json");
 
 export interface CalibrationEntry {
   id: string;

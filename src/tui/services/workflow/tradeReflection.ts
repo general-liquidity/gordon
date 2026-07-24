@@ -12,9 +12,9 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { getGordonDir } from "../../../infra/storage/paths.ts";
 
-const REFLECTIONS_PATH = join(homedir(), ".gordon", "reflections.json");
+const REFLECTIONS_PATH = join(getGordonDir(), "reflections.json");
 
 export interface TradeOutcome {
   tradeId: string;
