@@ -7,7 +7,14 @@
 preload = ["./src/tui/ink-custom/buildCompilerPlugin.ts"]
 
 [test]
-preload = ["./src/tui/ink-custom/buildCompilerPlugin.ts"]
+# globalTestReset registers a beforeEach that clears process-global trade/gate
+# singletons (WIP registry, cost budget/halt, kill switches, constitution halt)
+# so no test inherits dirty state under the shared-process run. Test-isolation
+# only — it changes no gate default or logic.
+preload = [
+  "./src/tui/ink-custom/buildCompilerPlugin.ts",
+  "./src/testing/globalTestReset.ts",
+]
 
 # Supply-chain defense: refuse to install any npm package version
 # released less than 48h ago. Window covers the typical detection
