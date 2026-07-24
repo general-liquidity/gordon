@@ -244,22 +244,28 @@ jobs:
             os: ubuntu-latest
             binary_name: gordon-linux-arm64-musl
           # macOS
+          # Every target cross-compiles from Linux. `bun build --compile`
+          # takes an explicit --target, this job never runs or signs the
+          # binary it produces, and a Linux runner is far faster than the
+          # Windows and macOS ones (about 1 minute versus 5 to 15). Only move
+          # a target back to a native runner if it starts needing execution or
+          # code signing on the host.
           - target: darwin-x64
             bun_target: bun-darwin-x64
-            os: macos-latest
+            os: ubuntu-latest
             binary_name: gordon-darwin-x64
           - target: darwin-arm64
             bun_target: bun-darwin-arm64
-            os: macos-latest
+            os: ubuntu-latest
             binary_name: gordon-darwin-arm64
           # Windows — both architectures
           - target: windows-x64
             bun_target: bun-windows-x64
-            os: windows-latest
+            os: ubuntu-latest
             binary_name: gordon-windows-x64.exe
           - target: windows-arm64
             bun_target: bun-windows-arm64
-            os: windows-latest
+            os: ubuntu-latest
             binary_name: gordon-windows-arm64.exe
             experimental: true
     steps:
