@@ -4,9 +4,8 @@
  *
  * Architecture:
  * - Agent class from @mastra/core for LLM-powered agents
- * - Sub-agents via `agents` object for network routing
+ * - Sub-agents via the native `agents` supervisor map + `.stream()`/`.generate()` delegation
  * - Tools as objects: { tool_id: toolInstance }
- * - .network() method for multi-agent orchestration
  * - Memory integration with LibSQL for task tracking
  *
  * IMPORTANT: Agents are lazily initialized to ensure environment

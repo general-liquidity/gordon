@@ -17,7 +17,7 @@
  *
  * Usage:
  *   node scripts/npm/stage-platform-packages.cjs \
- *     --binaries dist-assets --out staging --version 0.9.0 [--manifest staging/manifest.json]
+ *     --binaries dist-assets --out staging --version 0.1.0 [--manifest staging/manifest.json]
  *
  * Output:
  *   <out>/@general-liquidity/gordon-<target>/package.json

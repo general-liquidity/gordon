@@ -14,7 +14,7 @@
  * guaranteed regardless of how the file is arranged.
  *
  * Usage:
- *   node scripts/npm/apply-release-hashes.cjs --manifest staging/manifest.json --version 0.9.0
+ *   node scripts/npm/apply-release-hashes.cjs --manifest staging/manifest.json --version 0.1.0
  *
  * The manifest is produced by scripts/npm/stage-platform-packages.cjs and maps
  * each staged asset to its sha256.
