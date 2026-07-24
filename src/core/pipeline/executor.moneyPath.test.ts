@@ -273,6 +273,7 @@ describe("placeOCOOrders fallback client IDs", () => {
 
     const client = {
       exchangeId: "kraken",
+      getOrderHistory: async () => [],
       placeOrder: async (params: { newClientOrderId?: string }) => {
         captured.push(params.newClientOrderId ?? "");
         return {

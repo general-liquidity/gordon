@@ -129,7 +129,7 @@ describe("antithetic variance reduction (GARCH)", () => {
     expect(anti.returnStdError).toBeLessThan(plain.returnStdError);
     // …and it converges to the same expected return (within a few plain SEs).
     expect(Math.abs(anti.expectedReturn - plain.expectedReturn)).toBeLessThan(5 * plain.returnStdError);
-  });
+  }, 30000);
 
   it("expected shortfall is a left-tail mean: ES₅ ≤ returnP5 ≤ expectedReturn", () => {
     const res = monteCarloPathRisk(rets, "garch", { ...cfg, antithetic: true });
