@@ -41,16 +41,11 @@ export interface LogTransport {
  * Upstream-noise patterns that the demo cloak suppresses at the
  * transport layer (so they never even reach console.error / stderr).
  * Keeps the demo terminal clean while leaving the retry / circuit-breaker
- * machinery untouched. Independently togglable per category.
- *
- * The earlier fetch-time patches (cloakDedalusErrors) only work for log
- * lines that go through process.stderr.write — Ink intercepts
- * console.error at mount time, so messages routed through console.*
- * leak past those patches. Filtering here, BEFORE the transport runs,
- * is the only fix that holds across runtimes.
+ * machinery untouched. Filtering here, BEFORE the transport runs, is the
+ * only fix that holds across runtimes (Ink intercepts console.error at
+ * mount time, so messages routed through console.* leak past fetch-time
+ * patches).
  */
-const DEDALUS_NOISE_RE =
-  /Upstream LLM API error from dedalus|api\.dedaluslabs\.ai|AI_APICallError\b[\s\S]{0,200}dedalus/i;
 // Exchange REST/WS noise (Binance URLs are the most common match).
 const EXCHANGE_NOISE_RE =
   /api\.binance\.com|fapi\.binance\.com|testnet\.binance\.vision|Public API request failed|Signed API request failed|Failed to get spot balances|Failed to get funding balances|Test order failed|Rate limit critical - approaching Binance limit|WebSocket connection failed|WebSocket disconnected|Reconnect attempt failed|Pong timeout/i;
@@ -60,7 +55,6 @@ function isCloakedNoise(entry: LogEntry): boolean {
     entry.message +
     (entry.context ? " " + JSON.stringify(entry.context) : "") +
     (entry.error ? " " + entry.error.name + ": " + entry.error.message : "");
-  if (process.env.GORDON_SHOW_DEDALUS_ERRORS !== "1" && DEDALUS_NOISE_RE.test(haystack)) return true;
   if (process.env.GORDON_SHOW_BINANCE_ERRORS !== "1" && EXCHANGE_NOISE_RE.test(haystack)) return true;
   return false;
 }

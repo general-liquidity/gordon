@@ -69,7 +69,7 @@ export interface DecisionTrace {
   confidence?: number;
   /** Model identifier that produced the final decision. */
   model?: string;
-  /** Provider identifier (anthropic, openai, dedalus, …). */
+  /** Provider identifier (anthropic, openai, google, xai, …). */
   provider?: string;
   /** ISO 8601 timestamp when the trace was finalized. */
   builtAt: string;

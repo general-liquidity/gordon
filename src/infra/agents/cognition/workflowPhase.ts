@@ -85,30 +85,23 @@ export function resolveModelForWorkflowPhase(
 }
 
 export function resolveWorkflowPhaseModelRoute(phase: WorkflowPhase): { provider: LLMProvider; model: string } {
-  switch (phase) {
-    case "compaction":
-    case "scan":
-    case "ops":
-      if (process.env.DEDALUS_API_KEY) {
-        return { provider: "dedalus", model: "google/gemini-3-flash-preview" };
-      }
-      if (process.env.OPENAI_API_KEY) {
-        return { provider: "openai", model: "gpt-5.4" };
-      }
-      return { provider: "dedalus", model: "openai/gpt-5.2" };
-    case "analysis":
-    case "planning":
-    case "execution":
-    case "critique":
-    default:
-      if (process.env.DEDALUS_API_KEY) {
-        return { provider: "dedalus", model: "openai/gpt-5.2" };
-      }
-      if (process.env.OPENAI_API_KEY) {
-        return { provider: "openai", model: "gpt-5.4" };
-      }
-      return { provider: "dedalus", model: "openai/gpt-5.2" };
+  const isFast = phase === "compaction" || phase === "scan" || phase === "ops";
+
+  // First-party only for direct calls — env keys auto-detected by Mastra.
+  if (process.env.ANTHROPIC_API_KEY) {
+    return { provider: "anthropic", model: isFast ? "claude-haiku-4-5" : "claude-sonnet-5" };
   }
+  if (process.env.OPENAI_API_KEY) {
+    return { provider: "openai", model: isFast ? "gpt-5.4-mini" : "gpt-5.6" };
+  }
+  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY) {
+    return { provider: "google", model: isFast ? "gemini-3.5-flash-lite" : "gemini-3.1-pro-preview" };
+  }
+  if (process.env.XAI_API_KEY) {
+    return { provider: "xai", model: isFast ? "grok-4.3" : "grok-4.5" };
+  }
+  // Default to Anthropic; Mastra surfaces a clear missing-key error if unset.
+  return { provider: "anthropic", model: isFast ? "claude-haiku-4-5" : "claude-sonnet-5" };
 }
 
 export function getPhasePromptGuidance(phase: WorkflowPhase): string[] {

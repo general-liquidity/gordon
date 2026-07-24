@@ -7,7 +7,8 @@
  */
 
 import { z } from "zod";
-import type { LLMClient, Message, ModelConfig } from "../ai/llm/index.ts";
+import type { LLMClient, Message, ModelConfig, LLMProvider } from "../ai/llm/index.ts";
+import { providerRegistry } from "../runtime/providers/registry.ts";
 import {
   type StrategyDSL,
   StrategyDSLSchema,
@@ -34,6 +35,25 @@ import { capacitySweep } from "../../backtest/analysis/marketImpact.ts";
 
 const logger = createModuleLogger("strategy-generator");
 export const BACKTEST_NOT_PERFORMED_WARNING = "Backtest not performed - exchange client unavailable";
+
+/**
+ * Resolve a model tier ("flagship" / "fast") to a provider + model against
+ * whichever first-party provider the operator configured, so strategy
+ * generation tracks the operator's model family instead of a hardcoded model.
+ * Falls back to a first-party Anthropic model when no key is configured.
+ */
+function tierRoute(tier: "flagship" | "fast"): { provider: LLMProvider; model: string } {
+  const fallback = tier === "fast" ? "anthropic/claude-haiku-4-5" : "anthropic/claude-opus-4-8";
+  let spec: string;
+  try {
+    spec = tier === "fast" ? providerRegistry.getFastModel() : providerRegistry.getDefaultModel();
+  } catch {
+    spec = fallback;
+  }
+  const slash = spec.indexOf("/");
+  if (slash === -1) return { provider: "anthropic", model: spec };
+  return { provider: spec.slice(0, slash) as LLMProvider, model: spec.slice(slash + 1) };
+}
 
 /** Fast stable hash for use as a multiple-testing codeHash. */
 function quickHashDsl(s: string): string {
@@ -476,8 +496,7 @@ Timeframes: ${options.timeframes.join(", ")}`,
 
     try {
       return await this.llm.chatWithJSON(messages, intentSchema, {
-        provider: "dedalus",
-        model: "anthropic/claude-haiku-4-5-20251001",
+        ...tierRoute("fast"),
         temperature: 0.3,
         maxTokens: 1000,
       });
@@ -852,8 +871,7 @@ Fix these errors and return valid JSON.
    */
   private getModelConfig(): ModelConfig {
     return {
-      provider: "dedalus",
-      model: "openai/gpt-5.2",
+      ...tierRoute("flagship"),
       temperature: 0.4,
       maxTokens: 4000,
     };

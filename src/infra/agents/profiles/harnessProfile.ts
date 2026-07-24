@@ -14,7 +14,7 @@
  *   GORDON_HARNESS_ANTHROPIC_SUFFIX
  *   GORDON_HARNESS_OPENAI_SUFFIX
  *   GORDON_HARNESS_GOOGLE_SUFFIX
- *   GORDON_HARNESS_DEDALUS_SUFFIX
+ *   GORDON_HARNESS_XAI_SUFFIX
  *
  * Why operator-authored: every team's per-model tuning differs (latency
  * profile, response-shape preferences, regulatory hints). Shipping
@@ -32,18 +32,11 @@
  *   - Returns undefined when no matcher fires; callers should treat this
  *     as "no suffix" (composer emits empty SUFFIX, which it already
  *     handles as a no-op).
- *
- * Dedalus note: Dedalus is OpenAI-compatible; provider strings often
- * arrive as `openai/anthropic/...` (multi-segment). The matcher for
- * "dedalus" only fires when the literal `dedalus` prefix is present
- * (e.g. when an operator explicitly tags the override). For the common
- * Dedalus-via-openai path, the openai profile fires — which matches the
- * actual API surface the model sees.
  */
 
 import type { MastraModelConfig } from "../../runtime/providers/registry.ts";
 
-export type HarnessProvider = "anthropic" | "openai" | "google" | "dedalus";
+export type HarnessProvider = "anthropic" | "openai" | "google" | "xai";
 
 export interface HarnessProfile {
   /** Canonical provider id. */
@@ -85,25 +78,18 @@ const GOOGLE_PROFILE: HarnessProfile = {
   envOverride: "GORDON_HARNESS_GOOGLE_SUFFIX",
 };
 
-const DEDALUS_PROFILE: HarnessProfile = {
-  provider: "dedalus",
-  matchers: ["dedalus"],
+const XAI_PROFILE: HarnessProfile = {
+  provider: "xai",
+  matchers: ["xai", "grok"],
   suffix: EMPTY_SUFFIX,
-  envOverride: "GORDON_HARNESS_DEDALUS_SUFFIX",
+  envOverride: "GORDON_HARNESS_XAI_SUFFIX",
 };
 
-/**
- * Ordered list — dedalus must precede openai because Dedalus override
- * tags typically start with "dedalus" but Dedalus traffic via openai-
- * compatible routing arrives with "openai" prefix. Matching dedalus
- * first lets operators force the dedalus profile by tagging the
- * override explicitly while leaving the openai pathway intact.
- */
 export const DEFAULT_HARNESS_PROFILES: ReadonlyArray<HarnessProfile> = [
-  DEDALUS_PROFILE,
   ANTHROPIC_PROFILE,
   GOOGLE_PROFILE,
   OPENAI_PROFILE,
+  XAI_PROFILE,
 ];
 
 function readEnvOverride(

@@ -289,8 +289,8 @@ export class GordonAcpAgent implements Agent {
 
   async authenticate(_params: AuthenticateRequest): Promise<AuthenticateResponse> {
     // Gordon authenticates via env-based provider keys (ANTHROPIC_API_KEY,
-    // OPENAI_API_KEY, DEDALUS_API_KEY, etc.) — set by the operator outside
-    // the ACP session. No interactive auth from the editor side.
+    // OPENAI_API_KEY, etc.) — set by the operator outside the ACP session.
+    // No interactive auth from the editor side.
     return {};
   }
 

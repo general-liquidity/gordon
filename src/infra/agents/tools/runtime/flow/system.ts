@@ -14,7 +14,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getGordonContext, type MastraExecutionContext } from "../../types.ts";
-import { providerRegistry, getDedalusModels, refreshDedalusModels, getActiveRoute, DIRECT_MODELS, type DirectProviderName } from "../../../../runtime/providers/registry.ts";
+import { providerRegistry, getActiveRoute, DIRECT_MODELS, type DirectProviderName } from "../../../../runtime/providers/registry.ts";
 import { loadConfig, loadConfigBundle, saveResolvedConfig } from "../../../../storage/config/config.ts";
 import { ExchangeFactory } from "../../../../exchange/index.ts";
 import { BrokerFactory } from "../../../../broker/factory.ts";
@@ -143,7 +143,6 @@ export const getModelInfoTool = createTool({
   outputSchema: z.object({
     currentProvider: z.string(),
     currentModel: z.string(),
-    hasDedalus: z.boolean(),
     directProviders: z.array(z.object({
       name: z.string(),
       configured: z.boolean(),
@@ -153,11 +152,11 @@ export const getModelInfoTool = createTool({
         fast: z.string(),
       }),
     })),
-    dedalusModels: z.array(z.object({
+    availableModels: z.array(z.object({
       id: z.string(),
       name: z.string(),
       provider: z.string(),
-    })).optional(),
+    })),
     tip: z.string(),
   }),
   execute: async () => {
@@ -166,35 +165,21 @@ export const getModelInfoTool = createTool({
     const currentProvider = config?.modelConfig?.provider || activeRoute.provider;
     const currentModel = config?.modelConfig?.model || activeRoute.modelString;
     const availableProviders = providerRegistry.getAvailableProviders();
-    const hasDedalus = providerRegistry.hasDedalus();
 
-    if (hasDedalus) {
-      await refreshDedalusModels().catch(() => undefined);
-    }
-
-    const directProviders = (["openai", "anthropic", "google"] as DirectProviderName[]).map((name) => ({
+    const directProviders = (["anthropic", "openai", "google", "xai"] as DirectProviderName[]).map((name) => ({
       name,
       configured: availableProviders.includes(name),
       models: DIRECT_MODEL_TIERS[name],
     }));
 
-    const dedalusModels = hasDedalus
-      ? getDedalusModels().map((m) => ({
-          id: m.id,
-          name: m.name,
-          provider: m.provider,
-        }))
-      : undefined;
+    const availableModels = providerRegistry.getAllAvailableModels();
 
     return {
       currentProvider,
       currentModel,
-      hasDedalus,
       directProviders,
-      dedalusModels,
-      tip: hasDedalus
-        ? "Use /model to select from direct providers or Dedalus models (xAI, Moonshot, etc.)"
-        : "Set DEDALUS_API_KEY for a multi-provider gateway",
+      availableModels,
+      tip: "Use /model to select from any configured provider or gateway.",
     };
   },
 });

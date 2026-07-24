@@ -1,6 +1,6 @@
 /**
  * Provider Module
- * Multi-provider support for Gordon
+ * Model routing for Gordon on top of Mastra's native model router.
  */
 
 export {
@@ -14,11 +14,16 @@ export {
   getActiveRoute,
   resetProviderRegistry,
   getDirectClientRoute,
-  getDedalusModels,
-  refreshDedalusModels,
+  syncActiveProviderEnvironment,
   ProviderRegistry,
+  DIRECT_MODELS,
   type ModelMetadata,
+  type ModelRoute,
+  type ModelString,
   type ProviderName,
   type ProviderConfig,
+  type DirectProviderName,
+  type GatewayName,
   type MastraModelConfig,
+  type MastraOpenAICompatibleModelConfig,
 } from "./registry.ts";

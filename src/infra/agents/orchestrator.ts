@@ -133,11 +133,11 @@ const logger = createModuleLogger("orchestrator");
 
 /**
  * Per-call output-token caps. Without these, Mastra defaults to the model's
- * full catalog max (e.g. 100000 for Claude Haiku 4.5), and Dedalus's
- * Anthropic backend rejects non-streaming requests above ~21K with
+ * full catalog max (e.g. 100000 for Claude Haiku 4.5), and some provider
+ * backends reject non-streaming requests above ~21K with
  * "streaming_required" — producing a wave of 400s during fast-tier calls
- * (compaction, scan, ops phases use Haiku via Dedalus regardless of which
- * main model the user picked).
+ * (compaction, scan, ops phases use Haiku regardless of which main model
+ * the user picked).
  *
  * - STREAM cap is generous (65536) since streaming requests don't hit the
  *   provider threshold, and we want long agent responses to render fully.

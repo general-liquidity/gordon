@@ -28,7 +28,6 @@ export interface ContainerConfig {
   };
   llm?: {
     openaiApiKey?: string;
-    dedalusApiKey?: string;
     defaultProvider?: LLMProvider;
     model?: string;
   };
@@ -109,10 +108,8 @@ export class ServiceContainer {
         }
       : undefined);
 
-    if (llmConfig?.openaiApiKey || llmConfig?.dedalusApiKey) {
+    if (llmConfig) {
       this.services.llm = new LLMClient({
-        openaiApiKey: llmConfig.openaiApiKey,
-        dedalusApiKey: llmConfig.dedalusApiKey,
         defaultModel: llmConfig.model,
         defaultProvider: llmConfig.defaultProvider,
       });

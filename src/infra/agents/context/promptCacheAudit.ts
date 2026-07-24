@@ -15,10 +15,6 @@
  *                   and ≥1024 tokens. No markers required. Audit only verifies
  *                   the prefix shape is byte-identical between turns.
  *
- *   - Dedalus       OpenAI-compatible gateway — passes through `extra_body`,
- *                   so when the upstream is Anthropic, the gateway forwards
- *                   `system_blocks` with `cache_control` markers.
- *
  *   - Google        Separate `CachedContent` API — out of scope for this
  *                   audit (a different control flow entirely).
  *
@@ -33,7 +29,6 @@ import type { GroundedPromptMessage } from "./contextBudget.ts";
 export type AuditProviderType =
   | "anthropic"
   | "openai"
-  | "dedalus"
   | "google"
   | "unknown";
 
@@ -108,15 +103,13 @@ function inferProviderType(provider: string | undefined): AuditProviderType {
   const lower = provider.toLowerCase();
   if (lower.includes("anthropic") || lower === "claude") return "anthropic";
   if (lower === "openai") return "openai";
-  if (lower === "dedalus") return "dedalus";
   if (lower === "google" || lower.includes("gemini")) return "google";
   return "unknown";
 }
 
 function expectsExplicitMarkers(provider: AuditProviderType): boolean {
-  // Only Anthropic explicitly REQUIRES markers. Dedalus passes them through
-  // when the upstream is Anthropic, so we accept marker presence as valid
-  // but don't fail the audit when absent (a gateway-dependent decision).
+  // Only Anthropic explicitly REQUIRES markers. Gateways that pass them
+  // through are accepted when present but not failed when absent.
   return provider === "anthropic";
 }
 
@@ -135,7 +128,6 @@ export function auditCacheBlocks(
   const provider = typeof providerType === "string" && (
     providerType === "anthropic" ||
     providerType === "openai" ||
-    providerType === "dedalus" ||
     providerType === "google" ||
     providerType === "unknown"
   )

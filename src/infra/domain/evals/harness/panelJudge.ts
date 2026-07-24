@@ -30,14 +30,13 @@ import type {
 const logger = createModuleLogger("panel-judge");
 
 /**
- * Default 3-judge panel — one Anthropic, one OpenAI, one Google. All
- * routed through Dedalus per the existing provider convention. Override
- * via `options.panel` when calling.
+ * Default 3-judge panel — one Anthropic, one OpenAI, one Google, each on its
+ * first-party provider. Override via `options.panel` when calling.
  */
 export const DEFAULT_PANEL: ReadonlyArray<string> = [
-  "anthropic/claude-sonnet-4-6",
-  "openai/gpt-5.2",
-  "google/gemini-2.5-flash",
+  "anthropic/claude-sonnet-5",
+  "openai/gpt-5.5",
+  "google/gemini-3.6-flash",
 ];
 
 export interface PanelJudgeOptions extends JudgeOptions {

@@ -25,13 +25,37 @@ import { createLLMClientFromEnv } from "../../../../ai/llm/client.ts";
 import type { LLMClient } from "../../../../ai/llm/client.ts";
 import type { Message } from "../../../../ai/llm/types.ts";
 import { createModuleLogger } from "../../../../logger/index.ts";
+import { providerRegistry } from "../../../../runtime/providers/registry.ts";
+import type { LLMProvider } from "../../../../ai/llm/types.ts";
 import type { EvalScenario } from "../types.ts";
 import { generateScenarios } from "./index.ts";
 import type { GenerateOptions } from "./index.ts";
 
 const logger = createModuleLogger("eval-paraphrase");
 
-const DEFAULT_PARAPHRASE_MODEL = "anthropic/claude-sonnet-4-6";
+/**
+ * Resolve the provider + model the paraphrase pass runs on. An explicit
+ * `options.model` wins ("provider/model" or a bare model id, which defaults to
+ * the Anthropic provider). Otherwise the balanced tier of whichever first-party
+ * provider the operator configured is used, so paraphrasing tracks the
+ * operator's model family instead of a hardcoded one.
+ */
+function resolveParaphraseRoute(model: string | undefined): { provider: LLMProvider; model: string } {
+  const spec = model && model.length > 0 ? model : safeBalancedModel();
+  const slash = spec.indexOf("/");
+  if (slash === -1) {
+    return { provider: "anthropic", model: spec };
+  }
+  return { provider: spec.slice(0, slash) as LLMProvider, model: spec.slice(slash + 1) };
+}
+
+function safeBalancedModel(): string {
+  try {
+    return providerRegistry.getBalancedModel();
+  } catch {
+    return "anthropic/claude-sonnet-5";
+  }
+}
 
 const ParaphraseSchema = z.object({
   variants: z.array(z.string()),
@@ -77,7 +101,7 @@ export async function paraphraseScenarios(
   options: ParaphraseOptions = {},
 ): Promise<EvalScenario[]> {
   const n = Math.max(1, options.variantsPerScenario ?? 2);
-  const model = options.model ?? DEFAULT_PARAPHRASE_MODEL;
+  const route = resolveParaphraseRoute(options.model);
 
   let client: LLMClient;
   try {
@@ -103,7 +127,7 @@ export async function paraphraseScenarios(
           { role: "user", content: buildParaphrasePrompt(scenario, n) },
         ],
         ParaphraseSchema,
-        { provider: "dedalus", model, temperature: options.temperature ?? 0.7 },
+        { provider: route.provider, model: route.model, temperature: options.temperature ?? 0.7 },
       );
     } catch (err) {
       logger.warn("Paraphrase call failed — skipping scenario", {

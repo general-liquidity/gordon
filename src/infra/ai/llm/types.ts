@@ -1,12 +1,19 @@
 /**
  * LLM Client Types
- * Type definitions for multi-provider LLM support.
+ * Type definitions for Gordon's direct (non-Mastra) LLM calls.
+ *
+ * Direct calls (thinking / judges / critique / enrichment) resolve their model
+ * through Mastra's native model router — the same first-party providers and
+ * gateways the agents use. There is no gateway base-URL swap here.
  */
 
 /**
- * Supported LLM providers
+ * First-party LLM providers for direct calls. Env keys are auto-detected by
+ * Mastra (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY,
+ * XAI_API_KEY). Tool/executor paths are pinned to these — never a text-only
+ * gateway.
  */
-export type LLMProvider = "openai" | "dedalus" | "doubleword";
+export type LLMProvider = "openai" | "anthropic" | "google" | "xai";
 
 /**
  * Message role in a chat conversation
@@ -31,7 +38,7 @@ export interface TokenUsage {
 }
 
 /**
- * Response from the LLM API
+ * Response from the LLM
  */
 export interface LLMResponse {
   content: string;
@@ -41,203 +48,79 @@ export interface LLMResponse {
 }
 
 /**
- * OpenAI direct model variants
- */
-export type OpenAIModel =
-  | "gpt-5.4"           // Default direct OpenAI model
-  | "gpt-5.4-pro"       // Most capable
-  | "openai/gpt-5.4"
-  | "openai/gpt-5.4-pro";
-
-/**
- * Dedalus Labs model identifiers (provider/model format)
- */
-export type DedalusModel =
-  // OpenAI via Dedalus
-  | "openai/gpt-5.4"
-  // Anthropic via Dedalus
-  | "anthropic/claude-opus-4-6"
-  | "anthropic/claude-sonnet-4-5-20250929"
-  | "anthropic/claude-haiku-4-5-20251001"
-  // Google via Dedalus
-  | "google/gemini-3-flash-preview"
-  | "google/gemini-3-pro-preview"
-  // xAI via Dedalus
-  | "xai/grok-4-1-fast-reasoning"
-  | "xai/grok-4-1-fast-non-reasoning"
-  // Moonshot via Dedalus
-  | "moonshot/kimi-k2.5"
-  // Any other model string
-  | (string & {});
-
-/**
- * Model configuration for specific use cases
+ * Model configuration for a specific call.
+ * `model` is a bare id (e.g. "claude-opus-4-6") or a full "provider/model"
+ * string. When a bare id is given, `provider` qualifies it.
  */
 export interface ModelConfig {
   provider: LLMProvider;
-  model: OpenAIModel | DedalusModel;
+  model: string;
   temperature?: number;
   maxTokens?: number;
 }
 
 /**
- * Gordon's recommended models by use case
+ * Gordon's recommended models by use case (first-party).
  */
 export const GORDON_MODELS = {
   // Intent parsing - fast and cheap
   intentParsing: {
-    provider: "dedalus" as LLMProvider,
-    model: "anthropic/claude-haiku-4-5-20251001",
+    provider: "anthropic" as LLMProvider,
+    model: "claude-haiku-4-5",
     temperature: 0.3,
     maxTokens: 500,
   },
 
   // Plan generation - needs reasoning
   planGeneration: {
-    provider: "dedalus" as LLMProvider,
-    model: "openai/gpt-5.2",
+    provider: "openai" as LLMProvider,
+    model: "gpt-5.6",
     temperature: 0.5,
     maxTokens: 2000,
   },
 
-  // Complex reasoning (fallback to direct OpenAI)
+  // Complex reasoning
   complexReasoning: {
-    provider: "dedalus" as LLMProvider,
-    model: "anthropic/claude-opus-4-6",
+    provider: "anthropic" as LLMProvider,
+    model: "claude-opus-4-8",
     temperature: 0.4,
     maxTokens: 4000,
   },
 
   // Explanations - clear and educational
   explanations: {
-    provider: "dedalus" as LLMProvider,
-    model: "anthropic/claude-sonnet-4-5-20250929",
+    provider: "anthropic" as LLMProvider,
+    model: "claude-sonnet-5",
     temperature: 0.7,
     maxTokens: 1000,
   },
 
   // Fast/cheap operations
   fast: {
-    provider: "dedalus" as LLMProvider,
-    model: "google/gemini-3-flash-preview",
+    provider: "google" as LLMProvider,
+    model: "gemini-3.5-flash-lite",
     temperature: 0.3,
     maxTokens: 500,
   },
 
-  // Ultra-fast (Groq/Cerebras)
+  // Ultra-fast
   ultraFast: {
-    provider: "dedalus" as LLMProvider,
-    model: "xai/grok-4-1-fast-non-reasoning",
+    provider: "xai" as LLMProvider,
+    model: "grok-4.3",
     temperature: 0.3,
     maxTokens: 500,
   },
 } as const;
 
 /**
- * Configuration for the LLM client
+ * Configuration for the LLM client.
+ * API keys are optional — Mastra's router auto-detects provider keys from env.
  */
 export interface LLMClientConfig {
-  openaiApiKey?: string;
-  dedalusApiKey?: string;
-  doublewordApiKey?: string;
   defaultProvider?: LLMProvider;
   defaultModel?: string;
   temperature?: number;
   maxTokens?: number;
   maxRetries?: number;
   retryDelayMs?: number;
-}
-
-/**
- * Provider-specific configuration
- */
-export interface ProviderConfig {
-  apiKey: string;
-  baseUrl: string;
-  model: string;
-  temperature: number;
-  maxTokens: number;
-}
-
-/**
- * API endpoints
- */
-export const API_ENDPOINTS = {
-  openai: "https://api.openai.com/v1",
-  dedalus: "https://api.dedaluslabs.ai/v1",
-  // Doubleword — OpenAI-compatible inference (Model to Market partner). Same
-  // endpoint serves realtime + async (service_tier flex) + batch tiers.
-  doubleword: "https://api.doubleword.ai/v1",
-} as const;
-
-/**
- * OpenAI API message format
- */
-export interface OpenAIMessage {
-  role: MessageRole;
-  content: string;
-}
-
-/**
- * OpenAI API request body
- */
-export interface OpenAIRequestBody {
-  model: string;
-  messages: OpenAIMessage[];
-  temperature: number;
-  max_tokens: number;
-  response_format?: { type: "json_object" | "text" };
-  /**
-   * OpenAI-compatible endpoints (vLLM, LiteLLM, Dedalus, etc.) often forward
-   * extension params to the underlying model. We use `extra_body` to smuggle
-   * provider-specific hints such as Anthropic prompt-cache markers. Whether
-   * the active gateway forwards it is provider-dependent — runtime testing
-   * required to confirm cache hits.
-   */
-  extra_body?: Record<string, unknown>;
-}
-
-/**
- * OpenAI API response format
- */
-export interface OpenAIResponse {
-  id: string;
-  object: string;
-  created: number;
-  model: string;
-  choices: OpenAIChoice[];
-  usage: OpenAIUsage;
-}
-
-/**
- * OpenAI API choice in response
- */
-export interface OpenAIChoice {
-  index: number;
-  message: {
-    role: string;
-    content: string;
-  };
-  finish_reason: string;
-}
-
-/**
- * OpenAI API usage information
- */
-export interface OpenAIUsage {
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-}
-
-/**
- * OpenAI API error response
- */
-export interface OpenAIErrorResponse {
-  error: {
-    message: string;
-    type: string;
-    param?: string;
-    code?: string;
-  };
 }

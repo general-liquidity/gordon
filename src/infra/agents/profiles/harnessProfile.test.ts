@@ -30,12 +30,12 @@ describe("FW3 — harness profile registry", () => {
       expect(profile?.provider).toBe("google");
     });
 
-    test("matches dedalus when explicitly tagged", () => {
-      const profile = resolveHarnessProfile({ provider: "dedalus", model: "anthropic/claude-sonnet" } as any);
-      expect(profile?.provider).toBe("dedalus");
+    test("matches xai when explicitly tagged", () => {
+      const profile = resolveHarnessProfile({ provider: "xai", model: "grok-4.5" } as any);
+      expect(profile?.provider).toBe("xai");
     });
 
-    test("matches openai for openai-routed dedalus traffic", () => {
+    test("matches openai for openai-routed traffic", () => {
       const profile = resolveHarnessProfile({ provider: "openai", model: "anthropic/claude-sonnet" } as any);
       expect(profile?.provider).toBe("openai");
     });
@@ -132,13 +132,7 @@ describe("FW3 — harness profile registry", () => {
   describe("DEFAULT_HARNESS_PROFILES", () => {
     test("contains all four canonical providers", () => {
       const providers = DEFAULT_HARNESS_PROFILES.map((p) => p.provider).sort();
-      expect(providers).toEqual(["anthropic", "dedalus", "google", "openai"]);
-    });
-
-    test("dedalus precedes openai in the matcher list", () => {
-      const dedalusIdx = DEFAULT_HARNESS_PROFILES.findIndex((p) => p.provider === "dedalus");
-      const openaiIdx = DEFAULT_HARNESS_PROFILES.findIndex((p) => p.provider === "openai");
-      expect(dedalusIdx).toBeLessThan(openaiIdx);
+      expect(providers).toEqual(["anthropic", "google", "openai", "xai"]);
     });
 
     test("all profiles ship with empty suffix", () => {

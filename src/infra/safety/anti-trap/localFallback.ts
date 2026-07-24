@@ -47,7 +47,7 @@ export async function checkProviderHealth(
     return healthCache.health;
   }
   const url =
-    process.env.OPENAI_BASE_URL ?? process.env.DEDALUS_BASE_URL ?? "";
+    process.env.OPENAI_BASE_URL ?? process.env.GORDON_LOCAL_MODEL_URL ?? "";
   if (url.length === 0) {
     const result: ProviderHealth = "available";
     healthCache = { health: result, checkedAt: now };

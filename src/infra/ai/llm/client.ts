@@ -1,26 +1,34 @@
 /**
  * LLM Client
- * Multi-provider support for OpenAI and Dedalus Labs.
+ *
+ * Gordon's direct (non-Mastra-agent) LLM caller for thinking / judges /
+ * critique / enrichment. It resolves the model through Mastra's native model
+ * router and runs a one-shot generation via an ephemeral `Agent`, so the same
+ * first-party providers + gateways the agents use also serve direct calls.
+ * There is no gateway base-URL swap and no hand-rolled OpenAI-compatible HTTP.
+ *
+ * The retry + failover seams are preserved: this client still does bounded
+ * same-target retries and throws `ProviderExhaustedError` so the failover
+ * layer (`executeWithFailover`) can move to the next candidate.
  */
 
 import { z } from "zod";
+import { Agent } from "@mastra/core/agent";
 import type {
   LLMClientConfig,
   LLMProvider,
   LLMResponse,
   Message,
   ModelConfig,
-  OpenAIRequestBody,
-  OpenAIResponse,
-  OpenAIErrorResponse,
 } from "./types.ts";
-import { API_ENDPOINTS, GORDON_MODELS } from "./types.ts";
-import { getDirectClientRoute } from "../../runtime/providers/registry.ts";
+import { GORDON_MODELS } from "./types.ts";
+import { getMastraModel, getActiveRoute, type MastraModelConfig } from "../../runtime/providers/registry.ts";
+import { providerCacheHints } from "./providerCaching.ts";
 import { isCostHalted } from "../../platform/costTracker.ts";
 
 // Default configuration values
-const DEFAULT_PROVIDER: LLMProvider = "dedalus";
-const DEFAULT_MODEL = "openai/gpt-5.2";
+const DEFAULT_PROVIDER: LLMProvider = "anthropic";
+const DEFAULT_MODEL = "claude-sonnet-4-6";
 const DEFAULT_TEMPERATURE = 0.7;
 const DEFAULT_MAX_TOKENS = 2000;
 
@@ -30,7 +38,7 @@ const DEFAULT_INITIAL_RETRY_DELAY_MS = 1000;
 const MAX_RETRY_DELAY_MS = 32000;
 
 /**
- * Custom error class for LLM API errors
+ * Custom error class for LLM errors
  */
 export class LLMError extends Error {
   public statusCode: number;
@@ -43,7 +51,7 @@ export class LLMError extends Error {
     message: string,
     statusCode: number,
     errorType: string = "api_error",
-    provider: LLMProvider = "dedalus"
+    provider: LLMProvider = "anthropic",
   ) {
     super(message);
     this.name = "LLMError";
@@ -52,19 +60,16 @@ export class LLMError extends Error {
     this.provider = provider;
     this.isRateLimit = statusCode === 429;
     this.isRetryable =
-      statusCode === 429 || statusCode === 500 || statusCode === 503;
+      statusCode === 429 || statusCode === 500 || statusCode === 503 || statusCode === 0;
   }
 }
 
 /**
- * Structured "this provider is done for this request" signal.
+ * Structured "this target is done for this request" signal.
  *
- * Thrown by the client's retry loop when same-provider retries terminate:
- * immediately for non-retryable statuses (400/401/403, …) and after the
- * retry budget for retryable ones (429/5xx, network errors). Carries the
- * provider, the number of attempts made, and the final HTTP status so a
- * failover layer (`executeWithFailover`) can move to the next provider
- * without re-waiting any backoff.
+ * Thrown when same-target retries terminate so a failover layer
+ * (`executeWithFailover`) can move to the next provider without re-waiting any
+ * backoff. Carries the provider, attempts made, and a status hint.
  */
 export class ProviderExhaustedError extends LLMError {
   public attempts: number;
@@ -74,273 +79,166 @@ export class ProviderExhaustedError extends LLMError {
     statusCode: number,
     errorType: string,
     provider: LLMProvider,
-    attempts: number
+    attempts: number,
   ) {
     super(
       `[${provider}] provider exhausted after ${attempts} attempt(s) (status ${statusCode}): ${message}`,
       statusCode,
       errorType,
-      provider
+      provider,
     );
     this.name = "ProviderExhaustedError";
     this.attempts = attempts;
   }
 }
 
-/**
- * Sleep for a given number of milliseconds
- */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Calculate exponential backoff delay
- */
 function getBackoffDelay(attempt: number, initialDelayMs: number): number {
   const delay = initialDelayMs * Math.pow(2, attempt);
   const jitter = Math.random() * 0.3 * delay;
   return Math.min(delay + jitter, MAX_RETRY_DELAY_MS);
 }
 
+function specLabel(spec: MastraModelConfig): string {
+  return typeof spec === "string" ? spec : (spec.id ?? "custom");
+}
+
 /**
- * Multi-provider LLM Client for Gordon
- *
- * Supports:
- * - OpenAI direct (GPT-5.2 variants)
- * - Dedalus Labs (multi-provider orchestration)
+ * Direct LLM client. Uses Mastra's model router under the hood.
  */
 export class LLMClient {
-  private openaiApiKey?: string;
-  private dedalusApiKey?: string;
-  private doublewordApiKey?: string;
   private defaultProvider: LLMProvider;
   private defaultModel: string;
   private defaultTemperature: number;
   private defaultMaxTokens: number;
   private maxRetries: number;
   private retryDelayMs: number;
+  private agentCache = new Map<string, Agent>();
 
-  constructor(config: LLMClientConfig) {
-    if (!config.openaiApiKey && !config.dedalusApiKey && !config.doublewordApiKey) {
-      throw new Error("LLMClient requires at least one API key (openaiApiKey, dedalusApiKey, or doublewordApiKey)");
-    }
-
-    this.openaiApiKey = config.openaiApiKey;
-    this.dedalusApiKey = config.dedalusApiKey;
-    this.doublewordApiKey = config.doublewordApiKey;
+  constructor(config: LLMClientConfig = {}) {
     this.defaultProvider = config.defaultProvider ?? DEFAULT_PROVIDER;
     this.defaultModel = config.defaultModel ?? DEFAULT_MODEL;
     this.defaultTemperature = config.temperature ?? DEFAULT_TEMPERATURE;
     this.defaultMaxTokens = config.maxTokens ?? DEFAULT_MAX_TOKENS;
     this.maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.retryDelayMs = config.retryDelayMs ?? DEFAULT_INITIAL_RETRY_DELAY_MS;
-
-    // Validate that the default provider has an API key
-    if (this.defaultProvider === "openai" && !this.openaiApiKey) {
-      throw new Error("OpenAI API key required when defaultProvider is 'openai'");
-    }
-    if (this.defaultProvider === "dedalus" && !this.dedalusApiKey) {
-      throw new Error("Dedalus API key required when defaultProvider is 'dedalus'");
-    }
-    if (this.defaultProvider === "doubleword" && !this.doublewordApiKey) {
-      throw new Error("Doubleword API key required when defaultProvider is 'doubleword'");
-    }
   }
 
   /**
-   * Get API key for a provider
-   */
-  private getApiKey(provider: LLMProvider): string {
-    if (provider === "openai") {
-      if (!this.openaiApiKey) {
-        throw new LLMError("OpenAI API key not configured", 401, "auth_error", provider);
-      }
-      return this.openaiApiKey;
-    }
-
-    if (provider === "doubleword") {
-      if (!this.doublewordApiKey) {
-        throw new LLMError("Doubleword API key not configured", 401, "auth_error", provider);
-      }
-      return this.doublewordApiKey;
-    }
-
-    if (!this.dedalusApiKey) {
-      throw new LLMError("Dedalus API key not configured", 401, "auth_error", provider);
-    }
-    return this.dedalusApiKey;
-  }
-
-  /**
-   * Get base URL for a provider
-   */
-  private getBaseUrl(provider: LLMProvider): string {
-    return API_ENDPOINTS[provider];
-  }
-
-  /**
-   * Resolve a preset into runtime config.
-   * Uses preset provider/model when that provider is configured;
-   * otherwise falls back to client defaults while preserving preset sampling params.
+   * Resolve a preset into runtime config, preserving preset sampling params.
    */
   private resolvePresetConfig(
-    preset: (typeof GORDON_MODELS)[keyof typeof GORDON_MODELS]
+    preset: (typeof GORDON_MODELS)[keyof typeof GORDON_MODELS],
   ): ModelConfig {
-    const usePresetProvider = this.hasProvider(preset.provider);
     return {
-      provider: usePresetProvider ? preset.provider : this.defaultProvider,
-      model: (usePresetProvider ? preset.model : this.defaultModel) as ModelConfig["model"],
+      provider: preset.provider,
+      model: preset.model,
       temperature: preset.temperature,
       maxTokens: preset.maxTokens,
     };
   }
 
   /**
-   * Build request body
+   * Build (and cache) an ephemeral Mastra agent for a resolved model spec.
+   * Instructions are supplied per-call via the message list, so the agent
+   * itself carries a neutral system prompt.
    */
-  private buildRequestBody(
-    messages: Message[],
-    model: string,
-    temperature: number,
-    maxTokens: number,
-    jsonMode: boolean = false,
-    extraBody?: Record<string, unknown>,
-  ): OpenAIRequestBody {
-    const body: OpenAIRequestBody = {
-      model,
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
-      temperature,
-      max_tokens: maxTokens,
-    };
-
-    if (jsonMode) {
-      body.response_format = { type: "json_object" };
+  private agentFor(spec: MastraModelConfig): Agent {
+    const key = specLabel(spec);
+    let agent = this.agentCache.get(key);
+    if (!agent) {
+      agent = new Agent({
+        id: `gordon-direct:${key}`,
+        name: "gordon-direct",
+        // Neutral construction-time prompt — the real system prompt is passed
+        // per-call in the message list so a cached agent never leaks one
+        // call's system text into the next.
+        instructions: "You are Gordon, a precise trading assistant.",
+        model: spec as never,
+      });
+      this.agentCache.set(key, agent);
     }
-
-    if (extraBody && Object.keys(extraBody).length > 0) {
-      body.extra_body = extraBody;
-    }
-
-    return body;
+    return agent;
   }
 
   /**
-   * Make an API request with retry logic
+   * Run a one-shot generation through Mastra's model router.
    */
-  private async makeRequest(
-    provider: LLMProvider,
-    body: OpenAIRequestBody,
-    attempt: number = 0
-  ): Promise<OpenAIResponse> {
+  private async generate(
+    config: ModelConfig,
+    messages: Message[],
+    systemBlocks?: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }>,
+  ): Promise<LLMResponse> {
     if (isCostHalted()) {
-      throw new LLMError("Cost budget halted — LLM dispatch blocked", 402, "cost_halt", provider);
+      throw new LLMError("Cost budget halted — LLM dispatch blocked", 402, "cost_halt", config.provider);
     }
-    const baseUrl = this.getBaseUrl(provider);
-    const apiKey = this.getApiKey(provider);
-    const url = `${baseUrl}/chat/completions`;
 
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-      });
+    const spec = getMastraModel(config.provider, config.model);
+    const temperature = config.temperature ?? this.defaultTemperature;
+    const maxTokens = config.maxTokens ?? this.defaultMaxTokens;
 
-      if (!response.ok) {
-        const errorData = (await response.json()) as OpenAIErrorResponse;
-        const errorMessage =
-          errorData.error?.message ?? `HTTP error ${response.status}`;
-        const errorType = errorData.error?.type ?? "api_error";
+    const systemText = [
+      ...messages.filter((m) => m.role === "system").map((m) => m.content),
+      ...(systemBlocks?.map((b) => b.text) ?? []),
+    ]
+      .filter((t) => t.length > 0)
+      .join("\n\n");
 
-        const error = new LLMError(errorMessage, response.status, errorType, provider);
+    // Anthropic first-party prompt caching still applies on the direct path:
+    // mark the stable system prefix as a cache breakpoint when present.
+    const cacheHints = systemBlocks && systemBlocks.length > 0
+      ? providerCacheHints(config.provider as never)
+      : undefined;
 
-        // Retry on rate limits or server errors
-        if (error.isRetryable && attempt < this.maxRetries) {
-          const delay = getBackoffDelay(attempt, this.retryDelayMs);
-          console.warn(
-            `[${provider}] LLM request failed (${response.status}), retrying in ${Math.round(delay)}ms...`
-          );
-          await sleep(delay);
-          return this.makeRequest(provider, body, attempt + 1);
-        }
+    const convo = messages
+      .filter((m) => m.role !== "system")
+      .map((m) => ({ role: m.role, content: m.content }));
 
-        throw new ProviderExhaustedError(
-          error.message,
-          error.statusCode,
-          error.errorType,
-          provider,
-          attempt + 1,
-        );
-      }
+    const systemMessage = systemText.length > 0
+      ? [{ role: "system" as const, content: systemText, ...(cacheHints ? { providerOptions: cacheHints } : {}) }]
+      : [];
 
-      return (await response.json()) as OpenAIResponse;
-    } catch (error) {
-      // Handle network errors
-      if (
-        error instanceof TypeError &&
-        error.message.includes("fetch failed")
-      ) {
+    const agent = this.agentFor(spec);
+
+    let attempt = 0;
+    for (;;) {
+      try {
+        const result = await agent.generate([...systemMessage, ...convo] as never, {
+          modelSettings: { temperature, maxOutputTokens: maxTokens },
+        });
+
+        const usage = (result.usage ?? {}) as {
+          inputTokens?: number;
+          outputTokens?: number;
+          totalTokens?: number;
+        };
+        const promptTokens = usage.inputTokens ?? 0;
+        const completionTokens = usage.outputTokens ?? 0;
+
+        return {
+          content: result.text ?? "",
+          usage: {
+            promptTokens,
+            completionTokens,
+            totalTokens: usage.totalTokens ?? promptTokens + completionTokens,
+          },
+          model: specLabel(spec),
+          provider: config.provider,
+        };
+      } catch (error) {
         if (attempt < this.maxRetries) {
           const delay = getBackoffDelay(attempt, this.retryDelayMs);
-          console.warn(
-            `[${provider}] Network error, retrying in ${Math.round(delay)}ms...`
-          );
+          attempt += 1;
           await sleep(delay);
-          return this.makeRequest(provider, body, attempt + 1);
+          continue;
         }
-        throw new ProviderExhaustedError(
-          `Network error: Unable to reach ${provider} API`,
-          0,
-          "network_error",
-          provider,
-          attempt + 1,
-        );
+        const message = error instanceof Error ? error.message : String(error);
+        throw new ProviderExhaustedError(message, 0, "generation_error", config.provider, attempt + 1);
       }
-
-      if (error instanceof ProviderExhaustedError) {
-        throw error;
-      }
-
-      if (error instanceof LLMError) {
-        throw new ProviderExhaustedError(
-          error.message,
-          error.statusCode,
-          error.errorType,
-          provider,
-          attempt + 1,
-        );
-      }
-
-      throw error;
     }
-  }
-
-  /**
-   * Parse API response
-   */
-  private parseResponse(
-    response: OpenAIResponse,
-    provider: LLMProvider
-  ): LLMResponse {
-    const choice = response.choices[0];
-    if (!choice) {
-      throw new LLMError("No response choice returned from API", 500, "no_choice", provider);
-    }
-
-    return {
-      content: choice.message.content,
-      usage: {
-        promptTokens: response.usage.prompt_tokens,
-        completionTokens: response.usage.completion_tokens,
-        totalTokens: response.usage.total_tokens,
-      },
-      model: response.model,
-      provider,
-    };
   }
 
   /**
@@ -363,10 +261,8 @@ export class LLMClient {
     config: ModelConfig,
     options: {
       /**
-       * Anthropic-style system content blocks with cache_control markers.
-       * When provided, forwarded via `extra_body.system_blocks` so the
-       * OpenAI-compatible gateway (Dedalus/vLLM/LiteLLM) can pass them
-       * through to the underlying Anthropic model for prompt caching.
+       * System content blocks to prepend. On the first-party Anthropic route
+       * they carry a prompt-cache breakpoint (see providerCaching.ts).
        */
       systemBlocks?: Array<{
         type: "text";
@@ -378,20 +274,7 @@ export class LLMClient {
     if (messages.length === 0) {
       throw new Error("Messages array cannot be empty");
     }
-
-    const provider = config.provider;
-    const model = config.model;
-    const temperature = config.temperature ?? this.defaultTemperature;
-    const maxTokens = config.maxTokens ?? this.defaultMaxTokens;
-
-    const extraBody: Record<string, unknown> = {};
-    if (options.systemBlocks && options.systemBlocks.length > 0) {
-      extraBody.system_blocks = options.systemBlocks;
-    }
-
-    const body = this.buildRequestBody(messages, model, temperature, maxTokens, false, extraBody);
-    const response = await this.makeRequest(provider, body);
-    return this.parseResponse(response, provider);
+    return this.generate(config, messages, options.systemBlocks);
   }
 
   /**
@@ -399,19 +282,18 @@ export class LLMClient {
    */
   async chatWithPreset(
     messages: Message[],
-    preset: keyof typeof GORDON_MODELS
+    preset: keyof typeof GORDON_MODELS,
   ): Promise<LLMResponse> {
-    const presetConfig = GORDON_MODELS[preset];
-    return this.chatWithConfig(messages, this.resolvePresetConfig(presetConfig));
+    return this.chatWithConfig(messages, this.resolvePresetConfig(GORDON_MODELS[preset]));
   }
 
   /**
-   * Send a chat request expecting JSON, parsed with Zod schema
+   * Send a chat request expecting JSON, parsed with a Zod schema
    */
   async chatWithJSON<T>(
     messages: Message[],
     schema: z.ZodSchema<T>,
-    config?: Partial<ModelConfig>
+    config?: Partial<ModelConfig>,
   ): Promise<T> {
     if (messages.length === 0) {
       throw new Error("Messages array cannot be empty");
@@ -422,12 +304,11 @@ export class LLMClient {
     const temperature = config?.temperature ?? this.defaultTemperature;
     const maxTokens = config?.maxTokens ?? this.defaultMaxTokens;
 
-    // Ensure JSON instruction in system prompt
     const hasJsonInstruction = messages.some(
       (m) =>
         m.role === "system" &&
         (m.content.toLowerCase().includes("json") ||
-          m.content.toLowerCase().includes("respond with"))
+          m.content.toLowerCase().includes("respond with")),
     );
 
     const modifiedMessages = hasJsonInstruction
@@ -435,27 +316,26 @@ export class LLMClient {
       : messages.map((m) =>
           m.role === "system"
             ? { ...m, content: `${m.content}\n\nRespond with valid JSON.` }
-            : m
+            : m,
         );
 
-    const body = this.buildRequestBody(modifiedMessages, model, temperature, maxTokens, true);
-    const response = await this.makeRequest(provider, body);
-    const llmResponse = this.parseResponse(response, provider);
+    const llmResponse = await this.generate(
+      { provider, model, temperature, maxTokens },
+      modifiedMessages,
+    );
 
-    // Parse JSON content
     let jsonContent: unknown;
     try {
-      jsonContent = JSON.parse(llmResponse.content);
+      jsonContent = JSON.parse(extractJson(llmResponse.content));
     } catch {
       throw new LLMError(
         `Failed to parse JSON response: ${llmResponse.content.substring(0, 100)}...`,
         500,
         "json_parse_error",
-        provider
+        provider,
       );
     }
 
-    // Validate with Zod schema
     const result = schema.safeParse(jsonContent);
     if (!result.success) {
       const errorMessages = result.error.issues
@@ -465,7 +345,7 @@ export class LLMClient {
         `Response validation failed: ${errorMessages}`,
         500,
         "validation_error",
-        provider
+        provider,
       );
     }
 
@@ -476,66 +356,73 @@ export class LLMClient {
    * Convenience method for intent parsing (fast, cheap)
    */
   async parseIntent<T>(messages: Message[], schema: z.ZodSchema<T>): Promise<T> {
-    const preset = GORDON_MODELS.intentParsing;
-    return this.chatWithJSON(messages, schema, this.resolvePresetConfig(preset));
+    return this.chatWithJSON(messages, schema, this.resolvePresetConfig(GORDON_MODELS.intentParsing));
   }
 
   /**
    * Convenience method for plan generation (reasoning)
    */
   async generatePlan<T>(messages: Message[], schema: z.ZodSchema<T>): Promise<T> {
-    const preset = GORDON_MODELS.planGeneration;
-    return this.chatWithJSON(messages, schema, this.resolvePresetConfig(preset));
+    return this.chatWithJSON(messages, schema, this.resolvePresetConfig(GORDON_MODELS.planGeneration));
   }
 
   /**
    * Convenience method for explanations
    */
   async explain(messages: Message[]): Promise<LLMResponse> {
-    const preset = GORDON_MODELS.explanations;
-    return this.chatWithConfig(messages, this.resolvePresetConfig(preset));
+    return this.chatWithConfig(messages, this.resolvePresetConfig(GORDON_MODELS.explanations));
   }
 
   /**
-   * Check if a provider is available
+   * Check if a provider is available (env key present).
    */
   hasProvider(provider: LLMProvider): boolean {
-    if (provider === "openai") return !!this.openaiApiKey;
-    if (provider === "dedalus") return !!this.dedalusApiKey;
-    if (provider === "doubleword") return !!this.doublewordApiKey;
-    return false;
+    const envVar: Record<LLMProvider, string[]> = {
+      openai: ["OPENAI_API_KEY"],
+      anthropic: ["ANTHROPIC_API_KEY"],
+      google: ["GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY"],
+      xai: ["XAI_API_KEY"],
+    };
+    return envVar[provider].some((v) => !!process.env[v]);
   }
 
   /**
-   * Get list of available providers
+   * Get list of available providers (env keys present).
    */
   getAvailableProviders(): LLMProvider[] {
-    const providers: LLMProvider[] = [];
-    if (this.openaiApiKey) providers.push("openai");
-    if (this.dedalusApiKey) providers.push("dedalus");
-    if (this.doublewordApiKey) providers.push("doubleword");
-    return providers;
+    return (["openai", "anthropic", "google", "xai"] as LLMProvider[]).filter((p) => this.hasProvider(p));
   }
 }
 
 /**
- * Create a client from environment variables
+ * Extract a JSON object/array from a model response, tolerating code fences
+ * and leading prose that Mastra's text output may include.
+ */
+function extractJson(text: string): string {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenced?.[1]) return fenced[1].trim();
+  const firstObj = trimmed.search(/[[{]/);
+  if (firstObj > 0) return trimmed.slice(firstObj);
+  return trimmed;
+}
+
+/**
+ * Create a client from environment variables. Resolves the active first-party
+ * route via the provider registry (Mastra model router).
  */
 export function createLLMClientFromEnv(): LLMClient {
-  const configuredProvider = process.env.GORDON_PROVIDER;
-  const configuredModel = process.env.GORDON_MODEL ?? process.env.LLM_DEFAULT_MODEL;
-  const route = getDirectClientRoute(configuredProvider, configuredModel);
-
-  const defaultProvider: LLMProvider =
-    route.provider === "dedalus" || route.provider === "openai"
-      ? route.provider
-      : "dedalus";
+  const route = getActiveRoute();
+  const provider: LLMProvider =
+    route.transportProvider === "openai" ||
+    route.transportProvider === "anthropic" ||
+    route.transportProvider === "google" ||
+    route.transportProvider === "xai"
+      ? route.transportProvider
+      : "anthropic";
 
   return new LLMClient({
-    openaiApiKey: process.env.OPENAI_API_KEY,
-    dedalusApiKey: process.env.DEDALUS_API_KEY,
-    doublewordApiKey: process.env.DOUBLEWORD_API_KEY,
-    defaultProvider,
+    defaultProvider: provider,
     defaultModel: route.transportModelId,
   });
 }

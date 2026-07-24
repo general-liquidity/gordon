@@ -26,8 +26,8 @@
  *                and reference it on subsequent requests. Out of scope for
  *                this helper — different control flow.
  *
- * For the Dedalus path, see `extra_body.system_blocks` wired in client.ts
- * — that's the OpenAI-compatible gateway pass-through.
+ * The direct client (client.ts) attaches these hints as `providerOptions` on
+ * the system message it passes to Mastra's model router.
  *
  * Cache TTL knob (GORDON_PROMPT_CACHE_TTL):
  *
@@ -175,5 +175,9 @@ export const PROVIDER_CACHING_MODEL: Record<DirectProviderName, {
   google: {
     model: "separate_api",
     notes: "CachedContent API — explicit cache creation, not providerOptions",
+  },
+  xai: {
+    model: "automatic",
+    notes: "prefix cached transparently by the provider (no explicit markers)",
   },
 };

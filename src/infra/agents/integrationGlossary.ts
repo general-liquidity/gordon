@@ -208,14 +208,6 @@ function collectActiveIntegrationIds(context: GordonContext): string[] {
   const provider = context.config.modelConfig?.provider;
   if (provider) {
     ids.add(provider);
-    const model = context.config.modelConfig?.model?.toLowerCase();
-    if (provider === "dedalus" && model?.includes("/")) {
-      const [gatewayChild = ""] = model.split(/\s+/);
-      const routedProvider = gatewayChild.split("/")[0];
-      if (routedProvider) {
-        ids.add(`dedalus/${routedProvider}`);
-      }
-    }
   }
   return [...ids];
 }

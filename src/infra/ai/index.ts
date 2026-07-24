@@ -1,7 +1,7 @@
 // ============================================================================
 // AI — LLM providers and MCP server management
 //
-// LLM: Multi-provider client (Dedalus, OpenAI)
+// LLM: Multi-provider client (Anthropic, OpenAI, Google, xAI, gateways)
 // MCP: Model Context Protocol servers, registry, marketplace
 // ============================================================================
 

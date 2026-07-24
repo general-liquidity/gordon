@@ -24,8 +24,9 @@
 import { z } from "zod";
 import { createLLMClientFromEnv } from "../../../ai/llm/client.ts";
 import type { LLMClient } from "../../../ai/llm/client.ts";
-import type { Message } from "../../../ai/llm/types.ts";
+import type { Message, LLMProvider } from "../../../ai/llm/types.ts";
 import { createModuleLogger } from "../../../logger/index.ts";
+import { providerRegistry } from "../../../runtime/providers/registry.ts";
 import { getCategoryRubric } from "./categoryRubrics.ts";
 import type {
   EvalScenario,
@@ -38,32 +39,39 @@ import type {
 
 const logger = createModuleLogger("trajectory-judge");
 
-const DEFAULT_JUDGE_MODEL = "anthropic/claude-sonnet-4-6";
+/**
+ * Default judge model — the balanced tier of whichever first-party provider
+ * the operator has configured (GORDON_PROVIDER or the first available key), so
+ * the judge tracks the operator's model family instead of a hardcoded one.
+ * Falls back to a first-party Anthropic model when no key is configured.
+ * Override per-call via `judgeOptions.judgeModel` / `panelOptions.panel`.
+ */
+function defaultJudgeModel(): string {
+  try {
+    return providerRegistry.getBalancedModel();
+  } catch {
+    return "anthropic/claude-sonnet-5";
+  }
+}
 
 /**
- * Resolve which direct-client provider + transport model id a judgeModel maps to.
- *
- * Default routing is unchanged: judge calls go through `dedalus` with the
- * model string as-is (e.g. "anthropic/claude-sonnet-4-6", "openai/test").
- *
- * Opt-in: a judgeModel of the form `doubleword/<model>` routes the judge
- * through the existing Doubleword provider on the direct LLMClient
- * (OpenAI-compatible, DOUBLEWORD_API_KEY). The `doubleword/` prefix is
- * stripped so the bare model id is sent to the endpoint.
- *
- * Realtime only — async Batch API (JSONL) routing is a future cost
- * optimization, out of scope here.
+ * Resolve the first-party provider + transport model id a judgeModel maps to.
+ * Splits a "provider/model" string (e.g. "anthropic/claude-sonnet-5") into its
+ * first-party provider and bare model id. A bare model string defaults to the
+ * anthropic provider.
  */
-const DOUBLEWORD_PREFIX = "doubleword/";
-
 function resolveJudgeRoute(judgeModel: string): {
-  provider: "dedalus" | "doubleword";
+  provider: LLMProvider;
   model: string;
 } {
-  if (judgeModel.startsWith(DOUBLEWORD_PREFIX)) {
-    return { provider: "doubleword", model: judgeModel.slice(DOUBLEWORD_PREFIX.length) };
+  const slash = judgeModel.indexOf("/");
+  if (slash === -1) {
+    return { provider: "anthropic", model: judgeModel };
   }
-  return { provider: "dedalus", model: judgeModel };
+  return {
+    provider: judgeModel.slice(0, slash) as LLMProvider,
+    model: judgeModel.slice(slash + 1),
+  };
 }
 
 const JudgeResponseSchema = z.object({
@@ -123,7 +131,7 @@ export async function judgeTrajectories(
   options: JudgeOptions = {},
 ): Promise<JudgeResult> {
   const startTime = Date.now();
-  const judgeModel = options.judgeModel ?? request.judgeModel ?? DEFAULT_JUDGE_MODEL;
+  const judgeModel = options.judgeModel ?? request.judgeModel ?? defaultJudgeModel();
 
   if (request.trajectories.length === 0) {
     return {
@@ -468,7 +476,10 @@ export function buildMockJudgeClient(options: MockJudgeOptions): LLMClient {
       _schema: z.ZodSchema<T>,
       config?: unknown,
     ): Promise<T> => {
-      const model = (config as { model?: string } | undefined)?.model;
+      // Reconstruct the full "provider/model" spec from the resolved route so
+      // byModel / throwForModel keys match the panel entry ids the caller used.
+      const cfg = config as { provider?: string; model?: string } | undefined;
+      const model = cfg?.provider && cfg?.model ? `${cfg.provider}/${cfg.model}` : cfg?.model;
       if (options.throwOnCall) {
         throw new Error("mock judge: configured to throw");
       }

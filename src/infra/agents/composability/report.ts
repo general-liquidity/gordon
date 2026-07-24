@@ -73,7 +73,7 @@ export interface ComposabilityProbes {
 // Static catalogs
 // ============================================================================
 
-const LLM_PROVIDERS = ["openai", "dedalus"] as const;
+const LLM_PROVIDERS = ["anthropic", "openai", "google", "xai"] as const;
 
 const NATIVE_EXCHANGES = EXCHANGE_IDS;
 
@@ -188,7 +188,7 @@ export function captureComposabilityReport(
       availableCount: LLM_PROVIDERS.length,
       sample: [...LLM_PROVIDERS],
       pluggable: true,
-      description: "OpenAI-compatible providers routable via the LLM client abstraction. Dedalus routes Anthropic + Google + others through OpenAI-compatible API.",
+      description: "First-party model providers routable via Mastra's model router, plus OpenAI-compatible gateways and local hosts.",
     },
     {
       axis: "exchange",

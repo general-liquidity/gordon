@@ -341,8 +341,8 @@ export function getGordon(): Agent {
 
     // Cap maxOutputTokens for ALL internal calls. Without this, Mastra
     // defaults to the model's catalog max (e.g. 100000 for Haiku 4.5) and
-    // Dedalus's Anthropic backend rejects non-streaming requests above
-    // ~21K with "streaming_required" 400s during fast-tier phases.
+    // some provider backends reject large non-streaming requests with
+    // "streaming_required" 400s during fast-tier phases.
     //
     // BOTH paths need their own cap field — Mastra has separate option
     // pipelines for generate/stream vs network() multi-agent routing:

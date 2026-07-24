@@ -1,6 +1,7 @@
 /**
  * LLM Infrastructure Module
- * Multi-provider LLM support (OpenAI + Dedalus Labs)
+ * Direct (non-Mastra-agent) LLM calls, routed through Mastra's native model
+ * router — first-party providers + gateways.
  */
 
 // Types
@@ -10,21 +11,12 @@ export type {
   Message,
   TokenUsage,
   LLMResponse,
-  OpenAIModel,
-  DedalusModel,
   ModelConfig,
   LLMClientConfig,
-  ProviderConfig,
-  OpenAIMessage,
-  OpenAIRequestBody,
-  OpenAIResponse,
-  OpenAIChoice,
-  OpenAIUsage,
-  OpenAIErrorResponse,
 } from "./types.ts";
 
 // Constants
-export { API_ENDPOINTS, GORDON_MODELS } from "./types.ts";
+export { GORDON_MODELS } from "./types.ts";
 
 // Client
 export { LLMClient, LLMError, ProviderExhaustedError, createLLMClientFromEnv } from "./client.ts";

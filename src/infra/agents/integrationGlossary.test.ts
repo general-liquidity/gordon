@@ -27,21 +27,21 @@ describe("integration glossary grounding", () => {
   it("builds canonical glossary entries from taxonomy/discovery metadata", async () => {
     const glossary = await getCanonicalIntegrationGlossary(GordonConfigSchema.parse({}));
     const hyperliquid = glossary.find((entry) => entry.id === "hyperliquid");
-    const dedalus = glossary.find((entry) => entry.id === "dedalus");
+    const anthropic = glossary.find((entry) => entry.id === "anthropic");
 
     expect(hyperliquid).toBeDefined();
     expect((hyperliquid?.summary.length ?? 0)).toBeGreaterThan(0);
-    expect(dedalus?.summary.toLowerCase()).toContain("gateway");
+    expect((anthropic?.summary.length ?? 0)).toBeGreaterThan(0);
   });
 
   it("retrieves a selective glossary slice for explicitly mentioned integrations", async () => {
     const selection = await selectRelevantIntegrationGlossary(
-      "What does Hyperliquid do for Gordon and how does Dedalus route?",
+      "What does Hyperliquid do for Gordon and how does Anthropic route?",
       createContext(),
     );
 
     expect(selection.matchedIds).toContain("hyperliquid");
-    expect(selection.matchedIds).toContain("dedalus");
+    expect(selection.matchedIds).toContain("anthropic");
     expect(selection.entries.length).toBeLessThanOrEqual(10);
     expect(formatIntegrationGlossary(selection.entries)).toContain("Hyperliquid");
   });

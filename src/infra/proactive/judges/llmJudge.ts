@@ -105,7 +105,7 @@ export class LlmJudge implements ProposalJudge {
         temperature: 0.2,
         maxSteps: 1,
         // Cap output tokens — Mastra otherwise sends model-max (e.g. 100000
-        // for Haiku) which Dedalus rejects on non-streaming with
+        // for Haiku) which some backends reject on non-streaming with
         // "streaming_required". 4096 is plenty for a yes/no judge response.
         modelSettings: { maxOutputTokens: 4096 },
       });

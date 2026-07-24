@@ -4,10 +4,10 @@ import { GORDON_MODELS } from "../../infra/ai/llm/index.ts";
 type PipelinePreset = "planGeneration" | "explanations";
 
 const FALLBACK_MODEL_BY_PROVIDER: Record<LLMProvider, ModelConfig["model"]> = {
-  dedalus: "anthropic/claude-opus-4-6",
+  anthropic: GORDON_MODELS.planGeneration.model,
   openai: "gpt-5.5-2026-04-23",
-  // Nemotron via Doubleword — doubles for the NVIDIA Nemotron bounty.
-  doubleword: "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4",
+  google: "gemini-3.1-pro-preview",
+  xai: "grok-4.5",
 };
 
 export function buildFailoverModelChain(

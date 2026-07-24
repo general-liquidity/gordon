@@ -1,32 +1,43 @@
 /**
  * Provider Registry
- * Multi-provider support for Gordon via Mastra plus OpenAI-compatible gateways.
+ * Model routing for Gordon on top of Mastra's native model router (ai@5).
  *
- * Native providers:
- * - OpenAI
- * - Anthropic
- * - Google
+ * Mastra `Agent({ model })` accepts either:
+ *  - a provider/model STRING (hosted providers + gateways), or
+ *  - an OBJECT `{ id, url, apiKey?, headers? }` (local / OpenAI-compatible hosts).
  *
- * OpenAI-compatible providers:
- * - Dedalus Labs (meta-provider for OpenAI, Anthropic, Google, xAI, Moonshot)
+ * Provider classes:
+ *  - First-party (native, tool-capable): anthropic, openai, google, xai.
+ *    Env keys auto-detected by Mastra (ANTHROPIC_API_KEY, OPENAI_API_KEY,
+ *    GOOGLE_GENERATIVE_AI_API_KEY, XAI_API_KEY).
+ *  - Gateways: openrouter (OPENROUTER_API_KEY, tool-capable) and huggingface
+ *    (HF_TOKEN, text/research only — NO tool-calling).
+ *  - Local / custom: OpenAI-compatible host via the object form.
  *
- * Returns model strings in "provider/model" format for Gordon config, then
- * resolves them to the correct Mastra provider string at runtime.
+ * This module maps an operator "provider/model" (or "provider:model") string to
+ * the correct Mastra model spec and exposes tier helpers (fast / balanced /
+ * flagship) used across the agent + TUI surfaces.
  */
 
 // ============================================================================
 // Types
 // ============================================================================
 
-/** Providers Gordon can select directly in config/UI */
-export type DirectProviderName = "anthropic" | "openai" | "google";
+/** First-party providers Gordon pins tool/executor paths to. */
+export type DirectProviderName = "anthropic" | "openai" | "google" | "xai";
 
-/** Provider prefixes that can appear inside stored model IDs */
-export type ProviderPrefix = DirectProviderName | "xai" | "moonshot";
+/** Hosted gateways natively in the Mastra 1.5.0 catalogue (prefix-routed). */
+export type GatewayName = "openrouter" | "huggingface" | "togetherai" | "fireworks-ai" | "siliconflow" | "deepinfra";
 
-/** Full provider routing choices Gordon supports */
-export type ProviderName = DirectProviderName | "dedalus" | "doubleword";
-export type TransportProvider = "openai" | "anthropic" | "google";
+/**
+ * Provider routing is PASS-THROUGH: any `provider/model` string the operator
+ * supplies is forwarded to Mastra's model router (80+ providers in 1.5.0).
+ * The named unions are convenience/typing only — `ProviderName` is any string.
+ */
+export type ProviderName = string;
+
+/** Provider a request is transported to — best-effort label, not restricted. */
+export type TransportProvider = string;
 
 export interface ProviderConfig {
   name: ProviderName;
@@ -35,10 +46,35 @@ export interface ProviderConfig {
 }
 
 /**
- * Model string type stored in Gordon config/env.
- * Format: "provider/model" (e.g. "openai/gpt-5.4" or "dedalus/anthropic/claude-opus-4-6")
+ * Model string stored in Gordon config/env.
+ * Format: "provider/model" (e.g. "anthropic/claude-opus-4-6",
+ * "openrouter/anthropic/claude-sonnet-4.6", "huggingface/meta-llama/...").
  */
 export type ModelString = `${string}/${string}`;
+
+/**
+ * OpenAI-compatible object spec for local / custom hosts.
+ * Mastra resolves this directly against the given base URL.
+ */
+export interface MastraOpenAICompatibleModelConfig {
+  id: string;
+  url: string;
+  apiKey?: string;
+  headers?: Record<string, string>;
+}
+
+/**
+ * MastraModelConfig — what `Agent({ model })` accepts:
+ *  - a "provider/model" string for hosted providers + gateways, or
+ *  - an object spec for local / OpenAI-compatible hosts.
+ *
+ * The trailing `unknown`-widening keeps this assignable into Mastra's own
+ * `model` field (whose runtime accepts the object form but whose published
+ * type is narrower). This is the deliberate interop bridge — do not remove it
+ * without also casting at every Agent construction site.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type MastraModelConfig = ModelString | MastraOpenAICompatibleModelConfig | any;
 
 /**
  * Runtime routing information for a model selection.
@@ -49,137 +85,146 @@ export interface ModelRoute {
   provider: ProviderName;
   transportProvider: TransportProvider;
   transportModelId: string;
-  viaOpenAICompatibleProvider: boolean;
+  /** True when routed through a hosted gateway (openrouter / huggingface). */
+  viaGateway: boolean;
+  /** True when routed to a local / custom OpenAI-compatible host. */
+  viaLocalHost: boolean;
   baseUrl?: string;
   apiKeyEnvVar: string;
 }
 
-export interface MastraOpenAICompatibleModelConfig {
-  providerId: string;
-  modelId: string;
-  url: string;
-  apiKey: string;
-  id?: string;
-}
-
-/**
- * MastraModelConfig can be:
- * - A string like "openai/gpt-5.4" (Mastra's model router resolves it)
- * - A LanguageModelV2 instance from createOpenAI() (for custom endpoints like Dedalus)
- * - A deprecated object config shape (kept for backward compat)
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type MastraModelConfig = ModelString | MastraOpenAICompatibleModelConfig | any;
-
-interface OpenAICompatibleProviderConfig {
-  apiKeyEnvVar: "DEDALUS_API_KEY" | "DOUBLEWORD_API_KEY";
-  baseUrl: string;
-}
-
 export interface ModelMetadata {
   id: ModelString;
-  provider: ProviderPrefix;
+  provider: DirectProviderName;
   name: string;
   tier: "flagship" | "balanced" | "fast";
-}
-
-interface DedalusModelDiscoveryResponse {
-  data?: unknown;
-  models?: unknown;
 }
 
 // ============================================================================
 // Model Definitions
 // ============================================================================
 
+const DIRECT_PROVIDERS: readonly DirectProviderName[] = ["anthropic", "openai", "google", "xai"];
+const GATEWAY_PROVIDERS: readonly GatewayName[] = ["openrouter", "huggingface"];
+
 /**
- * Native provider models exposed directly via Mastra.
+ * All provider ids Gordon integrates a key/route for: first-party families,
+ * hosted gateways, and local / custom OpenAI-compatible host prefixes. Used by
+ * selection surfaces (slash `/model`, setup) to validate a provider without
+ * re-hardcoding the list. NOT an allowlist for resolution — the router itself
+ * is pass-through and forwards any well-formed `provider/model` string.
+ */
+export const KNOWN_PROVIDER_IDS: readonly string[] = [
+  "anthropic", "openai", "google", "xai",
+  "openrouter", "huggingface", "togetherai", "fireworks-ai", "siliconflow", "deepinfra",
+  "ollama", "lmstudio", "local", "custom",
+];
+
+/**
+ * Per-provider tier catalog exposed directly via Mastra's router.
+ * Frontier IDs, sourced from the Mastra model directory (mastra.ai/models).
+ * These are the newest tool-calling / agentic models per provider — older
+ * generations are omitted to avoid deprecation churn.
  */
 export const DIRECT_MODELS = {
   anthropic: {
-    flagship: "claude-opus-4-6",
-    balanced: "claude-sonnet-4-6",
+    flagship: "claude-opus-4-8",
+    balanced: "claude-sonnet-5",
     fast: "claude-haiku-4-5",
   },
   openai: {
-    flagship: "gpt-5.4-pro",
-    balanced: "gpt-5.4",
+    flagship: "gpt-5.6",
+    balanced: "gpt-5.5",
     fast: "gpt-5.4-mini",
   },
   google: {
     flagship: "gemini-3.1-pro-preview",
-    balanced: "gemini-3-pro-preview",
-    fast: "gemini-3.1-flash-lite-preview",
+    balanced: "gemini-3.6-flash",
+    fast: "gemini-3.5-flash-lite",
+  },
+  xai: {
+    flagship: "grok-4.5",
+    balanced: "grok-4.5",
+    fast: "grok-4.3",
   },
 } as const satisfies Record<DirectProviderName, { flagship: string; balanced: string; fast: string }>;
 
+const DIRECT_API_KEY_ENV: Record<DirectProviderName, string> = {
+  openai: "OPENAI_API_KEY",
+  anthropic: "ANTHROPIC_API_KEY",
+  google: "GOOGLE_GENERATIVE_AI_API_KEY",
+  xai: "XAI_API_KEY",
+};
+
+const GATEWAY_API_KEY_ENV: Partial<Record<GatewayName, string>> = {
+  openrouter: "OPENROUTER_API_KEY",
+  huggingface: "HF_TOKEN",
+  togetherai: "TOGETHER_API_KEY",
+  "fireworks-ai": "FIREWORKS_API_KEY",
+  siliconflow: "SILICONFLOW_API_KEY",
+  deepinfra: "DEEPINFRA_API_KEY",
+};
+
+/** Local / custom OpenAI-compatible host env knobs. */
+const LOCAL_URL_ENV = "GORDON_LOCAL_MODEL_URL";
+const LOCAL_API_KEY_ENV = "GORDON_LOCAL_MODEL_API_KEY";
+const DEFAULT_OLLAMA_URL = "http://localhost:11434/v1";
+
 /**
- * Dedalus-supported chat models via the OpenAI-compatible API.
- * See: https://docs.dedaluslabs.ai/sdk/models
+ * Provider prefixes Gordon routes to a LOCAL OpenAI-compatible host via the
+ * object form. Everything else is passed through to Mastra's router as a
+ * "provider/model" string — no allowlist.
  */
-export const DEDALUS_MODELS = [
-  { id: "openai/gpt-5.2", provider: "openai" as const, name: "GPT-5.2", tier: "flagship" as const },
-  { id: "anthropic/claude-opus-4-6", provider: "anthropic" as const, name: "Claude Opus 4.6", tier: "flagship" as const },
-  { id: "anthropic/claude-sonnet-4-5-20250929", provider: "anthropic" as const, name: "Claude Sonnet 4.5", tier: "balanced" as const },
-  { id: "anthropic/claude-haiku-4-5-20251001", provider: "anthropic" as const, name: "Claude Haiku 4.5", tier: "fast" as const },
-  { id: "google/gemini-3-pro-preview", provider: "google" as const, name: "Gemini 3 Pro", tier: "flagship" as const },
-  { id: "google/gemini-3-flash-preview", provider: "google" as const, name: "Gemini 3 Flash", tier: "fast" as const },
-  { id: "xai/grok-4-1-fast-reasoning", provider: "xai" as const, name: "Grok 4.1 Reasoning", tier: "flagship" as const },
-  { id: "xai/grok-4-1-fast-non-reasoning", provider: "xai" as const, name: "Grok 4.1 Fast", tier: "fast" as const },
-  { id: "moonshot/kimi-k2.5", provider: "moonshot" as const, name: "Kimi K2.5", tier: "flagship" as const },
-] as const satisfies ReadonlyArray<ModelMetadata>;
-
-const DEDALUS_MODEL_ID_SET = new Set<ModelString>(DEDALUS_MODELS.map((model) => model.id));
-
-/**
- * Doubleword-supported chat models via the OpenAI-compatible API.
- * Not typed as ModelMetadata because the "nvidia" prefix isn't a ProviderPrefix.
- */
-export const DOUBLEWORD_MODEL_IDS: readonly string[] = [
-  "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4",
-];
-
-/** OpenAI-compatible provider base URLs */
-export const DEDALUS_BASE_URL = "https://api.dedaluslabs.ai/v1";
-export const DOUBLEWORD_BASE_URL = "https://api.doubleword.ai/v1";
-
-const OPENAI_COMPATIBLE_PROVIDERS = {
-  dedalus: {
-    apiKeyEnvVar: "DEDALUS_API_KEY",
-    baseUrl: DEDALUS_BASE_URL,
-  },
-  doubleword: {
-    apiKeyEnvVar: "DOUBLEWORD_API_KEY",
-    baseUrl: DOUBLEWORD_BASE_URL,
-  },
-} as const satisfies Record<"dedalus" | "doubleword", OpenAICompatibleProviderConfig>;
+const LOCAL_PREFIXES = new Set(["ollama", "lmstudio", "local", "custom"]);
 
 // ============================================================================
 // Helpers
 // ============================================================================
 
 function isDirectProviderName(value: string): value is DirectProviderName {
-  return value === "openai" || value === "anthropic" || value === "google";
+  return (DIRECT_PROVIDERS as readonly string[]).includes(value);
 }
 
-function isProviderName(value: string): value is ProviderName {
-  return isDirectProviderName(value) || value === "dedalus" || value === "doubleword";
+function isGatewayName(value: string): value is GatewayName {
+  return (GATEWAY_PROVIDERS as readonly string[]).includes(value);
 }
 
+/** Split "provider/rest" — prefix is the first path segment. */
 function splitModelString(modelId: string): { prefix?: string; rawModelId: string } {
   if (!modelId.includes("/")) {
     return { rawModelId: modelId };
   }
-
   const [prefix, ...rest] = modelId.split("/");
   if (!prefix || rest.length === 0) {
     return { rawModelId: modelId };
   }
+  return { prefix, rawModelId: rest.join("/") };
+}
 
-  return {
-    prefix,
-    rawModelId: rest.join("/"),
-  };
+/**
+ * Combine an optional provider hint + model into a canonical spec string.
+ * Accepts "provider:model" (single-colon) or "provider/model", or a bare
+ * model with a separate provider hint.
+ */
+function canonicalSpec(provider: string | undefined, model: string | undefined): string {
+  if (model && model.includes("/")) {
+    return model;
+  }
+  if (model && model.includes(":")) {
+    const idx = model.indexOf(":");
+    return `${model.slice(0, idx)}/${model.slice(idx + 1)}`;
+  }
+  if (provider && model) {
+    return `${provider}/${model}`;
+  }
+  return model ?? provider ?? "";
+}
+
+const DEFAULT_LMSTUDIO_URL = "http://localhost:1234/v1";
+
+function localUrlFor(prefix: string): string {
+  if (process.env[LOCAL_URL_ENV]) return process.env[LOCAL_URL_ENV]!;
+  return prefix === "lmstudio" ? DEFAULT_LMSTUDIO_URL : DEFAULT_OLLAMA_URL;
 }
 
 // ============================================================================
@@ -188,410 +233,112 @@ function splitModelString(modelId: string): { prefix?: string; rawModelId: strin
 
 export class ProviderRegistry {
   private availableDirectProviders: Set<DirectProviderName> = new Set();
-  private hasDedalusKey = false;
-  private hasDoublewordKey = false;
-  private nativeOpenAIApiKey?: string;
-  private nativeOpenAIBaseUrl?: string;
-  private dedalusModels: ModelMetadata[] = [...DEDALUS_MODELS];
-  private dedalusModelsRefreshInFlight: Promise<readonly ModelMetadata[]> | null = null;
+  private availableGateways: Set<GatewayName> = new Set();
   private initialized = false;
-
-  constructor() {
-    // Lazy initialization - don't check env until first use
-  }
 
   private initializeFromEnv(): void {
     if (this.initialized) return;
 
-    this.nativeOpenAIApiKey = process.env.GORDON_NATIVE_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
-    this.nativeOpenAIBaseUrl = process.env.GORDON_NATIVE_OPENAI_BASE_URL ?? process.env.OPENAI_BASE_URL;
-
-    if (this.nativeOpenAIApiKey && !process.env.GORDON_NATIVE_OPENAI_API_KEY) {
-      process.env.GORDON_NATIVE_OPENAI_API_KEY = this.nativeOpenAIApiKey;
-    }
-
-    if (this.nativeOpenAIBaseUrl && !process.env.GORDON_NATIVE_OPENAI_BASE_URL) {
-      process.env.GORDON_NATIVE_OPENAI_BASE_URL = this.nativeOpenAIBaseUrl;
-    }
-
-    if (process.env.OPENAI_API_KEY) {
-      this.availableDirectProviders.add("openai");
-    }
-
-    if (process.env.ANTHROPIC_API_KEY) {
-      this.availableDirectProviders.add("anthropic");
-    }
-
+    if (process.env.OPENAI_API_KEY) this.availableDirectProviders.add("openai");
+    if (process.env.ANTHROPIC_API_KEY) this.availableDirectProviders.add("anthropic");
     if (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY) {
       this.availableDirectProviders.add("google");
     }
+    if (process.env.XAI_API_KEY) this.availableDirectProviders.add("xai");
 
-    if (process.env.DEDALUS_API_KEY) {
-      this.hasDedalusKey = true;
-    }
-
-    if (process.env.DOUBLEWORD_API_KEY) {
-      this.hasDoublewordKey = true;
-    }
+    if (process.env.OPENROUTER_API_KEY) this.availableGateways.add("openrouter");
+    if (process.env.HF_TOKEN) this.availableGateways.add("huggingface");
 
     this.initialized = true;
   }
 
-  private getDedalusModelCatalog(): readonly ModelMetadata[] {
-    return this.dedalusModels;
-  }
+  /**
+   * Resolve an operator "provider/model" (or "provider:model") string into a
+   * ModelRoute. PASS-THROUGH: any provider string is forwarded to Mastra's
+   * router unchanged. Only local prefixes route to a base-URL object form.
+   */
+  private routeForSpec(spec: string): ModelRoute {
+    const { prefix, rawModelId } = splitModelString(spec);
 
-  getDedalusModels(): readonly ModelMetadata[] {
-    this.initializeFromEnv();
-    return this.getDedalusModelCatalog();
-  }
-
-  private normalizeDiscoveredDedalusModels(payload: unknown): ModelMetadata[] {
-    const response = (payload ?? {}) as DedalusModelDiscoveryResponse;
-    const rawModels = Array.isArray(response.data)
-      ? response.data
-      : Array.isArray(response.models)
-        ? response.models
-        : Array.isArray(payload)
-          ? payload
-          : [];
-
-    const normalized = rawModels.flatMap((entry): ModelMetadata[] => {
-      if (!entry || typeof entry !== "object") {
-        return [];
-      }
-
-      const candidate = entry as Record<string, unknown>;
-      const rawId = typeof candidate.id === "string"
-        ? candidate.id
-        : typeof candidate.model === "string"
-          ? candidate.model
-          : null;
-
-      if (!rawId || !rawId.includes("/")) {
-        return [];
-      }
-
-      const { prefix, rawModelId } = splitModelString(rawId);
-      if (!prefix || !rawModelId) {
-        return [];
-      }
-
-      const provider = (isDirectProviderName(prefix) || prefix === "xai" || prefix === "moonshot")
-        ? prefix
-        : undefined;
-
-      if (!provider) {
-        return [];
-      }
-
-      const rawName = typeof candidate.name === "string"
-        ? candidate.name
-        : typeof candidate.display_name === "string"
-          ? candidate.display_name
-          : rawModelId;
-
-      const tier = typeof candidate.tier === "string" &&
-        (candidate.tier === "flagship" || candidate.tier === "balanced" || candidate.tier === "fast")
-        ? candidate.tier
-        : /mini|nano|flash|haiku|fast/i.test(rawId)
-          ? "fast"
-          : /sonnet|balanced/i.test(rawId)
-            ? "balanced"
-            : "flagship";
-
-      return [{
-        id: rawId as ModelString,
-        provider,
-        name: rawName,
-        tier,
-      }];
-    });
-
-    const unique = new Map<string, ModelMetadata>();
-    for (const model of normalized) {
-      unique.set(model.id, model);
+    if (!prefix) {
+      throw new Error(`Invalid model spec "${spec}". Expected "provider/model".`);
     }
 
-    return Array.from(unique.values());
-  }
-
-  async refreshDedalusModels(force = false): Promise<readonly ModelMetadata[]> {
-    this.initializeFromEnv();
-
-    if (!this.hasDedalusKey) {
-      this.dedalusModels = [...DEDALUS_MODELS];
-      return this.getDedalusModelCatalog();
-    }
-
-    if (!force && this.dedalusModelsRefreshInFlight) {
-      return this.dedalusModelsRefreshInFlight;
-    }
-
-    const fetchPromise = (async () => {
-      try {
-        const response = await fetch(`${DEDALUS_BASE_URL}/models`, {
-          headers: {
-            Authorization: `Bearer ${process.env.DEDALUS_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`Dedalus model discovery failed (${response.status})`);
-        }
-
-        const payload = await response.json();
-        const discovered = this.normalizeDiscoveredDedalusModels(payload)
-          .filter((model) => DEDALUS_MODEL_ID_SET.has(model.id));
-        if (discovered.length > 0) {
-          const discoveredById = new Map(discovered.map((model) => [model.id, model]));
-          this.dedalusModels = DEDALUS_MODELS.map((model) => discoveredById.get(model.id) ?? model);
-        } else {
-          this.dedalusModels = [...DEDALUS_MODELS];
-        }
-      } catch {
-        this.dedalusModels = this.dedalusModels.length > 0 ? this.dedalusModels : [...DEDALUS_MODELS];
-      } finally {
-        this.dedalusModelsRefreshInFlight = null;
-      }
-
-      return this.getDedalusModelCatalog();
-    })();
-
-    this.dedalusModelsRefreshInFlight = fetchPromise;
-    return fetchPromise;
-  }
-
-  private getRouteForSelection(provider: DirectProviderName | string, modelId: string): ModelRoute {
-    const resolved = this.resolveRequestedModel(provider, modelId);
-
-    if (resolved.provider === "dedalus") {
-      if (!this.hasDedalusKey) {
-        throw new Error(
-          `Provider "dedalus" selected but DEDALUS_API_KEY not configured.\n` +
-          `Set DEDALUS_API_KEY in your .env file or switch provider.`
-        );
-      }
-
-      if (!this.getDedalusModelCatalog().some((model) => model.id === resolved.fullModelId)) {
-        throw new Error(
-          `Model "${resolved.fullModelId}" is not supported by Dedalus.`
-        );
-      }
-
+    // Local OpenAI-compatible hosts (object form).
+    if (LOCAL_PREFIXES.has(prefix)) {
       return {
-        modelString: resolved.fullModelId,
-        resolvedModelString: `openai/${resolved.fullModelId}` as ModelString,
-        provider: "dedalus",
+        modelString: spec as ModelString,
+        resolvedModelString: spec as ModelString,
+        provider: prefix,
         transportProvider: "openai",
-        transportModelId: resolved.fullModelId,
-        viaOpenAICompatibleProvider: true,
-        baseUrl: DEDALUS_BASE_URL,
-        apiKeyEnvVar: "DEDALUS_API_KEY",
+        transportModelId: rawModelId,
+        viaGateway: false,
+        viaLocalHost: true,
+        baseUrl: localUrlFor(prefix),
+        apiKeyEnvVar: LOCAL_API_KEY_ENV,
       };
     }
 
-    if (resolved.provider === "doubleword") {
-      if (!this.hasDoublewordKey) {
-        throw new Error(
-          `Provider "doubleword" selected but DOUBLEWORD_API_KEY not configured.\n` +
-          `Set DOUBLEWORD_API_KEY in your .env file or switch provider.`
-        );
-      }
-
-      return {
-        modelString: resolved.fullModelId,
-        resolvedModelString: `openai/${resolved.fullModelId}` as ModelString,
-        provider: "doubleword",
-        transportProvider: "openai",
-        transportModelId: resolved.fullModelId,
-        viaOpenAICompatibleProvider: true,
-        baseUrl: DOUBLEWORD_BASE_URL,
-        apiKeyEnvVar: "DOUBLEWORD_API_KEY",
-      };
-    }
-
-    if (isDirectProviderName(resolved.provider) && this.availableDirectProviders.has(resolved.provider)) {
-      const envVarMap: Record<DirectProviderName, string> = {
-        openai: "OPENAI_API_KEY",
-        anthropic: "ANTHROPIC_API_KEY",
-        google: "GOOGLE_GENERATIVE_AI_API_KEY",
-      };
-
-      return {
-        modelString: resolved.fullModelId,
-        resolvedModelString: resolved.fullModelId,
-        provider: resolved.provider,
-        transportProvider: resolved.provider,
-        transportModelId: resolved.rawModelId,
-        viaOpenAICompatibleProvider: false,
-        apiKeyEnvVar: envVarMap[resolved.provider],
-      };
-    }
-
-    if (this.hasDedalusKey && this.getDedalusModelCatalog().some((model) => model.id === resolved.fullModelId)) {
-      return {
-        modelString: resolved.fullModelId,
-        resolvedModelString: `openai/${resolved.fullModelId}` as ModelString,
-        provider: "dedalus",
-        transportProvider: "openai",
-        transportModelId: resolved.fullModelId,
-        viaOpenAICompatibleProvider: true,
-        baseUrl: DEDALUS_BASE_URL,
-        apiKeyEnvVar: "DEDALUS_API_KEY",
-      };
-    }
-
-    throw new Error(
-      `Provider "${provider}" not configured. ` +
-      `Set the appropriate API key in your .env file.\n` +
-      `Available: ${this.getAvailableProviders().join(", ") || "none"}` +
-      (this.hasDedalusKey ? " (+ Dedalus models)" : "")
-    );
-  }
-
-  private resolveRequestedModel(provider: ProviderName | string, modelId: string): {
-    provider: ProviderName | string;
-    fullModelId: ModelString;
-    rawModelId: string;
-  } {
-    const { prefix, rawModelId } = splitModelString(modelId);
-
-    if (provider === "dedalus" || provider === "doubleword") {
-      const fullModelId = (prefix ? `${prefix}/${rawModelId}` : modelId) as ModelString;
-      return { provider, fullModelId, rawModelId };
-    }
-
-    if (isDirectProviderName(provider)) {
-      return {
-        provider,
-        fullModelId: `${provider}/${prefix ? rawModelId : modelId}` as ModelString,
-        rawModelId: prefix ? rawModelId : modelId,
-      };
-    }
+    // Everything else — first-party, gateways, and any of Mastra's other
+    // catalogue providers — passes straight through as a "provider/model"
+    // string. Mastra's router resolves the key + transport.
+    const fullModelId = spec as ModelString;
+    const apiKeyEnvVar = isDirectProviderName(prefix)
+      ? DIRECT_API_KEY_ENV[prefix]
+      : (GATEWAY_API_KEY_ENV as Record<string, string>)[prefix] ?? `${prefix.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}_API_KEY`;
 
     return {
-      provider,
-      fullModelId: (prefix ? `${prefix}/${rawModelId}` : modelId) as ModelString,
-      rawModelId,
+      modelString: fullModelId,
+      resolvedModelString: fullModelId,
+      provider: prefix,
+      transportProvider: isDirectProviderName(prefix) ? prefix : "openai",
+      transportModelId: rawModelId,
+      viaGateway: isGatewayName(prefix),
+      viaLocalHost: false,
+      apiKeyEnvVar,
     };
   }
 
-  hasDedalus(): boolean {
-    this.initializeFromEnv();
-    return this.hasDedalusKey;
-  }
-
-  isModelAvailable(modelId: ModelString): boolean {
-    this.initializeFromEnv();
-
-    const { prefix } = splitModelString(modelId);
-    if (!prefix) return false;
-
-    if (isDirectProviderName(prefix) && this.availableDirectProviders.has(prefix)) {
-      return true;
-    }
-
-    if (this.hasDedalusKey) {
-      return this.getDedalusModelCatalog().some((model) => model.id === modelId);
-    }
-
-    return false;
-  }
-
-  getModelRoute(modelId: ModelString): ModelRoute {
-    this.initializeFromEnv();
-
-    const { prefix, rawModelId } = splitModelString(modelId);
-    if (!prefix) {
-      throw new Error(`Invalid model string "${modelId}". Expected "provider/model".`);
-    }
-
-    if (isDirectProviderName(prefix) && this.availableDirectProviders.has(prefix)) {
-      const envVarMap: Record<DirectProviderName, string> = {
-        openai: "OPENAI_API_KEY",
-        anthropic: "ANTHROPIC_API_KEY",
-        google: "GOOGLE_GENERATIVE_AI_API_KEY",
-      };
-
-      return {
-        modelString: modelId,
-        resolvedModelString: modelId,
-        provider: prefix,
-        transportProvider: prefix,
-        transportModelId: rawModelId,
-        viaOpenAICompatibleProvider: false,
-        apiKeyEnvVar: envVarMap[prefix],
-      };
-    }
-
-    if (this.hasDedalusKey && this.getDedalusModelCatalog().some((model) => model.id === modelId)) {
-      return {
-        modelString: modelId,
-        resolvedModelString: `openai/${modelId}` as ModelString,
-        provider: "dedalus",
-        transportProvider: "openai",
-        transportModelId: modelId,
-        viaOpenAICompatibleProvider: true,
-        baseUrl: DEDALUS_BASE_URL,
-        apiKeyEnvVar: "DEDALUS_API_KEY",
-      };
-    }
-
-    throw new Error(
-      `Model "${modelId}" not available. Set the appropriate API key in your .env file.`
-    );
-  }
-
-  getModel(provider: DirectProviderName | string, modelId: string): ModelString {
-    this.initializeFromEnv();
-    return this.getRouteForSelection(provider, modelId).resolvedModelString;
+  private getRouteForSelection(provider: string | undefined, modelId: string | undefined): ModelRoute {
+    return this.routeForSpec(canonicalSpec(provider, modelId));
   }
 
   private getDefaultRoute(): ModelRoute {
     this.initializeFromEnv();
 
     const rawProvider = process.env.GORDON_PROVIDER;
+    const rawModel = process.env.GORDON_MODEL;
 
-    if (rawProvider === "dedalus") {
-      const dedalusDefault = this.getDedalusModelCatalog()[0]?.id || DEDALUS_MODELS[0].id;
-      const model = process.env.GORDON_MODEL || dedalusDefault;
-      return this.getRouteForSelection("dedalus", model);
+    if (rawModel && rawModel.includes("/")) {
+      return this.routeForSpec(rawModel);
     }
 
-    if (rawProvider === "doubleword") {
-      const model = process.env.GORDON_MODEL || DOUBLEWORD_MODEL_IDS[0]!;
-      return this.getRouteForSelection("doubleword", model);
-    }
-
-    let provider = rawProvider && isDirectProviderName(rawProvider)
-      ? rawProvider
-      : undefined;
+    let provider: DirectProviderName | undefined =
+      rawProvider && isDirectProviderName(rawProvider) ? rawProvider : undefined;
 
     if (!provider) {
-      // Prefer Dedalus when available — it's Gordon's primary multi-provider gateway
-      if (this.hasDedalusKey) {
-        const dedalusDefault = this.getDedalusModelCatalog()[0]?.id || DEDALUS_MODELS[0].id;
-        return this.getRouteForSelection("dedalus", dedalusDefault);
-      }
-
-      const preferredOrder: DirectProviderName[] = ["openai", "anthropic", "google"];
+      const preferredOrder: DirectProviderName[] = ["anthropic", "openai", "google", "xai"];
       const available = this.getAvailableProviders();
       provider = preferredOrder.find((candidate) => available.includes(candidate)) || available[0];
-
-      if (!provider) {
-        throw new Error(
-          "No LLM provider configured. Set one of these API keys in your .env file:\n" +
-          "  DEDALUS_API_KEY   - Dedalus Labs (access to many providers)\n" +
-          "  OPENAI_API_KEY    - OpenAI GPT-5.4\n" +
-          "  ANTHROPIC_API_KEY - Anthropic Claude Opus 4.6\n" +
-          "  GOOGLE_GENERATIVE_AI_API_KEY - Google Gemini 3 Pro"
-        );
-      }
     }
 
-    const model = process.env.GORDON_MODEL || DIRECT_MODELS[provider].flagship;
+    if (!provider) {
+      // Fall back to a configured gateway if no first-party key is present.
+      const gateway = [...this.availableGateways][0];
+      if (gateway && rawModel) {
+        return this.routeForSpec(`${gateway}/${rawModel}`);
+      }
+      throw new Error(
+        "No LLM provider configured. Set one of these API keys in your .env file:\n" +
+        "  ANTHROPIC_API_KEY - Anthropic Claude\n" +
+        "  OPENAI_API_KEY    - OpenAI GPT\n" +
+        "  GOOGLE_GENERATIVE_AI_API_KEY - Google Gemini\n" +
+        "  XAI_API_KEY       - xAI Grok\n" +
+        "  OPENROUTER_API_KEY / HF_TOKEN - gateways",
+      );
+    }
+
+    const model = rawModel || DIRECT_MODELS[provider].flagship;
     return this.getRouteForSelection(provider, model);
   }
 
@@ -599,163 +346,89 @@ export class ProviderRegistry {
     return this.getDefaultRoute();
   }
 
-  getDirectClientRoute(provider?: DirectProviderName | string, modelId?: string): ModelRoute {
+  getModelRoute(modelId: ModelString): ModelRoute {
     this.initializeFromEnv();
+    return this.routeForSpec(modelId);
+  }
 
-    const route = provider && modelId
-      ? this.getRouteForSelection(provider, modelId)
-      : this.getDefaultRoute();
+  /**
+   * Direct-client route (thinking / judges / non-Mastra callers). Pinned to a
+   * first-party or gateway spec — never a local host by default.
+   */
+  getDirectClientRoute(provider?: string, modelId?: string): ModelRoute {
+    this.initializeFromEnv();
+    return provider || modelId ? this.getRouteForSelection(provider, modelId) : this.getDefaultRoute();
+  }
 
-    if (route.provider === "openai" || route.provider === "dedalus") {
-      return route;
-    }
+  isModelAvailable(modelId: ModelString): boolean {
+    this.initializeFromEnv();
+    const { prefix } = splitModelString(modelId);
+    // Pass-through: any well-formed provider/model is resolvable by Mastra.
+    // For first-party providers we can additionally confirm the env key.
+    if (!prefix) return false;
+    if (isDirectProviderName(prefix)) return this.availableDirectProviders.has(prefix);
+    return true;
+  }
 
-    if (this.hasDedalusKey && this.getDedalusModelCatalog().some((model) => model.id === route.modelString)) {
-      return this.getRouteForSelection("dedalus", route.modelString);
-    }
-
-    throw new Error(
-      `Direct LLM client cannot route provider "${route.provider}" directly. ` +
-      `Configure DEDALUS_API_KEY or switch Gordon to OpenAI.`
-    );
+  getModel(provider?: string, modelId?: string): ModelString {
+    this.initializeFromEnv();
+    return this.getRouteForSelection(provider, modelId).resolvedModelString;
   }
 
   getDefaultModel(): ModelString {
     return this.getDefaultRoute().resolvedModelString;
   }
 
-  getMastraModel(provider?: DirectProviderName | string, modelId?: string): MastraModelConfig {
+  /**
+   * Build the Mastra model spec for `Agent({ model })`.
+   * Returns a string for hosted providers/gateways, or an object for local hosts.
+   */
+  getMastraModel(provider?: string, modelId?: string): MastraModelConfig {
     this.initializeFromEnv();
 
-    const route = provider && modelId
+    const route = provider || modelId
       ? this.getRouteForSelection(provider, modelId)
       : this.getDefaultRoute();
 
-    // Native providers (OpenAI, Anthropic, Google) → use Mastra's model router string
-    if (!route.viaOpenAICompatibleProvider || !route.baseUrl) {
-      return route.resolvedModelString;
+    if (route.viaLocalHost && route.baseUrl) {
+      const spec: MastraOpenAICompatibleModelConfig = {
+        id: route.modelString,
+        url: route.baseUrl,
+      };
+      const apiKey = process.env[route.apiKeyEnvVar];
+      if (apiKey) spec.apiKey = apiKey;
+      return spec;
     }
 
-    // OpenAI-compatible providers (Dedalus) → use Mastra's object format
-    // Per Mastra docs on gateway format:
-    //   Use gateway/provider/model when the remote behaves like a model gateway
-    //   and the upstream model namespace includes the provider.
-    // Dedalus expects full "openai/gpt-5.4" in the request body, so we use
-    // "dedalus/openai/gpt-5.4" as id — Mastra sends "openai/gpt-5.4" as the model name.
-    const apiKey = process.env[route.apiKeyEnvVar];
-    if (!apiKey) {
-      throw new Error(`API key not found for provider "${route.provider}". Set ${route.apiKeyEnvVar}.`);
-    }
+    return route.resolvedModelString;
+  }
 
-    return {
-      id: `${route.provider}/${route.transportModelId}`,
-      url: route.baseUrl,
-      apiKey,
-    } as any;
+  private tierProvider(rawProvider: string | undefined): DirectProviderName | undefined {
+    if (rawProvider && isDirectProviderName(rawProvider)) return rawProvider;
+    const preferredOrder: DirectProviderName[] = ["anthropic", "openai", "google", "xai"];
+    const available = this.getAvailableProviders();
+    return preferredOrder.find((candidate) => available.includes(candidate)) || available[0];
   }
 
   getFastModel(): ModelString {
     this.initializeFromEnv();
-
-    const rawProvider = process.env.GORDON_FAST_PROVIDER || process.env.GORDON_PROVIDER;
-
-    if (rawProvider === "dedalus") {
-      const model = process.env.GORDON_FAST_MODEL;
-      if (model) return this.getModel("dedalus", model);
-      const fastModel = this.getDedalusModelCatalog().find((candidate) => candidate.tier === "fast");
-      if (fastModel) return this.getModel("dedalus", fastModel.id);
-      return this.getDefaultModel();
-    }
-
-    let provider = rawProvider && isDirectProviderName(rawProvider)
-      ? rawProvider
-      : undefined;
-
-    if (!provider) {
-      const preferredOrder: DirectProviderName[] = ["openai", "google", "anthropic"];
-      const available = this.getAvailableProviders();
-      provider = preferredOrder.find((candidate) => available.includes(candidate)) || available[0];
-
-      if (!provider && this.hasDedalusKey) {
-        const fastModel = this.getDedalusModelCatalog().find((candidate) => candidate.tier === "fast");
-        if (fastModel) return this.getModel("dedalus", fastModel.id);
-      }
-
-      if (!provider) {
-        return this.getDefaultModel();
-      }
-    }
-
+    const provider = this.tierProvider(process.env.GORDON_FAST_PROVIDER || process.env.GORDON_PROVIDER);
+    if (!provider) return this.getDefaultModel();
     const model = process.env.GORDON_FAST_MODEL || DIRECT_MODELS[provider].fast;
     return this.getModel(provider, model);
   }
 
   getBalancedModel(): ModelString {
     this.initializeFromEnv();
-
-    const rawProvider = process.env.GORDON_PROVIDER;
-
-    if (rawProvider === "dedalus") {
-      const balancedModel = this.getDedalusModelCatalog().find((candidate) => candidate.tier === "balanced");
-      if (balancedModel) return this.getModel("dedalus", balancedModel.id);
-      return this.getDefaultModel();
-    }
-
-    let provider = rawProvider && isDirectProviderName(rawProvider)
-      ? rawProvider
-      : undefined;
-
-    if (!provider) {
-      const preferredOrder: DirectProviderName[] = ["openai", "anthropic", "google"];
-      const available = this.getAvailableProviders();
-      provider = preferredOrder.find((candidate) => available.includes(candidate)) || available[0];
-
-      if (!provider && this.hasDedalusKey) {
-        const balancedModel = this.getDedalusModelCatalog().find((candidate) => candidate.tier === "balanced");
-        if (balancedModel) return this.getModel("dedalus", balancedModel.id);
-      }
-
-      if (!provider) {
-        return this.getDefaultModel();
-      }
-    }
-
+    const provider = this.tierProvider(process.env.GORDON_PROVIDER);
+    if (!provider) return this.getDefaultModel();
     return this.getModel(provider, DIRECT_MODELS[provider].balanced);
   }
 
   getFastMastraModel(): MastraModelConfig {
     this.initializeFromEnv();
-
-    const rawProvider = process.env.GORDON_FAST_PROVIDER || process.env.GORDON_PROVIDER;
-
-    if (rawProvider === "dedalus") {
-      const model = process.env.GORDON_FAST_MODEL;
-      if (model) return this.getMastraModel("dedalus", model);
-      const fastModel = this.getDedalusModelCatalog().find((candidate) => candidate.tier === "fast");
-      if (fastModel) return this.getMastraModel("dedalus", fastModel.id);
-      return this.getMastraModel();
-    }
-
-    let provider = rawProvider && isDirectProviderName(rawProvider)
-      ? rawProvider
-      : undefined;
-
-    if (!provider) {
-      // Prefer Dedalus for fast models too
-      if (this.hasDedalusKey) {
-        const fastModel = this.getDedalusModelCatalog().find((candidate) => candidate.tier === "fast");
-        if (fastModel) return this.getMastraModel("dedalus", fastModel.id);
-      }
-
-      const preferredOrder: DirectProviderName[] = ["openai", "google", "anthropic"];
-      const available = this.getAvailableProviders();
-      provider = preferredOrder.find((candidate) => available.includes(candidate)) || available[0];
-
-      if (!provider) {
-        return this.getMastraModel();
-      }
-    }
-
+    const provider = this.tierProvider(process.env.GORDON_FAST_PROVIDER || process.env.GORDON_PROVIDER);
+    if (!provider) return this.getMastraModel();
     const model = process.env.GORDON_FAST_MODEL || DIRECT_MODELS[provider].fast;
     return this.getMastraModel(provider, model);
   }
@@ -765,38 +438,24 @@ export class ProviderRegistry {
     return Array.from(this.availableDirectProviders);
   }
 
-  getAllAvailableModels(): Array<{ id: string; name: string; provider: string; viaDedalus: boolean }> {
+  getAvailableGateways(): GatewayName[] {
     this.initializeFromEnv();
+    return Array.from(this.availableGateways);
+  }
 
-    const models: Array<{ id: string; name: string; provider: string; viaDedalus: boolean }> = [];
-
+  getAllAvailableModels(): Array<{ id: string; name: string; provider: string }> {
+    this.initializeFromEnv();
+    const models: Array<{ id: string; name: string; provider: string }> = [];
     for (const provider of this.availableDirectProviders) {
       const providerModels = DIRECT_MODELS[provider];
       for (const [tier, modelId] of Object.entries(providerModels)) {
-        const fullId = `${provider}/${modelId}`;
         models.push({
-          id: fullId,
+          id: `${provider}/${modelId}`,
           name: `${modelId} (${tier})`,
           provider,
-          viaDedalus: false,
         });
       }
     }
-
-    if (this.hasDedalusKey) {
-      for (const model of this.getDedalusModelCatalog()) {
-        const alreadyDirect = models.some((candidate) => candidate.id === model.id);
-        if (!alreadyDirect) {
-          models.push({
-            id: model.id,
-            name: model.name,
-            provider: model.provider,
-            viaDedalus: true,
-          });
-        }
-      }
-    }
-
     return models;
   }
 
@@ -807,16 +466,11 @@ export class ProviderRegistry {
 
   reset(): void {
     this.availableDirectProviders.clear();
-    this.hasDedalusKey = false;
-    this.hasDoublewordKey = false;
-    this.nativeOpenAIApiKey = undefined;
-    this.nativeOpenAIBaseUrl = undefined;
-    this.dedalusModels = [...DEDALUS_MODELS];
-    this.dedalusModelsRefreshInFlight = null;
+    this.availableGateways.clear();
     this.initialized = false;
   }
 
-  syncActiveProviderEnvironment(provider?: DirectProviderName | string, modelId?: string): ModelRoute {
+  syncActiveProviderEnvironment(provider?: string, modelId?: string): ModelRoute {
     return this.getDirectClientRoute(provider, modelId);
   }
 }
@@ -827,7 +481,7 @@ export const providerRegistry = new ProviderRegistry();
 // Convenience Functions
 // ============================================================================
 
-export function getModel(provider?: DirectProviderName | string, modelId?: string): ModelString {
+export function getModel(provider?: string, modelId?: string): ModelString {
   if (!provider || !modelId) {
     return providerRegistry.getDefaultModel();
   }
@@ -842,16 +496,12 @@ export function getBalancedModel(): ModelString {
   return providerRegistry.getBalancedModel();
 }
 
-export function getMastraModel(provider?: DirectProviderName | string, modelId?: string): MastraModelConfig {
+export function getMastraModel(provider?: string, modelId?: string): MastraModelConfig {
   return providerRegistry.getMastraModel(provider, modelId);
 }
 
 export function getFastMastraModel(): MastraModelConfig {
   return providerRegistry.getFastMastraModel();
-}
-
-export function hasDedalus(): boolean {
-  return providerRegistry.hasDedalus();
 }
 
 export function getModelRoute(modelId: ModelString): ModelRoute {
@@ -862,19 +512,11 @@ export function resetProviderRegistry(): void {
   providerRegistry.reset();
 }
 
-export function getDedalusModels(): readonly ModelMetadata[] {
-  return providerRegistry.getDedalusModels();
-}
-
-export function refreshDedalusModels(force = false): Promise<readonly ModelMetadata[]> {
-  return providerRegistry.refreshDedalusModels(force);
-}
-
-export function getDirectClientRoute(provider?: DirectProviderName | string, modelId?: string): ModelRoute {
+export function getDirectClientRoute(provider?: string, modelId?: string): ModelRoute {
   return providerRegistry.getDirectClientRoute(provider, modelId);
 }
 
-export function syncActiveProviderEnvironment(provider?: DirectProviderName | string, modelId?: string): ModelRoute {
+export function syncActiveProviderEnvironment(provider?: string, modelId?: string): ModelRoute {
   return providerRegistry.syncActiveProviderEnvironment(provider, modelId);
 }
 

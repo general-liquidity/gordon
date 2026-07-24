@@ -25,17 +25,17 @@ describe("localFallback", () => {
 
   describe("checkProviderHealth", () => {
     const origBase = process.env.OPENAI_BASE_URL;
-    const origDed = process.env.DEDALUS_BASE_URL;
+    const origLocal = process.env.GORDON_LOCAL_MODEL_URL;
 
     afterEach(() => {
       process.env.OPENAI_BASE_URL = origBase;
-      process.env.DEDALUS_BASE_URL = origDed;
+      process.env.GORDON_LOCAL_MODEL_URL = origLocal;
       _resetHealthCacheForTest();
     });
 
     it("returns available when no base URL configured", async () => {
       delete process.env.OPENAI_BASE_URL;
-      delete process.env.DEDALUS_BASE_URL;
+      delete process.env.GORDON_LOCAL_MODEL_URL;
       const h = await checkProviderHealth();
       expect(h).toBe("available");
     });
