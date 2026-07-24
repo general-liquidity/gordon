@@ -10,3 +10,8 @@ export {
   GordonToolCallReconciler,
   reportToolCallInterruption,
 } from "./toolcall-reconciler.ts";
+export {
+  getNativeInputProcessors,
+  getNativeOutputProcessors,
+  isNativeProcessorsEnabled,
+} from "./nativeProcessors.ts";
