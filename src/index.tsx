@@ -1,15 +1,5 @@
 #!/usr/bin/env bun
 
-// Install the Dedalus max_tokens guard before any LLM module loads.
-// Patches global fetch so Mastra-internal routing-agent calls (which
-// don't inherit our agent-level defaultOptions / defaultNetworkOptions)
-// can't blow the non-streaming threshold and 400 the user. Idempotent.
-// Also cloaks the noisy "Upstream LLM API error from dedalus" stack
-// dumps so demos / live sessions don't get interrupted — set
-// GORDON_SHOW_DEDALUS_ERRORS=1 to see them again while debugging.
-import { installDedalusMaxTokensGuard, cloakDedalusErrors } from "./infra/runtime/dedalusMaxTokensGuard.ts";
-installDedalusMaxTokensGuard();
-cloakDedalusErrors();
 import { installProductionGuards } from "./infra/safety/installProductionGuards.ts";
 installProductionGuards();
 
@@ -112,10 +102,6 @@ if (hasStdinData()) {
   process.env.GORDON_STDIN_PIPED = "1";
 }
 
-// ============================================================================
-// License Check — must pass before TUI loads
-// ============================================================================
-
 import { maybePromptForUpdate, runSelfUpgrade } from "./utils/update-notifier.ts";
 
 if (flags.upgrade) {
@@ -135,10 +121,6 @@ if (flags.upgrade) {
 // Users can manually update via `gordon --upgrade`
 const updateResult = "skipped";
 
-import { checkLicense, shutdownLicense } from "./infra/external/license/index.ts";
-await checkLicense();
-profileCheckpoint("license");
-
 // ============================================================================
 // TUI Launch
 // ============================================================================
@@ -147,12 +129,6 @@ import { startGordonTUI } from "./tui/index.js";
 import { closeDatabase } from "./infra/storage/database.ts";
 import { emitEvent } from "./events/index.ts";
 import { loadConfig } from "./infra/storage/config/config.ts";
-import {
-  initializeStructuredAxiom,
-  initializeTracing,
-  shutdownStructuredAxiom,
-  shutdownTracing,
-} from "./infra/platform/observability/index.ts";
 import * as telemetry from "./infra/platform/telemetry/index.ts";
 import { disconnectMCP } from "./infra/ai/mcp/client.ts";
 
@@ -180,25 +156,7 @@ async function gracefulShutdown(signal: string, code: number = 0): Promise<void>
   }
 
   try {
-    await shutdownLicense();
-  } catch {
-    // Non-critical
-  }
-
-  try {
     await telemetry.shutdown();
-  } catch {
-    // Non-critical
-  }
-
-  try {
-    await shutdownStructuredAxiom();
-  } catch {
-    // Non-critical
-  }
-
-  try {
-    await shutdownTracing();
   } catch {
     // Non-critical
   }
@@ -252,8 +210,6 @@ process.on("unhandledRejection", (reason, promise) => {
 
 // Initialize telemetry (no-op if not opted in)
 telemetry.init();
-initializeStructuredAxiom();
-void initializeTracing().catch(() => {});
 
 // Initialize multi-sink event router
 try {
