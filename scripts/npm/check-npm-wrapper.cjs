@@ -7,6 +7,20 @@ const wrapperDirectory = path.join(rootDirectory, "npm");
 const wrapperPkg = JSON.parse(fs.readFileSync(path.join(wrapperDirectory, "package.json"), "utf8"));
 const expectedVersion = String(process.env.GORDON_NPM_VERSION || rootPkg.version).replace(/^v/, "");
 
+// The per-platform binary sub-packages the wrapper depends on. Missing targets
+// degrade gracefully at install time (optional), but every one must be listed
+// here at the release version so the matching host actually gets a binary.
+const EXPECTED_OPTIONAL_TARGETS = [
+  "linux-x64",
+  "linux-arm64",
+  "linux-x64-musl",
+  "linux-arm64-musl",
+  "darwin-x64",
+  "darwin-arm64",
+  "win32-x64",
+  "win32-arm64"
+];
+
 const errors = [];
 
 if (wrapperPkg.name !== "@general-liquidity/gordon") {
@@ -21,16 +35,37 @@ if (Object.keys(wrapperPkg.dependencies || {}).length > 0) {
   errors.push("Wrapper package must not have runtime dependencies.");
 }
 
-if (Object.keys(wrapperPkg.optionalDependencies || {}).length > 0) {
-  errors.push("Wrapper package must not have optional dependencies.");
+// Distribution is via optionalDependencies now — there must be no postinstall
+// binary-download step (that was the 404/no-fallback/proxy failure class).
+if ((wrapperPkg.scripts || {}).postinstall) {
+  errors.push("Wrapper package must not declare a postinstall script (optionalDependencies model).");
 }
 
 if ((wrapperPkg.bin || {}).gordon !== "bin/gordon.cjs") {
   errors.push('Wrapper package bin.gordon must point to "bin/gordon.cjs".');
 }
 
-if ((wrapperPkg.scripts || {}).postinstall !== "node scripts/postinstall.cjs") {
-  errors.push('Wrapper package postinstall must run "node scripts/postinstall.cjs".');
+const files = wrapperPkg.files || [];
+if (!(files.length === 1 && files[0] === "bin/gordon.cjs")) {
+  errors.push(`Wrapper package files must be exactly ["bin/gordon.cjs"], found ${JSON.stringify(files)}.`);
+}
+
+const optionalDeps = wrapperPkg.optionalDependencies || {};
+for (const target of EXPECTED_OPTIONAL_TARGETS) {
+  const depName = `@general-liquidity/gordon-${target}`;
+  if (!(depName in optionalDeps)) {
+    errors.push(`Wrapper package is missing optionalDependency ${depName}.`);
+  } else if (optionalDeps[depName] !== expectedVersion) {
+    errors.push(
+      `optionalDependency ${depName} is "${optionalDeps[depName]}", expected "${expectedVersion}".`
+    );
+  }
+}
+for (const depName of Object.keys(optionalDeps)) {
+  const target = depName.replace("@general-liquidity/gordon-", "");
+  if (!EXPECTED_OPTIONAL_TARGETS.includes(target)) {
+    errors.push(`Unexpected optionalDependency ${depName}.`);
+  }
 }
 
 if ((wrapperPkg.repository || {}).url !== "https://github.com/general-liquidity/gordon.git") {
@@ -45,14 +80,7 @@ if (wrapperPkg.bugs !== "https://github.com/general-liquidity/gordon/issues") {
   errors.push('Wrapper package bugs must point to "https://github.com/general-liquidity/gordon/issues".');
 }
 
-for (const relativePath of [
-  "bin/gordon.cjs",
-  "lib/platform.cjs",
-  "lib/self-install.cjs",
-  "scripts/postinstall.cjs",
-  "README.md",
-  "LICENSE"
-]) {
+for (const relativePath of ["bin/gordon.cjs", "README.md", "LICENSE"]) {
   if (!fs.existsSync(path.join(wrapperDirectory, relativePath))) {
     errors.push(`Wrapper package is missing ${relativePath}.`);
   }

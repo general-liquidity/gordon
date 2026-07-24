@@ -53,8 +53,6 @@ const EXPECTED_PATTERNS = [
   /^README(\.md)?$/i,
   /^LICEN[CS]E(\.md)?$/i,
   /^bin\//,
-  /^lib\//,
-  /^scripts\//,
 ];
 
 let output;

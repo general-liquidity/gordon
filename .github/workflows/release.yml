@@ -17,10 +17,21 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
 
-      - name: Install dependencies
-        run: bun install
+      - name: Cache bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies (frozen lockfile)
+        # Frozen so CI-green == what ships. A frozen install does NOT re-resolve
+        # versions, so bunfig.toml's minimumReleaseAge age-gate never blocks it
+        # (that gate only applies to NEW resolutions, not to replaying bun.lock).
+        run: bun install --frozen-lockfile
 
       - name: Patch Bun-incompatible dependencies
         run: node scripts/patches/patch-mastra.cjs
@@ -72,28 +83,11 @@ jobs:
         run: node scripts/npm/audit-npm-pack.cjs
 
       - name: Audit npm pack content for credential leaks
-        # Greps every would-be-published file for npm tokens, GitHub
-        # PATs, AWS access keys, Stripe secrets, Vault tokens, PEM
-        # private keys, Slack/GitLab/Google/Anthropic/OpenAI API
-        # keys. Complements audit-npm-pack.cjs (file whitelist) with
-        # a content-pattern check on what does ship. Recommended by
-        # npm's publishing guides as a pre-publish safeguard.
         if: matrix.os == 'ubuntu-latest'
         run: node scripts/npm/audit-npm-pack-content.cjs
 
       - name: Source map guardrail (block sourcemap leak)
         run: node scripts/build/check-no-sourcemaps.cjs
-
-      - name: Verify registry signatures on wrapper deps (informational)
-        # `npm audit signatures` verifies Sigstore signatures + SLSA
-        # provenance attestations on installed packages. Informational
-        # (continue-on-error) until upstream deps fully adopt signed
-        # publishes — for now, surfaces visibility without breaking
-        # the release. See: docs.npmjs.com/viewing-package-provenance
-        if: matrix.os == 'ubuntu-latest'
-        continue-on-error: true
-        working-directory: npm
-        run: npm audit signatures
 
   verify-public-dist:
     name: Verify Public Dist Bundle
@@ -122,12 +116,11 @@ jobs:
       - verify-public-dist
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Generate CycloneDX SBOM
-        # Software Bill of Materials attached to every release. Lets
-        # downstream consumers verify Gordon's full dependency tree by
-        # cryptographic hash, trace upstream sources, and audit the
-        # supply chain offline. CycloneDX 1.5 JSON format.
-        # See: docs.npmjs.com/cli/v11/commands/npm-sbom
+        # Software Bill of Materials attached to every release. CycloneDX 1.5 JSON.
         run: |
           npm install --package-lock-only --ignore-scripts
           node scripts/dev/codegen/generate-sbom.cjs --output gordon-sbom.json
@@ -145,44 +138,49 @@ jobs:
     needs:
       - create-source-release
     runs-on: ${{ matrix.os }}
-    # Experimental targets (windows-arm64) are allowed to fail without
-    # blocking the rest of the release. Bun's windows-aarch64 cross-compile
-    # runtime is still flaky — we've seen incomplete downloads trip CI even
-    # though the toolchain itself is fine. Mark the job as best-effort so
-    # a Bun CDN hiccup can't block the publish pipeline.
+    # Experimental targets (windows-arm64) may fail without blocking the
+    # release. Under the optionalDependencies model this is fully non-blocking:
+    # a missing platform sub-package just isn't published, and the launcher
+    # degrades gracefully on that host instead of crashing.
     continue-on-error: ${{ matrix.experimental == true }}
     strategy:
-      # Don't cancel siblings if one target fails — let us see which
-      # targets are broken in a single CI run instead of game-of-whack-a-mole.
       fail-fast: false
       matrix:
         include:
           # Standard glibc Linux
           - target: linux-x64
+            bun_target: bun-linux-x64
             os: ubuntu-latest
             binary_name: gordon-linux-x64
           - target: linux-arm64
+            bun_target: bun-linux-arm64
             os: ubuntu-latest
             binary_name: gordon-linux-arm64
           # Alpine / musl Linux (separate libc — glibc binaries crash on Alpine)
           - target: linux-x64-musl
+            bun_target: bun-linux-x64-musl
             os: ubuntu-latest
             binary_name: gordon-linux-x64-musl
           - target: linux-arm64-musl
+            bun_target: bun-linux-arm64-musl
             os: ubuntu-latest
             binary_name: gordon-linux-arm64-musl
           # macOS
           - target: darwin-x64
+            bun_target: bun-darwin-x64
             os: macos-latest
             binary_name: gordon-darwin-x64
           - target: darwin-arm64
+            bun_target: bun-darwin-arm64
             os: macos-latest
             binary_name: gordon-darwin-arm64
           # Windows — both architectures
           - target: windows-x64
+            bun_target: bun-windows-x64
             os: windows-latest
             binary_name: gordon-windows-x64.exe
           - target: windows-arm64
+            bun_target: bun-windows-arm64
             os: windows-latest
             binary_name: gordon-windows-arm64.exe
             experimental: true
@@ -191,30 +189,35 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
 
-      - name: Install dependencies
-        run: bun install
+      - name: Cache bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
 
       - name: Patch Bun-incompatible dependencies
         run: node scripts/patches/patch-mastra.cjs
 
       - name: Build binary
-        # Simple retry loop — Bun's cross-compile runtime download is
-        # occasionally truncated on windows-arm64, and the fix is just to
-        # try again. Up to 3 attempts with a short backoff.
+        # Cross-compile through scripts/build/build.ts so the shipped binary
+        # carries the exact EXTERNALS list a local `bun run build:binary` uses
+        # (no CI-vs-local drift). Retry: Bun's cross-compile runtime download is
+        # occasionally truncated on windows-arm64; the fix is just to try again.
         shell: bash
         run: |
           set -e
           attempt=1
           max=3
-          until bun build --compile --target=bun-${{ matrix.target }} --outfile=${{ matrix.binary_name }} \
-            --external @lightprotocol/compressed-token \
-            --external @lightprotocol/stateless.js \
-            --external @solana-developers/helpers \
-            --external @galacticcouncil/api-augment/hydradx \
-            --external @galacticcouncil/api-augment/basilisk \
-            src/entry.ts; do
+          until bun scripts/build/build.ts --binary \
+            --target ${{ matrix.bun_target }} \
+            --outfile ${{ matrix.binary_name }}; do
             if [ $attempt -ge $max ]; then
               echo "Build failed after $attempt attempts"
               exit 1
@@ -224,6 +227,17 @@ jobs:
             sleep 10
           done
 
+      - name: Upload binary artifact
+        # Build-once, promote: the publish job downloads these artifacts rather
+        # than rebuilding. Also uploaded to the GH Release below for the
+        # direct-binary channel (install.sh / Homebrew / Scoop).
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.target }}
+          path: ${{ matrix.binary_name }}
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Upload binary to release
         shell: pwsh
         env:
@@ -231,10 +245,17 @@ jobs:
         run: |
           & gh release upload "${env:GITHUB_REF_NAME}" "${{ matrix.binary_name }}#${{ matrix.binary_name }}" --clobber
 
-  publish-public-dist:
-    name: Publish Public Dist Repo
+  publish:
+    name: Stage + Publish
     needs: build
     runs-on: ubuntu-latest
+    # id-token: write enables OIDC so `npm publish --provenance` signs each
+    # tarball (root wrapper + every platform sub-package) with SLSA Build L3
+    # attestations. contents: write is for the manifest commit + SHA256SUMS
+    # asset upload.
+    permissions:
+      id-token: write
+      contents: write
     env:
       VERSION: ${{ github.ref_name }}
     steps:
@@ -248,15 +269,35 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          registry-url: https://registry.npmjs.org
 
-      - name: Download release assets
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download built binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-assets
+          pattern: binary-*
+          merge-multiple: true
+
+      - name: Stage per-platform npm sub-packages
+        # Generates one @general-liquidity/gordon-<target> package dir per
+        # available binary + a manifest with per-asset sha256. Missing targets
+        # (e.g. a failed windows-arm64) are simply skipped, not fatal.
         run: |
-          mkdir -p dist-assets
-          gh release download "${VERSION}" \
-            --dir dist-assets \
-            --pattern "gordon-*"
+          node scripts/npm/stage-platform-packages.cjs \
+            --binaries dist-assets \
+            --out staging \
+            --version "${VERSION}" \
+            --manifest staging/manifest.json
+
+      - name: Wire per-asset hashes into Formula / Scoop / SHA256SUMS
+        # Deterministic, asset-name-keyed (replaces the fragile ordered-sed):
+        # correct per-arch hashes, no x64/arm64 reuse.
+        run: node scripts/npm/apply-release-hashes.cjs --manifest staging/manifest.json --version "${VERSION}"
+
+      - name: Prepare npm wrapper metadata
+        env:
+          GORDON_NPM_VERSION: ${{ github.ref_name }}
+        run: npm run prepare:npm-wrapper
 
       - name: Resolve source branch
         run: |
@@ -270,96 +311,49 @@ jobs:
           echo "SOURCE_BRANCH=${SOURCE_BRANCH}" >> "$GITHUB_ENV"
           git checkout "${SOURCE_BRANCH}"
 
-      - name: Compute hashes and update manifests
-        run: |
-          VERSION_NUMBER="${VERSION#v}"
-          echo "VERSION_NUMBER=$VERSION_NUMBER" >> "$GITHUB_ENV"
-
-          sha256sum dist-assets/gordon-darwin-arm64 | awk '{print $1}' > dist-assets/gordon-darwin-arm64.sha256
-          sha256sum dist-assets/gordon-darwin-x64 | awk '{print $1}' > dist-assets/gordon-darwin-x64.sha256
-          sha256sum dist-assets/gordon-linux-arm64 | awk '{print $1}' > dist-assets/gordon-linux-arm64.sha256
-          sha256sum dist-assets/gordon-linux-x64 | awk '{print $1}' > dist-assets/gordon-linux-x64.sha256
-          sha256sum dist-assets/gordon-windows-x64.exe | awk '{print $1}' > dist-assets/gordon-windows-x64.exe.sha256
-
-          DARWIN_ARM64=$(cat dist-assets/gordon-darwin-arm64.sha256)
-          DARWIN_X64=$(cat dist-assets/gordon-darwin-x64.sha256)
-          LINUX_ARM64=$(cat dist-assets/gordon-linux-arm64.sha256)
-          LINUX_X64=$(cat dist-assets/gordon-linux-x64.sha256)
-          WINDOWS_X64=$(cat dist-assets/gordon-windows-x64.exe.sha256)
-
-          sed -i "s/version \".*\"/version \"${VERSION_NUMBER}\"/" Formula/gordon.rb
-          sed -i "0,/sha256 \"[^\"]*\"/{s//sha256 \"${DARWIN_ARM64}\"/}" Formula/gordon.rb
-          sed -i "0,/sha256 \"[^\"]*\"/{s//sha256 \"${DARWIN_X64}\"/}" Formula/gordon.rb
-          sed -i "0,/sha256 \"[^\"]*\"/{s//sha256 \"${LINUX_ARM64}\"/}" Formula/gordon.rb
-          sed -i "0,/sha256 \"[^\"]*\"/{s//sha256 \"${LINUX_X64}\"/}" Formula/gordon.rb
-
-          sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION_NUMBER}\"/" scripts/scoop/gordon.json
-          sed -i "s/\"hash\": \"[^\"]*\"/\"hash\": \"${WINDOWS_X64}\"/" scripts/scoop/gordon.json
-          sed -i "s|/v[0-9.]*[^/]*/gordon-windows|/v${VERSION_NUMBER}/gordon-windows|g" scripts/scoop/gordon.json
-
-      - name: Prepare npm wrapper metadata
-        env:
-          GORDON_NPM_VERSION: ${{ github.ref_name }}
-        run: npm run prepare:npm-wrapper
-
       - name: Commit source manifest updates
         run: |
           git config user.name "Tiberiu Toca"
           git config user.email "tibi.toca@gmail.com"
-          git add Formula/gordon.rb scripts/scoop/gordon.json npm/package.json npm/README.md
+          git add Formula/gordon.rb scripts/scoop/gordon.json scripts/SHA256SUMS npm/package.json npm/README.md npm/LICENSE
           git diff --cached --quiet || git commit -m "chore: publish assets for ${VERSION}"
           git push origin "HEAD:${SOURCE_BRANCH}"
 
-  publish-npm:
-    name: Publish to npm
-    needs: publish-public-dist
-    runs-on: ubuntu-latest
-    # id-token: write enables OIDC token issuance so npm publish --provenance
-    # can sign the release with SLSA Build Level 3 attestations via Sigstore.
-    # This is the prerequisite for migrating to trusted publishing (which
-    # eliminates NPM_TOKEN entirely). See scripts/README.md "Supply-chain
-    # hardening" for the migration path.
-    permissions:
-      id-token: write
-      contents: read
-    env:
-      GORDON_NPM_VERSION: ${{ github.ref_name }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Configure npm for scoped publish
-        run: |
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-
-      - name: Prepare npm wrapper
-        run: npm run prepare:npm-wrapper
+      - name: Upload SHA256SUMS to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${VERSION}" scripts/SHA256SUMS#SHA256SUMS --clobber
 
       - name: Determine npm dist-tag
         id: dist-tag
         run: |
-          # Pre-release tags like v0.9.0-friends.1 publish under @friends.
-          # Stable tags like v0.9.0 publish under @latest.
-          # This keeps friend-only releases out of the default channel so
-          # `npm install -g @general-liquidity/gordon` won't pick them up.
+          # Pre-release tags (v0.1.0-alpha.1, -beta, -rc, -friends) publish to a
+          # side channel so `npm install -g @general-liquidity/gordon` (which
+          # resolves @latest) never picks them up. Clean tags go to @latest.
           if echo "${{ github.ref_name }}" | grep -qE 'friends|alpha|beta|rc'; then
-            echo "tag=friends" >> "$GITHUB_OUTPUT"
+            echo "tag=next" >> "$GITHUB_OUTPUT"
           else
             echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Publish to npm with SLSA provenance
-        working-directory: npm
-        # --provenance generates a Sigstore attestation tying the published
-        # tarball to this specific workflow run, so downstream installers
-        # can verify the package was built by Gordon's CI (not a tampered
-        # tarball). Public repo + public package are required for npm to
-        # accept provenance; both hold for @general-liquidity/gordon.
-        run: npm publish --access public --tag "${{ steps.dist-tag.outputs.tag }}" --provenance
+      - name: Publish platform sub-packages to npm
+        # Sub-packages FIRST so the root wrapper's optionalDependencies already
+        # resolve on the registry when it publishes. Each gets its own provenance
+        # attestation. A publish failure of one target should not silently pass —
+        # but a target that was never staged simply has no dir to iterate.
+        working-directory: staging/@general-liquidity
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -e
+          for dir in */; do
+            pkg="${dir%/}"
+            echo "Publishing @general-liquidity/${pkg}..."
+            ( cd "${pkg}" && npm publish --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}" )
+          done
+
+      - name: Publish root wrapper to npm
+        working-directory: npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}"

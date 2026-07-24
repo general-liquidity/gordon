@@ -7,7 +7,9 @@
  *
  * Modes:
  *   bun scripts/build.ts             → bundle to dist/entry.js (default)
- *   bun scripts/build.ts --binary    → compile standalone binary
+ *   bun scripts/build.ts --binary    → compile standalone binary (host target)
+ *   bun scripts/build.ts --binary --target bun-linux-x64 --outfile gordon-linux-x64
+ *                                    → cross-compile a named target (release matrix)
  *
  * Externals — native/runtime deps that must not be bundled. Moving these
  * out of the argv list into an array makes them easy to read and keeps
@@ -31,21 +33,33 @@ const ENTRY = resolve(ROOT, "src/entry.ts");
 const args = process.argv.slice(2);
 const binary = args.includes("--binary");
 
+function flagValue(name: string): string | undefined {
+  const index = args.indexOf(name);
+  return index >= 0 && args[index + 1] ? args[index + 1] : undefined;
+}
+
 if (binary) {
   // Compile to a single standalone executable via `bun build --compile`.
   // Binary compile still needs the CLI flags, not the Bun.build() API.
-  const proc = Bun.spawn(
-    [
-      "bun",
-      "build",
-      ENTRY,
-      "--compile",
-      "--outfile",
-      resolve(ROOT, "gordon"),
-      ...EXTERNALS.flatMap((e) => ["--external", e]),
-    ],
-    { stdout: "inherit", stderr: "inherit" },
-  );
+  //
+  // --target / --outfile let the release matrix cross-compile every platform
+  // through THIS script, so the shipped binary carries the exact same EXTERNALS
+  // list as a local `bun run build:binary` (no drift between CI and local).
+  const target = flagValue("--target"); // e.g. bun-linux-x64, bun-windows-x64
+  const outfile = flagValue("--outfile") ?? resolve(ROOT, "gordon");
+
+  const compileArgs = [
+    "bun",
+    "build",
+    ENTRY,
+    "--compile",
+    "--outfile",
+    outfile,
+    ...(target ? ["--target", target] : []),
+    ...EXTERNALS.flatMap((e) => ["--external", e]),
+  ];
+
+  const proc = Bun.spawn(compileArgs, { stdout: "inherit", stderr: "inherit" });
   const exitCode = await proc.exited;
   process.exit(exitCode);
 }

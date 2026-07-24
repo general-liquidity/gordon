@@ -1,4 +1,5 @@
 # Gordon CLI release-asset SHA-256 checksums.
-# Populated by the publish pipeline: node scripts/build/write-checksums.cjs <assets-dir>
+# Regenerated on every release by: node scripts/npm/apply-release-hashes.cjs --manifest <staging-manifest>
+# Consumed by scripts/install.sh and scripts/install.ps1 for the direct-binary channel.
 # Format (one per asset, sha256sum-compatible):
 #   <sha256hex>  <assetname>

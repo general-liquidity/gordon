@@ -19,13 +19,13 @@
 npm install -g @general-liquidity/gordon
 ```
 
-If global npm install fails with `EACCES` / permission errors on Linux or macOS, use the user-local npm path instead:
+If global npm install fails with `EACCES` / permission errors on Linux or macOS, point npm's global prefix at a user-writable directory (no `sudo`):
 
 ```bash
-npx @general-liquidity/gordon@latest install
+npm config set prefix "$HOME/.npm-global"
+export PATH="$HOME/.npm-global/bin:$PATH"
+npm install -g @general-liquidity/gordon
 ```
-
-That installs Gordon into a user-writable bin directory without `sudo`.
 
 `bun`:
 
@@ -59,35 +59,25 @@ Windows PowerShell:
 irm https://raw.githubusercontent.com/general-liquidity/gordon/main/scripts/install.ps1 | iex
 ```
 
-The npm package is a thin wrapper. It downloads the matching prebuilt binary for your platform during install.
-
-## npm Permission Fallback
-
-Global `npm install -g` can fail on Unix machines when the npm global prefix is root-owned. Gordon now supports a universal npm fallback:
-
-```bash
-npx @general-liquidity/gordon@latest install
-```
-
-If the chosen install directory is not already on `PATH`, Gordon prints the exact command to add it.
+The npm package is a thin launcher. The matching prebuilt binary for your platform ships as an `optionalDependency` (`@general-liquidity/gordon-<platform>`), so npm installs only the one binary your OS/CPU/libc needs — straight from the registry, with no separate binary download step. Platforms without a published binary fail with a clear message instead of a broken install.
 
 ## Upgrades
 
-Once installed, Gordon can upgrade itself with:
+Upgrade to the latest published release with your package manager:
 
 ```bash
-gordon --upgrade
+npm install -g @general-liquidity/gordon@latest
 ```
 
-That now resolves through the active install channel for npm, the user-local `npx` installer, Homebrew, Scoop, and the standalone install scripts.
+(or `bun add -g`, `brew upgrade`, `scoop update` for the other channels).
 
 ## Supported binaries
 
-- macOS arm64
-- macOS x64
-- Linux arm64
-- Linux x64
+- macOS arm64 / x64
+- Linux arm64 / x64 (glibc)
+- Linux arm64 / x64 (musl — Alpine, etc.)
 - Windows x64
+- Windows arm64 (best-effort)
 
 Release binaries and package manager manifests are published at:
 

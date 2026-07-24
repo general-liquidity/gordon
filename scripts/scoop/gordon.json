@@ -1,17 +1,17 @@
 {
-  "version": "0.9.0-friends.9",
+  "version": "0.1.0",
   "description": "The Frontier Trading Agent",
   "homepage": "https://gordoncli.com",
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/general-liquidity/gordon/releases/download/v0.9.0-friends.9/gordon-windows-x64.exe",
-      "hash": "1c2896a85795afd6ade2d3dac0bab1df05cce663a2dbc40b49cbd2878c23a582",
+      "url": "https://github.com/general-liquidity/gordon/releases/download/v0.1.0/gordon-windows-x64.exe",
+      "hash": "0000000000000000000000000000000000000000000000000000000000000000",
       "pre_install": "Rename-Item -Path \"$dir\\gordon-windows-x64.exe\" -NewName \"gordon.exe\" -ErrorAction SilentlyContinue"
     },
     "arm64": {
-      "url": "https://github.com/general-liquidity/gordon/releases/download/v0.9.0-friends.9/gordon-windows-arm64.exe",
-      "hash": "1c2896a85795afd6ade2d3dac0bab1df05cce663a2dbc40b49cbd2878c23a582",
+      "url": "https://github.com/general-liquidity/gordon/releases/download/v0.1.0/gordon-windows-arm64.exe",
+      "hash": "0000000000000000000000000000000000000000000000000000000000000000",
       "pre_install": "Rename-Item -Path \"$dir\\gordon-windows-arm64.exe\" -NewName \"gordon.exe\" -ErrorAction SilentlyContinue"
     }
   },
@@ -22,10 +22,10 @@
   "autoupdate": {
     "architecture": {
       "64bit": {
-        "url": "https://github.com/general-liquidity/gordon/releases/download/v0.9.0-friends.9/gordon-windows-x64.exe"
+        "url": "https://github.com/general-liquidity/gordon/releases/download/v0.1.0/gordon-windows-x64.exe"
       },
       "arm64": {
-        "url": "https://github.com/general-liquidity/gordon/releases/download/v0.9.0-friends.9/gordon-windows-arm64.exe"
+        "url": "https://github.com/general-liquidity/gordon/releases/download/v0.1.0/gordon-windows-arm64.exe"
       }
     }
   }

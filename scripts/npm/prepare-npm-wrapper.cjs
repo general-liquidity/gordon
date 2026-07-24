@@ -36,6 +36,14 @@ const wrapperPkg = readJson(wrapperPackagePath);
 const version = getRequestedVersion(rootPkg.version);
 
 wrapperPkg.version = version;
+// Keep every per-platform optionalDependency pinned to the wrapper version so
+// `npm install @general-liquidity/gordon` pulls the matching binary sub-package
+// for this exact release. Rewrites values in place; does not add/remove targets.
+if (wrapperPkg.optionalDependencies) {
+  for (const depName of Object.keys(wrapperPkg.optionalDependencies)) {
+    wrapperPkg.optionalDependencies[depName] = version;
+  }
+}
 wrapperPkg.author = rootPkg.author;
 wrapperPkg.bugs = WRAPPER_BUGS_URL;
 wrapperPkg.description = rootPkg.description;

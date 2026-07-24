@@ -2,7 +2,8 @@
 /**
  * CI Source Map Guardrail
  *
- * Fails the build if ANY .map file exists under dist/ or npm/lib/.
+ * Fails the build if ANY .map file exists under dist/ or the npm wrapper's
+ * shipped bin/ (or a staged npm/vendor/).
  *
  * This is the single most important guardrail against the Claude Code class
  * of leak: Anthropic shipped cli.mjs.map files containing sourcesContent
@@ -25,7 +26,7 @@ const path = require("node:path");
 const ROOT = path.resolve(__dirname, "..", "..");
 const DIRECTORIES_TO_CHECK = [
   path.join(ROOT, "dist"),
-  path.join(ROOT, "npm", "lib"),
+  path.join(ROOT, "npm", "bin"),
   path.join(ROOT, "npm", "vendor"),
 ];
 
