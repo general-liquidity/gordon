@@ -119,6 +119,10 @@ import {
   getAgentForTool,
 } from "./orchestrator/toolAgentMap.ts";
 import {
+  isNativeSupervisorEnabled,
+  buildNativeSupervisorDelegation,
+} from "./orchestrator/nativeSupervisor.ts";
+import {
   getCompiledSubagentProfiles,
   validateToolCall,
   handleAgentSwitch,
@@ -493,21 +497,27 @@ export async function* processMessageStream(
         ...(Object.keys(extendedThinkingOpts).length > 0 ? { providerOptions: extendedThinkingOpts } : {}),
         ...groundedPrompt.requestOptions,
         ...(tracingOptions && { tracingOptions }),
-        // Delegation hooks for supervisor → sub-agent routing
-        delegation: {
-          onDelegationStart: async (ctx: any) => {
-            state.currentAgent = ctx.primitiveId;
-            logger.info("Delegation to sub-agent", { agent: ctx.primitiveId });
-            return { proceed: true };
-          },
-          onDelegationComplete: async (ctx: any) => {
-            if (ctx.error) {
-              logger.warn("Delegation failed", { agent: ctx.primitiveId, error: ctx.error });
-              return { feedback: `Delegation to ${ctx.primitiveId} failed: ${ctx.error}. Try another approach.` };
-            }
-            return {};
-          },
-        },
+        // Delegation hooks for supervisor → sub-agent routing.
+        // Flag-gated: GORDON_NATIVE_SUPERVISOR=1 uses the native supervisor
+        // delegation config (messageFilter preserving the permission-scoped
+        // split + loop-safety + feedback drain). Default (flag off) keeps the
+        // existing minimal inline hooks — identical behavior.
+        delegation: isNativeSupervisorEnabled()
+          ? buildNativeSupervisorDelegation(state)
+          : {
+              onDelegationStart: async (ctx: any) => {
+                state.currentAgent = ctx.primitiveId;
+                logger.info("Delegation to sub-agent", { agent: ctx.primitiveId });
+                return { proceed: true };
+              },
+              onDelegationComplete: async (ctx: any) => {
+                if (ctx.error) {
+                  logger.warn("Delegation failed", { agent: ctx.primitiveId, error: ctx.error });
+                  return { feedback: `Delegation to ${ctx.primitiveId} failed: ${ctx.error}. Try another approach.` };
+                }
+                return {};
+              },
+            },
         onError: ({ error }: { error: string | Error }) => {
           logger.error("Stream error", { error: error instanceof Error ? error.message : error });
         },
