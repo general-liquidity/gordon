@@ -24,7 +24,6 @@ const EXTERNALS = [
   "@solana-developers/helpers",
   "@galacticcouncil/api-augment/hydradx",
   "@galacticcouncil/api-augment/basilisk",
-  "@polkadot-agent-kit/sdk",
 ];
 
 const ROOT = resolve(import.meta.dirname, "..", "..");
