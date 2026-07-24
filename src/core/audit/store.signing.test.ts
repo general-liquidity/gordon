@@ -8,6 +8,7 @@ import {
   getDatabase,
 } from "../../infra/storage/database.ts";
 import { saveTrace, verifyStoredAuditChain } from "./store.ts";
+import { provisionAuditSchema } from "./testSupport.ts";
 import type { AuditTrace } from "./types.ts";
 
 let tempDir: string;
@@ -15,6 +16,9 @@ let tempDir: string;
 beforeAll(() => {
   tempDir = mkdtempSync(join(tmpdir(), "gordon-audit-chain-"));
   setDatabasePathForTesting(join(tempDir, "audit-test.db"));
+  // Shared-process runs can leave store.ts's one-shot table-init guard flipped
+  // on a previous file's DB, so create the schema on this fresh handle directly.
+  provisionAuditSchema();
 });
 
 afterAll(() => {
