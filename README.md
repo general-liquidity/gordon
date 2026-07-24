@@ -98,6 +98,8 @@ export BINANCE_API_KEY="..."  BINANCE_API_SECRET="..."     # a crypto venue
 export ALPACA_API_KEY="..."   ALPACA_API_SECRET="..."      # or a stocks broker
 ```
 
+Every supported provider, exchange, broker, and data feed is documented in [`.env.example`](./.env.example). Copy it to `~/.gordon/.env` and fill in only what you use.
+
 Then talk to it, or drive it with slash commands:
 
 ```
@@ -342,6 +344,21 @@ bun run quality:brokers   # broker conformance + latency gate
 ```
 
 CI runs the suite, `tsc --noEmit`, Biome, broker conformance, the eval-harness regression gate, and guardrails that block source-map leaks and stray files before publish.
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for conventions before opening a PR.
+
+## Related projects
+
+Sibling open-source projects from the same team:
+
+- **[SharpeArena](https://github.com/general-liquidity/sharpearena)**: a reinforcement-learning environment for trading agents.
+- **[SharpeBench](https://github.com/general-liquidity/sharpebench)**: a reliability benchmark for trading agents (deflated Sharpe, `pass^k`, deterministic process checks).
+
+## License & safety docs
+
+Gordon is licensed under the [MIT License](./LICENSE). It is built and open-sourced by the team behind General Liquidity.
+
+Before you arm live trading, read [DISCLAIMER.md](./DISCLAIMER.md) and [TERMS.md](./TERMS.md): Gordon can place real orders on real venues with your keys, none of its output is financial advice, and you trade at your own risk. To report a security issue, see [SECURITY.md](./SECURITY.md).
 
 ---
 
