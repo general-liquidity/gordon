@@ -15,8 +15,8 @@
 // (GORDON_AUTODREAM_ENABLED) is on AND the gates below pass. Read-only-safe:
 // the only writes are memory curation the manual paths already perform.
 
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from "fs";
-import { join } from "path";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
+import { join, dirname } from "path";
 import { homedir } from "os";
 
 import { runACECycle } from "../../../infra/agents/ace/index.ts";
@@ -108,6 +108,9 @@ export class AutoDreamManager {
         } else { return false; }
       } catch { unlinkSync(LOCK_PATH); }
     }
+    // Default-on feature: on a fresh install ~/.gordon may not exist yet.
+    // Create the lock's parent dir rather than ENOENT-crashing consolidation.
+    mkdirSync(dirname(LOCK_PATH), { recursive: true });
     writeFileSync(LOCK_PATH, JSON.stringify({ pid: process.pid, timestamp: Date.now() }));
     return true;
   }
