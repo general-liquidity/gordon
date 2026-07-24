@@ -190,8 +190,12 @@ jobs:
 
       - name: Generate CycloneDX SBOM
         # Software Bill of Materials attached to every release. CycloneDX 1.5 JSON.
+        # --legacy-peer-deps: Gordon builds with Bun, which does not enforce
+        # peer ranges, and one transitive SDK still pins an older `ai` major.
+        # npm's strict peer resolution would fail this lockfile-only pass; the
+        # flag keeps SBOM generation working without changing what ships.
         run: |
-          npm install --package-lock-only --ignore-scripts
+          npm install --package-lock-only --ignore-scripts --legacy-peer-deps
           node scripts/dev/codegen/generate-sbom.cjs --output gordon-sbom.json
 
       - name: Create or update GitHub Release
