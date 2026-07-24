@@ -16,6 +16,11 @@ import type { DialogId } from "./state/types.ts";
 import { evaluatePermissionModeTransition } from "./state/permissionModeFsm.ts";
 
 // ── Components ──
+// Static imports: these were lazy require()s to dodge a circular dep that no
+// longer exists. require() also broke `bun build --compile`, which refuses any
+// require whose transitive deps contain a top-level await (ink -> yoga-layout).
+import { ThemeProvider } from "./themes/ThemeProvider.tsx";
+import { GordonInkUITheme } from "./themes/inkUiTheme.tsx";
 import { type Message, type MessageVariant } from "./components/messages/MessageBubble.tsx";
 import { StreamingText } from "./components/messages/StreamingText.tsx";
 import { AgentProgress } from "./components/status/AgentProgress.tsx";
@@ -2902,9 +2907,6 @@ function coerceWorkspace(value: string | null): WorkspaceId {
 // ============================================================================
 
 export function App() {
-  // Import ThemeProvider dynamically to avoid circular deps
-  const { ThemeProvider } = require("./themes/ThemeProvider.js");
-  const { GordonInkUITheme } = require("./themes/inkUiTheme.js");
   return (
     <ThemeProvider>
     <GordonInkUITheme>

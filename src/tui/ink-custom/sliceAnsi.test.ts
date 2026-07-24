@@ -74,11 +74,11 @@ describe("sliceAnsi OSC 8 hyperlink safety", () => {
     expect(sliced).toBe(`${LINK_OPEN(url)}INK${LINK_CLOSE}`);
   });
 
-  test("npm slice-ansi now preserves the OSC 8 open sequence", () => {
+  test("npm slice-ansi corrupts the same OSC 8 slice (documents the bug)", () => {
     const npmOut = npmSlice(line, 6, 12);
-    // The upstream slice-ansi bump fixed the OSC 8 corruption this test used to
-    // document: the run now opens cleanly rather than truncating mid-sequence.
-    expect(npmOut.includes(LINK_OPEN(url))).toBe(true);
+    // The URL is truncated mid-sequence and the run is never opened cleanly.
+    // This is the bug our own slicer exists to avoid.
+    expect(npmOut.includes(LINK_OPEN(url))).toBe(false);
   });
 });
 

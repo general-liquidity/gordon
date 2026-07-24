@@ -288,6 +288,33 @@ if (!fs.existsSync(outputJsPath)) {
 
 const reconcilerPath = require("path").resolve(__dirname, "..", "..", "node_modules", "ink", "build", "reconciler.js");
 
+// ============================================================================
+// Patch 4a: strip the dev-only top-level await so the standalone binary builds
+//
+// reconciler.js opens with `if (process.env['DEV'] === 'true') { await
+// import('./devtools.js'); }`. That branch never runs in a shipped binary, but
+// the top-level await is a STATIC property of the module: Bun's `--compile`
+// refuses any require() whose transitive deps contain one, so the lazy
+// require("./themes/inkUiTheme.js") in App.tsx (-> @inkjs/ui -> ink) fails the
+// whole build. Rewriting the await to a floating promise keeps the dev-only
+// behaviour and removes the top-level await.
+// ============================================================================
+if (require("fs").existsSync(reconcilerPath)) {
+  const tlaSource = require("fs").readFileSync(reconcilerPath, "utf8");
+  if (tlaSource.includes("void import('./devtools.js')")) {
+    log("[patch-ink] reconciler.js top-level await already stripped — skipping.");
+  } else if (!tlaSource.includes("await import('./devtools.js')")) {
+    warn("[patch-ink] WARNING: reconciler.js devtools top-level await not found — ink may have changed.");
+  } else {
+    require("fs").writeFileSync(
+      reconcilerPath,
+      tlaSource.replace("await import('./devtools.js')", "void import('./devtools.js')"),
+      "utf8",
+    );
+    log("[patch-ink] Patched reconciler.js — removed dev-only top-level await.");
+  }
+}
+
 if (!require("fs").existsSync(reconcilerPath)) {
   warn("[patch-ink] WARNING: reconciler.js not found at " + reconcilerPath + " — skipping dirty-tracking patch.");
 } else {
