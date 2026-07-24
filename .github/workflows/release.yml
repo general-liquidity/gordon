@@ -30,13 +30,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # `state` isolates the two suites that mutate process-global state
-          # (the persistence-dir override and the sqlite plan-DB path). They
-          # are order-sensitive to whatever else shares their process, so they
-          # get their own shard. Both are excluded from core/agents below;
-          # keep the three lists in sync or coverage silently drops.
+          # Bun's mock.module() is process-global and permanent: once a file
+          # installs one, every module loaded afterwards in that process gets
+          # the mock. Four trading suites mock the shared plans/trades/executor
+          # modules, which silently replaces the real plan store for any suite
+          # that loads later. Whoever loses that race depends on module-eval
+          # order, which differs per platform, so it passed locally and failed
+          # on Linux CI. `state` holds the real-plan-store suites and `mocked`
+          # holds the module-mocking ones, so the mocks cannot reach a suite
+          # that needs the real store. Keep these two lists disjoint from
+          # core/agents below or coverage silently drops.
           - shard-name: state
-            paths: src/core/lifecycle src/infra/agents/tools/trading
+            paths: src/core/lifecycle src/infra/agents/tools/trading/trading.approvalBinding.test.ts
+          - shard-name: mocked
+            paths: src/infra/agents/tools/trading/trading.executePlan.test.ts src/infra/agents/tools/trading/trading.terminationLayers.test.ts src/infra/agents/tools/trading/trading.terminationLayers.enforce.test.ts src/infra/agents/tools/trading/trading.wipGate.test.ts
           - shard-name: core
             paths: src/core/alpha src/core/audit src/core/backtesting src/core/consensus src/core/edge src/core/execution src/core/genome src/core/indicators src/core/learning src/core/market-analysis src/core/memory src/core/microstructure src/core/numerics src/core/orders src/core/pipeline src/core/playbooks src/core/positions src/core/regime src/core/risk-kernel src/core/risk-management src/core/runtime src/core/safety src/core/stats src/core/strategies src/core/volatility
           - shard-name: agents
