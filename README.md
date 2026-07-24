@@ -90,10 +90,10 @@ cd gordon && bun install && bun run build && bun start   # from source
 gordon
 ```
 
-First run walks you through setup: an LLM provider, your venues, a default permission mode, and preferences. Everything lives under `~/.gordon/` and never leaves your machine. Set at least one model provider and one venue before placing real orders:
+First run walks you through setup: an LLM provider, your venues, a default permission mode, and preferences. Everything lives under `~/.gordon/` and never leaves your machine. Gordon is local-first: no license key, no account, no phone-home, and every feature is free. Set at least one model provider and one venue before placing real orders:
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-..."     # or OPENAI_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY / DEDALUS_API_KEY
+export ANTHROPIC_API_KEY="sk-ant-..."     # or OPENAI_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY / XAI_API_KEY
 export BINANCE_API_KEY="..."  BINANCE_API_SECRET="..."     # a crypto venue
 export ALPACA_API_KEY="..."   ALPACA_API_SECRET="..."      # or a stocks broker
 ```
@@ -110,6 +110,7 @@ Then talk to it, or drive it with slash commands:
 /portfolio       positions, cash, P/L across venues
 /strict /paper /ask /auto    switch how far it may act on its own
 /killswitch      freeze a venue, instrument, or strategy
+/flags           see and toggle opt-in capabilities and settings
 /doctor          connectivity + config + permissions health check
 ```
 
@@ -192,15 +193,16 @@ Real adapters, not mock quotes. Gordon is model-, venue-, and editor-agnostic: i
 | <img height="16" align="top" src="./assets/integrations/glassnode.png" alt="" /> &nbsp;Glassnode | On-chain metrics |
 | <img height="16" align="top" src="./assets/integrations/dexscreener.png" alt="" /> &nbsp;DexScreener | DEX pairs |
 
-#### Models &nbsp;<sub>provider-agnostic</sub>
+#### Models &nbsp;<sub>provider-agnostic, via Mastra's native model router</sub>
 
 | Provider | Models |
 |:--|:--|
 | <img height="16" align="top" src="./assets/integrations/anthropic.svg" alt="" /> &nbsp;Anthropic | Claude |
 | <img height="16" align="top" src="./assets/integrations/openai.png" alt="" /> &nbsp;OpenAI | GPT |
 | <img height="16" align="top" src="./assets/integrations/google-gemini.svg" alt="" /> &nbsp;Google | Gemini |
+| &nbsp;xAI | Grok |
 
-<sub>Routed through Dedalus for single-key, multi-model access.</sub>
+<sub>These four first-party families have native tool-calling and drive the default agent roles. Pick any `provider/model` and Gordon routes it: frontier labs native in the catalogue (DeepSeek, Qwen/Alibaba, Kimi/Moonshot, z.ai and Zhipu GLM, MiniMax, StepFun, Mistral), gateways for one-key multi-model access (OpenRouter, Hugging Face, Together, Fireworks, SiliconFlow, DeepInfra), and local OpenAI-compatible hosts (Ollama, LM Studio). Defaults: orchestrator and executor on `claude-opus-4-8`, researcher on `claude-haiku-4-5`. Override per role with `GORDON_MODEL_ORCHESTRATOR` / `_EXECUTOR` / `_RESEARCHER` (`provider:model`), or globally with `GORDON_PROVIDER` / `GORDON_MODEL`. The trade-driving executor stays pinned to a first-party provider by default for tool-calling reliability; frontier and gateway models are freely selectable for research and analysis roles.</sub>
 
 #### Editors &amp; hosts &nbsp;<sub>run Gordon from</sub>
 
@@ -266,6 +268,20 @@ Real adapters, not mock quotes. Gordon is model-, venue-, and editor-agnostic: i
 - **Learning loop:** a regret ledger (rejected candidates reviewed at T+5 / T+20 to score whether the gate saved a loss or cost a gain), a setup model-book with forward-outcome cohort stats, counterfactual / inaction-value analysis, and a strategy-pivot stagnation detector.
 </details>
 
+<details>
+<summary><strong>Opt-in Mastra-native capabilities</strong></summary>
+
+Off by default; enable one flag at a time. Each layers a native Mastra feature on top of Gordon's own gates, never in place of them.
+
+- **Guardrail processors** (`GORDON_MASTRA_PROCESSORS`): native prompt-injection / PII / moderation detection on the model I/O stream.
+- **Observational Memory** (`GORDON_OBSERVATIONAL_MEMORY`): native background memory compaction.
+- **Native supervisor delegation** (`GORDON_NATIVE_SUPERVISOR`): Mastra's supervisor routing for sub-agent hand-off.
+- **Durable / resumable agents** (`GORDON_DURABLE_AGENTS`): snapshot-backed autonomous loops that survive a restart.
+- **Native tool-approval** (`GORDON_NATIVE_TOOL_APPROVAL`): marks `execute_plan` + `cancel_*` with a native approval predicate that defers to Gordon's existing risk gate.
+
+Core capability primitives (indicators, microstructure detectors, portfolio analytics, sizing, edge analysis, reasoning/quality passes, protective trade-halt gates) are always-on and cost-throttled, not flags. Tunable settings surface via `/flags` and the settings layer, with env vars as override.
+</details>
+
 ## Permission modes
 
 The same truth table is enforced in the preflight, the runtime engine, and every adapter. **Every mode still runs the risk classifier, kill switches, and audit.** The mode only sets how far the agent may act alone.
@@ -309,7 +325,7 @@ tools           canonical 22-tool surface + Finnhub / X / MCP / onchain
                                  │
 venues & data   exchanges · brokers · onchain · wallet intel · news
                                  │
-infrastructure  LibSQL (SQL + vector) · SQLite · OpenTelemetry · event bus
+infrastructure  LibSQL (SQL + vector) · SQLite · local OTEL tracing · event bus
 ```
 
 ## Tech stack
@@ -322,14 +338,14 @@ infrastructure  LibSQL (SQL + vector) · SQLite · OpenTelemetry · event bus
 | <img height="16" align="top" src="./assets/stack/react.svg" alt="" /> &nbsp;React 19 | TUI component model |
 | Ink 6 | Terminal renderer + custom framebuffer |
 | <img height="16" align="top" src="./assets/stack/mastra.png" alt="" /> &nbsp;[Mastra](https://mastra.ai) | Multi-agent framework |
-| <img height="16" align="top" src="./assets/stack/aisdk.png" alt="" /> &nbsp;AI SDK | Model calls (Anthropic, OpenAI, Google, Dedalus) |
+| <img height="16" align="top" src="./assets/stack/aisdk.png" alt="" /> &nbsp;AI SDK | Model calls via Mastra's native router (Anthropic, OpenAI, Google, xAI, frontier labs, gateways, local) |
 | <img height="16" align="top" src="./assets/stack/libsql.png" alt="" /> &nbsp;[LibSQL / Turso](https://turso.tech/libsql) | SQL + vector memory; SQLite for the audit log |
 | <img height="16" align="top" src="./assets/stack/zod.svg" alt="" /> &nbsp;[Zod](https://zod.dev) | Schema validation on every tool I/O and config |
 | <img height="16" align="top" src="./assets/stack/ccxt.png" alt="" /> &nbsp;[ccxt](https://ccxt.com) | Crypto exchange connectivity |
 | <img height="16" align="top" src="./assets/stack/mcp.png" alt="" /> &nbsp;[MCP](https://modelcontextprotocol.io) | External tool servers |
 | <img height="16" align="top" src="./assets/stack/acp.png" alt="" /> &nbsp;[ACP](https://agentclientprotocol.com) | Editor / IDE integration |
 | <img height="16" align="top" src="./assets/stack/biome.svg" alt="" /> &nbsp;Biome | Lint + format |
-| <img height="16" align="top" src="./assets/stack/opentelemetry.svg" alt="" /> &nbsp;OpenTelemetry | Tracing + metrics |
+| <img height="16" align="top" src="./assets/stack/opentelemetry.svg" alt="" /> &nbsp;OpenTelemetry | Local tracing + metrics (no external export) |
 
 ## Development
 

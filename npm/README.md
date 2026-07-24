@@ -59,7 +59,7 @@ Windows PowerShell:
 irm https://raw.githubusercontent.com/general-liquidity/gordon/main/scripts/install.ps1 | iex
 ```
 
-The npm package is a thin launcher. The matching prebuilt binary for your platform ships as an `optionalDependency` (`@general-liquidity/gordon-<platform>`), so npm installs only the one binary your OS/CPU/libc needs — straight from the registry, with no separate binary download step. Platforms without a published binary fail with a clear message instead of a broken install.
+The npm package is a thin launcher. The matching prebuilt binary for your platform ships as an `optionalDependency` (`@general-liquidity/gordon-<platform>`), so npm installs only the one binary your OS/CPU/libc needs, straight from the registry, with no separate binary download step. Platforms without a published binary fail with a clear message instead of a broken install.
 
 ## Upgrades
 
@@ -75,7 +75,7 @@ npm install -g @general-liquidity/gordon@latest
 
 - macOS arm64 / x64
 - Linux arm64 / x64 (glibc)
-- Linux arm64 / x64 (musl — Alpine, etc.)
+- Linux arm64 / x64 (musl, for Alpine, etc.)
 - Windows x64
 - Windows arm64 (best-effort)
 
@@ -88,20 +88,10 @@ Release binaries and package manager manifests are published at:
 Set one LLM provider key before first launch:
 
 ```bash
-export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."   # or OPENAI_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY / XAI_API_KEY
 ```
 
-or
-
-```bash
-export DEDALUS_API_KEY="dd-..."
-```
-
-or
-
-```bash
-export INCEPTION_API_KEY="..."
-```
+Gordon routes models through Mastra's native model router, so any `provider/model` works: first-party (Anthropic, OpenAI, Google, xAI), frontier labs (DeepSeek, Qwen, Kimi, GLM, MiniMax, StepFun, Mistral), gateways (OpenRouter, Hugging Face, Together, Fireworks, SiliconFlow, DeepInfra), or a local OpenAI-compatible host (Ollama, LM Studio).
 
 Then run:
 
