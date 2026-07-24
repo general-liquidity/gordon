@@ -30,6 +30,8 @@ let ensuredDir: string | null = null;
  */
 export function ensureGordonHome(): string {
   const dir = resolveGordonDir();
+  // Re-check whenever the resolved dir changes (tests point GORDON_HOME at a
+  // temp dir per case) or the directory has since been removed.
   if (dir !== ensuredDir || !existsSync(dir)) {
     try {
       mkdirSync(dir, { recursive: true });
@@ -56,5 +58,12 @@ export function getGordonDir(): string {
   return ensureGordonHome();
 }
 
-/** Pre-resolved Gordon directory for the current process */
-export const GORDON_DIR = getGordonDir();
+/**
+ * Pre-resolved Gordon directory for the current process.
+ *
+ * Deliberately a PURE path computation: doing filesystem I/O at module-import
+ * time runs before any test's setup can redirect the home, and the resulting
+ * first-import path would be cached for the whole process. Directory creation
+ * happens at write time via ensureGordonHome() / getGordonDir() instead.
+ */
+export const GORDON_DIR = resolveGordonDir();
