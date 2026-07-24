@@ -482,8 +482,10 @@ export async function* processMessageStream(
 
     // Per Mastra docs: `const stream = await agent.stream(messages, options)`
     // Returns MastraModelOutput with textStream, fullStream, text (Promise<string>)
-    // Extended-thinking providerOptions are spliced in when GORDON_EXTENDED_THINKING
-    // is set; returns {} otherwise so the call shape is identical when off.
+    // Extended-thinking providerOptions are phase-driven and default-on: depth
+    // resolves via override -> config.thinkingDepth -> GORDON_THINKING_DEPTH ->
+    // workflow phase. Returns {} when depth resolves to "off" (e.g. scan/ops or
+    // GORDON_THINKING_DEPTH=off) so the call shape is identical when disabled.
     const extendedThinkingOpts = providerOptionsForPhase(workflowPhase, {
       maxTokens: MAX_OUTPUT_TOKENS_STREAM,
       context,

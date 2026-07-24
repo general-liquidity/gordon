@@ -187,8 +187,9 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
   // never breaks TUI boot. Skipped services (marketPulse, debateMode) have
   // no lifecycle — they are pure utilities invoked on-demand elsewhere.
   try {
-    // GORDON_AUTODREAM_ENABLED=true — periodic memory consolidation (24h gated internally)
-    if (process.env.GORDON_AUTODREAM_ENABLED === "true") {
+    // GORDON_AUTODREAM_ENABLED — default-on periodic memory consolidation (24h
+    // gated internally). Operators force-off via GORDON_AUTODREAM_ENABLED=0.
+    if (process.env.GORDON_AUTODREAM_ENABLED !== "0" && process.env.GORDON_AUTODREAM_ENABLED !== "false") {
       const { AutoDreamManager } = await import("../services/workflow/autoDream.ts");
       const dream = new AutoDreamManager();
       void dream.checkAndConsolidate(0, null).catch(() => {});
@@ -197,8 +198,9 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
     console.error("[runtime] autoDream init failed:", err instanceof Error ? err.message : err);
   }
   try {
-    // GORDON_REFLECTION_ENABLED=true — warm post-trade reflection store from disk
-    if (process.env.GORDON_REFLECTION_ENABLED === "true") {
+    // GORDON_REFLECTION_ENABLED — default-on; warm post-trade reflection store
+    // from disk. Operators force-off via GORDON_REFLECTION_ENABLED=0.
+    if (process.env.GORDON_REFLECTION_ENABLED !== "0" && process.env.GORDON_REFLECTION_ENABLED !== "false") {
       const { getReflectionStore } = await import("../services/workflow/tradeReflection.ts");
       getReflectionStore();
     }

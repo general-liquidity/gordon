@@ -99,10 +99,10 @@ const SEVERITY_RANK: Record<FailureSeverity, number> = {
 };
 
 export function isAdversarialEvaluatorEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[ADVERSARIAL_EVALUATOR_FLAG_ENV] === "1" ||
-    env[ADVERSARIAL_EVALUATOR_FLAG_ENV] === "true"
-  );
+  // Default-on: the hostile-review discipline ships on out-of-box, throttled by
+  // the cost budget. Operators force-off via GORDON_ADVERSARIAL_EVALUATOR=0.
+  const raw = env[ADVERSARIAL_EVALUATOR_FLAG_ENV];
+  return raw !== "0" && raw !== "false";
 }
 
 /**

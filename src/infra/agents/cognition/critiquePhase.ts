@@ -18,6 +18,7 @@ import {
   type PlanRubric,
   type RubricScore,
 } from "../../safety/planRubric.ts";
+import { isAdversarialEvaluatorEnabled } from "./adversarialEvaluator.ts";
 import {
   withTimelineEntry,
   generateTimelineAgentId,
@@ -43,8 +44,7 @@ Identify at least 2-3 concrete failure modes spanning multiple categories (logic
 Output one sentence of actionable critique under 50 words. If after honest hostile review the trace is genuinely sound, say "Reasoning is sound." Be direct.`;
 
 function selectCritiqueSystemPrompt(): string {
-  const env = process.env.GORDON_ADVERSARIAL_EVALUATOR;
-  return env === "1" || env === "true"
+  return isAdversarialEvaluatorEnabled()
     ? CRITIQUE_ADVERSARIAL_SYSTEM_PROMPT
     : CRITIQUE_SYSTEM_PROMPT;
 }

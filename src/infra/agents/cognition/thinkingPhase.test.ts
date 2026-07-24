@@ -42,11 +42,19 @@ afterEach(() => {
 });
 
 describe("shouldRunToolFreeThinking gate", () => {
-  it("returns false when GORDON_TOOL_FREE_THINKING is unset", () => {
+  it("defaults on when GORDON_TOOL_FREE_THINKING is unset", () => {
     const ctx = createContext();
     const decision = shouldRunToolFreeThinking("a long message ".repeat(20), ctx);
+    expect(decision.run).toBe(true);
+    expect(decision.reason).toBe("user message > 200 chars");
+  });
+
+  it("lets explicit GORDON_TOOL_FREE_THINKING=0 disable the pass", () => {
+    process.env.GORDON_TOOL_FREE_THINKING = "0";
+    const ctx = createContext({ requestedTaskScope: "planning" });
+    const decision = shouldRunToolFreeThinking("a".repeat(201), ctx);
     expect(decision.run).toBe(false);
-    expect(decision.reason).toContain("flag");
+    expect(decision.reason).toContain("disabled");
   });
 
   it("triggers when message > 200 chars", () => {

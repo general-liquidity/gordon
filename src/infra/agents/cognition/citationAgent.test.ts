@@ -45,10 +45,12 @@ const ethCandlesEv: EvidenceRef = {
 };
 
 describe("isCitationAgentEnabled", () => {
-  it("respects the flag", () => {
-    expect(isCitationAgentEnabled({})).toBe(false);
+  it("defaults on and respects the off-override", () => {
+    expect(isCitationAgentEnabled({})).toBe(true);
     expect(isCitationAgentEnabled({ [CITATION_AGENT_FLAG_ENV]: "1" })).toBe(true);
     expect(isCitationAgentEnabled({ [CITATION_AGENT_FLAG_ENV]: "true" })).toBe(true);
+    expect(isCitationAgentEnabled({ [CITATION_AGENT_FLAG_ENV]: "0" })).toBe(false);
+    expect(isCitationAgentEnabled({ [CITATION_AGENT_FLAG_ENV]: "false" })).toBe(false);
   });
 });
 

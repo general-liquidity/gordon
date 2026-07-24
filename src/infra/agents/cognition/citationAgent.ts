@@ -83,7 +83,10 @@ export interface BuildManifestInput {
 }
 
 export function isCitationAgentEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[CITATION_AGENT_FLAG_ENV] === "1" || env[CITATION_AGENT_FLAG_ENV] === "true";
+  // Default-on: the evidence-trail audit ships on out-of-box, throttled by the
+  // cost budget. Operators force-off via GORDON_CITATION_AGENT=0.
+  const raw = env[CITATION_AGENT_FLAG_ENV];
+  return raw !== "0" && raw !== "false";
 }
 
 export function defaultCitationManifestPath(env: NodeJS.ProcessEnv = process.env): string {

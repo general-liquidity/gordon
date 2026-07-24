@@ -122,9 +122,11 @@ export function shouldRunToolFreeThinking(
   userMessage: string,
   context: GordonContext,
 ): { run: boolean; reason: string } {
-  const flag = process.env.GORDON_TOOL_FREE_THINKING === "true";
-  if (!flag) {
-    return { run: false, reason: "GORDON_TOOL_FREE_THINKING flag not enabled" };
+  // Default-on: reasoning passes ship on out-of-box, throttled by the cost
+  // budget. Operators force-off for a cheap run via GORDON_TOOL_FREE_THINKING=0.
+  const flag = process.env.GORDON_TOOL_FREE_THINKING;
+  if (flag === "0" || flag === "false") {
+    return { run: false, reason: "GORDON_TOOL_FREE_THINKING disabled (=0/false)" };
   }
   const phase = determineWorkflowPhase(context);
   const resolution = resolveThinkingDepth({ context, phase });

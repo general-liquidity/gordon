@@ -25,10 +25,12 @@ function fm(
 }
 
 describe("isAdversarialEvaluatorEnabled", () => {
-  it("respects the flag", () => {
-    expect(isAdversarialEvaluatorEnabled({})).toBe(false);
+  it("defaults on and respects the off-override", () => {
+    expect(isAdversarialEvaluatorEnabled({})).toBe(true);
     expect(isAdversarialEvaluatorEnabled({ [ADVERSARIAL_EVALUATOR_FLAG_ENV]: "1" })).toBe(true);
     expect(isAdversarialEvaluatorEnabled({ [ADVERSARIAL_EVALUATOR_FLAG_ENV]: "true" })).toBe(true);
+    expect(isAdversarialEvaluatorEnabled({ [ADVERSARIAL_EVALUATOR_FLAG_ENV]: "0" })).toBe(false);
+    expect(isAdversarialEvaluatorEnabled({ [ADVERSARIAL_EVALUATOR_FLAG_ENV]: "false" })).toBe(false);
   });
 });
 
