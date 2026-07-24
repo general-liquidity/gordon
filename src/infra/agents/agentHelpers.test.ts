@@ -54,9 +54,9 @@ describe("parseModelOverride", () => {
     });
   });
 
-  test("multi-segment model id (Dedalus prefix style)", () => {
-    expect(parseModelOverride("openai:anthropic/claude-sonnet-4-5")).toEqual({
-      provider: "openai",
+  test("multi-segment model id (gateway prefix style)", () => {
+    expect(parseModelOverride("openrouter:anthropic/claude-sonnet-4-5")).toEqual({
+      provider: "openrouter",
       model: "anthropic/claude-sonnet-4-5",
     });
   });

@@ -17,16 +17,16 @@ interface TokenEstimate {
 
 // Rough cost per 1K tokens by provider (input+output blended)
 const COST_PER_1K: Record<string, number> = {
-  "openai": 0.005,
   "anthropic": 0.008,
+  "openai": 0.005,
   "google": 0.003,
-  "dedalus": 0.006,
+  "xai": 0.006,
 };
 
 export function useTokenEstimation() {
   const estimate = useCallback((
     inputText: string,
-    provider: string = "dedalus",
+    provider: string = "anthropic",
     toolCount: number = 0,
   ): TokenEstimate => {
     // Rough estimation: ~4 chars per token for English text

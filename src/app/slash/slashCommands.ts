@@ -1320,7 +1320,7 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 1,
     action: "menu",
     target: "model",
-    whenToUse: "Switch between AI providers (openai, anthropic, google, dedalus) or specific models",
+    whenToUse: "Switch between AI providers (anthropic, openai, google, xai) or specific models",
   },
   {
     name: "mcp",
@@ -2090,7 +2090,7 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "telemetry",
     aliases: ["analytics", "tracking"],
-    description: "Manage telemetry consent, Axiom export, and research data collection (opt-in)",
+    description: "Manage telemetry consent and research data collection (opt-in)",
     usage: "/telemetry [status|enable|disable|research-enable|research-disable|research-status|research-upload|research-clear]",
     category: "system",
     level: 2,

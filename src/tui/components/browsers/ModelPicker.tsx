@@ -2,12 +2,17 @@ import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { GordonSelect } from "../../design-system/GordonSelect.js";
 import { MultiStepPicker, type PickerStep } from "../../design-system/MultiStepPicker.tsx";
+import { DIRECT_MODELS } from "../../../infra/runtime/providers/registry.ts";
 
 /**
  * ModelPicker — Interactive 2-step model selector (Claude Code style)
  *
- * Step 1: Pick provider (openai, anthropic, google, dedalus)
- * Step 2: Pick or type model name
+ * Step 1: Pick provider (first-party families + gateways)
+ * Step 2: Pick from that family's latest tier models, or type any model name
+ *
+ * The model lists are derived from the registry's DIRECT_MODELS catalog so
+ * they always reflect each family's current flagship / balanced / fast tiers.
+ * Gateways route free-typed "provider/model" strings straight through.
  *
  * Esc at any point cancels. Selection saves to config immediately.
  */
@@ -24,52 +29,37 @@ interface ModelOption {
   value: string;
 }
 
-const PROVIDERS: ModelOption[] = [
-  { label: "OpenAI", value: "openai" },
-  { label: "Anthropic (Claude)", value: "anthropic" },
-  { label: "Google (Gemini)", value: "google" },
-  { label: "Dedalus (OpenAI-compatible router)", value: "dedalus" },
-  { label: "Doubleword (OpenAI-compatible)", value: "doubleword" },
-];
-
-const MODEL_OPTIONS: Record<string, ModelOption[]> = {
-  openai: [
-    { label: "GPT-5.4 (flagship, 1.1M ctx — $3/$15)", value: "gpt-5.4" },
-    { label: "GPT-5.4 Pro (1.1M ctx)", value: "gpt-5.4-pro" },
-    { label: "GPT-5.4 mini (fast, 400K ctx — $0.75/$5)", value: "gpt-5.4-mini" },
-    { label: "GPT-5.4 nano (cheapest, 400K ctx — $0.20/$1)", value: "gpt-5.4-nano" },
-    { label: "Provider default", value: "__default__" },
-  ],
-  anthropic: [
-    { label: "Claude Opus 4.6 (most capable)", value: "claude-opus-4-6" },
-    { label: "Claude Sonnet 4.6 (balanced)", value: "claude-sonnet-4-6" },
-    { label: "Claude Haiku 4.5 (fast — $1/$5)", value: "claude-haiku-4-5" },
-    { label: "Provider default", value: "__default__" },
-  ],
-  google: [
-    { label: "Gemini 3.1 Pro", value: "gemini-3.1-pro-preview" },
-    { label: "Gemini 3.1 Pro (custom tools)", value: "gemini-3.1-pro-preview-customtools" },
-    { label: "Gemini 3.1 Flash Lite", value: "gemini-3.1-flash-lite-preview" },
-    { label: "Gemma 4 31B", value: "gemma-4-31b-it" },
-    { label: "Gemma 4 26B", value: "gemma-4-26b-it" },
-    { label: "Provider default", value: "__default__" },
-  ],
-  dedalus: [
-    { label: "GPT-5.2", value: "openai/gpt-5.2" },
-    { label: "Claude Opus 4.6", value: "anthropic/claude-opus-4-6" },
-    { label: "Claude Sonnet 4.5", value: "anthropic/claude-sonnet-4-5-20250929" },
-    { label: "Claude Haiku 4.5", value: "anthropic/claude-haiku-4-5-20251001" },
-    { label: "Gemini 3 Pro", value: "google/gemini-3-pro-preview" },
-    { label: "Gemini 3 Flash", value: "google/gemini-3-flash-preview" },
-    { label: "Grok 4.1 Reasoning", value: "xai/grok-4-1-fast-reasoning" },
-    { label: "Kimi K2", value: "moonshot/kimi-k2-0905-preview" },
-    { label: "Provider default", value: "__default__" },
-  ],
-  doubleword: [
-    { label: "Nemotron 3 Ultra (NVFP4)", value: "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4" },
-    { label: "Provider default", value: "__default__" },
-  ],
+const PROVIDER_LABELS: Record<string, string> = {
+  anthropic: "Anthropic (Claude)",
+  openai: "OpenAI (GPT)",
+  google: "Google (Gemini)",
+  xai: "xAI (Grok)",
+  openrouter: "OpenRouter (gateway)",
+  huggingface: "Hugging Face (gateway)",
 };
+
+const GATEWAY_PROVIDERS = ["openrouter", "huggingface"] as const;
+
+const PROVIDERS: ModelOption[] = [
+  ...Object.keys(DIRECT_MODELS),
+  ...GATEWAY_PROVIDERS,
+].map((p) => ({ label: PROVIDER_LABELS[p] ?? p, value: p }));
+
+// Build each first-party family's model options from the live tier catalog.
+// De-duplicate models shared across tiers (e.g. when flagship === balanced).
+const MODEL_OPTIONS: Record<string, ModelOption[]> = Object.fromEntries(
+  Object.entries(DIRECT_MODELS).map(([provider, tiers]) => {
+    const opts: ModelOption[] = [];
+    const seen = new Set<string>();
+    for (const [tier, model] of Object.entries(tiers)) {
+      if (seen.has(model)) continue;
+      seen.add(model);
+      opts.push({ label: `${model} (${tier})`, value: model });
+    }
+    opts.push({ label: "Provider default", value: "__default__" });
+    return [provider, opts];
+  }),
+);
 
 export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel }: Props) {
   type ModelPickerData = { provider: string };
@@ -99,7 +89,7 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
             <Text dimColor>Provider: {providerLabel}</Text>
             <Box marginTop={1}>
               <GordonSelect
-                options={MODEL_OPTIONS[provider] ?? MODEL_OPTIONS.openai!}
+                options={MODEL_OPTIONS[provider] ?? [{ label: "Provider default", value: "__default__" }]}
                 onChange={(value) => onSelect(provider, value === "__default__" ? undefined : value)}
               />
             </Box>

@@ -1080,14 +1080,14 @@ function AppInner() {
         // error on every message.
         try {
           const directProviders = providerRegistry.getAvailableProviders();
-          const hasDedalus = providerRegistry.hasDedalus();
+          const gateways = providerRegistry.getAvailableGateways();
           // Pre-populate preflight with everything already configured.
           // This lets the wizard skip steps on returning users.
           void (async () => {
             try {
               const config = await loadConfig();
               const pre: SetupPreflight = {
-                llmProviders: hasDedalus ? [...directProviders, "dedalus"] : [...directProviders],
+                llmProviders: [...directProviders, ...gateways],
                 exchanges: config.exchanges.map((e) => e.type),
                 brokers: config.brokers.map((b) => b.type),
                 permissionMode: config.permissionMode,
@@ -1097,7 +1097,7 @@ function AppInner() {
               // Keep defaults if config fails to load.
             }
           })();
-          if (directProviders.length === 0 && !hasDedalus) {
+          if (directProviders.length === 0 && gateways.length === 0) {
             dispatch({ type: "SET_SHOW_SETUP", show: true });
             dispatch({
               type: "ADD_MESSAGE",
@@ -1961,7 +1961,9 @@ function AppInner() {
                 openai: "OPENAI_API_KEY",
                 anthropic: "ANTHROPIC_API_KEY",
                 google: "GOOGLE_API_KEY",
-                dedalus: "DEDALUS_API_KEY",
+                xai: "XAI_API_KEY",
+                openrouter: "OPENROUTER_API_KEY",
+                huggingface: "HF_TOKEN",
                 groq: "GROQ_API_KEY",
               };
               const envVar = envVarByProvider[provider];

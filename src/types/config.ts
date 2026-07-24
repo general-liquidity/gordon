@@ -148,10 +148,17 @@ export const MemoryConfigSchema = z.object({
   memoryWarningThreshold: z.number().min(0.5).max(0.95).default(0.8),
 });
 
-export const ProviderSchema = z.enum(["openai", "anthropic", "google", "dedalus"]);
+/**
+ * Provider id stored in config. Kept PERMISSIVE (any non-empty string) so the
+ * operator can select any integrated family, hosted gateway, or local host —
+ * the model router is pass-through and resolves the transport at runtime.
+ * `KNOWN_PROVIDER_IDS` (registry) documents the integrated set for UX; it is
+ * not enforced here so new gateways work without a schema bump.
+ */
+export const ProviderSchema = z.string().min(1);
 
 export const ModelConfigSchema = z.object({
-  provider: ProviderSchema.default("openai"),
+  provider: ProviderSchema.default("anthropic"),
   model: z.string().optional(), // If not set, uses provider's flagship model
 });
 

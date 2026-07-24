@@ -71,11 +71,12 @@ const LLM_PROVIDER_STEP: StepConfig = {
   // Only show if no provider is already configured.
   show: (_d, p) => p.llmProviders.length === 0,
   options: [
-    { label: "Dedalus — multi-provider gateway (recommended)", value: "dedalus" },
+    { label: "Anthropic — Claude (recommended)", value: "anthropic" },
     { label: "OpenAI — GPT-5", value: "openai" },
-    { label: "Anthropic — Claude", value: "anthropic" },
     { label: "Google — Gemini", value: "google" },
-    { label: "Groq — LLaMA / Mixtral (fast)", value: "groq" },
+    { label: "xAI — Grok", value: "xai" },
+    { label: "OpenRouter — multi-model gateway", value: "openrouter" },
+    { label: "Hugging Face — gateway (text/research)", value: "huggingface" },
   ],
 };
 

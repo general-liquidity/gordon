@@ -22,49 +22,67 @@ export interface ResolvedModel {
  * All known aliases. Keys are lowercase.
  */
 const ALIASES: Record<string, ResolvedModel> = {
-  // ── Anthropic ──
-  opus:       { provider: "anthropic", model: "claude-opus-4-6",           displayName: "Claude Opus 4.6" },
-  sonnet:     { provider: "anthropic", model: "claude-sonnet-4-6",         displayName: "Claude Sonnet 4.6" },
-  haiku:      { provider: "anthropic", model: "claude-haiku-4-5",          displayName: "Claude Haiku 4.5" },
-  claude:     { provider: "anthropic", model: "claude-sonnet-4-6",         displayName: "Claude Sonnet 4.6 (default)" },
+  // ── Anthropic (frontier) ──
+  opus:       { provider: "anthropic", model: "claude-opus-4-8",  displayName: "Claude Opus 4.8" },
+  sonnet:     { provider: "anthropic", model: "claude-sonnet-5",  displayName: "Claude Sonnet 5" },
+  haiku:      { provider: "anthropic", model: "claude-haiku-4-5", displayName: "Claude Haiku 4.5" },
+  claude:     { provider: "anthropic", model: "claude-sonnet-5",  displayName: "Claude Sonnet 5 (default)" },
+  fable:      { provider: "anthropic", model: "claude-fable-5",   displayName: "Claude Fable 5 (opt-in heavy reasoning)" },
 
-  // ── OpenAI ──
-  "gpt-5.4":      { provider: "openai", model: "gpt-5.4",       displayName: "GPT-5.4 (1.1M ctx, $3/$15)" },
-  gpt5:           { provider: "openai", model: "gpt-5.4",       displayName: "GPT-5.4" },
-  "gpt-5.4-mini": { provider: "openai", model: "gpt-5.4-mini",  displayName: "GPT-5.4 mini (400K ctx, $0.75/$5)" },
+  // ── OpenAI (frontier) ──
+  gpt:            { provider: "openai", model: "gpt-5.6",       displayName: "GPT-5.6 (default)" },
+  gpt5:           { provider: "openai", model: "gpt-5.6",       displayName: "GPT-5.6" },
+  "gpt-5.6":      { provider: "openai", model: "gpt-5.6",       displayName: "GPT-5.6" },
+  "gpt-5.5":      { provider: "openai", model: "gpt-5.5",       displayName: "GPT-5.5" },
+  "gpt-5.4-mini": { provider: "openai", model: "gpt-5.4-mini",  displayName: "GPT-5.4 mini" },
   gpt5mini:       { provider: "openai", model: "gpt-5.4-mini",  displayName: "GPT-5.4 mini" },
-  "gpt-5.4-nano": { provider: "openai", model: "gpt-5.4-nano",  displayName: "GPT-5.4 nano (400K ctx, $0.20/$1)" },
+  "gpt-5.4-nano": { provider: "openai", model: "gpt-5.4-nano",  displayName: "GPT-5.4 nano" },
   gpt5nano:       { provider: "openai", model: "gpt-5.4-nano",  displayName: "GPT-5.4 nano" },
-  "gpt-5.4-pro":  { provider: "openai", model: "gpt-5.4-pro",   displayName: "GPT-5.4 Pro (1.1M ctx)" },
-  gpt5pro:        { provider: "openai", model: "gpt-5.4-pro",   displayName: "GPT-5.4 Pro" },
-  gpt:            { provider: "openai", model: "gpt-5.4",       displayName: "GPT-5.4 (default)" },
 
-  // ── Google ──
-  gemini:             { provider: "google", model: "gemini-3.1-pro-preview",              displayName: "Gemini 3.1 Pro" },
-  "gemini-pro":       { provider: "google", model: "gemini-3.1-pro-preview",              displayName: "Gemini 3.1 Pro" },
-  "gemini-flash":     { provider: "google", model: "gemini-3.1-flash-lite-preview",       displayName: "Gemini 3.1 Flash Lite" },
-  "gemini-tools":     { provider: "google", model: "gemini-3.1-pro-preview-customtools",  displayName: "Gemini 3.1 Pro (custom tools)" },
-  "gemma-26b":        { provider: "google", model: "gemma-4-26b-it",                      displayName: "Gemma 4 26B" },
-  "gemma-31b":        { provider: "google", model: "gemma-4-31b-it",                      displayName: "Gemma 4 31B" },
-  gemma:              { provider: "google", model: "gemma-4-31b-it",                      displayName: "Gemma 4 31B" },
+  // ── Google (frontier) ──
+  gemini:         { provider: "google", model: "gemini-3.1-pro-preview", displayName: "Gemini 3.1 Pro" },
+  "gemini-pro":   { provider: "google", model: "gemini-3.1-pro-preview", displayName: "Gemini 3.1 Pro" },
+  "gemini-flash": { provider: "google", model: "gemini-3.6-flash",       displayName: "Gemini 3.6 Flash" },
+  "gemini-lite":  { provider: "google", model: "gemini-3.5-flash-lite",  displayName: "Gemini 3.5 Flash Lite" },
 
-  // ── Dedalus (OpenAI-compatible router) ──
-  "dedalus-gpt":    { provider: "dedalus", model: "openai/gpt-5.2",                              displayName: "GPT-5.2 via Dedalus" },
-  "dedalus-opus":   { provider: "dedalus", model: "anthropic/claude-opus-4-6",             displayName: "Opus 4.6 via Dedalus" },
-  "dedalus-sonnet": { provider: "dedalus", model: "anthropic/claude-sonnet-4-6",          displayName: "Sonnet 4.6 via Dedalus" },
-  "dedalus-haiku":  { provider: "dedalus", model: "anthropic/claude-haiku-4-5-20251001",  displayName: "Haiku 4.5 via Dedalus" },
-  "dedalus-gemini": { provider: "dedalus", model: "google/gemini-3.1-pro-preview",        displayName: "Gemini 3.1 Pro via Dedalus" },
-  grok:             { provider: "dedalus", model: "xai/grok-4-1-fast-reasoning",          displayName: "Grok 4.1 Fast Reasoning" },
-  "grok-fast":      { provider: "dedalus", model: "xai/grok-4-1-fast-reasoning",          displayName: "Grok 4.1 Fast Reasoning" },
-  "grok-nonr":      { provider: "dedalus", model: "xai/grok-4-1-fast-non-reasoning",      displayName: "Grok 4.1 Fast Non-Reasoning" },
-  kimi:             { provider: "dedalus", model: "moonshot/kimi-k2-0905-preview",        displayName: "Kimi K2" },
+  // ── xAI (frontier) ──
+  grok:        { provider: "xai", model: "grok-4.5", displayName: "Grok 4.5" },
+  "grok-fast": { provider: "xai", model: "grok-4.3", displayName: "Grok 4.3" },
+
+  // ── Frontier labs natively in the Mastra catalogue ──
+  // Convenience only — the resolver passes ANY provider/model string through,
+  // so operators are not limited to the aliases below.
+  deepseek:    { provider: "deepseek",   model: "deepseek-v4-pro",   displayName: "DeepSeek V4 Pro" },
+  kimi:        { provider: "moonshotai", model: "kimi-k2.7",         displayName: "Kimi K2.7 (Moonshot)" },
+  qwen:        { provider: "alibaba",    model: "qwen3.7-max",       displayName: "Qwen3.7 Max (Alibaba, native)" },
+  "qwen-max":  { provider: "alibaba",    model: "qwen3.7-max",       displayName: "Qwen3.7 Max (Alibaba, native)" },
+  "qwen-plus": { provider: "alibaba",    model: "qwen3.7-plus",      displayName: "Qwen3.7 Plus (Alibaba, native)" },
+  glm:         { provider: "zai",        model: "glm-4.6",           displayName: "GLM-4.6 (z.ai)" },
+  zhipu:       { provider: "zhipuai",    model: "glm-4.6",           displayName: "GLM-4.6 (Zhipu)" },
+  minimax:     { provider: "minimax",    model: "minimax-m2",        displayName: "MiniMax M2" },
+  stepfun:     { provider: "stepfun",    model: "step-3",            displayName: "Step-3 (StepFun)" },
+  mistral:     { provider: "mistral",    model: "mistral-large-2512", displayName: "Mistral Large" },
+
+  // ── Routers (pass-through: <router>/<provider>/<model>) ──
+  llama:       { provider: "openrouter",   model: "meta-llama/llama-4-maverick", displayName: "Llama 4 Maverick (OpenRouter)" },
+  "kimi-or":   { provider: "openrouter",   model: "moonshotai/kimi-k2.7-code",   displayName: "Kimi K2.7 Code (OpenRouter)" },
+  together:    { provider: "togetherai",   model: "deepseek-ai/deepseek-v4",     displayName: "DeepSeek V4 (Together)" },
+  // Routers lag native providers — Qwen3.7 is not on every gateway yet, so the
+  // router alias stays on the widely-mirrored qwen3-max.
+  fireworks:   { provider: "fireworks-ai", model: "qwen3-max",                   displayName: "Qwen3 Max (Fireworks)" },
+
+  // ── Local OpenAI-compatible hosts (object form) ──
+  "local-qwen":     { provider: "ollama",   model: "qwen3.6",     displayName: "Qwen 3.6 (local via Ollama)" },
+  "local-deepseek": { provider: "ollama",   model: "deepseek-v4", displayName: "DeepSeek V4 (local via Ollama)" },
+  "local-gemma":    { provider: "ollama",   model: "gemma4:26b",  displayName: "Gemma 4 26B (local via Ollama)" },
+  "lmstudio":       { provider: "lmstudio", model: "qwen3.6",     displayName: "Qwen 3.6 (local via LM Studio)" },
 
   // ── Meta aliases ──
-  best:       { provider: "anthropic", model: "claude-opus-4-6",   displayName: "Best (Opus 4.6)" },
-  fast:       { provider: "anthropic", model: "claude-haiku-4-5",  displayName: "Fast (Haiku 4.5)" },
+  best:       { provider: "anthropic", model: "claude-opus-4-8",  displayName: "Best (Opus 4.8)" },
+  fast:       { provider: "anthropic", model: "claude-haiku-4-5", displayName: "Fast (Haiku 4.5)" },
   cheap:      { provider: "openai",    model: "gpt-5.4-nano",     displayName: "Cheap (GPT-5.4 nano)" },
-  reasoning:  { provider: "openai",    model: "gpt-5.4-pro",      displayName: "Reasoning (GPT-5.4 Pro)" },
-  default:    { provider: "openai",    model: "gpt-5.4",          displayName: "Default (GPT-5.4)" },
+  reasoning:  { provider: "openai",    model: "gpt-5.6",          displayName: "Reasoning (GPT-5.6)" },
+  default:    { provider: "anthropic", model: "claude-sonnet-5",  displayName: "Default (Claude Sonnet 5)" },
 };
 
 /**

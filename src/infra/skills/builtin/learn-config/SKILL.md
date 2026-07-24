@@ -91,14 +91,16 @@ Use `/shortcuts` to see all active bindings.
 
 ## Model Aliases
 
-Quick model switching:
-- `/model opus` → Claude Opus 4.6
-- `/model sonnet` → Claude Sonnet 4.6
-- `/model gpt5` → GPT-5.4
-- `/model fast` → Haiku 4.5 (fastest)
-- `/model cheap` → GPT-5.4 nano ($0.20/$1)
-- `/model best` → Opus 4.6 (most capable)
-- `/model grok` → Grok 4.1 via Dedalus
+Quick model switching (each alias resolves to its family's current tier — see `modelAliases.ts`):
+- `/model opus` → Claude Opus (flagship)
+- `/model sonnet` → Claude Sonnet (balanced)
+- `/model gpt5` → GPT-5 (OpenAI flagship)
+- `/model gemini` → Gemini Pro (Google)
+- `/model grok` → Grok (xAI)
+- `/model fast` → fast tier of the active family
+- `/model best` → flagship tier of the active family
+
+Configure any provider key (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, XAI_API_KEY, or a gateway key) and `/model <provider> <model>` to run any model.
 
 Or just `/model` to open the interactive picker.
 

@@ -769,9 +769,12 @@ export async function handleSystemMenuCommand(
       const newProvider = modelParts[0]?.toLowerCase();
       const newModel = modelParts.slice(1).join(" ") || undefined;
 
-      const validProviders = ["openai", "anthropic", "google", "dedalus"];
-      if (!validProviders.includes(newProvider ?? "")) {
-        // Not a known alias or provider — show help
+      // Accept any integrated provider/family (first-party, gateway, or local),
+      // plus explicit pass-through "provider/model" specs the router forwards.
+      const { KNOWN_PROVIDER_IDS } = await import("../../infra/runtime/providers/registry.ts");
+      const isPassThroughSpec = (newModel ?? "").includes("/");
+      if (!newProvider || (!KNOWN_PROVIDER_IDS.includes(newProvider) && !isPassThroughSpec)) {
+        // Not a known alias or integrated provider — show help
         const { formatAliasHelp } = await import("../../app/models/modelAliases.ts");
         addMessage(setState, "gordon",
           `Unknown model or provider: ${args.trim()}\n\n` + formatAliasHelp()

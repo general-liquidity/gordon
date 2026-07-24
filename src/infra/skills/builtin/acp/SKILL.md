@@ -2,7 +2,7 @@
 name: acp
 description: Use this when operating inside an Agent Client Protocol (ACP) host editor — Zed's Agent Panel, Athas's External Agents panel, or any client from the ACP Registry (50+ as of 2026). Gordon runs as a stdio subprocess spawned by the editor. Use when the operator mentions Zed, Athas, ACP, or talks about "the agent panel"; when stdin/stdout JSON-RPC is the transport; when prompt items arrive as a content array rather than a plain string; when the editor forwards MCP servers over ACP. The editor handles UI, file ops, terminal, and permission prompts — Gordon focuses on reasoning + tool calls.
 license: MIT
-compatibility: Requires `@agentclientprotocol/sdk` and a stdio-spawning ACP host (Zed, Athas). Auth via env-based provider keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, DEDALUS_API_KEY).
+compatibility: Requires `@agentclientprotocol/sdk` and a stdio-spawning ACP host (Zed, Athas). Auth via env-based provider keys (ANTHROPIC_API_KEY, OPENAI_API_KEY).
 metadata:
   author: Gordon
   version: "1.0"

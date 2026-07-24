@@ -33,7 +33,7 @@
  */
 
 import { Agent } from "@mastra/core/agent";
-import { type MastraModelConfig } from "../runtime/providers/registry.ts";
+import { providerRegistry, type MastraModelConfig } from "../runtime/providers/registry.ts";
 import { getMastraInstance } from "../platform/observability/tracing.ts";
 import { determineWorkflowPhase, resolveModelForWorkflowPhase } from "./cognition/workflowPhase.ts";
 import type { GordonConfig } from "../../types/index.ts";
@@ -48,6 +48,53 @@ const ROLE_ENV_VAR: Record<AgentRole, string> = {
   executor: "GORDON_MODEL_EXECUTOR",
   researcher: "GORDON_MODEL_RESEARCHER",
 };
+
+/** Model tier each role runs at by default. */
+type ModelTier = "flagship" | "fast";
+
+const ROLE_TIER: Record<AgentRole, ModelTier> = {
+  orchestrator: "flagship",
+  executor: "flagship",
+  researcher: "fast",
+};
+
+/**
+ * First-party fallback used only when no provider key is configured yet
+ * (registry tier resolution throws). Keeps the executor + orchestrator on a
+ * verified first-party model even before the operator sets a key.
+ */
+const FIRST_PARTY_FALLBACK: Record<ModelTier, ModelOverride> = {
+  flagship: { provider: "anthropic", model: "claude-opus-4-8" },
+  fast: { provider: "anthropic", model: "claude-haiku-4-5" },
+};
+
+/**
+ * Per-role default model, applied only when no explicit config, role env
+ * override, or global GORDON_MODEL/GORDON_PROVIDER is present.
+ *
+ * Provider-agnostic: the tier (flagship / fast) is resolved against whichever
+ * first-party provider the operator has configured (GORDON_PROVIDER or the
+ * first available key), so switching families — ANTHROPIC_API_KEY,
+ * OPENAI_API_KEY, XAI_API_KEY, … — automatically moves every role onto that
+ * family's latest tier models. The registry tier helpers only ever return
+ * first-party providers, so the executor is never routed to a gateway /
+ * unverified host by default.
+ */
+function roleDefaultModel(role: AgentRole): ModelOverride {
+  const tier = ROLE_TIER[role];
+  try {
+    const spec = tier === "fast"
+      ? providerRegistry.getFastModel()
+      : providerRegistry.getDefaultModel();
+    const slash = spec.indexOf("/");
+    if (slash > 0) {
+      return { provider: spec.slice(0, slash), model: spec.slice(slash + 1) };
+    }
+  } catch {
+    // No provider configured yet — fall through to the first-party fallback.
+  }
+  return FIRST_PARTY_FALLBACK[tier];
+}
 
 interface ModelOverride {
   provider?: string;
@@ -121,15 +168,18 @@ export function resolveRuntimeModel(
   // requestContext config, so explicit per-call config still wins. Env
   // var overrides win over global GORDON_MODEL/GORDON_PROVIDER.
   const roleOverride = agentRole ? getRoleModelOverride(agentRole) : undefined;
+  const roleDefault = agentRole ? roleDefaultModel(agentRole) : undefined;
   const baseModelConfig: ModelOverride = {
     provider:
       requestConfig?.modelConfig?.provider ??
       roleOverride?.provider ??
-      process.env.GORDON_PROVIDER,
+      process.env.GORDON_PROVIDER ??
+      roleDefault?.provider,
     model:
       requestConfig?.modelConfig?.model ??
       roleOverride?.model ??
-      process.env.GORDON_MODEL,
+      process.env.GORDON_MODEL ??
+      roleDefault?.model,
   };
 
   return resolveModelForWorkflowPhase(
@@ -169,20 +219,9 @@ export function formatModelLabel(model: MastraModelConfig): string {
   }
 
   if (typeof model.id === "string" && model.id.length > 0) {
-    return model.id;
-  }
-
-  const providerId =
-    typeof model.providerId === "string" && model.providerId.length > 0
-      ? model.providerId
-      : undefined;
-  const modelId =
-    typeof model.modelId === "string" && model.modelId.length > 0
-      ? model.modelId
-      : undefined;
-
-  if (providerId && modelId) {
-    return `${providerId}/${modelId}`;
+    const url =
+      typeof model.url === "string" && model.url.length > 0 ? model.url : undefined;
+    return url ? `${model.id} @ ${url}` : model.id;
   }
 
   return JSON.stringify(model);
@@ -191,8 +230,7 @@ export function formatModelLabel(model: MastraModelConfig): string {
 /**
  * Register an agent with the Mastra instance for observability tracing.
  * When tracing is enabled, this wires agent.#mastra so that generate()/stream()
- * calls automatically create Mastra spans (agent_run, tool_call, etc.)
- * exported to Axiom via OtelExporter with SensitiveDataFilter.
+ * calls automatically create Mastra spans (agent_run, tool_call, etc.).
  */
 export function registerObservability(agent: Agent): void {
   const mastra = getMastraInstance();
