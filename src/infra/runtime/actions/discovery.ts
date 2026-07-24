@@ -45,33 +45,19 @@ export async function discoverProviderCapabilities(config: GordonConfig): Promis
     });
   }
 
-  for (const providerId of ["openai", "anthropic", "google", "dedalus"] as const) {
+  for (const providerId of ["openai", "anthropic", "google", "xai"] as const) {
     snapshots.push({
       providerId,
       providerKind: "llm",
       label: getIntegrationSurfaceMetadata(providerId).displayName,
       supportsExecution: false,
       capabilities: actionCapabilitiesForKind("llm"),
-      notes: providerId === "dedalus"
-        ? ["Multi-model gateway parent for routed model catalogs."]
-        : ["Native model provider surface."],
+      notes: ["Native model provider surface."],
       integration: getIntegrationSurfaceMetadata(providerId),
     });
   }
 
-  for (const routedId of ["dedalus/openai", "dedalus/anthropic", "dedalus/google", "dedalus/xai", "dedalus/moonshot"] as const) {
-    snapshots.push({
-      providerId: routedId,
-      providerKind: "llm",
-      label: getIntegrationSurfaceMetadata(routedId).displayName,
-      supportsExecution: false,
-      capabilities: [],
-      notes: ["Routed model surface behind the Dedalus gateway."],
-      integration: getIntegrationSurfaceMetadata(routedId),
-    });
-  }
-
-  for (const observabilityId of ["axiom", "opentelemetry"] as const) {
+  for (const observabilityId of ["opentelemetry"] as const) {
     snapshots.push({
       providerId: observabilityId,
       providerKind: "observability",
@@ -82,16 +68,6 @@ export async function discoverProviderCapabilities(config: GordonConfig): Promis
       integration: getIntegrationSurfaceMetadata(observabilityId),
     });
   }
-
-  snapshots.push({
-    providerId: "supabase_license",
-    providerKind: "system",
-    label: getIntegrationSurfaceMetadata("supabase_license").displayName,
-    supportsExecution: false,
-    capabilities: [],
-    notes: ["System backend surface for licensing and heartbeat telemetry."],
-    integration: getIntegrationSurfaceMetadata("supabase_license"),
-  });
 
   try {
     await pluginInstaller.initialize();

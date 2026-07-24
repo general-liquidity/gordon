@@ -146,10 +146,10 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 
 function getLlmStatuses(envKeys: EnvMapRecord, keyringKeys: Set<string>): ProviderCredentialStatus[] {
   const providers = [
-    { id: "openai", key: "OPENAI_API_KEY", label: "OpenAI", authMode: "api_key" },
-    { id: "dedalus", key: "DEDALUS_API_KEY", label: "Dedalus", authMode: "api_key" },
     { id: "anthropic", key: "ANTHROPIC_API_KEY", label: "Anthropic", authMode: "api_key" },
+    { id: "openai", key: "OPENAI_API_KEY", label: "OpenAI", authMode: "api_key" },
     { id: "google", key: "GOOGLE_API_KEY", label: "Google", authMode: "api_key" },
+    { id: "xai", key: "XAI_API_KEY", label: "xAI", authMode: "api_key" },
   ];
 
   return providers.map((provider) => buildStatus(

@@ -19,10 +19,12 @@ const KEYRING_JSON_PATH = join(GORDON_DIR, "keyring.json");
 
 // Keys we support storing in keyring
 export const KEYRING_SUPPORTED_KEYS = [
-  "OPENAI_API_KEY",
-  "DEDALUS_API_KEY",
   "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
   "GOOGLE_API_KEY",
+  "XAI_API_KEY",
+  "OPENROUTER_API_KEY",
+  "HF_TOKEN",
   "GROQ_API_KEY",
   "ALPACA_API_KEY",
   "ALPACA_API_SECRET",

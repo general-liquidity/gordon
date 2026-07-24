@@ -28,8 +28,18 @@ const CWD_ENV_PATH = join(process.cwd(), ".env");
 const ENV_FILE_PATH = GORDON_ENV_PATH;
 
 export interface EnvKeys {
+  ANTHROPIC_API_KEY?: string;
   OPENAI_API_KEY?: string;
-  DEDALUS_API_KEY?: string;
+  GOOGLE_GENERATIVE_AI_API_KEY?: string;
+  XAI_API_KEY?: string;
+  OPENROUTER_API_KEY?: string;
+  HF_TOKEN?: string;
+  TOGETHER_API_KEY?: string;
+  FIREWORKS_API_KEY?: string;
+  SILICONFLOW_API_KEY?: string;
+  DEEPINFRA_API_KEY?: string;
+  GORDON_LOCAL_MODEL_URL?: string;
+  GORDON_LOCAL_MODEL_API_KEY?: string;
   ALPACA_API_KEY?: string;
   ALPACA_API_SECRET?: string;
   ALPACA_PAPER?: string;
@@ -71,16 +81,6 @@ export interface EnvKeys {
   COVALENT_API_KEY?: string;
   GORDON_PROVIDER?: string;
   GORDON_MODEL?: string;
-  GORDON_AXIOM_STRUCTURED_ENABLED?: string;
-  GORDON_AXIOM_TOKEN?: string;
-  GORDON_AXIOM_HASH_SALT?: string;
-  GORDON_AXIOM_BASE_URL?: string;
-  GORDON_AXIOM_EVENTS_DATASET?: string;
-  GORDON_AXIOM_AUDIT_DATASET?: string;
-  OTEL_TRACING_ENABLED?: string;
-  GORDON_TRACING_REVIEWED?: string;
-  OTEL_EXPORTER_OTLP_ENDPOINT?: string;
-  OTEL_EXPORTER_OTLP_HEADERS?: string;
   SYNTHDATA_API_KEY?: string;
 }
 
@@ -97,11 +97,6 @@ export interface EnvStatus {
   hasHyperliquidKey: boolean;
   hasOnchainDataKey: boolean;
   hasWalletIntelKey: boolean;
-  hasStructuredAxiomEnabled: boolean;
-  hasAxiomToken: boolean;
-  hasAxiomHashSalt: boolean;
-  tracingRequested: boolean;
-  tracingReviewed: boolean;
   hasSynthDataKey: boolean;
   keys: EnvKeys;
 }
@@ -181,7 +176,9 @@ function findEnvFilePath(): string | null {
 
 /** All tracked env key names (single source of truth) */
 const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
-  "OPENAI_API_KEY", "DEDALUS_API_KEY",
+  "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "XAI_API_KEY",
+  "OPENROUTER_API_KEY", "HF_TOKEN", "TOGETHER_API_KEY", "FIREWORKS_API_KEY",
+  "SILICONFLOW_API_KEY", "DEEPINFRA_API_KEY", "GORDON_LOCAL_MODEL_URL", "GORDON_LOCAL_MODEL_API_KEY",
   "ALPACA_API_KEY", "ALPACA_API_SECRET", "ALPACA_PAPER",
   "TASTYTRADE_API_KEY", "TASTYTRADE_API_SECRET", "TASTYTRADE_PAPER", "TASTYTRADE_ACCOUNT_ID",
   "IBKR_API_KEY", "IBKR_API_SECRET", "IBKR_PAPER", "IBKR_ACCOUNT_ID",
@@ -194,9 +191,6 @@ const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
   "BIRDEYE_API_KEY", "CODEX_API_KEY", "DEFINED_API_KEY", "ONEINCH_API_KEY", "COINGECKO_API_KEY",
   "NANSEN_API_KEY", "MORALIS_API_KEY", "ARKHAM_API_KEY", "DEBANK_ACCESS_KEY", "ZERION_API_KEY",
   "GOLDRUSH_API_KEY", "COVALENT_API_KEY",
-  "GORDON_AXIOM_STRUCTURED_ENABLED", "GORDON_AXIOM_TOKEN", "GORDON_AXIOM_HASH_SALT",
-  "GORDON_AXIOM_BASE_URL", "GORDON_AXIOM_EVENTS_DATASET", "GORDON_AXIOM_AUDIT_DATASET",
-  "OTEL_TRACING_ENABLED", "GORDON_TRACING_REVIEWED", "OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS",
   "SYNTHDATA_API_KEY",
 ];
 
@@ -204,7 +198,12 @@ const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
 function buildEnvStatus(keys: EnvKeys, fileExists: boolean): EnvStatus {
   return {
     fileExists,
-    hasLLMKey: !!(keys.OPENAI_API_KEY || keys.DEDALUS_API_KEY),
+    hasLLMKey: !!(
+      keys.ANTHROPIC_API_KEY || keys.OPENAI_API_KEY || keys.GOOGLE_GENERATIVE_AI_API_KEY
+      || keys.XAI_API_KEY || keys.OPENROUTER_API_KEY || keys.HF_TOKEN
+      || keys.TOGETHER_API_KEY || keys.FIREWORKS_API_KEY || keys.SILICONFLOW_API_KEY
+      || keys.DEEPINFRA_API_KEY || keys.GORDON_LOCAL_MODEL_URL
+    ),
     hasAlpacaKeys: !!(keys.ALPACA_API_KEY && keys.ALPACA_API_SECRET),
     hasRobinhoodKeys: !!(keys.ROBINHOOD_API_KEY && keys.ROBINHOOD_API_SECRET),
     hasBinanceKeys: !!(keys.BINANCE_API_KEY && keys.BINANCE_API_SECRET),
@@ -222,11 +221,6 @@ function buildEnvStatus(keys: EnvKeys, fileExists: boolean): EnvStatus {
       || keys.DEBANK_ACCESS_KEY || keys.ZERION_API_KEY
       || keys.GOLDRUSH_API_KEY || keys.COVALENT_API_KEY
     ),
-    hasStructuredAxiomEnabled: keys.GORDON_AXIOM_STRUCTURED_ENABLED === "true",
-    hasAxiomToken: !!keys.GORDON_AXIOM_TOKEN,
-    hasAxiomHashSalt: !!keys.GORDON_AXIOM_HASH_SALT,
-    tracingRequested: keys.OTEL_TRACING_ENABLED === "true",
-    tracingReviewed: keys.GORDON_TRACING_REVIEWED === "true",
     hasSynthDataKey: !!keys.SYNTHDATA_API_KEY,
     keys,
   };
@@ -368,9 +362,6 @@ export async function saveEnvKeys(newKeys: Partial<EnvKeys>): Promise<void> {
       updatedKeys[key] = formatEnvLine(key, value);
       // Also set in process.env for immediate use
       process.env[key] = value;
-      if (key === "OPENAI_API_KEY" && !process.env.GORDON_NATIVE_OPENAI_API_KEY) {
-        process.env.GORDON_NATIVE_OPENAI_API_KEY = value;
-      }
     }
   }
 
@@ -427,16 +418,16 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
     "# LLM Provider (pick one)",
   ];
 
+  if (keys.ANTHROPIC_API_KEY) {
+    lines.push(formatEnvLine("ANTHROPIC_API_KEY", keys.ANTHROPIC_API_KEY));
+  } else {
+    lines.push("# ANTHROPIC_API_KEY=sk-ant-...");
+  }
+
   if (keys.OPENAI_API_KEY) {
     lines.push(formatEnvLine("OPENAI_API_KEY", keys.OPENAI_API_KEY));
   } else {
     lines.push("# OPENAI_API_KEY=sk-...");
-  }
-
-  if (keys.DEDALUS_API_KEY) {
-    lines.push(formatEnvLine("DEDALUS_API_KEY", keys.DEDALUS_API_KEY));
-  } else {
-    lines.push("# DEDALUS_API_KEY=dd-...");
   }
 
   lines.push("");
@@ -583,35 +574,7 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   if (keys.GORDON_MODEL) {
     lines.push(formatEnvLine("GORDON_MODEL", keys.GORDON_MODEL));
   } else {
-    lines.push("# GORDON_MODEL=openai/gpt-5.4");
-  }
-
-  lines.push("");
-  lines.push("# ---- Observability & Privacy ----");
-  if (keys.GORDON_AXIOM_STRUCTURED_ENABLED) {
-    lines.push(formatEnvLine("GORDON_AXIOM_STRUCTURED_ENABLED", keys.GORDON_AXIOM_STRUCTURED_ENABLED));
-  } else {
-    lines.push("# GORDON_AXIOM_STRUCTURED_ENABLED=false");
-  }
-  if (keys.GORDON_AXIOM_HASH_SALT) {
-    lines.push(formatEnvLine("GORDON_AXIOM_HASH_SALT", keys.GORDON_AXIOM_HASH_SALT));
-  } else {
-    lines.push("# GORDON_AXIOM_HASH_SALT=");
-  }
-  if (keys.GORDON_AXIOM_TOKEN) {
-    lines.push(formatEnvLine("GORDON_AXIOM_TOKEN", keys.GORDON_AXIOM_TOKEN));
-  } else {
-    lines.push("# GORDON_AXIOM_TOKEN=");
-  }
-  if (keys.OTEL_TRACING_ENABLED) {
-    lines.push(formatEnvLine("OTEL_TRACING_ENABLED", keys.OTEL_TRACING_ENABLED));
-  } else {
-    lines.push("# OTEL_TRACING_ENABLED=false");
-  }
-  if (keys.GORDON_TRACING_REVIEWED) {
-    lines.push(formatEnvLine("GORDON_TRACING_REVIEWED", keys.GORDON_TRACING_REVIEWED));
-  } else {
-    lines.push("# GORDON_TRACING_REVIEWED=false");
+    lines.push("# GORDON_MODEL=anthropic/claude-opus-4-8");
   }
 
   // Always write to ~/.gordon/.env
@@ -621,9 +584,6 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   for (const [key, value] of Object.entries(keys)) {
     if (value) {
       process.env[key] = value;
-      if (key === "OPENAI_API_KEY" && !process.env.GORDON_NATIVE_OPENAI_API_KEY) {
-        process.env.GORDON_NATIVE_OPENAI_API_KEY = value;
-      }
     }
   }
 
@@ -667,10 +627,17 @@ export async function isReadyForTrading(): Promise<{ ready: boolean; reason?: st
 export async function isReadyForLLM(): Promise<{ ready: boolean; reason?: string }> {
   const validation = await validateEnv();
 
-  if (!validation.keys.OPENAI_API_KEY && !validation.keys.DEDALUS_API_KEY) {
+  const status = validation.keys as EnvKeys;
+  const hasAnyLLMKey = !!(
+    status.ANTHROPIC_API_KEY || status.OPENAI_API_KEY || status.GOOGLE_GENERATIVE_AI_API_KEY
+    || status.XAI_API_KEY || status.OPENROUTER_API_KEY || status.HF_TOKEN
+    || status.TOGETHER_API_KEY || status.FIREWORKS_API_KEY || status.SILICONFLOW_API_KEY
+    || status.DEEPINFRA_API_KEY || status.GORDON_LOCAL_MODEL_URL
+  );
+  if (!hasAnyLLMKey) {
     return {
       ready: false,
-      reason: "No LLM API key configured. Set OPENAI_API_KEY or DEDALUS_API_KEY.",
+      reason: "No LLM API key configured. Set ANTHROPIC_API_KEY (or OPENAI_API_KEY / another provider key).",
     };
   }
 

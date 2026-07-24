@@ -179,11 +179,11 @@ describe("Exfiltration scenario — pastebin.com", () => {
   });
 });
 
-describe("Launch-hardening: Dedalus primary host + typo guard", () => {
-  it("allows the primary Dedalus router host api.dedaluslabs.ai", () => {
-    const r = checkOutbound({ url: "https://api.dedaluslabs.ai/v1/chat/completions" });
+describe("Launch-hardening: first-party LLM host + typo guard", () => {
+  it("allows the primary Anthropic host api.anthropic.com", () => {
+    const r = checkOutbound({ url: "https://api.anthropic.com/v1/messages" });
     expect(r.allowed).toBe(true);
-    expect(r.host).toBe("api.dedaluslabs.ai");
+    expect(r.host).toBe("api.anthropic.com");
   });
 
   it("allows a real exchange host api.binance.com", () => {
@@ -191,11 +191,11 @@ describe("Launch-hardening: Dedalus primary host + typo guard", () => {
     expect(r.allowed).toBe(true);
   });
 
-  it("blocks the old typo host api.dedalus.ai", () => {
-    const r = checkOutbound({ url: "https://api.dedalus.ai/v1/chat/completions" });
+  it("blocks an unknown host api.example-llm.ai", () => {
+    const r = checkOutbound({ url: "https://api.example-llm.ai/v1/chat/completions" });
     expect(r.allowed).toBe(false);
     expect(() =>
-      enforceOutbound({ url: "https://api.dedalus.ai/v1/chat/completions" }, { mode: "block" }),
+      enforceOutbound({ url: "https://api.example-llm.ai/v1/chat/completions" }, { mode: "block" }),
     ).toThrow(BlockedOutboundError);
   });
 

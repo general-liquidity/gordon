@@ -11,7 +11,7 @@ import { z } from "zod";
 
 // API Key format patterns
 const OPENAI_KEY_PATTERN = /^sk-[a-zA-Z0-9-_]{32,}$/;
-const DEDALUS_KEY_PATTERN = /^dd-[a-zA-Z0-9-_]{16,}$/;
+const ANTHROPIC_KEY_PATTERN = /^sk-ant-[a-zA-Z0-9-_]{16,}$/;
 const BINANCE_KEY_PATTERN = /^[a-zA-Z0-9]{64}$/;
 const BINANCE_SECRET_PATTERN = /^[a-zA-Z0-9]{64}$/;
 const COINBASE_KEY_PATTERN = /^[a-zA-Z0-9]{16,64}$/;
@@ -35,13 +35,13 @@ export const OpenAIKeySchema = z
     "OpenAI API key must start with 'sk-' followed by at least 32 characters"
   );
 
-export const DedalusKeySchema = z
+export const AnthropicKeySchema = z
   .string()
   .trim()
-  .min(1, "Dedalus API key cannot be empty")
+  .min(1, "Anthropic API key cannot be empty")
   .refine(
-    (val) => DEDALUS_KEY_PATTERN.test(val),
-    "Dedalus API key must start with 'dd-' followed by at least 16 characters"
+    (val) => ANTHROPIC_KEY_PATTERN.test(val),
+    "Anthropic API key must start with 'sk-ant-' followed by at least 16 characters"
   );
 
 export const BinanceKeySchema = z
@@ -181,8 +181,8 @@ export const RobinhoodSecretSchema = z
 
 // Combined environment schema
 export const EnvKeysSchema = z.object({
+  ANTHROPIC_API_KEY: AnthropicKeySchema.optional(),
   OPENAI_API_KEY: OpenAIKeySchema.optional(),
-  DEDALUS_API_KEY: DedalusKeySchema.optional(),
   ALPACA_API_KEY: AlpacaKeySchema.optional(),
   ALPACA_API_SECRET: AlpacaSecretSchema.optional(),
   TASTYTRADE_API_KEY: TastytradeKeySchema.optional(),
@@ -286,6 +286,16 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
   const warnings: ValidationWarning[] = [];
   const validated: Record<string, string | undefined> = {};
 
+  // Validate Anthropic key
+  if (keys.ANTHROPIC_API_KEY) {
+    const result = validateApiKey("ANTHROPIC_API_KEY", keys.ANTHROPIC_API_KEY, AnthropicKeySchema);
+    if (!result.valid) {
+      errors.push({ key: "ANTHROPIC_API_KEY", message: result.error! });
+    } else {
+      validated.ANTHROPIC_API_KEY = keys.ANTHROPIC_API_KEY.trim();
+    }
+  }
+
   // Validate OpenAI key
   if (keys.OPENAI_API_KEY) {
     const result = validateApiKey("OPENAI_API_KEY", keys.OPENAI_API_KEY, OpenAIKeySchema);
@@ -296,13 +306,15 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
     }
   }
 
-  // Validate Dedalus key
-  if (keys.DEDALUS_API_KEY) {
-    const result = validateApiKey("DEDALUS_API_KEY", keys.DEDALUS_API_KEY, DedalusKeySchema);
-    if (!result.valid) {
-      errors.push({ key: "DEDALUS_API_KEY", message: result.error! });
-    } else {
-      validated.DEDALUS_API_KEY = keys.DEDALUS_API_KEY.trim();
+  // Pass-through validation for other provider / gateway / local keys.
+  for (const providerKey of [
+    "GOOGLE_GENERATIVE_AI_API_KEY", "XAI_API_KEY", "OPENROUTER_API_KEY", "HF_TOKEN",
+    "TOGETHER_API_KEY", "FIREWORKS_API_KEY", "SILICONFLOW_API_KEY", "DEEPINFRA_API_KEY",
+    "GORDON_LOCAL_MODEL_URL", "GORDON_LOCAL_MODEL_API_KEY",
+  ] as const) {
+    const value = keys[providerKey];
+    if (value && value.trim().length > 0) {
+      validated[providerKey] = value.trim();
     }
   }
 
@@ -469,14 +481,20 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
   }
 
   // Check if at least one LLM key is present
-  if (!keys.OPENAI_API_KEY && !keys.DEDALUS_API_KEY) {
+  const llmKeyValues = [
+    keys.ANTHROPIC_API_KEY, keys.OPENAI_API_KEY, keys.GOOGLE_GENERATIVE_AI_API_KEY,
+    keys.XAI_API_KEY, keys.OPENROUTER_API_KEY, keys.HF_TOKEN, keys.TOGETHER_API_KEY,
+    keys.FIREWORKS_API_KEY, keys.SILICONFLOW_API_KEY, keys.DEEPINFRA_API_KEY,
+    keys.GORDON_LOCAL_MODEL_URL,
+  ];
+  if (!llmKeyValues.some(Boolean)) {
     warnings.push({
       key: "LLM",
-      message: "No LLM API key configured. Set OPENAI_API_KEY or DEDALUS_API_KEY.",
+      message: "No LLM API key configured. Set ANTHROPIC_API_KEY (or OPENAI_API_KEY / another provider key).",
     });
   }
 
-  const configuredLLMKeys = [keys.OPENAI_API_KEY, keys.DEDALUS_API_KEY].filter(Boolean).length;
+  const configuredLLMKeys = llmKeyValues.filter(Boolean).length;
   if (configuredLLMKeys > 1) {
     warnings.push({
       key: "LLM",

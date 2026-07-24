@@ -29,16 +29,13 @@ describe("integration taxonomy", () => {
     expect(ccxt.marketFamily).toBe("crypto");
   });
 
-  it("classifies Dedalus as the routed model gateway parent", () => {
-    const gateway = getIntegrationSurfaceMetadata("dedalus");
-    const routed = getIntegrationSurfaceMetadata("dedalus/openai");
-    expect(gateway.integrationDomain).toBe("model_gateway");
-    expect(routed.integrationDomain).toBe("model_provider");
-    expect(routed.gatewayParent).toBe("dedalus");
+  it("classifies first-party model providers", () => {
+    expect(getIntegrationSurfaceMetadata("anthropic").integrationDomain).toBe("model_provider");
+    expect(getIntegrationSurfaceMetadata("xai").integrationDomain).toBe("model_provider");
   });
 
-  it("classifies the model gateway + providers (non-crypto surfaces retained)", () => {
+  it("classifies the model providers + observability (non-crypto surfaces retained)", () => {
     expect(getIntegrationSurfaceMetadata("openai").integrationDomain).toBe("model_provider");
-    expect(getIntegrationSurfaceMetadata("axiom").integrationDomain).toBe("observability_provider");
+    expect(getIntegrationSurfaceMetadata("opentelemetry").integrationDomain).toBe("observability_provider");
   });
 });

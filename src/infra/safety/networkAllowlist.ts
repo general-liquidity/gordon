@@ -67,12 +67,17 @@ export class BlockedOutboundError extends Error {
  * include browser/news/web-scrape hosts because those are higher-risk.
  */
 export const GORDON_DEFAULT_ALLOWLIST: readonly AllowlistRule[] = [
-  // LLM providers
+  // LLM providers + gateways
   { hostPattern: "api.anthropic.com", reason: "Anthropic LLM" },
-  { hostPattern: "api.openai.com", reason: "OpenAI / Dedalus router" },
-  { hostPattern: "api.dedaluslabs.ai", reason: "Dedalus router (primary)" },
-  { hostPattern: "api.doubleword.ai", reason: "Doubleword reasoning models" },
+  { hostPattern: "api.openai.com", reason: "OpenAI LLM" },
   { hostPattern: "generativelanguage.googleapis.com", reason: "Google Gemini" },
+  { hostPattern: "api.x.ai", reason: "xAI Grok" },
+  { hostPattern: "openrouter.ai", reason: "OpenRouter gateway" },
+  { hostPattern: "*.huggingface.co", reason: "Hugging Face gateway" },
+  { hostPattern: "api.together.xyz", reason: "Together AI gateway" },
+  { hostPattern: "api.fireworks.ai", reason: "Fireworks AI gateway" },
+  { hostPattern: "api.siliconflow.cn", reason: "SiliconFlow gateway" },
+  { hostPattern: "api.deepinfra.com", reason: "DeepInfra gateway" },
   // Crypto exchanges
   { hostPattern: "*.binance.com", reason: "Binance" },
   { hostPattern: "*.binance.us", reason: "Binance US" },
@@ -141,12 +146,7 @@ export const GORDON_DEFAULT_ALLOWLIST: readonly AllowlistRule[] = [
   // On-chain / EVM
   { hostPattern: "*.alchemy.com", reason: "Alchemy RPC" },
   { hostPattern: "*.helius.dev", reason: "Helius Solana" },
-  // Observability
-  { hostPattern: "*.axiom.co", reason: "Axiom telemetry" },
-  { hostPattern: "logfire-us.pydantic.dev", reason: "Logfire (US)" },
-  { hostPattern: "logfire-eu.pydantic.dev", reason: "Logfire (EU)" },
-  // License / hosted services + updates
-  { hostPattern: "*.supabase.co", reason: "Gordon license service" },
+  // Hosted services + updates
   { hostPattern: "*.gordon.sh", reason: "Gordon hosted services" },
   { hostPattern: "registry.npmjs.org", reason: "npm registry (updates)" },
   { hostPattern: "raw.githubusercontent.com", reason: "GitHub raw (updates)" },
