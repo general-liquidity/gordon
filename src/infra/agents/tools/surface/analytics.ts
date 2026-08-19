@@ -121,6 +121,11 @@ import {
   type Candle as IndicatorCandle,
   type SmcOHLC,
 } from "../../../../core/indicators/index.ts";
+import {
+  buildTradabilityMask,
+  summarizeMask,
+  type TradabilityBar,
+} from "../../../../core/indicators/tradability/index.ts";
 import { conditionalDistributionTest } from "../../../../core/alpha/conditional-distribution-test.ts";
 import { runPortfolioEnsemble } from "../../../../core/alpha/pc-method-ensemble.ts";
 import { runRegimeAllocationPolicy } from "../../../../core/alpha/regime-policy.ts";
@@ -1235,12 +1240,23 @@ export const computeIndicatorTool = createTool({
         args.bars ?? 200,
       );
       const result = dispatchIndicator(args.indicator, candles as IndicatorCandle[], args.params ?? {});
+      // Every indicator here is built on a rolling window, so one non-executable
+      // bar contaminates every value whose window touched it. The candles are
+      // reported, never rewritten: silently substituting prices would change
+      // results for ~95 indicators at once. The returns-based limit heuristic is
+      // off because it cannot tell a limit lock from ordinary crypto volatility,
+      // so only venue-supplied halt state and price bounds mark a bar here.
+      const tradability = summarizeMask(
+        buildTradabilityMask(candles as TradabilityBar[], {
+          limitMoveThreshold: Number.POSITIVE_INFINITY,
+        }),
+      );
       return {
         indicator: args.indicator,
         symbol: args.symbol,
         timeframe: args.timeframe ?? "1h",
         result,
-        metadata: { barCount: candles.length },
+        metadata: { barCount: candles.length, tradability },
         computedAt,
       };
     } catch (err) {

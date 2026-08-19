@@ -7,6 +7,7 @@ import {
   maskFromFlags,
   maskedRollingMean,
   propagateMask,
+  summarizeMask,
   type TradabilityBar,
 } from "./mask.ts";
 
@@ -222,5 +223,46 @@ describe("crossSectionalNormalize", () => {
   it("returns nothing when the whole universe is halted", () => {
     const out = crossSectionalNormalize([1, 2], maskFromFlags([false, false]));
     expect(out).toEqual([null, null]);
+  });
+});
+
+describe("summarizeMask", () => {
+  it("reports a clean window as uncontaminated", () => {
+    const summary = summarizeMask(buildTradabilityMask([bar(100), bar(101), bar(102)]));
+    expect(summary.contaminated).toBe(false);
+    expect(summary.maskedCount).toBe(0);
+    expect(summary.tradableCount).toBe(3);
+    expect(summary.reasonCounts).toEqual({});
+  });
+
+  it("counts each reason separately so the cause is visible, not just the total", () => {
+    const summary = summarizeMask(
+      buildTradabilityMask([
+        bar(100),
+        bar(101, { halted: true }),
+        bar(102, { suspended: true }),
+        bar(103, { halted: true }),
+      ]),
+    );
+    expect(summary.contaminated).toBe(true);
+    expect(summary.maskedCount).toBe(3);
+    expect(summary.reasonCounts.halted).toBe(2);
+    expect(summary.reasonCounts.suspended).toBe(1);
+  });
+
+  it("keeps tradable and masked counts summing to the window length", () => {
+    const summary = summarizeMask(
+      buildTradabilityMask([bar(100), bar(101, { halted: true }), bar(102)]),
+    );
+    expect(summary.tradableCount + summary.maskedCount).toBe(summary.barCount);
+  });
+
+  it("does not flag an ordinary large move when the limit heuristic is disabled", () => {
+    const summary = summarizeMask(
+      buildTradabilityMask([bar(100), bar(160), bar(120)], {
+        limitMoveThreshold: Number.POSITIVE_INFINITY,
+      }),
+    );
+    expect(summary.contaminated).toBe(false);
   });
 });

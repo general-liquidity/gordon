@@ -9,6 +9,7 @@ export type {
   TradabilityBar,
   TradabilityMask,
   MaskedSeries,
+  MaskSummary,
   BuildMaskOptions,
   MaskPolicy,
   CrossSectionalMethod,
@@ -20,6 +21,7 @@ export {
   applyMaskPolicy,
   propagateMask,
   maskedRollingMean,
+  summarizeMask,
   crossSectionalNormalize,
 } from "./mask.ts";
 

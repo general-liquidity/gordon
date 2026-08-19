@@ -348,3 +348,31 @@ export function crossSectionalNormalize(
 
   return out;
 }
+
+/**
+ * Per-reason counts plus the headline contamination verdict for one window.
+ * `contaminated` is what a caller should branch on: a window with any masked bar
+ * produces indicator values no order could have been filled against.
+ */
+export interface MaskSummary {
+  readonly barCount: number;
+  readonly tradableCount: number;
+  readonly maskedCount: number;
+  readonly contaminated: boolean;
+  readonly reasonCounts: Readonly<Partial<Record<NonTradableReason, number>>>;
+}
+
+export function summarizeMask(mask: TradabilityMask): MaskSummary {
+  const reasonCounts: Partial<Record<NonTradableReason, number>> = {};
+  for (const reason of mask.reasons) {
+    if (reason === null) continue;
+    reasonCounts[reason] = (reasonCounts[reason] ?? 0) + 1;
+  }
+  return {
+    barCount: mask.length,
+    tradableCount: mask.length - mask.maskedCount,
+    maskedCount: mask.maskedCount,
+    contaminated: mask.maskedCount > 0,
+    reasonCounts,
+  };
+}
