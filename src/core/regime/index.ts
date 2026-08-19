@@ -67,6 +67,7 @@ export {
   mahalanobisDistance,
   euclideanDistanceToCentroid,
   conservativeVerdict,
+  priceHistoryToStateVectors,
   DEFAULT_FAMILIARITY_THRESHOLD,
   DEFAULT_FAMILIARITY_EMA_SPAN,
   DEFAULT_FAMILIARITY_MIN_SAMPLES,

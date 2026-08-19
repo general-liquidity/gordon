@@ -21,6 +21,12 @@ import {
 } from "./volatilityPositionSizing.ts";
 import { checkCorrelationRisk } from "./correlationLimits.ts";
 import { computeTailRisk } from "./tailRisk.ts";
+import {
+  buildFamiliarityReferences,
+  evaluateFamiliarity,
+  priceHistoryToStateVectors,
+} from "../../../core/regime/familiarity.ts";
+
 
 // ============================================================================
 // Types
@@ -341,13 +347,50 @@ export function classifyTradeRisk(
   });
 
   // 8. Asset familiarity
+  // Having traded the symbol before says nothing about whether the market is in
+  // a state the operator has seen. When price history is available the symbol
+  // check is joined by a distributional one, and the dimension takes the worse
+  // of the two: a known symbol in an unprecedented regime is not familiar.
   const familiar = portfolio.tradedSymbols.has(trade.symbol);
-  const familiarityScore = familiar ? 0 : 40;
+  const symbolScore = familiar ? 0 : 40;
+  let familiarityScore = symbolScore;
+  let familiarityReason = familiar
+    ? `Previously traded ${trade.symbol}`
+    : `First time trading ${trade.symbol}`;
+
+  if (portfolio.targetPriceHistory && portfolio.targetPriceHistory.length >= 90) {
+    try {
+      const states = priceHistoryToStateVectors(portfolio.targetPriceHistory, 10);
+      const recentCount = 3;
+      if (states.length >= 12) {
+        const reference = states.slice(0, -recentCount);
+        const gate = evaluateFamiliarity({
+          references: buildFamiliarityReferences([
+            { label: "observed_history", vectors: reference },
+          ]),
+          window: states.slice(-recentCount),
+          nowMs: 0,
+        });
+        if (gate.outOfDistribution) {
+          familiarityScore = Math.max(symbolScore, 60);
+          familiarityReason +=
+            `, but the current state sits outside the distribution of the prior ` +
+            `${reference.length} observed states (familiarity ${gate.score.toFixed(2)})`;
+        } else if (gate.reason === "matched") {
+          familiarityReason += `; market state is within observed history`;
+        }
+      }
+    } catch (err) {
+      familiarityReason +=
+        `; state familiarity unavailable (${err instanceof Error ? err.message : String(err)})`;
+    }
+  }
+
   dimensions.push({
     name: "Asset Familiarity",
     score: familiarityScore,
     weight: 0.5,
-    reason: familiar ? `Previously traded ${trade.symbol}` : `First time trading ${trade.symbol}`,
+    reason: familiarityReason,
   });
 
   // ── MANDATORY HEDGE FUND-GRADE CHECKS (when data available) ──

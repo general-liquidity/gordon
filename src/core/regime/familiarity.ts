@@ -519,3 +519,58 @@ export function evaluateFamiliarity(input: FamiliarityGateInput): FamiliarityGat
     evaluatedAtMs: input.nowMs,
   };
 }
+
+/**
+ * Rolling state vectors from a plain price series: windowed log return,
+ * realized volatility of the within-window returns, and the deepest drawdown
+ * inside the window. Three features chosen so a calm advance and a violent one
+ * do not collapse to the same point, while staying computable from the only
+ * market data most callers actually hold.
+ *
+ * Returns one vector per complete window. A series shorter than `window + 1`
+ * yields none rather than a padded vector, since a partial window is a
+ * different estimator wearing the same name.
+ */
+export function priceHistoryToStateVectors(
+  prices: readonly number[],
+  window: number,
+): FeatureVector[] {
+  if (window < 2 || prices.length < window + 1) return [];
+  const vectors: FeatureVector[] = [];
+  for (let end = window; end < prices.length; end += 1) {
+    const start = end - window;
+    const first = prices[start];
+    const last = prices[end];
+    if (first === undefined || last === undefined) continue;
+    if (!(first > 0) || !(last > 0)) continue;
+
+    const returns: number[] = [];
+    for (let i = start + 1; i <= end; i += 1) {
+      const prev = prices[i - 1];
+      const cur = prices[i];
+      if (prev === undefined || cur === undefined) continue;
+      if (!(prev > 0) || !(cur > 0)) continue;
+      returns.push(Math.log(cur / prev));
+    }
+    if (returns.length === 0) continue;
+
+    const mean = returns.reduce((s, r) => s + r, 0) / returns.length;
+    const variance =
+      returns.reduce((s, r) => s + (r - mean) * (r - mean), 0) / returns.length;
+
+    let peak = first;
+    let maxDrawdown = 0;
+    for (let i = start; i <= end; i += 1) {
+      const price = prices[i];
+      if (price === undefined) continue;
+      if (price > peak) peak = price;
+      if (peak > 0) {
+        const dd = (peak - price) / peak;
+        if (dd > maxDrawdown) maxDrawdown = dd;
+      }
+    }
+
+    vectors.push([Math.log(last / first), Math.sqrt(variance), maxDrawdown]);
+  }
+  return vectors;
+}
