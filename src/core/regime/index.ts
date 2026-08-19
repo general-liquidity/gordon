@@ -57,3 +57,32 @@ export { RegimeDetector } from "./detector.ts";
 // Watcher (singleton)
 export { RegimeWatcher } from "./watcher.ts";
 export type { RegimeWatchResult, SlotRegimeAction } from "./watcher.ts";
+
+// Distributional familiarity gate
+export {
+  buildFamiliarityReference,
+  buildFamiliarityReferences,
+  evaluateFamiliarity,
+  familiarityPercentile,
+  mahalanobisDistance,
+  euclideanDistanceToCentroid,
+  conservativeVerdict,
+  DEFAULT_FAMILIARITY_THRESHOLD,
+  DEFAULT_FAMILIARITY_EMA_SPAN,
+  DEFAULT_FAMILIARITY_MIN_SAMPLES,
+  DEFAULT_FAMILIARITY_VARIANCE_RIDGE,
+} from "./familiarity.ts";
+export type {
+  FeatureVector,
+  LabelledStateGroup,
+  ReferenceDefect,
+  FamiliarityReference,
+  FamiliarityConfig,
+  ReferenceScore,
+  FamiliarityReason,
+  PositionState,
+  ConservativeAction,
+  ConservativeVerdict,
+  FamiliarityGateResult,
+  FamiliarityGateInput,
+} from "./familiarity.ts";
