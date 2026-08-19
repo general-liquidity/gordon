@@ -8,6 +8,7 @@
  *   - evaluatorCalibration    — few-shot anchoring (V2)
  *   - citationAgent           — evidence trail for recommendations
  *   - effortCalibration       — token/fanout/depth budget per complexity
+ *   - rationaleConsistency    — triangular evidence/reasoning/decision gate
  */
 
 export {
@@ -89,3 +90,37 @@ export type {
   TemperamentDials,
   TemperamentParams,
 } from "./temperament.ts";
+
+export {
+  buildLegPrompt,
+  scoreTriangularConsistency,
+  consistencyScoreOf,
+  weakestLeg,
+  symmetricOutcomeProduct,
+  applyAsymmetricOutcomeGate,
+  gateOutcomeByConsistency,
+  narrowEvidence,
+  formatConsistencyResult,
+  consistencyResultToPayload,
+  CONSISTENCY_LEGS,
+  LEG_RELATION,
+  UNSCORED_CONSISTENCY_SCORE,
+} from "./rationaleConsistency.ts";
+export type {
+  ConsistencyLeg,
+  EvidenceChunk,
+  RationaleTriple,
+  TriangularJudgeRequest,
+  TriangularJudgeVerdict,
+  TriangularJudge,
+  LegScore,
+  ScoredConsistencyResult,
+  UnscoredConsistencyResult,
+  TriangularConsistencyResult,
+  OutcomeDirection,
+  AsymmetricGateResult,
+  EntityMatcher,
+  ChunkRanker,
+  NarrowEvidenceOptions,
+  NarrowEvidenceResult,
+} from "./rationaleConsistency.ts";
