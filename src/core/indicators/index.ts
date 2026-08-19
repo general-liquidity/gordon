@@ -397,3 +397,33 @@ export type {
   PremiumDiscountZones,
   SmcAnalysis,
 } from "./smc-patterns.ts";
+
+export {
+  buildTradabilityMask,
+  allTradable,
+  maskFromFlags,
+  applyMaskPolicy,
+  propagateMask,
+  maskedRollingMean,
+  crossSectionalNormalize,
+  injectSentinels,
+  checkZeroOnMask,
+  checkIndependence,
+  checkPropagation,
+  checkTradabilityContract,
+  DEFAULT_SENTINELS,
+} from "./tradability/index.ts";
+export type {
+  NonTradableReason,
+  VenueTradability,
+  TradabilityBar,
+  TradabilityMask,
+  MaskedSeries,
+  BuildMaskOptions,
+  MaskPolicy,
+  CrossSectionalMethod,
+  MaskedOperator,
+  ContractProperty,
+  ContractViolation,
+  ContractReport,
+} from "./tradability/index.ts";
