@@ -20,6 +20,8 @@ import type {
 } from "./types.ts";
 import { DEFAULT_BACKTEST_PARAMS } from "./types.ts";
 import { calculateMetricsFromTrades } from "./metrics.ts";
+import { walkBookFill } from "./fill-model.ts";
+import type { BookFill, BookFillConfig, FillRecord } from "./fill-model.ts";
 
 // Import indicator calculation functions
 import {
@@ -77,6 +79,24 @@ interface BacktestableStrategy {
 }
 
 // ============================================================================
+// Engine Parameters
+// ============================================================================
+
+/**
+ * Engine parameters, extending the persisted `BacktestParams` with runtime-only
+ * options that carry callbacks and so cannot live in a serializable param set.
+ */
+export interface BacktestEngineParams extends BacktestParams {
+  /**
+   * Opt-in book-aware fills. Left unset (the default) the engine prices every
+   * fill exactly as it always has, so numbers from previously recorded runs do
+   * not move underneath their authors. This switch is deliberately off by
+   * default for that reason and no other.
+   */
+  fillModel?: BookFillConfig;
+}
+
+// ============================================================================
 // BacktestEngine Class
 // ============================================================================
 
@@ -107,10 +127,23 @@ export class BacktestEngine {
   private gridPositions: Position[] = [];
   private maxGridPositions: number = 1;
 
-  constructor(params: BacktestParams) {
+  private fillConfig: BookFillConfig | null = null;
+  private fillLog: FillRecord[] = [];
+
+  constructor(params: BacktestEngineParams) {
     this.params = { ...DEFAULT_BACKTEST_PARAMS, ...params };
     this.capital = this.params.initialCapital;
     this.peakEquity = this.capital;
+    this.fillConfig = params.fillModel ?? null;
+  }
+
+  /**
+   * Every fill priced by the book model, in execution order. Empty unless
+   * `fillModel` was supplied. Read `estimated` before trusting a run: a result
+   * that silently mixes book-priced and rate-estimated fills is unreadable.
+   */
+  getFillLog(): readonly FillRecord[] {
+    return this.fillLog;
   }
 
   /**
@@ -398,13 +431,20 @@ export class BacktestEngine {
     bar: OHLC,
     gridLevel: number
   ): void {
-    // Apply slippage
-    const slippedPrice = this.applySlippage(price, side === "LONG" ? "BUY" : "SELL");
-
-    // Calculate position size — divide equally among max grid positions
-    // so total exposure across all levels stays within sizing limits
-    const fullPositionValue = this.calculatePositionSize(slippedPrice);
-    const perGridValue = fullPositionValue / this.maxGridPositions;
+    // Apply slippage (book-walked when a fill model is configured).
+    // Position size divides equally among max grid positions so total exposure
+    // across all levels stays within sizing limits.
+    const entry = this.resolveEntryFill(
+      price,
+      side === "LONG" ? "BUY" : "SELL",
+      bar,
+      (p) => this.calculatePositionSize(p) / this.maxGridPositions
+    );
+    if (!entry) {
+      return; // Book held no liquidity for this side
+    }
+    const slippedPrice = entry.price;
+    const perGridValue = entry.value;
 
     if (perGridValue <= 0) {
       return; // Insufficient capital
@@ -464,11 +504,12 @@ export class BacktestEngine {
     bar: OHLC,
     reason: string
   ): void {
-    // Apply slippage (opposite direction)
-    const slippedPrice = this.applySlippage(
-      price,
-      pos.side === "LONG" ? "SELL" : "BUY"
-    );
+    // Apply slippage (opposite direction, book-walked when a fill model is configured)
+    const exitSide = pos.side === "LONG" ? "SELL" : "BUY";
+    const exitFill = this.bookFill(price, exitSide, pos.quantity, bar, "estimate");
+    const slippedPrice = exitFill && !exitFill.estimated
+      ? exitFill.price
+      : this.applySlippage(price, exitSide);
 
     // Calculate P&L
     const positionValue = pos.quantity * slippedPrice;
@@ -531,11 +572,17 @@ export class BacktestEngine {
    * Open a new position.
    */
   private openPosition(side: "LONG" | "SHORT", price: number, bar: OHLC): void {
-    // Apply slippage
-    const slippedPrice = this.applySlippage(price, side === "LONG" ? "BUY" : "SELL");
+    // Apply slippage (book-walked when a fill model is configured)
+    const entry = this.resolveEntryFill(price, side === "LONG" ? "BUY" : "SELL", bar, (p) =>
+      this.calculatePositionSize(p)
+    );
+    if (!entry) {
+      return; // Book held no liquidity for this side
+    }
+    const slippedPrice = entry.price;
 
     // Calculate position size
-    const positionValue = this.calculatePositionSize(slippedPrice);
+    const positionValue = entry.value;
 
     if (positionValue <= 0) {
       return; // Insufficient capital
@@ -594,11 +641,12 @@ export class BacktestEngine {
       return;
     }
 
-    // Apply slippage (opposite direction)
-    const slippedPrice = this.applySlippage(
-      price,
-      this.position.side === "LONG" ? "SELL" : "BUY"
-    );
+    // Apply slippage (opposite direction, book-walked when a fill model is configured)
+    const exitSide = this.position.side === "LONG" ? "SELL" : "BUY";
+    const exitFill = this.bookFill(price, exitSide, this.position.quantity, bar, "estimate");
+    const slippedPrice = exitFill && !exitFill.estimated
+      ? exitFill.price
+      : this.applySlippage(price, exitSide);
 
     // Calculate P&L
     const positionValue = this.position.quantity * slippedPrice;
@@ -815,6 +863,91 @@ export class BacktestEngine {
   }
 
   /**
+   * Resolve entry price and notional for one position.
+   *
+   * With no fill model this is the flat-rate arithmetic the engine has always
+   * done. With one, size is a function of price and the book price is a function
+   * of size, so the flat-rate price seeds the size the book is then walked with,
+   * and the notional is capped at what the book actually absorbed.
+   *
+   * Returns null when the book cannot absorb any quantity at all.
+   */
+  private resolveEntryFill(
+    referencePrice: number,
+    side: "BUY" | "SELL",
+    bar: OHLC,
+    sizeAt: (price: number) => number
+  ): { price: number; value: number } | null {
+    const flatPrice = this.applySlippage(referencePrice, side);
+    if (!this.fillConfig) {
+      return { price: flatPrice, value: sizeAt(flatPrice) };
+    }
+
+    const provisionalValue = sizeAt(flatPrice);
+    if (provisionalValue <= 0) {
+      return { price: flatPrice, value: provisionalValue };
+    }
+
+    const fill = this.bookFill(referencePrice, side, provisionalValue / flatPrice, bar, "fill");
+    if (!fill || fill.filledQuantity <= 0) {
+      return null;
+    }
+    return { price: fill.price, value: Math.min(sizeAt(fill.price), fill.filledQuantity * fill.price) };
+  }
+
+  /**
+   * Price a fill against the bar's book instead of the flat rate.
+   *
+   * Returns null when no fill model is configured, which is the signal to the
+   * caller to keep the untouched flat-rate path.
+   *
+   * `partialPolicy` decides what a book that runs dry means for this call site.
+   * "fill" is for entries, where order size is a free variable and taking only
+   * what the book holds is what a venue would do. "estimate" is for exits, where
+   * the quantity is fixed by the open position and a partial fill would leave a
+   * residual the bar loop does not model; those price at the flat rate and are
+   * flagged `estimated` rather than being invented at the last level.
+   */
+  private bookFill(
+    referencePrice: number,
+    side: "BUY" | "SELL",
+    quantity: number,
+    bar: OHLC,
+    partialPolicy: "fill" | "estimate"
+  ): BookFill | null {
+    if (!this.fillConfig) return null;
+
+    const flatPrice = this.applySlippage(referencePrice, side);
+    const depth = this.fillConfig.depth(bar, this.currentBarIndex);
+
+    let fill: BookFill;
+    if (!depth) {
+      fill = {
+        price: flatPrice,
+        requestedQuantity: quantity,
+        filledQuantity: quantity,
+        levelsConsumed: 0,
+        source: "estimated",
+        estimated: true,
+      };
+    } else {
+      fill = walkBookFill(depth, side, quantity, this.fillConfig.maxLevels);
+      if (fill.source === "book_partial" && partialPolicy === "estimate") {
+        fill = { ...fill, price: flatPrice, filledQuantity: quantity, estimated: true };
+      }
+    }
+
+    this.fillLog.push({
+      ...fill,
+      barIndex: this.currentBarIndex,
+      timestamp: bar.timestamp,
+      side,
+      referencePrice: flatPrice,
+    });
+    return fill;
+  }
+
+  /**
    * Calculate commission for a trade value.
    */
   private applyCommission(value: number): number {
@@ -994,6 +1127,7 @@ export class BacktestEngine {
     this.pendingSignals = [];
     this.gridPositions = [];
     this.maxGridPositions = 1;
+    this.fillLog = [];
   }
 
   /**
