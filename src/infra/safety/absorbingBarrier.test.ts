@@ -6,6 +6,13 @@ import {
   shouldBlockNewTrades,
   barriersToPayload,
   ABSORBING_BARRIER_FLAG_ENV,
+  createAbsorbingBarrierState,
+  recordExternalFlow,
+  evaluateAbsorbingBarrier,
+  absorbingBarrierToPayload,
+  type AbsorbingBarrierConfig,
+  type AbsorbingBarrierEvaluation,
+  type TerminalBarrierKind,
 } from "./absorbingBarrier.ts";
 
 describe("isAbsorbingBarrierEnabled", () => {
@@ -195,5 +202,168 @@ describe("barriersToPayload", () => {
     expect(p.barriers.length).toBe(1);
     expect(p.barriers[0]!.kind).toBe("broker");
     expect(p.nearest).toBe("broker");
+  });
+});
+
+describe("inception loss barrier", () => {
+  const TAU: AbsorbingBarrierConfig = {
+    inceptionLossFraction: 0.2,
+    trailingDrawdownFraction: 0.2,
+  };
+
+  function fold(
+    equities: number[],
+    config: AbsorbingBarrierConfig = TAU,
+    inception = 100_000,
+  ): AbsorbingBarrierEvaluation {
+    let state = createAbsorbingBarrierState(inception);
+    let evaluation = evaluateAbsorbingBarrier(state, inception, config);
+    state = evaluation.state;
+    for (const equity of equities) {
+      evaluation = evaluateAbsorbingBarrier(state, equity, config);
+      state = evaluation.state;
+    }
+    return evaluation;
+  }
+
+  it("an account that twice loses 18% and twice makes a new high survives the trailing limit while a fifth of committed capital is gone", () => {
+    // 100k down to 82k, back up to a new high of 110k, down 18% again to 90.2k.
+    const evaluation = fold([82_000, 110_000, 90_200]);
+
+    expect(evaluation.trailing.lossFraction).toBeCloseTo(0.18, 10);
+    expect(evaluation.trailing.headroomFraction).toBeGreaterThan(0);
+
+    expect(evaluation.inception.lossFraction).toBeCloseTo(0.378, 10);
+    expect(evaluation.tripped).toBe(true);
+    expect(evaluation.boundBy).toBe("inception");
+  });
+
+  it("the same path never halts when only the trailing limit is configured", () => {
+    const evaluation = fold([82_000, 110_000, 90_200], {
+      trailingDrawdownFraction: 0.2,
+    });
+    expect(evaluation.tripped).toBe(false);
+    expect(evaluation.inception.active).toBe(false);
+  });
+
+  it("names the barrier that bound and reports the distance to each", () => {
+    const evaluation = fold([82_000, 110_000, 90_200]);
+
+    expect(evaluation.boundBy).toBe("inception");
+    expect(evaluation.trailing.limitFraction).toBe(0.2);
+    expect(evaluation.trailing.headroomFraction).toBeCloseTo(0.02, 10);
+    expect(evaluation.trailing.triggerEquityUsd).toBe(88_000);
+    expect(evaluation.inception.headroomFraction).toBeCloseTo(-0.178, 10);
+    expect(evaluation.inception.triggerEquityUsd).toBe(108_000);
+    expect(evaluation.state.trippedAtEquityUsd).toBe(90_200);
+  });
+
+  it("names the trailing barrier when one uninterrupted collapse breaches both", () => {
+    const evaluation = fold([70_000]);
+    expect(evaluation.tripped).toBe(true);
+    expect(evaluation.boundBy).toBe("trailing_high_water");
+    expect(evaluation.trailing.lossFraction).toBeCloseTo(0.3, 10);
+    expect(evaluation.inception.lossFraction).toBeCloseTo(0.3, 10);
+  });
+
+  it("stays tripped after equity recovers past the high-water mark", () => {
+    const tripped = fold([82_000, 110_000, 90_200]);
+    expect(tripped.tripped).toBe(true);
+
+    const recovered = evaluateAbsorbingBarrier(tripped.state, 130_000, TAU);
+    expect(recovered.tripped).toBe(true);
+    expect(recovered.boundBy).toBe("inception");
+    expect(recovered.state.trippedAtEquityUsd).toBe(90_200);
+    expect(recovered.inceptionPointInTimeLossFraction).toBeLessThan(0);
+  });
+
+  it("never halts when no limits are configured", () => {
+    const evaluation = fold([50_000, 10_000, 1_000], {});
+    expect(evaluation.tripped).toBe(false);
+    expect(evaluation.boundBy).toBeNull();
+    expect(evaluation.inception.active).toBe(false);
+    expect(evaluation.trailing.active).toBe(false);
+    expect(evaluation.inception.headroomFraction).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it("a withdrawal from a flat account is not a loss", () => {
+    const state = createAbsorbingBarrierState(100_000);
+    const afterWithdrawal = recordExternalFlow(state, -30_000);
+    const evaluation = evaluateAbsorbingBarrier(afterWithdrawal, 70_000, TAU);
+
+    expect(evaluation.state.referenceCapitalUsd).toBe(70_000);
+    expect(evaluation.inception.lossFraction).toBe(0);
+    expect(evaluation.trailing.lossFraction).toBe(0);
+    expect(evaluation.tripped).toBe(false);
+  });
+
+  it("a deposit raises the reference instead of forgiving the open decline", () => {
+    const start = createAbsorbingBarrierState(100_000);
+    const afterLoss = evaluateAbsorbingBarrier(start, 85_000, TAU).state;
+    const afterDeposit = recordExternalFlow(afterLoss, 100_000);
+
+    // 185k of equity against 200k contributed: the open 15k decline survives
+    // the deposit, it is neither erased nor restated as a fresh loss.
+    const evaluation = evaluateAbsorbingBarrier(afterDeposit, 185_000, TAU);
+    expect(evaluation.state.referenceCapitalUsd).toBe(200_000);
+    expect(evaluation.inception.lossFraction).toBeCloseTo(0.075, 10);
+    expect(evaluation.tripped).toBe(false);
+  });
+
+  it("capital destroyed before a deposit still counts against the limit after it", () => {
+    let state = createAbsorbingBarrierState(100_000);
+    state = evaluateAbsorbingBarrier(state, 85_000, TAU).state;
+    state = evaluateAbsorbingBarrier(state, 102_000, TAU).state;
+    state = recordExternalFlow(state, 100_000);
+
+    // 15k destroyed and re-earned before the deposit, 27k destroyed after,
+    // against 200k contributed: 21% cumulative on a 13% trailing decline.
+    const evaluation = evaluateAbsorbingBarrier(state, 175_000, TAU);
+    expect(evaluation.inception.lossFraction).toBeCloseTo(0.21, 10);
+    expect(evaluation.trailing.headroomFraction).toBeGreaterThan(0);
+    expect(evaluation.boundBy).toBe("inception");
+  });
+
+  it("produces identical results for identical equity paths", () => {
+    const path = [95_000, 108_000, 91_000, 120_000, 88_000];
+    const a = fold(path);
+    const b = fold(path);
+    expect(a).toEqual(b);
+    expect(absorbingBarrierToPayload(a)).toEqual(absorbingBarrierToPayload(b));
+  });
+
+  it("reads no wall clock", () => {
+    const realNow = Date.now;
+    let clockReads = 0;
+    Date.now = () => {
+      clockReads += 1;
+      return realNow();
+    };
+    let boundBy: TerminalBarrierKind | null;
+    try {
+      const evaluation = fold([82_000, 110_000, 90_200]);
+      absorbingBarrierToPayload(evaluation);
+      boundBy = evaluation.boundBy;
+    } finally {
+      Date.now = realNow;
+    }
+    expect(clockReads).toBe(0);
+    expect(boundBy).toBe("inception");
+  });
+
+  it("payload carries the bound barrier and both readings", () => {
+    const payload = absorbingBarrierToPayload(fold([82_000, 110_000, 90_200])) as {
+      tripped: boolean;
+      boundBy: string;
+      referenceCapitalUsd: number;
+      barriers: Array<{ kind: string; headroomFraction: number }>;
+    };
+    expect(payload.tripped).toBe(true);
+    expect(payload.boundBy).toBe("inception");
+    expect(payload.referenceCapitalUsd).toBe(100_000);
+    expect(payload.barriers.map((b) => b.kind)).toEqual([
+      "trailing_high_water",
+      "inception",
+    ]);
   });
 });
