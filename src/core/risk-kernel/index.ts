@@ -61,6 +61,28 @@ export {
   OrderRequestSchema,
 } from "./audit.ts";
 
+export {
+  projectAction,
+  evaluateBarriers,
+  isFeasible,
+  limitsFromRiskConfig,
+  concentrationCapFromRiskConfig,
+} from "./safety-projection.ts";
+export type {
+  ConstraintName,
+  ProjectionVerdict,
+  ActionLeg,
+  LegState,
+  PriorAction,
+  SafetyState,
+  SafetyLimits,
+  ConstraintTelemetry,
+  SignConsistencyTelemetry,
+  ProjectionTelemetry,
+  SafetyProjectionResult,
+  BarrierValues,
+} from "./safety-projection.ts";
+
 // ============================================================================
 // Singleton Instance
 // ============================================================================
