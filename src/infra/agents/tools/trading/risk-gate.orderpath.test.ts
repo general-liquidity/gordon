@@ -1,0 +1,197 @@
+/**
+ * Order-path wiring for the safety projection and the economic order floor.
+ *
+ * Every case holds total equity at $10,000, and the process-wide drawdown tracker
+ * is reset to that figure before each case. Holding equity constant is not enough
+ * on its own: the tracker is a module singleton, so any earlier test file in the
+ * run can leave a peak behind that makes these fixtures read as a deep drawdown.
+ */
+
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+
+import { drawdownTracker } from "../../../../core/risk-management/drawdown-tracker.ts";
+
+import {
+  evaluateOrderRisk,
+  FEE_FIXED_PER_TRANCHE_ENV,
+  FEE_MIN_PER_ORDER_ENV,
+  FEE_TOLERANCE_BPS_ENV,
+  FEE_TRANCHE_SIZE_ENV,
+} from "./risk-gate.ts";
+import type { GordonContext } from "../types.ts";
+
+const EQUITY_USD = 10_000;
+const PRICE_USD = 1_000;
+
+interface StubBalance {
+  asset: string;
+  total: number;
+}
+
+function contextWith(options: { cashUsd: number; holdings?: StubBalance[] }): GordonContext {
+  const holdings = options.holdings ?? [];
+  const exchange = {
+    exchangeId: "stub",
+    isSandbox: true,
+    getFullAccountDetails: async () => ({
+      totalUsdtValue: EQUITY_USD,
+      nonZeroBalances: [
+        { asset: "USDT", total: options.cashUsd },
+        ...holdings,
+      ],
+    }),
+    getBalance: async (asset: string) => (asset === "USDT" ? options.cashUsd : 0),
+    getPrice: async () => PRICE_USD,
+  };
+  return { exchange, broker: null } as unknown as GordonContext;
+}
+
+/** Kernel-approved at $500 on a $10k account with $6k of cash and nothing held. */
+const FEASIBLE_ORDER = {
+  symbol: "BTCUSDT",
+  side: "BUY",
+  type: "LIMIT",
+  quantity: 0.5,
+  price: PRICE_USD,
+};
+
+/** $6,000 of BTC against $9,500 of ETH already on the book: gross exceeds 1x equity. */
+function oversizedOrderContext(): GordonContext {
+  return contextWith({ cashUsd: 6_000, holdings: [{ asset: "ETH", total: 9.5 }] });
+}
+
+const OVERSIZED_ORDER = {
+  symbol: "BTCUSDT",
+  side: "BUY",
+  type: "LIMIT",
+  quantity: 6,
+  price: PRICE_USD,
+};
+
+function clearFeeEnv(): void {
+  delete process.env[FEE_FIXED_PER_TRANCHE_ENV];
+  delete process.env[FEE_TRANCHE_SIZE_ENV];
+  delete process.env[FEE_MIN_PER_ORDER_ENV];
+  delete process.env[FEE_TOLERANCE_BPS_ENV];
+}
+
+afterEach(clearFeeEnv);
+
+beforeEach(() => {
+  drawdownTracker.reset(EQUITY_USD);
+});
+
+describe("evaluateOrderRisk order path", () => {
+  test("an order inside every limit keeps the size it asked for", async () => {
+    const result = await evaluateOrderRisk(FEASIBLE_ORDER, contextWith({ cashUsd: 6_000 }));
+
+    expect(result.approved).toBe(true);
+    expect(result.quantity).toBe(FEASIBLE_ORDER.quantity);
+  });
+
+  test("an order past the leverage ceiling is resized rather than refused", async () => {
+    const result = await evaluateOrderRisk(OVERSIZED_ORDER, oversizedOrderContext());
+
+    expect(result.approved).toBe(true);
+    expect(result.quantity).toBeLessThan(OVERSIZED_ORDER.quantity);
+    expect(result.quantity).toBeGreaterThan(0);
+    expect(result.quantity * PRICE_USD).toBeLessThanOrEqual(500 + 1e-6);
+  });
+
+  test("the constraint that moved the size is named to the operator", async () => {
+    const result = await evaluateOrderRisk(OVERSIZED_ORDER, oversizedOrderContext());
+    const joined = result.warnings.join(" | ");
+
+    expect(joined).toContain("leverage");
+    expect(joined).toContain("tightest constraint");
+    expect(joined).toContain("deviation");
+    expect(joined).toContain("rate limit utilisation");
+    expect(joined).toContain("active constraints");
+  });
+
+  test("an order below the economic floor is refused with the floor and the shortfall stated", async () => {
+    process.env[FEE_FIXED_PER_TRANCHE_ENV] = "2.50";
+    process.env[FEE_TRANCHE_SIZE_ENV] = "100";
+    process.env[FEE_TOLERANCE_BPS_ENV] = "100";
+
+    const result = await evaluateOrderRisk(
+      { ...FEASIBLE_ORDER, quantity: 0.1 },
+      contextWith({ cashUsd: 6_000 }),
+    );
+
+    expect(result.approved).toBe(false);
+    expect(result.reason).toContain("economic floor");
+    expect(result.reason).toContain("250.00");
+    expect(result.reason).toContain("150.00");
+  });
+
+  test("a zero-commission schedule asserts no floor and leaves a small order approved", async () => {
+    process.env[FEE_FIXED_PER_TRANCHE_ENV] = "0";
+    process.env[FEE_TRANCHE_SIZE_ENV] = "100";
+
+    const result = await evaluateOrderRisk(
+      { ...FEASIBLE_ORDER, quantity: 0.1 },
+      contextWith({ cashUsd: 6_000 }),
+    );
+
+    expect(result.approved).toBe(true);
+    expect(result.quantity).toBe(0.1);
+  });
+
+  test("an unconfigured fee schedule warns instead of refusing the order", async () => {
+    const result = await evaluateOrderRisk(FEASIBLE_ORDER, contextWith({ cashUsd: 6_000 }));
+
+    expect(result.approved).toBe(true);
+    expect(result.warnings.join(" | ")).toContain("Economic order floor not evaluated");
+  });
+
+  test("no portfolio context keeps the existing fail-closed rejection unchanged", async () => {
+    const result = await evaluateOrderRisk(FEASIBLE_ORDER, {
+      exchange: null,
+      broker: null,
+    } as unknown as GordonContext);
+
+    expect(result.approved).toBe(false);
+    expect(result.quantity).toBe(FEASIBLE_ORDER.quantity);
+    expect(result.reason).toContain("portfolio context unavailable");
+  });
+
+  test("no reference price leaves the kernel verdict alone and says so", async () => {
+    const result = await evaluateOrderRisk(
+      { symbol: "BTCUSDT", side: "BUY", type: "MARKET", quantity: 0.5 },
+      contextWith({ cashUsd: 6_000 }),
+    );
+
+    expect(result.quantity).toBe(0.5);
+    expect(result.warnings.join(" | ")).toContain("Safety projection skipped");
+  });
+
+  test("the gate never hands back more size than was asked for", async () => {
+    const cases = [
+      { order: FEASIBLE_ORDER, ctx: () => contextWith({ cashUsd: 6_000 }) },
+      { order: OVERSIZED_ORDER, ctx: oversizedOrderContext },
+      {
+        order: { ...FEASIBLE_ORDER, side: "SELL", quantity: 3 },
+        ctx: () => contextWith({ cashUsd: 6_000, holdings: [{ asset: "BTC", total: 3 }] }),
+      },
+      {
+        order: { ...FEASIBLE_ORDER, quantity: 0.001 },
+        ctx: () => contextWith({ cashUsd: 6_000 }),
+      },
+    ];
+
+    for (const { order, ctx } of cases) {
+      const result = await evaluateOrderRisk(order, ctx());
+      expect(result.quantity).toBeLessThanOrEqual(order.quantity);
+      expect(result.quantity).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  test("an order the kernel already refuses is never approved by the added layers", async () => {
+    // BTC exposure is already at the single-asset cap, so no adjustment exists.
+    const ctx = contextWith({ cashUsd: 6_000, holdings: [{ asset: "BTC", total: 3 }] });
+    const result = await evaluateOrderRisk({ ...FEASIBLE_ORDER, quantity: 2 }, ctx);
+
+    expect(result.approved).toBe(false);
+  });
+});

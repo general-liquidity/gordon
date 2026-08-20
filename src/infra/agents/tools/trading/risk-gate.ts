@@ -12,6 +12,20 @@ import { z } from "zod";
 
 import { riskKernel } from "../../../../core/risk-kernel/index.ts";
 import { PortfolioContextBuilder } from "../../../../core/risk-kernel/portfolio-context.ts";
+import type { OpenPosition, PortfolioContext } from "../../../../core/risk-kernel/portfolio-context.ts";
+import { loadConfigFromEnv } from "../../../../core/risk-kernel/config.ts";
+import {
+  concentrationCapFromRiskConfig,
+  limitsFromRiskConfig,
+  projectAction,
+} from "../../../../core/risk-kernel/safety-projection.ts";
+import type {
+  LegState,
+  ProjectionTelemetry,
+  SafetyState,
+} from "../../../../core/risk-kernel/safety-projection.ts";
+import { checkOrderAdmissibility } from "../../../../core/orders/economic-floor.ts";
+import type { EconomicFloorPolicy, FeeSchedule } from "../../../../core/orders/economic-floor.ts";
 import type { OrderRequest } from "../../../../core/risk-kernel/audit.ts";
 import { StrategyRuntime } from "../../../../core/runtime/engine.ts";
 import { resolveFlag } from "../../../config/flagResolver.ts";
@@ -24,6 +38,131 @@ import { evaluateConsensus } from "../../../../core/consensus/protocol.ts";
 import type { TradeProposal, ConsensusResult, AgentVote } from "../../../../core/consensus/protocol.ts";
 
 const logger = createModuleLogger("risk-gate");
+
+// ============================================================================
+// Safety projection and economic floor inputs
+// ============================================================================
+
+export const FEE_FIXED_PER_TRANCHE_ENV = "GORDON_FEE_FIXED_PER_TRANCHE_USD";
+export const FEE_TRANCHE_SIZE_ENV = "GORDON_FEE_TRANCHE_SIZE_USD";
+export const FEE_MIN_PER_ORDER_ENV = "GORDON_FEE_MIN_PER_ORDER_USD";
+export const FEE_TOLERANCE_BPS_ENV = "GORDON_FEE_TOLERANCE_BPS";
+
+const DEFAULT_FEE_TOLERANCE_BPS = 100;
+
+function parseUsdMinor(raw: string | undefined): number | undefined {
+  if (raw === undefined || raw.trim() === "") return undefined;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) return undefined;
+  return Math.round(value * 100);
+}
+
+/**
+ * The economic floor is only meaningful against a real fee schedule, and Gordon
+ * carries no venue commission feed. The operator states the schedule; nothing
+ * configured means no floor is asserted rather than a guessed one, since a
+ * guessed floor would refuse perfectly good orders.
+ */
+function resolveFeePolicy(): { schedule: FeeSchedule; policy: EconomicFloorPolicy } | null {
+  const fixedPerTrancheMinor = parseUsdMinor(process.env[FEE_FIXED_PER_TRANCHE_ENV]);
+  const trancheSizeMinor = parseUsdMinor(process.env[FEE_TRANCHE_SIZE_ENV]);
+  if (!fixedPerTrancheMinor || !trancheSizeMinor) return null;
+
+  const toleranceRaw = Number(process.env[FEE_TOLERANCE_BPS_ENV] ?? "");
+  const feeToleranceBps =
+    Number.isFinite(toleranceRaw) && toleranceRaw > 0 ? toleranceRaw : DEFAULT_FEE_TOLERANCE_BPS;
+
+  return {
+    schedule: {
+      fixedPerTrancheMinor,
+      trancheSizeMinor,
+      minimumPerOrderMinor: parseUsdMinor(process.env[FEE_MIN_PER_ORDER_ENV]),
+    },
+    policy: { feeToleranceBps },
+  };
+}
+
+function signedNotionalOf(position: OpenPosition): number {
+  const magnitude = Math.abs(position.size * position.currentPrice);
+  return position.side === "short" ? -magnitude : magnitude;
+}
+
+/**
+ * Map the live portfolio onto the projection's leg vector. Every open position
+ * becomes a leg so the leverage barrier sees real gross exposure, but only the
+ * traded symbol is allowed to move.
+ */
+function buildSafetyState(
+  symbol: string,
+  side: "buy" | "sell",
+  proposedNotionalUsd: number,
+  portfolio: PortfolioContext,
+  concentrationCapUsd: number,
+  drawdownBaseUsd: number,
+  nowMs: number,
+): SafetyState {
+  const bySymbol = new Map<string, number>();
+  for (const position of portfolio.openPositions) {
+    bySymbol.set(position.symbol, (bySymbol.get(position.symbol) ?? 0) + signedNotionalOf(position));
+  }
+
+  const currentNotionalUsd = bySymbol.get(symbol) ?? 0;
+  bySymbol.delete(symbol);
+
+  const legs: LegState[] = [
+    {
+      symbol,
+      currentNotionalUsd,
+      // Cash bounds a buy. A sell is bounded by the position and by venue rules,
+      // and Gordon has no short-capacity feed, so the sell side is left to the
+      // concentration and leverage barriers instead of a fabricated cash bound.
+      availableLiquidityUsd:
+        side === "sell" ? proposedNotionalUsd : Math.max(0, portfolio.availableBalance),
+      // A cap already breached before this order would empty the feasible set and
+      // refuse even a de-risking trade. Relaxing to the standing exposure keeps
+      // the barrier honest: this order may not enlarge the breach.
+      concentrationCapUsd: Math.max(concentrationCapUsd, Math.abs(currentNotionalUsd)),
+      rateLimitUsd: Number.POSITIVE_INFINITY,
+      riskPerUsd: 0,
+      signals: [],
+      costWeight: 1,
+    },
+  ];
+
+  for (const [otherSymbol, notional] of bySymbol) {
+    legs.push({
+      symbol: otherSymbol,
+      currentNotionalUsd: notional,
+      // Untraded legs are pinned at zero delta: this order is not the place to
+      // resize somebody else's position.
+      availableLiquidityUsd: 0,
+      concentrationCapUsd: Math.max(concentrationCapUsd, Math.abs(notional)),
+      rateLimitUsd: Number.POSITIVE_INFINITY,
+      riskPerUsd: 0,
+      signals: [],
+      costWeight: 1,
+    });
+  }
+
+  return {
+    nowMs,
+    equityUsd: portfolio.totalEquity,
+    currentDrawdownUsd: Math.max(0, (portfolio.currentDrawdown / 100) * drawdownBaseUsd),
+    legs,
+    recentActions: [],
+  };
+}
+
+/** The audit value of the projection is the geometry, so it is reported verbatim. */
+function describeProjection(telemetry: ProjectionTelemetry): string {
+  const active = telemetry.activeConstraints.join(", ") || "none";
+  return (
+    `Safety projection: tightest constraint ${telemetry.tightestConstraint ?? "none"}, ` +
+    `deviation $${telemetry.deviation.toFixed(2)}, ` +
+    `rate limit utilisation ${(telemetry.rateLimitUtilisation * 100).toFixed(1)}%, ` +
+    `active constraints [${active}].`
+  );
+}
 
 // ============================================================================
 // Helper
@@ -152,10 +291,113 @@ export async function evaluateOrderRisk(
       ? decision.modifiedOrder.quantity
       : order.quantity;
 
+  let approved = decision.approved;
+  let reason = decision.reason ?? (decision.approved ? "Approved." : "Rejected.");
+  let quantity = finalQty;
+
+  // -- Safety projection --------------------------------------------------
+  // Runs on the kernel's own output, so the projection can only move the order
+  // further inside the feasible set, never back out of it.
+  const referencePrice =
+    order.price ??
+    portfolioContext.openPositions.find((p) => p.symbol === order.symbol)?.currentPrice;
+  const drawdownBaseUsd =
+    portfolioContext.peakEquity > 0 ? portfolioContext.peakEquity : portfolioContext.totalEquity;
+
+  if (!referencePrice || referencePrice <= 0 || portfolioContext.totalEquity <= 0 || quantity <= 0) {
+    warnings.push(
+      "Safety projection skipped: no reference price or equity available for this order. Risk kernel result left unchanged.",
+    );
+  } else {
+    const riskConfig = loadConfigFromEnv();
+    const limits = limitsFromRiskConfig(riskConfig, drawdownBaseUsd);
+    const concentrationCapUsd = concentrationCapFromRiskConfig(
+      riskConfig,
+      portfolioContext.totalEquity,
+    );
+    const proposedNotionalUsd = quantity * referencePrice;
+    const signedNotionalUsd =
+      orderRequest.side === "sell" ? -proposedNotionalUsd : proposedNotionalUsd;
+
+    const state = buildSafetyState(
+      order.symbol,
+      orderRequest.side,
+      proposedNotionalUsd,
+      portfolioContext,
+      concentrationCapUsd,
+      drawdownBaseUsd,
+      Date.now(),
+    );
+
+    const projection = projectAction(
+      [{ symbol: order.symbol, notionalDelta: signedNotionalUsd }],
+      state,
+      limits,
+    );
+
+    if (projection.verdict !== "pass") {
+      warnings.push(describeProjection(projection.telemetry));
+    }
+
+    if (projection.verdict === "soft_intercept" && projection.action) {
+      const projectedLeg = projection.action.find((leg) => leg.symbol === order.symbol);
+      const projectedQty = projectedLeg
+        ? Math.floor((Math.abs(projectedLeg.notionalDelta) / referencePrice) * 1e8) / 1e8
+        : 0;
+
+      if (projectedQty <= 0) {
+        approved = false;
+        reason = `Rejected by safety projection: no feasible size remains for ${order.symbol} (binding constraint: ${projection.telemetry.tightestConstraint ?? "unknown"}).`;
+      } else if (projectedQty < quantity) {
+        warnings.push(
+          `Size reduced from ${quantity} to ${projectedQty} by the ${projection.telemetry.tightestConstraint ?? "safety"} constraint.`,
+        );
+        quantity = projectedQty;
+      }
+    } else if (
+      projection.verdict === "hard_intercept" ||
+      projection.verdict === "infeasible" ||
+      projection.verdict === "refused"
+    ) {
+      approved = false;
+      reason = `Rejected by safety projection (${projection.verdict}): ${order.symbol} cannot be placed within the feasible set (binding constraint: ${projection.telemetry.tightestConstraint ?? "unknown"}).`;
+    }
+  }
+
+  // -- Economic order floor ----------------------------------------------
+  // The venue minimum is not the economic minimum: an order can clear the
+  // exchange and still hand the commission a larger share than the operator's
+  // fee tolerance allows.
+  const feePolicy = resolveFeePolicy();
+  if (!feePolicy) {
+    warnings.push(
+      `Economic order floor not evaluated: no fee schedule configured (set ${FEE_FIXED_PER_TRANCHE_ENV} and ${FEE_TRANCHE_SIZE_ENV}).`,
+    );
+  } else if (referencePrice && referencePrice > 0 && quantity > 0) {
+    const notionalMinor = Math.round(quantity * referencePrice * 100);
+    const admissibility = checkOrderAdmissibility({
+      orders: [{ symbol: order.symbol, notionalMinor }],
+      schedule: feePolicy.schedule,
+      policy: feePolicy.policy,
+    });
+
+    const belowFloor = admissibility.violations.find((v) => v.kind === "below-economic-floor");
+    if (belowFloor && belowFloor.kind === "below-economic-floor") {
+      const notionalUsd = (belowFloor.notionalMinor / 100).toFixed(2);
+      const floorUsd = (belowFloor.floorMinor / 100).toFixed(2);
+      const shortfallUsd = (belowFloor.shortfallMinor / 100).toFixed(2);
+      approved = false;
+      reason = `Rejected below economic floor: ${order.symbol} notional $${notionalUsd} is $${shortfallUsd} short of the $${floorUsd} floor implied by the fee schedule at ${feePolicy.policy.feeToleranceBps} bps fee tolerance.`;
+      warnings.push(
+        `Economic floor $${floorUsd}, order notional $${notionalUsd}, shortfall $${shortfallUsd}. Below this size the fixed commission takes more than the configured tolerance.`,
+      );
+    }
+  }
+
   return {
-    approved: decision.approved,
-    quantity: finalQty,
-    reason: decision.reason ?? (decision.approved ? "Approved." : "Rejected."),
+    approved,
+    quantity,
+    reason,
     warnings,
   };
 }
