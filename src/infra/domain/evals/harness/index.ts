@@ -49,6 +49,18 @@ export type { JudgeOptions, MockJudgeOptions } from "./trajectoryJudge.ts";
 
 export { judgeTrajectoriesPanel, DEFAULT_PANEL } from "./panelJudge.ts";
 export type { PanelJudgeOptions } from "./panelJudge.ts";
+export type { PanelJudgeResultWithDissent } from "./panelJudge.ts";
+export { computePanelDissent, detectDissentConvergence } from "./panelDissent.ts";
+export type {
+  JudgeScoreEntry,
+  DissentPattern,
+  PanelVerdict,
+  AgreementMode,
+  TrajectoryDissent,
+  PanelDissentReport,
+  PanelDissentOptions,
+  DissentTrend,
+} from "./panelDissent.ts";
 
 export {
   CATEGORY_RUBRICS,

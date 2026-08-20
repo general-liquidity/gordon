@@ -16,6 +16,8 @@
  */
 
 import { judgeTrajectories } from "./trajectoryJudge.ts";
+import { computePanelDissent } from "./panelDissent.ts";
+import type { PanelDissentReport } from "./panelDissent.ts";
 import type { JudgeOptions } from "./trajectoryJudge.ts";
 import { createModuleLogger } from "../../../logger/index.ts";
 import type {
@@ -45,13 +47,27 @@ export interface PanelJudgeOptions extends JudgeOptions {
 }
 
 /**
+ * Panel result plus the dissent report. Additive: `consensus` keeps its exact
+ * meaning and value, so the CI gate that reads it is unaffected, while
+ * `dissent` says whether that number was worth trusting. Assignable to
+ * `PanelJudgeResult`, so existing callers need no change.
+ */
+export interface PanelJudgeResultWithDissent extends PanelJudgeResult {
+  /**
+   * Per-judge disagreement preserved rather than averaged away. Branch on
+   * `dissent.verdict` before treating `consensus` as a gate-quality number.
+   */
+  dissent: PanelDissentReport;
+}
+
+/**
  * Run a tri-judge panel concurrently and return per-judge entries
  * plus an averaged consensus. Never throws.
  */
 export async function judgeTrajectoriesPanel(
   request: JudgeRequest,
   options: PanelJudgeOptions = {},
-): Promise<PanelJudgeResult> {
+): Promise<PanelJudgeResultWithDissent> {
   const startTime = Date.now();
   const panel = options.panel ?? DEFAULT_PANEL;
 
@@ -62,6 +78,7 @@ export async function judgeTrajectoriesPanel(
       consensus: [],
       quorum: 0,
       durationMs: 0,
+      dissent: computePanelDissent(request.scenario.id, [], []),
     };
   }
 
@@ -70,19 +87,21 @@ export async function judgeTrajectoriesPanel(
       scenarioId: request.scenario.id,
     });
     const single = await judgeTrajectories(request, options);
+    const singlePanel: PanelJudgeEntry[] = [
+      {
+        judgeModel: single.judgeModel,
+        scored: single.scored,
+        durationMs: single.durationMs,
+        failed: single.fallback ? { reason: single.fallback.reason } : undefined,
+      },
+    ];
     return {
       scenarioId: request.scenario.id,
-      panel: [
-        {
-          judgeModel: single.judgeModel,
-          scored: single.scored,
-          durationMs: single.durationMs,
-          failed: single.fallback ? { reason: single.fallback.reason } : undefined,
-        },
-      ],
+      panel: singlePanel,
       consensus: single.scored,
       quorum: single.fallback ? 0 : 1,
       durationMs: single.durationMs,
+      dissent: computePanelDissent(request.scenario.id, singlePanel, request.trajectories),
     };
   }
 
@@ -114,6 +133,7 @@ export async function judgeTrajectoriesPanel(
     consensus,
     quorum: surviving.length,
     durationMs: Date.now() - startTime,
+    dissent: computePanelDissent(request.scenario.id, surviving, request.trajectories),
   };
 }
 
