@@ -233,7 +233,7 @@ describe("classifyTradeRisk — base dimension composition", () => {
     expect(Number.isFinite(dim.score)).toBe(true);
   });
 
-  it("composes all 15 dimensions when every optional input is supplied", () => {
+  it("composes all 16 dimensions when every optional input is supplied", () => {
     const prices = trendingPrices(120);
     const returns = prices.map((p, i, arr) => (i === 0 ? 0 : (p - arr[i - 1]!) / arr[i - 1]!)).slice(1);
     const result = classifyTradeRisk(
@@ -248,7 +248,7 @@ describe("classifyTradeRisk — base dimension composition", () => {
         marginOfError: { grade: "C", rawScore: -2, recommendation: "skip" },
       }),
     );
-    expect(result.dimensions).toHaveLength(15);
+    expect(result.dimensions).toHaveLength(16);
     expect(Number.isFinite(result.compositeScore)).toBe(true);
     for (const d of result.dimensions) {
       expect(Number.isFinite(d.score)).toBe(true);

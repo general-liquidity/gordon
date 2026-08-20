@@ -6,11 +6,12 @@
  * risk score + tier. Used by the permission system to auto-approve low-risk
  * trades and escalate high-risk ones.
  *
- * Dimensions scored (15 total — 8 base always-on + 7 optional when inputs exist):
+ * Dimensions scored (16 total: 8 base always-on + 8 optional when inputs exist):
  *   Base: position size, concentration, drawdown proximity, daily loss budget,
  *         trade frequency, volatility, market hours, asset familiarity.
  *   Optional: vol-adjusted sizing, correlation risk, venue MEV exposure,
- *              regime transition risk, fake liquidity, margin of error, tail risk.
+ *              regime transition risk, fake liquidity, margin of error, tail risk,
+ *              uncertainty decomposition.
  */
 
 import {
@@ -26,6 +27,11 @@ import {
   evaluateFamiliarity,
   priceHistoryToStateVectors,
 } from "../../../core/regime/familiarity.ts";
+import {
+  decomposeUncertainty,
+  type EstimatorOpinion,
+  type LegEstimate,
+} from "../../../core/alpha/uncertainty-decomposition.ts";
 
 
 // ============================================================================
@@ -260,6 +266,57 @@ function invalidInputAssessment(errors: string[]): RiskAssessment {
 // Classifier
 // ============================================================================
 
+const UNCERTAINTY_DIMENSION_NAME = "Uncertainty Decomposition";
+
+/**
+ * Per-period expected-return opinions, all carried on the observation series' own scale
+ * so the disagreement term stays meaningful. They fail differently by horizon (full
+ * sample against the last 10 periods) and by robustness (mean against median), and the
+ * fourth comes off a separately supplied feed. They are not fully independent: per the
+ * decomposition module's own load-bearing limitation, correlated estimators understate
+ * epistemic uncertainty, so this set errs toward reporting less of it, never more.
+ */
+function buildDriftEstimators(
+  returns: number[],
+  independentReturns: number[] | undefined,
+): EstimatorOpinion[] {
+  const estimators: EstimatorOpinion[] = [];
+  const finite = returns.filter((r) => Number.isFinite(r));
+  if (finite.length === 0) return estimators;
+
+  const mean = (xs: number[]): number => xs.reduce((s, x) => s + x, 0) / xs.length;
+
+  estimators.push({ name: "full_sample_drift", estimate: mean(finite) });
+
+  const sorted = [...finite].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const upper = sorted[mid] ?? 0;
+  const lower = sorted[mid - 1] ?? upper;
+  estimators.push({
+    name: "median_drift",
+    estimate: sorted.length % 2 === 0 ? (lower + upper) / 2 : upper,
+  });
+
+  if (finite.length >= 10) {
+    estimators.push({ name: "recent_drift", estimate: mean(finite.slice(-10)) });
+  }
+
+  if (independentReturns) {
+    const feed = independentReturns.filter((r) => Number.isFinite(r));
+    if (feed.length >= 10) {
+      estimators.push({ name: "independent_feed_drift", estimate: mean(feed) });
+    }
+  }
+
+  return estimators;
+}
+
+function weightedComposite(dimensions: RiskDimension[]): number {
+  const totalWeight = dimensions.reduce((sum, d) => sum + d.weight, 0);
+  if (totalWeight <= 0) return 0;
+  return dimensions.reduce((sum, d) => sum + d.score * d.weight, 0) / totalWeight;
+}
+
 export function classifyTradeRisk(
   trade: TradeProposal,
   portfolio: PortfolioContext,
@@ -357,6 +414,9 @@ export function classifyTradeRisk(
   let familiarityReason = familiar
     ? `Previously traded ${trade.symbol}`
     : `First time trading ${trade.symbol}`;
+  // Kept for the uncertainty dimension below. Null means the gate never ran, which is
+  // not the same as the state being familiar.
+  let familiarityGateScore: number | null = null;
 
   if (portfolio.targetPriceHistory && portfolio.targetPriceHistory.length >= 90) {
     try {
@@ -371,6 +431,7 @@ export function classifyTradeRisk(
           window: states.slice(-recentCount),
           nowMs: 0,
         });
+        familiarityGateScore = gate.score;
         if (gate.outOfDistribution) {
           familiarityScore = Math.max(symbolScore, 60);
           familiarityReason +=
@@ -580,9 +641,73 @@ export function classifyTradeRisk(
     }
   }
 
-  // Compute weighted composite
-  const totalWeight = dimensions.reduce((sum, d) => sum + d.weight, 0);
-  const compositeScore = dimensions.reduce((sum, d) => sum + d.score * d.weight, 0) / totalWeight;
+  // 16. Uncertainty decomposition: score the EVIDENCE behind the trade, not the trade.
+  // Scored off the module's recommended action rather than off a collapsed total,
+  // because the three legs demand opposite responses at the same total: irreducible
+  // market noise is a legitimate trade at smaller size, while not-knowing and
+  // out-of-distribution are refusals to trade at any size. Folding them into one number
+  // and then grading it is exactly the error the decomposition exists to prevent.
+  if (portfolio.targetPriceHistory && portfolio.targetPriceHistory.length >= 60) {
+    try {
+      const observations = pricesToReturns(portfolio.targetPriceHistory);
+      const uncertainty = decomposeUncertainty({
+        observations,
+        estimators: buildDriftEstimators(observations, portfolio.targetReturns),
+        // Reused from dimension 8 rather than recomputed: a second run of the gate over
+        // the same window could return a verdict that contradicts the familiarity
+        // dimension the operator was just shown.
+        familiarityScore: familiarityGateScore,
+      });
+
+      const legs = uncertainty.legs;
+      const unmeasured = (["aleatoric", "epistemic", "distributional"] as const).filter(
+        (k) => legs[k].status === "unavailable",
+      );
+
+      let uncertaintyScore: number;
+      if (uncertainty.action === "abstain") {
+        uncertaintyScore = 95;
+      } else if (uncertainty.action === "gather_evidence") {
+        // An unmeasured leg is ignorance about ignorance: conservative, but held below
+        // the score for disagreement that was actually observed and found large.
+        uncertaintyScore = unmeasured.length > 0 ? 55 : 70;
+      } else if (uncertainty.action === "size_down") {
+        uncertaintyScore = 45;
+      } else {
+        uncertaintyScore = Math.round(25 * (legs.aleatoric.value ?? 1));
+      }
+
+      const legText = (leg: LegEstimate): string =>
+        `${leg.leg} ${leg.value === null ? "unavailable" : leg.value.toFixed(2)}`;
+
+      dimensions.push({
+        name: UNCERTAINTY_DIMENSION_NAME,
+        score: uncertaintyScore,
+        weight: 1.2,
+        reason:
+          `Action ${uncertainty.action} (${legText(legs.aleatoric)}, ` +
+          `${legText(legs.epistemic)}, ${legText(legs.distributional)}): ` +
+          uncertainty.actionReason,
+      });
+    } catch (err) {
+      dimensions.push({
+        name: UNCERTAINTY_DIMENSION_NAME,
+        score: 55,
+        weight: 1.2,
+        reason: `Dimension computation failed (${err instanceof Error ? err.message : String(err)}): scored conservatively, uncertainty is unmeasured rather than absent`,
+      });
+    }
+  }
+
+  // Compute weighted composite. The composite is a weighted MEAN, so a dimension that
+  // scores below the running average pulls it down: a trade must never look safer for
+  // having had its evidence examined. The uncertainty dimension is therefore allowed to
+  // raise the composite and never to lower it.
+  const withoutUncertainty = dimensions.filter((d) => d.name !== UNCERTAINTY_DIMENSION_NAME);
+  const compositeScore =
+    withoutUncertainty.length === dimensions.length
+      ? weightedComposite(dimensions)
+      : Math.max(weightedComposite(dimensions), weightedComposite(withoutUncertainty));
 
   // Classify tier
   const tier: RiskTier =
