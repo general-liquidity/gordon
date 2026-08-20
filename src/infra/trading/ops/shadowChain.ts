@@ -34,7 +34,11 @@ import {
   distanceToBarriers,
   shouldBlockNewTrades,
 } from "../../safety/absorbingBarrier.ts";
-import type { BarriersResult } from "../../safety/absorbingBarrier.ts";
+import type {
+  BarriersResult,
+  AbsorbingBarrierEvaluation,
+} from "../../safety/absorbingBarrier.ts";
+import { observeSessionEquity } from "../../safety/absorbingBarrierState.ts";
 import { runKillList } from "./preExecKillList.ts";
 import type { KillListResult } from "./preExecKillList.ts";
 import { mapLiquidity } from "./liquidityMapper.ts";
@@ -81,6 +85,11 @@ export interface ShadowPlanResult {
   riskBundle: AuditResult;
   sizer: SizingResult | null;
   barriers: BarriersResult | null;
+  /**
+   * Inception-referenced barrier, reported alongside the trailing one above.
+   * Null when the operator has configured no terminal loss limit.
+   */
+  terminalBarrier: AbsorbingBarrierEvaluation | null;
   killList: KillListResult;
   liquidity: LiquidityMapResult;
   streak: StreakResult | null;
@@ -100,6 +109,7 @@ function aggregateVerdict(
   bundle: AuditResult,
   sizer: SizingResult | null,
   barriers: BarriersResult | null,
+  terminalBarrier: AbsorbingBarrierEvaluation | null,
   killList: KillListResult,
   streak: StreakResult | null,
   giveBack: GiveBackResult | null,
@@ -111,6 +121,13 @@ function aggregateVerdict(
   if (sizer && sizer.rejected) blockers.push(`Sizer rejected: ${sizer.rejectionReason}`);
   if (barriers && shouldBlockNewTrades(barriers)) {
     blockers.push(`Absorbing barrier breach: nearest ${barriers.nearest} at ${barriers.nearestRUnits.toFixed(2)}R`);
+  }
+  // Separate check, never an else: the two barriers answer different questions
+  // and the gate is the union of their blocks.
+  if (terminalBarrier && terminalBarrier.tripped) {
+    blockers.push(
+      `Absorbing barrier terminal: ${terminalBarrier.boundBy} limit breached at ${((terminalBarrier.state.trippedAtLossFraction ?? 0) * 100).toFixed(1)}% of reference capital`,
+    );
   }
   if (!killList.pass) blockers.push(`Kill list: ${killList.blockers.join(", ")}`);
   if (streak && (streak.state === "tripped" || streak.state === "cooldown")) {
@@ -174,6 +191,12 @@ function formatMarkdown(result: ShadowPlanResult): string {
     lines.push(`- **Absorbing barriers**: nearest ${result.barriers.nearest ?? "none"} at ${Number.isFinite(result.barriers.nearestRUnits) ? result.barriers.nearestRUnits.toFixed(2) + "R" : "n/a"}`);
   } else {
     lines.push("- **Absorbing barriers**: SKIPPED (account state not configured)");
+  }
+  if (result.terminalBarrier) {
+    const t = result.terminalBarrier;
+    lines.push(
+      `- **Terminal loss barrier**: ${t.tripped ? `TRIPPED by ${t.boundBy}` : "ok"} (inception ${(t.inception.lossFraction * 100).toFixed(1)}%, trailing ${(t.trailing.lossFraction * 100).toFixed(1)}%)`,
+    );
   }
   lines.push(`- **Kill list**: ${result.killList.pass ? "PASS" : `BLOCK (${result.killList.blockers.length})`}`);
   if (result.streak) {
@@ -272,6 +295,10 @@ export function runShadowChain(input: ShadowPlanInput): ShadowPlanResult {
     });
   }
 
+  // Folded independently of baseR: the inception barrier is measured in
+  // fractions of capital and needs no R unit, so a missing R must not silence it.
+  const terminalBarrier = observeSessionEquity(currentEquity);
+
   const killList = runKillList({
     bored: process.env.GORDON_OPERATOR_BORED === "1",
     angry: process.env.GORDON_OPERATOR_ANGRY === "1",
@@ -329,6 +356,7 @@ export function runShadowChain(input: ShadowPlanInput): ShadowPlanResult {
     riskBundle,
     sizer,
     barriers,
+    terminalBarrier,
     killList,
     streak,
     giveBack,
@@ -344,6 +372,7 @@ export function runShadowChain(input: ShadowPlanInput): ShadowPlanResult {
     riskBundle,
     sizer,
     barriers,
+    terminalBarrier,
     killList,
     liquidity,
     streak,
@@ -373,6 +402,8 @@ export function runShadowChain(input: ShadowPlanInput): ShadowPlanResult {
       bundleVerdict: riskBundle.verdict,
       sizerRejected: sizer?.rejected ?? null,
       killListPass: killList.pass,
+      terminalBarrierTripped: terminalBarrier?.tripped ?? null,
+      terminalBarrierBoundBy: terminalBarrier?.boundBy ?? null,
       microstructureRegime: manipulationContext?.regime ?? null,
       microstructurePosture: manipulationContext?.posture ?? null,
     },

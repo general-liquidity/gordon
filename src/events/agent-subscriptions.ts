@@ -560,7 +560,26 @@ export function createDefaultSubscriptions(
                 psychologicalTiltUsd: psychTilt > 0 ? psychTilt : undefined,
                 baseRiskPerTradeUsd: baseR > 0 ? baseR : undefined,
               });
-              const wouldBlock = shouldBlockNewTrades(barriers);
+              const trailingWouldBlock = shouldBlockNewTrades(barriers);
+              // The trailing barrier forgives a recover-and-lose-again path, so
+              // the inception-referenced fold is evaluated alongside it and the
+              // gate is the union: either one blocking blocks.
+              // Isolated: a failure in the newer barrier must not swallow the
+              // trailing verdict this block already emits.
+              let terminal: import(
+                "../infra/safety/absorbingBarrier.ts"
+              ).AbsorbingBarrierEvaluation | null = null;
+              try {
+                const { observeSessionEquity } = await import(
+                  "../infra/safety/absorbingBarrierState.ts"
+                );
+                terminal = observeSessionEquity(currentEquity);
+              } catch (err) {
+                logger.warn("terminal-barrier fold failed", {
+                  error: (err as Error).message,
+                });
+              }
+              const wouldBlock = trailingWouldBlock || (terminal?.tripped ?? false);
               shadowVerdict(
                 "absorbing_barrier",
                 "trading.absorbing_barrier.shadow",
@@ -570,6 +589,12 @@ export function createDefaultSubscriptions(
                   nearest: barriers.nearest,
                   nearestRUnits: Number.isFinite(barriers.nearestRUnits)
                     ? Number(barriers.nearestRUnits.toFixed(2))
+                    : null,
+                  trailingWouldBlock,
+                  terminalTripped: terminal?.tripped ?? null,
+                  terminalBoundBy: terminal?.boundBy ?? null,
+                  terminalInceptionLossFraction: terminal
+                    ? Number(terminal.inception.lossFraction.toFixed(4))
                     : null,
                   wouldBlock,
                 },
