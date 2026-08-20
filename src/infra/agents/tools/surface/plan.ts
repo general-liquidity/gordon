@@ -48,6 +48,202 @@ import {
   attachExecution,
   planToPayload,
 } from "../../../trading/ops/executionPlaybook.ts";
+import {
+  assessBacktestValidity,
+  computeSignalHalfLife,
+  monthsUntilBelowCostFloor,
+  PAPER_CALIBRATION_2026,
+} from "../../../../core/alpha/signal-half-life.ts";
+
+// ============================================================================
+// signal decay (shared by backtest + verify_plan)
+// ============================================================================
+
+/**
+ * The named calibration is a MODEL OUTPUT with one empirically calibrated input, not a
+ * measured decay curve. Every surface that prints a number derived from it repeats that,
+ * so an operator never reads 18 months as a fact about their own strategy.
+ */
+const DEFAULT_CALIBRATION_LABEL = "PAPER_CALIBRATION_2026 (model output, not measured)";
+const OPERATOR_CALIBRATION_LABEL = "operator-supplied half-life";
+
+const DEFAULT_HALF_LIFE_MONTHS = computeSignalHalfLife(PAPER_CALIBRATION_2026).halfLifeMonths;
+
+/** Plan horizons are authored in hours, so a nominal 30-day month keeps the conversion legible. */
+const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
+export interface BacktestDecayReport {
+  readonly halfLifeMonths: number;
+  readonly calibration: string;
+  readonly backtestWindowMonths: number;
+  readonly halfLivesInWindow: number;
+  readonly measuresDecayedAverage: boolean;
+  readonly overstatementFactor: number;
+  readonly windowAverageEdgeFraction: number;
+  readonly edgeAtWindowEnd: number;
+  readonly warnings: readonly string[];
+  /** Non-null only when the window outlived the half-life, so callers can lead with it. */
+  readonly headline: string | null;
+}
+
+/**
+ * A window longer than the edge's own half-life means the reported metrics average a period
+ * in which the signal half-died. That is a validity error about the measurement, not a note
+ * about the future, so it is reported on every backtest rather than gated behind an opt-in.
+ */
+export function assessBacktestWindowDecay(input: {
+  readonly backtestWindowMonths: number;
+  readonly liveHorizonMonths?: number;
+  readonly halfLifeMonths?: number;
+}): BacktestDecayReport {
+  const operatorSupplied = typeof input.halfLifeMonths === "number" && input.halfLifeMonths > 0;
+  const halfLifeMonths = operatorSupplied ? (input.halfLifeMonths as number) : DEFAULT_HALF_LIFE_MONTHS;
+  const calibration = operatorSupplied ? OPERATOR_CALIBRATION_LABEL : DEFAULT_CALIBRATION_LABEL;
+  const windowMonths = Math.max(0, input.backtestWindowMonths);
+  const liveHorizonMonths = Math.max(0, input.liveHorizonMonths ?? 0);
+
+  const validity = assessBacktestValidity({
+    backtestWindowMonths: windowMonths,
+    liveHorizonMonths,
+    halfLifeMonths,
+  });
+
+  return {
+    halfLifeMonths,
+    calibration,
+    backtestWindowMonths: windowMonths,
+    halfLivesInWindow: validity.halfLivesInWindow,
+    measuresDecayedAverage: validity.measuresDecayedAverage,
+    overstatementFactor: validity.overstatementFactor,
+    windowAverageEdgeFraction: validity.windowAverageEdgeFraction,
+    edgeAtWindowEnd: validity.edgeAtWindowEnd,
+    warnings: validity.warnings,
+    headline: validity.measuresDecayedAverage
+      ? `DECAY_VALIDITY: the ${windowMonths.toFixed(1)}-month window spans ${validity.halfLivesInWindow.toFixed(2)} half-lives ` +
+        `at a ${halfLifeMonths.toFixed(1)}-month half-life, so these metrics overstate the edge available now by about ` +
+        `${validity.overstatementFactor.toFixed(2)}x. Half-life source: ${calibration}.`
+      : null,
+  };
+}
+
+export interface PlanDecayAssessment {
+  readonly ran: boolean;
+  /** Named inputs the check needed and did not get. Empty when `ran` is true. */
+  readonly missingInputs: readonly string[];
+  readonly halfLifeMonths: number;
+  readonly calibration: string;
+  readonly horizonMonths: number | null;
+  readonly monthsUntilBelowCostFloor: number | null;
+  readonly alreadyBelowCostFloor: boolean;
+  readonly belowFloorWithinHorizon: boolean;
+  /** Reasons fit for the verdict. Empty whenever the check could not run. */
+  readonly warnings: readonly string[];
+  readonly note: string;
+}
+
+/**
+ * Absent data is not evidence of decay, so a missing edge or horizon degrades to an
+ * annotation with the missing field named. It never produces a warning and so never moves
+ * a verdict.
+ */
+export function assessPlanDecay(input: {
+  readonly backtestedEdge?: number;
+  readonly costFloorEdge?: number;
+  readonly horizonMonths?: number;
+  readonly halfLifeMonths?: number;
+}): PlanDecayAssessment {
+  const operatorSupplied = typeof input.halfLifeMonths === "number" && input.halfLifeMonths > 0;
+  const halfLifeMonths = operatorSupplied ? (input.halfLifeMonths as number) : DEFAULT_HALF_LIFE_MONTHS;
+  const calibration = operatorSupplied ? OPERATOR_CALIBRATION_LABEL : DEFAULT_CALIBRATION_LABEL;
+
+  const missingInputs: string[] = [];
+  // A non-positive edge is treated as absent rather than as an error: the half-life module
+  // throws on it, and a verify call must not fail on a malformed annotation input.
+  if (!(typeof input.backtestedEdge === "number" && input.backtestedEdge > 0)) {
+    missingInputs.push("backtestedEdge");
+  }
+  if (!(typeof input.costFloorEdge === "number" && input.costFloorEdge >= 0)) {
+    missingInputs.push("costFloorEdge");
+  }
+  if (!(typeof input.horizonMonths === "number" && input.horizonMonths > 0)) {
+    missingInputs.push("horizonMonths");
+  }
+
+  if (missingInputs.length > 0) {
+    return {
+      ran: false,
+      missingInputs,
+      halfLifeMonths,
+      calibration,
+      horizonMonths: typeof input.horizonMonths === "number" ? input.horizonMonths : null,
+      monthsUntilBelowCostFloor: null,
+      alreadyBelowCostFloor: false,
+      belowFloorWithinHorizon: false,
+      warnings: [],
+      note:
+        `Signal-decay check did not run: missing ${missingInputs.join(", ")}. ` +
+        "This is an absence of inputs, not a finding about the plan.",
+    };
+  }
+
+  const horizonMonths = input.horizonMonths as number;
+  const horizon = monthsUntilBelowCostFloor({
+    backtestedEdge: input.backtestedEdge as number,
+    costFloorEdge: input.costFloorEdge as number,
+    halfLifeMonths,
+  });
+  const belowFloorWithinHorizon =
+    !horizon.alreadyBelowFloor && horizon.monthsUntilBelowFloor <= horizonMonths;
+
+  const warnings: string[] = [];
+  if (horizon.alreadyBelowFloor) {
+    warnings.push(
+      `EDGE_BELOW_COST_FLOOR: the supporting edge of ${horizon.backtestedEdge} is already at or below the ` +
+        `${horizon.costFloorEdge} cost floor before any decay is applied, so the plan does not pay for its own execution.`,
+    );
+  } else if (belowFloorWithinHorizon) {
+    warnings.push(
+      `EDGE_DECAY: the supporting edge falls below its ${horizon.costFloorEdge} cost floor after ` +
+        `${horizon.monthsUntilBelowFloor.toFixed(1)} months, inside the ${horizonMonths.toFixed(2)}-month intended horizon. ` +
+        `Half-life source: ${calibration}.`,
+    );
+  }
+
+  return {
+    ran: true,
+    missingInputs: [],
+    halfLifeMonths,
+    calibration,
+    horizonMonths,
+    monthsUntilBelowCostFloor: Number.isFinite(horizon.monthsUntilBelowFloor)
+      ? horizon.monthsUntilBelowFloor
+      : null,
+    alreadyBelowCostFloor: horizon.alreadyBelowFloor,
+    belowFloorWithinHorizon,
+    warnings,
+    note: `${horizon.summary} Half-life source: ${calibration}.`,
+  };
+}
+
+/**
+ * Extracted from verify_plan unchanged so the monotonicity property (more reasons never
+ * yields a better verdict) can be asserted directly against the live decision rule.
+ */
+export function resolveVerifyVerdict(input: {
+  readonly hasError: boolean;
+  readonly approved: boolean;
+  readonly reasonCount: number;
+}): { verdict: "approve" | "conditional" | "reject"; riskTier: "low" | "medium" | "high" | "critical" } {
+  if (input.hasError) {
+    return { verdict: "reject", riskTier: "critical" };
+  }
+  if (!input.approved) {
+    return { verdict: "reject", riskTier: "high" };
+  }
+  return input.reasonCount > 0
+    ? { verdict: "conditional", riskTier: "medium" }
+    : { verdict: "approve", riskTier: "low" };
+}
 
 // ============================================================================
 // create_plan
@@ -310,6 +506,10 @@ export const verifyPlanTool = createTool({
     "",
     "MANDATORY before approve_plan + execute_plan. Plans that haven't been",
     "verified should never reach execution.",
+    "",
+    "Pass expectedEdge + costFloorEdge to also check whether the supporting edge",
+    "decays under its cost floor inside the holding horizon. Omitting them",
+    "annotates that the check did not run; it never counts against the plan.",
   ].join("\n"),
   inputSchema: z.object({
     planId: z.string(),
@@ -320,6 +520,28 @@ export const verifyPlanTool = createTool({
       .describe(
         "If set, evaluate risk against this hypothetical portfolio value instead of the live exchange balance. Use for 'verify the plan on a $X account' reasoning without switching modes.",
       ),
+    expectedEdge: z
+      .number()
+      .optional()
+      .describe(
+        "Backtested edge supporting this plan, in the same unit as costFloorEdge (Sharpe is the usual one). Required, with costFloorEdge, for the signal-decay check. Omit rather than guess: a missing value annotates, it never counts against the plan.",
+      ),
+    costFloorEdge: z
+      .number()
+      .optional()
+      .describe("Edge level below which the strategy no longer covers its own execution costs."),
+    horizonMonths: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Intended holding horizon in months. Defaults to the plan's own expiry window."),
+    signalHalfLifeMonths: z
+      .number()
+      .positive()
+      .optional()
+      .describe(
+        "Override the default signal half-life. The default is a model calibration, not a measurement of this strategy.",
+      ),
   }),
   outputSchema: z.object({
     planId: z.string(),
@@ -328,9 +550,29 @@ export const verifyPlanTool = createTool({
     constitutionViolations: z.array(z.unknown()),
     recommendation: z.string(),
     summary: z.string(),
+    decay: z
+      .object({
+        ran: z.boolean(),
+        missingInputs: z.array(z.string()),
+        halfLifeMonths: z.number(),
+        calibration: z.string(),
+        horizonMonths: z.number().nullable(),
+        monthsUntilBelowCostFloor: z.number().nullable(),
+        alreadyBelowCostFloor: z.boolean(),
+        belowFloorWithinHorizon: z.boolean(),
+        note: z.string(),
+      })
+      .optional(),
   }),
   execute: async (
-    args: { planId: string; portfolioOverrideUsd?: number },
+    args: {
+      planId: string;
+      portfolioOverrideUsd?: number;
+      expectedEdge?: number;
+      costFloorEdge?: number;
+      horizonMonths?: number;
+      signalHalfLifeMonths?: number;
+    },
     execContext?: MastraExecutionContext,
   ) => {
     const plan = dbGetPlan(args.planId);
@@ -398,30 +640,54 @@ export const verifyPlanTool = createTool({
       );
     }
 
-    const hasWarnings = warnings.length > 0;
-    const verdict: "approve" | "conditional" | "reject" = result.error
-      ? "reject"
-      : approved
-        ? hasWarnings
-          ? "conditional"
-          : "approve"
-        : "reject";
-    const tier: "low" | "medium" | "high" | "critical" = result.error
-      ? "critical"
-      : approved
-        ? hasWarnings
-          ? "medium"
-          : "low"
-        : "high";
+    // Signal-decay check. The plan's expiry window is the only holding horizon a Plan
+    // carries, so it stands in when the caller does not name one.
+    const planExpiryMonths =
+      plan.expiresAt && plan.createdAt
+        ? (new Date(plan.expiresAt).getTime() - new Date(plan.createdAt).getTime()) / MONTH_MS
+        : undefined;
+    const decay = assessPlanDecay({
+      backtestedEdge: args.expectedEdge,
+      costFloorEdge: args.costFloorEdge,
+      horizonMonths: args.horizonMonths ?? planExpiryMonths,
+      halfLifeMonths: args.signalHalfLifeMonths,
+    });
+    // Decay findings DO influence the verdict, but only ever as an extra reason, which can
+    // downgrade approve to conditional and never the reverse. The justification for letting
+    // it count at all: it only ever fires on edge numbers the caller supplied, and "this
+    // trade does not cover its own execution cost over the horizon it is held for" is a
+    // substantive objection, not a stylistic note. It cannot fire on the default
+    // calibration alone, so a modelled half-life never gates a plan by itself.
+    warnings.push(...decay.warnings);
+
+    const { verdict, riskTier } = resolveVerifyVerdict({
+      hasError: Boolean(result.error),
+      approved,
+      reasonCount: warnings.length,
+    });
+
+    const baseSummary =
+      result.reason ?? result.error ?? (routingConflict ? "Routing-policy conflict — see warnings." : "Verify complete.");
 
     return {
       planId: args.planId,
       verdict,
-      riskTier: tier,
+      riskTier,
       constitutionViolations: warnings as unknown[],
       recommendation:
         verdict === "approve" ? "auto_approve" : verdict === "conditional" ? "prompt_user" : "block",
-      summary: result.reason ?? result.error ?? (routingConflict ? "Routing-policy conflict — see warnings." : "Verify complete."),
+      summary: decay.ran ? baseSummary : `${baseSummary} ${decay.note}`,
+      decay: {
+        ran: decay.ran,
+        missingInputs: [...decay.missingInputs],
+        halfLifeMonths: decay.halfLifeMonths,
+        calibration: decay.calibration,
+        horizonMonths: decay.horizonMonths,
+        monthsUntilBelowCostFloor: decay.monthsUntilBelowCostFloor,
+        alreadyBelowCostFloor: decay.alreadyBelowCostFloor,
+        belowFloorWithinHorizon: decay.belowFloorWithinHorizon,
+        note: decay.note,
+      },
     };
   },
 });
@@ -732,6 +998,12 @@ export const backtestTool = createTool({
     "  - `comparedToRunId`: take the prior run's inputs AS-IS but apply",
     "    CURRENT params on top. Use to isolate parameter-tuning effects",
     "    from data effects.",
+    "",
+    "Signal decay: every run returns a `decay` block comparing the window length",
+    "against the signal's half-life. When the window is longer than the half-life,",
+    "the metrics average a period in which the edge half-died and the summary leads",
+    "with the overstatement factor. The default half-life is a model calibration,",
+    "not a measurement of this strategy. Override with `signalHalfLifeMonths`.",
   ].join("\n"),
   inputSchema: z.object({
     strategyId: z.string().describe("Strategy slot ID or playbook name (e.g. 'support_bounce')."),
@@ -754,6 +1026,18 @@ export const backtestTool = createTool({
       .describe(
         "Inherit window + strategyId + symbol from this snapshot, but use the CURRENT params from this call. Use to A/B parameter changes against a frozen data window.",
       ),
+    signalHalfLifeMonths: z
+      .number()
+      .positive()
+      .optional()
+      .describe(
+        "Override the signal half-life used for the decay-validity check. The default is a model calibration, not a measurement of this strategy.",
+      ),
+    liveHorizonMonths: z
+      .number()
+      .positive()
+      .optional()
+      .describe("How long the strategy is intended to be traded live, for the decay-validity check. Default 0."),
   }),
   outputSchema: z.object({
     runId: z.string(),
@@ -771,6 +1055,19 @@ export const backtestTool = createTool({
         interpretation: z.string(),
       })
       .optional(),
+    decay: z
+      .object({
+        halfLifeMonths: z.number(),
+        calibration: z.string(),
+        backtestWindowMonths: z.number(),
+        halfLivesInWindow: z.number(),
+        measuresDecayedAverage: z.boolean(),
+        overstatementFactor: z.number().nullable(),
+        windowAverageEdgeFraction: z.number(),
+        edgeAtWindowEnd: z.number(),
+        warnings: z.array(z.string()),
+      })
+      .optional(),
   }),
   execute: async (
     args: {
@@ -784,6 +1081,8 @@ export const backtestTool = createTool({
       market?: "auto" | "crypto" | "stocks";
       replayRunId?: string;
       comparedToRunId?: string;
+      signalHalfLifeMonths?: number;
+      liveHorizonMonths?: number;
     },
     execContext?: MastraExecutionContext,
   ) => {
@@ -887,6 +1186,16 @@ export const backtestTool = createTool({
       // Snapshot write failure is non-fatal — return the result.
     }
 
+    // Decay validity of the window that was actually measured. A window longer than the
+    // edge's half-life makes the reported metrics an average over a period in which the
+    // signal half-died, so it leads the summary rather than trailing it.
+    const decayReport = assessBacktestWindowDecay({
+      backtestWindowMonths: Math.max(0, toTs - fromTs) / MONTH_MS,
+      liveHorizonMonths: args.liveHorizonMonths,
+      halfLifeMonths: args.signalHalfLifeMonths,
+    });
+    const baseSummary = result.summary ?? result.formattedSummary ?? result.error ?? "Backtest complete.";
+
     const out: {
       runId: string;
       inputsHash: string;
@@ -899,11 +1208,35 @@ export const backtestTool = createTool({
         deltas: Record<string, number | null>;
         interpretation: string;
       };
+      decay?: {
+        halfLifeMonths: number;
+        calibration: string;
+        backtestWindowMonths: number;
+        halfLivesInWindow: number;
+        measuresDecayedAverage: boolean;
+        overstatementFactor: number | null;
+        windowAverageEdgeFraction: number;
+        edgeAtWindowEnd: number;
+        warnings: string[];
+      };
     } = {
       runId,
       inputsHash,
       metrics: result.result ?? {},
-      summary: result.summary ?? result.formattedSummary ?? result.error ?? "Backtest complete.",
+      summary: decayReport.headline ? `${decayReport.headline}\n\n${baseSummary}` : baseSummary,
+      decay: {
+        halfLifeMonths: decayReport.halfLifeMonths,
+        calibration: decayReport.calibration,
+        backtestWindowMonths: decayReport.backtestWindowMonths,
+        halfLivesInWindow: decayReport.halfLivesInWindow,
+        measuresDecayedAverage: decayReport.measuresDecayedAverage,
+        overstatementFactor: Number.isFinite(decayReport.overstatementFactor)
+          ? decayReport.overstatementFactor
+          : null,
+        windowAverageEdgeFraction: decayReport.windowAverageEdgeFraction,
+        edgeAtWindowEnd: decayReport.edgeAtWindowEnd,
+        warnings: [...decayReport.warnings],
+      },
     };
 
     if (backtestResult) {
