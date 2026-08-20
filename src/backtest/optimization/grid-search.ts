@@ -8,6 +8,7 @@
 
 import type { OHLC } from "../types.ts";
 import type { Strategy } from "../../strategies/types.ts";
+import { selectByBootstrapPercentile } from "../../core/stats/bootstrap-select.ts";
 
 // ============================================================================
 // Type Definitions
@@ -87,6 +88,18 @@ export interface BacktestResult {
 
   /** Execution time in milliseconds */
   executionTimeMs: number;
+
+  /**
+   * Per-period returns, when the engine already computes them. Read only by robust selection,
+   * which resamples this series instead of re-running a backtest per bootstrap resample.
+   */
+  periodReturns?: readonly number[];
+
+  /**
+   * Per-period equity samples. The full engine result carries an equity curve, so robust
+   * selection can derive a return series from it without the caller passing anything extra.
+   */
+  equityCurve?: ReadonlyArray<{ equity: number }>;
 }
 
 /**
@@ -148,6 +161,340 @@ export interface ProgressInfo {
 
 export type ProgressCallback = (info: ProgressInfo) => void;
 
+// ============================================================================
+// Robust (bootstrap-percentile) Selection
+// ============================================================================
+
+/**
+ * Opt-in percentile-of-bootstrapped-utility selection, run alongside the ordinary search.
+ *
+ * Picking the parameter with the best observed metric is an argmax over one draw's noise as much
+ * as over any real edge. `selectByBootstrapPercentile` re-ranks the same candidates on a
+ * percentile of their utility distribution over dependence-preserving resamples of the observed
+ * path, and the distance between the two rankings is the diagnostic worth having.
+ *
+ * Disabled by default: existing optimization results are a regression baseline, so the winner the
+ * search returns is left exactly as it was and the percentile view is reported beside it.
+ */
+export interface RobustSelectionOptions {
+  /** Default false. When false the search behaves exactly as it does without this option. */
+  enabled: boolean;
+
+  /**
+   * Percentile to select on, 0..1. Defaults to the module default of 0.5, the middle of the
+   * 0.3-0.7 band measured to generalize best. A lower percentile is NOT more conservative here:
+   * it buys protection against a disaster the sample barely evidences.
+   */
+  alpha?: number;
+
+  resamples?: number;
+
+  seed?: number;
+
+  /** Mean geometric block length for the stationary bootstrap. */
+  meanBlockLength?: number;
+
+  /**
+   * Extract the per-period return series for one candidate. Defaults to the result's
+   * `periodReturns`, else a series derived from its `equityCurve`.
+   */
+  returns?: (
+    result: BacktestResult,
+    params: ParameterSet
+  ) => readonly number[] | undefined;
+
+  /**
+   * Utility of one resampled return series. Defaults to a function of the search metric. Supply
+   * this when the metric being searched is not reconstructible from a return series, or when the
+   * property worth resampling is path-dependent (ruin barriers, exposure limits), which an
+   * order-invariant utility such as Sharpe cannot express.
+   */
+  utility?: (periodReturns: readonly number[]) => number;
+}
+
+/** Per-candidate evidence behind a robust selection. */
+export interface RobustCandidateEvidence {
+  params: ParameterSet;
+
+  /** Utility on the observed path in its observed order: what argmax ranks on. */
+  pointEstimate: number;
+
+  /** Utility at `alpha` of the bootstrap distribution: what robust selection ranks on. */
+  percentileUtility: number;
+
+  /** pointEstimate minus percentileUtility. Large means the observed number was probably luck. */
+  overfitGap: number;
+
+  /** p95 minus p05 of the candidate's utility distribution. */
+  spread: number;
+
+  /** Resamples that produced a finite utility. */
+  evaluations: number;
+}
+
+/**
+ * Both winners and their disagreement. Never collapsed into a single "best": a disagreement
+ * between the observed best and the percentile best is the most useful thing this reports.
+ */
+export interface RobustSelectionReport {
+  /** False when no candidate carried a usable per-period series; see `unavailableReason`. */
+  available: boolean;
+
+  unavailableReason: string | null;
+
+  alpha: number;
+
+  resamples: number;
+
+  seed: number;
+
+  /** Observations in each candidate's return series. */
+  sampleSize: number;
+
+  /** Name of the utility the candidates were resampled on. */
+  utilityMetric: string;
+
+  /** Winner by argmax of the point estimate: the same params the search returns as `bestParams`. */
+  argmaxWinner: ParameterSet | null;
+
+  /** Winner by the alpha-th percentile of bootstrapped utility. */
+  percentileWinner: ParameterSet | null;
+
+  /** True when the two winners differ: the observed best was probably lucky. */
+  disagree: boolean;
+
+  argmaxWinnerOverfitGap: number | null;
+
+  percentileWinnerOverfitGap: number | null;
+
+  candidates: RobustCandidateEvidence[];
+
+  warnings: string[];
+}
+
+/** One candidate's per-period series, collected during the search. */
+export interface RobustSample {
+  params: ParameterSet;
+  returns: readonly number[] | undefined;
+}
+
+/**
+ * Derive a per-period return series from a backtest result, or undefined when the result carries
+ * no series. Deriving beats re-running: `selectByBootstrapPercentile` evaluates every candidate
+ * once per resample, and a backtest per resample would be thousands of full runs.
+ */
+export function periodReturnsFromResult(
+  result: BacktestResult
+): readonly number[] | undefined {
+  if (result.periodReturns && result.periodReturns.length > 0) {
+    return result.periodReturns;
+  }
+
+  const curve = result.equityCurve;
+  if (!curve || curve.length < 2) return undefined;
+
+  const returns: number[] = [];
+  for (let i = 1; i < curve.length; i++) {
+    const prev = curve[i - 1]?.equity;
+    const current = curve[i]?.equity;
+    if (
+      prev === undefined ||
+      current === undefined ||
+      !Number.isFinite(prev) ||
+      !Number.isFinite(current) ||
+      prev === 0
+    ) {
+      return undefined;
+    }
+    returns.push(current / prev - 1);
+  }
+
+  return returns;
+}
+
+function sharpeOfReturns(returns: readonly number[]): number {
+  if (returns.length < 2) return Number.NaN;
+  let sum = 0;
+  for (const r of returns) sum += r;
+  const mean = sum / returns.length;
+  let ss = 0;
+  for (const r of returns) ss += (r - mean) * (r - mean);
+  const stdDev = Math.sqrt(ss / (returns.length - 1));
+  return stdDev === 0 ? Number.NaN : mean / stdDev;
+}
+
+function compoundedPercentOfReturns(returns: readonly number[]): number {
+  let equity = 1;
+  for (const r of returns) equity *= 1 + r;
+  return (equity - 1) * 100;
+}
+
+function calmarOfReturns(returns: readonly number[]): number {
+  let equity = 1;
+  let peak = 1;
+  let maxDrawdown = 0;
+  for (const r of returns) {
+    equity *= 1 + r;
+    if (equity > peak) peak = equity;
+    const drawdown = peak === 0 ? 0 : 1 - equity / peak;
+    if (drawdown > maxDrawdown) maxDrawdown = drawdown;
+  }
+  if (maxDrawdown === 0) return Number.NaN;
+  return (equity - 1) / maxDrawdown;
+}
+
+function resolveUtility(
+  metric: string,
+  override: ((returns: readonly number[]) => number) | undefined
+): {
+  fn: (returns: readonly number[]) => number;
+  name: string;
+  warning: string | null;
+} {
+  if (override) return { fn: override, name: `${metric} (custom)`, warning: null };
+
+  switch (metric) {
+    case "sharpeRatio":
+      return { fn: sharpeOfReturns, name: "sharpeRatio", warning: null };
+    case "totalReturn":
+      return { fn: compoundedPercentOfReturns, name: "totalReturn", warning: null };
+    case "calmarRatio":
+      return { fn: calmarOfReturns, name: "calmarRatio", warning: null };
+    default:
+      return {
+        fn: sharpeOfReturns,
+        name: "sharpeRatio",
+        warning: `metric ${metric} cannot be rebuilt from a return series; candidates were resampled on sharpeRatio instead. Pass robustSelection.utility to score the metric you are actually searching on`,
+      };
+  }
+}
+
+/**
+ * Rank collected candidates on a percentile of their bootstrapped utility and report that ranking
+ * beside the ordinary argmax one.
+ */
+export function buildRobustSelectionReport(
+  samples: readonly RobustSample[],
+  metric: string,
+  options: RobustSelectionOptions
+): RobustSelectionReport {
+  const warnings: string[] = [];
+
+  const unavailable = (reason: string): RobustSelectionReport => ({
+    available: false,
+    unavailableReason: reason,
+    alpha: 0,
+    resamples: 0,
+    seed: 0,
+    sampleSize: 0,
+    utilityMetric: metric,
+    argmaxWinner: null,
+    percentileWinner: null,
+    disagree: false,
+    argmaxWinnerOverfitGap: null,
+    percentileWinnerOverfitGap: null,
+    candidates: [],
+    warnings,
+  });
+
+  const withSeries = samples.filter(
+    (s): s is { params: ParameterSet; returns: readonly number[] } =>
+      s.returns !== undefined && s.returns.length >= 2
+  );
+
+  if (withSeries.length === 0) {
+    return unavailable(
+      "no candidate backtest carried a per-period return series (periodReturns or equityCurve), and robust selection resamples that series rather than re-running backtests"
+    );
+  }
+
+  // Indices are drawn once and shared across candidates, so every candidate must be indexable by
+  // the same vector. A candidate on a shorter path is dropped rather than padded or truncated.
+  const first = withSeries[0];
+  if (first === undefined) return unavailable("no usable candidate series");
+  const sampleSize = first.returns.length;
+
+  const usable = withSeries.filter((s) => s.returns.length === sampleSize);
+  if (usable.length < withSeries.length) {
+    warnings.push(
+      `${withSeries.length - usable.length} candidate(s) had a return series of a different length than ${sampleSize} and were excluded from robust selection`
+    );
+  }
+  if (samples.length > withSeries.length) {
+    warnings.push(
+      `${samples.length - withSeries.length} candidate(s) produced no usable per-period return series and were excluded from robust selection`
+    );
+  }
+
+  const utility = resolveUtility(metric, options.utility);
+  if (utility.warning) warnings.push(utility.warning);
+
+  const selection = selectByBootstrapPercentile<{
+    params: ParameterSet;
+    returns: readonly number[];
+  }>({
+    candidates: usable,
+    sampleSize,
+    alpha: options.alpha,
+    resamples: options.resamples,
+    seed: options.seed,
+    meanBlockLength: options.meanBlockLength,
+    label: (candidate) => JSON.stringify(candidate.params),
+    evaluate: (candidate, indices) => {
+      const resampled = new Array<number>(indices.length);
+      for (let i = 0; i < indices.length; i++) {
+        resampled[i] = candidate.returns[indices[i] ?? 0] ?? 0;
+      }
+      return utility.fn(resampled);
+    },
+  });
+
+  warnings.push(...selection.warnings);
+
+  const candidates: RobustCandidateEvidence[] = selection.evidence.map((e) => ({
+    params: e.candidate.params,
+    pointEstimate: e.pointEstimate,
+    percentileUtility: e.percentileUtility,
+    overfitGap: e.overfitGap,
+    spread: e.spread,
+    evaluations: e.evaluations,
+  }));
+
+  const argmaxEvidence = candidates[selection.pointEstimateWinnerIndex];
+  const percentileEvidence = candidates[selection.selectedIndex];
+
+  return {
+    available: true,
+    unavailableReason: null,
+    alpha: selection.alpha,
+    resamples: selection.resamples,
+    seed: selection.seed,
+    sampleSize: selection.sampleSize,
+    utilityMetric: utility.name,
+    argmaxWinner: argmaxEvidence?.params ?? null,
+    percentileWinner: percentileEvidence?.params ?? null,
+    disagree: selection.disagreesWithPointEstimate,
+    argmaxWinnerOverfitGap: argmaxEvidence?.overfitGap ?? null,
+    percentileWinnerOverfitGap: percentileEvidence?.overfitGap ?? null,
+    candidates,
+    warnings,
+  };
+}
+
+/** Collect one candidate's per-period series for robust selection. */
+export function collectRobustSample(
+  result: BacktestResult,
+  params: ParameterSet,
+  options: RobustSelectionOptions
+): RobustSample {
+  return {
+    params,
+    returns: options.returns
+      ? options.returns(result, params)
+      : periodReturnsFromResult(result),
+  };
+}
+
 /**
  * Options for the GridSearchOptimizer.
  */
@@ -160,6 +507,9 @@ export interface GridSearchOptions {
 
   /** How often to call progress callback (default: every combination) */
   progressInterval?: number;
+
+  /** Opt-in bootstrap-percentile selection reported beside the argmax winner. Default off. */
+  robustSelection?: RobustSelectionOptions;
 }
 
 /**
@@ -183,6 +533,12 @@ export interface OptimizationResult {
 
   /** Total execution time in milliseconds */
   executionTimeMs: number;
+
+  /**
+   * Present only when robust selection was enabled. `bestParams` above stays the argmax winner
+   * either way; this reports the percentile winner beside it, plus whether they disagree.
+   */
+  robustSelection?: RobustSelectionReport;
 }
 
 // ============================================================================
@@ -246,7 +602,8 @@ export class GridSearchOptimizer {
     options: GridSearchOptions = {}
   ): OptimizationResult {
     const startTime = Date.now();
-    const { constraint, onProgress, progressInterval = 1 } = options;
+    const { constraint, onProgress, progressInterval = 1, robustSelection } = options;
+    const robustSamples: RobustSample[] = [];
 
     // Generate all parameter combinations
     const allCombinations = this.generateCombinations(paramRanges);
@@ -285,6 +642,10 @@ export class GridSearchOptimizer {
         params,
         metrics: result.metrics,
       });
+
+      if (robustSelection?.enabled) {
+        robustSamples.push(collectRobustSample(result, params, robustSelection));
+      }
 
       // Track best result
       if (metricValue !== undefined && metricValue > bestMetricValue) {
@@ -342,6 +703,15 @@ export class GridSearchOptimizer {
       allResults,
       totalCombinations,
       executionTimeMs,
+      ...(robustSelection?.enabled
+        ? {
+            robustSelection: buildRobustSelectionReport(
+              robustSamples,
+              String(metric),
+              robustSelection
+            ),
+          }
+        : {}),
     };
   }
 

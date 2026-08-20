@@ -17,6 +17,12 @@ import type {
   ProgressCallback,
   ProgressInfo,
   OptimizationResult,
+  RobustSample,
+  RobustSelectionOptions,
+} from "./grid-search.ts";
+import {
+  buildRobustSelectionReport,
+  collectRobustSample,
 } from "./grid-search.ts";
 
 // ============================================================================
@@ -77,6 +83,9 @@ export interface RandomSearchOptions {
 
   /** Maximum attempts to find valid params per iteration (default: 100) */
   maxConstraintAttempts?: number;
+
+  /** Opt-in bootstrap-percentile selection reported beside the argmax winner. Default off. */
+  robustSelection?: RobustSelectionOptions;
 }
 
 // ============================================================================
@@ -208,7 +217,9 @@ export class RandomSearchOptimizer {
       progressInterval = 1,
       seed,
       maxConstraintAttempts = 100,
+      robustSelection,
     } = options;
+    const robustSamples: RobustSample[] = [];
 
     // Initialize RNG with seed if provided
     this.rng = new SeededRandom(seed);
@@ -250,6 +261,10 @@ export class RandomSearchOptimizer {
         params,
         metrics: result.metrics,
       });
+
+      if (robustSelection?.enabled) {
+        robustSamples.push(collectRobustSample(result, params, robustSelection));
+      }
 
       // Track best result
       if (metricValue !== undefined && metricValue > bestMetricValue) {
@@ -309,6 +324,15 @@ export class RandomSearchOptimizer {
       allResults,
       totalCombinations: allResults.length,
       executionTimeMs,
+      ...(robustSelection?.enabled
+        ? {
+            robustSelection: buildRobustSelectionReport(
+              robustSamples,
+              String(metric),
+              robustSelection
+            ),
+          }
+        : {}),
     };
   }
 

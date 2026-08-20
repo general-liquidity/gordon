@@ -49,6 +49,13 @@ export {
   type ProgressCallback,
   type GridSearchOptions,
   type OptimizationResult,
+  buildRobustSelectionReport,
+  collectRobustSample,
+  periodReturnsFromResult,
+  type RobustCandidateEvidence,
+  type RobustSample,
+  type RobustSelectionOptions,
+  type RobustSelectionReport,
 } from "./grid-search.ts";
 
 // ============================================================================
