@@ -12,6 +12,18 @@ import type { LLMClient } from "../../ai/llm/index.ts";
 import type { GordonContext } from "../types.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { emitEvent } from "../../../events/index.ts";
+import { flagEnv } from "../../config/flagResolver.ts";
+import {
+  scoreTriangularConsistency,
+  consistencyScoreOf,
+  weakestLeg,
+  formatConsistencyResult,
+  type ConsistencyLeg,
+  type EvidenceChunk,
+  type RationaleTriple,
+  type TriangularConsistencyResult,
+  type TriangularJudge,
+} from "./rationaleConsistency.ts";
 
 const logger = createModuleLogger("reflection");
 
@@ -37,6 +49,12 @@ export interface ReflectionResult {
     checksPerformed: number;
     usedLLM: boolean;
   };
+  /**
+   * Triangular evidence/reasoning/decision score for the plan rationale.
+   * Present only when GORDON_RATIONALE_CONSISTENCY is enabled and a judge
+   * was available.
+   */
+  rationaleConsistency?: TriangularConsistencyResult;
 }
 
 /**
@@ -49,6 +67,11 @@ export interface ReflectionOptions {
   minConfidence?: number;
   /** Additional context for reflection */
   additionalContext?: string;
+  /**
+   * Judge used to score the rationale triple. Defaults to one built from
+   * `context.llm`. Injectable so tests never reach the network.
+   */
+  rationaleJudge?: TriangularJudge;
 }
 
 // ============================================================================
@@ -497,6 +520,192 @@ Analyze this plan and identify any issues.`;
   }
 }
 
+// ============================================================================
+// Triangular rationale consistency (GORDON_RATIONALE_CONSISTENCY)
+// ============================================================================
+
+export const RATIONALE_CONSISTENCY_FLAG_ENV = "GORDON_RATIONALE_CONSISTENCY";
+
+/**
+ * Opt-in, unlike the default-on cognition primitives. Two reasons: the judge
+ * costs three extra LLM calls per plan reflection, and a low score can turn a
+ * plan the rule checks accepted into an invalid one. An operator who
+ * configures nothing keeps the previous reflection behaviour exactly.
+ */
+export function isRationaleConsistencyEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
+  const raw = env[RATIONALE_CONSISTENCY_FLAG_ENV];
+  return raw === "1" || raw === "true";
+}
+
+/**
+ * Mean below which the rationale counts as unsupported. Set well under 1.0 on
+ * purpose: the gate is there to catch rationales the evidence does not carry,
+ * not to demand a perfect score from a judge that has its own variance.
+ */
+export const MIN_PLAN_RATIONALE_CONSISTENCY = 0.6;
+
+const TRIANGULAR_JUDGE_SYSTEM_PROMPT =
+  "You score one relation of a trading rationale. Follow the instructions in the user message exactly and reply with JSON only.";
+
+const LegVerdictSchema = z.object({
+  score: z.number(),
+  justification: z.string().optional(),
+});
+
+/** Suggested remedy per relation. Each leg fails for a different reason. */
+const LEG_REMEDY: Record<ConsistencyLeg, string> = {
+  factuality:
+    "Cite the retrieved evidence for each claim in the reasoning, or drop the claims the evidence does not carry.",
+  deduction:
+    "State the step that takes the reasoning to this entry, stop, and size. The decision currently does not follow from it.",
+  consistency:
+    "Re-read the evidence against the decision alone. The evidence points somewhere other than this trade.",
+};
+
+/**
+ * The decision d of the triple: the plan restated as the action being
+ * justified, not the prose that justifies it.
+ */
+function planDecisionText(plan: Plan): string {
+  const takeProfit = plan.takeProfit
+    .map((tp) => `$${tp.price} (${(tp.percentToSell * 100).toFixed(0)}%)`)
+    .join(", ");
+  return [
+    `${plan.direction} ${plan.symbol} via ${plan.strategy}`,
+    `entry ${plan.entry.type} at ${plan.entry.price ?? "market"}`,
+    `stop $${plan.stopLoss.price}`,
+    takeProfit ? `take profit ${takeProfit}` : "no take profit",
+    `allocation $${plan.allocation.amount} (${(plan.allocation.percentOfPortfolio * 100).toFixed(1)}% of portfolio)`,
+  ].join("; ");
+}
+
+/**
+ * The evidence E of the triple. `synthesisManifest` is the only record of what
+ * the session actually saw at plan time, so it is the evidence the rationale
+ * has to be entailed by. A plan without one yields no evidence, which is
+ * itself the correct input: an ungrounded rationale should score low on the
+ * factuality and consistency legs.
+ */
+export function planEvidenceChunks(plan: Plan): EvidenceChunk[] {
+  const manifest = plan.synthesisManifest;
+  if (!manifest) return [];
+  const chunks: EvidenceChunk[] = [];
+
+  if (manifest.regime) {
+    chunks.push({
+      id: "regime",
+      source: `regime@${manifest.regime.timeframe}`,
+      text: `Detected regime ${manifest.regime.label} at confidence ${manifest.regime.confidence}.`,
+    });
+  }
+  if (manifest.news) {
+    const bullish = manifest.news.topBullish ? ` Most bullish: ${manifest.news.topBullish}.` : "";
+    const bearish = manifest.news.topBearish ? ` Most bearish: ${manifest.news.topBearish}.` : "";
+    chunks.push({
+      id: "news",
+      source: "news",
+      text: `${manifest.news.headlinesCount} headlines over roughly ${manifest.news.windowHoursApprox}h, net sentiment ${manifest.news.netSentiment}.${bullish}${bearish}`,
+    });
+  }
+  chunks.push({
+    id: "observations",
+    source: "session",
+    text: `${manifest.observationCount} observations recorded on ${manifest.symbol} over the preceding ${Math.round(manifest.observationWindowMs / 60000)} minutes.`,
+  });
+  if (manifest.matchedLessonIds.length > 0) {
+    chunks.push({
+      id: "lessons",
+      source: "ace",
+      text: `Prior lessons matching ${manifest.symbol}: ${manifest.matchedLessonIds.join(", ")}.`,
+    });
+  }
+  const candles = manifest.candleSnapshotRef;
+  if (candles) {
+    chunks.push({
+      id: "candles",
+      source: `${candles.venue}:${candles.symbol}`,
+      text: `${candles.barCount} ${candles.timeframe} bars from ${new Date(candles.fromTs).toISOString()} to ${new Date(candles.toTs).toISOString()}.`,
+    });
+  }
+  return chunks;
+}
+
+export function buildPlanRationaleTriple(plan: Plan): RationaleTriple {
+  return {
+    evidence: planEvidenceChunks(plan),
+    reasoning: plan.reasoning,
+    decision: planDecisionText(plan),
+  };
+}
+
+/**
+ * Judge backed by the same client `reflectOnPlanWithLLM` uses. Throwing is
+ * safe here: `scoreTriangularConsistency` converts a throw into an unscored
+ * leg rather than a passing one.
+ */
+export function createLLMTriangularJudge(llm: LLMClient): TriangularJudge {
+  return ({ prompt }) =>
+    llm.chatWithJSON(
+      [
+        { role: "system", content: TRIANGULAR_JUDGE_SYSTEM_PROMPT },
+        { role: "user", content: prompt },
+      ],
+      LegVerdictSchema,
+    );
+}
+
+/**
+ * Score a plan's rationale across the three relations. Returns null when the
+ * gate is off or no judge is available, which is the "unchanged behaviour"
+ * path, distinct from an unscored result.
+ */
+export async function scorePlanRationaleConsistency(
+  plan: Plan,
+  context: GordonContext,
+  options: ReflectionOptions = {},
+): Promise<TriangularConsistencyResult | null> {
+  if (!isRationaleConsistencyEnabled()) return null;
+  const judge = options.rationaleJudge ?? (context.llm ? createLLMTriangularJudge(context.llm) : null);
+  if (!judge) return null;
+
+  const result = await scoreTriangularConsistency(buildPlanRationaleTriple(plan), judge);
+  logger.debug("Rationale consistency scored", {
+    planId: plan.id,
+    report: formatConsistencyResult(result),
+  });
+  return result;
+}
+
+/**
+ * Fold a consistency result into reflection findings.
+ *
+ * An unscored result never produces an issue. The judge is a network call, and
+ * a judge outage is not evidence against the plan: it degrades the pass to a
+ * note. A result that WAS scored and came back low is a real finding.
+ */
+export function rationaleConsistencyFindings(
+  result: TriangularConsistencyResult,
+): { issues: string[]; suggestions: string[] } {
+  if (!result.scored) {
+    return {
+      issues: [],
+      suggestions: [
+        `Rationale consistency could not be scored (${result.reason}); recorded as ${consistencyScoreOf(result).toFixed(2)} for reporting only.`,
+      ],
+    };
+  }
+  if (result.mean >= MIN_PLAN_RATIONALE_CONSISTENCY) {
+    return { issues: [], suggestions: [] };
+  }
+  const weakest = weakestLeg(result);
+  return {
+    issues: [
+      `Rationale consistency ${result.mean.toFixed(2)} is below ${MIN_PLAN_RATIONALE_CONSISTENCY.toFixed(2)} (factuality ${result.factuality.toFixed(2)}, deduction ${result.deduction.toFixed(2)}, consistency ${result.consistency.toFixed(2)})`,
+    ],
+    suggestions: [LEG_REMEDY[weakest.leg]],
+  };
+}
+
 /**
  * Perform comprehensive reflection on a trade plan
  *
@@ -523,9 +732,23 @@ export async function reflectOnPlan(
   // Run LLM reflection for semantic analysis
   const llmResult = await reflectOnPlanWithLLM(plan, context, options);
 
+  // Score the rationale against the evidence the session actually held.
+  const consistency = await scorePlanRationaleConsistency(plan, context, options);
+  const consistencyFindings = consistency
+    ? rationaleConsistencyFindings(consistency)
+    : { issues: [], suggestions: [] };
+
   // Combine results
-  const combinedIssues = [...new Set([...ruleResult.issues, ...llmResult.issues])];
-  const combinedSuggestions = [...new Set([...ruleResult.suggestions, ...llmResult.suggestions])];
+  const combinedIssues = [
+    ...new Set([...ruleResult.issues, ...llmResult.issues, ...consistencyFindings.issues]),
+  ];
+  const combinedSuggestions = [
+    ...new Set([
+      ...ruleResult.suggestions,
+      ...llmResult.suggestions,
+      ...consistencyFindings.suggestions,
+    ]),
+  ];
   const combinedConfidence = (ruleResult.confidence + llmResult.confidence) / 2;
 
   const result: ReflectionResult = {
@@ -535,9 +758,13 @@ export async function reflectOnPlan(
     confidence: combinedConfidence,
     metadata: {
       durationMs: Date.now() - startTime,
-      checksPerformed: (ruleResult.metadata?.checksPerformed ?? 0) + (llmResult.metadata?.checksPerformed ?? 0),
+      checksPerformed:
+        (ruleResult.metadata?.checksPerformed ?? 0) +
+        (llmResult.metadata?.checksPerformed ?? 0) +
+        (consistency ? 1 : 0),
       usedLLM: true,
     },
+    ...(consistency ? { rationaleConsistency: consistency } : {}),
   };
 
   await emitReflectionEvent(plan, result, "combined");
