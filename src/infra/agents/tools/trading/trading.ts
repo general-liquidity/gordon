@@ -638,6 +638,8 @@ export const executePlanTool = createTool({
       }, { toolName: "execute_plan" });
     }
 
+    let wipSlotClaimed = false;
+    let wipSlotCommitted = false;
     if (isWipLimitEnabled()) {
       const wipGate = gateSessionPlan(plan.symbol, plan.strategy);
       if (!wipGate.allowed) {
@@ -660,7 +662,16 @@ export const executePlanTool = createTool({
           error: wipGate.message,
         }, { toolName: "execute_plan" });
       }
+      // Claim the slot here, not after submit: gate and claim run with no
+      // await between them, so a concurrent execute_plan on the same symbol
+      // observes the slot already taken instead of passing the same gate.
+      activateSessionPlan(planId, plan.symbol, plan.strategy);
+      wipSlotClaimed = true;
     }
+
+    // The claim above must be released on every exit path below, including a
+    // throw, unless execution actually took the slot (wipSlotCommitted).
+    try {
 
     recordStructuredObservation({
       eventType: "execution.rationale_recorded",
@@ -1240,6 +1251,7 @@ export const executePlanTool = createTool({
       deactivateSessionPlan(planId);
     } else {
       activateSessionPlan(planId, plan.symbol, plan.strategy);
+      wipSlotCommitted = true;
     }
 
     if (isTerminationLayersEnabled()) {
@@ -1428,6 +1440,10 @@ export const executePlanTool = createTool({
       success: false,
       error: result.error,
     }, { toolName: "execute_plan" });
+
+    } finally {
+      if (wipSlotClaimed && !wipSlotCommitted) deactivateSessionPlan(planId);
+    }
   },
 });
 
