@@ -1,17 +1,17 @@
 {
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "The Frontier Trading Agent",
   "homepage": "https://gordoncli.com",
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/general-liquidity/gordon/releases/download/v0.3.1/gordon-windows-x64.exe",
-      "hash": "d1a88136013b8238629aab9a90d963fb99cb15bcf31fb62f2aacf1fe1055b668",
+      "url": "https://github.com/general-liquidity/gordon/releases/download/v0.3.2/gordon-windows-x64.exe",
+      "hash": "4b5fa8a780d30f8b5575d570de7e58b4de4bbc7ed39100e13ef20530e2123b0c",
       "pre_install": "Rename-Item -Path \"$dir\\gordon-windows-x64.exe\" -NewName \"gordon.exe\" -ErrorAction SilentlyContinue"
     },
     "arm64": {
-      "url": "https://github.com/general-liquidity/gordon/releases/download/v0.3.1/gordon-windows-arm64.exe",
-      "hash": "cb35bba81144b9c276023747997a790e5faf266be13292ad71a90acf52dd60ed",
+      "url": "https://github.com/general-liquidity/gordon/releases/download/v0.3.2/gordon-windows-arm64.exe",
+      "hash": "7d63dc321bec0ae131af73bbeebf86f2f1eae972cc2b2119da90ebf8d045f4bb",
       "pre_install": "Rename-Item -Path \"$dir\\gordon-windows-arm64.exe\" -NewName \"gordon.exe\" -ErrorAction SilentlyContinue"
     }
   },
@@ -22,10 +22,10 @@
   "autoupdate": {
     "architecture": {
       "64bit": {
-        "url": "https://github.com/general-liquidity/gordon/releases/download/v0.3.1/gordon-windows-x64.exe"
+        "url": "https://github.com/general-liquidity/gordon/releases/download/v0.3.2/gordon-windows-x64.exe"
       },
       "arm64": {
-        "url": "https://github.com/general-liquidity/gordon/releases/download/v0.3.1/gordon-windows-arm64.exe"
+        "url": "https://github.com/general-liquidity/gordon/releases/download/v0.3.2/gordon-windows-arm64.exe"
       }
     }
   }
