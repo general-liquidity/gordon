@@ -1,4 +1,5 @@
 import { describe, it, expect } from "bun:test";
+import * as agentReadiness from "./agentReadiness.ts";
 import {
   checkAgentReadiness,
   isAgentReadinessEnabled,
@@ -6,6 +7,15 @@ import {
 } from "./agentReadiness.ts";
 
 describe("agentReadiness", () => {
+  it("exposes no override flag", () => {
+    // GORDON_AGENT_READINESS_OVERRIDE overrode nothing: with no gate to
+    // bypass it only suppressed the doctor rows, which is what leaving
+    // GORDON_AGENT_READINESS_GATE off already does.
+    const names = Object.keys(agentReadiness);
+    expect(names).not.toContain("isAgentReadinessOverridden");
+    expect(names).not.toContain("AGENT_READINESS_OVERRIDE_ENV");
+  });
+
   it("is disabled by default", () => {
     const env = { ...process.env };
     delete env[AGENT_READINESS_FLAG_ENV];

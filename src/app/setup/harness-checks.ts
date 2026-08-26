@@ -47,7 +47,6 @@ import type { DoctorCheck } from "./setup-runtime.ts";
 import {
   checkAgentReadiness,
   isAgentReadinessEnabled,
-  isAgentReadinessOverridden,
 } from "../../infra/diagnostics/agentReadiness.ts";
 import { checkEnvStatus } from "../../infra/storage/config/env.ts";
 
@@ -334,10 +333,10 @@ export function collectClaudeMdLintChecks(_repoRoot: string = process.cwd()): Do
   return [];
 }
 
-// --- Agent readiness gate ----------------------------------------------------
+// --- Agent readiness report rows ---------------------------------------------
 
 export async function collectAgentReadinessChecks(): Promise<DoctorCheck[]> {
-  if (!isAgentReadinessEnabled() || isAgentReadinessOverridden()) return [];
+  if (!isAgentReadinessEnabled()) return [];
   const env = await checkEnvStatus();
   const result = checkAgentReadiness({ hasLlmKey: env.hasLLMKey });
   if (result.ready) {
@@ -346,7 +345,7 @@ export async function collectAgentReadinessChecks(): Promise<DoctorCheck[]> {
         id: "agent_readiness",
         ok: true,
         severity: "info",
-        message: "Agent readiness gate passed.",
+        message: "Agent readiness conditions all pass.",
       },
     ];
   }
@@ -355,7 +354,7 @@ export async function collectAgentReadinessChecks(): Promise<DoctorCheck[]> {
       id: "agent_readiness",
       ok: false,
       severity: "error",
-      message: result.blockingMessage ?? "Agent readiness gate failed.",
+      message: result.blockingMessage ?? "Agent readiness conditions failed.",
     },
     ...result.conditions
       .filter((c) => !c.ok)

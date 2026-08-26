@@ -4,8 +4,9 @@
  * Lightweight boot-time checks. NOT a gate despite the flag name: the sole
  * consumer is `collectAgentReadinessChecks` in app/setup/harness-checks.ts,
  * which turns the result into doctor report rows. Nothing blocks agent
- * spawn on a failing condition, and `GORDON_AGENT_READINESS_OVERRIDE`
- * suppresses the rows rather than overriding a block.
+ * spawn on a failing condition. There was a `GORDON_AGENT_READINESS_OVERRIDE`
+ * flag here; with no gate to override it only suppressed the rows, which is
+ * exactly what leaving the readiness flag off already does.
  *
  * Conditions are only listed here when they are actually probed. A
  * condition that cannot be verified does not belong in the list — an
@@ -18,7 +19,6 @@ import { join } from "node:path";
 import { flagEnv } from "../config/flagResolver.ts";
 
 export const AGENT_READINESS_FLAG_ENV = "GORDON_AGENT_READINESS_GATE";
-export const AGENT_READINESS_OVERRIDE_ENV = "GORDON_AGENT_READINESS_OVERRIDE";
 
 export interface ReadinessCondition {
   id: string;
@@ -40,10 +40,6 @@ export interface ReadinessResult {
 
 export function isAgentReadinessEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   return env[AGENT_READINESS_FLAG_ENV] === "1" || env[AGENT_READINESS_FLAG_ENV] === "true";
-}
-
-export function isAgentReadinessOverridden(env: NodeJS.ProcessEnv = flagEnv()): boolean {
-  return env[AGENT_READINESS_OVERRIDE_ENV] === "1" || env[AGENT_READINESS_OVERRIDE_ENV] === "true";
 }
 
 export function checkAgentReadiness(inputs: ReadinessInputs = {}): ReadinessResult {

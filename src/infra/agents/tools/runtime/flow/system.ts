@@ -648,7 +648,8 @@ const KEEPER_FLAGS = [
   },
   {
     name: "GORDON_AGENT_READINESS_GATE",
-    description: "Boot-time readiness checks before agent spawn.",
+    description:
+      "Adds boot-time readiness rows to the doctor report. Not a gate: nothing blocks agent spawn on a failing condition.",
     truthy: ["1", "true"],
     defaultOn: false,
   },
