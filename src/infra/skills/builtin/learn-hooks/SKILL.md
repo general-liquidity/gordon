@@ -24,6 +24,12 @@ Hooks let you inject custom rules at key points in Gordon's lifecycle. They're h
 | **PreOrderPlacement** | Before trade execution | Final risk check, size adjustment |
 | **PostOrderPlacement** | After trade executes | Record outcome, update journal |
 
+Only **PreOrderPlacement** and **PostOrderPlacement** have production emit
+sites today. The other points are declared but never reached, so a hook
+registered there never runs; `/doctor` reports registrations at an unemitted
+point as a finding. Use the order-placement points for anything that must
+actually fire.
+
 ## Hook Actions
 
 Each hook can return:
