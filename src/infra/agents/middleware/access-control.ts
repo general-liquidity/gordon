@@ -77,6 +77,11 @@ function operationContextFor(toolName: string): TradingOperationContext {
  * Non-trade tools always pass. Trade tools delegate to checkTradingPermission
  * which knows the truth table across all 6 modes (auto/ask/strict/paper/
  * observe/plan).
+ *
+ * A null config fails CLOSED for gated tools. First run is not this case:
+ * loadConfig() writes and returns a default config when no file exists, so
+ * null here means the config could not be read, and an unreadable config
+ * carries no permissionMode to honour.
  */
 export async function checkToolAccess(
   toolName: string,
@@ -84,9 +89,15 @@ export async function checkToolAccess(
   userId: string = "system",
   options: { sandboxActive?: boolean } = {},
 ): Promise<AccessControlResult> {
-  if (!config) return { allowed: true };
   if (!TRADING_TOOLS.has(toolName) && !STATE_MODIFYING_TOOLS.has(toolName)) {
     return { allowed: true };
+  }
+
+  if (!config) {
+    const reason = `Tool ${toolName} blocked — configuration unavailable, permission mode cannot be determined`;
+    safeAuditBlocked(userId, { toolName, permissionMode: null }, reason);
+    logger.warn("Tool blocked — config unavailable", { toolName, userId });
+    return { allowed: false, reason };
   }
 
   const operation = operationContextFor(toolName);
@@ -110,7 +121,10 @@ export async function checkToolAccess(
 
 export function createAccessControlMiddleware(userId: string) {
   return async (toolName: string): Promise<AccessControlResult> => {
-    const config = await loadConfig().catch(() => null);
+    const config = await loadConfig().catch((err) => {
+      logger.error("Config load failed — access control failing closed", err instanceof Error ? err : new Error(String(err)));
+      return null;
+    });
     return checkToolAccess(toolName, config, userId);
   };
 }

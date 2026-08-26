@@ -89,4 +89,25 @@ describe("checkToolAccess", () => {
     const result = await checkToolAccess("place_order", createConfig("ask"), "test-user");
     expect(result.allowed).toBe(true);
   });
+
+  it("blocks trade tools when config is unavailable", async () => {
+    const result = await checkToolAccess("place_order", null, "test-user");
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain("configuration unavailable");
+  });
+
+  it("blocks state-modifying tools when config is unavailable", async () => {
+    const result = await checkToolAccess("approve_plan", null, "test-user");
+    expect(result.allowed).toBe(false);
+  });
+
+  it("blocks withdrawals when config is unavailable", async () => {
+    const result = await checkToolAccess("withdraw_to_external", null, "test-user");
+    expect(result.allowed).toBe(false);
+  });
+
+  it("still allows non-gated tools when config is unavailable", async () => {
+    const result = await checkToolAccess("get_market_data", null, "test-user");
+    expect(result.allowed).toBe(true);
+  });
 });
