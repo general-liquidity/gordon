@@ -9,7 +9,10 @@ const IBKR_CAPABILITIES: BrokerCapabilities = {
   supportsShortSelling: true,
   supportsOptions: true,
   supportsStreaming: true,
-  supportsPaperTrading: true,
+  // The IBKR gateway is a local bridge: paper versus live is decided by which
+  // account was logged into it, which the adapter cannot observe. There is no
+  // paper endpoint to route to, so this adapter cannot offer a paper guarantee.
+  supportsPaperTrading: false,
   supportsHistoricalBars: false,
 };
 
@@ -20,8 +23,9 @@ const IBKR_CONFIG: RestBrokerAdapterConfig = {
   displayName: "Interactive Brokers",
   capabilities: IBKR_CAPABILITIES,
   authStyle: "none",
+  // No defaultPaperBaseUrl: both used to resolve to the same gateway URL, which
+  // presented a paper/live distinction the transport does not have.
   defaultLiveBaseUrl: process.env.IBKR_GATEWAY_URL ?? IBKR_DEFAULT_URL,
-  defaultPaperBaseUrl: process.env.IBKR_GATEWAY_URL ?? IBKR_DEFAULT_URL,
   accountDiscoveryPaths: [
     "/v1/api/iserver/accounts",
   ],
