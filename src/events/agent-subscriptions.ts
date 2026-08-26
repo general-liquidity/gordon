@@ -551,16 +551,29 @@ export function createDefaultSubscriptions(
             const psychTilt = Number(process.env.GORDON_PSYCHOLOGICAL_TILT_USD ?? 0);
             const equityHwm = Number(process.env.GORDON_EQUITY_HIGH_WATER_MARK_USD ?? 0);
             const baseR = Number(process.env.GORDON_BASE_R_PER_TRADE_USD ?? 0);
+            // Loss budgets are measured from the equity the day opened at, not
+            // from wherever equity happens to sit now. Absent that anchor the
+            // budgets are unusable, so those two barriers stay inactive.
+            const dayStartEquity = Number(process.env.GORDON_DAY_START_EQUITY_USD ?? 0);
             if (currentEquity > 0) {
-              const barriers = distanceToBarriers({
+              // R-units are undefined without an R, so the distance barriers
+              // are skipped rather than defaulted. The terminal fold below is
+              // measured in fractions of capital and runs regardless.
+              const barriers = baseR > 0 ? distanceToBarriers({
                 currentEquity,
                 equityHighWaterMark: equityHwm > 0 ? equityHwm : undefined,
-                dailyLossBudgetUsd: dailyLossBudget > 0 ? dailyLossBudget : undefined,
+                dailyLoss:
+                  dailyLossBudget > 0 && dayStartEquity > 0
+                    ? { windowStartEquityUsd: dayStartEquity, budgetUsd: dailyLossBudget }
+                    : undefined,
                 propFirmTrailingDdUsd: propFirmTrailingDd > 0 ? propFirmTrailingDd : undefined,
-                psychologicalTiltUsd: psychTilt > 0 ? psychTilt : undefined,
-                baseRiskPerTradeUsd: baseR > 0 ? baseR : undefined,
-              });
-              const trailingWouldBlock = shouldBlockNewTrades(barriers);
+                psychologicalTilt:
+                  psychTilt > 0 && dayStartEquity > 0
+                    ? { windowStartEquityUsd: dayStartEquity, budgetUsd: psychTilt }
+                    : undefined,
+                baseRiskPerTradeUsd: baseR,
+              }) : null;
+              const trailingWouldBlock = barriers !== null && shouldBlockNewTrades(barriers);
               // The trailing barrier forgives a recover-and-lose-again path, so
               // the inception-referenced fold is evaluated alongside it and the
               // gate is the union: either one blocking blocks.
@@ -586,10 +599,11 @@ export function createDefaultSubscriptions(
                 wouldBlock ? "failure" : "info",
                 {
                   planId: e.planId,
-                  nearest: barriers.nearest,
-                  nearestRUnits: Number.isFinite(barriers.nearestRUnits)
-                    ? Number(barriers.nearestRUnits.toFixed(2))
-                    : null,
+                  nearest: barriers?.nearest ?? null,
+                  nearestRUnits:
+                    barriers && Number.isFinite(barriers.nearestRUnits)
+                      ? Number(barriers.nearestRUnits.toFixed(2))
+                      : null,
                   trailingWouldBlock,
                   terminalTripped: terminal?.tripped ?? null,
                   terminalBoundBy: terminal?.boundBy ?? null,

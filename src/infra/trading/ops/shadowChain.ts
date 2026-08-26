@@ -285,12 +285,22 @@ export function runShadowChain(input: ShadowPlanInput): ShadowPlanResult {
   const dailyLossBudget = Number(process.env.GORDON_RISK_DAILY_LOSS_USD ?? 0);
   const psychTilt = Number(process.env.GORDON_PSYCHOLOGICAL_TILT_USD ?? 0);
   const baseR = sizer?.finalDollarRisk ?? Number(process.env.GORDON_BASE_R_PER_TRADE_USD ?? 0);
+  // Both budgets are losses FROM the day's opening equity. Anchoring them to
+  // current equity would put the trigger a fixed budget below wherever the
+  // account already is, so neither could ever be reached.
+  const dayStartEquity = Number(process.env.GORDON_DAY_START_EQUITY_USD ?? 0);
   let barriers: BarriersResult | null = null;
   if (currentEquity > 0 && baseR > 0) {
     barriers = distanceToBarriers({
       currentEquity,
-      dailyLossBudgetUsd: dailyLossBudget > 0 ? dailyLossBudget : undefined,
-      psychologicalTiltUsd: psychTilt > 0 ? psychTilt : undefined,
+      dailyLoss:
+        dailyLossBudget > 0 && dayStartEquity > 0
+          ? { windowStartEquityUsd: dayStartEquity, budgetUsd: dailyLossBudget }
+          : undefined,
+      psychologicalTilt:
+        psychTilt > 0 && dayStartEquity > 0
+          ? { windowStartEquityUsd: dayStartEquity, budgetUsd: psychTilt }
+          : undefined,
       baseRiskPerTradeUsd: baseR,
     });
   }

@@ -42,7 +42,7 @@ describe("distanceToBarriers — broker", () => {
   it("computes distance via daily loss budget", () => {
     const r = distanceToBarriers({
       currentEquity: 100_000,
-      dailyLossBudgetUsd: 3000,
+      dailyLoss: { windowStartEquityUsd: 100_000, budgetUsd: 3000 },
       baseRiskPerTradeUsd: 1000,
     });
     const broker = r.barriers.find((b) => b.kind === "broker")!;
@@ -55,11 +55,70 @@ describe("distanceToBarriers — broker", () => {
     const r = distanceToBarriers({
       currentEquity: 100_000,
       maintenanceMarginEquity: 80_000,
-      dailyLossBudgetUsd: 5000,
+      dailyLoss: { windowStartEquityUsd: 100_000, budgetUsd: 5000 },
       baseRiskPerTradeUsd: 1000,
     });
     const broker = r.barriers.find((b) => b.kind === "broker")!;
     expect(broker.dollarsToBarrier).toBe(5000);
+  });
+});
+
+describe("distanceToBarriers — loss budgets are anchored, not floating", () => {
+  // Anchoring a budget to CURRENT equity put the trigger the same distance
+  // below the operator at every moment: the distance stayed equal to the
+  // budget forever and neither barrier could fire. These pin the anchor.
+
+  it("daily-loss distance shrinks as the day's loss accrues", () => {
+    const read = (equity: number) =>
+      distanceToBarriers({
+        currentEquity: equity,
+        dailyLoss: { windowStartEquityUsd: 100_000, budgetUsd: 2000 },
+        baseRiskPerTradeUsd: 500,
+      }).barriers.find((b) => b.kind === "broker")!;
+
+    expect(read(100_000).dollarsToBarrier).toBe(2000);
+    expect(read(99_000).dollarsToBarrier).toBe(1000);
+    expect(read(98_100).dollarsToBarrier).toBe(100);
+    // Old behaviour: every one of these read 2000 / 4R / "warn".
+    expect(read(98_100).rUnitsToBarrier).toBeCloseTo(0.2, 9);
+    expect(read(98_100).alertLevel).toBe("critical");
+  });
+
+  it("daily-loss barrier can actually be breached", () => {
+    const r = distanceToBarriers({
+      currentEquity: 97_000,
+      dailyLoss: { windowStartEquityUsd: 100_000, budgetUsd: 2000 },
+      baseRiskPerTradeUsd: 500,
+    });
+    const broker = r.barriers.find((b) => b.kind === "broker")!;
+    expect(broker.triggerEquity).toBe(98_000);
+    expect(broker.dollarsToBarrier).toBe(-1000);
+    expect(broker.alertLevel).toBe("breached");
+    expect(shouldBlockNewTrades(r)).toBe(true);
+  });
+
+  it("psychological tilt is measured from the session open, not from now", () => {
+    const r = distanceToBarriers({
+      currentEquity: 96_000,
+      psychologicalTilt: { windowStartEquityUsd: 100_000, budgetUsd: 5000 },
+      baseRiskPerTradeUsd: 1000,
+    });
+    const psych = r.barriers.find((b) => b.kind === "psychological")!;
+    expect(psych.triggerEquity).toBe(95_000);
+    expect(psych.dollarsToBarrier).toBe(1000);
+    expect(psych.alertLevel).toBe("critical");
+  });
+
+  it("rejects a missing R unit instead of falling back to $1 per R", () => {
+    // baseR of 1 made rUnits equal dollars, so a $2,000 distance read 2000R
+    // and classified "ok". Every barrier was permanently ok.
+    expect(() =>
+      distanceToBarriers({
+        currentEquity: 100_000,
+        maintenanceMarginEquity: 98_000,
+        baseRiskPerTradeUsd: 0,
+      }),
+    ).toThrow();
   });
 });
 
@@ -104,7 +163,7 @@ describe("distanceToBarriers — psychological tilt", () => {
   it("uses operator-supplied tilt amount", () => {
     const r = distanceToBarriers({
       currentEquity: 100_000,
-      psychologicalTiltUsd: 5000,
+      psychologicalTilt: { windowStartEquityUsd: 100_000, budgetUsd: 5000 },
       baseRiskPerTradeUsd: 1000,
     });
     const psych = r.barriers.find((b) => b.kind === "psychological")!;
@@ -115,7 +174,7 @@ describe("distanceToBarriers — psychological tilt", () => {
   });
 
   it("inactive when no tilt point provided (no universal formula)", () => {
-    const r = distanceToBarriers({ currentEquity: 100_000 });
+    const r = distanceToBarriers({ currentEquity: 100_000, baseRiskPerTradeUsd: 1000 });
     expect(r.barriers.find((b) => b.kind === "psychological")!.active).toBe(false);
   });
 });
@@ -127,7 +186,7 @@ describe("distanceToBarriers — nearest selection", () => {
       maintenanceMarginEquity: 90_000,
       equityHighWaterMark: 102_000,
       propFirmTrailingDdUsd: 5000,
-      psychologicalTiltUsd: 8000,
+      psychologicalTilt: { windowStartEquityUsd: 100_000, budgetUsd: 8000 },
       baseRiskPerTradeUsd: 1000,
     });
     // broker = 10R, prop = 3R, psych = 8R
@@ -136,7 +195,7 @@ describe("distanceToBarriers — nearest selection", () => {
   });
 
   it("nearest is null when no barriers are active", () => {
-    const r = distanceToBarriers({ currentEquity: 100_000 });
+    const r = distanceToBarriers({ currentEquity: 100_000, baseRiskPerTradeUsd: 1000 });
     expect(r.nearest).toBeNull();
     expect(r.nearestRUnits).toBe(Number.POSITIVE_INFINITY);
   });
@@ -158,7 +217,7 @@ describe("alert levels", () => {
     for (const [rUnits, expected] of cases) {
       const r = distanceToBarriers({
         currentEquity: 100_000,
-        dailyLossBudgetUsd: rUnits * 1000,
+        dailyLoss: { windowStartEquityUsd: 100_000, budgetUsd: rUnits * 1000 },
         baseRiskPerTradeUsd: 1000,
       });
       expect(r.barriers.find((b) => b.kind === "broker")!.alertLevel).toBe(expected as "ok");
@@ -170,7 +229,7 @@ describe("shouldBlockNewTrades", () => {
   it("blocks at warn or worse", () => {
     const r = distanceToBarriers({
       currentEquity: 100_000,
-      dailyLossBudgetUsd: 1500,
+      dailyLoss: { windowStartEquityUsd: 100_000, budgetUsd: 1500 },
       baseRiskPerTradeUsd: 1000,
     });
     expect(shouldBlockNewTrades(r)).toBe(true);
@@ -179,7 +238,7 @@ describe("shouldBlockNewTrades", () => {
   it("allows at watch level", () => {
     const r = distanceToBarriers({
       currentEquity: 100_000,
-      dailyLossBudgetUsd: 7000,
+      dailyLoss: { windowStartEquityUsd: 100_000, budgetUsd: 7000 },
       baseRiskPerTradeUsd: 1000,
     });
     expect(shouldBlockNewTrades(r)).toBe(false);
@@ -190,7 +249,7 @@ describe("barriersToPayload", () => {
   it("emits only active barriers and stable shape", () => {
     const r = distanceToBarriers({
       currentEquity: 100_000,
-      dailyLossBudgetUsd: 3000,
+      dailyLoss: { windowStartEquityUsd: 100_000, budgetUsd: 3000 },
       baseRiskPerTradeUsd: 1000,
     });
     const p = barriersToPayload(r) as {

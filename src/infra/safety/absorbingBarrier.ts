@@ -40,6 +40,27 @@ export type BarrierKind = "broker" | "prop_firm" | "psychological";
 
 export type AlertLevel = "ok" | "watch" | "warn" | "critical" | "breached";
 
+/**
+ * A loss allowance and the equity it is measured FROM.
+ *
+ * The two travel together because a budget alone does not locate a barrier.
+ * Subtracting a budget from CURRENT equity puts the trigger the same distance
+ * below the operator at every moment, so the distance to the barrier is
+ * permanently equal to the budget and the barrier can never be reached: a
+ * $2,000 daily cap read 4R away at $100,000 equity and still read 4R away at
+ * $97,000, having already been blown through by $1,000. The anchor is what
+ * makes the distance shrink as the loss accrues.
+ */
+export interface LossBudget {
+  /**
+   * Equity at the start of the window this budget is measured over: today's
+   * open for a daily cap, the session open for a tilt threshold.
+   */
+  windowStartEquityUsd: number;
+  /** Dollars of loss from `windowStartEquityUsd` that exhausts the budget. */
+  budgetUsd: number;
+}
+
 export interface BarrierInput {
   currentEquity: number;
   /**
@@ -53,20 +74,26 @@ export interface BarrierInput {
    * to current) wins.
    */
   maintenanceMarginEquity?: number;
-  /** Alternative broker expression: dollars of intraday loss allowed today. */
-  dailyLossBudgetUsd?: number;
+  /**
+   * Alternative broker expression: intraday loss allowed today, measured
+   * from today's opening equity.
+   */
+  dailyLoss?: LossBudget;
   /** Trailing drawdown allowance vs high-water mark (prop-firm style). */
   propFirmTrailingDdUsd?: number;
   /**
-   * Operator-set tilt threshold — the loss dollar amount where decision
-   * quality collapses. Personal, no universal formula.
+   * Operator-set tilt threshold — the loss where decision quality collapses,
+   * measured from the equity the session opened at. Personal, no universal
+   * formula.
    */
-  psychologicalTiltUsd?: number;
+  psychologicalTilt?: LossBudget;
   /**
-   * Base R unit (typical per-trade dollar risk) used to translate
-   * dollar distance into R-units. Defaults to 1 if unknown.
+   * Base R unit (typical per-trade dollar risk) used to translate dollar
+   * distance into R-units. Required: a default of 1 silently turns the
+   * R-unit ladder that `classifyAlert` reads into a dollar ladder, and every
+   * realistic dollar distance then lands in the "ok" band.
    */
-  baseRiskPerTradeUsd?: number;
+  baseRiskPerTradeUsd: number;
 }
 
 export interface BarrierDistance {
@@ -126,14 +153,18 @@ function makeDistance(
 }
 
 export function distanceToBarriers(input: BarrierInput): BarriersResult {
-  const baseR = input.baseRiskPerTradeUsd ?? 1;
+  const baseR = input.baseRiskPerTradeUsd;
+  if (!(baseR > 0)) {
+    throw new Error("baseRiskPerTradeUsd must be positive: R-units are undefined without it");
+  }
 
   let brokerTrigger: number | null = null;
   if (input.maintenanceMarginEquity !== undefined) {
     brokerTrigger = input.maintenanceMarginEquity;
   }
-  if (input.dailyLossBudgetUsd !== undefined) {
-    const dailyTrigger = input.currentEquity - input.dailyLossBudgetUsd;
+  if (input.dailyLoss !== undefined) {
+    const dailyTrigger =
+      input.dailyLoss.windowStartEquityUsd - input.dailyLoss.budgetUsd;
     brokerTrigger = brokerTrigger === null ? dailyTrigger : Math.max(brokerTrigger, dailyTrigger);
   }
 
@@ -146,8 +177,8 @@ export function distanceToBarriers(input: BarrierInput): BarriersResult {
   }
 
   const psychTrigger =
-    input.psychologicalTiltUsd !== undefined
-      ? input.currentEquity - input.psychologicalTiltUsd
+    input.psychologicalTilt !== undefined
+      ? input.psychologicalTilt.windowStartEquityUsd - input.psychologicalTilt.budgetUsd
       : null;
 
   const barriers: BarrierDistance[] = [
