@@ -10,6 +10,19 @@ called out explicitly, whatever their size.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-08-26
+
+### Fixed
+
+- Backtest signals can now attach absolute stop-loss and take-profit prices to
+  both classic and grid positions. The engine validates that each level lies
+  on the exposure-reducing side of the actual slipped entry, and the existing
+  stop/target branches are now reachable through a real run instead of only by
+  direct helper tests.
+- Protective backtest exits apply slippage exactly once. Their trigger and
+  adverse fill are computed separately, and an already-priced fallback is no
+  longer passed through the generic exit slippage a second time.
+
 ## [0.3.1] - 2026-08-26
 
 ### Fixed
