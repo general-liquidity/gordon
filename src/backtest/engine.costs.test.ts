@@ -36,11 +36,7 @@ function params(overrides: Partial<BacktestEngineParams> = {}): BacktestEnginePa
 const entryExitStrategy = {
   id: "cost-test",
   name: "cost-test",
-  generateSignal(
-    bar: OHLC,
-    _indicators: unknown,
-    position: Position | null,
-  ): Signal | null {
+  generateSignal(bar: OHLC, _indicators: unknown, position: Position | null): Signal | null {
     if (!position && bar.close === 100) {
       return { type: "BUY", price: bar.close, timestamp: bar.timestamp, reason: "entry" };
     }
@@ -78,11 +74,7 @@ describe("commission accounting", () => {
 const buyAndHoldStrategy = {
   id: "hold-test",
   name: "hold-test",
-  generateSignal(
-    bar: OHLC,
-    _indicators: unknown,
-    position: Position | null,
-  ): Signal | null {
+  generateSignal(bar: OHLC, _indicators: unknown, position: Position | null): Signal | null {
     if (!position && bar.close === 100) {
       return { type: "BUY", price: bar.close, timestamp: bar.timestamp, reason: "entry" };
     }
@@ -146,11 +138,7 @@ const gridHoldStrategy = {
 const shortHoldStrategy = {
   id: "short-hold-test",
   name: "short-hold-test",
-  generateSignal(
-    bar: OHLC,
-    _indicators: unknown,
-    position: Position | null,
-  ): Signal | null {
+  generateSignal(bar: OHLC, _indicators: unknown, position: Position | null): Signal | null {
     if (!position && bar.close === 100) {
       return { type: "SELL", price: bar.close, timestamp: bar.timestamp, reason: "short entry" };
     }
@@ -221,6 +209,16 @@ describe("capital change equals the sum of trade netPnL", () => {
     // a flat 0 while the curve stopped one movement short.
     expect(last.drawdown).toBeCloseTo(11, 6);
     expect(result.metrics.maxDrawdown).toBeGreaterThan(0);
+  });
+});
+
+describe("open grid equity", () => {
+  test("charges entry commission once, at entry", () => {
+    const result = new BacktestEngine(params()).run(gridHoldStrategy, bars([100, 100]));
+    // The grid level uses half the fixed $10,000 allocation: $5,000 plus a $5
+    // entry fee leaves $94,995 cash and a $5,000 position. The old grid-only
+    // mark subtracted that same $5 fee again and reported $99,990.
+    expect(result.equityCurve[0]!.equity).toBeCloseTo(99_995, 8);
   });
 });
 

@@ -12,7 +12,10 @@ import { z } from "zod";
 
 import { riskKernel } from "../../../../core/risk-kernel/index.ts";
 import { PortfolioContextBuilder } from "../../../../core/risk-kernel/portfolio-context.ts";
-import type { OpenPosition, PortfolioContext } from "../../../../core/risk-kernel/portfolio-context.ts";
+import type {
+  OpenPosition,
+  PortfolioContext,
+} from "../../../../core/risk-kernel/portfolio-context.ts";
 import { loadConfigFromEnv } from "../../../../core/risk-kernel/config.ts";
 import {
   concentrationCapFromRiskConfig,
@@ -35,7 +38,11 @@ import { createModuleLogger } from "../../../logger/index.ts";
 import { evaluateBaselineCircuitBreakers } from "../../../../gateway/circuit-breakers/index.ts";
 import { computeCircuitBreakerLiveData } from "../../../../gateway/circuit-breakers/data-provider.ts";
 import { evaluateConsensus } from "../../../../core/consensus/protocol.ts";
-import type { TradeProposal, ConsensusResult, AgentVote } from "../../../../core/consensus/protocol.ts";
+import type {
+  TradeProposal,
+  ConsensusResult,
+  AgentVote,
+} from "../../../../core/consensus/protocol.ts";
 
 const logger = createModuleLogger("risk-gate");
 
@@ -103,7 +110,10 @@ function buildSafetyState(
 ): SafetyState {
   const bySymbol = new Map<string, number>();
   for (const position of portfolio.openPositions) {
-    bySymbol.set(position.symbol, (bySymbol.get(position.symbol) ?? 0) + signedNotionalOf(position));
+    bySymbol.set(
+      position.symbol,
+      (bySymbol.get(position.symbol) ?? 0) + signedNotionalOf(position),
+    );
   }
 
   const currentNotionalUsd = bySymbol.get(symbol) ?? 0;
@@ -181,20 +191,9 @@ export async function evaluateOrderRisk(
 ): Promise<{ approved: boolean; quantity: number; reason: string; warnings: string[] }> {
   const warnings: string[] = [];
 
-  // -- Build OrderRequest ------------------------------------------------
-  const orderRequest: OrderRequest = {
-    symbol: order.symbol,
-    side: order.side.toLowerCase() as "buy" | "sell",
-    type: order.type.toLowerCase().replace("-", "_") as "market" | "limit" | "stop_limit",
-    quantity: order.quantity,
-    price: order.price,
-    exchangeId: ctx.exchange?.exchangeId ?? "unknown",
-    agentId: agentId ?? "executor",
-  };
-
   // -- Build PortfolioContext --------------------------------------------
   const builder = new PortfolioContextBuilder();
-  let portfolioContext;
+  let portfolioContext: PortfolioContext | undefined;
 
   if (ctx.exchange) {
     try {
@@ -224,6 +223,53 @@ export async function evaluateOrderRisk(
       warnings: ["No exchange or broker adapter available. Risk kernel evaluation blocked."],
     };
   }
+
+  // A market order still has a dollar size. The kernel and the safety
+  // projection cannot evaluate it from quantity alone when the symbol is not
+  // already held, so resolve a conservative executable-side quote here at the
+  // common gate rather than relying on every dispatch site to remember one.
+  let referencePrice = order.price;
+  if (
+    !(typeof referencePrice === "number" && Number.isFinite(referencePrice) && referencePrice > 0)
+  ) {
+    try {
+      if (ctx.exchange) {
+        referencePrice = await ctx.exchange.getPrice(order.symbol);
+      } else if (ctx.broker) {
+        const quote = await ctx.broker.getLatestQuote(order.symbol);
+        referencePrice = order.side.toLowerCase() === "sell" ? quote.bidPrice : quote.askPrice;
+      }
+    } catch (err) {
+      logger.warn("Could not resolve a market-order reference price", {
+        symbol: order.symbol,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  if (
+    !(typeof referencePrice === "number" && Number.isFinite(referencePrice) && referencePrice > 0)
+  ) {
+    return {
+      approved: false,
+      quantity: order.quantity,
+      reason: `Rejected: no positive reference price is available for ${order.symbol}.`,
+      warnings: [
+        "Market-order risk and notional checks cannot run without an executable-side price.",
+      ],
+    };
+  }
+
+  // -- Build OrderRequest ------------------------------------------------
+  const orderRequest: OrderRequest = {
+    symbol: order.symbol,
+    side: order.side.toLowerCase() as "buy" | "sell",
+    type: order.type.toLowerCase().replace("-", "_") as "market" | "limit" | "stop_limit",
+    quantity: order.quantity,
+    price: referencePrice,
+    exchangeId: ctx.exchange?.exchangeId ?? ctx.broker?.brokerId ?? "unknown",
+    agentId: agentId ?? "executor",
+  };
 
   // Baseline circuit breakers (Phase 0 fail-safe controls)
   const runtime = StrategyRuntime.getInstance();
@@ -272,8 +318,7 @@ export async function evaluateOrderRisk(
   // A paper-mode override is only meaningful where fills are simulated. The
   // condition used to be negated, so the override fired EXCLUSIVELY on live
   // venues — exactly where the kernel must not be short-circuited.
-  const modeOverride =
-    envRiskMode === "paper" && sandboxActive ? ("paper" as const) : undefined;
+  const modeOverride = envRiskMode === "paper" && sandboxActive ? ("paper" as const) : undefined;
 
   // -- Evaluate ----------------------------------------------------------
   const decision = await riskKernel.evaluate(orderRequest, portfolioContext, {
@@ -301,13 +346,15 @@ export async function evaluateOrderRisk(
   // -- Safety projection --------------------------------------------------
   // Runs on the kernel's own output, so the projection can only move the order
   // further inside the feasible set, never back out of it.
-  const referencePrice =
-    order.price ??
-    portfolioContext.openPositions.find((p) => p.symbol === order.symbol)?.currentPrice;
   const drawdownBaseUsd =
     portfolioContext.peakEquity > 0 ? portfolioContext.peakEquity : portfolioContext.totalEquity;
 
-  if (!referencePrice || referencePrice <= 0 || portfolioContext.totalEquity <= 0 || quantity <= 0) {
+  if (
+    !referencePrice ||
+    referencePrice <= 0 ||
+    portfolioContext.totalEquity <= 0 ||
+    quantity <= 0
+  ) {
     warnings.push(
       "Safety projection skipped: no reference price or equity available for this order. Risk kernel result left unchanged.",
     );
@@ -421,13 +468,18 @@ export const checkRiskTool = createTool({
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair symbol, e.g. BTCUSDT"),
     side: z.enum(["BUY", "SELL"]).describe("Order side: BUY or SELL"),
-    type: z.enum(["MARKET", "LIMIT", "STOP_LIMIT"]).describe("type: order type — MARKET, LIMIT, or STOP_LIMIT"),
+    type: z
+      .enum(["MARKET", "LIMIT", "STOP_LIMIT"])
+      .describe("type: order type — MARKET, LIMIT, or STOP_LIMIT"),
     quantity: z.number().describe("Order quantity in base asset"),
     price: z.number().optional().describe("Limit price (required for LIMIT/STOP_LIMIT)"),
     slotId: z.string().optional().describe("Strategy slot ID for consensus evaluation"),
     playbookName: z.string().optional().describe("Playbook name for consensus evaluation"),
     stopLoss: z.number().optional().describe("Stop loss price for consensus evaluation"),
-    takeProfit: z.array(z.number()).optional().describe("Take profit prices for consensus evaluation"),
+    takeProfit: z
+      .array(z.number())
+      .optional()
+      .describe("Take profit prices for consensus evaluation"),
   }),
   execute: async (input, execContext?: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
@@ -487,16 +539,19 @@ export const checkRiskTool = createTool({
         originalQuantity: input.quantity,
         adjustedQuantity: result.quantity,
         sizeAdjusted: result.quantity !== input.quantity,
-        reason: consensus && consensus.decision === "REJECTED"
-          ? `Consensus rejected (score: ${consensus.score.toFixed(2)}): ${consensus.dissenting_agents.join(", ")}`
-          : result.reason,
+        reason:
+          consensus && consensus.decision === "REJECTED"
+            ? `Consensus rejected (score: ${consensus.score.toFixed(2)}): ${consensus.dissenting_agents.join(", ")}`
+            : result.reason,
         warnings: result.warnings,
-        consensus: consensus ? {
-          decision: consensus.decision,
-          score: consensus.score,
-          quorumMet: consensus.quorum_met,
-          dissenting: consensus.dissenting_agents,
-        } : undefined,
+        consensus: consensus
+          ? {
+              decision: consensus.decision,
+              score: consensus.score,
+              quorumMet: consensus.quorum_met,
+              dissenting: consensus.dissenting_agents,
+            }
+          : undefined,
       };
     } catch (err) {
       logger.error("check_risk tool failed", err as Error);

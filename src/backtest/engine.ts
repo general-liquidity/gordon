@@ -101,11 +101,7 @@ export function protectiveOrderPrices(
 interface BacktestableStrategy {
   id: string;
   name: string;
-  generateSignal(
-    bar: OHLC,
-    indicators: IndicatorState,
-    position: Position | null
-  ): Signal | null;
+  generateSignal(bar: OHLC, indicators: IndicatorState, position: Position | null): Signal | null;
   kellyParams?: {
     winRate: number;
     avgWin: number;
@@ -191,7 +187,7 @@ export class BacktestEngine {
   run(
     strategy: BacktestableStrategy | Strategy,
     data: OHLC[],
-    strategyParams?: ParameterSet
+    strategyParams?: ParameterSet,
   ): BacktestEngineResult {
     const adjustedStrategy = this.applyStrategyParams(strategy, strategyParams);
     // Reset state for fresh run
@@ -299,7 +295,7 @@ export class BacktestEngine {
     bar: OHLC,
     index: number,
     data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal {
     if ("generateSignal" in strategy && typeof strategy.generateSignal === "function") {
       const generator = strategy.generateSignal as (...args: unknown[]) => Signal | null;
@@ -393,10 +389,14 @@ export class BacktestEngine {
   private flushPendingSignals(bar: OHLC): void {
     if (this.pendingSignals.length === 0) return;
 
-    const dueSignals = this.pendingSignals.filter((pending) => pending.executeAtBar <= this.currentBarIndex);
+    const dueSignals = this.pendingSignals.filter(
+      (pending) => pending.executeAtBar <= this.currentBarIndex,
+    );
     if (dueSignals.length === 0) return;
 
-    this.pendingSignals = this.pendingSignals.filter((pending) => pending.executeAtBar > this.currentBarIndex);
+    this.pendingSignals = this.pendingSignals.filter(
+      (pending) => pending.executeAtBar > this.currentBarIndex,
+    );
     for (const pending of dueSignals) {
       const executionSignal: Signal = {
         ...pending.signal,
@@ -422,21 +422,21 @@ export class BacktestEngine {
 
     if (signal.type === "BUY") {
       // Close any short grid positions on reversal
-      const shortGridPositions = this.gridPositions.filter(p => p.side === "SHORT");
+      const shortGridPositions = this.gridPositions.filter((p) => p.side === "SHORT");
       for (const pos of shortGridPositions) {
         this.closeGridPosition(pos, signal.price || bar.close, bar, "SIGNAL_REVERSAL");
       }
 
       // Check if we already have a position at this exact grid level
       const existingAtLevel = this.gridPositions.find(
-        p => p.gridLevel === signal.gridLevel && p.side === "LONG"
+        (p) => p.gridLevel === signal.gridLevel && p.side === "LONG",
       );
       if (existingAtLevel) {
         return; // Already have this grid level filled
       }
 
       // Check if we've reached max grid positions
-      const longGridCount = this.gridPositions.filter(p => p.side === "LONG").length;
+      const longGridCount = this.gridPositions.filter((p) => p.side === "LONG").length;
       if (longGridCount >= maxPos) {
         return; // At capacity
       }
@@ -446,14 +446,14 @@ export class BacktestEngine {
       if (signal.gridLevel !== undefined) {
         // Close the specific grid level if it exists
         const matchingPos = this.gridPositions.find(
-          p => p.gridLevel === signal.gridLevel && p.side === "LONG"
+          (p) => p.gridLevel === signal.gridLevel && p.side === "LONG",
         );
         if (matchingPos) {
           this.closeGridPosition(matchingPos, signal.price || bar.close, bar, "SIGNAL_EXIT");
         }
       } else {
         // No specific grid level — close ALL long grid positions
-        const longGridPositions = [...this.gridPositions.filter(p => p.side === "LONG")];
+        const longGridPositions = [...this.gridPositions.filter((p) => p.side === "LONG")];
         for (const pos of longGridPositions) {
           this.closeGridPosition(pos, signal.price || bar.close, bar, "SIGNAL_EXIT");
         }
@@ -461,7 +461,7 @@ export class BacktestEngine {
 
       // Open short grid positions if allowed
       if (this.params.allowShorts && signal.gridLevel !== undefined) {
-        const shortGridCount = this.gridPositions.filter(p => p.side === "SHORT").length;
+        const shortGridCount = this.gridPositions.filter((p) => p.side === "SHORT").length;
         if (shortGridCount < maxPos) {
           this.openGridPosition("SHORT", signal.price || bar.close, bar, signal.gridLevel!);
         }
@@ -480,7 +480,7 @@ export class BacktestEngine {
     side: "LONG" | "SHORT",
     price: number,
     bar: OHLC,
-    gridLevel: number
+    gridLevel: number,
   ): void {
     // Apply slippage (book-walked when a fill model is configured).
     // Position size divides equally among max grid positions so total exposure
@@ -489,7 +489,7 @@ export class BacktestEngine {
       price,
       side === "LONG" ? "BUY" : "SELL",
       bar,
-      (p) => this.calculatePositionSize(p) / this.maxGridPositions
+      (p) => this.calculatePositionSize(p) / this.maxGridPositions,
     );
     if (!entry) {
       return; // Book held no liquidity for this side
@@ -549,18 +549,12 @@ export class BacktestEngine {
   /**
    * Close a specific grid position.
    */
-  private closeGridPosition(
-    pos: Position,
-    price: number,
-    bar: OHLC,
-    reason: string
-  ): void {
+  private closeGridPosition(pos: Position, price: number, bar: OHLC, reason: string): void {
     // Apply slippage (opposite direction, book-walked when a fill model is configured)
     const exitSide = pos.side === "LONG" ? "SELL" : "BUY";
     const exitFill = this.bookFill(price, exitSide, pos.quantity, bar, "estimate");
-    const slippedPrice = exitFill && !exitFill.estimated
-      ? exitFill.price
-      : this.applySlippage(price, exitSide);
+    const slippedPrice =
+      exitFill && !exitFill.estimated ? exitFill.price : this.applySlippage(price, exitSide);
 
     // Calculate P&L
     const positionValue = pos.quantity * slippedPrice;
@@ -629,7 +623,7 @@ export class BacktestEngine {
   private openPosition(side: "LONG" | "SHORT", price: number, bar: OHLC): void {
     // Apply slippage (book-walked when a fill model is configured)
     const entry = this.resolveEntryFill(price, side === "LONG" ? "BUY" : "SELL", bar, (p) =>
-      this.calculatePositionSize(p)
+      this.calculatePositionSize(p),
     );
     if (!entry) {
       return; // Book held no liquidity for this side
@@ -699,9 +693,8 @@ export class BacktestEngine {
     // Apply slippage (opposite direction, book-walked when a fill model is configured)
     const exitSide = this.position.side === "LONG" ? "SELL" : "BUY";
     const exitFill = this.bookFill(price, exitSide, this.position.quantity, bar, "estimate");
-    const slippedPrice = exitFill && !exitFill.estimated
-      ? exitFill.price
-      : this.applySlippage(price, exitSide);
+    const slippedPrice =
+      exitFill && !exitFill.estimated ? exitFill.price : this.applySlippage(price, exitSide);
 
     // Calculate P&L
     const positionValue = this.position.quantity * slippedPrice;
@@ -839,12 +832,13 @@ export class BacktestEngine {
       case "FIXED_AMOUNT":
         return Math.min(
           this.params.fixedAmount || 1000,
-          this.capital * 0.95 // Never use more than 95%
+          this.capital * 0.95, // Never use more than 95%
         );
 
-      case "FIXED_PERCENT":
+      case "FIXED_PERCENT": {
         const percent = this.params.fixedPercent || 0.1;
         return this.capital * percent;
+      }
 
       case "KELLY":
         return this.calculateKellySize();
@@ -920,7 +914,7 @@ export class BacktestEngine {
     referencePrice: number,
     side: "BUY" | "SELL",
     bar: OHLC,
-    sizeAt: (price: number) => number
+    sizeAt: (price: number) => number,
   ): { price: number; value: number } | null {
     const flatPrice = this.applySlippage(referencePrice, side);
     if (!this.fillConfig) {
@@ -936,7 +930,10 @@ export class BacktestEngine {
     if (!fill || fill.filledQuantity <= 0) {
       return null;
     }
-    return { price: fill.price, value: Math.min(sizeAt(fill.price), fill.filledQuantity * fill.price) };
+    return {
+      price: fill.price,
+      value: Math.min(sizeAt(fill.price), fill.filledQuantity * fill.price),
+    };
   }
 
   /**
@@ -957,7 +954,7 @@ export class BacktestEngine {
     side: "BUY" | "SELL",
     quantity: number,
     bar: OHLC,
-    partialPolicy: "fill" | "estimate"
+    partialPolicy: "fill" | "estimate",
   ): BookFill | null {
     if (!this.fillConfig) return null;
 
@@ -999,9 +996,11 @@ export class BacktestEngine {
   }
 
   private getExecutionRate(): number {
-    return (this.params.slippageRate ?? 0)
-      + ((this.params.spreadRate ?? 0) / 2)
-      + (this.params.marketImpactRate ?? 0);
+    return (
+      (this.params.slippageRate ?? 0) +
+      (this.params.spreadRate ?? 0) / 2 +
+      (this.params.marketImpactRate ?? 0)
+    );
   }
 
   // ============================================================================
@@ -1027,13 +1026,15 @@ export class BacktestEngine {
       }
     }
 
-    // Add all grid positions' value (subtract entry commission like the single-position path)
+    // Add all grid positions' value. Entry commission was already removed
+    // from `capital` when each position opened; subtracting it again here made
+    // every open grid level pay the entry fee twice in the equity curve.
     for (const pos of this.gridPositions) {
       const positionValue = pos.quantity * bar.close;
       if (pos.side === "LONG") {
-        equity += positionValue - pos.entryCommission;
+        equity += positionValue;
       } else {
-        equity += pos.quantity * pos.entryPrice + pos.unrealizedPnL - pos.entryCommission;
+        equity += pos.quantity * pos.entryPrice + pos.unrealizedPnL;
       }
     }
 
@@ -1074,10 +1075,10 @@ export class BacktestEngine {
    * Pre-calculate all common indicators for the entire dataset.
    */
   private precalculateIndicators(data: OHLC[]): IndicatorArrays {
-    const closes = data.map(bar => bar.close);
+    const closes = data.map((bar) => bar.close);
 
     // Convert OHLC to Candle format for ATR
-    const candles: Candle[] = data.map(bar => ({
+    const candles: Candle[] = data.map((bar) => ({
       open: bar.open,
       high: bar.high,
       low: bar.low,
@@ -1179,7 +1180,7 @@ export class BacktestEngine {
    */
   private applyStrategyParams(
     strategy: BacktestableStrategy | Strategy,
-    params?: ParameterSet
+    params?: ParameterSet,
   ): BacktestableStrategy | Strategy {
     if (!params || Object.keys(params).length === 0) {
       return strategy;
@@ -1213,13 +1214,14 @@ export class BacktestEngine {
   private buildResult(
     strategyId: string,
     data: OHLC[],
-    finalPositionClosed: boolean = false
+    finalPositionClosed: boolean = false,
   ): BacktestEngineResult {
     // Calculate final capital from equity curve
     const lastEquityPoint = this.equityCurve[this.equityCurve.length - 1];
-    const finalCapital = this.equityCurve.length > 0 && lastEquityPoint
-      ? lastEquityPoint.equity
-      : this.params.initialCapital;
+    const finalCapital =
+      this.equityCurve.length > 0 && lastEquityPoint
+        ? lastEquityPoint.equity
+        : this.params.initialCapital;
 
     // Calculate metrics
     const metrics = this.calculateMetrics(finalCapital);
@@ -1273,7 +1275,7 @@ export function runBacktest(
   strategy: BacktestableStrategy | Strategy,
   data: OHLC[],
   params?: Partial<BacktestParams>,
-  strategyParams?: ParameterSet
+  strategyParams?: ParameterSet,
 ): BacktestEngineResult {
   const fullParams: BacktestParams = {
     ...DEFAULT_BACKTEST_PARAMS,

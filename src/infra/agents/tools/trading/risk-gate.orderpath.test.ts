@@ -19,6 +19,7 @@ import {
   FEE_TRANCHE_SIZE_ENV,
 } from "./risk-gate.ts";
 import type { GordonContext } from "../types.ts";
+import type { BrokerAdapter } from "../../../broker/types.ts";
 
 const EQUITY_USD = 10_000;
 const PRICE_USD = 1_000;
@@ -35,15 +36,40 @@ function contextWith(options: { cashUsd: number; holdings?: StubBalance[] }): Go
     isSandbox: true,
     getFullAccountDetails: async () => ({
       totalUsdtValue: EQUITY_USD,
-      nonZeroBalances: [
-        { asset: "USDT", total: options.cashUsd },
-        ...holdings,
-      ],
+      nonZeroBalances: [{ asset: "USDT", total: options.cashUsd }, ...holdings],
     }),
     getBalance: async (asset: string) => (asset === "USDT" ? options.cashUsd : 0),
     getPrice: async () => PRICE_USD,
   };
   return { exchange, broker: null } as unknown as GordonContext;
+}
+
+function brokerContextWith(quote: { bidPrice: number; askPrice: number }): GordonContext {
+  const broker = {
+    brokerId: "alpaca",
+    isPaper: true,
+    getAccount: async () => ({
+      id: "paper-account",
+      status: "ACTIVE",
+      currency: "USD",
+      cash: 6_000,
+      buyingPower: 6_000,
+      portfolioValue: EQUITY_USD,
+      patternDayTrader: false,
+      shortingEnabled: true,
+      tradingBlocked: false,
+    }),
+    getPositions: async () => [],
+    getLatestQuote: async (symbol: string) => ({
+      symbol,
+      bidPrice: quote.bidPrice,
+      bidSize: 100,
+      askPrice: quote.askPrice,
+      askSize: 100,
+      timestamp: new Date().toISOString(),
+    }),
+  } as unknown as BrokerAdapter;
+  return { exchange: null, broker } as unknown as GordonContext;
 }
 
 /** Kernel-approved at $500 on a $10k account with $6k of cash and nothing held. */
@@ -167,14 +193,48 @@ describe("evaluateOrderRisk order path", () => {
     expect(result.reason).toContain("portfolio context unavailable");
   });
 
-  test("no reference price leaves the kernel verdict alone and says so", async () => {
+  test("a new-symbol market order obtains a reference price before risk evaluation", async () => {
     const result = await evaluateOrderRisk(
       { symbol: "BTCUSDT", side: "BUY", type: "MARKET", quantity: 0.5 },
       contextWith({ cashUsd: 6_000 }),
     );
 
+    expect(result.approved).toBe(true);
     expect(result.quantity).toBe(0.5);
-    expect(result.warnings.join(" | ")).toContain("Safety projection skipped");
+    expect(result.warnings.join(" | ")).not.toContain("Safety projection skipped");
+  });
+
+  test("a market order fails closed when its venue cannot provide a price", async () => {
+    const ctx = contextWith({ cashUsd: 6_000 });
+    (ctx.exchange as unknown as { getPrice: () => Promise<number> }).getPrice = async () =>
+      Number.NaN;
+    const result = await evaluateOrderRisk(
+      { symbol: "NEWUSDT", side: "BUY", type: "MARKET", quantity: 0.5 },
+      ctx,
+    );
+
+    expect(result.approved).toBe(false);
+    expect(result.reason).toContain("no positive reference price");
+  });
+
+  test("a broker buy uses the executable ask quote in the common risk gate", async () => {
+    const result = await evaluateOrderRisk(
+      { symbol: "AAPL", side: "BUY", type: "MARKET", quantity: 5 },
+      brokerContextWith({ bidPrice: 99, askPrice: 100 }),
+    );
+
+    expect(result.approved).toBe(true);
+    expect(result.warnings.join(" | ")).not.toContain("Safety projection skipped");
+  });
+
+  test("a broker sell uses the executable bid and fails closed on an invalid quote", async () => {
+    const result = await evaluateOrderRisk(
+      { symbol: "AAPL", side: "SELL", type: "MARKET", quantity: 5 },
+      brokerContextWith({ bidPrice: Number.NaN, askPrice: 100 }),
+    );
+
+    expect(result.approved).toBe(false);
+    expect(result.reason).toContain("no positive reference price");
   });
 
   test("the gate never hands back more size than was asked for", async () => {

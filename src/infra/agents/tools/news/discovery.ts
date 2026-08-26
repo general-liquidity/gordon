@@ -70,12 +70,7 @@ export const getTrendingTokensTool = createTool({
       .min(0)
       .default(5)
       .describe("Minimum absolute price change % (default: 5%)"),
-    limit: z
-      .number()
-      .min(1)
-      .max(50)
-      .default(20)
-      .describe("Max results to return"),
+    limit: z.number().min(1).max(50).default(20).describe("Max results to return"),
     direction: z
       .enum(["gainers", "losers", "both"])
       .default("gainers")
@@ -86,30 +81,40 @@ export const getTrendingTokensTool = createTool({
     venueRoute: z.enum(["exchange", "broker"]).optional(),
     capabilities: cryptoDiscoveryCapabilitySchema.optional(),
     direction: z.string().optional(),
-    filters: z.object({
-      minVolume: z.number(),
-      minPriceChange: z.number(),
-    }).optional(),
+    filters: z
+      .object({
+        minVolume: z.number(),
+        minPriceChange: z.number(),
+      })
+      .optional(),
     count: z.number().optional(),
-    tokens: z.array(z.object({
-      rank: z.number(),
-      symbol: z.string(),
-      price: z.string(),
-      change24h: z.string(),
-      volume24h: z.string(),
-      high24h: z.number(),
-      low24h: z.number(),
-    })).optional(),
+    tokens: z
+      .array(
+        z.object({
+          rank: z.number(),
+          symbol: z.string(),
+          price: z.string(),
+          change24h: z.string(),
+          volume24h: z.string(),
+          high24h: z.number(),
+          low24h: z.number(),
+        }),
+      )
+      .optional(),
     message: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ minVolume, minPriceChange, limit, direction }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { minVolume, minPriceChange, limit, direction },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (ctx?.broker && !ctx?.exchange) {
       return {
         marketFamily: "stocks" as const,
         venueRoute: "broker" as const,
-        error: "Trending token discovery requires a crypto venue with 24h ticker coverage. Use /analyze <ticker> for stock-specific workflows.",
+        error:
+          "Trending token discovery requires a crypto venue with 24h ticker coverage. Use /analyze <ticker> for stock-specific workflows.",
       };
     }
     if (!ctx?.exchange) {
@@ -120,10 +125,23 @@ export const getTrendingTokensTool = createTool({
       const tickers = await ctx.exchange.get24hrTickers();
       // Backfill the markdown ticker registry from whatever the exchange
       // actually surfaces — base asset before the USDT/USDC/... suffix.
-      registerSymbols(tickers.map((t) => t.symbol.replace(/(USDT|USDC|FDUSD|TUSD|BUSD|USD|EUR|GBP|JPY)$/, "")));
+      registerSymbols(
+        tickers.map((t) => t.symbol.replace(/(USDT|USDC|FDUSD|TUSD|BUSD|USD|EUR|GBP|JPY)$/, "")),
+      );
 
       // Skip leveraged tokens and stablecoins
-      const skipPatterns = ["UP", "DOWN", "BEAR", "BULL", "USDC", "BUSD", "TUSD", "USDP", "FDUSD", "DAI"];
+      const skipPatterns = [
+        "UP",
+        "DOWN",
+        "BEAR",
+        "BULL",
+        "USDC",
+        "BUSD",
+        "TUSD",
+        "USDP",
+        "FDUSD",
+        "DAI",
+      ];
 
       const filtered = tickers
         .filter((t) => {
@@ -226,12 +244,7 @@ export const getHighVolumeTokensTool = createTool({
       .min(0)
       .default(10000000)
       .describe("Minimum 24h volume in USDT (default: 10M)"),
-    limit: z
-      .number()
-      .min(1)
-      .max(50)
-      .default(20)
-      .describe("Max results to return"),
+    limit: z.number().min(1).max(50).default(20).describe("Max results to return"),
   }),
   outputSchema: z.object({
     marketFamily: z.enum(["crypto", "stocks"]).optional(),
@@ -239,14 +252,18 @@ export const getHighVolumeTokensTool = createTool({
     capabilities: cryptoDiscoveryCapabilitySchema.optional(),
     minVolume: z.string().optional(),
     count: z.number().optional(),
-    tokens: z.array(z.object({
-      rank: z.number(),
-      symbol: z.string(),
-      price: z.string(),
-      volume24h: z.string(),
-      change24h: z.string(),
-      trades24h: z.string(),
-    })).optional(),
+    tokens: z
+      .array(
+        z.object({
+          rank: z.number(),
+          symbol: z.string(),
+          price: z.string(),
+          volume24h: z.string(),
+          change24h: z.string(),
+          trades24h: z.string(),
+        }),
+      )
+      .optional(),
     message: z.string().optional(),
     error: z.string().optional(),
   }),
@@ -256,7 +273,8 @@ export const getHighVolumeTokensTool = createTool({
       return {
         marketFamily: "stocks" as const,
         venueRoute: "broker" as const,
-        error: "High-volume token discovery requires a crypto venue with market-wide ticker coverage. Use /analyze <ticker> for stock-specific workflows.",
+        error:
+          "High-volume token discovery requires a crypto venue with market-wide ticker coverage. Use /analyze <ticker> for stock-specific workflows.",
       };
     }
     if (!ctx?.exchange) {
@@ -267,7 +285,9 @@ export const getHighVolumeTokensTool = createTool({
       const tickers = await ctx.exchange.get24hrTickers();
       // Backfill the markdown ticker registry from whatever the exchange
       // actually surfaces — base asset before the USDT/USDC/... suffix.
-      registerSymbols(tickers.map((t) => t.symbol.replace(/(USDT|USDC|FDUSD|TUSD|BUSD|USD|EUR|GBP|JPY)$/, "")));
+      registerSymbols(
+        tickers.map((t) => t.symbol.replace(/(USDT|USDC|FDUSD|TUSD|BUSD|USD|EUR|GBP|JPY)$/, "")),
+      );
 
       // Skip leveraged tokens
       const skipPatterns = ["UP", "DOWN", "BEAR", "BULL"];
@@ -355,29 +375,30 @@ export const getAvailableMarketsTool = createTool({
       .string()
       .default("")
       .describe("Filter by quote asset (e.g., 'USDT', 'BTC'). Empty for all."),
-    limit: z
-      .number()
-      .min(1)
-      .max(100)
-      .default(50)
-      .describe("Max results to return"),
+    limit: z.number().min(1).max(100).default(50).describe("Max results to return"),
   }),
   outputSchema: z.object({
-    filters: z.object({
-      baseAsset: z.string(),
-      quoteAsset: z.string(),
-    }).optional(),
+    filters: z
+      .object({
+        baseAsset: z.string(),
+        quoteAsset: z.string(),
+      })
+      .optional(),
     totalAvailable: z.number().optional(),
     showing: z.number().optional(),
-    markets: z.array(z.object({
-      symbol: z.string(),
-      baseAsset: z.string(),
-      quoteAsset: z.string(),
-      tickSize: z.string(),
-      minQty: z.string(),
-      stepSize: z.string(),
-      minNotional: z.string(),
-    })).optional(),
+    markets: z
+      .array(
+        z.object({
+          symbol: z.string(),
+          baseAsset: z.string(),
+          quoteAsset: z.string(),
+          tickSize: z.string(),
+          minQty: z.string(),
+          stepSize: z.string(),
+          minNotional: z.string(),
+        }),
+      )
+      .optional(),
     message: z.string().optional(),
     error: z.string().optional(),
   }),
@@ -390,7 +411,9 @@ export const getAvailableMarketsTool = createTool({
     try {
       const exchangeInfo = await ctx.exchange.getExchangeInfo();
 
-      let symbols = exchangeInfo.symbols.filter((s) => s.status === "TRADING" && s.isSpotTradingAllowed);
+      let symbols = exchangeInfo.symbols.filter(
+        (s) => s.status === "TRADING" && s.isSpotTradingAllowed,
+      );
 
       // Apply filters
       if (baseAsset) {
@@ -404,9 +427,15 @@ export const getAvailableMarketsTool = createTool({
 
       // Get price filter info for each symbol
       const markets = symbols.slice(0, limit).map((s) => {
-        const priceFilter = s.filters.find((f) => f.filterType === "PRICE_FILTER") as { tickSize?: string } | undefined;
-        const lotFilter = s.filters.find((f) => f.filterType === "LOT_SIZE") as { minQty?: string; stepSize?: string } | undefined;
-        const notionalFilter = s.filters.find((f) => f.filterType === "NOTIONAL" || f.filterType === "MIN_NOTIONAL") as { minNotional?: string; notional?: string } | undefined;
+        const priceFilter = s.filters.find((f) => f.filterType === "PRICE_FILTER") as
+          | { tickSize?: string }
+          | undefined;
+        const lotFilter = s.filters.find((f) => f.filterType === "LOT_SIZE") as
+          | { minQty?: string; stepSize?: string }
+          | undefined;
+        const notionalFilter = s.filters.find(
+          (f) => f.filterType === "NOTIONAL" || f.filterType === "MIN_NOTIONAL",
+        ) as { minNotional?: string; notional?: string } | undefined;
 
         return {
           symbol: s.symbol,
@@ -459,36 +488,48 @@ export const placeBracketOrderTool = createTool({
   outputSchema: z.object({
     success: z.boolean().optional(),
     message: z.string().optional(),
-    entry: z.object({
-      orderId: z.number(),
-      status: z.string(),
-      filledQty: z.number(),
-      avgPrice: z.number(),
-    }).optional(),
-    exits: z.object({
-      ocoOrderListId: z.number(),
-      status: z.string(),
-      takeProfit: z.number(),
-      stopLoss: z.number(),
-      orders: z.array(z.object({
+    entry: z
+      .object({
         orderId: z.number(),
-      })),
-    }).optional(),
+        status: z.string(),
+        filledQty: z.number(),
+        avgPrice: z.number(),
+      })
+      .optional(),
+    exits: z
+      .object({
+        ocoOrderListId: z.number(),
+        status: z.string(),
+        takeProfit: z.number(),
+        stopLoss: z.number(),
+        orders: z.array(
+          z.object({
+            orderId: z.number(),
+          }),
+        ),
+      })
+      .optional(),
     symbol: z.string().optional(),
     side: z.string().optional(),
     quantity: z.number().optional(),
     stopLossPrice: z.number().optional(),
     takeProfitPrice: z.number().optional(),
     error: z.string().optional(),
-    entryOrder: z.object({
-      orderId: z.number(),
-      symbol: z.string(),
-      status: z.string(),
-      executedQty: z.string(),
-      cummulativeQuoteQty: z.string(),
-    }).passthrough().optional(),
+    entryOrder: z
+      .object({
+        orderId: z.number(),
+        symbol: z.string(),
+        status: z.string(),
+        executedQty: z.string(),
+        cummulativeQuoteQty: z.string(),
+      })
+      .passthrough()
+      .optional(),
   }),
-  execute: async ({ symbol, side, quantity, stopLossPrice, takeProfitPrice }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, side, quantity, stopLossPrice, takeProfitPrice },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -506,7 +547,9 @@ export const placeBracketOrderTool = createTool({
           takeProfitPrice,
         };
       }
-      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", {
+        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper,
+      });
       if (!check.allowed) {
         return {
           error: check.reason ?? "Placing bracket orders not permitted under current mode",
@@ -517,7 +560,9 @@ export const placeBracketOrderTool = createTool({
           takeProfitPrice,
         };
       }
-      const consent = requireLiveConsent({ sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper ?? false });
+      const consent = requireLiveConsent({
+        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper ?? false,
+      });
       if (!consent.ok) {
         return {
           error: consent.reason ?? "Live-trading consent required.",
@@ -538,10 +583,17 @@ export const placeBracketOrderTool = createTool({
       const riskResult = await evaluateOrderRisk(
         { symbol: normalizedSymbol, side, type: "MARKET", quantity, price: undefined },
         ctx,
-        "executor"
+        "executor",
       );
       if (!riskResult.approved) {
-        return { error: `Risk check rejected: ${riskResult.reason}`, symbol, side, quantity, stopLossPrice, takeProfitPrice };
+        return {
+          error: `Risk check rejected: ${riskResult.reason}`,
+          symbol,
+          side,
+          quantity,
+          stopLossPrice,
+          takeProfitPrice,
+        };
       }
       // Use risk-adjusted quantity if modified
       if (riskResult.quantity !== quantity) {
@@ -660,29 +712,48 @@ export const placeMarketOrderTool = createTool({
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'USDCUSDT')"),
     side: z.enum(["BUY", "SELL"]).describe("BUY or SELL"),
-    quantity: z.number().positive().optional().describe("Quantity of the base asset to trade (e.g., 0.5 BTC). Use this OR quoteOrderQty, not both."),
-    quoteOrderQty: z.number().positive().optional().describe("Amount of quote asset to spend (e.g., 54 USDC). Use this OR quantity, not both."),
+    quantity: z
+      .number()
+      .positive()
+      .optional()
+      .describe(
+        "Quantity of the base asset to trade (e.g., 0.5 BTC). Use this OR quoteOrderQty, not both.",
+      ),
+    quoteOrderQty: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Amount of quote asset to spend (e.g., 54 USDC). Use this OR quantity, not both."),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
     message: z.string().optional(),
-    order: z.object({
-      orderId: z.number(),
-      symbol: z.string(),
-      side: z.string(),
-      status: z.string(),
-      executedQty: z.number(),
-      cummulativeQuoteQty: z.number(),
-      avgPrice: z.number(),
-    }).optional(),
+    order: z
+      .object({
+        orderId: z.number(),
+        symbol: z.string(),
+        side: z.string(),
+        status: z.string(),
+        executedQty: z.number(),
+        cummulativeQuoteQty: z.number(),
+        avgPrice: z.number(),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, side, quantity, quoteOrderQty }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, side, quantity, quoteOrderQty },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange && !ctx?.broker) {
       return errors.noExchange;
     }
-    const plan = await planActionExecution("trading.market_order", { symbol, side, quantity, quoteOrderQty }, ctx);
+    const plan = await planActionExecution(
+      "trading.market_order",
+      { symbol, side, quantity, quoteOrderQty },
+      ctx,
+    );
     if (!plan.ready) {
       return {
         error: formatActionPlanMarkdown(plan),
@@ -690,32 +761,39 @@ export const placeMarketOrderTool = createTool({
     }
 
     const instrument = await resolveInstrument(ctx, symbol);
-    const normalizedSymbol = typeof plan.preview?.symbol === "string"
-      ? String(plan.preview.symbol)
-      : instrument.normalizedSymbol;
+    const normalizedSymbol =
+      typeof plan.preview?.symbol === "string"
+        ? String(plan.preview.symbol)
+        : instrument.normalizedSymbol;
 
     // Permission gate — blocks strict/observe/plan/paper for real execution
     {
       const killBlock = checkKillSwitchForOrder(ctx, { instrument: normalizedSymbol });
       if (killBlock.blocked) return { error: killBlock.error };
-      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", {
+        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper,
+      });
       if (!check.allowed) {
         return { error: check.reason ?? "Market order not permitted under current mode" };
       }
-      const consent = requireLiveConsent({ sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper ?? false });
+      const consent = requireLiveConsent({
+        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper ?? false,
+      });
       if (!consent.ok) {
         return { error: consent.reason ?? "Live-trading consent required." };
       }
     }
 
-    // Risk gate: evaluate order before placement (crypto execution only today)
-    if (instrument.route === "exchange" && quantity && quantity > 0) {
+    // Risk gate: both exchange and broker routes cross the same money-path
+    // boundary. The common evaluator resolves exchange prices or executable-
+    // side broker quotes before calculating notional risk.
+    if (quantity && quantity > 0) {
       try {
         const { evaluateOrderRisk } = await import("../trading/risk-gate.ts");
         const riskResult = await evaluateOrderRisk(
           { symbol: normalizedSymbol, side, type: "MARKET", quantity },
           ctx,
-          "executor"
+          "executor",
         );
         if (!riskResult.approved) {
           return { error: `Risk check rejected: ${riskResult.reason}` };
@@ -839,7 +917,10 @@ export const previewMarketOrderTool = createTool({
     quoteOrderQty: z.number().positive().optional().describe("Quote asset amount to spend"),
   }),
   outputSchema: marketOrderPlanOutputSchema,
-  execute: async ({ symbol, side, quantity, quoteOrderQty }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, side, quantity, quoteOrderQty },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     const normalizedSymbol = normalizeCryptoSymbol(symbol);
     if (!ctx) {
@@ -857,17 +938,28 @@ export const previewMarketOrderTool = createTool({
           side,
         },
       });
-      return { error: "Context not available.", ready: false, summary: "Context not available.", blockers: ["Context not available."] };
+      return {
+        error: "Context not available.",
+        ready: false,
+        summary: "Context not available.",
+        blockers: ["Context not available."],
+      };
     }
 
     try {
-      const plan = await planActionExecution("trading.preview_market_order", { symbol, side, quantity, quoteOrderQty }, ctx);
-      const previewDetails = plan.preview && typeof plan.preview === "object"
-        ? plan.preview as Record<string, unknown>
-        : undefined;
-      const venue = typeof previewDetails?.venue === "string"
-        ? previewDetails.venue
-        : ctx.exchange?.exchangeId ?? ctx.broker?.brokerId;
+      const plan = await planActionExecution(
+        "trading.preview_market_order",
+        { symbol, side, quantity, quoteOrderQty },
+        ctx,
+      );
+      const previewDetails =
+        plan.preview && typeof plan.preview === "object"
+          ? (plan.preview as Record<string, unknown>)
+          : undefined;
+      const venue =
+        typeof previewDetails?.venue === "string"
+          ? previewDetails.venue
+          : (ctx.exchange?.exchangeId ?? ctx.broker?.brokerId);
 
       recordStructuredObservation({
         eventType: plan.ready ? "execution.preview_generated" : "execution.preview_blocked",

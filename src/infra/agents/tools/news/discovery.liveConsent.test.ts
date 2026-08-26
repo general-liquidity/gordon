@@ -51,11 +51,86 @@ function makeExecContext(placed: string[], isSandbox: boolean) {
   return { requestContext: { get: (key: string) => values[key] } } as never;
 }
 
+function makeBrokerExecContext(placed: string[]) {
+  const broker = {
+    brokerId: "alpaca",
+    displayName: "Alpaca Paper",
+    isPaper: true,
+    capabilities: {
+      supportsMarketOrders: true,
+      supportsLimitOrders: true,
+      supportsExtendedHours: false,
+      supportsFractionalShares: true,
+      supportsShortSelling: true,
+      supportsOptions: false,
+      supportsStreaming: false,
+      supportsPaperTrading: true,
+      supportsHistoricalBars: true,
+    },
+    getAccount: async () => ({
+      id: "paper",
+      status: "ACTIVE",
+      currency: "USD",
+      cash: 10_000,
+      buyingPower: 10_000,
+      portfolioValue: 10_000,
+      patternDayTrader: false,
+      shortingEnabled: true,
+      tradingBlocked: false,
+    }),
+    getPositions: async () => [
+      {
+        symbol: "AAPL",
+        qty: 95,
+        side: "long",
+        marketValue: 9_500,
+        avgEntryPrice: 100,
+        unrealizedPl: 0,
+        unrealizedPlPercent: 0,
+      },
+    ],
+    getLatestQuote: async (symbol: string) => ({
+      symbol,
+      bidPrice: 99,
+      bidSize: 100,
+      askPrice: 100,
+      askSize: 100,
+      timestamp: new Date().toISOString(),
+    }),
+    placeOrder: async (params: { symbol: string }) => {
+      placed.push(params.symbol);
+      return {
+        id: "broker-order-1",
+        symbol: params.symbol,
+        side: "buy",
+        type: "market",
+        timeInForce: "day",
+        status: "filled",
+        qty: 1000,
+        filledQty: 1000,
+        extendedHours: false,
+      };
+    },
+  };
+  const values: Record<string, unknown> = {
+    exchange: null,
+    broker,
+    config: { permissionMode: "auto" },
+  };
+  return { requestContext: { get: (key: string) => values[key] } } as never;
+}
+
 describe("discovery order tools live-consent gate", () => {
   it("place_bracket_order refuses on a live venue without consent", async () => {
     const placed: string[] = [];
     const res = (await placeBracketOrderTool.execute!(
-      { symbol: "BTCUSDT", side: "BUY", quantity: 0.01, stopLossPrice: 90, takeProfitPrice: 120 } as never,
+      {
+        symbol: "BTCUSDT",
+        side: "BUY",
+        quantity: 0.01,
+        stopLossPrice: 90,
+        takeProfitPrice: 120,
+      } as never,
       makeExecContext(placed, false),
     )) as { error?: string };
 
@@ -71,6 +146,17 @@ describe("discovery order tools live-consent gate", () => {
     )) as { error?: string };
 
     expect(res.error).toMatch(/have not yet acknowledged live trading/);
+    expect(placed).toEqual([]);
+  });
+
+  it("runs the common risk gate before dispatching a paper-broker order", async () => {
+    const placed: string[] = [];
+    const res = (await placeMarketOrderTool.execute!(
+      { symbol: "AAPL", side: "BUY", quantity: 6 } as never,
+      makeBrokerExecContext(placed),
+    )) as { error?: string };
+
+    expect(res.error).toContain("Risk kernel rejected");
     expect(placed).toEqual([]);
   });
 });

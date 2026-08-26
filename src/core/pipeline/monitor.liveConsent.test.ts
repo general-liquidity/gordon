@@ -12,7 +12,8 @@ import { setDatabasePathForTesting } from "../../infra/storage/database.ts";
 import { createPlan } from "../../infra/storage/entities/plans.ts";
 import { createTrade } from "../../infra/storage/entities/trades.ts";
 import { CONSENT_PATH_ENV, recordLiveConsent } from "../../infra/safety/consent.ts";
-import { placeGridTakeProfits } from "./monitor.ts";
+import { placeGridTakeProfits, remainingTradeQuantity } from "./monitor.ts";
+import type { OrderParams } from "../../infra/exchange/index.ts";
 
 const dbPath = join(tmpdir(), `gordon-consent-monitor-${process.pid}-${Date.now()}.db`);
 const consentPath = join(tmpdir(), `gordon-consent-monitor-${process.pid}-${Date.now()}.json`);
@@ -82,14 +83,14 @@ function makeGridTrade(): Trade {
   });
 }
 
-function makeExchange(isSandbox: boolean, placed: string[]): Exchange {
+function makeExchange(isSandbox: boolean, placed: OrderParams[]): Exchange {
   return {
     exchangeId: "binance",
     isSandbox,
     getPrice: async () => 48_500,
     getOpenOrders: async () => [],
-    placeOrder: async (params: { symbol: string }) => {
-      placed.push(params.symbol);
+    placeOrder: async (params: OrderParams) => {
+      placed.push(params);
       return {
         orderId: `tp-${placed.length}`,
         symbol: params.symbol,
@@ -106,21 +107,55 @@ function makeExchange(isSandbox: boolean, placed: string[]): Exchange {
 }
 
 describe("placeGridTakeProfits live-consent gate", () => {
-  it("refuses to dispatch on a live venue without consent", async () => {
-    const placed: string[] = [];
-    const result = await placeGridTakeProfits(makeGridTrade(), makeExchange(false, placed));
-
-    expect(result.success).toBe(false);
-    expect(result.skippedReason).toMatch(/have not yet acknowledged live trading/);
-    expect(placed).toEqual([]);
-  });
-
-  it("dispatches on a live venue once consent is recorded", async () => {
-    recordLiveConsent();
-    const placed: string[] = [];
+  it("allows a verified exposure reduction on a live venue without fresh consent", async () => {
+    const placed: OrderParams[] = [];
     const result = await placeGridTakeProfits(makeGridTrade(), makeExchange(false, placed));
 
     expect(result.success).toBe(true);
-    expect(placed.length).toBeGreaterThan(0);
+    expect(placed).toHaveLength(1);
+    expect(placed[0]!.side).toBe("SELL");
+    expect(placed[0]!.quantity).toBeCloseTo(0.03, 8);
+  });
+
+  it("never replaces quantity that a manual exit already closed", async () => {
+    recordLiveConsent();
+    const trade = makeGridTrade();
+    trade.exits.push({
+      orderId: "manual-partial",
+      price: 50_000,
+      quantity: 0.01,
+      filledAt: new Date().toISOString(),
+      reason: "MANUAL",
+    });
+    const placed: OrderParams[] = [];
+    const result = await placeGridTakeProfits(trade, makeExchange(false, placed));
+
+    expect(result.success).toBe(true);
+    expect(placed).toHaveLength(1);
+    expect(placed[0]!.quantity).toBeCloseTo(0.02, 6);
+  });
+});
+
+describe("remainingTradeQuantity", () => {
+  it("subtracts every filled exit and never crosses below zero", () => {
+    expect(
+      remainingTradeQuantity({
+        entries: [
+          { orderId: "e1", price: 100, quantity: 2, filledAt: "now" },
+          { orderId: "e2", price: 90, quantity: 1, filledAt: "now" },
+        ],
+        exits: [
+          { orderId: "x1", price: 110, quantity: 1, filledAt: "now", reason: "MANUAL" },
+          { orderId: "x2", price: 115, quantity: 0.5, filledAt: "now", reason: "TP1" },
+        ],
+      }),
+    ).toBeCloseTo(1.5, 6);
+
+    expect(
+      remainingTradeQuantity({
+        entries: [{ orderId: "e", price: 100, quantity: 1, filledAt: "now" }],
+        exits: [{ orderId: "x", price: 90, quantity: 2, filledAt: "now", reason: "STOP" }],
+      }),
+    ).toBe(0);
   });
 });

@@ -26,7 +26,7 @@ import {
   repairProtectiveOrders,
 } from "./executor.ts";
 import { getTrailingStopTracker } from "../orders/trailing-stop.ts";
-import { assertLiveConsent } from "../../infra/trading/execution/preflight.ts";
+import { assertConsentForExposure } from "../../infra/trading/execution/preflight.ts";
 
 const logger = createModuleLogger("monitor");
 
@@ -89,8 +89,8 @@ export interface MonitorUpdate {
   currentPrice: number;
   unrealizedPnl: number;
   unrealizedPnlPercent: number;
-  distanceToStop: number;      // percentage
-  distanceToNextTP: number;    // percentage
+  distanceToStop: number; // percentage
+  distanceToNextTP: number; // percentage
   status: "healthy" | "warning" | "critical";
 }
 
@@ -174,7 +174,7 @@ function updateBaseline(
   symbol: string,
   currentVolume: number,
   priceVelocity: number,
-  range: number
+  range: number,
 ): void {
   const sb = getOrCreateBaseline(symbol);
 
@@ -201,7 +201,8 @@ function updateBaseline(
   if (sb.calibrated) {
     const alpha = 0.1;
     sb.baseline.avgVolume = sb.baseline.avgVolume * (1 - alpha) + currentVolume * alpha;
-    sb.baseline.avgPriceVelocity = sb.baseline.avgPriceVelocity * (1 - alpha) + priceVelocity * alpha;
+    sb.baseline.avgPriceVelocity =
+      sb.baseline.avgPriceVelocity * (1 - alpha) + priceVelocity * alpha;
     sb.baseline.avgRange = sb.baseline.avgRange * (1 - alpha) + range * alpha;
   }
 }
@@ -210,7 +211,7 @@ function checkMultiMetricAnomaly(
   symbol: string,
   currentVolume: number,
   priceVelocity: number,
-  range: number
+  range: number,
 ): Alert | null {
   const sb = getOrCreateBaseline(symbol);
   if (!sb.calibrated) return null;
@@ -298,9 +299,7 @@ function generateClientOrderId(planId: string, type: string): string {
 /**
  * Run a complete monitor cycle
  */
-export async function runMonitorCycle(
-  client: Exchange
-): Promise<MonitorResult> {
+export async function runMonitorCycle(client: Exchange): Promise<MonitorResult> {
   const timestamp = new Date().toISOString();
   const updates: MonitorUpdate[] = [];
   const alerts: Alert[] = [];
@@ -447,11 +446,14 @@ export async function runMonitorCycle(
 async function processTradeUpdate(
   client: Exchange,
   trade: Trade,
-  alerts: Alert[]
+  alerts: Alert[],
 ): Promise<MonitorUpdate | null> {
   const plan = getPlan(trade.planId);
   if (!plan) {
-    logger.error("Plan not found for trade", undefined, { tradeId: trade.id, planId: trade.planId });
+    logger.error("Plan not found for trade", undefined, {
+      tradeId: trade.id,
+      planId: trade.planId,
+    });
     return null;
   }
 
@@ -460,10 +462,7 @@ async function processTradeUpdate(
   const fillAlerts = await checkOrderFills(client, trade, plan);
   alerts.push(...fillAlerts);
 
-  const { unrealizedPnl, unrealizedPnlPercent } = calculateUnrealizedPnl(
-    trade,
-    currentPrice
-  );
+  const { unrealizedPnl, unrealizedPnlPercent } = calculateUnrealizedPnl(trade, currentPrice);
 
   const distanceToStop = calculateDistanceToStop(currentPrice, plan);
   const distanceToNextTP = calculateDistanceToNextTP(trade, currentPrice, plan);
@@ -533,11 +532,7 @@ async function processTradeUpdate(
   };
 }
 
-async function checkOrderFills(
-  client: Exchange,
-  trade: Trade,
-  plan: Plan
-): Promise<Alert[]> {
+async function checkOrderFills(client: Exchange, trade: Trade, plan: Plan): Promise<Alert[]> {
   const alerts: Alert[] = [];
 
   // Check if this is a grid entry plan
@@ -718,7 +713,7 @@ async function checkGridFills(
   client: Exchange,
   trade: Trade,
   plan: Plan,
-  alerts: Alert[]
+  alerts: Alert[],
 ): Promise<Alert[]> {
   if (!plan.grid) {
     return alerts;
@@ -902,45 +897,51 @@ async function checkGridFills(
       const allLevelsFilled = filledLevels >= totalLevels;
 
       // Find the highest filled level price
-      const highestFilledPrice = Math.max(...updatedTrade.entries.map(e => e.price));
+      const highestFilledPrice = Math.max(...updatedTrade.entries.map((e) => e.price));
 
       // Check for price reversal (1% above highest filled level)
       const reversalThreshold = highestFilledPrice * (1 + GRID_REVERSAL_THRESHOLD);
       const priceReversed = currentPrice >= reversalThreshold;
 
       // Check if TPs have already been placed (by checking for existing TP exits or TP orders)
-      const hasTakeProfitOrders = openOrders.some(o =>
-        o.side === "SELL" && o.type === "LIMIT"
-      );
+      const hasTakeProfitOrders = openOrders.some((o) => o.side === "SELL" && o.type === "LIMIT");
+      const hasFilledTakeProfit = updatedTrade.exits.some((exit) => exit.reason.startsWith("TP"));
 
       // Place deferred TPs if: (all levels filled OR price reversed) AND no TPs placed yet
-      if ((allLevelsFilled || priceReversed) && !hasTakeProfitOrders && updatedTrade.exits.length === 0) {
-        const totalQuantity = updatedTrade.entries.reduce((sum, e) => sum + e.quantity, 0);
+      if ((allLevelsFilled || priceReversed) && !hasTakeProfitOrders && !hasFilledTakeProfit) {
+        const totalQuantity = remainingTradeQuantity(updatedTrade);
 
-        logger.info("Placing deferred take profits", {
-          tradeId: trade.id,
-          symbol: trade.symbol,
-          reason: allLevelsFilled ? "all_levels_filled" : "price_reversal",
-          totalQuantity,
-          filledLevels,
-          currentPrice,
-        });
-
-        await placeDeferredTakeProfits(client, updatedTrade, plan, totalQuantity, alerts);
-
-        alerts.push({
-          type: "order_filled",
-          tradeId: trade.id,
-          message: `${trade.symbol}: Deferred take profits placed (${allLevelsFilled ? "all levels filled" : "price reversal"})`,
-          severity: "info",
-          data: {
+        if (totalQuantity <= 0) {
+          logger.info("Skipping deferred take profits because no open quantity remains", {
+            tradeId: trade.id,
+            symbol: trade.symbol,
+          });
+        } else {
+          logger.info("Placing deferred take profits", {
+            tradeId: trade.id,
+            symbol: trade.symbol,
             reason: allLevelsFilled ? "all_levels_filled" : "price_reversal",
+            totalQuantity,
             filledLevels,
-            totalLevels,
             currentPrice,
-            reversalThreshold,
-          },
-        });
+          });
+
+          await placeDeferredTakeProfits(client, updatedTrade, plan, totalQuantity, alerts);
+
+          alerts.push({
+            type: "order_filled",
+            tradeId: trade.id,
+            message: `${trade.symbol}: Deferred take profits placed (${allLevelsFilled ? "all levels filled" : "price reversal"})`,
+            severity: "info",
+            data: {
+              reason: allLevelsFilled ? "all_levels_filled" : "price_reversal",
+              filledLevels,
+              totalLevels,
+              currentPrice,
+              reversalThreshold,
+            },
+          });
+        }
       }
     }
 
@@ -966,7 +967,7 @@ async function checkGridFills(
   } catch (error) {
     logger.error("Error checking grid fills", error as Error, {
       tradeId: trade.id,
-      symbol: trade.symbol
+      symbol: trade.symbol,
     });
   }
 
@@ -991,6 +992,24 @@ function calculateWeightedAverageEntry(entries: EntryFill[]): number {
 }
 
 /**
+ * Quantity that can still be closed without crossing through flat and opening
+ * a short. Every filled exit counts, regardless of why it happened: a manual
+ * or stop fill reduces the same position that a later take-profit order would
+ * otherwise oversell.
+ */
+export function remainingTradeQuantity(trade: Pick<Trade, "entries" | "exits">): number {
+  const entered = trade.entries.reduce(
+    (sum, fill) => sum + (Number.isFinite(fill.quantity) && fill.quantity > 0 ? fill.quantity : 0),
+    0,
+  );
+  const exited = trade.exits.reduce(
+    (sum, fill) => sum + (Number.isFinite(fill.quantity) && fill.quantity > 0 ? fill.quantity : 0),
+    0,
+  );
+  return roundQuantity(Math.max(0, entered - exited));
+}
+
+/**
  * Place deferred take profit orders after grid entries have filled
  *
  * This is called when either all grid levels have filled or price has
@@ -1005,13 +1024,17 @@ async function placeDeferredTakeProfits(
   trade: Trade,
   plan: Plan,
   totalQuantity: number,
-  alerts: Alert[]
+  alerts: Alert[],
 ): Promise<void> {
-  // Gated despite looking protective: this PLACES resting SELL limits, it does
-  // not close a position, and `totalQuantity` is supplied by the caller rather
-  // than bounded against the trade's remaining open quantity. It cannot be
-  // verified as exposure-reducing, so it takes the exposure-increasing gate.
-  assertLiveConsent(client, "monitor.deferred_take_profits");
+  assertConsentForExposure(client, "monitor.deferred_take_profits", {
+    direction: "REDUCES_EXPOSURE",
+    reduction: {
+      side: "SELL",
+      quantity: totalQuantity,
+      exitSide: "SELL",
+      remainingQuantity: remainingTradeQuantity(trade),
+    },
+  });
 
   // Track successfully placed quantities to properly calculate remaining
   let placedQuantity = 0;
@@ -1026,9 +1049,10 @@ async function placeDeferredTakeProfits(
 
     // Calculate quantity for this TP level
     // For the last TP, use whatever quantity remains after previous successful placements
+    const unplacedQuantity = roundQuantity(totalQuantity - placedQuantity);
     const tpQuantity = isLastTP
-      ? roundQuantity(totalQuantity - placedQuantity)
-      : roundQuantity(totalQuantity * tp.percentToSell);
+      ? unplacedQuantity
+      : roundQuantity(Math.min(unplacedQuantity, totalQuantity * tp.percentToSell));
 
     if (tpQuantity <= 0) {
       tpResults.push({ level: i + 1, success: false, quantity: 0 });
@@ -1112,8 +1136,8 @@ async function placeDeferredTakeProfits(
   }
 
   // Log summary of TP placement
-  const successCount = tpResults.filter(r => r.success).length;
-  const failCount = tpResults.filter(r => !r.success && r.quantity === 0).length;
+  const successCount = tpResults.filter((r) => r.success).length;
+  const failCount = tpResults.filter((r) => !r.success && r.quantity === 0).length;
 
   if (failCount > 0) {
     logger.warn("Some deferred TPs failed to place", {
@@ -1170,14 +1194,17 @@ interface GridLevelStatus {
  */
 export async function placeGridTakeProfits(
   trade: Trade,
-  exchange: Exchange
+  exchange: Exchange,
 ): Promise<GridTPPlacementResult> {
   const alerts: Alert[] = [];
 
   // Get the plan for this trade
   const plan = getPlan(trade.planId);
   if (!plan) {
-    logger.warn("Cannot place grid TPs - plan not found", { tradeId: trade.id, planId: trade.planId });
+    logger.warn("Cannot place grid TPs - plan not found", {
+      tradeId: trade.id,
+      planId: trade.planId,
+    });
     return {
       success: false,
       placedCount: 0,
@@ -1227,14 +1254,12 @@ export async function placeGridTakeProfits(
     const openOrders = await exchange.getOpenOrders(trade.symbol);
 
     // Check if TP orders already exist
-    const existingTpOrders = openOrders.filter(o =>
-      o.side === "SELL" && o.type === "LIMIT"
-    );
+    const existingTpOrders = openOrders.filter((o) => o.side === "SELL" && o.type === "LIMIT");
 
     if (existingTpOrders.length > 0) {
       logger.debug("Grid TPs already placed", {
         tradeId: trade.id,
-        existingTpCount: existingTpOrders.length
+        existingTpCount: existingTpOrders.length,
       });
       return {
         success: true,
@@ -1247,11 +1272,11 @@ export async function placeGridTakeProfits(
 
     // Check if any exits have already occurred (partial TP fills)
     if (trade.exits.length > 0) {
-      const tpExits = trade.exits.filter(e => e.reason.startsWith("TP"));
+      const tpExits = trade.exits.filter((e) => e.reason.startsWith("TP"));
       if (tpExits.length > 0) {
         logger.debug("Trade already has TP exits", {
           tradeId: trade.id,
-          tpExitCount: tpExits.length
+          tpExitCount: tpExits.length,
         });
         return {
           success: true,
@@ -1265,9 +1290,9 @@ export async function placeGridTakeProfits(
 
     // Analyze grid fill status
     const gridLevels = plan.grid.levels;
-    const filledLevelPrices = new Set(trade.entries.map(e => e.price));
+    const filledLevelPrices = new Set(trade.entries.map((e) => e.price));
     const gridLevelStatus: GridLevelStatus[] = gridLevels.map((level, index) => {
-      const matchingEntry = trade.entries.find(e => e.price === level.price);
+      const matchingEntry = trade.entries.find((e) => e.price === level.price);
       return {
         levelIndex: index + 1,
         price: level.price,
@@ -1277,7 +1302,7 @@ export async function placeGridTakeProfits(
       };
     });
 
-    const filledLevels = gridLevelStatus.filter(l => l.isFilled);
+    const filledLevels = gridLevelStatus.filter((l) => l.isFilled);
     const totalLevels = gridLevels.length;
     const fillPercent = filledLevels.length / totalLevels;
 
@@ -1292,7 +1317,7 @@ export async function placeGridTakeProfits(
     const allLevelsFilled = filledLevels.length >= totalLevels;
 
     // Find the highest filled level price for reversal detection
-    const highestFilledPrice = Math.max(...trade.entries.map(e => e.price));
+    const highestFilledPrice = Math.max(...trade.entries.map((e) => e.price));
     const reversalThreshold = highestFilledPrice * (1 + GRID_REVERSAL_THRESHOLD);
     const priceReversed = currentPrice >= reversalThreshold;
 
@@ -1325,8 +1350,8 @@ export async function placeGridTakeProfits(
       };
     }
 
-    // Calculate total quantity from filled entries
-    const totalQuantity = trade.entries.reduce((sum, e) => sum + e.quantity, 0);
+    // Filled exits of every kind reduce what these resting sells may close.
+    const totalQuantity = remainingTradeQuantity(trade);
 
     if (totalQuantity <= 0) {
       return {
@@ -1349,10 +1374,15 @@ export async function placeGridTakeProfits(
       currentPrice,
     });
 
-    // Gated: order placement, not a close. `totalQuantity` sums filled entries
-    // WITHOUT subtracting filled exits, so the placed size can exceed what is
-    // still open. Not verifiably exposure-reducing.
-    assertLiveConsent(exchange, "monitor.grid_take_profits");
+    assertConsentForExposure(exchange, "monitor.grid_take_profits", {
+      direction: "REDUCES_EXPOSURE",
+      reduction: {
+        side: "SELL",
+        quantity: totalQuantity,
+        exitSide: "SELL",
+        remainingQuantity: totalQuantity,
+      },
+    });
 
     // Place TP orders
     let placedCount = 0;
@@ -1369,7 +1399,7 @@ export async function placeGridTakeProfits(
       // For the last TP, use whatever quantity remains
       const tpQuantity = isLastTP
         ? roundQuantity(remainingQuantity)
-        : roundQuantity(totalQuantity * tp.percentToSell);
+        : roundQuantity(Math.min(remainingQuantity, totalQuantity * tp.percentToSell));
 
       if (tpQuantity <= 0) {
         logger.debug("Skipping TP level - no quantity", { level: i + 1 });
@@ -1431,7 +1461,6 @@ export async function placeGridTakeProfits(
             orderId: tpOrder.orderId.toString(),
           },
         });
-
       } catch (error) {
         failedCount++;
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -1500,7 +1529,6 @@ export async function placeGridTakeProfits(
       failedCount,
       alerts,
     };
-
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
@@ -1523,10 +1551,7 @@ export async function placeGridTakeProfits(
  * Process all grid trades and place TPs where needed
  * Called from runMonitorCycle
  */
-async function processGridTakeProfits(
-  client: Exchange,
-  alerts: Alert[]
-): Promise<void> {
+async function processGridTakeProfits(client: Exchange, alerts: Alert[]): Promise<void> {
   // Get all active trades
   const openTrades = listTrades({ status: "OPEN" });
   const partialTrades = listTrades({ status: "PARTIAL" });
@@ -1579,7 +1604,7 @@ async function processGridTakeProfits(
 
 function calculateUnrealizedPnl(
   trade: Trade,
-  currentPrice: number
+  currentPrice: number,
 ): { unrealizedPnl: number; unrealizedPnlPercent: number } {
   const avgEntry = trade.averageEntry;
   const remainingQty = calculateRemainingQuantity(trade);
@@ -1594,9 +1619,7 @@ function calculateUnrealizedPnl(
   return { unrealizedPnl, unrealizedPnlPercent };
 }
 
-function calculateRealizedPnl(
-  trade: Trade
-): { realizedPnl: number; realizedPnlPercent: number } {
+function calculateRealizedPnl(trade: Trade): { realizedPnl: number; realizedPnlPercent: number } {
   const avgEntry = trade.averageEntry;
 
   if (avgEntry === 0 || trade.exits.length === 0) {
@@ -1613,9 +1636,7 @@ function calculateRealizedPnl(
   }
 
   const entryValue = avgEntry * totalExitQty;
-  const realizedPnlPercent = entryValue > 0
-    ? (totalRealizedPnl / entryValue) * 100
-    : 0;
+  const realizedPnlPercent = entryValue > 0 ? (totalRealizedPnl / entryValue) * 100 : 0;
 
   return { realizedPnl: totalRealizedPnl, realizedPnlPercent };
 }
@@ -1642,17 +1663,11 @@ function calculateDistanceToStop(currentPrice: number, plan: Plan): number {
   return ((currentPrice - stopPrice) / currentPrice) * 100;
 }
 
-function calculateDistanceToNextTP(
-  trade: Trade,
-  currentPrice: number,
-  plan: Plan
-): number {
+function calculateDistanceToNextTP(trade: Trade, currentPrice: number, plan: Plan): number {
   if (currentPrice === 0) return 0;
 
   const filledTPs = new Set(
-    trade.exits
-      .filter((e) => e.reason.startsWith("TP"))
-      .map((e) => e.reason)
+    trade.exits.filter((e) => e.reason.startsWith("TP")).map((e) => e.reason),
   );
 
   for (let i = 0; i < plan.takeProfit.length; i++) {
@@ -1684,10 +1699,7 @@ function determineHealthStatus(distanceToStop: number): "healthy" | "warning" | 
 // Anomaly Detection
 // ============================================================================
 
-async function checkMarketAnomalies(
-  client: Exchange,
-  symbol: string
-): Promise<Alert[]> {
+async function checkMarketAnomalies(client: Exchange, symbol: string): Promise<Alert[]> {
   const alerts: Alert[] = [];
 
   try {
@@ -1723,7 +1735,10 @@ async function checkMarketAnomalies(
     const flashCrashAlert = checkFlashCrash(symbol, currentCandle);
     if (flashCrashAlert) {
       alerts.push(flashCrashAlert);
-      logger.warn("Flash crash detected", { symbol, dropPercent: flashCrashAlert.data.dropPercent });
+      logger.warn("Flash crash detected", {
+        symbol,
+        dropPercent: flashCrashAlert.data.dropPercent,
+      });
       logEvent({
         type: "ALERT",
         data: {
@@ -1737,19 +1752,22 @@ async function checkMarketAnomalies(
     }
 
     // Multi-metric baseline anomaly detection
-    const priceVelocity = currentCandle.open > 0
-      ? Math.abs(currentCandle.close - currentCandle.open) / currentCandle.open
-      : 0;
-    const candleRange = currentCandle.close > 0
-      ? (currentCandle.high - currentCandle.low) / currentCandle.close
-      : 0;
+    const priceVelocity =
+      currentCandle.open > 0
+        ? Math.abs(currentCandle.close - currentCandle.open) / currentCandle.open
+        : 0;
+    const candleRange =
+      currentCandle.close > 0 ? (currentCandle.high - currentCandle.low) / currentCandle.close : 0;
 
     // Feed current metrics into the baseline tracker
     updateBaseline(symbol, currentCandle.volume, priceVelocity, candleRange);
 
     // Check for multi-metric anomaly (only fires after baseline is calibrated)
     const multiMetricAlert = checkMultiMetricAnomaly(
-      symbol, currentCandle.volume, priceVelocity, candleRange
+      symbol,
+      currentCandle.volume,
+      priceVelocity,
+      candleRange,
     );
     if (multiMetricAlert) {
       alerts.push(multiMetricAlert);
@@ -1776,7 +1794,7 @@ async function checkMarketAnomalies(
 function checkVolumeSpike(
   symbol: string,
   currentCandle: { volume: number },
-  previousCandles: { volume: number }[]
+  previousCandles: { volume: number }[],
 ): Alert | null {
   if (previousCandles.length === 0) return null;
 
@@ -1806,14 +1824,17 @@ function checkVolumeSpike(
 
 function checkFlashCrash(
   symbol: string,
-  currentCandle: { open: number; close: number; low: number }
+  currentCandle: { open: number; close: number; low: number },
 ): Alert | null {
   if (currentCandle.open === 0) return null;
 
   const dropPercent = ((currentCandle.open - currentCandle.close) / currentCandle.open) * 100;
   const maxDropPercent = ((currentCandle.open - currentCandle.low) / currentCandle.open) * 100;
 
-  if (dropPercent >= FLASH_CRASH_THRESHOLD_PERCENT || maxDropPercent >= FLASH_CRASH_THRESHOLD_PERCENT) {
+  if (
+    dropPercent >= FLASH_CRASH_THRESHOLD_PERCENT ||
+    maxDropPercent >= FLASH_CRASH_THRESHOLD_PERCENT
+  ) {
     return {
       type: "flash_crash",
       message: `${symbol}: Flash crash detected (${Math.max(dropPercent, maxDropPercent).toFixed(1)}% drop)`,
@@ -1840,7 +1861,9 @@ function checkFlashCrash(
  * This enables faster detection of stop-loss and take-profit triggers
  * Only connects if there are active trades to monitor
  */
-export async function initializeRealtimeMonitor(_exchangeId: string = "ccxt:binance"): Promise<void> {
+export async function initializeRealtimeMonitor(
+  _exchangeId: string = "ccxt:binance",
+): Promise<void> {
   const { syncExchangeMarketFeeds } = await import("../../infra/exchange/marketStreamLifecycle.ts");
   await syncExchangeMarketFeeds();
 }
@@ -1946,10 +1969,7 @@ function checkRealtimePriceAlert(symbol: string, price: number): void {
  * Get cached real-time price (faster than API call)
  * Falls back to API if no cached price available
  */
-export async function getRealtimePrice(
-  client: Exchange,
-  symbol: string
-): Promise<number> {
+export async function getRealtimePrice(client: Exchange, symbol: string): Promise<number> {
   const cached = realtimePriceCache.get(symbol);
 
   // Use cache if fresh (within 5 seconds)
@@ -1973,11 +1993,17 @@ export function isRealtimeMonitorActive(): boolean {
 // ============================================================================
 
 export function formatTradeStatus(update: MonitorUpdate): string {
-  const { trade, currentPrice, unrealizedPnl, unrealizedPnlPercent, distanceToStop, distanceToNextTP, status } = update;
+  const {
+    trade,
+    currentPrice,
+    unrealizedPnl,
+    unrealizedPnlPercent,
+    distanceToStop,
+    distanceToNextTP,
+    status,
+  } = update;
 
-  const statusIndicator = status === "critical" ? "[!!!]" :
-                          status === "warning" ? "[!]" :
-                          "[OK]";
+  const statusIndicator = status === "critical" ? "[!!!]" : status === "warning" ? "[!]" : "[OK]";
 
   const pnlSign = unrealizedPnl >= 0 ? "+" : "";
   const pnlFormatted = `${pnlSign}$${unrealizedPnl.toFixed(2)} (${pnlSign}${unrealizedPnlPercent.toFixed(2)}%)`;
@@ -1994,7 +2020,9 @@ export function formatTradeStatus(update: MonitorUpdate): string {
 
   if (trade.exits.length > 0) {
     const realizedSign = trade.realizedPnl >= 0 ? "+" : "";
-    lines.push(`  Realized PnL: ${realizedSign}$${trade.realizedPnl.toFixed(2)} (${realizedSign}${trade.realizedPnlPercent.toFixed(2)}%)`);
+    lines.push(
+      `  Realized PnL: ${realizedSign}$${trade.realizedPnl.toFixed(2)} (${realizedSign}${trade.realizedPnlPercent.toFixed(2)}%)`,
+    );
   }
 
   return lines.join("\n");
