@@ -107,6 +107,27 @@ export const SAFETY_CRITICAL_PATTERNS: readonly string[] = [
   "skill_install",
   "exec_shell",
   "run_shell",
+  // Sets GORDON_ALLOW_LIVE / GORDON_RISK_MODE and persists them, so it can grant
+  // itself live-trading authority and disable the risk kernel.
+  "manage_flags",
+];
+
+/**
+ * Permission scopes that grant authority rather than exercise it. Trust is earned
+ * per tool by repeated human approval, but no amount of repetition should let a
+ * tool that can *widen* its own authority bypass the human queue. Excluding by
+ * scope rather than by name is deliberate: `SAFETY_CRITICAL_PATTERNS` above only
+ * catches names someone remembered to add, which is how `manage_flags` reached
+ * `analysis.run` and auto-approval in the first place.
+ */
+const NEVER_TRUST_AUTO_APPROVE_SCOPES: readonly string[] = [
+  "system.mode.write",
+  "runtime.background.write",
+  "transfer.execute",
+  "wallet.write",
+  "livetrade.execute",
+  "plugin.install",
+  "mcp.connect",
 ];
 
 export function isSafetyCritical(toolName: string): boolean {
@@ -321,6 +342,13 @@ export function evaluateTrustEligibility(
       score,
       eligible: false,
       reason: "Policy requires human approval — trust auto-approval skipped",
+    };
+  }
+  if (permissionScope !== undefined && NEVER_TRUST_AUTO_APPROVE_SCOPES.includes(permissionScope)) {
+    return {
+      score,
+      eligible: false,
+      reason: `Scope ${permissionScope} grants authority — trust auto-approval never applies`,
     };
   }
   return { score, eligible: true, reason: score.reason };

@@ -220,3 +220,44 @@ describe("TrustTrajectory persistence", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 });
+
+describe("authority-granting scopes are never trust-auto-approved", () => {
+  it("flags manage_flags by name", () => {
+    expect(isSafetyCritical("manage_flags")).toBe(true);
+  });
+
+  it("abstains for an authority-granting scope however long the approval history", () => {
+    const t = new TrustTrajectory({ minApprovals: 3, scoreThreshold: 0.9 });
+    // A tool whose NAME is on no deny-list, reached through a scope that is.
+    for (let i = 0; i < 12; i++) {
+      t.record({
+        toolName: "some_future_tool",
+        permissionScope: "system.mode.write",
+        decision: "approved",
+        timestamp: NOW - i,
+      });
+    }
+    const hook = buildTrustTrajectoryHook(t, { now: () => NOW });
+    expect(hook({
+      toolName: "some_future_tool",
+      policy: { tool: { permissionScope: "system.mode.write" } },
+    }).decision).toBe("abstain");
+  });
+
+  it("still auto-approves a read scope with the same approval history", () => {
+    const t = new TrustTrajectory({ minApprovals: 3, scoreThreshold: 0.9 });
+    for (let i = 0; i < 12; i++) {
+      t.record({
+        toolName: "some_future_tool",
+        permissionScope: "market.read",
+        decision: "approved",
+        timestamp: NOW - i,
+      });
+    }
+    const hook = buildTrustTrajectoryHook(t, { now: () => NOW });
+    expect(hook({
+      toolName: "some_future_tool",
+      policy: { tool: { permissionScope: "market.read" } },
+    }).decision).toBe("allow");
+  });
+});
