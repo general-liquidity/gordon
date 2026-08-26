@@ -118,7 +118,7 @@ describe("Wright chain — clean plan, all gates pass", () => {
     const barriers = distanceToBarriers({
       currentEquity: 130_000,
       maintenanceMarginEquity: 50_000,
-      psychologicalTiltUsd: 50_000,
+      psychologicalTilt: { windowStartEquityUsd: 130_000, budgetUsd: 50_000 },
       baseRiskPerTradeUsd: sizing.finalDollarRisk,
     });
     expect(shouldBlockNewTrades(barriers)).toBe(false);

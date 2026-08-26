@@ -68,10 +68,38 @@ export function expectedReturnUnderLeverage(
   return { arithmetic: a, geometric: a - d, drag: d, stddev: s };
 }
 
+/**
+ * Bars per year for a return series. Use it to convert a per-period Sharpe
+ * into the annualized units `leveragePrivilege` requires.
+ *
+ *   - crypto daily (24/7): 365
+ *   - equity/FX daily:     252
+ *   - hourly crypto:       8760
+ */
+export function annualizeSharpe(
+  sharpePerPeriod: number,
+  periodsPerYear: number,
+): number {
+  if (!(periodsPerYear > 0)) {
+    throw new Error("periodsPerYear must be positive");
+  }
+  return sharpePerPeriod * Math.sqrt(periodsPerYear);
+}
+
 export interface LeveragePrivilegeInput {
-  sharpe: number;
-  /** Minimum Sharpe required to earn leverage. Default 1.5 per Wright Ch 13. */
-  minSharpe?: number;
+  /**
+   * ANNUALIZED Sharpe. The name carries the period on purpose: the 1.5 floor
+   * below is annualized in Wright Ch 13, and a bare `sharpe` field let a
+   * per-period number be compared against it. On 252 daily bars an annualized
+   * 1.5 is a per-period 0.0945, and a per-period 1.5 is an annualized 23.8;
+   * on hourly bars, 140. Convert with `annualizeSharpe` before calling.
+   */
+  sharpeAnnualized: number;
+  /**
+   * Minimum ANNUALIZED Sharpe required to earn leverage. Default 1.5 per
+   * Wright Ch 13, which quotes it in annualized units.
+   */
+  minSharpeAnnualized?: number;
   /** Max drawdown observed at 1× sizing, as a positive fraction. */
   observedMaxDrawdown?: number;
   /** Max drawdown the operator can tolerate before psychological break. */
@@ -88,14 +116,16 @@ export interface LeveragePrivilegeResult {
   suggestedMaxLeverage: number | null;
 }
 
-const DEFAULT_MIN_SHARPE = 1.5;
+const DEFAULT_MIN_SHARPE_ANNUALIZED = 1.5;
 
 export function leveragePrivilege(input: LeveragePrivilegeInput): LeveragePrivilegeResult {
-  const minSharpe = input.minSharpe ?? DEFAULT_MIN_SHARPE;
+  const minSharpe = input.minSharpeAnnualized ?? DEFAULT_MIN_SHARPE_ANNUALIZED;
   const reasons: string[] = [];
-  let earned = input.sharpe >= minSharpe;
+  let earned = input.sharpeAnnualized >= minSharpe;
   if (!earned) {
-    reasons.push(`sharpe ${input.sharpe.toFixed(2)} below floor ${minSharpe}`);
+    reasons.push(
+      `annualized sharpe ${input.sharpeAnnualized.toFixed(2)} below annualized floor ${minSharpe}`,
+    );
   }
 
   let suggestedMaxLeverage: number | null = null;

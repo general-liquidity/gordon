@@ -6,6 +6,7 @@ import {
   recoveryReturn,
   expectedReturnUnderLeverage,
   leveragePrivilege,
+  annualizeSharpe,
   compareStrategies,
   dragToPayload,
 } from "./volatilityDrag.ts";
@@ -77,19 +78,19 @@ describe("expectedReturnUnderLeverage", () => {
 
 describe("leveragePrivilege", () => {
   it("denies leverage below Sharpe floor", () => {
-    const r = leveragePrivilege({ sharpe: 0.5 });
+    const r = leveragePrivilege({ sharpeAnnualized: 0.5 });
     expect(r.earned).toBe(false);
-    expect(r.reasons[0]).toContain("below floor");
+    expect(r.reasons[0]).toContain("below annualized floor");
   });
 
   it("grants leverage at Sharpe 2.0", () => {
-    const r = leveragePrivilege({ sharpe: 2.0 });
+    const r = leveragePrivilege({ sharpeAnnualized: 2.0 });
     expect(r.earned).toBe(true);
   });
 
   it("denies when observed DD already exceeds tolerance", () => {
     const r = leveragePrivilege({
-      sharpe: 2.0,
+      sharpeAnnualized: 2.0,
       observedMaxDrawdown: 0.15,
       drawdownTolerance: 0.10,
     });
@@ -99,7 +100,7 @@ describe("leveragePrivilege", () => {
 
   it("suggests max leverage as tolerance / observed DD", () => {
     const r = leveragePrivilege({
-      sharpe: 2.0,
+      sharpeAnnualized: 2.0,
       observedMaxDrawdown: 0.03,
       drawdownTolerance: 0.12,
     });
@@ -107,9 +108,31 @@ describe("leveragePrivilege", () => {
     expect(r.suggestedMaxLeverage).toBeCloseTo(4, 5);
   });
 
+  it("the 1.5 floor is annualized: a per-period Sharpe must be converted first", () => {
+    // A strategy with an annualized Sharpe of 2.0 on 252 daily bars has a
+    // per-period Sharpe of 0.126. Handing the per-period number to a field
+    // called `sharpe` denied leverage the strategy had earned; handing a
+    // per-period 1.5 (annualized 23.8) granted it on a fiction.
+    const perPeriod = 2.0 / Math.sqrt(252);
+    expect(perPeriod).toBeCloseTo(0.126, 3);
+    expect(annualizeSharpe(perPeriod, 252)).toBeCloseTo(2.0, 9);
+    expect(leveragePrivilege({ sharpeAnnualized: annualizeSharpe(perPeriod, 252) }).earned).toBe(
+      true,
+    );
+    // Unconverted, it falls below the annualized floor, which is the safe
+    // direction but the wrong answer.
+    expect(leveragePrivilege({ sharpeAnnualized: perPeriod }).earned).toBe(false);
+  });
+
+  it("annualizeSharpe scales by sqrt(periodsPerYear), not by periodsPerYear", () => {
+    expect(annualizeSharpe(0.1, 252)).toBeCloseTo(1.5875, 4);
+    expect(annualizeSharpe(0.1, 8760)).toBeCloseTo(9.3595, 4);
+    expect(() => annualizeSharpe(0.1, 0)).toThrow();
+  });
+
   it("respects custom Sharpe floor", () => {
-    expect(leveragePrivilege({ sharpe: 1.0, minSharpe: 0.8 }).earned).toBe(true);
-    expect(leveragePrivilege({ sharpe: 1.0, minSharpe: 1.2 }).earned).toBe(false);
+    expect(leveragePrivilege({ sharpeAnnualized: 1.0, minSharpeAnnualized: 0.8 }).earned).toBe(true);
+    expect(leveragePrivilege({ sharpeAnnualized: 1.0, minSharpeAnnualized: 1.2 }).earned).toBe(false);
   });
 });
 
