@@ -10,6 +10,21 @@ called out explicitly, whatever their size.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-26
+
+### Fixed
+
+- Emergency liquidation now pauses strategy slots before touching orders,
+  preserves downside-protective exits until their replacement market close is
+  confirmed, and removes those exits only after every active trade for the
+  symbol closes. A failed market close therefore no longer leaves the position
+  naked, while a successful close cannot leave a stale exit capable of
+  reversing the flat position.
+- Emergency cleanup recognizes both explicit `gordon_…` client-order IDs and
+  the exchange adapter's default `gordon-…` idempotency IDs. When mutually
+  exclusive exits exceed the remaining position, stop-loss protection is kept
+  ahead of same-side profit orders.
+
 ## [0.3.0] - 2026-08-26
 
 ### Security
