@@ -14,6 +14,7 @@ import {
   resetAttemptCounterForTesting,
   ATTEMPTS_LOG_PATH_ENV,
 } from "./multipleTestingTracker.ts";
+import { normalCdf } from "../../../core/numerics/index.ts";
 
 let tempDir: string;
 let logPath: string;
@@ -283,5 +284,139 @@ describe("attemptToPayload", () => {
     const p = attemptToPayload(attempt);
     expect(p.kind).toBe("multiple_testing.attempt_recorded");
     expect(p.family).toBe("x");
+  });
+});
+
+// ============================================================================
+// Dimensional correctness of the deflated-Sharpe gate (Tier-0 Group B, item 2)
+// ============================================================================
+
+describe("dynamicDeflatedThreshold: dimensional correctness", () => {
+  const base = {
+    family: "dimensional/BTCUSD",
+    observedSharpeAnnualized: 2,
+    annualization: 252,
+    trialCountOverride: 99,
+  } as const;
+
+  it("null benchmark shrinks as the track record lengthens", () => {
+    const short = dynamicDeflatedThreshold({ ...base, periods: 63 });
+    const long = dynamicDeflatedThreshold({ ...base, periods: 2520 });
+
+    // E[max Z] is dimensionless; the per-period null benchmark is E[max Z]/sqrt(n).
+    // Before the fix this divided by sqrt(annualization), so the benchmark was
+    // IDENTICAL for both track lengths.
+    expect(long.expectedMaxSharpeNullAnnualized).toBeLessThan(
+      short.expectedMaxSharpeNullAnnualized,
+    );
+    // A 40x longer track must shrink the bar by sqrt(40) ~ 6.3x.
+    expect(
+      short.expectedMaxSharpeNullAnnualized / long.expectedMaxSharpeNullAnnualized,
+    ).toBeCloseTo(Math.sqrt(2520 / 63), 6);
+  });
+
+  it("null benchmark equals E[max Z]/sqrt(periods), annualized", () => {
+    const periods = 1000;
+    const ann = 252;
+    const r = dynamicDeflatedThreshold({ ...base, periods, annualization: ann });
+    const eMaxZ = expectedMaxSharpeUnderNull(base.trialCountOverride + 1);
+
+    expect(r.expectedMaxSharpeNullAnnualized).toBeCloseTo(
+      (eMaxZ / Math.sqrt(periods)) * Math.sqrt(ann),
+      10,
+    );
+    // The mis-scaled version was eMaxZ (dimensionless) all the way through.
+    expect(r.expectedMaxSharpeNullAnnualized).not.toBeCloseTo(eMaxZ, 3);
+  });
+
+  it("a longer track with the same Sharpe never faces a higher bar", () => {
+    let prevBenchmark = Infinity;
+    let prevP = -Infinity;
+    for (const periods of [63, 126, 252, 504, 1260, 2520]) {
+      const r = dynamicDeflatedThreshold({ ...base, periods });
+      expect(r.expectedMaxSharpeNullAnnualized).toBeLessThan(prevBenchmark);
+      expect(r.dsrPValue).toBeGreaterThanOrEqual(prevP);
+      prevBenchmark = r.expectedMaxSharpeNullAnnualized;
+      prevP = r.dsrPValue;
+    }
+  });
+
+  it("p-value matches Bailey and Lopez de Prado on raw kurtosis, via an exact normal CDF", () => {
+    const periods = 500;
+    const ann = 252;
+    const skewness = -0.4;
+    const excessKurtosis = 1.5; // raw gamma4 = 4.5
+    const r = dynamicDeflatedThreshold({
+      ...base,
+      periods,
+      annualization: ann,
+      skewness,
+      excessKurtosis,
+    });
+
+    const eMaxZ = expectedMaxSharpeUnderNull(base.trialCountOverride + 1);
+    const srPer = base.observedSharpeAnnualized / Math.sqrt(ann);
+    const sr0Per = eMaxZ / Math.sqrt(periods);
+    // (gamma4 - 1)/4 on RAW kurtosis == (excess + 2)/4. For a normal this is
+    // 0.5, not 0; the old (excess/4) form deleted the term entirely.
+    const kurtTerm = (excessKurtosis + 2) / 4;
+    const den = Math.sqrt(1 - skewness * srPer + kurtTerm * srPer * srPer);
+    const z = ((srPer - sr0Per) * Math.sqrt(periods - 1)) / den;
+
+    expect(r.dsrPValue).toBeCloseTo(normalCdf(z), 12);
+  });
+
+  it("the non-normality term survives for normal returns (excess kurtosis 0)", () => {
+    const periods = 500;
+    const ann = 252;
+    // Two calls whose ONLY difference is the kurtosis term contributing 0.5 vs 0.
+    const normalCase = dynamicDeflatedThreshold({
+      ...base,
+      periods,
+      annualization: ann,
+      excessKurtosis: 0,
+    });
+    const termDeleted = dynamicDeflatedThreshold({
+      ...base,
+      periods,
+      annualization: ann,
+      excessKurtosis: -2, // drives kurtTerm to exactly 0
+    });
+    // A normal must carry a +0.5*SR^2 penalty, so its denominator is larger and
+    // its p-value strictly lower. Before the fix these two were swapped.
+    expect(normalCase.dsrPValue).toBeLessThan(termDeleted.dsrPValue);
+  });
+
+  it("normal CDF is exact, not the mis-scaled A&S 7.1.26 variant", () => {
+    // The old hand-rolled CDF applied erf coefficients with t = 1/(1+p|x|) but
+    // exp(-x^2/2), substituting the /sqrt(2) in the exponent only. Peak error
+    // ~0.037 near x = 0.57, biased HIGH, which inflates every DSR p-value.
+    const misScaled = (x: number): number => {
+      const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+      const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+      const sign = x < 0 ? -1 : 1;
+      const t = 1.0 / (1.0 + p * Math.abs(x));
+      const y =
+        1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-(x * x) / 2);
+      return 0.5 * (1.0 + sign * y);
+    };
+
+    // The mis-scaled function really is that far off, and biased HIGH.
+    expect(misScaled(0.567) - normalCdf(0.567)).toBeGreaterThan(0.03);
+    // At the 0.95 decision point it reports 0.961 for a true 0.95, so a gate
+    // set at "p > 0.95" was passing tracks that had not cleared it.
+    expect(misScaled(1.6448536269514722)).toBeGreaterThan(0.96);
+
+    // The module's own p-value now agrees with the exact CDF at every z it
+    // produces, including the band where the mis-scaled variant was worst.
+    for (const periods of [40, 50, 60, 80, 120, 500]) {
+      const r = dynamicDeflatedThreshold({ ...base, periods, observedSharpeAnnualized: 1.2 });
+      const eMaxZ = expectedMaxSharpeUnderNull(base.trialCountOverride + 1);
+      const srPer = 1.2 / Math.sqrt(252);
+      const sr0Per = eMaxZ / Math.sqrt(periods);
+      const den = Math.sqrt(1 + 0.5 * srPer * srPer);
+      const z = ((srPer - sr0Per) * Math.sqrt(periods - 1)) / den;
+      expect(r.dsrPValue).toBeCloseTo(normalCdf(z), 12);
+    }
   });
 });

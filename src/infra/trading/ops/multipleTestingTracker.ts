@@ -28,6 +28,7 @@
 import { existsSync, mkdirSync, appendFileSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import { normalCdf } from "../../../core/numerics/index.ts";
 
 export const ATTEMPTS_LOG_PATH_ENV = "GORDON_ATTEMPTS_LOG_PATH";
 
@@ -171,9 +172,11 @@ export function countTrials(family: string, path?: string): TrialCount {
  * Expected maximum Sharpe ratio under the null (no skill) for N independent
  * trials. Approximation from Bailey & López de Prado (2014).
  *
- * Returned value is in standardized (annualized-Sharpe) units, i.e. the
- * expected max of N draws from N(0, 1). Per-period conversion is the
- * caller's responsibility — divide by `sqrt(annualization)`.
+ * Returned value is DIMENSIONLESS: the expected max of N draws from N(0, 1),
+ * i.e. a z-score, not a Sharpe in any time unit. To turn it into a per-period
+ * Sharpe benchmark, divide by `sqrt(numPeriods)`: under the null, per-period
+ * trial Sharpes have standard deviation ~1/sqrt(n) over n observations. It does
+ * NOT scale with the annualization factor.
  *
  * Use this to derive a dynamic threshold for DSR: as N grows, so does the
  * Sharpe a chance-only researcher would observe.
@@ -209,7 +212,13 @@ export interface DynamicThresholdInput {
   annualization?: number;
   /** Skewness of the strategy's returns (default 0). */
   skewness?: number;
-  /** Excess kurtosis (default 0 for normal). */
+  /**
+   * EXCESS kurtosis (gamma4 - 3), so 0 means normal. The Bailey & Lopez de
+   * Prado denominator is stated on RAW kurtosis as (gamma4 - 1)/4, which is
+   * (excessKurtosis + 2)/4 here, so it is 0.5 for a normal, NOT 0. Keep the
+   * convention straight: passing raw kurtosis into this field understates the
+   * standard error and inflates the p-value.
+   */
   excessKurtosis?: number;
   /** Override trial count (e.g. for ablation). Defaults to readAttempts(family). */
   trialCountOverride?: number;
@@ -219,7 +228,11 @@ export interface DynamicThresholdInput {
 
 export interface DynamicThresholdResult {
   trialCount: number;
-  /** Expected-max Sharpe under null in annualized units. */
+  /**
+   * Expected-max Sharpe under the null, in ANNUALIZED units. Derived from the
+   * dimensionless E[max Z] by scaling to per-period (1/sqrt(periods)) and then
+   * annualizing (sqrt(annualization)), so it shrinks as the track lengthens.
+   */
   expectedMaxSharpeNullAnnualized: number;
   observedSharpeAnnualized: number;
   /**
@@ -229,17 +242,6 @@ export interface DynamicThresholdResult {
   dsrPValue: number;
   /** Verdict at 0.95 significance. */
   passes: boolean;
-}
-
-function normalCDF(x: number): number {
-  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
-  const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
-  const sign = x < 0 ? -1 : 1;
-  const t = 1.0 / (1.0 + p * Math.abs(x));
-  const y =
-    1.0 -
-    (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-(x * x) / 2);
-  return 0.5 * (1.0 + sign * y);
 }
 
 /**
@@ -268,21 +270,30 @@ export function dynamicDeflatedThreshold(input: DynamicThresholdInput): DynamicT
 
   // +1 because the current attempt is itself a trial
   const effectiveTrials = Math.max(trialCount + 1, 2);
-  const expectedMaxAnn = expectedMaxSharpeUnderNull(effectiveTrials);
+  const eMaxZ = expectedMaxSharpeUnderNull(effectiveTrials);
 
-  // Convert both to per-period for the standardization formula.
+  // `eMaxZ` is a dimensionless z-score. Under the null, per-period trial
+  // Sharpes have standard deviation ~1/sqrt(n) over n observations, so the
+  // per-period null benchmark is eMaxZ / sqrt(n), NOT eMaxZ / sqrt(ann).
+  // Dividing by the annualization factor left the bar independent of track
+  // length, so the gate was most permissive where the evidence was weakest.
+  // Matches `backtestCredibility.expectedMaxSharpe`, which scales by
+  // sqrt(variance / numPeriods) with unit null variance.
   const sr_per = input.observedSharpeAnnualized / Math.sqrt(ann);
-  const sr0_per = expectedMaxAnn / Math.sqrt(ann);
+  const sr0_per = eMaxZ / Math.sqrt(n);
   const skew = input.skewness ?? 0;
   const exKurt = input.excessKurtosis ?? 0;
+  // Bailey & Lopez de Prado use RAW kurtosis as (gamma4 - 1)/4, which is 0.5
+  // for a normal. In excess-kurtosis units that is (exKurt + 2)/4.
+  const kurtTerm = (exKurt + 2) / 4;
 
   const num = (sr_per - sr0_per) * Math.sqrt(n - 1);
-  const den = Math.sqrt(Math.max(1 - skew * sr_per + (exKurt / 4) * sr_per * sr_per, 1e-9));
-  const dsr = normalCDF(num / den);
+  const den = Math.sqrt(Math.max(1 - skew * sr_per + kurtTerm * sr_per * sr_per, 1e-9));
+  const dsr = normalCdf(num / den);
 
   return {
     trialCount,
-    expectedMaxSharpeNullAnnualized: expectedMaxAnn,
+    expectedMaxSharpeNullAnnualized: (eMaxZ / Math.sqrt(n)) * Math.sqrt(ann),
     observedSharpeAnnualized: input.observedSharpeAnnualized,
     dsrPValue: dsr,
     passes: dsr > 0.95,

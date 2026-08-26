@@ -17,6 +17,8 @@
  * Source: FinRL_Crypto (Bailey & López de Prado, 2012-2014)
  */
 
+import { normalCdf } from "../../../core/numerics/index.ts";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -107,15 +109,6 @@ function isEffectivelyZeroStddev(s: number, m: number): boolean {
   return s <= ZERO_VARIANCE_REL_EPS * Math.abs(m);
 }
 
-function normalCDF(x: number): number {
-  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
-  const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
-  const sign = x < 0 ? -1 : 1;
-  const t = 1.0 / (1.0 + p * Math.abs(x));
-  const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x / 2);
-  return 0.5 * (1.0 + sign * y);
-}
-
 function normalInverseCDF(p: number): number {
   // Rational approximation (Abramowitz & Stegun 26.2.23)
   if (p <= 0) return -Infinity;
@@ -171,7 +164,7 @@ export function probabilisticSharpeRatio(
   if (!(seSharpe > 0)) return { psr: 0.5, observedSharpe, significant: false };
 
   const z = (srStar - benchStar) / seSharpe;
-  const psr = normalCDF(z);
+  const psr = normalCdf(z);
 
   return {
     psr,
@@ -238,7 +231,7 @@ export function deflatedSharpeRatio(
   if (!(seSharpe > 0)) return { dsr: 0.5, observedSharpe, expectedMaxSharpeUnderNull: annualizedESharpeMax, significant: false };
 
   const z = (srStar - benchStar) / seSharpe;
-  const dsr = normalCDF(z);
+  const dsr = normalCdf(z);
 
   return {
     dsr,
