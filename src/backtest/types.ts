@@ -59,6 +59,12 @@ export interface Signal {
   /** Human-readable explanation for the signal */
   reason: string;
 
+  /** Absolute stop-loss price to attach to a newly opened position. */
+  stopLoss?: number;
+
+  /** Absolute take-profit price to attach to a newly opened position. */
+  takeProfit?: number;
+
   /** Grid level index (0-based) for grid/DCA strategies. When set, the engine allows multiple concurrent positions. */
   gridLevel?: number;
 
@@ -827,11 +833,7 @@ export interface Strategy {
    * @param position - Current open position (if any)
    * @returns Trading signal
    */
-  generateSignal(
-    bar: OHLC,
-    indicators: IndicatorState,
-    position: Position | null
-  ): Signal;
+  generateSignal(bar: OHLC, indicators: IndicatorState, position: Position | null): Signal;
 
   /**
    * Optional Kelly criterion parameters for position sizing.

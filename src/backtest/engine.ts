@@ -94,6 +94,43 @@ export function protectiveOrderPrices(
   };
 }
 
+function protectionFromSignal(
+  side: "LONG" | "SHORT",
+  entryPrice: number,
+  signal: Pick<Signal, "stopLoss" | "takeProfit">,
+): Pick<Position, "stopLoss" | "takeProfit"> {
+  const { stopLoss, takeProfit } = signal;
+  for (const [name, value] of [
+    ["stopLoss", stopLoss],
+    ["takeProfit", takeProfit],
+  ] as const) {
+    if (value !== undefined && (!Number.isFinite(value) || value <= 0)) {
+      throw new Error(`${name} must be a finite positive price (got ${value})`);
+    }
+  }
+
+  if (side === "LONG") {
+    if (stopLoss !== undefined && stopLoss >= entryPrice) {
+      throw new Error(`long stopLoss ${stopLoss} must be below entry ${entryPrice}`);
+    }
+    if (takeProfit !== undefined && takeProfit <= entryPrice) {
+      throw new Error(`long takeProfit ${takeProfit} must be above entry ${entryPrice}`);
+    }
+  } else {
+    if (stopLoss !== undefined && stopLoss <= entryPrice) {
+      throw new Error(`short stopLoss ${stopLoss} must be above entry ${entryPrice}`);
+    }
+    if (takeProfit !== undefined && takeProfit >= entryPrice) {
+      throw new Error(`short takeProfit ${takeProfit} must be below entry ${entryPrice}`);
+    }
+  }
+
+  return {
+    ...(stopLoss === undefined ? {} : { stopLoss }),
+    ...(takeProfit === undefined ? {} : { takeProfit }),
+  };
+}
+
 /**
  * Adapter interface for strategies used in backtesting.
  * Allows both full Strategy interface and simplified backtest-only strategies.
@@ -321,21 +358,6 @@ export class BacktestEngine {
   }
 
   /**
-   * Process a bar and generate/execute signals.
-   */
-  private processBar(bar: OHLC, index: number, indicators: IndicatorState): void {
-    this.currentBarIndex = index;
-
-    // Check stops first
-    if (this.position) {
-      this.checkStopTakeProfit(bar);
-    }
-
-    // Get and execute signal
-    // Note: This is called from run() which handles signal generation
-  }
-
-  /**
    * Execute a trading signal.
    * Supports both single-position (classic) and multi-position (grid/DCA) modes.
    * Grid mode activates when signal.gridLevel is defined.
@@ -358,7 +380,7 @@ export class BacktestEngine {
 
       // Open long if no position
       if (!this.position) {
-        this.openPosition("LONG", signal.price || bar.close, bar);
+        this.openPosition("LONG", signal.price || bar.close, bar, signal);
       }
     } else if (signalType === "SELL") {
       // If we have a long position, close it
@@ -368,7 +390,7 @@ export class BacktestEngine {
 
       // Open short if allowed and no position
       if (!this.position && this.params.allowShorts) {
-        this.openPosition("SHORT", signal.price || bar.close, bar);
+        this.openPosition("SHORT", signal.price || bar.close, bar, signal);
       }
     }
   }
@@ -441,7 +463,7 @@ export class BacktestEngine {
         return; // At capacity
       }
 
-      this.openGridPosition("LONG", signal.price || bar.close, bar, signal.gridLevel!);
+      this.openGridPosition("LONG", signal.price || bar.close, bar, signal.gridLevel!, signal);
     } else if (signal.type === "SELL") {
       if (signal.gridLevel !== undefined) {
         // Close the specific grid level if it exists
@@ -463,7 +485,7 @@ export class BacktestEngine {
       if (this.params.allowShorts && signal.gridLevel !== undefined) {
         const shortGridCount = this.gridPositions.filter((p) => p.side === "SHORT").length;
         if (shortGridCount < maxPos) {
-          this.openGridPosition("SHORT", signal.price || bar.close, bar, signal.gridLevel!);
+          this.openGridPosition("SHORT", signal.price || bar.close, bar, signal.gridLevel!, signal);
         }
       }
     }
@@ -481,6 +503,7 @@ export class BacktestEngine {
     price: number,
     bar: OHLC,
     gridLevel: number,
+    signal: Pick<Signal, "stopLoss" | "takeProfit">,
   ): void {
     // Apply slippage (book-walked when a fill model is configured).
     // Position size divides equally among max grid positions so total exposure
@@ -495,6 +518,7 @@ export class BacktestEngine {
       return; // Book held no liquidity for this side
     }
     const slippedPrice = entry.price;
+    const protection = protectionFromSignal(side, slippedPrice, signal);
     const perGridValue = entry.value;
 
     if (perGridValue <= 0) {
@@ -526,6 +550,7 @@ export class BacktestEngine {
         entryBarIndex: this.currentBarIndex,
         quantity: adjustedQuantity,
         entryCommission: adjustedCommission,
+        ...protection,
         unrealizedPnL: 0,
         gridLevel,
       });
@@ -540,6 +565,7 @@ export class BacktestEngine {
         entryBarIndex: this.currentBarIndex,
         quantity,
         entryCommission: commission,
+        ...protection,
         unrealizedPnL: 0,
         gridLevel,
       });
@@ -549,12 +575,22 @@ export class BacktestEngine {
   /**
    * Close a specific grid position.
    */
-  private closeGridPosition(pos: Position, price: number, bar: OHLC, reason: string): void {
+  private closeGridPosition(
+    pos: Position,
+    price: number,
+    bar: OHLC,
+    reason: string,
+    priceAlreadySlipped = false,
+  ): void {
     // Apply slippage (opposite direction, book-walked when a fill model is configured)
     const exitSide = pos.side === "LONG" ? "SELL" : "BUY";
     const exitFill = this.bookFill(price, exitSide, pos.quantity, bar, "estimate");
     const slippedPrice =
-      exitFill && !exitFill.estimated ? exitFill.price : this.applySlippage(price, exitSide);
+      exitFill && !exitFill.estimated
+        ? exitFill.price
+        : priceAlreadySlipped
+          ? price
+          : this.applySlippage(price, exitSide);
 
     // Calculate P&L
     const positionValue = pos.quantity * slippedPrice;
@@ -620,7 +656,12 @@ export class BacktestEngine {
   /**
    * Open a new position.
    */
-  private openPosition(side: "LONG" | "SHORT", price: number, bar: OHLC): void {
+  private openPosition(
+    side: "LONG" | "SHORT",
+    price: number,
+    bar: OHLC,
+    signal: Pick<Signal, "stopLoss" | "takeProfit">,
+  ): void {
     // Apply slippage (book-walked when a fill model is configured)
     const entry = this.resolveEntryFill(price, side === "LONG" ? "BUY" : "SELL", bar, (p) =>
       this.calculatePositionSize(p),
@@ -629,6 +670,7 @@ export class BacktestEngine {
       return; // Book held no liquidity for this side
     }
     const slippedPrice = entry.price;
+    const protection = protectionFromSignal(side, slippedPrice, signal);
 
     // Calculate position size
     const positionValue = entry.value;
@@ -664,6 +706,7 @@ export class BacktestEngine {
         entryBarIndex: this.currentBarIndex,
         quantity: adjustedQuantity,
         entryCommission: adjustedCommission,
+        ...protection,
         unrealizedPnL: 0,
       };
     } else {
@@ -677,6 +720,7 @@ export class BacktestEngine {
         entryBarIndex: this.currentBarIndex,
         quantity,
         entryCommission: commission,
+        ...protection,
         unrealizedPnL: 0,
       };
     }
@@ -685,7 +729,12 @@ export class BacktestEngine {
   /**
    * Close the current position.
    */
-  private closePosition(price: number, bar: OHLC, reason: string): void {
+  private closePosition(
+    price: number,
+    bar: OHLC,
+    reason: string,
+    priceAlreadySlipped = false,
+  ): void {
     if (!this.position) {
       return;
     }
@@ -694,7 +743,11 @@ export class BacktestEngine {
     const exitSide = this.position.side === "LONG" ? "SELL" : "BUY";
     const exitFill = this.bookFill(price, exitSide, this.position.quantity, bar, "estimate");
     const slippedPrice =
-      exitFill && !exitFill.estimated ? exitFill.price : this.applySlippage(price, exitSide);
+      exitFill && !exitFill.estimated
+        ? exitFill.price
+        : priceAlreadySlipped
+          ? price
+          : this.applySlippage(price, exitSide);
 
     // Calculate P&L
     const positionValue = this.position.quantity * slippedPrice;
@@ -757,14 +810,14 @@ export class BacktestEngine {
       if (this.position.stopLoss) {
         const sl = protectiveOrderPrices(side, this.position.stopLoss, slippage);
         if (side === "LONG" ? bar.low <= sl.triggerPrice : bar.high >= sl.triggerPrice) {
-          this.closePosition(sl.fillPrice, bar, "STOP_LOSS");
+          this.closePosition(sl.fillPrice, bar, "STOP_LOSS", true);
           return;
         }
       }
       if (this.position.takeProfit) {
         const tp = protectiveOrderPrices(side, this.position.takeProfit, slippage);
         if (side === "LONG" ? bar.high >= tp.triggerPrice : bar.low <= tp.triggerPrice) {
-          this.closePosition(tp.fillPrice, bar, "TAKE_PROFIT");
+          this.closePosition(tp.fillPrice, bar, "TAKE_PROFIT", true);
           return;
         }
       }
@@ -777,15 +830,14 @@ export class BacktestEngine {
       if (pos.stopLoss) {
         const sl = protectiveOrderPrices(pos.side, pos.stopLoss, slippage);
         if (pos.side === "LONG" ? bar.low <= sl.triggerPrice : bar.high >= sl.triggerPrice) {
-          this.closeGridPosition(pos, sl.fillPrice, bar, "STOP_LOSS");
+          this.closeGridPosition(pos, sl.fillPrice, bar, "STOP_LOSS", true);
           continue;
         }
       }
       if (pos.takeProfit) {
         const tp = protectiveOrderPrices(pos.side, pos.takeProfit, slippage);
         if (pos.side === "LONG" ? bar.high >= tp.triggerPrice : bar.low <= tp.triggerPrice) {
-          this.closeGridPosition(pos, tp.fillPrice, bar, "TAKE_PROFIT");
-          continue;
+          this.closeGridPosition(pos, tp.fillPrice, bar, "TAKE_PROFIT", true);
         }
       }
     }
@@ -827,7 +879,7 @@ export class BacktestEngine {
   /**
    * Calculate position size based on sizing mode.
    */
-  private calculatePositionSize(price: number): number {
+  private calculatePositionSize(_price: number): number {
     switch (this.params.positionSizing) {
       case "FIXED_AMOUNT":
         return Math.min(
@@ -1246,7 +1298,7 @@ export class BacktestEngine {
   /**
    * Calculate all performance metrics.
    */
-  private calculateMetrics(finalCapital: number): BacktestMetrics {
+  private calculateMetrics(_finalCapital: number): BacktestMetrics {
     return calculateMetricsFromTrades(this.trades, this.equityCurve, this.params);
   }
 }
