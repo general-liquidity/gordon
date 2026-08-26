@@ -25,6 +25,7 @@ import {
 } from "../../errors/index.ts";
 import { auditLog } from "../../infra/platform/audit/index.ts";
 import { checkKillSwitchForOrder } from "../../infra/safety/killSwitchGate.ts";
+import { assertLiveConsent } from "../../infra/trading/execution/preflight.ts";
 import type {
   Plan,
   Trade,
@@ -1710,6 +1711,8 @@ export async function placeOrderIdempotent(
   client: Exchange,
   params: OrderParams
 ): Promise<Order> {
+  assertLiveConsent(client, "executor.place_order_idempotent");
+
   if (!params.newClientOrderId) {
     // No client order ID - just place normally
     return client.placeOrder(params);
@@ -2039,6 +2042,18 @@ export async function placeOCOOrders(
 ): Promise<OCOResult> {
   const logPrefix = planId ? `[${planId}] ` : "";
   logger.info(`${logPrefix}Placing OCO order`, { symbol, side, quantity, stopPrice, takeProfitPrice });
+
+  // Both the native-OCO path and the two-leg fallback dispatch to the venue.
+  try {
+    assertLiveConsent(client, "executor.place_oco_orders");
+  } catch (error) {
+    return {
+      success: false,
+      orderIds: [],
+      native: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 
   // Audit: Record OCO attempt
   auditLog.record(userId, "PLACE_OCO_ORDER", {

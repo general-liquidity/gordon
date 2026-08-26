@@ -13,6 +13,7 @@ import { logEvent } from "../../infra/storage/entities/events.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { StrategyRuntime } from "../runtime/engine.ts";
 import type { CircuitBreakerTrigger } from "../../gateway/circuit-breakers/baseline.ts";
+import { assertLiveConsent } from "../../infra/trading/execution/preflight.ts";
 
 const logger = createModuleLogger("emergency-liquidation");
 
@@ -137,6 +138,8 @@ async function closeAllOpenPositions(
       // Determine exit side from the plan's direction
       const plan = getPlan(trade.planId);
       const exitSide = plan?.direction === "short" ? "BUY" : "SELL";
+
+      assertLiveConsent(exchange, "emergency_liquidation.close_position");
 
       const orderResult = await exchange.placeOrder({
         symbol: trade.symbol,

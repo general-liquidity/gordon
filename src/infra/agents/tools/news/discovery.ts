@@ -23,6 +23,7 @@ import { registerSymbols } from "../../../../tui/components/messages/markdownPal
 import { getGordonContext, type MastraExecutionContext } from "../types.ts";
 import type { ExchangeExtended } from "../../../exchange/types.ts";
 import { checkKillSwitchForOrder } from "../../../safety/killSwitchGate.ts";
+import { requireLiveConsent } from "../../../safety/consent.ts";
 
 // ============================================================================
 // Error Messages
@@ -516,6 +517,17 @@ export const placeBracketOrderTool = createTool({
           takeProfitPrice,
         };
       }
+      const consent = requireLiveConsent({ sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper ?? false });
+      if (!consent.ok) {
+        return {
+          error: consent.reason ?? "Live-trading consent required.",
+          symbol,
+          side,
+          quantity,
+          stopLossPrice,
+          takeProfitPrice,
+        };
+      }
     }
 
     const normalizedSymbol = normalizeCryptoSymbol(symbol);
@@ -689,6 +701,10 @@ export const placeMarketOrderTool = createTool({
       const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return { error: check.reason ?? "Market order not permitted under current mode" };
+      }
+      const consent = requireLiveConsent({ sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper ?? false });
+      if (!consent.ok) {
+        return { error: consent.reason ?? "Live-trading consent required." };
       }
     }
 

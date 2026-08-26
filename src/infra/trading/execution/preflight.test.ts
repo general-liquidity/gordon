@@ -7,7 +7,7 @@ import type { GordonContext } from "../../agents/types.ts";
 import type { Exchange, OrderParams } from "../../exchange/types.ts";
 import { resetAllKillSwitches } from "../../safety/killSwitches.ts";
 import { CONSENT_PATH_ENV, recordLiveConsent } from "../../safety/consent.ts";
-import { createSafeOrderSubmitter, runExecutionPreflight } from "./preflight.ts";
+import { assertLiveConsent, createSafeOrderSubmitter, runExecutionPreflight } from "./preflight.ts";
 
 // Kill-switch state is process-global and persisted; a switch tripped by
 // another test file would otherwise fail these preflight assertions.
@@ -149,5 +149,41 @@ describe("execution preflight — live consent gate", () => {
       skipRiskGate: true,
     });
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("assertLiveConsent", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "gordon-assert-consent-"));
+    process.env[CONSENT_PATH_ENV] = join(dir, "consent.json");
+  });
+
+  afterEach(() => {
+    delete process.env[CONSENT_PATH_ENV];
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("throws on a live venue without consent", () => {
+    expect(() => assertLiveConsent({ isSandbox: false }, "test.assert")).toThrow(
+      /have not yet acknowledged live trading/,
+    );
+  });
+
+  it("treats an absent venue handle as live", () => {
+    expect(() => assertLiveConsent(undefined, "test.assert")).toThrow(
+      /have not yet acknowledged live trading/,
+    );
+  });
+
+  it("passes for a sandbox exchange and a paper broker", () => {
+    expect(() => assertLiveConsent({ isSandbox: true }, "test.assert")).not.toThrow();
+    expect(() => assertLiveConsent({ isPaper: true }, "test.assert")).not.toThrow();
+  });
+
+  it("passes on a live venue once consent is recorded", () => {
+    recordLiveConsent(process.env);
+    expect(() => assertLiveConsent({ isSandbox: false }, "test.assert")).not.toThrow();
   });
 });

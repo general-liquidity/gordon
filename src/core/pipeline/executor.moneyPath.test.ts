@@ -122,6 +122,7 @@ describe("repairProtectiveOrders", () => {
     const entryClientId = generateDeterministicClientOrderId(plan.id, "entry");
     const client = {
       exchangeId: "binance",
+      isSandbox: true,
       getOrderHistory: async () => [
         {
           orderId: "entry-1",
@@ -184,6 +185,7 @@ describe("repairProtectiveOrders", () => {
 
     const client = {
       exchangeId: "binance",
+      isSandbox: true,
       getOrderHistory: async () => [
         {
           orderId: "entry-1",
@@ -273,6 +275,7 @@ describe("placeOCOOrders fallback client IDs", () => {
 
     const client = {
       exchangeId: "kraken",
+      isSandbox: true,
       getOrderHistory: async () => [],
       getOpenOrders: async () => [],
       placeOrder: async (params: { newClientOrderId?: string }) => {

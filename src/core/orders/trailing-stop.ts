@@ -20,6 +20,7 @@ import { logEvent } from "../../infra/storage/entities/events.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
 import type { Trade, Plan, ExitFill } from "../../types/index.ts";
+import { assertLiveConsent } from "../../infra/trading/execution/preflight.ts";
 
 const logger = createModuleLogger("trailing-stop");
 
@@ -479,6 +480,7 @@ export class TrailingStopTracker extends EventEmitter {
 
     let sellOrder: Order;
     try {
+      assertLiveConsent(client, "trailing_stop.execute");
       sellOrder = await client.placeOrder(orderParams);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";

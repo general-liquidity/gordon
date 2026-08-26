@@ -33,6 +33,33 @@ export type ExecutionPreflightResult = ExecutionPreflightSuccess | ExecutionPref
 
 export type SafeOrderSubmitter = (order: OrderParams) => Promise<Order>;
 
+/**
+ * Live-consent guard for dispatch paths that hold only a venue handle and no
+ * GordonContext (core pipeline, order managers, emergency liquidation). Same
+ * gate `runExecutionPreflight` applies, reachable without a context. Throws so
+ * the caller's existing failure path reports the refusal; an absent venue is
+ * treated as live (fail closed).
+ */
+export function assertLiveConsent(
+  venue: { isSandbox?: boolean; isPaper?: boolean } | undefined,
+  source: string,
+): void {
+  const sandboxActive = venue?.isSandbox ?? venue?.isPaper ?? false;
+  const consent = requireLiveConsent({ sandboxActive });
+  if (consent.ok) return;
+  recordStructuredObservation({
+    eventType: "execution.preflight_blocked",
+    workflow: "execution",
+    source,
+    component: "execution_preflight",
+    toolName: source,
+    outcome: "failure",
+    status: "live_consent_required",
+    reason: consent.reason,
+  });
+  throw new Error(consent.reason ?? "Live-trading consent required.");
+}
+
 function makePreflightId(source: string): string {
   return `pf_${source.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }

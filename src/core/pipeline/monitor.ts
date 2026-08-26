@@ -26,6 +26,7 @@ import {
   repairProtectiveOrders,
 } from "./executor.ts";
 import { getTrailingStopTracker } from "../orders/trailing-stop.ts";
+import { assertLiveConsent } from "../../infra/trading/execution/preflight.ts";
 
 const logger = createModuleLogger("monitor");
 
@@ -1006,6 +1007,8 @@ async function placeDeferredTakeProfits(
   totalQuantity: number,
   alerts: Alert[]
 ): Promise<void> {
+  assertLiveConsent(client, "monitor.deferred_take_profits");
+
   // Track successfully placed quantities to properly calculate remaining
   let placedQuantity = 0;
   const tpResults: { level: number; success: boolean; quantity: number }[] = [];
@@ -1341,6 +1344,8 @@ export async function placeGridTakeProfits(
       averageEntry: trade.averageEntry,
       currentPrice,
     });
+
+    assertLiveConsent(exchange, "monitor.grid_take_profits");
 
     // Place TP orders
     let placedCount = 0;

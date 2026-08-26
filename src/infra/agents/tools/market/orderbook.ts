@@ -25,6 +25,7 @@ import { createCachedTool, TOOL_CACHE_CONFIG } from "../runtime/cache.ts";
 import { placeOCOOrders } from "../../../../core/pipeline/executor.ts";
 import { resolveInstrument } from "../../../domain/markets/instruments.ts";
 import { checkKillSwitchForOrder } from "../../../safety/killSwitchGate.ts";
+import { requireLiveConsent } from "../../../safety/consent.ts";
 
 function killSwitchOrderError(
   ctx: ReturnType<typeof getGordonContext>,
@@ -753,6 +754,10 @@ export const placeLimitOrderTool = createTool({
       const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return { error: check.reason ?? "Placing limit orders not permitted under current mode" };
+      }
+      const consent = requireLiveConsent({ sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper ?? false });
+      if (!consent.ok) {
+        return { error: consent.reason ?? "Live-trading consent required." };
       }
     }
 
