@@ -31,14 +31,20 @@ const SUPPORTED_EXCHANGES: NativeExchangeId[] = [
  * Cache key generator for exchange instances. Operates on the canonical
  * (`ccxt:*`) id so the same venue caches once regardless of input form.
  */
-function getCacheKey(exchangeId: ExchangeId, credentials: ExchangeCredentials): string {
+function getCacheKey(
+  exchangeId: ExchangeId,
+  credentials: ExchangeCredentials,
+  resolvedSandbox: boolean,
+): string {
   // Use first 8 characters of key as identifier to avoid storing full key.
   // For wallet-based venues (hyperliquid), use the wallet key; else the API key.
   const key = ccxtIdToNativeVenue(exchangeId) === "hyperliquid"
     ? credentials.walletPrivateKey || credentials.apiKey
     : credentials.apiKey;
   const keyPrefix = key.substring(0, 8);
-  return `${exchangeId}:${keyPrefix}`;
+  // The resolved mode is part of the adapter's identity: without it, a live
+  // adapter cached earlier is handed back to a caller asking for sandbox.
+  return `${exchangeId}:${keyPrefix}:${resolvedSandbox ? "sandbox" : "live"}`;
 }
 
 /**
@@ -89,7 +95,7 @@ function getCacheKey(exchangeId: ExchangeId, credentials: ExchangeCredentials): 
 export class ExchangeFactory {
   /**
    * Instance cache to avoid creating duplicate exchange connections
-   * Key format: "exchangeId:apiKeyPrefix"
+   * Key format: "exchangeId:apiKeyPrefix:sandbox|live"
    */
   private static instanceCache: Map<string, Exchange> = new Map();
 
@@ -125,7 +131,7 @@ export class ExchangeFactory {
     // CCXT venues defer to CCXT's own detection at construct time.
     assertSandboxSupported(canonical, resolvedSandbox);
 
-    const cacheKey = getCacheKey(canonical, credentials);
+    const cacheKey = getCacheKey(canonical, credentials, resolvedSandbox);
     const cached = this.instanceCache.get(cacheKey);
     if (cached) return cached;
 
@@ -217,8 +223,11 @@ export class ExchangeFactory {
    * @param credentials - The credentials used to create the instance
    */
   static removeFromCache(exchangeId: ExchangeId, credentials: ExchangeCredentials): void {
-    const cacheKey = getCacheKey(exchangeId, credentials);
-    this.instanceCache.delete(cacheKey);
+    // `create` caches under the canonical id, so normalize before evicting.
+    const canonical = normalizeExchangeId(exchangeId);
+    // The caller names credentials, not a mode, so evict both mode entries.
+    this.instanceCache.delete(getCacheKey(canonical, credentials, true));
+    this.instanceCache.delete(getCacheKey(canonical, credentials, false));
   }
 
   /**
