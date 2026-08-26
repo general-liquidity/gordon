@@ -1,6 +1,6 @@
-export const STRATEGY_TEMPLATE = `import { createGordonSDKClient } from "@general-liquidity/gordon/sdk";
+export const STRATEGY_TEMPLATE = `import { createGordonSDK } from "@general-liquidity/gordon/sdk";
 
-const gordon = createGordonSDKClient({
+const gordon = createGordonSDK({
   token: process.env.GORDON_AUTH_TOKEN!,
   sessionId: "{{PROJECT_NAME}}",
 });
@@ -9,9 +9,9 @@ async function main() {
   await gordon.connect();
   console.log("{{PROJECT_NAME}} strategy connected");
 
-  // 1. Arm the system for live trading (1 hour window)
-  await gordon.arm({ durationHours: 1, reason: "{{PROJECT_NAME}} strategy session" });
-  console.log("System armed");
+  // 1. Stay read-only for the starter run. Raise this yourself once you have
+  //    reviewed what the strategy does; "auto" lets Gordon place trades.
+  await gordon.setPermissionMode({ mode: "strict", reason: "{{PROJECT_NAME}} starter run" });
 
   // 2. Run a market scan to find opportunities
   const scan = await gordon.scan({ topN: 30, timeframes: ["15m"] });
@@ -32,11 +32,7 @@ async function main() {
   const health = await gordon.healthCheck({ aggressive: false });
   console.log("Health check:", health.data);
 
-  // 7. Disarm when done
-  await gordon.disarm({ reason: "Strategy session complete" });
-  console.log("System disarmed");
-
-  gordon.disconnect();
+  await gordon.disconnect();
 }
 
 main().catch((err) => {

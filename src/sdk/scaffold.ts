@@ -17,6 +17,24 @@ export interface ScaffoldOptions {
   packageManager: PackageManager;
 }
 
+/**
+ * The name is substituted verbatim into a generated package.json and into a
+ * string literal in the generated src/index.ts, both of which the user then
+ * installs and runs. It arrives from argv, so it is a boundary value: anything
+ * outside the npm-safe alphabet could close the literal it lands in and inject
+ * JSON keys or executable code into the scaffolded project.
+ */
+const PROJECT_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,213}$/;
+
+export function assertValidProjectName(name: string): void {
+  if (!PROJECT_NAME_PATTERN.test(name)) {
+    throw new Error(
+      `Invalid project name: ${JSON.stringify(name)}. ` +
+        "Use lowercase letters, digits, '.', '-' or '_', starting with a letter or digit (max 214 chars).",
+    );
+  }
+}
+
 function applyTokens(content: string, options: ScaffoldOptions): string {
   const runCmd = options.packageManager === "bun" ? "bun run" : "npx tsx";
   return content
@@ -25,6 +43,8 @@ function applyTokens(content: string, options: ScaffoldOptions): string {
 }
 
 export async function scaffoldProject(targetDir: string, options: ScaffoldOptions): Promise<string[]> {
+  assertValidProjectName(options.name);
+
   const srcDir = join(targetDir, "src");
   await mkdir(srcDir, { recursive: true });
 
