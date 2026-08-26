@@ -231,8 +231,19 @@ export interface StopLossRule {
   /** Type of stop-loss calculation */
   type: "fixed_percent" | "atr" | "structure" | "custom";
 
-  /** Percentage value (if applicable) */
-  value?: number;
+  /**
+   * Stop distance as a PERCENT of entry price. Only meaningful for
+   * `fixed_percent` and as a secondary bound on `structure` / `custom`.
+   *
+   * Split from `atrMultiple` because one untyped `value` field made the unit
+   * depend on `type`, and the parser's percent fallback wrote a percent into
+   * it for ATR stops too: "1.5 ATR below the swing low, max 2% of equity"
+   * yielded value = 2, which an ATR consumer reads as 2 ATR.
+   */
+  percentValue?: number;
+
+  /** Stop distance as a MULTIPLE of ATR. Only meaningful for `atr`. */
+  atrMultiple?: number;
 }
 
 /**
@@ -256,8 +267,24 @@ export interface PositionSizingRule {
   /** Natural language description */
   description: string;
 
-  /** Risk percentage per trade (e.g., 1 means 1%) */
+  /**
+   * Percent of the account put AT RISK per trade, i.e. what is lost if the
+   * stop is hit (e.g. 1 means 1%). Position size is derived from it and the
+   * stop distance, so it is typically several times smaller than the notional
+   * the position occupies.
+   */
   riskPercent?: number;
+
+  /**
+   * Percent of the account the position OCCUPIES (allocation sizing, e.g.
+   * "position size: 5% of portfolio").
+   *
+   * Separate from `riskPercent` because a single field harvested from any
+   * percentage in the sizing bullet turned an allocation into a risk budget:
+   * a 5% allocation behind a 2% stop risks 0.1% of the account, not 5%, so
+   * reading it as risk-per-trade oversizes by 50x.
+   */
+  positionPercent?: number;
 }
 
 // ============================================================================

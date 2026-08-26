@@ -25,7 +25,7 @@ function pb(id: string, subs: SubPlaybookReference[] = []): Playbook {
     execution: {
       entryType: "market",
       entryDescription: `${id} entry`,
-      stopLoss: { description: "1%", type: "fixed_percent", value: 1 },
+      stopLoss: { description: "1%", type: "fixed_percent", percentValue: 1 },
       takeProfit: { description: "2:1", riskRewardRatio: 2 },
       positionSizing: { description: "1% risk", riskPercent: 1 },
     },

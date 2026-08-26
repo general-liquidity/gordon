@@ -115,7 +115,11 @@ export function playbookToProtocol(pb: Playbook): PlaybookProtocol {
       description: buildExitDescription(pb),
       stop_loss: {
         type: stopLossTypeMap[pb.execution.stopLoss.type] ?? "fixed_percent",
-        value: pb.execution.stopLoss.value ?? 2,
+        // An ATR stop's value is a multiple, every other type's is a percent.
+        value:
+          pb.execution.stopLoss.type === "atr"
+            ? pb.execution.stopLoss.atrMultiple ?? 2
+            : pb.execution.stopLoss.percentValue ?? 2,
         params: pb.execution.stopLoss.type === "atr"
           ? { atr_period: 14 }
           : undefined,

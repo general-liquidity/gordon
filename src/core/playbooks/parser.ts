@@ -381,16 +381,21 @@ function parseExecutionSection(body: string): PlaybookExecution {
   };
 }
 
-function parseStopLossRule(text: string): StopLossRule {
+export function parseStopLossRule(text: string): StopLossRule {
   const lower = text.toLowerCase();
   const rule: StopLossRule = { description: text, type: "custom" };
 
   if (lower.includes("atr")) {
     rule.type = "atr";
+    // "1.5 ATR below the swing low", "2x ATR", "ATR × 2", "ATR(14) x 1.5".
+    const atrMatch =
+      lower.match(/(\d+(?:\.\d+)?)\s*(?:x|\*|×)?\s*atr/) ??
+      lower.match(/atr(?:\s*\(\s*\d+\s*\))?\s*(?:x|\*|×)\s*(\d+(?:\.\d+)?)/);
+    if (atrMatch) rule.atrMultiple = parseFloat(atrMatch[1]!);
   } else if (lower.includes("%") || lower.match(/\d+-\d+%/)) {
     rule.type = "fixed_percent";
     const pctMatch = lower.match(/(\d+(?:\.\d+)?)\s*%/);
-    if (pctMatch) rule.value = parseFloat(pctMatch[1]!);
+    if (pctMatch) rule.percentValue = parseFloat(pctMatch[1]!);
   } else if (
     lower.includes("support") ||
     lower.includes("swing low") ||
@@ -400,10 +405,13 @@ function parseStopLossRule(text: string): StopLossRule {
     rule.type = "structure";
   }
 
-  // Extract percentage even for structure-based stops
-  if (rule.value === undefined) {
+  // A percent mentioned alongside a structure or custom stop is a secondary
+  // bound and belongs in the percent field. It is NOT harvested for an ATR
+  // stop: "1.5 ATR below the swing low, max 2% of equity" would otherwise
+  // leave 2 in the field an ATR consumer reads as a multiple.
+  if (rule.percentValue === undefined && rule.type !== "atr") {
     const pctMatch = lower.match(/(\d+(?:\.\d+)?)\s*%/);
-    if (pctMatch) rule.value = parseFloat(pctMatch[1]!);
+    if (pctMatch) rule.percentValue = parseFloat(pctMatch[1]!);
   }
 
   return rule;
@@ -426,13 +434,27 @@ function parseTakeProfitRule(text: string): TakeProfitRule {
   return rule;
 }
 
-function parsePositionSizingRule(text: string): PositionSizingRule {
+export function parsePositionSizingRule(text: string): PositionSizingRule {
   const rule: PositionSizingRule = { description: text };
 
-  // Extract risk percentage: "Risk 1% of portfolio" or "1% risk"
-  const pctMatch = text.match(/(?:risk\s+)?(\d+(?:\.\d+)?)\s*%/i);
-  if (pctMatch) {
-    rule.riskPercent = parseFloat(pctMatch[1]!);
+  // Risk-per-trade only when the text actually says risk: "Risk 1% of
+  // portfolio", "1% risk per trade", "risk per trade: 1%". The optional
+  // `(?:risk\s+)?` prefix that used to guard this matched every percentage in
+  // the bullet, so "Position size: 5% of portfolio" was recorded as a 5%
+  // risk budget.
+  const riskMatch =
+    text.match(/risk[^.\n]{0,30}?(\d+(?:\.\d+)?)\s*%/i) ??
+    text.match(/(\d+(?:\.\d+)?)\s*%[^.\n]{0,20}?risk/i);
+  if (riskMatch) {
+    rule.riskPercent = parseFloat(riskMatch[1]!);
+  }
+
+  // Any other percentage in a sizing bullet is an allocation, not a risk
+  // budget. Recorded separately so a consumer must choose which it wants.
+  const sizeMatch = text.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (sizeMatch) {
+    const value = parseFloat(sizeMatch[1]!);
+    if (value !== rule.riskPercent) rule.positionPercent = value;
   }
 
   return rule;

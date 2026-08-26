@@ -80,20 +80,30 @@ export const GenomeSchema = z.object({
   ]),
 
   // ---- Backtest Performance ----
+  /** Annualized Sharpe. `FitnessCalculator` scores it against a target of 2.0,
+   *  which is an annualized number. */
   backtest_sharpe: z.number().optional(),
-  backtest_win_rate: z.number().optional(),
+  /** Win rate as a PERCENT in [0, 100], matching `paper_win_rate` and
+   *  `live_win_rate`. Bounded because the three feed one clamped fitness term:
+   *  a fraction written here (0.55 for 55%) scores 0.55 out of 100 and the
+   *  genome is under-weighted 100x with nothing raising an error. */
+  backtest_win_rate: z.number().min(0).max(100).optional(),
   backtest_profit_factor: z.number().optional(),
-  backtest_max_drawdown: z.number().optional(),
+  /** Max drawdown as a PERCENT in [0, 100]. `FitnessCalculator` divides it by
+   *  a DRAWDOWN_MAX of 50, which is a percent. */
+  backtest_max_drawdown: z.number().min(0).max(100).optional(),
 
   // ---- Paper Trading Performance ----
   paper_trades: z.number().default(0),
   paper_pnl: z.number().default(0),
-  paper_win_rate: z.number().optional(),
+  /** Win rate as a PERCENT in [0, 100]. See `backtest_win_rate`. */
+  paper_win_rate: z.number().min(0).max(100).optional(),
 
   // ---- Live Trading Performance ----
   live_trades: z.number().default(0),
   live_pnl: z.number().default(0),
-  live_win_rate: z.number().optional(),
+  /** Win rate as a PERCENT in [0, 100]. See `backtest_win_rate`. */
+  live_win_rate: z.number().min(0).max(100).optional(),
 
   // ---- Composite Fitness ----
   /** Fitness score 0-100, computed from weighted performance metrics */
