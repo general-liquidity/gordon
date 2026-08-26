@@ -96,15 +96,7 @@ export class RiskKernel {
     });
 
     // Run all checks
-    const checks: RiskCheck[] = [];
-    checks.push(this.checkPositionSize(order, context));
-    checks.push(this.checkDailyLossLimit(order, context));
-    checks.push(this.checkDrawdownLimit(order, context));
-    checks.push(this.checkPortfolioExposure(order, context));
-    checks.push(await this.checkCorrelation(order, context));
-    checks.push(this.checkMaxOpenPositions(order, context));
-    checks.push(this.checkLeverageLimit(order, context));
-    checks.push(this.checkLiquidityAdequacy(order, context));
+    const checks: RiskCheck[] = await this.runChecks(order, context);
 
     // Determine overall decision
     const criticalFailures = checks.filter((c) => !c.passed && c.severity === "critical");
@@ -154,10 +146,31 @@ export class RiskKernel {
           timestamp: new Date().toISOString(),
         };
       } else {
-        // Enforce mode: try to adjust, otherwise reject
-        const adjustedOrder = this.config.autoAdjustSize
+        // Enforce mode: try to adjust, otherwise reject.
+        //
+        // A resize is only a remedy if the resized order actually passes. The
+        // adjuster caps position value, available balance, single-asset exposure
+        // and a drawdown-derived multiplier, so those breaches either resolve or
+        // drive the quantity under its own floor and reject. Nothing it does
+        // reduces the COUNT of open positions, and nothing makes a correlation
+        // check that threw have run. At the open-position cap this returned a
+        // smaller order and approved it.
+        //
+        // Rather than maintain a list of which checks a resize can fix, which
+        // would drift as checks are added, re-run every check against the
+        // adjusted order and require it to come back clean.
+        const candidate = this.config.autoAdjustSize
           ? this.tryAdjustOrder(order, context)
           : null;
+        let adjustedOrder: OrderRequest | null = null;
+        let adjustedChecks: RiskCheck[] = [];
+        if (candidate) {
+          adjustedChecks = await this.runChecks(candidate, context);
+          const stillCritical = adjustedChecks.filter(
+            (c) => !c.passed && c.severity === "critical",
+          );
+          if (stillCritical.length === 0) adjustedOrder = candidate;
+        }
 
         if (adjustedOrder) {
           decision = {
@@ -165,7 +178,9 @@ export class RiskKernel {
             action: "modify",
             originalOrder: order,
             modifiedOrder: adjustedOrder,
-            checks,
+            // The adjusted order's own checks, so a caller reading the decision
+            // sees what the order it may actually place was scored against.
+            checks: adjustedChecks,
             reason: `Order modified to comply with risk limits. Original qty: ${order.quantity}, adjusted: ${adjustedOrder.quantity}. ${criticalFailures.map((c) => c.details).join("; ")}`,
             timestamp: new Date().toISOString(),
           };
@@ -622,6 +637,23 @@ export class RiskKernel {
   // Order Adjustment
   // ==========================================================================
 
+  /** Every risk check, in order, against one candidate order. */
+  private async runChecks(
+    order: OrderRequest,
+    context: PortfolioContext,
+  ): Promise<RiskCheck[]> {
+    return [
+      this.checkPositionSize(order, context),
+      this.checkDailyLossLimit(order, context),
+      this.checkDrawdownLimit(order, context),
+      this.checkPortfolioExposure(order, context),
+      await this.checkCorrelation(order, context),
+      this.checkMaxOpenPositions(order, context),
+      this.checkLeverageLimit(order, context),
+      this.checkLiquidityAdequacy(order, context),
+    ];
+  }
+
   /**
    * Try to adjust the order size to fit within risk limits.
    * Returns the adjusted order, or null if no viable adjustment exists.
@@ -673,6 +705,25 @@ export class RiskKernel {
 
       if (adjustedQuantity * orderPrice > remainingExposure) {
         adjustedQuantity = remainingExposure / orderPrice;
+      }
+    }
+
+    // Adjust for the leverage ceiling. Positions already open consume the
+    // allowance before this order gets any, so the room left is the ceiling
+    // minus what is already held, not the ceiling itself. Without this the
+    // adjuster under-reduced: an account already at 95% of its limit had an
+    // oversized order cut to a size that still breached, and the breach was
+    // only caught by the re-check that now follows every adjustment.
+    if (this.config.maxLeverage > 0 && context.totalEquity > 0) {
+      const heldValue = context.openPositions.reduce(
+        (sum, p) => sum + p.size * p.currentPrice,
+        0,
+      );
+      const leverageRoom =
+        this.config.maxLeverage * context.totalEquity - heldValue;
+      if (leverageRoom <= 0) return null;
+      if (adjustedQuantity * orderPrice > leverageRoom) {
+        adjustedQuantity = leverageRoom / orderPrice;
       }
     }
 

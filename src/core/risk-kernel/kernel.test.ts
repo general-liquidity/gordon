@@ -98,3 +98,78 @@ describe("RiskKernel — market order with no price", () => {
     expect(decision.approved).toBe(true);
   });
 });
+
+describe("RiskKernel - a resize is only a remedy if the resized order passes", () => {
+  function heldPosition(symbol: string) {
+    return {
+      symbol,
+      side: "long" as const,
+      size: 0.01,
+      entryPrice: 100,
+      currentPrice: 100,
+      unrealizedPnL: 0,
+      exchangeId: "test",
+    };
+  }
+
+  // The open-position cap is the case the adjuster cannot reach. It caps
+  // position value, available balance, single-asset exposure and a
+  // drawdown-derived multiplier, so those breaches either resolve or drive the
+  // quantity under its own floor and reject. Nothing about a smaller order
+  // reduces the COUNT of positions already open.
+  //
+  // Without re-verification this returned action "modify" with quantity 0.1 and
+  // approved true, because the kernel resized and never asked whether the
+  // smaller order passed.
+  it("rejects at the open-position cap instead of approving a smaller order", async () => {
+    const kernel = new RiskKernel({
+      mode: "enforce",
+      autoAdjustSize: true,
+      maxPositionSizeUsd: 5_000,
+      maxOpenPositions: 2,
+      maxSingleAssetExposure: 90,
+    });
+
+    const decision = await kernel.evaluate(
+      {
+        symbol: "BTCUSDT",
+        side: "buy",
+        type: "limit",
+        quantity: 1,
+        price: 50_000,
+        exchangeId: "test",
+        agentId: "test-agent",
+      },
+      context({ openPositions: [heldPosition("ETHUSDT"), heldPosition("SOLUSDT")] }),
+    );
+
+    expect(decision.action).toBe("reject");
+    expect(decision.approved).toBe(false);
+  });
+
+  it("still modifies when the smaller order genuinely complies", async () => {
+    const kernel = new RiskKernel({
+      mode: "enforce",
+      autoAdjustSize: true,
+      maxPositionSizeUsd: 5_000,
+    });
+
+    const decision = await kernel.evaluate(
+      {
+        symbol: "BTCUSDT",
+        side: "buy",
+        type: "limit",
+        quantity: 1,
+        price: 50_000,
+        exchangeId: "test",
+        agentId: "test-agent",
+      },
+      context(),
+    );
+
+    expect(decision.action).toBe("modify");
+    expect(decision.approved).toBe(true);
+    expect(decision.modifiedOrder!.quantity).toBe(0.1);
+    expect(decision.checks.every((c) => c.passed || c.severity !== "critical")).toBe(true);
+  });
+});

@@ -89,24 +89,35 @@ describe("evaluateOrderRisk order path", () => {
     expect(result.quantity).toBe(FEASIBLE_ORDER.quantity);
   });
 
-  test("an order past the leverage ceiling is resized rather than refused", async () => {
+  // This fixture holds 9.5 ETH against 10,000 equity, so 9,500 of the leverage
+  // allowance is already spent and only 500 of new exposure fits. Cutting a
+  // 6,000 order to 500 is a 92% reduction, past the adjuster's floor, and past
+  // that floor refusing is more honest than silently placing 8% of what was
+  // asked for. The order is therefore refused rather than resized.
+  //
+  // It previously reported approved, because the adjuster did not account for
+  // the leverage ceiling at all and the kernel never re-checked what it had
+  // produced: the resized order still stood at 1.05x against a 1x limit.
+  test("an order the adjuster cannot bring under the leverage ceiling is refused", async () => {
     const result = await evaluateOrderRisk(OVERSIZED_ORDER, oversizedOrderContext());
 
-    expect(result.approved).toBe(true);
-    expect(result.quantity).toBeLessThan(OVERSIZED_ORDER.quantity);
-    expect(result.quantity).toBeGreaterThan(0);
-    expect(result.quantity * PRICE_USD).toBeLessThanOrEqual(500 + 1e-6);
+    expect(result.approved).toBe(false);
+    // The refusal names what it could not satisfy rather than failing silently.
+    expect(result.reason.length).toBeGreaterThan(0);
   });
 
-  test("the constraint that moved the size is named to the operator", async () => {
-    const result = await evaluateOrderRisk(OVERSIZED_ORDER, oversizedOrderContext());
-    const joined = result.warnings.join(" | ");
+  test("a resizable order is resized, and the constraint is named to the operator", async () => {
+    // 0.6 lots is 600 of exposure against 500 of room: over the ceiling, but a
+    // 17% cut, well inside the adjuster's floor.
+    const result = await evaluateOrderRisk(
+      { ...OVERSIZED_ORDER, quantity: 0.6 },
+      oversizedOrderContext(),
+    );
 
-    expect(joined).toContain("leverage");
-    expect(joined).toContain("tightest constraint");
-    expect(joined).toContain("deviation");
-    expect(joined).toContain("rate limit utilisation");
-    expect(joined).toContain("active constraints");
+    expect(result.approved).toBe(true);
+    expect(result.quantity).toBeLessThan(0.6);
+    expect(result.quantity).toBeGreaterThan(0);
+    expect(result.quantity * PRICE_USD).toBeLessThanOrEqual(500 + 1e-6);
   });
 
   test("an order below the economic floor is refused with the floor and the shortfall stated", async () => {
