@@ -131,6 +131,12 @@ export ALPACA_API_KEY="..."   ALPACA_API_SECRET="..."      # or a stocks broker
 
 Every supported provider, exchange, broker, and data feed is documented in [`.env.example`](./.env.example). Copy it to `~/.gordon/.env` and fill in only what you use.
 
+Managed deployments may also provide a signed highest-precedence
+`policy.json`. Set `GORDON_POLICY_KEY` in the process environment to its HMAC
+key; this secret is intentionally not exposed through `/flags` or persisted in
+the settings layers. If a policy file exists but is unsigned, malformed, or
+cannot be verified, Gordon refuses the entire policy layer.
+
 Then talk to it, or drive it with slash commands:
 
 ```

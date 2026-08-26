@@ -140,6 +140,12 @@ Most behavior primitives are now defaults-on as part of the core architecture. T
 
 Use `/flags` in the TUI to see the current state of these and toggle them at runtime.
 
+`GORDON_POLICY_KEY` is intentionally absent from `/flags`: it is an HMAC
+secret used to verify the optional highest-precedence `policy.json` layer, not
+a behavior toggle. Supply it through the process environment (and optionally
+override the file with `GORDON_POLICY_PATH`). A policy file that exists without
+a valid signature is refused rather than applied or demoted.
+
 Defaults-on (previously flagged, now part of the architecture): result-cache delta envelopes, semantic output filtering, extended thinking by workflow phase, recovery-tier escalation, autonomous-loop reminders, kill switches (checked in `execute_plan` via `isExecutionAllowed`), network allowlist (warn mode, wired via `installOutboundFetchGuard` in `src/index.tsx`), filesystem write guard (warn mode, wired via `installFilesystemWriteGuard` in `src/index.tsx`), trade ledger, plan rubric, bar-permutation test, WIP-limit gate, boundary check, clean-state gate, init probe, lifecycle reconstruction, family-diversity detector, all microstructure detectors (touch dynamics, microstructure toxicity, MEV detection, manufactured imbalance, manipulation context, cross-venue divergence, ATR progression), session memory, artifact index, tool context, explain-first.
 
 **LLM provider resilience:** `src/infra/ai/llm/providerCaching.ts` (Anthropic prompt-cache breakpoints) and `providerFailover.ts` (`executeWithFailover`) compose with the settings-layer priority chain — env keys → `settings.json` provider order → per-call overrides.
