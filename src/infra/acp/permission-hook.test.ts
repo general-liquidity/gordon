@@ -8,11 +8,12 @@ import {
   evaluateTrustEligibility,
   getDefaultTrustTrajectory,
 } from "../../runtime/permissions/trustTrajectory.ts";
+import { getAcpPermissionEngine, resetAcpGordonContext } from "./context.ts";
 
 // Mock PermissionEngine that records prepended hooks
 class FakePermissionEngine {
-  hooks: Array<(input: { toolName: string; policy: any }) => unknown> = [];
-  prependHook(hook: (input: { toolName: string; policy: any }) => unknown): () => void {
+  hooks: Array<(input: { toolName: string; policy: any; context: any }) => unknown> = [];
+  prependHook(hook: (input: { toolName: string; policy: any; context: any }) => unknown): () => void {
     this.hooks.unshift(hook);
     return () => {
       const idx = this.hooks.indexOf(hook);
@@ -20,10 +21,14 @@ class FakePermissionEngine {
     };
   }
   // Call the first hook for testing
-  async invokeHook(toolName: string, policy: any = defaultPolicy()): Promise<unknown> {
+  async invokeHook(toolName: string, policy: any = defaultPolicy(), sessionId?: string): Promise<unknown> {
     const hook = this.hooks[0];
     if (!hook) return null;
-    return hook({ toolName, policy });
+    return hook({
+      toolName,
+      policy,
+      context: sessionId ? { runtime: { sessionId } } : {},
+    });
   }
 }
 
@@ -58,6 +63,16 @@ function fakeConnection(
 describe("installAcpPermissionHook", () => {
   beforeEach(() => {
     _resetDefaultTrustTrajectoryForTests();
+    resetAcpGordonContext();
+  });
+
+  it("keeps approval queues isolated between ACP sessions", () => {
+    expect(getAcpPermissionEngine("session-a")).not.toBe(
+      getAcpPermissionEngine("session-b"),
+    );
+    expect(getAcpPermissionEngine("session-a")).toBe(
+      getAcpPermissionEngine("session-a"),
+    );
   });
 
   it("safety-critical tools abstain (no editor prompt)", async () => {
@@ -178,6 +193,20 @@ describe("installAcpPermissionHook", () => {
     });
     const result = await engine.invokeHook("get_market_data");
     expect(result).toEqual({ decision: "abstain" });
+  });
+
+  it("abstains from a concurrent ACP session's permission request", async () => {
+    const engine = new FakePermissionEngine();
+    const { connection, calls } = fakeConnection(() => ({
+      outcome: { outcome: "selected", optionId: "allow_once" },
+    }));
+    installAcpPermissionHook(engine as unknown as PermissionEngine, {
+      sessionId: "session-a",
+      connection,
+    });
+    const result = await engine.invokeHook("get_market_data", defaultPolicy(), "session-b");
+    expect(result).toEqual({ decision: "abstain" });
+    expect(calls).toHaveLength(0);
   });
 
   it("ACP hook and buildTrustTrajectoryHook agree on eligibility for the same ledger", async () => {

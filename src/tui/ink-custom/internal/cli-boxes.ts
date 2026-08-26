@@ -1,6 +1,6 @@
 // cli-boxes — inlined border-drawing characters.
 //
-// Status: NOT WIRED. Included as Phase 1-ready replacement for the
+// Active in charPool and renderBorder as the local replacement for the
 // `cli-boxes` npm dependency. Gordon only uses a small subset of the
 // border styles cli-boxes ships, so inlining them here saves a dep in
 // the final Phase 6 shipping tree.

@@ -17,6 +17,7 @@ import {
 } from "../harness/runtimeHarness.ts";
 import { recordToolCallForFriction } from "../harness/toolFrictionTracker.ts";
 import { runLifecycleHooks } from "../harness/lifecycleHooks.ts";
+import { beginSubagentHook, endSubagentHook } from "../../hooks/subagentHookBridge.ts";
 import { compileSubagentProfiles, isToolAllowedForAgent } from "../harness/subagentProfiles.ts";
 import { defaultHandoffCoordinator } from "./HandoffCoordinator.ts";
 import { getDynamicToolAgentMap } from "../../runtime/routing/manager.ts";
@@ -86,6 +87,8 @@ export function getCompiledSubagentProfiles() {
  */
 export interface StreamProcessingState {
   currentAgent: string | undefined;
+  /** Exact bridge key for the currently open SubagentStart/SubagentStop pair. */
+  activeSubagentHookKey?: string;
   fullText: string;
   lastSubAgentToolResult: {
     toolName: string;
@@ -320,7 +323,27 @@ export async function handleAgentSwitch(
   }
 
   const previousAgent = state.currentAgent || "Gordon";
+  const nextKey = `stream:${context.threadId ?? "standalone"}:${detectedAgent}`;
+  const start = await beginSubagentHook({
+    key: nextKey,
+    type: detectedAgent,
+    parent: previousAgent,
+    task: toolName,
+  });
+  if (!start.allowed) return null;
+
+  if (previousAgent !== "Gordon") {
+    await endSubagentHook({
+      key:
+        state.activeSubagentHookKey
+        ?? `stream:${context.threadId ?? "standalone"}:${previousAgent}`,
+      type: previousAgent,
+      parent: "Gordon",
+      status: "completed",
+    });
+  }
   state.currentAgent = detectedAgent;
+  state.activeSubagentHookKey = nextKey;
 
   // Track the handoff
   await defaultHandoffCoordinator.track(previousAgent, state.currentAgent, {

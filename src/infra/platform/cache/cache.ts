@@ -22,6 +22,8 @@ export interface CacheConfig {
   maxEntries: number;
   /** Whether to update TTL on access */
   updateTtlOnAccess: boolean;
+  /** Clock used for TTL bookkeeping. Defaults to Date.now. */
+  now?: () => number;
 }
 
 /**
@@ -41,6 +43,7 @@ export class Cache<T = unknown> {
   private cache: Map<string, CacheEntry<T>> = new Map();
   private config: CacheConfig;
   private stats = { hits: 0, misses: 0 };
+  private readonly now: () => number;
 
   constructor(config: Partial<CacheConfig> = {}) {
     this.config = {
@@ -48,6 +51,7 @@ export class Cache<T = unknown> {
       maxEntries: config.maxEntries ?? 1000,
       updateTtlOnAccess: config.updateTtlOnAccess ?? false,
     };
+    this.now = config.now ?? Date.now;
   }
 
   /**
@@ -62,7 +66,7 @@ export class Cache<T = unknown> {
     }
 
     // Check if expired
-    if (Date.now() > entry.expiresAt) {
+    if (this.now() > entry.expiresAt) {
       this.cache.delete(key);
       this.stats.misses++;
       return undefined;
@@ -72,7 +76,7 @@ export class Cache<T = unknown> {
 
     // Update TTL on access if configured
     if (this.config.updateTtlOnAccess) {
-      entry.expiresAt = Date.now() + this.config.defaultTtl;
+      entry.expiresAt = this.now() + this.config.defaultTtl;
     }
 
     return entry.value;
@@ -87,7 +91,7 @@ export class Cache<T = unknown> {
       this.evictOldest();
     }
 
-    const now = Date.now();
+    const now = this.now();
     this.cache.set(key, {
       value,
       expiresAt: now + (ttl ?? this.config.defaultTtl),
@@ -101,7 +105,7 @@ export class Cache<T = unknown> {
   has(key: string): boolean {
     const entry = this.cache.get(key);
     if (!entry) return false;
-    if (Date.now() > entry.expiresAt) {
+    if (this.now() > entry.expiresAt) {
       this.cache.delete(key);
       return false;
     }
@@ -126,11 +130,7 @@ export class Cache<T = unknown> {
   /**
    * Get or set - returns cached value or computes and caches
    */
-  async getOrSet(
-    key: string,
-    compute: () => T | Promise<T>,
-    ttl?: number
-  ): Promise<T> {
+  async getOrSet(key: string, compute: () => T | Promise<T>, ttl?: number): Promise<T> {
     const cached = this.get(key);
     if (cached !== undefined) {
       return cached;
@@ -157,7 +157,7 @@ export class Cache<T = unknown> {
    * Remove expired entries
    */
   prune(): number {
-    const now = Date.now();
+    const now = this.now();
     let pruned = 0;
 
     for (const [key, entry] of this.cache) {

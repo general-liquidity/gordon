@@ -3,8 +3,8 @@
  * Audit risk-tree — explain WHY the known-accepted-critical advisories
  * are in Gordon's dependency tree.
  *
- * The CI `bun audit` step silences four long-tail crypto-transitive
- * criticals (protobufjs, elliptic, handlebars, form-data). This
+ * The CI `bun audit` step silences three accepted transitive criticals
+ * (protobufjs, form-data, shell-quote). This
  * script runs `bun why` for each affected package and emits a
  * top-N report showing which direct dependencies pull them in. The
  * point is to make the silenced advisories actionable: when an
@@ -16,7 +16,7 @@
  * explanation rather than a generic advisory dump.
  */
 
-const { execSync } = require("node:child_process");
+const { execFileSync } = require("node:child_process");
 const path = require("node:path");
 
 const ACCEPTED_ADVISORIES = [
@@ -27,30 +27,25 @@ const ACCEPTED_ADVISORIES = [
     severity: "critical",
   },
   {
-    id: "GHSA-vjh7-7g9h-fjfh",
-    pkg: "elliptic",
-    summary: "ECDSA private key extraction",
-    severity: "critical",
-  },
-  {
-    id: "GHSA-2w6w-674q-4c4q",
-    pkg: "handlebars",
-    summary: "AST type confusion JS injection",
-    severity: "critical",
-  },
-  {
     id: "GHSA-fjxv-7rqg-78g4",
     pkg: "form-data",
     summary: "Unsafe random boundary",
     severity: "critical",
   },
+  {
+    id: "GHSA-w7jw-789q-3m8p",
+    pkg: "shell-quote",
+    summary: "Newline escape gap in quote() operator values",
+    severity: "critical",
+  },
 ];
 
-const rootDir = path.resolve(__dirname, "..", "..");
+const rootDir = path.resolve(__dirname, "..", "..", "..");
+const bunBin = process.env.BUN_BIN?.trim() || "bun";
 
 function tryBunWhy(pkg) {
   try {
-    return execSync(`bun why ${pkg} --top`, {
+    return execFileSync(bunBin, ["why", pkg, "--top"], {
       cwd: rootDir,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
@@ -58,8 +53,11 @@ function tryBunWhy(pkg) {
     });
   } catch (err) {
     if (err.code === "ENOENT" || /not found|not recognized/i.test(err.message ?? "")) {
-      console.error(`audit-risk-tree: bun CLI not found in PATH — skipping.`);
-      process.exit(0);
+      console.error(
+        `audit-risk-tree: Bun executable ${JSON.stringify(bunBin)} was not found; ` +
+          "set BUN_BIN to an absolute path.",
+      );
+      process.exit(1);
     }
     // bun why may exit non-zero when the package isn't installed
     return null;

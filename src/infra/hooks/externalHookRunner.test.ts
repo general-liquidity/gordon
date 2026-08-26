@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "bun:test";
-import { mkdtempSync, writeFileSync, chmodSync } from "node:fs";
+import { afterEach, describe, it, expect, beforeEach } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -18,14 +18,20 @@ let tempDir: string;
 
 function writeScript(name: string, body: string): string {
   const path = join(tempDir, name);
-  writeFileSync(path, body, { mode: 0o755 });
-  if (process.platform !== "win32") chmodSync(path, 0o755);
+  writeFileSync(path, body, "utf-8");
   return path;
+}
+
+function portableConfig(body: string): ExternalHookConfig<"PreToolUse"> {
+  const script = writeScript(`handler-${crypto.randomUUID()}.mjs`, body);
+  return { ...baseConfig(process.execPath), args: [script] };
 }
 
 beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), "gordon-external-hook-test-"));
 });
+
+afterEach(() => rmSync(tempDir, { recursive: true, force: true }));
 
 const sampleToolPayload: PreToolUsePayload = {
   toolName: "place_order",
@@ -73,90 +79,61 @@ describe("runExternalHook — missing handler", () => {
 });
 
 describe("runExternalHook — exit-code semantics", () => {
-  // Cross-platform note: these tests use shell scripts on Unix. On Windows
-  // we skip the executable tests (Bun supports `.cmd` but the test setup
-  // is platform-specific). Mark these tests platform-gated.
-  const skipOnWindows = process.platform === "win32";
-
-  it.skipIf(skipOnWindows)("exit 0 → allow", async () => {
-    const path = writeScript("allow.sh", "#!/bin/sh\nexit 0\n");
-    const r = await runExternalHook(baseConfig(path), sampleToolPayload);
+  it("exit 0 → allow", async () => {
+    const r = await runExternalHook(portableConfig("process.exit(0);"), sampleToolPayload);
     expect(r.result.action).toBe("allow");
     expect(r.meta.exitCode).toBe(0);
   });
 
-  it.skipIf(skipOnWindows)("exit 2 → block with stderr reason", async () => {
-    const path = writeScript(
-      "block.sh",
-      "#!/bin/sh\necho 'protected path' >&2\nexit 2\n",
-    );
-    const r = await runExternalHook(baseConfig(path), sampleToolPayload);
+  it("exit 2 → block with stderr reason", async () => {
+    const r = await runExternalHook(portableConfig("console.error('protected path'); process.exit(2);"), sampleToolPayload);
     expect(r.result.action).toBe("block");
     expect(r.result.reason).toContain("protected path");
     expect(r.meta.exitCode).toBe(2);
   });
 
-  it.skipIf(skipOnWindows)("exit 5 → block (fail-closed on unexpected code)", async () => {
-    const path = writeScript(
-      "weird.sh",
-      "#!/bin/sh\necho 'something odd' >&2\nexit 5\n",
-    );
-    const r = await runExternalHook(baseConfig(path), sampleToolPayload);
+  it("exit 5 → block (fail-closed on unexpected code)", async () => {
+    const r = await runExternalHook(portableConfig("console.error('something odd'); process.exit(5);"), sampleToolPayload);
     expect(r.result.action).toBe("block");
     expect(r.result.reason).toContain("something odd");
   });
 });
 
 describe("runExternalHook — JSON-on-stdout overrides exit code", () => {
-  const skipOnWindows = process.platform === "win32";
-
-  it.skipIf(skipOnWindows)("parses stdout JSON for action=modify", async () => {
-    const path = writeScript(
-      "modify.sh",
-      `#!/bin/sh\necho '{"action":"modify","replacement":{"qty":0.05}}'\nexit 0\n`,
-    );
-    const r = await runExternalHook(baseConfig(path), sampleToolPayload);
+  it("parses stdout JSON for action=modify", async () => {
+    const r = await runExternalHook(portableConfig("process.stdout.write(JSON.stringify({action:'modify',replacement:{qty:0.05}}));"), sampleToolPayload);
     expect(r.result.action).toBe("modify");
     expect(r.result.replacement).toEqual({ qty: 0.05 });
     expect(r.meta.stdoutJsonParsed).toBe(true);
   });
 
-  it.skipIf(skipOnWindows)("ignores invalid JSON on stdout and uses exit code", async () => {
-    const path = writeScript("invalidjson.sh", "#!/bin/sh\necho 'not json'\nexit 0\n");
-    const r = await runExternalHook(baseConfig(path), sampleToolPayload);
+  it("ignores invalid JSON on stdout and uses exit code", async () => {
+    const r = await runExternalHook(portableConfig("process.stdout.write('not json');"), sampleToolPayload);
     expect(r.result.action).toBe("allow");
     expect(r.meta.stdoutJsonParsed).toBe(false);
   });
 
-  it.skipIf(skipOnWindows)("preserves metadata field from stdout JSON", async () => {
-    const path = writeScript(
-      "meta.sh",
-      `#!/bin/sh\necho '{"action":"allow","metadata":{"reviewedBy":"compliance"}}'\nexit 0\n`,
-    );
-    const r = await runExternalHook(baseConfig(path), sampleToolPayload);
+  it("preserves metadata field from stdout JSON", async () => {
+    const r = await runExternalHook(portableConfig("process.stdout.write(JSON.stringify({action:'allow',metadata:{reviewedBy:'compliance'}}));"), sampleToolPayload);
     expect(r.result.metadata).toEqual({ reviewedBy: "compliance" });
   });
 });
 
 describe("runExternalHook — a handler that never reads stdin", () => {
-  const skipOnWindows = process.platform === "win32";
-
   // A handler is free to ignore its input. When it exits without reading, the
   // payload write races the closing pipe and EPIPE arrives asynchronously, past
   // any try/catch around the write. That error used to reach the child's error
   // handler and turn a successful exit 0 into a spawn failure, which is a block.
   // A large payload widens the race enough to catch a regression: this failed
   // reliably before the stdin error listener and passes with it.
-  it.skipIf(skipOnWindows)("reports exit 0 as allow even under a large payload", async () => {
-    const path = writeScript("ignores-stdin.sh", `#!/bin/sh
-exit 0
-`);
+  it("reports exit 0 as allow even under a large payload", async () => {
+    const config = portableConfig("process.exit(0);");
     const bulky = {
       ...sampleToolPayload,
       filler: "x".repeat(1_000_000),
     } as unknown as typeof sampleToolPayload;
     for (let attempt = 0; attempt < 20; attempt += 1) {
-      const r = await runExternalHook(baseConfig(path), bulky);
+      const r = await runExternalHook(config, bulky);
       expect(r.result.action).toBe("allow");
       expect(r.meta.spawnFailed).toBeFalsy();
       expect(r.meta.exitCode).toBe(0);
@@ -165,18 +142,12 @@ exit 0
 });
 
 describe("runExternalHook — payload delivery", () => {
-  const skipOnWindows = process.platform === "win32";
-
-  it.skipIf(skipOnWindows)("delivers payload as JSON on stdin", async () => {
-    const path = writeScript(
-      "echo-payload.sh",
-      `#!/bin/sh
-cat > /tmp/gordon-hook-payload.json
-exit 0
-`,
-    );
-    await runExternalHook(baseConfig(path), sampleToolPayload);
-    const written = require("node:fs").readFileSync("/tmp/gordon-hook-payload.json", "utf8");
+  it("delivers payload as JSON on stdin", async () => {
+    const output = join(tempDir, "payload.json");
+    const config = portableConfig("let data=''; for await (const c of process.stdin) data += c; await Bun.write(process.env.OUT, data);");
+    config.env = { OUT: output };
+    await runExternalHook(config, sampleToolPayload);
+    const written = require("node:fs").readFileSync(output, "utf8");
     const parsed = JSON.parse(written);
     expect(parsed.point).toBe("PreToolUse");
     expect(parsed.payload.toolName).toBe("place_order");
@@ -184,42 +155,67 @@ exit 0
 });
 
 describe("runExternalHook — timeout", () => {
-  const skipOnWindows = process.platform === "win32";
-
-  it.skipIf(skipOnWindows)("kills handler that exceeds timeoutMs and blocks", async () => {
-    const path = writeScript("slow.sh", "#!/bin/sh\nsleep 5\nexit 0\n");
+  it("kills handler that exceeds timeoutMs and blocks", async () => {
     const r = await runExternalHook(
-      { ...baseConfig(path), timeoutMs: 100 },
+      { ...portableConfig("await new Promise(r => setTimeout(r, 5000));"), timeoutMs: 100 },
       sampleToolPayload,
     );
     expect(r.result.action).toBe("block");
     expect(r.meta.timedOut).toBe(true);
     expect(r.result.reason).toContain("timed out");
   });
+
+  it("does not let an early JSON allow override a later timeout", async () => {
+    const r = await runExternalHook(
+      {
+        ...portableConfig(
+          "process.stdout.write(JSON.stringify({action:'allow'})); await new Promise(r => setTimeout(r, 5000));",
+        ),
+        timeoutMs: 100,
+      },
+      sampleToolPayload,
+    );
+    expect(r.result.action).toBe("block");
+    expect(r.meta.timedOut).toBe(true);
+    expect(r.meta.stdoutJsonParsed).toBe(false);
+  });
+});
+
+describe("runExternalHook — bounded output", () => {
+  it("kills and blocks a handler whose output exceeds the process budget", async () => {
+    const r = await runExternalHook(
+      portableConfig("process.stdout.write('x'.repeat(70_000)); await new Promise(r => setTimeout(r, 5000));"),
+      sampleToolPayload,
+    );
+    expect(r.result.action).toBe("block");
+    expect(r.meta.outputLimitExceeded).toBe(true);
+    expect(r.result.reason).toContain("output exceeded");
+  });
+
+  it("refuses a non-positive direct-call timeout", async () => {
+    const r = await runExternalHook(
+      { ...portableConfig("process.exit(0);"), timeoutMs: 0 },
+      sampleToolPayload,
+    );
+    expect(r.result.action).toBe("block");
+    expect(r.meta.spawnFailed).toBe(true);
+    expect(r.result.reason).toContain("timeoutMs");
+  });
 });
 
 describe("runExternalHook — args + env", () => {
-  const skipOnWindows = process.platform === "win32";
-
-  it.skipIf(skipOnWindows)("passes args to handler", async () => {
-    const path = writeScript(
-      "args.sh",
-      `#!/bin/sh\nif [ "$1" = "--mode=strict" ]; then exit 0; else exit 2; fi\n`,
-    );
+  it("passes args to handler", async () => {
+    const config = portableConfig("process.exit(process.argv.includes('--mode=strict') ? 0 : 2);");
     const r = await runExternalHook(
-      { ...baseConfig(path), args: ["--mode=strict"] },
+      { ...config, args: [...(config.args ?? []), "--mode=strict"] },
       sampleToolPayload,
     );
     expect(r.result.action).toBe("allow");
   });
 
-  it.skipIf(skipOnWindows)("passes env vars to handler", async () => {
-    const path = writeScript(
-      "env.sh",
-      `#!/bin/sh\nif [ "$GORDON_TEST_VAR" = "yes" ]; then exit 0; else echo "no env" >&2; exit 2; fi\n`,
-    );
+  it("passes env vars to handler", async () => {
     const r = await runExternalHook(
-      { ...baseConfig(path), env: { GORDON_TEST_VAR: "yes" } },
+      { ...portableConfig("process.exit(process.env.GORDON_TEST_VAR === 'yes' ? 0 : 2);"), env: { GORDON_TEST_VAR: "yes" } },
       sampleToolPayload,
     );
     expect(r.result.action).toBe("allow");
@@ -236,6 +232,7 @@ describe("runMetaToPayload", () => {
       stdoutJsonParsed: false,
       timedOut: false,
       spawnFailed: false,
+      outputLimitExceeded: false,
     };
     const result = { action: "allow" as const };
     const p = runMetaToPayload(config, meta, result);
@@ -246,30 +243,18 @@ describe("runMetaToPayload", () => {
 });
 
 describe("Trading scenario — pre-order CPI-release check", () => {
-  const skipOnWindows = process.platform === "win32";
-
-  it.skipIf(skipOnWindows)("operator wires custom policy: block if it's CPI day", async () => {
+  it("operator wires custom policy: block if it's CPI day", async () => {
     // External hook reads stdin, blocks all orders if env CPI_TODAY=1.
-    const path = writeScript(
-      "cpi-check.sh",
-      `#!/bin/sh
-read -r payload
-if [ "$CPI_TODAY" = "1" ]; then
-  echo "CPI release imminent — no orders allowed" >&2
-  exit 2
-fi
-exit 0
-`,
-    );
+    const config = portableConfig("if(process.env.CPI_TODAY==='1'){console.error('CPI release imminent — no orders allowed');process.exit(2)}");
     const blocked = await runExternalHook(
-      { ...baseConfig(path), env: { CPI_TODAY: "1" } },
+      { ...config, env: { CPI_TODAY: "1" } },
       sampleToolPayload,
     );
     expect(blocked.result.action).toBe("block");
     expect(blocked.result.reason).toContain("CPI release");
 
     const allowed = await runExternalHook(
-      { ...baseConfig(path), env: { CPI_TODAY: "0" } },
+      { ...config, env: { CPI_TODAY: "0" } },
       sampleToolPayload,
     );
     expect(allowed.result.action).toBe("allow");

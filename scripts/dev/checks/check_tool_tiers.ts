@@ -85,6 +85,9 @@ const KNOWN_HOT_TIER_TOOL_FAMILIES = new Set<string>([
   "instrumentedMicrostructureTools",
   "instrumentedMultiModalChartTools",
   "instrumentedNewsTools",
+  // Any hot-tier tool may spill an oversized result. Its bounded reader must
+  // remain available in the same tier or the recovery marker is a dead end.
+  "instrumentedOffloadedResultTools",
   "instrumentedOrderbookTools",
   "instrumentedPairAnalysisTools",
   "instrumentedParallelAnalysisTools",

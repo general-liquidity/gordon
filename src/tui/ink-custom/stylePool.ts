@@ -1,6 +1,6 @@
 // stylePool — Phase 1 ANSI style interning with LRU eviction.
 //
-// Status: NOT WIRED. Maps pre-serialized ANSI SGR strings to compact 8-bit
+// Active in customRender. Maps pre-serialized ANSI SGR strings to compact 8-bit
 // IDs so cells can store them in the packed Int32 layout. Default capacity
 // is 256 (the cell layout's styleId field is 8 bits). Baseline styles are
 // pre-interned at construction to keep common cases stable across sessions.

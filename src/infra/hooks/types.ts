@@ -8,36 +8,26 @@
  * Each hook point has its own payload shape + return semantics.
  */
 
-export type HookPoint =
-  /** Before a tool executes — can block or modify args. */
-  | "PreToolUse"
-  /** After a tool executes — can modify/transform results. */
-  | "PostToolUse"
-  /** Before context compaction runs — can veto or defer. */
-  | "PreCompact"
-  /** After context compaction — for restoring state/caches. */
-  | "PostCompact"
-  /** When a new session/conversation starts. */
-  | "SessionStart"
-  /** When the agent stops (graceful exit, error, user interrupt). */
-  | "Stop"
-  /** Before a user prompt is dispatched to the model — inspect, route, or block. */
-  | "UserPromptSubmit"
-  /** When the session ends — flush logs, archive handoff, emit final span. */
-  | "SessionEnd"
-  /** Before an approval prompt is shown to the user. */
-  | "PreApproval"
-  /** After user approval decision is made. */
-  | "PostApproval"
-  /** Before a trade order is placed (trading-specific). */
-  | "PreOrderPlacement"
-  /** After a trade order is placed (trading-specific). */
-  | "PostOrderPlacement"
-  /** When a subagent starts running. Lets plugins react to executor /
-   *  researcher / fork lifecycle without polling. */
-  | "SubagentStart"
-  /** When a subagent stops (success or failure). */
-  | "SubagentStop";
+/** Canonical runtime list. Config parsing and diagnostics import this same
+ * value, so a newly declared point cannot silently disappear from either. */
+export const HOOK_POINTS = [
+  "PreToolUse",
+  "PostToolUse",
+  "PreCompact",
+  "PostCompact",
+  "SessionStart",
+  "Stop",
+  "UserPromptSubmit",
+  "SessionEnd",
+  "PreApproval",
+  "PostApproval",
+  "PreOrderPlacement",
+  "PostOrderPlacement",
+  "SubagentStart",
+  "SubagentStop",
+] as const;
+
+export type HookPoint = typeof HOOK_POINTS[number];
 
 export type HookAction =
   /** Let execution continue unchanged. */
@@ -145,6 +135,12 @@ export interface PostApprovalPayload {
 }
 
 export interface PreOrderPlacementPayload {
+  /**
+   * Agent-issued order intent at a public execution boundary. This hook is
+   * deliberately not a universal venue-adapter interceptor: protective exits,
+   * emergency liquidation, reconciliation, and adapter-internal follow-ups
+   * keep their dedicated safety invariants and cannot be stranded by a hook.
+   */
   symbol: string;
   side: "buy" | "sell";
   quantity: number;
@@ -159,6 +155,7 @@ export interface PreOrderPlacementPayload {
 }
 
 export interface PostOrderPlacementPayload {
+  /** Venue acknowledgement/result for an agent-issued order intent. */
   orderId: string;
   symbol: string;
   side: "buy" | "sell";
@@ -236,8 +233,8 @@ export interface HookDefinition<P extends HookPoint = HookPoint> {
    * Async-rewake mode (Claude Code v2.1.72+ pattern): the engine kicks off
    * this hook in parallel with other hooks at the same point, but still
    * awaits its result before the overall decision is returned. Unlike a
-   * sync hook (whose thrown errors are logged and skipped), a rewake hook
-   * that throws fails CLOSED and surfaces a "block" decision.
+   * sync hook, a rewake hook runs concurrently. Both modes fail closed when a
+   * handler throws and surface a "block" decision.
    *
    * Use for compliance / audit / external risk-check calls that take
    * hundreds of ms and don't depend on each other but DO need to gate

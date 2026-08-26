@@ -10,6 +10,54 @@ called out explicitly, whatever their size.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-26
+
+### Security
+
+- Production now emits every declared lifecycle hook, including user-prompt,
+  subagent, tool, approval, compaction, notification, session, and stop events.
+  External handlers are installed from the governed registry, run without a
+  shell, enforce time and output limits, terminate process trees where the host
+  permits it, and fail closed when an enabled registry is empty or invalid.
+- Permission fingerprints include validated arguments, hook-modified approval
+  rationales must remain nonempty strings, and agent-initiated cancellations
+  pass the same exposure-direction consent checks as other order operations.
+- ACP-forwarded HTTP MCP servers reject unsafe schemes, private or mixed DNS
+  answers, and duplicate identities. Forwarded stdio servers are denied unless
+  the operator explicitly enables them, and their launchers remain allowlisted.
+
+### Added
+
+- ACP sessions now persist turns and modes, serialize replacement prompts,
+  surface tool lifecycle events, bridge scoped permission requests, and clean
+  up session-local MCP, usage, cancellation, and ACE state transactionally.
+- Governed ACE lessons are injected per request and carry active-revision
+  attribution into the action log without mutating a shared system prompt.
+- The opt-in custom terminal renderer now owns its lifecycle, selection overlay,
+  scroll state, accessibility fallback, and non-TTY fallback. The standard
+  renderer remains the default.
+- Deterministic unattended burn-in and daemon-startup validators exercise
+  scheduling, persistence suppression, cleanup, and evidence heartbeats while
+  explicitly forbidding model inference and venue/order dispatch.
+
+### Fixed
+
+- Session start, daemon startup, and post-compaction side effects now roll back
+  partially initialized state and attempt every cleanup before reporting an
+  aggregate failure.
+- TUI exit no longer waits forever after the renderer has closed; it now flushes
+  Stop and SessionEnd policy hooks before MCP, telemetry, and database teardown.
+- Tool failures still emit post-tool lifecycle events; blocked or malformed
+  hook replacements can no longer disappear into an implicit allow path.
+- Sliding-TTL cache coverage uses an injected clock instead of wall-clock sleeps,
+  removing a parallel-CI timing failure without changing production semantics.
+- The critical dependency audit is an executable gate with a maintained,
+  minimal accepted-advisory set, and the risk-tree audit resolves the repository
+  root and Bun executable consistently across Windows and POSIX runners.
+- Release test sharding now covers every discovered test file exactly once and
+  enforces that invariant on every main/PR build; six previously orphaned suites,
+  including the common risk-gate order path, are assigned to isolated shards.
+
 ## [0.3.2] - 2026-08-26
 
 ### Fixed
@@ -208,6 +256,9 @@ The permission change is behavioral: a tool that was previously auto-approved
 through the unknown-name fallthrough now queues for human approval. That is the
 intent, and it is why this is a minor rather than a patch release.
 
-[Unreleased]: https://github.com/general-liquidity/gordon/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/general-liquidity/gordon/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/general-liquidity/gordon/compare/v0.3.2...v0.4.0
+[0.3.2]: https://github.com/general-liquidity/gordon/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/general-liquidity/gordon/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/general-liquidity/gordon/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/general-liquidity/gordon/compare/v0.1.0...v0.2.0

@@ -5,6 +5,7 @@
 
 import { checkTrajectory } from "../process/processChecks.ts";
 import type { ProcessCheckResult } from "../process/processChecks.ts";
+import type { NormalizedTrace } from "../process/processChecks.ts";
 import { passKFromChecks } from "../process/passK.ts";
 import type { PassKResult } from "../process/passK.ts";
 import type { EvalScenario, EvalTrajectory } from "../types.ts";
@@ -21,6 +22,7 @@ export interface ProduceKRunsInput {
 
 export interface ProduceKRunsResult {
   trajectories: EvalTrajectory[];
+  normalizedTraces: NormalizedTrace[];
   processResults: ProcessCheckResult[];
   passKResult: PassKResult;
 }
@@ -36,6 +38,7 @@ export async function produceKRuns(input: ProduceKRunsInput): Promise<ProduceKRu
   const k = Math.max(1, input.k);
   const variantLabel = input.variantLabel ?? "eval-k-run";
   const trajectories: EvalTrajectory[] = [];
+  const normalizedTraces: NormalizedTrace[] = [];
   const processResults: ProcessCheckResult[] = [];
 
   for (let i = 0; i < k; i++) {
@@ -47,6 +50,7 @@ export async function produceKRuns(input: ProduceKRunsInput): Promise<ProduceKRu
       threadId,
     });
     trajectories.push(trajectory);
+    normalizedTraces.push(normalized);
     processResults.push(checkTrajectory(normalized));
   }
 
@@ -55,5 +59,5 @@ export async function produceKRuns(input: ProduceKRunsInput): Promise<ProduceKRu
     isSafetyScenario(input.scenario) ? { mode: "all" } : {},
   );
 
-  return { trajectories, processResults, passKResult };
+  return { trajectories, normalizedTraces, processResults, passKResult };
 }

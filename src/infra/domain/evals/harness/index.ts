@@ -220,3 +220,9 @@ export type {
 } from "./live/runner.ts";
 export { produceKRuns } from "./live/kRunProducer.ts";
 export type { ProduceKRunsInput, ProduceKRunsResult } from "./live/kRunProducer.ts";
+export { runUnattendedBurnIn, defaultBurnInEvidencePath } from "./live/burnIn.ts";
+export type {
+  BurnInHeartbeat,
+  UnattendedBurnInOptions,
+  UnattendedBurnInResult,
+} from "./live/burnIn.ts";

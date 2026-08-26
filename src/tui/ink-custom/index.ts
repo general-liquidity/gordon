@@ -1,13 +1,7 @@
-// ink-custom — Phase 0 public API.
-//
-// This file is a re-export facade that mirrors `ink/build/index.d.ts` exactly
-// for the subset of Ink's surface that Gordon uses. Runtime behavior is
-// provided by the upstream `ink` package for now; subsequent phases replace
-// each named export with an in-tree implementation.
-//
-// DO NOT IMPORT FROM THIS FILE YET. Gordon's components still import from
-// "ink" directly. This module exists so Phase 1+ has a stable target that
-// preserves the public API while the internals are rewritten.
+// Gordon's stable TUI surface. Application components import this facade. The
+// render entry selects vanilla Ink by default or Gordon's owned cell pipeline
+// under an explicit opt-in; components and hooks below are Gordon-owned ports
+// that work with either context adapter.
 
 export type { RenderOptions, Instance } from "./render.ts";
 export { render } from "./render.ts";

@@ -1,6 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import type { GordonContext } from "../../infra/agents/types.ts";
+import { emitHook, runHooks } from "../../infra/hooks/engine.ts";
 import type {
   RuntimeApprovalRequest,
   RuntimeApprovalRule,
@@ -15,6 +16,7 @@ export interface PermissionHookInput {
   context: GordonContext;
   runtimeState: ReturnType<RuntimeStore["getState"]>;
   toolName: string;
+  args?: unknown;
 }
 
 export interface PermissionHookDecision {
@@ -126,13 +128,41 @@ function sameRuleIdentity(a: RuntimeApprovalRule, b: RuntimeApprovalRule): boole
   );
 }
 
-function buildFingerprint(tool: RuntimeToolSpec, context: GordonContext, runtimeState: ReturnType<RuntimeStore["getState"]>): string {
+function hashApprovalArgs(args: unknown): string {
+  if (args === undefined) return "no-args";
+  const seen = new WeakSet<object>();
+  const serialized = JSON.stringify(args, (_key, value: unknown) => {
+    if (typeof value === "bigint") return { $gordonType: "bigint", value: value.toString() };
+    if (typeof value === "undefined") return { $gordonType: "undefined" };
+    if (typeof value === "number" && !Number.isFinite(value)) {
+      return { $gordonType: "number", value: String(value) };
+    }
+    if (!value || typeof value !== "object") return value;
+    if (seen.has(value)) return { $gordonType: "circular" };
+    seen.add(value);
+    if (Array.isArray(value)) return value;
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).sort(([left], [right]) =>
+        left.localeCompare(right)
+      ),
+    );
+  });
+  return createHash("sha256").update(serialized ?? String(args)).digest("hex");
+}
+
+function buildFingerprint(
+  tool: RuntimeToolSpec,
+  context: GordonContext,
+  runtimeState: ReturnType<RuntimeStore["getState"]>,
+  args?: unknown,
+): string {
   return [
     tool.id,
     tool.permissionScope,
     runtimeState.runtimeId,
     runtimeState.session.threadId ?? runtimeState.session.snapshot?.threadId ?? "no-thread",
     context.config.permissionMode,
+    hashApprovalArgs(args),
   ].join(":");
 }
 
@@ -173,6 +203,7 @@ export class PermissionEngine {
   private readonly hooks: Array<(input: PermissionHookInput) => PermissionHookDecision | Promise<PermissionHookDecision>> = [
     defaultClassifier,
   ];
+  private readonly approvalArgs = new Map<string, unknown>();
 
   constructor(runtimeStore: RuntimeStore) {
     this.runtimeStore = runtimeStore;
@@ -224,6 +255,7 @@ export class PermissionEngine {
     toolName: string,
     context: GordonContext,
     policy: RuntimeToolPolicyDecision,
+    args?: unknown,
   ): Promise<PermissionEvaluation> {
     const runtimeState = this.runtimeStore.getState();
     const tool = policy.tool;
@@ -272,7 +304,7 @@ export class PermissionEngine {
         sessionId: runtimeState.session.sessionId,
         resourceId: runtimeState.session.resourceId,
         threadId: runtimeState.session.threadId ?? runtimeState.session.snapshot?.threadId ?? undefined,
-        fingerprint: buildFingerprint(tool, context, runtimeState),
+        fingerprint: buildFingerprint(tool, context, runtimeState, args),
         status: "approved",
         reason: `Approved by ${matchingRule.scope} rule.`,
         actor: matchingRule.createdBy,
@@ -294,6 +326,7 @@ export class PermissionEngine {
       context,
       runtimeState,
       toolName,
+      args,
     };
     for (const hook of this.hooks) {
       const decision = await hook(hookInput);
@@ -313,7 +346,7 @@ export class PermissionEngine {
           sessionId: runtimeState.session.sessionId,
           resourceId: runtimeState.session.resourceId,
           threadId: runtimeState.session.threadId ?? runtimeState.session.snapshot?.threadId ?? undefined,
-          fingerprint: buildFingerprint(tool, context, runtimeState),
+          fingerprint: buildFingerprint(tool, context, runtimeState, args),
           status: "approved",
           reason: decision.reason,
           actor: decision.actor,
@@ -352,7 +385,7 @@ export class PermissionEngine {
           sessionId: runtimeState.session.sessionId,
           resourceId: runtimeState.session.resourceId,
           threadId: runtimeState.session.threadId ?? runtimeState.session.snapshot?.threadId ?? undefined,
-          fingerprint: buildFingerprint(tool, context, runtimeState),
+          fingerprint: buildFingerprint(tool, context, runtimeState, args),
           status: "denied",
           reason: decision.reason,
           actor: decision.actor,
@@ -380,7 +413,11 @@ export class PermissionEngine {
         };
       }
 
-      const queued = this.queueRequest(toolName, tool, policy.approvalClass, context, runtimeState, decision.reason);
+      const approvalHook = await this.runPreApprovalHook(toolName, tool.riskClass, decision.reason, args);
+      if (approvalHook.blocked) {
+        return { status: "blocked", source: "hook", reason: approvalHook.reason };
+      }
+      const queued = this.queueRequest(toolName, tool, policy.approvalClass, context, runtimeState, approvalHook.reason, args);
       return {
         status: "pending",
         source: decision.actor?.startsWith("classifier") ? "classifier" : "hook",
@@ -389,7 +426,11 @@ export class PermissionEngine {
       };
     }
 
-    const queued = this.queueRequest(toolName, tool, policy.approvalClass, context, runtimeState, policy.reason);
+    const approvalHook = await this.runPreApprovalHook(toolName, tool.riskClass, policy.reason, args);
+    if (approvalHook.blocked) {
+      return { status: "blocked", source: "hook", reason: approvalHook.reason };
+    }
+    const queued = this.queueRequest(toolName, tool, policy.approvalClass, context, runtimeState, approvalHook.reason, args);
     return {
       status: "pending",
       source: "policy",
@@ -435,7 +476,13 @@ export class PermissionEngine {
       Date.now(),
       approved.permissionScope,
     );
+    const args = this.approvalArgs.get(approved.id);
     this.resolvePendingRequest(approved);
+    emitHook("PostApproval", {
+      action: approved.toolName,
+      decision: options.persist ? "always" : "once",
+      args,
+    });
     return approved;
   }
 
@@ -489,7 +536,13 @@ export class PermissionEngine {
       Date.now(),
       denied.permissionScope,
     );
+    const args = this.approvalArgs.get(denied.id);
     this.resolvePendingRequest(denied);
+    emitHook("PostApproval", {
+      action: denied.toolName,
+      decision: "deny",
+      args,
+    });
 
     if (options.cascade) {
       // Re-read state (resolvePendingRequest mutated it) and cascade-deny
@@ -499,6 +552,7 @@ export class PermissionEngine {
         (entry) => entry.id !== requestId && entry.permissionScope === pending.permissionScope,
       );
       for (const target of targets) {
+        const targetArgs = this.approvalArgs.get(target.id);
         const cascaded: RuntimeApprovalRequest = {
           ...target,
           status: "denied",
@@ -515,6 +569,11 @@ export class PermissionEngine {
           cascaded.permissionScope,
         );
         this.resolvePendingRequest(cascaded);
+        emitHook("PostApproval", {
+          action: cascaded.toolName,
+          decision: "deny",
+          args: targetArgs,
+        });
       }
     }
 
@@ -551,8 +610,9 @@ export class PermissionEngine {
     context: GordonContext,
     runtimeState: ReturnType<RuntimeStore["getState"]>,
     reason?: string,
+    args?: unknown,
   ): RuntimeApprovalRequest {
-    const fingerprint = buildFingerprint(tool, context, runtimeState);
+    const fingerprint = buildFingerprint(tool, context, runtimeState, args);
     const existing = runtimeState.approvals.pending.find((entry) => entry.fingerprint === fingerprint);
     if (existing) {
       return existing;
@@ -574,13 +634,49 @@ export class PermissionEngine {
       reason: reason ?? `Approval required for ${toolName}.`,
       requestedAt: new Date().toISOString(),
     };
+    this.approvalArgs.set(request.id, args);
 
-    const pending = [request, ...runtimeState.approvals.pending].slice(0, 50);
+    const allPending = [request, ...runtimeState.approvals.pending];
+    const pending = allPending.slice(0, 50);
+    for (const evicted of allPending.slice(50)) this.approvalArgs.delete(evicted.id);
     this.runtimeStore.setApprovalState({
       pending,
       recent: [request, ...runtimeState.approvals.recent].slice(0, 50),
     });
     return request;
+  }
+
+  private async runPreApprovalHook(
+    toolName: string,
+    riskClass: RuntimeToolSpec["riskClass"],
+    rationale?: string,
+    args?: unknown,
+  ): Promise<{ blocked: boolean; reason?: string }> {
+    const payload = {
+      action: toolName,
+      riskTier: riskClass === "critical"
+        ? "critical" as const
+        : riskClass === "high"
+          ? "high" as const
+          : "standard" as const,
+      rationale: rationale ?? `Approval required for ${toolName}.`,
+      args,
+    };
+    const result = await runHooks("PreApproval", payload);
+    if (result.action === "block") {
+      return {
+        blocked: true,
+        reason: result.reason ?? "Approval request blocked by lifecycle hook.",
+      };
+    }
+    const finalPayload = (result.metadata?.finalPayload as typeof payload | undefined) ?? payload;
+    if (typeof finalPayload.rationale !== "string" || finalPayload.rationale.trim().length === 0) {
+      return {
+        blocked: true,
+        reason: "PreApproval hook produced an invalid rationale.",
+      };
+    }
+    return { blocked: false, reason: finalPayload.rationale };
   }
 
   private resolvePendingRequest(request: RuntimeApprovalRequest): void {
@@ -589,6 +685,7 @@ export class PermissionEngine {
       pending: state.approvals.pending.filter((entry) => entry.id !== request.id),
       recent: [request, ...state.approvals.recent.filter((entry) => entry.id !== request.id)].slice(0, 50),
     });
+    this.approvalArgs.delete(request.id);
   }
 
   private recordResolvedRequest(request: RuntimeApprovalRequest): void {

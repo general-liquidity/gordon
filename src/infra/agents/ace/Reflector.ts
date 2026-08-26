@@ -5,12 +5,13 @@
  *   Reflector  → analyzes past trades/decisions, extracts lesson candidates
  *   Curator    → ranks/dedupes lessons and writes them to ~/.gordon/ace-lessons.json
  *
- * The Curator output file is read by future Gordon sessions and injected into
- * the system prompt so accumulated lessons persist across sessions.
+ * The Curator output file is read for each Gordon request and injected into
+ * the governed request-context section so accumulated lessons persist across
+ * sessions without freezing one revision into a process-global agent object.
  *
- * SCAFFOLD STATUS — gated behind GORDON_ACE_ENABLED=true. Not auto-wired into
- * the orchestrator default path. A future sprint can enable it via a periodic
- * job, a `/ace reflect` command, or an autonomous cycle hook.
+ * Reflection/curation remains an explicit governed operation. Promoted lessons
+ * are already auto-injected into request context when GORDON_ACE_ENABLED is
+ * true; this module deliberately does not autonomously promote new lessons.
  */
 
 import { listActionLogEntries } from "../../action-log/store.ts";

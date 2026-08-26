@@ -7,5 +7,8 @@ export {
   type GatewayIPCResponse,
 } from "./ipc.ts";
 
-export { startGatewayDaemonProcess, type GatewayDaemonHandle } from "./process.ts";
-
+export {
+  startGatewayDaemonProcess,
+  type GatewayDaemonHandle,
+  type GatewayDaemonStartOptions,
+} from "./process.ts";

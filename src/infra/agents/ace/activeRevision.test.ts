@@ -49,4 +49,23 @@ describe("ACE active-revision attribution stamp", () => {
     expect(stampAceLessonRevision(payload)).toBe(payload);
     expect(stampAceLessonRevision(payload).aceLessonRevision).toBe(2);
   });
+
+  it("keeps concurrent session revisions isolated", () => {
+    setActiveACELessonRevision(3, ["session-a", "thread-a"]);
+    setActiveACELessonRevision(8, ["session-b", "thread-b"]);
+
+    expect(getActiveACELessonRevision("session-a")).toBe(3);
+    expect(getActiveACELessonRevision("thread-b")).toBe(8);
+    expect(stampAceLessonRevision({}, "thread-a")).toEqual({ aceLessonRevision: 3 });
+    expect(stampAceLessonRevision({}, "session-b")).toEqual({ aceLessonRevision: 8 });
+    expect(stampAceLessonRevision({}, "unknown-session")).toEqual({});
+  });
+
+  it("clears only the aliases for the session being closed", () => {
+    setActiveACELessonRevision(3, ["session-a", "thread-a"]);
+    setActiveACELessonRevision(8, "session-b");
+    resetActiveACELessonRevision(["session-a", "thread-a"]);
+    expect(getActiveACELessonRevision("session-a")).toBe(0);
+    expect(getActiveACELessonRevision("session-b")).toBe(8);
+  });
 });

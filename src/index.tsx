@@ -156,6 +156,19 @@ async function gracefulShutdown(signal: string, code: number = 0): Promise<void>
   }
 
   try {
+    const { shutdownRuntime } = await import("./tui/bridge/runtime.ts");
+    const lifecycleReason = signal === "uncaughtException"
+      ? "error"
+      : signal === "exit"
+        ? "user_quit"
+        : "external_signal";
+    await shutdownRuntime(lifecycleReason);
+  } catch (error) {
+    console.error("Runtime lifecycle shutdown failed:", error);
+    if (code === 0) code = 1;
+  }
+
+  try {
     await telemetry.shutdown();
   } catch {
     // Non-critical

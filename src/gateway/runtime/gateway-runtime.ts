@@ -98,6 +98,16 @@ export class GatewayRuntime {
     this.registerDefaultHandlers();
   }
 
+  /** Release per-session timers and emit their lifecycle-end hooks. */
+  dispose(): void {
+    this.sessionRuntimeFactory.dispose();
+  }
+
+  /** Await lifecycle hooks before a daemon process releases its stores. */
+  async disposeAsync(): Promise<void> {
+    await this.sessionRuntimeFactory.disposeAsync();
+  }
+
   private getSessionRuntime(sessionId: string) {
     return this.sessionRuntimeFactory.get(sessionId, { sessionId });
   }
@@ -360,7 +370,7 @@ export class GatewayRuntime {
       const actions = runtime.runHealthCheck();
 
       // Also clean up stale positions
-      let positionCleanup;
+      let positionCleanup: Awaited<ReturnType<typeof cleanupStalePositions>>;
       try {
         positionCleanup = await cleanupStalePositions();
       } catch {
@@ -493,7 +503,9 @@ export class GatewayRuntime {
         });
 
         // Emergency liquidation: cancel orders + close positions + pause slots
-        let liquidation;
+        let liquidation:
+          | Awaited<ReturnType<typeof executeEmergencyLiquidation>>
+          | { error: string };
         try {
           liquidation = await executeEmergencyLiquidation(context.exchange, result.triggers);
         } catch (liqErr) {

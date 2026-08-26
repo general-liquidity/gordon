@@ -203,8 +203,17 @@ export async function runHooks<P extends HookPoint>(
         currentPayload = { ...currentPayload, ...(result.replacement as object) } as HookPayloadMap[P];
       }
     } catch (err) {
-      // Hook errors must not crash the agent loop; log and continue.
+      // A registered hook is part of the active policy plane. Treating a crash
+      // as allow makes an installed compliance/risk control disappear exactly
+      // when it is unhealthy. Surface a typed block instead of throwing out of
+      // the agent loop or continuing ungoverned.
+      const message = err instanceof Error ? err.message : String(err);
       console.error(`[hooks] ${def.id} threw at ${point}:`, err);
+      await Promise.allSettled(rewakePromises.map((rewake) => rewake.promise));
+      return {
+        action: "block",
+        reason: `${def.id}: hook failed: ${message}`,
+      };
     } finally {
       emitStatus(point, def, "end");
     }
@@ -220,6 +229,16 @@ export async function runHooks<P extends HookPoint>(
         metadata: result.metadata,
       };
     }
+    if (result.action === "modify") {
+      // Parallel hooks all observe the same pre-sync payload, so there is no
+      // deterministic order in which to merge their replacements. Silently
+      // discarding one advertises a policy mutation that never happened.
+      return {
+        action: "block",
+        reason: `${def.id} (asyncRewake): modify is unsupported for concurrent hooks; register it as a synchronous hook`,
+        metadata: result.metadata,
+      };
+    }
   }
 
   return { action: "allow", metadata: { finalPayload: currentPayload } };
@@ -227,7 +246,16 @@ export async function runHooks<P extends HookPoint>(
 
 /** Synchronous convenience — fires-and-forgets without blocking. */
 export function emitHook<P extends HookPoint>(point: P, payload: HookPayloadMap[P]): void {
-  runHooks(point, payload).catch((err) => {
-    console.error(`[hooks] emit ${point} failed:`, err);
-  });
+  runHooks(point, payload)
+    .then((result) => {
+      // Post/lifecycle emitters cannot roll back the event that already
+      // happened, but a blocked audit hook must still be visible rather than
+      // disappearing as an ignored fulfilled promise.
+      if (result.action === "block") {
+        console.error(`[hooks] emit ${point} blocked: ${result.reason ?? "blocked"}`);
+      }
+    })
+    .catch((err) => {
+      console.error(`[hooks] emit ${point} failed:`, err);
+    });
 }

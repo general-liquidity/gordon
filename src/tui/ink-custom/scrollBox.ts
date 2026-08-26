@@ -1,6 +1,6 @@
 // scrollBox — pure utility for high-frequency scroll state mutation.
 //
-// Status: NOT WIRED. Provides a thin handle that mutates a DOMElement's
+// Active in VirtualMessageList. Provides a thin handle that mutates a DOMElement's
 // scroll position WITHOUT triggering a React reconcile per event. Mouse
 // wheel events arrive at ~150 Hz; routing each through `setState`
 // reconcile -> commit -> layout adds 5-10ms per event. The Claude Code
@@ -29,7 +29,6 @@
 //
 // What this module does NOT do (deferred):
 //   * Mouse-wheel parsing (SGR 1003 or other terminal mouse modes).
-//   * Wiring into any React component.
 //   * Reading content height to compute scrollMax — caller's job.
 //
 // Tests: scrollBox.test.ts exercises the pure state machine — clamping,

@@ -433,6 +433,9 @@ export const placeOCOOrderTool = createTool({
       }
       // Use risk-adjusted quantity if modified
       if (riskResult.quantity !== quantity) {
+        if (riskResult.quantity > quantity) {
+          return { error: "Risk check returned an exposure-increasing quantity; order refused." };
+        }
         quantity = riskResult.quantity;
       }
     } catch (riskErr) {
@@ -541,6 +544,9 @@ export const cancelAllOrdersTool = createTool({
     });
     try {
       appendActionLogEntry({
+        sessionId: ctx.runtime?.sessionId,
+        threadId: ctx.threadId ?? ctx.runtime?.threadId,
+        resourceId: ctx.userId ?? ctx.runtime?.resourceId,
         entryType: "execution_result",
         title: `Cancel all orders ${normalizedSymbol}`,
         content: `Cancellation rationale: ${rationale}`,
@@ -550,9 +556,16 @@ export const cancelAllOrdersTool = createTool({
       // Storage failures must not block the cancellation itself.
     }
 
-    // No live-consent gate, deliberately. Cancellation only removes resting
-    // orders, so it is exposure-reducing by construction and stays ungated
-    // even when consent has expired or been revoked. Do not add a gate here.
+    // A blanket cancellation can remove a protective stop. It does not change
+    // current exposure, but it can turn a bounded position into an unprotected
+    // one, so the agent-issued path requires the same live-capital
+    // acknowledgement as other risk-increasing mutations. Emergency
+    // liquidation uses its narrower, position-aware cancellation routine and
+    // remains available after consent expires.
+    const consent = requireLiveConsent({ sandboxActive: ctx.exchange.isSandbox ?? false });
+    if (!consent.ok) {
+      return { error: consent.reason ?? "Live-trading consent required.", symbol: normalizedSymbol };
+    }
     try {
       const cancelled = await ctx.exchange.cancelAllOrders(normalizedSymbol);
 
@@ -765,6 +778,19 @@ export const placeLimitOrderTool = createTool({
     }
 
     const normalizedSymbol = normalizeSymbol(symbol);
+    let referencePrice: number;
+    try {
+      referencePrice = await ctx.exchange.getPrice(normalizedSymbol);
+      if (!Number.isFinite(referencePrice) || referencePrice <= 0) {
+        throw new Error("venue returned a non-positive price");
+      }
+    } catch (error) {
+      return {
+        error: `Limit order refused because a live reference price was unavailable: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      };
+    }
 
     // Risk gate: evaluate order before placement
     try {
@@ -779,6 +805,9 @@ export const placeLimitOrderTool = createTool({
       }
       // Use risk-adjusted quantity if modified
       if (riskResult.quantity !== quantity) {
+        if (riskResult.quantity > quantity) {
+          return { error: "Risk check returned an exposure-increasing quantity; order refused." };
+        }
         quantity = riskResult.quantity;
       }
     } catch (riskErr) {
@@ -787,20 +816,43 @@ export const placeLimitOrderTool = createTool({
       };
     }
 
-    // PreOrderPlacement hook — can block or modify
-    {
-      const preHook = await runHooks("PreOrderPlacement", {
-        symbol: normalizedSymbol,
-        side: side.toLowerCase() === "sell" ? "sell" : "buy",
-        quantity: quantity,
-        orderType: "LIMIT",
-        notionalUsd: quantity * price,
-        exchangeId: ctx.exchange?.exchangeId,
-      });
-      if (preHook.action === "block") {
-        return { error: `PreOrderPlacement hook blocked: ${preHook.reason}` };
-      }
+    const requestedOrder = {
+      symbol: normalizedSymbol,
+      side: side.toLowerCase() === "sell" ? "sell" as const : "buy" as const,
+      quantity,
+      orderType: "LIMIT",
+      notionalUsd: quantity * price,
+      exchangeId: ctx.exchange.exchangeId,
+      limitPrice: price,
+      referencePrice,
+    };
+    const preHook = await runHooks("PreOrderPlacement", requestedOrder);
+    if (preHook.action === "block") {
+      return { error: `PreOrderPlacement hook blocked: ${preHook.reason}` };
     }
+    const hookedOrder =
+      (preHook.metadata?.finalPayload as typeof requestedOrder | undefined) ?? requestedOrder;
+    if (
+      hookedOrder.symbol !== requestedOrder.symbol
+      || hookedOrder.side !== requestedOrder.side
+      || hookedOrder.orderType !== requestedOrder.orderType
+      || hookedOrder.limitPrice !== requestedOrder.limitPrice
+      || hookedOrder.referencePrice !== requestedOrder.referencePrice
+    ) {
+      return { error: "PreOrderPlacement hook may reduce size but cannot change order identity or price." };
+    }
+    const reducedQuantity = Math.min(
+      hookedOrder.quantity,
+      hookedOrder.notionalUsd / price,
+    );
+    if (
+      !Number.isFinite(reducedQuantity)
+      || reducedQuantity <= 0
+      || reducedQuantity > quantity
+    ) {
+      return { error: "PreOrderPlacement hook returned an invalid or exposure-increasing size." };
+    }
+    quantity = reducedQuantity;
 
     try {
       const orderResult = await ctx.exchange.placeOrder({
@@ -819,15 +871,20 @@ export const placeLimitOrderTool = createTool({
         };
       }
 
-      // PostOrderPlacement hook — fire-and-forget audit
-      runHooks("PostOrderPlacement", {
+      // The order is already placed, so a post hook cannot roll it back. Await
+      // it anyway so an external audit sink has completed before success is
+      // reported, and surface a refusal instead of discarding it silently.
+      const postOrderHook = await runHooks("PostOrderPlacement", {
         orderId: String(orderResult.orderId ?? ""),
         symbol: orderResult.symbol ?? normalizedSymbol,
         side: side.toLowerCase() === "sell" ? "sell" : "buy",
         status: orderResult.status ?? "unknown",
         filledQty: Number(orderResult.executedQty ?? 0),
         notionalUsd: quantity * price,
-      }).catch(() => {});
+      });
+      if (postOrderHook.action === "block") {
+        console.error(`[hooks] PostOrderPlacement blocked after order ${String(orderResult.orderId ?? "unknown")}: ${postOrderHook.reason ?? "blocked"}`);
+      }
 
       return {
         success: true,
@@ -1013,6 +1070,9 @@ export const cancelOrderTool = createTool({
     });
     try {
       appendActionLogEntry({
+        sessionId: ctx.runtime?.sessionId,
+        threadId: ctx.threadId ?? ctx.runtime?.threadId,
+        resourceId: ctx.userId ?? ctx.runtime?.resourceId,
         entryType: "execution_result",
         title: `Cancel order ${normalizedSymbol} #${orderId}`,
         content: `Cancellation rationale: ${rationale}`,
@@ -1022,8 +1082,15 @@ export const cancelOrderTool = createTool({
       // Storage failures must not block the cancellation itself.
     }
 
-    // No live-consent gate, deliberately. Cancelling an unfilled order removes
-    // committed exposure and can never create it. Do not add a gate here.
+    // A specific order can still be a protective stop. The public agent tool
+    // cannot prove from an exchange order id alone that cancellation only
+    // removes an unfilled entry, so it fails closed on a live venue until the
+    // operator has acknowledged live-capital control. Position-aware emergency
+    // cleanup remains separately exempt.
+    const consent = requireLiveConsent({ sandboxActive: ctx.exchange.isSandbox ?? false });
+    if (!consent.ok) {
+      return { error: consent.reason ?? "Live-trading consent required.", symbol: normalizedSymbol };
+    }
     try {
       await ctx.exchange.cancelOrder(normalizedSymbol, String(orderId));
 

@@ -26,6 +26,12 @@ export interface AcpSessionTurn {
   ts: number;
 }
 
+interface AcpSessionModeRecord {
+  kind: "mode";
+  modeId: string;
+  ts: number;
+}
+
 export function getAcpSessionsDir(env: NodeJS.ProcessEnv = process.env): string {
   return env[ACP_SESSIONS_PATH_ENV] ?? join(homedir(), ".gordon", "acp-sessions");
 }
@@ -51,15 +57,16 @@ function sessionPath(sessionId: string, env: NodeJS.ProcessEnv = process.env): s
   return join(getAcpSessionsDir(env), `${sanitizeSessionId(sessionId)}.jsonl`);
 }
 
-function ensureDir(env: NodeJS.ProcessEnv = process.env): void {
+function ensureDir(env: NodeJS.ProcessEnv = process.env): boolean {
   const dir = getAcpSessionsDir(env);
   if (!existsSync(dir)) {
     try {
       mkdirSync(dir, { recursive: true });
     } catch {
-      // Non-fatal — caller handles append failure
+      return false;
     }
   }
+  return true;
 }
 
 /**
@@ -70,14 +77,71 @@ export function appendSessionTurn(
   sessionId: string,
   turn: AcpSessionTurn,
   env: NodeJS.ProcessEnv = process.env,
-): void {
-  ensureDir(env);
+): boolean {
+  if (!ensureDir(env)) return false;
   try {
     appendFileSync(sessionPath(sessionId, env), JSON.stringify(turn) + "\n", "utf-8");
+    return true;
   } catch {
-    // Persistence is best-effort; transient FS errors shouldn't break the
-    // prompt loop. The in-memory history (in GordonAcpAgent) is still
-    // accurate for the current process.
+    // The boolean lets the ACP boundary fail the operation without mutating its
+    // in-memory history or claiming the turn is resumable.
+    return false;
+  }
+}
+
+/** Append one completed user/assistant turn with a single filesystem write. */
+export function appendSessionTurns(
+  sessionId: string,
+  turns: readonly AcpSessionTurn[],
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (turns.length === 0) return true;
+  if (!ensureDir(env)) return false;
+  try {
+    const payload = turns.map((turn) => JSON.stringify(turn)).join("\n") + "\n";
+    appendFileSync(sessionPath(sessionId, env), payload, "utf-8");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function appendSessionMode(
+  sessionId: string,
+  modeId: string,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (!ensureDir(env)) return false;
+  const record: AcpSessionModeRecord = { kind: "mode", modeId, ts: Date.now() };
+  try {
+    appendFileSync(sessionPath(sessionId, env), JSON.stringify(record) + "\n", "utf-8");
+    return true;
+  } catch {
+    // The caller keeps the prior in-memory mode when persistence fails.
+    return false;
+  }
+}
+
+export function loadSessionMode(
+  sessionId: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string | null {
+  const path = sessionPath(sessionId, env);
+  if (!existsSync(path)) return null;
+  try {
+    let latest: string | null = null;
+    for (const line of readFileSync(path, "utf-8").split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        const parsed = JSON.parse(line) as Partial<AcpSessionModeRecord>;
+        if (parsed.kind === "mode" && typeof parsed.modeId === "string") latest = parsed.modeId;
+      } catch {
+        // Line-isolated JSONL: a damaged turn cannot erase the last valid mode.
+      }
+    }
+    return latest;
+  } catch {
+    return null;
   }
 }
 

@@ -32,6 +32,9 @@ jobs:
       - name: Typecheck
         run: bun tsc --noEmit -p tsconfig.json
 
+      - name: Verify exact release test-shard coverage
+        run: bun run check:test-shards
+
       - name: Focused safety and execution tests
         run: >
           bun test
@@ -96,13 +99,9 @@ jobs:
     # (bunfig.toml minimumReleaseAge) and the IOC scanner (doctor
     # checkSupplyChainIocs) for defense in depth.
     #
-    # Current behavior: informational. `bun audit --audit-level=X` is a
-    # display filter — Bun returns exit 0 regardless of findings. Output
-    # is visible in the run log so reviewers can spot new advisories;
-    # tighten to a hard gate via `bun audit --json | jq` once Gordon's
-    # noise floor (mostly long-tail crypto transitives — protobufjs,
-    # elliptic) is either patched upstream or explicitly accepted via an
-    # ignore list.
+    # The critical pass is a hard gate on every advisory outside the explicit
+    # accepted baseline. The high-severity pass remains informational while
+    # Gordon's long-tail crypto dependency noise floor is reduced upstream.
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -133,11 +132,6 @@ jobs:
         # Accepted criticals (audit baseline as of 2026-05):
         #   GHSA-xq3m-2v4x-88gg — protobufjs RCE (via solana-agent-kit
         #     / drift-labs / langchain transitives)
-        #   GHSA-vjh7-7g9h-fjfh — elliptic ECDSA key extraction (via
-        #     ethers / coinbase-sdk / metaplex / polkadot transitives)
-        #   GHSA-2w6w-674q-4c4q — handlebars AST type confusion (via
-        #     a transitive of a transitive — handlebars not used
-        #     directly)
         #   GHSA-fjxv-7rqg-78g4 — form-data unsafe random boundary
         #     (via transitive HTTP-client deps)
         #   GHSA-w7jw-789q-3m8p — shell-quote newline-escape gap (via a
@@ -146,8 +140,6 @@ jobs:
         run: |
           bun audit --audit-level=critical \
             --ignore GHSA-xq3m-2v4x-88gg \
-            --ignore GHSA-vjh7-7g9h-fjfh \
-            --ignore GHSA-2w6w-674q-4c4q \
             --ignore GHSA-fjxv-7rqg-78g4 \
             --ignore GHSA-w7jw-789q-3m8p
 
@@ -161,8 +153,6 @@ jobs:
         run: |
           bun audit --audit-level=high \
             --ignore GHSA-xq3m-2v4x-88gg \
-            --ignore GHSA-vjh7-7g9h-fjfh \
-            --ignore GHSA-2w6w-674q-4c4q \
             --ignore GHSA-fjxv-7rqg-78g4
 
       - name: Security scanner self-test

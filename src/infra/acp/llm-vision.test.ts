@@ -14,12 +14,16 @@ describe("resolveVisionPath", () => {
     expect(resolveVisionPath({})).toBe("inline");
   });
 
-  it("respects blocks when explicitly set", () => {
-    expect(resolveVisionPath({ [VISION_PATH_ENV]: "blocks" })).toBe("blocks");
+  it("refuses blocks until the production LLM boundary can carry them", () => {
+    expect(() => resolveVisionPath({ [VISION_PATH_ENV]: "blocks" })).toThrow(
+      /not supported.*string-only production LLM boundary/,
+    );
   });
 
-  it("falls back to inline for unknown values", () => {
-    expect(resolveVisionPath({ [VISION_PATH_ENV]: "weird" })).toBe("inline");
+  it("refuses unknown values instead of silently changing operator intent", () => {
+    expect(() => resolveVisionPath({ [VISION_PATH_ENV]: "weird" })).toThrow(
+      /must be "inline"/,
+    );
   });
 });
 

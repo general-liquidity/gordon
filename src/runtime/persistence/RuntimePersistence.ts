@@ -49,6 +49,7 @@ export class RuntimePersistence {
   private readonly baseDir: string;
   private readonly dbPath: string;
   private readonly db: Database;
+  private closed = false;
 
   constructor(options: RuntimePersistenceOptions = {}) {
     const preferredDir = options.baseDir ?? join(GORDON_DIR, "runtime");
@@ -356,6 +357,8 @@ export class RuntimePersistence {
   }
 
   close(): void {
+    if (this.closed) return;
+    this.closed = true;
     this.db.close(false);
   }
 
@@ -433,4 +436,5 @@ export class RuntimePersistence {
       return fallbackDir;
     }
   }
+
 }

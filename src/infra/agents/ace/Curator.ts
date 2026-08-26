@@ -4,9 +4,9 @@
  * Reads candidates from the Reflector, merges them with any persisted lessons,
  * dedupes, scores, prunes, and writes the result to ~/.gordon/ace-lessons.json.
  *
- * Subsequent Gordon sessions can call `loadACELessons()` and inject the
- * formatted block into the system prompt. Auto-injection is NOT yet wired —
- * this is scaffolded for a future sprint.
+ * Each Gordon request loads the governed store through the dynamic
+ * `shared.ace-lessons` context section. Injection is flag-gated, revision
+ * stamped per session, and deliberately excluded from the stable prompt cache.
  *
  * SCAFFOLD STATUS — gated behind GORDON_ACE_ENABLED=true; no-ops otherwise.
  */
@@ -390,8 +390,8 @@ export function loadLessonEvidence(
 }
 
 /**
- * Render the lesson store as a compact prompt block. Future sprints can
- * inject this into the system prompt of new sessions.
+ * Render the lesson store as the compact block injected by
+ * `context/promptSections.ts`.
  */
 export function formatACELessonsForPrompt(store: ACELessonStore, maxLessons = 12): string {
   if (!isACEEnabled() || store.lessons.length === 0) return "";

@@ -40,7 +40,7 @@ describe("runHooks — sync chain (existing behavior preserved)", () => {
     });
     const r = await runHooks("PreToolUse", { toolName: "x", toolCallId: "1", args: { v: 1 } });
     expect(log).toEqual(["first:1", "second:2"]);
-    expect((r.metadata?.finalPayload as { args: { v: number } }).args.v).toBe(3);
+    expect((r.metadata!.finalPayload as { args: { v: number } }).args.v).toBe(3);
   });
 
   it("first sync block stops the chain", async () => {
@@ -176,7 +176,23 @@ describe("runHooks — asyncRewake mode", () => {
     expect(r.reason).toContain("compliance API unreachable");
   });
 
-  it("a sync hook that throws still logs and continues (unchanged)", async () => {
+  it("a rewake hook cannot silently discard a concurrent modification", async () => {
+    registerHook({
+      id: "invalid-parallel-mutator",
+      point: "PreToolUse",
+      asyncRewake: true,
+      handler: async () => ({ action: "modify", replacement: { args: { quantity: 0 } } }),
+    });
+    const r = await runHooks("PreToolUse", {
+      toolName: "x",
+      toolCallId: "1",
+      args: { quantity: 1 },
+    });
+    expect(r.action).toBe("block");
+    expect(r.reason).toContain("modify is unsupported");
+  });
+
+  it("a sync hook that throws fails closed without escaping the agent loop", async () => {
     registerHook({
       id: "sync-thrower",
       point: "PreToolUse",
@@ -185,7 +201,9 @@ describe("runHooks — asyncRewake mode", () => {
       },
     });
     const r = await runHooks("PreToolUse", { toolName: "x", toolCallId: "1", args: {} });
-    expect(r.action).toBe("allow");
+    expect(r.action).toBe("block");
+    expect(r.reason).toContain("sync-thrower");
+    expect(r.reason).toContain("boom");
   });
 
   it("rewake hooks can be mixed with sync hooks under the same point", async () => {

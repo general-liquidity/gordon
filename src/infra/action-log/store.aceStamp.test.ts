@@ -48,4 +48,21 @@ describe("action-log → ACE revision attribution stamp", () => {
     });
     expect(entry.payload).not.toHaveProperty("aceLessonRevision");
   });
+
+  it("attributes an entry to its own session rather than another active session", () => {
+    setActiveACELessonRevision(4, "session-a");
+    setActiveACELessonRevision(9, "session-b");
+    const a = appendActionLogEntry({
+      sessionId: "session-a",
+      entryType: "tool_call",
+      title: "a",
+    });
+    const b = appendActionLogEntry({
+      sessionId: "session-b",
+      entryType: "tool_call",
+      title: "b",
+    });
+    expect(a.payload.aceLessonRevision).toBe(4);
+    expect(b.payload.aceLessonRevision).toBe(9);
+  });
 });

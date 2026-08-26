@@ -1,7 +1,7 @@
 /**
  * migrationScheduler — Phase 6 reconciler module.
  *
- * Status: NOT WIRED. A thin wrapper around setInterval that fires a
+ * Active in customRender. A thin wrapper around setInterval that fires a
  * user-supplied migration callback every N ms. Guards against reentrancy
  * (slow migrations never overlap) and swallows errors so the scheduler keeps
  * ticking even if one migration throws.

@@ -76,7 +76,11 @@ export function appendActionLogEntry(input: AppendActionLogEntryInput): ActionLo
     entryType: input.entryType,
     title: input.title,
     content: input.content ?? "",
-    payload: stampAceLessonRevision(input.payload ?? {}),
+    payload: stampAceLessonRevision(input.payload ?? {}, [
+      input.sessionId,
+      input.threadId,
+      input.resourceId,
+    ]),
     label: input.label,
     bookmarked: input.bookmarked ?? false,
     createdAt: input.createdAt ?? new Date().toISOString(),

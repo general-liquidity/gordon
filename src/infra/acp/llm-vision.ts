@@ -14,16 +14,18 @@
  *      pixels/audio, but knows they were attached. Works on every
  *      provider, including text-only models.
  *
- *   2. **Content-block path (deferred to v3.6)** — when the Gordon LLM
+ *   2. **Content-block translators (deferred)** — when the Gordon LLM
  *      client gains content-block support (Anthropic image blocks,
  *      OpenAI vision input_image), the attachments would be passed
  *      verbatim. This module exposes `toAnthropicContentBlocks` +
  *      `toOpenAIContentParts` as ready-to-use translators so the v3.6
  *      flip is mechanical.
  *
- * The path choice is set by `GORDON_ACP_VISION_PATH=inline|blocks`
- * (default `inline`). Setting `blocks` requires LLM client support
- * that v3.5 doesn't yet ship; the env flag is forward-prep.
+ * The production path is currently `inline`. Setting
+ * `GORDON_ACP_VISION_PATH=blocks` fails explicitly: accepting that setting
+ * while the production handler still has a string-only LLM boundary would
+ * silently discard the attachment payload. The converter functions remain
+ * exported so the future content-block integration has one tested boundary.
  */
 
 import type { MultimodalAttachment } from "./content-translator.ts";
@@ -33,7 +35,14 @@ export const VISION_PATH_ENV = "GORDON_ACP_VISION_PATH";
 export type VisionPath = "inline" | "blocks";
 
 export function resolveVisionPath(env: NodeJS.ProcessEnv = process.env): VisionPath {
-  return env[VISION_PATH_ENV] === "blocks" ? "blocks" : "inline";
+  const configured = env[VISION_PATH_ENV]?.trim().toLowerCase();
+  if (!configured || configured === "inline") return "inline";
+  if (configured === "blocks") {
+    throw new Error(
+      `${VISION_PATH_ENV}=blocks is not supported by Gordon's string-only production LLM boundary; use inline until content-block transport is wired`,
+    );
+  }
+  throw new Error(`${VISION_PATH_ENV} must be "inline" when set; received ${JSON.stringify(configured)}`);
 }
 
 /**

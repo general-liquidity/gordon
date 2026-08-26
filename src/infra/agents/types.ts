@@ -23,6 +23,7 @@ export interface GordonRuntimeAccess {
   evaluateToolAccess: (
     toolName: string,
     context: GordonContext,
+    args?: unknown,
   ) => Promise<GordonRuntimeToolAccessResult>;
   refreshPlugins?: () => Promise<void>;
   reloadPlugins?: () => Promise<void>;

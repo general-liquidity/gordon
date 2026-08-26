@@ -1,9 +1,38 @@
-import { describe, it, expect } from "bun:test";
+import { afterEach, beforeEach, describe, it, expect } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   GordonAcpAgent,
+  ACP_SESSION_MODES,
   type PromptHandler,
 } from "./server.ts";
 import { PROTOCOL_VERSION } from "@agentclientprotocol/sdk";
+import { ACP_SESSIONS_PATH_ENV, loadSessionTurns } from "./sessions.ts";
+import { clearHooks, registerHook } from "../hooks/engine.ts";
+import {
+  checkCostBudget,
+  resetCostBudgetState,
+  setCostBudget,
+} from "../platform/costTracker.ts";
+
+let sessionDir: string;
+let previousSessionDir: string | undefined;
+
+beforeEach(() => {
+  sessionDir = mkdtempSync(join(tmpdir(), "gordon-acp-server-"));
+  previousSessionDir = process.env[ACP_SESSIONS_PATH_ENV];
+  process.env[ACP_SESSIONS_PATH_ENV] = sessionDir;
+});
+
+afterEach(() => {
+  clearHooks();
+  setCostBudget(null);
+  resetCostBudgetState();
+  if (previousSessionDir === undefined) delete process.env[ACP_SESSIONS_PATH_ENV];
+  else process.env[ACP_SESSIONS_PATH_ENV] = previousSessionDir;
+  rmSync(sessionDir, { recursive: true, force: true });
+});
 
 // =================== mock SDK connection ===================
 //
@@ -69,6 +98,7 @@ describe("GordonAcpAgent — initialize", () => {
     expect(result.agentCapabilities?.promptCapabilities?.embeddedContext).toBe(true);
     expect(result.agentCapabilities?.mcpCapabilities?.http).toBe(true);
     expect(result.agentCapabilities?.mcpCapabilities?.sse).toBe(true);
+    expect(result.agentCapabilities?.sessionCapabilities?.close).toEqual({});
     expect(result.authMethods).toEqual([]);
   });
 });
@@ -90,6 +120,8 @@ describe("GordonAcpAgent — newSession", () => {
     const { agent } = makeAgent();
     const result = await agent.newSession({ cwd: "/tmp", mcpServers: [] });
     expect(result.sessionId).toMatch(/^[0-9a-f]{32}$/);
+    expect(result.modes?.currentModeId).toBe("default");
+    expect(result.modes?.availableModes.map((mode) => mode.id)).toEqual(ACP_SESSION_MODES.map((mode) => mode.id));
   });
 
   it("returns unique ids across calls", async () => {
@@ -120,10 +152,54 @@ describe("GordonAcpAgent — newSession", () => {
     ).rejects.toThrow(/Invalid sessionId/);
   });
 
-  it("setSessionMode returns empty (v1 no-op)", async () => {
-    const { agent } = makeAgent();
-    const result = await agent.setSessionMode({ sessionId: "00".repeat(16), modeId: "default" });
+  it("setSessionMode changes the mode delivered to the production prompt handler", async () => {
+    const seen: string[] = [];
+    const { agent, conn } = makeAgent(async ({ modeId }) => {
+      seen.push(modeId);
+      return { stopReason: "end_turn", assistantText: "ok" };
+    });
+    const session = await agent.newSession({ cwd: "/tmp", mcpServers: [] });
+    const result = await agent.setSessionMode({ sessionId: session.sessionId, modeId: "paper" });
     expect(result).toEqual({});
+    expect(conn.updates.at(-1)?.update).toEqual({
+      sessionUpdate: "current_mode_update",
+      currentModeId: "paper",
+    });
+    await agent.prompt({ sessionId: session.sessionId, prompt: [{ type: "text", text: "test" }] });
+    expect(seen).toEqual(["paper"]);
+  });
+
+  it("setSessionMode rejects unknown sessions and unsupported modes", async () => {
+    const { agent } = makeAgent();
+    await expect(agent.setSessionMode({ sessionId: "00".repeat(16), modeId: "paper" })).rejects.toThrow("Unknown sessionId");
+    const session = await agent.newSession({ cwd: "/tmp", mcpServers: [] });
+    await expect(agent.setSessionMode({ sessionId: session.sessionId, modeId: "live" })).rejects.toThrow("Unsupported");
+  });
+
+  it("does not change the in-memory mode when mode persistence fails", async () => {
+    const seen: string[] = [];
+    const { agent } = makeAgent(async ({ modeId }) => {
+      seen.push(modeId);
+      return { stopReason: "end_turn", assistantText: "ok" };
+    });
+    const session = await agent.newSession({ cwd: "/tmp", mcpServers: [] });
+    rmSync(sessionDir, { recursive: true, force: true });
+    writeFileSync(sessionDir, "not a directory", "utf-8");
+
+    await expect(
+      agent.setSessionMode({ sessionId: session.sessionId, modeId: "paper" }),
+    ).rejects.toThrow(/Failed to persist/);
+
+    rmSync(sessionDir, { force: true });
+    await agent.prompt({ sessionId: session.sessionId, prompt: [{ type: "text", text: "test" }] });
+    expect(seen).toEqual(["default"]);
+  });
+
+  it("closeSession releases the session", async () => {
+    const { agent } = makeAgent();
+    const session = await agent.newSession({ cwd: "/tmp", mcpServers: [] });
+    expect(await agent.closeSession({ sessionId: session.sessionId })).toEqual({});
+    await expect(agent.prompt({ sessionId: session.sessionId, prompt: [{ type: "text", text: "test" }] })).rejects.toThrow("Unknown sessionId");
   });
 });
 
@@ -270,6 +346,32 @@ describe("GordonAcpAgent — prompt", () => {
     // Second call's history should be empty because first was cancelled
     expect(seenHistories[1]).toEqual([]);
   });
+
+  it("cleans up a pre-turn budget stop so a later prompt can run", async () => {
+    let calls = 0;
+    const { agent } = makeAgent(async () => {
+      calls += 1;
+      return { stopReason: "end_turn", assistantText: "ok" };
+    });
+    const session = await agent.newSession({ cwd: "/tmp", mcpServers: [] });
+    setCostBudget({ sessionUsd: 0.01, action: "halt", warnThresholds: [] });
+    checkCostBudget(0.02, 0.02);
+
+    const stopped = await agent.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "blocked by budget" }],
+    });
+    expect(stopped.stopReason).toBe("max_tokens");
+    expect(calls).toBe(0);
+
+    setCostBudget(null);
+    const resumed = await agent.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "now run" }],
+    });
+    expect(resumed.stopReason).toBe("end_turn");
+    expect(calls).toBe(1);
+  });
 });
 
 // =================== cancel ===================
@@ -306,6 +408,31 @@ describe("GordonAcpAgent — cancel", () => {
     await expect(agent.cancel({ sessionId: "ff".repeat(16) })).resolves.toBeUndefined();
   });
 
+  it("an abort remains authoritative when a handler returns end_turn late", async () => {
+    let release!: () => void;
+    let started!: () => void;
+    const running = new Promise<void>((resolve) => { started = resolve; });
+    const finish = new Promise<void>((resolve) => { release = resolve; });
+    const { agent } = makeAgent(async () => {
+      started();
+      await finish;
+      // Deliberately violates the handler contract to prove the ACP boundary
+      // cannot persist a cancelled completion as a successful turn.
+      return { stopReason: "end_turn", assistantText: "late answer" };
+    });
+    const session = await agent.newSession({ cwd: "/tmp", mcpServers: [] });
+    const prompt = agent.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "cancel me" }],
+    });
+    await running;
+    await agent.cancel({ sessionId: session.sessionId });
+    release();
+
+    expect((await prompt).stopReason).toBe("cancelled");
+    expect(loadSessionTurns(session.sessionId)).toEqual([]);
+  });
+
   it("re-prompting the same session aborts the prior pending prompt", async () => {
     let firstAborted = false;
     const handler: PromptHandler = async ({ prompt, signal }) => {
@@ -337,5 +464,134 @@ describe("GordonAcpAgent — cancel", () => {
     const firstResult = await first;
     expect(firstResult.stopReason).toBe("cancelled");
     expect(firstAborted).toBe(true);
+  });
+
+  it("waits for the aborted prompt to settle before starting its replacement", async () => {
+    let releaseFirst!: () => void;
+    let firstStarted!: () => void;
+    const firstIsRunning = new Promise<void>((resolve) => { firstStarted = resolve; });
+    const release = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    let secondStarted = false;
+    const handler: PromptHandler = async ({ prompt, signal }) => {
+      if (prompt === "first") {
+        firstStarted();
+        await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }));
+        await release;
+        return { stopReason: "cancelled", assistantText: "late partial" };
+      }
+      secondStarted = true;
+      return { stopReason: "end_turn", assistantText: "second answer" };
+    };
+    const { agent } = makeAgent(handler);
+    const session = await agent.newSession({ cwd: "/tmp", mcpServers: [] });
+    const first = agent.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "first" }],
+    });
+    await firstIsRunning;
+    const second = agent.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "second" }],
+    });
+    await Promise.resolve();
+    expect(secondStarted).toBe(false);
+    releaseFirst();
+    expect((await first).stopReason).toBe("cancelled");
+    expect((await second).stopReason).toBe("end_turn");
+    expect(loadSessionTurns(session.sessionId).map((turn) => turn.content)).toEqual([
+      "second",
+      "second answer",
+    ]);
+  });
+
+  it("runs only the newest of two replacements queued behind an active prompt", async () => {
+    let releaseFirst!: () => void;
+    let firstStarted!: () => void;
+    const firstIsRunning = new Promise<void>((resolve) => { firstStarted = resolve; });
+    const release = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const entered: string[] = [];
+    const { agent } = makeAgent(async ({ prompt, signal }) => {
+      entered.push(prompt);
+      if (prompt === "first") {
+        firstStarted();
+        await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }));
+        await release;
+        return { stopReason: "cancelled", assistantText: "discarded" };
+      }
+      return { stopReason: "end_turn", assistantText: `${prompt} answer` };
+    });
+    const session = await agent.newSession({ cwd: "/tmp", mcpServers: [] });
+    const first = agent.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "first" }],
+    });
+    await firstIsRunning;
+    const second = agent.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "second" }],
+    });
+    const third = agent.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "third" }],
+    });
+    releaseFirst();
+
+    expect((await first).stopReason).toBe("cancelled");
+    expect((await second).stopReason).toBe("cancelled");
+    expect((await third).stopReason).toBe("end_turn");
+    expect(entered).toEqual(["first", "third"]);
+    expect(loadSessionTurns(session.sessionId).map((turn) => turn.content)).toEqual([
+      "third",
+      "third answer",
+    ]);
+  });
+});
+
+describe("GordonAcpAgent — close lifecycle", () => {
+  it("keeps a session open when a Stop hook vetoes closure", async () => {
+    const unregister = registerHook({
+      id: "test-stop-veto",
+      point: "Stop",
+      handler: () => ({ action: "block", reason: "operator policy" }),
+    });
+    const { agent } = makeAgent();
+    const session = await agent.newSession({ cwd: "/tmp", mcpServers: [] });
+    await expect(agent.closeSession({ sessionId: session.sessionId })).rejects.toThrow(/operator policy/);
+    unregister();
+    expect((await agent.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "still open" }],
+    })).stopReason).toBe("end_turn");
+  });
+
+  it("waits for an aborted prompt before deleting session state", async () => {
+    let releasePrompt!: () => void;
+    let promptStarted!: () => void;
+    const started = new Promise<void>((resolve) => { promptStarted = resolve; });
+    const release = new Promise<void>((resolve) => { releasePrompt = resolve; });
+    const { agent } = makeAgent(async ({ signal }) => {
+      promptStarted();
+      await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }));
+      await release;
+      return { stopReason: "cancelled", assistantText: "late" };
+    });
+    const session = await agent.newSession({ cwd: "/tmp", mcpServers: [] });
+    const prompt = agent.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "long" }],
+    });
+    await started;
+    let closed = false;
+    const close = agent.closeSession({ sessionId: session.sessionId }).then(() => { closed = true; });
+    await Promise.resolve();
+    expect(closed).toBe(false);
+    releasePrompt();
+    expect((await prompt).stopReason).toBe("cancelled");
+    await close;
+    expect(loadSessionTurns(session.sessionId)).toEqual([]);
+    await expect(agent.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "too late" }],
+    })).rejects.toThrow(/Unknown sessionId/);
   });
 });

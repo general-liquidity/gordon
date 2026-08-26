@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import {
   HandoffCoordinator,
   type FilterableMessage,
@@ -9,6 +9,13 @@ import {
   buildNativeSupervisorDelegation,
   type SupervisorDelegationState,
 } from "./nativeSupervisor.ts";
+import { clearHooks, registerHook } from "../../hooks/engine.ts";
+import { resetSubagentHookBridgeForTests } from "../../hooks/subagentHookBridge.ts";
+
+afterEach(() => {
+  clearHooks();
+  resetSubagentHookBridgeForTests();
+});
 
 describe("isNativeSupervisorEnabled", () => {
   test("default (unset) is off", () => {
@@ -90,6 +97,42 @@ describe("onDelegationStart", () => {
     const res = await onStart({ primitiveId: "executor", toolCallId: "tc2" });
     expect(res.proceed).toBe(true);
     expect(state.currentAgent).toBe("executor");
+  });
+
+  test("pairs same-type invocations by tool-call id instead of collapsing them", async () => {
+    const stopped: string[] = [];
+    registerHook({
+      id: "observe-stop",
+      point: "SubagentStop",
+      handler: (payload) => {
+        stopped.push(payload.subagentId);
+        return { action: "allow" };
+      },
+    });
+    const coordinator = new HandoffCoordinator();
+    const firstState: SupervisorDelegationState = { currentAgent: undefined };
+    const secondState: SupervisorDelegationState = { currentAgent: undefined };
+    const first = buildNativeSupervisorDelegation(firstState, coordinator, "thread-1");
+    const second = buildNativeSupervisorDelegation(secondState, coordinator, "thread-1");
+
+    await (first.onDelegationStart as (ctx: any) => Promise<any>)({
+      primitiveId: "researcher",
+      toolCallId: "call-1",
+    });
+    await (second.onDelegationStart as (ctx: any) => Promise<any>)({
+      primitiveId: "researcher",
+      toolCallId: "call-2",
+    });
+    await (first.onDelegationComplete as (ctx: any) => Promise<any>)({
+      primitiveId: "researcher",
+      toolCallId: "call-1",
+    });
+    await (second.onDelegationComplete as (ctx: any) => Promise<any>)({
+      primitiveId: "researcher",
+      toolCallId: "call-2",
+    });
+
+    expect(stopped.sort()).toEqual(["call-1", "call-2"]);
   });
 });
 

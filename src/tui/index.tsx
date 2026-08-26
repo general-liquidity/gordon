@@ -32,8 +32,6 @@ export async function startGordonTUI(): Promise<void> {
   });
   setInkInstance(instance);
   await instance.waitUntilExit();
-
-  await new Promise<void>(() => {});
 }
 
 function acquireTuiLockOrExit(): ReturnType<typeof acquireInstanceLock> {

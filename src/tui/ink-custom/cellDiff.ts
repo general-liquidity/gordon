@@ -1,6 +1,6 @@
 // cellDiff — Phase 1 cell-level diff producing minimal Patch runs.
 //
-// Status: NOT WIRED. Walks the raw Int32Arrays of two buffers and emits one
+// Active in customRender. Walks the raw Int32Arrays of two buffers and emits one
 // Patch per contiguous same-style run on each row. Clean cells are skipped
 // cheaply by comparing packed ints directly. The dirty bit on `curr` is
 // cleared as we read each cell so subsequent diffs only pay for real changes.

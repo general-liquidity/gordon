@@ -278,9 +278,10 @@ sharpen Gordon's security posture if we ever need them:
 - **`bun ci`** — alias for `bun install --frozen-lockfile`. Use in
   CI/CD pipelines where the lockfile must not drift.
 - **`bun audit --ignore <advisory-id>`** — silence specific known
-  advisories. Gordon's `ci.yml` audit step uses this for the four
-  long-tail crypto-transitive criticals (protobufjs, elliptic) that
-  can't be fixed without upstream releases.
+  advisories. Gordon's `ci.yml` critical audit uses a reviewed baseline for
+  protobufjs, form-data, and shell-quote transitives that cannot currently be
+  removed without upstream releases. `audit-risk-tree.cjs` identifies the
+  direct dependency paths and must be updated whenever that baseline changes.
 - **`bun patch` / `bun patch --commit`** — git-friendly persistent
   dependency patching. Future replacement for `scripts/patches/`
   if Mastra/Ink patches become persistent rather than postinstall.

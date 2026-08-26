@@ -56,7 +56,10 @@ export class QueryRuntime {
   ): AsyncGenerator<StreamEvent, void> {
     const context = await this.resolveContext(session, options);
     const runtimeQueryTool = this.deps.toolRegistry.ensure("runtime_query_stream");
-    await this.toolInvoker.prepare("runtime_query_stream", context, this.buildInvocationInput(session, options));
+    await this.toolInvoker.prepare("runtime_query_stream", context, {
+      ...this.buildInvocationInput(session, options),
+      args: { userMessage },
+    });
     this.deps.runtimeStore.setPermissionScopes([
       ...this.deps.runtimeStore.getState().permissionScopes,
       runtimeQueryTool.permissionScope,
@@ -139,6 +142,7 @@ export class QueryRuntime {
         context,
         {
           ...this.buildInvocationInput(session, options),
+          args: { userMessage },
           executor: async () => processMessage(userMessage, context, session.threadId, session.resourceId),
         },
       );
@@ -201,6 +205,7 @@ export class QueryRuntime {
         context,
         {
           ...this.buildInvocationInput(session, options),
+          args: { userMessage, structured: true },
           executor: async () => processStructuredMessage(userMessage, schema, context, session.threadId, session.resourceId),
         },
       );

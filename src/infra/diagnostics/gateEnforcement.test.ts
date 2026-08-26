@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -10,6 +10,29 @@ import {
   type GateDescriptor,
 } from "./gateEnforcement.ts";
 import { clearHooks, registerHook } from "../hooks/engine.ts";
+import {
+  POLICY_KEY_ENV,
+  POLICY_PATH_ENV,
+  writeSignedPolicy,
+} from "../config/settingsSync/policySignature.ts";
+import { HOOK_POINTS, type HookPoint } from "../hooks/types.ts";
+
+const PRODUCTION_HOOK_BRIDGES = {
+  PreToolUse: ["../agents/tools/wrappers/withMetrics.ts", 'runHooks("PreToolUse"'],
+  PostToolUse: ["../agents/tools/wrappers/withMetrics.ts", 'runHooks("PostToolUse"'],
+  PreCompact: ["../domain/memory/summarizer.ts", 'runHooks("PreCompact"'],
+  PostCompact: ["../domain/memory/summarizer.ts", 'runHooks("PostCompact"'],
+  SessionStart: ["../../runtime/session/SessionRuntime.ts", 'runHooks("SessionStart"'],
+  Stop: ["../../runtime/session/SessionRuntime.ts", 'runHooks("Stop"'],
+  UserPromptSubmit: ["../agents/orchestrator.ts", 'runHooks("UserPromptSubmit"'],
+  SessionEnd: ["../../runtime/session/SessionRuntime.ts", 'runHooks("SessionEnd"'],
+  PreApproval: ["../../runtime/permissions/PermissionEngine.ts", 'runHooks("PreApproval"'],
+  PostApproval: ["../../runtime/permissions/PermissionEngine.ts", 'emitHook("PostApproval"'],
+  PreOrderPlacement: ["../agents/tools/market/orderbook.ts", 'runHooks("PreOrderPlacement"'],
+  PostOrderPlacement: ["../agents/tools/market/orderbook.ts", 'runHooks("PostOrderPlacement"'],
+  SubagentStart: ["../hooks/subagentHookBridge.ts", 'runHooks("SubagentStart"'],
+  SubagentStop: ["../hooks/subagentHookBridge.ts", 'runHooks("SubagentStop"'],
+} as const satisfies Record<HookPoint, readonly [string, string]>;
 
 const dirs: string[] = [];
 
@@ -69,19 +92,28 @@ describe("checkHookCoverage", () => {
     expect(checkHookCoverage().status).toBe("pass");
   });
 
-  test("a hook on a point nothing emits is reported as never running", () => {
+  test("a hook is reported inert when the supplied coverage map omits its point", () => {
     registerHook({
       id: "compaction-veto",
       point: "PreCompact",
       handler: () => ({ action: "allow" }),
     });
-    const check = checkHookCoverage();
+    const check = checkHookCoverage(new Set(["PreOrderPlacement", "PostOrderPlacement"]));
     expect(check.status).toBe("fail");
     expect(check.message).toContain("compaction-veto@PreCompact");
   });
 
-  test("only the order-placement points are emitted today", () => {
-    expect([...EMITTED_HOOK_POINTS].sort()).toEqual(["PostOrderPlacement", "PreOrderPlacement"]);
+  test("all declared lifecycle points have a production bridge", () => {
+    expect(EMITTED_HOOK_POINTS.size).toBe(14);
+    expect(EMITTED_HOOK_POINTS.has("PreToolUse")).toBe(true);
+    expect(EMITTED_HOOK_POINTS.has("SessionEnd")).toBe(true);
+    expect(EMITTED_HOOK_POINTS.has("SubagentStop")).toBe(true);
+    expect(Object.keys(PRODUCTION_HOOK_BRIDGES).sort()).toEqual([...HOOK_POINTS].sort());
+    for (const point of HOOK_POINTS) {
+      const [relativePath, token] = PRODUCTION_HOOK_BRIDGES[point];
+      const source = readFileSync(new URL(relativePath, import.meta.url), "utf-8");
+      expect(source, `${point} production bridge`).toContain(token);
+    }
   });
 });
 
@@ -92,7 +124,7 @@ describe("checkPolicyLayerIntegrity", () => {
     expect(checkPolicyLayerIntegrity(join(dir, "policy.json")).status).toBe("info");
   });
 
-  test("an unsigned policy that sets flags is surfaced with what it overrides", () => {
+  test("an unsigned policy is refused rather than trusted", () => {
     const dir = mkdtempSync(join(tmpdir(), "gordon-policy-"));
     dirs.push(dir);
     const path = join(dir, "policy.json");
@@ -102,10 +134,22 @@ describe("checkPolicyLayerIntegrity", () => {
       "utf-8",
     );
     const check = checkPolicyLayerIntegrity(path);
-    expect(check.status).toBe("warn");
-    expect(check.message).toContain("UNSIGNED");
-    expect(check.message).toContain("GORDON_RISK_ACK");
-    expect(check.message).toContain("sandbox.subprocess");
+    expect(check.status).toBe("fail");
+    expect(check.message).toContain("REFUSED");
+    expect(check.message).toContain("no_key");
+    expect(check.message).toContain("signature cannot be verified");
+  });
+
+  test("a correctly signed policy passes the integrity diagnostic", () => {
+    const dir = mkdtempSync(join(tmpdir(), "gordon-policy-"));
+    dirs.push(dir);
+    const path = join(dir, "policy.json");
+    const key = "diagnostic-policy-key";
+    const env = { ...process.env, [POLICY_PATH_ENV]: path, [POLICY_KEY_ENV]: key };
+    writeSignedPolicy({ flags: { GORDON_RISK_ACK: "1" } }, key, { env });
+    const check = checkPolicyLayerIntegrity(path, env);
+    expect(check.status).toBe("pass");
+    expect(check.message).toContain("signed and verified");
   });
 
   test("an unparseable policy is a failure, not a silent skip", () => {

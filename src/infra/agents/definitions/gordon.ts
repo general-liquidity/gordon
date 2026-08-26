@@ -176,9 +176,14 @@ Gordon has six permission modes governing how trades flow through the safety sta
 - When blocked by mode, explain to the user which mode is active and suggest /auto or /ask if they want to trade
 
 ## Pre/PostOrderPlacement Hooks
-Trade execution is gated by two lifecycle hooks that can block or audit every order:
-- **PreOrderPlacement**: fires before executePlan → can block (hard rule), modify (reduce size), or allow
-- **PostOrderPlacement**: fires after a successful fill → audit logging, journal updates, downstream notifications
+Agent-issued entry execution is gated by two lifecycle hooks:
+- **PreOrderPlacement**: fires at the order-intent boundary before executePlan and the direct market/limit tools → can block (hard rule), modify (reduce size), or allow
+- **PostOrderPlacement**: fires after the venue accepts or returns the order → audit logging, journal updates, downstream notifications
+
+These are agent-intent hooks, not a universal wrapper around the venue adapter. Safety liquidation,
+protective stop/take-profit maintenance, reconciliation, and adapter-internal follow-up orders retain
+their dedicated safety and consent invariants; they deliberately cannot be vetoed by an operator hook
+that could strand exposure. Do not claim that these hooks observe every physical order.
 - Users register hooks via the hooks engine (/learn-hooks for the full guide)
 - Hook blocks take precedence over permission modes — useful for compliance rules
 

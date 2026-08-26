@@ -36,6 +36,7 @@ import { recordStructuredObservation } from "../../../../platform/observability/
 import { redactString } from "../../../../platform/observability/valueRedaction.ts";
 import { appendActionLogEntry } from "../../../../action-log/index.ts";
 import { createModuleLogger } from "../../../../logger/index.ts";
+import { getGordonContext, type MastraExecutionContext } from "../../types.ts";
 
 const logger = createModuleLogger("agent-feedback");
 
@@ -153,7 +154,11 @@ export const reportBlockedTool = createTool({
     severity: z.string(),
     error: z.string().optional(),
   }),
-  execute: async ({ intent, approachesTried, blocker, suggestedNext, severity }) => {
+  execute: async (
+    { intent, approachesTried, blocker, suggestedNext, severity },
+    execContext: MastraExecutionContext,
+  ) => {
+    const context = getGordonContext(execContext);
     const result = appendAgentFeedback({
       intent,
       approachesTried,
@@ -185,6 +190,9 @@ export const reportBlockedTool = createTool({
     // markers in title + blocker text in content.
     try {
       appendActionLogEntry({
+        sessionId: context?.runtime?.sessionId,
+        threadId: context?.threadId ?? context?.runtime?.threadId,
+        resourceId: context?.userId ?? context?.runtime?.resourceId,
         entryType: "run_status",
         title: `Agent reported blocked (severity: ${severity})`,
         content: `Agent reported blocked while attempting: "${intent}". Blocker: ${blocker}. Approaches tried: ${approachesTried.join("; ")}.${suggestedNext ? ` Suggested next: ${suggestedNext}.` : ""}`,

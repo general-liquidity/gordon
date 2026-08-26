@@ -6,8 +6,11 @@ import { buildPermissionProfileHook } from "./profiles.ts";
 
 let defaultEngine: PermissionEngine | null = null;
 
-function createDefaultEngine(): PermissionEngine {
-  const store = new RuntimeStore(createDefaultRuntimeSessionState("default-permission-engine"));
+export function createPermissionEngine(
+  runtimeId: string,
+  sessionId?: string,
+): PermissionEngine {
+  const store = new RuntimeStore(createDefaultRuntimeSessionState(runtimeId, sessionId));
   const engine = new PermissionEngine(store);
   engine.prependHook(buildTrustTrajectoryHook(getDefaultTrustTrajectory()));
   // Profile hook: abstains entirely when no profile is selected
@@ -19,7 +22,7 @@ function createDefaultEngine(): PermissionEngine {
 /** Process-singleton used by ACP and other surfaces without a SessionRuntime. */
 export function getDefaultPermissionEngine(): PermissionEngine {
   if (!defaultEngine) {
-    defaultEngine = createDefaultEngine();
+    defaultEngine = createPermissionEngine("default-permission-engine");
   }
   return defaultEngine;
 }

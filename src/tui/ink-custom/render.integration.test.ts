@@ -1,7 +1,7 @@
 // Integration test for render.ts entry point.
 //
 // Verifies:
-//   1. Default-on path starts the custom pipeline — captures stdout and
+//   1. Explicit opt-in starts the custom pipeline — captures stdout and
 //      asserts it contains at least a cursor-hide sequence and our text.
 //   2. Opt-out (GORDON_CUSTOM_RENDER=0) plus each environment-driven
 //      fallback condition (TERM=dumb, TMUX, STY, non-TTY, screen reader)
@@ -38,6 +38,17 @@ const originalMigrationInterval = process.env["GORDON_POOL_MIGRATION_INTERVAL_MS
 const originalTerm = process.env["TERM"];
 const originalTmux = process.env["TMUX"];
 const originalSty = process.env["STY"];
+const screenReaderVars = [
+  "INK_SCREEN_READER",
+  "ACCESSIBILITY_ENABLED",
+  "SCREEN_READER",
+  "GORDON_SCREEN_READER",
+  "VOICE_OVER_ENABLED",
+  "NARRATOR_RUNNING",
+] as const;
+const originalScreenReaderEnv = Object.fromEntries(
+  screenReaderVars.map((key) => [key, process.env[key]]),
+) as Record<(typeof screenReaderVars)[number], string | undefined>;
 
 // Collecting write stream — quacks like a WriteStream.
 function createMockStdout(): NodeJS.WriteStream & { captured: string } {
@@ -70,6 +81,11 @@ afterEach(() => {
   else process.env["TMUX"] = originalTmux;
   if (originalSty === undefined) delete process.env["STY"];
   else process.env["STY"] = originalSty;
+  for (const key of screenReaderVars) {
+    const original = originalScreenReaderEnv[key];
+    if (original === undefined) delete process.env[key];
+    else process.env[key] = original;
+  }
   _resetFallbackNoticeForTests();
 });
 
@@ -167,11 +183,6 @@ describe("render() integration", () => {
       }
     });
 
-    // The vanilla `useApp`/`useStdout` shims still target ink's contexts;
-    // Lane 1 ports the App + contexts but leaves the hook shim story for
-    // a follow-up lane. We test the OWNED contexts directly here so this
-    // suite exercises our App's provider wiring without depending on the
-    // separate hook port.
     test("AppContext is populated — exit() triggers unmount", async () => {
       const stdout = createMockStdout();
       const captured: { exit?: () => void } = {};
@@ -212,12 +223,25 @@ describe("render() integration", () => {
       }
     });
 
-    // Smoke retain: the hook shims still resolve at compile/runtime even
-    // though they read from ink's contexts. We don't assert behavior here —
-    // see Lane 1's report. Removed once the hook shim port lands.
-    test("hook shims are importable (smoke)", () => {
-      expect(typeof useApp).toBe("function");
-      expect(typeof useStdout).toBe("function");
+    test("owned hook shims resolve the custom renderer's live contexts", async () => {
+      const stdout = createMockStdout();
+      const captured: { exit?: () => void; stdout?: NodeJS.WriteStream } = {};
+      const Consumer: React.FC = () => {
+        captured.exit = useApp().exit;
+        captured.stdout = useStdout().stdout;
+        return React.createElement(Text, null, "hook-consumer");
+      };
+      const instance = render(React.createElement(Consumer), {
+        stdout,
+        patchConsole: false,
+        exitOnCtrlC: false,
+      });
+
+      expect(captured.stdout).toBe(stdout);
+      expect(typeof captured.exit).toBe("function");
+      const exitPromise = instance.waitUntilExit();
+      captured.exit?.();
+      await exitPromise;
     });
 
     test("patchConsole cleanup restores original console.log", () => {
@@ -232,22 +256,24 @@ describe("render() integration", () => {
       expect(console.log).toBe(originalLog);
     });
 
-    // Phase 4 — selection overlay writers exposed on Instance.
-    // Paint integration is deferred to the patch transport, but the writers
-    // must exist and be safe to call so callers can wire UI now.
-    test("selection overlay writers exist and do not throw", () => {
+    test("selection is painted and clearing restores the plain frame", () => {
       const stdout = createMockStdout();
       const tree = React.createElement(Text, null, "sel");
       const instance = render(tree, { stdout, patchConsole: false, exitOnCtrlC: false });
       try {
         expect(typeof instance.setSelection).toBe("function");
         expect(typeof instance.clearSelection).toBe("function");
-        // Setting a range, null, and clearing must all be side-effect safe.
-        expect(() =>
-          instance.setSelection!({ startRow: 0, startCol: 0, endRow: 0, endCol: 3 }),
-        ).not.toThrow();
-        expect(() => instance.setSelection!(null)).not.toThrow();
-        expect(() => instance.clearSelection!()).not.toThrow();
+        const before = stdout.captured.length;
+        instance.setSelection!({ startRow: 0, startCol: 0, endRow: 0, endCol: 2 });
+        const selectedOutput = stdout.captured.slice(before);
+        expect(selectedOutput).toContain("\x1b[7m");
+        expect(selectedOutput).toContain("sel");
+
+        const beforeClear = stdout.captured.length;
+        instance.clearSelection!();
+        const clearedOutput = stdout.captured.slice(beforeClear);
+        expect(clearedOutput).toContain("sel");
+        expect(clearedOutput).not.toContain("\x1b[7m");
       } finally {
         instance.unmount();
       }
@@ -273,15 +299,14 @@ describe("render() integration", () => {
       }
     });
 
-    test("GORDON_POOL_MIGRATION_ENABLED unset: scheduler is not started", () => {
+    test("GORDON_POOL_MIGRATION_ENABLED unset: default scheduler starts and unmount stops it", () => {
       delete process.env["GORDON_POOL_MIGRATION_ENABLED"];
       const stdout = createMockStdout();
       const tree = React.createElement(Text, null, "no-mig");
       const instance = render(tree, { stdout, patchConsole: false, exitOnCtrlC: false });
       try {
-        // Sanity: mount still works with the flag off (this is the default
-        // code path, we just want to guard against a regression where the
-        // flag-check short-circuit gets broken).
+        // Sanity: migration defaults on whenever the custom renderer is active;
+        // unmount must still stop its timer without leaking an open handle.
         expect(stdout.captured).toContain("no-mig");
       } finally {
         instance.unmount();
@@ -303,8 +328,8 @@ describe("render() integration", () => {
           Static<string>,
           {
             items,
-            children: (item: string) =>
-              React.createElement(Text, { key: item }, item),
+            // biome-ignore lint/correctness/noChildrenProp: Ink's Static type requires this render function in its props.
+            children: (item: string) => React.createElement(Text, { key: item }, item),
           },
         ) as React.ReactElement,
         React.createElement(Text, null, "live-region"),
@@ -328,8 +353,8 @@ describe("render() integration", () => {
           { flexDirection: "column" },
           React.createElement(Static<string>, {
             items,
-            children: (item: string) =>
-              React.createElement(Text, { key: item }, item),
+            // biome-ignore lint/correctness/noChildrenProp: Ink's Static type requires this render function in its props.
+            children: (item: string) => React.createElement(Text, { key: item }, item),
           }) as React.ReactElement,
           React.createElement(Text, null, "live-line"),
         );
@@ -391,17 +416,16 @@ describe("render() integration", () => {
 
         // Relative cursor sequences we expect from the new transport:
         //   CUU = CSI n A, CUD = CSI n B, CUF = CSI n C, plus \r.
+        const csiSequences = rerenderTail.split("\u001B[").slice(1);
         const hasRelative =
-          /\x1b\[\d+A/.test(rerenderTail) ||
-          /\x1b\[\d+B/.test(rerenderTail) ||
-          /\x1b\[\d+C/.test(rerenderTail) ||
+          csiSequences.some((sequence) => /^\d+[ABC]/.test(sequence)) ||
           rerenderTail.includes("\r");
         // Absolute CUP = CSI row ; col H — what the old full-rewrite path
         // would emit via toAnsiString-with-absolute-positioning. Our
         // full-rewrite path actually uses eraseLines + plain text (no
         // CUP), so the primary assertion is on hasRelative; absence of
         // CUP here is a consistency check.
-        const hasAbsoluteCup = /\x1b\[\d+;\d+H/.test(rerenderTail);
+        const hasAbsoluteCup = csiSequences.some((sequence) => /^\d+;\d+H/.test(sequence));
 
         expect(hasRelative).toBe(true);
         expect(hasAbsoluteCup).toBe(false);
@@ -444,6 +468,7 @@ describe("render() integration", () => {
       delete process.env["TERM"];
       delete process.env["TMUX"];
       delete process.env["STY"];
+      for (const key of screenReaderVars) delete process.env[key];
       _resetFallbackNoticeForTests();
     });
 
@@ -487,6 +512,35 @@ describe("render() integration", () => {
       expect(stderr.captured).toContain("screen reader enabled");
     });
 
+    for (const [key, value] of [
+      ["INK_SCREEN_READER", "true"],
+      ["ACCESSIBILITY_ENABLED", "true"],
+      ["SCREEN_READER", "true"],
+      ["GORDON_SCREEN_READER", "true"],
+      ["VOICE_OVER_ENABLED", "1"],
+      ["NARRATOR_RUNNING", "1"],
+    ] as const) {
+      test(`opt-in + ${key}: render falls back to vanilla`, () => {
+        process.env["GORDON_CUSTOM_RENDER"] = "1";
+        process.env[key] = value;
+        const stdout = createMockStdout();
+        const stderr = fakeStderr();
+        const instance = render(React.createElement(Text, null, "accessible"), {
+          stdout,
+          stderr,
+          patchConsole: false,
+          exitOnCtrlC: false,
+        });
+        try {
+          expect(instance.setSelection).toBeUndefined();
+          expect(stderr.captured).toContain("screen reader enabled");
+        } finally {
+          instance.unmount();
+          instance.cleanup();
+        }
+      });
+    }
+
     test("opt-in + non-TTY stdout: returns false, isTTY notice", () => {
       process.env["GORDON_CUSTOM_RENDER"] = "1";
       const stderr = fakeStderr();
@@ -495,6 +549,14 @@ describe("render() integration", () => {
       const result = shouldUseCustomRenderer(stdout, stderr, false);
       expect(result).toBe(false);
       expect(stderr.captured).toContain("not a TTY");
+    });
+
+    test("opt-in + stdout with no isTTY capability also falls back", () => {
+      process.env["GORDON_CUSTOM_RENDER"] = "1";
+      const stdout = new PassThrough() as unknown as NodeJS.WriteStream;
+      const stderr = fakeStderr();
+      expect(shouldUseCustomRenderer(stdout, stderr, false)).toBe(false);
+      expect(stderr.captured).toContain("stdout is not a TTY");
     });
 
     test("opt-in + TERM=dumb: returns false, TERM=dumb notice", () => {

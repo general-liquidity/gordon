@@ -37,6 +37,8 @@ import { ScratchpadStore } from "../workers/ScratchpadStore.ts";
 import { WorkerRegistry } from "../workers/WorkerRegistry.ts";
 import { createRuntimeSessionContext } from "./SessionContext.ts";
 import { SessionController } from "./SessionController.ts";
+import { emitHook, runHooks } from "../../infra/hooks/engine.ts";
+import { resetActiveACELessonRevision } from "../../infra/agents/ace/activeRevision.ts";
 
 export interface SessionRuntimeDeps {
   runtimeId: string;
@@ -157,7 +159,11 @@ export class SessionRuntime {
     return this.transcriptProjector.toPlainText(this.transcriptStore.list());
   }
 
-  async evaluateToolAccess(toolName: string, context: GordonContext): Promise<GordonRuntimeToolAccessResult> {
+  async evaluateToolAccess(
+    toolName: string,
+    context: GordonContext,
+    args?: unknown,
+  ): Promise<GordonRuntimeToolAccessResult> {
     const definition = this.toolRegistry.getDefinition(toolName);
     const policy = await evaluateRuntimeToolPolicy(toolName, context, undefined, definition?.spec);
     if (!policy.allowed) {
@@ -167,7 +173,7 @@ export class SessionRuntime {
       };
     }
 
-    const permission = await this.permissionEngine.evaluate(toolName, context, policy);
+    const permission = await this.permissionEngine.evaluate(toolName, context, policy, args);
     if (permission.status === "allowed") {
       return {
         status: "allowed",
@@ -371,8 +377,17 @@ export class SessionRuntime {
   }
 
   async initializeSession(options: { autoResume?: boolean; forceNewThread?: boolean } = {}): Promise<SessionInfo> {
-    const session = await this.sessionController.initializeSession(options);
-    const snapshot = await this.sessionController.getCurrentSession();
+    const checkpoint = await this.sessionController.captureState();
+    let session: SessionInfo;
+    let snapshot: RuntimeSessionSnapshot;
+    try {
+      session = await this.sessionController.initializeSession(options);
+      await this.runSessionStartHook(session);
+      snapshot = await this.sessionController.getCurrentSession();
+    } catch (error) {
+      await this.sessionController.restoreState(checkpoint);
+      throw error;
+    }
     this.runtimeStore.setSession(
       {
         runtimeId: this.runtimeId,
@@ -386,8 +401,17 @@ export class SessionRuntime {
   }
 
   async resumeSession(): Promise<SessionInfo | null> {
-    const session = await this.sessionController.resumeSession();
-    const snapshot = await this.sessionController.getCurrentSession();
+    const checkpoint = await this.sessionController.captureState();
+    let session: SessionInfo | null;
+    let snapshot: RuntimeSessionSnapshot;
+    try {
+      session = await this.sessionController.resumeSession();
+      if (session) await this.runSessionStartHook(session);
+      snapshot = await this.sessionController.getCurrentSession();
+    } catch (error) {
+      await this.sessionController.restoreState(checkpoint);
+      throw error;
+    }
     this.runtimeStore.setSession(
       {
         runtimeId: this.runtimeId,
@@ -401,8 +425,17 @@ export class SessionRuntime {
   }
 
   async startNewSession(): Promise<SessionInfo> {
-    const session = await this.sessionController.startNewSession();
-    const snapshot = await this.sessionController.getCurrentSession();
+    const checkpoint = await this.sessionController.captureState();
+    let session: SessionInfo;
+    let snapshot: RuntimeSessionSnapshot;
+    try {
+      session = await this.sessionController.startNewSession();
+      await this.runSessionStartHook(session);
+      snapshot = await this.sessionController.getCurrentSession();
+    } catch (error) {
+      await this.sessionController.restoreState(checkpoint);
+      throw error;
+    }
     this.runtimeStore.setSession(
       {
         runtimeId: this.runtimeId,
@@ -413,6 +446,70 @@ export class SessionRuntime {
       snapshot,
     );
     return session;
+  }
+
+  emitLifecycleEnd(reason: "user_quit" | "timeout" | "error" | "graceful" | "external_signal" = "graceful"): void {
+    const state = this.runtimeStore.getState();
+    const sessionId = state.session.sessionId ?? this.sessionId ?? this.runtimeId;
+    const transcript = this.transcriptStore.list();
+    emitHook("Stop", {
+      reason: reason === "timeout" ? "timeout" : reason === "error" ? "error" : "graceful",
+      sessionId,
+    });
+    emitHook("SessionEnd", {
+      sessionId,
+      threadId: state.session.threadId ?? state.session.snapshot?.threadId ?? undefined,
+      reason,
+      endedAt: new Date().toISOString(),
+      turnCount: transcript.filter((entry) => entry.role === "user").length,
+      toolCallCount: transcript.filter((entry) => entry.role === "tool").length,
+    });
+    this.resetAceRevisionAliases(state, sessionId);
+  }
+
+  /** Awaitable teardown path for process owners that must flush external hooks. */
+  async emitLifecycleEndAsync(
+    reason: "user_quit" | "timeout" | "error" | "graceful" | "external_signal" = "graceful",
+  ): Promise<void> {
+    const state = this.runtimeStore.getState();
+    const sessionId = state.session.sessionId ?? this.sessionId ?? this.runtimeId;
+    const transcript = this.transcriptStore.list();
+    const failures: Error[] = [];
+    const stop = await runHooks("Stop", {
+      reason: reason === "timeout" ? "timeout" : reason === "error" ? "error" : "graceful",
+      sessionId,
+    });
+    if (stop.action === "block") {
+      failures.push(new Error(stop.reason ?? `Stop hook blocked teardown for ${sessionId}`));
+    }
+    const sessionEnd = await runHooks("SessionEnd", {
+      sessionId,
+      threadId: state.session.threadId ?? state.session.snapshot?.threadId ?? undefined,
+      reason,
+      endedAt: new Date().toISOString(),
+      turnCount: transcript.filter((entry) => entry.role === "user").length,
+      toolCallCount: transcript.filter((entry) => entry.role === "tool").length,
+    });
+    this.resetAceRevisionAliases(state, sessionId);
+    if (sessionEnd.action === "block") {
+      failures.push(new Error(sessionEnd.reason ?? `SessionEnd hook failed for ${sessionId}`));
+    }
+    if (failures.length > 0) {
+      throw new AggregateError(failures, `Runtime lifecycle teardown hooks failed for ${sessionId}`);
+    }
+  }
+
+  private resetAceRevisionAliases(
+    state: ReturnType<RuntimeStore["getState"]>,
+    sessionId: string,
+  ): void {
+    resetActiveACELessonRevision([
+      sessionId,
+      state.session.threadId,
+      state.session.snapshot?.threadId,
+      state.session.resourceId,
+      state.session.snapshot?.resourceId,
+    ]);
   }
 
   async getCurrentSession(): Promise<RuntimeSessionSnapshot> {
@@ -497,13 +594,28 @@ export class SessionRuntime {
     return context;
   }
 
+  private async runSessionStartHook(session: SessionInfo): Promise<void> {
+    const result = await runHooks("SessionStart", {
+      sessionId: this.sessionId ?? session.threadId,
+      userId: session.resourceId,
+      threadId: session.threadId,
+      configSnapshot: {
+        runtimeId: this.runtimeId,
+        resumed: !session.isNewSession,
+      },
+    });
+    if (result.action === "block") {
+      throw new Error(result.reason ?? "Session start blocked by lifecycle hook.");
+    }
+  }
+
   private createRuntimeAccess(session: RuntimeSessionContext): GordonRuntimeAccess {
     return {
       runtimeId: session.runtimeId,
       sessionId: session.sessionId,
       resourceId: session.resourceId,
       threadId: session.threadId,
-      evaluateToolAccess: (toolName, context) => this.evaluateToolAccess(toolName, context),
+      evaluateToolAccess: (toolName, context, args) => this.evaluateToolAccess(toolName, context, args),
       refreshPlugins: async () => {
         await this.refreshPlugins();
       },

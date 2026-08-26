@@ -74,11 +74,11 @@ export function validatePluginCommand(command?: string, args?: string[]): string
     return `Plugin command contains shell metacharacters: "${command}"`;
   }
 
-  if (!path.isAbsolute(command)) {
-    const base = path.basename(command).replace(/\.(exe|cmd|bat)$/i, '');
-    if (!ALLOWED_LAUNCHERS.has(base)) {
-      return `Plugin command launcher "${base}" is not in the allowlist (${[...ALLOWED_LAUNCHERS].join(', ')})`;
-    }
+  // Absolute paths are not an exemption: `/bin/sh` and
+  // `C:\\Windows\\System32\\cmd.exe` are still arbitrary-code launchers.
+  const base = path.win32.basename(path.posix.basename(command)).replace(/\.(exe|cmd|bat)$/i, '');
+  if (!ALLOWED_LAUNCHERS.has(base)) {
+    return `Plugin command launcher "${base}" is not in the allowlist (${[...ALLOWED_LAUNCHERS].join(', ')})`;
   }
 
   if (args !== undefined) {

@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   test:
-    # Sharded test matrix. The full 840-file suite is split across disjoint
+    # Sharded test matrix. The full suite is split across disjoint
     # path subsets so each shard is a FRESH `bun test` process over far fewer
     # files. This eliminates the cross-file contamination that flaked the
     # money-path DB tests (global sqlite singleton via setDatabasePathForTesting)
@@ -42,18 +42,20 @@ jobs:
           # core/agents below or coverage silently drops.
           - shard-name: state
             paths: src/core/lifecycle src/infra/agents/tools/trading/trading.approvalBinding.test.ts
+          - shard-name: state-extra
+            paths: src/infra/agents/tools/trading/risk-gate.orderpath.test.ts src/infra/agents/tools/trading/trading.wipClaimRelease.test.ts src/infra/agents/tools/trading/trading.wipRace.test.ts
           - shard-name: mocked
             paths: src/infra/agents/tools/trading/trading.executePlan.test.ts src/infra/agents/tools/trading/trading.terminationLayers.test.ts src/infra/agents/tools/trading/trading.terminationLayers.enforce.test.ts src/infra/agents/tools/trading/trading.wipGate.test.ts
           - shard-name: core
             paths: src/core/alpha src/core/audit src/core/backtesting src/core/consensus src/core/edge src/core/execution src/core/genome src/core/indicators src/core/learning src/core/market-analysis src/core/memory src/core/microstructure src/core/numerics src/core/orders src/core/pipeline src/core/playbooks src/core/positions src/core/regime src/core/risk-kernel src/core/risk-management src/core/runtime src/core/safety src/core/stats src/core/strategies src/core/volatility
           - shard-name: agents
-            paths: src/infra/agents/ace src/infra/agents/background src/infra/agents/cognition src/infra/agents/composability src/infra/agents/context src/infra/agents/definitions src/infra/agents/harness src/infra/agents/memory src/infra/agents/middleware src/infra/agents/observation src/infra/agents/orchestrator src/infra/agents/peers src/infra/agents/processors src/infra/agents/profiles src/infra/agents/prompt-sections src/infra/agents/reminders src/infra/agents/research src/infra/agents/runtime src/infra/agents/schemas src/infra/agents/skills src/infra/agents/streaming src/infra/agents/tooling src/infra/agents/toolOutputFilters src/infra/agents/wiring src/infra/agents/workflows src/infra/agents/tools/account src/infra/agents/tools/market src/infra/agents/tools/news src/infra/agents/tools/peer src/infra/agents/tools/providers src/infra/agents/tools/runtime src/infra/agents/tools/strategy src/infra/agents/tools/structuredOutput src/infra/agents/tools/surface src/infra/agents/tools/web src/infra/agents/tools/wrappers src/infra/agents/agentHelpers.test.ts src/infra/agents/contextFork.test.ts src/infra/agents/contextTimeline.test.ts src/infra/agents/integrationGlossary.test.ts src/infra/agents/investigation.test.ts src/infra/agents/sessionCostLedger.test.ts
+            paths: src/infra/agents/ace src/infra/agents/background src/infra/agents/cognition src/infra/agents/composability src/infra/agents/context src/infra/agents/definitions src/infra/agents/harness src/infra/agents/memory src/infra/agents/middleware src/infra/agents/observation src/infra/agents/orchestrator src/infra/agents/peers src/infra/agents/processors src/infra/agents/profiles src/infra/agents/prompt-sections src/infra/agents/reminders src/infra/agents/research src/infra/agents/runtime src/infra/agents/schemas src/infra/agents/skills src/infra/agents/streaming src/infra/agents/tooling src/infra/agents/toolOutputFilters src/infra/agents/wiring src/infra/agents/workflows src/infra/agents/tools/account src/infra/agents/tools/market src/infra/agents/tools/news src/infra/agents/tools/peer src/infra/agents/tools/providers src/infra/agents/tools/runtime src/infra/agents/tools/strategy src/infra/agents/tools/structuredOutput src/infra/agents/tools/surface src/infra/agents/tools/web src/infra/agents/tools/wrappers src/infra/agents/agentHelpers.test.ts src/infra/agents/agentFlagSplitPath.test.ts src/infra/agents/contextFork.test.ts src/infra/agents/contextTimeline.test.ts src/infra/agents/integrationGlossary.test.ts src/infra/agents/investigation.test.ts src/infra/agents/orchestrator.userPromptHook.test.ts src/infra/agents/sessionCostLedger.test.ts src/infra/agents/strategy-generator.test.ts
           - shard-name: money-path
             paths: src/infra/trading src/infra/safety src/infra/storage src/infra/exchange src/infra/broker
           - shard-name: infra-rest
             paths: src/infra/acp src/infra/action-log src/infra/ai src/infra/auth src/infra/calibration src/infra/cli src/infra/config src/infra/context src/infra/data src/infra/diagnostics src/infra/domain src/infra/execution src/infra/hooks src/infra/logger src/infra/memory src/infra/news src/infra/observability src/infra/permissions src/infra/platform src/infra/proactive src/infra/protocols src/infra/runtime src/infra/scheduler src/infra/security src/infra/skills src/infra/testing src/infra/tools src/infra/venues
           - shard-name: app-ui
-            paths: src/tui src/app src/runtime src/backtest src/services src/gateway src/utils src/events src/types src/cli.test.ts scripts/dev/harness scripts/research/scans
+            paths: src/tui src/app src/runtime src/backtest src/services src/gateway src/utils src/events src/types src/sdk src/cli.test.ts scripts/dev/harness scripts/research/scans
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -106,6 +108,9 @@ jobs:
 
       - name: Patch Bun-incompatible dependencies
         run: node scripts/patches/patch-mastra.cjs
+
+      - name: Verify exact test-shard coverage
+        run: bun run check:test-shards
 
       - name: Run broker conformance matrix
         run: bun run test:broker-conformance

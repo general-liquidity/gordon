@@ -15,9 +15,8 @@
  *   - Surface image/audio as a typed entry in the structured result so
  *     downstream callers can choose to: (a) pass to a vision-capable
  *     LLM, or (b) describe as a placeholder when routing to text-only
- *     models. Gordon's defaultPromptHandler keeps the placeholder-as-
- *     text approach for now (deferred multimodal LLM wiring is v3.5
- *     follow-up work).
+ *     models. Gordon's default inline path uses bounded textual descriptors;
+ *     handlers still receive the typed attachments for a vision-aware path.
  *   - Resource (inline) items become text or are flagged as binary
  *   - Resource links surface as `[file: <uri>]` placeholders (v2 behavior)
  *

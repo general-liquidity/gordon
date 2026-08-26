@@ -165,6 +165,12 @@ export interface SelectionOverlay {
   clear(): void;
   /** Apply selection highlight (SGR 7 inverse) to a patch list. */
   applyTo(patches: readonly Patch[]): Patch[];
+  /**
+   * Materialize the selected cells from a painted frame as patches. This is
+   * used after a full-frame rewrite: selection is a display concern and must
+   * never mutate the framebuffer that subsequent content diffs compare.
+   */
+  patchesFor(frame: CellBuffer, charPool: CharPool): Patch[];
 }
 
 export interface CursorDeclaration {

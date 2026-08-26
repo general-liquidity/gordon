@@ -1,6 +1,6 @@
 // cellBuffer — Phase 1 packed Int32 cell grid.
 //
-// Status: NOT WIRED. One Int32 per cell encodes (charIdx | styleId | width |
+// Active in customRender. One Int32 per cell encodes (charIdx | styleId | width |
 // dirty) per the bit layout in internal/contracts.ts. The reconciler diff
 // walks the raw Int32Array directly for speed; `get()` is a convenience for
 // tests and debugging.

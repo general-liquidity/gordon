@@ -25,6 +25,7 @@ export { RuntimePersistence } from "./persistence/RuntimePersistence.ts";
 export { RuntimeHistoryManager } from "./history/RuntimeHistoryManager.ts";
 export { PermissionEngine, ToolApprovalRequiredError } from "./permissions/PermissionEngine.ts";
 export {
+  createPermissionEngine,
   getDefaultPermissionEngine,
   registerPermissionEngine,
 } from "./permissions/defaultPermissionEngine.ts";

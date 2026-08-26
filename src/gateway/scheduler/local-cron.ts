@@ -73,12 +73,14 @@ export function computeNextRunAt(cronExpr: string, from = new Date()): string {
 
 export interface LocalCronSchedulerOptions {
   tickIntervalMs?: number;
+  shouldRun?: (task: SchedulerTaskRecord) => boolean;
 }
 
 export class LocalCronScheduler {
   private readonly tickIntervalMs: number;
   private timer: ReturnType<typeof setInterval> | null = null;
   private readonly onTrigger: (task: SchedulerTaskRecord) => Promise<void>;
+  private readonly shouldRun: (task: SchedulerTaskRecord) => boolean;
   private running = false;
   private tickPromise: Promise<void> | null = null;
 
@@ -88,6 +90,7 @@ export class LocalCronScheduler {
   ) {
     this.onTrigger = onTrigger;
     this.tickIntervalMs = options.tickIntervalMs ?? 5_000;
+    this.shouldRun = options.shouldRun ?? (() => true);
   }
 
   start(): void {
@@ -117,6 +120,7 @@ export class LocalCronScheduler {
     const tasks = listSchedulerTasks();
     const due = tasks.filter((task) => {
       if (!task.enabled) return false;
+      if (!this.shouldRun(task)) return false;
       if (!task.nextRunAt) return true;
       return Date.parse(task.nextRunAt) <= now.getTime();
     });

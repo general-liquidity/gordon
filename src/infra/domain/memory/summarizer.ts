@@ -25,6 +25,7 @@ import { STRATEGY_IDS } from "../../../strategies/types.ts";
 import { TIMEFRAME_IDS } from "../../../types/timeframes.ts";
 import { collapseContext } from "./contextCollapse.ts";
 import { resolveFlag } from "../../config/flagResolver.ts";
+import { runHooks } from "../../hooks/engine.ts";
 
 const logger = createModuleLogger("summarizer");
 
@@ -484,6 +485,20 @@ export class ConversationSummarizer {
     const messagesToSummarize = messages.length - this.config.recentMessagesToKeep;
     const contextFillRatio = this.estimateContextFillRatio(messages);
     const usedTokens = this.estimateMessageTokens(messages);
+    const preCompact = await runHooks("PreCompact", {
+      estimatedTokens: usedTokens,
+      threshold: this.config.maxContextTokensEstimate,
+      messageCount: messages.length,
+    });
+    if (preCompact.action === "block") {
+      logger.warn("Conversation compaction blocked by lifecycle hook", { reason: preCompact.reason });
+      return {
+        summarized: false,
+        messages,
+        messagesSummarized: 0,
+        contextFillRatio,
+      };
+    }
     const compactionStage = determineCompactionStageFromPressure(
       contextFillRatio,
       usedTokens,
@@ -512,13 +527,25 @@ export class ConversationSummarizer {
           recentMessagesToKeep: this.getRecentMessagesToKeepForStage("collapse"),
           minLengthToCollapse: 1500,
         });
-        return {
+        const result: SummarizationResult = {
           summarized: collapseResult.collapsedBlocks.length > 0,
           messages: [...preservedStableMessages, ...collapseResult.projected],
           messagesSummarized: collapseResult.collapsedBlocks.length,
           compactionStage: "collapse",
           contextFillRatio,
         };
+        if (result.summarized) {
+          const postCompact = await runHooks("PostCompact", {
+            beforeTokens: usedTokens,
+            afterTokens: this.estimateMessageTokens(result.messages),
+            clearedCount: result.messagesSummarized,
+          });
+          if (postCompact.action === "block") {
+            logger.warn("Collapsed context withheld by PostCompact hook", { reason: postCompact.reason });
+            return { summarized: false, messages, messagesSummarized: 0, contextFillRatio };
+          }
+        }
+        return result;
       }
 
       // Iterative merge (item 2 from pi-mono audit): if the non-stable history
@@ -615,29 +642,7 @@ export class ConversationSummarizer {
         summarizedCount: messagesToSummarize,
       });
 
-      // Wire: record tombstones for compacted messages (audit trail)
-      try {
-        const { recordTombstones } = await import("../../context/compaction/tombstones.ts");
-        const compactedContent = olderMessages
-          .filter((m) => typeof m.content === "string")
-          .map((m) => ({ role: String(m.role), content: String(m.content) }));
-        void recordTombstones(compactedContent, "full_compact");
-      } catch { /* non-critical */ }
-
-      // Wire: extract durable facts to session memory before they're lost
-      try {
-        const { parseExtractionOutput, addSessionMemory } = await import("../../memory/sessionMemory.ts");
-        // Use the "Durable User Facts" section from the summary if present
-        const durableMatch = summaryText.match(/### Durable User Facts[\s\S]*?(?=###|$)/);
-        if (durableMatch && !durableMatch[0].includes("None in this conversation")) {
-          const facts = parseExtractionOutput(
-            `[{"category":"user_fact","content":${JSON.stringify(durableMatch[0].trim())},"confidence":0.8}]`,
-          );
-          for (const fact of facts) addSessionMemory(fact);
-        }
-      } catch { /* non-critical */ }
-
-      return {
+      const result: SummarizationResult = {
         summarized: true,
         messages: summarizedMessages,
         messagesSummarized: adjustedMessagesToSummarize,
@@ -647,6 +652,39 @@ export class ConversationSummarizer {
         contextFillRatio,
         compactionDetails,
       };
+      const postCompact = await runHooks("PostCompact", {
+        beforeTokens: usedTokens,
+        afterTokens: this.estimateMessageTokens(result.messages),
+        clearedCount: result.messagesSummarized,
+      });
+      if (postCompact.action === "block") {
+        logger.warn("Summarized context withheld by PostCompact hook", { reason: postCompact.reason });
+        return { summarized: false, messages, messagesSummarized: 0, compactionStage, contextFillRatio };
+      }
+
+      // Commit compaction side effects only after PostCompact accepts the
+      // projection. A veto must not leave tombstones or durable facts behind
+      // for a compaction result the caller never adopted.
+      try {
+        const { recordTombstones } = await import("../../context/compaction/tombstones.ts");
+        const compactedContent = olderMessages
+          .filter((message) => typeof message.content === "string")
+          .map((message) => ({ role: String(message.role), content: String(message.content) }));
+        await recordTombstones(compactedContent, "full_compact");
+      } catch { /* non-critical */ }
+
+      try {
+        const { parseExtractionOutput, addSessionMemory } = await import("../../memory/sessionMemory.ts");
+        const durableMatch = summaryText.match(/### Durable User Facts[\s\S]*?(?=###|$)/);
+        if (durableMatch && !durableMatch[0].includes("None in this conversation")) {
+          const facts = parseExtractionOutput(
+            `[{"category":"user_fact","content":${JSON.stringify(durableMatch[0].trim())},"confidence":0.8}]`,
+          );
+          for (const fact of facts) addSessionMemory(fact);
+        }
+      } catch { /* non-critical */ }
+
+      return result;
     } catch (error) {
       logger.error("Summarization failed, returning original messages", error as Error);
       // On failure, return original messages to avoid data loss

@@ -50,7 +50,7 @@ const tab = "\t";
 // eslint-disable-next-line no-control-regex
 const shiftTab = "[Z";
 // eslint-disable-next-line no-control-regex
-const escape = "";
+const escapeKey = "";
 
 type Props = {
   readonly children?: ReactNode;
@@ -226,6 +226,7 @@ export default class App extends PureComponent<Props, State> {
   isScreenReaderActive(): boolean {
     const env = process.env;
     return (
+      env["INK_SCREEN_READER"] === "true" ||
       env["ACCESSIBILITY_ENABLED"] === "true" ||
       env["SCREEN_READER"] === "true" ||
       env["GORDON_SCREEN_READER"] === "true" ||
@@ -368,10 +369,11 @@ export default class App extends PureComponent<Props, State> {
   };
 
   handleReadable = (): void => {
-    let chunk: string | null;
+    let chunk = this.props.stdin.read() as string | null;
     // Drain everything currently buffered, dispatching each chunk.
-    while ((chunk = this.props.stdin.read() as string | null) !== null) {
+    while (chunk !== null) {
       this.dispatchChunk(chunk);
+      chunk = this.props.stdin.read() as string | null;
     }
   };
 
@@ -393,7 +395,7 @@ export default class App extends PureComponent<Props, State> {
       this.handleExit();
     }
     // Reset focus when there's an active focused component on Esc
-    if (input === escape && this.state.activeFocusId) {
+    if (input === escapeKey && this.state.activeFocusId) {
       this.setState({
         activeFocusId: undefined,
       });

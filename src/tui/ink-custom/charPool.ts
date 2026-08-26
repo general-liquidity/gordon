@@ -1,6 +1,6 @@
 // charPool — Phase 1 grapheme interning with LRU eviction.
 //
-// Status: NOT WIRED. Maps short strings (typically one grapheme, sometimes
+// Active in customRender. Maps short strings (typically one grapheme, sometimes
 // a short run) to 20-bit IDs suitable for the packed cell layout. Default
 // capacity is 1<<20 = 1048576, the full addressable range. ASCII printable
 // and common box-drawing chars are pre-interned so startup IDs are stable.

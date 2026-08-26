@@ -5,6 +5,8 @@ import { join } from "node:path";
 import {
   appendSessionTurn,
   loadSessionTurns,
+  appendSessionMode,
+  loadSessionMode,
   sessionExists,
   sanitizeSessionId,
   getAcpSessionsDir,
@@ -91,6 +93,16 @@ describe("appendSessionTurn + loadSessionTurns", () => {
     const turns = loadSessionTurns("s4");
     expect(turns).toHaveLength(1);
     expect(turns[0]!.content).toBe("valid");
+  });
+});
+
+describe("ACP session mode persistence", () => {
+  it("returns the last appended mode without exposing mode records as turns", () => {
+    appendSessionMode("mode-session", "plan");
+    appendSessionTurn("mode-session", { role: "user", content: "hello", ts: 1 });
+    appendSessionMode("mode-session", "paper");
+    expect(loadSessionMode("mode-session")).toBe("paper");
+    expect(loadSessionTurns("mode-session")).toEqual([{ role: "user", content: "hello", ts: 1 }]);
   });
 });
 

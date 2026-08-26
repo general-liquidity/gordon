@@ -132,8 +132,81 @@ import {
 } from "./orchestrator/streamProcessor.ts";
 import { reportToolCallInterruption } from "./processors/toolcall-reconciler.ts";
 import type { InterruptionReason } from "./runtime/toolCallReconciler.ts";
+import { runHooks } from "../hooks/engine.ts";
+import { beginSubagentHook, endSubagentHook } from "../hooks/subagentHookBridge.ts";
 
 const logger = createModuleLogger("orchestrator");
+
+export async function applyUserPromptSubmitHooks(
+  userMessage: string,
+  context: GordonContext,
+  threadId?: string,
+): Promise<string> {
+  const payload = {
+    prompt: userMessage,
+    threadId: threadId ?? context.threadId,
+    sessionId: context.runtime?.sessionId ?? threadId ?? context.threadId ?? "standalone",
+    submittedAt: new Date().toISOString(),
+    source: "api" as const,
+  };
+  const result = await runHooks("UserPromptSubmit", payload);
+  if (result.action === "block") {
+    throw new Error(result.reason ?? "User prompt blocked by lifecycle hook.");
+  }
+  const finalPayload = (result.metadata?.finalPayload as typeof payload | undefined) ?? payload;
+  if (typeof finalPayload.prompt !== "string") {
+    throw new Error("UserPromptSubmit hook produced an invalid non-string prompt.");
+  }
+  return finalPayload.prompt;
+}
+
+/** Lifecycle-aware delegation callbacks for the non-native supervisor path. */
+export function buildInlineSupervisorDelegation(
+  state: StreamProcessingState,
+  scopeKey: string = "standalone",
+): Record<string, unknown> {
+  return {
+    onDelegationStart: async (ctx: any) => {
+      const primitiveId = String(ctx?.primitiveId ?? "unknown");
+      const lifecycleKey = `stream:${scopeKey}:${ctx?.toolCallId ?? primitiveId}`;
+      const lifecycle = await beginSubagentHook({
+        key: lifecycleKey,
+        id: typeof ctx?.toolCallId === "string" ? ctx.toolCallId : undefined,
+        type: primitiveId,
+        parent: "Gordon",
+        task: typeof ctx?.task === "string" ? ctx.task : undefined,
+      });
+      if (!lifecycle.allowed) {
+        return { proceed: false, rejectionReason: lifecycle.reason };
+      }
+      state.currentAgent = primitiveId;
+      state.activeSubagentHookKey = lifecycleKey;
+      logger.info("Delegation to sub-agent", { agent: primitiveId });
+      return { proceed: true };
+    },
+    onDelegationComplete: async (ctx: any) => {
+      const primitiveId = String(ctx?.primitiveId ?? state.currentAgent ?? "unknown");
+      await endSubagentHook({
+        key:
+          state.activeSubagentHookKey
+          ?? `stream:${scopeKey}:${ctx?.toolCallId ?? primitiveId}`,
+        type: primitiveId,
+        parent: "Gordon",
+        status: ctx?.error ? "failed" : "completed",
+        result: ctx?.result,
+        error: ctx?.error ? String(ctx.error) : undefined,
+      });
+      state.activeSubagentHookKey = undefined;
+      if (ctx?.error) {
+        logger.warn("Delegation failed", { agent: primitiveId, error: ctx.error });
+        return {
+          feedback: `Delegation to ${primitiveId} failed: ${ctx.error}. Try another approach.`,
+        };
+      }
+      return {};
+    },
+  };
+}
 
 /**
  * Per-call output-token caps. Without these, Mastra defaults to the model's
@@ -419,6 +492,7 @@ export async function* processMessageStream(
   const requestContext = createRequestContext(context);
 
   try {
+    userMessage = await applyUserPromptSubmitHooks(userMessage, context, threadId);
     const groundedPrompt = await buildGroundedPrompt(userMessage, context, requestContext);
     // Mutable view used when the tool-free thinking gate prepends its trace.
     let groundedMessages = groundedPrompt.messages;
@@ -496,6 +570,7 @@ export async function* processMessageStream(
         ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
         maxSteps: 20,
         modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS_STREAM },
+        ...(options.toolsets ? { toolsets: options.toolsets } : {}),
         ...(Object.keys(extendedThinkingOpts).length > 0 ? { providerOptions: extendedThinkingOpts } : {}),
         ...groundedPrompt.requestOptions,
         ...(tracingOptions && { tracingOptions }),
@@ -505,21 +580,8 @@ export async function* processMessageStream(
         // split + loop-safety + feedback drain). Default (flag off) keeps the
         // existing minimal inline hooks — identical behavior.
         delegation: isNativeSupervisorEnabled()
-          ? buildNativeSupervisorDelegation(state)
-          : {
-              onDelegationStart: async (ctx: any) => {
-                state.currentAgent = ctx.primitiveId;
-                logger.info("Delegation to sub-agent", { agent: ctx.primitiveId });
-                return { proceed: true };
-              },
-              onDelegationComplete: async (ctx: any) => {
-                if (ctx.error) {
-                  logger.warn("Delegation failed", { agent: ctx.primitiveId, error: ctx.error });
-                  return { feedback: `Delegation to ${ctx.primitiveId} failed: ${ctx.error}. Try another approach.` };
-                }
-                return {};
-              },
-            },
+          ? buildNativeSupervisorDelegation(state, defaultHandoffCoordinator, context.threadId ?? "standalone")
+          : buildInlineSupervisorDelegation(state, context.threadId ?? "standalone"),
         onError: ({ error }: { error: string | Error }) => {
           logger.error("Stream error", { error: error instanceof Error ? error.message : error });
         },
@@ -535,10 +597,14 @@ export async function* processMessageStream(
     // ── Primary: fullStream (rich typed events — tool calls, reasoning, agent switches) ──
     if (streamObj?.fullStream) {
       const reader = (streamObj.fullStream as unknown as ReadableStream<InternalStreamChunk>).getReader();
+      let streamEndedNormally = false;
       try {
         while (true) {
           const { done, value } = await readStreamChunkWithAbort(reader, signal);
-          if (done) break;
+          if (done) {
+            streamEndedNormally = true;
+            break;
+          }
           const chunk = value as InternalStreamChunk;
           try { bridgeStreamEvent(chunk as any, 0); } catch { /* non-critical */ }
           yield* processFullStreamChunk(chunk, state, context);
@@ -546,6 +612,22 @@ export async function* processMessageStream(
       } finally {
         reader.releaseLock();
         if (state.currentAgent && state.currentAgent.toLowerCase() !== "gordon") {
+          await endSubagentHook({
+            key:
+              state.activeSubagentHookKey
+              ?? `stream:${context.threadId ?? "standalone"}:${state.currentAgent}`,
+            type: state.currentAgent,
+            parent: "Gordon",
+            status: signal?.aborted
+              ? "aborted"
+              : streamEndedNormally
+                ? "completed"
+                : "failed",
+            error: !signal?.aborted && !streamEndedNormally
+              ? "stream ended before delegation completion"
+              : undefined,
+          });
+          state.activeSubagentHookKey = undefined;
           await runLifecycleHooks("subagent_stop", context, {
             threadId: context.threadId,
             subagentName: state.currentAgent,
@@ -926,6 +1008,7 @@ export async function processStructuredMessage<T extends Record<string, unknown>
   const effectiveResourceId = resourceId || context.userId || "default";
 
   try {
+    userMessage = await applyUserPromptSubmitHooks(userMessage, context, threadId);
     const groundedPrompt = await buildGroundedPrompt(userMessage, context, requestContext);
     const result = await gordonAgent().generate(groundedPrompt.messages, {
       requestContext,
@@ -979,6 +1062,7 @@ export async function processMessage(
   const requestContext = createRequestContext(context);
 
   try {
+    userMessage = await applyUserPromptSubmitHooks(userMessage, context, threadId);
     const groundedPrompt = await buildGroundedPrompt(userMessage, context, requestContext);
     const tracingOptions = createAgentTracingOptions();
     const effectiveResourceId = resourceId || context.userId || "default";
@@ -1029,6 +1113,15 @@ export async function processSimpleMessage(
   context: GordonContext
 ): Promise<string> {
   const startTime = Date.now();
+
+  try {
+    userMessage = await applyUserPromptSubmitHooks(userMessage, context, context.threadId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    recordRequest(Date.now() - startTime, false);
+    recordError("UserPromptHookBlock");
+    return message;
+  }
 
   const inputCheck = await checkInputGuardrails(userMessage);
   if (!inputCheck.allowed) {

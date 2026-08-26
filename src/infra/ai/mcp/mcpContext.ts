@@ -20,12 +20,12 @@ function createMcpRuntimeAccess(): GordonRuntimeAccess {
     sessionId: "mcp-expose",
     threadId: "mcp-expose",
     resourceId: "mcp-expose",
-    evaluateToolAccess: async (toolName, context) => {
+    evaluateToolAccess: async (toolName, context, args) => {
       const policy = await evaluateRuntimeToolPolicy(toolName, context);
       if (!policy.allowed) {
         return { status: "blocked", reason: policy.reason };
       }
-      const permission = await engine.evaluate(toolName, context, policy);
+      const permission = await engine.evaluate(toolName, context, policy, args);
       if (permission.status === "allowed") {
         return { status: "allowed", reason: permission.reason };
       }

@@ -1,6 +1,6 @@
 // framebuffer — Phase 2 double-buffered frame management.
 //
-// Status: NOT WIRED. Phase 2 scaffolding built against the interfaces in
+// Active in customRender. Built against the interfaces in
 // `./internal/contracts.ts`. The concrete `CellBuffer` implementation lives
 // in Phase 1 (`./cellBuffer.ts`) and is supplied here via a factory, so this
 // module never has to import Phase 1's implementation directly.

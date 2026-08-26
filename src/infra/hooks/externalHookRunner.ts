@@ -28,7 +28,7 @@
  * `{ "action": "allow" }` on stdout from the handler's error path.
  */
 
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -36,6 +36,8 @@ import type { HookPoint, HookResult, HookPayloadMap } from "./types.ts";
 import { flagEnv } from "../config/flagResolver.ts";
 
 export const EXTERNAL_HOOK_RUNNER_FLAG_ENV = "GORDON_EXTERNAL_HOOK_RUNNER";
+export const EXTERNAL_HOOK_OUTPUT_LIMIT_BYTES = 64 * 1024;
+const EXTERNAL_HOOK_KILL_GRACE_MS = 250;
 
 export interface ExternalHookConfig<P extends HookPoint = HookPoint> {
   /** Stable id for logging / removal. */
@@ -61,6 +63,7 @@ export interface ExternalHookExecutionMeta {
   stdoutJsonParsed: boolean;
   timedOut: boolean;
   spawnFailed: boolean;
+  outputLimitExceeded: boolean;
 }
 
 export interface ExternalHookRunResult {
@@ -99,7 +102,24 @@ interface SpawnOutcome {
   stdout: string;
   stderr: string;
   timedOut: boolean;
+  outputLimitExceeded: boolean;
   spawnError?: Error;
+}
+
+function terminateHandler(child: ReturnType<typeof spawn>, signal: NodeJS.Signals): void {
+  try {
+    if (process.platform !== "win32" && child.pid) {
+      process.kill(-child.pid, signal);
+    } else {
+      child.kill(signal);
+    }
+  } catch {
+    try {
+      child.kill(signal);
+    } catch {
+      // The child may already have exited between the state check and kill.
+    }
+  }
 }
 
 function runHandlerProcess(
@@ -113,9 +133,13 @@ function runHandlerProcess(
     let stdout = "";
     let stderr = "";
     let timedOut = false;
+    let outputLimitExceeded = false;
+    let outputBytes = 0;
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    let forceKillHandle: ReturnType<typeof setTimeout> | undefined;
+    let terminationRequested = false;
 
-    let child;
+    let child: ChildProcessWithoutNullStreams;
     try {
       child = spawn(handlerPath, [...args], {
         stdio: ["pipe", "pipe", "pipe"],
@@ -128,49 +152,59 @@ function runHandlerProcess(
         stdout: "",
         stderr: err instanceof Error ? err.message : String(err),
         timedOut: false,
+        outputLimitExceeded: false,
         spawnError: err instanceof Error ? err : new Error(String(err)),
       });
       return;
     }
 
+    const requestTermination = (): void => {
+      if (terminationRequested) return;
+      terminationRequested = true;
+      terminateHandler(child, "SIGTERM");
+      forceKillHandle = setTimeout(() => terminateHandler(child, "SIGKILL"), EXTERNAL_HOOK_KILL_GRACE_MS);
+      forceKillHandle.unref?.();
+    };
+
+    const capture = (current: string, chunk: Buffer): string => {
+      const room = Math.max(0, EXTERNAL_HOOK_OUTPUT_LIMIT_BYTES - outputBytes);
+      outputBytes += chunk.byteLength;
+      if (chunk.byteLength > room || outputBytes > EXTERNAL_HOOK_OUTPUT_LIMIT_BYTES) {
+        outputLimitExceeded = true;
+        requestTermination();
+      }
+      return room > 0 ? current + chunk.subarray(0, room).toString("utf8") : current;
+    };
+
     child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf8");
+      stdout = capture(stdout, chunk);
     });
     child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8");
+      stderr = capture(stderr, chunk);
     });
 
     child.on("error", (err) => {
       if (timeoutHandle) clearTimeout(timeoutHandle);
+      if (forceKillHandle) clearTimeout(forceKillHandle);
       resolvePromise({
         exitCode: null,
         stdout,
         stderr: stderr || err.message,
         timedOut,
+        outputLimitExceeded,
         spawnError: err,
       });
     });
 
     child.on("close", (code) => {
       if (timeoutHandle) clearTimeout(timeoutHandle);
-      resolvePromise({ exitCode: code, stdout, stderr, timedOut });
+      if (forceKillHandle) clearTimeout(forceKillHandle);
+      resolvePromise({ exitCode: code, stdout, stderr, timedOut, outputLimitExceeded });
     });
 
     timeoutHandle = setTimeout(() => {
       timedOut = true;
-      try {
-        if (process.platform !== "win32" && child.pid) {
-          process.kill(-child.pid, "SIGTERM");
-        } else {
-          child.kill("SIGTERM");
-        }
-      } catch {
-        try {
-          child.kill("SIGTERM");
-        } catch {
-          // ignore
-        }
-      }
+      requestTermination();
     }, timeoutMs);
 
     // A handler is free to ignore its stdin: `exit 0` without reading is a
@@ -227,6 +261,7 @@ function exitCodeToResult(
   stderr: string,
   timedOut: boolean,
   spawnFailed: boolean,
+  outputLimitExceeded: boolean,
 ): HookResult {
   if (spawnFailed) {
     return {
@@ -236,6 +271,12 @@ function exitCodeToResult(
   }
   if (timedOut) {
     return { action: "block", reason: "external hook timed out" };
+  }
+  if (outputLimitExceeded) {
+    return {
+      action: "block",
+      reason: `external hook output exceeded ${EXTERNAL_HOOK_OUTPUT_LIMIT_BYTES} bytes`,
+    };
   }
   if (exitCode === 0) {
     return { action: "allow" };
@@ -266,6 +307,22 @@ export async function runExternalHook<P extends HookPoint>(
   const args = config.args ?? [];
   const start = Date.now();
 
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    const reason = `external hook timeoutMs must be a finite positive number (got ${timeoutMs})`;
+    return {
+      result: { action: "block", reason },
+      meta: {
+        exitCode: null,
+        durationMs: Date.now() - start,
+        stderr: reason,
+        stdoutJsonParsed: false,
+        timedOut: false,
+        spawnFailed: true,
+        outputLimitExceeded: false,
+      },
+    };
+  }
+
   let handlerPath: string;
   try {
     handlerPath = resolveHandlerPath(config.handlerPath, opts.cwd);
@@ -282,6 +339,7 @@ export async function runExternalHook<P extends HookPoint>(
         stdoutJsonParsed: false,
         timedOut: false,
         spawnFailed: true,
+        outputLimitExceeded: false,
       },
     };
   }
@@ -296,7 +354,12 @@ export async function runExternalHook<P extends HookPoint>(
   const outcome = await runHandlerProcess(handlerPath, args, payloadJson, timeoutMs, config.env);
 
   // First try to parse stdout as a structured HookResult.
-  const jsonResult = tryParseHookResultJson(outcome.stdout);
+  // A structured allow/modify cannot override a transport failure. In
+  // particular, a handler that prints {action:"allow"} and then hangs must
+  // still fail closed when its deadline expires.
+  const jsonResult = outcome.timedOut || outcome.outputLimitExceeded || outcome.spawnError
+    ? null
+    : tryParseHookResultJson(outcome.stdout);
   const stdoutJsonParsed = jsonResult !== null;
   const result =
     jsonResult ??
@@ -305,6 +368,7 @@ export async function runExternalHook<P extends HookPoint>(
       outcome.stderr,
       outcome.timedOut,
       !!outcome.spawnError,
+      outcome.outputLimitExceeded,
     );
 
   return {
@@ -316,6 +380,7 @@ export async function runExternalHook<P extends HookPoint>(
       stdoutJsonParsed,
       timedOut: outcome.timedOut,
       spawnFailed: !!outcome.spawnError,
+      outputLimitExceeded: outcome.outputLimitExceeded,
     },
   };
 }
@@ -334,6 +399,7 @@ export function runMetaToPayload(
     durationMs: meta.durationMs,
     timedOut: meta.timedOut,
     spawnFailed: meta.spawnFailed,
+    outputLimitExceeded: meta.outputLimitExceeded,
     stdoutJsonParsed: meta.stdoutJsonParsed,
     action: result.action,
     reason: result.reason,

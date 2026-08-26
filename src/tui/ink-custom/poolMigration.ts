@@ -1,7 +1,7 @@
 /**
  * poolMigration — Phase 6 reconciler module.
  *
- * Status: NOT WIRED. Compacts the Phase 1 string pools (chars, styles) and
+ * Active in customRender. Compacts the string pools (chars, styles) and
  * the Phase 4 hyperlink pool by rebuilding them with only the items still
  * referenced by the current front frame. Runs periodically (see
  * migrationScheduler) so long-running Gordon sessions don't grow unbounded

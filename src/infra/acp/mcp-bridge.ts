@@ -12,19 +12,11 @@
  *   - acp        { type: "acp",  command, args?, env?, name }   (UNSTABLE)
  *   - stdio      { command, args?, env?, name }
  *
- * v3 captures + stores these configs per session and exposes them via a
- * lookup helper. The actual Gordon-side MCP-client wiring (spinning up
- * Mastra MCP clients per server + registering tools with the agent
- * registry) is deferred to v3.5 — that path crosses several Gordon
- * subsystems and warrants its own commit.
- *
- * In v3 the capture lets:
- *   - Tools that want to know "what MCP servers does the editor have"
- *     query `getSessionMcpServers(sessionId)`
- *   - Diagnostics surface the forwarded set (`/diagnose-acp` could
- *     enumerate them later)
- *   - Future v3.5 work has the data already in hand — no protocol-side
- *     changes needed to activate
+ * The server converts the captured configs into a per-session Mastra MCP
+ * client. Its toolsets are discovered for each prompt and passed to the agent
+ * through Mastra's request-scoped `toolsets` option, after Gordon wraps every
+ * tool with the same sanitizer, lifecycle, metrics, and permission boundary as
+ * built-in tools.
  */
 
 import type { McpServer } from "@agentclientprotocol/sdk";

@@ -749,6 +749,9 @@ export const placeMarketOrderTool = createTool({
     if (!ctx?.exchange && !ctx?.broker) {
       return errors.noExchange;
     }
+    if ((quantity === undefined) === (quoteOrderQty === undefined)) {
+      return { error: "Provide exactly one of quantity or quoteOrderQty." };
+    }
     const plan = await planActionExecution(
       "trading.market_order",
       { symbol, side, quantity, quoteOrderQty },
@@ -765,64 +768,116 @@ export const placeMarketOrderTool = createTool({
       typeof plan.preview?.symbol === "string"
         ? String(plan.preview.symbol)
         : instrument.normalizedSymbol;
+    const sandboxActive = instrument.route === "broker"
+      ? ctx.broker?.isPaper ?? false
+      : ctx.exchange?.isSandbox ?? false;
 
     // Permission gate — blocks strict/observe/plan/paper for real execution
     {
       const killBlock = checkKillSwitchForOrder(ctx, { instrument: normalizedSymbol });
       if (killBlock.blocked) return { error: killBlock.error };
       const check = checkTradingPermission(ctx.config?.permissionMode, "execute", {
-        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper,
+        sandboxActive,
       });
       if (!check.allowed) {
         return { error: check.reason ?? "Market order not permitted under current mode" };
       }
       const consent = requireLiveConsent({
-        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper ?? false,
+        sandboxActive,
       });
       if (!consent.ok) {
         return { error: consent.reason ?? "Live-trading consent required." };
       }
     }
 
-    // Risk gate: both exchange and broker routes cross the same money-path
-    // boundary. The common evaluator resolves exchange prices or executable-
-    // side broker quotes before calculating notional risk.
-    if (quantity && quantity > 0) {
-      try {
-        const { evaluateOrderRisk } = await import("../trading/risk-gate.ts");
-        const riskResult = await evaluateOrderRisk(
-          { symbol: normalizedSymbol, side, type: "MARKET", quantity },
-          ctx,
-          "executor",
-        );
-        if (!riskResult.approved) {
-          return { error: `Risk check rejected: ${riskResult.reason}` };
-        }
-        // Use risk-adjusted quantity if modified
-        if (riskResult.quantity !== quantity) {
-          quantity = riskResult.quantity;
-        }
-      } catch (riskErr) {
-        return {
-          error: `Risk check failed for market order: ${riskErr instanceof Error ? riskErr.message : String(riskErr)}`,
-        };
+    let referencePrice: number;
+    try {
+      if (instrument.route === "broker" && ctx.broker) {
+        const quote = await ctx.broker.getLatestQuote(normalizedSymbol);
+        referencePrice = side === "SELL" ? quote.bidPrice : quote.askPrice;
+      } else if (ctx.exchange) {
+        referencePrice = await ctx.exchange.getPrice(normalizedSymbol);
+      } else {
+        throw new Error(`No ${instrument.route} adapter is available`);
       }
+      if (!Number.isFinite(referencePrice) || referencePrice <= 0) {
+        throw new Error("venue returned a non-positive price");
+      }
+    } catch (error) {
+      return {
+        error: `Market order refused because an executable reference price was unavailable: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      };
     }
 
-    // PreOrderPlacement hook — can block or modify the order
-    {
-      const preHook = await runHooks("PreOrderPlacement", {
-        symbol: normalizedSymbol,
-        side: side.toLowerCase() === "sell" ? "sell" : "buy",
-        quantity: quantity ?? 0,
-        orderType: "MARKET",
-        notionalUsd: quoteOrderQty ?? 0,
-        exchangeId: ctx.exchange?.exchangeId ?? ctx.broker?.brokerId,
-      });
-      if (preHook.action === "block") {
-        return { error: `PreOrderPlacement hook blocked: ${preHook.reason}` };
+    try {
+      const { evaluateOrderRisk } = await import("../trading/risk-gate.ts");
+      const requestedQuantity = quantity ?? quoteOrderQty! / referencePrice;
+      const riskContext = instrument.route === "broker"
+        ? { ...ctx, exchange: null }
+        : { ...ctx, broker: null };
+      const riskResult = await evaluateOrderRisk(
+        {
+          symbol: normalizedSymbol,
+          side,
+          type: "MARKET",
+          quantity: requestedQuantity,
+          price: referencePrice,
+        },
+        riskContext,
+        "executor",
+      );
+      if (!riskResult.approved) {
+        return { error: `Risk check rejected: ${riskResult.reason}` };
       }
+      if (riskResult.quantity > requestedQuantity) {
+        return { error: "Risk check returned an exposure-increasing quantity; order refused." };
+      }
+      if (quantity !== undefined) quantity = riskResult.quantity;
+      else quoteOrderQty = riskResult.quantity * referencePrice;
+    } catch (riskErr) {
+      return {
+        error: `Risk check failed for market order: ${riskErr instanceof Error ? riskErr.message : String(riskErr)}`,
+      };
     }
+
+    const requestedOrder = {
+      symbol: normalizedSymbol,
+      side: side.toLowerCase() === "sell" ? "sell" as const : "buy" as const,
+      quantity: quantity ?? quoteOrderQty! / referencePrice,
+      orderType: "MARKET",
+      notionalUsd: quoteOrderQty ?? quantity! * referencePrice,
+      exchangeId: instrument.route === "broker" ? ctx.broker?.brokerId : ctx.exchange?.exchangeId,
+      referencePrice,
+    };
+    const preHook = await runHooks("PreOrderPlacement", requestedOrder);
+    if (preHook.action === "block") {
+      return { error: `PreOrderPlacement hook blocked: ${preHook.reason}` };
+    }
+    const hookedOrder =
+      (preHook.metadata?.finalPayload as typeof requestedOrder | undefined) ?? requestedOrder;
+    if (
+      hookedOrder.symbol !== requestedOrder.symbol
+      || hookedOrder.side !== requestedOrder.side
+      || hookedOrder.orderType !== requestedOrder.orderType
+      || hookedOrder.referencePrice !== requestedOrder.referencePrice
+    ) {
+      return { error: "PreOrderPlacement hook may reduce size but cannot change order identity or price." };
+    }
+    const reducedNotional = Math.min(
+      hookedOrder.notionalUsd,
+      hookedOrder.quantity * referencePrice,
+    );
+    if (
+      !Number.isFinite(reducedNotional)
+      || reducedNotional <= 0
+      || reducedNotional > requestedOrder.notionalUsd
+    ) {
+      return { error: "PreOrderPlacement hook returned an invalid or exposure-increasing size." };
+    }
+    if (quantity !== undefined) quantity = reducedNotional / referencePrice;
+    else quoteOrderQty = reducedNotional;
 
     try {
       if (instrument.route === "broker" && ctx.broker) {
@@ -834,6 +889,18 @@ export const placeMarketOrderTool = createTool({
           ...(quantity ? { qty: quantity } : {}),
           ...(quoteOrderQty ? { notional: quoteOrderQty } : {}),
         });
+
+        const postOrderHook = await runHooks("PostOrderPlacement", {
+          orderId: String(orderResult.id),
+          symbol: orderResult.symbol ?? normalizedSymbol,
+          side: orderResult.side,
+          status: orderResult.status,
+          filledQty: orderResult.filledQty,
+          notionalUsd: orderResult.notional ?? reducedNotional,
+        });
+        if (postOrderHook.action === "block") {
+          console.error(`[hooks] PostOrderPlacement blocked after order ${String(orderResult.id)}: ${postOrderHook.reason ?? "blocked"}`);
+        }
 
         return {
           success: true,
@@ -876,15 +943,17 @@ export const placeMarketOrderTool = createTool({
       const quoteQty = orderResult.cummulativeQuoteQty;
       const avgPrice = executedQty > 0 ? quoteQty / executedQty : 0;
 
-      // PostOrderPlacement hook — fire-and-forget audit
-      runHooks("PostOrderPlacement", {
+      const postOrderHook = await runHooks("PostOrderPlacement", {
         orderId: String(orderResult.orderId ?? ""),
         symbol: orderResult.symbol ?? normalizedSymbol,
         side: side.toLowerCase() === "sell" ? "sell" : "buy",
         status: orderResult.status ?? "unknown",
         filledQty: executedQty,
         notionalUsd: quoteQty,
-      }).catch(() => {});
+      });
+      if (postOrderHook.action === "block") {
+        console.error(`[hooks] PostOrderPlacement blocked after order ${String(orderResult.orderId ?? "unknown")}: ${postOrderHook.reason ?? "blocked"}`);
+      }
 
       return {
         success: true,

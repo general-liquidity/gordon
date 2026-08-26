@@ -38,6 +38,8 @@ export class ToolInvoker {
       transcriptStore: TranscriptStore;
       scratchpadStore: ScratchpadStore;
       workerRegistry: WorkerRegistry;
+      /** Arguments whose identity and content the permission applies to. */
+      args?: unknown;
       signal?: AbortSignal;
       listRuntimeCommands?: () => string[];
       refreshPlugins?: () => Promise<void>;
@@ -51,7 +53,7 @@ export class ToolInvoker {
       throw new Error(policy.reason || `Tool ${toolName} blocked by runtime policy.`);
     }
 
-    const permission = await this.permissionEngine.evaluate(toolName, context, policy);
+    const permission = await this.permissionEngine.evaluate(toolName, context, policy, input.args);
     if (permission.status === "blocked") {
       throw new Error(permission.reason || `Tool ${toolName} blocked by permission engine.`);
     }
@@ -91,6 +93,8 @@ export class ToolInvoker {
       transcriptStore: TranscriptStore;
       scratchpadStore: ScratchpadStore;
       workerRegistry: WorkerRegistry;
+      /** Arguments whose identity and content the permission applies to. */
+      args?: unknown;
       signal?: AbortSignal;
       executor?: () => Promise<T>;
       listRuntimeCommands?: () => string[];

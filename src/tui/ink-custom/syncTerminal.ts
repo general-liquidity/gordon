@@ -1,6 +1,6 @@
 // syncTerminal — Phase 3 terminal capability detection + BSU/ESU frame wrapping.
 //
-// Status: NOT WIRED. Detects whether the host terminal supports the Sync
+// Active in customRender and terminal utilities. Detects whether the host terminal supports the Sync
 // Update Mode DEC private mode (CSI ?2026 h / CSI ?2026 l) plus related
 // capabilities (alternate screen buffer, OSC 8 hyperlinks) from environment
 // variables. When supported, wrapFrame() brackets a frame's ANSI payload

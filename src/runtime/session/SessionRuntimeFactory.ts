@@ -207,6 +207,35 @@ export class SessionRuntimeFactory {
       }
     }
     this.persistTimers.clear();
+    for (const runtime of this.runtimes.values()) {
+      runtime.emitLifecycleEnd("graceful");
+    }
     this.runtimes.clear();
+    this.persistence.close();
+  }
+
+  /** Process-owner teardown that waits for lifecycle policy and audit hooks. */
+  async disposeAsync(): Promise<void> {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const timer of this.persistTimers.values()) {
+      if (timer) clearTimeout(timer);
+    }
+    this.persistTimers.clear();
+    const lifecycleResults = await Promise.allSettled(
+      [...this.runtimes.values()].map((runtime) => runtime.emitLifecycleEndAsync("graceful")),
+    );
+    this.runtimes.clear();
+    const failures = lifecycleResults.flatMap((result) =>
+      result.status === "rejected" ? [result.reason] : []
+    );
+    try {
+      this.persistence.close();
+    } catch (error) {
+      failures.push(error);
+    }
+    if (failures.length > 0) {
+      throw new AggregateError(failures, "Session runtime factory disposed with lifecycle failures");
+    }
   }
 }

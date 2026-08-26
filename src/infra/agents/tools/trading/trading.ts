@@ -1091,6 +1091,15 @@ export const executePlanTool = createTool({
           error: `Risk kernel rejected this trade: ${riskResult.reason}`,
         }, { toolName: "execute_plan" });
       }
+      const approvedQuantity = plan.allocation.amount / (plan.entry.price || 1);
+      if (Math.abs(riskResult.quantity - approvedQuantity) > 1e-12) {
+        return validateToolOutput(executePlanOutputSchema, {
+          success: false,
+          error:
+            `Risk kernel requires quantity ${riskResult.quantity}, but the approved plan is bound to ${approvedQuantity}. `
+            + "Amend and re-approve the plan before execution.",
+        }, { toolName: "execute_plan" });
+      }
 
       // Risk acknowledgement gate (GORDON_RISK_ACK)
       const ackResult = verifyAcksFromWarnings(
@@ -1149,12 +1158,14 @@ export const executePlanTool = createTool({
       );
     }
 
-    // PreOrderPlacement hook — can block or modify the order
+    // The approved plan is content-bound. Hooks may veto it, but a mutation
+    // must go through plan amendment and approval rather than changing the
+    // order after its approval hash was checked.
     // (referencePrice was fetched and validated at the order-construction
     // gate above; reused here for the fat-finger / price-deviation guard.)
-    const preOrderHook = await runHooks("PreOrderPlacement", {
+    const requestedOrder = {
       symbol: plan.symbol,
-      side: planOrderSide,
+      side: planOrderSide as "buy" | "sell",
       quantity: plan.allocation.amount / (plan.entry.price || 1),
       orderType: plan.entry.type === "market" ? "MARKET" : "LIMIT",
       notionalUsd: plan.allocation.amount,
@@ -1163,11 +1174,28 @@ export const executePlanTool = createTool({
       ...(plan.entry.type !== "market" &&
         typeof plan.entry.price === "number" && { limitPrice: plan.entry.price }),
       ...(typeof referencePrice === "number" && { referencePrice }),
-    });
+    };
+    const preOrderHook = await runHooks("PreOrderPlacement", requestedOrder);
     if (preOrderHook.action === "block") {
       return validateToolOutput(executePlanOutputSchema, {
         success: false,
         error: `PreOrderPlacement hook blocked: ${preOrderHook.reason}`,
+      }, { toolName: "execute_plan" });
+    }
+    const hookedOrder =
+      (preOrderHook.metadata?.finalPayload as typeof requestedOrder | undefined) ?? requestedOrder;
+    if (
+      hookedOrder.symbol !== requestedOrder.symbol
+      || hookedOrder.side !== requestedOrder.side
+      || hookedOrder.quantity !== requestedOrder.quantity
+      || hookedOrder.orderType !== requestedOrder.orderType
+      || hookedOrder.notionalUsd !== requestedOrder.notionalUsd
+      || hookedOrder.limitPrice !== requestedOrder.limitPrice
+      || hookedOrder.referencePrice !== requestedOrder.referencePrice
+    ) {
+      return validateToolOutput(executePlanOutputSchema, {
+        success: false,
+        error: "PreOrderPlacement requested a modification to a content-bound plan. Amend and re-approve the plan before execution.",
       }, { toolName: "execute_plan" });
     }
 
@@ -1322,16 +1350,24 @@ export const executePlanTool = createTool({
       }
     }
 
-    // PostOrderPlacement hook — fires after execution regardless of success
+    // The trade already exists at this point. Await post-execution audit hooks
+    // before reporting success, while treating a block as an observable audit
+    // refusal rather than pretending it can roll the fill back.
     if (result.success && result.trade) {
-      runHooks("PostOrderPlacement", {
+      const postOrderHook = await runHooks("PostOrderPlacement", {
         orderId: result.trade.id,
         symbol: result.trade.symbol,
         side: planOrderSide,
         status: "filled",
-        filledQty: plan.allocation.amount / (plan.entry.price || 1),
-        notionalUsd: plan.allocation.amount,
-      }).catch(() => {}); // Fire-and-forget — don't block response
+        filledQty: result.trade.entries.reduce((sum, entry) => sum + entry.quantity, 0),
+        notionalUsd: result.trade.entries.reduce(
+          (sum, entry) => sum + entry.quantity * entry.price,
+          0,
+        ),
+      });
+      if (postOrderHook.action === "block") {
+        console.error(`[hooks] PostOrderPlacement blocked after trade ${result.trade.id}: ${postOrderHook.reason ?? "blocked"}`);
+      }
     }
 
     if (result.success && result.trade) {
@@ -1370,6 +1406,9 @@ export const executePlanTool = createTool({
       // execution if storage is misconfigured.
       try {
         appendActionLogEntry({
+          sessionId: ctx.runtime?.sessionId,
+          threadId: ctx.threadId ?? ctx.runtime?.threadId,
+          resourceId: ctx.userId ?? ctx.runtime?.resourceId,
           entryType: "execution_result",
           title: `${result.trade.symbol} executed`,
           content: `Plan ${planId} executed cleanly on ${result.trade.symbol}. User rationale: ${rationale}`,

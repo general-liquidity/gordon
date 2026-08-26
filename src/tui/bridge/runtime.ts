@@ -2,7 +2,6 @@ import type { StreamEvent } from "../../infra/agents/orchestrator.ts";
 import type { SessionRuntime } from "../../runtime/session/SessionRuntime.ts";
 import { SessionRuntimeFactory } from "../../runtime/session/SessionRuntimeFactory.ts";
 import type { RuntimeApprovalRequest, RuntimeApprovalRule } from "../../runtime/contracts/types.ts";
-import type { GordonRuntimeToolAccessResult } from "../../infra/agents/types.ts";
 import { quickPermissionCheck } from "../../infra/permissions/racing.ts";
 import type { PermissionRule } from "../../infra/permissions/rules.ts";
 import { getConversationBudget } from "../../infra/context/budgeting/conversationBudget.ts";
@@ -43,7 +42,6 @@ import { getRuntimeApprovalShortId } from "../../app/runtime/runtimeApprovalId.t
 import { subscribeToEvents } from "./eventSubscriptions.js";
 import type { Action, TuiNotification } from "../state/types.js";
 import { appendNotificationCapped } from "../state/notificationRetention.ts";
-import { noteRiskKernelFailure, resetRiskKernelHealth } from "./riskKernelHealth.ts";
 import { fetchApprovalRiskDetails, buildCounterOfferDenialReason } from "./approvalRiskDetails.ts";
 import { recordTurn, resetTurnSummaries, formatTurnsView } from "./turnSummaries.ts";
 import { createStreamFlusher } from "./streamFlusher.ts";
@@ -315,7 +313,6 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
     threadId: runtimeState.session.threadId ?? null,
   }));
 
-  resetRiskKernelHealth();
   resetTurnSummaries();
 
   // Start background monitoring
@@ -339,6 +336,18 @@ export function abortActiveTurn(): boolean {
     return true;
   }
   return false;
+}
+
+/** Flush the TUI session's lifecycle hooks and persistence before process-level
+ * services (MCP, telemetry, database) are torn down. */
+export async function shutdownRuntime(
+  reason: "user_quit" | "timeout" | "error" | "graceful" | "external_signal" = "graceful",
+): Promise<void> {
+  abortActiveTurn();
+  const factory = runtimeFactory;
+  runtimeFactory = null;
+  activeRuntime = null;
+  if (factory) await factory.disposeAsync();
 }
 
 export function performSessionReset(setState: StateUpdater): void {
@@ -678,20 +687,16 @@ async function streamResponse(
 
           recordTurn(userMessage, textFlusher.buffer);
 
-          // ── Phase 5: Risk kernel pre-check on pending approvals ──
-          // Evaluate each pending approval through evaluateToolAccess.
-          // Auto-deny blocked, auto-approve allowed, only show dialog for pending.
+          // ── Phase 5: project pending approvals into dialogs ──
+          // PermissionEngine already ran policy, classification, lifecycle
+          // hooks, and the argument-sensitive fingerprint when the tool first
+          // attempted to execute. Re-evaluating here used to construct a
+          // second request without the original args or venue context. Only a
+          // rule created after the request was queued is safe to apply here;
+          // otherwise the original request stays pending for the operator.
           const rawPending = runtime.getPendingApprovals();
           const stillPending: RuntimeApprovalRequest[] = [];
           const riskMessages: Message[] = [];
-
-          const riskContext = {
-            userId: "tui-user",
-            config: await loadConfig(),
-            runtime: undefined as never,
-            threadId: undefined as string | undefined,
-            resourceId: undefined as string | undefined,
-          } as any;
 
           for (const approval of rawPending) {
             try {
@@ -726,54 +731,10 @@ async function streamResponse(
                 continue;
               }
 
-              const accessResult = await runtime.evaluateToolAccess(
-                approval.toolName,
-                riskContext,
-              );
-
-              if (accessResult.status === "blocked") {
-                // Auto-deny: risk kernel blocks this tool
-                runtime.denyPendingRequest(approval.id, {
-                  reason: accessResult.reason ?? "Blocked by risk kernel",
-                  actor: "risk-kernel",
-                });
-                riskMessages.push({
-                  id: `risk-deny-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                  role: "system",
-                  variant: "approval" as const,
-                  content: `\u2717 Auto-denied: ${approval.toolName} \u2014 ${accessResult.reason ?? "risk kernel block"}`,
-                  timestamp: new Date().toISOString(),
-                });
-              } else if (accessResult.status === "allowed") {
-                // Auto-approve: risk kernel allows this tool
-                runtime.approvePendingRequest(approval.id, {
-                  persist: false,
-                  actor: "risk-kernel",
-                });
-                riskMessages.push({
-                  id: `risk-approve-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                  role: "system",
-                  variant: "approval" as const,
-                  content: `\u2713 Auto-approved: ${approval.toolName} \u2014 ${accessResult.reason ?? "risk kernel pass"}`,
-                  timestamp: new Date().toISOString(),
-                });
-              } else {
-                // "pending" — needs human approval via dialog
-                stillPending.push(approval);
-              }
-            } catch (err) {
-              // Fall through to manual approval, but tell the operator the
-              // risk kernel is down — once per session, not per approval.
-              const warning = noteRiskKernelFailure(err);
-              if (warning) {
-                riskMessages.push({
-                  id: `risk-health-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                  role: "system",
-                  variant: "approval" as const,
-                  content: warning,
-                  timestamp: new Date().toISOString(),
-                });
-              }
+              stillPending.push(approval);
+            } catch {
+              // Rule projection is an optimization, not a gate. Any failure
+              // leaves the original request pending.
               stillPending.push(approval);
             }
           }

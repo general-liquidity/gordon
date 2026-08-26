@@ -56,7 +56,10 @@ const templateDir = new URL("../prompt-sections/templates/", import.meta.url);
 const sectionCache = new Map<string, string>();
 let registryCache: PromptSectionRegistryRecord[] | null = null;
 
-const fallbackSectionContent = new Map<string, string | (() => string)>([
+const fallbackSectionContent = new Map<
+  string,
+  string | ((options: PromptSectionRenderOptions) => string)
+>([
   ...SHARED_PROMPT_SECTIONS.map((section) => [section.id, section.content] as const),
   ...Object.values(ROLE_PROMPT_SECTIONS).flat().map((section) => [section.id, section.content] as const),
   [
@@ -84,20 +87,31 @@ const fallbackSectionContent = new Map<string, string | (() => string)>([
 - Prefer native Gordon tools first, and only lean on MCP-backed tools when the request clearly targets plugin or external-tool capabilities.`,
   ],
   [
-    // Dynamic section — ACE (Agentic Context Engineering) lessons accumulated
-    // across prior sessions. When GORDON_ACE_ENABLED is off, or no lessons
-    // have been curated yet, returns "" so the section is filtered out by
-    // composeAgentInstructions' .filter(Boolean). When enabled, the lesson
-    // block is loaded once per (role, scope, provider, …) cache key — stable
-    // within a session, refreshes on next session start.
+    // Dynamic context section — ACE lessons accumulated across prior sessions.
+    // It is composed per request (not into the process-global Agent instance),
+    // so concurrent sessions receive and attribute their own revision.
     "shared.ace-lessons",
-    () => {
-      if (!isACEEnabled()) return "";
+    (options) => {
+      const scopes = [
+        options.context?.runtime?.sessionId,
+        options.context?.threadId,
+        options.context?.userId,
+      ];
+      // This section is intentionally evaluated on every prompt composition.
+      // The generic section cache is process-wide, so caching it would pin the
+      // first lesson set for the lifetime of a daemon instead of picking up a
+      // revision promoted between sessions. Clearing the stamp on every empty
+      // path also prevents actions from inheriting an earlier ACE revision
+      // after the flag is disabled or the store becomes empty.
+      if (!isACEEnabled()) {
+        setActiveACELessonRevision(0, scopes);
+        return "";
+      }
       const store = loadACELessons();
       const block = formatACELessonsForPrompt(store);
       // Record the revision the agent is actually operating under (only when a
       // non-empty block was injected) so logged actions can be attributed to it.
-      if (block) setActiveACELessonRevision(store.revision);
+      setActiveACELessonRevision(block ? store.revision : 0, scopes);
       return block;
     },
   ],
@@ -134,8 +148,11 @@ function loadRegistry(): PromptSectionRegistryRecord[] {
   return registryCache;
 }
 
-function renderStaticPromptSection(section: string | (() => string)): string {
-  const content = typeof section === "function" ? section() : section;
+function renderStaticPromptSection(
+  section: string | ((options: PromptSectionRenderOptions) => string),
+  options: PromptSectionRenderOptions,
+): string {
+  const content = typeof section === "function" ? section(options) : section;
   return content.trim();
 }
 
@@ -186,8 +203,12 @@ function renderTemplate(template: string, options: PromptSectionRenderOptions): 
 
 function loadSectionContent(record: PromptSectionRegistryRecord, options: PromptSectionRenderOptions): string {
   const cacheKey = `${record.id}:${options.role ?? "none"}:${options.context?.requestedTaskScope ?? "none"}:${options.context?.config.modelConfig?.provider ?? "none"}:${options.context?.exchange?.exchangeId ?? "no-exchange"}:${options.context?.broker?.brokerId ?? "no-broker"}`;
-  const cached = sectionCache.get(cacheKey);
-  if (cached) {
+  // ACE is backed by a governed, revisioned on-disk store. It must not use the
+  // process-lifetime template cache: a daemon can host many sessions and a
+  // curation pass between them must become visible without a restart.
+  const isDynamicAceSection = record.id === "shared.ace-lessons";
+  const cached = isDynamicAceSection ? undefined : sectionCache.get(cacheKey);
+  if (cached !== undefined) {
     return cached;
   }
 
@@ -198,12 +219,12 @@ function loadSectionContent(record: PromptSectionRegistryRecord, options: Prompt
   } else {
     const fallback = fallbackSectionContent.get(record.id);
     if (fallback) {
-      template = renderStaticPromptSection(fallback);
+      template = renderStaticPromptSection(fallback, options);
     }
   }
 
   const rendered = renderTemplate(template, options);
-  sectionCache.set(cacheKey, rendered);
+  if (!isDynamicAceSection) sectionCache.set(cacheKey, rendered);
   return rendered;
 }
 

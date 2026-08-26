@@ -1,7 +1,7 @@
 // render — entry point with env-flag-gated custom pipeline.
 //
-// Default (Lane 1 / Phase A2): the custom renderer runs unless an explicit
-// opt-out or an environment-driven fallback condition forces vanilla Ink.
+// The custom renderer is opt-in. Even when enabled, an environment-driven
+// fallback condition can force vanilla Ink.
 // Fallbacks force vanilla when:
 //   * `GORDON_CUSTOM_RENDER=0|false` (explicit opt-out)
 //   * `TERM=dumb` (no ANSI processing — escape sequences would render as
@@ -77,7 +77,7 @@ export type RenderOptions = {
   patchConsole?: boolean;
   /** Called after each render with timing metrics. */
   onRender?: (metrics: { renderTime: number }) => void;
-  /** Enable screen reader support. @default process.env.INK_SCREEN_READER === 'true' */
+  /** Enable screen reader support. Environment auto-detection is the default. */
   isScreenReaderEnabled?: boolean;
   /** Maximum frames per second. @default 30 */
   maxFps?: number;
@@ -103,9 +103,8 @@ export type Instance = {
   clear: () => void;
   /**
    * Set a selection range (custom renderer only; no-op under vanilla ink).
-   * Currently scaffolding — the overlay is allocated but not yet applied to
-   * the full-frame rewrite path. Wiring lands when patch-based emission is
-   * activated. @internal
+   * The custom pipeline repaints this range with inverse-video cells while
+   * leaving the content framebuffer untouched. @internal
    */
   setSelection?: (range: SelectionRange | null) => void;
   /** Clear any active selection. @see setSelection */
@@ -152,7 +151,10 @@ export function shouldUseCustomRenderer(
     emitFallbackNotice(resolvedStderr, "screen reader enabled");
     return false;
   }
-  if (resolvedStdout.isTTY === false) {
+  // Node reports redirected stdout as either `false` or `undefined` depending
+  // on the stream implementation. Only an affirmative TTY is safe for cursor
+  // movement and alternate-frame assumptions.
+  if (resolvedStdout.isTTY !== true) {
     emitFallbackNotice(resolvedStderr, "stdout is not a TTY");
     return false;
   }
@@ -193,11 +195,23 @@ function resolveOptions(options?: NodeJS.WriteStream | RenderOptions): Required<
     patchConsole: opts.patchConsole ?? true,
     onRender: opts.onRender ?? (() => {}),
     isScreenReaderEnabled:
-      opts.isScreenReaderEnabled ?? process.env["INK_SCREEN_READER"] === "true",
+      opts.isScreenReaderEnabled ?? isScreenReaderEnvironment(),
     maxFps: opts.maxFps ?? 30,
     incrementalRendering: opts.incrementalRendering ?? false,
     alternateScreen: opts.alternateScreen ?? false,
   };
+}
+
+function isScreenReaderEnvironment(): boolean {
+  const env = process.env;
+  return (
+    env["INK_SCREEN_READER"] === "true" ||
+    env["ACCESSIBILITY_ENABLED"] === "true" ||
+    env["SCREEN_READER"] === "true" ||
+    env["GORDON_SCREEN_READER"] === "true" ||
+    env["VOICE_OVER_ENABLED"] === "1" ||
+    env["NARRATOR_RUNNING"] === "1"
+  );
 }
 
 /**

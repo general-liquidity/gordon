@@ -61,7 +61,14 @@ export function installAcpPermissionHook(
 ): () => void {
   const trajectory = getDefaultTrustTrajectory();
 
-  const uninstall = engine.prependHook(async ({ toolName, policy }) => {
+  const uninstall = engine.prependHook(async ({ toolName, policy, context }) => {
+    // The default permission engine is process-scoped while ACP sessions may
+    // prompt concurrently. A turn-local hook must never intercept another
+    // session's tool call and show its approval in the wrong editor view.
+    const requestSessionId = context.runtime?.sessionId;
+    if (requestSessionId && requestSessionId !== options.sessionId) {
+      return { decision: "abstain" };
+    }
     const permissionScope = policy.tool.permissionScope;
 
     // Safety-critical bypass — editor approval is too thin for these.

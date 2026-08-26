@@ -123,7 +123,10 @@ Most behavior primitives are now defaults-on as part of the core architecture. T
 
 | Env flag | Activates |
 |---|---|
-| `GORDON_ACE_ENABLED=true` | Activate ACE (Agentic Context Engineering): `/reflect` distills the action log into lessons, injected into the system prompt of future sessions via `shared.ace-lessons`. Writes to system prompt across sessions — opt-in for safety. |
+| `GORDON_ACE_ENABLED=true` | Activate ACE (Agentic Context Engineering): `/reflect` distills scoped action-log evidence into governed lessons. The active revision is injected into request context for the matching session/thread/resource on each prompt; it does not mutate the shared system prompt. Cross-session learning remains opt-in. |
+| `GORDON_EXTERNAL_HOOK_RUNNER=1` | Install operator-defined lifecycle hooks from `GORDON_EXTERNAL_HOOKS_PATH` (default `~/.gordon/hooks.json`). Enabling the runner with a missing, malformed, empty, or partially invalid registry aborts startup. |
+| `GORDON_ACP_ALLOW_STDIO_MCP=1` | Permit an ACP peer to forward stdio MCP server commands. Default deny because the command runs on the Gordon host; executable paths are validated and shell interpretation is not used. |
+| `GORDON_ACP_VISION_PATH=inline` | ACP attachment mode. `inline` is the only supported production value while the LLM client boundary is string-only; `blocks` is refused explicitly rather than silently dropping image/audio payloads. |
 | `GORDON_DYNAMIC_SUBAGENTS=1` | Enable the FW7 `delegate_subagent` dispatcher. Requires operator-authored `.claude/subagents/*.json` profiles. Sensitive because subagents spawn fresh agent instances. |
 | `GORDON_DEFER_WORKING_MEMORY=1` | Buffer mid-session working-memory writes to preserve prompt-cache stability; flush at session boundaries. Performance trade-off — see Hot-tier discipline section. |
 | `GORDON_SUPERVISION_RUST_RATE` | Periodic flawed-plan injection rate (0–1). Calibrated threshold; default off, operators set their own cadence. |

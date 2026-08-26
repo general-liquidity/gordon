@@ -13,17 +13,20 @@
  * `enforced` probe or it is not listed.
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { DiagnosticCheck } from "./doctor.ts";
-import { GORDON_DIR } from "../storage/paths.ts";
 import { isFilesystemWriteGuardEnabled } from "../safety/filesystemWriteGuard.ts";
 import { isFilesystemWriteGuardInstalled } from "../safety/filesystemWriteGuardInstaller.ts";
 import { isNetworkAllowlistEnabled } from "../safety/networkAllowlist.ts";
 import { isOutboundFetchGuardInstalled } from "../safety/outboundFetchGuard.ts";
 import { isExternalHookRunnerEnabled } from "../hooks/externalHookRunner.ts";
+import { getExternalHookInstallerState } from "../hooks/externalHookRegistry.ts";
 import { listHooks } from "../hooks/engine.ts";
-import type { HookPoint } from "../hooks/types.ts";
+import { HOOK_POINTS, type HookPoint } from "../hooks/types.ts";
+import {
+  inspectPolicyLayer,
+  policyPath as resolvePolicyPath,
+  POLICY_PATH_ENV,
+} from "../config/settingsSync/policySignature.ts";
 
 export interface GateDescriptor {
   id: string;
@@ -38,16 +41,7 @@ export interface GateDescriptor {
   remedy: string;
 }
 
-/**
- * Hook points that a production call site actually emits. Everything else in
- * `HookPoint` is declared but unreachable, so a hook registered there never
- * runs. `PreToolUse` has an emit site in infra/permissions/racing.ts but only
- * inside `racePermissionDecision`, which no production caller invokes.
- */
-export const EMITTED_HOOK_POINTS: ReadonlySet<HookPoint> = new Set<HookPoint>([
-  "PreOrderPlacement",
-  "PostOrderPlacement",
-]);
+export const EMITTED_HOOK_POINTS: ReadonlySet<HookPoint> = new Set(HOOK_POINTS);
 
 export const DEFAULT_GATES: readonly GateDescriptor[] = [
   {
@@ -71,12 +65,9 @@ export const DEFAULT_GATES: readonly GateDescriptor[] = [
     label: "External hook runner",
     flag: "GORDON_EXTERNAL_HOOK_RUNNER",
     enabled: () => isExternalHookRunnerEnabled(),
-    // infra/hooks/externalHookRunner.ts is imported by nothing but its own
-    // test: no code loads external hook configs or dispatches to it. Setting
-    // the flag changes nothing today, and saying so is the whole point.
-    enforced: () => false,
+    enforced: () => getExternalHookInstallerState().installed,
     remedy:
-      "No caller wires externalHookRunner.ts — external hook handlers are never dispatched. Unset the flag or wire the runner.",
+      "Set GORDON_EXTERNAL_HOOKS_PATH to a valid hooks JSON file and restart Gordon.",
   },
 ];
 
@@ -109,56 +100,29 @@ export function checkGateEnforcement(
   });
 }
 
-/**
- * `~/.gordon/policy.json` is the highest-precedence PERSISTENT settings layer:
- * it outranks the local layer that `/flags set` writes to, so anything in it
- * silently overrides what the operator sets through the UI. It carries no
- * signature (unlike the `synced` layer, which is HMAC-verified) and sits
- * inside the filesystem write guard's own allowlist, so any code that can
- * write `~/.gordon` can rewrite the "organization policy" that feeds both the
- * flag resolver and the subprocess-sandbox toggle.
- *
- * There is no signing scheme for this layer today, so the honest thing is to
- * make its presence and reach visible rather than imply it is trusted.
- */
 export function checkPolicyLayerIntegrity(
-  policyPath: string = join(GORDON_DIR, "policy.json"),
+  path: string = resolvePolicyPath(),
+  env: NodeJS.ProcessEnv = process.env,
 ): DiagnosticCheck {
   const id = "gate.policy-layer";
   const label = "Organization policy layer";
-  if (!existsSync(policyPath)) {
-    return { id, label, status: "info", message: `No policy layer at ${policyPath}.` };
+  const state = inspectPolicyLayer({ ...env, [POLICY_PATH_ENV]: path });
+  if (state.state === "absent") {
+    return { id, label, status: "info", message: `No policy layer at ${path}.` };
   }
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(readFileSync(policyPath, "utf-8")) as Record<string, unknown>;
-  } catch {
+  if (state.state === "refused") {
     return {
       id,
       label,
       status: "fail",
-      message: `${policyPath} is unparseable — it is silently ignored, so any policy it was meant to carry is not applied.`,
-    };
-  }
-  const overridden: string[] = [];
-  const flags = parsed.flags;
-  if (flags && typeof flags === "object" && !Array.isArray(flags)) {
-    overridden.push(...Object.keys(flags as Record<string, unknown>));
-  }
-  if (parsed.sandbox) overridden.push("sandbox.subprocess");
-  if (overridden.length === 0) {
-    return {
-      id,
-      label,
-      status: "warn",
-      message: `${policyPath} exists and outranks the local settings layer, but is unsigned. It sets no flags today.`,
+      message: `${path} is REFUSED and not applied (${state.reason}): ${state.detail}.`,
     };
   }
   return {
     id,
     label,
-    status: "warn",
-    message: `${policyPath} is UNSIGNED yet outranks the layer /flags writes to, and it overrides: ${overridden.join(", ")}. Anything able to write ~/.gordon can change these.`,
+    status: "pass",
+    message: `${path} is signed and verified (origin ${state.origin}, ${state.keys.length} top-level keys).`,
   };
 }
 

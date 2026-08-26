@@ -1,6 +1,7 @@
 import { installFilesystemWriteGuard } from "./filesystemWriteGuardInstaller.ts";
 import { installOutboundFetchGuard } from "./outboundFetchGuard.ts";
 import { installProcessHardening } from "./processHardening.ts";
+import { installExternalHooks } from "../hooks/externalHookRegistry.ts";
 import {
   FILESYSTEM_WRITE_GUARD_FLAG_ENV,
   FILESYSTEM_WRITE_GUARD_MODE_ENV,
@@ -62,9 +63,13 @@ export function applyProductionEnvDefaults(env: NodeJS.ProcessEnv = process.env)
 /** Idempotent safety-plane bootstrap for any Gordon process entry point. */
 export function installProductionGuards(): void {
   if (installed) return;
-  installed = true;
   applyProductionEnvDefaults();
   installProcessHardening();
   installOutboundFetchGuard();
   installFilesystemWriteGuard();
+  installExternalHooks();
+  // Mark the aggregate bootstrap complete only after every enabled guard is
+  // installed. In particular, a fail-closed external-hook config error must
+  // not make a later diagnostic/retry believe the whole safety plane exists.
+  installed = true;
 }

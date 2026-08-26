@@ -11,19 +11,14 @@
 //     AnsiPatcher.write() -> SyncTerminal.wrapFrame(), and finally write to
 //     stdout via Ink's `log-update` pattern.
 //
-// Known limitations for this first activation:
-//   * No accessibility / screen-reader fallback.
-//   * Selection overlay is allocated but not applied to the full-frame
-//     rewrite transport yet — `instance.setSelection` mutates the overlay
-//     state but the paint pipeline currently reprints toAnsiString(). The
-//     overlay will start applying when the patch-based transport lands
-//     (see TODO(incremental-patches) below).
+// Accessibility is handled at the entry point: screen-reader sessions never
+// enter this cell renderer and use vanilla Ink's accessibility path instead.
 //
 // Phase status:
 //   * Phase 3 — `<Static>` scrolls into history above the live frame.
-//   * Phase 4 — hyperlink pool, selection overlay, cursor declaration are
-//     all allocated; cursor declaration emits; the other two are staged
-//     for the patch transport.
+//   * Phase 4 — hyperlink pool, selection overlay and cursor declaration are
+//     active. Selection is emitted after a full repaint without mutating the
+//     content framebuffer, so clearing it restores the underlying styles.
 //   * Phase 6 — pool-migration scheduler runs by default whenever the
 //     custom renderer is active. Override via `GORDON_POOL_MIGRATION_ENABLED=false`
 //     to disable (benchmarking cold pools), interval configurable via
@@ -34,9 +29,8 @@
 //     (Lane 1 / Phase B1), which sets up the 5 context providers
 //     (AppContext / StdinContext / StdoutContext / StderrContext /
 //     FocusContext) that hook consumers read from.
-//   * Hook shims in ink-custom/hooks/ currently still import from `ink`
-//     (vanilla `useApp`/`useInput`/`useStdout`); porting those shims to
-//     read from our owned contexts is tracked under a separate lane.
+//   * Hook implementations in ink-custom/hooks/ read the owned contexts;
+//     they do not cross into Ink's private context graph.
 //
 // If any of these are a blocker in a real session, flip
 // GORDON_CUSTOM_RENDER=0 or leave it unset — the vanilla Ink path is
@@ -123,6 +117,8 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
   // onRender becomes a no-op so we never paint over the child's output.
   let isSuspended = false;
   let lastPaintedAnsi = "";
+  let selectionRevision = 0;
+  let lastPaintedSelectionRevision = 0;
   let lastPrintedHeight = 0;
   // Track the width the last full repaint was sized to. A width change
   // invalidates the incremental patch path — existing cells on screen sit
@@ -239,6 +235,7 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
       frameBuffer.swap();
 
       const fullAnsi = output.toAnsiString();
+      const selectionChanged = selectionRevision !== lastPaintedSelectionRevision;
 
       // Append the declared cursor position (Phase 4) so inputs like
       // TextInput can park the physical cursor on the correct cell AFTER
@@ -270,7 +267,12 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
 
       // Subsequent frames: if nothing changed AND no new static tail,
       // skip. If only static changed, we still need to erase + emit.
-      if (!hasStatic && fullAnsi === lastPaintedAnsi && patches.length === 0) {
+      if (
+        !hasStatic &&
+        !selectionChanged &&
+        fullAnsi === lastPaintedAnsi &&
+        patches.length === 0
+      ) {
         options.onRender?.({ renderTime: performance.now() - startTime });
         return;
       }
@@ -293,6 +295,8 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
         !hasStatic &&
         !sizeChanged &&
         patches.length > 0 &&
+        selectionOverlay.current === null &&
+        !selectionChanged &&
         patches.length < INCREMENTAL_PATCH_THRESHOLD &&
         nextHeight === lastPrintedHeight &&
         width === lastPrintedWidth;
@@ -315,10 +319,22 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
 
       const erase = lastPrintedHeight > 0 ? ansiEscapes.eraseLines(lastPrintedHeight) : "";
       if (hasStatic) emittedStaticAnsi += staticAnsi + "\n";
+      const selectedPatches = selectionOverlay.applyTo(
+        selectionOverlay.patchesFor(frameBuffer.front, charPool),
+      );
+      const selectionAnsi = relativePatcher.write(
+        selectedPatches,
+        stylePool,
+        charPool,
+        nextHeight,
+      );
       writeToStdout(
-        syncTerm.wrapFrame(erase + staticEmit + fullAnsi + "\n" + cursorAnsi),
+        syncTerm.wrapFrame(
+          erase + staticEmit + fullAnsi + "\n" + selectionAnsi + cursorAnsi,
+        ),
       );
       lastPaintedAnsi = fullAnsi;
+      lastPaintedSelectionRevision = selectionRevision;
       lastPrintedHeight = nextHeight;
       lastPrintedWidth = width;
       options.onRender?.({ renderTime: performance.now() - startTime });
@@ -526,17 +542,18 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
       lastPaintedAnsi = "";
       lastPrintedHeight = 0;
     },
-    // Phase 4 affordances. The overlay is allocated and these writers
-    // mutate its internal state, but the full-frame rewrite path doesn't
-    // consume overlay patches yet (it reprints toAnsiString()). When the
-    // incremental-patch transport lands, overlay.applyTo(patches) will be
-    // inserted into the patch pipeline — at that point these writers
-    // already do the right thing.
+    // Selection is deliberately rendered as a display overlay, not written
+    // into the framebuffer. Changing it forces one repaint so both setting
+    // and clearing a range take effect even when React content is unchanged.
     setSelection: (range: SelectionRange | null) => {
       selectionOverlay.set(range);
+      selectionRevision++;
+      onRender();
     },
     clearSelection: () => {
       selectionOverlay.clear();
+      selectionRevision++;
+      onRender();
     },
   };
 

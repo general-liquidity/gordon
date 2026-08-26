@@ -10,7 +10,13 @@
  * ANSI: SGR 7 (inverse video) / SGR 27 (reset inverse).
  */
 
-import type { Patch, SelectionOverlay, SelectionRange } from "./internal/contracts.ts";
+import type {
+  CellBuffer,
+  CharPool,
+  Patch,
+  SelectionOverlay,
+  SelectionRange,
+} from "./internal/contracts.ts";
 
 const SGR_INVERSE_ON = "\x1b[7m";
 const SGR_INVERSE_OFF = "\x1b[27m";
@@ -36,12 +42,28 @@ function cellInRange(x: number, y: number, range: SelectionRange): boolean {
   return true; // fully selected interior row
 }
 
+function normalize(range: SelectionRange): SelectionRange {
+  const startBeforeEnd =
+    range.startRow < range.endRow ||
+    (range.startRow === range.endRow && range.startCol <= range.endCol);
+  const firstRow = startBeforeEnd ? range.startRow : range.endRow;
+  const firstCol = startBeforeEnd ? range.startCol : range.endCol;
+  const lastRow = startBeforeEnd ? range.endRow : range.startRow;
+  const lastCol = startBeforeEnd ? range.endCol : range.startCol;
+  return {
+    startRow: Math.max(0, Math.trunc(firstRow)),
+    startCol: Math.max(0, Math.trunc(firstCol)),
+    endRow: Math.max(0, Math.trunc(lastRow)),
+    endCol: Math.max(0, Math.trunc(lastCol)),
+  };
+}
+
 export function createSelectionOverlay(): SelectionOverlay {
   const overlay: SelectionOverlay = {
     current: null,
 
     set(range: SelectionRange | null): void {
-      overlay.current = range;
+      overlay.current = range === null ? null : normalize(range);
     },
 
     clear(): void {
@@ -79,6 +101,38 @@ export function createSelectionOverlay(): SelectionOverlay {
         }
       }
       return out;
+    },
+
+    patchesFor(frame: CellBuffer, charPool: CharPool): Patch[] {
+      const range = overlay.current;
+      if (range === null || frame.width === 0 || frame.height === 0) return [];
+
+      const patches: Patch[] = [];
+      const firstRow = Math.max(0, range.startRow);
+      const lastRow = Math.min(frame.height - 1, range.endRow);
+      for (let y = firstRow; y <= lastRow; y++) {
+        let x = 0;
+        while (x < frame.width) {
+          const cell = frame.get(x, y);
+          const visualWidth = cell.width === 1 ? 2 : cell.width === 2 ? 0 : 1;
+          const selected =
+            cellInRange(x, y, range) ||
+            (visualWidth === 2 && cellInRange(x + 1, y, range));
+          if (selected && visualWidth > 0) {
+            patches.push({
+              x,
+              y,
+              content: charPool.get(cell.charIdx) ?? " ",
+              visualWidth,
+              styleId: cell.styleId,
+            });
+          }
+          // A double-width grapheme owns its trailing terminal cell. Do not
+          // serialize that placeholder independently.
+          x += visualWidth === 2 ? 2 : 1;
+        }
+      }
+      return patches;
     },
   };
 

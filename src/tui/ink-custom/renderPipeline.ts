@@ -1,6 +1,6 @@
 // renderPipeline — Phase 2 diff + ANSI serialization glue.
 //
-// Status: NOT WIRED. Exposes two factory functions that together turn a
+// Active in customRender. Exposes two factory functions that together turn a
 // pair of cell buffers into a single ANSI string ready for
 // `process.stdout.write()`:
 //
@@ -239,7 +239,7 @@ export function createAnsiPatcher(): AnsiPatcher {
  *     next caller can repeat the sequence without drift.
  *
  * Strategy:
- *   1. `cursorUp(previousFrameHeight + 1) + \r` pulls the cursor to the
+ *   1. `cursorUp(previousFrameHeight) + \r` pulls the cursor to the
  *      frame's top-left anchor (conceptually row=0, col=0 of the frame).
  *   2. For each patch (sorted by (y, x)):
  *        * Cross-row: `cursorDown(rowDelta) + \r + cursorForward(x)` —
@@ -285,11 +285,11 @@ export function createRelativeAnsiPatcher(): RelativeAnsiPatcher {
       });
 
       // Anchor pull-back: cursor currently at column 0 of line below frame.
-      // `cursorUp(previousFrameHeight + 1) + \r` lands us at the frame's
+      // `cursorUp(previousFrameHeight) + \r` lands us at the frame's
       // top-left conceptual row=0 anchor. `\r` is defensive — the CSI move
       // shouldn't affect column, but explicit reset avoids relying on
       // terminal quirks.
-      const pullBack = Math.max(0, previousFrameHeight + 1);
+      const pullBack = Math.max(0, previousFrameHeight);
       let out = "";
       if (pullBack > 0) {
         out += CSI + pullBack + "A" + "\r";

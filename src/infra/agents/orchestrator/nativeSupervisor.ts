@@ -34,6 +34,7 @@ import {
   type FilterableMessage,
 } from "./HandoffCoordinator.ts";
 import { collectSupervisorFeedback } from "./toolAgentMap.ts";
+import { beginSubagentHook, endSubagentHook } from "../../hooks/subagentHookBridge.ts";
 
 const logger = createModuleLogger("native-supervisor");
 
@@ -47,6 +48,7 @@ const SUPERVISOR_AGENT = "Gordon";
  */
 export interface SupervisorDelegationState {
   currentAgent: string | undefined;
+  activeSubagentHookKey?: string;
 }
 
 /**
@@ -103,6 +105,7 @@ export function shouldBlockDelegation(
 export function buildNativeSupervisorDelegation(
   state: SupervisorDelegationState,
   coordinator: HandoffCoordinator = defaultHandoffCoordinator,
+  scopeKey: string = "standalone",
 ): Record<string, unknown> {
   return {
     // Supervisor keeps only the sub-agent's text response in later iterations —
@@ -129,10 +132,27 @@ export function buildNativeSupervisorDelegation(
 
     onDelegationStart: async (ctx: any) => {
       const primitiveId: string = ctx?.primitiveId ?? "";
-      state.currentAgent = primitiveId;
+      const lifecycleKey = `stream:${scopeKey}:${ctx?.toolCallId ?? primitiveId}`;
+      const lifecycle = await beginSubagentHook({
+        key: lifecycleKey,
+        id: ctx?.toolCallId,
+        type: primitiveId,
+        parent: SUPERVISOR_AGENT,
+        task: typeof ctx?.task === "string" ? ctx.task : undefined,
+      });
+      if (!lifecycle.allowed) {
+        return { proceed: false, rejectionReason: lifecycle.reason };
+      }
 
       const decision = shouldBlockDelegation(primitiveId, coordinator);
       if (decision.block) {
+        await endSubagentHook({
+          key: lifecycleKey,
+          type: primitiveId,
+          parent: SUPERVISOR_AGENT,
+          status: "aborted",
+          error: decision.reason,
+        });
         logger.warn("Native delegation blocked (loop-safety)", {
           agent: primitiveId,
           reason: decision.reason,
@@ -142,6 +162,8 @@ export function buildNativeSupervisorDelegation(
           rejectionReason: decision.reason ?? "Delegation blocked by loop-safety.",
         };
       }
+      state.currentAgent = primitiveId;
+      state.activeSubagentHookKey = lifecycleKey;
       if (decision.reason) {
         logger.debug("Native delegation advisory", {
           agent: primitiveId,
@@ -161,6 +183,17 @@ export function buildNativeSupervisorDelegation(
 
     onDelegationComplete: async (ctx: any) => {
       const primitiveId: string = ctx?.primitiveId ?? "";
+      await endSubagentHook({
+        key:
+          state.activeSubagentHookKey
+          ?? `stream:${scopeKey}:${ctx?.toolCallId ?? primitiveId}`,
+        type: primitiveId,
+        parent: SUPERVISOR_AGENT,
+        status: ctx?.error ? "failed" : "completed",
+        result: ctx?.result,
+        error: ctx?.error ? String(ctx.error) : undefined,
+      });
+      state.activeSubagentHookKey = undefined;
       if (ctx?.error) {
         logger.warn("Native delegation failed", { agent: primitiveId, error: ctx.error });
         return {

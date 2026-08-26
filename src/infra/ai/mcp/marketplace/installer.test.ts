@@ -56,6 +56,12 @@ describe("validatePluginCommand", () => {
     expect(validatePluginCommand("bash", ["-c", "echo hi"])).not.toBeNull();
   });
 
+  it("does not let an absolute path bypass the launcher allowlist", () => {
+    expect(validatePluginCommand("/bin/sh", ["-c", "echo hi"])).not.toBeNull();
+    expect(validatePluginCommand("C:\\Windows\\System32\\cmd.exe", ["/c", "echo hi"])).not.toBeNull();
+    expect(validatePluginCommand("/usr/bin/node", ["server.mjs"])).toBeNull();
+  });
+
   it("strips a .exe/.cmd suffix before checking the allowlist", () => {
     expect(validatePluginCommand("npx.cmd", ["-y", "some-mcp"])).toBeNull();
   });

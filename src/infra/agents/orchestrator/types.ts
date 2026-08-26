@@ -6,6 +6,7 @@
 
 import type { SummarizationResult, SummarizerConfig } from "../../domain/memory/index.ts";
 import type { Message } from "../../ai/llm/types.ts";
+import type { ToolsetsInput } from "@mastra/core/agent";
 
 // ============================================================================
 // Stream Event Types
@@ -41,6 +42,8 @@ export interface StreamEvent {
 
 export interface ProcessMessageStreamOptions {
   signal?: AbortSignal;
+  /** Per-request tools, used by ACP for editor-forwarded MCP servers. */
+  toolsets?: ToolsetsInput;
 }
 
 // ============================================================================

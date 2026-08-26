@@ -4,17 +4,9 @@
  * User-extensible lifecycle hooks: register handlers that fire at key
  * points to enforce custom risk rules, log events, or veto operations.
  *
- * `HookPoint` declares 14 points, but only the two order-placement points
- * are actually emitted by production call sites today:
- *
- *   emitted : PreOrderPlacement, PostOrderPlacement
- *   declared but never reached : PreToolUse, PostToolUse, PreCompact,
- *     PostCompact, SessionStart, SessionEnd, Stop, UserPromptSubmit,
- *     PreApproval, PostApproval, SubagentStart, SubagentStop
- *
- * A hook registered at an unemitted point never runs. `checkHookCoverage`
- * in `infra/diagnostics/gateEnforcement.ts` reports that as a doctor
- * finding so an inert hook is visible instead of silently trusted.
+ * Every declared HookPoint has a production bridge. `checkHookCoverage` in
+ * `infra/diagnostics/gateEnforcement.ts` keeps that claim executable so a
+ * future declaration cannot silently remain inert.
  */
 
 export {
@@ -26,6 +18,13 @@ export {
   emitHook,
   setHookStatusListener,
 } from "./engine.ts";
+export {
+  installExternalHooks,
+  loadExternalHookConfig,
+  resolveExternalHooksPath,
+  getExternalHookInstallerState,
+  EXTERNAL_HOOKS_PATH_ENV,
+} from "./externalHookRegistry.ts";
 export type { HookStatusEvent } from "./engine.ts";
 export {
   validateStructuredOutput,

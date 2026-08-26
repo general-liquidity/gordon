@@ -19,7 +19,7 @@
 
 ---
 
-**Gordon is an open-source (MIT) AI trading agent for crypto and equities that runs in your terminal.** You state the intent in plain language, it drafts a structured plan, you approve it, and a deny-first risk harness gates every order before it reaches a venue.
+**Gordon is an open-source (MIT) AI trading agent for crypto and equities that runs in your terminal.** You state the intent in plain language, it drafts a structured plan, you approve it, and a deny-first risk harness gates agent-issued exposure increases before they reach a venue. Verified reductions, protective exits, emergency liquidation, and reconciliation follow their own bounded safety invariants so revoked consent cannot strand risk.
 
 The model proposes. The harness disposes.
 
@@ -70,11 +70,11 @@ Gordon turns a plain-language intent, *"find me a clean BTC long for the NY sess
 
 Three convictions the whole codebase is built around.
 
-**The model proposes, the harness disposes.** Intelligence and authority are separated by design. The agent that *reasons* about a trade is not the agent that *places* it, and neither can reach a venue without clearing a wall of deterministic checks. Capability is necessary. It is nowhere near sufficient.
+**The model proposes, the harness disposes.** Intelligence and authority are separated by design. The agent that *reasons* about a trade is not the agent that *places* it, and an agent-issued exposure increase cannot reach a venue without clearing deterministic checks. Capability is necessary. It is nowhere near sufficient.
 
-**Plan-first, always.** Nothing touches a venue until you have seen it as a structured diff and approved it. Gordon's job is to make you a *better decision-maker, faster*, not to fire orders and explain itself afterward. Approvals are content-bound: change a single leg of a plan and it has to be approved again.
+**Plan-first for new risk.** A discretionary exposure increase does not touch a venue until you have seen it as a structured diff and approved it (unless you deliberately select `auto`). Gordon's job is to make you a *better decision-maker, faster*, not to fire entries and explain itself afterward. Approvals are content-bound: change a single leg of a plan and it has to be approved again. Exposure-reducing protection and recovery remain available under separate invariants.
 
-**Deny-first, not trust-first.** The default answer to "may this run?" is no. Every order earns its way to a venue through a permission engine, a 15-dimension risk classifier, a hard deny-list, and scoped kill switches. An agent cannot talk, charm, or hallucinate its way past a limit it is structurally forbidden to cross.
+**Deny-first, not trust-first.** The default answer to "may this run?" is no. Every agent-issued exposure increase earns its way to a venue through a permission engine, a 15-dimension risk classifier, a hard deny-list, and scoped kill switches. An agent cannot talk, charm, or hallucinate its way past a limit it is structurally forbidden to cross.
 
 ### How that compares
 
@@ -83,7 +83,7 @@ Gordon is not a faster bot. It is a different shape: a supervised agent, where t
 | | Gordon | Freqtrade | Hummingbot | LLM + broker API by hand |
 |:--|:--:|:--:|:--:|:--:|
 | Driven by natural-language intent | ✓ | Rule/strategy code | Rule/strategy config | ✓ |
-| Plan shown as a diff and approved before any order | ✓ | ✗ | ✗ | You build it |
+| Agent-issued exposure increase shown as a diff and approved in supervised modes | ✓ | ✗ | ✗ | You build it |
 | Deny-first permission gate on every tool call | ✓ | ✗ | ✗ | You build it |
 | Multi-dimension pre-trade risk classifier | ✓ (15 dims) | Strategy-level limits | Strategy-level limits | You build it |
 | Tamper-evident (HMAC-chained) audit trail | ✓ | Logs | Logs | You build it |
@@ -156,7 +156,7 @@ Then talk to it, or drive it with slash commands:
 
 ## How Gordon keeps you safe
 
-This is the part most trading bots don't have, and the reason Gordon exists. An order is defended in depth: it has to survive every layer before it reaches a venue.
+This is the part most trading bots don't have, and the reason Gordon exists. An agent-issued exposure increase is defended in depth: it has to survive every layer before it reaches a venue. Protective and recovery paths are separately constrained to verified reductions.
 
 | Layer | What it does |
 |-------|--------------|
@@ -364,7 +364,7 @@ The same truth table is enforced in the preflight, the runtime engine, and every
 | `auto` | ✓ | ✓ | ✓ | ✓ | Autonomous within risk gates. For systematic slots. |
 
 > [!IMPORTANT]
-> `auto` is not "no guardrails." Every order still clears the full `execute_plan` gauntlet; it only drops the per-order human confirmation.
+> `auto` is not "no guardrails." Every agent-issued exposure increase still clears the full `execute_plan` gauntlet; it only drops the per-order human confirmation.
 
 ## What Gordon is not
 
@@ -385,6 +385,16 @@ One engine, several front ends:
 | Daemon | `gordon daemon start` | A long-running gateway over IPC: scheduled slots, circuit breakers, reconciliation. |
 | ACP / IDE | `bun acp` | A JSON-RPC server over stdio implementing the [Agent Client Protocol](https://agentclientprotocol.com) for editors like Zed. |
 | Schedules | `gordon schedule add …` | Cron-style autonomous mandates. |
+
+Operator-defined lifecycle hooks are opt-in and fail closed. Set
+`GORDON_EXTERNAL_HOOK_RUNNER=1` and point `GORDON_EXTERNAL_HOOKS_PATH` at a
+non-empty JSON hook registry; an absent, malformed, or empty registry aborts
+startup instead of silently disabling policy. ACP accepts text and attachment
+descriptors through its string-only LLM boundary. `GORDON_ACP_VISION_PATH=blocks`
+is refused until native content blocks are wired. ACP-forwarded stdio MCP
+servers are also refused unless the operator explicitly sets
+`GORDON_ACP_ALLOW_STDIO_MCP=1`; forwarded HTTP/SSE endpoints are DNS- and
+address-checked against local/private destinations.
 
 ## Architecture
 
@@ -433,6 +443,9 @@ bun run typecheck    # tsc --noEmit
 bun run build        # bundle to dist/  (--binary for a standalone executable)
 bun run check        # Biome lint + format
 bun run quality:brokers   # broker conformance + latency gate
+bun run check:test-shards                    # every test file belongs to exactly one release shard
+bun run eval:burn-in -- --cycles 2 --k 2   # deterministic unattended harness; no model or venue
+bun run check:daemon-startup               # validation-only IPC/scheduler boot; no model, venue, or order
 ```
 
 CI runs the suite, `tsc --noEmit`, Biome, broker conformance, the eval-harness regression gate, and guardrails that block source-map leaks and stray files before publish.
@@ -454,9 +467,9 @@ Open-source projects from the same team, meant to be used together.
 - **A backtest is not an edge.** Walk-forward, Monte Carlo, and the overfitting guards reduce self-deception; they do not create live alpha.
 - **LLM inference costs real money** and scales with session length. Cap it with `GORDON_COST_BUDGET_USD` and disable reasoning passes for cheaper runs.
 - **Venue coverage is uneven.** Some brokers need account enrollment, market-data entitlements, or a running gateway before anything works.
-- **The agent can be wrong.** That is why every order needs your approval by default. Do not run `auto` on capital you have not sized for being wrong.
+- **The agent can be wrong.** In the default `ask` mode, agent-issued exposure increases need your explicit approval; `auto` deliberately removes that confirmation while retaining deterministic gates. Do not run `auto` on capital you have not sized for being wrong.
 - **The windows-arm64 prebuilt binary is best-effort.** Other platforms are built and smoke-tested on every release.
-- **This is young software.** v0.1.0, MIT, no warranty. Start in `paper` or `strict` and read the source on the paths that touch money.
+- **This is young software.** MIT, no warranty. Start in `paper` or `strict` and read the source on the paths that touch money.
 
 ## Community & contributing
 

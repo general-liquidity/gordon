@@ -87,4 +87,31 @@ describe("ToolInvoker", () => {
     ).rejects.toBeInstanceOf(ToolApprovalRequiredError);
     expect(store.getState().approvals.pending).toHaveLength(1);
   });
+
+  it("does not collapse different runtime-tool arguments into one approval", async () => {
+    const { invoker, store } = createInvoker();
+    const state = store.getState();
+    const base = {
+      session: state.session,
+      runtimeState: state,
+      transcriptStore: new TranscriptStore(),
+      scratchpadStore: new ScratchpadStore(),
+      workerRegistry: new WorkerRegistry(),
+    };
+
+    await expect(
+      invoker.prepare("place_market_order", createContext("ask"), {
+        ...base,
+        args: { symbol: "BTCUSDT", quantity: 1 },
+      }),
+    ).rejects.toBeInstanceOf(ToolApprovalRequiredError);
+    await expect(
+      invoker.prepare("place_market_order", createContext("ask"), {
+        ...base,
+        args: { symbol: "ETHUSDT", quantity: 1 },
+      }),
+    ).rejects.toBeInstanceOf(ToolApprovalRequiredError);
+
+    expect(store.getState().approvals.pending).toHaveLength(2);
+  });
 });
