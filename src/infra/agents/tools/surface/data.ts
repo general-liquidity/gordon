@@ -490,8 +490,8 @@ export const getNewsTool = createTool({
     const hoursBack = args.sinceMinutes ? Math.ceil(args.sinceMinutes / 60) : undefined;
 
     // Headlines come back with publishedAt (crypto) or sometimes a different
-    // field shape (stocks). The filter is lenient — anything missing a
-    // timestamp is preserved rather than silently dropped.
+    // field shape (stocks). Strict mode: a headline the code cannot date
+    // is dropped rather than leaked past the point-in-time cutoff.
     const applyAsOf = (items: unknown[]): unknown[] => {
       if (!args.asOf) return items;
       return filterByAsOf(
@@ -502,6 +502,7 @@ export const getNewsTool = createTool({
           (r.published_at as string | undefined) ??
           (r.datetime as string | undefined) ??
           (r.timestamp as string | number | undefined),
+        "strict",
       );
     };
 

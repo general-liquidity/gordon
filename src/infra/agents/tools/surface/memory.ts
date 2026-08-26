@@ -131,7 +131,7 @@ export const memorySearchTool = createTool({
       // First pass — standard limit unless caller asked for deep upfront.
       const firstLimit = mode === "deep" ? deepLimit : baseLimit;
       const firstRaw = await manager.journal.search(args.query, { limit: firstLimit });
-      const firstFiltered = filterByAsOf(flatten(firstRaw), args.asOf, (r) => r.createdAt);
+      const firstFiltered = filterByAsOf(flatten(firstRaw), args.asOf, (r) => r.createdAt, "permissive");
 
       let merged: FlattenedRecord[] = firstFiltered;
       let expanded = false;
@@ -141,7 +141,7 @@ export const memorySearchTool = createTool({
       // for "deep" (one pass is the contract) or "standard" (no fallback).
       if (mode === "auto" && isThinEvidence(firstFiltered)) {
         const secondRaw = await manager.journal.search(args.query, { limit: deepLimit });
-        const secondFiltered = filterByAsOf(flatten(secondRaw), args.asOf, (r) => r.createdAt);
+        const secondFiltered = filterByAsOf(flatten(secondRaw), args.asOf, (r) => r.createdAt, "permissive");
         merged = mergeAndDedupe(firstFiltered as unknown as Array<Record<string, unknown>>, secondFiltered as unknown as Array<Record<string, unknown>>) as unknown as FlattenedRecord[];
         expanded = merged.length > firstFiltered.length;
       }

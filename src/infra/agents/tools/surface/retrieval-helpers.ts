@@ -27,28 +27,48 @@ export const DEFAULT_THIN_COUNT = 3;
 export const DEFAULT_THIN_SCORE = 0.3;
 
 /**
- * Drop records whose timestamp is strictly after `asOf`. Returns the
- * input unchanged when `asOf` is missing or unparseable, so callers
- * don't have to guard.
+ * How undated / malformed-date records are treated by `filterByAsOf`.
  *
- * Records with no resolvable timestamp are PRESERVED — better to keep
- * potentially-relevant memory than to silently drop entries whose
- * timestamp field was malformed. Caller can post-filter if stricter
- * semantics are needed.
+ *   - "strict": a record whose timestamp is missing or unparseable is
+ *     DROPPED. Required on any path whose output can inform a trade —
+ *     a leaked post-cutoff headline is worse than a missing one.
+ *   - "permissive": such a record is KEPT. Only defensible for assistant
+ *     memory retrieval, where an undated note carries no leak risk.
+ *
+ * An unparseable CUTOFF is an error in both modes: a caller asking
+ * "as of T" with a T the code cannot read must not silently receive
+ * everything.
+ */
+export type AsOfMode = "strict" | "permissive";
+
+export class InvalidAsOfCutoffError extends Error {
+  constructor(asOf: string) {
+    super(`Unparseable asOf cutoff: ${JSON.stringify(asOf)}`);
+    this.name = "InvalidAsOfCutoffError";
+  }
+}
+
+/**
+ * Drop records whose timestamp is strictly after `asOf`. Returns the
+ * input unchanged when `asOf` is missing, so callers don't have to guard.
+ *
+ * Throws `InvalidAsOfCutoffError` when `asOf` is present but unparseable.
  */
 export function filterByAsOf<T>(
   records: T[],
   asOf: string | undefined,
   getTimestamp: (r: T) => string | number | undefined | null,
+  mode: AsOfMode,
 ): T[] {
   if (!asOf) return records;
   const cutoff = Date.parse(asOf);
-  if (!Number.isFinite(cutoff)) return records;
+  if (!Number.isFinite(cutoff)) throw new InvalidAsOfCutoffError(asOf);
+  const keepUndated = mode === "permissive";
   return records.filter((r) => {
     const raw = getTimestamp(r);
-    if (raw == null) return true;
+    if (raw == null) return keepUndated;
     const ts = typeof raw === "number" ? raw : Date.parse(String(raw));
-    if (!Number.isFinite(ts)) return true;
+    if (!Number.isFinite(ts)) return keepUndated;
     return ts <= cutoff;
   });
 }

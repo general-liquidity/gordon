@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   filterByAsOf,
+  InvalidAsOfCutoffError,
   isThinEvidence,
   classifyEvidenceQuality,
   mergeAndDedupe,
@@ -9,7 +10,7 @@ import {
 describe("filterByAsOf", () => {
   test("returns input unchanged when asOf is undefined", () => {
     const recs = [{ createdAt: "2026-05-26T00:00:00Z" }, { createdAt: "2026-05-27T00:00:00Z" }];
-    const out = filterByAsOf(recs, undefined, (r) => r.createdAt);
+    const out = filterByAsOf(recs, undefined, (r) => r.createdAt, "strict");
     expect(out).toEqual(recs);
   });
 
@@ -19,30 +20,64 @@ describe("filterByAsOf", () => {
       { createdAt: "2026-05-26T12:00:00Z", id: "b" },
       { createdAt: "2026-05-27T00:00:00Z", id: "c" },
     ];
-    const out = filterByAsOf(recs, "2026-05-26T12:00:00Z", (r) => r.createdAt);
+    const out = filterByAsOf(recs, "2026-05-26T12:00:00Z", (r) => r.createdAt, "strict");
     expect(out.map((r) => r.id)).toEqual(["a", "b"]);
   });
 
   test("keeps records exactly equal to asOf", () => {
     const recs = [{ createdAt: "2026-05-26T12:00:00Z", id: "a" }];
-    const out = filterByAsOf(recs, "2026-05-26T12:00:00Z", (r) => r.createdAt);
+    const out = filterByAsOf(recs, "2026-05-26T12:00:00Z", (r) => r.createdAt, "strict");
     expect(out).toHaveLength(1);
   });
 
-  test("preserves records with missing timestamps (lenient)", () => {
+  test("permissive mode preserves records with missing timestamps", () => {
     const recs = [
       { createdAt: "2026-05-25", id: "a" },
       { createdAt: undefined as unknown as string, id: "b" },
       { createdAt: "2026-05-28", id: "c" },
     ];
-    const out = filterByAsOf(recs, "2026-05-26", (r) => r.createdAt);
+    const out = filterByAsOf(recs, "2026-05-26", (r) => r.createdAt, "permissive");
     expect(out.map((r) => r.id)).toEqual(["a", "b"]);
   });
 
-  test("returns input unchanged on unparseable asOf", () => {
+  test("strict mode drops records with missing timestamps", () => {
+    const recs = [
+      { createdAt: "2026-05-25", id: "a" },
+      { createdAt: undefined as unknown as string, id: "b" },
+      { createdAt: "2026-05-28", id: "c" },
+    ];
+    const out = filterByAsOf(recs, "2026-05-26", (r) => r.createdAt, "strict");
+    expect(out.map((r) => r.id)).toEqual(["a"]);
+  });
+
+  test("strict mode drops records with unparseable timestamps", () => {
+    const recs = [
+      { createdAt: "2026-05-25", id: "a" },
+      { createdAt: "sometime last week", id: "b" },
+    ];
+    const out = filterByAsOf(recs, "2026-05-26", (r) => r.createdAt, "strict");
+    expect(out.map((r) => r.id)).toEqual(["a"]);
+  });
+
+  test("permissive mode keeps records with unparseable timestamps", () => {
+    const recs = [
+      { createdAt: "2026-05-25", id: "a" },
+      { createdAt: "sometime last week", id: "b" },
+    ];
+    const out = filterByAsOf(recs, "2026-05-26", (r) => r.createdAt, "permissive");
+    expect(out.map((r) => r.id)).toEqual(["a", "b"]);
+  });
+
+  test("throws on unparseable asOf in strict mode", () => {
     const recs = [{ createdAt: "2026-05-25", id: "a" }];
-    const out = filterByAsOf(recs, "not-a-date", (r) => r.createdAt);
-    expect(out).toEqual(recs);
+    expect(() => filterByAsOf(recs, "not-a-date", (r) => r.createdAt, "strict"))
+      .toThrow(InvalidAsOfCutoffError);
+  });
+
+  test("throws on unparseable asOf in permissive mode too", () => {
+    const recs = [{ createdAt: "2026-05-25", id: "a" }];
+    expect(() => filterByAsOf(recs, "not-a-date", (r) => r.createdAt, "permissive"))
+      .toThrow(InvalidAsOfCutoffError);
   });
 
   test("accepts numeric ms-epoch timestamps", () => {
@@ -50,7 +85,7 @@ describe("filterByAsOf", () => {
       { ts: 1_000_000_000_000, id: "a" }, // Sep 2001
       { ts: 2_000_000_000_000, id: "b" }, // May 2033
     ];
-    const out = filterByAsOf(recs, "2026-01-01T00:00:00Z", (r) => r.ts);
+    const out = filterByAsOf(recs, "2026-01-01T00:00:00Z", (r) => r.ts, "strict");
     expect(out.map((r) => r.id)).toEqual(["a"]);
   });
 });
