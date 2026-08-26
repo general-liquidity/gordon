@@ -8,6 +8,10 @@
  * In production this could be replaced with a data-driven correlation
  * matrix from historical price data. The static groups provide a
  * reasonable baseline for crypto markets.
+ *
+ * A pair the table does not cover is reported as `status: "unknown"`, never
+ * as a low-correlation pass, and a check that throws is reported as
+ * `status: "error"`. Neither may be scored as a clean result.
  */
 
 import { createModuleLogger } from "../../infra/logger/index.ts";
@@ -19,17 +23,40 @@ const logger = createModuleLogger("correlation-checker");
 // Types
 // ============================================================================
 
+/**
+ * Outcome of a correlation check.
+ *
+ * - `checked`: every symbol involved is in the correlation table, so the
+ *   numbers below are the model's real verdict.
+ * - `unknown`: at least one symbol is absent from the table. The estimates
+ *   below are a crypto-beta guess, not a measurement. Never score this as a
+ *   clean pass: silence about a pair is not evidence that it is uncorrelated.
+ * - `error`: the check threw. Nothing was measured and nothing here may be
+ *   scored.
+ */
+export type CorrelationStatus = "checked" | "unknown" | "error";
+
 export interface CorrelationResult {
+  /** Outcome class of the check. Callers must branch on this before scoring. */
+  status: CorrelationStatus;
   /** Whether the new position passes the correlation check */
   acceptable: boolean;
-  /** Correlation score of the new position with existing portfolio (0-1) */
-  maxCorrelation: number;
+  /**
+   * Correlation score of the new position with existing portfolio (0-1).
+   * `null` when nothing was computed (`status: "error"`).
+   */
+  maxCorrelation: number | null;
   /** The symbol most correlated with the new position */
   mostCorrelatedWith: string | null;
   /** The correlation group the new position belongs to */
   group: string | null;
-  /** Percentage of portfolio in the same correlation group */
-  groupExposurePercent: number;
+  /**
+   * Percentage of portfolio in the same correlation group.
+   * `null` when nothing was computed (`status: "error"`).
+   */
+  groupExposurePercent: number | null;
+  /** Symbols absent from the correlation table, hence unmodelled */
+  unknownSymbols: string[];
   /** Human-readable explanation */
   details: string;
 }
@@ -164,17 +191,21 @@ export class CorrelationChecker {
   ): Promise<CorrelationResult> {
     try {
       if (existingPositions.length === 0) {
+        // Nothing to correlate against, so an unlisted symbol is not a gap here.
         return {
+          status: "checked",
           acceptable: true,
           maxCorrelation: 0,
           mostCorrelatedWith: null,
           group: this.getGroup(newSymbol),
           groupExposurePercent: 0,
+          unknownSymbols: [],
           details: "No existing positions. Correlation check passed.",
         };
       }
 
       const newGroup = this.getGroup(newSymbol);
+      const unknownSymbols = this.collectUnknownSymbols(newSymbol, existingPositions);
       let maxCorrelation = 0;
       let mostCorrelatedWith: string | null = null;
 
@@ -211,9 +242,13 @@ export class CorrelationChecker {
       // Determine if acceptable
       const acceptable = groupExposurePercent < maxCorrelatedExposurePercent;
 
+      const status: CorrelationStatus = unknownSymbols.length > 0 ? "unknown" : "checked";
+
       let details: string;
       if (!acceptable) {
         details = `Correlation group "${newGroup}" already has ${groupExposurePercent.toFixed(1)}% exposure (limit: ${maxCorrelatedExposurePercent}%). Adding ${newSymbol} would increase concentrated risk.`;
+      } else if (status === "unknown") {
+        details = `Correlation is UNKNOWN, not low: ${unknownSymbols.join(", ")} ${unknownSymbols.length === 1 ? "is" : "are"} absent from the correlation table, so no correlation with the existing portfolio was measured. The ${maxCorrelation.toFixed(2)} figure is an unverified crypto-beta assumption.`;
       } else if (maxCorrelation > 0.8) {
         details = `High correlation (${maxCorrelation.toFixed(2)}) with ${mostCorrelatedWith}. Group exposure: ${groupExposurePercent.toFixed(1)}%.`;
       } else if (maxCorrelation > 0.5) {
@@ -224,6 +259,7 @@ export class CorrelationChecker {
 
       logger.debug("Correlation check completed", {
         newSymbol,
+        status,
         group: newGroup,
         maxCorrelation: maxCorrelation.toFixed(2),
         mostCorrelatedWith,
@@ -232,25 +268,47 @@ export class CorrelationChecker {
       });
 
       return {
+        status,
         acceptable,
         maxCorrelation,
         mostCorrelatedWith,
         group: newGroup,
         groupExposurePercent,
+        unknownSymbols,
         details,
       };
     } catch (error) {
       logger.error("Error checking correlation", error as Error);
-      // Fail open: allow the trade but flag the error
+      // A risk check that throws has measured nothing. Reporting a pass here
+      // would make the gate unfailable, which reads as evidence of safety and
+      // is not. The numeric fields stay null so no caller can score them.
       return {
-        acceptable: true,
-        maxCorrelation: 0,
+        status: "error",
+        acceptable: false,
+        maxCorrelation: null,
         mostCorrelatedWith: null,
         group: null,
-        groupExposurePercent: 0,
-        details: `Correlation check encountered an error: ${(error as Error).message}. Defaulting to acceptable.`,
+        groupExposurePercent: null,
+        unknownSymbols: [],
+        details: `Correlation check failed to run: ${(error as Error).message}. Correlated-exposure limits were not verified.`,
       };
     }
+  }
+
+  /**
+   * Symbols involved in the check that the static table has never heard of.
+   * Their correlation is assumed, not measured.
+   */
+  private collectUnknownSymbols(
+    newSymbol: string,
+    existingPositions: OpenPosition[],
+  ): string[] {
+    const unknown = new Set<string>();
+    if (!this.getGroup(newSymbol)) unknown.add(newSymbol.toUpperCase());
+    for (const pos of existingPositions) {
+      if (!this.getGroup(pos.symbol)) unknown.add(pos.symbol.toUpperCase());
+    }
+    return Array.from(unknown);
   }
 
   /**

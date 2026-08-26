@@ -442,6 +442,16 @@ export class RiskKernel {
       context.totalEquity
     );
 
+    // A check that threw measured nothing, so it cannot contribute a pass.
+    if (result.status === "error") {
+      return {
+        name: "correlation",
+        passed: false,
+        details: result.details,
+        severity: "critical",
+      };
+    }
+
     if (!result.acceptable) {
       return {
         name: "correlation",
@@ -451,7 +461,19 @@ export class RiskKernel {
       };
     }
 
-    if (result.maxCorrelation > 0.8) {
+    // An unmodelled pair is surfaced as a warning failure rather than an
+    // `info` pass: it never lands in "all risk checks passed", but it also
+    // does not block, since an unlisted symbol is routine, not a violation.
+    if (result.status === "unknown") {
+      return {
+        name: "correlation",
+        passed: false,
+        details: result.details,
+        severity: "warning",
+      };
+    }
+
+    if (result.maxCorrelation !== null && result.maxCorrelation > 0.8) {
       return {
         name: "correlation",
         passed: true,
