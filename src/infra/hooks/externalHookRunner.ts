@@ -33,6 +33,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 import type { HookPoint, HookResult, HookPayloadMap } from "./types.ts";
+import { flagEnv } from "../config/flagResolver.ts";
 
 export const EXTERNAL_HOOK_RUNNER_FLAG_ENV = "GORDON_EXTERNAL_HOOK_RUNNER";
 
@@ -74,7 +75,7 @@ export class ExternalHandlerMissingError extends Error {
   }
 }
 
-export function isExternalHookRunnerEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isExternalHookRunnerEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   return (
     env[EXTERNAL_HOOK_RUNNER_FLAG_ENV] === "1" ||
     env[EXTERNAL_HOOK_RUNNER_FLAG_ENV] === "true"

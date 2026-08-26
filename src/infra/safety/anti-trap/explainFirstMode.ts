@@ -15,6 +15,8 @@
  *      observe how the user's thesis compared to Gordon's rationale.
  */
 
+import { flagEnv } from "../../config/flagResolver.ts";
+
 export interface UserThesis {
   planId: string;
   thesis: string;
@@ -25,7 +27,7 @@ export interface UserThesis {
 const thesisStore = new Map<string, UserThesis>();
 
 export function isExplainFirstEnabled(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): boolean {
   return env.GORDON_EXPLAIN_FIRST === "1" || env.GORDON_EXPLAIN_FIRST === "true";
 }
@@ -68,7 +70,7 @@ export interface ThesisRequirement {
 
 export function requiresUserThesis(
   planId: string,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): ThesisRequirement {
   if (!isExplainFirstEnabled(env)) return { required: false };
   const thesis = thesisStore.get(planId);

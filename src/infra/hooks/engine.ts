@@ -159,7 +159,12 @@ export async function runHooks<P extends HookPoint>(
         return await Promise.resolve(handler(rewakePayload));
       } catch (err) {
         console.error(`[hooks] ${def.id} (asyncRewake) threw at ${point}:`, err);
-        return { action: "allow" } as HookResult;
+        // Fail closed. A rewake hook is documented as a compliance / audit
+        // gate, so an unreachable or crashing one must not silently allow.
+        return {
+          action: "block",
+          reason: `asyncRewake hook failed: ${err instanceof Error ? err.message : String(err)}`,
+        } as HookResult;
       } finally {
         emitStatus(point, def, "end");
       }

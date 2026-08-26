@@ -58,13 +58,15 @@ export interface GuardViolation {
   currentValue?: unknown;
 }
 
+import { flagEnv } from "../config/flagResolver.ts";
+
 export interface GuardResult {
   passes: boolean;
   violations: GuardViolation[];
   blockingFixInstruction: string | null;
 }
 
-export function isSafetyConfigGuardEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isSafetyConfigGuardEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   return (
     env[SAFETY_CONFIG_GUARD_FLAG_ENV] === "1" ||
     env[SAFETY_CONFIG_GUARD_FLAG_ENV] === "true"

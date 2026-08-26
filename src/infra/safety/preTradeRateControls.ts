@@ -13,6 +13,8 @@
  * a market maker firing thousands of messages per second.
  */
 
+import { flagEnv } from "../config/flagResolver.ts";
+
 export const PRETRADE_RATE_CONTROLS_FLAG_ENV = "GORDON_PRETRADE_RATE_CONTROLS";
 export const PRETRADE_RATE_CONTROLS_DISABLE_ENV =
   "GORDON_PRETRADE_RATE_CONTROLS_DISABLE";
@@ -24,7 +26,7 @@ export const PRETRADE_RATE_CONTROLS_DISABLE_ENV =
  * affirmative — setting it never disables the controls — so existing
  * enable-it configs keep working.
  */
-export function isPreTradeRateControlsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isPreTradeRateControlsEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   const disabled =
     env[PRETRADE_RATE_CONTROLS_DISABLE_ENV] === "1" ||
     env[PRETRADE_RATE_CONTROLS_DISABLE_ENV] === "true";

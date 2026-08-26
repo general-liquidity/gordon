@@ -25,6 +25,8 @@
  *   otherwise                           → block
  */
 
+import { flagEnv } from "../config/flagResolver.ts";
+
 export type RubricScore = 0 | 1 | 2;
 
 export interface PlanRubric {
@@ -51,7 +53,7 @@ export const RUBRIC_DIMENSIONS = [
 export type RubricDimension = (typeof RUBRIC_DIMENSIONS)[number];
 
 export function isPlanRubricEnabled(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): boolean {
   return env.GORDON_PLAN_RUBRIC === "1" || env.GORDON_PLAN_RUBRIC === "true";
 }

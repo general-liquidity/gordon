@@ -151,6 +151,43 @@ describe("runHooks — asyncRewake mode", () => {
     expect(rewakeRan).toBe(true);
   });
 
+  it("a rewake hook that THROWS fails closed with block", async () => {
+    // The engine and HookDefinition docstrings both promise a failing rewake
+    // hook yields a block "so compliance / audit gates don't lose teeth".
+    // It used to swallow the throw and return allow — a gate that reports
+    // itself as installed while never denying anything.
+    registerHook({
+      id: "compliance-down",
+      point: "PreOrderPlacement",
+      asyncRewake: true,
+      handler: async () => {
+        throw new Error("compliance API unreachable");
+      },
+    });
+    const r = await runHooks("PreOrderPlacement", {
+      symbol: "BTC",
+      side: "buy",
+      quantity: 1,
+      orderType: "MARKET",
+      notionalUsd: 50000,
+    });
+    expect(r.action).toBe("block");
+    expect(r.reason).toContain("compliance-down");
+    expect(r.reason).toContain("compliance API unreachable");
+  });
+
+  it("a sync hook that throws still logs and continues (unchanged)", async () => {
+    registerHook({
+      id: "sync-thrower",
+      point: "PreToolUse",
+      handler: () => {
+        throw new Error("boom");
+      },
+    });
+    const r = await runHooks("PreToolUse", { toolName: "x", toolCallId: "1", args: {} });
+    expect(r.action).toBe("allow");
+  });
+
   it("rewake hooks can be mixed with sync hooks under the same point", async () => {
     registerHook({
       id: "sync-allow",

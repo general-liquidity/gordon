@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { dirname, join } from "node:path";
 import { createModuleLogger } from "../logger/index.ts";
 import { getGordonDir } from "../storage/paths.ts";
+import { flagEnv } from "../config/flagResolver.ts";
 
 const logger = createModuleLogger("kill-switches");
 
@@ -27,7 +28,7 @@ export const KILL_SWITCHES_FLAG_ENV = "GORDON_KILL_SWITCHES";
 export const KILL_SWITCH_STATE_PATH_ENV = "GORDON_KILL_SWITCH_STATE_PATH";
 export const MIN_KILL_SWITCH_RESET_RATIONALE_CHARS = 10;
 
-export function isKillSwitchesEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isKillSwitchesEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   const raw = env[KILL_SWITCHES_FLAG_ENV];
   return raw !== "0" && raw !== "false";
 }

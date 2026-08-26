@@ -48,6 +48,11 @@ import {
   isFilesystemWriteGuardInstalled,
   type FilesystemWriteGuardStatus,
 } from "../safety/filesystemWriteGuardInstaller.ts";
+import {
+  checkGateEnforcement,
+  checkHookCoverage,
+  checkPolicyLayerIntegrity,
+} from "./gateEnforcement.ts";
 import { verifyStoredAuditChain } from "../../core/audit/store.ts";
 
 export interface DiagnosticCheck {
@@ -1076,6 +1081,9 @@ export function runDoctorChecks(): DiagnosticCheck[] {
     checkSafetyDenyList(),
     checkOutboundFetchGuard(),
     checkFilesystemWriteGuard(),
+    ...checkGateEnforcement(),
+    checkHookCoverage(),
+    checkPolicyLayerIntegrity(),
     checkKillSwitchState(),
     checkAuditChainIntegrity(),
     checkHotTierCap(),

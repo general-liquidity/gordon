@@ -78,6 +78,68 @@ export function guardWritePath(path: Fs.PathLike, caller: string): void {
   }
 }
 
+/** Mutators whose target path is the FIRST argument. */
+const DESTINATION_FIRST_MUTATORS = ["unlinkSync", "rmSync", "rmdirSync", "truncateSync"] as const;
+/** Mutators whose created/overwritten path is the SECOND argument. */
+const DESTINATION_SECOND_MUTATORS = ["renameSync", "copyFileSync", "linkSync", "symlinkSync"] as const;
+
+function patchFirstPathArg(
+  target: Record<string, unknown>,
+  thisArg: unknown,
+  key: string,
+  caller: string,
+): void {
+  const original = target[key];
+  if (typeof original !== "function") return;
+  const bound = (original as (...a: unknown[]) => unknown).bind(thisArg);
+  target[key] = (...args: unknown[]) => {
+    const p = args[0];
+    if (typeof p === "string" || p instanceof URL || p instanceof Buffer) {
+      guardWritePath(p as Fs.PathLike, caller);
+    }
+    return bound(...args);
+  };
+}
+
+function patchSecondPathArg(
+  target: Record<string, unknown>,
+  thisArg: unknown,
+  key: string,
+  caller: string,
+): void {
+  const original = target[key];
+  if (typeof original !== "function") return;
+  const bound = (original as (...a: unknown[]) => unknown).bind(thisArg);
+  target[key] = (...args: unknown[]) => {
+    const p = args[1];
+    if (typeof p === "string" || p instanceof URL || p instanceof Buffer) {
+      guardWritePath(p as Fs.PathLike, caller);
+    }
+    return bound(...args);
+  };
+}
+
+/**
+ * `Bun.write` is the runtime's own file-writing API and bypasses `node:fs`
+ * entirely. On Bun it is the shortest path around the guard, so it gets the
+ * same allowlist check. No-op on non-Bun runtimes.
+ */
+function installBunWriteGuard(): void {
+  const bun = (globalThis as { Bun?: Record<string, unknown> }).Bun;
+  if (!bun || typeof bun.write !== "function") return;
+  const originalWrite = bun.write as (...a: unknown[]) => unknown;
+  bun.write = (...args: unknown[]) => {
+    const dest = args[0];
+    if (typeof dest === "string" || dest instanceof URL) {
+      guardWritePath(dest as Fs.PathLike, "Bun.write");
+    } else if (dest && typeof dest === "object" && typeof (dest as { name?: unknown }).name === "string") {
+      // BunFile — its `name` is the path it was opened against.
+      guardWritePath((dest as { name: string }).name, "Bun.write");
+    }
+    return originalWrite(...args);
+  };
+}
+
 export function installFilesystemWriteGuard(): void {
   if (installed) return;
   installed = true;
@@ -127,6 +189,25 @@ export function installFilesystemWriteGuard(): void {
     guardWritePath(path, "fs.promises.mkdir");
     return forwardCall(originalMkdir, fsPromises, [path, ...args]);
   }) as typeof fsPromises.mkdir;
+
+  // Mutating entry points that are not "write a buffer to a file" but still
+  // change the filesystem outside the allowlist. Without these the guard is
+  // trivially walked around: renameSync into ~/.ssh, unlink of /etc/hosts,
+  // or a symlink planted to redirect a later allowlisted write.
+  //
+  // For two-path calls (rename, copyFile, link, symlink) the guarded path is
+  // the DESTINATION — that is what gets created or overwritten. `symlink`
+  // takes (target, path), so its destination is the second argument.
+  for (const name of DESTINATION_FIRST_MUTATORS) {
+    patchFirstPathArg(mutableFs, fs, name, `fs.${name}`);
+    patchFirstPathArg(mutablePromises, fsPromises, name.replace(/Sync$/, ""), `fs.promises.${name.replace(/Sync$/, "")}`);
+  }
+  for (const name of DESTINATION_SECOND_MUTATORS) {
+    patchSecondPathArg(mutableFs, fs, name, `fs.${name}`);
+    patchSecondPathArg(mutablePromises, fsPromises, name.replace(/Sync$/, ""), `fs.promises.${name.replace(/Sync$/, "")}`);
+  }
+
+  installBunWriteGuard();
 
   try {
     syncBuiltinESMExports();

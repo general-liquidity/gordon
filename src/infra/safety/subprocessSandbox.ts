@@ -32,6 +32,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { loadLayeredSettings } from "../config/settingsLayers.ts";
+import { flagEnv } from "../config/flagResolver.ts";
 import { createModuleLogger } from "../logger/index.ts";
 
 const logger = createModuleLogger("subprocess-sandbox");
@@ -100,7 +101,7 @@ function isSandboxEnabledViaConfig(): boolean {
  * NOT fall through to config — env is the per-run override).
  */
 export function isSandboxEnabled(): boolean {
-  const v = process.env.GORDON_SANDBOX_SUBPROCESS;
+  const v = flagEnv().GORDON_SANDBOX_SUBPROCESS;
   if (v !== undefined && v !== "") {
     return isTruthyFlag(v);
   }

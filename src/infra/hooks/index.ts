@@ -2,8 +2,22 @@
  * Gordon Hooks System
  *
  * User-extensible lifecycle hooks: register handlers that fire at key
- * points (PreToolUse, PreOrderPlacement, PreCompact, SessionStart, etc.)
- * to enforce custom risk rules, log events, or veto operations.
+ * points to enforce custom risk rules, log events, or veto operations.
+ *
+ * `HookPoint` declares 14 points, but only the two order-placement points
+ * are actually emitted by production call sites today:
+ *
+ *   emitted : PreOrderPlacement, PostOrderPlacement
+ *   declared but never reached : PreToolUse (its only emit site is
+ *     `runHookRacer` in infra/permissions/racing.ts, reachable only from
+ *     `racePermissionDecision`, which no production caller invokes),
+ *     PostToolUse, PreCompact, PostCompact, SessionStart, SessionEnd,
+ *     Stop, UserPromptSubmit, PreApproval, PostApproval, SubagentStart,
+ *     SubagentStop
+ *
+ * A hook registered at an unemitted point never runs. `checkHookCoverage`
+ * in `infra/diagnostics/gateEnforcement.ts` reports that as a doctor
+ * finding so an inert hook is visible instead of silently trusted.
  */
 
 export {

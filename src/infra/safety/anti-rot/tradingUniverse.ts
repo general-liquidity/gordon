@@ -15,6 +15,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import { flagEnv } from "../../config/flagResolver.ts";
 
 export interface TradingUniverse {
   /** Allowed symbols (case-insensitive, stored upper). Empty = unrestricted on this axis. */
@@ -39,7 +40,7 @@ export const EMPTY_UNIVERSE: TradingUniverse = {
 let cachedUniverse: TradingUniverse | null = null;
 
 export function isUniverseEnabled(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): boolean {
   return (
     env.GORDON_TRADING_UNIVERSE === "1" ||
@@ -110,7 +111,7 @@ export interface UniverseCheckResult {
 
 export function checkUniverse(
   input: UniverseCheckInput,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
   universe: TradingUniverse = loadUniverse(),
 ): UniverseCheckResult {
   if (!isUniverseEnabled(env)) {

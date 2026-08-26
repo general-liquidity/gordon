@@ -24,6 +24,7 @@ import { BROKER_IDS } from "../../broker/types.ts";
 import { STRATEGY_IDS } from "../../../strategies/types.ts";
 import { TIMEFRAME_IDS } from "../../../types/timeframes.ts";
 import { collapseContext } from "./contextCollapse.ts";
+import { resolveFlag } from "../../config/flagResolver.ts";
 
 const logger = createModuleLogger("summarizer");
 
@@ -237,7 +238,14 @@ export interface SummarizationResult {
   compactionDetails?: CompactionDetails;
 }
 
-export type CompactionStage = "masking" | "pruning" | "aggressive" | "collapse" | "full";
+export const COMPACTION_STAGES = [
+  "masking",
+  "pruning",
+  "aggressive",
+  "collapse",
+  "full",
+] as const;
+export type CompactionStage = (typeof COMPACTION_STAGES)[number];
 
 /**
  * Compaction pressure thresholds.
@@ -306,6 +314,15 @@ export function determineCompactionStageFromPressure(
   usedTokens?: number,
   maxTokens?: number,
 ): CompactionStage {
+  // Debug override. GORDON_COMPACTION_STAGE is advertised by /flags as
+  // "force a specific compaction stage during debugging", so it has to
+  // actually short-circuit stage selection. Read through the resolver so a
+  // value set via /flags (settings layer) works, not just a shell export.
+  const forced = resolveFlag("GORDON_COMPACTION_STAGE");
+  if (forced && (COMPACTION_STAGES as readonly string[]).includes(forced)) {
+    return forced as CompactionStage;
+  }
+
   // Ratio-based stage (legacy path, still drives small contexts).
   let ratioStage: CompactionStage = "masking";
   if (contextFillRatio >= COMPACTION_PRESSURE_THRESHOLDS.full) ratioStage = "full";

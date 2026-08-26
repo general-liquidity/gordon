@@ -17,6 +17,20 @@
  * evaluator immediately rejects for foreseeable reasons" loops.
  */
 
+import { flagEnv } from "../config/flagResolver.ts";
+
+export const SPRINT_CONTRACT_FLAG_ENV = "GORDON_SPRINT_CONTRACT";
+
+/**
+ * Opt-in gate. The autonomous loop records a contract only when this is on;
+ * the flag is advertised as a toggle by /flags, /sprint-status and CLAUDE.md,
+ * so it has to actually gate something.
+ */
+export function isSprintContractEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
+  const raw = env[SPRINT_CONTRACT_FLAG_ENV];
+  return raw === "1" || raw === "true";
+}
+
 export interface SprintContract {
   /** Stable identifier so the contract can be referenced from later entries. */
   contractId: string;

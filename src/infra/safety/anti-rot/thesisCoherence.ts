@@ -16,6 +16,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import { flagEnv } from "../../config/flagResolver.ts";
 
 export type ThesisBias = "long" | "short" | "neutral";
 export type ThesisHorizon = "intraday" | "swing" | "position";
@@ -36,7 +37,7 @@ export interface RunningThesis {
 let cachedThesis: RunningThesis | null = null;
 
 export function isCoherenceEnabled(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): boolean {
   return (
     env.GORDON_THESIS_COHERENCE === "1" ||
@@ -53,7 +54,7 @@ export function defaultThesisPath(): string {
 const DEFAULT_COHERENCE_THRESHOLD = 0.5;
 
 export function getCoherenceThreshold(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): number {
   const raw = env.GORDON_THESIS_COHERENCE_THRESHOLD;
   if (!raw) return DEFAULT_COHERENCE_THRESHOLD;
@@ -203,7 +204,7 @@ export interface CoherenceGateResult {
 
 export function gateCoherence(
   plan: PlanShape,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
   thesis: RunningThesis | null = loadRunningThesis(),
 ): CoherenceGateResult {
   if (!isCoherenceEnabled(env)) {

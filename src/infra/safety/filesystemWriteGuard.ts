@@ -20,8 +20,10 @@
  * or `/etc/passwd`, this catches it.
  */
 
-import { resolve, sep } from "node:path";
+import { realpathSync } from "node:fs";
+import { basename, dirname, resolve, sep } from "node:path";
 import { homedir, tmpdir } from "node:os";
+import { flagEnv } from "../config/flagResolver.ts";
 
 export const FILESYSTEM_WRITE_GUARD_FLAG_ENV = "GORDON_FILESYSTEM_WRITE_GUARD";
 export const FILESYSTEM_WRITE_GUARD_MODE_ENV = "GORDON_FILESYSTEM_WRITE_GUARD_MODE";
@@ -73,12 +75,12 @@ function ensureInitialized(): void {
   _initialized = true;
 }
 
-export function isFilesystemWriteGuardEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isFilesystemWriteGuardEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   const raw = env[FILESYSTEM_WRITE_GUARD_FLAG_ENV];
   return raw !== "0" && raw !== "false";
 }
 
-export function getGuardMode(env: NodeJS.ProcessEnv = process.env): GuardMode {
+export function getGuardMode(env: NodeJS.ProcessEnv = flagEnv()): GuardMode {
   return env[FILESYSTEM_WRITE_GUARD_MODE_ENV] === "block" ? "block" : "warn";
 }
 
@@ -108,6 +110,29 @@ function startsWithPathPrefix(path: string, prefix: string): boolean {
   return false;
 }
 
+/**
+ * Resolve `p` through symlinks. Walks up to the deepest ancestor that
+ * exists on disk, `realpathSync`s that, then re-appends the missing tail.
+ * A lexical `resolve()` alone is not enough: a symlink parked inside an
+ * allowlisted directory (`~/.gordon/escape -> /etc`) makes an outside
+ * write look like an inside one.
+ */
+function realResolve(p: string): string {
+  let current = resolve(p);
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      const real = realpathSync(current);
+      return tail.length === 0 ? real : resolve(real, ...tail);
+    } catch {
+      const parent = dirname(current);
+      if (parent === current) return resolve(p);
+      tail.unshift(basename(current));
+      current = parent;
+    }
+  }
+}
+
 export function checkWrite(
   input: CheckWriteInput,
   opts: { mode?: GuardMode; rules?: readonly PathRule[] } = {},
@@ -120,9 +145,24 @@ export function checkWrite(
   for (const rule of rules) {
     // Resolve the rule prefix so callers can pass relative or unresolved paths.
     const resolvedPrefix = resolve(rule.prefix);
-    if (startsWithPathPrefix(resolvedPath, resolvedPrefix)) {
+    if (!startsWithPathPrefix(resolvedPath, resolvedPrefix)) continue;
+
+    // Lexically inside. Confirm it is still inside after symlink resolution,
+    // otherwise the allowlist can be walked out of via a planted link.
+    const realPath = realResolve(resolvedPath);
+    if (realPath === resolvedPath) {
       return { allowed: true, resolvedPath, matchedRule: rule, mode };
     }
+    const realInside = rules.some((r) => startsWithPathPrefix(realPath, realResolve(r.prefix)));
+    if (realInside) {
+      return { allowed: true, resolvedPath, matchedRule: rule, mode };
+    }
+    return {
+      allowed: false,
+      resolvedPath,
+      reason: `path resolves outside the allowlist via a symlink (real path: ${realPath})`,
+      mode,
+    };
   }
 
   return {

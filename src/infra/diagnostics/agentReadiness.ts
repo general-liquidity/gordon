@@ -1,7 +1,15 @@
 /**
- * Agent readiness gate (GORDON_AGENT_READINESS_GATE).
+ * Agent readiness checks (GORDON_AGENT_READINESS_GATE).
  *
- * Lightweight boot-time checks — module restored after doc-only reference.
+ * Lightweight boot-time checks. NOT a gate despite the flag name: the sole
+ * consumer is `collectAgentReadinessChecks` in app/setup/harness-checks.ts,
+ * which turns the result into doctor report rows. Nothing blocks agent
+ * spawn on a failing condition, and `GORDON_AGENT_READINESS_OVERRIDE`
+ * suppresses the rows rather than overriding a block.
+ *
+ * Conditions are only listed here when they are actually probed. A
+ * condition that cannot be verified does not belong in the list — an
+ * always-`ok: true` row reads as evidence and is not.
  */
 
 import { existsSync } from "node:fs";
@@ -45,11 +53,6 @@ export function checkAgentReadiness(inputs: ReadinessInputs = {}): ReadinessResu
       id: "can_start",
       ok: existsSync(home),
       message: existsSync(home) ? `Gordon home present at ${home}` : `Missing Gordon home at ${home}`,
-    },
-    {
-      id: "can_test",
-      ok: true,
-      message: "Eval harness modules loadable",
     },
     {
       id: "can_see_progress",

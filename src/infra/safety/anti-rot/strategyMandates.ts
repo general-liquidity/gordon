@@ -17,6 +17,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import { flagEnv } from "../../config/flagResolver.ts";
 
 export interface StrategyMandate {
   id: string;
@@ -40,7 +41,7 @@ export interface StrategyMandate {
 let cachedMandates: StrategyMandate[] | null = null;
 
 export function isStrategyMandatesEnabled(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): boolean {
   return (
     env.GORDON_STRATEGY_MANDATES === "1" ||
@@ -182,7 +183,7 @@ export interface MandateGateResult {
 export function gateAgainstMandate(
   input: MandateMatchInput & MandateGateInput,
   budgetState: MandateBudgetState,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
   mandates: StrategyMandate[] = loadMandates(),
 ): MandateGateResult {
   if (!isStrategyMandatesEnabled(env)) {

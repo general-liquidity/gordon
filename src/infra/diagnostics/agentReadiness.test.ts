@@ -17,4 +17,17 @@ describe("agentReadiness", () => {
     expect(result.conditions.length).toBeGreaterThan(0);
     expect(result.conditions.some((c) => c.id === "can_hand_off")).toBe(true);
   });
+
+  it("carries no condition that is ok regardless of input", () => {
+    // `can_test` reported ok: true with the message "Eval harness modules
+    // loadable" without probing anything. A row that cannot fail is not
+    // evidence, and in a readiness report it reads as if it were.
+    const best = checkAgentReadiness({ gordonHome: process.cwd(), hasLlmKey: true });
+    const worst = checkAgentReadiness({ gordonHome: "/gordon-does-not-exist", hasLlmKey: false });
+    const alwaysOk = best.conditions
+      .filter((c) => c.ok)
+      .filter((c) => worst.conditions.find((w) => w.id === c.id)?.ok === true)
+      .map((c) => c.id);
+    expect(alwaysOk).toEqual([]);
+  });
 });

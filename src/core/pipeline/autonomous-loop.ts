@@ -23,6 +23,7 @@ import {
 import {
   createSprintContract,
   contractToPayload,
+  isSprintContractEnabled,
   type SprintContract,
 } from "../../infra/safety/sprintContract.ts";
 import { tickAndCollectReminders } from "../../infra/agents/wiring/reminderWiring.ts";
@@ -685,22 +686,24 @@ export function startAutonomousLoop(config: AutonomousLoopConfig): { success: bo
   // pre-session statement of intent; the actuals at stopAutonomousLoop
   // are emitted alongside so an operator can compute the diff
   // post-hoc via `compareWithActuals`.
-  const venue = config.exchange.exchangeId;
-  loopState.sprintContract = createSprintContract({
-    scope: {
-      symbols: config.mandate.symbols ?? [],
-      venues: venue ? [venue] : [],
-      strategies: [],
-    },
-    verificationStandards: [
-      `min confidence above ${config.mandate.minConfidence}`,
-      `max drawdown within ${config.mandate.maxDrawdown}%`,
-      `mandate ${config.mandate.id} not breached`,
-    ],
-    exclusions: [`no trading outside mandate ${config.mandate.id}`],
-    intent: `autonomous loop on mandate ${config.mandate.id}`,
-  });
-  logger.info("Sprint contract recorded", contractToPayload(loopState.sprintContract));
+  if (isSprintContractEnabled()) {
+    const venue = config.exchange.exchangeId;
+    loopState.sprintContract = createSprintContract({
+      scope: {
+        symbols: config.mandate.symbols ?? [],
+        venues: venue ? [venue] : [],
+        strategies: [],
+      },
+      verificationStandards: [
+        `min confidence above ${config.mandate.minConfidence}`,
+        `max drawdown within ${config.mandate.maxDrawdown}%`,
+        `mandate ${config.mandate.id} not breached`,
+      ],
+      exclusions: [`no trading outside mandate ${config.mandate.id}`],
+      intent: `autonomous loop on mandate ${config.mandate.id}`,
+    });
+    logger.info("Sprint contract recorded", contractToPayload(loopState.sprintContract));
+  }
 
   const intervalMs = config.mandate.scanIntervalMinutes * 60 * 1000;
 

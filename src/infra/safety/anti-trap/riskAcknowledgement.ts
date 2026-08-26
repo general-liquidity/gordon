@@ -45,7 +45,7 @@ export interface AcknowledgementResult {
 export function verifyRiskAcknowledgement(
   provided: ReadonlyArray<string>,
   assessment: RiskAssessment,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
   topN: number = 3,
 ): AcknowledgementResult {
   if (!isRiskAckEnabled(env)) {
@@ -91,7 +91,7 @@ export function verifyRiskAcknowledgement(
 export function verifyAcksFromWarnings(
   provided: ReadonlyArray<string>,
   warnings: ReadonlyArray<string>,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): AcknowledgementResult {
   if (!isRiskAckEnabled(env)) {
     return { ok: true, required: [], missing: [] };

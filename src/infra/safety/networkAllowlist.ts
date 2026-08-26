@@ -24,6 +24,8 @@
  * destinations.
  */
 
+import { flagEnv } from "../config/flagResolver.ts";
+
 export const NETWORK_ALLOWLIST_FLAG_ENV = "GORDON_NETWORK_ALLOWLIST";
 export const NETWORK_ALLOWLIST_MODE_ENV = "GORDON_NETWORK_ALLOWLIST_MODE";
 
@@ -162,12 +164,12 @@ export const GORDON_DEFAULT_ALLOWLIST: readonly AllowlistRule[] = [
 
 const _registry: AllowlistRule[] = [...GORDON_DEFAULT_ALLOWLIST];
 
-export function isNetworkAllowlistEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isNetworkAllowlistEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   const raw = env[NETWORK_ALLOWLIST_FLAG_ENV];
   return raw !== "0" && raw !== "false";
 }
 
-export function getAllowlistMode(env: NodeJS.ProcessEnv = process.env): AllowlistMode {
+export function getAllowlistMode(env: NodeJS.ProcessEnv = flagEnv()): AllowlistMode {
   const raw = env[NETWORK_ALLOWLIST_MODE_ENV];
   if (raw === "block") return "block";
   // Default is "warn" — log only, don't break tools.

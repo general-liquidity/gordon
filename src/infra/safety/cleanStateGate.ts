@@ -30,6 +30,7 @@
  */
 
 import type { DiagnosticCheck } from "../diagnostics/doctor.ts";
+import { flagEnv } from "../config/flagResolver.ts";
 
 /**
  * Which doctor-check IDs participate in the gate. Conservative subset:
@@ -72,7 +73,7 @@ export interface SessionProgressSignal {
 }
 
 export function isCleanStateGateEnabled(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): boolean {
   return env.GORDON_CLEAN_STATE_GATE === "1" || env.GORDON_CLEAN_STATE_GATE === "true";
 }
@@ -93,7 +94,7 @@ export function isCleanStateGateEnabled(
 export function runCleanStateGate(
   checks: ReadonlyArray<DiagnosticCheck>,
   progress: SessionProgressSignal,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): CleanStateGateResult {
   if (!isCleanStateGateEnabled(env)) {
     return {
@@ -161,7 +162,7 @@ export function runCleanStateGate(
  * session knows the state was intentional, not an accident.
  */
 export function hasOverrideAcknowledgement(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): boolean {
   return (
     env.GORDON_CLEAN_STATE_GATE_OVERRIDE === "1" ||

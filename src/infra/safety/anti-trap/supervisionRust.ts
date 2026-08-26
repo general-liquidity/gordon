@@ -15,6 +15,7 @@ import { appendFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { flagEnv } from "../../config/flagResolver.ts";
 
 export type FlawType =
   | "wrong_direction"
@@ -96,7 +97,7 @@ export function defaultSupervisionLogPath(): string {
   return join(homedir(), ".gordon", "supervision-rust.jsonl");
 }
 
-export function getInjectionRate(env: NodeJS.ProcessEnv = process.env): number {
+export function getInjectionRate(env: NodeJS.ProcessEnv = flagEnv()): number {
   const raw = env.GORDON_SUPERVISION_RUST_RATE;
   if (!raw) return 0;
   const n = Number(raw);
@@ -105,7 +106,7 @@ export function getInjectionRate(env: NodeJS.ProcessEnv = process.env): number {
 }
 
 export function shouldInjectFlaw(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
   rng: () => number = Math.random,
 ): boolean {
   const rate = getInjectionRate(env);

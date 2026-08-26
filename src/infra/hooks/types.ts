@@ -235,10 +235,9 @@ export interface HookDefinition<P extends HookPoint = HookPoint> {
   /**
    * Async-rewake mode (Claude Code v2.1.72+ pattern): the engine kicks off
    * this hook in parallel with other hooks at the same point, but still
-   * awaits its result before the overall decision is returned. A failing
-   * async-rewake hook surfaces a "block" decision exactly like a sync hook
-   * would — the only difference is wall-clock time when multiple slow
-   * hooks share a point.
+   * awaits its result before the overall decision is returned. Unlike a
+   * sync hook (whose thrown errors are logged and skipped), a rewake hook
+   * that throws fails CLOSED and surfaces a "block" decision.
    *
    * Use for compliance / audit / external risk-check calls that take
    * hundreds of ms and don't depend on each other but DO need to gate

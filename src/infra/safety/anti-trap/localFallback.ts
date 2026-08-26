@@ -12,6 +12,8 @@
  * result OR a raw-data envelope when provider is unavailable.
  */
 
+import { flagEnv } from "../../config/flagResolver.ts";
+
 export type ProviderHealth = "available" | "degraded" | "unavailable";
 
 interface HealthCacheEntry {
@@ -23,7 +25,7 @@ let healthCache: HealthCacheEntry | null = null;
 const HEALTH_TTL_MS = 30_000;
 
 export function isLocalFallbackEnabled(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): boolean {
   return (
     env.GORDON_LOCAL_FALLBACK === "1" || env.GORDON_LOCAL_FALLBACK === "true"
@@ -87,7 +89,7 @@ export async function withReadOnlyFallback<T, R>(
   toolName: string,
   llmFn: () => Promise<T>,
   rawFn: () => Promise<R>,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): Promise<FallbackEnvelope<T | R>> {
   if (!isLocalFallbackEnabled(env)) {
     const data = await llmFn();
