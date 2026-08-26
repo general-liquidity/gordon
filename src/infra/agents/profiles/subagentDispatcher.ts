@@ -56,6 +56,7 @@ import {
   type ToolFilterResult,
 } from "./subagentToolFilter.ts";
 import type { SubagentProfile } from "./subagentProfile.ts";
+import { flagEnv } from "../../config/flagResolver.ts";
 
 const SAFETY_PREAMBLE = `You are a Gordon read-only research subagent invoked by the orchestrator.
 
@@ -137,7 +138,7 @@ export interface DispatchResult {
  * structured "feature disabled" notification.
  */
 export function isDynamicSubagentsEnabled(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): boolean {
   const raw = env.GORDON_DYNAMIC_SUBAGENTS;
   if (typeof raw !== "string") return false;
@@ -193,7 +194,7 @@ export async function dispatchSubagentTask(
   toolRegistry: Record<string, unknown>,
   options: DispatchOptions = {},
 ): Promise<DispatchResult> {
-  const env = options.env ?? process.env;
+  const env = options.env ?? flagEnv();
   const registry = options.registry ?? getDefaultAgentRegistry();
   const subagentId = generateSubagentId(profile.name);
 

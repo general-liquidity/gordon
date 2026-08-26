@@ -29,6 +29,7 @@ import {
 } from "@mastra/core/processors";
 import { getFastMastraModel, type MastraModelConfig } from "../../runtime/providers/registry.ts";
 import { getCostBudget } from "../../platform/costTracker.ts";
+import { resolveFlag } from "../../config/flagResolver.ts";
 
 /** True when the operator has opted into the native-processor layer. */
 export function isNativeProcessorsEnabled(): boolean {
@@ -53,12 +54,12 @@ function detectionModel(): MastraModelConfig {
  * the same default (25) the bootstrap uses. Returns `undefined` when no
  * positive budget is discoverable, in which case the cost guard is omitted.
  */
-function discoverCostCeiling(): number | undefined {
+export function discoverCostCeiling(): number | undefined {
   const budget = getCostBudget();
   if (budget?.sessionUsd !== undefined && budget.sessionUsd > 0) {
     return budget.sessionUsd;
   }
-  const envRaw = process.env.GORDON_COST_BUDGET_USD;
+  const envRaw = resolveFlag("GORDON_COST_BUDGET_USD");
   if (envRaw !== undefined) {
     const parsed = Number(envRaw);
     if (Number.isFinite(parsed) && parsed > 0) return parsed;

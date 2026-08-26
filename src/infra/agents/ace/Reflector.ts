@@ -16,6 +16,7 @@
 import { listActionLogEntries } from "../../action-log/store.ts";
 import type { ActionLogEntry } from "../../action-log/types.ts";
 import { createModuleLogger } from "../../logger/index.ts";
+import { resolveFlag } from "../../config/flagResolver.ts";
 
 const logger = createModuleLogger("ace-reflector");
 
@@ -74,7 +75,7 @@ export interface ReflectorOutput {
  * this returns false so callers don't need to guard separately.
  */
 export function isACEEnabled(): boolean {
-  return process.env.GORDON_ACE_ENABLED === "true";
+  return resolveFlag("GORDON_ACE_ENABLED") === "true";
 }
 
 /**
