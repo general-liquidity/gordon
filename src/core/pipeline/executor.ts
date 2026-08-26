@@ -2044,6 +2044,8 @@ export async function placeOCOOrders(
   logger.info(`${logPrefix}Placing OCO order`, { symbol, side, quantity, stopPrice, takeProfitPrice });
 
   // Both the native-OCO path and the two-leg fallback dispatch to the venue.
+  // Gated: `side` and `quantity` are caller-supplied and unrelated to any open
+  // position, so a BUY OCO opens or grows one. Not verifiably reducing.
   try {
     assertLiveConsent(client, "executor.place_oco_orders");
   } catch (error) {

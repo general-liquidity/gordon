@@ -550,6 +550,9 @@ export const cancelAllOrdersTool = createTool({
       // Storage failures must not block the cancellation itself.
     }
 
+    // No live-consent gate, deliberately. Cancellation only removes resting
+    // orders, so it is exposure-reducing by construction and stays ungated
+    // even when consent has expired or been revoked. Do not add a gate here.
     try {
       const cancelled = await ctx.exchange.cancelAllOrders(normalizedSymbol);
 
@@ -1019,6 +1022,8 @@ export const cancelOrderTool = createTool({
       // Storage failures must not block the cancellation itself.
     }
 
+    // No live-consent gate, deliberately. Cancelling an unfilled order removes
+    // committed exposure and can never create it. Do not add a gate here.
     try {
       await ctx.exchange.cancelOrder(normalizedSymbol, String(orderId));
 

@@ -890,6 +890,12 @@ export const cancelTool = createTool({
     execContext?: MastraExecutionContext,
   ) => {
     const ctx = getGordonContext(execContext);
+    // No live-consent gate on any target here, deliberately. Consent gates
+    // exposure-INCREASING operations; every target of this tool is
+    // exposure-reducing (cancel a resting order, or close all/part of an open
+    // position). Gating the exit behind the same acknowledgement that permits
+    // the entry would strand the operator once consent expires. Do not add a
+    // gate here thinking it was an oversight.
     try {
       switch (args.target) {
         case "order": {

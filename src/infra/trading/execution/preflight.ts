@@ -39,6 +39,9 @@ export type SafeOrderSubmitter = (order: OrderParams) => Promise<Order>;
  * gate `runExecutionPreflight` applies, reachable without a context. Throws so
  * the caller's existing failure path reports the refusal; an absent venue is
  * treated as live (fail closed).
+ *
+ * This is the EXPOSURE-INCREASING half of the consent rule. If the operation
+ * reduces an existing position, call `assertConsentForExposure` instead.
  */
 export function assertLiveConsent(
   venue: { isSandbox?: boolean; isPaper?: boolean } | undefined,
@@ -58,6 +61,105 @@ export function assertLiveConsent(
     reason: consent.reason,
   });
   throw new Error(consent.reason ?? "Live-trading consent required.");
+}
+
+/**
+ * A verified claim that an order strictly reduces an existing position.
+ *
+ * Every field is the value the order will ACTUALLY carry, paired with the
+ * position facts it must be consistent with. Callers must read `side` and
+ * `quantity` off the order params they are about to submit, not off the
+ * intermediate variables they hope those params were built from.
+ */
+export interface ExposureReduction {
+  /** Side the order will be submitted with. */
+  side: "BUY" | "SELL";
+  /** Quantity the order will be submitted with. */
+  quantity: number;
+  /** Side that closes this position, derived from the position's direction. */
+  exitSide: "BUY" | "SELL";
+  /** Quantity still open on the position (filled entries minus filled exits). */
+  remainingQuantity: number;
+}
+
+/**
+ * What an operation does to the operator's market exposure. Consent gates one
+ * direction and not the other, so the caller must say which it is.
+ */
+export type ExposureEffect =
+  | { direction: "INCREASES_EXPOSURE" }
+  | { direction: "REDUCES_EXPOSURE"; reduction: ExposureReduction };
+
+/**
+ * Decide whether a REDUCES_EXPOSURE claim is true. A close that trades the
+ * wrong way, or for more than is open, can open or grow a position, so it is
+ * not a reduction regardless of what the call site is named.
+ */
+export function verifyExposureReduction(
+  reduction: ExposureReduction,
+): { ok: true } | { ok: false; reason: string } {
+  if (reduction.side !== reduction.exitSide) {
+    return {
+      ok: false,
+      reason: `order side ${reduction.side} is not the exit side ${reduction.exitSide} for this position`,
+    };
+  }
+  if (!Number.isFinite(reduction.quantity) || reduction.quantity <= 0) {
+    return {
+      ok: false,
+      reason: `reducing quantity must be a finite positive number (got ${reduction.quantity})`,
+    };
+  }
+  if (!Number.isFinite(reduction.remainingQuantity) || reduction.remainingQuantity <= 0) {
+    return {
+      ok: false,
+      reason: `no open quantity remains to reduce (got ${reduction.remainingQuantity})`,
+    };
+  }
+  if (reduction.quantity > reduction.remainingQuantity) {
+    return {
+      ok: false,
+      reason: `quantity ${reduction.quantity} exceeds the remaining open quantity ${reduction.remainingQuantity}`,
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * Consent gate keyed on exposure direction. THIS is the entry point new
+ * dispatch sites should use; `assertLiveConsent` is the increasing half of it.
+ *
+ * Live consent exists to gate taking on risk with real capital. An
+ * exposure-reducing operation is the remedy for capital ALREADY at risk, so
+ * putting it behind the same acknowledgement disarms the safety mechanism
+ * exactly when it is needed: consent granted, positions opened, consent
+ * expired or revoked, operator now unable to exit.
+ *
+ * The exemption only has teeth because the reducing claim is verified rather
+ * than believed. A "close" that could open or grow a position is an
+ * exposure-increasing operation wearing the wrong name, so an unverifiable
+ * claim is recorded and then falls through to the gate.
+ */
+export function assertConsentForExposure(
+  venue: { isSandbox?: boolean; isPaper?: boolean } | undefined,
+  source: string,
+  effect: ExposureEffect,
+): void {
+  if (effect.direction === "REDUCES_EXPOSURE") {
+    const verified = verifyExposureReduction(effect.reduction);
+    if (verified.ok) return;
+    recordStructuredObservation({
+      eventType: "execution.exposure_reduction_unverified",
+      workflow: "execution",
+      source,
+      component: "execution_preflight",
+      toolName: source,
+      outcome: "failure",
+      status: "exposure_reduction_unverified",
+      reason: verified.reason,
+    });
+  }
+  assertLiveConsent(venue, source);
 }
 
 function makePreflightId(source: string): string {

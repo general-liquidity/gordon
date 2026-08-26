@@ -1,5 +1,12 @@
 /**
- * Live-consent gate on the trailing-stop exit dispatch site.
+ * `executeTrailingStop` market-closes the remainder of a position, so it is
+ * EXPOSURE-REDUCING and is not gated on live consent. (Placing a resting stop
+ * order is a different act and is not what this site does.)
+ *
+ * The module is long-only: it hardcodes SELL and computes long-only PnL. On a
+ * short trade SELL is not the exit side, the reduction claim fails
+ * verification, and the dispatch falls back to the consent gate rather than
+ * silently doubling the position.
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
@@ -11,11 +18,12 @@ import type { Plan, Trade } from "../../types/index.ts";
 import { setDatabasePathForTesting } from "../../infra/storage/database.ts";
 import { createPlan } from "../../infra/storage/entities/plans.ts";
 import { createTrade } from "../../infra/storage/entities/trades.ts";
-import { CONSENT_PATH_ENV, recordLiveConsent } from "../../infra/safety/consent.ts";
+import { CONSENT_PATH_ENV } from "../../infra/safety/consent.ts";
+import { assertConsentForExposure } from "../../infra/trading/execution/preflight.ts";
 import { TrailingStopTracker } from "./trailing-stop.ts";
 
-const dbPath = join(tmpdir(), `gordon-consent-tsl-${process.pid}-${Date.now()}.db`);
-const consentPath = join(tmpdir(), `gordon-consent-tsl-${process.pid}-${Date.now()}.json`);
+const dbPath = join(tmpdir(), `gordon-exposure-tsl-${process.pid}-${Date.now()}.db`);
+const consentPath = join(tmpdir(), `gordon-exposure-tsl-${process.pid}-${Date.now()}.json`);
 let previousConsentPath: string | undefined;
 
 beforeAll(() => {
@@ -25,6 +33,7 @@ beforeAll(() => {
 });
 
 afterEach(() => {
+  // Consent is never recorded in this file.
   if (existsSync(consentPath)) rmSync(consentPath);
 });
 
@@ -42,10 +51,10 @@ afterAll(() => {
   }
 });
 
-function makeOpenTrade(): Trade {
+function makeOpenTrade(direction: "long" | "short" = "long", exitQty = 0): Trade {
   const plan = createPlan({
     symbol: "BTCUSDT",
-    direction: "long",
+    direction,
     strategy: "support_bounce",
     allocation: { currency: "USDT", amount: 1000, percentOfPortfolio: 0.01 },
     entry: { type: "limit", price: 50_000 },
@@ -53,7 +62,7 @@ function makeOpenTrade(): Trade {
     grid: null,
     stopLoss: { price: 49_000 },
     takeProfit: [{ price: 52_000, percentToSell: 1 }],
-    reasoning: "trailing stop consent test",
+    reasoning: "trailing stop exposure test",
     status: "EXECUTING",
   } as unknown as Omit<Plan, "id" | "createdAt">);
 
@@ -63,30 +72,46 @@ function makeOpenTrade(): Trade {
     closedAt: null,
     symbol: "BTCUSDT",
     entries: [{ orderId: "entry-1", price: 50_000, quantity: 0.02, filledAt: new Date().toISOString() }],
-    exits: [],
+    exits: exitQty
+      ? [
+          {
+            orderId: "exit-1",
+            price: 51_000,
+            quantity: exitQty,
+            filledAt: new Date().toISOString(),
+            reason: "TP1" as const,
+          },
+        ]
+      : [],
     averageEntry: 50_000,
     realizedPnl: 0,
     realizedPnlPercent: 0,
-    status: "OPEN",
+    status: exitQty ? "PARTIAL" : "OPEN",
   });
 }
 
-function makeClient(isSandbox: boolean, placed: string[]): Exchange {
+interface PlacedOrder {
+  symbol: string;
+  side: string;
+  quantity: number;
+}
+
+function makeClient(isSandbox: boolean, placed: PlacedOrder[]): Exchange {
   return {
     exchangeId: "binance",
     isSandbox,
-    placeOrder: async (params: { symbol: string }) => {
-      placed.push(params.symbol);
+    placeOrder: async (params: { symbol: string; side: string; quantity: number }) => {
+      placed.push({ symbol: params.symbol, side: params.side, quantity: params.quantity });
       return {
         orderId: "tsl-exit-1",
         symbol: params.symbol,
-        side: "SELL",
+        side: params.side,
         type: "MARKET",
         status: "FILLED",
         price: 51_000,
-        quantity: 0.02,
-        executedQty: 0.02,
-        cummulativeQuoteQty: 1020,
+        quantity: params.quantity,
+        executedQty: params.quantity,
+        cummulativeQuoteQty: 51_000 * params.quantity,
       };
     },
   } as unknown as Exchange;
@@ -104,24 +129,42 @@ function trackerFor(trade: Trade): TrailingStopTracker {
   return tracker;
 }
 
-describe("executeTrailingStop live-consent gate", () => {
-  it("refuses to dispatch on a live venue without consent", async () => {
+describe("executeTrailingStop is exposure-reducing, not consent-gated", () => {
+  it("closes a live long position without recorded consent", async () => {
     const trade = makeOpenTrade();
-    const placed: string[] = [];
+    const placed: PlacedOrder[] = [];
+    const result = await trackerFor(trade).executeTrailingStop(makeClient(false, placed), trade.id);
+
+    expect(result.success).toBe(true);
+    expect(placed).toHaveLength(1);
+    expect(placed[0]?.side).toBe("SELL");
+  });
+
+  it("still refuses an exposure-increasing order on the same un-consented live venue", () => {
+    expect(() =>
+      assertConsentForExposure({ isSandbox: false }, "test.open_position", {
+        direction: "INCREASES_EXPOSURE",
+      }),
+    ).toThrow(/have not yet acknowledged live trading/);
+  });
+
+  it("never closes more than the quantity still open", async () => {
+    const trade = makeOpenTrade("long", 0.005);
+    const placed: PlacedOrder[] = [];
+    await trackerFor(trade).executeTrailingStop(makeClient(false, placed), trade.id);
+
+    expect(placed).toHaveLength(1);
+    expect(placed[0]?.quantity).toBeLessThanOrEqual(0.015);
+    expect(placed[0]?.quantity).toBeCloseTo(0.015, 8);
+  });
+
+  it("falls back to the consent gate on a short trade, where SELL is not the exit side", async () => {
+    const trade = makeOpenTrade("short");
+    const placed: PlacedOrder[] = [];
     const result = await trackerFor(trade).executeTrailingStop(makeClient(false, placed), trade.id);
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/have not yet acknowledged live trading/);
     expect(placed).toEqual([]);
-  });
-
-  it("dispatches on a live venue once consent is recorded", async () => {
-    recordLiveConsent();
-    const trade = makeOpenTrade();
-    const placed: string[] = [];
-    const result = await trackerFor(trade).executeTrailingStop(makeClient(false, placed), trade.id);
-
-    expect(result.success).toBe(true);
-    expect(placed).toEqual(["BTCUSDT"]);
   });
 });

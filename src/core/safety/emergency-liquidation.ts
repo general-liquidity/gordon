@@ -13,7 +13,7 @@ import { logEvent } from "../../infra/storage/entities/events.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { StrategyRuntime } from "../runtime/engine.ts";
 import type { CircuitBreakerTrigger } from "../../gateway/circuit-breakers/baseline.ts";
-import { assertLiveConsent } from "../../infra/trading/execution/preflight.ts";
+import { assertConsentForExposure } from "../../infra/trading/execution/preflight.ts";
 
 const logger = createModuleLogger("emergency-liquidation");
 
@@ -95,6 +95,10 @@ async function cancelAllGordonOrders(
 
       for (const order of gordonOrders) {
         try {
+          // Deliberately NOT gated on live consent. A cancellation removes a
+          // resting order, so it can only shrink committed exposure, never
+          // create it. Gating it would strand the operator with live orders
+          // they cannot pull. Do not "fix" this as an oversight.
           await exchange.cancelOrder(symbol, order.orderId.toString());
           result.ordersCancelled++;
           logger.info("Cancelled order", {
@@ -137,17 +141,30 @@ async function closeAllOpenPositions(
 
       // Determine exit side from the plan's direction
       const plan = getPlan(trade.planId);
-      const exitSide = plan?.direction === "short" ? "BUY" : "SELL";
+      const exitSide: "BUY" | "SELL" = plan?.direction === "short" ? "BUY" : "SELL";
 
-      assertLiveConsent(exchange, "emergency_liquidation.close_position");
-
-      const orderResult = await exchange.placeOrder({
+      const closeOrder = {
         symbol: trade.symbol,
         side: exitSide,
-        type: "MARKET",
+        type: "MARKET" as const,
         quantity: remainingQty,
         newClientOrderId: `gordon_emergency_${trade.id.slice(0, 8)}_${Date.now()}`,
+      };
+
+      // Exposure-reducing: not gated on live consent, but the reduction is
+      // verified against what the order actually carries, so a close that
+      // could open or grow a position falls back to the gate.
+      assertConsentForExposure(exchange, "emergency_liquidation.close_position", {
+        direction: "REDUCES_EXPOSURE",
+        reduction: {
+          side: closeOrder.side,
+          quantity: closeOrder.quantity,
+          exitSide,
+          remainingQuantity: remainingQty,
+        },
       });
+
+      const orderResult = await exchange.placeOrder(closeOrder);
 
       // Update trade record
       const exitPrice = orderResult.executedQty > 0

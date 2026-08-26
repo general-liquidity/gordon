@@ -1007,6 +1007,10 @@ async function placeDeferredTakeProfits(
   totalQuantity: number,
   alerts: Alert[]
 ): Promise<void> {
+  // Gated despite looking protective: this PLACES resting SELL limits, it does
+  // not close a position, and `totalQuantity` is supplied by the caller rather
+  // than bounded against the trade's remaining open quantity. It cannot be
+  // verified as exposure-reducing, so it takes the exposure-increasing gate.
   assertLiveConsent(client, "monitor.deferred_take_profits");
 
   // Track successfully placed quantities to properly calculate remaining
@@ -1345,6 +1349,9 @@ export async function placeGridTakeProfits(
       currentPrice,
     });
 
+    // Gated: order placement, not a close. `totalQuantity` sums filled entries
+    // WITHOUT subtracting filled exits, so the placed size can exceed what is
+    // still open. Not verifiably exposure-reducing.
     assertLiveConsent(exchange, "monitor.grid_take_profits");
 
     // Place TP orders

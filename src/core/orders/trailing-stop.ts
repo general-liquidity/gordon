@@ -20,7 +20,7 @@ import { logEvent } from "../../infra/storage/entities/events.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
 import type { Trade, Plan, ExitFill } from "../../types/index.ts";
-import { assertLiveConsent } from "../../infra/trading/execution/preflight.ts";
+import { assertConsentForExposure } from "../../infra/trading/execution/preflight.ts";
 
 const logger = createModuleLogger("trailing-stop");
 
@@ -478,9 +478,23 @@ export class TrailingStopTracker extends EventEmitter {
       newClientOrderId: `gordon_tsl_${tradeId.slice(4)}_${Date.now().toString(36)}`,
     };
 
+    // This site EXECUTES the stop (market-closes the remainder); it is not the
+    // placement of a resting stop order. The module is long-only (hardcoded
+    // SELL, long-only PnL), so on a short trade the verification fails and the
+    // dispatch falls back to the live-consent gate rather than doubling down.
+    const exitSide = getPlan(trade.planId)?.direction === "short" ? "BUY" : "SELL";
+
     let sellOrder: Order;
     try {
-      assertLiveConsent(client, "trailing_stop.execute");
+      assertConsentForExposure(client, "trailing_stop.execute", {
+        direction: "REDUCES_EXPOSURE",
+        reduction: {
+          side: orderParams.side,
+          quantity: roundedQty,
+          exitSide,
+          remainingQuantity: remainingQty,
+        },
+      });
       sellOrder = await client.placeOrder(orderParams);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
