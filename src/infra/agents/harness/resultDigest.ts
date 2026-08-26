@@ -47,12 +47,21 @@ function findPrimaryArray(result: unknown): PrimaryArray | null {
   return null;
 }
 
+/**
+ * Sub-unit magnitudes keep significant figures, not decimal places: a flat
+ * toFixed(4) renders anything below 5e-5 as "0", and the digest is the only
+ * surviving representation of an offloaded result. Crypto prices routinely
+ * live down at 1e-8.
+ */
+export function formatDigestNumber(v: number): string {
+  if (!Number.isFinite(v)) return String(v);
+  if (Number.isInteger(v)) return String(v);
+  if (Math.abs(v) >= 1) return v.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+  return String(Number(v.toPrecision(5)));
+}
+
 function fmt(v: unknown): string {
-  if (typeof v === "number") {
-    if (!Number.isFinite(v)) return String(v);
-    if (Number.isInteger(v)) return String(v);
-    return v.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
-  }
+  if (typeof v === "number") return formatDigestNumber(v);
   if (typeof v === "string") return v.length > 32 ? `${v.slice(0, 32)}…` : v;
   if (v === null || v === undefined) return String(v);
   return "·";

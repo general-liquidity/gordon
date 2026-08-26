@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { digestLargeResult } from "./resultDigest.ts";
+import { digestLargeResult, formatDigestNumber } from "./resultDigest.ts";
 
 describe("digestLargeResult", () => {
   test("returns null for non-tabular or too-small input", () => {
@@ -59,5 +59,33 @@ describe("digestLargeResult", () => {
     expect(() => digestLargeResult(rows)).not.toThrow();
     const d = digestLargeResult(rows);
     expect(d === null || typeof d === "string").toBe(true);
+  });
+});
+
+describe("formatDigestNumber", () => {
+  test("preserves small magnitudes instead of collapsing them to zero", () => {
+    expect(formatDigestNumber(0.00000812)).toBe("0.00000812");
+    expect(formatDigestNumber(0.000034)).toBe("0.000034");
+    expect(formatDigestNumber(0.00005)).toBe("0.00005");
+    expect(formatDigestNumber(1e-9)).toBe("1e-9");
+  });
+
+  test("keeps the existing rendering for unit-and-above magnitudes", () => {
+    expect(formatDigestNumber(1.23456)).toBe("1.2346");
+    expect(formatDigestNumber(45000.0)).toBe("45000");
+    expect(formatDigestNumber(45000.5)).toBe("45000.5");
+    expect(formatDigestNumber(-0.000034)).toBe("-0.000034");
+  });
+
+  test("passes non-finite values straight through", () => {
+    expect(formatDigestNumber(NaN)).toBe("NaN");
+    expect(formatDigestNumber(Infinity)).toBe("Infinity");
+  });
+
+  test("a satoshi-scale price column survives the digest", () => {
+    const rows = Array.from({ length: 20 }, (_, i) => ({ price: 0.00000812 + i * 1e-9 }));
+    const d = digestLargeResult(rows)!;
+    expect(d).toContain("price: min 0.00000812");
+    expect(d).not.toContain("price: min 0 max 0");
   });
 });

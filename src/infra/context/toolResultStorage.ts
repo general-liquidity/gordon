@@ -8,8 +8,8 @@
  *
  * Solution: When a tool result exceeds MAX_TOOL_RESULT_CHARS, write it to
  * ~/.gordon/tool-results/ and replace the in-context content with a compact
- * preview + file path. The agent can read the full result via the read_file
- * tool if it actually needs the full payload.
+ * preview + file path. The agent can read the full result via the
+ * read_offloaded_result tool if it actually needs the full payload.
  *
  * Per-turn budget (MAX_TURN_RESULT_CHARS) caps the total across all parallel
  * tool calls — spills the largest results first until the turn fits.
@@ -75,7 +75,7 @@ export function buildPersistedContent(
   return (
     `[Large tool result spilled to disk: ${filePath} (${sizeKB} KB)]\n\n` +
     `Preview:\n${preview}\n\n` +
-    `Use read_file on the path above to load the full result if needed.`
+    `Use read_offloaded_result on the path above to load the full result if needed.`
   );
 }
 

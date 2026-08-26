@@ -4,7 +4,7 @@
  * When a tool's result serializes to more than MAX_TOOL_RESULT_CHARS, the full
  * result is written to ~/.gordon/tool-results/ and the return value is mutated
  * to include a `_spilledTo` path + a compact preview. The agent can read the
- * full result via the read_file tool if the preview is insufficient.
+ * full result via the read_offloaded_result tool if the preview is insufficient.
  *
  * Wraps an entire tool bundle at registration time — tools themselves are
  * untouched. Wrapping is transparent: small results pass through unchanged.
@@ -47,13 +47,13 @@ function spillIfNeeded(toolId: string, callId: string, result: unknown): unknown
       _spilledTo: filePath,
       _originalSizeKB: sizeKB,
       _preview: preview,
-      _note: `Result spilled to disk (${sizeKB} KB). Use read_file on _spilledTo for full content.`,
+      _note: `Result spilled to disk (${sizeKB} KB). Use read_offloaded_result on _spilledTo for full content.`,
     };
   }
   return (
     `[Large tool result spilled to disk: ${filePath} (${sizeKB} KB)]\n\n` +
     `Preview:\n${preview}\n\n` +
-    `Use read_file on the path above for the full result.`
+    `Use read_offloaded_result on the path above for the full result.`
   );
 }
 

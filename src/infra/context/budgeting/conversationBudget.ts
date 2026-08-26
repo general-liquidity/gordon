@@ -25,7 +25,9 @@ export const DEFAULT_CONVERSATION_BUDGET_CHARS = 500_000;
 export const MIN_KEEP_RECENT = 8;
 
 /** After trimming an old result, replace with this. */
-export const TRIMMED_MARKER = "[Tool result trimmed to save context — re-invoke tool or use read_file if needed]";
+// This branch drops the content without spilling it, so there is nothing to
+// read back — re-invoking the tool is the only recovery.
+export const TRIMMED_MARKER = "[Tool result trimmed to save context — re-invoke the tool if you need it again]";
 
 // ============================================================================
 // Types

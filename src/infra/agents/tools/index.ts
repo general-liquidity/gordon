@@ -45,6 +45,7 @@ export { marketTools } from "./market/market.ts";
 export { positionTools } from "./account/positions.ts";
 export { schedulerTools } from "./runtime/lifecycle/scheduler.ts";
 export { systemTools } from "./runtime/flow/system.ts";
+export { offloadedResultTools } from "./runtime/offloadedResult.ts";
 export { earnTools } from "./account/earn.ts";
 export { chartTools } from "./market/charts.ts";
 export { orderbookTools } from "./market/orderbook.ts";
@@ -588,6 +589,7 @@ import { marketTools } from "./market/market.ts";
 import { positionTools } from "./account/positions.ts";
 import { schedulerTools } from "./runtime/lifecycle/scheduler.ts";
 import { systemTools } from "./runtime/flow/system.ts";
+import { offloadedResultTools } from "./runtime/offloadedResult.ts";
 import { earnTools } from "./account/earn.ts";
 import { chartTools } from "./market/charts.ts";
 import { orderbookTools } from "./market/orderbook.ts";
@@ -732,6 +734,7 @@ const _rawAllTools = {
   ...positionTools,
   ...schedulerTools,
   ...systemTools,
+  ...offloadedResultTools,
   ...earnTools,
   ...chartTools,
   ...orderbookTools,

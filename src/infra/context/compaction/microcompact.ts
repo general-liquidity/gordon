@@ -19,7 +19,8 @@
  * because their output is the ground truth of what actually happened.
  */
 
-export const MC_CLEARED_MARKER = "[Old tool result content cleared — use read_file or re-invoke if needed]";
+// Cleared, not spilled: nothing on disk to recover, so re-invoke is the path.
+export const MC_CLEARED_MARKER = "[Old tool result content cleared — re-invoke the tool if you need it again]";
 
 export const COUNT_TRIGGER_THRESHOLD = 8;
 export const COUNT_KEEP_RECENT = 4;
@@ -71,7 +72,7 @@ const COMPACTABLE_TOOLS = new Set([
   // Memory/context
   "memory_search",
   "memory_get",
-  "read_file",
+  "read_offloaded_result",
   "heartbeat",
 ]);
 

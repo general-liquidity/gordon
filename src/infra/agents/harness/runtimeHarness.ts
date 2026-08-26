@@ -871,6 +871,7 @@ export async function optimizeToolResultForContext(
       preview: buildPreviewText(serialized, result),
       bytes,
       toolName,
+      recoverWith: "read_offloaded_result",
     },
     offloaded: true,
     scratchFile,

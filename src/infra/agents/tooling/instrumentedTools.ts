@@ -17,6 +17,7 @@ import {
   positionTools,
   schedulerTools,
   systemTools,
+  offloadedResultTools,
   earnTools,
   chartTools,
   orderbookTools,
@@ -102,6 +103,9 @@ export const instrumentedMarketTools = withToolsMetrics(marketTools);
 export const instrumentedPositionTools = withToolsMetrics(positionTools);
 export const instrumentedSchedulerTools = withToolsMetrics(schedulerTools);
 export const instrumentedSystemTools = withToolsMetrics(systemTools);
+// Cold tier: recovering a spilled tool result is rare by construction, well
+// below the hot-tier bar, and only useful after an offload has happened.
+export const instrumentedOffloadedResultTools = withToolsMetrics(offloadedResultTools);
 export const instrumentedEarnTools = withToolsMetrics(earnTools);
 export const instrumentedChartTools = withToolsMetrics(chartTools);
 export const instrumentedOrderbookTools = withToolsMetrics(orderbookTools);

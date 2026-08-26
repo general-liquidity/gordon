@@ -21,6 +21,7 @@ import {
   instrumentedFinnhubTools,
   instrumentedFinnhubFundamentalsTools,
   instrumentedFinnhubMarketsTools,
+  instrumentedOffloadedResultTools,
   instrumentedSecFilingTools,
   instrumentedWebTools,
   instrumentedRecursiveDecomposeTools,
@@ -85,6 +86,9 @@ export function getResearcher(): Agent {
       ...instrumentedFinnhubTools,
       ...instrumentedFinnhubFundamentalsTools,
       ...instrumentedFinnhubMarketsTools,
+      // Recovering a spilled tool result: cold tier, and only reachable after
+      // an offload has already happened.
+      ...(isHotTierOnly() ? {} : instrumentedOffloadedResultTools),
       ...(isHotTierOnly() ? {} : instrumentedSecFilingTools),
       // Open-web reach (web_fetch / web_search) — gated allowlist + injection-
       // sanitized, COLD tier (DD/discovery, not the hot scan path).

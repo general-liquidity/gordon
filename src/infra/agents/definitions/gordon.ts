@@ -15,6 +15,7 @@ import {
 } from "../capabilityTruth.ts";
 import {
   // System + observability + meta utilities (no surface-tool equivalent).
+  instrumentedOffloadedResultTools,
   instrumentedSystemTools,
   instrumentedAgentFeedbackTools,
   instrumentedMultiModalChartTools,
@@ -339,6 +340,7 @@ export function getGordon(): Agent {
   // marker call is a no-op when the flag is unset (identical construction).
   const tools = {
     // System info + agent self-feedback (no generalized-surface equivalent)
+    ...(isHotTierOnly() ? {} : instrumentedOffloadedResultTools),
     ...instrumentedSystemTools,
     ...instrumentedAgentFeedbackTools,
 
