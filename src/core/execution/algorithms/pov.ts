@@ -44,15 +44,15 @@ export class POVExecutor {
     session: ExecutionSession,
     exchange: Exchange,
     config: POVConfig,
+    submitOrder: OrderSubmitter,
     onComplete?: (session: ExecutionSession) => void,
-    submitOrder?: OrderSubmitter,
   ) {
     this.session = session;
     this.exchange = exchange;
     this.config = config;
     this.onComplete = onComplete;
     this.startTimeMs = Date.now();
-    this.submitOrder = submitOrder ?? ((params) => this.exchange.placeOrder(params));
+    this.submitOrder = submitOrder;
   }
 
   async start(): Promise<void> {

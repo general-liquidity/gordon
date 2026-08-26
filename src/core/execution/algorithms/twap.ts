@@ -30,14 +30,14 @@ export class TWAPExecutor {
     session: ExecutionSession,
     exchange: Exchange,
     config: TWAPConfig,
+    submitOrder: OrderSubmitter,
     onComplete?: (session: ExecutionSession) => void,
-    submitOrder?: OrderSubmitter,
   ) {
     this.session = session;
     this.exchange = exchange;
     this.config = config;
     this.onComplete = onComplete;
-    this.submitOrder = submitOrder ?? ((params) => this.exchange.placeOrder(params));
+    this.submitOrder = submitOrder;
     this.initializeSlices();
   }
 

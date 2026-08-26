@@ -31,14 +31,14 @@ export class VWAPExecutor {
     session: ExecutionSession,
     exchange: Exchange,
     config: VWAPConfig,
+    submitOrder: OrderSubmitter,
     onComplete?: (session: ExecutionSession) => void,
-    submitOrder?: OrderSubmitter,
   ) {
     this.session = session;
     this.exchange = exchange;
     this.config = config;
     this.onComplete = onComplete;
-    this.submitOrder = submitOrder ?? ((params) => this.exchange.placeOrder(params));
+    this.submitOrder = submitOrder;
   }
 
   async start(): Promise<void> {

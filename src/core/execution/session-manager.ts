@@ -62,7 +62,7 @@ export class ExecutionSessionManager {
   async startSession(
     intent: ExecutionIntent,
     exchange: Exchange,
-    submitOrder?: OrderSubmitter,
+    submitOrder: OrderSubmitter,
   ): Promise<ExecutionSession> {
     const sessionId = crypto.randomUUID();
 
@@ -90,22 +90,22 @@ export class ExecutionSessionManager {
     switch (intent.algorithm) {
       case "TWAP": {
         const config: TWAPConfig = { ...DEFAULT_TWAP_CONFIG, ...intent.config as Partial<TWAPConfig> };
-        executor = new TWAPExecutor(session, exchange, config, onComplete, submitOrder);
+        executor = new TWAPExecutor(session, exchange, config, submitOrder, onComplete);
         break;
       }
       case "VWAP": {
         const config: VWAPConfig = { ...DEFAULT_VWAP_CONFIG, ...intent.config as Partial<VWAPConfig> };
-        executor = new VWAPExecutor(session, exchange, config, onComplete, submitOrder);
+        executor = new VWAPExecutor(session, exchange, config, submitOrder, onComplete);
         break;
       }
       case "ICEBERG": {
         const config: IcebergConfig = { ...DEFAULT_ICEBERG_CONFIG, ...intent.config as Partial<IcebergConfig> };
-        executor = new IcebergExecutor(session, exchange, config, onComplete, submitOrder);
+        executor = new IcebergExecutor(session, exchange, config, submitOrder, onComplete);
         break;
       }
       case "POV": {
         const config: POVConfig = { ...DEFAULT_POV_CONFIG, ...intent.config as Partial<POVConfig> };
-        executor = new POVExecutor(session, exchange, config, onComplete, submitOrder);
+        executor = new POVExecutor(session, exchange, config, submitOrder, onComplete);
         break;
       }
     }
