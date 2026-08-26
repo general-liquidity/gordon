@@ -386,7 +386,11 @@ export async function walkForwardTest(
     // Calculate overfit ratio
     const trainValue = getMetricValue(trainMetrics, fullConfig.optimizeFor);
     const testValue = getMetricValue(testMetrics, fullConfig.optimizeFor);
-    const overfitRatio = testValue !== 0 ? trainValue / testValue : Infinity;
+    const overfitRatio = computeOverfitRatio(
+      trainValue,
+      testValue,
+      fullConfig.optimizeFor,
+    );
 
     // Check for concerning overfit
     if (overfitRatio > 2) {
@@ -453,6 +457,36 @@ export async function walkForwardTest(
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * In-sample over out-of-sample performance, always >= 0, higher = worse.
+ *
+ * A plain `train / test` on SIGNED scores rewards exactly the case the metric
+ * exists to catch: train Sharpe +2.0 against test -1.0 gives -2, which clears
+ * every `> 2` threshold and then averages into `avgOverfitRatio` pulling the
+ * robustness score UP. Two collapses of a strategy under a losing train and a
+ * worse test (-1 over -2) scored 0.5, indistinguishable from a perfect hold.
+ *
+ * The repair is to treat sign, not just magnitude, as information:
+ *   - out-of-sample score gone (<= 0) while in-sample had one: Infinity, the
+ *     total-degradation case
+ *   - no in-sample score to begin with: 1, an edge failure rather than an
+ *     overfit, and not this metric's business
+ * `maxDrawdown` is inverted because for it lower is better.
+ */
+export function computeOverfitRatio(
+  trainValue: number,
+  testValue: number,
+  optimizeFor: keyof BacktestMetrics,
+): number {
+  if (optimizeFor === "maxDrawdown") {
+    if (trainValue <= 0) return testValue > 0 ? Number.POSITIVE_INFINITY : 1;
+    return testValue / trainValue;
+  }
+  if (trainValue <= 0) return 1;
+  if (testValue <= 0) return Number.POSITIVE_INFINITY;
+  return trainValue / testValue;
+}
 
 /**
  * Optimize strategy parameters on training data.

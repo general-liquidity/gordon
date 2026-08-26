@@ -779,8 +779,10 @@ export class PlaybookRuleEngine {
 
   private parseStopLossPercent(): number {
     const sl = this.playbook.execution.stopLoss;
-    if (sl.value !== undefined && sl.value > 0) {
-      return sl.value;
+    // Percent field only: an ATR multiple read as a percent is a different
+    // stop distance entirely.
+    if (sl.percentValue !== undefined && sl.percentValue > 0) {
+      return sl.percentValue;
     }
     // Default stop loss percentages by playbook type
     if (this.playbook.id === "momentum-breakout") return 1.5;

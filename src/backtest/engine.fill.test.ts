@@ -56,6 +56,7 @@ function entryExitStrategy() {
 function baseParams(notional: number): BacktestEngineParams {
   return {
     initialCapital: 1_000_000,
+    timeframe: "1h",
     positionSizing: "FIXED_AMOUNT",
     fixedAmount: notional,
     commissionRate: 0,

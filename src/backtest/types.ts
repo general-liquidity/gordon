@@ -617,6 +617,16 @@ export interface BacktestParams {
   /** Starting capital for the backtest */
   initialCapital: number;
 
+  /**
+   * Bar interval of the series being tested ("1m", "1h", "4h", "1d", ...).
+   *
+   * Required because it sets the annualization factor for Sharpe, Sortino and
+   * volatility. Without it the metrics layer annualized everything at 365, as
+   * though every bar were a calendar day, which on the default 4h bars
+   * understates Sharpe by sqrt(2190/365) = 2.45x and on 1h bars by 4.9x.
+   */
+  timeframe: string;
+
   /** Position sizing mode */
   positionSizing: PositionSizingMode;
 
@@ -656,6 +666,7 @@ export interface BacktestParams {
  */
 export const DEFAULT_BACKTEST_PARAMS: BacktestParams = {
   initialCapital: 10000,
+  timeframe: "4h",
   positionSizing: "FIXED_PERCENT",
   fixedPercent: 0.1, // 10% of equity
   commissionRate: 0.001, // 0.1%

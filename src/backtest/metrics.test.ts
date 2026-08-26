@@ -4,6 +4,7 @@ import {
   calculateSharpeRatio,
   calculateSortinoRatio,
   calculateAllMetrics,
+  periodsPerYearForTimeframe,
 } from "./metrics.ts";
 import type { EquityPoint, ClosedTrade } from "./types.ts";
 
@@ -64,5 +65,55 @@ describe("metrics periodsPerYear parameterization", () => {
     expect(m252.sharpeRatio).not.toBe(m365.sharpeRatio);
     // calendar-based annualizedReturn is unaffected by periodsPerYear (uses elapsed days)
     expect(m252.annualizedReturn).toBeCloseTo(m365.annualizedReturn, 12);
+  });
+});
+
+describe("annualization factor comes from the bar, not the calendar", () => {
+  it("periodsPerYearForTimeframe counts BARS per year for a 24/7 series", () => {
+    expect(periodsPerYearForTimeframe("1d")).toBe(365);
+    expect(periodsPerYearForTimeframe("4h")).toBe(2190);
+    expect(periodsPerYearForTimeframe("1h")).toBe(8760);
+    expect(periodsPerYearForTimeframe("15m")).toBe(35040);
+  });
+
+  it("annualizing 4h bars at 365 understates Sharpe by sqrt(2190/365) = 2.45x", () => {
+    const wrong = calculateSharpeRatio(RET, 0, 365);
+    const right = calculateSharpeRatio(RET, 0, periodsPerYearForTimeframe("4h"));
+    expect(right / wrong).toBeCloseTo(Math.sqrt(2190 / 365), 6);
+    expect(Math.sqrt(2190 / 365)).toBeCloseTo(2.449, 3);
+  });
+
+  it("refuses an unknown timeframe rather than falling back to 365", () => {
+    expect(() => periodsPerYearForTimeframe("7h")).toThrow();
+  });
+});
+
+describe("fees are charged once", () => {
+  it("netProfit equals totalPnl, which already carries every commission", () => {
+    // finalCapital is produced by a capital path that deducted both legs of
+    // every commission. Subtracting totalFees again charged them twice.
+    const curve: EquityPoint[] = [
+      { timestamp: 0, equity: 10000 },
+      { timestamp: 86400000, equity: 10500 },
+    ];
+    const trades: ClosedTrade[] = [
+      {
+        id: "t1",
+        symbol: "BTCUSDT",
+        side: "long",
+        entryPrice: 100,
+        exitPrice: 106,
+        quantity: 100,
+        entryTime: 0,
+        exitTime: 86400000,
+        pnl: 500,
+        pnlPercent: 5,
+        fees: 100,
+      },
+    ];
+    const m = calculateAllMetrics(10000, 10500, curve, trades, 1);
+    expect(m.totalPnl).toBe(500);
+    expect(m.totalFees).toBe(100);
+    expect(m.netProfit).toBe(500);
   });
 });

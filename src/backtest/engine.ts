@@ -60,6 +60,41 @@ interface IndicatorArrays {
 // ============================================================================
 
 /**
+ * Where a protective order triggers, and where it fills once slippage is
+ * charged. Every arm moves the same direction: against the position.
+ *
+ *   stop:  triggers EARLY, the bar only has to come within slippage of it,
+ *          and fills BEYOND it (a worse price than the stop asked for)
+ *   TP:    triggers LATE, the bar has to trade THROUGH it by slippage, and
+ *          fills SHORT of it (a worse price than the limit asked for)
+ *
+ * Split out of four inline expressions because the sign convention is the
+ * entire content of the calculation, and inline it was inverted on both
+ * take-profit arms: a long TP triggered at `limit * (1 - slippage)`, below
+ * the limit, then filled at `limit * (1 + slippage)`, above it. A limit exit
+ * that both fires early and fills better than its own limit is free money on
+ * both legs, and the comment above it claimed the opposite behaviour.
+ */
+export function protectiveOrderPrices(
+  side: "LONG" | "SHORT",
+  limitPrice: number,
+  slippage: number,
+): { triggerPrice: number; fillPrice: number } {
+  // Longs are hurt by lower prices, shorts by higher ones.
+  const adverse = side === "LONG" ? -1 : 1;
+  // The fill always lands on the adverse side of the limit. The trigger
+  // always lands on the favourable side, and one sign covers both kinds: for
+  // a long, a stop firing early and a TP firing late are both "the trigger
+  // sits above the limit"; for a short, both sit below it. Which comparison
+  // to make against it (low <= for a long stop, high >= for a long TP) is the
+  // call site's business.
+  return {
+    triggerPrice: limitPrice * (1 - adverse * slippage),
+    fillPrice: limitPrice * (1 + adverse * slippage),
+  };
+}
+
+/**
  * Adapter interface for strategies used in backtesting.
  * Allows both full Strategy interface and simplified backtest-only strategies.
  */
@@ -525,7 +560,11 @@ export class BacktestEngine {
     // Apply exit commission
     const exitCommission = this.applyCommission(positionValue);
     const totalCommission = pos.entryCommission + exitCommission;
-    const netPnL = grossPnL - exitCommission;
+    // Both legs. The entry leg was already deducted from `capital` at open, so
+    // netting only the exit leg left `capital` correct while every per-trade
+    // statistic derived from netPnL (win rate, expectancy, profit factor,
+    // Monte Carlo) was optimistic by exactly one commission.
+    const netPnL = grossPnL - totalCommission;
 
     // Add proceeds back to capital
     if (pos.side === "LONG") {
@@ -662,7 +701,9 @@ export class BacktestEngine {
     // Apply exit commission
     const exitCommission = this.applyCommission(positionValue);
     const totalCommission = this.position.entryCommission + exitCommission;
-    const netPnL = grossPnL - exitCommission;
+    // Both legs; see closeGridPosition. `capital` already carries the entry
+    // leg, so netting only the exit leg overstated every per-trade statistic.
+    const netPnL = grossPnL - totalCommission;
 
     // Add proceeds back to capital
     if (this.position.side === "LONG") {
@@ -701,28 +742,20 @@ export class BacktestEngine {
    * Handles both single position and grid positions.
    */
   private checkStopTakeProfit(bar: OHLC): void {
-    // Check single position (classic path)
-    // Apply slippage to trigger prices for more realistic fills:
-    // Longs: stop triggers slightly early (worse), TP triggers slightly late (worse)
-    // Shorts: stop triggers slightly early (worse), TP triggers slightly late (worse)
     const slippage = this.getExecutionRate();
     if (this.position) {
-      if (this.position.side === "LONG") {
-        if (this.position.stopLoss && bar.low <= this.position.stopLoss * (1 + slippage)) {
-          this.closePosition(this.position.stopLoss * (1 - slippage), bar, "STOP_LOSS");
+      const side = this.position.side;
+      if (this.position.stopLoss) {
+        const sl = protectiveOrderPrices(side, this.position.stopLoss, slippage);
+        if (side === "LONG" ? bar.low <= sl.triggerPrice : bar.high >= sl.triggerPrice) {
+          this.closePosition(sl.fillPrice, bar, "STOP_LOSS");
           return;
         }
-        if (this.position.takeProfit && bar.high >= this.position.takeProfit * (1 - slippage)) {
-          this.closePosition(this.position.takeProfit * (1 + slippage), bar, "TAKE_PROFIT");
-          return;
-        }
-      } else {
-        if (this.position.stopLoss && bar.high >= this.position.stopLoss * (1 - slippage)) {
-          this.closePosition(this.position.stopLoss * (1 + slippage), bar, "STOP_LOSS");
-          return;
-        }
-        if (this.position.takeProfit && bar.low <= this.position.takeProfit * (1 + slippage)) {
-          this.closePosition(this.position.takeProfit * (1 - slippage), bar, "TAKE_PROFIT");
+      }
+      if (this.position.takeProfit) {
+        const tp = protectiveOrderPrices(side, this.position.takeProfit, slippage);
+        if (side === "LONG" ? bar.high >= tp.triggerPrice : bar.low <= tp.triggerPrice) {
+          this.closePosition(tp.fillPrice, bar, "TAKE_PROFIT");
           return;
         }
       }
@@ -732,22 +765,17 @@ export class BacktestEngine {
     // Snapshot ensures we iterate over a stable copy while closeGridPosition mutates this.gridPositions
     const gridSnapshot = [...this.gridPositions];
     for (const pos of gridSnapshot) {
-      if (pos.side === "LONG") {
-        if (pos.stopLoss && bar.low <= pos.stopLoss * (1 + slippage)) {
-          this.closeGridPosition(pos, pos.stopLoss * (1 - slippage), bar, "STOP_LOSS");
+      if (pos.stopLoss) {
+        const sl = protectiveOrderPrices(pos.side, pos.stopLoss, slippage);
+        if (pos.side === "LONG" ? bar.low <= sl.triggerPrice : bar.high >= sl.triggerPrice) {
+          this.closeGridPosition(pos, sl.fillPrice, bar, "STOP_LOSS");
           continue;
         }
-        if (pos.takeProfit && bar.high >= pos.takeProfit * (1 - slippage)) {
-          this.closeGridPosition(pos, pos.takeProfit * (1 + slippage), bar, "TAKE_PROFIT");
-          continue;
-        }
-      } else {
-        if (pos.stopLoss && bar.high >= pos.stopLoss * (1 - slippage)) {
-          this.closeGridPosition(pos, pos.stopLoss * (1 + slippage), bar, "STOP_LOSS");
-          continue;
-        }
-        if (pos.takeProfit && bar.low <= pos.takeProfit * (1 + slippage)) {
-          this.closeGridPosition(pos, pos.takeProfit * (1 - slippage), bar, "TAKE_PROFIT");
+      }
+      if (pos.takeProfit) {
+        const tp = protectiveOrderPrices(pos.side, pos.takeProfit, slippage);
+        if (pos.side === "LONG" ? bar.high >= tp.triggerPrice : bar.low <= tp.triggerPrice) {
+          this.closeGridPosition(pos, tp.fillPrice, bar, "TAKE_PROFIT");
           continue;
         }
       }

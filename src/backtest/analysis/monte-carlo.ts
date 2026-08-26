@@ -42,6 +42,20 @@ export interface MonteCarloConfig {
   /** Whether to calculate drawdown distribution (default: true) */
   calculateDrawdowns: boolean;
 
+  /**
+   * How each iteration is built from the trade list (default: "permutation").
+   *
+   *   - "permutation": reorder the same trades. Tells you how much of the
+   *     equity PATH depended on the sequence, so only the drawdown
+   *     distribution carries information. Terminal equity is invariant under
+   *     reordering, by arithmetic, in dollars and in compounded returns
+   *     alike: a sum does not care about order and neither does a product.
+   *   - "bootstrap": resample trade returns WITH replacement. The trade
+   *     population changes per iteration, so terminal return genuinely varies
+   *     and the return distribution means something.
+   */
+  resampleMode: "permutation" | "bootstrap";
+
   /** Progress callback */
   onProgress?: (progress: MonteCarloProgress) => void;
 }
@@ -54,6 +68,7 @@ export const DEFAULT_MONTE_CARLO_CONFIG: MonteCarloConfig = {
   initialCapital: 10000,
   confidenceLevels: [0.05, 0.25, 0.5, 0.75, 0.95],
   calculateDrawdowns: true,
+  resampleMode: "permutation",
 };
 
 /**
@@ -293,12 +308,16 @@ export async function runMonteCarloSimulation(
   let lastProgressTime = Date.now();
   const progressInterval = 100; // ms
 
-  for (let i = 0; i < fullConfig.iterations; i++) {
-    // Shuffle trades
-    const shuffledTrades = shuffleArray([...trades], random);
+  const returnFractions = tradeReturnFractions(trades, fullConfig.initialCapital);
 
-    // Calculate equity curve for shuffled trades
-    const equityCurve = calculateEquityCurve(shuffledTrades, fullConfig.initialCapital);
+  for (let i = 0; i < fullConfig.iterations; i++) {
+    const equityCurve =
+      fullConfig.resampleMode === "bootstrap"
+        ? compoundEquityCurve(
+            bootstrapSample(returnFractions, returnFractions.length, random),
+            fullConfig.initialCapital,
+          )
+        : calculateEquityCurve(shuffleArray([...trades], random), fullConfig.initialCapital);
     const finalEquity = equityCurve[equityCurve.length - 1] ?? fullConfig.initialCapital;
     const iterationReturn = calculateReturn(equityCurve, fullConfig.initialCapital);
     const maxDrawdown = fullConfig.calculateDrawdowns
@@ -434,6 +453,47 @@ function calculateEquityCurve(trades: Trade[], initialCapital: number): number[]
   }
 
   return curve;
+}
+
+/**
+ * Each trade's P&L as a fraction of the equity it was taken on, read off the
+ * original ordering.
+ *
+ * A dollar P&L is not portable between iterations: $100 earned on $10,000 is a
+ * 1% result, and replaying it verbatim at $40,000 silently states a 0.25%
+ * result instead. Bootstrapping needs the fraction, so it is derived once here
+ * rather than assumed.
+ */
+function tradeReturnFractions(trades: Trade[], initialCapital: number): number[] {
+  const fractions: number[] = [];
+  let equity = initialCapital;
+  for (const trade of trades) {
+    fractions.push(equity !== 0 ? trade.netPnL / equity : 0);
+    equity += trade.netPnL;
+  }
+  return fractions;
+}
+
+/**
+ * Compound a sequence of per-trade return fractions into an equity curve.
+ */
+function compoundEquityCurve(fractions: number[], initialCapital: number): number[] {
+  const curve: number[] = [initialCapital];
+  let equity = initialCapital;
+  for (const r of fractions) {
+    equity *= 1 + r;
+    curve.push(equity);
+  }
+  return curve;
+}
+
+/** Sample `count` items with replacement. */
+function bootstrapSample<T>(source: T[], count: number, random: () => number): T[] {
+  const out: T[] = [];
+  for (let i = 0; i < count; i++) {
+    out.push(source[Math.floor(random() * source.length)]!);
+  }
+  return out;
 }
 
 /**
@@ -652,16 +712,28 @@ function assessRobustness(
     );
   }
 
-  // Check return variability
-  const returnCV = returnDist.mean !== 0
-    ? Math.abs(returnDist.stdDev / returnDist.mean)
-    : Infinity;
+  // Check return variability.
+  //
+  // A permutation run produces a degenerate return distribution: reordering
+  // the same trades cannot change terminal equity, so stdDev is zero to
+  // floating point (measured 4.5e-14 over 1000 shuffles) and the coefficient
+  // of variation was ~1e-14. That cleared the `< 0.3` arm on every single
+  // run, so "consistent performance" was awarded to any strategy at all.
+  // Only a distribution that actually varies can be scored.
+  const returnDistributionIsDegenerate =
+    !(returnDist.stdDev > Math.abs(returnDist.mean) * 1e-9);
 
-  if (returnCV > 1) {
-    score -= 15;
-    observations.push("High return variability (unstable performance)");
-  } else if (returnCV < 0.3) {
-    observations.push("Low return variability (consistent performance)");
+  if (!returnDistributionIsDegenerate) {
+    const returnCV = returnDist.mean !== 0
+      ? Math.abs(returnDist.stdDev / returnDist.mean)
+      : Infinity;
+
+    if (returnCV > 1) {
+      score -= 15;
+      observations.push("High return variability (unstable performance)");
+    } else if (returnCV < 0.3) {
+      observations.push("Low return variability (consistent performance)");
+    }
   }
 
   // Check worst case scenario

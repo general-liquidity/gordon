@@ -41,6 +41,48 @@ const DEFAULT_RISK_FREE_RATE = 0.02;
  */
 const TRADING_DAYS_PER_YEAR = 365;
 
+/** Bar length in minutes for each timeframe the backtester accepts. */
+const TIMEFRAME_MINUTES: Record<string, number> = {
+  "1m": 1,
+  "3m": 3,
+  "5m": 5,
+  "15m": 15,
+  "30m": 30,
+  "1h": 60,
+  "2h": 120,
+  "4h": 240,
+  "6h": 360,
+  "8h": 480,
+  "12h": 720,
+  "1d": 1440,
+  "3d": 4320,
+  "1w": 10080,
+  "1M": 43200,
+};
+
+const MINUTES_PER_YEAR_24_7 = 365 * 24 * 60;
+
+/**
+ * Bars per year for a 24/7 crypto series on the given timeframe.
+ *
+ * The annualization factor is a property of the BAR, not of the calendar, and
+ * a backtest that never passes one annualizes at 365 as though every bar were
+ * a day: on the default 4h bars that understates Sharpe by sqrt(2190/365) =
+ * 2.45x, on 1h bars by 4.9x.
+ *
+ * Throws on an unrecognised timeframe rather than falling back, because a
+ * silent fallback is how the wrong factor gets used in the first place.
+ */
+export function periodsPerYearForTimeframe(timeframe: string): number {
+  const minutes = TIMEFRAME_MINUTES[timeframe];
+  if (minutes === undefined) {
+    throw new Error(
+      `Unknown timeframe "${timeframe}": cannot derive an annualization factor`,
+    );
+  }
+  return MINUTES_PER_YEAR_24_7 / minutes;
+}
+
 // ============================================================================
 // Return Metrics
 // ============================================================================
@@ -629,7 +671,10 @@ export function calculateAllMetrics(
   // Calculate additional metrics
   const totalPnl = finalCapital - initialCapital;
   const totalFees = trades.reduce((sum, t) => sum + t.fees, 0);
-  const netProfit = totalPnl - totalFees;
+  // finalCapital already has every commission deducted, so totalPnl IS the
+  // net figure. Subtracting the fees again charged them twice, once through
+  // the capital path and once here.
+  const netProfit = totalPnl;
   const avgTradeDuration = calculateAverageTradeDuration(trades);
   const maxDrawdownDuration = calculateMaxDrawdownDuration(equityCurve);
 
@@ -786,15 +831,18 @@ import type { Trade, EquityPointExtended, BacktestParams } from "./types.ts";
  *
  * @param trades - Array of Trade objects from the engine
  * @param equityCurve - Equity curve with extended drawdown info
- * @param params - Backtest parameters
+ * @param params - Backtest parameters. `params.timeframe` sets the
+ *   annualization factor; there is deliberately no override argument, because
+ *   an optional one defaulting to 365 is how a 4h backtest ended up
+ *   annualizing as though every bar were a calendar day.
  * @returns Complete BacktestMetrics object
  */
 export function calculateMetricsFromTrades(
   trades: Trade[],
   equityCurve: EquityPointExtended[],
   params: BacktestParams,
-  periodsPerYear: number = TRADING_DAYS_PER_YEAR,
 ): BacktestMetrics {
+  const periodsPerYear = periodsPerYearForTimeframe(params.timeframe);
   const initialCapital = params.initialCapital;
   const lastEquityPoint = equityCurve[equityCurve.length - 1];
   const firstEquityPoint = equityCurve[0];

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { walkForwardTest } from "./walk-forward.ts";
+import { computeOverfitRatio } from "./walk-forward.ts";
 import type { OHLC } from "../types.ts";
 
 /**
@@ -193,5 +194,38 @@ describe("walkForwardTest — expanding / anchored mode", () => {
     expect(w1.trainStart).toBe(0);
     // Train ends purgeBars before the test window opens (testStart - 1 - purge).
     expect(w1.trainEnd).toBe(w1.testStart - 1 - purgeBars);
+  });
+});
+
+describe("computeOverfitRatio", () => {
+  it("is never negative when out-of-sample performance reverses sign", () => {
+    // train +2.0 / test -1.0 used to give -2, which clears every `> 2`
+    // threshold and then pulls avgOverfitRatio DOWN, scoring the exact
+    // failure the metric exists to catch as maximum robustness.
+    expect(computeOverfitRatio(2.0, -1.0, "sharpeRatio")).toBe(
+      Number.POSITIVE_INFINITY,
+    );
+    expect(computeOverfitRatio(2.0, 0, "sharpeRatio")).toBe(
+      Number.POSITIVE_INFINITY,
+    );
+  });
+
+  it("still measures ordinary degradation the same way", () => {
+    expect(computeOverfitRatio(2.0, 1.0, "sharpeRatio")).toBe(2);
+    expect(computeOverfitRatio(2.0, 0.5, "sharpeRatio")).toBe(4);
+    expect(computeOverfitRatio(1.0, 1.0, "sharpeRatio")).toBe(1);
+  });
+
+  it("does not call an all-losing strategy well-generalized", () => {
+    // train -1.0 / test -2.0 used to give 0.5, indistinguishable from a
+    // strategy that held up perfectly out of sample.
+    expect(computeOverfitRatio(-1.0, -2.0, "sharpeRatio")).toBe(1);
+    expect(computeOverfitRatio(-1.0, -2.0, "sharpeRatio")).not.toBeLessThan(1);
+  });
+
+  it("inverts for maxDrawdown, where lower is better", () => {
+    // 10% in sample, 30% out of sample: three times worse, ratio 3.
+    expect(computeOverfitRatio(10, 30, "maxDrawdown")).toBe(3);
+    expect(computeOverfitRatio(30, 10, "maxDrawdown")).toBeCloseTo(1 / 3, 12);
   });
 });
