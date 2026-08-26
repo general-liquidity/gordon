@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, test } from "bun:test";
 
 import { ExchangeFactory } from "./factory.ts";
 
-const CREDENTIALS = { apiKey: "abcdefgh1234", apiSecret: "secret" };
+// Obviously-fake markers: the secret scanner allowlists `dummy`/`placeholder`
+// shaped fixtures, and a high-entropy random-looking literal here would trip the
+// hard gate for no reason. The cache key only reads the first 8 characters.
+const CREDENTIALS = { apiKey: "dummy-api-key-not-a-secret", apiSecret: "dummy-placeholder" };
 
 describe("ExchangeFactory instance cache", () => {
   beforeEach(() => {

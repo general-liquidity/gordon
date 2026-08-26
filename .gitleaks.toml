@@ -28,4 +28,10 @@ regexes = [
   '''(?i)x{20,}''',
   # Common dummy/placeholder markers used in fixtures and docs.
   '''(?i)(your[_-]?api[_-]?key|example|placeholder|dummy|test[_-]?secret|xxx+|changeme)''',
+  # A sequential-alphabet fixture key committed in ae8b0716 (exchange factory
+  # cache test). HEAD uses a `dummy`-shaped literal covered by the marker rule
+  # above, but the scan walks full history, so the original value needs its own
+  # entry. Pinned to that exact literal rather than the file or the commit: a
+  # real key committed to a test file is still a leak.
+  '''\babcdefgh1234\b''',
 ]
