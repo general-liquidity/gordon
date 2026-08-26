@@ -33,7 +33,7 @@ import { resolveFlag } from "../../config/flagResolver.ts";
 
 /** True when the operator has opted into the native-processor layer. */
 export function isNativeProcessorsEnabled(): boolean {
-  const raw = process.env.GORDON_MASTRA_PROCESSORS?.toLowerCase();
+  const raw = resolveFlag("GORDON_MASTRA_PROCESSORS")?.toLowerCase();
   return raw === "1" || raw === "true";
 }
 
@@ -43,7 +43,7 @@ export function isNativeProcessorsEnabled(): boolean {
  * `GORDON_MASTRA_PROCESSORS_MODEL`.
  */
 function detectionModel(): MastraModelConfig {
-  const override = process.env.GORDON_MASTRA_PROCESSORS_MODEL;
+  const override = resolveFlag("GORDON_MASTRA_PROCESSORS_MODEL");
   if (override && override.length > 0) return override;
   return getFastMastraModel();
 }

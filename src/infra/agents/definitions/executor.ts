@@ -20,21 +20,20 @@ import {
   instrumentedRuntimeTools,
   instrumentedAdvancedTools,
   instrumentedTradingInfraTools,
+  instrumentedOffloadedResultTools,
   gordonInputGuard,
   gordonOutputSanitizer,
   gordonToolCallReconciler,
 } from "../tooling/instrumentedTools.ts";
 import { createSubAgentMemory } from "../memory/memoryFactory.ts";
-import { createModelResolver, registerObservability, resolveRuntimeModel } from "../agentHelpers.ts";
 import {
-  getHarnessSuffixForModel,
-  isHarnessProfilesEnabled,
-} from "../profiles/harnessProfile.ts";
+  createModelResolver,
+  registerObservability,
+  resolveRuntimeModel,
+} from "../agentHelpers.ts";
+import { getHarnessSuffixForModel, isHarnessProfilesEnabled } from "../profiles/harnessProfile.ts";
 import { applyNativeApprovalMarkers } from "../harness/nativeToolApproval.ts";
-import {
-  nativeInputProcessorsForAgent,
-  nativeOutputProcessorsForAgent,
-} from "../nativeWiring.ts";
+import { nativeInputProcessorsForAgent, nativeOutputProcessorsForAgent } from "../nativeWiring.ts";
 
 const EXECUTOR_INSTRUCTIONS = `You are Gordon's trade executor agent.
 
@@ -126,42 +125,43 @@ export function getExecutor(): Agent {
   // Extracted so native tool-approval markers (GORDON_NATIVE_TOOL_APPROVAL) can
   // be applied to execute_plan + the cancel_* family before construction.
   const tools = {
-      execute_plan: instrumentedTradingTools.execute_plan,
-      close_trade: instrumentedTradingTools.close_trade,
-      set_permission_mode: instrumentedTradingTools.set_permission_mode,
-      list_plans: instrumentedTradingTools.list_plans,
-      approve_plan: instrumentedTradingTools.approve_plan,
-      set_trailing_stop: instrumentedTradingTools.set_trailing_stop,
-      update_trailing_stop: instrumentedTradingTools.update_trailing_stop,
-      close_partial_position: instrumentedTradingTools.close_partial_position,
-      delegate_to_peer: instrumentedPeerTools.delegate_to_peer,
-      place_bracket_order: instrumentedDiscoveryTools.place_bracket_order,
-      preview_market_order: instrumentedDiscoveryTools.preview_market_order,
-      place_market_order: instrumentedDiscoveryTools.place_market_order,
-      place_limit_order: instrumentedOrderbookTools.place_limit_order,
-      place_oco_order: instrumentedOrderbookTools.place_oco_order,
-      cancel_all_orders: instrumentedOrderbookTools.cancel_all_orders,
-      cancel_order: instrumentedOrderbookTools.cancel_order,
-      cancel_replace_order: instrumentedOrderbookTools.cancel_replace_order,
-      cancel_order_list: instrumentedOrderbookTools.cancel_order_list,
-      get_order_status: instrumentedOrderbookTools.get_order_status,
-      test_order: instrumentedOrderbookTools.test_order,
-      ...instrumentedSharedContextTools,
-      ...instrumentedCheckRiskTool,
-      // Critic (risk classifier) — MANDATORY pre-execution check
-      classify_trade_risk: instrumentedTradingInfraTools.classify_trade_risk,
-      // Gap 1 — per-trade rule-override emit. Executor calls this
-      // whenever it proceeds with an order despite classify_trade_risk
-      // returning recommendation !== 'auto_approve' AND the operator
-      // approved anyway. Required min-10-char rationale.
-      record_rule_override: instrumentedAdherenceTools.record_rule_override,
-      list_active_positions: instrumentedPositionTrackingTools.list_active_positions,
-      get_position_detail: instrumentedPositionTrackingTools.get_position_detail,
-      search_memory: instrumentedMemoryTools.search_memory,
-      approve_strategy_trade: instrumentedRuntimeTools.approve_strategy_trade,
-      simulate_order_bundle: instrumentedAdvancedTools.simulate_order_bundle,
-      verify_circuit_breaker_proof: instrumentedAdvancedTools.verify_circuit_breaker_proof,
-      ...getRoutingToolsForAgent("Executor"),
+    execute_plan: instrumentedTradingTools.execute_plan,
+    close_trade: instrumentedTradingTools.close_trade,
+    set_permission_mode: instrumentedTradingTools.set_permission_mode,
+    list_plans: instrumentedTradingTools.list_plans,
+    approve_plan: instrumentedTradingTools.approve_plan,
+    set_trailing_stop: instrumentedTradingTools.set_trailing_stop,
+    update_trailing_stop: instrumentedTradingTools.update_trailing_stop,
+    close_partial_position: instrumentedTradingTools.close_partial_position,
+    delegate_to_peer: instrumentedPeerTools.delegate_to_peer,
+    place_bracket_order: instrumentedDiscoveryTools.place_bracket_order,
+    preview_market_order: instrumentedDiscoveryTools.preview_market_order,
+    place_market_order: instrumentedDiscoveryTools.place_market_order,
+    place_limit_order: instrumentedOrderbookTools.place_limit_order,
+    place_oco_order: instrumentedOrderbookTools.place_oco_order,
+    cancel_all_orders: instrumentedOrderbookTools.cancel_all_orders,
+    cancel_order: instrumentedOrderbookTools.cancel_order,
+    cancel_replace_order: instrumentedOrderbookTools.cancel_replace_order,
+    cancel_order_list: instrumentedOrderbookTools.cancel_order_list,
+    get_order_status: instrumentedOrderbookTools.get_order_status,
+    test_order: instrumentedOrderbookTools.test_order,
+    ...instrumentedSharedContextTools,
+    ...instrumentedCheckRiskTool,
+    // Critic (risk classifier) — MANDATORY pre-execution check
+    classify_trade_risk: instrumentedTradingInfraTools.classify_trade_risk,
+    // Gap 1 — per-trade rule-override emit. Executor calls this
+    // whenever it proceeds with an order despite classify_trade_risk
+    // returning recommendation !== 'auto_approve' AND the operator
+    // approved anyway. Required min-10-char rationale.
+    record_rule_override: instrumentedAdherenceTools.record_rule_override,
+    list_active_positions: instrumentedPositionTrackingTools.list_active_positions,
+    get_position_detail: instrumentedPositionTrackingTools.get_position_detail,
+    search_memory: instrumentedMemoryTools.search_memory,
+    approve_strategy_trade: instrumentedRuntimeTools.approve_strategy_trade,
+    simulate_order_bundle: instrumentedAdvancedTools.simulate_order_bundle,
+    verify_circuit_breaker_proof: instrumentedAdvancedTools.verify_circuit_breaker_proof,
+    ...instrumentedOffloadedResultTools,
+    ...getRoutingToolsForAgent("Executor"),
   };
 
   // Native tool-approval (GORDON_NATIVE_TOOL_APPROVAL): mark execute_plan +
@@ -169,9 +169,7 @@ export function getExecutor(): Agent {
   // deny-first gate (riskClassifier + PermissionEngine + kill switch). No-op
   // when the flag is unset; the deny-first gate still runs first and this
   // never approves anything the gate would block.
-  applyNativeApprovalMarkers(
-    tools as Record<string, { id?: string; requireApproval?: unknown }>,
-  );
+  applyNativeApprovalMarkers(tools as Record<string, { id?: string; requireApproval?: unknown }>);
 
   const agent = new Agent({
     id: "executor",

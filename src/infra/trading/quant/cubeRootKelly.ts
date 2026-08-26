@@ -1,5 +1,5 @@
 /**
- * Power-Law (Cube-Root) Kelly Position Sizing (GORDON_CUBE_ROOT_KELLY).
+ * Experimental Power-Law (Cube-Root) Kelly Position Sizing.
  *
  * Computes the position size for a given alpha and return variance using
  * Giller's power-law Kelly holding function:
@@ -33,7 +33,11 @@
  *
  * Source: Giller, "Essays on Trading Strategy" (2023), Essay 3.4.2.
  *
- * Pure compute. No I/O.
+ * Pure compute. No I/O. This module is a research primitive and is not wired
+ * into Gordon's live position-sizing path. There is deliberately no feature
+ * flag for it: production adoption requires a separately reviewed choice of
+ * position scale, cap, and calibration evidence rather than silently changing
+ * the orders emitted by the existing empirical-Kelly path.
  */
 
 export interface CubeRootKellyInput {
@@ -113,8 +117,7 @@ export function computeCubeRootKelly(input: CubeRootKellyInput): CubeRootKellyRe
   // argument of the power is dimensionless and the result carries position
   // units. Skipping the scale is the h₀ = 1 assumption that turns the
   // function into an amplifier for every holding below one unit.
-  let position =
-    magnitude > 0 ? scale * Math.pow(magnitude / scale, beta) * Math.sign(alpha) : 0;
+  let position = magnitude > 0 ? scale * Math.pow(magnitude / scale, beta) * Math.sign(alpha) : 0;
   let clipped = false;
   if (Math.abs(position) > limit) {
     position = limit * Math.sign(position);
@@ -122,8 +125,7 @@ export function computeCubeRootKelly(input: CubeRootKellyInput): CubeRootKellyRe
   }
 
   // Scale factor relative to linear Kelly. Guard divide-by-zero for α = 0.
-  const scaleFactor =
-    Math.abs(linearKelly) > 0 ? position / linearKelly : 0;
+  const scaleFactor = Math.abs(linearKelly) > 0 ? position / linearKelly : 0;
 
   const reasoning =
     `α=${alpha.toFixed(6)}, σ²=${variance.toFixed(6)}, β=${beta.toFixed(3)}, h₀=${scale.toFixed(6)}; ` +
