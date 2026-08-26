@@ -156,7 +156,7 @@ export class RiskKernel {
       } else {
         // Enforce mode: try to adjust, otherwise reject
         const adjustedOrder = this.config.autoAdjustSize
-          ? this.tryAdjustOrder(order, context, checks)
+          ? this.tryAdjustOrder(order, context)
           : null;
 
         if (adjustedOrder) {
@@ -183,7 +183,7 @@ export class RiskKernel {
     } else {
       // Only warnings, no critical failures
       if (this.config.autoAdjustSize && warningFailures.length > 0) {
-        const adjustedOrder = this.tryAdjustOrder(order, context, checks);
+        const adjustedOrder = this.tryAdjustOrder(order, context);
         if (adjustedOrder && adjustedOrder.quantity !== order.quantity) {
           decision = {
             approved: true,
@@ -259,7 +259,10 @@ export class RiskKernel {
    * Checks both absolute USD limit and portfolio percentage limit.
    */
   private checkPositionSize(order: OrderRequest, context: PortfolioContext): RiskCheck {
-    const orderValueUsd = this.estimateOrderValueUsd(order);
+    const orderValueUsd = this.estimateOrderValueUsd(order, context);
+    if (orderValueUsd === undefined) {
+      return this.unpricedOrderCheck("position_size", order);
+    }
 
     // Check absolute USD limit
     if (orderValueUsd > this.config.maxPositionSizeUsd) {
@@ -319,7 +322,10 @@ export class RiskKernel {
     }
 
     // Check if there's enough remaining allowance for a potential loss
-    const orderValue = this.estimateOrderValueUsd(order);
+    const orderValue = this.estimateOrderValueUsd(order, context);
+    if (orderValue === undefined) {
+      return this.unpricedOrderCheck("daily_loss_limit", order);
+    }
     // Assume worst case: 5% loss on the position as a rough estimate
     const estimatedMaxLoss = orderValue * 0.05;
 
@@ -398,7 +404,10 @@ export class RiskKernel {
       .filter((p) => p.symbol === order.symbol)
       .reduce((sum, p) => sum + p.size * p.currentPrice, 0);
 
-    const newOrderValue = this.estimateOrderValueUsd(order);
+    const newOrderValue = this.estimateOrderValueUsd(order, context);
+    if (newOrderValue === undefined) {
+      return this.unpricedOrderCheck("portfolio_exposure", order);
+    }
     const totalExposure = existingExposure + newOrderValue;
     const exposurePercent = (totalExposure / context.totalEquity) * 100;
 
@@ -513,7 +522,10 @@ export class RiskKernel {
       (sum, p) => sum + p.size * p.currentPrice,
       0
     );
-    const newOrderValue = this.estimateOrderValueUsd(order);
+    const newOrderValue = this.estimateOrderValueUsd(order, context);
+    if (newOrderValue === undefined) {
+      return this.unpricedOrderCheck("leverage_limit", order);
+    }
     const totalAfterOrder = totalPositionValue + newOrderValue;
 
     const effectiveLeverage = context.totalEquity > 0
@@ -551,7 +563,10 @@ export class RiskKernel {
       };
     }
 
-    const orderValueUsd = this.estimateOrderValueUsd(order);
+    const orderValueUsd = this.estimateOrderValueUsd(order, context);
+    if (orderValueUsd === undefined) {
+      return this.unpricedOrderCheck("liquidity", order);
+    }
 
     if (orderValueUsd > context.availableBalance) {
       return {
@@ -592,25 +607,16 @@ export class RiskKernel {
   private tryAdjustOrder(
     order: OrderRequest,
     context: PortfolioContext,
-    checks: RiskCheck[]
   ): OrderRequest | null {
     let adjustedQuantity = order.quantity;
-    const orderPrice = order.price ?? 0;
+    const orderPrice = order.price && order.price > 0
+      ? order.price
+      : context.openPositions.find((p) => p.symbol === order.symbol)?.currentPrice ?? 0;
 
-    // If we don't have a price, we cannot meaningfully adjust quantity
-    if (orderPrice <= 0) {
-      // For market orders, we can still try proportional reduction
-      const failedChecks = checks.filter((c) => !c.passed);
-      if (failedChecks.some((c) => c.name === "position_size" || c.name === "portfolio_exposure" || c.name === "liquidity")) {
-        // Reduce by half as a rough heuristic for market orders without price
-        adjustedQuantity = order.quantity * 0.5;
-        if (adjustedQuantity < order.quantity * 0.1) {
-          return null; // Would reduce to less than 10% of original
-        }
-        return { ...order, quantity: adjustedQuantity };
-      }
-      return null;
-    }
+    // An order that cannot be priced cannot be meaningfully resized: halving an
+    // unpriced base quantity does not bring it under a dollar cap, it just
+    // produces a second unpriced order. Reject instead.
+    if (orderPrice <= 0) return null;
 
     const currentOrderValue = adjustedQuantity * orderPrice;
 
@@ -725,18 +731,36 @@ export class RiskKernel {
 
   /**
    * Estimate the USD value of an order.
-   * For limit orders, uses the limit price. For market orders, uses
-   * quantity as the value (assumes the caller passes USD-denominated quantity
-   * or that price context is handled by the exchange).
+   *
+   * `order.quantity` is denominated in the BASE asset, so it is never a USD
+   * value on its own: 0.5 BTC is not $0.50. A limit price prices the order
+   * directly; a market order is priced off the mark price of an existing
+   * position in the same symbol when the portfolio carries one. With neither,
+   * the value is genuinely unknown and this returns `undefined` so the
+   * dollar-denominated checks can fail closed instead of comparing a limit
+   * against a number that is wrong by orders of magnitude.
    */
-  private estimateOrderValueUsd(order: OrderRequest): number {
+  private estimateOrderValueUsd(order: OrderRequest, context: PortfolioContext): number | undefined {
     if (order.price && order.price > 0) {
       return order.quantity * order.price;
     }
-    // For market orders without price, quantity is treated as the base asset amount.
-    // We cannot precisely estimate USD value without the current market price.
-    // Return quantity as a rough estimate (caller should provide price when possible).
-    return order.quantity;
+    const markPrice = context.openPositions.find((p) => p.symbol === order.symbol)?.currentPrice;
+    if (markPrice && markPrice > 0) {
+      return order.quantity * markPrice;
+    }
+    return undefined;
+  }
+
+  /** Uniform fail-closed check for an order whose USD value cannot be priced. */
+  private unpricedOrderCheck(name: string, order: OrderRequest): RiskCheck {
+    return {
+      name,
+      passed: false,
+      details:
+        `Cannot price ${order.quantity} ${order.symbol}: the order carries no price and no mark price ` +
+        `is available for the symbol. Dollar-denominated limits cannot be verified.`,
+      severity: "critical",
+    };
   }
 
   /**
