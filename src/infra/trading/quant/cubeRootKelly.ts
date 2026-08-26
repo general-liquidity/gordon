@@ -4,7 +4,17 @@
  * Computes the position size for a given alpha and return variance using
  * Giller's power-law Kelly holding function:
  *
- *   h(α, σ²) = (|α| / (2λσ²))^β × sign(α)
+ *   h(α, σ²) = h₀ × (|α| / (2λσ²h₀))^β × sign(α)
+ *
+ * h₀ is the POSITION SCALE: the holding at which the power law and linear
+ * Kelly agree. It is not cosmetic. `|α|/(2λσ²)` carries position units, and
+ * raising a quantity with units to a fractional power is meaningless unless
+ * it is first divided by a reference of the same units. Written without h₀
+ * the expression is the h₀ = 1 special case with the unit silently assumed,
+ * and because β ≤ 1 exponentiation then attenuates only above 1.0 and
+ * AMPLIFIES everything below it: a linear Kelly of 0.01 became 0.215 (21.5x)
+ * and 0.0001 became 0.046 (464x). With h₀ supplied, the ratio is 1.0 exactly
+ * at h₀ and the curve attenuates above it, as intended.
  *
  * For β = 1 this is the classical Markowitz / linear-Kelly form. For β < 1
  * the holding function backs off from large signals — exactly the behaviour
@@ -13,8 +23,8 @@
  * Kelly), and that this value is remarkably robust to the "ultra-violet
  * cut-off" used in the underlying integral.
  *
- * For β → 0 the function approaches a step function (sign of alpha only).
- * For β = 1 the function recovers linear Kelly. Choose β based on tail
+ * For β → 0 the function approaches a step function of height h₀ (sign of
+ * alpha only). For β = 1 the function recovers linear Kelly. Choose β on tail
  * fatness: crypto markets are unambiguously fat-tailed (β < 1); equities
  * sit at roughly β ∈ [0.5, 0.7].
  *
@@ -31,12 +41,23 @@ export interface CubeRootKellyInput {
   alpha: number;
   /** Variance of returns (σ²). Must be positive. */
   returnVariance: number;
+  /**
+   * Position scale h₀, in the SAME units as the returned position. Required:
+   * the power law is only dimensionally defined relative to a reference
+   * holding. Set it to the holding the operator considers a full-size
+   * position, so h₀ is the point where power-law and linear Kelly agree.
+   */
+  positionScale: number;
+  /**
+   * Maximum absolute position, in the SAME units as `positionScale`.
+   * Required: this is a sizing function on a money path and the power law is
+   * unbounded above, so the cap is not optional.
+   */
+  positionLimit: number;
   /** Kelly exponent β ∈ (0, 1]. Default 1/3 (cube-root Kelly per Giller's optimum). */
   exponent?: number;
   /** Market price of risk λ. Default 1/2 (asymptotic-Kelly = Markowitz). */
   riskAversion?: number;
-  /** Maximum absolute position. If positive, clips the result. Default Infinity. */
-  positionLimit?: number;
 }
 
 export interface CubeRootKellyResult {
@@ -50,6 +71,8 @@ export interface CubeRootKellyResult {
   clipped: boolean;
   /** Exponent used. */
   exponentUsed: number;
+  /** Position scale h₀ used, echoed so a reader can reproduce the number. */
+  positionScaleUsed: number;
   reasoning: string;
 }
 
@@ -61,10 +84,17 @@ export function computeCubeRootKelly(input: CubeRootKellyInput): CubeRootKellyRe
   const variance = input.returnVariance;
   const beta = input.exponent ?? DEFAULT_EXPONENT;
   const lambda = input.riskAversion ?? DEFAULT_RISK_AVERSION;
-  const limit = input.positionLimit ?? Number.POSITIVE_INFINITY;
+  const scale = input.positionScale;
+  const limit = input.positionLimit;
 
   if (variance <= 0) {
     throw new Error("returnVariance must be positive");
+  }
+  if (!(scale > 0) || !Number.isFinite(scale)) {
+    throw new Error("positionScale must be a positive finite number");
+  }
+  if (!Number.isFinite(limit)) {
+    throw new Error("positionLimit must be finite");
   }
   if (beta <= 0 || beta > 1) {
     throw new Error("exponent must satisfy 0 < β ≤ 1");
@@ -79,7 +109,12 @@ export function computeCubeRootKelly(input: CubeRootKellyInput): CubeRootKellyRe
   const linearKelly = alpha / (2 * lambda * variance);
   const magnitude = Math.abs(linearKelly);
 
-  let position = magnitude > 0 ? Math.pow(magnitude, beta) * Math.sign(alpha) : 0;
+  // Divide by the scale before exponentiating, multiply back after: the
+  // argument of the power is dimensionless and the result carries position
+  // units. Skipping the scale is the h₀ = 1 assumption that turns the
+  // function into an amplifier for every holding below one unit.
+  let position =
+    magnitude > 0 ? scale * Math.pow(magnitude / scale, beta) * Math.sign(alpha) : 0;
   let clipped = false;
   if (Math.abs(position) > limit) {
     position = limit * Math.sign(position);
@@ -91,7 +126,7 @@ export function computeCubeRootKelly(input: CubeRootKellyInput): CubeRootKellyRe
     Math.abs(linearKelly) > 0 ? position / linearKelly : 0;
 
   const reasoning =
-    `α=${alpha.toFixed(6)}, σ²=${variance.toFixed(6)}, β=${beta.toFixed(3)}; ` +
+    `α=${alpha.toFixed(6)}, σ²=${variance.toFixed(6)}, β=${beta.toFixed(3)}, h₀=${scale.toFixed(6)}; ` +
     `linear Kelly=${linearKelly.toFixed(6)}, power-law=${position.toFixed(6)}, ` +
     `scale=${scaleFactor.toFixed(3)}${clipped ? " (clipped)" : ""}`;
 
@@ -101,6 +136,7 @@ export function computeCubeRootKelly(input: CubeRootKellyInput): CubeRootKellyRe
     scaleFactor,
     clipped,
     exponentUsed: beta,
+    positionScaleUsed: scale,
     reasoning,
   };
 }
@@ -112,6 +148,7 @@ export function cubeRootKellyToPayload(result: CubeRootKellyResult): Record<stri
     linearKellyPosition: Number(result.linearKellyPosition.toFixed(8)),
     scaleFactor: Number(result.scaleFactor.toFixed(4)),
     exponent: Number(result.exponentUsed.toFixed(4)),
+    positionScale: Number(result.positionScaleUsed.toFixed(8)),
     clipped: result.clipped,
   };
 }
