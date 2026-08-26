@@ -138,6 +138,32 @@ describe("runExternalHook — JSON-on-stdout overrides exit code", () => {
   });
 });
 
+describe("runExternalHook — a handler that never reads stdin", () => {
+  const skipOnWindows = process.platform === "win32";
+
+  // A handler is free to ignore its input. When it exits without reading, the
+  // payload write races the closing pipe and EPIPE arrives asynchronously, past
+  // any try/catch around the write. That error used to reach the child's error
+  // handler and turn a successful exit 0 into a spawn failure, which is a block.
+  // A large payload widens the race enough to catch a regression: this failed
+  // reliably before the stdin error listener and passes with it.
+  it.skipIf(skipOnWindows)("reports exit 0 as allow even under a large payload", async () => {
+    const path = writeScript("ignores-stdin.sh", `#!/bin/sh
+exit 0
+`);
+    const bulky = {
+      ...sampleToolPayload,
+      filler: "x".repeat(1_000_000),
+    } as unknown as typeof sampleToolPayload;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const r = await runExternalHook(baseConfig(path), bulky);
+      expect(r.result.action).toBe("allow");
+      expect(r.meta.spawnFailed).toBeFalsy();
+      expect(r.meta.exitCode).toBe(0);
+    }
+  });
+});
+
 describe("runExternalHook — payload delivery", () => {
   const skipOnWindows = process.platform === "win32";
 

@@ -172,6 +172,17 @@ function runHandlerProcess(
       }
     }, timeoutMs);
 
+    // A handler is free to ignore its stdin: `exit 0` without reading is a
+    // legitimate allow. When it does, the payload write loses a race against the
+    // child closing the pipe and the stream emits EPIPE asynchronously, which the
+    // surrounding try/catch cannot see. Without this listener that error reaches
+    // `child.on("error")` and a successful exit 0 is reported as a spawn failure,
+    // which is a block: the fail-closed posture turning a working handler into a
+    // refusal, intermittently and only under load.
+    child.stdin.on("error", () => {
+      // The child's exit code is the verdict. A pipe it declined to read is not.
+    });
+
     try {
       child.stdin.write(payloadJson);
       child.stdin.end();
