@@ -10,6 +10,7 @@ import { z } from "zod";
 
 import {
   BACKTEST_NOT_PERFORMED_WARNING,
+  describeAbsentBacktest,
   createStrategyGenerator,
 } from "../../../strategy-generator.ts";
 import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "../../types.ts";
@@ -188,23 +189,28 @@ export const strategyIterateTool = createTool({
 
       // Save the improved strategy
       try {
-        await saveGeneratedStrategy(result.strategy, result.backtestResult);
+        await saveGeneratedStrategy(result.strategy, result.backtestResult ?? undefined);
       } catch (saveError) {
         console.warn("Failed to save iterated strategy:", saveError);
       }
 
       // Compare metrics
-      const warnings = result.backtestResult.warnings;
-      const backtestPerformed = !warnings.includes(BACKTEST_NOT_PERFORMED_WARNING);
-      const newMetrics = backtestPerformed
-        ? {
-            totalReturn: Math.round(result.backtestResult.metrics.totalReturn * 100) / 100,
-            sharpeRatio: Math.round(result.backtestResult.metrics.sharpeRatio * 100) / 100,
-            maxDrawdown: Math.round(result.backtestResult.metrics.maxDrawdown * 100) / 100,
-            winRate: Math.round(result.backtestResult.metrics.winRate * 100) / 100,
-            totalTrades: result.backtestResult.metrics.totalTrades,
-          }
-        : undefined;
+      const iterated = result.backtestResult;
+      const warnings = iterated
+        ? iterated.warnings
+        : [describeAbsentBacktest(result.backtestAbsent ?? { reason: "no_exchange_client" })];
+      const backtestPerformed =
+        iterated !== null && !warnings.includes(BACKTEST_NOT_PERFORMED_WARNING);
+      const newMetrics =
+        backtestPerformed && iterated
+          ? {
+              totalReturn: Math.round(iterated.metrics.totalReturn * 100) / 100,
+              sharpeRatio: Math.round(iterated.metrics.sharpeRatio * 100) / 100,
+              maxDrawdown: Math.round(iterated.metrics.maxDrawdown * 100) / 100,
+              winRate: Math.round(iterated.metrics.winRate * 100) / 100,
+              totalTrades: iterated.metrics.totalTrades,
+            }
+          : undefined;
 
       // Determine if improved based on key metrics
       let improved: boolean | undefined;

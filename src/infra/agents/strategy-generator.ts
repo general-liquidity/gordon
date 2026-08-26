@@ -101,22 +101,71 @@ export interface GenerationOptions {
   turnoverPerDay?: number;
 }
 
+/** Why no backtest was produced for a generated strategy. */
+export type BacktestAbsenceReason =
+  /** No exchange client was configured, so a backtest was impossible. */
+  | "no_exchange_client"
+  /** A backtest was attempted and threw. */
+  | "backtest_failed";
+
+/**
+ * Typed absent-backtest state. A generation result carries this INSTEAD of a
+ * fabricated zero-metric result, so no consumer can mistake "never measured"
+ * for "measured, and the numbers were zero". `maxDrawdown: 0` in particular is
+ * the theoretical best value and would bias any drawdown-weighted pooling.
+ */
+export interface AbsentBacktest {
+  reason: BacktestAbsenceReason;
+  /** Error message when `reason` is "backtest_failed". */
+  detail?: string;
+}
+
+/** Human-readable line for an absent backtest, for surfacing to the user. */
+export function describeAbsentBacktest(absent: AbsentBacktest): string {
+  return absent.reason === "no_exchange_client"
+    ? BACKTEST_NOT_PERFORMED_WARNING
+    : `Backtest failed: ${absent.detail ?? "unknown error"}`;
+}
+
 /**
  * Result of strategy generation
  */
 export interface GeneratedStrategy {
   /** The generated strategy DSL */
   strategy: StrategyDSL;
-  /** Backtest results */
-  backtestResult: BacktestResult;
+  /** Backtest results, or null when no backtest was produced. */
+  backtestResult: BacktestResult | null;
+  /** Set when `backtestResult` is null: says WHY no backtest exists. */
+  backtestAbsent: AbsentBacktest | null;
   /** Number of iterations used */
   iterations: number;
   /** Improvements made during iteration */
   improvements: string[];
   /** Whether the strategy met the performance thresholds */
   meetsThresholds: boolean;
+  /**
+   * Recovery steps taken silently during generation. Recovery is intentional
+   * (an assistant should not hard-fail on a flaky LLM call), but the caller
+   * and the user must be able to see that they did not get what they asked for.
+   */
+  degradations: GenerationDegradation[];
   /** Generation timestamp */
   generatedAt: string;
+}
+
+/** What kind of recovery was applied when a generation step failed. */
+export type GenerationDegradationKind =
+  /** Intent parsing failed; hardcoded default intent fields were substituted. */
+  | "intent_parse_defaulted"
+  /** DSL generation failed; a template strategy was substituted for the LLM output. */
+  | "dsl_generation_substituted"
+  /** Schema-repair call failed; only minimal local field fixes were applied. */
+  | "validation_repair_minimal";
+
+export interface GenerationDegradation {
+  kind: GenerationDegradationKind;
+  /** What was substituted or defaulted, and why. */
+  detail: string;
 }
 
 interface IterateStrategyOptions {
@@ -193,17 +242,22 @@ export class StrategyGeneratorAgent {
 
     logger.info("Starting strategy generation", { prompt: prompt.slice(0, 100) });
 
+    const degradations: GenerationDegradation[] = [];
+
     // Step 1: Parse user intent
-    const intent = await this.parseIntent(prompt, options);
+    const intent = await this.parseIntent(prompt, options, degradations);
     logger.info("Parsed intent", { style: intent.style, indicators: intent.indicators });
 
     // Step 2: Generate initial strategy
-    let strategy = await this.generateDSL(intent, options);
+    let strategy = await this.generateDSL(intent, options, degradations);
     let iterations = 1;
     const improvements: string[] = [];
 
     // Step 3: Validate and backtest loop
     let backtestResult: BacktestResult | null = null;
+    let backtestAbsent: AbsentBacktest | null = null;
+
+    const family = `${intent.style}/${options.symbol}`;
 
     while (iterations <= maxIterations) {
       // Validate the strategy
@@ -212,7 +266,15 @@ export class StrategyGeneratorAgent {
         logger.warn("Strategy validation failed, regenerating", {
           errors: validation.errors,
         });
-        strategy = await this.fixValidationErrors(strategy, validation.errors ?? []);
+        // A candidate that fails validation still consumed a null trial, so
+        // count it before regenerating, or the multiple-testing bar only ever
+        // sees the survivors.
+        this.recordGenerationTrial(family, strategy, {
+          verdict: "errored",
+          observedSharpe: 0,
+          notes: `validation failed: ${(validation.errors ?? []).slice(0, 3).join("; ")}`,
+        });
+        strategy = await this.fixValidationErrors(strategy, validation.errors ?? [], degradations);
         continue;
       }
 
@@ -274,13 +336,9 @@ export class StrategyGeneratorAgent {
           // Q4: log this iteration as a multiple-testing attempt and surface
           // the dynamic DSR verdict alongside the static thresholds.
           {
-            const family = `${intent.style}/${options.symbol}`;
-            const codeHash = quickHashDsl(JSON.stringify(strategy));
-            recordAttempt({
-              family,
-              codeHash,
-              observedSharpe: metrics.sharpeRatio,
+            this.recordGenerationTrial(family, strategy, {
               verdict: meetsThresholds ? "accepted" : "rejected",
+              observedSharpe: metrics.sharpeRatio,
             });
             const dsr = dynamicDeflatedThreshold({
               family,
@@ -327,35 +385,66 @@ export class StrategyGeneratorAgent {
           backtestResult = improved.backtestResult;
           iterations++;
         } catch (error) {
-          logger.error("Backtest failed", {
-            error: error instanceof Error ? error.message : "Unknown error",
+          const detail = error instanceof Error ? error.message : "Unknown error";
+          logger.error("Backtest failed", { error: detail });
+          backtestResult = null;
+          backtestAbsent = { reason: "backtest_failed", detail };
+          this.recordGenerationTrial(family, strategy, {
+            verdict: "errored",
+            observedSharpe: 0,
+            notes: `backtest failed: ${detail}`,
           });
           break;
         }
       } else {
         // No exchange client, skip backtesting
         logger.warn("No exchange client available, skipping backtest");
+        backtestAbsent = { reason: "no_exchange_client" };
+        this.recordGenerationTrial(family, strategy, {
+          verdict: "errored",
+          observedSharpe: 0,
+          notes: BACKTEST_NOT_PERFORMED_WARNING,
+        });
         break;
       }
-    }
-
-    // Create mock backtest result if none available
-    if (!backtestResult) {
-      backtestResult = this.createMockBacktestResult(strategy, options);
     }
 
     return {
       strategy,
       backtestResult,
+      backtestAbsent: backtestResult ? null : (backtestAbsent ?? { reason: "no_exchange_client" }),
       iterations,
       improvements,
+      // An absent backtest is not evidence of anything, so it can never meet
+      // a performance threshold.
       meetsThresholds: backtestResult
         ? backtestResult.metrics.sharpeRatio >= minSharpe &&
           backtestResult.metrics.winRate >= minWinRate &&
           backtestResult.metrics.maxDrawdown <= maxDrawdown
         : false,
+      degradations,
       generatedAt: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Record one emitted candidate as a multiple-testing trial. Every candidate
+   * the generator emits consumes a null trial, including ones that fail
+   * validation or fail to backtest. Counting only survivors understates the
+   * search burden and makes the deflated-Sharpe bar too low.
+   */
+  private recordGenerationTrial(
+    family: string,
+    strategy: StrategyDSL,
+    outcome: { verdict: "accepted" | "rejected" | "errored"; observedSharpe: number; notes?: string },
+  ): void {
+    recordAttempt({
+      family,
+      codeHash: quickHashDsl(JSON.stringify(strategy)),
+      observedSharpe: outcome.observedSharpe,
+      verdict: outcome.verdict,
+      notes: outcome.notes,
+    });
   }
 
   /**
@@ -437,9 +526,11 @@ Please improve the strategy based on this feedback. Return ONLY valid JSON match
       return {
         strategy: response,
         backtestResult: nextBacktestResult,
+        backtestAbsent: null,
         iterations: 1,
         improvements: [feedback],
         meetsThresholds: false,
+        degradations: [],
         generatedAt: new Date().toISOString(),
       };
     } catch (error) {
@@ -459,7 +550,8 @@ Please improve the strategy based on this feedback. Return ONLY valid JSON match
    */
   private async parseIntent(
     prompt: string,
-    options: GenerationOptions
+    options: GenerationOptions,
+    degradations: GenerationDegradation[]
   ): Promise<ParsedIntent> {
     const intentSchema = z.object({
       style: z.string(),
@@ -499,8 +591,11 @@ Timeframes: ${options.timeframes.join(", ")}`,
         maxTokens: 1000,
       });
     } catch (error) {
-      logger.warn("Intent parsing failed, using defaults", {
-        error: error instanceof Error ? error.message : "Unknown",
+      const detail = error instanceof Error ? error.message : "Unknown";
+      logger.warn("Intent parsing failed, using defaults", { error: detail });
+      degradations.push({
+        kind: "intent_parse_defaulted",
+        detail: `Intent parsing failed (${detail}); defaulted style to "trend-following" with indicators rsi, macd, sma and an ATR-based exit.`,
       });
       // Return reasonable defaults
       return {
@@ -524,7 +619,8 @@ Timeframes: ${options.timeframes.join(", ")}`,
    */
   private async generateDSL(
     intent: ParsedIntent,
-    options: GenerationOptions
+    options: GenerationOptions,
+    degradations: GenerationDegradation[]
   ): Promise<StrategyDSL> {
     const messages: Message[] = [
       {
@@ -574,8 +670,11 @@ Return ONLY valid JSON matching the StrategyDSL schema.
 
       return strategy;
     } catch (error) {
-      logger.error("DSL generation failed", {
-        error: error instanceof Error ? error.message : "Unknown",
+      const detail = error instanceof Error ? error.message : "Unknown";
+      logger.error("DSL generation failed", { error: detail });
+      degradations.push({
+        kind: "dsl_generation_substituted",
+        detail: `DSL generation failed (${detail}); returned a built-in template strategy instead of one generated from the request.`,
       });
       // Return a template strategy as fallback
       return this.createFallbackStrategy(intent, options);
@@ -587,7 +686,8 @@ Return ONLY valid JSON matching the StrategyDSL schema.
    */
   private async fixValidationErrors(
     strategy: StrategyDSL,
-    errors: string[]
+    errors: string[],
+    degradations: GenerationDegradation[]
   ): Promise<StrategyDSL> {
     const messages: Message[] = [
       {
@@ -628,7 +728,13 @@ Fix these errors and return valid JSON.
         StrategyDSLSchema,
         this.getModelConfig()
       );
-    } catch {
+    } catch (error) {
+      degradations.push({
+        kind: "validation_repair_minimal",
+        detail: `Schema-repair call failed (${
+          error instanceof Error ? error.message : "Unknown"
+        }); applied only local id/tier/version defaults against errors: ${errors.slice(0, 3).join("; ")}`,
+      });
       // Return the original with minimal fixes
       return {
         ...strategy,
@@ -793,65 +899,6 @@ Fix these errors and return valid JSON.
     };
   }
 
-  /**
-   * Create a mock backtest result when backtesting is unavailable
-   */
-  private createMockBacktestResult(
-    strategy: StrategyDSL,
-    options: GenerationOptions
-  ): BacktestResult {
-    return {
-      id: `mock_bt_${Date.now()}`,
-      strategyName: strategy.name,
-      config: {
-        strategyId: strategy.id,
-        symbol: options.symbol,
-        timeframe: options.timeframes[0] || "4h",
-        days: options.backtestDays,
-        initialCapital: 10000,
-        positionSizePercent: 10,
-        compounding: false,
-        feePercent: 0.1,
-        slippagePercent: 0.05,
-      },
-      metrics: {
-        totalReturn: 0,
-        annualizedReturn: 0,
-        cagr: 0,
-        maxDrawdown: 0,
-        sharpeRatio: 0,
-        sortinoRatio: 0,
-        volatility: 0,
-        calmarRatio: 0,
-        totalTrades: 0,
-        winningTrades: 0,
-        losingTrades: 0,
-        winRate: 0,
-        profitFactor: 0,
-        averageTrade: 0,
-        averageWin: 0,
-        averageLoss: 0,
-        expectancy: 0,
-        maxConsecutiveWins: 0,
-        maxConsecutiveLosses: 0,
-        initialValue: 10000,
-        finalValue: 10000,
-        totalPnl: 0,
-        netProfit: 0,
-        totalFees: 0,
-        avgTradeDuration: 0,
-        maxDrawdownDuration: 0,
-      },
-      trades: [],
-      equityCurve: [],
-      drawdownCurve: [],
-      startDate: new Date().toISOString(),
-      endDate: new Date().toISOString(),
-      executionTime: 0,
-      createdAt: new Date().toISOString(),
-      warnings: [BACKTEST_NOT_PERFORMED_WARNING],
-    };
-  }
 
   private withBacktestWarning(backtestResult: BacktestResult, warning: string): BacktestResult {
     if (backtestResult.warnings.includes(warning)) {

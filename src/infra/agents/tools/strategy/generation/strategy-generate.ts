@@ -9,8 +9,8 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import {
-  BACKTEST_NOT_PERFORMED_WARNING,
   createStrategyGenerator,
+  describeAbsentBacktest,
 } from "../../../strategy-generator.ts";
 import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "../../types.ts";
 import { saveGeneratedStrategy } from "../../../../storage/entities/generated-strategies.ts";
@@ -75,6 +75,10 @@ const outputSchema = z.object({
   improvements: z.array(z.string()).optional(),
   meetsThresholds: z.boolean().optional(),
   backtestPerformed: z.boolean().optional(),
+  /** Recovery steps taken during generation: what the user did not get. */
+  degradations: z
+    .array(z.object({ kind: z.string(), detail: z.string() }))
+    .optional(),
   warnings: z.array(z.string()).optional(),
   error: z.string().optional(),
 });
@@ -122,33 +126,40 @@ export const strategyGenerateTool = createTool({
 
       // Save the generated strategy
       try {
-        await saveGeneratedStrategy(result.strategy, result.backtestResult);
+        await saveGeneratedStrategy(result.strategy, result.backtestResult ?? undefined);
       } catch (saveError) {
         // Log but don't fail if save fails
         console.warn("Failed to save generated strategy:", saveError);
       }
 
-      // Extract backtest summary
-      const metrics = result.backtestResult.metrics;
-      const warnings = result.backtestResult.warnings;
-      const backtestPerformed = !warnings.includes(BACKTEST_NOT_PERFORMED_WARNING);
+      // Extract backtest summary. When no backtest was produced there are no
+      // metrics to report, so emit the typed reason instead of zeros, which
+      // would read as a real result with a perfect (0%) drawdown.
+      const backtestPerformed = result.backtestResult !== null;
+      const warnings = result.backtestResult
+        ? result.backtestResult.warnings
+        : [describeAbsentBacktest(result.backtestAbsent ?? { reason: "no_exchange_client" })];
+      const metrics = result.backtestResult?.metrics;
 
       return {
         success: true,
         strategyId: result.strategy.id,
         strategyName: result.strategy.name,
         strategyDescription: result.strategy.description,
-        backtestSummary: {
-          totalReturn: Math.round(metrics.totalReturn * 100) / 100,
-          sharpeRatio: Math.round(metrics.sharpeRatio * 100) / 100,
-          maxDrawdown: Math.round(metrics.maxDrawdown * 100) / 100,
-          winRate: Math.round(metrics.winRate * 100) / 100,
-          totalTrades: metrics.totalTrades,
-        },
+        backtestSummary: metrics
+          ? {
+              totalReturn: Math.round(metrics.totalReturn * 100) / 100,
+              sharpeRatio: Math.round(metrics.sharpeRatio * 100) / 100,
+              maxDrawdown: Math.round(metrics.maxDrawdown * 100) / 100,
+              winRate: Math.round(metrics.winRate * 100) / 100,
+              totalTrades: metrics.totalTrades,
+            }
+          : undefined,
         iterations: result.iterations,
         improvements: result.improvements,
         meetsThresholds: result.meetsThresholds,
         backtestPerformed,
+        degradations: result.degradations.length > 0 ? result.degradations : undefined,
         warnings: warnings.length > 0 ? warnings : undefined,
       };
     } catch (error) {
