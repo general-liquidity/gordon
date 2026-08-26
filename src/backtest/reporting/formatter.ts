@@ -447,13 +447,55 @@ export function formatParameters(params: ParameterSet): string {
 // Format Quick Summary
 // ============================================================================
 
+export interface BacktestSummaryOptions {
+  /**
+   * How many strategy variants were tested before this result was selected.
+   * REQUIRED for a deflated Sharpe to mean anything: a DSR at one trial is
+   * not deflated. When this is absent or < 2, the summary reports PSR (which
+   * is legitimately a single-track statistic) and explicitly declines to
+   * report a DSR rather than printing an undeflated number as if it were one.
+   */
+  trialsTested?: number;
+}
+
+/**
+ * Annualization factor for a PER-TRADE return series.
+ *
+ * The credibility statistics are fed trade returns, not bar returns, so the
+ * bar interval is the wrong factor: a strategy on 4h bars that trades twice a
+ * month does not have 2190 return observations per year. The honest factor is
+ * the strategy's realized trade frequency over the backtest span. Falls back
+ * to 365 only when the span is unusable.
+ *
+ * NOTE: PSR and DSR are both invariant to this factor by construction (the
+ * observed Sharpe and the null benchmark carry the same sqrt(ppy)), so today
+ * this only corrects `credibility.observedSharpe` and minTRL. It is fixed here
+ * so the argument stops asserting something false about the series.
+ */
+export function tradeReturnsPerYear(result: BacktestResult, tradeCount: number): number {
+  const startMs = Date.parse(result.startDate);
+  const endMs = Date.parse(result.endDate);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return 365;
+  const years = (endMs - startMs) / (365.25 * 24 * 60 * 60 * 1000);
+  if (!(years > 0)) return 365;
+  const perYear = tradeCount / years;
+  if (!Number.isFinite(perYear) || perYear <= 0) return 365;
+  // Clamp to a sane band: below 1/yr annualization is meaningless, and above
+  // daily-plus-intraday the estimate is dominated by a short span.
+  return Math.min(Math.max(perYear, 1), 365 * 24);
+}
+
 /**
  * Format a quick one-line summary of backtest results
  *
  * @param result - The backtest result to summarize
+ * @param options - Multiple-testing context; see `BacktestSummaryOptions`
  * @returns One-line summary string
  */
-export function formatBacktestSummary(result: BacktestResult): string {
+export function formatBacktestSummary(
+  result: BacktestResult,
+  options: BacktestSummaryOptions = {},
+): string {
   const { metrics, config } = result;
   const base = `${result.strategyName} on ${config.symbol} (${config.timeframe}): ${formatPercent(metrics.totalReturn)} return, ${formatPercent(metrics.winRate * 100)} win rate, Sharpe ${formatNumber(metrics.sharpeRatio)}, Max DD ${formatPercent(metrics.maxDrawdown * -1)}`;
 
@@ -468,10 +510,25 @@ export function formatBacktestSummary(result: BacktestResult): string {
         const raw = (t.exitPrice - t.entryPrice) / t.entryPrice;
         return t.side === "LONG" ? raw : -raw;
       });
-      const credibility = assessBacktestCredibility(returns, 1, 365);
+      const trialsTested = options.trialsTested;
+      const deflatable = trialsTested !== undefined && trialsTested >= 2;
+      const annualization = tradeReturnsPerYear(result, returns.length);
+      const credibility = assessBacktestCredibility(
+        returns,
+        deflatable ? trialsTested : 1,
+        annualization,
+      );
       const psr = `${(credibility.psr * 100).toFixed(0)}% ${credibility.psrSignificant ? "✓" : "✗"}`;
-      const dsr = `${(credibility.deflatedSharpe * 100).toFixed(0)}% ${credibility.dsrSignificant ? "✓" : "✗"}`;
-      const verdict = credibility.credible ? "credible" : "NOT credible";
+      // At one trial the DSR is arithmetically identical to the PSR, so
+      // printing it as "DSR" would claim a deflation that was never applied.
+      const dsr = deflatable
+        ? `${(credibility.deflatedSharpe * 100).toFixed(0)}% ${credibility.dsrSignificant ? "✓" : "✗"} (${trialsTested} trials)`
+        : "n/a (trial count not supplied, not deflated)";
+      const verdict = deflatable
+        ? credibility.credible
+          ? "credible"
+          : "NOT credible"
+        : "undeflated (multiple-testing burden unknown)";
       extra += `\n  Credibility: PSR ${psr}, DSR ${dsr}, ${verdict}`;
 
       const mean = returns.reduce((s, r) => s + r, 0) / returns.length;
