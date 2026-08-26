@@ -204,15 +204,21 @@ export class BacktestEngine {
     // Pre-calculate all indicators
     this.indicators = this.precalculateIndicators(data);
 
+    let finalPositionClosed = false;
+
     // Process each bar
     for (let i = 0; i < data.length; i++) {
       this.currentBarIndex = i;
       const bar = data[i];
       if (!bar) continue;
+      const isLastBar = i === data.length - 1;
 
       // Stop processing new signals after max drawdown breach
       if (this.reachedMaxDrawdown) {
         this.flushPendingSignals(bar);
+        if (isLastBar) {
+          finalPositionClosed = this.closeOpenPositions(bar);
+        }
         this.updateEquityCurve(bar);
         continue;
       }
@@ -242,33 +248,43 @@ export class BacktestEngine {
         this.updateUnrealizedPnL(bar.close);
       }
 
+      // The forced end-of-backtest close has to land BEFORE this bar's equity
+      // point. Run after the loop, it charged an exit commission that no
+      // equity point ever saw, so finalCapital (read off the last point) was
+      // one exit commission richer than the trades it was built from, and
+      // every curve-derived statistic inherited the same gap.
+      if (isLastBar) {
+        finalPositionClosed = this.closeOpenPositions(bar);
+      }
+
       // Update equity curve
       this.updateEquityCurve(bar);
     }
 
-    // Close any remaining positions at end of backtest (single + grid)
-    let finalPositionClosed = false;
-    if (data.length > 0) {
-      const lastBar = data[data.length - 1];
-      if (lastBar) {
-        // Close single position
-        if (this.position) {
-          this.closePosition(lastBar.close, lastBar, "END_OF_BACKTEST");
-          finalPositionClosed = true;
-        }
+    return this.buildResult(strategy.id, data, finalPositionClosed);
+  }
 
-        // Close all remaining grid positions
-        if (this.gridPositions.length > 0) {
-          const gridSnapshot = [...this.gridPositions];
-          for (const pos of gridSnapshot) {
-            this.closeGridPosition(pos, lastBar.close, lastBar, "END_OF_BACKTEST");
-          }
-          finalPositionClosed = true;
-        }
-      }
+  /**
+   * Close everything still open at this bar's close. Returns whether anything
+   * was closed.
+   */
+  private closeOpenPositions(bar: OHLC): boolean {
+    let closed = false;
+
+    if (this.position) {
+      this.closePosition(bar.close, bar, "END_OF_BACKTEST");
+      closed = true;
     }
 
-    return this.buildResult(strategy.id, data, finalPositionClosed);
+    if (this.gridPositions.length > 0) {
+      const gridSnapshot = [...this.gridPositions];
+      for (const pos of gridSnapshot) {
+        this.closeGridPosition(pos, bar.close, bar, "END_OF_BACKTEST");
+      }
+      closed = true;
+    }
+
+    return closed;
   }
 
   // ============================================================================

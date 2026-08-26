@@ -74,6 +74,156 @@ describe("commission accounting", () => {
   });
 });
 
+/** Buys once and never sells, so the run ends holding an open position. */
+const buyAndHoldStrategy = {
+  id: "hold-test",
+  name: "hold-test",
+  generateSignal(
+    bar: OHLC,
+    _indicators: unknown,
+    position: Position | null,
+  ): Signal | null {
+    if (!position && bar.close === 100) {
+      return { type: "BUY", price: bar.close, timestamp: bar.timestamp, reason: "entry" };
+    }
+    return null;
+  },
+};
+
+/**
+ * Grid entry at 100, grid exit at 110, so the run ends flat. The
+ * single-position strategies cannot do this: the engine only asks for a signal
+ * while flat or in grid mode, so their only exit is a stop, a target, or the
+ * forced end-of-backtest close.
+ */
+const gridRoundTripStrategy = {
+  id: "grid-round-trip-test",
+  name: "grid-round-trip-test",
+  generateSignal(bar: OHLC, _indicators: unknown, _position: Position | null): Signal | null {
+    if (bar.close === 100) {
+      return {
+        type: "BUY",
+        price: bar.close,
+        timestamp: bar.timestamp,
+        reason: "grid entry",
+        gridLevel: 0,
+        maxPositions: 2,
+      };
+    }
+    if (bar.close === 110) {
+      return {
+        type: "SELL",
+        price: bar.close,
+        timestamp: bar.timestamp,
+        reason: "grid exit",
+        gridLevel: 0,
+        maxPositions: 2,
+      };
+    }
+    return null;
+  },
+};
+
+/** Buys a grid level and holds it, so the multi-position path ends open. */
+const gridHoldStrategy = {
+  id: "grid-hold-test",
+  name: "grid-hold-test",
+  generateSignal(bar: OHLC, _indicators: unknown, _position: Position | null): Signal | null {
+    if (bar.close === 100) {
+      return {
+        type: "BUY",
+        price: bar.close,
+        timestamp: bar.timestamp,
+        reason: "grid entry",
+        gridLevel: 0,
+        maxPositions: 2,
+      };
+    }
+    return null;
+  },
+};
+
+const shortHoldStrategy = {
+  id: "short-hold-test",
+  name: "short-hold-test",
+  generateSignal(
+    bar: OHLC,
+    _indicators: unknown,
+    position: Position | null,
+  ): Signal | null {
+    if (!position && bar.close === 100) {
+      return { type: "SELL", price: bar.close, timestamp: bar.timestamp, reason: "short entry" };
+    }
+    return null;
+  },
+};
+
+/**
+ * The identity that catches every commission-accounting defect at once: money
+ * only leaves the account through a trade, so the change in capital over a
+ * completed backtest must equal the sum of what those trades netted.
+ *
+ * It broke because the END_OF_BACKTEST close ran AFTER the last
+ * `updateEquityCurve`, so the exit commission it charged never reached the
+ * final equity point that `finalCapital` is read from. Only a run that ends
+ * holding an open position takes that path, which is why most cases below end
+ * with one.
+ */
+describe("capital change equals the sum of trade netPnL", () => {
+  function assertInvariant(result: { finalCapital: number; trades: { netPnL: number }[] }) {
+    const summed = result.trades.reduce((sum, t) => sum + t.netPnL, 0);
+    expect(result.finalCapital - 100_000).toBeCloseTo(summed, 6);
+  }
+
+  test("run ending with an open long position", () => {
+    const result = new BacktestEngine(params()).run(buyAndHoldStrategy, bars([100, 100, 110, 110]));
+    expect(result.finalPositionClosed).toBe(true);
+    expect(result.trades).toHaveLength(1);
+    expect(result.trades[0]!.exitReason).toBe("END_OF_BACKTEST");
+    // 10,000 notional in at 100, out at 110: gross 1,000 less 10 entry and 11
+    // exit commission. Before the ordering fix the capital change read 990.
+    expect(result.finalCapital - 100_000).toBeCloseTo(979, 6);
+    assertInvariant(result);
+  });
+
+  test("run ending with an open short position", () => {
+    const result = new BacktestEngine(params({ allowShorts: true })).run(
+      shortHoldStrategy,
+      bars([100, 100, 90, 90]),
+    );
+    expect(result.finalPositionClosed).toBe(true);
+    assertInvariant(result);
+  });
+
+  test("run ending with open grid positions", () => {
+    const result = new BacktestEngine(params()).run(gridHoldStrategy, bars([100, 100, 110, 110]));
+    expect(result.finalPositionClosed).toBe(true);
+    expect(result.trades.length).toBeGreaterThan(0);
+    assertInvariant(result);
+  });
+
+  test("run ending flat still balances", () => {
+    const result = new BacktestEngine(params()).run(
+      gridRoundTripStrategy,
+      bars([100, 100, 110, 110]),
+    );
+    expect(result.finalPositionClosed).toBe(false);
+    assertInvariant(result);
+  });
+
+  test("the final equity point carries the forced close, and so does max drawdown", () => {
+    const result = new BacktestEngine(params()).run(buyAndHoldStrategy, bars([100, 100, 110, 110]));
+    const last = result.equityCurve[result.equityCurve.length - 1]!;
+    expect(last.equity).toBeCloseTo(result.finalCapital, 9);
+    expect(result.metrics.finalValue).toBeCloseTo(result.finalCapital, 9);
+    expect(result.metrics.netProfit).toBeCloseTo(979, 6);
+    // The 11 the exit commission gives back off the 100,990 peak. Reported as
+    // a flat 0 while the curve stopped one movement short.
+    expect(last.drawdown).toBeCloseTo(11, 6);
+    expect(result.metrics.maxDrawdown).toBeGreaterThan(0);
+  });
+});
+
 describe("protectiveOrderPrices", () => {
   const s = 0.01;
 
