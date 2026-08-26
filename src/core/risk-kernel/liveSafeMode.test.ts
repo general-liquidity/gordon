@@ -14,10 +14,19 @@ describe("resolveLiveSafeMode", () => {
     expect(resolveLiveSafeMode("warn", true)).toBe("warn");
   });
 
-  it("never touches enforce or paper", () => {
-    expect(resolveLiveSafeMode("enforce", false)).toBe("enforce");
-    expect(resolveLiveSafeMode("paper", false)).toBe("paper");
+  it("upgrades paper -> enforce on a live (non-sandbox) venue", () => {
+    // Paper mode approves every order without running a check. A live venue
+    // fills a live order regardless of what the kernel calls its own mode.
+    expect(resolveLiveSafeMode("paper", false)).toBe("enforce");
+  });
+
+  it("leaves paper untouched on a sandbox venue", () => {
     expect(resolveLiveSafeMode("paper", true)).toBe("paper");
+  });
+
+  it("never touches enforce", () => {
+    expect(resolveLiveSafeMode("enforce", false)).toBe("enforce");
+    expect(resolveLiveSafeMode("enforce", true)).toBe("enforce");
   });
 });
 
@@ -64,5 +73,35 @@ describe("RiskKernel.evaluate — warn mode on a live venue", () => {
     });
     // warn stays warn on sandbox — critical violations are logged but allowed.
     expect(decision.approved).toBe(true);
+  });
+});
+
+describe("RiskKernel.evaluate — paper mode on a live venue", () => {
+  it("paper modeOverride + live venue hard-rejects a position-size breach", async () => {
+    const kernel = new RiskKernel({ mode: "enforce", autoAdjustSize: false });
+    const decision = await kernel.evaluate(breachingOrder(), context(), {
+      modeOverride: "paper",
+      sandboxActive: false,
+    });
+    expect(decision.approved).toBe(false);
+    expect(decision.reason).not.toContain("Paper mode");
+  });
+
+  it("paper config + live venue hard-rejects a position-size breach", async () => {
+    const kernel = new RiskKernel({ mode: "paper", autoAdjustSize: false });
+    const decision = await kernel.evaluate(breachingOrder(), context(), {
+      sandboxActive: false,
+    });
+    expect(decision.approved).toBe(false);
+    expect(decision.action).toBe("reject");
+  });
+
+  it("paper config + sandbox venue still approves everything", async () => {
+    const kernel = new RiskKernel({ mode: "paper", autoAdjustSize: false });
+    const decision = await kernel.evaluate(breachingOrder(), context(), {
+      sandboxActive: true,
+    });
+    expect(decision.approved).toBe(true);
+    expect(decision.reason).toContain("Paper mode");
   });
 });

@@ -269,8 +269,11 @@ export async function evaluateOrderRisk(
   const sandboxActive =
     (ctx.exchange as { isSandbox?: boolean } | null)?.isSandbox ?? ctx.broker?.isPaper ?? false;
   const envRiskMode = resolveFlag("GORDON_RISK_MODE");
+  // A paper-mode override is only meaningful where fills are simulated. The
+  // condition used to be negated, so the override fired EXCLUSIVELY on live
+  // venues — exactly where the kernel must not be short-circuited.
   const modeOverride =
-    envRiskMode === "paper" && !sandboxActive ? ("paper" as const) : undefined;
+    envRiskMode === "paper" && sandboxActive ? ("paper" as const) : undefined;
 
   // -- Evaluate ----------------------------------------------------------
   const decision = await riskKernel.evaluate(orderRequest, portfolioContext, {

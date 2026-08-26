@@ -195,3 +195,27 @@ describe("evaluateOrderRisk order path", () => {
     expect(result.approved).toBe(false);
   });
 });
+
+describe("evaluateOrderRisk GORDON_RISK_MODE=paper override", () => {
+  afterEach(() => {
+    delete process.env.GORDON_RISK_MODE;
+  });
+
+  test("applies the paper override on a sandbox venue", async () => {
+    process.env.GORDON_RISK_MODE = "paper";
+    const result = await evaluateOrderRisk(FEASIBLE_ORDER, contextWith({ cashUsd: 6_000 }));
+
+    expect(result.approved).toBe(true);
+    expect(result.reason).toContain("Paper mode");
+  });
+
+  test("does not apply the paper override on a live venue", async () => {
+    process.env.GORDON_RISK_MODE = "paper";
+    const ctx = contextWith({ cashUsd: 6_000 });
+    (ctx.exchange as unknown as { isSandbox: boolean }).isSandbox = false;
+
+    const result = await evaluateOrderRisk(FEASIBLE_ORDER, ctx);
+
+    expect(result.reason).not.toContain("Paper mode");
+  });
+});

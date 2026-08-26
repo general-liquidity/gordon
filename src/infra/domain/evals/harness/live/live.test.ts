@@ -116,6 +116,10 @@ describe("EvalSandbox risk-kernel isolation", () => {
           currentDrawdown: 0,
           peakEquity: 10_000,
         },
+        // The eval sandbox is not a venue: nothing here can fill. Paper mode is
+        // only honored when the caller says so, because resolveLiveSafeMode now
+        // upgrades paper to enforce on an unknown/live venue.
+        { sandboxActive: true },
       );
       expect(decision.approved).toBe(true);
       expect(decision.reason).toContain("Paper mode");

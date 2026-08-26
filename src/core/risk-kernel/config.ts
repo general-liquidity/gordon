@@ -148,9 +148,11 @@ export function loadConfigFromEnv(overrides?: Partial<RiskKernelConfig>): RiskKe
  * never on real capital.
  *
  * Rule: when the venue is NOT sandbox/paper, `warn` is upgraded to `enforce`.
- * `paper` mode is left untouched — operators may intentionally run paper
- * evaluation logic, and the venue itself blocks real fills. Returns the mode
- * unchanged on a sandbox venue.
+ *
+ * `paper` is upgraded the same way, and for a stronger reason: paper mode
+ * approves every order outright without running any check. The venue does not
+ * block real fills — a live venue fills a live order regardless of what the
+ * kernel calls its own mode. Returns the mode unchanged on a sandbox venue.
  */
 export function resolveLiveSafeMode(
   mode: RiskKernelConfig["mode"],
@@ -159,6 +161,12 @@ export function resolveLiveSafeMode(
   if (mode === "warn" && !sandboxActive) {
     logger.warn(
       "GORDON_RISK_MODE=warn overridden to enforce on a live venue — hard risk caps stay active on real capital",
+    );
+    return "enforce";
+  }
+  if (mode === "paper" && !sandboxActive) {
+    logger.warn(
+      "GORDON_RISK_MODE=paper overridden to enforce on a live venue — hard risk caps stay active on real capital",
     );
     return "enforce";
   }
