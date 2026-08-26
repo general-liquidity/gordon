@@ -6,6 +6,7 @@
  * Configuration can be loaded from environment variables or defaults.
  */
 
+import { flagEnv } from "../../infra/config/flagResolver.ts";
 import { z } from "zod";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 
@@ -93,7 +94,11 @@ export const DEFAULT_RISK_CONFIG: RiskKernelConfig = {
  *   GORDON_RISK_REQUIRE_APPROVAL (true | false)
  */
 export function loadConfigFromEnv(overrides?: Partial<RiskKernelConfig>): RiskKernelConfig {
-  const env = process.env;
+  // Resolved rather than raw: the risk gate already reads GORDON_RISK_MODE through
+  // the flag resolver, so reading process.env here meant a mode set via /flags
+  // governed the gate but not the kernel it gates, and stopped applying at all on
+  // the next restart. The two must not disagree about the same flag.
+  const env = flagEnv();
 
   const raw: Record<string, unknown> = {
     maxPositionSizeUsd: parseEnvNumber(env.GORDON_RISK_MAX_POSITION_USD) ?? overrides?.maxPositionSizeUsd,
