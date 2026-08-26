@@ -18,6 +18,19 @@
  * GORDON_SETTINGS_SYNC is enabled (see config/settingsSync) — default OFF, so
  * the chain is unchanged when the flag is unset.
  *
+ * WHY `policy` OUTRANKS THE OPERATOR (deliberate, not list order): the policy
+ * layer exists for managed deployments, where the fund/desk that owns the
+ * account sets guardrails the person at the keyboard must not be able to widen
+ * from the TUI. That is the whole point of the layer, so it sits above `local`
+ * (what `/flags set` writes) and above `synced`. Only the live, non-persistent
+ * controls (`session` and `cli`) outrank it.
+ *
+ * Because it outranks the operator and feeds both the flag resolver and the
+ * subprocess-sandbox toggle, the policy file MUST be signed with the same
+ * HMAC scheme as the synced layer (see settingsSync/policySignature.ts). An
+ * unsigned or badly-signed policy file is refused outright rather than applied
+ * or quietly demoted. A missing policy file is the normal case and is silent.
+ *
  * Each layer is a partial config. Merge is shallow per top-level key,
  * deep for nested objects (exchanges, risk, etc.).
  */
@@ -25,6 +38,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GORDON_DIR } from "../storage/paths.ts";
+import { loadPolicyLayer } from "./settingsSync/policySignature.ts";
 import { loadRemoteSyncLayer } from "./settingsSync/index.ts";
 
 // ============================================================================
@@ -117,13 +131,6 @@ function loadLocalLayer(): LayeredSettings | null {
   return { layer: "local", values, source: path };
 }
 
-function loadPolicyLayer(): LayeredSettings | null {
-  const path = join(GORDON_DIR, "policy.json");
-  const values = loadJsonFile(path);
-  if (!values) return null;
-  return { layer: "policy", values, source: path };
-}
-
 // ============================================================================
 // In-Memory Layers (CLI flags + session overrides)
 // ============================================================================
@@ -208,6 +215,8 @@ export function loadLayeredSettings(options: LoadSettingsOptions = {}): MergedSe
   const synced = loadRemoteSyncLayer();
   if (synced) layers.push(synced);
 
+  // Signed organization policy. Refused (not applied, not demoted) when the
+  // file exists but fails verification; silent when absent.
   const policy = loadPolicyLayer();
   if (policy) layers.push(policy);
 
