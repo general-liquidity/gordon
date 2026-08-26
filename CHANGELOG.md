@@ -10,6 +10,50 @@ called out explicitly, whatever their size.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-26
+
+### Security
+
+- Every known venue-dispatch path now enforces live-capital consent. The four
+  execution algorithms no longer fall back to a raw `placeOrder` submitter,
+  malformed or missing access-control configuration fails closed, and the WIP
+  claim is acquired synchronously before a plan can submit.
+- Consent is keyed to exposure direction. A verified close remains available
+  after consent is revoked, while a wrong-side or oversized order cannot claim
+  the reduction exemption. Grid and deferred take-profit ladders now subtract
+  every filled exit and cap their aggregate resting quantity at what remains
+  open.
+- The risk kernel re-checks an adjusted order against every critical rule and
+  accounts for leverage already consumed by open positions. Correlation can
+  report `unknown` or `fault` instead of laundering missing evidence into a
+  pass, and broker-routed orders use the same gate as exchange orders.
+- New-symbol market orders are priced at the exchange mark or executable-side
+  broker quote before dollar-denominated checks run. An unavailable or invalid
+  price is a typed refusal.
+- The highest-precedence `policy.json` settings layer is HMAC-signed and is
+  refused wholesale when its signature cannot be verified. Its key remains an
+  environment secret and is not exposed through `/flags`.
+
+### Fixed
+
+- Backtest capital now includes the forced terminal close before the final
+  equity point, and open grid positions no longer pay their entry commission a
+  second time when marked. The permanent invariant reconciles capital change
+  with summed per-trade net P&L.
+- The power-law Kelly utility is dimensionally scaled and capped, loss barriers
+  are anchored to session-opening equity, annualized Sharpe inputs are named at
+  the type boundary, and return bootstraps resample fractions rather than
+  nominal P&L.
+- Point-in-time filtering declares strict or permissive treatment explicitly;
+  an unreadable cutoff never disables the filter. Advertised flags now have
+  executable readers, including processor model selection through the layered
+  resolver.
+- Large tool outputs can be recovered through a bounded, path-confined reader
+  from Gordon, Researcher, and Executor. Small prices retain significant digits
+  instead of rendering as zero.
+- Scaffolded SDK projects run without arming live trading and reject project
+  names that could inject generated TypeScript.
+
 ## [0.2.0] - 2026-08-26
 
 ### Security
@@ -136,5 +180,6 @@ The permission change is behavioral: a tool that was previously auto-approved
 through the unknown-name fallthrough now queues for human approval. That is the
 intent, and it is why this is a minor rather than a patch release.
 
-[Unreleased]: https://github.com/general-liquidity/gordon/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/general-liquidity/gordon/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/general-liquidity/gordon/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/general-liquidity/gordon/compare/v0.1.0...v0.2.0
