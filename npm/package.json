@@ -34,13 +34,13 @@
     "provenance": true
   },
   "optionalDependencies": {
-    "@general-liquidity/gordon-linux-x64": "0.1.0",
-    "@general-liquidity/gordon-linux-arm64": "0.1.0",
-    "@general-liquidity/gordon-linux-x64-musl": "0.1.0",
-    "@general-liquidity/gordon-linux-arm64-musl": "0.1.0",
-    "@general-liquidity/gordon-darwin-x64": "0.1.0",
-    "@general-liquidity/gordon-darwin-arm64": "0.1.0",
-    "@general-liquidity/gordon-win32-x64": "0.1.0",
-    "@general-liquidity/gordon-win32-arm64": "0.1.0"
+    "@general-liquidity/gordon-linux-x64": "0.2.0",
+    "@general-liquidity/gordon-linux-arm64": "0.2.0",
+    "@general-liquidity/gordon-linux-x64-musl": "0.2.0",
+    "@general-liquidity/gordon-linux-arm64-musl": "0.2.0",
+    "@general-liquidity/gordon-darwin-x64": "0.2.0",
+    "@general-liquidity/gordon-darwin-arm64": "0.2.0",
+    "@general-liquidity/gordon-win32-x64": "0.2.0",
+    "@general-liquidity/gordon-win32-arm64": "0.2.0"
   }
 }
