@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 
 import type { RuntimeToolPolicyDecision } from "../tools/ToolPolicy.ts";
+import { CapabilityRegistry } from "../tools/CapabilityRegistry.ts";
 import { PermissionEngine } from "./PermissionEngine.ts";
 import { RuntimeStore } from "../state/RuntimeStore.ts";
 import { createDefaultRuntimeSessionState } from "../state/SessionState.ts";
@@ -147,5 +148,34 @@ describe("PermissionEngine", () => {
 
     expect(evaluation.status).toBe("allowed");
     expect(evaluation.source).toBe("classifier");
+  });
+
+  it("requires human approval for manage_flags", async () => {
+    const store = new RuntimeStore(createDefaultRuntimeSessionState("app"));
+    const engine = new PermissionEngine(store);
+
+    // Spec comes from the live registry, so this asserts the declaration, not a
+    // fixture. Approval class matches ToolPolicy's mapping for system.mode.write.
+    const spec = new CapabilityRegistry().resolveToolSpec("manage_flags");
+    const evaluation = await engine.evaluate("manage_flags", context, createPolicy({
+      approvalClass: "per_tool",
+      tool: spec,
+    }));
+
+    expect(evaluation.status).toBe("pending");
+    expect(store.getState().approvals.pending).toHaveLength(1);
+  });
+
+  it("queues an undeclared, unrecognized tool instead of auto-allowing it", async () => {
+    const store = new RuntimeStore(createDefaultRuntimeSessionState("app"));
+    const engine = new PermissionEngine(store);
+
+    const spec = new CapabilityRegistry().resolveToolSpec("zzz_unrecognized_widget");
+    const evaluation = await engine.evaluate("zzz_unrecognized_widget", context, createPolicy({
+      approvalClass: "per_tool",
+      tool: spec,
+    }));
+
+    expect(evaluation.status).toBe("pending");
   });
 });

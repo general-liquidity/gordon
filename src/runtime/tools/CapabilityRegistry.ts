@@ -7,6 +7,38 @@ import type {
   RuntimeWorkerRole,
 } from "../contracts/types.ts";
 
+/**
+ * An explicit, author-written capability declaration. Unlike the name-regex
+ * inference below, a declaration is authority the tool carries: category and
+ * permissionScope are mandatory, and the registry uses it verbatim instead of
+ * guessing from the tool id.
+ */
+export type ToolCapabilityDeclaration =
+  Pick<RuntimeToolSpec, "category" | "permissionScope"> & Partial<RuntimeToolSpec>;
+
+/**
+ * Tools whose authority is DECLARED rather than inferred. Name-regex inference
+ * is skipped entirely for these ids, so adding a tool whose name happens to
+ * miss every pattern cannot silently downgrade its permission scope.
+ */
+const DECLARED_TOOL_CAPABILITIES: Record<string, ToolCapabilityDeclaration> = {
+  // Writes process.env and ~/.gordon/settings.local.json, and its settable set
+  // includes GORDON_ALLOW_LIVE, GORDON_RISK_MODE and GORDON_RISK_MAX_LEVERAGE.
+  // The orchestrator carries this tool, so an auto-approved manage_flags is a
+  // path from a chat turn to live capital. Never auto-approved.
+  manage_flags: {
+    category: "system",
+    permissionScope: "system.mode.write",
+    riskClass: "critical",
+    sideEffectLevel: "write",
+    workerRole: "Gordon",
+    requiresTradePermission: false,
+    supportsStreaming: false,
+    supportsBackground: false,
+    idempotent: false,
+  },
+};
+
 const STATIC_TOOL_OVERRIDES: Record<string, Partial<RuntimeToolSpec>> = {
   quick_scan: {
     category: "market",
@@ -322,7 +354,12 @@ function inferCategory(toolId: string): RuntimeToolCategory {
   return "unknown";
 }
 
-function inferPermissionScope(toolId: string, category: RuntimeToolCategory): RuntimePermissionScope {
+/**
+ * Returns `undefined` when neither a name pattern nor the category places the
+ * tool. An unplaced tool must not fall back to `analysis.run`: that scope
+ * carries approvalClass "none", which the permission classifier auto-allows.
+ */
+function inferPermissionScope(toolId: string, category: RuntimeToolCategory): RuntimePermissionScope | undefined {
   const normalized = toolId.toLowerCase();
   if (/plugin|install/.test(normalized)) return "plugin.install";
   if (/mcp|reload_mcp/.test(normalized)) return "mcp.connect";
@@ -334,8 +371,17 @@ function inferPermissionScope(toolId: string, category: RuntimeToolCategory): Ru
   if (category === "planning") return "analysis.run";
   if (category === "monitoring") return "portfolio.read";
   if (category === "market" || category === "analysis") return "market.read";
-  return "analysis.run";
+  if (category === "education" || category === "backtest") return "analysis.run";
+  return undefined;
 }
+
+/**
+ * Scope handed to a tool that is neither declared nor placed by any pattern.
+ * `system.mode.write` is the narrowest existing scope whose approvalClass
+ * ("per_tool") keeps the default classifier from auto-allowing, so an unknown
+ * tool reaches a human instead of running unattended.
+ */
+const UNCLASSIFIED_PERMISSION_SCOPE: RuntimePermissionScope = "system.mode.write";
 
 function inferRiskClass(scope: RuntimePermissionScope, category: RuntimeToolCategory): RuntimeRiskClass {
   switch (scope) {
@@ -404,8 +450,11 @@ export class CapabilityRegistry {
   }
 
   resolveToolSpec(toolId: string): RuntimeToolSpec {
-    const category = inferCategory(toolId);
-    const permissionScope = inferPermissionScope(toolId, category);
+    const declaration = DECLARED_TOOL_CAPABILITIES[toolId];
+    const category = declaration?.category ?? inferCategory(toolId);
+    const inferredScope = declaration?.permissionScope ?? inferPermissionScope(toolId, category);
+    const unclassified = inferredScope === undefined;
+    const permissionScope = inferredScope ?? UNCLASSIFIED_PERMISSION_SCOPE;
     const riskClass = inferRiskClass(permissionScope, category);
     const sideEffectLevel = inferSideEffectLevel(permissionScope);
     const requiresTradePermission = permissionScope === "livetrade.execute" || permissionScope === "transfer.execute";
@@ -414,7 +463,7 @@ export class CapabilityRegistry {
     const base: RuntimeToolSpec = {
       id: toolId,
       category,
-      riskClass,
+      riskClass: unclassified ? "high" : riskClass,
       permissionScope,
       sideEffectLevel,
       requiresTradePermission,
@@ -431,6 +480,9 @@ export class CapabilityRegistry {
       ...base,
       ...(staticOverride ?? {}),
       ...(override ?? {}),
+      // An explicit declaration is the authority for the tool and outranks both
+      // the inferred base and any registered override.
+      ...(declaration ?? {}),
     };
   }
 }
