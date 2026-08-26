@@ -1,9 +1,10 @@
 /**
  * Emergency Liquidation
  *
- * When circuit breakers trip, this module cancels all open Gordon orders
- * and closes all open positions via market orders. This is the nuclear
- * option — only triggered by critical circuit breaker trips.
+ * When circuit breakers trip, this module stops strategy creation, cancels
+ * exposure-increasing Gordon orders, closes open positions via market orders,
+ * then removes protective exits only after their position is confirmed closed.
+ * This is the nuclear option — only triggered by critical circuit breaker trips.
  */
 
 import type { Exchange } from "../../infra/exchange/types.ts";
@@ -27,8 +28,8 @@ export interface EmergencyLiquidationResult {
 }
 
 /**
- * Execute emergency liquidation: cancel all orders, close all positions,
- * pause all strategy slots.
+ * Execute emergency liquidation without creating an unprotected interval when
+ * a close fails.
  */
 export async function executeEmergencyLiquidation(
   exchange: Exchange,
@@ -47,14 +48,21 @@ export async function executeEmergencyLiquidation(
     triggers: triggers.map((t) => `${t.name}: ${t.current} >= ${t.threshold}`),
   });
 
-  // Phase 1: Cancel all open Gordon orders
-  await cancelAllGordonOrders(exchange, result);
-
-  // Phase 2: Close all open positions via market orders
-  await closeAllOpenPositions(exchange, result);
-
-  // Phase 3: Pause all active strategy slots
+  // Phase 1: stop strategies before touching their resting orders, otherwise a
+  // live slot can recreate an order while liquidation is in progress.
   pauseAllSlots(result);
+
+  // Phase 2: cancel only orders whose fill could open or increase exposure.
+  // Protective exits remain live until the replacement market close succeeds.
+  await cancelExposureIncreasingOrders(exchange, result);
+
+  // Phase 3: close positions. A failed close deliberately leaves its protective
+  // exits resting rather than turning a liquidation failure into naked risk.
+  const closedSymbols = await closeAllOpenPositions(exchange, result);
+
+  // Phase 4: after every active trade for a symbol closed successfully, remove
+  // the now-stale exits before they can reverse the flat position.
+  await cancelOrdersForSymbols(exchange, result, closedSymbols);
 
   logEvent({
     type: "SYSTEM",
@@ -74,34 +82,93 @@ export async function executeEmergencyLiquidation(
   return result;
 }
 
-async function cancelAllGordonOrders(
+type ActiveTrade = ReturnType<typeof listTrades>[number];
+
+function isGordonOrder(clientOrderId: string | undefined): boolean {
+  // Explicit call sites use the underscore form; the CCXT adapter's automatic
+  // idempotency key uses the hyphen form. Both are Gordon-owned orders and must
+  // participate in emergency cleanup.
+  return (
+    clientOrderId?.startsWith("gordon_") === true || clientOrderId?.startsWith("gordon-") === true
+  );
+}
+
+function protectiveOrderPriority(type: string): number {
+  // If mutually exclusive exits collectively exceed the remaining position,
+  // preserve downside protection first. The later cleanup removes whichever
+  // protective order remains after the market close succeeds.
+  if (type === "STOP_LOSS" || type === "STOP_LOSS_LIMIT") return 0;
+  if (type === "TAKE_PROFIT" || type === "TAKE_PROFIT_LIMIT") return 1;
+  return 2;
+}
+
+function remainingQuantity(trade: ActiveTrade): number {
+  const entered = trade.entries.reduce((sum, entry) => sum + entry.quantity, 0);
+  const exited = trade.exits.reduce((sum, exit) => sum + exit.quantity, 0);
+  return Math.max(0, entered - exited);
+}
+
+function protectiveCapacityBySide(trades: ActiveTrade[]): Map<"BUY" | "SELL", number> {
+  const capacity = new Map<"BUY" | "SELL", number>([
+    ["BUY", 0],
+    ["SELL", 0],
+  ]);
+  for (const trade of trades) {
+    const plan = getPlan(trade.planId);
+    const side: "BUY" | "SELL" = plan?.direction === "short" ? "BUY" : "SELL";
+    capacity.set(side, (capacity.get(side) ?? 0) + remainingQuantity(trade));
+  }
+  return capacity;
+}
+
+async function cancelExposureIncreasingOrders(
   exchange: Exchange,
   result: EmergencyLiquidationResult,
 ): Promise<void> {
-  // Get all symbols with active trades
   const openTrades = listTrades({ status: "OPEN" });
   const partialTrades = listTrades({ status: "PARTIAL" });
-  const symbols = new Set([
-    ...openTrades.map((t) => t.symbol),
-    ...partialTrades.map((t) => t.symbol),
-  ]);
+  const tradesBySymbol = new Map<string, ActiveTrade[]>();
+  for (const trade of [...openTrades, ...partialTrades]) {
+    const trades = tradesBySymbol.get(trade.symbol) ?? [];
+    trades.push(trade);
+    tradesBySymbol.set(trade.symbol, trades);
+  }
 
-  for (const symbol of symbols) {
+  for (const [symbol, trades] of tradesBySymbol) {
     try {
       const openOrders = await exchange.getOpenOrders(symbol);
-      const gordonOrders = openOrders.filter(
-        (o) => o.clientOrderId?.startsWith("gordon_"),
-      );
+      const capacity = protectiveCapacityBySide(trades);
+      const protectedSoFar = new Map<"BUY" | "SELL", number>([
+        ["BUY", 0],
+        ["SELL", 0],
+      ]);
+
+      const gordonOrders = openOrders
+        .filter((order) => isGordonOrder(order.clientOrderId))
+        .sort(
+          (left, right) => protectiveOrderPriority(left.type) - protectiveOrderPriority(right.type),
+        );
 
       for (const order of gordonOrders) {
+        const side = order.side;
+        const quantity = Number(order.quantity);
+        const nextProtected = (protectedSoFar.get(side) ?? 0) + quantity;
+        const isProtective =
+          Number.isFinite(quantity) && quantity > 0 && nextProtected <= (capacity.get(side) ?? 0);
+        if (isProtective) {
+          protectedSoFar.set(side, nextProtected);
+          logger.info("Preserved protective exit until emergency close confirms", {
+            symbol,
+            orderId: order.orderId,
+            side,
+            quantity,
+          });
+          continue;
+        }
         try {
-          // Deliberately NOT gated on live consent. A cancellation removes a
-          // resting order, so it can only shrink committed exposure, never
-          // create it. Gating it would strand the operator with live orders
-          // they cannot pull. Do not "fix" this as an oversight.
           await exchange.cancelOrder(symbol, order.orderId.toString());
           result.ordersCancelled++;
-          logger.info("Cancelled order", {
+          logger.info("Cancelled exposure-increasing order", {
             symbol,
             orderId: order.orderId,
             clientOrderId: order.clientOrderId,
@@ -122,22 +189,59 @@ async function cancelAllGordonOrders(
   }
 }
 
+async function cancelOrdersForSymbols(
+  exchange: Exchange,
+  result: EmergencyLiquidationResult,
+  symbols: ReadonlySet<string>,
+): Promise<void> {
+  for (const symbol of symbols) {
+    try {
+      const openOrders = await exchange.getOpenOrders(symbol);
+      for (const order of openOrders) {
+        if (!isGordonOrder(order.clientOrderId)) continue;
+        try {
+          await exchange.cancelOrder(symbol, order.orderId.toString());
+          result.ordersCancelled++;
+          logger.info("Cancelled stale exit after emergency close", {
+            symbol,
+            orderId: order.orderId,
+            clientOrderId: order.clientOrderId,
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          result.errors.push(`Cancel order ${order.orderId} failed: ${msg}`);
+          logger.warn("Failed to cancel stale order after emergency close", {
+            orderId: order.orderId,
+            error: msg,
+          });
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      result.errors.push(`Cancel orders for ${symbol} failed: ${msg}`);
+    }
+  }
+}
+
 async function closeAllOpenPositions(
   exchange: Exchange,
   result: EmergencyLiquidationResult,
-): Promise<void> {
+): Promise<Set<string>> {
   const openTrades = listTrades({ status: "OPEN" });
   const partialTrades = listTrades({ status: "PARTIAL" });
   const activeTrades = [...openTrades, ...partialTrades];
+  const attemptedBySymbol = new Map<string, number>();
+  const closedBySymbol = new Map<string, number>();
 
   for (const trade of activeTrades) {
+    attemptedBySymbol.set(trade.symbol, (attemptedBySymbol.get(trade.symbol) ?? 0) + 1);
     try {
-      // Calculate remaining quantity to close
-      const totalEntryQty = trade.entries.reduce((sum, e) => sum + e.quantity, 0);
-      const totalExitQty = trade.exits.reduce((sum, e) => sum + e.quantity, 0);
-      const remainingQty = totalEntryQty - totalExitQty;
+      const remainingQty = remainingQuantity(trade);
 
-      if (remainingQty <= 0) continue;
+      if (remainingQty <= 0) {
+        closedBySymbol.set(trade.symbol, (closedBySymbol.get(trade.symbol) ?? 0) + 1);
+        continue;
+      }
 
       // Determine exit side from the plan's direction
       const plan = getPlan(trade.planId);
@@ -167,9 +271,10 @@ async function closeAllOpenPositions(
       const orderResult = await exchange.placeOrder(closeOrder);
 
       // Update trade record
-      const exitPrice = orderResult.executedQty > 0
-        ? orderResult.cummulativeQuoteQty / orderResult.executedQty
-        : orderResult.price;
+      const exitPrice =
+        orderResult.executedQty > 0
+          ? orderResult.cummulativeQuoteQty / orderResult.executedQty
+          : orderResult.price;
 
       const updatedTrade = { ...trade };
       updatedTrade.exits = [
@@ -189,10 +294,12 @@ async function closeAllOpenPositions(
       const avgEntry = trade.averageEntry || 0;
       const pnlMultiplier = plan?.direction === "short" ? -1 : 1;
       updatedTrade.realizedPnl =
-        (trade.realizedPnl ?? 0) + pnlMultiplier * (exitPrice - avgEntry) * (orderResult.executedQty ?? remainingQty);
+        (trade.realizedPnl ?? 0) +
+        pnlMultiplier * (exitPrice - avgEntry) * (orderResult.executedQty ?? remainingQty);
 
       updateTrade(trade.id, updatedTrade);
       result.positionsClosed++;
+      closedBySymbol.set(trade.symbol, (closedBySymbol.get(trade.symbol) ?? 0) + 1);
 
       logger.info("Emergency closed position", {
         tradeId: trade.id,
@@ -209,14 +316,18 @@ async function closeAllOpenPositions(
       });
     }
   }
+
+  return new Set(
+    [...attemptedBySymbol]
+      .filter(([symbol, count]) => (closedBySymbol.get(symbol) ?? 0) === count)
+      .map(([symbol]) => symbol),
+  );
 }
 
 function pauseAllSlots(result: EmergencyLiquidationResult): void {
   try {
     const runtime = StrategyRuntime.getInstance();
-    const activeSlots = runtime.getActiveSlots().filter(
-      (s) => s.status === "active",
-    );
+    const activeSlots = runtime.getActiveSlots().filter((s) => s.status === "active");
 
     for (const slot of activeSlots) {
       try {

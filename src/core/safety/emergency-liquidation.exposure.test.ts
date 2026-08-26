@@ -88,7 +88,14 @@ function makeOpenTrade(opts: {
     openedAt: new Date().toISOString(),
     closedAt: null,
     symbol: "BTCUSDT",
-    entries: [{ orderId: "entry-1", price: 50_000, quantity: opts.entryQty, filledAt: new Date().toISOString() }],
+    entries: [
+      {
+        orderId: "entry-1",
+        price: 50_000,
+        quantity: opts.entryQty,
+        filledAt: new Date().toISOString(),
+      },
+    ],
     exits: opts.exitQty
       ? [
           {
@@ -193,12 +200,15 @@ describe("emergency liquidation is exposure-reducing, not consent-gated", () => 
   it("cancels resting orders without consent", async () => {
     makeOpenTrade({ direction: "long", entryQty: 0.02 });
     const cancelled: string[] = [];
+    let orderOpen = true;
     const exchange = {
       exchangeId: "binance",
       isSandbox: false,
-      getOpenOrders: async () => [{ orderId: 991, clientOrderId: "gordon_x", symbol: "BTCUSDT" }],
+      getOpenOrders: async () =>
+        orderOpen ? [{ orderId: 991, clientOrderId: "gordon_x", symbol: "BTCUSDT" }] : [],
       cancelOrder: async (_symbol: string, orderId: string) => {
         cancelled.push(orderId);
+        orderOpen = false;
       },
       placeOrder: async (params: { symbol: string; side: string; quantity: number }) => ({
         orderId: "emerg-1",
@@ -216,6 +226,175 @@ describe("emergency liquidation is exposure-reducing, not consent-gated", () => 
     const result = await executeEmergencyLiquidation(exchange, []);
 
     expect(cancelled).toEqual(["991"]);
+    expect(result.ordersCancelled).toBe(1);
+  });
+
+  it("recognizes adapter-generated gordon-hyphen order ids during cleanup", async () => {
+    makeOpenTrade({ direction: "long", entryQty: 0.02 });
+    const cancelled: string[] = [];
+    let orderOpen = true;
+    const exchange = {
+      exchangeId: "binance",
+      isSandbox: false,
+      getOpenOrders: async () =>
+        orderOpen
+          ? [
+              {
+                orderId: 994,
+                clientOrderId: "gordon-0123456789abcdef",
+                symbol: "BTCUSDT",
+                side: "BUY",
+                type: "LIMIT",
+                quantity: 0.01,
+              },
+            ]
+          : [],
+      cancelOrder: async (_symbol: string, orderId: string) => {
+        cancelled.push(orderId);
+        orderOpen = false;
+      },
+      placeOrder: async (params: { symbol: string; side: string; quantity: number }) => ({
+        orderId: "emerg-hyphen",
+        symbol: params.symbol,
+        side: params.side,
+        type: "MARKET",
+        status: "FILLED",
+        price: 49_500,
+        quantity: params.quantity,
+        executedQty: params.quantity,
+        cummulativeQuoteQty: 49_500 * params.quantity,
+      }),
+    } as unknown as Exchange;
+
+    const result = await executeEmergencyLiquidation(exchange, []);
+
+    expect(cancelled).toEqual(["994"]);
+    expect(result.ordersCancelled).toBe(1);
+  });
+
+  it("preserves a stop before a same-side profit order when only one exit fits", async () => {
+    makeOpenTrade({ direction: "long", entryQty: 0.02 });
+    const events: string[] = [];
+    let openOrders = [
+      {
+        orderId: 995,
+        clientOrderId: "gordon_tp",
+        symbol: "BTCUSDT",
+        side: "SELL",
+        type: "TAKE_PROFIT_LIMIT",
+        quantity: 0.02,
+      },
+      {
+        orderId: 996,
+        clientOrderId: "gordon_stop",
+        symbol: "BTCUSDT",
+        side: "SELL",
+        type: "STOP_LOSS_LIMIT",
+        quantity: 0.02,
+      },
+    ];
+    const exchange = {
+      exchangeId: "binance",
+      isSandbox: false,
+      getOpenOrders: async () => openOrders,
+      cancelOrder: async (_symbol: string, orderId: string) => {
+        events.push(`cancel:${orderId}`);
+        openOrders = openOrders.filter((order) => String(order.orderId) !== orderId);
+      },
+      placeOrder: async (params: { symbol: string; side: string; quantity: number }) => {
+        events.push("close");
+        return {
+          orderId: "emerg-priority",
+          symbol: params.symbol,
+          side: params.side,
+          type: "MARKET",
+          status: "FILLED",
+          price: 49_500,
+          quantity: params.quantity,
+          executedQty: params.quantity,
+          cummulativeQuoteQty: 49_500 * params.quantity,
+        };
+      },
+    } as unknown as Exchange;
+
+    await executeEmergencyLiquidation(exchange, []);
+
+    expect(events).toEqual(["cancel:995", "close", "cancel:996"]);
+  });
+
+  it("keeps a protective exit live when the emergency market close fails", async () => {
+    makeOpenTrade({ direction: "long", entryQty: 0.02 });
+    const cancelled: string[] = [];
+    const exchange = {
+      exchangeId: "binance",
+      isSandbox: false,
+      getOpenOrders: async () => [
+        {
+          orderId: 992,
+          clientOrderId: "gordon_stop",
+          symbol: "BTCUSDT",
+          side: "SELL",
+          quantity: 0.02,
+        },
+      ],
+      cancelOrder: async (_symbol: string, orderId: string) => {
+        cancelled.push(orderId);
+      },
+      placeOrder: async () => {
+        throw new Error("venue unavailable");
+      },
+    } as unknown as Exchange;
+
+    const result = await executeEmergencyLiquidation(exchange, []);
+
+    expect(cancelled).toEqual([]);
+    expect(result.positionsClosed).toBe(0);
+    expect(result.errors.some((error) => error.includes("venue unavailable"))).toBe(true);
+  });
+
+  it("cancels a protective exit only after its replacement close succeeds", async () => {
+    makeOpenTrade({ direction: "long", entryQty: 0.02 });
+    const events: string[] = [];
+    let orderOpen = true;
+    const exchange = {
+      exchangeId: "binance",
+      isSandbox: false,
+      getOpenOrders: async () =>
+        orderOpen
+          ? [
+              {
+                orderId: 993,
+                clientOrderId: "gordon_stop",
+                symbol: "BTCUSDT",
+                side: "SELL",
+                quantity: 0.02,
+              },
+            ]
+          : [],
+      cancelOrder: async () => {
+        events.push("cancel");
+        orderOpen = false;
+      },
+      placeOrder: async (params: { symbol: string; side: string; quantity: number }) => {
+        events.push("close");
+        return {
+          orderId: "emerg-2",
+          symbol: params.symbol,
+          side: params.side,
+          type: "MARKET",
+          status: "FILLED",
+          price: 49_500,
+          quantity: params.quantity,
+          executedQty: params.quantity,
+          cummulativeQuoteQty: 49_500 * params.quantity,
+        };
+      },
+    } as unknown as Exchange;
+
+    const result = await executeEmergencyLiquidation(exchange, []);
+
+    expect(events).toEqual(["close", "cancel"]);
+    expect(result.positionsClosed).toBe(1);
     expect(result.ordersCancelled).toBe(1);
   });
 });
