@@ -190,7 +190,7 @@ describe("runDeflatedResearchLoop — correlation de-duplication", () => {
 
     expect(result.approved.map((c) => c.hypothesis.id)).toEqual(["first", "distinct"]);
     expect(result.rejected.length).toBe(1);
-    expect(result.rejected[0]!.candidate.hypothesis.id).toBe("dup");
+    expect(result.rejected[0]!.candidate!.hypothesis.id).toBe("dup");
     expect(result.rejected[0]!.reason).toBe("correlated");
   });
 });
@@ -303,5 +303,62 @@ describe("runDeflatedResearchLoop — failure-pattern memory feeds generate", ()
     // failure-pattern memory grows each round and is handed forward.
     expect(seenTrials).toEqual([0, 1, 2, 3]);
     expect(seenRejections).toEqual([0, 1, 2, 3]);
+  });
+});
+
+// ============================================================================
+// Trial accounting for failed backtests (Tier-0 Group B, item 4)
+// ============================================================================
+
+describe("runDeflatedResearchLoop: a failed backtest still consumes a trial", () => {
+  it("counts a throwing backtest and keeps searching", async () => {
+    const seen: number[] = [];
+    const result = await runDeflatedResearchLoop(
+      {
+        generate: (memory) => ({ id: `h${memory.iterations}`, description: "h" }),
+        backtest: (hypothesis) => {
+          if (hypothesis.id === "h2") throw new Error("no historical data");
+          return { hypothesis, oosReturns: [0.01, 0.02, 0.015] };
+        },
+        score: (_returns, totalTrials) => {
+          seen.push(totalTrials);
+          return { sharpe: 1.5, deflatedSignificant: false };
+        },
+      },
+      { targetApproved: 5, maxIterations: 4 },
+    );
+
+    // Before the fix the throw escaped the loop entirely: it propagated out of
+    // runDeflatedResearchLoop before `trials++`, so the trial was invisible AND
+    // the caller lost the accumulated count.
+    expect(result.trials).toBe(4);
+    expect(result.iterations).toBe(4);
+
+    const failed = result.rejected.filter((r) => r.reason === "backtest_failed");
+    expect(failed.length).toBe(1);
+    expect(failed[0]!.candidate).toBeNull();
+    expect(failed[0]!.trialsAtScore).toBe(2);
+
+    // The failed trial is baked into the bar every LATER candidate is scored
+    // against: the scorer sees 1, then 3, 4, never a reused 2.
+    expect(seen).toEqual([1, 3, 4]);
+  });
+
+  it("does not reuse the trial number consumed by a failed backtest", async () => {
+    const result = await runDeflatedResearchLoop(
+      {
+        generate: (memory) => ({ id: `h${memory.iterations}`, description: "h" }),
+        backtest: () => {
+          throw new Error("always fails");
+        },
+        score: () => ({ sharpe: 0, deflatedSignificant: false }),
+      },
+      { targetApproved: 1, maxIterations: 3 },
+    );
+
+    expect(result.trials).toBe(3);
+    expect(result.approved).toHaveLength(0);
+    expect(result.rejected).toHaveLength(3);
+    expect(result.rejected.map((r) => r.trialsAtScore)).toEqual([1, 2, 3]);
   });
 });

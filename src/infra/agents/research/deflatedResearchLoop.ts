@@ -51,10 +51,13 @@ export type RejectReason =
   | "deflation"
   | "non_positive_sharpe"
   | "correlated"
-  | "insufficient_trades";
+  | "insufficient_trades"
+  /** The injected `backtest` threw. The trial still counts. */
+  | "backtest_failed";
 
 export interface RejectedCandidate {
-  candidate: Candidate;
+  /** Null when the backtest itself threw, so no candidate was produced. */
+  candidate: Candidate | null;
   reason: RejectReason;
   /** Sharpe reported by `score` for this candidate (may be in-sample-looking). */
   sharpe: number;
@@ -163,6 +166,7 @@ function emptyRejectionCounts(): Record<RejectReason, number> {
     non_positive_sharpe: 0,
     correlated: 0,
     insufficient_trades: 0,
+    backtest_failed: 0,
   };
 }
 
@@ -190,13 +194,30 @@ export async function runDeflatedResearchLoop(
     };
 
     const hypothesis = await deps.generate(memory);
-    const candidate = await deps.backtest(hypothesis);
 
-    // KEY INVARIANT: every backtested candidate is a trial. The counter only
-    // ever increments — it is never reset per candidate or per iteration — so
-    // the deflated-Sharpe bar rises the harder we search. This is the honest
+    // KEY INVARIANT: every EMITTED candidate is a trial. The counter only ever
+    // increments (it is never reset per candidate or per iteration), so the
+    // deflated-Sharpe bar rises the harder we search. This is the honest
     // multiple-testing correction the naive in-sample loop omits.
+    //
+    // It increments BEFORE the backtest: a candidate whose backtest throws
+    // still consumed a null draw. Counting only the ones that survived to be
+    // scored understates the search burden and lowers the bar.
     trials++;
+
+    let candidate: Candidate;
+    try {
+      candidate = await deps.backtest(hypothesis);
+    } catch {
+      rejectionCounts.backtest_failed++;
+      rejected.push({
+        candidate: null,
+        reason: "backtest_failed",
+        sharpe: 0,
+        trialsAtScore: trials,
+      });
+      continue;
+    }
 
     const { sharpe, deflatedSignificant } = deps.score(
       candidate.oosReturns,
