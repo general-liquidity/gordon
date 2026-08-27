@@ -72,7 +72,7 @@ export function takeInteractionMark(): { kind: InteractionKind; atMs: number } |
 **Acceptance criteria:**
 1. `bun tsc --noEmit -p tsconfig.json` clean.
 2. `bun test src/tui` green.
-3. Manual: run the TUI (`bun run src/index.tsx` or the project's launch command), start a long streaming response (`/scan`), type continuously into the prompt — characters echo without visible stalls while tokens stream.
+3. Manual: run the TUI through `node bin/gordon.cjs`, start a long streaming response (`/scan`), type continuously into the prompt — characters echo without visible stalls while tokens stream.
 4. With `GORDON_PERF_LOG=/tmp/perf.jsonl` set, the JSONL snapshots include frames attributed to `keystroke` (verify the field appears — exact budget enforcement is item 12).
 5. React DevTools-style verification not available; instead: add a temporary `console.error` in `PromptInput` body, dispatch a notification via another terminal event, observe `PromptInput` does NOT log (memo bailout) while a keystroke DOES. Remove the probe before commit.
 

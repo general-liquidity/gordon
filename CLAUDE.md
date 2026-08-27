@@ -36,7 +36,7 @@ It is **not** a coding agent. Most patterns from Claude Code's coding-agent desi
 | `src/core/risk-kernel/` | Risk audit trail |
 | `src/app/slash/slashCommands.ts` | Slash command definitions (programmatic, not markdown) |
 | `src/gateway/` + `src/core-sdk/` | Gateway daemon, protocol envelopes, scheduler — headless/SDK surface alongside TUI |
-| `src/app/acp-entry.ts` | ACP (Agent Client Protocol) entry — `bun acp` for editor/IDE integration |
+| `src/app/acp-entry.ts` | ACP (Agent Client Protocol) implementation — launch through `npm run acp` / `bin/gordon.cjs` |
 | `src/tui/` | Ink-based custom TUI with framebuffer + vim mode |
 | `src/events/market-events.ts` | Event bus types — `strategy:plan_ready` lives here |
 | `scripts/patches/patch-mastra.cjs` | Postinstall patch for Mastra `lastMessages` cap on sub-agents |
@@ -62,6 +62,7 @@ Why: the "Reverse-Engineering Memory" pattern survey identifies "always-inject" 
 - **Imports:** Use `.ts` extensions on relative imports (Bun convention).
 - **Tests:** `bun test <path>` — bun:test, no jest. Co-located `*.test.ts` files.
 - **Typecheck:** `bun tsc --noEmit -p tsconfig.json`. Must be clean before commit.
+- **Runtime entrypoints:** use `node bin/gordon.cjs`, `npm run acp`, or `npm run mcp`. Raw Bun execution of `src/entry.ts`, `src/index.tsx`, ACP, or MCP source is unsupported because a cwd `bunfig.toml` preload runs before Gordon code.
 - **Tool offload limit:** 1800 chars per result by default; per-family overrides in `runtimeHarness.ts` (market/account/order tools get higher limits).
 - **Doom-loop detection:** Sliding 20-call window, threshold 3 identical fingerprints — see `recordToolCallFingerprint` in `runtimeHarness.ts`.
 - **Compaction thresholds:** 70/80/90/94/99% pressure → masking / pruning / aggressive / collapse / full summary. Recent observations preserved 6/6/3/3.
@@ -127,8 +128,8 @@ Why this matters: Gordon's schema is already at 405 tools / ~45K tokens. Past pu
 |---|---|
 | `GORDON_KILL_SWITCHES` | Firm-wide / venue / strategy kill switches, checked before execution. |
 | `GORDON_WIP_LIMIT_ENABLED` | Work-in-progress plan gate (N per symbol, M per strategy). |
-| `GORDON_STREAK_CIRCUIT_BREAKER` | Consecutive-loss cooldown, enforced in `evaluateOrderRisk` via `infra/safety/preTradeHaltGates.ts`. Timed and self-expiring, NOT a kill switch; the trip timestamp lives in `trading/ops/streakCircuitState.ts`. |
-| `GORDON_GIVE_BACK_STOP` | Refuses new risk once the session gives back more than half its high-water P&L. Reads session equity from the `absorbingBarrierState` fold. |
+| `GORDON_STREAK_CIRCUIT_BREAKER` | Consecutive-loss cooldown, enforced in `evaluateOrderRisk` via `infra/safety/preTradeHaltGates.ts`. Timed and self-expiring, NOT a kill switch; confirmed exchange outcomes and the trip timestamp are persisted in the authenticated halt ledger before the teaching log runs. Broker adapters do not yet provide a confirmed-close outcome feed, so the default-on gate fails closed for new live-broker risk; exposure reductions and paper-broker orders remain allowed, and live broker trading requires explicitly disabling this gate. Legacy unscoped debrief rows apply only to the explicit `default` identity. |
+| `GORDON_GIVE_BACK_STOP` | Refuses new risk once the session gives back more than half its high-water P&L. Reads durable session equity from the authenticated per-portfolio halt ledger. |
 | `GORDON_ABSORBING_BARRIER` | Distance-to-ruin gate plus the terminal loss fold. Dormant until the barrier inputs are configured. |
 | `GORDON_NETWORK_ALLOWLIST` | Outbound-fetch allowlist (warn mode unless `GORDON_NETWORK_ALLOWLIST_MODE=block`). |
 | `GORDON_FILESYSTEM_WRITE_GUARD` | Filesystem write guard (warn mode unless `..._MODE=block`). |
@@ -150,15 +151,26 @@ The three order-time halt gates skip exposure-REDUCING orders. They exist to sto
 | `GORDON_DYNAMIC_SUBAGENTS=1` | Enable the FW7 `delegate_subagent` dispatcher. Requires operator-authored `.claude/subagents/*.json` profiles. Sensitive because subagents spawn fresh agent instances. |
 | `GORDON_PEER_DELEGATION=1` | Permit operator-requested `/delegate` calls to the Cursor or Warp CLI peer. Default off because this spawns an external agent process. Children receive only the base process environment and their peer-specific API key, and combined output is capped. |
 | `GORDON_DEFER_WORKING_MEMORY=1` | Buffer mid-session working-memory writes to preserve prompt-cache stability; flush at session boundaries. Performance trade-off — see Hot-tier discipline section. |
-| `GORDON_SUPERVISION_RUST_RATE` | Periodic flawed-plan injection rate (0–1). Calibrated threshold; default off, operators set their own cadence. |
 | `GORDON_COMPACTION_STAGE` | Force a specific compaction stage during debugging. Read-only override; not a feature gate. |
 | `GORDON_MEMORY_WRITE_GUARD=1` | Enforce (not just log) the working-memory sensitive-field guard: an untrusted-source write that changes a sensitive field (risk limits, venue, account type, base currency) is **blocked**, prior value preserved. Trusted paths (`recordTrustedProvenance`) pass; non-sensitive untrusted writes are unaffected. Default off — opt-in because aggressive enforcement could surprise flows that legitimately update profile via the LLM. |
 | `GORDON_SPRINT_CONTRACT=1` | Record scope/actuals for autonomous-loop sessions (`infra/safety/sprintContract.ts`); inspect via `/sprint-status`. |
 | `GORDON_AGENT_READINESS_GATE=1` | Adds boot-time readiness rows to the doctor report (`infra/diagnostics/agentReadiness.ts` via `app/setup/harness-checks.ts`). NOT a gate: nothing blocks agent spawn on a failing condition. There is no override flag: leaving this flag off is what suppresses the rows. |
 | `GORDON_RISK_ACK=1` | Anti-rubber-stamp risk-acknowledgement gate (`infra/safety/anti-trap/riskAcknowledgement.ts`): on medium+ tier `execute_plan` the agent must name the top weighted risk dimensions in `acknowledgedRisks`, and every risk-kernel warning needs its own substantive (>=20 chars) and distinct entry. Opt-in — forces explicit supervision instead of single-keystroke approval. |
 | `GORDON_ALLOW_LIVE=1` | Opt into LIVE crypto trading on a venue that has no sandbox/testnet (`infra/exchange/sandboxSupport.ts`). Without it, an unset `sandbox` flag on a no-sandbox venue refuses rather than silently routing live. An explicit `sandbox: false` (or config `live: true`) is a deliberate live choice and does not need this flag. |
+| `GORDON_MANAGED_EXITS_ACK=1` | Acknowledge that any live take-profit without venue-native OCO requires Gordon's managed exit reconciler to remain running. Default-off: without this acknowledgement, those live plans are refused before entry; the venue-resident protective stop and all sandbox/backtest paths are unaffected. |
 | `GORDON_RATIONALE_CONSISTENCY=1` | Triangular rationale gate on plan reflection (`infra/agents/cognition/reflection.ts`): scores evidence-to-reasoning, reasoning-to-decision and evidence-to-decision separately, and can invalidate a plan the rule checks accepted. Opt-in because it costs three extra LLM calls per plan. A judge outage degrades to a suggestion and never blocks. |
-| `GORDON_INCEPTION_LOSS_FRACTION` | Fraction of reference capital whose cumulative destruction halts trading (`infra/safety/absorbingBarrierState.ts`). Unset leaves the barrier inactive and behaviour unchanged. Evaluated alongside the trailing high-water barrier, and the gate is the union of their blocks. Seed the reference with `GORDON_INCEPTION_EQUITY_USD`, else the first equity the process observes. State is process-scoped: it does not survive a restart. |
+| `GORDON_INCEPTION_LOSS_FRACTION` | Fraction of reference capital whose cumulative destruction halts trading (`infra/safety/absorbingBarrierState.ts`). Unset leaves the barrier inactive and behaviour unchanged. Evaluated alongside the trailing high-water barrier, and the gate is the union of their blocks. Seed the reference with `GORDON_INCEPTION_EQUITY_USD`, else the first observed equity. State survives restart in the HMAC-authenticated ledger keyed by broker account ID or a non-secret exchange-connection fingerprint. For CCXT, set `CCXT_<VENUE>_ACCOUNT_ID` (or the first-class `<VENUE>_ACCOUNT_ID`) before credential rotation to retain the same durable identity. Without that stable ID, rotation creates a new namespace and requires the audited archive/reset. Deposits, withdrawals, corrupt files and replacement accounts also require `/killswitch archive-halt-state <rationale>` because Gordon has no authoritative cross-venue capital-flow feed. |
+
+The halt ledger detects invalid content, replacement after it has been observed
+by the running process, and failures to lock or persist. Those failures stay
+fail-closed until the explicit audited archive/reset. It has no external
+monotonic anchor, so a fresh process cannot prove that a missing or valid older
+ledger was deleted or rolled back. Likewise, an observation that could not be
+written cannot preserve its in-memory failure latch across a crash. Keep the
+ledger and its `GORDON_AUDIT_HMAC_KEY` (preferably supplied through
+`GORDON_AUDIT_HMAC_KEY_PATH` or the default `~/.gordon/audit-hmac.key`) in
+durable operator-controlled storage, and resolve persistence errors before
+restarting.
 | `GORDON_TRAILING_DD_FRACTION` | Trailing give-back limit consumed by the same barrier fold. Unset leaves it inactive. |
 | `GORDON_FEE_FIXED_PER_TRANCHE_USD` | Fixed commission per fee tranche, with `GORDON_FEE_TRANCHE_SIZE_USD`, optional `GORDON_FEE_MIN_PER_ORDER_USD`, and `GORDON_FEE_TOLERANCE_BPS` (default 100). Together they derive the economic order floor enforced in `evaluateOrderRisk`: an order clearing the venue minimum can still hand a fixed commission more of the position than the fee tolerance allows. Unset means the floor is not evaluated and a warning is emitted, since Gordon has no venue commission feed and a guessed floor would refuse good orders. |
 | `GORDON_CLEAN_STATE_GATE=1` | Refuse to start an autonomous loop from dirty session state. |
@@ -167,9 +179,11 @@ The three order-time halt gates skip exposure-REDUCING orders. They exist to sto
 | `GORDON_TRADING_UNIVERSE=1` / `GORDON_STRATEGY_MANDATES=1` / `GORDON_THESIS_COHERENCE=1` | The three anti-rot gates. Each needs an operator-authored file (`*_PATH`), which is why none can be default-on. |
 | `GORDON_SAFETY_CONFIG_GUARD=1` | Refuse config edits that loosen a safety setting without explicit confirmation. |
 | `GORDON_SANDBOX_SUBPROCESS` | Sandbox spawned subprocesses. Unset falls through to the settings file rather than defaulting in the reader. |
-| `GORDON_LOCAL_FALLBACK=1` | Fall back to a local model (`GORDON_LOCAL_MODEL_URL`) when the hosted provider is unavailable. |
 
-Use `/flags` in the TUI to see the current state of these and toggle them at runtime.
+Use `/flags` in the TUI to see and manage these settings. Rows marked
+startup-only (`GORDON_GUARDS`, `GORDON_DISABLE_GUARDS`,
+`GORDON_PROCESS_HARDENING`, and `GORDON_EXTERNAL_HOOK_RUNNER`) require a
+restart; the remaining rows reach their live readers without one.
 
 `GORDON_POLICY_KEY` is intentionally absent from `/flags`: it is an HMAC
 secret used to verify the optional highest-precedence `policy.json` layer, not
@@ -228,7 +242,7 @@ The legacy generalized-trading tool modules (calculate_rsi, getCandles, etc.) re
 | Hook lifecycle | `src/infra/hooks/types.ts` + `engine.ts` |
 | The proactive radar | `src/infra/proactive/engine/observer.ts` (tick intervals) + `producers/` |
 | Memory / compaction | `src/infra/domain/memory/summarizer.ts` (5 stages at 70/80/90/94/99) + `contextCollapse.ts` |
-| Gateway / SDK / ACP surfaces | `src/gateway/` + `src/core-sdk/` + `src/app/acp-entry.ts` (`bun acp`) |
+| Gateway / SDK / ACP surfaces | `src/gateway/` + `src/core-sdk/` + `src/app/acp-entry.ts` (`npm run acp`) |
 | Stock headlines (Yahoo + EDGAR) | `src/infra/news/stockHeadlines.ts` |
 | Strategy backtests | `src/backtest/` |
 

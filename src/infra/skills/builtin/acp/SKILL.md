@@ -13,7 +13,7 @@ last-reviewed: 2026-05-23
 
 # ACP Skill
 
-When Gordon is running in ACP mode (`bun acp` entry point, spawned as a subprocess by Zed/Athas/etc.), use this skill to understand the protocol surface and edge cases.
+When Gordon is running in ACP mode (`npm run acp`, spawned through the hardened Node launcher by Zed/Athas/etc.), use this skill to understand the protocol surface and edge cases.
 
 ## When to use
 

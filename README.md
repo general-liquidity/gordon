@@ -186,7 +186,11 @@ Gordon is **three agents split along a security boundary**, not one model wearin
 Around them sits the runtime that makes a long session trustworthy:
 
 - **Cognition in phases:** a tool-free thinking pass, in-band extended thinking, an adversarial self-critique at high depth, and a citation audit. These reasoning passes are on by default and throttled by the session cost budget (`GORDON_COST_BUDGET_USD`); set any of them to `0` for a cheaper run.
-- **Protective halts on by default:** the streak circuit breaker, revenge-trade guard, give-back stop, WIP limit, and absorbing barrier all arm themselves out of the box, with their thresholds left tunable. Only the WIP limit hard-blocks an execution; the rest report.
+- **Protective halts on by default:** the streak circuit breaker, give-back stop,
+  WIP limit, and absorbing barrier all arm themselves out of the box, with
+  their thresholds left tunable. Every one refuses new risk on the order path
+  while leaving exposure-reducing exits available; shadow telemetry reports
+  the same verdicts for observability.
 - **A canonical 22-tool surface:** 5 data, 4 analytics (two of them meta-dispatchers over ~94 indicator and 9 microstructure ops), 6 plan/exec, 3 memory/audit, 4 workflow. Integration feeds (Finnhub, X, MCP, onchain) spread on top.
 - **A doom-loop harness:** dual-layer fingerprinting catches both identical-call loops and A-B-A-B cycles; oversized tool results are offloaded to scratch.
 - **5-stage memory compaction:** masking → pruning → aggressive → collapse → full, triggered by context pressure, with a reversible read-time collapse before any lossy summary.
@@ -383,8 +387,16 @@ One engine, several front ends:
 | TUI | `gordon` | The full Ink terminal desk (Desk / Market / Plan / Lab / Monitor workspaces, vim mode). |
 | Headless | `gordon --headless "prompt"` | One prompt in, response out, for scripts and pipes. |
 | Daemon | `gordon daemon start` | A long-running gateway over IPC: scheduled slots, circuit breakers, reconciliation. |
-| ACP / IDE | `bun acp` | A JSON-RPC server over stdio implementing the [Agent Client Protocol](https://agentclientprotocol.com) for editors like Zed. |
+| ACP / IDE | `npm run acp` | A JSON-RPC server over stdio implementing the [Agent Client Protocol](https://agentclientprotocol.com) for editors like Zed. |
 | Schedules | `gordon schedule add …` | Cron-style autonomous mandates. |
+
+Raw Bun source entry invocation is unsupported. Do not run `src/entry.ts`,
+`src/index.tsx`, `src/app/acp-entry.ts`, or
+`src/infra/ai/mcp/serveCli.ts` directly with Bun:
+Bun can execute a caller-controlled cwd `bunfig.toml` preload before Gordon's
+first source instruction. Use `gordon`, `node bin/gordon.cjs`, `npm run acp`,
+or `npm run mcp`; those supported paths select Gordon's runtime config and
+disable implicit cwd dotenv loading before Bun starts.
 
 Operator-defined lifecycle hooks are opt-in and fail closed. Set
 `GORDON_EXTERNAL_HOOK_RUNNER=1` and point `GORDON_EXTERNAL_HOOKS_PATH` at a

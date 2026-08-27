@@ -74,9 +74,9 @@ EDIT `src/tui/index.tsx` — inside the existing `if (process.stdout.isTTY)` blo
 **Acceptance criteria:**
 1. `bun test src/tui/boot/banner.test.ts` passes.
 2. `bun tsc --noEmit -p tsconfig.json` is clean.
-3. Run `bun run src/index.tsx` in a terminal ≥60 cols: the 6-line block logo renders in teal with the tagline beneath, before the panel.
+3. Run `node bin/gordon.cjs` in a terminal ≥60 cols: the 6-line block logo renders in teal with the tagline beneath, before the panel.
 4. Resize the terminal below 60 cols and relaunch: the 2-line compact wordmark renders instead; no logo line wraps.
-5. `bun run src/index.tsx --headless "noop" 2>&1 | findstr "██"` produces no output (banner never printed in headless), and piping stdout (non-TTY) prints no banner.
+5. `node bin/gordon.cjs --headless "noop" 2>&1 | findstr "██"` produces no output (banner never printed in headless), and piping stdout (non-TTY) prints no banner.
 
 **Test plan:** `src/tui/boot/banner.test.ts` (bun:test, co-located):
 - every `GORDON_LOGO` line has visible length exactly `LOGO_WIDTH` (strip ANSI with `/\x1b\[[0-9;]*m/g` — same regex as `vlen` at src/tui/index.tsx:213);
@@ -290,7 +290,7 @@ Once the first message lands the panel unmounts — the static block above persi
 **Acceptance criteria:**
 1. `bun tsc --noEmit -p tsconfig.json` clean.
 2. `bun test src/tui/boot` passes; `bun test src/tui` introduces no new failures.
-3. Launch `bun run src/index.tsx`: banner + static rows print instantly (before any spinner), live rows appear below showing `connecting…` placeholders, then hydrate. Boot is never blocked on network.
+3. Launch `node bin/gordon.cjs`: banner + static rows print instantly (before any spinner), live rows appear below showing `connecting…` placeholders, then hydrate. Boot is never blocked on network.
 4. Launch with networking disabled (or no exchange configured): live rows show the degraded copy (`offline — /doctor to diagnose` / `no venue — /configure exchange to connect` / `market data unavailable`) within ~5s; the app remains fully usable.
 5. Trip a kill switch (`/killswitch trip firm "test halt rationale"`), relaunch: `switches` row shows red `HALTED: firm — test halt rationale`. Reset, relaunch: `none tripped`.
 6. With `GORDON_PROACTIVE_AUTO_START=1`: radar row shows `21 producers · warming up` on a fresh launch. Without it: `off — set GORDON_PROACTIVE_AUTO_START=1 or /radar start`.

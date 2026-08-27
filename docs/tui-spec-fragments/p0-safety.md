@@ -306,7 +306,7 @@ Warn-and-bail copy (raw ANSI like the boot card; yellow `\x1b[33m` for the ⚠ l
 2. Manual: launch the TUI twice; the second prints the warning verbatim (with real pid/cwd) and exits with code 1; the first is unaffected.
 3. Manual: kill the first instance with task-kill (no clean exit), relaunch → stale lock detected, boots normally.
 4. Manual: `GORDON_ALLOW_MULTI_INSTANCE=1` lets a second instance boot.
-5. `bun acp` and non-TTY invocations (`bun run src/index.tsx | cat` equivalent) never touch the lock file.
+5. `npm run acp` and supported non-TTY launcher invocations never touch the lock file. Raw Bun source entry invocation is unsupported because cwd preloads execute before application code.
 6. `bun tsc --noEmit -p tsconfig.json` clean.
 
 **Test plan:** `src/infra/storage/instanceLock.test.ts` — because `NODE_ENV === "test"` under bun test, give `acquireInstanceLock` an internal options bag for tests: `acquireInstanceLock(name, { force?: boolean })` where `force: true` skips the env bypasses (keep it out of the public signature docs; one-line WHY comment). Cases:

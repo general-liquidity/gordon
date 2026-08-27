@@ -28,6 +28,11 @@ in the same release. `bin/gordon.cjs` resolves the installed platform
 sub-package at runtime and execs its vendored binary — nothing is fetched on
 install, so there is **no postinstall step**.
 
+The root package is CLI-only and intentionally has no `main` or `module`
+source export. Supported source-package launches enter through
+`bin/gordon.cjs`; raw Bun execution of files under `src/` is unsupported
+because a caller-controlled cwd preload can run before application code.
+
 ```bash
 npm i -g @general-liquidity/gordon
 ```
@@ -55,6 +60,20 @@ package blocks `npm publish`).
 Everything is driven by pushing a tag. CI builds the 8-target matrix, stages the
 per-platform sub-packages, publishes the root plus every sub-package to npm with
 `--provenance`, and uploads the binaries as GitHub Release assets.
+
+Before creating a tag, run and watch the non-publishing rehearsal. It derives
+the shard and binary matrices from the tag workflow itself and exercises frozen
+locks, SBOM generation, broker gates, npm/public-dist audits, all wrapper hosts,
+and every binary target including Windows ARM64. It also stages all eight
+platform packages and runs the Formula, Scoop, and SHA256SUMS hash wiring
+against rehearsal copies. The host binary is run from a cwd containing hostile
+dotenv controls and must report the exact package version. The rehearsal never
+publishes or edits the production manifests:
+
+```bash
+gh workflow run release-rehearsal.yml --ref main
+gh run watch "$(gh run list --workflow release-rehearsal.yml --branch main --limit 1 --json databaseId --jq '.[0].databaseId')" --exit-status
+```
 
 ```bash
 # 1. Land the version bump on main.

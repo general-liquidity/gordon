@@ -10,6 +10,94 @@ called out explicitly, whatever their size.
 
 ## [Unreleased]
 
+### Security
+
+- Repository-owned dotenv files can no longer disable kill switches, widen
+  risk limits, or change paper/live routing. Supported source, ACP and MCP
+  launchers use a Gordon-owned Bun config with dotenv autoload disabled, and
+  compiled executables disable both dotenv and bunfig autoload at build time.
+  Gordon also scans every exact
+  Bun implicit candidate (`.env`, `.env.local`, and all development,
+  production and test variants, including `*.local`) before any control read.
+  A cwd file may contain only the shared provider-credential allowlist; every
+  other key is refused even when an identical value was inherited from the
+  shell. `~/.gordon/.env` and the operator settings store remain trusted.
+  Public main, daemon, ACP and MCP surfaces all enter through the hardened Node
+  launcher (compiled daemons respawn the compiled executable); raw Bun source
+  entry invocation is explicitly unsupported because Bun can execute a
+  caller-controlled cwd preload before application code. The CLI-only package
+  no longer advertises an unpublished `src/index.tsx` module export.
+- Streak, give-back and absorbing-barrier state now survives restart in an
+  HMAC-authenticated, atomically replaced ledger. State is isolated by the real
+  broker account ID or a non-secret fingerprint of the exchange connection.
+  Confirmed closes write deduplicated, account-scoped outcomes to that signed
+  ledger before the best-effort teaching log or agent subscriber runs. A
+  live broker adapter currently has no confirmed-close outcome feed, so the
+  default-on streak gate refuses new live-broker risk rather than pretending
+  its history is complete; exposure reductions and paper-broker orders remain
+  allowed, and an operator may explicitly disable that gate for live broker
+  trading. A
+  lock/write failure latches fail-closed until the operator explicitly
+  archives and resets; an unrelated successful update cannot clear it. Reset
+  copies and verifies the exact old bytes before atomically replacing the still
+  canonical ledger. Corrupt or unwritable state refuses new risk but never
+  blocks an exposure-reducing order. Legacy unscoped debrief rows apply only to
+  the explicit `default` identity, so identified accounts receive a one-time
+  streak-history reset on upgrade rather than contaminating each other.
+  Deletion after this process has observed a ledger also latches fail-closed.
+  A fresh process cannot distinguish a deleted or rolled-back ledger from a
+  first launch without an external monotonic anchor, and a write failure cannot
+  make its own latch survive a crash; operators must therefore treat the ledger
+  and its key as durable safety records and investigate any persistence error
+  before restart.
+- CCXT accounts may set `CCXT_<VENUE>_ACCOUNT_ID` (or the first-class
+  `<VENUE>_ACCOUNT_ID`) to keep durable halt identity stable across API-key
+  rotation. The live adapter cache still fingerprints the actual credentials,
+  so a rotated key constructs a new client instead of reusing stale auth.
+- Order cancellation is classified by exposure direction. Cancelling a proven
+  cash/spot or unambiguous derivative entry remains possible without
+  live-capital consent; cancelling a protective exit requires consent,
+  including a BUY protecting a short. Margin, hedge-mode, unrelated-symbol,
+  singular-position, missing and contradictory metadata fail closed. Exact
+  open-order IDs are resolved before symbols, and cancel-all preserves prior
+  successful mutations when a later order's metadata lookup fails.
+- Any live take-profit plan without venue-native OCO is refused before entry unless the operator
+  explicitly enables `GORDON_MANAGED_EXITS_ACK`. The flag records awareness
+  that targets are process-managed while the protective stop remains at the
+  venue; sandbox and backtest behavior is unchanged.
+- Gordon does not claim to adjust the terminal barrier for deposits and
+  withdrawals: no authoritative synchronous capital-flow feed exists across
+  every supported venue. Operators must use the audited archive/reset after an
+  external capital-flow event before relying on inception-relative loss again.
+
+### CI
+
+- Added a non-publishing release rehearsal. It derives the exact test shards and
+  binary target matrix from `release.yml`, validates both frozen lockfiles,
+  generates the CycloneDX SBOM, runs broker conformance and latency gates,
+  audits npm pack contents, sourcemaps and the public distribution, verifies
+  the wrapper across Linux, macOS and Windows, runs every shard in a fresh
+  process, cross-compiles all supported targets including windows-arm64, then
+  stages all eight platform packages and exercises the release hash wiring in
+  an isolated output tree before a tag is cut. The host artifact is executed
+  from a hostile-dotenv cwd and must report the exact package version.
+
+### Fixed
+
+- `/flags` now includes every live aggregate, process-hardening, external-hook
+  and risk-policy gate found by the reverse source inventory. Startup-only rows
+  say that a restart is required, aggregate guards report their real default-on
+  state, settings-layer values reach their production readers, and the inert
+  `GORDON_PRODUCTION` pseudo-gate was removed from safety claims.
+- Removed the inert `GORDON_SUPERVISION_RUST_RATE` and
+  `GORDON_LOCAL_FALLBACK` rows and their orphan implementations. Neither had a
+  production caller, so advertising them implied behavior Gordon did not
+  execute.
+- Pinned the daily-trade constitution boundary to its original calibration:
+  49 completed trades still pass and the 50th blocks. The limit of 50 predates
+  removal of the erroneous `tradesThisDay * 3` inflation, so no recalibration
+  was warranted.
+
 ## [0.5.5] - 2026-08-27
 
 ### Fixed
