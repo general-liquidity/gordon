@@ -8,6 +8,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { drawdownTracker } from "../../../../core/risk-management/drawdown-tracker.ts";
 
@@ -20,6 +22,7 @@ import {
 } from "./risk-gate.ts";
 import type { GordonContext } from "../types.ts";
 import type { BrokerAdapter } from "../../../broker/types.ts";
+import { DEBRIEF_MATRIX_PATH_ENV } from "../../../trading/ops/debriefMatrix.ts";
 
 const EQUITY_USD = 10_000;
 const PRICE_USD = 1_000;
@@ -106,8 +109,25 @@ function clearFeeEnv(): void {
 
 afterEach(clearFeeEnv);
 
+// The streak halt gate is default-on and reads the debrief log, which resolves
+// to ~/.gordon/debriefs.jsonl when unset. This suite is about the kernel and
+// the fee floor, so point it at a path that does not exist: otherwise three
+// consecutive losers in the developer's own trade history start refusing the
+// orders these cases expect to be approved, and the suite fails on a machine
+// rather than on a change.
+const previousDebriefPath = process.env[DEBRIEF_MATRIX_PATH_ENV];
+
 beforeEach(() => {
+  process.env[DEBRIEF_MATRIX_PATH_ENV] = join(
+    tmpdir(),
+    "gordon-orderpath-no-debriefs-fixture.jsonl",
+  );
   drawdownTracker.reset(EQUITY_USD);
+});
+
+afterEach(() => {
+  if (previousDebriefPath === undefined) delete process.env[DEBRIEF_MATRIX_PATH_ENV];
+  else process.env[DEBRIEF_MATRIX_PATH_ENV] = previousDebriefPath;
 });
 
 describe("evaluateOrderRisk order path", () => {
