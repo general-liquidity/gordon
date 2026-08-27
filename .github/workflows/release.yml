@@ -227,11 +227,10 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
-    # Experimental targets (windows-arm64) may fail without blocking the
-    # release. Under the optionalDependencies model this is fully non-blocking:
-    # a missing platform sub-package just isn't published, and the launcher
-    # degrades gracefully on that host instead of crashing.
-    continue-on-error: ${{ matrix.experimental == true }}
+    # Every target in the matrix is expected to build. A leg that fails fails
+    # the release rather than silently dropping a platform: v0.5.4 shipped 7
+    # binaries where v0.4.0 shipped 8 because windows-arm64 failed under
+    # continue-on-error and nobody noticed for a release.
     strategy:
       fail-fast: false
       matrix:
@@ -278,7 +277,6 @@ jobs:
             bun_target: bun-windows-arm64
             os: ubuntu-latest
             binary_name: gordon-windows-arm64.exe
-            experimental: true
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -286,7 +284,13 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: 1.3.7
+          # 1.4.0 rather than the 1.3.7 the test and lint jobs pin. Compiling
+          # --target=bun-windows-arm64 downloads @oven/bun-windows-aarch64,
+          # first published at 1.3.10, so on 1.3.7 that leg fails every run
+          # with "Target platform 'bun-windows-aarch64-v1.3.7' is not
+          # available for download". 1.4.0 is the version that built v0.4.0's
+          # complete 8-binary set.
+          bun-version: 1.4.0
 
       - name: Cache bun install
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -378,8 +382,9 @@ jobs:
 
       - name: Stage per-platform npm sub-packages
         # Generates one @general-liquidity/gordon-<target> package dir per
-        # available binary + a manifest with per-asset sha256. Missing targets
-        # (e.g. a failed windows-arm64) are simply skipped, not fatal.
+        # available binary + a manifest with per-asset sha256. The staging
+        # script tolerates a missing target, but the build matrix no longer
+        # does, so publish only ever runs on the complete set.
         run: |
           node scripts/npm/stage-platform-packages.cjs \
             --binaries dist-assets \
