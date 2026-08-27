@@ -5,28 +5,9 @@
  */
 
 import { GORDON_DIR } from "./infra/storage/paths.ts";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import { fileURLToPath } from "node:url";
+import { GORDON_VERSION } from "./version.ts";
 
-function loadVersion(): string {
-  try {
-    const currentFile = fileURLToPath(import.meta.url);
-    const packageJsonPath = path.resolve(path.dirname(currentFile), "../package.json");
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")) as {
-      version?: string;
-    };
-    if (typeof packageJson.version === "string" && packageJson.version.length > 0) {
-      return packageJson.version;
-    }
-  } catch {
-    // Fall back to a hardcoded version if package.json is unavailable.
-  }
-
-  return "0.8.8";
-}
-
-const VERSION = loadVersion();
+const VERSION = GORDON_VERSION;
 const MIN_BUN_VERSION = "1.0.0";
 
 export interface CLIFlags {

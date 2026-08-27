@@ -1,21 +1,20 @@
-#!/usr/bin/env bun
 /**
  * Gordon-as-MCP-server entry point.
  *
  * Run via:
- *   bun run src/infra/ai/mcp/serveCli.ts
+ *   npm run mcp
  *
  * Wire into MCP-aware clients:
  *
  *   Claude Code:
- *     claude mcp add gordon -- bun run /path/to/gordon-cli-alpha/src/infra/ai/mcp/serveCli.ts
+ *     claude mcp add gordon -- node /path/to/gordon-cli-alpha/bin/gordon.cjs --gordon-source-mode=mcp
  *
  *   Cursor (~/.cursor/mcp.json):
  *     {
  *       "mcpServers": {
  *         "gordon": {
- *           "command": "bun",
- *           "args": ["run", "/path/to/gordon-cli-alpha/src/infra/ai/mcp/serveCli.ts"]
+ *           "command": "node",
+ *           "args": ["/path/to/gordon-cli-alpha/bin/gordon.cjs", "--gordon-source-mode=mcp"]
  *         }
  *       }
  *     }
@@ -36,16 +35,33 @@
  * stderr. The startup banner uses `console.error` deliberately.
  */
 
-import { installProductionGuards } from "../../safety/installProductionGuards.ts";
-import { connectStdio, type ToolRegistry } from "./exposeServer.ts";
-import {
-  instrumentedTradingTools,
-  instrumentedMarketTools,
-  instrumentedMarketAnalysisTools,
-  instrumentedIndicatorTools,
-  instrumentedChartTools,
-} from "../../agents/tooling/instrumentedTools.ts";
-import { getMcpGordonExecContext } from "./mcpContext.ts";
+import type { ToolRegistry } from "./exposeServer.ts";
+import { assertRuntimeEnvProvenance } from "../../storage/config/runtimeEnvProvenance.ts";
+import { GORDON_VERSION } from "../../../version.ts";
+
+assertRuntimeEnvProvenance();
+if (process.argv.includes("--version")) {
+  console.log(`gordon-mcp v${GORDON_VERSION}`);
+  process.exit(0);
+}
+
+const [
+  { installProductionGuards },
+  { connectStdio },
+  {
+    instrumentedTradingTools,
+    instrumentedMarketTools,
+    instrumentedMarketAnalysisTools,
+    instrumentedIndicatorTools,
+    instrumentedChartTools,
+  },
+  { getMcpGordonExecContext },
+] = await Promise.all([
+  import("../../safety/installProductionGuards.ts"),
+  import("./exposeServer.ts"),
+  import("../../agents/tooling/instrumentedTools.ts"),
+  import("./mcpContext.ts"),
+]);
 
 function parseAllowList(): string[] | undefined {
   const raw = process.env.GORDON_MCP_TOOL_ALLOWLIST;

@@ -12,6 +12,7 @@ import { listTrippedSwitches, type KillSwitchKey } from "../../infra/safety/kill
 import { isObserverRunning } from "../../infra/proactive/engine/observer.ts";
 import { getProducerHealthTracker } from "../../infra/proactive/engine/producerHealth.ts";
 import { getSuggestionStore } from "../../infra/proactive/storage/suggestionStore.ts";
+import { GORDON_VERSION } from "../../version.ts";
 import { getGordonDir } from "../../infra/storage/paths.ts";
 
 const TEAL = "\x1b[38;2;52;238;176m";
@@ -184,11 +185,10 @@ function collectRadarSnapshot(): BootStaticInfo["radar"] {
 
 /** Sync reads only: config/session files + guard/kill-switch/radar accessors. Never throws. */
 export function collectBootStaticInfo(): BootStaticInfo {
-  const rawVersion = process.env.npm_package_version ?? process.env.GORDON_VERSION ?? "0.9";
   const config = readBootConfig();
 
   return {
-    version: rawVersion.split("-")[0]!,
+    version: GORDON_VERSION.split("-")[0]!,
     model: config.model,
     effort: process.env.GORDON_EFFORT ?? null,
     permissionMode: config.permissionMode,

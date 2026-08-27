@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { parseCommand } from "./cli.ts";
+import packageJson from "../package.json" with { type: "json" };
+import { parseCommand, VERSION } from "./cli.ts";
 
 const originalArgv = [...process.argv];
 
@@ -9,6 +10,10 @@ afterEach(() => {
 });
 
 describe("cli command parsing", () => {
+  test("reports the package version in source mode", () => {
+    expect(VERSION).toBe(packageJson.version);
+  });
+
   test("parses doctor command with args", () => {
     process.argv = ["bun", "src/index.tsx", "doctor", "--json"];
     expect(parseCommand()).toEqual({ name: "doctor", args: ["--json"] });

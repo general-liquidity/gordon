@@ -1,21 +1,38 @@
-#!/usr/bin/env bun
 /**
  * Gordon ACP entry — boots an Agent Client Protocol server on stdio.
  *
  * Editors (Zed, Athas, any ACP-compatible host) spawn this as a child
  * process. JSON-RPC 2.0 over stdin/stdout per the ACP spec.
  *
- *   $ bun run src/app/acp-entry.ts            # direct
- *   $ bun acp                                 # via package.json script
+ *   $ npm run acp                             # safe Node launcher
  *
  * The process blocks forever; the editor closes stdin to terminate.
  * Diagnostic output goes to stderr (stdout is reserved for ACP frames).
  */
 
-import { installProductionGuards } from "../infra/safety/installProductionGuards.ts";
-import { getDefaultPermissionEngine } from "../runtime/permissions/defaultPermissionEngine.ts";
-import { startAcpServerOnStdio } from "../infra/acp/server.ts";
-import { redactString } from "../infra/platform/observability/valueRedaction.ts";
+import { assertRuntimeEnvProvenance } from "../infra/storage/config/runtimeEnvProvenance.ts";
+import { GORDON_VERSION } from "../version.ts";
+
+assertRuntimeEnvProvenance();
+if (process.argv.includes("--version")) {
+  console.log(`gordon-acp v${GORDON_VERSION}`);
+  process.exit(0);
+}
+
+// Keep modules that install guards or read execution settings behind the
+// provenance check. Static ESM imports execute dependencies before this
+// module's body and would make the assertion too late.
+const [
+  { installProductionGuards },
+  { getDefaultPermissionEngine },
+  { startAcpServerOnStdio },
+  { redactString },
+] = await Promise.all([
+  import("../infra/safety/installProductionGuards.ts"),
+  import("../runtime/permissions/defaultPermissionEngine.ts"),
+  import("../infra/acp/server.ts"),
+  import("../infra/platform/observability/valueRedaction.ts"),
+]);
 
 installProductionGuards();
 getDefaultPermissionEngine();

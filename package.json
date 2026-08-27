@@ -21,13 +21,14 @@
     "cryptocurrency",
     "vibe-trading"
   ],
-  "module": "src/index.tsx",
   "type": "module",
   "bin": {
-    "gordon": "./dist/index.js"
+    "gordon": "./bin/gordon.cjs"
   },
   "files": [
+    "bin",
     "dist",
+    "scripts/patches/patch-ink.cjs",
     "scripts/patches/patch-mastra.cjs",
     "prompts",
     "assets",
@@ -39,11 +40,12 @@
     "bun": ">=1.0"
   },
   "scripts": {
-    "start": "bun run --silent src/index.tsx",
-    "start:compiled": "GORDON_REACT_COMPILER=1 bun run --silent src/index.tsx",
-    "dev": "bun --watch run src/index.tsx",
-    "acp": "bun run src/app/acp-entry.ts",
-    "dev:compiled": "GORDON_REACT_COMPILER=1 bun --watch run src/index.tsx",
+    "start": "node bin/gordon.cjs",
+    "start:compiled": "GORDON_REACT_COMPILER=1 node bin/gordon.cjs",
+    "dev": "node bin/gordon.cjs",
+    "acp": "node bin/gordon.cjs --gordon-source-mode=acp",
+    "mcp": "node bin/gordon.cjs --gordon-source-mode=mcp",
+    "dev:compiled": "GORDON_REACT_COMPILER=1 node bin/gordon.cjs",
     "build": "bun scripts/build/build.ts",
     "build:binary": "bun scripts/build/build.ts --binary",
     "generate:actions-docs": "bun run scripts/dev/codegen/generate-action-docs.ts",

@@ -17,6 +17,8 @@ import {
 import { createKeyringProvider, KEYRING_SUPPORTED_KEYS } from "../keyring.ts";
 import { GORDON_DIR } from "../paths.ts";
 import { resetProviderRegistry } from "../../runtime/providers/index.ts";
+import { assertRuntimeEnvProvenance } from "./runtimeEnvProvenance.ts";
+import { isAllowedCwdEnvKey } from "./envTrustPolicy.ts";
 const GORDON_ENV_PATH = join(GORDON_DIR, ".env");
 
 // Secondary location: current working directory (for development)
@@ -283,12 +285,17 @@ function buildEnvStatus(keys: EnvKeys, fileExists: boolean): EnvStatus {
  * Checks both ~/.gordon/.env and cwd/.env
  */
 export async function checkEnvStatus(): Promise<EnvStatus> {
+  assertRuntimeEnvProvenance();
   const envPath = findEnvFilePath();
   const fileExists = envPath !== null;
 
   // Parse .env file if it exists, otherwise use empty map
   const parsed: Record<string, string> = fileExists
-    ? parseEnvContent(await Bun.file(envPath).text())
+    ? Object.fromEntries(
+        Object.entries(parseEnvContent(await Bun.file(envPath).text())).filter(
+          ([name]) => envPath !== CWD_ENV_PATH || isAllowedCwdEnvKey(name),
+        ),
+      )
     : {};
 
   // Resolve each key: .env file value > process.env fallback
@@ -306,6 +313,7 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
  * Checks ~/.gordon/.env first, then cwd/.env
  */
 export async function loadEnvFile(): Promise<void> {
+  assertRuntimeEnvProvenance();
   const shellEnvKeys = new Set<string>(
     ENV_KEY_NAMES.filter((name) => !!process.env[name]).map((name) => String(name)),
   );
@@ -315,9 +323,11 @@ export async function loadEnvFile(): Promise<void> {
     const file = Bun.file(envPath);
     const content = await file.text();
     const parsed = parseEnvContent(content);
+    const fromCwd = envPath === CWD_ENV_PATH;
 
     // Only set if not already in process.env (process.env takes precedence)
     for (const [key, value] of Object.entries(parsed)) {
+      if (fromCwd && !isAllowedCwdEnvKey(key)) continue;
       if (!shellEnvKeys.has(key) && !process.env[key]) {
         process.env[key] = value;
       }
@@ -388,10 +398,11 @@ export async function saveEnvKeys(newKeys: Partial<EnvKeys>): Promise<void> {
   let existingContent = "";
   const existingKeys: Record<string, string> = {};
 
-  // Read existing .env if it exists (from either location)
-  const envPath = findEnvFilePath();
-  if (envPath) {
-    const file = Bun.file(envPath);
+  // Only the operator-owned file is preservation input. Reading cwd/.env here
+  // would promote repository content into ~/.gordon/.env when setup saved an
+  // unrelated key, bypassing the source-aware read policy permanently.
+  if (existsSync(GORDON_ENV_PATH)) {
+    const file = Bun.file(GORDON_ENV_PATH);
     existingContent = await file.text();
 
     // Parse existing keys to preserve order and comments

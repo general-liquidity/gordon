@@ -12,6 +12,7 @@ RUN bun install --frozen-lockfile --production
 # Copy source
 COPY src/ src/
 COPY prompts/ prompts/
+COPY assets/ assets/
 COPY tsconfig.json ./
 
 # Build (if applicable)
@@ -30,6 +31,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/prompts ./prompts
+COPY --from=builder /app/assets ./assets
 COPY --from=builder /app/tsconfig.json ./
 
 # Gordon stores data in ~/.gordon — mount a volume for persistence
@@ -39,4 +41,4 @@ VOLUME ["/data"]
 
 USER gordon
 
-ENTRYPOINT ["bun", "run", "src/index.tsx"]
+ENTRYPOINT ["bun", "--config=/app/assets/bunfig.runtime.toml", "--no-env-file", "run", "src/entry.ts"]

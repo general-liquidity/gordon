@@ -6,6 +6,12 @@
 # this entry in by default has no effect on normal builds.
 preload = ["./src/tui/ink-custom/buildCompilerPlugin.ts"]
 
+# Gordon's loader distinguishes the operator-owned ~/.gordon/.env from an
+# untrusted repository-owned <cwd>/.env. Bun's implicit dotenv preload erases
+# that provenance before application code can enforce the distinction, so all
+# dotenv loading is delegated to src/infra/storage/config/env.ts.
+env = false
+
 [test]
 # globalTestReset registers a beforeEach that clears process-global trade/gate
 # singletons (WIP registry, cost budget/halt, kill switches, constitution halt)
@@ -56,7 +62,7 @@ minimumReleaseAgeExcludes = [
 
 # Run-time configuration applied to `bun run` / `bun script.ts` invocations.
 [run]
-# Don't echo the resolved script command (`$ bun --watch run src/index.tsx`)
+# Don't echo the resolved package script command (`$ node bin/gordon.cjs`)
 # above the GORDON banner on `bun run dev` — the banner is the boot identity.
 silent = true
 # Kill all child processes when Bun exits — including when the parent

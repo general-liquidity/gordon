@@ -11,6 +11,7 @@ import {
 import { getOrCreateDaemonToken } from "./security/auth.ts";
 import { getDefaultIpcPath, isIpcDaemonReachable, sendIpcCommand } from "./daemon/ipc.ts";
 import { startGatewayDaemonProcess } from "./daemon/process.ts";
+import { resolveDaemonSpawnCommand } from "./daemon/spawnCommand.ts";
 import {
   applyBootstrap,
   collectDoctorReport,
@@ -32,14 +33,6 @@ async function waitForDaemon(timeoutMs: number = 60_000): Promise<boolean> {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   return false;
-}
-
-function buildSpawnArgs(): string[] {
-  const scriptPath = process.argv[1];
-  if (scriptPath) {
-    return ["run", scriptPath, "daemon", "run"];
-  }
-  return ["run", "src/index.tsx", "daemon", "run"];
 }
 
 async function sendLocalCommand(
@@ -90,7 +83,8 @@ async function runDaemonCommand(action: "start" | "run" | "stop" | "status"): Pr
     //   Windows: detached:true on Windows requires windowsHide:true to
     //          actually run hidden — otherwise a console window flashes.
     const isWindows = process.platform === "win32";
-    const child = spawn(process.execPath, buildSpawnArgs(), {
+    const spawnCommand = resolveDaemonSpawnCommand();
+    const child = spawn(spawnCommand.command, spawnCommand.args, {
       detached: true,
       stdio: "ignore",
       windowsHide: isWindows,

@@ -96,7 +96,7 @@ jobs:
           REPORT="reports/${{ matrix.task.id }}.json"
           # Pipe stderr to a sidecar log so the structured JSON on stdout
           # stays clean for downstream parsing.
-          bun src/index.tsx --headless --json --quiet "${{ matrix.task.prompt }}" \
+          node bin/gordon.cjs --headless --json --quiet "${{ matrix.task.prompt }}" \
             > "$REPORT" \
             2> "reports/${{ matrix.task.id }}.stderr.log"
           EXIT=$?

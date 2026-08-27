@@ -24,6 +24,8 @@ const EXTERNALS: string[] = [];
 
 const ROOT = resolve(import.meta.dirname, "..", "..");
 const ENTRY = resolve(ROOT, "src/entry.ts");
+const ACP_ENTRY = resolve(ROOT, "src/app/acp-entry.ts");
+const MCP_ENTRY = resolve(ROOT, "src/infra/ai/mcp/serveCli.ts");
 
 const args = process.argv.slice(2);
 const binary = args.includes("--binary");
@@ -44,10 +46,14 @@ if (binary) {
   const outfile = flagValue("--outfile") ?? resolve(ROOT, "gordon");
 
   const compileArgs = [
-    "bun",
+    process.execPath,
     "build",
     ENTRY,
     "--compile",
+    // Compiled Bun executables otherwise autoload <cwd>/.env and bunfig.toml
+    // before Gordon can apply its source-aware trust-boundary checks.
+    "--no-compile-autoload-dotenv",
+    "--no-compile-autoload-bunfig",
     "--outfile",
     outfile,
     ...(target ? ["--target", target] : []),
@@ -61,8 +67,9 @@ if (binary) {
 
 // Library bundle path — use the programmatic Bun.build() API.
 const result = await Bun.build({
-  entrypoints: [ENTRY],
+  entrypoints: [ENTRY, ACP_ENTRY, MCP_ENTRY],
   outdir: resolve(ROOT, "dist"),
+  naming: "[name].[ext]",
   target: "bun",
   external: EXTERNALS,
 });

@@ -1,0 +1,8 @@
+# Runtime config selected explicitly by bin/gordon.cjs. It is intentionally
+# free of preloads: a caller's working directory must not execute code before
+# Gordon's startup trust-boundary checks.
+env = false
+
+[run]
+silent = true
+noOrphans = true

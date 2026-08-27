@@ -1,5 +1,3 @@
-#!/usr/bin/env bun
-
 import { installProductionGuards } from "./infra/safety/installProductionGuards.ts";
 installProductionGuards();
 

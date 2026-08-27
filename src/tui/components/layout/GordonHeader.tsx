@@ -2,6 +2,7 @@ import { Box, Text } from "../../ink-custom";
 import type { PermissionMode } from "../../state/types.js";
 import type { GordonTheme } from "../../themes/themes.ts";
 import { useTheme } from "../../themes/ThemeProvider.tsx";
+import { GORDON_VERSION } from "../../../version.ts";
 
 // ============================================================================
 // GordonHeader — Codex-style info box
@@ -58,8 +59,7 @@ export function GordonHeader({
     ? (theme[WORKSPACE_TINT[workspace] ?? "uiBrand"] as string)
     : null;
   const modeColor = MODE_COLOR[permissionMode] ?? "rgb(52,238,176)";
-  const rawVersion = process.env.npm_package_version ?? process.env.GORDON_VERSION ?? "0.9";
-  const version = rawVersion.split("-")[0]!;
+  const version = GORDON_VERSION.split("-")[0]!;
   const isPaper = permissionMode === "paper";
 
   const sessionDisplay = threadId

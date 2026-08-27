@@ -661,9 +661,9 @@ function newSessionId(): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Start a GordonAcpAgent listening on stdio. Used by the bin entry
- * (`bun run src/app/acp-entry.ts`). Blocks forever — the editor closes
- * stdin to terminate.
+ * Start a GordonAcpAgent listening on stdio. Used by the hardened Node
+ * launcher (`npm run acp`). Blocks forever — the editor closes stdin to
+ * terminate.
  *
  * stderr is NOT touched by the SDK (stdout is reserved for ACP frames),
  * so anything written to stderr is safe diagnostic logging the editor

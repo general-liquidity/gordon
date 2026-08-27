@@ -22,13 +22,13 @@
     "risk",
     "backtest"
   ],
-  "command": "bun",
-  "args": ["run", "src/app/acp-entry.ts"],
+  "command": "node",
+  "args": ["bin/gordon.cjs", "--gordon-source-mode=acp"],
   "env": {
     "GORDON_ACP_MODE": "1"
   },
   "requirements": {
-    "node": ">=20",
+    "node": ">=22.22.0",
     "bun": ">=1.0"
   },
   "auth": {

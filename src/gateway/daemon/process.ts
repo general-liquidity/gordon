@@ -23,6 +23,7 @@ import { listPlans } from "../../infra/storage/entities/plans.ts";
 import { closeDatabase } from "../../infra/storage/database.ts";
 import { resetMemoryManager } from "../../core/memory/index.ts";
 import { resetSubscriptionRegistry } from "../../events/index.ts";
+import { assertRuntimeEnvProvenance } from "../../infra/storage/config/runtimeEnvProvenance.ts";
 
 const logger = createModuleLogger("gateway-daemon");
 
@@ -56,6 +57,7 @@ export interface GatewayDaemonStartOptions {
 export async function startGatewayDaemonProcess(
   options: GatewayDaemonStartOptions = {},
 ): Promise<GatewayDaemonHandle> {
+  assertRuntimeEnvProvenance();
   const validationOnly = options.validationOnly ?? false;
   installProductionGuards();
   await bootstrapV07();
