@@ -20,14 +20,6 @@ import { KEEPER_FLAGS } from "./system.ts";
 
 const SAFETY_DIR = join(import.meta.dir, "../../../../safety");
 
-/**
- * Readers that exist but gate nothing: both functions are exported and never
- * called anywhere in src/, so the flags govern no behaviour. Listing them in
- * /flags would advertise a switch that does not move. Wire the reader into a
- * call site or delete it; do not add it here to silence this test.
- */
-const GATES_NOTHING = new Set(["GORDON_DECISION_OBSERVABILITY", "GORDON_STRATEGY_EDGE_THESIS"]);
-
 /** Not toggles: file locations and enum-valued modes are configuration. */
 function isToggleName(flag: string): boolean {
   return !flag.endsWith("_PATH") && !flag.endsWith("_MODE") && !flag.endsWith("_URL");
@@ -114,7 +106,7 @@ describe("the /flags registry covers every safety gate", () => {
   test("every flag a safety reader gates on is listed in /flags", () => {
     const registered = new Set<string>(KEEPER_FLAGS.map((f) => f.name));
     const missing = discovered
-      .filter((d) => !registered.has(d.flag) && !GATES_NOTHING.has(d.flag))
+      .filter((d) => !registered.has(d.flag))
       .map((d) => `${d.flag} (${d.reader})`);
 
     expect([...new Set(missing)]).toEqual([]);

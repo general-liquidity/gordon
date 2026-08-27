@@ -6,8 +6,6 @@ import {
   parseStampedRecord,
   stampedEditToPayload,
   verificationToPayload,
-  isDecisionObservabilityEnabled,
-  DECISION_OBSERVABILITY_FLAG_ENV,
   type StampEditPredictionInput,
 } from "./decisionObservability.ts";
 
@@ -25,13 +23,6 @@ const validStamp: StampEditPredictionInput = {
   rationale:
     "MAE distribution of recent winners suggests -0.4R captures 80%+ without false positives",
 };
-
-describe("isDecisionObservabilityEnabled", () => {
-  it("respects the flag", () => {
-    expect(isDecisionObservabilityEnabled({})).toBe(false);
-    expect(isDecisionObservabilityEnabled({ [DECISION_OBSERVABILITY_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("stampEditPrediction — validation", () => {
   it("rejects empty editId", () => {

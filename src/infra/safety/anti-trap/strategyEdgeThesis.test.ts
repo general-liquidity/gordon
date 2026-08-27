@@ -2,8 +2,6 @@ import { describe, it, expect } from "bun:test";
 import {
   captureEdgeThesis,
   edgeThesisToPayload,
-  isStrategyEdgeThesisEnabled,
-  STRATEGY_EDGE_THESIS_FLAG_ENV,
   type EdgeThesisInput,
 } from "./strategyEdgeThesis.ts";
 
@@ -18,13 +16,6 @@ const validInput: EdgeThesisInput = {
   persistenceRationale:
     "regulatory and IPS constraints prevent these funds from adjusting timing even when prices move adversely",
 };
-
-describe("isStrategyEdgeThesisEnabled", () => {
-  it("respects the flag", () => {
-    expect(isStrategyEdgeThesisEnabled({})).toBe(false);
-    expect(isStrategyEdgeThesisEnabled({ [STRATEGY_EDGE_THESIS_FLAG_ENV]: "1" })).toBe(true);
-  });
-});
 
 describe("captureEdgeThesis — validation", () => {
   it("rejects empty strategyId", () => {
