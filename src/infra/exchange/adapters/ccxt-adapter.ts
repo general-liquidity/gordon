@@ -15,8 +15,15 @@
  * `toCcxtSymbol` helper) and returns CCXT's slash format.
  *
  * Sandbox: CCXT exposes `exchange.setSandboxMode(true)` for ~30 venues.
- * A requested sandbox that the venue cannot provide is refused; it never
- * falls through to a live endpoint.
+ * The guarantee is partial and venue-scoped. For a first-class venue the
+ * static matrix in `../sandboxSupport.ts` is authoritative: a sandbox
+ * request on a venue recorded as `unsupported` (kraken, coinbase,
+ * binance_us, robinhood) is refused at construction. For a long-tail CCXT
+ * venue there is no matrix entry, so `assertSandboxSupported` is a no-op
+ * and the request is passed to CCXT, which now ships a `test` URL for every
+ * exchange. A venue that silently no-ops on `setSandboxMode(true)` therefore
+ * dispatches LIVE while `isSandbox` reads true. Do not read `isSandbox` on a
+ * long-tail venue as a paper-trading guarantee.
  *
  * Error model: CCXT throws typed errors (`AuthenticationError`,
  * `InsufficientFunds`, `InvalidOrder`, `NetworkError`, `ExchangeError`,
