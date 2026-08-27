@@ -74,15 +74,18 @@ jobs:
 
       - name: Fetch pull-request base
         if: github.event_name == 'pull_request'
-        run: git fetch origin "${{ github.base_ref }}" --depth=1
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git fetch origin "$BASE_REF" --depth=1
 
       - name: Semgrep — diff-aware hard gate
         env:
           BEFORE_SHA: ${{ github.event.before }}
           BASE_REF: ${{ github.base_ref }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
+          if [ "$EVENT_NAME" = "pull_request" ]; then
             baseline="origin/${BASE_REF}"
           elif git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
             baseline="${BEFORE_SHA}"

@@ -44,6 +44,9 @@ jobs:
 
       - name: Validate scenario bundle
         run: |
+          # The single quotes intentionally prevent the shell from expanding
+          # JavaScript template literals such as `${s.id}`.
+          # shellcheck disable=SC2016
           bun -e '
             import { ALL_SCENARIOS, ADVERSARIAL_SCENARIOS } from "./src/infra/domain/evals/harness/scenarios/index.ts";
 

@@ -34,4 +34,8 @@ regexes = [
   # entry. Pinned to that exact literal rather than the file or the commit: a
   # real key committed to a test file is still a leak.
   '''\babcdefgh1234\b''',
+  # Canonical JWT.io HS256 example token used to prove the redactor catches
+  # JWTs. It is public test data, not an authentication credential. Keep this
+  # exact because the history scan includes the commit that introduced it.
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c''',
 ]
