@@ -1426,7 +1426,7 @@ Both ship with **informational mode as default**: the primitive returns the obse
 
 ### D2. Revenge-trade guard ✅ shipped
 
-**Module:** `src/infra/trading/quant/revengeTradeGuard.ts`. Flag `GORDON_REVENGE_TRADE_GUARD`.
+**Module:** `src/infra/trading/quant/revengeTradeGuard.ts`. No flag: the guard is advisory and nothing on the order path reads it.
 **What:** Detects post-loss size escalation. Returns `revengeTradeDetected = true` when BOTH (a) the prior closed trade was a loss AND (b) the currently-proposed plan size is ≥ baseline × sizeIncreaseThreshold (default 1.5). Informational mode returns `flag`; active mode returns `block`.
 **Mastra tool:** `evaluate_revenge_trade_guard` in `runtime/revengeTradeGuardDiagnostic.ts`.
 **Test coverage:** 16 tests — validation, detection logic across (size, prior-PnL) combinations, mode behavior, custom threshold sensitivity.

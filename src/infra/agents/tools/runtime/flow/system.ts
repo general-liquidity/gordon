@@ -637,12 +637,6 @@ const KEEPER_FLAGS = [
     defaultOn: false,
   },
   {
-    name: "GORDON_REVENGE_TRADE_GUARD",
-    description: "Blocks re-entry immediately after a loss (revenge-trade guard).",
-    truthy: ["1", "true"],
-    defaultOn: false,
-  },
-  {
     name: "GORDON_GIVE_BACK_STOP",
     description: "Flatten when session gives back >50% of intraday high-water P&L.",
     truthy: ["1", "true"],

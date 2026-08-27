@@ -26,19 +26,13 @@
  * hotStreakSizer (D1) which encodes the other half of his sizing
  * asymmetry — "bet big when hot, never bet big to get even."
  *
+ * Advisory, not an enforcement gate: the only caller is the agent-callable
+ * `evaluate_revenge_trade_guard` tool. No order path consults it, so there is
+ * no operator flag for it — see docs/archived/harness-deferred-wiring.md (D2)
+ * for what wiring it into the permission engine would take.
+ *
  * Pure compute. No I/O.
  */
-
-import { flagEnv } from "../../config/flagResolver.ts";
-
-export const REVENGE_TRADE_GUARD_FLAG_ENV = "GORDON_REVENGE_TRADE_GUARD";
-
-export function isRevengeTradeGuardEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
-  // Default-on protective gate: absence = enabled. Explicit "0"/"false" opts out.
-  // Read via flagEnv() so settings.json + /flags can toggle it (env still wins).
-  const raw = env[REVENGE_TRADE_GUARD_FLAG_ENV];
-  return raw !== "0" && raw !== "false";
-}
 
 export type GuardMode = "informational" | "active";
 
