@@ -1,0 +1,101 @@
+name: Release Rehearsal
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  critical-gates:
+    name: Exact tag-only gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.22.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.7
+      - name: Validate npm lockfile
+        run: npm ci --ignore-scripts
+      - name: Validate frozen Bun lockfile
+        run: bun install --frozen-lockfile
+      - name: Patch Bun-incompatible dependencies
+        run: node scripts/patches/patch-mastra.cjs
+      - name: Generate release SBOM
+        run: node scripts/dev/codegen/generate-sbom.cjs --output gordon-sbom.json
+      - name: Verify exact test-shard ownership
+        run: bun run check:test-shards
+      - name: Run every release test shard in a fresh process
+        run: bun scripts/dev/release/rehearse-test-shards.ts
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Run broker conformance matrix
+        run: bun run test:broker-conformance
+      - name: Run broker latency quality gate
+        run: bun run quality:brokers
+      - name: Prepare and verify npm wrapper versions
+        run: |
+          npm run prepare:npm-wrapper
+          npm run check:npm-wrapper
+          npm run smoke:npm-wrapper
+      - name: Audit npm pack contents and source maps
+        run: |
+          bun run build
+          bun scripts/dev/release/rehearse-source-package.ts
+          node scripts/npm/audit-npm-pack.cjs
+          node scripts/npm/audit-npm-pack-content.cjs
+          node scripts/build/check-no-sourcemaps.cjs
+      - name: Prepare and verify public distribution bundle
+        run: |
+          node scripts/build/prepare-public-dist.cjs --out-dir .public-dist
+          test -f .public-dist/README.md
+          test -f .public-dist/install.sh
+          test -f .public-dist/install.ps1
+          test -f .public-dist/Formula/gordon.rb
+          test -f .public-dist/bucket/gordon.json
+
+  wrapper-matrix:
+    name: npm wrapper (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.22.0
+      - name: Rehearse the cross-platform npm wrapper
+        run: |
+          npm run prepare:npm-wrapper
+          npm run check:npm-wrapper
+          npm run smoke:npm-wrapper
+          node scripts/npm/audit-npm-pack.cjs
+          node scripts/build/check-no-sourcemaps.cjs
+
+  binary-targets:
+    name: Every supported binary target
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.0
+      - name: Validate frozen Bun lockfile
+        run: bun install --frozen-lockfile
+      - name: Patch Bun-incompatible dependencies
+        run: node scripts/patches/patch-mastra.cjs
+      - name: Cross-compile the release matrix, including windows-arm64
+        run: bun scripts/dev/release/rehearse-binaries.ts
+      - name: Stage every platform package and wire release hashes without publishing
+        run: bun scripts/dev/release/rehearse-package-staging.ts

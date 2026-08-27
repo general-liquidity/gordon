@@ -15,6 +15,7 @@
  *
  * Usage:
  *   node scripts/npm/apply-release-hashes.cjs --manifest staging/manifest.json --version 0.1.0
+ * Optional --output-root writes rehearsal copies instead of production files.
  *
  * The manifest is produced by scripts/npm/stage-platform-packages.cjs and maps
  * each staged asset to its sha256.
@@ -23,13 +24,14 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const repoRoot = path.resolve(__dirname, "..", "..");
+const defaultRepoRoot = path.resolve(__dirname, "..", "..");
 
 function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === "--manifest") out.manifest = argv[++i];
     else if (argv[i] === "--version") out.version = argv[++i];
+    else if (argv[i] === "--output-root") out.outputRoot = argv[++i];
   }
   return out;
 }
@@ -38,13 +40,14 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.manifest) {
     console.error(
-      "Usage: node scripts/npm/apply-release-hashes.cjs --manifest <file> [--version <v>]",
+      "Usage: node scripts/npm/apply-release-hashes.cjs --manifest <file> [--version <v>] [--output-root <dir>]",
     );
     process.exit(1);
   }
 
   const manifest = JSON.parse(fs.readFileSync(path.resolve(args.manifest), "utf8"));
   const version = String(args.version || manifest.version).replace(/^v/, "");
+  const repoRoot = args.outputRoot ? path.resolve(args.outputRoot) : defaultRepoRoot;
 
   // asset name -> sha256
   const hashByAsset = new Map();
