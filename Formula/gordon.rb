@@ -9,26 +9,26 @@
 class Gordon < Formula
   desc "The Frontier Trading Agent - AI-powered crypto trading CLI"
   homepage "https://gordoncli.com"
-  version "0.5.4"
+  version "0.5.5"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/general-liquidity/gordon/releases/download/v#{version}/gordon-darwin-arm64"
-      sha256 "9bbffe11b728b51b963fcc373a48e88f1b7022393dee13087654f66bb8795d09"
+      sha256 "54cbd18d207eb1327880284e01b6b357c18c07abbcd59f0715dba96a8238006d"
     else
       url "https://github.com/general-liquidity/gordon/releases/download/v#{version}/gordon-darwin-x64"
-      sha256 "bdc43e528e868f10a7d1547b1811a1034709f48eae19f066d54ee8211b54e54e"
+      sha256 "14bcce82013c2c3328efc8be500e14ce1645194fc3bcbf3acaf866c0c4720556"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
       url "https://github.com/general-liquidity/gordon/releases/download/v#{version}/gordon-linux-arm64"
-      sha256 "7ca26ec926ae0750d3642e5bbdbd1fde55087b5e69a0df08f2a63d25cc638bc2"
+      sha256 "c7b2518e0b42b939b0a9db2c067f84a1560500f0c8e3f539a77cc985eb3c73b6"
     else
       url "https://github.com/general-liquidity/gordon/releases/download/v#{version}/gordon-linux-x64"
-      sha256 "6c8aa982a59b6fc53db5f7be02103bfb8fd9faf03e8ffa00257623364fd77fdd"
+      sha256 "e5e8163c4086736128a65eb903b2c94cac5feb3fddb744c5285e3ce344b87813"
     end
   end
 
