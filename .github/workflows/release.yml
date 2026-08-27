@@ -44,7 +44,7 @@ jobs:
           - shard-name: state
             paths: src/core/lifecycle src/infra/agents/tools/trading/trading.approvalBinding.test.ts
           - shard-name: state-extra
-            paths: src/infra/agents/tools/trading/risk-gate.orderpath.test.ts src/infra/agents/tools/trading/trading.wipClaimRelease.test.ts src/infra/agents/tools/trading/trading.wipRace.test.ts src/infra/agents/tools/trading/wallet.withdrawConsent.test.ts
+            paths: src/infra/agents/tools/trading/risk-gate.orderpath.test.ts src/infra/agents/tools/trading/risk-gate.haltGates.test.ts src/infra/agents/tools/trading/trading.wipClaimRelease.test.ts src/infra/agents/tools/trading/trading.wipRace.test.ts src/infra/agents/tools/trading/wallet.withdrawConsent.test.ts
           - shard-name: mocked
             paths: src/infra/agents/tools/trading/trading.executePlan.test.ts src/infra/agents/tools/trading/trading.terminationLayers.test.ts src/infra/agents/tools/trading/trading.terminationLayers.enforce.test.ts src/infra/agents/tools/trading/trading.wipGate.test.ts src/infra/agents/tools/trading/trading.riskAck.test.ts
           - shard-name: core

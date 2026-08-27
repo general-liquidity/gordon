@@ -88,6 +88,14 @@ export function observeSessionEquity(
   env: NodeJS.ProcessEnv = flagEnv(),
 ): AbsorbingBarrierEvaluation | null {
   if (!hasConfiguredLimit(config)) return null;
+  return foldEquity(currentEquityUsd, config, env);
+}
+
+function foldEquity(
+  currentEquityUsd: number,
+  config: AbsorbingBarrierConfig,
+  env: NodeJS.ProcessEnv,
+): AbsorbingBarrierEvaluation | null {
   if (!Number.isFinite(currentEquityUsd) || currentEquityUsd <= 0) return null;
 
   if (sessionState === null) {
@@ -99,6 +107,45 @@ export function observeSessionEquity(
   const evaluation = evaluateAbsorbingBarrier(sessionState, currentEquityUsd, config);
   sessionState = evaluation.state;
   return evaluation;
+}
+
+/**
+ * The session equity figures other gates need, taken from the same fold.
+ *
+ * The give-back stop wants a session start, a session high-water mark and a
+ * current equity. All three already exist here, and a second store would
+ * disagree with this one the first time an external flow landed. Unlike
+ * `observeSessionEquity` this maintains the fold even when no terminal limit
+ * is configured, because the figures are useful without one; with no limit the
+ * barrier readings stay inactive and `barrier` is null, so nothing can trip.
+ *
+ * `sessionStartEquityUsd` is the fold's reference capital: the operator's
+ * declared GORDON_INCEPTION_EQUITY_USD when set, otherwise the first equity
+ * this process observed. An operator who declares an inception figure above
+ * where the process starts leaves the give-back rule dormant rather than
+ * firing it early, which is the safe direction for a rule that halts trading.
+ */
+export interface SessionEquityTrack {
+  sessionStartEquityUsd: number;
+  sessionHighWaterMarkUsd: number;
+  currentEquityUsd: number;
+  /** Null when the operator configured no terminal limit. */
+  barrier: AbsorbingBarrierEvaluation | null;
+}
+
+export function trackSessionEquity(
+  currentEquityUsd: number,
+  config: AbsorbingBarrierConfig = readAbsorbingBarrierConfigFromEnv(),
+  env: NodeJS.ProcessEnv = flagEnv(),
+): SessionEquityTrack | null {
+  const evaluation = foldEquity(currentEquityUsd, config, env);
+  if (evaluation === null) return null;
+  return {
+    sessionStartEquityUsd: evaluation.state.referenceCapitalUsd,
+    sessionHighWaterMarkUsd: evaluation.state.highWaterMarkUsd,
+    currentEquityUsd,
+    barrier: hasConfiguredLimit(config) ? evaluation : null,
+  };
 }
 
 /**

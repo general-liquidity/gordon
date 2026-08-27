@@ -22,6 +22,8 @@
 import { beforeEach } from "bun:test";
 
 import { resetSessionWipRegistryForTesting } from "../infra/safety/wipSessionRegistry.ts";
+import { resetSessionAbsorbingBarrierForTesting } from "../infra/safety/absorbingBarrierState.ts";
+import { resetStreakCircuitForTesting } from "../infra/trading/ops/streakCircuitState.ts";
 import { reloadConstitutionHaltState } from "../infra/safety/defense/tradingConstitution.ts";
 import { resetAllKillSwitches } from "../infra/safety/killSwitches.ts";
 import {
@@ -43,6 +45,13 @@ beforeEach(() => {
   // KILL_SWITCH_STATE_PATH_ENV is set); when a persistence path IS set this
   // is a no-op without a rationale, so persistence tests are not clobbered.
   resetAllKillSwitches();
+
+  // Pre-trade halt-gate state: the session equity fold the give-back stop and
+  // the absorbing barrier read, and the streak breaker's trip timestamp. Both
+  // are process-scoped singletons the order path now maintains, so a test that
+  // marks a high-water mark or trips a cooldown would otherwise halt a later one.
+  resetSessionAbsorbingBarrierForTesting();
+  resetStreakCircuitForTesting();
 
   // Trading-constitution halt. Under `bun test` (no path override) this
   // reloads to a clean, non-halted in-memory state without touching disk.

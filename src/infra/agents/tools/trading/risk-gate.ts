@@ -32,6 +32,7 @@ import type { EconomicFloorPolicy, FeeSchedule } from "../../../../core/orders/e
 import type { OrderRequest } from "../../../../core/risk-kernel/audit.ts";
 import { StrategyRuntime } from "../../../../core/runtime/engine.ts";
 import { resolveFlag } from "../../../config/flagResolver.ts";
+import { evaluatePreTradeHaltGates } from "../../../safety/preTradeHaltGates.ts";
 import { getGordonContext, type MastraExecutionContext } from "../types.ts";
 import type { GordonContext } from "../types.ts";
 import { createModuleLogger } from "../../../logger/index.ts";
@@ -161,6 +162,30 @@ function buildSafetyState(
     legs,
     recentActions: [],
   };
+}
+
+/**
+ * True when this order shrinks the position it names rather than adding to it.
+ *
+ * Same test the execution preflight applies to a live-consent exemption: the
+ * order must be on the exit side of a position that exists, and must not
+ * exceed it, because an order that flips the sign is new exposure wearing the
+ * name of an exit. The halt gates read this so a give-back stop or a streak
+ * cooldown cannot prevent an operator from flattening.
+ */
+function reducesExposure(
+  symbol: string,
+  side: "buy" | "sell",
+  proposedNotionalUsd: number,
+  portfolio: PortfolioContext,
+): boolean {
+  const netNotional = portfolio.openPositions
+    .filter((position) => position.symbol === symbol)
+    .reduce((sum, position) => sum + signedNotionalOf(position), 0);
+  if (netNotional === 0) return false;
+  const delta = side === "sell" ? -proposedNotionalUsd : proposedNotionalUsd;
+  if (Math.sign(delta) === Math.sign(netNotional)) return false;
+  return Math.abs(delta) <= Math.abs(netNotional);
 }
 
 /** The audit value of the projection is the geometry, so it is reported verbatim. */
@@ -309,6 +334,28 @@ export async function evaluateOrderRisk(
       quantity: order.quantity,
       reason: `Rejected by circuit breaker: ${breaker.triggers.map((t) => t.name).join(", ")}`,
       warnings: breaker.triggers.map((t) => t.message),
+    };
+  }
+
+  // Operator halt gates. Re-evaluated on every order and self-clearing, so a
+  // timed cooldown or a recovered equity curve releases without an operator
+  // reset. Exposure-reducing orders are exempt: these stop new risk.
+  const haltGates = evaluatePreTradeHaltGates({
+    currentEquityUsd: portfolioContext.totalEquity,
+    exposureReducing: reducesExposure(
+      order.symbol,
+      orderRequest.side,
+      order.quantity * referencePrice,
+      portfolioContext,
+    ),
+  });
+  warnings.push(...haltGates.warnings);
+  if (haltGates.blocks.length > 0) {
+    return {
+      approved: false,
+      quantity: order.quantity,
+      reason: `Rejected by halt gate: ${haltGates.blocks.map((b) => `${b.gate} — ${b.reason}`).join("; ")}`,
+      warnings: [...warnings, ...haltGates.blocks.map((b) => b.reason)],
     };
   }
 
