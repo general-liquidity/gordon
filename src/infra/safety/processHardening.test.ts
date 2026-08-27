@@ -4,10 +4,14 @@ import {
   resetProcessHardeningForTesting,
   PROCESS_HARDENING_FLAG_ENV,
 } from "./processHardening.ts";
+import { clearSessionOverrides, setSessionOverride } from "../config/settingsLayers.ts";
+import { resetFlagCache } from "../config/flagResolver.ts";
 
 describe("installProcessHardening", () => {
   beforeEach(() => {
     resetProcessHardeningForTesting();
+    clearSessionOverrides();
+    resetFlagCache();
   });
 
   test("runs without throwing on the default (safe subset) path", () => {
@@ -56,6 +60,20 @@ describe("installProcessHardening", () => {
     };
     installProcessHardening(env);
     expect(env.NODE_OPTIONS).toBe("--max-old-space-size=4096");
+  });
+
+  test("the real installer reads the process-hardening value persisted by /flags", () => {
+    const previous = process.env.NODE_OPTIONS;
+    process.env.NODE_OPTIONS = "--report-on-fatalerror --max-old-space-size=4096";
+    setSessionOverride("flags", { [PROCESS_HARDENING_FLAG_ENV]: "1" });
+    resetFlagCache();
+    try {
+      installProcessHardening();
+      expect(process.env.NODE_OPTIONS).toBe("--max-old-space-size=4096");
+    } finally {
+      if (previous === undefined) delete process.env.NODE_OPTIONS;
+      else process.env.NODE_OPTIONS = previous;
+    }
   });
 
   test("deletes NODE_OPTIONS when only --report-* flags remain", () => {

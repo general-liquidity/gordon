@@ -19,6 +19,7 @@ import {
   type ExternalHookConfig,
 } from "./externalHookRunner.ts";
 import { HOOK_POINTS, type HookDefinition, type HookPoint } from "./types.ts";
+import { flagEnv } from "../config/flagResolver.ts";
 
 export const EXTERNAL_HOOKS_PATH_ENV = "GORDON_EXTERNAL_HOOKS_PATH";
 export const DEFAULT_EXTERNAL_HOOKS_FILENAME = "hooks.json";
@@ -150,7 +151,7 @@ export function loadExternalHookConfig(path: string): ExternalHookFileEntry[] {
 }
 
 export function installExternalHooks(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = flagEnv(),
 ): ExternalHookInstallerState {
   if (!isExternalHookRunnerEnabled(env)) return getExternalHookInstallerState();
   if (state.installed) return getExternalHookInstallerState();

@@ -2,7 +2,6 @@ import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import {
   installProductionGuards,
   applyProductionEnvDefaults,
-  PRODUCTION_FLAG_ENV,
   DISABLE_GUARDS_ENV,
   GUARDS_MODE_ENV,
 } from "./installProductionGuards.ts";
@@ -14,7 +13,6 @@ import { NETWORK_ALLOWLIST_FLAG_ENV, NETWORK_ALLOWLIST_MODE_ENV } from "./networ
 
 describe("installProductionGuards", () => {
   const clearGuardEnv = () => {
-    delete process.env[PRODUCTION_FLAG_ENV];
     delete process.env[NETWORK_ALLOWLIST_FLAG_ENV];
     delete process.env[NETWORK_ALLOWLIST_MODE_ENV];
     delete process.env[FILESYSTEM_WRITE_GUARD_FLAG_ENV];
@@ -26,8 +24,7 @@ describe("installProductionGuards", () => {
   // fails unrelated later test files that write outside the allowlist.
   afterEach(clearGuardEnv);
 
-  it("sets block-mode defaults when GORDON_PRODUCTION=1", () => {
-    process.env[PRODUCTION_FLAG_ENV] = "1";
+  it("sets block-mode defaults at production bootstrap", () => {
     installProductionGuards();
     expect(process.env[NETWORK_ALLOWLIST_FLAG_ENV]).toBe("1");
     expect(process.env[NETWORK_ALLOWLIST_MODE_ENV]).toBe("block");

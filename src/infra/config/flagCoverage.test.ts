@@ -33,6 +33,11 @@ const FLAG_DECLARATION_FILE = join(
   "flow",
   "system.ts",
 );
+const INVENTORY_ONLY_FILES = new Set([
+  FLAG_DECLARATION_FILE,
+  join(SRC_ROOT, "infra", "config", "safetyCriticalFlags.ts"),
+  join(SRC_ROOT, "infra", "config", "flagResolver.ts"),
+]);
 
 function collectSourceFiles(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -87,7 +92,7 @@ function readPatterns(flag: string, aliases: Set<string>): RegExp[] {
   for (const name of names) {
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     patterns.push(new RegExp(`resolveFlag\\(\\s*${escaped}\\s*\\)`));
-    patterns.push(new RegExp(`env\\[\\s*${escaped}\\s*\\]`));
+    patterns.push(new RegExp(`(?:env|resolved)\\[\\s*${escaped}\\s*\\]`));
   }
   return patterns;
 }
@@ -98,7 +103,7 @@ function stripComments(src: string): string {
 }
 
 describe("advertised flags are actually read", () => {
-  const files = collectSourceFiles(SRC_ROOT).filter((f) => f !== FLAG_DECLARATION_FILE);
+  const files = collectSourceFiles(SRC_ROOT).filter((f) => !INVENTORY_ONLY_FILES.has(f));
   const bodies = new Map(files.map((f) => [f, stripComments(readFileSync(f, "utf-8"))]));
   const flags = advertisedFlags();
 

@@ -18,7 +18,7 @@
  *
  * Composes naturally with the existing anti-trap surface in
  * `src/infra/safety/anti-trap/` (`explainFirstMode`, `riskAcknowledgement`,
- * `supervisionRust`) and with `swing-mandate.ts`'s consecutive-losses
+ * `riskAcknowledgement`) and with `swing-mandate.ts`'s consecutive-losses
  * stop. Those are coarse-grained — this is the targeted detector for
  * the specific size-escalation pattern.
  *

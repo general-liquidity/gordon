@@ -22,9 +22,7 @@ import { isPlanRubricEnabled } from "./planRubric.ts";
 import { isSafetyConfigGuardEnabled } from "./safetyConfigGuard.ts";
 import { isSprintContractEnabled } from "./sprintContract.ts";
 import { isRiskAckEnabled, verifyAcksFromWarnings } from "./anti-trap/riskAcknowledgement.ts";
-import { getInjectionRate } from "./anti-trap/supervisionRust.ts";
 import { isExplainFirstEnabled } from "./anti-trap/explainFirstMode.ts";
-import { isLocalFallbackEnabled } from "./anti-trap/localFallback.ts";
 import { isStrategyMandatesEnabled } from "./anti-rot/strategyMandates.ts";
 import { isCoherenceEnabled } from "./anti-rot/thesisCoherence.ts";
 import { isUniverseEnabled } from "./anti-rot/tradingUniverse.ts";
@@ -42,9 +40,7 @@ const TOUCHED = [
   "GORDON_SAFETY_CONFIG_GUARD",
   "GORDON_SPRINT_CONTRACT",
   "GORDON_RISK_ACK",
-  "GORDON_SUPERVISION_RUST_RATE",
   "GORDON_EXPLAIN_FIRST",
-  "GORDON_LOCAL_FALLBACK",
   "GORDON_STRATEGY_MANDATES",
   "GORDON_THESIS_COHERENCE",
   "GORDON_TRADING_UNIVERSE",
@@ -132,19 +128,9 @@ describe("settings-layer flags reach their gate", () => {
     expect(result.ok).toBe(false);
   });
 
-  test("GORDON_SUPERVISION_RUST_RATE", () => {
-    settingsLayerOnly({ GORDON_SUPERVISION_RUST_RATE: "0.25" });
-    expect(getInjectionRate()).toBe(0.25);
-  });
-
   test("GORDON_EXPLAIN_FIRST", () => {
     settingsLayerOnly({ GORDON_EXPLAIN_FIRST: "1" });
     expect(isExplainFirstEnabled()).toBe(true);
-  });
-
-  test("GORDON_LOCAL_FALLBACK", () => {
-    settingsLayerOnly({ GORDON_LOCAL_FALLBACK: "1" });
-    expect(isLocalFallbackEnabled()).toBe(true);
   });
 
   test("GORDON_STRATEGY_MANDATES", () => {

@@ -585,13 +585,6 @@ export const KEEPER_FLAGS = [
     defaultOn: false,
   },
   {
-    name: "GORDON_SUPERVISION_RUST_RATE",
-    description:
-      "Periodic flawed-plan injection rate (0–1). Calibrated threshold; operators set their own cadence.",
-    truthy: [],
-    defaultOn: false,
-  },
-  {
     name: "GORDON_COMPACTION_STAGE",
     description:
       "Force a specific compaction stage during debugging. Values: 'masking' | 'pruning' | 'aggressive' | 'full'.",
@@ -740,6 +733,20 @@ export const KEEPER_FLAGS = [
     defaultOn: false,
   },
   {
+    name: "GORDON_RISK_AUTO_ADJUST",
+    description:
+      "Allow the risk kernel to reduce an oversized order to the largest compliant size. Default-on; set 0/false to refuse instead.",
+    truthy: ["1", "true"],
+    defaultOn: true,
+  },
+  {
+    name: "GORDON_RISK_REQUIRE_APPROVAL",
+    description:
+      "Require explicit approval for risk-kernel warnings. Default-on; set 0/false only when another approval policy owns that decision.",
+    truthy: ["1", "true"],
+    defaultOn: true,
+  },
+  {
     name: "GORDON_RISK_MAX_LEVERAGE",
     description: "Max leverage cap applied at the exchange adapter.",
     truthy: [],
@@ -751,6 +758,13 @@ export const KEEPER_FLAGS = [
     description:
       "Opt into LIVE trading on a venue with no sandbox/testnet. Money-path — leave off unless deliberate.",
     truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_MANAGED_EXITS_ACK",
+    description:
+      "Acknowledge that live take-profits without venue-native OCO are process-managed: the venue keeps the stop, but Gordon must remain running to trigger and reconcile targets. Default-off; affected live plans are refused until acknowledged.",
+    truthy: ["1", "true", "yes"],
     defaultOn: false,
   },
   {
@@ -789,17 +803,38 @@ export const KEEPER_FLAGS = [
     defaultOn: false,
   },
   {
+    name: "GORDON_PROCESS_HARDENING",
+    description:
+      "Strip diagnostic-report NODE_OPTIONS inherited by child processes, in addition to the always-on report suppression. Startup-only; restart after changing.",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_EXTERNAL_HOOK_RUNNER",
+    description:
+      "Run operator-configured external lifecycle hooks. Fail-closed when enabled but the hook configuration is missing or invalid. Startup-only; restart after changing.",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_DISABLE_GUARDS",
+    description:
+      "Emergency opt-out for both the outbound-network and filesystem-write guards. On means both guards are disabled. Startup-only; restart after changing.",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_GUARDS",
+    description:
+      "Aggregate network/filesystem guard mode. Defaults to block; use 'warn' for observation. Startup-only; restart after changing.",
+    truthy: [],
+    defaultOn: true,
+  },
+  {
     name: "GORDON_SANDBOX_SUBPROCESS",
     description:
       "Sandbox spawned subprocesses. When unset the value falls through to the settings file rather than defaulting here.",
     truthy: ["1", "true", "yes", "on"],
-    defaultOn: false,
-  },
-  {
-    name: "GORDON_LOCAL_FALLBACK",
-    description:
-      "Fall back to a local model (GORDON_LOCAL_MODEL_URL) when the hosted provider is unavailable.",
-    truthy: ["1", "true"],
     defaultOn: false,
   },
   {
@@ -835,8 +870,9 @@ export const manageFlagsTool = createTool({
     "Resolution precedence: process.env override > settings.json (flags) > built-in default.",
     "action='list' returns the resolved state of each.",
     "action='set' persists to the local settings layer (~/.gordon/settings.local.json)",
-    "AND applies to the current process, so the change survives restart. An explicit",
-    "env var still overrides the stored value.",
+    "and updates the settings cache for readers that resolve per operation, so the change",
+    "survives restart. Rows marked startup-only take effect after restart. An explicit env",
+    "var still overrides the stored value.",
   ].join("\n"),
   inputSchema: z.object({
     action: z.enum(["list", "set"]),

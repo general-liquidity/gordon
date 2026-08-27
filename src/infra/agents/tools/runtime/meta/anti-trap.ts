@@ -1,10 +1,9 @@
 /**
  * Anti-trap tools — supervision-preservation primitives.
  *
- * Companion tools for the GORDON_EXPLAIN_FIRST / GORDON_SUPERVISION_RUST_RATE
- * flags. These let the agent capture the user's pre-articulated thesis
- * before execution and (optionally) record calibration outcomes for the
- * supervision-rust check.
+ * Companion tools for GORDON_EXPLAIN_FIRST
+ * flag. These let the agent capture the user's pre-articulated thesis before
+ * execution and maintain the operator-authored anti-rot declarations.
  */
 
 import { createTool } from "@mastra/core/tools";
@@ -13,14 +12,10 @@ import { z } from "zod";
 import { recordStructuredObservation } from "../../../../platform/observability/index.ts";
 import {
   recordUserThesis,
-  newSupervisionRecord,
-  recordSupervisionResult,
-  readSupervisionScore,
   saveUniverse,
   checkUniverse,
   saveRunningThesis,
   saveMandates,
-  type FlawType,
   type StrategyMandate,
 } from "../../../../safety/index.ts";
 
@@ -79,40 +74,6 @@ export const recordUserThesisTool = createTool({
       thesisLength: entry.thesis.length,
       source: entry.source,
       capturedAt: entry.capturedAt,
-    };
-  },
-});
-
-export const recordSupervisionOutcomeTool = createTool({
-  id: "record_supervision_outcome",
-  description:
-    "Record the outcome of a supervision-rust calibration check — whether the user " +
-    "caught (rejected) or missed (accepted) a deliberately-flawed plan. Use ONLY when " +
-    "the surrounding system signals a flaw was injected; do not call speculatively. " +
-    "Persists to ~/.gordon/supervision-rust.jsonl for catch-rate analysis.",
-  inputSchema: z.object({
-    flawId: z.string().describe("Identifier of the injected flaw."),
-    flawType: z
-      .enum(["wrong_direction", "excessive_size", "missing_stop", "inverted_rr", "stale_data"])
-      .describe("Category of the injected flaw."),
-    planId: z.string().describe("Plan the flaw was injected into."),
-    userAccepted: z
-      .boolean()
-      .describe("true if the user rubber-stamped the flawed plan (missed); false if caught."),
-  }),
-  outputSchema: z.object({
-    recorded: z.boolean(),
-    catchRate: z.number(),
-    totalChecks: z.number(),
-  }),
-  execute: async ({ flawId, flawType, planId, userAccepted }) => {
-    const rec = newSupervisionRecord(flawId, flawType as FlawType, planId, userAccepted);
-    recordSupervisionResult(rec);
-    const score = readSupervisionScore();
-    return {
-      recorded: true,
-      catchRate: score.catchRate,
-      totalChecks: score.total,
     };
   },
 });
@@ -331,7 +292,6 @@ export const setStrategyMandateTool = createTool({
 
 export const antiTrapTools = {
   record_user_thesis: recordUserThesisTool,
-  record_supervision_outcome: recordSupervisionOutcomeTool,
   set_trading_universe: setTradingUniverseTool,
   check_universe: checkUniverseTool,
   set_running_thesis: setRunningThesisTool,

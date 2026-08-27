@@ -12,6 +12,8 @@ import {
   resetExternalHooksForTests,
 } from "./externalHookRegistry.ts";
 import { EXTERNAL_HOOK_RUNNER_FLAG_ENV } from "./externalHookRunner.ts";
+import { clearSessionOverrides, setSessionOverride } from "../config/settingsLayers.ts";
+import { resetFlagCache } from "../config/flagResolver.ts";
 
 const dirs: string[] = [];
 
@@ -26,6 +28,8 @@ function tempFile(name: string, contents: string): string {
 afterEach(() => {
   resetExternalHooksForTests();
   clearHooks();
+  clearSessionOverrides();
+  resetFlagCache();
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -108,6 +112,22 @@ describe("installExternalHooks", () => {
     const result = await runHooks("Stop", { reason: "graceful", sessionId: "s1" });
     expect(result.action).toBe("block");
     expect(result.reason).toContain("operator policy");
+  });
+
+  test("the real installer reads runner and path values persisted by /flags", () => {
+    const handler = tempFile("settings-handler.mjs", "process.stdout.write('{}');");
+    const config = tempFile(
+      "settings-hooks.json",
+      JSON.stringify({ hooks: [{ id: "settings-hook", point: "Stop", handlerPath: handler }] }),
+    );
+    setSessionOverride("flags", {
+      [EXTERNAL_HOOK_RUNNER_FLAG_ENV]: "1",
+      [EXTERNAL_HOOKS_PATH_ENV]: config,
+    });
+    resetFlagCache();
+
+    expect(installExternalHooks().installed).toBe(true);
+    expect(listHooks("Stop").map((hook) => hook.id)).toEqual(["settings-hook"]);
   });
 
   test("enabled runner fails closed when config is missing", () => {

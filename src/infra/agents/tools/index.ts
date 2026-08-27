@@ -107,7 +107,7 @@ export { aceTools } from "./runtime/meta/ace-tools.ts";
 // Agent self-feedback tool (report_blocked)
 export { agentFeedbackTools } from "./runtime/meta/agent-feedback.ts";
 
-// Anti-trap tools (record_user_thesis, record_supervision_outcome)
+// Anti-trap tools (operator thesis, universe, coherence, and mandate declarations)
 export { antiTrapTools } from "./runtime/meta/anti-trap.ts";
 
 // Status overview tool (/status slash command target)

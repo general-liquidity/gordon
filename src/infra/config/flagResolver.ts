@@ -3,15 +3,15 @@
  * of reading `process.env.GORDON_*` directly.
  *
  * Precedence (highest wins):
- *   1. explicit env override  — `process.env.GORDON_X` (set in the shell / .env)
+ *   1. explicit env override  — `process.env.GORDON_X` (shell or trusted ~/.gordon/.env)
  *   2. settings.json `flags`  — the layered settings store (project/local/…)
  *   3. built-in default       — the reader module's own fallback (unchanged)
  *
- * Rationale: env vars were the operator interface. They are now the LOWEST
- * override layer — a fallback for CI / one-off shells — while the settings
- * layer (surfaced by /flags + the TUI panels) is the durable operator surface.
- * This module only changes HOW a flag is READ; the reader modules keep their
- * own parse semantics and defaults, so no default VALUES change.
+ * Rationale: env vars remain the highest-precedence escape hatch for CI and
+ * one-off shells, while the settings layer (surfaced by /flags + the TUI
+ * panels) is the durable operator surface used when env is unset. This module
+ * only changes HOW a flag is READ; the reader modules keep their own parse
+ * semantics and defaults, so no default VALUES change.
  *
  * The `flags` section of the merged settings is a flat map of GORDON_* names
  * to values, e.g.  { "flags": { "GORDON_ACE_ENABLED": "true" } }.
@@ -21,6 +21,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { GORDON_DIR } from "../storage/paths.ts";
 import { loadLayeredSettings } from "./settingsLayers.ts";
+import { isSafetyCriticalFlag } from "./safetyCriticalFlags.ts";
 
 /** Local settings file that `/flags set` and the TUI persist flag values to. */
 const LOCAL_SETTINGS_PATH = join(GORDON_DIR, "settings.local.json");
@@ -39,54 +40,6 @@ let cachedFlags: Record<string, string> | null = null;
  * these resolve from env, the operator's own home-directory settings, and the
  * signed policy layer only. Every other flag keeps the full chain.
  */
-const SAFETY_CRITICAL_FLAGS = new Set([
-  "GORDON_KILL_SWITCHES",
-  "GORDON_KILL_SWITCH_STATE_PATH",
-  "GORDON_ALLOW_LIVE",
-  "GORDON_PRODUCTION",
-  "GORDON_GUARDS",
-  "GORDON_DISABLE_GUARDS",
-  "GORDON_SAFETY_CONFIG_GUARD",
-  "GORDON_PROCESS_HARDENING",
-  "GORDON_SANDBOX_SUBPROCESS",
-  "GORDON_EXTERNAL_HOOK_RUNNER",
-  "GORDON_EXTERNAL_HOOKS_PATH",
-  "GORDON_PERMISSION_PROFILE",
-  "GORDON_TRUST_LEDGER_PATH",
-  "GORDON_CONSENT_PATH",
-  "GORDON_CONSTITUTION_HALT_PATH",
-  "GORDON_RISK_ACK",
-  "GORDON_RISK_MODE",
-  "GORDON_RISK_AUTO_ADJUST",
-  "GORDON_RISK_REQUIRE_APPROVAL",
-  "GORDON_RISK_MAX_LEVERAGE",
-  "GORDON_RISK_MAX_POSITION_USD",
-  "GORDON_RISK_MAX_POSITION_PERCENT",
-  "GORDON_RISK_MAX_OPEN_POSITIONS",
-  "GORDON_RISK_MAX_DRAWDOWN_PERCENT",
-  "GORDON_RISK_MAX_SINGLE_ASSET_EXPOSURE",
-  "GORDON_RISK_MAX_CORRELATED_EXPOSURE",
-  "GORDON_RISK_DAILY_LOSS_USD",
-  "GORDON_RISK_DAILY_LOSS_PERCENT",
-  "GORDON_ABSORBING_BARRIER",
-  "GORDON_INCEPTION_LOSS_FRACTION",
-  "GORDON_INCEPTION_EQUITY_USD",
-  "GORDON_TRAILING_DD_FRACTION",
-  "GORDON_PRETRADE_RATE_CONTROLS",
-  "GORDON_PRETRADE_RATE_CONTROLS_DISABLE",
-  "GORDON_NETWORK_ALLOWLIST",
-  "GORDON_NETWORK_ALLOWLIST_MODE",
-  "GORDON_FILESYSTEM_WRITE_GUARD",
-  "GORDON_FILESYSTEM_WRITE_GUARD_MODE",
-  "GORDON_CLEAN_STATE_GATE",
-  "GORDON_CLEAN_STATE_GATE_OVERRIDE",
-  "GORDON_WIP_LIMIT",
-  "GORDON_WIP_LIMIT_ENABLED",
-  "GORDON_WIP_LIMIT_GLOBAL",
-  "GORDON_WIP_LIMIT_PER_STRATEGY",
-  "GORDON_WIP_LIMIT_PER_SYMBOL",
-]);
-
 /** Layers a repository can supply, and therefore an attacker who ships one. */
 const UNTRUSTED_SAFETY_LAYERS = new Set(["project"]);
 
@@ -105,7 +58,7 @@ function loadSettingsFlags(): Record<string, string> {
       const untrusted = UNTRUSTED_SAFETY_LAYERS.has(layer.layer);
       for (const [k, v] of Object.entries(flags as Record<string, unknown>)) {
         if (v === undefined || v === null) continue;
-        if (untrusted && SAFETY_CRITICAL_FLAGS.has(k)) continue;
+        if (untrusted && isSafetyCriticalFlag(k)) continue;
         out[k] = typeof v === "string" ? v : String(v);
       }
     }

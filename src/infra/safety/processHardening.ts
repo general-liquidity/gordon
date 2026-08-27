@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createModuleLogger } from "../logger/index.ts";
+import { flagEnv } from "../config/flagResolver.ts";
 
 // Best-effort process hardening for a money-handling agent. Goal: reduce the
 // chance that a crash, fatal-error diagnostic report, or attached debugger
@@ -43,7 +44,7 @@ export const PROCESS_HARDENING_FLAG_ENV = "GORDON_PROCESS_HARDENING";
 
 let installed = false;
 
-function isAggressiveEnabled(env: NodeJS.ProcessEnv): boolean {
+export function isProcessHardeningEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   const v = env[PROCESS_HARDENING_FLAG_ENV];
   return v === "1" || v === "true";
 }
@@ -126,14 +127,17 @@ function logCoreDumpStatus(): void {
  * Opt-in via GORDON_PROCESS_HARDENING=1: NODE_OPTIONS `--report-*` stripping,
  * which mutates an env var that child processes inherit.
  */
-export function installProcessHardening(env: NodeJS.ProcessEnv = process.env): void {
+export function installProcessHardening(
+  env: NodeJS.ProcessEnv = process.env,
+  resolved: NodeJS.ProcessEnv = env === process.env ? flagEnv() : env,
+): void {
   if (installed) return;
   installed = true;
 
   suppressDiagnosticReports();
   logCoreDumpStatus();
 
-  if (isAggressiveEnabled(env)) {
+  if (isProcessHardeningEnabled(resolved)) {
     stripReportFlagsFromNodeOptions(env);
   }
 }

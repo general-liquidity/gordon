@@ -1,17 +1,15 @@
 /**
  * Safety Module — Trading Constitution + Prompt Injection Defense
- *   + Anti-trap defenses (explain-first, supervision-rust, risk-ack, local-fallback)
+ *   + Anti-trap defenses (explain-first and risk acknowledgement)
  *
  * Two layers of protection that CANNOT be overridden:
  *   1. Trading Constitution: immutable risk limits from professional trading wisdom
  *   2. Injection Defense: pattern-matching against malicious prompt manipulation
  *
- * Plus four feature-flagged supervision-preservation primitives that map
+ * Plus feature-flagged supervision-preservation primitives that map
  * Faye's "agentic coding is a trap" critique onto vibe trading:
  *   - GORDON_EXPLAIN_FIRST: user writes thesis before seeing Gordon's
- *   - GORDON_SUPERVISION_RUST_RATE: periodic flawed-plan calibration check
  *   - GORDON_RISK_ACK: medium+ tier plans require explicit risk acknowledgement
- *   - GORDON_LOCAL_FALLBACK: read-only tools return raw data when provider down
  */
 
 // Trading Constitution
@@ -45,25 +43,6 @@ export {
 } from "./anti-trap/explainFirstMode.ts";
 export type { UserThesis, ThesisRequirement } from "./anti-trap/explainFirstMode.ts";
 
-// Supervision-rust calibration check
-export {
-  SUPERVISION_FLAWS,
-  defaultSupervisionLogPath,
-  getInjectionRate,
-  shouldInjectFlaw,
-  pickFlaw,
-  injectFlaw,
-  newSupervisionRecord,
-  recordSupervisionResult,
-  readSupervisionScore,
-} from "./anti-trap/supervisionRust.ts";
-export type {
-  FlawType,
-  SupervisionFlaw,
-  SupervisionRecord,
-  SupervisionScore,
-} from "./anti-trap/supervisionRust.ts";
-
 // Risk-acknowledgement gate
 export {
   isRiskAckEnabled,
@@ -72,14 +51,6 @@ export {
   verifyAcksFromWarnings,
 } from "./anti-trap/riskAcknowledgement.ts";
 export type { AcknowledgementResult } from "./anti-trap/riskAcknowledgement.ts";
-
-// Local-fallback for read-only tools
-export {
-  isLocalFallbackEnabled,
-  checkProviderHealth,
-  withReadOnlyFallback,
-} from "./anti-trap/localFallback.ts";
-export type { ProviderHealth, FallbackEnvelope } from "./anti-trap/localFallback.ts";
 
 // Asset-class inference helper (shared by anti-rot gates)
 export {

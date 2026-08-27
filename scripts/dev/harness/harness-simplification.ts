@@ -101,18 +101,8 @@ const HARNESS_FLAGS: HarnessFlag[] = [
     defaultEnabled: false,
   },
   {
-    name: "GORDON_SUPERVISION_RUST_RATE",
-    description: "Periodic flawed-plan calibration check",
-    defaultEnabled: false,
-  },
-  {
     name: "GORDON_RISK_ACK",
     description: "Medium+ tier plans require risk acknowledgement",
-    defaultEnabled: false,
-  },
-  {
-    name: "GORDON_LOCAL_FALLBACK",
-    description: "Read-only tools fall back to raw data when provider down",
     defaultEnabled: false,
   },
   {
