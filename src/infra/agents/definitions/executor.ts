@@ -141,7 +141,6 @@ export function getExecutor(): Agent {
     place_oco_order: instrumentedOrderbookTools.place_oco_order,
     cancel_all_orders: instrumentedOrderbookTools.cancel_all_orders,
     cancel_order: instrumentedOrderbookTools.cancel_order,
-    cancel_replace_order: instrumentedOrderbookTools.cancel_replace_order,
     cancel_order_list: instrumentedOrderbookTools.cancel_order_list,
     get_order_status: instrumentedOrderbookTools.get_order_status,
     test_order: instrumentedOrderbookTools.test_order,

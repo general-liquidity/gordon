@@ -243,9 +243,9 @@ function seededStartIndices(
 }
 
 function cleanStarts(length: number, startIndices: number[]): number[] {
-  return [
-    ...new Set(startIndices.filter((i) => Number.isInteger(i) && i >= 0 && i < length)),
-  ].sort((a, b) => a - b);
+  return [...new Set(startIndices.filter((i) => Number.isInteger(i) && i >= 0 && i < length))].sort(
+    (a, b) => a - b,
+  );
 }
 
 function rounded(x: number): number {
@@ -331,7 +331,7 @@ export function injectCrashBlocks(
     : seededStartIndices(candles.length, len, opts.count ?? 1, opts.seed ?? 0);
   if (starts.length === 0) return candles.map((c) => ({ ...c }));
 
-  const perBar = Math.pow(1 - opts.dropPct / 100, 1 / len);
+  const perBar = (1 - opts.dropPct / 100) ** (1 / len);
   const out: Candle[] = candles.map((c) => ({ ...c }));
   const startSet = new Set<number>(starts);
 

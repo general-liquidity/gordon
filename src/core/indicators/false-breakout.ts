@@ -41,7 +41,7 @@ export interface FalseBreakoutResult {
 function findSRLevels(
   candles: Candle[],
   lookback: number,
-  tolerance: number
+  tolerance: number,
 ): { supports: SRLevel[]; resistances: SRLevel[] } {
   const supports: { price: number; count: number }[] = [];
   const resistances: { price: number; count: number }[] = [];
@@ -90,12 +90,12 @@ function findSRLevels(
   }
 
   return {
-    supports: supports.map(s => ({
+    supports: supports.map((s) => ({
       price: parseFloat(s.price.toFixed(4)),
       type: "support" as const,
       strength: s.count,
     })),
-    resistances: resistances.map(r => ({
+    resistances: resistances.map((r) => ({
       price: parseFloat(r.price.toFixed(4)),
       type: "resistance" as const,
       strength: r.count,
@@ -151,7 +151,7 @@ export function calculateFalseBreakout(
   breakoutThreshold: number = 0.001,
   wickThreshold: number = 0.6,
   volumeMultiplier: number = 1.2,
-  tolerance: number = 0.005
+  tolerance: number = 0.005,
 ): FalseBreakoutResult {
   const emptyResult: FalseBreakoutResult = {
     supportLevels: [],
@@ -171,7 +171,7 @@ export function calculateFalseBreakout(
   const { supports, resistances } = findSRLevels(
     candles.slice(0, -2), // Exclude last 2 bars from S/R detection
     srLookback,
-    tolerance
+    tolerance,
   );
 
   if (supports.length === 0 && resistances.length === 0) {
@@ -246,7 +246,7 @@ export function calculateFalseBreakout(
     volSpike,
     confidence,
     supports.length,
-    resistances.length
+    resistances.length,
   );
 
   return {
@@ -271,7 +271,7 @@ function buildFalseBreakoutInterpretation(
   volSpike: number,
   confidence: number,
   supportCount: number,
-  resistCount: number
+  resistCount: number,
 ): string {
   let msg = `S/R levels: ${supportCount} supports, ${resistCount} resistances. `;
 

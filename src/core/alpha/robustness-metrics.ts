@@ -136,9 +136,7 @@ export function computeRobustnessMetrics(
   const normalizedPercentileSpread = (p90 - p10) / denom;
 
   // Bad tail: low end for higher-is-better, high end for lower-is-better.
-  const downsideRobustnessLoss = higherIsBetter
-    ? (median - p10) / denom
-    : (p90 - median) / denom;
+  const downsideRobustnessLoss = higherIsBetter ? (median - p10) / denom : (p90 - median) / denom;
 
   // survivalRatio is signed so that "positive = bad tail still acceptable"
   // holds in both directions. Higher-is-better: a positive p10 (bad run still
@@ -147,10 +145,7 @@ export function computeRobustnessMetrics(
   const survivalRatio = higherIsBetter ? p10 / denom : -p90 / denom;
 
   let verdict: RobustnessVerdict;
-  if (
-    normalizedPercentileSpread < ROBUST_SPREAD_MAX &&
-    survivalRatio > ROBUST_SURVIVAL_MIN
-  ) {
+  if (normalizedPercentileSpread < ROBUST_SPREAD_MAX && survivalRatio > ROBUST_SURVIVAL_MIN) {
     verdict = "robust";
   } else if (
     normalizedPercentileSpread > FRAGILE_SPREAD_MIN ||

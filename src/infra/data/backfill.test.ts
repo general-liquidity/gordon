@@ -18,7 +18,11 @@ let currentDbPath = "";
 const cleanupPaths = new Set<string>();
 
 function safeUnlink(path: string): void {
-  try { if (existsSync(path)) unlinkSync(path); } catch { /* Windows-busy */ }
+  try {
+    if (existsSync(path)) unlinkSync(path);
+  } catch {
+    /* Windows-busy */
+  }
 }
 
 const TF_MS = 60 * 60 * 1000; // 1h
@@ -59,7 +63,12 @@ function makeMockExchange(opts: {
   const exchange = {
     exchangeId: "ccxt:binance",
     displayName: "Mock Binance",
-    async getCandles(_symbol: string, _interval: string, limit = 100, since?: number): Promise<Candle[]> {
+    async getCandles(
+      _symbol: string,
+      _interval: string,
+      limit = 100,
+      since?: number,
+    ): Promise<Candle[]> {
       calls.push({ since, limit });
       const start = since ?? 0;
       const page = series.filter((c) => c.openTime >= start).slice(0, Math.min(limit, pageCap));
@@ -248,7 +257,10 @@ describe("backfillOHLCV — dataset registration", () => {
   test("no dataset row when the range yields no candles", async () => {
     const rangeStart = 1_700_000_000_000;
     // series starts AFTER the requested window end → nothing in range.
-    const { exchange } = makeMockExchange({ rangeStart: rangeStart + 10_000 * TF_MS, totalBars: 100 });
+    const { exchange } = makeMockExchange({
+      rangeStart: rangeStart + 10_000 * TF_MS,
+      totalBars: 100,
+    });
 
     const result = await backfillOHLCV({
       exchange,

@@ -92,10 +92,7 @@ describe("resolveSubPlaybooks", () => {
   });
 
   it("reports missing references without halting", () => {
-    const root = pb("root", [
-      { playbookId: "ghost" },
-      { playbookId: "real" },
-    ]);
+    const root = pb("root", [{ playbookId: "ghost" }, { playbookId: "real" }]);
     const real = pb("real");
     const r = resolveSubPlaybooks(root, lookup([root, real]));
     expect(r.errors.length).toBe(1);

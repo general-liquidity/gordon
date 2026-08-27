@@ -33,13 +33,14 @@ export class GatewayContextResolver {
 
   async resolve(sessionId: string): Promise<GordonContext> {
     const config = await loadConfig();
-    const { exchange, broker, llm, portfolioValue, availableCash } = await this.resolveClients(config);
+    const { exchange, broker, llm, portfolioValue, availableCash } =
+      await this.resolveClients(config);
     const session = await getCurrentSession();
 
     return {
       exchange,
       broker,
-      llm: (llm ?? ({} as LLMClient)),
+      llm: llm ?? ({} as LLMClient),
       config,
       portfolioValue,
       availableCash,
@@ -108,7 +109,12 @@ export class GatewayContextResolver {
       }
     }
 
-    if (!exchange && env.hasBinanceKeys && env.keys.BINANCE_API_KEY && env.keys.BINANCE_API_SECRET) {
+    if (
+      !exchange &&
+      env.hasBinanceKeys &&
+      env.keys.BINANCE_API_KEY &&
+      env.keys.BINANCE_API_SECRET
+    ) {
       try {
         exchange = ExchangeFactory.create("ccxt:binance", {
           apiKey: env.keys.BINANCE_API_KEY,
@@ -121,7 +127,12 @@ export class GatewayContextResolver {
       }
     }
 
-    if (!exchange && env.hasRobinhoodKeys && env.keys.ROBINHOOD_API_KEY && env.keys.ROBINHOOD_API_SECRET) {
+    if (
+      !exchange &&
+      env.hasRobinhoodKeys &&
+      env.keys.ROBINHOOD_API_KEY &&
+      env.keys.ROBINHOOD_API_SECRET
+    ) {
       try {
         exchange = ExchangeFactory.create("ccxt:robinhood", {
           apiKey: env.keys.ROBINHOOD_API_KEY,
@@ -141,12 +152,11 @@ export class GatewayContextResolver {
       const apiSecret = process.env[envEntry.secret] || "";
       if (!apiKey || !apiSecret) continue;
 
-      const paperFromEnv = envEntry.paper
-        ? parseBoolEnv(process.env[envEntry.paper])
-        : false;
-      const paperMode = sandboxOverride !== null
-        ? (sandboxOverride && isBrokerPaperSupported(brokerId))
-        : paperFromEnv;
+      const paperFromEnv = envEntry.paper ? parseBoolEnv(process.env[envEntry.paper]) : false;
+      const paperMode =
+        sandboxOverride !== null
+          ? sandboxOverride && isBrokerPaperSupported(brokerId)
+          : paperFromEnv;
 
       try {
         broker = await BrokerFactory.createWithAuth(brokerId, {

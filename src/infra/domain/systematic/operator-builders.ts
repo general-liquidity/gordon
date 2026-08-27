@@ -31,7 +31,9 @@ function formatCurrency(value: number, digits = 2): string {
   return `$${value.toFixed(digits)}`;
 }
 
-function gateStatusFromValidation(status: "passed" | "warning" | "failed"): OperatorReport["status"] {
+function gateStatusFromValidation(
+  status: "passed" | "warning" | "failed",
+): OperatorReport["status"] {
   switch (status) {
     case "passed":
       return "success";
@@ -45,7 +47,7 @@ function gateStatusFromValidation(status: "passed" | "warning" | "failed"): Oper
 function toneForMetric(value: number, goodIfPositive = true): OperatorMetric["tone"] {
   if (!Number.isFinite(value)) return "info";
   if (value === 0) return "info";
-  return goodIfPositive ? (value > 0 ? "success" : "warning") : (value < 0 ? "success" : "warning");
+  return goodIfPositive ? (value > 0 ? "success" : "warning") : value < 0 ? "success" : "warning";
 }
 
 function mapValidationGate(
@@ -83,7 +85,9 @@ function buildValidationActions(
   }
 
   const failedGate = validation.gates.find((gate) => !gate.passed);
-  const rationale = failedGate ? `Address ${failedGate.name} before promotion.` : "Run another validation pass.";
+  const rationale = failedGate
+    ? `Address ${failedGate.name} before promotion.`
+    : "Run another validation pass.";
 
   return [
     {
@@ -112,20 +116,50 @@ export function buildBacktestOperatorReport(params: {
   profile: SystematicStrategyProfile;
   biasDiagnostics?: BiasDiagnosticSummary;
 }): OperatorReport {
-  const { strategyName, symbol, timeframe, days, executionTime, result, validation, profile, biasDiagnostics } = params;
+  const {
+    strategyName,
+    symbol,
+    timeframe,
+    days,
+    executionTime,
+    result,
+    validation,
+    profile,
+    biasDiagnostics,
+  } = params;
   const metrics: OperatorMetric[] = [
-    { label: "Return", value: formatPercent(result.metrics.totalReturn), tone: toneForMetric(result.metrics.totalReturn) },
-    { label: "Sharpe", value: formatNumber(result.metrics.sharpeRatio), tone: result.metrics.sharpeRatio >= 1 ? "success" : "warning" },
-    { label: "Max Drawdown", value: formatPercent(-Math.abs(result.metrics.maxDrawdown)), tone: result.metrics.maxDrawdown <= 15 ? "success" : "warning" },
-    { label: "Trades", value: String(result.metrics.totalTrades), tone: result.metrics.totalTrades >= 30 ? "success" : "warning" },
-    { label: "Validation Score", value: formatNumber(validation.score, 1), tone: validation.liveEligible ? "success" : "warning" },
+    {
+      label: "Return",
+      value: formatPercent(result.metrics.totalReturn),
+      tone: toneForMetric(result.metrics.totalReturn),
+    },
+    {
+      label: "Sharpe",
+      value: formatNumber(result.metrics.sharpeRatio),
+      tone: result.metrics.sharpeRatio >= 1 ? "success" : "warning",
+    },
+    {
+      label: "Max Drawdown",
+      value: formatPercent(-Math.abs(result.metrics.maxDrawdown)),
+      tone: result.metrics.maxDrawdown <= 15 ? "success" : "warning",
+    },
+    {
+      label: "Trades",
+      value: String(result.metrics.totalTrades),
+      tone: result.metrics.totalTrades >= 30 ? "success" : "warning",
+    },
+    {
+      label: "Validation Score",
+      value: formatNumber(validation.score, 1),
+      tone: validation.liveEligible ? "success" : "warning",
+    },
     { label: "Execution", value: `${executionTime}ms`, tone: "info" },
   ];
 
   const warnings = [
     ...result.warnings,
-    ...result.systematic?.quality.warnings ?? [],
-    ...biasDiagnostics?.notes ?? [],
+    ...(result.systematic?.quality.warnings ?? []),
+    ...(biasDiagnostics?.notes ?? []),
   ];
 
   return normalizeOperatorReport({
@@ -186,7 +220,9 @@ export function buildOptimizationOperatorReport(params: {
 
   const warnings = [...(params.warnings ?? [])];
   if (params.overfitSummary?.isLikelyOverfit) {
-    warnings.push(`Optimization appears overfit (${params.overfitSummary.severity}, score ${params.overfitSummary.overfitScore.toFixed(2)}).`);
+    warnings.push(
+      `Optimization appears overfit (${params.overfitSummary.severity}, score ${params.overfitSummary.overfitScore.toFixed(2)}).`,
+    );
   }
 
   return normalizeOperatorReport({
@@ -195,25 +231,40 @@ export function buildOptimizationOperatorReport(params: {
     summary: best
       ? `${params.strategyName} on ${params.symbol} ${params.timeframe} ranked ${params.rankedResults.length} candidates by ${params.optimizeFor}. Best score ${formatNumber(best.score, 3)}.`
       : `No valid optimization candidates were produced for ${params.strategyName}.`,
-    metrics: best ? [
-      { label: "Best Score", value: formatNumber(best.score, 3), tone: "success" },
-      { label: "Best Return", value: formatPercent(best.metrics.totalReturn), tone: toneForMetric(best.metrics.totalReturn) },
-      { label: "Best Sharpe", value: formatNumber(best.metrics.sharpeRatio), tone: best.metrics.sharpeRatio >= 1 ? "success" : "warning" },
-      { label: "Candidates", value: String(params.rankedResults.length), tone: "info" },
-    ] : [],
-    tables: topRows.length > 0 ? [{
-      title: "Ranked Candidates",
-      columns: [
-        { key: "rank", header: "#" , align: "right"},
-        { key: "params", header: "Parameters" },
-        { key: "score", header: "Score", align: "right" },
-        { key: "sharpe", header: "Sharpe", align: "right" },
-        { key: "return", header: "Return", align: "right" },
-        { key: "dd", header: "MaxDD", align: "right" },
-        { key: "trades", header: "Trades", align: "right" },
-      ],
-      rows: topRows,
-    }] : [],
+    metrics: best
+      ? [
+          { label: "Best Score", value: formatNumber(best.score, 3), tone: "success" },
+          {
+            label: "Best Return",
+            value: formatPercent(best.metrics.totalReturn),
+            tone: toneForMetric(best.metrics.totalReturn),
+          },
+          {
+            label: "Best Sharpe",
+            value: formatNumber(best.metrics.sharpeRatio),
+            tone: best.metrics.sharpeRatio >= 1 ? "success" : "warning",
+          },
+          { label: "Candidates", value: String(params.rankedResults.length), tone: "info" },
+        ]
+      : [],
+    tables:
+      topRows.length > 0
+        ? [
+            {
+              title: "Ranked Candidates",
+              columns: [
+                { key: "rank", header: "#", align: "right" },
+                { key: "params", header: "Parameters" },
+                { key: "score", header: "Score", align: "right" },
+                { key: "sharpe", header: "Sharpe", align: "right" },
+                { key: "return", header: "Return", align: "right" },
+                { key: "dd", header: "MaxDD", align: "right" },
+                { key: "trades", header: "Trades", align: "right" },
+              ],
+              rows: topRows,
+            },
+          ]
+        : [],
     warnings,
     actions: [
       {
@@ -282,44 +333,66 @@ export function buildComparisonOperatorReport(params: {
     summary: winner
       ? `${winner.strategy} leads ${params.rankings.length} compared strategies on ${params.symbol} ${params.timeframe}, ranked by ${params.rankBy}.`
       : `No comparable strategies produced valid results on ${params.symbol}.`,
-    metrics: winner ? [
-      { label: "Winner", value: winner.strategy, tone: "success" },
-      { label: "Winner Score", value: formatNumber(winner.score, 3), tone: "success" },
-      { label: "Return", value: formatPercent(winner.metrics.totalReturn), tone: toneForMetric(winner.metrics.totalReturn) },
-      { label: "Sharpe", value: formatNumber(winner.metrics.sharpeRatio), tone: winner.metrics.sharpeRatio >= 1 ? "success" : "warning" },
-    ] : [],
-    tables: rows.length > 0 ? [{
-      title: "Rankings",
-      columns: [
-        { key: "rank", header: "#", align: "right" },
-        { key: "strategy", header: "Strategy" },
-        { key: "score", header: "Score", align: "right" },
-        { key: "return", header: "Return", align: "right" },
-        { key: "sharpe", header: "Sharpe", align: "right" },
-        { key: "dd", header: "MaxDD", align: "right" },
-        { key: "trades", header: "Trades", align: "right" },
-      ],
-      rows,
-    }] : [],
+    metrics: winner
+      ? [
+          { label: "Winner", value: winner.strategy, tone: "success" },
+          { label: "Winner Score", value: formatNumber(winner.score, 3), tone: "success" },
+          {
+            label: "Return",
+            value: formatPercent(winner.metrics.totalReturn),
+            tone: toneForMetric(winner.metrics.totalReturn),
+          },
+          {
+            label: "Sharpe",
+            value: formatNumber(winner.metrics.sharpeRatio),
+            tone: winner.metrics.sharpeRatio >= 1 ? "success" : "warning",
+          },
+        ]
+      : [],
+    tables:
+      rows.length > 0
+        ? [
+            {
+              title: "Rankings",
+              columns: [
+                { key: "rank", header: "#", align: "right" },
+                { key: "strategy", header: "Strategy" },
+                { key: "score", header: "Score", align: "right" },
+                { key: "return", header: "Return", align: "right" },
+                { key: "sharpe", header: "Sharpe", align: "right" },
+                { key: "dd", header: "MaxDD", align: "right" },
+                { key: "trades", header: "Trades", align: "right" },
+              ],
+              rows,
+            },
+          ]
+        : [],
     diffs,
-    actions: winner ? [
-      {
-        label: "Inspect winner status",
-        command: `/systematic status ${winner.strategyId}`,
-        priority: "now",
-      },
-      {
-        label: "Backtest winner again",
-        command: `/backtest ${winner.strategyId} ${params.symbol} ${params.timeframe}`,
-        priority: "next",
-      },
-    ] : [],
+    actions: winner
+      ? [
+          {
+            label: "Inspect winner status",
+            command: `/systematic status ${winner.strategyId}`,
+            priority: "now",
+          },
+          {
+            label: "Backtest winner again",
+            command: `/backtest ${winner.strategyId} ${params.symbol} ${params.timeframe}`,
+            priority: "next",
+          },
+        ]
+      : [],
   });
 }
 
 export function buildRuntimeHealthOperatorReport(params: {
   portfolio: PortfolioState;
-  actions: Array<{ type: string; slot_id?: string; reason: string; severity: "warning" | "critical" }>;
+  actions: Array<{
+    type: string;
+    slot_id?: string;
+    reason: string;
+    severity: "warning" | "critical";
+  }>;
 }): OperatorReport {
   const activeSlots = params.portfolio.slots.filter((slot) => slot.status !== "stopped");
   const rows = activeSlots.map((slot) => {
@@ -345,24 +418,40 @@ export function buildRuntimeHealthOperatorReport(params: {
     summary: `${activeSlots.length} active slot(s), ${formatCurrency(params.portfolio.total_pnl)} total PnL, portfolio drawdown ${params.portfolio.portfolio_drawdown_percent.toFixed(1)}%.`,
     metrics: [
       { label: "Active Slots", value: String(activeSlots.length), tone: "info" },
-      { label: "Allocated", value: formatCurrency(params.portfolio.allocated_capital), tone: "info" },
+      {
+        label: "Allocated",
+        value: formatCurrency(params.portfolio.allocated_capital),
+        tone: "info",
+      },
       { label: "Deployed", value: formatCurrency(params.portfolio.deployed_capital), tone: "info" },
-      { label: "Portfolio Drawdown", value: `${params.portfolio.portfolio_drawdown_percent.toFixed(1)}%`, tone: params.portfolio.portfolio_drawdown_percent <= 10 ? "success" : "warning" },
+      {
+        label: "Portfolio Drawdown",
+        value: `${params.portfolio.portfolio_drawdown_percent.toFixed(1)}%`,
+        tone: params.portfolio.portfolio_drawdown_percent <= 10 ? "success" : "warning",
+      },
     ],
-    tables: rows.length > 0 ? [{
-      title: "Strategy Slots",
-      columns: [
-        { key: "slot", header: "Slot" },
-        { key: "status", header: "Status" },
-        { key: "allocation", header: "Alloc", align: "right" },
-        { key: "pnl", header: "PnL", align: "right" },
-        { key: "trades", header: "Trades", align: "right" },
-        { key: "win", header: "Win", align: "right" },
-        { key: "dd", header: "Drawdown", align: "right" },
-      ],
-      rows,
-    }] : [],
-    warnings: params.actions.map((action) => `${action.severity.toUpperCase()}: ${action.reason}${action.slot_id ? ` (${action.slot_id})` : ""}`),
+    tables:
+      rows.length > 0
+        ? [
+            {
+              title: "Strategy Slots",
+              columns: [
+                { key: "slot", header: "Slot" },
+                { key: "status", header: "Status" },
+                { key: "allocation", header: "Alloc", align: "right" },
+                { key: "pnl", header: "PnL", align: "right" },
+                { key: "trades", header: "Trades", align: "right" },
+                { key: "win", header: "Win", align: "right" },
+                { key: "dd", header: "Drawdown", align: "right" },
+              ],
+              rows,
+            },
+          ]
+        : [],
+    warnings: params.actions.map(
+      (action) =>
+        `${action.severity.toUpperCase()}: ${action.reason}${action.slot_id ? ` (${action.slot_id})` : ""}`,
+    ),
     actions: [
       {
         label: "Inspect systematic portfolio",
@@ -380,9 +469,10 @@ export function buildLiveBacktestDiffReport(params: {
   backtest?: BacktestResult | null;
   profile?: SystematicStrategyProfile | null;
 }): OperatorReport {
-  const liveWinRate = params.slot && params.slot.total_trades > 0
-    ? (params.slot.winning_trades / params.slot.total_trades) * 100
-    : null;
+  const liveWinRate =
+    params.slot && params.slot.total_trades > 0
+      ? (params.slot.winning_trades / params.slot.total_trades) * 100
+      : null;
   const backtestWinRate = params.backtest ? params.backtest.metrics.winRate * 100 : null;
   const diffs: OperatorDiff[] = [];
 
@@ -391,17 +481,28 @@ export function buildLiveBacktestDiffReport(params: {
       label: "Win Rate",
       baseline: `${backtestWinRate?.toFixed(1) ?? "N/A"}%`,
       current: `${liveWinRate?.toFixed(1) ?? "N/A"}%`,
-      delta: liveWinRate !== null && backtestWinRate !== null ? formatPercent(liveWinRate - backtestWinRate) : undefined,
-      status: liveWinRate !== null && backtestWinRate !== null
-        ? liveWinRate >= backtestWinRate ? "better" : "worse"
-        : "n/a",
+      delta:
+        liveWinRate !== null && backtestWinRate !== null
+          ? formatPercent(liveWinRate - backtestWinRate)
+          : undefined,
+      status:
+        liveWinRate !== null && backtestWinRate !== null
+          ? liveWinRate >= backtestWinRate
+            ? "better"
+            : "worse"
+          : "n/a",
     });
     diffs.push({
       label: "Drawdown",
       baseline: `${params.backtest.metrics.maxDrawdown.toFixed(1)}%`,
       current: `${params.slot.current_drawdown_percent.toFixed(1)}%`,
-      delta: formatPercent(params.backtest.metrics.maxDrawdown - params.slot.current_drawdown_percent),
-      status: params.slot.current_drawdown_percent <= params.backtest.metrics.maxDrawdown ? "better" : "worse",
+      delta: formatPercent(
+        params.backtest.metrics.maxDrawdown - params.slot.current_drawdown_percent,
+      ),
+      status:
+        params.slot.current_drawdown_percent <= params.backtest.metrics.maxDrawdown
+          ? "better"
+          : "worse",
     });
     diffs.push({
       label: "Trade Count",
@@ -415,13 +516,22 @@ export function buildLiveBacktestDiffReport(params: {
   return normalizeOperatorReport({
     title: "Live vs Backtest",
     status: params.slot && params.backtest ? "info" : "warning",
-    summary: params.slot && params.backtest
-      ? `${params.strategyName} is running live with ${params.slot.total_trades} live trades against ${params.backtest.metrics.totalTrades} backtest trades in the latest systematic snapshot.`
-      : `Gordon needs both a live slot and a stored backtest for ${params.strategyName} to produce a diff.`,
+    summary:
+      params.slot && params.backtest
+        ? `${params.strategyName} is running live with ${params.slot.total_trades} live trades against ${params.backtest.metrics.totalTrades} backtest trades in the latest systematic snapshot.`
+        : `Gordon needs both a live slot and a stored backtest for ${params.strategyName} to produce a diff.`,
     metrics: [
       { label: "Strategy", value: params.strategyName, tone: "info" },
-      { label: "Systematic Status", value: params.profile?.status ?? "untracked", tone: params.profile?.liveEligible ? "success" : "warning" },
-      { label: "Decay Score", value: params.profile ? formatNumber(params.profile.decayScore, 1) : "N/A", tone: params.profile && params.profile.decayScore < 25 ? "success" : "warning" },
+      {
+        label: "Systematic Status",
+        value: params.profile?.status ?? "untracked",
+        tone: params.profile?.liveEligible ? "success" : "warning",
+      },
+      {
+        label: "Decay Score",
+        value: params.profile ? formatNumber(params.profile.decayScore, 1) : "N/A",
+        tone: params.profile && params.profile.decayScore < 25 ? "success" : "warning",
+      },
     ],
     diffs,
     actions: [
@@ -451,25 +561,45 @@ export function buildDecayOperatorReport(params: {
     summary: profile
       ? `${profile.strategyName} has decay score ${profile.decayScore.toFixed(1)} and systematic status ${profile.status}.`
       : "No systematic profile exists for this strategy yet.",
-    metrics: profile ? [
-      { label: "Decay Score", value: formatNumber(profile.decayScore, 1), tone: profile.decayScore >= 35 ? "warning" : "success" },
-      { label: "Validation Score", value: formatNumber(profile.validationScore, 1), tone: profile.liveEligible ? "success" : "warning" },
-      { label: "Status", value: profile.status, tone: profile.status === "degraded" ? "warning" : "info" },
-    ] : [],
-    tables: params.lifecycle.length > 0 ? [{
-      title: "Recent Lifecycle",
-      columns: [
-        { key: "event", header: "Event" },
-        { key: "createdAt", header: "Created" },
-      ],
-      rows: params.lifecycle.slice(0, 8).map((event) => ({
-        event: event.eventType,
-        createdAt: event.createdAt,
-      })),
-    }] : [],
-    warnings: profile?.decayScore && profile.decayScore >= 35
-      ? ["Decay exceeds the degradation threshold. Revalidate or reduce capital allocation."]
+    metrics: profile
+      ? [
+          {
+            label: "Decay Score",
+            value: formatNumber(profile.decayScore, 1),
+            tone: profile.decayScore >= 35 ? "warning" : "success",
+          },
+          {
+            label: "Validation Score",
+            value: formatNumber(profile.validationScore, 1),
+            tone: profile.liveEligible ? "success" : "warning",
+          },
+          {
+            label: "Status",
+            value: profile.status,
+            tone: profile.status === "degraded" ? "warning" : "info",
+          },
+        ]
       : [],
+    tables:
+      params.lifecycle.length > 0
+        ? [
+            {
+              title: "Recent Lifecycle",
+              columns: [
+                { key: "event", header: "Event" },
+                { key: "createdAt", header: "Created" },
+              ],
+              rows: params.lifecycle.slice(0, 8).map((event) => ({
+                event: event.eventType,
+                createdAt: event.createdAt,
+              })),
+            },
+          ]
+        : [],
+    warnings:
+      profile?.decayScore && profile.decayScore >= 35
+        ? ["Decay exceeds the degradation threshold. Revalidate or reduce capital allocation."]
+        : [],
     actions: [
       {
         label: "Run another backtest",
@@ -491,27 +621,42 @@ export function buildDatasetInventoryReport(params: {
     metrics: [
       { label: "Datasets", value: String(params.datasets.length), tone: "info" },
       { label: "Snapshots", value: String(params.snapshots.length), tone: "info" },
-      { label: "Best Quality", value: params.datasets.length > 0 ? formatNumber(Math.max(...params.datasets.map((dataset) => dataset.quality.qualityScore)), 1) : "N/A", tone: "success" },
+      {
+        label: "Best Quality",
+        value:
+          params.datasets.length > 0
+            ? formatNumber(
+                Math.max(...params.datasets.map((dataset) => dataset.quality.qualityScore)),
+                1,
+              )
+            : "N/A",
+        tone: "success",
+      },
     ],
-    tables: params.datasets.length > 0 ? [{
-      title: "Datasets",
-      columns: [
-        { key: "symbol", header: "Symbol" },
-        { key: "timeframe", header: "Timeframe" },
-        { key: "marketFamily", header: "Market" },
-        { key: "quality", header: "Quality", align: "right" },
-        { key: "candles", header: "Candles", align: "right" },
-        { key: "source", header: "Source" },
-      ],
-      rows: params.datasets.slice(0, 10).map((dataset) => ({
-        symbol: dataset.symbol,
-        timeframe: dataset.timeframe,
-        marketFamily: dataset.marketFamily,
-        quality: formatNumber(dataset.quality.qualityScore, 1),
-        candles: String(dataset.candleCount),
-        source: dataset.sourceId,
-      })),
-    }] : [],
+    tables:
+      params.datasets.length > 0
+        ? [
+            {
+              title: "Datasets",
+              columns: [
+                { key: "symbol", header: "Symbol" },
+                { key: "timeframe", header: "Timeframe" },
+                { key: "marketFamily", header: "Market" },
+                { key: "quality", header: "Quality", align: "right" },
+                { key: "candles", header: "Candles", align: "right" },
+                { key: "source", header: "Source" },
+              ],
+              rows: params.datasets.slice(0, 10).map((dataset) => ({
+                symbol: dataset.symbol,
+                timeframe: dataset.timeframe,
+                marketFamily: dataset.marketFamily,
+                quality: formatNumber(dataset.quality.qualityScore, 1),
+                candles: String(dataset.candleCount),
+                source: dataset.sourceId,
+              })),
+            },
+          ]
+        : [],
     actions: [
       {
         label: "Inspect experiments",
@@ -531,24 +676,41 @@ export function buildExperimentsReport(params: {
     summary: `${params.experiments.length} experiment(s) currently tracked in the systematic journal.`,
     metrics: [
       { label: "Experiments", value: String(params.experiments.length), tone: "info" },
-      { label: "Validated", value: String(params.experiments.filter((experiment) => experiment.status === "validated").length), tone: "success" },
-      { label: "Live", value: String(params.experiments.filter((experiment) => experiment.status === "live").length), tone: "info" },
+      {
+        label: "Validated",
+        value: String(
+          params.experiments.filter((experiment) => experiment.status === "validated").length,
+        ),
+        tone: "success",
+      },
+      {
+        label: "Live",
+        value: String(
+          params.experiments.filter((experiment) => experiment.status === "live").length,
+        ),
+        tone: "info",
+      },
     ],
-    tables: params.experiments.length > 0 ? [{
-      title: "Experiment Journal",
-      columns: [
-        { key: "strategy", header: "Strategy" },
-        { key: "status", header: "Status" },
-        { key: "hypothesis", header: "Hypothesis" },
-        { key: "updatedAt", header: "Updated" },
-      ],
-      rows: params.experiments.slice(0, 10).map((experiment) => ({
-        strategy: experiment.strategyName,
-        status: experiment.status,
-        hypothesis: experiment.hypothesis,
-        updatedAt: experiment.updatedAt,
-      })),
-    }] : [],
+    tables:
+      params.experiments.length > 0
+        ? [
+            {
+              title: "Experiment Journal",
+              columns: [
+                { key: "strategy", header: "Strategy" },
+                { key: "status", header: "Status" },
+                { key: "hypothesis", header: "Hypothesis" },
+                { key: "updatedAt", header: "Updated" },
+              ],
+              rows: params.experiments.slice(0, 10).map((experiment) => ({
+                strategy: experiment.strategyName,
+                status: experiment.status,
+                hypothesis: experiment.hypothesis,
+                updatedAt: experiment.updatedAt,
+              })),
+            },
+          ]
+        : [],
     actions: [
       {
         label: "Open A/B workflow",
@@ -567,17 +729,22 @@ export function buildLifecycleReport(params: {
     title: "Lifecycle Log",
     status: params.lifecycle.length > 0 ? "info" : "warning",
     summary: `${params.lifecycle.length} lifecycle event(s) recorded for ${params.strategyId}.`,
-    tables: params.lifecycle.length > 0 ? [{
-      title: "Recent Events",
-      columns: [
-        { key: "eventType", header: "Event" },
-        { key: "createdAt", header: "Created" },
-      ],
-      rows: params.lifecycle.slice(0, 15).map((event) => ({
-        eventType: event.eventType,
-        createdAt: event.createdAt,
-      })),
-    }] : [],
+    tables:
+      params.lifecycle.length > 0
+        ? [
+            {
+              title: "Recent Events",
+              columns: [
+                { key: "eventType", header: "Event" },
+                { key: "createdAt", header: "Created" },
+              ],
+              rows: params.lifecycle.slice(0, 15).map((event) => ({
+                eventType: event.eventType,
+                createdAt: event.createdAt,
+              })),
+            },
+          ]
+        : [],
     actions: [
       {
         label: "Inspect systematic status",
@@ -595,28 +762,41 @@ export function buildPortfolioOperatorReport(summary: StrategyPortfolioSummary):
     summary: `${summary.entries.length} strategy profile(s), diversification score ${summary.diversificationScore.toFixed(1)}, concentration risk ${summary.concentrationRisk}.`,
     metrics: [
       { label: "Strategies", value: String(summary.entries.length), tone: "info" },
-      { label: "Capital Weight", value: formatNumber(summary.totalCapitalWeight * 100, 1) + "%", tone: "info" },
-      { label: "Diversification", value: formatNumber(summary.diversificationScore, 1), tone: summary.diversificationScore >= 60 ? "success" : "warning" },
+      {
+        label: "Capital Weight",
+        value: `${formatNumber(summary.totalCapitalWeight * 100, 1)}%`,
+        tone: "info",
+      },
+      {
+        label: "Diversification",
+        value: formatNumber(summary.diversificationScore, 1),
+        tone: summary.diversificationScore >= 60 ? "success" : "warning",
+      },
     ],
-    tables: summary.entries.length > 0 ? [{
-      title: "Portfolio Entries",
-      columns: [
-        { key: "strategyName", header: "Strategy" },
-        { key: "marketFamily", header: "Market" },
-        { key: "status", header: "Status" },
-        { key: "validationScore", header: "Validation", align: "right" },
-        { key: "capitalWeight", header: "Weight", align: "right" },
-        { key: "estimatedCorrelation", header: "Corr", align: "right" },
-      ],
-      rows: summary.entries.slice(0, 10).map((entry) => ({
-        strategyName: entry.strategyName,
-        marketFamily: entry.marketFamily,
-        status: entry.status,
-        validationScore: formatNumber(entry.validationScore, 1),
-        capitalWeight: `${(entry.capitalWeight * 100).toFixed(1)}%`,
-        estimatedCorrelation: formatNumber(entry.estimatedCorrelation, 2),
-      })),
-    }] : [],
+    tables:
+      summary.entries.length > 0
+        ? [
+            {
+              title: "Portfolio Entries",
+              columns: [
+                { key: "strategyName", header: "Strategy" },
+                { key: "marketFamily", header: "Market" },
+                { key: "status", header: "Status" },
+                { key: "validationScore", header: "Validation", align: "right" },
+                { key: "capitalWeight", header: "Weight", align: "right" },
+                { key: "estimatedCorrelation", header: "Corr", align: "right" },
+              ],
+              rows: summary.entries.slice(0, 10).map((entry) => ({
+                strategyName: entry.strategyName,
+                marketFamily: entry.marketFamily,
+                status: entry.status,
+                validationScore: formatNumber(entry.validationScore, 1),
+                capitalWeight: `${(entry.capitalWeight * 100).toFixed(1)}%`,
+                estimatedCorrelation: formatNumber(entry.estimatedCorrelation, 2),
+              })),
+            },
+          ]
+        : [],
     warnings: summary.notes,
     actions: [
       {
@@ -638,48 +818,73 @@ export function buildStrategyStatusReport(params: {
   const profile = params.profile;
   return normalizeOperatorReport({
     title: "Systematic Strategy Status",
-    status: !profile ? "warning" : profile.liveEligible ? "success" : profile.validationStatus === "warning" ? "warning" : "error",
+    status: !profile
+      ? "warning"
+      : profile.liveEligible
+        ? "success"
+        : profile.validationStatus === "warning"
+          ? "warning"
+          : "error",
     summary: profile
       ? `${profile.strategyName} is ${profile.status} with validation ${profile.validationStatus} (${profile.validationScore.toFixed(1)}).`
       : `No systematic profile exists for ${params.strategyId}.`,
-    metrics: profile ? [
-      { label: "Market", value: profile.marketFamily, tone: "info" },
-      { label: "Validation", value: formatNumber(profile.validationScore, 1), tone: profile.liveEligible ? "success" : "warning" },
-      { label: "Decay", value: formatNumber(profile.decayScore, 1), tone: profile.decayScore < 25 ? "success" : "warning" },
-      { label: "Return Driver", value: profile.returnDriver, tone: "info" },
-    ] : [],
-    gates: params.validation?.gates.map((gate) => ({
-      name: gate.name,
-      status: gate.passed ? "pass" : "fail",
-      score: gate.score,
-      detail: gate.detail,
-      blocker: !gate.passed,
-    })) ?? [],
+    metrics: profile
+      ? [
+          { label: "Market", value: profile.marketFamily, tone: "info" },
+          {
+            label: "Validation",
+            value: formatNumber(profile.validationScore, 1),
+            tone: profile.liveEligible ? "success" : "warning",
+          },
+          {
+            label: "Decay",
+            value: formatNumber(profile.decayScore, 1),
+            tone: profile.decayScore < 25 ? "success" : "warning",
+          },
+          { label: "Return Driver", value: profile.returnDriver, tone: "info" },
+        ]
+      : [],
+    gates:
+      params.validation?.gates.map((gate) => ({
+        name: gate.name,
+        status: gate.passed ? "pass" : "fail",
+        score: gate.score,
+        detail: gate.detail,
+        blocker: !gate.passed,
+      })) ?? [],
     tables: [
-      ...(params.experiments.length > 0 ? [{
-        title: "Recent Experiments",
-        columns: [
-          { key: "id", header: "Experiment" },
-          { key: "status", header: "Status" },
-          { key: "updated", header: "Updated" },
-        ],
-        rows: params.experiments.slice(0, 5).map((experiment) => ({
-          id: experiment.experimentId,
-          status: experiment.status,
-          updated: experiment.updatedAt,
-        })),
-      }] : []),
-      ...(params.lifecycle.length > 0 ? [{
-        title: "Recent Lifecycle",
-        columns: [
-          { key: "event", header: "Event" },
-          { key: "created", header: "Created" },
-        ],
-        rows: params.lifecycle.slice(0, 5).map((event) => ({
-          event: event.eventType,
-          created: event.createdAt,
-        })),
-      }] : []),
+      ...(params.experiments.length > 0
+        ? [
+            {
+              title: "Recent Experiments",
+              columns: [
+                { key: "id", header: "Experiment" },
+                { key: "status", header: "Status" },
+                { key: "updated", header: "Updated" },
+              ],
+              rows: params.experiments.slice(0, 5).map((experiment) => ({
+                id: experiment.experimentId,
+                status: experiment.status,
+                updated: experiment.updatedAt,
+              })),
+            },
+          ]
+        : []),
+      ...(params.lifecycle.length > 0
+        ? [
+            {
+              title: "Recent Lifecycle",
+              columns: [
+                { key: "event", header: "Event" },
+                { key: "created", header: "Created" },
+              ],
+              rows: params.lifecycle.slice(0, 5).map((event) => ({
+                event: event.eventType,
+                created: event.createdAt,
+              })),
+            },
+          ]
+        : []),
     ],
     actions: [
       {

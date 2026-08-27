@@ -78,7 +78,7 @@ export class TrendRangeStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, CANDLE_LIMIT);
     if (candles.length < 50) {
@@ -126,7 +126,7 @@ export class TrendRangeStrategy extends BaseStrategy {
 
     if (barsInRange < MIN_BARS_IN_RANGE) {
       return this.notDetected(
-        `Only ${barsInRange}/${RANGE_LOOKBACK} bars in range (need ${MIN_BARS_IN_RANGE}+)`
+        `Only ${barsInRange}/${RANGE_LOOKBACK} bars in range (need ${MIN_BARS_IN_RANGE}+)`,
       );
     }
 
@@ -169,7 +169,7 @@ export class TrendRangeStrategy extends BaseStrategy {
 
     if (!breakoutDirection) {
       return this.notDetected(
-        `Range detected (${barsInRange}/${RANGE_LOOKBACK} bars in range) but no breakout yet`
+        `Range detected (${barsInRange}/${RANGE_LOOKBACK} bars in range) but no breakout yet`,
       );
     }
 
@@ -246,7 +246,7 @@ export class TrendRangeStrategy extends BaseStrategy {
 
     // Long range duration
     if (rangeDuration >= 20) {
-      confidence += 0.10;
+      confidence += 0.1;
     }
 
     // Breakout volume surge
@@ -256,7 +256,7 @@ export class TrendRangeStrategy extends BaseStrategy {
 
     // ATR squeeze during range
     if (atrContracting) {
-      confidence += 0.10;
+      confidence += 0.1;
     }
 
     // Breakout aligns with SMA 20 slope
@@ -282,10 +282,10 @@ export class TrendRangeStrategy extends BaseStrategy {
 
     const reasons: string[] = [];
     reasons.push(
-      `Range detected: ${barsInRange}/${RANGE_LOOKBACK} bars in range (WMA ${currentWma.toFixed(2)})`
+      `Range detected: ${barsInRange}/${RANGE_LOOKBACK} bars in range (WMA ${currentWma.toFixed(2)})`,
     );
     reasons.push(
-      `Breakout ${breakoutDirection} with ${breakoutStrength.toFixed(2)} ATR conviction`
+      `Breakout ${breakoutDirection} with ${breakoutStrength.toFixed(2)} ATR conviction`,
     );
     reasons.push(`Range: $${rangeLower.toFixed(2)} - $${rangeUpper.toFixed(2)}`);
     reasons.push(`Volume: ${volumeRatio.toFixed(1)}x average`);
@@ -346,7 +346,7 @@ export class TrendRangeStrategy extends BaseStrategy {
       const tr = Math.max(
         current.high - current.low,
         Math.abs(current.high - previous.close),
-        Math.abs(current.low - previous.close)
+        Math.abs(current.low - previous.close),
       );
       trueRanges.push(tr);
     }
@@ -372,8 +372,7 @@ export class TrendRangeStrategy extends BaseStrategy {
   private getVolumeRatio(candles: Candle[]): number {
     if (candles.length < 21) return 1;
     const lastVolume = candles[candles.length - 1]?.volume ?? 0;
-    const avgVolume =
-      candles.slice(-21, -1).reduce((sum, c) => sum + c.volume, 0) / 20;
+    const avgVolume = candles.slice(-21, -1).reduce((sum, c) => sum + c.volume, 0) / 20;
     return avgVolume > 0 ? lastVolume / avgVolume : 0;
   }
 
@@ -381,10 +380,7 @@ export class TrendRangeStrategy extends BaseStrategy {
   // Plan Parameters
   // ============================================================================
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", CANDLE_LIMIT);
     const currentPrice = this.getCurrentPrice(candles, ctx);
 
@@ -421,15 +417,8 @@ export class TrendRangeStrategy extends BaseStrategy {
           { price: entryPrice - rangeWidth * 3, percentToSell: 0.25 },
         ];
 
-    const avgTpPrice = takeProfits.reduce(
-      (sum, tp) => sum + tp.price * tp.percentToSell,
-      0
-    );
-    const riskRewardRatio = this.calculateRiskReward(
-      entryPrice,
-      stopLoss,
-      avgTpPrice
-    );
+    const avgTpPrice = takeProfits.reduce((sum, tp) => sum + tp.price * tp.percentToSell, 0);
+    const riskRewardRatio = this.calculateRiskReward(entryPrice, stopLoss, avgTpPrice);
 
     const direction = isUpBreakout ? "upward" : "downward";
 
@@ -500,7 +489,7 @@ When creating a plan using the Trend Range Detector strategy:
     bar: OHLC,
     index: number,
     data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     // Need enough history for WMA + range lookback
     if (index < WMA_PERIOD + RANGE_LOOKBACK) return null;
@@ -554,7 +543,7 @@ When creating a plan using the Trend Range Detector strategy:
         if (bar.volume > 0 && index >= 21) {
           let volSum = 0;
           for (let v = index - 20; v < index; v++) {
-            volSum += (data[v]?.volume ?? 0);
+            volSum += data[v]?.volume ?? 0;
           }
           const avgVol = volSum / 20;
           volumeOk = avgVol === 0 || bar.volume >= avgVol * 1.2;
@@ -579,7 +568,7 @@ When creating a plan using the Trend Range Detector strategy:
         if (bar.volume > 0 && index >= 21) {
           let volSum = 0;
           for (let v = index - 20; v < index; v++) {
-            volSum += (data[v]?.volume ?? 0);
+            volSum += data[v]?.volume ?? 0;
           }
           const avgVol = volSum / 20;
           volumeOk = avgVol === 0 || bar.volume >= avgVol * 1.2;

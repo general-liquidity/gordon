@@ -28,7 +28,17 @@ const logger = createModuleLogger("calibration");
 // Types
 // ============================================================================
 
-export type ConfidenceBucket = "0-10" | "10-20" | "20-30" | "30-40" | "40-50" | "50-60" | "60-70" | "70-80" | "80-90" | "90-100";
+export type ConfidenceBucket =
+  | "0-10"
+  | "10-20"
+  | "20-30"
+  | "30-40"
+  | "40-50"
+  | "50-60"
+  | "60-70"
+  | "70-80"
+  | "80-90"
+  | "90-100";
 
 export type DecisionDomain =
   | "proactive_suggestion"
@@ -77,7 +87,10 @@ export interface CalibrationStats {
   totalWithOutcomes: number;
   overallAccuracy: number;
   bucketStats: Record<ConfidenceBucket, { count: number; correct: number; accuracy: number }>;
-  byDomain: Record<string, { count: number; correct: number; accuracy: number; avgConfidence: number }>;
+  byDomain: Record<
+    string,
+    { count: number; correct: number; accuracy: number; avgConfidence: number }
+  >;
   calibrationError: number;
 }
 
@@ -115,16 +128,26 @@ function toBucket(confidence: number): ConfidenceBucket {
 
 function bucketMidpoint(bucket: ConfidenceBucket): number {
   switch (bucket) {
-    case "0-10": return 0.05;
-    case "10-20": return 0.15;
-    case "20-30": return 0.25;
-    case "30-40": return 0.35;
-    case "40-50": return 0.45;
-    case "50-60": return 0.55;
-    case "60-70": return 0.65;
-    case "70-80": return 0.75;
-    case "80-90": return 0.85;
-    case "90-100": return 0.95;
+    case "0-10":
+      return 0.05;
+    case "10-20":
+      return 0.15;
+    case "20-30":
+      return 0.25;
+    case "30-40":
+      return 0.35;
+    case "40-50":
+      return 0.45;
+    case "50-60":
+      return 0.55;
+    case "60-70":
+      return 0.65;
+    case "70-80":
+      return 0.75;
+    case "80-90":
+      return 0.85;
+    case "90-100":
+      return 0.95;
   }
 }
 
@@ -144,7 +167,9 @@ interface JournalEntry {
  * caller generates it (e.g. timestamp + random suffix, or reuse an
  * existing domain id like proactive suggestion id).
  */
-export function recordDecision(decision: Omit<CalibrationDecision, "createdAt">): CalibrationDecision {
+export function recordDecision(
+  decision: Omit<CalibrationDecision, "createdAt">,
+): CalibrationDecision {
   const full: CalibrationDecision = {
     ...decision,
     confidence: Math.max(0, Math.min(1, decision.confidence)),
@@ -153,7 +178,7 @@ export function recordDecision(decision: Omit<CalibrationDecision, "createdAt">)
   try {
     ensureDir();
     const entry: JournalEntry = { type: "decision", at: full.createdAt, decision: full };
-    appendFileSync(getCalibrationPath(), JSON.stringify(entry) + "\n", "utf8");
+    appendFileSync(getCalibrationPath(), `${JSON.stringify(entry)}\n`, "utf8");
   } catch (err) {
     logger.warn("Failed to record calibration decision", { err: String(err) });
   }
@@ -173,7 +198,7 @@ export function recordOutcome(outcome: Omit<CalibrationOutcome, "recordedAt">): 
   try {
     ensureDir();
     const entry: JournalEntry = { type: "outcome", at: full.recordedAt, outcome: full };
-    appendFileSync(getCalibrationPath(), JSON.stringify(entry) + "\n", "utf8");
+    appendFileSync(getCalibrationPath(), `${JSON.stringify(entry)}\n`, "utf8");
   } catch (err) {
     logger.warn("Failed to record calibration outcome", { err: String(err) });
   }
@@ -235,7 +260,10 @@ export function computeCalibrationStats(
   const withOutcomes = filtered.filter((r) => r.outcome && r.outcome.result !== "unknown");
   const totalWithOutcomes = withOutcomes.length;
 
-  const bucketStats: Record<ConfidenceBucket, { count: number; correct: number; accuracy: number }> = {
+  const bucketStats: Record<
+    ConfidenceBucket,
+    { count: number; correct: number; accuracy: number }
+  > = {
     "0-10": { count: 0, correct: 0, accuracy: 0 },
     "10-20": { count: 0, correct: 0, accuracy: 0 },
     "20-30": { count: 0, correct: 0, accuracy: 0 },
@@ -248,7 +276,16 @@ export function computeCalibrationStats(
     "90-100": { count: 0, correct: 0, accuracy: 0 },
   };
 
-  const domainStats: Record<string, { count: number; correct: number; accuracy: number; avgConfidence: number; confidenceSum: number }> = {};
+  const domainStats: Record<
+    string,
+    {
+      count: number;
+      correct: number;
+      accuracy: number;
+      avgConfidence: number;
+      confidenceSum: number;
+    }
+  > = {};
 
   let calibrationErrorSum = 0;
   let totalCorrect = 0;
@@ -261,7 +298,13 @@ export function computeCalibrationStats(
     totalCorrect += correct;
 
     if (!domainStats[r.domain]) {
-      domainStats[r.domain] = { count: 0, correct: 0, accuracy: 0, avgConfidence: 0, confidenceSum: 0 };
+      domainStats[r.domain] = {
+        count: 0,
+        correct: 0,
+        accuracy: 0,
+        avgConfidence: 0,
+        confidenceSum: 0,
+      };
     }
     const ds = domainStats[r.domain]!;
     ds.count += 1;
@@ -278,7 +321,10 @@ export function computeCalibrationStats(
     }
   }
 
-  const byDomain: Record<string, { count: number; correct: number; accuracy: number; avgConfidence: number }> = {};
+  const byDomain: Record<
+    string,
+    { count: number; correct: number; accuracy: number; avgConfidence: number }
+  > = {};
   for (const [domain, ds] of Object.entries(domainStats)) {
     byDomain[domain] = {
       count: ds.count,
@@ -288,12 +334,10 @@ export function computeCalibrationStats(
     };
   }
 
-  const calibrationError = totalWithOutcomes > 0
-    ? Number((calibrationErrorSum / totalWithOutcomes).toFixed(3))
-    : 0;
-  const overallAccuracy = totalWithOutcomes > 0
-    ? Number((totalCorrect / totalWithOutcomes).toFixed(3))
-    : 0;
+  const calibrationError =
+    totalWithOutcomes > 0 ? Number((calibrationErrorSum / totalWithOutcomes).toFixed(3)) : 0;
+  const overallAccuracy =
+    totalWithOutcomes > 0 ? Number((totalCorrect / totalWithOutcomes).toFixed(3)) : 0;
 
   return {
     totalDecisions,

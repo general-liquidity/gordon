@@ -76,9 +76,7 @@ const MINUTES_PER_YEAR_24_7 = 365 * 24 * 60;
 export function periodsPerYearForTimeframe(timeframe: string): number {
   const minutes = TIMEFRAME_MINUTES[timeframe];
   if (minutes === undefined) {
-    throw new Error(
-      `Unknown timeframe "${timeframe}": cannot derive an annualization factor`,
-    );
+    throw new Error(`Unknown timeframe "${timeframe}": cannot derive an annualization factor`);
   }
   return MINUTES_PER_YEAR_24_7 / minutes;
 }
@@ -96,10 +94,7 @@ export function periodsPerYearForTimeframe(timeframe: string): number {
  * @param finalCapital - Ending portfolio value
  * @returns Total return percentage (e.g., 25.5 for 25.5% return)
  */
-export function calculateTotalReturn(
-  initialCapital: number,
-  finalCapital: number
-): number {
+export function calculateTotalReturn(initialCapital: number, finalCapital: number): number {
   if (initialCapital <= 0) {
     return 0;
   }
@@ -118,10 +113,7 @@ export function calculateTotalReturn(
  * @param days - Number of days in the backtest period
  * @returns Annualized return percentage
  */
-export function calculateAnnualizedReturn(
-  totalReturn: number,
-  days: number
-): number {
+export function calculateAnnualizedReturn(totalReturn: number, days: number): number {
   if (days <= 0) {
     return 0;
   }
@@ -137,7 +129,7 @@ export function calculateAnnualizedReturn(
     return -100; // Total loss
   }
 
-  const annualized = Math.pow(1 + totalReturnDecimal, 1 / yearsElapsed) - 1;
+  const annualized = (1 + totalReturnDecimal) ** (1 / yearsElapsed) - 1;
   return annualized * 100;
 }
 
@@ -154,11 +146,7 @@ export function calculateAnnualizedReturn(
  * @param years - Number of years in the backtest period
  * @returns CAGR percentage
  */
-export function calculateCAGR(
-  initialCapital: number,
-  finalCapital: number,
-  years: number
-): number {
+export function calculateCAGR(initialCapital: number, finalCapital: number, years: number): number {
   return statsCagr(initialCapital, finalCapital, years);
 }
 
@@ -257,10 +245,7 @@ export function calculateSortinoRatio(
  * @param maxDrawdown - Maximum drawdown as a positive percentage
  * @returns Calmar ratio
  */
-export function calculateCalmarRatio(
-  annualizedReturn: number,
-  maxDrawdown: number
-): number {
+export function calculateCalmarRatio(annualizedReturn: number, maxDrawdown: number): number {
   if (maxDrawdown === 0) {
     return annualizedReturn > 0 ? Infinity : 0;
   }
@@ -366,11 +351,7 @@ export function calculateAverageLoss(trades: ClosedTrade[]): number {
  * @param avgLoss - Average losing trade value (as a positive number)
  * @returns Expected value per trade
  */
-export function calculateExpectancy(
-  winRate: number,
-  avgWin: number,
-  avgLoss: number
-): number {
+export function calculateExpectancy(winRate: number, avgWin: number, avgLoss: number): number {
   return winRate * avgWin - (1 - winRate) * avgLoss;
 }
 
@@ -849,18 +830,19 @@ export function calculateMetricsFromTrades(
   const finalCapital = lastEquityPoint?.equity ?? initialCapital;
 
   // Convert extended equity curve to basic format for existing functions
-  const basicEquityCurve: EquityPoint[] = equityCurve.map(e => ({
+  const basicEquityCurve: EquityPoint[] = equityCurve.map((e) => ({
     timestamp: e.timestamp,
     equity: e.equity,
   }));
 
   // Calculate days from equity curve
-  const days = equityCurve.length > 1 && lastEquityPoint && firstEquityPoint
-    ? (lastEquityPoint.timestamp - firstEquityPoint.timestamp) / (1000 * 60 * 60 * 24)
-    : 1;
+  const days =
+    equityCurve.length > 1 && lastEquityPoint && firstEquityPoint
+      ? (lastEquityPoint.timestamp - firstEquityPoint.timestamp) / (1000 * 60 * 60 * 24)
+      : 1;
 
   // Convert engine Trade to ClosedTrade format
-  const closedTrades: ClosedTrade[] = trades.map(t => ({
+  const closedTrades: ClosedTrade[] = trades.map((t) => ({
     id: t.id,
     symbol: "", // Not tracked by engine
     side: t.side.toLowerCase() as "long" | "short",
@@ -885,30 +867,35 @@ export function calculateMetricsFromTrades(
   );
 
   // Add engine-specific metrics
-  const winningTrades = trades.filter(t => t.netPnL > 0);
-  const losingTrades = trades.filter(t => t.netPnL < 0);
+  const winningTrades = trades.filter((t) => t.netPnL > 0);
+  const losingTrades = trades.filter((t) => t.netPnL < 0);
 
   // Extended reporting metrics — computed from the equity-curve return series
   // and the trade record. All null/empty when inputs are insufficient.
   const periodReturns = calculateDailyReturns(basicEquityCurve);
   const tailRatio = calculateTailRatio(periodReturns) ?? undefined;
-  const rollingSharpe = calculateRollingSharpe(periodReturns, DEFAULT_ROLLING_WINDOW, periodsPerYear);
+  const rollingSharpe = calculateRollingSharpe(
+    periodReturns,
+    DEFAULT_ROLLING_WINDOW,
+    periodsPerYear,
+  );
   // Engine has no benchmark series — beta is null unless a caller wires one in.
   const rollingBeta = calculateRollingBeta(periodReturns, null);
   const drawdownPeriods = extractDrawdownPeriods(basicEquityCurve);
   // Engine tracks positions only at trade boundaries, not per bar, so realized
   // turnover is derived from traded notional. Each round-trip trades entry +
   // exit notional ≈ 2 × entry value; normalize by initial capital, per trade.
-  const realizedTurnover = trades.length > 0
-    ? parseFloat(
-        (
-          trades.reduce(
-            (sum, t) => sum + (Math.abs(t.entryPrice * t.quantity) * 2) / initialCapital,
-            0,
-          ) / trades.length
-        ).toFixed(6),
-      )
-    : undefined;
+  const realizedTurnover =
+    trades.length > 0
+      ? parseFloat(
+          (
+            trades.reduce(
+              (sum, t) => sum + (Math.abs(t.entryPrice * t.quantity) * 2) / initialCapital,
+              0,
+            ) / trades.length
+          ).toFixed(6),
+        )
+      : undefined;
 
   return {
     ...baseMetrics,
@@ -920,21 +907,19 @@ export function calculateMetricsFromTrades(
     // Override with more precise calculations from Trade type
     grossProfit: winningTrades.reduce((sum, t) => sum + t.grossPnL, 0),
     grossLoss: Math.abs(losingTrades.reduce((sum, t) => sum + t.grossPnL, 0)),
-    largestWin: winningTrades.length > 0
-      ? Math.max(...winningTrades.map(t => t.netPnL))
-      : 0,
-    largestLoss: losingTrades.length > 0
-      ? Math.abs(Math.min(...losingTrades.map(t => t.netPnL)))
-      : 0,
-    avgHoldingPeriod: trades.length > 0
-      ? trades.reduce((sum, t) => sum + t.holdingPeriod, 0) / trades.length
-      : 0,
-    avgWinHoldingPeriod: winningTrades.length > 0
-      ? winningTrades.reduce((sum, t) => sum + t.holdingPeriod, 0) / winningTrades.length
-      : 0,
-    avgLossHoldingPeriod: losingTrades.length > 0
-      ? losingTrades.reduce((sum, t) => sum + t.holdingPeriod, 0) / losingTrades.length
-      : 0,
+    largestWin: winningTrades.length > 0 ? Math.max(...winningTrades.map((t) => t.netPnL)) : 0,
+    largestLoss:
+      losingTrades.length > 0 ? Math.abs(Math.min(...losingTrades.map((t) => t.netPnL))) : 0,
+    avgHoldingPeriod:
+      trades.length > 0 ? trades.reduce((sum, t) => sum + t.holdingPeriod, 0) / trades.length : 0,
+    avgWinHoldingPeriod:
+      winningTrades.length > 0
+        ? winningTrades.reduce((sum, t) => sum + t.holdingPeriod, 0) / winningTrades.length
+        : 0,
+    avgLossHoldingPeriod:
+      losingTrades.length > 0
+        ? losingTrades.reduce((sum, t) => sum + t.holdingPeriod, 0) / losingTrades.length
+        : 0,
     totalCommission: trades.reduce((sum, t) => sum + t.commission, 0),
     commissionPct: (trades.reduce((sum, t) => sum + t.commission, 0) / initialCapital) * 100,
     // Ensure maxDrawdownDuration is in bars for engine compatibility

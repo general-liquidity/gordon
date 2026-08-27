@@ -1,5 +1,5 @@
 import type { RuntimeTranscriptEntry } from "../contracts/types.ts";
-import { TranscriptStore } from "./TranscriptStore.ts";
+import type { TranscriptStore } from "./TranscriptStore.ts";
 
 export class CompactionManager {
   compact(entries: RuntimeTranscriptEntry[], maxEntries: number): RuntimeTranscriptEntry[] {

@@ -107,7 +107,12 @@ function linearRegressionSlope(x: number[], y: number[]): number {
 // Interpretation
 // ============================================================================
 
-export type HurstRegime = "strongly_mean_reverting" | "mean_reverting" | "random_walk" | "trending" | "strongly_trending";
+export type HurstRegime =
+  | "strongly_mean_reverting"
+  | "mean_reverting"
+  | "random_walk"
+  | "trending"
+  | "strongly_trending";
 
 export interface HurstAnalysis {
   exponent: number;
@@ -127,7 +132,8 @@ export function interpretHurst(h: number): HurstAnalysis {
 
   if (h < 0.35) {
     regime = "strongly_mean_reverting";
-    implication = "Strong mean reversion. Fade breakouts, buy dips, sell rips. Mean-reversion strategies optimal.";
+    implication =
+      "Strong mean reversion. Fade breakouts, buy dips, sell rips. Mean-reversion strategies optimal.";
   } else if (h < 0.45) {
     regime = "mean_reverting";
     implication = "Mild mean reversion. Range-bound strategies preferred. Avoid trend-following.";

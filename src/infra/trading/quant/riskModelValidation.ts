@@ -48,7 +48,13 @@ export interface PopulationStabilityResult {
   verdict: "stable" | "moderate_shift" | "significant_shift" | "insufficient";
   bins: number;
   /** Per-bin breakdown: reference %, current %, PSI contribution. */
-  perBin: Array<{ lower: number; upper: number; expectedPct: number; actualPct: number; contribution: number }>;
+  perBin: Array<{
+    lower: number;
+    upper: number;
+    expectedPct: number;
+    actualPct: number;
+    contribution: number;
+  }>;
   interpretation: string;
 }
 
@@ -59,12 +65,20 @@ function quantileSorted(sorted: number[], q: number): number {
   return lo === hi ? sorted[lo]! : sorted[lo]! + (pos - lo) * (sorted[hi]! - sorted[lo]!);
 }
 
-export function computePopulationStability(input: PopulationStabilityInput): PopulationStabilityResult {
+export function computePopulationStability(
+  input: PopulationStabilityInput,
+): PopulationStabilityResult {
   const bins = Math.max(2, Math.floor(input.bins ?? 10));
   const expected = (input.expected ?? []).filter((x) => Number.isFinite(x));
   const actual = (input.actual ?? []).filter((x) => Number.isFinite(x));
   if (expected.length < bins || actual.length < 1) {
-    return { psi: 0, verdict: "insufficient", bins, perBin: [], interpretation: `need ≥ ${bins} reference + ≥1 current observation` };
+    return {
+      psi: 0,
+      verdict: "insufficient",
+      bins,
+      perBin: [],
+      interpretation: `need ≥ ${bins} reference + ≥1 current observation`,
+    };
   }
 
   // Quantile (equal-frequency) bin edges from the reference, deduped.
@@ -139,29 +153,46 @@ export interface VaRBacktestResult {
   conditionalCoverageLR: number;
   conditionalCoveragePValue: number;
   conditionalCoverageReject: boolean;
-  verdict: "well_calibrated" | "rate_miscalibrated" | "violations_clustered" | "miscalibrated" | "insufficient";
+  verdict:
+    | "well_calibrated"
+    | "rate_miscalibrated"
+    | "violations_clustered"
+    | "miscalibrated"
+    | "insufficient";
   interpretation: string;
 }
 
 const MIN_VAR_OBS = 30;
 
 export function computeVaRBacktest(input: VaRBacktestInput): VaRBacktestResult {
-  const confidence = input.confidence && input.confidence > 0 && input.confidence < 1 ? input.confidence : 0.99;
+  const confidence =
+    input.confidence && input.confidence > 0 && input.confidence < 1 ? input.confidence : 0.99;
   const p = 1 - confidence; // expected exception rate
   const n = Math.min(input.returns?.length ?? 0, input.varForecasts?.length ?? 0);
 
   const insufficient = (): VaRBacktestResult => ({
-    nObs: n, violations: 0, violationRate: 0, expectedRate: round(p, 6),
-    kupiecLR: 0, kupiecPValue: 1, kupiecReject: false,
-    independenceLR: 0, independencePValue: 1, independenceReject: false,
-    conditionalCoverageLR: 0, conditionalCoveragePValue: 1, conditionalCoverageReject: false,
-    verdict: "insufficient", interpretation: `need ≥ ${MIN_VAR_OBS} aligned (return, VaR) pairs, got ${n}`,
+    nObs: n,
+    violations: 0,
+    violationRate: 0,
+    expectedRate: round(p, 6),
+    kupiecLR: 0,
+    kupiecPValue: 1,
+    kupiecReject: false,
+    independenceLR: 0,
+    independencePValue: 1,
+    independenceReject: false,
+    conditionalCoverageLR: 0,
+    conditionalCoveragePValue: 1,
+    conditionalCoverageReject: false,
+    verdict: "insufficient",
+    interpretation: `need ≥ ${MIN_VAR_OBS} aligned (return, VaR) pairs, got ${n}`,
   });
   if (n < MIN_VAR_OBS) return insufficient();
 
   // Violation: realized loss exceeds the VaR (return below −VaR).
   const breach: number[] = [];
-  for (let i = 0; i < n; i++) breach.push(input.returns[i]! < -Math.abs(input.varForecasts[i]!) ? 1 : 0);
+  for (let i = 0; i < n; i++)
+    breach.push(input.returns[i]! < -Math.abs(input.varForecasts[i]!) ? 1 : 0);
   const x = breach.reduce((s, b) => s + b, 0);
   const rate = x / n;
 
@@ -170,7 +201,10 @@ export function computeVaRBacktest(input: VaRBacktestInput): VaRBacktestResult {
     -2 * (safeTerm(n - x, 1 - p) + safeTerm(x, p) - safeTerm(n - x, 1 - rate) - safeTerm(x, rate));
 
   // Christoffersen independence (Markov transitions of the breach indicator), χ²₁.
-  let n00 = 0, n01 = 0, n10 = 0, n11 = 0;
+  let n00 = 0,
+    n01 = 0,
+    n10 = 0,
+    n11 = 0;
   for (let i = 1; i < n; i++) {
     const prev = breach[i - 1]!;
     const cur = breach[i]!;
@@ -184,8 +218,12 @@ export function computeVaRBacktest(input: VaRBacktestInput): VaRBacktestResult {
   const pi2 = n00 + n01 + n10 + n11 > 0 ? (n01 + n11) / (n00 + n01 + n10 + n11) : 0;
   const independenceLR =
     -2 *
-    (safeTerm(n00 + n10, 1 - pi2) + safeTerm(n01 + n11, pi2) -
-      safeTerm(n00, 1 - pi01) - safeTerm(n01, pi01) - safeTerm(n10, 1 - pi11) - safeTerm(n11, pi11));
+    (safeTerm(n00 + n10, 1 - pi2) +
+      safeTerm(n01 + n11, pi2) -
+      safeTerm(n00, 1 - pi01) -
+      safeTerm(n01, pi01) -
+      safeTerm(n10, 1 - pi11) -
+      safeTerm(n11, pi11));
 
   const ccLR = kupiecLR + independenceLR;
   const kupiecReject = kupiecLR > CHI2_95_DF1;
@@ -211,10 +249,20 @@ export function computeVaRBacktest(input: VaRBacktestInput): VaRBacktestResult {
           : `${x}/${n} violations — both rate AND clustering fail (VaR mis-calibrated on coverage and independence)`;
 
   return {
-    nObs: n, violations: x, violationRate: round(rate, 6), expectedRate: round(p, 6),
-    kupiecLR: round(kupiecLR), kupiecPValue: round(chiSquareSF(kupiecLR, 1), 4), kupiecReject,
-    independenceLR: round(independenceLR), independencePValue: round(chiSquareSF(independenceLR, 1), 4), independenceReject,
-    conditionalCoverageLR: round(ccLR), conditionalCoveragePValue: round(chiSquareSF(ccLR, 2), 4), conditionalCoverageReject: ccReject,
-    verdict, interpretation,
+    nObs: n,
+    violations: x,
+    violationRate: round(rate, 6),
+    expectedRate: round(p, 6),
+    kupiecLR: round(kupiecLR),
+    kupiecPValue: round(chiSquareSF(kupiecLR, 1), 4),
+    kupiecReject,
+    independenceLR: round(independenceLR),
+    independencePValue: round(chiSquareSF(independenceLR, 1), 4),
+    independenceReject,
+    conditionalCoverageLR: round(ccLR),
+    conditionalCoveragePValue: round(chiSquareSF(ccLR, 2), 4),
+    conditionalCoverageReject: ccReject,
+    verdict,
+    interpretation,
   };
 }

@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import type { ModeBannerState } from "../../state/types.ts";
 import { useTheme } from "../../themes/ThemeProvider.tsx";
@@ -22,7 +22,9 @@ export function TradingModeBanner({
     <Box borderStyle="round" borderColor={color} paddingX={1} flexDirection="column">
       {live ? (
         <>
-          <Text color={color} bold>{"⚠"} LIVE TRADING — real money at risk</Text>
+          <Text color={color} bold>
+            {"⚠"} LIVE TRADING — real money at risk
+          </Text>
           <Text>
             {banner.mode === "auto"
               ? "mode: auto — approved orders reach the venue."
@@ -32,12 +34,16 @@ export function TradingModeBanner({
         </>
       ) : banner.mode === "paper" ? (
         <>
-          <Text color={color} bold>{"▮"} PAPER TRADING — simulated fills only</Text>
+          <Text color={color} bold>
+            {"▮"} PAPER TRADING — simulated fills only
+          </Text>
           <Text>No order will reach a real venue.</Text>
           <Text>/ask or /auto to trade for real.</Text>
         </>
       ) : (
-        <Text color={color} bold>Execution constrained — mode {banner.mode}.</Text>
+        <Text color={color} bold>
+          Execution constrained — mode {banner.mode}.
+        </Text>
       )}
       <Text dimColor>Esc/d dismiss</Text>
     </Box>

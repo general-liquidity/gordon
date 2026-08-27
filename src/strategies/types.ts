@@ -139,11 +139,7 @@ export interface Strategy extends StrategyDefinition {
    * @param ctx - Context with exchange client and optional pre-fetched data
    * @returns Detection result with confidence and signals
    */
-  detect(
-    symbol: string,
-    timeframe: string,
-    ctx: StrategyContext
-  ): Promise<StrategyDetectionResult>;
+  detect(symbol: string, timeframe: string, ctx: StrategyContext): Promise<StrategyDetectionResult>;
 
   /**
    * Calculate plan parameters based on strategy rules.
@@ -152,10 +148,7 @@ export interface Strategy extends StrategyDefinition {
    * @param ctx - Context with exchange client and optional pre-fetched data
    * @returns Plan parameters with entry, stop, and targets
    */
-  getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams>;
+  getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams>;
 
   /**
    * Get strategy-specific prompt fragment for the Planner agent.
@@ -175,12 +168,7 @@ export interface Strategy extends StrategyDefinition {
    * @param indicators - Pre-calculated indicator values for this bar
    * @returns Signal if conditions are met, null otherwise
    */
-  generateSignal(
-    bar: OHLC,
-    index: number,
-    data: OHLC[],
-    indicators: IndicatorState
-  ): Signal | null;
+  generateSignal(bar: OHLC, index: number, data: OHLC[], indicators: IndicatorState): Signal | null;
 
   /**
    * Get the list of indicators required by this strategy.

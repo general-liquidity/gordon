@@ -33,8 +33,10 @@ export function detectDistTag(version: string = VERSION): string {
 function npmRegistryUrl(tag: string = detectDistTag()): string {
   return `https://registry.npmjs.org/${PACKAGE_NAME}/${encodeURIComponent(tag)}`;
 }
-const PUBLIC_INSTALL_SH_URL = "https://raw.githubusercontent.com/general-liquidity/gordon/main/scripts/install.sh";
-const PUBLIC_INSTALL_PS1_URL = "https://raw.githubusercontent.com/general-liquidity/gordon/main/scripts/install.ps1";
+const PUBLIC_INSTALL_SH_URL =
+  "https://raw.githubusercontent.com/general-liquidity/gordon/main/scripts/install.sh";
+const PUBLIC_INSTALL_PS1_URL =
+  "https://raw.githubusercontent.com/general-liquidity/gordon/main/scripts/install.ps1";
 const NPM_WRAPPER_INSTALL_MANIFEST = "install.json";
 const INSTALL_CHANNEL_METADATA_FILE = "gordon-install.json";
 
@@ -198,8 +200,10 @@ function readAdjacentInstallContext(execPath: string): InstallContext | null {
 }
 
 function isHomebrewPath(normalizedExec: string): boolean {
-  return /\/(?:opt\/homebrew|usr\/local|homebrew)\/cellar\/gordon\//i.test(normalizedExec)
-    || /\/cellar\/gordon\//i.test(normalizedExec);
+  return (
+    /\/(?:opt\/homebrew|usr\/local|homebrew)\/cellar\/gordon\//i.test(normalizedExec) ||
+    /\/cellar\/gordon\//i.test(normalizedExec)
+  );
 }
 
 function isScoopPath(normalizedExec: string): boolean {
@@ -210,18 +214,24 @@ function isScoopPath(normalizedExec: string): boolean {
   return /\/scoop\/apps\/gordon\//i.test(normalizedExec);
 }
 
-export function detectInstallContext(options: {
-  packageRoot?: string | null;
-  scriptArg?: string;
-  execPath?: string;
-  env?: NodeJS.ProcessEnv;
-} = {}): InstallContext {
-  const packageRoot = options.packageRoot === undefined ? currentPackageRoot() : options.packageRoot;
+export function detectInstallContext(
+  options: {
+    packageRoot?: string | null;
+    scriptArg?: string;
+    execPath?: string;
+    env?: NodeJS.ProcessEnv;
+  } = {},
+): InstallContext {
+  const packageRoot =
+    options.packageRoot === undefined ? currentPackageRoot() : options.packageRoot;
   const scriptArg = options.scriptArg ?? process.argv[1] ?? "";
   const execPath = options.execPath ?? process.execPath;
   const env = options.env ?? process.env;
 
-  if (scriptArg.endsWith("src/index.tsx") || (packageRoot && fs.existsSync(path.join(packageRoot, "src", "index.tsx")))) {
+  if (
+    scriptArg.endsWith("src/index.tsx") ||
+    (packageRoot && fs.existsSync(path.join(packageRoot, "src", "index.tsx")))
+  ) {
     return { channel: "dev" };
   }
 
@@ -250,9 +260,9 @@ export function detectInstallContext(options: {
   }
 
   if (
-    normalizedExec.includes("/.bun/")
-    || normalizedExec.endsWith("/bun")
-    || normalizedExec.endsWith("/bun.exe")
+    normalizedExec.includes("/.bun/") ||
+    normalizedExec.endsWith("/bun") ||
+    normalizedExec.endsWith("/bun.exe")
   ) {
     return { channel: "bun" };
   }
@@ -350,7 +360,9 @@ function isInteractiveSession(): boolean {
 }
 
 function shouldColorPrompt(): boolean {
-  return Boolean(process.stdout.isTTY && process.env.NO_COLOR === undefined && process.env.TERM !== "dumb");
+  return Boolean(
+    process.stdout.isTTY && process.env.NO_COLOR === undefined && process.env.TERM !== "dumb",
+  );
 }
 
 function highlightCommandStem(display: string, command: string, color: boolean): string {
@@ -381,7 +393,10 @@ export function formatUpdatePromptLines(
   ];
 }
 
-async function promptForAction(latestVersion: string, updateCommand: UpdateCommand): Promise<"update" | "skip" | "skip-version"> {
+async function promptForAction(
+  latestVersion: string,
+  updateCommand: UpdateCommand,
+): Promise<"update" | "skip" | "skip-version"> {
   const [headline, commandLine, choiceLine] = formatUpdatePromptLines(latestVersion, updateCommand);
   process.stdout.write("\n");
   process.stdout.write(`${headline}\n`);
@@ -424,9 +439,10 @@ async function runUpdateCommand(updateCommand: UpdateCommand): Promise<boolean> 
   // installers (curl piped to sh) and direct binaries, we should NOT use
   // a shell — it adds attack surface for command-injection if the command
   // string ever flows from untrusted input.
-  const needsShell = process.platform === "win32"
-    && /\.(cmd|bat|ps1)$/i.test(updateCommand.command) === false
-    && /^(npm|bun|brew|scoop|pnpm|yarn|powershell|pwsh|irm)$/i.test(updateCommand.command);
+  const needsShell =
+    process.platform === "win32" &&
+    /\.(cmd|bat|ps1)$/i.test(updateCommand.command) === false &&
+    /^(npm|bun|brew|scoop|pnpm|yarn|powershell|pwsh|irm)$/i.test(updateCommand.command);
 
   return await new Promise((resolve) => {
     const child = spawn(updateCommand.command, updateCommand.args, {
@@ -489,7 +505,9 @@ export async function maybePromptForUpdate(): Promise<"updated" | "skipped" | "n
     return "updated";
   }
 
-  process.stdout.write(`\nUpdate failed. You can retry manually:\n  ${updateCommand.publicDisplay}\n`);
+  process.stdout.write(
+    `\nUpdate failed. You can retry manually:\n  ${updateCommand.publicDisplay}\n`,
+  );
   return "skipped";
 }
 
@@ -521,7 +539,11 @@ export async function checkForUpdates(): Promise<void> {
   saveState(state);
 }
 
-export function getUpdateInfo(): { current: string; latest: string | null; updateAvailable: boolean } {
+export function getUpdateInfo(): {
+  current: string;
+  latest: string | null;
+  updateAvailable: boolean;
+} {
   const state = loadState();
   return {
     current: VERSION,

@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../ink-custom";
 
 // ============================================================================
@@ -19,7 +18,13 @@ interface Props {
   description?: string;
 }
 
-export function ListItem({ label, selected = false, focused = false, disabled = false, description }: Props) {
+export function ListItem({
+  label,
+  selected = false,
+  focused = false,
+  disabled = false,
+  description,
+}: Props) {
   const pointer = focused ? "\u25B8 " : "  ";
   const check = selected ? "\u2713 " : "";
 

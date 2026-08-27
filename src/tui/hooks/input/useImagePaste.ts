@@ -1,8 +1,7 @@
-import { useState, useCallback, useEffect, useRef } from "react";
-import { execSync } from "child_process";
-import { writeFileSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
+import { useState, useCallback, useRef } from "react";
+import { execSync } from "node:child_process";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 // ============================================================================
 // useImagePaste — Detects pasted image paths and clipboard images

@@ -14,7 +14,7 @@ describe("memory source", () => {
       expect(s.derivedFrom!.startsWith("memory:")).toBe(true);
       expect(s.category).toBe("memory");
       expect(s.tags).toContain("memory");
-      expect(s.extraRubric && s.extraRubric.length).toBeTruthy();
+      expect(s.extraRubric?.length).toBeTruthy();
       expect(s.systemPrompt.length).toBeGreaterThan(50);
       expect(s.userInput.length).toBeGreaterThan(10);
     }
@@ -22,8 +22,12 @@ describe("memory source", () => {
 
   it("flags the poisoned + lookahead cases as adversarial / no-lookahead probes", () => {
     const scn = memoryScenarios();
-    expect(scn.find((s) => s.derivedFrom === "memory:poisoned-recall")!.tags).toContain("adversarial");
-    expect(scn.find((s) => s.derivedFrom === "memory:oracle-lookahead")!.tags).toContain("no-lookahead");
+    expect(scn.find((s) => s.derivedFrom === "memory:poisoned-recall")!.tags).toContain(
+      "adversarial",
+    );
+    expect(scn.find((s) => s.derivedFrom === "memory:oracle-lookahead")!.tags).toContain(
+      "no-lookahead",
+    );
   });
 
   it("is wired into the full generator suite via the 'memory' source", () => {

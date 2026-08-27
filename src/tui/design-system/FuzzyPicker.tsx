@@ -1,4 +1,4 @@
-import React, { useState, useMemo, type ReactNode } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { Box, Text, useInput, useStdout } from "../ink-custom";
 
 // ============================================================================
@@ -53,8 +53,7 @@ export function FuzzyPicker({
     const lower = query.toLowerCase();
     return items.filter(
       (item) =>
-        item.label.toLowerCase().includes(lower) ||
-        (item.description && item.description.toLowerCase().includes(lower)),
+        item.label.toLowerCase().includes(lower) || item.description?.toLowerCase().includes(lower),
     );
   }, [items, query]);
 
@@ -87,7 +86,7 @@ export function FuzzyPicker({
     }
   });
 
-  const displayItems = direction === "up" ? [...filtered].reverse() : filtered;
+  const _displayItems = direction === "up" ? [...filtered].reverse() : filtered;
   const startIdx = Math.max(0, selectedIndex - Math.floor(visibleCount / 2));
   const visible = filtered.slice(startIdx, startIdx + visibleCount);
 
@@ -113,9 +112,7 @@ export function FuzzyPicker({
                   {isFocused ? "\u25B8 " : "  "}
                 </Text>
                 <Text bold={isFocused}>{item.label}</Text>
-                {item.description ? (
-                  <Text dimColor> \u2014 {item.description}</Text>
-                ) : null}
+                {item.description ? <Text dimColor> \u2014 {item.description}</Text> : null}
               </Box>
             );
           })}

@@ -150,13 +150,15 @@ function scanSymbol(symbol: string): SymbolResult | null {
 
   for (let end = WINDOW; end <= candles.length; end += STEP) {
     const win = candles.slice(end - WINDOW, end);
-    let signal;
+    let signal: ReturnType<RegimeClassifier["classify"]>;
     try {
       signal = classifier.classify(win, symbol, TF);
     } catch (err) {
       errorCount += 1;
       if (issues.length < 3) {
-        issues.push(`classify() threw at bar ${end}: ${err instanceof Error ? err.message : String(err)}`);
+        issues.push(
+          `classify() threw at bar ${end}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
       continue;
     }
@@ -178,7 +180,9 @@ function scanSymbol(symbol: string): SymbolResult | null {
 
     if (prev !== null && prev !== regime) {
       transitions += 1;
-      (transitionMatrix[prev] ??= {})[regime] = ((transitionMatrix[prev] ??= {})[regime] ?? 0) + 1;
+      if (!transitionMatrix[prev]) transitionMatrix[prev] = {};
+      const transitionsFromPrevious = transitionMatrix[prev]!;
+      transitionsFromPrevious[regime] = (transitionsFromPrevious[regime] ?? 0) + 1;
     }
     prev = regime;
   }
@@ -222,7 +226,9 @@ if (!isMainThread && parentPort) {
 function runSharded(symbols: string[]): Promise<SymbolResult[]> {
   const nWorkers = Math.max(1, Math.min(availableParallelism(), symbols.length));
   const chunks: string[][] = Array.from({ length: nWorkers }, () => []);
-  symbols.forEach((s, i) => chunks[i % nWorkers]!.push(s));
+  symbols.forEach((s, i) => {
+    chunks[i % nWorkers]!.push(s);
+  });
 
   return Promise.all(
     chunks.map(
@@ -281,7 +287,11 @@ function synchronization(results: SymbolResult[]): {
   let totalCells = 0;
 
   for (let i = 0; i < maxLen; i++) {
-    const buckets: { trend: number; chop: number; volatile: number } = { trend: 0, chop: 0, volatile: 0 };
+    const buckets: { trend: number; chop: number; volatile: number } = {
+      trend: 0,
+      chop: 0,
+      volatile: 0,
+    };
     let present = 0;
     for (const r of results) {
       const lab = r.labelSeries[i];
@@ -343,7 +353,9 @@ async function main(): Promise<void> {
   console.log(`Symbols discovered : ${symbols.length} (${symbols.join(", ")})`);
   console.log(`Window / step      : ${WINDOW} bars / ${STEP}`);
   console.log(`Classifier         : RegimeClassifier.classify() — pure, no DB writes`);
-  console.log(`Parallelism        : ${serial ? "serial (1 core)" : `${nWorkers} workers / ${availableParallelism()} cores`}`);
+  console.log(
+    `Parallelism        : ${serial ? "serial (1 core)" : `${nWorkers} workers / ${availableParallelism()} cores`}`,
+  );
   console.log("");
 
   const t0 = Date.now();
@@ -371,17 +383,19 @@ async function main(): Promise<void> {
   ].join(" ");
   console.log(header);
   for (const r of results) {
-    console.log([
-      r.symbol.padEnd(10),
-      String(r.total).padStart(6),
-      pct(r.counts.trending_up, r.total),
-      pct(r.counts.trending_down, r.total),
-      pct(r.counts.ranging, r.total),
-      pct(r.counts.volatile, r.total),
-      pct(r.counts.quiet, r.total),
-      pct(r.counts.breakout, r.total),
-      String(r.transitions).padStart(6),
-    ].join(" "));
+    console.log(
+      [
+        r.symbol.padEnd(10),
+        String(r.total).padStart(6),
+        pct(r.counts.trending_up, r.total),
+        pct(r.counts.trending_down, r.total),
+        pct(r.counts.ranging, r.total),
+        pct(r.counts.volatile, r.total),
+        pct(r.counts.quiet, r.total),
+        pct(r.counts.breakout, r.total),
+        String(r.transitions).padStart(6),
+      ].join(" "),
+    );
   }
   console.log("");
 
@@ -396,23 +410,36 @@ async function main(): Promise<void> {
     const bar = "█".repeat(Math.round((uni[reg] / Math.max(1, totalWins)) * 50));
     console.log(`  ${reg.padEnd(14)} ${pct(uni[reg], totalWins)}%  ${bar}`);
   }
-  const trendShare = ALL_REGIMES.filter((r) => TREND_REGIMES.has(r)).reduce((a, r) => a + uni[r], 0);
+  const trendShare = ALL_REGIMES.filter((r) => TREND_REGIMES.has(r)).reduce(
+    (a, r) => a + uni[r],
+    0,
+  );
   const chopShare = ALL_REGIMES.filter((r) => CHOP_REGIMES.has(r)).reduce((a, r) => a + uni[r], 0);
   const volShare = uni.volatile;
   console.log("");
-  console.log(`  Macro framing:  TREND(up/down/breakout) ${pct(trendShare, totalWins)}%   ` +
-    `CHOP(range/quiet) ${pct(chopShare, totalWins)}%   VOLATILE ${pct(volShare, totalWins)}%`);
+  console.log(
+    `  Macro framing:  TREND(up/down/breakout) ${pct(trendShare, totalWins)}%   ` +
+      `CHOP(range/quiet) ${pct(chopShare, totalWins)}%   VOLATILE ${pct(volShare, totalWins)}%`,
+  );
   console.log("");
 
   // ── Cross-symbol synchronization ──────────────────────────────────────────
   const sync = synchronization(results);
   console.log("CROSS-SYMBOL SYNCHRONIZATION (do regimes flip together?)");
   console.log("-".repeat(82));
-  console.log(`  Mean macro-bucket agreement across symbols : ${fmt(sync.meanAgreement * 100, 1)}%  (over ${sync.steps} aligned steps)`);
-  console.log(`    interpretation: 100% = every symbol always in the same macro-regime (fully correlated panel,`);
-  console.log(`    the 'diversification illusion'); ~33% = independent (3 buckets, no shared regime).`);
-  console.log(`  Panel macro-share (cell-weighted)          : ` +
-    `trend ${fmt(sync.bucketShareSeries.trend * 100, 1)}%  chop ${fmt(sync.bucketShareSeries.chop * 100, 1)}%  volatile ${fmt(sync.bucketShareSeries.volatile * 100, 1)}%`);
+  console.log(
+    `  Mean macro-bucket agreement across symbols : ${fmt(sync.meanAgreement * 100, 1)}%  (over ${sync.steps} aligned steps)`,
+  );
+  console.log(
+    `    interpretation: 100% = every symbol always in the same macro-regime (fully correlated panel,`,
+  );
+  console.log(
+    `    the 'diversification illusion'); ~33% = independent (3 buckets, no shared regime).`,
+  );
+  console.log(
+    `  Panel macro-share (cell-weighted)          : ` +
+      `trend ${fmt(sync.bucketShareSeries.trend * 100, 1)}%  chop ${fmt(sync.bucketShareSeries.chop * 100, 1)}%  volatile ${fmt(sync.bucketShareSeries.volatile * 100, 1)}%`,
+  );
   console.log("");
 
   // ── Transition aggregate ──────────────────────────────────────────────────
@@ -421,7 +448,9 @@ async function main(): Promise<void> {
   for (const r of results) {
     for (const [from, tos] of Object.entries(r.transitionMatrix)) {
       for (const [to, n] of Object.entries(tos)) {
-        (aggMatrix[from] ??= {})[to] = ((aggMatrix[from] ??= {})[to] ?? 0) + n;
+        if (!aggMatrix[from]) aggMatrix[from] = {};
+        const aggregateFromSource = aggMatrix[from]!;
+        aggregateFromSource[to] = (aggregateFromSource[to] ?? 0) + n;
       }
     }
   }
@@ -432,9 +461,11 @@ async function main(): Promise<void> {
     for (const [to, n] of Object.entries(tos)) flows.push({ from, to, n });
   }
   flows.sort((a, b) => b.n - a.n);
-  console.log(`  Total transitions across panel : ${totalTransitions}` +
-    `  (avg ${fmt(totalTransitions / Math.max(1, results.length), 1)} / symbol, ` +
-    `1 flip per ${fmt(totalWins / Math.max(1, totalTransitions), 1)} windows)`);
+  console.log(
+    `  Total transitions across panel : ${totalTransitions}` +
+      `  (avg ${fmt(totalTransitions / Math.max(1, results.length), 1)} / symbol, ` +
+      `1 flip per ${fmt(totalWins / Math.max(1, totalTransitions), 1)} windows)`,
+  );
   for (const f of flows.slice(0, 10)) {
     console.log(`    ${f.from.padEnd(14)} -> ${f.to.padEnd(14)} ${String(f.n).padStart(6)}`);
   }
@@ -444,11 +475,17 @@ async function main(): Promise<void> {
   console.log("ROBUSTNESS / CLASSIFIER HEALTH");
   console.log("-".repeat(82));
   console.log(`  Symbols scanned OK : ${results.length} / ${symbols.length}`);
-  console.log(`  Symbols skipped    : ${skipped.length}${skipped.length ? ` (too few bars: ${skipped.join(", ")})` : ""}`);
+  console.log(
+    `  Symbols skipped    : ${skipped.length}${skipped.length ? ` (too few bars: ${skipped.join(", ")})` : ""}`,
+  );
   const flagged = results.filter((r) => r.issues.length > 0);
   if (flagged.length === 0) {
-    console.log(`  Issues             : NONE — classifier survived ${totalWins} windows across the panel with`);
-    console.log(`                       no exceptions, no out-of-taxonomy labels, no NaN confidence, no`);
+    console.log(
+      `  Issues             : NONE — classifier survived ${totalWins} windows across the panel with`,
+    );
+    console.log(
+      `                       no exceptions, no out-of-taxonomy labels, no NaN confidence, no`,
+    );
     console.log(`                       degenerate (single-label) symbols.`);
   } else {
     console.log(`  Issues             : ${flagged.length} symbol(s) flagged:`);
@@ -459,8 +496,10 @@ async function main(): Promise<void> {
   console.log("");
 
   console.log("=".repeat(82));
-  console.log(`Scanned ${totalWins} windows across ${results.length} symbols in ${(elapsedMs / 1000).toFixed(1)}s. ` +
-    `Characterization + infra validation only — no edge claimed.`);
+  console.log(
+    `Scanned ${totalWins} windows across ${results.length} symbols in ${(elapsedMs / 1000).toFixed(1)}s. ` +
+      `Characterization + infra validation only — no edge claimed.`,
+  );
   console.log("=".repeat(82));
 }
 

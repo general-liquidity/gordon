@@ -7,7 +7,6 @@
  * Pattern: Claude Code status dashboard with per-symbol metrics.
  */
 
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 import { ProgressBar } from "../../design-system/ProgressBar.js";
@@ -47,7 +46,16 @@ const REGIME_ICON: Record<RegimeType, string> = {
   volatile: "\u2195",
 };
 
-const SPARK_CHARS = ["\u2581", "\u2582", "\u2583", "\u2584", "\u2585", "\u2586", "\u2587", "\u2588"];
+const SPARK_CHARS = [
+  "\u2581",
+  "\u2582",
+  "\u2583",
+  "\u2584",
+  "\u2585",
+  "\u2586",
+  "\u2587",
+  "\u2588",
+];
 
 function renderSparkline(values: number[]): string {
   if (values.length === 0) return "";
@@ -90,11 +98,31 @@ export function RegimeStatusPanel({ regimes, onClose }: Props) {
     <Pane title="MARKET REGIMES">
       {/* Column headers */}
       <Box paddingLeft={2}>
-        <Box width={10}><Text bold dimColor>SYMBOL</Text></Box>
-        <Box width={12}><Text bold dimColor>REGIME</Text></Box>
-        <Box width={16}><Text bold dimColor>CONFIDENCE</Text></Box>
-        <Box width={10}><Text bold dimColor>DURATION</Text></Box>
-        <Box width={22}><Text bold dimColor>SPARKLINE</Text></Box>
+        <Box width={10}>
+          <Text bold dimColor>
+            SYMBOL
+          </Text>
+        </Box>
+        <Box width={12}>
+          <Text bold dimColor>
+            REGIME
+          </Text>
+        </Box>
+        <Box width={16}>
+          <Text bold dimColor>
+            CONFIDENCE
+          </Text>
+        </Box>
+        <Box width={10}>
+          <Text bold dimColor>
+            DURATION
+          </Text>
+        </Box>
+        <Box width={22}>
+          <Text bold dimColor>
+            SPARKLINE
+          </Text>
+        </Box>
       </Box>
 
       {/* Regime rows */}

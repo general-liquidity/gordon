@@ -185,9 +185,7 @@ export function acceptIfAdversarial(
   // justifies the failure at the required severity.
   if (!report.passed) {
     const minRank = SEVERITY_RANK[minSeverityOnFail];
-    const hasJustification = report.failureModes.some(
-      (f) => SEVERITY_RANK[f.severity] >= minRank,
-    );
+    const hasJustification = report.failureModes.some((f) => SEVERITY_RANK[f.severity] >= minRank);
     if (!hasJustification) {
       rejectionReasons.push(
         `verdict is failed but no finding at severity >= ${minSeverityOnFail}; review may be cherry-picking`,

@@ -9,8 +9,10 @@ import type { Message } from "./MessageBubble.tsx";
 function UserMessageInner({ message }: { message: Message }) {
   return (
     <Box marginTop={1} flexDirection="row">
-      <Text color="green" bold>{">"}</Text>
-      <Text>{" "}</Text>
+      <Text color="green" bold>
+        {">"}
+      </Text>
+      <Text> </Text>
       <Box flexGrow={1}>
         <Text>{message.content}</Text>
       </Box>

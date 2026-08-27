@@ -21,22 +21,15 @@ import {
   generateLearningInsights,
   formatLearningInsights,
   getStrategyConfidenceMultiplier,
-  getAgentConfidenceMultiplier,
   processUnrecordedTrades,
 } from "./feedbackLoop.ts";
-import {
-  getStrategyPerformance,
-  getAgentPerformance,
-  getAllStrategyPerformances,
-  getRecentTradeSummary,
-} from "./tradeEvaluator.ts";
+import { getStrategyPerformance, getAllStrategyPerformances } from "./tradeEvaluator.ts";
 import {
   generatePerformanceReport,
   formatPerformanceReport,
   getWinRateByStrategy,
   getRiskRewardAnalysis,
   getPerformanceByMarketCondition,
-  getPerformanceBySymbol,
   type TimePeriod,
 } from "./performanceMetrics.ts";
 
@@ -130,9 +123,7 @@ export const getStrategyPerformanceTool = createTool({
     "Shows win rate, profit factor, average R:R, and recent trend. " +
     "Use this to evaluate which strategies are working best.",
   inputSchema: z.object({
-    strategy: z
-      .string()
-      .describe("Strategy ID (e.g., 'support_bounce', 'bollinger_bounce')"),
+    strategy: z.string().describe("Strategy ID (e.g., 'support_bounce', 'bollinger_bounce')"),
   }),
   outputSchema: z.object({
     strategy: z.string(),
@@ -224,12 +215,12 @@ export const getAllStrategyPerformancesTool = createTool({
         winRate: z.string(),
         profitFactor: z.string(),
         recentTrend: z.string(),
-      })
+      }),
     ),
     summary: z.string(),
   }),
   execute: async ({ minTrades, sortBy }) => {
-    let performances = getAllStrategyPerformances().filter((p) => p.totalTrades >= minTrades);
+    const performances = getAllStrategyPerformances().filter((p) => p.totalTrades >= minTrades);
 
     // Sort
     switch (sortBy) {
@@ -354,10 +345,7 @@ export const getPerformanceReportTool = createTool({
       .enum(["day", "week", "month", "quarter", "year", "all"])
       .default("month")
       .describe("Time period to analyze"),
-    format: z
-      .enum(["json", "text"])
-      .default("text")
-      .describe("Output format"),
+    format: z.enum(["json", "text"]).default("text").describe("Output format"),
   }),
   outputSchema: z.object({
     report: z.any().optional(),
@@ -412,7 +400,13 @@ export const trackRecommendationTool = createTool({
     message: z.string(),
     error: z.string().optional(),
   }),
-  execute: async ({ planId, recommendedByAgent, confidenceAtEntry, marketCondition, timeframe }) => {
+  execute: async ({
+    planId,
+    recommendedByAgent,
+    confidenceAtEntry,
+    marketCondition,
+    timeframe,
+  }) => {
     const plan = getPlan(planId);
     if (!plan) {
       return {
@@ -481,7 +475,7 @@ export const getWinRateAnalysisTool = createTool({
         winRate: z.string(),
         trades: z.number(),
         trend: z.string(),
-      })
+      }),
     ),
     summary: z.string(),
   }),
@@ -495,7 +489,7 @@ export const getWinRateAnalysisTool = createTool({
         trades: data.trades,
         trend: data.trend,
       }))
-      .sort((a, b) => parseInt(b.winRate) - parseInt(a.winRate));
+      .sort((a, b) => parseInt(b.winRate, 10) - parseInt(a.winRate, 10));
 
     const improving = strategies.filter((s) => s.trend === "improving").length;
     const declining = strategies.filter((s) => s.trend === "declining").length;
@@ -569,7 +563,7 @@ export const getMarketConditionPerformanceTool = createTool({
         totalTrades: z.number(),
         winRate: z.string(),
         bestStrategy: z.string().nullable(),
-      })
+      }),
     ),
     recommendation: z.string(),
   }),
@@ -583,8 +577,12 @@ export const getMarketConditionPerformanceTool = createTool({
       bestStrategy: p.bestStrategy,
     }));
 
-    const best = performances.filter((p) => p.totalTrades >= 3).sort((a, b) => b.winRate - a.winRate)[0];
-    const worst = performances.filter((p) => p.totalTrades >= 3).sort((a, b) => a.winRate - b.winRate)[0];
+    const best = performances
+      .filter((p) => p.totalTrades >= 3)
+      .sort((a, b) => b.winRate - a.winRate)[0];
+    const worst = performances
+      .filter((p) => p.totalTrades >= 3)
+      .sort((a, b) => a.winRate - b.winRate)[0];
 
     let recommendation = "Insufficient data for market condition analysis";
     if (best && worst && best.winRate > worst.winRate + 0.15) {

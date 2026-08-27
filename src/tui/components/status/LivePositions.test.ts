@@ -67,9 +67,9 @@ describe("applyPositionEvents", () => {
   });
 
   it("ignores unknown ids", () => {
-    expect(applyPositionEvents(base, [
-      { kind: "update", positionId: "missing", updates: { pnl: 99 } },
-    ])).toBe(base);
+    expect(
+      applyPositionEvents(base, [{ kind: "update", positionId: "missing", updates: { pnl: 99 } }]),
+    ).toBe(base);
   });
 });
 
@@ -130,7 +130,15 @@ describe("column layout", () => {
     expect(at60.map((c) => c.key)).not.toContain("acctPct");
     expect(at60.map((c) => c.key)).not.toContain("riskPct");
     // Core columns survive even when the budget is blown.
-    for (const key of ["symbol", "side", "quantity", "entryPrice", "lastPrice", "pnl", "stopPrice"] as const) {
+    for (const key of [
+      "symbol",
+      "side",
+      "quantity",
+      "entryPrice",
+      "lastPrice",
+      "pnl",
+      "stopPrice",
+    ] as const) {
       expect(at60.map((c) => c.key)).toContain(key);
     }
   });
@@ -175,10 +183,7 @@ describe("prepareDisplayRows", () => {
   });
 
   it("does not mutate the input ordering", () => {
-    const input = [
-      makePosition({ id: "a", pnl: 1 }),
-      makePosition({ id: "b", pnl: 100 }),
-    ];
+    const input = [makePosition({ id: "a", pnl: 1 }), makePosition({ id: "b", pnl: 100 })];
     prepareDisplayRows(input);
     expect(input.map((p) => p.id)).toEqual(["a", "b"]);
   });
@@ -196,9 +201,7 @@ describe("buildFooterLine", () => {
     const cols = selectVisibleColumns(80);
     const { label, pnl } = buildFooterLine(cols, 39, -1234.5);
     const pnlIdx = cols.findIndex((c) => c.key === "pnl");
-    const expectedLabelWidth = cols
-      .slice(0, pnlIdx)
-      .reduce((sum, c) => sum + c.width + 1, 0);
+    const expectedLabelWidth = cols.slice(0, pnlIdx).reduce((sum, c) => sum + c.width + 1, 0);
     expect(label).toHaveLength(expectedLabelWidth);
     expect(pnl).toHaveLength(cols[pnlIdx]!.width);
     expect(pnl.trim()).toBe("-1,234.5");

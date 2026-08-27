@@ -147,8 +147,7 @@ export function classifyMaCrossoverCleanness(
 ): MaCrossoverResult {
   const maLength = options.maLength ?? DEFAULT_MA_LENGTH;
   const slopeWindow = options.slopeWindow ?? DEFAULT_SLOPE_WINDOW;
-  const trendingSlope =
-    options.trendingSlopeThreshold ?? DEFAULT_TRENDING_SLOPE;
+  const trendingSlope = options.trendingSlopeThreshold ?? DEFAULT_TRENDING_SLOPE;
   const cleanCeil = options.cleanCrossCeiling ?? DEFAULT_CLEAN_CEIL;
   const messyCeil = options.messyCrossCeiling ?? DEFAULT_MESSY_CEIL;
 
@@ -160,11 +159,7 @@ export function classifyMaCrossoverCleanness(
     );
   }
   if (cleanCeil >= messyCeil) {
-    return insufficient(
-      "cleanCrossCeiling must be < messyCrossCeiling.",
-      bars.length,
-      maLength,
-    );
+    return insufficient("cleanCrossCeiling must be < messyCrossCeiling.", bars.length, maLength);
   }
 
   const closes = bars.map((b) => b.close);
@@ -250,7 +245,7 @@ export function classifyMaCrossoverCleanness(
   const normalisedCross = Math.min(1, crossCount / (messyCeil + 4));
   const slopeScore = Math.min(1, Math.abs(slopeFraction) / (trendingSlope * 4));
   const cleannessScore = parseFloat(
-    (Math.max(0, (1 - normalisedCross) * 0.5 + slopeScore * 0.5)).toFixed(4),
+    Math.max(0, (1 - normalisedCross) * 0.5 + slopeScore * 0.5).toFixed(4),
   );
 
   const summary =

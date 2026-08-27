@@ -6,7 +6,11 @@ import {
 } from "./manipulationContext.ts";
 import type { ToxicityResult } from "./microstructureToxicity.ts";
 
-const makeToxicity = (regime: "quiet" | "elevated" | "active", score: number, overrides: Partial<ToxicityResult["components"]> = {}): ToxicityResult => ({
+const makeToxicity = (
+  regime: "quiet" | "elevated" | "active",
+  score: number,
+  overrides: Partial<ToxicityResult["components"]> = {},
+): ToxicityResult => ({
   score,
   regime,
   components: {

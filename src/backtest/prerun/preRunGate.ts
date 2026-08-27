@@ -14,7 +14,10 @@
  */
 
 import type { BacktestConfig } from "../types.ts";
-import { loadConfigFromEnv as loadRiskConfig, type RiskKernelConfig } from "../../core/risk-kernel/config.ts";
+import {
+  loadConfigFromEnv as loadRiskConfig,
+  type RiskKernelConfig,
+} from "../../core/risk-kernel/config.ts";
 
 // ============================================================================
 // Types
@@ -73,7 +76,9 @@ export const DEFAULT_GATE_LIMITS: PreRunGateLimits = {
  * fall back to DEFAULT_GATE_LIMITS values — those are backtest-specific
  * and don't have a live-runtime analog.
  */
-export function getGateLimitsFromRiskConfig(override?: Partial<RiskKernelConfig>): PreRunGateLimits {
+export function getGateLimitsFromRiskConfig(
+  override?: Partial<RiskKernelConfig>,
+): PreRunGateLimits {
   let risk: RiskKernelConfig;
   try {
     risk = loadRiskConfig(override);
@@ -115,9 +120,7 @@ export function checkBacktestPreconditions(
   // Leverage cap
   const leverage = config.leverage ?? 1;
   if (leverage > limits.maxLeverage) {
-    violations.push(
-      `leverage ${leverage}x exceeds cap ${limits.maxLeverage}x`,
-    );
+    violations.push(`leverage ${leverage}x exceeds cap ${limits.maxLeverage}x`);
   }
   if (leverage < 1) {
     violations.push(`leverage ${leverage}x is invalid (must be >= 1)`);
@@ -152,9 +155,7 @@ export function checkBacktestPreconditions(
 
   // Fee sanity
   if (config.feePercent !== undefined && config.feePercent > limits.maxFeePct) {
-    violations.push(
-      `fee ${config.feePercent}% exceeds ${limits.maxFeePct}% sanity cap — typo?`,
-    );
+    violations.push(`fee ${config.feePercent}% exceeds ${limits.maxFeePct}% sanity cap — typo?`);
   }
 
   return {
@@ -168,8 +169,6 @@ export function checkBacktestPreconditions(
  * Merge user-provided limit overrides with defaults. Handy for tools that
  * accept partial limit objects from the agent.
  */
-export function mergeGateLimits(
-  overrides: Partial<PreRunGateLimits>,
-): PreRunGateLimits {
+export function mergeGateLimits(overrides: Partial<PreRunGateLimits>): PreRunGateLimits {
   return { ...DEFAULT_GATE_LIMITS, ...overrides };
 }

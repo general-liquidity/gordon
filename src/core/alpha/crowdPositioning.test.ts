@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  computeCrowdPositioningVerdict,
-  summarizeCrowdPositioning,
-} from "./crowdPositioning.ts";
+import { computeCrowdPositioningVerdict, summarizeCrowdPositioning } from "./crowdPositioning.ts";
 
 describe("computeCrowdPositioningVerdict — empty / minimal", () => {
   test("no inputs → balanced verdict with zero signals", () => {
@@ -74,7 +71,9 @@ describe("computeCrowdPositioningVerdict — liquidation imbalance opposes other
 
   test("liquidation signal alone produces opposing contribution", () => {
     const v = computeCrowdPositioningVerdict({ recentLiquidationImbalance: 0.6 });
-    const liqContrib = v.contributingSignals.find((s) => s.signal === "recent_liquidation_imbalance");
+    const liqContrib = v.contributingSignals.find(
+      (s) => s.signal === "recent_liquidation_imbalance",
+    );
     expect(liqContrib?.contribution).toBeLessThan(0);
   });
 });

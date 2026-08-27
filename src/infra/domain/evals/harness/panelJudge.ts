@@ -160,14 +160,21 @@ function averageScores(
   const sums = new Map<string, ScoreAccumulator>();
   for (const entry of surviving) {
     for (const scored of entry.scored) {
-      const acc: ScoreAccumulator =
-        sums.get(scored.id) ??
-        { total: 0, count: 0, explanations: [], flagVotes: 0, failureVotes: new Map() };
+      const acc: ScoreAccumulator = sums.get(scored.id) ?? {
+        total: 0,
+        count: 0,
+        explanations: [],
+        flagVotes: 0,
+        failureVotes: new Map(),
+      };
       acc.total += scored.score;
       acc.count += 1;
       if (scored.genericNonActionable) acc.flagVotes += 1;
       if (scored.failureMode) {
-        acc.failureVotes.set(scored.failureMode, (acc.failureVotes.get(scored.failureMode) ?? 0) + 1);
+        acc.failureVotes.set(
+          scored.failureMode,
+          (acc.failureVotes.get(scored.failureMode) ?? 0) + 1,
+        );
       }
       if (scored.explanation) acc.explanations.push(`[${entry.judgeModel}] ${scored.explanation}`);
       sums.set(scored.id, acc);

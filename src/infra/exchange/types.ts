@@ -56,8 +56,15 @@ export function isCcxtExchangeId(id: string): id is CcxtExchangeId {
  * and the set may grow with CCXT updates) so they're not part of this list.
  */
 export const EXCHANGE_IDS = [
-  "binance", "binance_us", "coinbase", "kraken", "bitfinex",
-  "hyperliquid", "robinhood", "okx", "gemini",
+  "binance",
+  "binance_us",
+  "coinbase",
+  "kraken",
+  "bitfinex",
+  "hyperliquid",
+  "robinhood",
+  "okx",
+  "gemini",
 ] as const satisfies readonly NativeExchangeId[];
 
 /**
@@ -93,16 +100,23 @@ export interface ExchangeCredentials {
  * Used by saveConfiguration to persist all exchange keys to .env,
  * and by resolveExchangeCredentials to restore them from process.env.
  */
-export const EXCHANGE_ENV_MAP: Record<NativeExchangeId, { key?: string; secret?: string; passphrase?: string; wallet?: string; walletAddress?: string }> = {
-  binance:     { key: "BINANCE_API_KEY",     secret: "BINANCE_API_SECRET" },
-  binance_us:  { key: "BINANCE_US_API_KEY",  secret: "BINANCE_US_API_SECRET" },
-  coinbase:    { key: "COINBASE_API_KEY",     secret: "COINBASE_API_SECRET",   passphrase: "COINBASE_PASSPHRASE" },
-  kraken:      { key: "KRAKEN_API_KEY",       secret: "KRAKEN_API_SECRET" },
-  bitfinex:    { key: "BITFINEX_API_KEY",     secret: "BITFINEX_API_SECRET" },
+export const EXCHANGE_ENV_MAP: Record<
+  NativeExchangeId,
+  { key?: string; secret?: string; passphrase?: string; wallet?: string; walletAddress?: string }
+> = {
+  binance: { key: "BINANCE_API_KEY", secret: "BINANCE_API_SECRET" },
+  binance_us: { key: "BINANCE_US_API_KEY", secret: "BINANCE_US_API_SECRET" },
+  coinbase: {
+    key: "COINBASE_API_KEY",
+    secret: "COINBASE_API_SECRET",
+    passphrase: "COINBASE_PASSPHRASE",
+  },
+  kraken: { key: "KRAKEN_API_KEY", secret: "KRAKEN_API_SECRET" },
+  bitfinex: { key: "BITFINEX_API_KEY", secret: "BITFINEX_API_SECRET" },
   hyperliquid: { wallet: "HYPERLIQUID_PRIVATE_KEY", walletAddress: "HYPERLIQUID_WALLET_ADDRESS" },
-  robinhood:   { key: "ROBINHOOD_API_KEY",    secret: "ROBINHOOD_API_SECRET" },
-  okx:         { key: "OKX_API_KEY",          secret: "OKX_API_SECRET",       passphrase: "OKX_PASSPHRASE" },
-  gemini:      { key: "GEMINI_API_KEY",       secret: "GEMINI_API_SECRET" },
+  robinhood: { key: "ROBINHOOD_API_KEY", secret: "ROBINHOOD_API_SECRET" },
+  okx: { key: "OKX_API_KEY", secret: "OKX_API_SECRET", passphrase: "OKX_PASSPHRASE" },
+  gemini: { key: "GEMINI_API_KEY", secret: "GEMINI_API_SECRET" },
 };
 
 /**
@@ -122,10 +136,7 @@ export const EXCHANGE_ENV_MAP: Record<NativeExchangeId, { key?: string; secret?:
  */
 export function normalizePemSecret(secret: string): string {
   let s = secret.trim();
-  if (
-    (s.startsWith('"') && s.endsWith('"')) ||
-    (s.startsWith("'") && s.endsWith("'"))
-  ) {
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
     s = s.slice(1, -1);
   }
   if (s.includes("BEGIN") && s.includes("PRIVATE KEY")) {
@@ -203,9 +214,10 @@ export const NATIVE_TO_CCXT_SUBID: Record<NativeExchangeId, string> = {
 };
 
 const CCXT_SUBID_TO_NATIVE: Record<string, NativeExchangeId> = Object.fromEntries(
-  (Object.entries(NATIVE_TO_CCXT_SUBID) as [NativeExchangeId, string][]).map(
-    ([native, subId]) => [subId, native],
-  ),
+  (Object.entries(NATIVE_TO_CCXT_SUBID) as [NativeExchangeId, string][]).map(([native, subId]) => [
+    subId,
+    native,
+  ]),
 );
 
 /**
@@ -233,9 +245,15 @@ export function ccxtIdToNativeVenue(id: string): NativeExchangeId | undefined {
   return CCXT_SUBID_TO_NATIVE[extractCcxtSubId(id as CcxtExchangeId)];
 }
 
-export function resolveExchangeCredentials(
-  config: { type: string; apiKey: string; apiSecret: string; passphrase?: string; walletPrivateKey?: string; sandbox?: boolean; live?: boolean },
-): ExchangeCredentials {
+export function resolveExchangeCredentials(config: {
+  type: string;
+  apiKey: string;
+  apiSecret: string;
+  passphrase?: string;
+  walletPrivateKey?: string;
+  sandbox?: boolean;
+  live?: boolean;
+}): ExchangeCredentials {
   // CCXT exchanges use their own env var pattern (CCXT_<UPPER>_*). For the
   // first-class venues (ccxt:binance, …) we ALSO fall back to their curated
   // native env names (BINANCE_API_KEY, …) so existing operator keys keep
@@ -261,18 +279,28 @@ export function resolveExchangeCredentials(
     let passphrase = config.passphrase;
     let walletPrivateKey = config.walletPrivateKey;
     if (isRedacted(apiKey)) apiKey = fromEnv(legacy?.key, envs.key, generic.key) || "";
-    if (isRedacted(apiSecret)) apiSecret = fromEnv(legacy?.secret, envs.secret, generic.secret) || "";
-    if (isRedacted(passphrase)) passphrase = fromEnv(legacy?.passphrase, envs.passphrase, generic.passphrase);
-    if (isRedacted(walletPrivateKey)) walletPrivateKey = fromEnv(legacy?.wallet, envs.walletKey, generic.walletKey);
+    if (isRedacted(apiSecret))
+      apiSecret = fromEnv(legacy?.secret, envs.secret, generic.secret) || "";
+    if (isRedacted(passphrase))
+      passphrase = fromEnv(legacy?.passphrase, envs.passphrase, generic.passphrase);
+    if (isRedacted(walletPrivateKey))
+      walletPrivateKey = fromEnv(legacy?.wallet, envs.walletKey, generic.walletKey);
     const walletAddress = fromEnv(legacy?.walletAddress, envs.walletAddress, generic.walletAddress);
     apiSecret = normalizePemSecret(apiSecret);
     if (!passphrase) passphrase = undefined;
-    return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, live: config.live, walletPrivateKey, walletAddress };
+    return {
+      apiKey,
+      apiSecret,
+      passphrase,
+      sandbox: config.sandbox,
+      live: config.live,
+      walletPrivateKey,
+      walletAddress,
+    };
   }
 
-  const envMap = config.type in EXCHANGE_ENV_MAP
-    ? EXCHANGE_ENV_MAP[config.type as NativeExchangeId]
-    : undefined;
+  const envMap =
+    config.type in EXCHANGE_ENV_MAP ? EXCHANGE_ENV_MAP[config.type as NativeExchangeId] : undefined;
   const isRedacted = (v: string | undefined) => !v || v === "***";
 
   let apiKey = config.apiKey;
@@ -284,8 +312,10 @@ export function resolveExchangeCredentials(
   if (envMap) {
     if (isRedacted(apiKey) && envMap.key) apiKey = process.env[envMap.key] || "";
     if (isRedacted(apiSecret) && envMap.secret) apiSecret = process.env[envMap.secret] || "";
-    if (isRedacted(passphrase) && envMap.passphrase) passphrase = process.env[envMap.passphrase] || undefined;
-    if (isRedacted(walletPrivateKey) && envMap.wallet) walletPrivateKey = process.env[envMap.wallet] || undefined;
+    if (isRedacted(passphrase) && envMap.passphrase)
+      passphrase = process.env[envMap.passphrase] || undefined;
+    if (isRedacted(walletPrivateKey) && envMap.wallet)
+      walletPrivateKey = process.env[envMap.wallet] || undefined;
     if (envMap.walletAddress) walletAddress = process.env[envMap.walletAddress] || undefined;
   }
 
@@ -298,7 +328,15 @@ export function resolveExchangeCredentials(
   apiSecret = normalizePemSecret(apiSecret);
   if (!passphrase) passphrase = undefined;
 
-  return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, live: config.live, walletPrivateKey, walletAddress };
+  return {
+    apiKey,
+    apiSecret,
+    passphrase,
+    sandbox: config.sandbox,
+    live: config.live,
+    walletPrivateKey,
+    walletAddress,
+  };
 }
 
 // ============================================================================
@@ -531,6 +569,17 @@ export interface Trade {
   isMaker: boolean;
 }
 
+/** Public tape execution. Venues may omit aggressor side; that is unknown, not a buy. */
+export interface PublicTrade {
+  id: string;
+  symbol: string;
+  side: OrderSide | "UNKNOWN";
+  price: number;
+  quantity: number;
+  time: number;
+  isMaker: boolean;
+}
+
 // ============================================================================
 // Wallet Types
 // ============================================================================
@@ -687,6 +736,9 @@ export interface Exchange {
   /** Get average price over a period */
   getAvgPrice(symbol: string): Promise<AvgPrice>;
 
+  /** Get recent public market trades for a symbol */
+  getRecentTrades(symbol: string, limit?: number): Promise<PublicTrade[]>;
+
   // -------------------------------------------------------------------------
   // Account (Authenticated)
   // -------------------------------------------------------------------------
@@ -729,8 +781,8 @@ export interface Exchange {
   // History (Authenticated)
   // -------------------------------------------------------------------------
 
-  /** Get trade history for a symbol */
-  getTradeHistory(symbol: string, limit?: number): Promise<Trade[]>;
+  /** Get authenticated trade history, optionally restricted to a symbol */
+  getTradeHistory(symbol?: string, limit?: number): Promise<Trade[]>;
 
   /** Get order history for a symbol */
   getOrderHistory(symbol: string, limit?: number): Promise<Order[]>;
@@ -834,7 +886,11 @@ export interface FundingHistoryEntry {
 export interface ExchangeDerivatives {
   fetchFundingRate(symbol: string): Promise<FundingRate>;
   fetchFundingRates(symbols?: string[]): Promise<FundingRate[]>;
-  fetchFundingHistory(symbol: string, since?: number, limit?: number): Promise<FundingHistoryEntry[]>;
+  fetchFundingHistory(
+    symbol: string,
+    since?: number,
+    limit?: number,
+  ): Promise<FundingHistoryEntry[]>;
   setLeverage(leverage: number, symbol: string): Promise<void>;
   setMarginMode(mode: MarginMode, symbol: string): Promise<void>;
   fetchPosition(symbol: string): Promise<Position | null>;
@@ -849,8 +905,16 @@ export interface ExchangeDerivatives {
 export interface ExchangeMargin {
   addMargin(symbol: string, amount: number): Promise<{ symbol: string; amount: number }>;
   borrowCrossMargin(currency: string, amount: number): Promise<{ id: string; amount: number }>;
-  borrowIsolatedMargin(symbol: string, currency: string, amount: number): Promise<{ id: string; amount: number }>;
-  repayMargin(currency: string, amount: number, symbol?: string): Promise<{ id: string; amount: number }>;
+  borrowIsolatedMargin(
+    symbol: string,
+    currency: string,
+    amount: number,
+  ): Promise<{ id: string; amount: number }>;
+  repayMargin(
+    currency: string,
+    amount: number,
+    symbol?: string,
+  ): Promise<{ id: string; amount: number }>;
 }
 
 /**
@@ -896,7 +960,13 @@ export interface ExchangeExtended extends Exchange {
   getWebSocket?(): Promise<ExchangeWebSocket>;
 
   // Withdrawals
-  withdraw?(coin: string, network: string, address: string, amount: number, tag?: string): Promise<WithdrawalResult>;
+  withdraw?(
+    coin: string,
+    network: string,
+    address: string,
+    amount: number,
+    tag?: string,
+  ): Promise<WithdrawalResult>;
   getWithdrawalInfo?(coin: string, network?: string): Promise<WithdrawalInfo>;
 }
 

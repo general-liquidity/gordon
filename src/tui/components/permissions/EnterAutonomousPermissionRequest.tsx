@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 
@@ -17,7 +17,10 @@ export function EnterAutonomousPermissionRequest({ strategyCount, onDecision }: 
   const [unlocked, setUnlocked] = useState(false);
 
   useEffect(() => {
-    if (countdown <= 0) { setUnlocked(true); return; }
+    if (countdown <= 0) {
+      setUnlocked(true);
+      return;
+    }
     const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(t);
   }, [countdown]);
@@ -35,15 +38,27 @@ export function EnterAutonomousPermissionRequest({ strategyCount, onDecision }: 
         paddingX={2}
         paddingY={1}
       >
-        <Text color="yellow" bold>{"⚠"} ENTER AUTONOMOUS MODE</Text>
+        <Text color="yellow" bold>
+          {"⚠"} ENTER AUTONOMOUS MODE
+        </Text>
         <Text> </Text>
-        <Text>{"  "}Gordon will trade <Text bold color="yellow">without asking for approval.</Text></Text>
-        <Text dimColor>{"  "}{strategyCount} {strategyCount === 1 ? "strategy" : "strategies"} will run autonomously.</Text>
+        <Text>
+          {"  "}Gordon will trade{" "}
+          <Text bold color="yellow">
+            without asking for approval.
+          </Text>
+        </Text>
+        <Text dimColor>
+          {"  "}
+          {strategyCount} {strategyCount === 1 ? "strategy" : "strategies"} will run autonomously.
+        </Text>
         <Text> </Text>
         <Text color="yellow">{"  "}You can exit autonomous mode at any time.</Text>
         <Text> </Text>
         {!unlocked ? (
-          <Text dimColor>{"  "}Confirm available in {countdown}s... (Esc to cancel)</Text>
+          <Text dimColor>
+            {"  "}Confirm available in {countdown}s... (Esc to cancel)
+          </Text>
         ) : (
           <Box paddingLeft={2}>
             <Select

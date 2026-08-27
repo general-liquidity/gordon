@@ -15,7 +15,8 @@ import { checkInputGuardrails } from "../middleware/guardrails.ts";
 export class GordonInputGuard implements Processor<"gordon-input-guard"> {
   readonly id = "gordon-input-guard" as const;
   readonly name = "Gordon Input Guard";
-  readonly description = "Regex-based input guardrail for prompt injection, safety bypass, and risky trading patterns";
+  readonly description =
+    "Regex-based input guardrail for prompt injection, safety bypass, and risky trading patterns";
 
   async processInput(args: ProcessInputArgs): Promise<ProcessInputResult> {
     const { messages, abort } = args;

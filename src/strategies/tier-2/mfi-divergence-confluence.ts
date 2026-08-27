@@ -55,7 +55,7 @@ export class MFIDivergenceConfluenceStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, CANDLE_LIMIT);
     if (candles.length < 30) {
@@ -76,7 +76,7 @@ export class MFIDivergenceConfluenceStrategy extends BaseStrategy {
     conditions.push({
       name: "MFI Oversold",
       met: mfiOversold,
-      detail: `MFI: ${mfi.current?.toFixed(1) ?? "N/A"} ${mfiOversold ? "< " + MFI_OVERSOLD : ">= " + MFI_OVERSOLD}`,
+      detail: `MFI: ${mfi.current?.toFixed(1) ?? "N/A"} ${mfiOversold ? `< ${MFI_OVERSOLD}` : `>= ${MFI_OVERSOLD}`}`,
     });
 
     // 2. RSI oversold
@@ -85,13 +85,13 @@ export class MFIDivergenceConfluenceStrategy extends BaseStrategy {
     conditions.push({
       name: "RSI Oversold",
       met: rsiOversold,
-      detail: `RSI: ${rsi.current?.toFixed(1) ?? "N/A"} ${rsiOversold ? "< " + RSI_OVERSOLD : ">= " + RSI_OVERSOLD}`,
+      detail: `RSI: ${rsi.current?.toFixed(1) ?? "N/A"} ${rsiOversold ? `< ${RSI_OVERSOLD}` : `>= ${RSI_OVERSOLD}`}`,
     });
 
     // 3. RSI bullish divergence
     const divergence = calculateDivergence(candles);
     const hasBullishDiv = divergence.divergences.some(
-      (d: { type: string }) => d.type === "bullish"
+      (d: { type: string }) => d.type === "bullish",
     );
     conditions.push({
       name: "RSI Bullish Divergence",
@@ -103,8 +103,7 @@ export class MFIDivergenceConfluenceStrategy extends BaseStrategy {
 
     // 4. Price at/below lower Bollinger Band
     const bb = this.calculateBollingerBands(candles);
-    const atLowerBB =
-      bb.current.lower !== null && currentPrice <= bb.current.lower * 1.005;
+    const atLowerBB = bb.current.lower !== null && currentPrice <= bb.current.lower * 1.005;
     conditions.push({
       name: "At Lower BB",
       met: atLowerBB,
@@ -131,7 +130,7 @@ export class MFIDivergenceConfluenceStrategy extends BaseStrategy {
         .map((c) => c.name)
         .join(", ");
       return this.notDetected(
-        `Only ${conditionsMet}/5 conditions met (need ${MIN_CONDITIONS}). Missing: ${unmet}`
+        `Only ${conditionsMet}/5 conditions met (need ${MIN_CONDITIONS}). Missing: ${unmet}`,
       );
     }
 
@@ -153,18 +152,13 @@ export class MFIDivergenceConfluenceStrategy extends BaseStrategy {
       conditions: conditions.map((c) => ({ name: c.name, met: c.met })),
     };
 
-    const reasons = conditions.map(
-      (c) => `${c.met ? "[YES]" : "[NO]"} ${c.detail}`
-    );
+    const reasons = conditions.map((c) => `${c.met ? "[YES]" : "[NO]"} ${c.detail}`);
     reasons.unshift(`${conditionsMet}/5 confluence conditions met`);
 
     return this.detected(confidence, signals, reasons.join(". "));
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", CANDLE_LIMIT);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const atr = this.calculateATR(candles);
@@ -243,7 +237,7 @@ When creating a plan using the MFI Divergence Confluence strategy:
     bar: OHLC,
     index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     if (index < 20) return null;
 
@@ -253,9 +247,12 @@ When creating a plan using the MFI Divergence Confluence strategy:
 
     // Simple proxy: RSI oversold + at lower BB + volume spike
     if (
-      rsi != null && rsi < RSI_OVERSOLD &&
-      bbLower != null && bar.close <= bbLower * 1.005 &&
-      volumeRatio != null && volumeRatio > 1.5
+      rsi != null &&
+      rsi < RSI_OVERSOLD &&
+      bbLower != null &&
+      bar.close <= bbLower * 1.005 &&
+      volumeRatio != null &&
+      volumeRatio > 1.5
     ) {
       return {
         type: "BUY",

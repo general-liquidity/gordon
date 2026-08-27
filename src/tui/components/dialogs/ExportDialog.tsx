@@ -11,7 +11,7 @@
  * Phase 17 of the TUI rebuild.
  */
 
-import React, { useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 import * as fs from "node:fs";
@@ -61,8 +61,7 @@ interface Props {
 function tradesToCsv(trades: TradeRecord[]): string {
   const header = "Symbol,Side,Quantity,Price,Timestamp,PnL";
   const rows = trades.map(
-    (t) =>
-      `${t.symbol},${t.side},${t.quantity},${t.price},${t.timestamp},${t.pnl ?? ""}`,
+    (t) => `${t.symbol},${t.side},${t.quantity},${t.price},${t.timestamp},${t.pnl ?? ""}`,
   );
   return [header, ...rows].join("\n");
 }
@@ -135,22 +134,18 @@ export function ExportDialog({ onClose, trades, session, strategies }: Props) {
   );
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
-      paddingX={2}
-      paddingY={1}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
       <Box>
-        <Text bold color="cyan">EXPORT DATA</Text>
+        <Text bold color="cyan">
+          EXPORT DATA
+        </Text>
       </Box>
       <Text> </Text>
 
       {status === "success" ? (
         <Box flexDirection="column">
           <Text color="green">{"\u2713"} Export complete</Text>
-          <Text dimColor>  {exportedPath}</Text>
+          <Text dimColor> {exportedPath}</Text>
           <Text> </Text>
           <Text dimColor>Press Esc to close</Text>
         </Box>

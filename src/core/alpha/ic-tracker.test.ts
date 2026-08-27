@@ -1,7 +1,10 @@
 import { describe, it, expect } from "bun:test";
 import { trackIc, computeIc } from "./ic-tracker.ts";
 
-function makePairs(n: number, sigToReturn: (s: number) => number): {
+function makePairs(
+  n: number,
+  sigToReturn: (s: number) => number,
+): {
   signals: number[];
   returns: number[];
 } {
@@ -87,7 +90,7 @@ describe("trackIc — verdicts", () => {
     const snap = trackIc("noisy", signals, returns);
     // IC will be near zero
     expect(snap.ic).not.toBeNull();
-    expect(Math.abs(snap.ic!)).toBeLessThan(0.10);
+    expect(Math.abs(snap.ic!)).toBeLessThan(0.1);
   });
 
   it("flags decay when IC trends negative across sub-windows", () => {

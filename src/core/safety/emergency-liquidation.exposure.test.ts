@@ -124,6 +124,7 @@ function makeExchange(isSandbox: boolean, placed: PlacedOrder[]): Exchange {
   return {
     exchangeId: "binance",
     isSandbox,
+    getOrderHistory: async () => [],
     getOpenOrders: async () => [],
     cancelOrder: async () => undefined,
     placeOrder: async (params: { symbol: string; side: string; quantity: number }) => {
@@ -204,6 +205,7 @@ describe("emergency liquidation is exposure-reducing, not consent-gated", () => 
     const exchange = {
       exchangeId: "binance",
       isSandbox: false,
+      getOrderHistory: async () => [],
       getOpenOrders: async () =>
         orderOpen ? [{ orderId: 991, clientOrderId: "gordon_x", symbol: "BTCUSDT" }] : [],
       cancelOrder: async (_symbol: string, orderId: string) => {
@@ -236,6 +238,7 @@ describe("emergency liquidation is exposure-reducing, not consent-gated", () => 
     const exchange = {
       exchangeId: "binance",
       isSandbox: false,
+      getOrderHistory: async () => [],
       getOpenOrders: async () =>
         orderOpen
           ? [
@@ -296,6 +299,7 @@ describe("emergency liquidation is exposure-reducing, not consent-gated", () => 
     const exchange = {
       exchangeId: "binance",
       isSandbox: false,
+      getOrderHistory: async () => [],
       getOpenOrders: async () => openOrders,
       cancelOrder: async (_symbol: string, orderId: string) => {
         events.push(`cancel:${orderId}`);
@@ -328,6 +332,7 @@ describe("emergency liquidation is exposure-reducing, not consent-gated", () => 
     const exchange = {
       exchangeId: "binance",
       isSandbox: false,
+      getOrderHistory: async () => [],
       getOpenOrders: async () => [
         {
           orderId: 992,
@@ -359,6 +364,7 @@ describe("emergency liquidation is exposure-reducing, not consent-gated", () => 
     const exchange = {
       exchangeId: "binance",
       isSandbox: false,
+      getOrderHistory: async () => [],
       getOpenOrders: async () =>
         orderOpen
           ? [

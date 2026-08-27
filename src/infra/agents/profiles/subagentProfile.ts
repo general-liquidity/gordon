@@ -137,9 +137,7 @@ export function validateSubagentProfile(
   if (profile.model !== undefined && profile.model.length > 0) {
     const colonIdx = profile.model.indexOf(":");
     const looksWrong =
-      colonIdx === 0 ||
-      colonIdx === profile.model.length - 1 ||
-      profile.model.trim().length === 0;
+      colonIdx === 0 || colonIdx === profile.model.length - 1 || profile.model.trim().length === 0;
     if (looksWrong) {
       issues.push({
         severity: "warning",

@@ -75,7 +75,12 @@ describe("classifyMaProximity", () => {
 
   test("stopBufferAbsolute subtracts from MA before stop calc", () => {
     const noBuffer = classifyMaProximity({ price: 100, adr: 2, sma10: 99 });
-    const withBuffer = classifyMaProximity({ price: 100, adr: 2, sma10: 99, stopBufferAbsolute: 1 });
+    const withBuffer = classifyMaProximity({
+      price: 100,
+      adr: 2,
+      sma10: 99,
+      stopBufferAbsolute: 1,
+    });
     expect(withBuffer.stopUnderMaPct).toBeGreaterThan(noBuffer.stopUnderMaPct);
   });
 

@@ -23,12 +23,12 @@ import type { PermissionMode } from "../../tui/state/types.ts";
 const LIVE_CAPABLE_MODES: ReadonlySet<PermissionMode> = new Set(["auto", "ask"]);
 
 const MODE_DESCRIPTIONS: Record<PermissionMode, string> = {
-  auto:    "Trades now execute without per-action approval.",
-  ask:     "Each trade requires approval via dialog (default).",
-  strict:  "Read-only mode. All trades blocked.",
-  paper:   "Paper trading mode. Real orders blocked; simulated fills only.",
+  auto: "Trades now execute without per-action approval.",
+  ask: "Each trade requires approval via dialog (default).",
+  strict: "Read-only mode. All trades blocked.",
+  paper: "Paper trading mode. Real orders blocked; simulated fills only.",
   observe: "Observation mode. No execution of any kind.",
-  plan:    "Planning-only mode. Plans can be created but not executed.",
+  plan: "Planning-only mode. Plans can be created but not executed.",
 };
 
 export async function handlePermissionModeCommand(
@@ -48,9 +48,7 @@ export async function handlePermissionModeCommand(
     }
   }
 
-  const ackNote = consentJustRecorded
-    ? "Live trading acknowledged (DISCLAIMER.md). "
-    : "";
+  const ackNote = consentJustRecorded ? "Live trading acknowledged (DISCLAIMER.md). " : "";
 
   const config = await loadConfig();
   const previous = config.permissionMode ?? "ask";
@@ -76,8 +74,11 @@ export async function handlePermissionModeCommand(
   }
 
   const sandboxNote =
-    mode === "paper"   ? " Venue adapters switched to sandbox/testnet endpoints." :
-    previous === "paper" ? " Venue adapters restored to live endpoints." : "";
+    mode === "paper"
+      ? " Venue adapters switched to sandbox/testnet endpoints."
+      : previous === "paper"
+        ? " Venue adapters restored to live endpoints."
+        : "";
 
   return `${ackNote}Permission mode → '${mode}'. ${MODE_DESCRIPTIONS[mode]}${sandboxNote}`;
 }

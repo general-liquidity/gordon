@@ -18,7 +18,7 @@ import type { ToolsetsInput } from "@mastra/core/agent";
 export interface StreamEvent {
   type:
     | "text_delta"
-    | "thinking_delta"     // LLM reasoning / chain-of-thought chunks (Vibe-Trading streaming pattern)
+    | "thinking_delta" // LLM reasoning / chain-of-thought chunks (Vibe-Trading streaming pattern)
     | "tool_call_start"
     | "tool_call_end"
     | "agent_switch"

@@ -49,7 +49,7 @@ export function sleep(ms: number): Promise<void> {
  */
 export function calculateBackoffDelay(attempt: number, baseDelayMs: number): number {
   // Exponential backoff with jitter: baseDelay * 2^attempt + random jitter
-  const exponentialDelay = baseDelayMs * Math.pow(2, attempt);
+  const exponentialDelay = baseDelayMs * 2 ** attempt;
   const jitter = Math.random() * baseDelayMs * 0.5;
   return Math.min(exponentialDelay + jitter, 30000); // Cap at 30 seconds
 }
@@ -74,18 +74,14 @@ export const DEFAULT_FALLBACK_CHAIN: AgentFallbackChain = {
   },
   Backtester: {
     primaryAgent: "Backtester",
-    fallbacks: [
-      { name: "backtest_cache", type: "cache" },
-    ],
+    fallbacks: [{ name: "backtest_cache", type: "cache" }],
     maxRetries: 2,
     baseDelayMs: 2000,
     useCacheOnFailure: true,
   },
   Scanner: {
     primaryAgent: "Scanner",
-    fallbacks: [
-      { name: "scan_market", type: "tool" },
-    ],
+    fallbacks: [{ name: "scan_market", type: "tool" }],
     maxRetries: 3,
     baseDelayMs: 1000,
     useCacheOnFailure: false,
@@ -106,9 +102,7 @@ export const DEFAULT_FALLBACK_CHAIN: AgentFallbackChain = {
   },
   Monitor: {
     primaryAgent: "Monitor",
-    fallbacks: [
-      { name: "check_positions", type: "tool" },
-    ],
+    fallbacks: [{ name: "check_positions", type: "tool" }],
     maxRetries: 3,
     baseDelayMs: 1000,
     useCacheOnFailure: true,
@@ -177,7 +171,7 @@ export function generateBacktestCacheKey(
   symbol: string,
   strategyId: string,
   timeframe: string,
-  days: number
+  days: number,
 ): string {
   return `backtest:${symbol}:${strategyId}:${timeframe}:${days}`;
 }

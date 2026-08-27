@@ -211,7 +211,7 @@ export async function strategyExists(id: string): Promise<boolean> {
  * @returns Object with success count and errors
  */
 export async function saveStrategies(
-  strategies: StrategyDSL[]
+  strategies: StrategyDSL[],
 ): Promise<{ saved: number; errors: Array<{ id: string; error: string }> }> {
   await ensureDir();
 
@@ -348,7 +348,7 @@ export async function exportStrategies(outputPath: string): Promise<number> {
  * Import strategies from a JSON file
  */
 export async function importStrategies(
-  inputPath: string
+  inputPath: string,
 ): Promise<{ imported: number; skipped: number; errors: string[] }> {
   const content = await fs.readFile(inputPath, "utf-8");
   const data = JSON.parse(content);
@@ -358,7 +358,7 @@ export async function importStrategies(
   let skipped = 0;
 
   // Handle both array format and object with strategies array
-  const strategies: unknown[] = Array.isArray(data) ? data : data.strategies ?? [];
+  const strategies: unknown[] = Array.isArray(data) ? data : (data.strategies ?? []);
 
   for (const item of strategies) {
     const validation = validateStrategyDSL(item);
@@ -380,7 +380,9 @@ export async function importStrategies(
       await saveStrategy(validation.data!);
       imported++;
     } catch (error) {
-      errors.push(`${validation.data!.id}: ${error instanceof Error ? error.message : "save failed"}`);
+      errors.push(
+        `${validation.data!.id}: ${error instanceof Error ? error.message : "save failed"}`,
+      );
     }
   }
 
@@ -396,7 +398,7 @@ export async function importStrategies(
  */
 export async function updateStrategyMetadata(
   id: string,
-  metadata: Partial<NonNullable<StrategyDSL["metadata"]>>
+  metadata: Partial<NonNullable<StrategyDSL["metadata"]>>,
 ): Promise<boolean> {
   const strategy = await loadStrategy(id);
   if (!strategy) {
@@ -417,7 +419,7 @@ export async function updateStrategyMetadata(
  */
 export async function addBacktestResults(
   id: string,
-  results: Record<string, unknown>
+  results: Record<string, unknown>,
 ): Promise<boolean> {
   return updateStrategyMetadata(id, { backtestResults: results });
 }

@@ -5,7 +5,6 @@
  * Returns null when isActive is false.
  */
 
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 
 // ============================================================================

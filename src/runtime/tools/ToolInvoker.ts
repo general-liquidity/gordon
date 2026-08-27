@@ -6,7 +6,10 @@ import type { TranscriptStore } from "../transcript/TranscriptStore.ts";
 import type { ScratchpadStore } from "../workers/ScratchpadStore.ts";
 import type { WorkerRegistry } from "../workers/WorkerRegistry.ts";
 import type { RuntimeToolExecutionContext, ToolRegistry } from "./ToolRegistry.ts";
-import { PermissionEngine, ToolApprovalRequiredError } from "../permissions/PermissionEngine.ts";
+import {
+  type PermissionEngine,
+  ToolApprovalRequiredError,
+} from "../permissions/PermissionEngine.ts";
 import type { RuntimeHistoryResult } from "../contracts/types.ts";
 
 export interface ToolInvocationResult<T> {

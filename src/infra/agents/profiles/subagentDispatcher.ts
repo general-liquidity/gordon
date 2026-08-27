@@ -43,18 +43,11 @@ import {
   type AgentRegistry,
 } from "../harness/subagentCoordination.ts";
 import {
-  drainSteers,
-  clearSteers,
-  createSteerStore,
   applyQueuedSteers,
   finalizeSteers,
-  STEER_PREFIX,
   type SubagentSteerStore,
 } from "../harness/subagentSteer.ts";
-import {
-  filterToolsForProfile,
-  type ToolFilterResult,
-} from "./subagentToolFilter.ts";
+import { filterToolsForProfile, type ToolFilterResult } from "./subagentToolFilter.ts";
 import type { SubagentProfile } from "./subagentProfile.ts";
 import { flagEnv } from "../../config/flagResolver.ts";
 
@@ -137,9 +130,7 @@ export interface DispatchResult {
  * live execution. When off (default), all dispatches return a
  * structured "feature disabled" notification.
  */
-export function isDynamicSubagentsEnabled(
-  env: NodeJS.ProcessEnv = flagEnv(),
-): boolean {
+export function isDynamicSubagentsEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   const raw = env.GORDON_DYNAMIC_SUBAGENTS;
   if (typeof raw !== "string") return false;
   const normalized = raw.trim().toLowerCase();
@@ -242,8 +233,7 @@ export async function dispatchSubagentTask(
       notification: buildTaskNotification({
         subagentId,
         status: "aborted",
-        summary:
-          "GORDON_DYNAMIC_SUBAGENTS is not set. Profile validated, dispatch skipped.",
+        summary: "GORDON_DYNAMIC_SUBAGENTS is not set. Profile validated, dispatch skipped.",
         result: {
           profile: profile.name,
           tools_allowed: filter.allowed.length,

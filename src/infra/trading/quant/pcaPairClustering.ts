@@ -169,9 +169,10 @@ function canonicalizeSign(vec: number[]): number[] {
  * eigenvector (sign-canonicalized). ml-matrix yields ascending order with
  * eigenvectors as matrix columns, so we reverse + transpose here.
  */
-function jacobiEigen(
-  src: ReadonlyArray<ReadonlyArray<number>>,
-): { eigenvalues: number[]; eigenvectors: number[][] } {
+function jacobiEigen(src: ReadonlyArray<ReadonlyArray<number>>): {
+  eigenvalues: number[];
+  eigenvectors: number[][];
+} {
   const n = src.length;
   const evd = eigenDecomposition(src.map((row) => [...row]));
   if (!evd) return { eigenvalues: [], eigenvectors: [] };
@@ -233,9 +234,7 @@ function dbscan(points: number[][], eps: number, minPts: number): number[] {
   return labels;
 }
 
-export function computePcaPairClustering(
-  input: PcaPairClusteringInput,
-): PcaPairClusteringResult {
+export function computePcaPairClustering(input: PcaPairClusteringInput): PcaPairClusteringResult {
   const returns = input.returns;
   const N = returns.length;
   if (N < 2) {
@@ -246,15 +245,12 @@ export function computePcaPairClustering(
     throw new Error(`each return series must have length ≥ 2, got ${T}`);
   }
   if (input.symbols && input.symbols.length !== N) {
-    throw new Error(
-      `symbols length ${input.symbols.length} ≠ assets length ${N}`,
-    );
+    throw new Error(`symbols length ${input.symbols.length} ≠ assets length ${N}`);
   }
   if (input.epsilon <= 0) {
     throw new Error("epsilon must be positive");
   }
-  const k =
-    input.numComponents ?? Math.min(MAX_DIMENSIONS, Math.max(1, N - 1), 5);
+  const k = input.numComponents ?? Math.min(MAX_DIMENSIONS, Math.max(1, N - 1), 5);
   if (k < 1 || k > N) {
     throw new Error(`numComponents must satisfy 1 ≤ k ≤ N (got k=${k}, N=${N})`);
   }
@@ -290,11 +286,8 @@ export function computePcaPairClustering(
 
   // Variance explained by the kept components
   const totalVariance = eigenvalues.reduce((a, b) => a + Math.max(0, b), 0);
-  const keptVariance = eigenvalues
-    .slice(0, k)
-    .reduce((a, b) => a + Math.max(0, b), 0);
-  const varianceExplained =
-    totalVariance > 0 ? keptVariance / totalVariance : 0;
+  const keptVariance = eigenvalues.slice(0, k).reduce((a, b) => a + Math.max(0, b), 0);
+  const varianceExplained = totalVariance > 0 ? keptVariance / totalVariance : 0;
 
   // DBSCAN
   const labels = dbscan(embeddings, input.epsilon, minPts);

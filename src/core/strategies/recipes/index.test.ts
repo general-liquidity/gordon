@@ -1,9 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  evaluateRecipes,
-  newRecipePipelineState,
-  DEFAULT_REGIME_RSI_SETTINGS,
-} from "./index.ts";
+import { evaluateRecipes, newRecipePipelineState, DEFAULT_REGIME_RSI_SETTINGS } from "./index.ts";
 
 describe("evaluateRecipes (pipeline)", () => {
   it("threads state across calls and runs all four stages", () => {

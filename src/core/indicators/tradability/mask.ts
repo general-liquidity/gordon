@@ -113,11 +113,7 @@ function explicitFlagReason(bar: VenueTradability): NonTradableReason | null {
   return null;
 }
 
-function atLimitBound(
-  close: number,
-  bar: VenueTradability,
-  tolerance: number,
-): boolean {
+function atLimitBound(close: number, bar: VenueTradability, tolerance: number): boolean {
   if (bar.limitUp != null && close >= bar.limitUp * (1 - tolerance)) return true;
   if (bar.limitDown != null && close <= bar.limitDown * (1 + tolerance)) return true;
   return false;
@@ -170,10 +166,7 @@ export function buildTradabilityMask(
 }
 
 /** Mask with every cell tradable, the identity input to any masked operator. */
-export function allTradable(
-  length: number,
-  builtAt: number | null = null,
-): TradabilityMask {
+export function allTradable(length: number, builtAt: number | null = null): TradabilityMask {
   return finalizeMask(
     Array.from({ length }, () => true),
     Array.from({ length }, () => null),
@@ -233,10 +226,7 @@ export function applyMaskPolicy(
  * only when EVERY input cell it depends on was executable. This is the rule the
  * paper's ablation was measuring, and anything weaker leaves the contamination in.
  */
-export function propagateMask(
-  mask: TradabilityMask,
-  window: number,
-): TradabilityMask {
+export function propagateMask(mask: TradabilityMask, window: number): TradabilityMask {
   const tradable: boolean[] = [];
   const reasons: (NonTradableReason | null)[] = [];
 

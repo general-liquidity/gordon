@@ -197,18 +197,18 @@ describe("estimateExpectedReturn — composite", () => {
     const r = estimateExpectedReturn({
       assetClass: "equity",
       historicalReturns: HIST_12,
-      valuation: { metric: 0.10, metricType: "operator_supplied" },
+      valuation: { metric: 0.1, metricType: "operator_supplied" },
       regime: "expansion",
       weights: { historical: 0, valuation: 1, regime: 0 },
     });
-    expect(r.composite).toBeCloseTo(0.10, 4);
+    expect(r.composite).toBeCloseTo(0.1, 4);
   });
 
   it("100% historical weight yields the historical estimate", () => {
     const r = estimateExpectedReturn({
       assetClass: "equity",
       historicalReturns: HIST_12,
-      valuation: { metric: 0.10, metricType: "operator_supplied" },
+      valuation: { metric: 0.1, metricType: "operator_supplied" },
       regime: "expansion",
       weights: { historical: 1, valuation: 0, regime: 0 },
     });

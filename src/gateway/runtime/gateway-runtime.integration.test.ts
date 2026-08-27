@@ -16,18 +16,20 @@ describe("GatewayRuntime integration", () => {
     try {
       sessionRuntimeFactory = new SessionRuntimeFactory({
         persistence,
-        resolveContext: async ({ session }) => ({
-          userId: session.resourceId ?? "user-1",
-          config: { permissionMode: "ask" },
-        }) as any,
+        resolveContext: async ({ session }) =>
+          ({
+            userId: session.resourceId ?? "user-1",
+            config: { permissionMode: "ask" },
+          }) as any,
       });
 
       const runtime = new GatewayRuntime({
         sessionRuntimeFactory,
-        resolveContext: async () => ({
-          userId: "user-1",
-          config: { permissionMode: "ask" },
-        }) as any,
+        resolveContext: async () =>
+          ({
+            userId: "user-1",
+            config: { permissionMode: "ask" },
+          }) as any,
       });
 
       const envelope = {
@@ -41,7 +43,9 @@ describe("GatewayRuntime integration", () => {
           payload: {},
         },
       };
-      const handler = (runtime as any).handlers.get("runtime.background_status") as ((input: typeof envelope) => Promise<unknown>);
+      const handler = (runtime as any).handlers.get("runtime.background_status") as (
+        input: typeof envelope,
+      ) => Promise<unknown>;
       const response = await handler(envelope);
       expect(response).toBeDefined();
 

@@ -59,7 +59,7 @@ export class VolumeSurgeStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, 50);
     if (candles.length < 25) {
@@ -79,7 +79,7 @@ export class VolumeSurgeStrategy extends BaseStrategy {
 
     if (volumeRatio < MIN_VOLUME_RATIO) {
       return this.notDetected(
-        `Volume not surging (${volumeRatio.toFixed(1)}x < ${MIN_VOLUME_RATIO}x average)`
+        `Volume not surging (${volumeRatio.toFixed(1)}x < ${MIN_VOLUME_RATIO}x average)`,
       );
     }
 
@@ -98,9 +98,7 @@ export class VolumeSurgeStrategy extends BaseStrategy {
     // Check RSI not overbought
     const rsi = this.calculateRSI(candles);
     if (rsi.current !== null && rsi.current > RSI_MAX) {
-      return this.notDetected(
-        `RSI overbought (${rsi.current.toFixed(1)} > ${RSI_MAX})`
-      );
+      return this.notDetected(`RSI overbought (${rsi.current.toFixed(1)} > ${RSI_MAX})`);
     }
 
     // Calculate confidence
@@ -117,18 +115,14 @@ export class VolumeSurgeStrategy extends BaseStrategy {
     const levels = this.detectLevels(candles, currentPrice);
     const resistances = this.getResistances(levels, currentPrice);
     const breakingResistance = resistances.some(
-      (r) => lastCandle.open < r.price && lastCandle.close > r.price
+      (r) => lastCandle.open < r.price && lastCandle.close > r.price,
     );
     if (breakingResistance) {
       confidence += 0.1;
     }
 
     // Consecutive high volume bonus
-    const consecutiveHighVol = this.countConsecutiveHighVolume(
-      candles,
-      volumeMA,
-      1.5
-    );
+    const consecutiveHighVol = this.countConsecutiveHighVolume(candles, volumeMA, 1.5);
     if (consecutiveHighVol >= 2) {
       confidence += 0.1;
     }
@@ -182,10 +176,7 @@ export class VolumeSurgeStrategy extends BaseStrategy {
   /**
    * Check if current price is a local high
    */
-  private isLocalHigh(
-    candles: { high: number; close: number }[],
-    lookback: number
-  ): boolean {
+  private isLocalHigh(candles: { high: number; close: number }[], lookback: number): boolean {
     const lastCandle = candles[candles.length - 1];
     if (!lastCandle) return false;
 
@@ -201,7 +192,7 @@ export class VolumeSurgeStrategy extends BaseStrategy {
   private countConsecutiveHighVolume(
     candles: { volume: number }[],
     volumeMA: number,
-    threshold: number
+    threshold: number,
   ): number {
     let count = 0;
     for (let i = candles.length - 1; i >= 0; i--) {
@@ -215,10 +206,7 @@ export class VolumeSurgeStrategy extends BaseStrategy {
     return count;
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", 50);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const lastCandle = candles[candles.length - 1];
@@ -248,7 +236,8 @@ export class VolumeSurgeStrategy extends BaseStrategy {
       stopLoss,
       takeProfits,
       riskRewardRatio,
-      notes: `Volume breakout trade. Stop below surge candle at $${stopLoss.toFixed(2)}. ` +
+      notes:
+        `Volume breakout trade. Stop below surge candle at $${stopLoss.toFixed(2)}. ` +
         `High momentum expected. R:R ${riskRewardRatio.toFixed(1)}:1`,
     };
   }
@@ -309,7 +298,7 @@ When creating a plan using the Volume Surge strategy:
     bar: OHLC,
     _index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     const price = bar.close;
     const { rsi14, volumeRatio, sma20, nearestResistance } = indicators;
@@ -364,14 +353,7 @@ When creating a plan using the Volume Surge strategy:
    * Get required indicators for backtesting.
    */
   override getRequiredIndicators(): string[] {
-    return [
-      "sma20",
-      "rsi14",
-      "atr14",
-      "volumeRatio",
-      "volumeAvg20",
-      "nearestResistance",
-    ];
+    return ["sma20", "rsi14", "atr14", "volumeRatio", "volumeAvg20", "nearestResistance"];
   }
 }
 

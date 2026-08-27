@@ -4,10 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { StrategyGeneratorAgent, describeAbsentBacktest } from "./strategy-generator.ts";
-import {
-  ATTEMPTS_LOG_PATH_ENV,
-  countTrials,
-} from "../trading/ops/multipleTestingTracker.ts";
+import { ATTEMPTS_LOG_PATH_ENV, countTrials } from "../trading/ops/multipleTestingTracker.ts";
 import { EXAMPLE_RSI_BOUNCE_DSL } from "../../strategies/dsl/schema.ts";
 import type { LLMClient } from "../ai/llm/index.ts";
 
@@ -102,9 +99,9 @@ describe("StrategyGeneratorAgent: absent backtest is typed, not fabricated (item
     expect(describeAbsentBacktest({ reason: "no_exchange_client" })).toContain(
       "exchange client unavailable",
     );
-    expect(
-      describeAbsentBacktest({ reason: "backtest_failed", detail: "no candles" }),
-    ).toContain("no candles");
+    expect(describeAbsentBacktest({ reason: "backtest_failed", detail: "no candles" })).toContain(
+      "no candles",
+    );
   });
 });
 
@@ -147,9 +144,7 @@ describe("StrategyGeneratorAgent: silent recovery is surfaced (item 5)", () => {
     const result = await agent.generateFromPrompt("rsi bounce on btc", OPTIONS);
 
     expect(result.strategy).toBeDefined();
-    expect(result.degradations.map((d) => d.kind)).toContain(
-      "dsl_generation_substituted",
-    );
+    expect(result.degradations.map((d) => d.kind)).toContain("dsl_generation_substituted");
   });
 
   it("reports no degradations on a clean run", async () => {

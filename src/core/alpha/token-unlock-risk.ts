@@ -107,7 +107,8 @@ export function computeTokenUnlockRisk(input: TokenUnlockInput): TokenUnlockResu
   const totalOverhangPct = valid
     ? parseFloat(((upcoming.reduce((s, e) => s + e.amount, 0) / circ) * 100).toFixed(4))
     : 0;
-  const largestUnlockPct = scored.length > 0 ? Math.max(...scored.map((e) => e.pctOfCirculating)) : 0;
+  const largestUnlockPct =
+    scored.length > 0 ? Math.max(...scored.map((e) => e.pctOfCirculating)) : 0;
   const fdvToCirculating =
     input.totalSupply != null && valid ? parseFloat((input.totalSupply / circ).toFixed(4)) : null;
 
@@ -119,7 +120,8 @@ export function computeTokenUnlockRisk(input: TokenUnlockInput): TokenUnlockResu
         (INSIDER.has(e.recipient) ? ` to ${e.recipient} (cliff-into-insider risk)` : ""),
     );
   }
-  if (totalOverhangPct >= 50) flags.push(`total overhang ${totalOverhangPct.toFixed(0)}% of circulating`);
+  if (totalOverhangPct >= 50)
+    flags.push(`total overhang ${totalOverhangPct.toFixed(0)}% of circulating`);
 
   const insiderCliff = flaggedUpcoming.some((e) => INSIDER.has(e.recipient));
   const verdict: TokenUnlockResult["verdict"] =
@@ -133,7 +135,9 @@ export function computeTokenUnlockRisk(input: TokenUnlockInput): TokenUnlockResu
     ? "Invalid circulating supply — cannot score unlock risk."
     : `Unlock schedule: ${shape}, ${scored.length} event(s), largest ${largestUnlockPct.toFixed(1)}% of circulating, ` +
       `overhang ${totalOverhangPct.toFixed(0)}%. ` +
-      (nextUnlock ? `Next: ${nextUnlock.date} (${nextUnlock.pctOfCirculating.toFixed(1)}%). ` : "") +
+      (nextUnlock
+        ? `Next: ${nextUnlock.date} (${nextUnlock.pctOfCirculating.toFixed(1)}%). `
+        : "") +
       `Verdict: ${verdict}.`;
 
   return {

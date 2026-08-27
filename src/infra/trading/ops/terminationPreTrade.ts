@@ -44,7 +44,7 @@ export async function buildTerminationPreTradeFromPlan(
       dailyLossPct: Math.abs(portfolio.dailyPnlUsd / portfolio.totalValueUsd) * 100,
       openPositionCount: portfolio.positions.length,
       tradesThisHour: portfolio.recentTradeCount,
-      tradesThisDay: portfolio.recentTradeCount * 3,
+      tradesThisDay: portfolio.todayTradeCount ?? portfolio.recentTradeCount,
       consecutiveLosses: 0,
       hasStopLoss: plan.stopLoss.price > 0,
       isCrypto: inferAssetClass(ctx.exchange?.exchangeId, plan.symbol) === "crypto",

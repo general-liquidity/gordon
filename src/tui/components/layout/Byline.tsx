@@ -1,4 +1,3 @@
-import React from "react";
 import { Text } from "../../ink-custom";
 
 // ============================================================================
@@ -14,9 +13,5 @@ export function Byline({ parts }: Props) {
   const filtered = parts.filter(Boolean) as string[];
   if (filtered.length === 0) return null;
 
-  return (
-    <Text dimColor>
-      {filtered.join(" \u00b7 ")}
-    </Text>
-  );
+  return <Text dimColor>{filtered.join(" \u00b7 ")}</Text>;
 }

@@ -47,7 +47,9 @@ const BACKPRESSURE_EXEMPT: ReadonlySet<ProactiveCategory> = new Set<ProactiveCat
 ]);
 
 function isOrchestrationBackpressureEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[ORCHESTRATION_BACKPRESSURE_ENV] === "1" || env[ORCHESTRATION_BACKPRESSURE_ENV] === "true";
+  return (
+    env[ORCHESTRATION_BACKPRESSURE_ENV] === "1" || env[ORCHESTRATION_BACKPRESSURE_ENV] === "true"
+  );
 }
 
 function readReviewCapacityPerHour(env: NodeJS.ProcessEnv = process.env): number {
@@ -141,9 +143,7 @@ export class HeuristicJudge implements ProposalJudge {
     };
   }
 
-  private checkRelevance(
-    candidate: ProactiveSuggestion,
-  ): { ok: boolean; reason?: string } {
+  private checkRelevance(candidate: ProactiveSuggestion): { ok: boolean; reason?: string } {
     const { category, triggers } = candidate;
     switch (category) {
       case "whale_alert":
@@ -195,9 +195,7 @@ export function setActiveJudge(judge: ProposalJudge): void {
   activeJudge = judge;
 }
 
-export async function judgeCandidate(
-  candidate: ProactiveSuggestion,
-): Promise<JudgeVerdict> {
+export async function judgeCandidate(candidate: ProactiveSuggestion): Promise<JudgeVerdict> {
   return activeJudge.evaluate(candidate);
 }
 

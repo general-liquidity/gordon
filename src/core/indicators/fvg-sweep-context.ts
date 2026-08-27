@@ -68,7 +68,7 @@ const round = (x: number, n: number) => parseFloat(x.toFixed(n));
 
 export function calculateFvgSweepContext(
   candles: Candle[],
-  opts?: { pivotWindow?: number; lookback?: number }
+  opts?: { pivotWindow?: number; lookback?: number },
 ): FvgSweepContextResult {
   const pivotWindow = opts?.pivotWindow ?? 2;
   const lookback = opts?.lookback ?? 10;

@@ -35,7 +35,7 @@ describe("reweightSignals", () => {
   test("better recent performance → higher weight", () => {
     const signals: SignalPerformance[] = [
       { signalId: "WINNER", recentReturns: [0.05, 0.03, 0.04, 0.06, 0.02] },
-      { signalId: "AVG", recentReturns: [0.01, 0.00, 0.01, -0.01, 0.02] },
+      { signalId: "AVG", recentReturns: [0.01, 0.0, 0.01, -0.01, 0.02] },
       { signalId: "LOSER", recentReturns: [-0.03, -0.02, -0.05, -0.01, -0.04] },
     ];
     const r = reweightSignals(signals);
@@ -49,14 +49,12 @@ describe("reweightSignals", () => {
   test("weights always sum to 1", () => {
     const signals: SignalPerformance[] = [
       { signalId: "A", recentReturns: [0.05, 0.03, 0.04, 0.06, 0.02] },
-      { signalId: "B", recentReturns: [0.01, 0.00, 0.01, -0.01, 0.02] },
+      { signalId: "B", recentReturns: [0.01, 0.0, 0.01, -0.01, 0.02] },
       { signalId: "C", recentReturns: [-0.03, -0.02, -0.05, -0.01, -0.04] },
       { signalId: "D", recentReturns: [0.02, 0.01, 0.03, 0.02, 0.01] },
     ];
     const r = reweightSignals(signals);
-    const validSum = r.weights
-      .filter((w) => w.weight > 0)
-      .reduce((s, w) => s + w.weight, 0);
+    const validSum = r.weights.filter((w) => w.weight > 0).reduce((s, w) => s + w.weight, 0);
     expect(validSum).toBeCloseTo(1, 5);
   });
 
@@ -119,12 +117,12 @@ describe("reweightSignals", () => {
     ];
     const r = reweightSignals(signals, {
       strength: 10,
-      minWeight: 0.10,
-      maxWeight: 0.70,
+      minWeight: 0.1,
+      maxWeight: 0.7,
     });
     for (const w of r.weights) {
-      expect(w.weight).toBeGreaterThanOrEqual(0.10 - 0.001);
-      expect(w.weight).toBeLessThanOrEqual(0.70 + 0.001);
+      expect(w.weight).toBeGreaterThanOrEqual(0.1 - 0.001);
+      expect(w.weight).toBeLessThanOrEqual(0.7 + 0.001);
     }
   });
 

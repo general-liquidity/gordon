@@ -54,7 +54,7 @@ export class HiddenDivergenceStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, CANDLE_LIMIT);
     if (candles.length < 50) {
@@ -70,7 +70,7 @@ export class HiddenDivergenceStrategy extends BaseStrategy {
     const ema50 = this.calculateEMA(candles, TREND_EMA_PERIOD);
     if (!ema50.current || currentPrice < ema50.current) {
       return this.notDetected(
-        `Price $${currentPrice.toFixed(2)} below EMA50 $${ema50.current?.toFixed(2) ?? "N/A"} — need uptrend for bullish hidden divergence`
+        `Price $${currentPrice.toFixed(2)} below EMA50 $${ema50.current?.toFixed(2) ?? "N/A"} — need uptrend for bullish hidden divergence`,
       );
     }
 
@@ -84,7 +84,7 @@ export class HiddenDivergenceStrategy extends BaseStrategy {
     // Check standard divergence detector for additional confirmation
     const divergence = calculateDivergence(candles);
     const hasConfirmingDiv = divergence.divergences.some(
-      (d: { type: string }) => d.type === "bullish"
+      (d: { type: string }) => d.type === "bullish",
     );
 
     // VPT confirmation
@@ -133,11 +133,17 @@ export class HiddenDivergenceStrategy extends BaseStrategy {
 
     const reasons: string[] = [];
     reasons.push("Hidden bullish divergence detected");
-    reasons.push(`Price higher low: $${hiddenDiv.priceHigherLow?.toFixed(2)} > $${hiddenDiv.pricePrevLow?.toFixed(2)}`);
-    reasons.push(`RSI lower low: ${hiddenDiv.rsiLowerLow?.toFixed(1)} < ${hiddenDiv.rsiPrevLow?.toFixed(1)}`);
+    reasons.push(
+      `Price higher low: $${hiddenDiv.priceHigherLow?.toFixed(2)} > $${hiddenDiv.pricePrevLow?.toFixed(2)}`,
+    );
+    reasons.push(
+      `RSI lower low: ${hiddenDiv.rsiLowerLow?.toFixed(1)} < ${hiddenDiv.rsiPrevLow?.toFixed(1)}`,
+    );
     if (vptBullish) reasons.push("VPT confirms bullish trend");
     if (hasConfirmingDiv) reasons.push("Divergence detector confirms");
-    reasons.push(`EMA50: $${ema50.current.toFixed(2)} (price ${distToEMA > 0 ? "above" : "below"})`);
+    reasons.push(
+      `EMA50: $${ema50.current.toFixed(2)} (price ${distToEMA > 0 ? "above" : "below"})`,
+    );
 
     return this.detected(confidence, signals, reasons.join(". "));
   }
@@ -151,7 +157,7 @@ export class HiddenDivergenceStrategy extends BaseStrategy {
     rsiPrevLow?: number;
     currentRSI?: number;
   } {
-    const prices = candles.map((c) => c.close);
+    const _prices = candles.map((c) => c.close);
     const rsi = this.calculateRSI(candles);
 
     if (rsi.current === null || rsi.values.length < candles.length) {
@@ -161,7 +167,7 @@ export class HiddenDivergenceStrategy extends BaseStrategy {
     // Find recent swing lows in price
     const priceLows = this.findSwingLows(
       candles.map((c) => c.low),
-      SWING_LOOKBACK
+      SWING_LOOKBACK,
     );
     if (priceLows.length < 2) {
       return { detected: false, reason: "Need at least 2 price swing lows" };
@@ -206,10 +212,7 @@ export class HiddenDivergenceStrategy extends BaseStrategy {
     };
   }
 
-  private findSwingLows(
-    values: number[],
-    lookback: number
-  ): { index: number; value: number }[] {
+  private findSwingLows(values: number[], lookback: number): { index: number; value: number }[] {
     const lows: { index: number; value: number }[] = [];
 
     for (let i = lookback; i < values.length - lookback; i++) {
@@ -228,10 +231,7 @@ export class HiddenDivergenceStrategy extends BaseStrategy {
     return lows;
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", CANDLE_LIMIT);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const atr = this.calculateATR(candles);
@@ -306,7 +306,7 @@ When creating a plan using the Hidden Divergence strategy:
     bar: OHLC,
     index: number,
     data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     if (index < 50) return null;
 
@@ -316,12 +316,20 @@ When creating a plan using the Hidden Divergence strategy:
 
     // Simple proxy: price above EMA50, RSI pulling back but not oversold
     if (
-      ema50 != null && bar.close > ema50 &&
-      rsi != null && prevRsi != null &&
-      rsi < prevRsi && rsi > 35 && rsi < 50
+      ema50 != null &&
+      bar.close > ema50 &&
+      rsi != null &&
+      prevRsi != null &&
+      rsi < prevRsi &&
+      rsi > 35 &&
+      rsi < 50
     ) {
       // Check price making higher low
-      if (index >= 2 && data[index - 1]!.low < data[index - 2]!.low && bar.low > data[index - 1]!.low) {
+      if (
+        index >= 2 &&
+        data[index - 1]!.low < data[index - 2]!.low &&
+        bar.low > data[index - 1]!.low
+      ) {
         return {
           type: "BUY",
           price: bar.close,

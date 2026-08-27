@@ -20,7 +20,7 @@
 
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createModuleLogger } from "../logger/index.ts";
 
@@ -51,7 +51,7 @@ export interface SkillHistoryIndex {
 
 export function getSkillHistoryRoot(): string {
   const override = process.env.GORDON_SKILL_HISTORY_PATH;
-  if (override && override.trim()) return override;
+  if (override?.trim()) return override;
   return join(homedir(), ".gordon", "skills", "history");
 }
 
@@ -77,7 +77,7 @@ function loadIndex(skillId: string): SkillHistoryIndex {
   try {
     const raw = readFileSync(path, "utf8");
     const parsed = JSON.parse(raw) as Partial<SkillHistoryIndex>;
-    if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.snapshots)) {
+    if (parsed?.version !== 1 || !Array.isArray(parsed.snapshots)) {
       return emptyIndex(skillId);
     }
     return {

@@ -22,33 +22,36 @@ import { getSuggestionStore } from "../storage/suggestionStore.ts";
 const MIN = 60 * 1000;
 const HR = 60 * MIN;
 
-const DEFAULT_POLICIES: Record<ProactiveCategory, {
-  cooldownMs: number;
-  minConfidence: number;
-  maxPerHour: number;
-}> = {
-  regime_flip:          { cooldownMs: 30 * MIN, minConfidence: 0.70, maxPerHour: 2 },
-  chart_pattern:        { cooldownMs: 30 * MIN, minConfidence: 0.55, maxPerHour: 2 },
-  whale_alert:          { cooldownMs: 5 * MIN,  minConfidence: 0.65, maxPerHour: 12 },
-  volatility_spike:     { cooldownMs: 10 * MIN, minConfidence: 0.70, maxPerHour: 6 },
-  stop_loss_tighten:    { cooldownMs: 15 * MIN, minConfidence: 0.75, maxPerHour: 4 },
-  portfolio_drift:      { cooldownMs: 60 * MIN, minConfidence: 0.65, maxPerHour: 1 },
-  missed_entry:         { cooldownMs: 20 * MIN, minConfidence: 0.75, maxPerHour: 3 },
-  position_review:      { cooldownMs: 4 * HR,   minConfidence: 0.65, maxPerHour: 1 },
-  journal_prompt:       { cooldownMs: 8 * HR,   minConfidence: 0.60, maxPerHour: 1 },
-  session_review:       { cooldownMs: 12 * HR,  minConfidence: 0.60, maxPerHour: 1 },
-  risk_warning:         { cooldownMs: 5 * MIN,  minConfidence: 0.80, maxPerHour: 8 },
-  playbook_suggest:     { cooldownMs: 30 * MIN, minConfidence: 0.70, maxPerHour: 2 },
-  funding_alert:        { cooldownMs: 30 * MIN, minConfidence: 0.65, maxPerHour: 4 },
-  news_event:           { cooldownMs: 10 * MIN, minConfidence: 0.65, maxPerHour: 6 },
+const DEFAULT_POLICIES: Record<
+  ProactiveCategory,
+  {
+    cooldownMs: number;
+    minConfidence: number;
+    maxPerHour: number;
+  }
+> = {
+  regime_flip: { cooldownMs: 30 * MIN, minConfidence: 0.7, maxPerHour: 2 },
+  chart_pattern: { cooldownMs: 30 * MIN, minConfidence: 0.55, maxPerHour: 2 },
+  whale_alert: { cooldownMs: 5 * MIN, minConfidence: 0.65, maxPerHour: 12 },
+  volatility_spike: { cooldownMs: 10 * MIN, minConfidence: 0.7, maxPerHour: 6 },
+  stop_loss_tighten: { cooldownMs: 15 * MIN, minConfidence: 0.75, maxPerHour: 4 },
+  portfolio_drift: { cooldownMs: 60 * MIN, minConfidence: 0.65, maxPerHour: 1 },
+  missed_entry: { cooldownMs: 20 * MIN, minConfidence: 0.75, maxPerHour: 3 },
+  position_review: { cooldownMs: 4 * HR, minConfidence: 0.65, maxPerHour: 1 },
+  journal_prompt: { cooldownMs: 8 * HR, minConfidence: 0.6, maxPerHour: 1 },
+  session_review: { cooldownMs: 12 * HR, minConfidence: 0.6, maxPerHour: 1 },
+  risk_warning: { cooldownMs: 5 * MIN, minConfidence: 0.8, maxPerHour: 8 },
+  playbook_suggest: { cooldownMs: 30 * MIN, minConfidence: 0.7, maxPerHour: 2 },
+  funding_alert: { cooldownMs: 30 * MIN, minConfidence: 0.65, maxPerHour: 4 },
+  news_event: { cooldownMs: 10 * MIN, minConfidence: 0.65, maxPerHour: 6 },
   // Stock event categories (Finnhub-driven)
-  earnings_approaching: { cooldownMs: 6 * HR,   minConfidence: 0.60, maxPerHour: 3 },
-  insider_flow_alert:   { cooldownMs: 4 * HR,   minConfidence: 0.65, maxPerHour: 2 },
-  analyst_upgrade:      { cooldownMs: 2 * HR,   minConfidence: 0.65, maxPerHour: 3 },
-  congressional_trade:  { cooldownMs: 6 * HR,   minConfidence: 0.65, maxPerHour: 2 },
+  earnings_approaching: { cooldownMs: 6 * HR, minConfidence: 0.6, maxPerHour: 3 },
+  insider_flow_alert: { cooldownMs: 4 * HR, minConfidence: 0.65, maxPerHour: 2 },
+  analyst_upgrade: { cooldownMs: 2 * HR, minConfidence: 0.65, maxPerHour: 3 },
+  congressional_trade: { cooldownMs: 6 * HR, minConfidence: 0.65, maxPerHour: 2 },
   // A live edge degrading or retiring is capital-at-risk — fires only on a
   // health transition (already self-throttled), so a tight cooldown is fine.
-  edge_health:          { cooldownMs: 15 * MIN, minConfidence: 0.75, maxPerHour: 4 },
+  edge_health: { cooldownMs: 15 * MIN, minConfidence: 0.75, maxPerHour: 4 },
 };
 
 // ============================================================================
@@ -94,10 +97,7 @@ export class CategoryPolicyManager {
    * Decide whether a candidate suggestion can fire. Checks: confidence gate,
    * cooldown, hourly rate limit, and explicit / auto-suppression.
    */
-  canFire(
-    category: ProactiveCategory,
-    confidence: number,
-  ): { allowed: boolean; reason?: string } {
+  canFire(category: ProactiveCategory, confidence: number): { allowed: boolean; reason?: string } {
     const s = this.state.get(category);
     if (!s) return { allowed: false, reason: `unknown category: ${category}` };
 
@@ -227,7 +227,8 @@ export class CategoryPolicyManager {
       this.state.set(entry.category, {
         category: entry.category,
         cooldownMs: typeof entry.cooldownMs === "number" ? entry.cooldownMs : cur.cooldownMs,
-        minConfidence: typeof entry.minConfidence === "number" ? entry.minConfidence : cur.minConfidence,
+        minConfidence:
+          typeof entry.minConfidence === "number" ? entry.minConfidence : cur.minConfidence,
         maxPerHour: typeof entry.maxPerHour === "number" ? entry.maxPerHour : cur.maxPerHour,
         lastFiredAt: entry.lastFiredAt,
         recentFireTimes: Array.isArray(entry.recentFireTimes) ? [...entry.recentFireTimes] : [],

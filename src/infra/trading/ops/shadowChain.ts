@@ -13,31 +13,15 @@
  */
 
 import { classifyMarginalParticipant } from "./marginalParticipantClassifier.ts";
-import type {
-  MarginalParticipantResult,
-  DriverKind,
-} from "./marginalParticipantClassifier.ts";
+import type { MarginalParticipantResult, DriverKind } from "./marginalParticipantClassifier.ts";
 import { attributeEdge } from "./edgeAttribution.ts";
 import type { EdgeAttributionResult, EdgeType } from "./edgeAttribution.ts";
 import { auditRiskBundle } from "./riskBundleAuditor.ts";
-import type { AuditResult, RiskItem } from "./riskBundleAuditor.ts";
-import {
-  sizePosition,
-  classifyPerformanceState,
-} from "./pathDependentSizer.ts";
-import type {
-  SizingResult,
-  TradeTier,
-  PerformanceState,
-} from "./pathDependentSizer.ts";
-import {
-  distanceToBarriers,
-  shouldBlockNewTrades,
-} from "../../safety/absorbingBarrier.ts";
-import type {
-  BarriersResult,
-  AbsorbingBarrierEvaluation,
-} from "../../safety/absorbingBarrier.ts";
+import type { AuditResult } from "./riskBundleAuditor.ts";
+import { sizePosition, classifyPerformanceState } from "./pathDependentSizer.ts";
+import type { SizingResult, TradeTier, PerformanceState } from "./pathDependentSizer.ts";
+import { distanceToBarriers, shouldBlockNewTrades } from "../../safety/absorbingBarrier.ts";
+import type { BarriersResult, AbsorbingBarrierEvaluation } from "../../safety/absorbingBarrier.ts";
 import { observeSessionEquity } from "../../safety/absorbingBarrierState.ts";
 import { runKillList } from "./preExecKillList.ts";
 import type { KillListResult } from "./preExecKillList.ts";
@@ -118,13 +102,15 @@ function aggregateVerdict(
   const blockers: string[] = [];
   if (edge.verdict === "no_edge") blockers.push("No identifiable edge");
   if (bundle.verdict === "no_go") blockers.push("Risk bundle audit failed");
-  if (sizer && sizer.rejected) blockers.push(`Sizer rejected: ${sizer.rejectionReason}`);
+  if (sizer?.rejected) blockers.push(`Sizer rejected: ${sizer.rejectionReason}`);
   if (barriers && shouldBlockNewTrades(barriers)) {
-    blockers.push(`Absorbing barrier breach: nearest ${barriers.nearest} at ${barriers.nearestRUnits.toFixed(2)}R`);
+    blockers.push(
+      `Absorbing barrier breach: nearest ${barriers.nearest} at ${barriers.nearestRUnits.toFixed(2)}R`,
+    );
   }
   // Separate check, never an else: the two barriers answer different questions
   // and the gate is the union of their blocks.
-  if (terminalBarrier && terminalBarrier.tripped) {
+  if (terminalBarrier?.tripped) {
     blockers.push(
       `Absorbing barrier terminal: ${terminalBarrier.boundBy} limit breached at ${((terminalBarrier.state.trippedAtLossFraction ?? 0) * 100).toFixed(1)}% of reference capital`,
     );
@@ -136,14 +122,10 @@ function aggregateVerdict(
   if (giveBack && giveBack.state === "triggered") {
     blockers.push("Give-back stop triggered — flatten the session");
   }
-  if (manipulation && manipulation.shouldRefuse) {
-    blockers.push(
-      `Microstructure manipulation regime: ${manipulation.reasoning}`,
-    );
+  if (manipulation?.shouldRefuse) {
+    blockers.push(`Microstructure manipulation regime: ${manipulation.reasoning}`);
   } else if (manipulation && manipulation.posture === "size_down") {
-    blockers.push(
-      `Microstructure elevated: ${manipulation.reasoning}`,
-    );
+    blockers.push(`Microstructure elevated: ${manipulation.reasoning}`);
   }
 
   if (blockers.length === 0) return { verdict: "go", blockers };
@@ -165,30 +147,44 @@ function formatMarkdown(result: ShadowPlanResult): string {
   const i = result.input;
   lines.push(`# Shadow plan: ${i.direction.toUpperCase()} ${i.symbol} @ ${i.entry}`);
   lines.push("");
-  lines.push(`**Verdict: ${result.overallVerdict.toUpperCase()}** (${result.blockers.length} blocker(s))`);
+  lines.push(
+    `**Verdict: ${result.overallVerdict.toUpperCase()}** (${result.blockers.length} blocker(s))`,
+  );
   if (result.blockers.length > 0) {
     for (const b of result.blockers) lines.push(`- ❌ ${b}`);
   }
   lines.push("");
   lines.push("## Pre-trade chain");
-  lines.push(`- **Marginal participant**: ${result.marginalParticipant.marginal} (confidence ${result.marginalParticipant.confidence.toFixed(2)})`);
+  lines.push(
+    `- **Marginal participant**: ${result.marginalParticipant.marginal} (confidence ${result.marginalParticipant.confidence.toFixed(2)})`,
+  );
   lines.push(`  - ${result.marginalParticipant.reasoning}`);
-  lines.push(`- **Edge attribution**: ${result.edgeAttribution.verdict} (${result.edgeAttribution.edgeType})`);
+  lines.push(
+    `- **Edge attribution**: ${result.edgeAttribution.verdict} (${result.edgeAttribution.edgeType})`,
+  );
   if (result.edgeAttribution.reasons.length > 0) {
     for (const r of result.edgeAttribution.reasons) lines.push(`  - ${r}`);
   }
-  lines.push(`- **Risk bundle**: ${result.riskBundle.verdict} — ${result.riskBundle.paidRisks.length} paid risk(s), ${result.riskBundle.unhedgedNoItems.length} unhedged no(s)`);
+  lines.push(
+    `- **Risk bundle**: ${result.riskBundle.verdict} — ${result.riskBundle.paidRisks.length} paid risk(s), ${result.riskBundle.unhedgedNoItems.length} unhedged no(s)`,
+  );
   if (result.sizer) {
     if (result.sizer.rejected) {
       lines.push(`- **Sizer**: REJECTED (${result.sizer.rejectionReason})`);
     } else {
-      lines.push(`- **Sizer**: $${result.sizer.finalDollarRisk.toFixed(0)} dollar risk → ${result.sizer.positionUnits.toFixed(4)} units (state multiplier ${result.sizer.stateMultiplier})`);
+      lines.push(
+        `- **Sizer**: $${result.sizer.finalDollarRisk.toFixed(0)} dollar risk → ${result.sizer.positionUnits.toFixed(4)} units (state multiplier ${result.sizer.stateMultiplier})`,
+      );
     }
   } else {
-    lines.push("- **Sizer**: SKIPPED (account state not configured — set GORDON_INITIAL_RISK_CAPITAL_USD)");
+    lines.push(
+      "- **Sizer**: SKIPPED (account state not configured — set GORDON_INITIAL_RISK_CAPITAL_USD)",
+    );
   }
   if (result.barriers) {
-    lines.push(`- **Absorbing barriers**: nearest ${result.barriers.nearest ?? "none"} at ${Number.isFinite(result.barriers.nearestRUnits) ? result.barriers.nearestRUnits.toFixed(2) + "R" : "n/a"}`);
+    lines.push(
+      `- **Absorbing barriers**: nearest ${result.barriers.nearest ?? "none"} at ${Number.isFinite(result.barriers.nearestRUnits) ? `${result.barriers.nearestRUnits.toFixed(2)}R` : "n/a"}`,
+    );
   } else {
     lines.push("- **Absorbing barriers**: SKIPPED (account state not configured)");
   }
@@ -198,12 +194,18 @@ function formatMarkdown(result: ShadowPlanResult): string {
       `- **Terminal loss barrier**: ${t.tripped ? `TRIPPED by ${t.boundBy}` : "ok"} (inception ${(t.inception.lossFraction * 100).toFixed(1)}%, trailing ${(t.trailing.lossFraction * 100).toFixed(1)}%)`,
     );
   }
-  lines.push(`- **Kill list**: ${result.killList.pass ? "PASS" : `BLOCK (${result.killList.blockers.length})`}`);
+  lines.push(
+    `- **Kill list**: ${result.killList.pass ? "PASS" : `BLOCK (${result.killList.blockers.length})`}`,
+  );
   if (result.streak) {
-    lines.push(`- **Streak**: ${result.streak.state} (consecutive losses: ${result.streak.consecutiveLosses})`);
+    lines.push(
+      `- **Streak**: ${result.streak.state} (consecutive losses: ${result.streak.consecutiveLosses})`,
+    );
   }
   if (result.giveBack) {
-    lines.push(`- **Give-back**: ${result.giveBack.state} (session PnL $${result.giveBack.sessionPnlUsd.toFixed(0)})`);
+    lines.push(
+      `- **Give-back**: ${result.giveBack.state} (session PnL $${result.giveBack.sessionPnlUsd.toFixed(0)})`,
+    );
   }
   if (result.manipulationContext) {
     lines.push(
@@ -212,8 +214,14 @@ function formatMarkdown(result: ShadowPlanResult): string {
   }
   if (result.liquidity.nearestBelow || result.liquidity.nearestAbove) {
     lines.push("- **Liquidity map**:");
-    if (result.liquidity.nearestBelow) lines.push(`  - Below: ${result.liquidity.nearestBelow.price} (strength ${result.liquidity.nearestBelow.strength})`);
-    if (result.liquidity.nearestAbove) lines.push(`  - Above: ${result.liquidity.nearestAbove.price} (strength ${result.liquidity.nearestAbove.strength})`);
+    if (result.liquidity.nearestBelow)
+      lines.push(
+        `  - Below: ${result.liquidity.nearestBelow.price} (strength ${result.liquidity.nearestBelow.strength})`,
+      );
+    if (result.liquidity.nearestAbove)
+      lines.push(
+        `  - Above: ${result.liquidity.nearestAbove.price} (strength ${result.liquidity.nearestAbove.strength})`,
+      );
   }
   return lines.join("\n");
 }
@@ -232,7 +240,7 @@ export function runShadowChain(input: ShadowPlanInput): ShadowPlanResult {
     edgeType: input.edgeType ?? "structural",
     counterparty:
       process.env.GORDON_EDGE_COUNTERPARTY ??
-      `${marginalParticipant.marginal === "opportunity" ? "forced flow on the other side" : "consensus on " + input.symbol}`,
+      `${marginalParticipant.marginal === "opportunity" ? "forced flow on the other side" : `consensus on ${input.symbol}`}`,
     constraint:
       process.env.GORDON_EDGE_CONSTRAINT ??
       (marginalParticipant.marginal === "opportunity"
@@ -330,9 +338,7 @@ export function runShadowChain(input: ShadowPlanInput): ShadowPlanResult {
       },
       ...input.targets.map((tp, i) => ({
         price: tp,
-        kind: (input.direction === "long" ? "resistance" : "support") as
-          | "resistance"
-          | "support",
+        kind: (input.direction === "long" ? "resistance" : "support") as "resistance" | "support",
         testCount: 1,
         label: `target ${i + 1}`,
       })),

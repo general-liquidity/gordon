@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeLogitRsi,
-  logitRsiToPayload,
-} from "./logitRsi.ts";
+import { computeLogitRsi, logitRsiToPayload } from "./logitRsi.ts";
 
 describe("computeLogitRsi", () => {
   it("short series → NaN with reason", () => {
@@ -36,9 +33,7 @@ describe("computeLogitRsi", () => {
   });
 
   it("RSI=50 maps to logit≈0", () => {
-    const prices = Array.from({ length: 80 }, (_, i) =>
-      100 + 5 * Math.sin(i / 5)
-    );
+    const prices = Array.from({ length: 80 }, (_, i) => 100 + 5 * Math.sin(i / 5));
     const r = computeLogitRsi({ prices });
     expect(Math.abs(r.currentLogit)).toBeLessThan(2);
   });
@@ -58,7 +53,7 @@ describe("computeLogitRsi", () => {
       s = (s * 1664525 + 1013904223) >>> 0;
       return s / 0xffffffff - 0.5;
     };
-    const base = Array.from({ length: 100 }, (_, i) => 100 + rand() * 2);
+    const base = Array.from({ length: 100 }, (_, _i) => 100 + rand() * 2);
     const shock = Array.from({ length: 20 }, (_, i) => 100 + 30 + i * 2);
     const r = computeLogitRsi({ prices: [...base, ...shock] });
     expect(["overbought", "extreme_overbought"]).toContain(r.currentZone);

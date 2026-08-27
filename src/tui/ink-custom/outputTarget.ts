@@ -384,9 +384,7 @@ export function createOutputTarget(width: number, height: number): OutputTarget 
       // when a HyperlinkPool is provided AND the inbound text carries OSC
       // 8 codes — blank cells and non-link chars stay 0 and generate no
       // OSC 8 sequences in the emitted string.
-      const linkGrid: Uint32Array | null = hyperlinkPool
-        ? new Uint32Array(width * height)
-        : null;
+      const linkGrid: Uint32Array | null = hyperlinkPool ? new Uint32Array(width * height) : null;
 
       const clips: Array<ClipOp["clip"]> = [];
       for (const op of operations) {
@@ -504,7 +502,7 @@ export function createOutputTarget(width: number, height: number): OutputTarget 
         let activeLinkId = 0;
         for (let colX = 0; colX < row.length; colX++) {
           const ch = row[colX]!;
-          const newLinkId = linkGrid ? linkGrid[rowY * width + colX] ?? 0 : 0;
+          const newLinkId = linkGrid ? (linkGrid[rowY * width + colX] ?? 0) : 0;
           if (newLinkId !== activeLinkId) {
             if (activeLinkId !== 0) out += LINK_CLOSE_CODE;
             if (newLinkId !== 0 && hyperlinkPool) {

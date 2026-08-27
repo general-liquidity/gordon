@@ -24,9 +24,7 @@ describe("wrapForMultiplexer", () => {
     delete process.env.STY;
     process.env.TMUX = "/tmp/tmux-1000/default,1,0";
     // ESC ] 0 ; gordon BEL  ->  ESC P tmux ; ESC ESC ] 0 ; gordon BEL ESC \
-    expect(wrapForMultiplexer(SEQ)).toBe(
-      `\x1bPtmux;\x1b\x1b]0;gordon\x07\x1b\\`,
-    );
+    expect(wrapForMultiplexer(SEQ)).toBe(`\x1bPtmux;\x1b\x1b]0;gordon\x07\x1b\\`);
   });
 
   it("wraps in screen DCS passthrough when $STY is set", () => {

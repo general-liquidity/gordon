@@ -23,8 +23,8 @@ let syncOutputSupported = true;
 // Detect if terminal supports synchronized output
 try {
   const term = process.env.TERM_PROGRAM ?? "";
-  syncOutputSupported = /iTerm|WezTerm|Ghostty|kitty|foot|Contour/i.test(term)
-    || !!process.env.WT_SESSION;
+  syncOutputSupported =
+    /iTerm|WezTerm|Ghostty|kitty|foot|Contour/i.test(term) || !!process.env.WT_SESSION;
 } catch {
   syncOutputSupported = false;
 }
@@ -36,11 +36,11 @@ try {
 export function installLineDiffRenderer(): () => void {
   const originalWrite = process.stdout.write.bind(process.stdout);
 
-  const patchedWrite = function (
+  const patchedWrite = (
     chunk: string | Buffer | Uint8Array,
     encodingOrCallback?: BufferEncoding | ((err?: Error | null) => void),
     callback?: (err?: Error | null) => void,
-  ): boolean {
+  ): boolean => {
     // Only diff string writes (Ink's output)
     if (typeof chunk !== "string") {
       return originalWrite(chunk, encodingOrCallback as BufferEncoding, callback);

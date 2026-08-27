@@ -31,4 +31,3 @@ export function createGatewayError(
 ): GatewayError {
   return { code, message, details, retryable };
 }
-

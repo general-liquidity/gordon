@@ -7,9 +7,13 @@ import type {
   RuntimeApprovalRule,
   RuntimeToolSpec,
 } from "../contracts/types.ts";
-import { RuntimeStore } from "../state/RuntimeStore.ts";
+import type { RuntimeStore } from "../state/RuntimeStore.ts";
 import type { RuntimeToolPolicyDecision } from "../tools/ToolPolicy.ts";
-import { getDefaultTrustTrajectory, isSafetyCritical, recordPermissionEvaluation } from "./trustTrajectory.ts";
+import {
+  getDefaultTrustTrajectory,
+  isSafetyCritical,
+  recordPermissionEvaluation,
+} from "./trustTrajectory.ts";
 
 export interface PermissionHookInput {
   policy: RuntimeToolPolicyDecision;
@@ -102,7 +106,12 @@ function globToRegex(pattern: string): RegExp {
   return new RegExp(`^${body}$`);
 }
 
-function matchesRule(tool: RuntimeToolSpec, toolName: string, rule: RuntimeApprovalRule, now: number): boolean {
+function matchesRule(
+  tool: RuntimeToolSpec,
+  toolName: string,
+  rule: RuntimeApprovalRule,
+  now: number,
+): boolean {
   if (rule.expiresAt && new Date(rule.expiresAt).getTime() <= now) return false;
   if (rule.permissionScope && rule.permissionScope !== tool.permissionScope) return false;
   if (rule.toolName && rule.toolName !== toolName) return false;
@@ -143,11 +152,13 @@ function hashApprovalArgs(args: unknown): string {
     if (Array.isArray(value)) return value;
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>).sort(([left], [right]) =>
-        left.localeCompare(right)
+        left.localeCompare(right),
       ),
     );
   });
-  return createHash("sha256").update(serialized ?? String(args)).digest("hex");
+  return createHash("sha256")
+    .update(serialized ?? String(args))
+    .digest("hex");
 }
 
 function buildFingerprint(
@@ -175,9 +186,9 @@ function defaultClassifier(input: PermissionHookInput): PermissionHookDecision {
   }
 
   if (
-    input.policy.tool.sideEffectLevel === "read"
-    && input.policy.tool.riskClass === "low"
-    && input.policy.approvalClass !== "always_require_human"
+    input.policy.tool.sideEffectLevel === "read" &&
+    input.policy.tool.riskClass === "low" &&
+    input.policy.approvalClass !== "always_require_human"
   ) {
     return {
       decision: "allow",
@@ -185,7 +196,10 @@ function defaultClassifier(input: PermissionHookInput): PermissionHookDecision {
     };
   }
 
-  if (input.policy.approvalClass === "always_require_human" || input.policy.tool.riskClass === "critical") {
+  if (
+    input.policy.approvalClass === "always_require_human" ||
+    input.policy.tool.riskClass === "critical"
+  ) {
     return {
       decision: "queue",
       actor: "classifier:human-required",
@@ -200,9 +214,9 @@ function defaultClassifier(input: PermissionHookInput): PermissionHookDecision {
 
 export class PermissionEngine {
   private readonly runtimeStore: RuntimeStore;
-  private readonly hooks: Array<(input: PermissionHookInput) => PermissionHookDecision | Promise<PermissionHookDecision>> = [
-    defaultClassifier,
-  ];
+  private readonly hooks: Array<
+    (input: PermissionHookInput) => PermissionHookDecision | Promise<PermissionHookDecision>
+  > = [defaultClassifier];
   private readonly approvalArgs = new Map<string, unknown>();
 
   constructor(runtimeStore: RuntimeStore) {
@@ -303,7 +317,8 @@ export class PermissionEngine {
         runtimeId: runtimeState.runtimeId,
         sessionId: runtimeState.session.sessionId,
         resourceId: runtimeState.session.resourceId,
-        threadId: runtimeState.session.threadId ?? runtimeState.session.snapshot?.threadId ?? undefined,
+        threadId:
+          runtimeState.session.threadId ?? runtimeState.session.snapshot?.threadId ?? undefined,
         fingerprint: buildFingerprint(tool, context, runtimeState, args),
         status: "approved",
         reason: `Approved by ${matchingRule.scope} rule.`,
@@ -345,7 +360,8 @@ export class PermissionEngine {
           runtimeId: runtimeState.runtimeId,
           sessionId: runtimeState.session.sessionId,
           resourceId: runtimeState.session.resourceId,
-          threadId: runtimeState.session.threadId ?? runtimeState.session.snapshot?.threadId ?? undefined,
+          threadId:
+            runtimeState.session.threadId ?? runtimeState.session.snapshot?.threadId ?? undefined,
           fingerprint: buildFingerprint(tool, context, runtimeState, args),
           status: "approved",
           reason: decision.reason,
@@ -384,7 +400,8 @@ export class PermissionEngine {
           runtimeId: runtimeState.runtimeId,
           sessionId: runtimeState.session.sessionId,
           resourceId: runtimeState.session.resourceId,
-          threadId: runtimeState.session.threadId ?? runtimeState.session.snapshot?.threadId ?? undefined,
+          threadId:
+            runtimeState.session.threadId ?? runtimeState.session.snapshot?.threadId ?? undefined,
           fingerprint: buildFingerprint(tool, context, runtimeState, args),
           status: "denied",
           reason: decision.reason,
@@ -413,11 +430,24 @@ export class PermissionEngine {
         };
       }
 
-      const approvalHook = await this.runPreApprovalHook(toolName, tool.riskClass, decision.reason, args);
+      const approvalHook = await this.runPreApprovalHook(
+        toolName,
+        tool.riskClass,
+        decision.reason,
+        args,
+      );
       if (approvalHook.blocked) {
         return { status: "blocked", source: "hook", reason: approvalHook.reason };
       }
-      const queued = this.queueRequest(toolName, tool, policy.approvalClass, context, runtimeState, approvalHook.reason, args);
+      const queued = this.queueRequest(
+        toolName,
+        tool,
+        policy.approvalClass,
+        context,
+        runtimeState,
+        approvalHook.reason,
+        args,
+      );
       return {
         status: "pending",
         source: decision.actor?.startsWith("classifier") ? "classifier" : "hook",
@@ -426,11 +456,24 @@ export class PermissionEngine {
       };
     }
 
-    const approvalHook = await this.runPreApprovalHook(toolName, tool.riskClass, policy.reason, args);
+    const approvalHook = await this.runPreApprovalHook(
+      toolName,
+      tool.riskClass,
+      policy.reason,
+      args,
+    );
     if (approvalHook.blocked) {
       return { status: "blocked", source: "hook", reason: approvalHook.reason };
     }
-    const queued = this.queueRequest(toolName, tool, policy.approvalClass, context, runtimeState, approvalHook.reason, args);
+    const queued = this.queueRequest(
+      toolName,
+      tool,
+      policy.approvalClass,
+      context,
+      runtimeState,
+      approvalHook.reason,
+      args,
+    );
     return {
       status: "pending",
       source: "policy",
@@ -585,11 +628,13 @@ export class PermissionEngine {
    * e.g. `denyAll({ scope: "trading" })` clears only trading-risk approvals.
    * Returns the count of requests denied.
    */
-  denyAll(options: {
-    scope?: RuntimeApprovalRequest["permissionScope"];
-    actor?: string;
-    reason?: string;
-  } = {}): number {
+  denyAll(
+    options: {
+      scope?: RuntimeApprovalRequest["permissionScope"];
+      actor?: string;
+      reason?: string;
+    } = {},
+  ): number {
     const state = this.runtimeStore.getState();
     const targets = state.approvals.pending.filter(
       (entry) => !options.scope || entry.permissionScope === options.scope,
@@ -613,7 +658,9 @@ export class PermissionEngine {
     args?: unknown,
   ): RuntimeApprovalRequest {
     const fingerprint = buildFingerprint(tool, context, runtimeState, args);
-    const existing = runtimeState.approvals.pending.find((entry) => entry.fingerprint === fingerprint);
+    const existing = runtimeState.approvals.pending.find(
+      (entry) => entry.fingerprint === fingerprint,
+    );
     if (existing) {
       return existing;
     }
@@ -628,7 +675,8 @@ export class PermissionEngine {
       runtimeId: runtimeState.runtimeId,
       sessionId: runtimeState.session.sessionId,
       resourceId: runtimeState.session.resourceId,
-      threadId: runtimeState.session.threadId ?? runtimeState.session.snapshot?.threadId ?? undefined,
+      threadId:
+        runtimeState.session.threadId ?? runtimeState.session.snapshot?.threadId ?? undefined,
       fingerprint,
       status: "pending",
       reason: reason ?? `Approval required for ${toolName}.`,
@@ -654,11 +702,12 @@ export class PermissionEngine {
   ): Promise<{ blocked: boolean; reason?: string }> {
     const payload = {
       action: toolName,
-      riskTier: riskClass === "critical"
-        ? "critical" as const
-        : riskClass === "high"
-          ? "high" as const
-          : "standard" as const,
+      riskTier:
+        riskClass === "critical"
+          ? ("critical" as const)
+          : riskClass === "high"
+            ? ("high" as const)
+            : ("standard" as const),
       rationale: rationale ?? `Approval required for ${toolName}.`,
       args,
     };
@@ -683,7 +732,10 @@ export class PermissionEngine {
     const state = this.runtimeStore.getState();
     this.runtimeStore.setApprovalState({
       pending: state.approvals.pending.filter((entry) => entry.id !== request.id),
-      recent: [request, ...state.approvals.recent.filter((entry) => entry.id !== request.id)].slice(0, 50),
+      recent: [request, ...state.approvals.recent.filter((entry) => entry.id !== request.id)].slice(
+        0,
+        50,
+      ),
     });
     this.approvalArgs.delete(request.id);
   }
@@ -691,7 +743,10 @@ export class PermissionEngine {
   private recordResolvedRequest(request: RuntimeApprovalRequest): void {
     const state = this.runtimeStore.getState();
     this.runtimeStore.setApprovalState({
-      recent: [request, ...state.approvals.recent.filter((entry) => entry.id !== request.id)].slice(0, 50),
+      recent: [request, ...state.approvals.recent.filter((entry) => entry.id !== request.id)].slice(
+        0,
+        50,
+      ),
     });
   }
 

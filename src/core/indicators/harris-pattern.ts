@@ -95,7 +95,11 @@ export function calculateHarrisPattern(candles: Candle[]): HarrisPatternResult {
 
   const current = signals[n - 1]!;
   const currentLabel =
-    current === 2 ? "BUY signal on latest bar" : current === 1 ? "SELL signal on latest bar" : "no signal on latest bar";
+    current === 2
+      ? "BUY signal on latest bar"
+      : current === 1
+        ? "SELL signal on latest bar"
+        : "no signal on latest bar";
 
   const interpretation = `Harris DAX 4-bar pattern over ${n} bars: ${buyCount} buy, ${sellCount} sell (${currentLabel}).`;
 

@@ -181,4 +181,3 @@ export async function isIpcDaemonReachable(socketPath?: string): Promise<boolean
     client.on("error", () => resolve(false));
   });
 }
-

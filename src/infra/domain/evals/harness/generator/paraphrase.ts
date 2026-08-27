@@ -40,7 +40,10 @@ const logger = createModuleLogger("eval-paraphrase");
  * provider the operator configured is used, so paraphrasing tracks the
  * operator's model family instead of a hardcoded one.
  */
-function resolveParaphraseRoute(model: string | undefined): { provider: LLMProvider; model: string } {
+function resolveParaphraseRoute(model: string | undefined): {
+  provider: LLMProvider;
+  model: string;
+} {
   const spec = model && model.length > 0 ? model : safeBalancedModel();
   const slash = spec.indexOf("/");
   if (slash === -1) {
@@ -179,13 +182,11 @@ export function writeParaphraseCache(
   mkdirSync(dirname(path), { recursive: true });
   // Stable ordering for clean diffs.
   const sorted = [...scenarios].sort((a, b) => a.id.localeCompare(b.id));
-  writeFileSync(path, JSON.stringify(sorted, null, 2) + "\n", "utf8");
+  writeFileSync(path, `${JSON.stringify(sorted, null, 2)}\n`, "utf8");
   return { written: sorted.length };
 }
 
-export function readParaphraseCache(
-  path: string = defaultParaphraseCachePath(),
-): EvalScenario[] {
+export function readParaphraseCache(path: string = defaultParaphraseCachePath()): EvalScenario[] {
   if (!existsSync(path)) return [];
   try {
     const raw = readFileSync(path, "utf8");

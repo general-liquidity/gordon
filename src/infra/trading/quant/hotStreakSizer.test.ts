@@ -1,17 +1,10 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeHotStreakSizing,
-  hotStreakSizerToPayload,
-} from "./hotStreakSizer.ts";
+import { computeHotStreakSizing, hotStreakSizerToPayload } from "./hotStreakSizer.ts";
 
 describe("computeHotStreakSizing — validation", () => {
   it("rejects non-finite P&L", () => {
-    expect(() =>
-      computeHotStreakSizing({ recentRealizedPnLPct: NaN }),
-    ).toThrow();
-    expect(() =>
-      computeHotStreakSizing({ recentRealizedPnLPct: Infinity }),
-    ).toThrow();
+    expect(() => computeHotStreakSizing({ recentRealizedPnLPct: NaN })).toThrow();
+    expect(() => computeHotStreakSizing({ recentRealizedPnLPct: Infinity })).toThrow();
   });
 
   it("rejects non-positive hotThresholdPct", () => {
@@ -56,34 +49,34 @@ describe("computeHotStreakSizing — classification", () => {
   });
 
   it("cold at -10% (below default -0.05 threshold)", () => {
-    const r = computeHotStreakSizing({ recentRealizedPnLPct: -0.10 });
+    const r = computeHotStreakSizing({ recentRealizedPnLPct: -0.1 });
     expect(r.classification).toBe("cold");
   });
 
   it("classification is hot exactly at hotThreshold", () => {
-    const r = computeHotStreakSizing({ recentRealizedPnLPct: 0.20 });
+    const r = computeHotStreakSizing({ recentRealizedPnLPct: 0.2 });
     expect(r.classification).toBe("hot");
   });
 });
 
 describe("computeHotStreakSizing — suggested multiplier", () => {
   it("hot at exactly hotThreshold → 1.0 baseline", () => {
-    const r = computeHotStreakSizing({ recentRealizedPnLPct: 0.20 });
+    const r = computeHotStreakSizing({ recentRealizedPnLPct: 0.2 });
     expect(r.suggestedMultiplier).toBeCloseTo(1.0, 4);
   });
 
   it("hot at 2× hotThreshold → maxMultiplier", () => {
-    const r = computeHotStreakSizing({ recentRealizedPnLPct: 0.40 });
+    const r = computeHotStreakSizing({ recentRealizedPnLPct: 0.4 });
     expect(r.suggestedMultiplier).toBeCloseTo(1.5, 4);
   });
 
   it("hot at 3× hotThreshold → still capped at maxMultiplier", () => {
-    const r = computeHotStreakSizing({ recentRealizedPnLPct: 0.60 });
+    const r = computeHotStreakSizing({ recentRealizedPnLPct: 0.6 });
     expect(r.suggestedMultiplier).toBeCloseTo(1.5, 4);
   });
 
   it("hot at 1.5× hotThreshold → linear interp midpoint", () => {
-    const r = computeHotStreakSizing({ recentRealizedPnLPct: 0.30 });
+    const r = computeHotStreakSizing({ recentRealizedPnLPct: 0.3 });
     expect(r.suggestedMultiplier).toBeCloseTo(1.25, 4);
   });
 
@@ -93,12 +86,12 @@ describe("computeHotStreakSizing — suggested multiplier", () => {
   });
 
   it("cold → coldMultiplier (default 0.5)", () => {
-    const r = computeHotStreakSizing({ recentRealizedPnLPct: -0.20 });
+    const r = computeHotStreakSizing({ recentRealizedPnLPct: -0.2 });
     expect(r.suggestedMultiplier).toBe(0.5);
   });
 
   it("respects custom coldMultiplier=0 (refuse)", () => {
-    const r = computeHotStreakSizing({ recentRealizedPnLPct: -0.20, coldMultiplier: 0 });
+    const r = computeHotStreakSizing({ recentRealizedPnLPct: -0.2, coldMultiplier: 0 });
     expect(r.suggestedMultiplier).toBe(0);
     expect(r.recommendedAction).toBe("refuse");
   });
@@ -106,7 +99,7 @@ describe("computeHotStreakSizing — suggested multiplier", () => {
 
 describe("computeHotStreakSizing — informational vs active mode", () => {
   it("informational mode (default): effectiveMultiplier = 1.0 even when hot", () => {
-    const r = computeHotStreakSizing({ recentRealizedPnLPct: 0.40 });
+    const r = computeHotStreakSizing({ recentRealizedPnLPct: 0.4 });
     expect(r.mode).toBe("informational");
     expect(r.suggestedMultiplier).toBeCloseTo(1.5, 4);
     expect(r.effectiveMultiplier).toBe(1.0);
@@ -115,7 +108,7 @@ describe("computeHotStreakSizing — informational vs active mode", () => {
 
   it("active mode: effectiveMultiplier = suggestedMultiplier when hot", () => {
     const r = computeHotStreakSizing({
-      recentRealizedPnLPct: 0.40,
+      recentRealizedPnLPct: 0.4,
       mode: "active",
     });
     expect(r.effectiveMultiplier).toBeCloseTo(1.5, 4);
@@ -123,7 +116,7 @@ describe("computeHotStreakSizing — informational vs active mode", () => {
   });
 
   it("informational mode when cold: suggested = 0.5, effective = 1.0", () => {
-    const r = computeHotStreakSizing({ recentRealizedPnLPct: -0.20 });
+    const r = computeHotStreakSizing({ recentRealizedPnLPct: -0.2 });
     expect(r.suggestedMultiplier).toBe(0.5);
     expect(r.effectiveMultiplier).toBe(1.0);
     expect(r.recommendedAction).toBe("size_down_suggested_informational");
@@ -131,7 +124,7 @@ describe("computeHotStreakSizing — informational vs active mode", () => {
 
   it("active mode when cold: minimum_probe_only", () => {
     const r = computeHotStreakSizing({
-      recentRealizedPnLPct: -0.20,
+      recentRealizedPnLPct: -0.2,
       mode: "active",
     });
     expect(r.effectiveMultiplier).toBe(0.5);

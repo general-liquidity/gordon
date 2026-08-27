@@ -2,10 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import type { CandidateProducer, ProactiveObservation } from "../engine/proactiveEngine.ts";
 import type { ProactiveSuggestion } from "../types.ts";
 import { getProducerHealthTracker } from "../engine/producerHealth.ts";
-import {
-  tradeEventProducer,
-  resetTradeEventProducerState,
-} from "./events/tradeEventProducer.ts";
+import { tradeEventProducer, resetTradeEventProducerState } from "./events/tradeEventProducer.ts";
 import { scanOpportunityProducer } from "./signals/scanOpportunityProducer.ts";
 import { riskProducer } from "./risk/riskProducer.ts";
 import { stopProducer } from "./risk/stopProducer.ts";
@@ -30,7 +27,10 @@ import {
   congressionalTradeProducer,
 } from "./events/stockEventsProducer.ts";
 
-function busObs(eventType: string, extra: Partial<ProactiveObservation> = {}): ProactiveObservation {
+function busObs(
+  eventType: string,
+  extra: Partial<ProactiveObservation> = {},
+): ProactiveObservation {
   return {
     source: "event_bus",
     eventType,
@@ -39,7 +39,10 @@ function busObs(eventType: string, extra: Partial<ProactiveObservation> = {}): P
   };
 }
 
-function tickObs(eventType: string, extra: Partial<ProactiveObservation> = {}): ProactiveObservation {
+function tickObs(
+  eventType: string,
+  extra: Partial<ProactiveObservation> = {},
+): ProactiveObservation {
   return {
     source: "monitor_loop",
     eventType,
@@ -65,7 +68,9 @@ describe("proactive producers — smoke coverage", () => {
 
     test("fires journal_prompt after five closed trades", async () => {
       for (let i = 0; i < 4; i++) {
-        expect(await runProducer(tradeEventProducer, busObs("trade:closed", { symbol: "BTCUSDT" }))).toEqual([]);
+        expect(
+          await runProducer(tradeEventProducer, busObs("trade:closed", { symbol: "BTCUSDT" })),
+        ).toEqual([]);
       }
       const cards = await runProducer(
         tradeEventProducer,

@@ -4,7 +4,11 @@ import type { Message } from "./MessageBubble.tsx";
 
 // Shutdown: graceful exit notice with session summary
 // Trading context: confirms positions are safe before exit
-export const ShutdownMessage = React.memo(function ShutdownMessage({ message }: { message: Message }) {
+export const ShutdownMessage = React.memo(function ShutdownMessage({
+  message,
+}: {
+  message: Message;
+}) {
   return (
     <Box marginTop={1} flexDirection="column">
       <Box paddingLeft={2}>

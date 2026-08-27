@@ -20,7 +20,12 @@ export interface AOResult {
   /** Zero-line crossover */
   crossover: "bullish_cross" | "bearish_cross" | "none";
   /** Momentum direction */
-  momentum: "accelerating_up" | "decelerating_up" | "accelerating_down" | "decelerating_down" | "flat";
+  momentum:
+    | "accelerating_up"
+    | "decelerating_up"
+    | "accelerating_down"
+    | "decelerating_down"
+    | "flat";
   /** Signal */
   signal: "buy" | "sell" | "neutral";
   /** Interpretation string */
@@ -52,7 +57,7 @@ function sma(values: number[], period: number): (number | null)[] {
 export function calculateAO(
   candles: Candle[],
   fastPeriod: number = 5,
-  slowPeriod: number = 34
+  slowPeriod: number = 34,
 ): AOResult {
   if (candles.length < slowPeriod + 5) {
     return {
@@ -67,7 +72,7 @@ export function calculateAO(
   }
 
   // Median price = (High + Low) / 2
-  const medianPrices = candles.map(c => (c.high + c.low) / 2);
+  const medianPrices = candles.map((c) => (c.high + c.low) / 2);
 
   // AO = SMA(median, fast) - SMA(median, slow)
   const fastSma = sma(medianPrices, fastPeriod);
@@ -86,7 +91,7 @@ export function calculateAO(
 
   const current = aoValues[aoValues.length - 1] ?? null;
   const prev = (aoValues.length >= 2 ? aoValues[aoValues.length - 2] : null) ?? null;
-  const prev2 = (aoValues.length >= 3 ? aoValues[aoValues.length - 3] : null) ?? null;
+  const _prev2 = (aoValues.length >= 3 ? aoValues[aoValues.length - 3] : null) ?? null;
 
   // Color
   let color: "lime" | "green" | "red" | "maroon" = "green";
@@ -106,7 +111,12 @@ export function calculateAO(
   }
 
   // Momentum
-  let momentum: "accelerating_up" | "decelerating_up" | "accelerating_down" | "decelerating_down" | "flat" = "flat";
+  let momentum:
+    | "accelerating_up"
+    | "decelerating_up"
+    | "accelerating_down"
+    | "decelerating_down"
+    | "flat" = "flat";
   if (current !== null && prev !== null) {
     if (current > 0 && current > prev) momentum = "accelerating_up";
     else if (current > 0 && current <= prev) momentum = "decelerating_up";
@@ -133,7 +143,11 @@ export function calculateAO(
 }
 
 function buildAOInterpretation(
-  ao: number | null, color: string, crossover: string, momentum: string, signal: string
+  ao: number | null,
+  color: string,
+  crossover: string,
+  momentum: string,
+  _signal: string,
 ): string {
   if (ao === null) return "Insufficient data for AO.";
 

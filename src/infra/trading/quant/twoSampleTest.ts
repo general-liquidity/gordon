@@ -156,8 +156,7 @@ export function mannWhitneyU(a: number[], b: number[]): MannWhitneyResult | null
   const meanU = (n1 * n2) / 2;
   let tieCorrection = 0;
   for (const t of tieGroups) tieCorrection += t * t * t - t;
-  const varU =
-    ((n1 * n2) / 12) * (N + 1 - tieCorrection / (N * (N - 1)));
+  const varU = ((n1 * n2) / 12) * (N + 1 - tieCorrection / (N * (N - 1)));
 
   let z = 0;
   let pValue = 1;
@@ -190,16 +189,15 @@ export function twoSamplePnlTest(input: {
   const scenario = input?.scenario;
   if (!isFiniteVector(baseline) || !isFiniteVector(scenario)) return null;
   if (baseline.length < MIN_SAMPLE || scenario.length < MIN_SAMPLE) return null;
-  const alpha = Number.isFinite(input.alpha) && input.alpha! > 0 && input.alpha! < 1
-    ? input.alpha!
-    : 0.05;
+  const alpha =
+    Number.isFinite(input.alpha) && input.alpha! > 0 && input.alpha! < 1 ? input.alpha! : 0.05;
 
   const mw = mannWhitneyU(baseline, scenario);
   if (mw == null) return null;
 
   const paired =
     baseline.length === scenario.length
-      ? pairedTTest(baseline, scenario) ?? undefined
+      ? (pairedTTest(baseline, scenario) ?? undefined)
       : undefined;
 
   const mwSig = mw.pValue < alpha;

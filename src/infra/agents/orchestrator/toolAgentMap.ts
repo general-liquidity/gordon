@@ -16,7 +16,7 @@ import {
   type FilterableMessage,
   type SubagentContextFilterResult,
   type DelegationFeedbackNote,
-  HandoffCoordinator,
+  type HandoffCoordinator,
 } from "./HandoffCoordinator.ts";
 
 const logger = createModuleLogger("orchestrator-tool-map");
@@ -72,13 +72,15 @@ export const TOOL_AGENT_MAP: Record<string, string> = {
 // ============================================================================
 
 const PLANNING_ARTIFACT_TOOLS = new Set([
-  "create_plan", "create_grid_plan", "execute_plan", "approve_plan",
-  "list_plans", "preview_market_order",
+  "create_plan",
+  "create_grid_plan",
+  "execute_plan",
+  "approve_plan",
+  "list_plans",
+  "preview_market_order",
 ]);
 
-const REQUIRES_PLANNING_ARTIFACT = new Set([
-  "execute_plan", "approve_plan",
-]);
+const REQUIRES_PLANNING_ARTIFACT = new Set(["execute_plan", "approve_plan"]);
 
 export function isPlanningArtifactTool(toolName: string | undefined): boolean {
   return toolName ? PLANNING_ARTIFACT_TOOLS.has(toolName) : false;
@@ -108,9 +110,10 @@ export function getAgentForTool(toolName: string): string | undefined {
 /**
  * Build the default executor handoff budget from context and risk config
  */
-export function buildDefaultExecutorHandoffBudget(
-  context: GordonContext,
-): { toolBudget: number; maxSteps: number } {
+export function buildDefaultExecutorHandoffBudget(context: GordonContext): {
+  toolBudget: number;
+  maxSteps: number;
+} {
   const readiness = getExecutionReadiness(context);
   if (!readiness.ready) {
     return { toolBudget: 0, maxSteps: 0 };

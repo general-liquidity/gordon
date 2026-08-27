@@ -27,9 +27,7 @@ describe("computeCarteaJaimungalSignalSpeed — validation", () => {
   });
 
   it("rejects negative running penalty", () => {
-    expect(() =>
-      computeCarteaJaimungalSignalSpeed({ ...base, runningPenalty: -1 }),
-    ).toThrow();
+    expect(() => computeCarteaJaimungalSignalSpeed({ ...base, runningPenalty: -1 })).toThrow();
   });
 });
 

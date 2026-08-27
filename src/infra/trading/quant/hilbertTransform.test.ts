@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeHilbertTransform,
-  hilbertToPayload,
-} from "./hilbertTransform.ts";
+import { computeHilbertTransform, hilbertToPayload } from "./hilbertTransform.ts";
 
 describe("computeHilbertTransform", () => {
   it("short series → NaN with reason", () => {

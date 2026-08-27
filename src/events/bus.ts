@@ -55,7 +55,7 @@ export class EventBus {
   on<T extends EventType>(
     type: T,
     handler: EventHandler<T>,
-    options: SubscriptionOptions = {}
+    options: SubscriptionOptions = {},
   ): () => void {
     const subs = this.handlers.get(type) || [];
     const subscription: Subscription = {
@@ -88,7 +88,10 @@ export class EventBus {
 
     return () => {
       const current = this.handlers.get("*") || [];
-      this.handlers.set("*", current.filter((s) => s.handler !== handler));
+      this.handlers.set(
+        "*",
+        current.filter((s) => s.handler !== handler),
+      );
     };
   }
 
@@ -98,7 +101,7 @@ export class EventBus {
   once<T extends EventType>(
     type: T,
     handler: EventHandler<T>,
-    options: SubscriptionOptions = {}
+    options: SubscriptionOptions = {},
   ): () => void {
     return this.on(type, handler, { ...options, once: true });
   }
@@ -111,7 +114,7 @@ export class EventBus {
     if (subs) {
       this.handlers.set(
         type,
-        subs.filter((s) => s.handler !== handler)
+        subs.filter((s) => s.handler !== handler),
       );
     }
   }
@@ -144,7 +147,10 @@ export class EventBus {
     const wildcardHandlers = this.handlers.get("*") || [];
 
     // Combine and process
-    const toRemove: { type: EventType | "*"; handler: EventHandler<EventType> | WildcardHandler }[] = [];
+    const toRemove: {
+      type: EventType | "*";
+      handler: EventHandler<EventType> | WildcardHandler;
+    }[] = [];
 
     // Process type-specific handlers
     for (const sub of typeHandlers) {
@@ -178,7 +184,7 @@ export class EventBus {
       if (subs) {
         this.handlers.set(
           type,
-          subs.filter((s) => s.handler !== handler)
+          subs.filter((s) => s.handler !== handler),
         );
       }
     }
@@ -189,7 +195,7 @@ export class EventBus {
    */
   async send<T extends EventType>(
     type: T,
-    data: Omit<EventData<T>, "type" | "timestamp">
+    data: Omit<EventData<T>, "type" | "timestamp">,
   ): Promise<void> {
     const event = {
       ...data,
@@ -258,7 +264,7 @@ export function setEventBus(bus: EventBus): void {
  */
 export async function emitEvent<T extends EventType>(
   type: T,
-  data: Omit<EventData<T>, "type" | "timestamp">
+  data: Omit<EventData<T>, "type" | "timestamp">,
 ): Promise<void> {
   await getEventBus().send(type, data);
 }

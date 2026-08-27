@@ -27,4 +27,3 @@ export function toMessageStreamChunk(event: StreamEvent): MessageStreamChunk {
     usage: event.usage,
   };
 }
-

@@ -8,7 +8,6 @@ import { Box, Text } from "../../ink-custom";
 interface Props {
   summary: string;
   lineCount: number;
-  onExpand: () => void;
   expanded?: boolean;
   lines?: string[];
 }
@@ -18,7 +17,6 @@ const MAX_VISIBLE_LINES = 12;
 export const CollapsedReadSearchContent = React.memo(function CollapsedReadSearchContent({
   summary,
   lineCount,
-  onExpand,
   expanded = false,
   lines = [],
 }: Props) {
@@ -28,7 +26,9 @@ export const CollapsedReadSearchContent = React.memo(function CollapsedReadSearc
         <Text dimColor>{"⎿ "}</Text>
         <Text dimColor>{summary}</Text>
         <Text dimColor>{" · "}</Text>
-        <Text dimColor>{lineCount} line{lineCount !== 1 ? "s" : ""}</Text>
+        <Text dimColor>
+          {lineCount} line{lineCount !== 1 ? "s" : ""}
+        </Text>
         <Text dimColor>{" [E] expand"}</Text>
       </Box>
     );
@@ -43,15 +43,17 @@ export const CollapsedReadSearchContent = React.memo(function CollapsedReadSearc
         <Text dimColor>{"⎿ "}</Text>
         <Text dimColor>{summary}</Text>
         <Text dimColor>{" · "}</Text>
-        <Text dimColor>{lineCount} line{lineCount !== 1 ? "s" : ""}</Text>
+        <Text dimColor>
+          {lineCount} line{lineCount !== 1 ? "s" : ""}
+        </Text>
       </Box>
       <Box flexDirection="column" paddingLeft={3}>
         {visible.map((line, i) => (
-          <Text key={i} dimColor>{line}</Text>
+          <Text key={i} dimColor>
+            {line}
+          </Text>
         ))}
-        {overflow > 0 && (
-          <Text dimColor>{`... (+${overflow} more)`}</Text>
-        )}
+        {overflow > 0 && <Text dimColor>{`... (+${overflow} more)`}</Text>}
       </Box>
     </Box>
   );

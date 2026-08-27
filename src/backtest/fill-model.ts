@@ -92,7 +92,7 @@ export function walkBookFill(
   depth: BarDepth,
   side: "BUY" | "SELL",
   quantity: number,
-  maxLevels?: number
+  maxLevels?: number,
 ): BookFill {
   const passive = side === "BUY" ? depth.asks : depth.bids;
   const usable = passive.filter((l) => l.quantity > 0 && Number.isFinite(l.price));
@@ -113,7 +113,12 @@ export function walkBookFill(
   const levels = maxLevels === undefined ? usable : rankedLevels(usable, side).slice(0, maxLevels);
   for (let i = 0; i < levels.length; i++) {
     const level = levels[i]!;
-    book.submit({ id: `maker_${i}`, side: makerSide, price: level.price, quantity: level.quantity });
+    book.submit({
+      id: `maker_${i}`,
+      side: makerSide,
+      price: level.price,
+      quantity: level.quantity,
+    });
   }
 
   // A market order takes each maker at the MAKER's price, which is precisely

@@ -18,7 +18,7 @@ function createHookDriver<T>(render: () => T) {
   const cell: HookCell = { states: [], refs: [], callbacks: [] };
   let stateIdx = 0;
   let refIdx = 0;
-  let cbIdx = 0;
+  let _cbIdx = 0;
   let rerender: () => void;
 
   const dispatcher = {
@@ -42,7 +42,7 @@ function createHookDriver<T>(render: () => T) {
     useCallback<F>(fn: F, _deps: unknown[]): F {
       // Deps don't matter for behavior here; always return the latest closure
       // so the callback sees current state/refs.
-      cbIdx++;
+      _cbIdx++;
       return fn;
     },
   };
@@ -50,17 +50,18 @@ function createHookDriver<T>(render: () => T) {
   rerender = () => {
     stateIdx = 0;
     refIdx = 0;
-    cbIdx = 0;
-    const internals = (React as unknown as {
+    _cbIdx = 0;
+    const internals = React as unknown as {
       __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE?: {
         H: typeof dispatcher | null;
       };
       __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED?: {
         ReactCurrentDispatcher?: { current: typeof dispatcher | null };
       };
-    });
+    };
     const modern = internals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
-    const legacy = internals.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED?.ReactCurrentDispatcher;
+    const legacy =
+      internals.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED?.ReactCurrentDispatcher;
     const prevModern = modern?.H ?? null;
     const prevLegacy = legacy?.current ?? null;
     if (modern) modern.H = dispatcher as never;

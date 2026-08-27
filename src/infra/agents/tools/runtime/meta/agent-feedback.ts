@@ -70,7 +70,7 @@ export function appendAgentFeedback(
       approachesTried: entry.approachesTried.map((a) => redactString(a)),
       appendedAt: new Date().toISOString(),
     };
-    appendFileSync(path, JSON.stringify(row) + "\n", { encoding: "utf-8" });
+    appendFileSync(path, `${JSON.stringify(row)}\n`, { encoding: "utf-8" });
     return { written: true, path };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

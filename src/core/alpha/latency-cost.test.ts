@@ -39,7 +39,7 @@ describe("estimateLatencyCost", () => {
       bidAskSpread: 0.01,
       latencyMs: 200,
       timeHorizonSeconds: 10,
-      commissionPerShare: 0.10,
+      commissionPerShare: 0.1,
     });
     expect(r.verdict).toBe("negligible");
     expect(r.latencyCostAsFractionOfCommission).toBeLessThan(0.01);
@@ -70,7 +70,7 @@ describe("estimateLatencyCost", () => {
     });
     const wide = estimateLatencyCost({
       annualizedVolatility: 0.25,
-      bidAskSpread: 0.10,
+      bidAskSpread: 0.1,
       latencyMs: 100,
       timeHorizonSeconds: 10,
     });
@@ -98,7 +98,7 @@ describe("estimateLatencyCost", () => {
 
   test("fraction-of-spread surfaced in output", () => {
     const r = estimateLatencyCost({
-      annualizedVolatility: 0.30,
+      annualizedVolatility: 0.3,
       bidAskSpread: 0.01,
       latencyMs: 200,
       timeHorizonSeconds: 5,
@@ -161,7 +161,7 @@ describe("formatLatencyCost", () => {
       bidAskSpread: 0.01,
       latencyMs: 1,
       timeHorizonSeconds: 10,
-      commissionPerShare: 0.10,
+      commissionPerShare: 0.1,
     });
     const text = formatLatencyCost(r);
     expect(text).toContain("Latency Cost");

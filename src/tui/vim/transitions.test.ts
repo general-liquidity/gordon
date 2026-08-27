@@ -36,17 +36,41 @@ function makeVim(text: string, cursor = 0): Vim {
   const insertBuf = { s: "" };
 
   const ctx: VimContext = {
-    get text() { return state.text; },
-    get cursor() { return state.cursor; },
-    setText(t) { state.text = t; },
-    setCursor(c) { state.cursor = c; },
-    enterInsert(c) { state.cursor = c; state.mode = VimMode.Insert; insertBuf.s = ""; },
-    getRegister() { return persistent.register; },
-    setRegister(content, linewise) { persistent.register = { content, linewise }; },
-    getLastFind() { return persistent.lastFind; },
-    setLastFind(type, char) { persistent.lastFind = { type, char }; },
-    recordChange(change) { persistent.lastChange = change; },
-    onDotRepeat() { if (persistent.lastChange) replayChange(persistent.lastChange, ctx); },
+    get text() {
+      return state.text;
+    },
+    get cursor() {
+      return state.cursor;
+    },
+    setText(t) {
+      state.text = t;
+    },
+    setCursor(c) {
+      state.cursor = c;
+    },
+    enterInsert(c) {
+      state.cursor = c;
+      state.mode = VimMode.Insert;
+      insertBuf.s = "";
+    },
+    getRegister() {
+      return persistent.register;
+    },
+    setRegister(content, linewise) {
+      persistent.register = { content, linewise };
+    },
+    getLastFind() {
+      return persistent.lastFind;
+    },
+    setLastFind(type, char) {
+      persistent.lastFind = { type, char };
+    },
+    recordChange(change) {
+      persistent.lastChange = change;
+    },
+    onDotRepeat() {
+      if (persistent.lastChange) replayChange(persistent.lastChange, ctx);
+    },
   };
 
   function clampNormal(): void {
@@ -57,10 +81,18 @@ function makeVim(text: string, cursor = 0): Vim {
   }
 
   const vim: Vim = {
-    get text() { return state.text; },
-    get cursor() { return state.cursor; },
-    get mode() { return state.mode; },
-    get register() { return persistent.register; },
+    get text() {
+      return state.text;
+    },
+    get cursor() {
+      return state.cursor;
+    },
+    get mode() {
+      return state.mode;
+    },
+    get register() {
+      return persistent.register;
+    },
     feed(keys: string) {
       for (const key of [...keys]) {
         if (state.mode === VimMode.Insert) {
@@ -86,7 +118,8 @@ function makeVim(text: string, cursor = 0): Vim {
         // execute may have flipped the mode via ctx.enterInsert; the cast
         // reopens the type TS narrowed at the top-of-loop INSERT guard.
         const modeAfter = state.mode as VimMode;
-        state.command = modeAfter === VimMode.Insert ? { type: "idle" } : (res.next ?? { type: "idle" });
+        state.command =
+          modeAfter === VimMode.Insert ? { type: "idle" } : (res.next ?? { type: "idle" });
         clampNormal();
       }
       return vim;

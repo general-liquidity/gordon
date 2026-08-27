@@ -74,7 +74,10 @@ export function buildTaskFanoutTool(
               .string()
               .min(1)
               .describe("Self-contained brief: objective + scope. The subagent sees ONLY this."),
-            label: z.string().optional().describe("Optional short label for the gather (e.g. the ticker)."),
+            label: z
+              .string()
+              .optional()
+              .describe("Optional short label for the gather (e.g. the ticker)."),
           }),
         )
         .min(1)
@@ -86,7 +89,9 @@ export function buildTaskFanoutTool(
         .min(1)
         .max(MAX_FANOUT_CONCURRENCY)
         .optional()
-        .describe(`Max subagents at once (default 4, ceiling ${MAX_FANOUT_CONCURRENCY}). Mind the token cost.`),
+        .describe(
+          `Max subagents at once (default 4, ceiling ${MAX_FANOUT_CONCURRENCY}). Mind the token cost.`,
+        ),
     }),
     outputSchema: z.object({
       total: z.number(),
@@ -116,7 +121,9 @@ export function buildTaskFanoutTool(
       tasks: { role: string; task: string; label?: string }[];
       concurrency?: number;
     }) => {
-      const report = await fanoutSubagentTasks(profiles, tasks, readOnlyToolRegistry, { concurrency });
+      const report = await fanoutSubagentTasks(profiles, tasks, readOnlyToolRegistry, {
+        concurrency,
+      });
       return {
         total: report.total,
         dropped: report.dropped,

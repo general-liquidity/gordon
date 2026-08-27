@@ -68,11 +68,21 @@ function classify(order: unknown, index: number, slippageReviewBps: number): Tri
   const base = { index, symbol, status };
 
   // 1. Hard failure — rejected / errored / explicitly unsuccessful.
-  if (success === false || (status && FAILURE_RE.test(status)) || (error && success !== true && !status)) {
+  if (
+    success === false ||
+    (status && FAILURE_RE.test(status)) ||
+    (error && success !== true && !status)
+  ) {
     return { ...base, bucket: "fix", reason: error ?? `order ${status ?? "failed"}` };
   }
 
-  const filled = firstNumber(rec, ["filledQty", "filled", "executedQty", "filledQuantity", "filledAmount"]);
+  const filled = firstNumber(rec, [
+    "filledQty",
+    "filled",
+    "executedQty",
+    "filledQuantity",
+    "filledAmount",
+  ]);
   const requested = firstNumber(rec, ["requestedQty", "quantity", "amount", "qty", "size"]);
 
   // 2. Zero fill on a non-rejected order is suspect enough to fix.
@@ -81,17 +91,38 @@ function classify(order: unknown, index: number, slippageReviewBps: number): Tri
   }
 
   // 3. Partial fill — filled, but short of the request.
-  if (filled !== undefined && requested !== undefined && requested > 0 && filled < requested * 0.999) {
+  if (
+    filled !== undefined &&
+    requested !== undefined &&
+    requested > 0 &&
+    filled < requested * 0.999
+  ) {
     return { ...base, bucket: "review", reason: `partial fill ${trim(filled)}/${trim(requested)}` };
   }
 
   // 4. Slippage beyond tolerance — only when both fill and reference are known.
-  const fill = firstNumber(rec, ["avgFillPrice", "averageEntry", "fillPrice", "averagePrice", "price"]);
-  const ref = firstNumber(rec, ["expectedPrice", "limitPrice", "refPrice", "requestedPrice", "referencePrice"]);
+  const fill = firstNumber(rec, [
+    "avgFillPrice",
+    "averageEntry",
+    "fillPrice",
+    "averagePrice",
+    "price",
+  ]);
+  const ref = firstNumber(rec, [
+    "expectedPrice",
+    "limitPrice",
+    "refPrice",
+    "requestedPrice",
+    "referencePrice",
+  ]);
   if (fill !== undefined && ref !== undefined && ref > 0) {
     const slipBps = (Math.abs(fill - ref) / ref) * 10_000;
     if (slipBps > slippageReviewBps) {
-      return { ...base, bucket: "review", reason: `slippage ${Math.round(slipBps)}bps (fill ${trim(fill)} vs ${trim(ref)})` };
+      return {
+        ...base,
+        bucket: "review",
+        reason: `slippage ${Math.round(slipBps)}bps (fill ${trim(fill)} vs ${trim(ref)})`,
+      };
     }
   }
 

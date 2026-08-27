@@ -3,8 +3,8 @@
  * Handles loading and building prompts for the LLM
  */
 
-import { readFile } from "fs/promises";
-import { join } from "path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { Message } from "./types.ts";
 
 // Default prompts directory relative to project root
@@ -49,14 +49,11 @@ export async function loadPrompt(name: string): Promise<string> {
       "code" in error &&
       (error as NodeJS.ErrnoException).code === "ENOENT"
     ) {
-      throw new PromptError(
-        `Prompt file not found: ${promptPath}`,
-        name
-      );
+      throw new PromptError(`Prompt file not found: ${promptPath}`, name);
     }
     throw new PromptError(
       `Failed to load prompt "${name}": ${error instanceof Error ? error.message : String(error)}`,
-      name
+      name,
     );
   }
 }
@@ -68,16 +65,12 @@ export async function loadPrompt(name: string): Promise<string> {
  * @param context - Object containing variable values to inject
  * @returns The template with placeholders replaced
  */
-export function injectContext(
-  template: string,
-  context: Record<string, unknown>
-): string {
+export function injectContext(template: string, context: Record<string, unknown>): string {
   let result = template;
 
   for (const [key, value] of Object.entries(context)) {
     const placeholder = `{{${key}}}`;
-    const stringValue =
-      typeof value === "object" ? JSON.stringify(value, null, 2) : String(value);
+    const stringValue = typeof value === "object" ? JSON.stringify(value, null, 2) : String(value);
     result = result.split(placeholder).join(stringValue);
   }
 
@@ -94,12 +87,10 @@ export function injectContext(
 export function buildMessages(
   systemPrompt: string,
   userMessage: string,
-  context?: Record<string, unknown>
+  context?: Record<string, unknown>,
 ): Message[] {
   // Inject context into system prompt if provided
-  const finalSystemPrompt = context
-    ? injectContext(systemPrompt, context)
-    : systemPrompt;
+  const finalSystemPrompt = context ? injectContext(systemPrompt, context) : systemPrompt;
 
   return [
     {
@@ -125,11 +116,9 @@ export function buildMessagesWithHistory(
   systemPrompt: string,
   history: Message[],
   userMessage: string,
-  context?: Record<string, unknown>
+  context?: Record<string, unknown>,
 ): Message[] {
-  const finalSystemPrompt = context
-    ? injectContext(systemPrompt, context)
-    : systemPrompt;
+  const finalSystemPrompt = context ? injectContext(systemPrompt, context) : systemPrompt;
 
   return [
     {
@@ -154,7 +143,7 @@ export function buildMessagesWithHistory(
 export async function loadAndBuildMessages(
   promptName: string,
   userMessage: string,
-  context?: Record<string, unknown>
+  context?: Record<string, unknown>,
 ): Promise<Message[]> {
   const systemPrompt = await loadPrompt(promptName);
   return buildMessages(systemPrompt, userMessage, context);

@@ -35,7 +35,7 @@ export const validatePlaybookTool = createTool({
     playbook_id: z
       .string()
       .describe(
-        "Playbook ID (kebab-case, e.g., 'momentum-breakout') to validate from the registry"
+        "Playbook ID (kebab-case, e.g., 'momentum-breakout') to validate from the registry",
       ),
   }),
   outputSchema: z.object({
@@ -84,9 +84,7 @@ export const exportPlaybookTool = createTool({
   inputSchema: z.object({
     playbook_id: z
       .string()
-      .describe(
-        "Playbook ID (kebab-case, e.g., 'momentum-breakout') to export"
-      ),
+      .describe("Playbook ID (kebab-case, e.g., 'momentum-breakout') to export"),
   }),
   outputSchema: z.object({
     playbook_id: z.string().optional(),
@@ -127,9 +125,7 @@ export const importPlaybookTool = createTool({
     "Validates the JSON against the protocol schema and reports any issues. " +
     "Use when user provides a JSON playbook to 'import' or 'load'.",
   inputSchema: z.object({
-    json: z
-      .string()
-      .describe("Protocol JSON string to import"),
+    json: z.string().describe("Protocol JSON string to import"),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
@@ -180,12 +176,8 @@ export const comparePlaybooksTool = createTool({
     "Shows differences in entry conditions, exit rules, risk management, and execution. " +
     "Use when user asks to 'compare', 'diff', or 'contrast' two strategies.",
   inputSchema: z.object({
-    playbook_id_a: z
-      .string()
-      .describe("First playbook ID (kebab-case)"),
-    playbook_id_b: z
-      .string()
-      .describe("Second playbook ID (kebab-case)"),
+    playbook_id_a: z.string().describe("First playbook ID (kebab-case)"),
+    playbook_id_b: z.string().describe("Second playbook ID (kebab-case)"),
   }),
   outputSchema: z.object({
     comparison: z
@@ -197,7 +189,7 @@ export const comparePlaybooksTool = createTool({
             field: z.string(),
             value_a: z.string(),
             value_b: z.string(),
-          })
+          }),
         ),
         summary: z.string(),
       })
@@ -248,7 +240,7 @@ interface FieldDifference {
  */
 function compareProtocols(
   a: { [key: string]: unknown } & Record<string, unknown>,
-  b: { [key: string]: unknown } & Record<string, unknown>
+  b: { [key: string]: unknown } & Record<string, unknown>,
 ): FieldDifference[] {
   const diffs: FieldDifference[] = [];
 
@@ -256,82 +248,82 @@ function compareProtocols(
     label: string;
     path: (obj: Record<string, unknown>) => unknown;
   }> = [
-    { label: "Tier", path: (o) => o["tier"] },
-    { label: "Timeframe", path: (o) => o["timeframe"] },
-    { label: "Regimes", path: (o) => JSON.stringify(o["regimes"]) },
-    { label: "Assets", path: (o) => JSON.stringify(o["assets"]) },
+    { label: "Tier", path: (o) => o.tier },
+    { label: "Timeframe", path: (o) => o.timeframe },
+    { label: "Regimes", path: (o) => JSON.stringify(o.regimes) },
+    { label: "Assets", path: (o) => JSON.stringify(o.assets) },
     {
       label: "Entry — Indicators Count",
       path: (o) => {
-        const entry = o["entry"] as Record<string, unknown> | undefined;
-        const indicators = entry?.["indicators"] as unknown[] | undefined;
+        const entry = o.entry as Record<string, unknown> | undefined;
+        const indicators = entry?.indicators as unknown[] | undefined;
         return indicators?.length ?? 0;
       },
     },
     {
       label: "Entry — Confluence Required",
       path: (o) => {
-        const entry = o["entry"] as Record<string, unknown> | undefined;
-        return entry?.["confluence_required"] ?? 0;
+        const entry = o.entry as Record<string, unknown> | undefined;
+        return entry?.confluence_required ?? 0;
       },
     },
     {
       label: "Stop Loss Type",
       path: (o) => {
-        const exit = o["exit"] as Record<string, unknown> | undefined;
-        const sl = exit?.["stop_loss"] as Record<string, unknown> | undefined;
-        return sl?.["type"] ?? "unknown";
+        const exit = o.exit as Record<string, unknown> | undefined;
+        const sl = exit?.stop_loss as Record<string, unknown> | undefined;
+        return sl?.type ?? "unknown";
       },
     },
     {
       label: "Stop Loss Value",
       path: (o) => {
-        const exit = o["exit"] as Record<string, unknown> | undefined;
-        const sl = exit?.["stop_loss"] as Record<string, unknown> | undefined;
-        return sl?.["value"] ?? 0;
+        const exit = o.exit as Record<string, unknown> | undefined;
+        const sl = exit?.stop_loss as Record<string, unknown> | undefined;
+        return sl?.value ?? 0;
       },
     },
     {
       label: "Take Profit Levels",
       path: (o) => {
-        const exit = o["exit"] as Record<string, unknown> | undefined;
-        const tp = exit?.["take_profit"] as unknown[] | undefined;
+        const exit = o.exit as Record<string, unknown> | undefined;
+        const tp = exit?.take_profit as unknown[] | undefined;
         return JSON.stringify(tp ?? []);
       },
     },
     {
       label: "Max Risk Per Trade %",
       path: (o) => {
-        const risk = o["risk"] as Record<string, unknown> | undefined;
-        return risk?.["max_risk_per_trade_percent"] ?? 0;
+        const risk = o.risk as Record<string, unknown> | undefined;
+        return risk?.max_risk_per_trade_percent ?? 0;
       },
     },
     {
       label: "Max Position Size %",
       path: (o) => {
-        const risk = o["risk"] as Record<string, unknown> | undefined;
-        return risk?.["max_position_size_percent"] ?? 0;
+        const risk = o.risk as Record<string, unknown> | undefined;
+        return risk?.max_position_size_percent ?? 0;
       },
     },
     {
       label: "Max Concurrent Positions",
       path: (o) => {
-        const risk = o["risk"] as Record<string, unknown> | undefined;
-        return risk?.["max_concurrent_positions"] ?? 0;
+        const risk = o.risk as Record<string, unknown> | undefined;
+        return risk?.max_concurrent_positions ?? 0;
       },
     },
     {
       label: "Order Type",
       path: (o) => {
-        const exec = o["execution"] as Record<string, unknown> | undefined;
-        return exec?.["order_type"] ?? "unknown";
+        const exec = o.execution as Record<string, unknown> | undefined;
+        return exec?.order_type ?? "unknown";
       },
     },
     {
       label: "Entry Method",
       path: (o) => {
-        const exec = o["execution"] as Record<string, unknown> | undefined;
-        return exec?.["entry_method"] ?? "unknown";
+        const exec = o.execution as Record<string, unknown> | undefined;
+        return exec?.entry_method ?? "unknown";
       },
     },
   ];

@@ -41,7 +41,7 @@ export interface ChaikinOscResult {
 function moneyFlowVolume(c: Candle): number {
   const range = c.high - c.low;
   if (range < 1e-10) return 0;
-  const mfm = ((c.close - c.low) - (c.high - c.close)) / range;
+  const mfm = (c.close - c.low - (c.high - c.close)) / range;
   return mfm * c.volume;
 }
 
@@ -124,7 +124,7 @@ export function calculateChaikinAD(candles: Candle[]): ChaikinADResult {
 export function calculateChaikinOscillator(
   candles: Candle[],
   fast: number = 3,
-  slow: number = 10
+  slow: number = 10,
 ): ChaikinOscResult {
   const periods: [number, number] = [fast, slow];
   if (candles.length < slow) {

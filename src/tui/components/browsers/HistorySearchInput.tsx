@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text } from "../../ink-custom";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 
@@ -26,73 +26,73 @@ export function HistorySearchInput({ history, onSelect, onClose }: Props) {
   // Most-recent entries first
   const reversed = [...history].reverse();
 
-  const matches = reversed.filter((entry) =>
-    query === "" ? true : entry.toLowerCase().includes(query.toLowerCase())
-  ).slice(0, MAX_RESULTS);
+  const matches = reversed
+    .filter((entry) => (query === "" ? true : entry.toLowerCase().includes(query.toLowerCase())))
+    .slice(0, MAX_RESULTS);
 
-  useRoutedInput((input, key) => {
-    if (key.escape) {
-      onClose();
-      return;
-    }
-
-    if (key.return) {
-      const selected = matches[focusIdx];
-      if (selected != null) {
-        onSelect(selected);
-      } else {
+  useRoutedInput(
+    (input, key) => {
+      if (key.escape) {
         onClose();
+        return;
       }
-      return;
-    }
 
-    if (key.upArrow) {
-      setFocusIdx((i) => (i > 0 ? i - 1 : matches.length - 1));
-      return;
-    }
+      if (key.return) {
+        const selected = matches[focusIdx];
+        if (selected != null) {
+          onSelect(selected);
+        } else {
+          onClose();
+        }
+        return;
+      }
 
-    if (key.downArrow) {
-      setFocusIdx((i) => (i < matches.length - 1 ? i + 1 : 0));
-      return;
-    }
+      if (key.upArrow) {
+        setFocusIdx((i) => (i > 0 ? i - 1 : matches.length - 1));
+        return;
+      }
 
-    if (key.backspace || key.delete) {
-      setQuery((q) => q.slice(0, -1));
-      setFocusIdx(0);
-      return;
-    }
+      if (key.downArrow) {
+        setFocusIdx((i) => (i < matches.length - 1 ? i + 1 : 0));
+        return;
+      }
 
-    if (input && !key.ctrl && !key.meta) {
-      setQuery((q) => q + input);
-      setFocusIdx(0);
-    }
-  }, { id: "historySearchInput", priority: FOCUS_PRIORITY.DIALOG });
+      if (key.backspace || key.delete) {
+        setQuery((q) => q.slice(0, -1));
+        setFocusIdx(0);
+        return;
+      }
+
+      if (input && !key.ctrl && !key.meta) {
+        setQuery((q) => q + input);
+        setFocusIdx(0);
+      }
+    },
+    { id: "historySearchInput", priority: FOCUS_PRIORITY.DIALOG },
+  );
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="gray"
-      paddingX={1}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1}>
       {/* Title */}
       <Box marginBottom={1}>
         <Text bold color="gray">
           HISTORY SEARCH
         </Text>
-        <Text dimColor>  (Esc to close)</Text>
+        <Text dimColor> (Esc to close)</Text>
       </Box>
 
       {/* Search input line */}
       <Box marginBottom={1}>
-        <Text color="cyanBright" bold>{">"} </Text>
+        <Text color="cyanBright" bold>
+          {">"}{" "}
+        </Text>
         <Text>{query}</Text>
         <Text color="cyanBright">{"█"}</Text>
       </Box>
 
       {/* Results */}
       {matches.length === 0 ? (
-        <Text dimColor>  No matches</Text>
+        <Text dimColor> No matches</Text>
       ) : (
         matches.map((entry, i) => {
           const isFocused = i === focusIdx;

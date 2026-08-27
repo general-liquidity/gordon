@@ -48,7 +48,7 @@ function handNormalPDF(x: number): number {
 function handNormalCDF_AS26217(x: number): number {
   const sign = x < 0 ? -1 : 1;
   const ax = Math.abs(x);
-  const b1 = 0.319381530;
+  const b1 = 0.31938153;
   const b2 = -0.356563782;
   const b3 = 1.781477937;
   const b4 = -1.821255978;
@@ -66,8 +66,7 @@ function handNormalCDF_AS7126(x: number): number {
   const t = 1 / (1 + 0.3275911 * Math.abs(z));
   const y =
     1 -
-    (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t +
-      0.254829592) *
+    ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) *
       t *
       Math.exp(-z * z);
   const erfApprox = z >= 0 ? y : -y;
@@ -80,8 +79,7 @@ function handErf_AS7126(u: number): number {
   const t = 1 / (1 + 0.3275911 * a);
   const y =
     1 -
-    (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t +
-      0.254829592) *
+    ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) *
       t *
       Math.exp(-a * a);
   return u >= 0 ? y : -y;
@@ -90,8 +88,8 @@ function handErf_AS7126(u: number): number {
 /** Source: linearRegression.ts / conditional-distribution-test.ts — Lanczos ln Γ. */
 function handGammaln(x: number): number {
   const cof = [
-    76.18009172947146, -86.50532032941677, 24.01409824083091,
-    -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5,
+    76.18009172947146, -86.50532032941678, 24.01409824083091, -1.231739572450155,
+    0.1208650973866179e-2, -0.5395239384953e-5,
   ];
   let y = x;
   let tmp = x + 5.5;
@@ -101,7 +99,7 @@ function handGammaln(x: number): number {
     y += 1;
     ser += cof[j]! / y;
   }
-  return -tmp + Math.log((2.5066282746310005 * ser) / x);
+  return -tmp + Math.log((2.5066282746310007 * ser) / x);
 }
 
 /** Source: linearRegression.ts — continued-fraction incomplete beta (Lentz). */
@@ -217,15 +215,23 @@ function agree(name: string, got: number, ref: number): void {
 // ---------------------------------------------------------------------------
 
 const NORMAL_X = [
-  -6, -4, -3.5, -2.575, -1.96, -1.2, -0.5, -0.1, 0, 0.1, 0.5, 1, 1.2, 1.96,
-  2.575, 3.5, 4, 6,
+  -6, -4, -3.5, -2.575, -1.96, -1.2, -0.5, -0.1, 0, 0.1, 0.5, 1, 1.2, 1.96, 2.575, 3.5, 4, 6,
 ];
-const PROBS = [1e-6, 0.001, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.99, 0.999, 0.999999];
+const PROBS = [
+  1e-6, 0.001, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975, 0.99, 0.999, 0.999999,
+];
 const ERF_X = [-3, -2, -1, -0.5, -0.1, 0, 0.1, 0.5, 1, 2, 3, 5];
 const ERFINV_X = [-0.999, -0.95, -0.8, -0.5, -0.1, 0, 0.1, 0.5, 0.8, 0.95, 0.999];
 const GAMMALN_X = [0.1, 0.5, 1, 1.5, 2, 2.5, 3, 4.5, 7, 10, 25, 100];
 const BETA_PARAMS: Array<[number, number]> = [
-  [0.5, 0.5], [1, 1], [2, 2], [2, 5], [5, 2], [0.5, 5], [10, 10], [3, 7],
+  [0.5, 0.5],
+  [1, 1],
+  [2, 2],
+  [2, 5],
+  [5, 2],
+  [0.5, 5],
+  [10, 10],
+  [3, 7],
 ];
 const BETA_X = [0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99];
 const T_STATS = [-5, -3, -2.5, -1.5, -0.5, 0, 0.5, 1.5, 2.5, 3, 5];
@@ -369,7 +375,7 @@ describe("observed max deltas (abs-or-rel) per function", () => {
       .sort((a, b) => b[1] - a[1])
       .map(([k, v]) => `  ${k}: ${v.toExponential(3)}`);
     // eslint-disable-next-line no-console
-    console.log("\nMax observed delta (min(abs,rel)) per function:\n" + lines.join("\n"));
+    console.log(`\nMax observed delta (min(abs,rel)) per function:\n${lines.join("\n")}`);
     for (const [, v] of Object.entries(maxDelta)) {
       expect(v).toBeLessThan(TOL);
     }

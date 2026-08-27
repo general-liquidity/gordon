@@ -31,14 +31,26 @@ export const efficientTradingFrontierDiagnosticTool = createTool({
   inputSchema: z.object({
     orderSize: z.number().positive().describe("Order size to execute (same units as ADV)."),
     adv: z.number().positive().describe("Average daily volume in the same units."),
-    vol: z.number().min(0).describe("Realized intraday volatility as a fraction (e.g. 0.02 = 2% daily)."),
-    volAnn: z.number().positive().optional().describe("Annualized volatility. Default = vol * sqrt(daysPerYear)."),
+    vol: z
+      .number()
+      .min(0)
+      .describe("Realized intraday volatility as a fraction (e.g. 0.02 = 2% daily)."),
+    volAnn: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Annualized volatility. Default = vol * sqrt(daysPerYear)."),
     riskAversion: z
       .number()
       .min(0)
       .optional()
-      .describe("λ — weight on timing risk in the objective. Higher λ → prefer shorter horizon. Default 1."),
-    horizonDays: z.array(z.number().positive()).optional().describe("Horizon points (days) to evaluate. Default 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10."),
+      .describe(
+        "λ — weight on timing risk in the objective. Higher λ → prefer shorter horizon. Default 1.",
+      ),
+    horizonDays: z
+      .array(z.number().positive())
+      .optional()
+      .describe("Horizon points (days) to evaluate. Default 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10."),
     daysPerYear: z.number().positive().optional().describe("Trading days per year. Default 252."),
   }),
   outputSchema: z.object({

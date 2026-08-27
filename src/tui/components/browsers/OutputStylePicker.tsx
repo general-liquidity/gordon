@@ -6,7 +6,6 @@
  * Escape closes without saving.
  */
 
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { GordonSelect } from "../../design-system/GordonSelect.js";
@@ -64,21 +63,20 @@ const SELECT_OPTIONS = STYLE_OPTIONS.map((o) => ({
 // ============================================================================
 
 export function OutputStylePicker({ current, onChange, onClose }: Props) {
-  useRoutedInput((_, key) => {
-    if (key.escape) onClose();
-  }, { id: "outputStylePicker", priority: FOCUS_PRIORITY.DIALOG });
+  useRoutedInput(
+    (_, key) => {
+      if (key.escape) onClose();
+    },
+    { id: "outputStylePicker", priority: FOCUS_PRIORITY.DIALOG },
+  );
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
-      paddingX={2}
-      paddingY={1}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
       {/* Header */}
       <Box justifyContent="center">
-        <Text bold color="cyan">OUTPUT STYLE</Text>
+        <Text bold color="cyan">
+          OUTPUT STYLE
+        </Text>
       </Box>
       <Text> </Text>
 
@@ -96,7 +94,9 @@ export function OutputStylePicker({ current, onChange, onClose }: Props) {
       />
 
       <Text> </Text>
-      <Text dimColor>{"↑↓"} navigate {"·"} Enter select {"·"} Esc close</Text>
+      <Text dimColor>
+        {"↑↓"} navigate {"·"} Enter select {"·"} Esc close
+      </Text>
     </Box>
   );
 }

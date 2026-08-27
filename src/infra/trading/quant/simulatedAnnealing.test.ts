@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeSimulatedAnnealing,
-  simulatedAnnealingToPayload,
-} from "./simulatedAnnealing.ts";
+import { computeSimulatedAnnealing, simulatedAnnealingToPayload } from "./simulatedAnnealing.ts";
 
 describe("computeSimulatedAnnealing — convex problem", () => {
   it("finds the maximum of a 1D quadratic", () => {
@@ -127,7 +124,9 @@ describe("computeSimulatedAnnealing — determinism", () => {
     });
     // Different seeds → different paths (best values may both converge but
     // intermediate acceptance counts should differ)
-    expect(a.acceptedMoves !== b.acceptedMoves || a.acceptedWorseMoves !== b.acceptedWorseMoves).toBe(true);
+    expect(
+      a.acceptedMoves !== b.acceptedMoves || a.acceptedWorseMoves !== b.acceptedWorseMoves,
+    ).toBe(true);
   });
 });
 

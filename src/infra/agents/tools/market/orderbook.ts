@@ -20,7 +20,7 @@ import { runHooks } from "../../../hooks/engine.ts";
 import { recordStructuredObservation } from "../../../platform/observability/index.ts";
 import { appendActionLogEntry } from "../../../action-log/index.ts";
 
-import type { OrderBookEntry } from "../../../exchange/types.ts";
+import type { ExchangeExtended, OrderBookEntry } from "../../../exchange/types.ts";
 import { createCachedTool, TOOL_CACHE_CONFIG } from "../runtime/cache.ts";
 import { placeOCOOrders } from "../../../../core/pipeline/executor.ts";
 import { resolveInstrument } from "../../../domain/markets/instruments.ts";
@@ -72,48 +72,64 @@ export const getOrderBookTool = createTool({
   outputSchema: z.object({
     marketFamily: z.enum(["crypto", "stocks"]).optional(),
     venueRoute: z.enum(["exchange", "broker"]).optional(),
-    capabilities: z.object({
-      supportsQuotes: z.boolean(),
-      supportsBidAsk: z.boolean(),
-      supportsOrderBook: z.boolean(),
-      supportsSessionCalendar: z.boolean(),
-      supportsExtendedHours: z.boolean(),
-      supportsHistoricalBars: z.boolean(),
-    }).optional(),
+    capabilities: z
+      .object({
+        supportsQuotes: z.boolean(),
+        supportsBidAsk: z.boolean(),
+        supportsOrderBook: z.boolean(),
+        supportsSessionCalendar: z.boolean(),
+        supportsExtendedHours: z.boolean(),
+        supportsHistoricalBars: z.boolean(),
+      })
+      .optional(),
     symbol: z.string().optional(),
     message: z.string().optional(),
-    spread: z.object({
-      value: z.string(),
-      percent: z.string(),
-      bestBid: z.number(),
-      bestAsk: z.number(),
-    }).optional(),
-    liquidity: z.object({
-      bidDepth: z.string(),
-      askDepth: z.string(),
-      ratio: z.string(),
-      imbalance: z.string(),
-    }).optional(),
-    walls: z.object({
-      largestBid: z.object({
-        price: z.number().optional(),
-        quantity: z.number().optional(),
-      }),
-      largestAsk: z.object({
-        price: z.number().optional(),
-        quantity: z.number().optional(),
-      }),
-    }).optional(),
-    topBids: z.array(z.object({
-      price: z.number(),
-      quantity: z.number(),
-      total: z.number(),
-    })).optional(),
-    topAsks: z.array(z.object({
-      price: z.number(),
-      quantity: z.number(),
-      total: z.number(),
-    })).optional(),
+    spread: z
+      .object({
+        value: z.string(),
+        percent: z.string(),
+        bestBid: z.number(),
+        bestAsk: z.number(),
+      })
+      .optional(),
+    liquidity: z
+      .object({
+        bidDepth: z.string(),
+        askDepth: z.string(),
+        ratio: z.string(),
+        imbalance: z.string(),
+      })
+      .optional(),
+    walls: z
+      .object({
+        largestBid: z.object({
+          price: z.number().optional(),
+          quantity: z.number().optional(),
+        }),
+        largestAsk: z.object({
+          price: z.number().optional(),
+          quantity: z.number().optional(),
+        }),
+      })
+      .optional(),
+    topBids: z
+      .array(
+        z.object({
+          price: z.number(),
+          quantity: z.number(),
+          total: z.number(),
+        }),
+      )
+      .optional(),
+    topAsks: z
+      .array(
+        z.object({
+          price: z.number(),
+          quantity: z.number(),
+          total: z.number(),
+        }),
+      )
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol, limit }, execContext: MastraExecutionContext) => {
@@ -135,7 +151,8 @@ export const getOrderBookTool = createTool({
           venueRoute: instrument.route,
           capabilities: instrument.capabilities,
           symbol: normalizedSymbol,
-          message: "Level-2 order book depth is not available on the active broker. Returning top-of-book quote instead.",
+          message:
+            "Level-2 order book depth is not available on the active broker. Returning top-of-book quote instead.",
           spread: {
             value: spreadValue.toFixed(4),
             percent: `${spreadPercent.toFixed(4)}%`,
@@ -160,21 +177,25 @@ export const getOrderBookTool = createTool({
       // Calculate totals and find walls
       let bidTotal = 0;
       let askTotal = 0;
-      const bids = normalizeEntries(orderBook.bids).slice(0, limit).map((entry) => {
-        const quantity = entry.quantity;
-        bidTotal += quantity;
-        return { price: entry.price, quantity, total: bidTotal };
-      });
+      const bids = normalizeEntries(orderBook.bids)
+        .slice(0, limit)
+        .map((entry) => {
+          const quantity = entry.quantity;
+          bidTotal += quantity;
+          return { price: entry.price, quantity, total: bidTotal };
+        });
 
-      const asks = normalizeEntries(orderBook.asks).slice(0, limit).map((entry) => {
-        const quantity = entry.quantity;
-        askTotal += quantity;
-        return { price: entry.price, quantity, total: askTotal };
-      });
+      const asks = normalizeEntries(orderBook.asks)
+        .slice(0, limit)
+        .map((entry) => {
+          const quantity = entry.quantity;
+          askTotal += quantity;
+          return { price: entry.price, quantity, total: askTotal };
+        });
 
       // Find largest walls
-      const largestBid = bids.reduce((max, b) => b.quantity > max.quantity ? b : max, bids[0]!);
-      const largestAsk = asks.reduce((max, a) => a.quantity > max.quantity ? a : max, asks[0]!);
+      const largestBid = bids.reduce((max, b) => (b.quantity > max.quantity ? b : max), bids[0]!);
+      const largestAsk = asks.reduce((max, a) => (a.quantity > max.quantity ? a : max), asks[0]!);
 
       // Calculate spread
       const bestBid = bids[0]?.price ?? 0;
@@ -189,7 +210,7 @@ export const getOrderBookTool = createTool({
         symbol: normalizedSymbol,
         spread: {
           value: spread.toFixed(8),
-          percent: spreadPercent.toFixed(4) + "%",
+          percent: `${spreadPercent.toFixed(4)}%`,
           bestBid,
           bestAsk,
         },
@@ -223,14 +244,16 @@ export const getSpreadTool = createTool({
   outputSchema: z.object({
     marketFamily: z.enum(["crypto", "stocks"]).optional(),
     venueRoute: z.enum(["exchange", "broker"]).optional(),
-    capabilities: z.object({
-      supportsQuotes: z.boolean(),
-      supportsBidAsk: z.boolean(),
-      supportsOrderBook: z.boolean(),
-      supportsSessionCalendar: z.boolean(),
-      supportsExtendedHours: z.boolean(),
-      supportsHistoricalBars: z.boolean(),
-    }).optional(),
+    capabilities: z
+      .object({
+        supportsQuotes: z.boolean(),
+        supportsBidAsk: z.boolean(),
+        supportsOrderBook: z.boolean(),
+        supportsSessionCalendar: z.boolean(),
+        supportsExtendedHours: z.boolean(),
+        supportsHistoricalBars: z.boolean(),
+      })
+      .optional(),
     symbol: z.string().optional(),
     bidPrice: z.number().optional(),
     askPrice: z.number().optional(),
@@ -300,7 +323,7 @@ export const getSpreadTool = createTool({
         bidPrice: spread.bidPrice,
         askPrice: spread.askPrice,
         spread: spread.spread.toFixed(8),
-        spreadPercent: spread.spreadPercent.toFixed(4) + "%",
+        spreadPercent: `${spread.spreadPercent.toFixed(4)}%`,
         assessment,
       };
     } catch (error) {
@@ -325,16 +348,19 @@ export const getRecentTradesTool = createTool({
     analysis: z.object({
       buyVolume: z.string(),
       sellVolume: z.string(),
+      unknownVolume: z.string(),
       ratio: z.string(),
       dominance: z.string(),
     }),
-    trades: z.array(z.object({
-      price: z.string(),
-      quantity: z.string(),
-      value: z.string(),
-      side: z.enum(["BUY", "SELL"]),
-      time: z.string(),
-    })),
+    trades: z.array(
+      z.object({
+        price: z.string(),
+        quantity: z.string(),
+        value: z.string(),
+        side: z.enum(["BUY", "SELL", "UNKNOWN"]),
+        time: z.string(),
+      }),
+    ),
     error: z.string().optional(),
   }),
   execute: async ({ symbol, limit }, execContext: MastraExecutionContext) => {
@@ -343,17 +369,75 @@ export const getRecentTradesTool = createTool({
     if (!ctx?.exchange) {
       return {
         symbol: normalizedSymbol,
-        analysis: { buyVolume: "0", sellVolume: "0", ratio: "0", dominance: "N/A" },
+        analysis: {
+          buyVolume: "0",
+          sellVolume: "0",
+          unknownVolume: "0",
+          ratio: "N/A",
+          dominance: "N/A",
+        },
         trades: [],
         error: errors.noExchange.error,
       };
     }
-    return {
-      symbol: normalizedSymbol,
-      analysis: { buyVolume: "0", sellVolume: "0", ratio: "0", dominance: "N/A" },
-      trades: [],
-      error: "Public recent trades require exchange-native market data; not available via CCXT adapter.",
-    };
+    try {
+      const trades = await ctx.exchange.getRecentTrades(normalizedSymbol, limit);
+      const buyVolume = trades
+        .filter((trade) => trade.side === "BUY")
+        .reduce((sum, trade) => sum + trade.quantity, 0);
+      const sellVolume = trades
+        .filter((trade) => trade.side === "SELL")
+        .reduce((sum, trade) => sum + trade.quantity, 0);
+      const unknownVolume = trades
+        .filter((trade) => trade.side === "UNKNOWN")
+        .reduce((sum, trade) => sum + trade.quantity, 0);
+      const ratio = sellVolume > 0 ? buyVolume / sellVolume : buyVolume > 0 ? Infinity : 0;
+      const dominance =
+        buyVolume + sellVolume === 0
+          ? unknownVolume > 0
+            ? "UNKNOWN"
+            : "N/A"
+          : buyVolume > sellVolume
+            ? "BUY"
+            : sellVolume > buyVolume
+              ? "SELL"
+              : "BALANCED";
+      return {
+        symbol: normalizedSymbol,
+        analysis: {
+          buyVolume: buyVolume.toFixed(8),
+          sellVolume: sellVolume.toFixed(8),
+          unknownVolume: unknownVolume.toFixed(8),
+          ratio:
+            buyVolume + sellVolume === 0
+              ? "N/A"
+              : Number.isFinite(ratio)
+                ? ratio.toFixed(2)
+                : "Infinity",
+          dominance,
+        },
+        trades: trades.map((trade) => ({
+          price: trade.price.toFixed(8),
+          quantity: trade.quantity.toFixed(8),
+          value: (trade.price * trade.quantity).toFixed(8),
+          side: trade.side,
+          time: new Date(trade.time).toISOString(),
+        })),
+      };
+    } catch (error) {
+      return {
+        symbol: normalizedSymbol,
+        analysis: {
+          buyVolume: "0",
+          sellVolume: "0",
+          unknownVolume: "0",
+          ratio: "N/A",
+          dominance: "N/A",
+        },
+        trades: [],
+        error: `Failed to fetch public market trades: ${(error as Error).message}`,
+      };
+    }
   },
 });
 
@@ -376,7 +460,12 @@ export const placeOCOOrderTool = createTool({
     quantity: z.number().positive().describe("Quantity to trade"),
     takeProfitPrice: z.number().positive().describe("Take-profit limit price"),
     stopPrice: z.number().positive().describe("Stop-loss trigger price"),
-    stopLimitPrice: z.number().default(0).describe("Stop-loss limit price (slightly below stopPrice). Use 0 to default to stopPrice * 0.995."),
+    stopLimitPrice: z
+      .number()
+      .default(0)
+      .describe(
+        "Stop-loss limit price (slightly below stopPrice). Use 0 to default to stopPrice * 0.995.",
+      ),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
@@ -391,7 +480,10 @@ export const placeOCOOrderTool = createTool({
     takeProfitPrice: z.number().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, side, quantity, takeProfitPrice, stopPrice, stopLimitPrice }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, side, quantity, takeProfitPrice, stopPrice, stopLimitPrice },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -400,7 +492,9 @@ export const placeOCOOrderTool = createTool({
     {
       const killErr = killSwitchOrderError(ctx, symbol);
       if (killErr) return { error: killErr, symbol, side, quantity, takeProfitPrice, stopPrice };
-      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", {
+        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper,
+      });
       if (!check.allowed) {
         return {
           error: check.reason ?? "Trading not permitted under current mode",
@@ -416,9 +510,8 @@ export const placeOCOOrderTool = createTool({
     const normalizedSymbol = normalizeSymbol(symbol);
 
     // Default stopLimitPrice to 0.5% below stopPrice if not provided
-    const effectiveStopLimitPrice = stopLimitPrice && stopLimitPrice > 0
-      ? stopLimitPrice
-      : stopPrice * 0.995;
+    const effectiveStopLimitPrice =
+      stopLimitPrice && stopLimitPrice > 0 ? stopLimitPrice : stopPrice * 0.995;
 
     // Risk gate: evaluate order before placement
     try {
@@ -426,7 +519,7 @@ export const placeOCOOrderTool = createTool({
       const riskResult = await evaluateOrderRisk(
         { symbol: normalizedSymbol, side, type: "LIMIT", quantity, price: takeProfitPrice },
         ctx,
-        "executor"
+        "executor",
       );
       if (!riskResult.approved) {
         return { error: `Risk check rejected: ${riskResult.reason}` };
@@ -454,7 +547,7 @@ export const placeOCOOrderTool = createTool({
         effectiveStopLimitPrice,
         takeProfitPrice,
         undefined, // no planId for ad-hoc tool calls
-        ctx.userId ?? "system"
+        ctx.userId ?? "system",
       );
 
       if (!result.success) {
@@ -499,18 +592,24 @@ export const cancelAllOrdersTool = createTool({
         message:
           "rationale must be at least 10 characters. Mass cancel is destructive — articulate the SPECIFIC trigger (regime flip, hack news, mandate breach, explicit user request). 'cleanup' or 'safety' is not enough. If you cannot articulate why, do not call — surface the ambiguity instead.",
       })
-      .describe("One-sentence reason for cancelling ALL orders on this symbol (e.g. 'User requested emergency cancel after regime flip')"),
+      .describe(
+        "One-sentence reason for cancelling ALL orders on this symbol (e.g. 'User requested emergency cancel after regime flip')",
+      ),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
     message: z.string().optional(),
-    cancelledOrders: z.array(z.object({
-      orderId: z.number(),
-      type: z.string(),
-      side: z.string(),
-      price: z.string(),
-      quantity: z.string(),
-    })).optional(),
+    cancelledOrders: z
+      .array(
+        z.object({
+          orderId: z.number(),
+          type: z.string(),
+          side: z.string(),
+          price: z.string(),
+          quantity: z.string(),
+        }),
+      )
+      .optional(),
     symbol: z.string().optional(),
     error: z.string().optional(),
   }),
@@ -521,7 +620,9 @@ export const cancelAllOrdersTool = createTool({
     }
 
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "cancel", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
+      const check = checkTradingPermission(ctx.config?.permissionMode, "cancel", {
+        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper,
+      });
       if (!check.allowed) {
         return {
           error: check.reason ?? "Cancelling orders not permitted under current mode",
@@ -564,7 +665,10 @@ export const cancelAllOrdersTool = createTool({
     // remains available after consent expires.
     const consent = requireLiveConsent({ sandboxActive: ctx.exchange.isSandbox ?? false });
     if (!consent.ok) {
-      return { error: consent.reason ?? "Live-trading consent required.", symbol: normalizedSymbol };
+      return {
+        error: consent.reason ?? "Live-trading consent required.",
+        symbol: normalizedSymbol,
+      };
     }
     try {
       const cancelled = await ctx.exchange.cancelAllOrders(normalizedSymbol);
@@ -631,7 +735,7 @@ export const getOrderStatusTool = createTool({
           quantity: quantity.toFixed(4),
           filled: filled.toFixed(4),
           remaining: Math.max(quantity - filled, 0).toFixed(4),
-          fillPercent: quantity > 0 ? ((filled / quantity) * 100).toFixed(1) + "%" : "0%",
+          fillPercent: quantity > 0 ? `${((filled / quantity) * 100).toFixed(1)}%` : "0%",
           time: order.submittedAt,
         };
       } catch (error) {
@@ -654,7 +758,8 @@ export const getOrderStatusTool = createTool({
         quantity: order.quantity.toFixed(8),
         filled: order.executedQty.toFixed(8),
         remaining: (order.quantity - order.executedQty).toFixed(8),
-        fillPercent: order.quantity > 0 ? ((order.executedQty / order.quantity) * 100).toFixed(1) + "%" : "0%",
+        fillPercent:
+          order.quantity > 0 ? `${((order.executedQty / order.quantity) * 100).toFixed(1)}%` : "0%",
         time: order.time ? new Date(order.time).toISOString() : undefined,
       };
     } catch (error) {
@@ -678,13 +783,15 @@ export const testOrderTool = createTool({
   outputSchema: z.object({
     valid: z.boolean().optional(),
     message: z.string().optional(),
-    orderDetails: z.object({
-      symbol: z.string(),
-      side: z.enum(["BUY", "SELL"]),
-      type: z.enum(["LIMIT", "MARKET"]),
-      quantity: z.number(),
-      price: z.number(),
-    }).optional(),
+    orderDetails: z
+      .object({
+        symbol: z.string(),
+        side: z.enum(["BUY", "SELL"]),
+        type: z.enum(["LIMIT", "MARKET"]),
+        quantity: z.number(),
+        price: z.number(),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol, side, type, quantity, price }, execContext: MastraExecutionContext) => {
@@ -706,9 +813,7 @@ export const testOrderTool = createTool({
 
       return {
         valid: isValid,
-        message: isValid
-          ? "Order is valid and would be accepted."
-          : "Order is invalid.",
+        message: isValid ? "Order is valid and would be accepted." : "Order is invalid.",
         orderDetails: {
           symbol: normalizedSymbol,
           side,
@@ -741,24 +846,34 @@ export const placeLimitOrderTool = createTool({
     side: z.enum(["BUY", "SELL"]).describe("BUY or SELL"),
     quantity: z.number().positive().describe("Quantity of the base asset to trade"),
     price: z.number().positive().describe("Limit price at which to place the order"),
-    timeInForce: z.enum(["GTC", "IOC", "FOK"]).default("GTC").describe("Time in force: GTC (Good Til Cancelled), IOC (Immediate or Cancel), FOK (Fill or Kill)"),
+    timeInForce: z
+      .enum(["GTC", "IOC", "FOK"])
+      .default("GTC")
+      .describe(
+        "Time in force: GTC (Good Til Cancelled), IOC (Immediate or Cancel), FOK (Fill or Kill)",
+      ),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
     message: z.string().optional(),
-    order: z.object({
-      orderId: z.number(),
-      symbol: z.string(),
-      side: z.string(),
-      type: z.string(),
-      status: z.string(),
-      price: z.number(),
-      quantity: z.number(),
-      executedQty: z.number(),
-    }).optional(),
+    order: z
+      .object({
+        orderId: z.number(),
+        symbol: z.string(),
+        side: z.string(),
+        type: z.string(),
+        status: z.string(),
+        price: z.number(),
+        quantity: z.number(),
+        executedQty: z.number(),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, side, quantity, price, timeInForce }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, side, quantity, price, timeInForce },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -767,11 +882,15 @@ export const placeLimitOrderTool = createTool({
     {
       const killErr = killSwitchOrderError(ctx, symbol);
       if (killErr) return { error: killErr };
-      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", {
+        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper,
+      });
       if (!check.allowed) {
         return { error: check.reason ?? "Placing limit orders not permitted under current mode" };
       }
-      const consent = requireLiveConsent({ sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper ?? false });
+      const consent = requireLiveConsent({
+        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper ?? false,
+      });
       if (!consent.ok) {
         return { error: consent.reason ?? "Live-trading consent required." };
       }
@@ -798,7 +917,7 @@ export const placeLimitOrderTool = createTool({
       const riskResult = await evaluateOrderRisk(
         { symbol: normalizedSymbol, side, type: "LIMIT", quantity, price },
         ctx,
-        "executor"
+        "executor",
       );
       if (!riskResult.approved) {
         return { error: `Risk check rejected: ${riskResult.reason}` };
@@ -818,7 +937,7 @@ export const placeLimitOrderTool = createTool({
 
     const requestedOrder = {
       symbol: normalizedSymbol,
-      side: side.toLowerCase() === "sell" ? "sell" as const : "buy" as const,
+      side: side.toLowerCase() === "sell" ? ("sell" as const) : ("buy" as const),
       quantity,
       orderType: "LIMIT",
       notionalUsd: quantity * price,
@@ -833,23 +952,18 @@ export const placeLimitOrderTool = createTool({
     const hookedOrder =
       (preHook.metadata?.finalPayload as typeof requestedOrder | undefined) ?? requestedOrder;
     if (
-      hookedOrder.symbol !== requestedOrder.symbol
-      || hookedOrder.side !== requestedOrder.side
-      || hookedOrder.orderType !== requestedOrder.orderType
-      || hookedOrder.limitPrice !== requestedOrder.limitPrice
-      || hookedOrder.referencePrice !== requestedOrder.referencePrice
+      hookedOrder.symbol !== requestedOrder.symbol ||
+      hookedOrder.side !== requestedOrder.side ||
+      hookedOrder.orderType !== requestedOrder.orderType ||
+      hookedOrder.limitPrice !== requestedOrder.limitPrice ||
+      hookedOrder.referencePrice !== requestedOrder.referencePrice
     ) {
-      return { error: "PreOrderPlacement hook may reduce size but cannot change order identity or price." };
+      return {
+        error: "PreOrderPlacement hook may reduce size but cannot change order identity or price.",
+      };
     }
-    const reducedQuantity = Math.min(
-      hookedOrder.quantity,
-      hookedOrder.notionalUsd / price,
-    );
-    if (
-      !Number.isFinite(reducedQuantity)
-      || reducedQuantity <= 0
-      || reducedQuantity > quantity
-    ) {
+    const reducedQuantity = Math.min(hookedOrder.quantity, hookedOrder.notionalUsd / price);
+    if (!Number.isFinite(reducedQuantity) || reducedQuantity <= 0 || reducedQuantity > quantity) {
       return { error: "PreOrderPlacement hook returned an invalid or exposure-increasing size." };
     }
     quantity = reducedQuantity;
@@ -883,7 +997,9 @@ export const placeLimitOrderTool = createTool({
         notionalUsd: quantity * price,
       });
       if (postOrderHook.action === "block") {
-        console.error(`[hooks] PostOrderPlacement blocked after order ${String(orderResult.orderId ?? "unknown")}: ${postOrderHook.reason ?? "blocked"}`);
+        console.error(
+          `[hooks] PostOrderPlacement blocked after order ${String(orderResult.orderId ?? "unknown")}: ${postOrderHook.reason ?? "blocked"}`,
+        );
       }
 
       return {
@@ -916,22 +1032,29 @@ export const getOpenOrdersTool = createTool({
     "List all open/pending orders, optionally filtered by symbol. " +
     "Use when user asks 'what orders do I have open?', 'show my pending orders', 'open orders', 'any limit orders active?'.",
   inputSchema: z.object({
-    symbol: z.string().optional().describe("Trading pair to filter (e.g., 'BTCUSDT'). Leave empty for all open orders."),
+    symbol: z
+      .string()
+      .optional()
+      .describe("Trading pair to filter (e.g., 'BTCUSDT'). Leave empty for all open orders."),
   }),
   outputSchema: z.object({
     count: z.number().optional(),
-    orders: z.array(z.object({
-      orderId: z.number(),
-      symbol: z.string(),
-      side: z.string(),
-      type: z.string(),
-      status: z.string(),
-      price: z.number(),
-      quantity: z.number(),
-      executedQty: z.number(),
-      remaining: z.number(),
-      time: z.string().optional(),
-    })).optional(),
+    orders: z
+      .array(
+        z.object({
+          orderId: z.number(),
+          symbol: z.string(),
+          side: z.string(),
+          type: z.string(),
+          status: z.string(),
+          price: z.number(),
+          quantity: z.number(),
+          executedQty: z.number(),
+          remaining: z.number(),
+          time: z.string().optional(),
+        }),
+      )
+      .optional(),
     message: z.string().optional(),
     error: z.string().optional(),
   }),
@@ -976,9 +1099,7 @@ export const getOpenOrdersTool = createTool({
         };
       }
 
-      const normalizedSymbol = symbol
-        ? (normalizeSymbol(symbol))
-        : undefined;
+      const normalizedSymbol = symbol ? normalizeSymbol(symbol) : undefined;
 
       const openOrders = await ctx.exchange!.getOpenOrders(normalizedSymbol);
 
@@ -1034,7 +1155,9 @@ export const cancelOrderTool = createTool({
         message:
           "rationale must be at least 10 characters. Name the SPECIFIC reason this order should be cancelled — invalidation event, sizing breach, user request. 'replacing it' is not a reason — describe what's different about the new context.",
       })
-      .describe("One-sentence reason for cancelling this order (e.g. 'Stop moved invalidated by trend change')"),
+      .describe(
+        "One-sentence reason for cancelling this order (e.g. 'Stop moved invalidated by trend change')",
+      ),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
@@ -1050,7 +1173,9 @@ export const cancelOrderTool = createTool({
     }
 
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "cancel", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
+      const check = checkTradingPermission(ctx.config?.permissionMode, "cancel", {
+        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper,
+      });
       if (!check.allowed) {
         return { error: check.reason ?? "Cancelling orders not permitted under current mode" };
       }
@@ -1076,7 +1201,13 @@ export const cancelOrderTool = createTool({
         entryType: "execution_result",
         title: `Cancel order ${normalizedSymbol} #${orderId}`,
         content: `Cancellation rationale: ${rationale}`,
-        payload: { kind: "cancel", tool: "cancel_order", symbol: normalizedSymbol, orderId, rationale },
+        payload: {
+          kind: "cancel",
+          tool: "cancel_order",
+          symbol: normalizedSymbol,
+          orderId,
+          rationale,
+        },
       });
     } catch {
       // Storage failures must not block the cancellation itself.
@@ -1089,7 +1220,10 @@ export const cancelOrderTool = createTool({
     // cleanup remains separately exempt.
     const consent = requireLiveConsent({ sandboxActive: ctx.exchange.isSandbox ?? false });
     if (!consent.ok) {
-      return { error: consent.reason ?? "Live-trading consent required.", symbol: normalizedSymbol };
+      return {
+        error: consent.reason ?? "Live-trading consent required.",
+        symbol: normalizedSymbol,
+      };
     }
     try {
       await ctx.exchange.cancelOrder(normalizedSymbol, String(orderId));
@@ -1123,18 +1257,22 @@ export const getOrderHistoryTool = createTool({
   outputSchema: z.object({
     symbol: z.string().optional(),
     count: z.number().optional(),
-    orders: z.array(z.object({
-      orderId: z.number(),
-      symbol: z.string(),
-      side: z.string(),
-      type: z.string(),
-      status: z.string(),
-      price: z.number(),
-      quantity: z.number(),
-      executedQty: z.number(),
-      cummulativeQuoteQty: z.number(),
-      time: z.string().optional(),
-    })).optional(),
+    orders: z
+      .array(
+        z.object({
+          orderId: z.number(),
+          symbol: z.string(),
+          side: z.string(),
+          type: z.string(),
+          status: z.string(),
+          price: z.number(),
+          quantity: z.number(),
+          executedQty: z.number(),
+          cummulativeQuoteQty: z.number(),
+          time: z.string().optional(),
+        }),
+      )
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol, limit }, execContext: MastraExecutionContext) => {
@@ -1189,39 +1327,48 @@ export const cancelReplaceOrderTool = createTool({
     type: z.enum(["LIMIT", "MARKET"]).describe("Type of the new replacement order"),
     quantity: z.number().positive().describe("Quantity for the new order"),
     price: z.number().optional().describe("Price for the new order (required for LIMIT orders)"),
-    timeInForce: z.enum(["GTC", "IOC", "FOK"]).default("GTC").describe("Time in force for the new order"),
+    timeInForce: z
+      .enum(["GTC", "IOC", "FOK"])
+      .default("GTC")
+      .describe("Time in force for the new order"),
     rationale: z
       .string()
       .min(10, {
         message:
           "rationale must be at least 10 characters. Cancel-replace is two destructive actions — articulate why the OLD order should die AND why the NEW order is correct. 'price changed' is insufficient — name the concrete trigger and the new entry/exit basis.",
       })
-      .describe("One-sentence reason for replacing this order (e.g. 'Better entry price available after pullback to 99800')"),
+      .describe(
+        "One-sentence reason for replacing this order (e.g. 'Better entry price available after pullback to 99800')",
+      ),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
     message: z.string().optional(),
     cancelResult: z.string().optional(),
     newOrderResult: z.string().optional(),
-    newOrder: z.object({
-      orderId: z.number(),
-      symbol: z.string(),
-      side: z.string(),
-      type: z.string(),
-      status: z.string(),
-      price: z.string(),
-      quantity: z.string(),
-    }).optional(),
+    newOrder: z
+      .object({
+        orderId: z.number(),
+        symbol: z.string(),
+        side: z.string(),
+        type: z.string(),
+        status: z.string(),
+        price: z.string(),
+        quantity: z.string(),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, cancelOrderId, side, type, quantity, price, timeInForce, rationale }, execContext: MastraExecutionContext) => {
+  execute: async (_params, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
 
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", {
+        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper,
+      });
       if (!check.allowed) {
         return { error: check.reason ?? "Cancel/replace not permitted under current mode" };
       }
@@ -1252,17 +1399,23 @@ export const cancelOrderListTool = createTool({
         message:
           "rationale must be at least 10 characters. OCO/OTO lists cancel both legs — articulate why BOTH legs are invalid, not just one. If only one leg is invalid, cancel that single order instead of the whole list.",
       })
-      .describe("One-sentence reason for cancelling this OCO/OTO list (e.g. 'Both legs invalidated by funding flip')"),
+      .describe(
+        "One-sentence reason for cancelling this OCO/OTO list (e.g. 'Both legs invalidated by funding flip')",
+      ),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
     message: z.string().optional(),
     orderListId: z.number().optional(),
     status: z.string().optional(),
-    cancelledOrders: z.array(z.object({
-      orderId: z.number(),
-      symbol: z.string(),
-    })).optional(),
+    cancelledOrders: z
+      .array(
+        z.object({
+          orderId: z.number(),
+          symbol: z.string(),
+        }),
+      )
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol, orderListId, rationale }, execContext: MastraExecutionContext) => {
@@ -1272,13 +1425,47 @@ export const cancelOrderListTool = createTool({
     }
 
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "cancel", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
+      const check = checkTradingPermission(ctx.config?.permissionMode, "cancel", {
+        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper,
+      });
       if (!check.allowed) {
         return { error: check.reason ?? "Cancelling order lists not permitted under current mode" };
       }
     }
 
-    return { error: "OCO/OTO order-list cancel requires Binance SAPI; not available via CCXT adapter." };
+    const consent = requireLiveConsent({ sandboxActive: ctx.exchange.isSandbox ?? false });
+    if (!consent.ok) return { error: consent.reason ?? "Live-trading consent required." };
+
+    const extended = ctx.exchange as ExchangeExtended;
+    if (!extended.cancelOrderList) {
+      return { error: `Order-list cancellation is not supported on ${ctx.exchange.displayName}.` };
+    }
+    const normalizedSymbol = normalizeSymbol(symbol);
+    try {
+      await extended.cancelOrderList(normalizedSymbol, orderListId);
+      appendActionLogEntry({
+        sessionId: ctx.runtime?.sessionId,
+        threadId: ctx.threadId ?? ctx.runtime?.threadId,
+        resourceId: ctx.userId ?? ctx.runtime?.resourceId,
+        entryType: "execution_result",
+        title: `Cancel order list ${normalizedSymbol} #${orderListId}`,
+        content: `Cancellation rationale: ${rationale}`,
+        payload: {
+          kind: "cancel",
+          tool: "cancel_order_list",
+          symbol: normalizedSymbol,
+          orderListId,
+        },
+      });
+      return {
+        success: true,
+        message: `Cancelled order list #${orderListId} on ${normalizedSymbol}`,
+        orderListId,
+        status: "CANCELLED",
+      };
+    } catch (error) {
+      return { error: `Failed to cancel order list #${orderListId}: ${(error as Error).message}` };
+    }
   },
 });
 
@@ -1294,14 +1481,20 @@ export const getOpenOrderListsTool = createTool({
   inputSchema: z.object({}),
   outputSchema: z.object({
     count: z.number().optional(),
-    orderLists: z.array(z.object({
-      orderListId: z.number(),
-      symbol: z.string(),
-      status: z.string(),
-      orders: z.array(z.object({
-        orderId: z.number(),
-      })),
-    })).optional(),
+    orderLists: z
+      .array(
+        z.object({
+          orderListId: z.number(),
+          symbol: z.string(),
+          status: z.string(),
+          orders: z.array(
+            z.object({
+              orderId: z.number(),
+            }),
+          ),
+        }),
+      )
+      .optional(),
     message: z.string().optional(),
     error: z.string().optional(),
   }),
@@ -1311,7 +1504,9 @@ export const getOpenOrderListsTool = createTool({
       return errors.noExchange;
     }
 
-    return { error: "Open OCO/OTO order lists require Binance SAPI; not available via CCXT adapter." };
+    return {
+      error: "Open OCO/OTO order lists require Binance SAPI; not available via CCXT adapter.",
+    };
   },
 });
 
@@ -1342,8 +1537,8 @@ export const orderbookTools = {
   get_open_orders: getOpenOrdersTool,
   get_order_history: getOrderHistoryTool,
   test_order: testOrderTool,
-  // Binance-only tools
-  cancel_replace_order: cancelReplaceOrderTool,
+  // Venue-specific tools are exposed only when the shared adapter contract can
+  // actually execute them. The atomic cancel-replace and open-list stubs remain
+  // exported for direct compatibility but are not advertised to agents.
   cancel_order_list: cancelOrderListTool,
-  get_open_order_lists: getOpenOrderListsTool,
 };

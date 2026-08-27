@@ -104,7 +104,7 @@ export function ledoitWolfCovariance(
   const n = returns.length;
   const t = returns[0]!.length;
   const mu = sample.reduce((sum, row, i) => sum + row[i]!, 0) / n;
-  const target = sample.map((row, i) => row.map((_, j) => i === j ? mu : 0));
+  const target = sample.map((row, i) => row.map((_, j) => (i === j ? mu : 0)));
   const centered = returns.map((series) => {
     const mean = series.reduce((sum, value) => sum + value, 0) / t;
     return series.map((value) => value - mean);
@@ -160,7 +160,9 @@ export function computeCovarianceMatrix(returns: number[][]): number[][] | null 
     const mean = sum / T;
     for (let t = 0; t < T; t++) X.set(i, t, X.get(i, t) - mean);
   }
-  return X.mmul(X.transpose()).div(T - 1).to2DArray();
+  return X.mmul(X.transpose())
+    .div(T - 1)
+    .to2DArray();
 }
 
 /**

@@ -73,7 +73,7 @@ function det2(m: Mat2): number {
 
 function inv2(m: Mat2): Mat2 | null {
   const d = det2(m);
-  if (!isFinite(d) || Math.abs(d) < 1e-15) return null;
+  if (!Number.isFinite(d) || Math.abs(d) < 1e-15) return null;
   return [
     [m[1][1] / d, -m[0][1] / d],
     [-m[1][0] / d, m[0][0] / d],

@@ -11,12 +11,10 @@ export {
   // State enum & schema
   PositionStateSchema,
   type PositionState,
-
   // Transition map
   VALID_TRANSITIONS,
   TERMINAL_STATES,
   ACTIVE_STATES,
-
   // Sub-record schemas & types
   SetupSignalSchema,
   type SetupSignal,
@@ -32,15 +30,12 @@ export {
   type TradeReview,
   TrailingStopSchema,
   type TrailingStop,
-
   // State transition
   StateTransitionSchema,
   type StateTransition,
-
   // Position record
   PositionRecordSchema,
   type PositionRecord,
-
   // Input / query types
   type CreatePositionParams,
   type FillData,
@@ -49,7 +44,6 @@ export {
   type HistoryOptions,
   type PositionSummary,
   type PositionStats,
-
   // Event types
   type PositionStateChangedEvent,
   type PositionCreatedEvent,

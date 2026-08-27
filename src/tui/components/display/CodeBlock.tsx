@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Box, Text } from "../../ink-custom";
 
 /**
@@ -23,16 +23,21 @@ interface Props {
 let cliHighlightPromise: Promise<
   ((text: string, options: { language?: string; ignoreIllegals: boolean }) => string) | null
 > | null = null;
+type HighlightFunction = (
+  text: string,
+  options: { language?: string; ignoreIllegals: boolean },
+) => string;
 
 function loadCliHighlight() {
   if (cliHighlightPromise) return cliHighlightPromise;
   cliHighlightPromise = import("cli-highlight")
     .then((mod) => {
       // cli-highlight exposes a `highlight` function as default or named export
-      const fn = (mod as { highlight?: Function; default?: Function }).highlight
-        ?? (mod as { default?: Function }).default;
+      const fn =
+        (mod as { highlight?: HighlightFunction; default?: HighlightFunction }).highlight ??
+        (mod as { default?: HighlightFunction }).default;
       if (typeof fn !== "function") return null;
-      return fn as (text: string, options: { language?: string; ignoreIllegals: boolean }) => string;
+      return fn;
     })
     .catch(() => null);
   return cliHighlightPromise;
@@ -78,7 +83,8 @@ export function CodeBlock({ code, language }: Props) {
       {/* Top border with language label */}
       <Box>
         <Text dimColor>
-          {"\u250C"}{"\u2500"}
+          {"\u250C"}
+          {"\u2500"}
           {language ? ` ${language} ` : ""}
           {"\u2500".repeat(Math.max(1, 30 - (language?.length ?? 0)))}
         </Text>
@@ -100,7 +106,8 @@ export function CodeBlock({ code, language }: Props) {
       {/* Bottom border */}
       <Box>
         <Text dimColor>
-          {"\u2514"}{"\u2500".repeat(32)}
+          {"\u2514"}
+          {"\u2500".repeat(32)}
           {loadFailed ? " (unhighlighted)" : ""}
         </Text>
       </Box>

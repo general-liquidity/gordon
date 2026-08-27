@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { StructuredDiff, type DiffHunk } from "../editors/StructuredDiff.tsx";
 import { KeyboardHints } from "../../design-system/KeyboardHints.tsx";
@@ -7,16 +7,26 @@ import { KeyboardHints } from "../../design-system/KeyboardHints.tsx";
 // DiffDialog — Browse diffs per trading session with file list and detail view
 // ============================================================================
 
-export interface FileDiff { path: string; additions: number; deletions: number; hunks: DiffHunk[]; }
-interface Props { diffs: FileDiff[]; onClose: () => void; }
+export interface FileDiff {
+  path: string;
+  additions: number;
+  deletions: number;
+  hunks: DiffHunk[];
+}
+interface Props {
+  diffs: FileDiff[];
+  onClose: () => void;
+}
 
 export function DiffDialog({ diffs, onClose }: Props) {
   const [selected, setSelected] = useState(0);
   const [viewDetail, setViewDetail] = useState(false);
 
   useInput((_, key) => {
-    if (key.escape) { if (viewDetail) setViewDetail(false); else onClose(); }
-    else if (key.return) setViewDetail(true);
+    if (key.escape) {
+      if (viewDetail) setViewDetail(false);
+      else onClose();
+    } else if (key.return) setViewDetail(true);
     else if (key.upArrow && !viewDetail) setSelected((p) => Math.max(0, p - 1));
     else if (key.downArrow && !viewDetail) setSelected((p) => Math.min(diffs.length - 1, p + 1));
   });
@@ -24,7 +34,9 @@ export function DiffDialog({ diffs, onClose }: Props) {
   if (viewDetail && diffs[selected]) {
     return (
       <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
-        <Text bold color="cyanBright">DIFF: {diffs[selected]!.path}</Text>
+        <Text bold color="cyanBright">
+          DIFF: {diffs[selected]!.path}
+        </Text>
         <StructuredDiff hunks={diffs[selected]!.hunks} filePath={diffs[selected]!.path} />
         <KeyboardHints hints={[{ keys: "esc", label: "back" }]} />
       </Box>
@@ -33,10 +45,14 @@ export function DiffDialog({ diffs, onClose }: Props) {
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
-      <Text bold color="cyanBright">SESSION DIFFS</Text>
+      <Text bold color="cyanBright">
+        SESSION DIFFS
+      </Text>
       {diffs.map((diff, i) => (
         <Box key={i}>
-          <Text color={i === selected ? "cyanBright" : undefined}>{i === selected ? "\u25B8 " : "  "}</Text>
+          <Text color={i === selected ? "cyanBright" : undefined}>
+            {i === selected ? "\u25B8 " : "  "}
+          </Text>
           <Text bold={i === selected}>{diff.path}</Text>
           <Text color="green"> +{diff.additions}</Text>
           <Text color="red"> -{diff.deletions}</Text>

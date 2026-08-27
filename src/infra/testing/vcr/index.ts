@@ -49,12 +49,12 @@ import {
 import { canonicalizeUrl, DEFAULT_MATCHER } from "./cassette.ts";
 import { redactBody, redactHeaders } from "./redaction.ts";
 
-export {
-  type Cassette,
-  type Interaction,
-  type MatcherConfig,
-  type RecordedRequest,
-  type RecordedResponse,
+export type {
+  Cassette,
+  Interaction,
+  MatcherConfig,
+  RecordedRequest,
+  RecordedResponse,
 } from "./cassette.ts";
 export { VCR_REDACTED, redactBody, redactHeaders, redactPlanted } from "./redaction.ts";
 
@@ -80,7 +80,10 @@ export interface VcrOptions {
 
 /** Thrown when a replayed request has no matching cassette interaction. */
 export class VcrNoMatchError extends Error {
-  constructor(public readonly request: RecordedRequest, cassetteName: string) {
+  constructor(
+    public readonly request: RecordedRequest,
+    cassetteName: string,
+  ) {
     super(
       `[vcr] no recorded interaction in cassette "${cassetteName}" for ` +
         `${request.method} ${request.url}` +
@@ -186,7 +189,7 @@ export class VcrSession {
       interactions: this.interactions,
     };
     mkdirSync(dirname(this.cassettePath), { recursive: true });
-    writeFileSync(this.cassettePath, JSON.stringify(cassette, null, 2) + "\n", "utf8");
+    writeFileSync(this.cassettePath, `${JSON.stringify(cassette, null, 2)}\n`, "utf8");
   }
 
   /** In-memory interactions (post-redaction in record mode). For tests. */

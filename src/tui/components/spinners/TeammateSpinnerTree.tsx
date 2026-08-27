@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { TeammateSpinnerLine } from "./TeammateSpinnerLine.js";
 

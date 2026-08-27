@@ -28,10 +28,7 @@ export interface HighlightRange {
  * Find all non-overlapping case-insensitive matches of `query` in `text`.
  * Returns an array of { start, end } index ranges (end is exclusive).
  */
-export function findHighlightRanges(
-  text: string,
-  query: string,
-): HighlightRange[] {
+export function findHighlightRanges(text: string, query: string): HighlightRange[] {
   if (!query || query.length < 2 || !text) return [];
 
   const ranges: HighlightRange[] = [];
@@ -62,9 +59,6 @@ export function findHighlightRanges(
  * const ranges = useSearchHighlight("BTC/USDT on Binance", "binance");
  * // [{ start: 10, end: 17 }]
  */
-export function useSearchHighlight(
-  text: string,
-  query: string,
-): HighlightRange[] {
+export function useSearchHighlight(text: string, query: string): HighlightRange[] {
   return useMemo(() => findHighlightRanges(text, query), [text, query]);
 }

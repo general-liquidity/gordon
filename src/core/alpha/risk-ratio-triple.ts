@@ -72,13 +72,10 @@ const DEFAULT_SYMMETRIC_TOLERANCE = 0.1;
 const DEFAULT_CALMAR_FLOOR = 1.0;
 const DEFAULT_SORTINO_FLOOR = 2.0;
 
-export function interpretRiskRatioTriple(
-  input: RiskRatioTripleInput,
-): RiskRatioTripleResult {
+export function interpretRiskRatioTriple(input: RiskRatioTripleInput): RiskRatioTripleResult {
   const { sharpe, sortino } = input;
-  const calmar = typeof input.calmar === "number" && Number.isFinite(input.calmar)
-    ? input.calmar
-    : null;
+  const calmar =
+    typeof input.calmar === "number" && Number.isFinite(input.calmar) ? input.calmar : null;
   const tol = input.symmetricTolerance ?? DEFAULT_SYMMETRIC_TOLERANCE;
   const calmarFloor = input.calmarFloor ?? DEFAULT_CALMAR_FLOOR;
   const sortinoFloor = input.sortinoFloor ?? DEFAULT_SORTINO_FLOOR;
@@ -115,9 +112,7 @@ export function interpretRiskRatioTriple(
     }
   }
 
-  const sortinoPassesFloor = Number.isFinite(sortino)
-    ? sortino >= sortinoFloor
-    : true; // unbounded Sortino trivially clears any finite floor
+  const sortinoPassesFloor = Number.isFinite(sortino) ? sortino >= sortinoFloor : true; // unbounded Sortino trivially clears any finite floor
   const calmarPassesFloor = calmar === null ? null : calmar >= calmarFloor;
 
   const skewSentence =
@@ -139,7 +134,9 @@ export function interpretRiskRatioTriple(
   const interpretation =
     `Sharpe ${Number.isFinite(sharpe) ? sharpe.toFixed(2) : "n/a"}, ` +
     `Sortino ${Number.isFinite(sortino) ? sortino.toFixed(2) : "∞"}` +
-    (divergenceRatio !== null ? ` (${divergenceRatio.toFixed(2)}× the √2×Sharpe symmetric expectation of ${expectedSortino.toFixed(2)})` : "") +
+    (divergenceRatio !== null
+      ? ` (${divergenceRatio.toFixed(2)}× the √2×Sharpe symmetric expectation of ${expectedSortino.toFixed(2)})`
+      : "") +
     `. ${skewSentence} ${floorSentence}`;
 
   return {

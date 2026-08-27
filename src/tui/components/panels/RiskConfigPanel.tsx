@@ -61,13 +61,7 @@ function padRight(s: string, w: number): string {
 // Component
 // ============================================================================
 
-export function RiskConfigPanel({
-  checks,
-  mode,
-  onModeChange,
-  onThresholdChange,
-  onClose,
-}: Props) {
+export function RiskConfigPanel({ checks, mode, onModeChange, onThresholdChange, onClose }: Props) {
   const [cursor, setCursor] = useState(0);
   const [modeIndex, setModeIndex] = useState(MODES.indexOf(mode));
 
@@ -88,6 +82,13 @@ export function RiskConfigPanel({
       const next = (modeIndex + 1) % MODES.length;
       setModeIndex(next);
       onModeChange?.(MODES[next]!);
+      return;
+    }
+    if ((key.leftArrow || key.rightArrow) && onThresholdChange) {
+      const check = checks[cursor];
+      if (!check) return;
+      const multiplier = key.leftArrow ? 0.9 : 1.1;
+      onThresholdChange(check.id, Math.max(0, check.limit * multiplier));
     }
   });
 
@@ -119,9 +120,21 @@ export function RiskConfigPanel({
 
       {/* Column headers */}
       <Box paddingLeft={3}>
-        <Box width={22}><Text bold dimColor>CHECK</Text></Box>
-        <Box width={24}><Text bold dimColor>USAGE</Text></Box>
-        <Box width={10}><Text bold dimColor>STATUS</Text></Box>
+        <Box width={22}>
+          <Text bold dimColor>
+            CHECK
+          </Text>
+        </Box>
+        <Box width={24}>
+          <Text bold dimColor>
+            USAGE
+          </Text>
+        </Box>
+        <Box width={10}>
+          <Text bold dimColor>
+            STATUS
+          </Text>
+        </Box>
       </Box>
 
       {/* Check rows */}
@@ -144,10 +157,15 @@ export function RiskConfigPanel({
               <Box width={24}>
                 <ProgressBar value={Math.min(ratio, 1)} width={12} fillColor={color} />
                 <Text color={color}> {pct}%</Text>
-                <Text dimColor> ({check.currentValue}/{check.limit})</Text>
+                <Text dimColor>
+                  {" "}
+                  ({check.currentValue}/{check.limit})
+                </Text>
               </Box>
               <Box width={10}>
-                <Text color={iconColor}>{icon} {check.passed ? "PASS" : "FAIL"}</Text>
+                <Text color={iconColor}>
+                  {icon} {check.passed ? "PASS" : "FAIL"}
+                </Text>
               </Box>
             </Box>
             {isFocused && (
@@ -161,7 +179,8 @@ export function RiskConfigPanel({
 
       <Text> </Text>
       <Text dimColor>
-        {"\u2191\u2193"} navigate {"\u00b7"} m cycle mode {"\u00b7"} Esc close
+        {"\u2191\u2193"} navigate {"\u00b7"} ←→ threshold {"\u00b7"} m cycle mode {"\u00b7"} Esc
+        close
       </Text>
     </Pane>
   );

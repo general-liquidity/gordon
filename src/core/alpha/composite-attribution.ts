@@ -20,10 +20,7 @@
  * Purely diagnostic — does not change the classifier's behavior.
  */
 
-import type {
-  RiskAssessment,
-  RiskDimension,
-} from "../../infra/trading/risk/riskClassifier.ts";
+import type { RiskAssessment, RiskDimension } from "../../infra/trading/risk/riskClassifier.ts";
 
 export interface DimensionAttribution {
   name: string;
@@ -65,9 +62,7 @@ export interface CompositeAttribution {
  *   - All scores 0 → all contributions are 0; topDriver is the highest-
  *     weighted dimension (most likely to flip first if scores rise)
  */
-export function explainCompositeAttribution(
-  assessment: RiskAssessment,
-): CompositeAttribution {
+export function explainCompositeAttribution(assessment: RiskAssessment): CompositeAttribution {
   const dims = assessment.dimensions;
 
   let totalWeight = 0;
@@ -79,8 +74,7 @@ export function explainCompositeAttribution(
 
   const attributions: DimensionAttribution[] = dims.map((d) => {
     const weightedScore = d.score * d.weight;
-    const contribution =
-      totalWeightedScore > 0 ? weightedScore / totalWeightedScore : 0;
+    const contribution = totalWeightedScore > 0 ? weightedScore / totalWeightedScore : 0;
     return {
       name: d.name,
       rawScore: d.score,
@@ -92,9 +86,7 @@ export function explainCompositeAttribution(
     };
   });
 
-  const sorted = [...attributions].sort(
-    (a, b) => b.weightedScore - a.weightedScore,
-  );
+  const sorted = [...attributions].sort((a, b) => b.weightedScore - a.weightedScore);
 
   const topDriver = sorted.length > 0 ? sorted[0]! : null;
   // Bottom driver: lowest non-zero contribution, OR lowest weighted score
@@ -142,9 +134,7 @@ export function formatAttributionTable(attr: CompositeAttribution): string {
   if (attr.dimensionsByContribution.length === 0) {
     return "(no dimensions)";
   }
-  const maxName = Math.max(
-    ...attr.dimensionsByContribution.map((d) => d.name.length),
-  );
+  const maxName = Math.max(...attr.dimensionsByContribution.map((d) => d.name.length));
   const lines: string[] = [
     `Composite ${attr.compositeScore.toFixed(1)} → ${attr.tier} (${attr.recommendation})`,
     "",

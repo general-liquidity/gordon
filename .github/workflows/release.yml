@@ -6,7 +6,7 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
@@ -26,6 +26,7 @@ jobs:
     # untested code shipping. Verified by enumerating find src -name '*.test.ts'.
     name: Test (${{ matrix.shard-name }})
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -58,13 +59,15 @@ jobs:
             paths: src/tui src/app src/runtime src/backtest src/services src/gateway src/utils src/events src/types src/sdk src/cli.test.ts scripts/dev/harness scripts/research/scans
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.7
 
       - name: Cache bun install
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
@@ -88,15 +91,18 @@ jobs:
   test-gates:
     name: Test Gates (conformance + typecheck)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.7
 
       - name: Cache bun install
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
@@ -125,6 +131,7 @@ jobs:
     name: Verify npm Wrapper (${{ matrix.os }})
     needs: [test, test-gates]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     env:
       GORDON_NPM_VERSION: ${{ github.ref_name }}
     strategy:
@@ -136,12 +143,12 @@ jobs:
           - windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 22.22.0
 
       - name: Prepare npm wrapper
         run: npm run prepare:npm-wrapper
@@ -166,9 +173,10 @@ jobs:
     name: Verify Public Dist Bundle
     needs: [test, test-gates]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Prepare public dist bundle
         run: node scripts/build/prepare-public-dist.cjs --out-dir .public-dist
@@ -189,27 +197,22 @@ jobs:
       - verify-npm-wrapper
       - verify-public-dist
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Generate CycloneDX SBOM
         # Software Bill of Materials attached to every release. CycloneDX 1.5 JSON.
-        #
-        # Gordon installs with Bun, so the dependency tree npm sees will always
-        # look inconsistent to it (npm reports every peer range Bun does not
-        # enforce as missing/invalid). That is a reporting artifact, not a
-        # broken tree: the shipped binary is built from bun.lock. The refresh is
-        # therefore best-effort and the whole step is non-blocking, since the
-        # SBOM is a release attachment and must never gate a release.
-        continue-on-error: true
-        run: |
-          npm install --package-lock-only --ignore-scripts --legacy-peer-deps \
-            || echo "npm lockfile refresh reported peer issues; continuing (bun.lock is the source of truth)"
-          node scripts/dev/codegen/generate-sbom.cjs --output gordon-sbom.json
+        # package-lock.json is refreshed and reviewed with dependency changes;
+        # release jobs consume it rather than resolving a new graph at publish
+        # time. A missing or malformed SBOM is a release failure.
+        run: node scripts/dev/codegen/generate-sbom.cjs --output gordon-sbom.json
 
       - name: Create or update GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           generate_release_notes: true
           files: gordon-sbom.json
@@ -221,6 +224,9 @@ jobs:
     needs:
       - create-source-release
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    permissions:
+      contents: write
     # Experimental targets (windows-arm64) may fail without blocking the
     # release. Under the optionalDependencies model this is fully non-blocking:
     # a missing platform sub-package just isn't published, and the launcher
@@ -275,13 +281,15 @@ jobs:
             experimental: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.7
 
       - name: Cache bun install
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
@@ -320,7 +328,7 @@ jobs:
         # Build-once, promote: the publish job downloads these artifacts rather
         # than rebuilding. Also uploaded to the GH Release below for the
         # direct-binary channel (install.sh / Homebrew / Scoop).
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: binary-${{ matrix.target }}
           path: ${{ matrix.binary_name }}
@@ -338,6 +346,7 @@ jobs:
     name: Stage + Publish
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # id-token: write enables OIDC so `npm publish --provenance` signs each
     # tarball (root wrapper + every platform sub-package) with SLSA Build L3
     # attestations. contents: write is for the manifest commit + SHA256SUMS
@@ -349,19 +358,19 @@ jobs:
       VERSION: ${{ github.ref_name }}
     steps:
       - name: Checkout source repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 22.22.0
           registry-url: https://registry.npmjs.org
 
       - name: Download built binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: dist-assets
           pattern: binary-*
@@ -402,9 +411,8 @@ jobs:
 
       - name: Commit source manifest updates
         # Bookkeeping: refresh the brew/scoop/npm manifests on the source
-        # branch. This must never block a publish, so it tolerates failure,
-        # for example when the branch moved on while the release was running.
-        continue-on-error: true
+        # branch. A failure blocks publication so registry metadata can never
+        # get ahead of the source manifests that verify its binaries.
         run: |
           git config user.name "Tiberiu Toca"
           git config user.email "tibi.toca@gmail.com"
@@ -416,7 +424,7 @@ jobs:
             exit 0
           fi
           git commit -m "chore: publish assets for ${VERSION}"
-          git pull --rebase origin "${SOURCE_BRANCH}" || true
+          git pull --rebase origin "${SOURCE_BRANCH}"
           git push origin "HEAD:${SOURCE_BRANCH}"
 
       - name: Upload SHA256SUMS to release

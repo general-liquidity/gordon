@@ -19,7 +19,10 @@ describe("listCcxtExchanges", () => {
     // OTHER verified id must be present and flagged; nothing else is flagged.
     const catalogIds = new Set(catalog.map((e) => e.id));
     const expectedVerified = VERIFIED_EXCHANGE_IDS.filter((id) => catalogIds.has(id)).sort();
-    const actualVerified = catalog.filter((e) => e.verified).map((e) => e.id).sort();
+    const actualVerified = catalog
+      .filter((e) => e.verified)
+      .map((e) => e.id)
+      .sort();
     expect(actualVerified).toEqual(expectedVerified);
     // robinhood specifically is absent from the ccxt list
     expect(catalogIds.has("robinhood")).toBe(false);

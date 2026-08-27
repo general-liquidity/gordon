@@ -26,7 +26,11 @@ afterAll(() => {
   setDatabasePathForTesting(null);
   for (const suffix of ["", "-wal", "-shm"]) {
     const p = `${dbPath}${suffix}`;
-    try { if (existsSync(p)) unlinkSync(p); } catch { /* ignore */ }
+    try {
+      if (existsSync(p)) unlinkSync(p);
+    } catch {
+      /* ignore */
+    }
   }
 });
 
@@ -49,7 +53,9 @@ beforeEach(() => {
 
 const RATIONALE = "User confirmed plan, entry trigger hit, no regime conflict";
 
-function planFixture(overrides: Partial<Omit<Plan, "id" | "createdAt">> = {}): Omit<Plan, "id" | "createdAt"> {
+function planFixture(
+  overrides: Partial<Omit<Plan, "id" | "createdAt">> = {},
+): Omit<Plan, "id" | "createdAt"> {
   return {
     symbol: "BTCUSDT",
     direction: "long",
@@ -66,14 +72,16 @@ function planFixture(overrides: Partial<Omit<Plan, "id" | "createdAt">> = {}): O
   };
 }
 
-function makeExecContext(options: { quote?: number; portfolioValue?: number; maxAllocationPerTrade?: number } = {}) {
+function makeExecContext(
+  options: { quote?: number; portfolioValue?: number; maxAllocationPerTrade?: number } = {},
+) {
   const requestContext = new RequestContext();
   requestContext.set("exchange", {
     exchangeId: "binance",
     displayName: "Mock Binance",
     isSandbox: true,
     getPrice: async () => options.quote ?? 50_000,
-    getBalance: async (asset: string) => asset === "USDT" ? 50_000 : 0,
+    getBalance: async (asset: string) => (asset === "USDT" ? 50_000 : 0),
     getFullAccountDetails: async () => ({
       accountInfo: {
         canTrade: true,
@@ -107,18 +115,25 @@ function makeExecContext(options: { quote?: number; portfolioValue?: number; max
 }
 
 async function approve(planId: string) {
-  return (await (approvePlanTool as unknown as {
-    execute: (input: { planId: string }, ctx: unknown) => Promise<{ success: boolean; error?: string }>;
-  }).execute({ planId }, makeExecContext()));
+  return await (
+    approvePlanTool as unknown as {
+      execute: (
+        input: { planId: string },
+        ctx: unknown,
+      ) => Promise<{ success: boolean; error?: string }>;
+    }
+  ).execute({ planId }, makeExecContext());
 }
 
 async function exec(planId: string, ctxOptions: Parameters<typeof makeExecContext>[0] = {}) {
-  return (await (executePlanTool as unknown as {
-    execute: (
-      input: { planId: string; rationale: string },
-      ctx: unknown,
-    ) => Promise<{ success: boolean; error?: string }>;
-  }).execute({ planId, rationale: RATIONALE }, makeExecContext(ctxOptions)));
+  return await (
+    executePlanTool as unknown as {
+      execute: (
+        input: { planId: string; rationale: string },
+        ctx: unknown,
+      ) => Promise<{ success: boolean; error?: string }>;
+    }
+  ).execute({ planId, rationale: RATIONALE }, makeExecContext(ctxOptions));
 }
 
 describe("approve_plan content binding", () => {
@@ -207,9 +222,11 @@ describe("execute_plan order-construction price gate", () => {
   });
 
   test("guardrails validateTrade blocks allocation above the configured cap", async () => {
-    const plan = createPlan(planFixture({
-      allocation: { currency: "USDT", amount: 50_000, percentOfPortfolio: 0.5 },
-    }));
+    const plan = createPlan(
+      planFixture({
+        allocation: { currency: "USDT", amount: 50_000, percentOfPortfolio: 0.5 },
+      }),
+    );
     await approve(plan.id);
     const result = await exec(plan.id, { portfolioValue: 100_000, maxAllocationPerTrade: 0.2 });
     expect(result.success).toBe(false);

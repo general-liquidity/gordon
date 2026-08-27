@@ -90,8 +90,11 @@ function kurtosis(arr: number[]): number {
   const s = stddev(arr);
   if (s === 0) return 3;
   const sum4 = arr.reduce((acc, v) => acc + ((v - m) / s) ** 4, 0);
-  return ((n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))) * sum4
-    - (3 * (n - 1) ** 2) / ((n - 2) * (n - 3)) + 3;
+  return (
+    ((n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))) * sum4 -
+    (3 * (n - 1) ** 2) / ((n - 2) * (n - 3)) +
+    3
+  );
 }
 
 /**
@@ -116,8 +119,12 @@ function normalInverseCDF(p: number): number {
   if (p === 0.5) return 0;
 
   const t = p < 0.5 ? Math.sqrt(-2 * Math.log(p)) : Math.sqrt(-2 * Math.log(1 - p));
-  const c0 = 2.515517, c1 = 0.802853, c2 = 0.010328;
-  const d1 = 1.432788, d2 = 0.189269, d3 = 0.001308;
+  const c0 = 2.515517,
+    c1 = 0.802853,
+    c2 = 0.010328;
+  const d1 = 1.432788,
+    d2 = 0.189269,
+    d3 = 0.001308;
   const result = t - (c0 + c1 * t + c2 * t * t) / (1 + d1 * t + d2 * t * t + d3 * t * t * t);
   return p < 0.5 ? -result : result;
 }
@@ -156,9 +163,7 @@ export function probabilisticSharpeRatio(
   const srStar = observedSharpe / Math.sqrt(periodsPerYear); // Per-period Sharpe
   const benchStar = benchmarkSharpe / Math.sqrt(periodsPerYear);
 
-  const seSharpe = Math.sqrt(
-    (1 - skew * srStar + ((kurt - 1) / 4) * srStar * srStar) / n
-  );
+  const seSharpe = Math.sqrt((1 - skew * srStar + ((kurt - 1) / 4) * srStar * srStar) / n);
 
   // !(x > 0) also catches NaN (negative sqrt argument from extreme skew/kurtosis) — fail closed.
   if (!(seSharpe > 0)) return { psr: 0.5, observedSharpe, significant: false };
@@ -183,7 +188,8 @@ export function probabilisticSharpeRatio(
  */
 function expectedMaxSharpe(numTrials: number, variance: number, numPeriods: number): number {
   if (numTrials <= 1) return 0;
-  const eZ = (1 - 0.5772) * normalInverseCDF(1 - 1 / numTrials) +
+  const eZ =
+    (1 - 0.5772) * normalInverseCDF(1 - 1 / numTrials) +
     0.5772 * normalInverseCDF(1 - 1 / (numTrials * Math.E));
   return Math.sqrt(variance / numPeriods) * eZ;
 }
@@ -202,13 +208,20 @@ export function deflatedSharpeRatio(
   returns: number[],
   numStrategiesTested: number = 1,
   periodsPerYear: number = 365,
-): { dsr: number; observedSharpe: number; expectedMaxSharpeUnderNull: number; significant: boolean } {
+): {
+  dsr: number;
+  observedSharpe: number;
+  expectedMaxSharpeUnderNull: number;
+  significant: boolean;
+} {
   const n = returns.length;
-  if (n < 10) return { dsr: 0.5, observedSharpe: 0, expectedMaxSharpeUnderNull: 0, significant: false };
+  if (n < 10)
+    return { dsr: 0.5, observedSharpe: 0, expectedMaxSharpeUnderNull: 0, significant: false };
 
   const m = mean(returns);
   const s = stddev(returns);
-  if (isEffectivelyZeroStddev(s, m)) return { dsr: 0.5, observedSharpe: 0, expectedMaxSharpeUnderNull: 0, significant: false };
+  if (isEffectivelyZeroStddev(s, m))
+    return { dsr: 0.5, observedSharpe: 0, expectedMaxSharpeUnderNull: 0, significant: false };
 
   const observedSharpe = (m / s) * Math.sqrt(periodsPerYear);
   const skew = skewness(returns);
@@ -223,12 +236,16 @@ export function deflatedSharpeRatio(
   const srStar = observedSharpe / Math.sqrt(periodsPerYear);
   const benchStar = eSharpeMax;
 
-  const seSharpe = Math.sqrt(
-    (1 - skew * srStar + ((kurt - 1) / 4) * srStar * srStar) / n
-  );
+  const seSharpe = Math.sqrt((1 - skew * srStar + ((kurt - 1) / 4) * srStar * srStar) / n);
 
   // !(x > 0) also catches NaN (negative sqrt argument from extreme skew/kurtosis) — fail closed.
-  if (!(seSharpe > 0)) return { dsr: 0.5, observedSharpe, expectedMaxSharpeUnderNull: annualizedESharpeMax, significant: false };
+  if (!(seSharpe > 0))
+    return {
+      dsr: 0.5,
+      observedSharpe,
+      expectedMaxSharpeUnderNull: annualizedESharpeMax,
+      significant: false,
+    };
 
   const z = (srStar - benchStar) / seSharpe;
   const dsr = normalCdf(z);
@@ -264,7 +281,8 @@ export function minimumTrackRecordLength(
 
   const m = mean(returns);
   const s = stddev(returns);
-  if (isEffectivelyZeroStddev(s, m) || m <= 0) return { minTRL: Infinity, actualLength: n, sufficient: false, observedSharpe: 0 };
+  if (isEffectivelyZeroStddev(s, m) || m <= 0)
+    return { minTRL: Infinity, actualLength: n, sufficient: false, observedSharpe: 0 };
 
   const sr = m / s; // Per-period Sharpe
   const observedSharpe = sr * Math.sqrt(periodsPerYear);
@@ -356,7 +374,14 @@ export function combinatorialPurgedCV(
   }
 
   if (oosSharpesPerFold.length === 0) {
-    return { folds: 0, oosSharpesPerFold: [], meanOOSSharpe: 0, pbo: 1, likelyOverfit: true, summary: "CPCV failed — no valid folds." };
+    return {
+      folds: 0,
+      oosSharpesPerFold: [],
+      meanOOSSharpe: 0,
+      pbo: 1,
+      likelyOverfit: true,
+      summary: "CPCV failed — no valid folds.",
+    };
   }
 
   const meanOOSSharpe = mean(oosSharpesPerFold);
@@ -403,9 +428,17 @@ export function assessBacktestCredibility(
   const parts: string[] = [];
   parts.push(`Sharpe: ${psr.observedSharpe.toFixed(2)}`);
   parts.push(`PSR: ${(psr.psr * 100).toFixed(0)}% ${psr.significant ? "✓" : "✗"}`);
-  parts.push(`DSR: ${(dsr.dsr * 100).toFixed(0)}% ${dsr.significant ? "✓" : "✗"} (tested ${numStrategiesTested} strategies)`);
-  parts.push(`MinTRL: ${mtrl.minTRL} periods needed, have ${mtrl.actualLength} ${mtrl.sufficient ? "✓" : "✗"}`);
-  parts.push(credible ? "VERDICT: Statistically credible" : "VERDICT: NOT credible — may be noise or data-mining artifact");
+  parts.push(
+    `DSR: ${(dsr.dsr * 100).toFixed(0)}% ${dsr.significant ? "✓" : "✗"} (tested ${numStrategiesTested} strategies)`,
+  );
+  parts.push(
+    `MinTRL: ${mtrl.minTRL} periods needed, have ${mtrl.actualLength} ${mtrl.sufficient ? "✓" : "✗"}`,
+  );
+  parts.push(
+    credible
+      ? "VERDICT: Statistically credible"
+      : "VERDICT: NOT credible — may be noise or data-mining artifact",
+  );
 
   return {
     observedSharpe: psr.observedSharpe,

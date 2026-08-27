@@ -30,11 +30,7 @@ describe("computeSignalPool — basic voting", () => {
 
   test("partial agreement — 2/3 true crosses default 0.5 threshold", () => {
     const r = computeSignalPool({
-      signals: [
-        [true],
-        [true],
-        [false],
-      ],
+      signals: [[true], [true], [false]],
     });
     expect(r.fractions[0]).toBeCloseTo(2 / 3, 5);
     expect(r.fired[0]).toBe(true);
@@ -42,11 +38,7 @@ describe("computeSignalPool — basic voting", () => {
 
   test("1/3 true does NOT cross 0.5 threshold", () => {
     const r = computeSignalPool({
-      signals: [
-        [true],
-        [false],
-        [false],
-      ],
+      signals: [[true], [false], [false]],
     });
     expect(r.fired[0]).toBe(false);
   });
@@ -55,11 +47,7 @@ describe("computeSignalPool — basic voting", () => {
 describe("computeSignalPool — thresholds", () => {
   test("threshold 0.6 requires more agreement", () => {
     const r = computeSignalPool({
-      signals: [
-        [true],
-        [true],
-        [false],
-      ],
+      signals: [[true], [true], [false]],
       threshold: 0.7,
     });
     expect(r.fired[0]).toBe(false);

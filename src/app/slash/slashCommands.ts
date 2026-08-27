@@ -47,7 +47,16 @@ export interface SlashCommand {
 
 type SlashCommandSeed = Omit<
   SlashCommand,
-  "workflow" | "workflowLabel" | "workflowOrder" | "audience" | "audienceLabel" | "audienceOrder" | "hideAliasesByDefault" | "subcommands" | "subcommandDescriptions" | "hideFromTypeahead"
+  | "workflow"
+  | "workflowLabel"
+  | "workflowOrder"
+  | "audience"
+  | "audienceLabel"
+  | "audienceOrder"
+  | "hideAliasesByDefault"
+  | "subcommands"
+  | "subcommandDescriptions"
+  | "hideFromTypeahead"
 > & {
   subcommands?: string[];
   subcommandDescriptions?: Record<string, string>;
@@ -305,7 +314,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 1,
     action: "tool",
     target: "handle_kill_switch_command",
-    whenToUse: "Immediately halt or restore execution by firm, venue, instrument, strategy, account, or trader scope",
+    whenToUse:
+      "Immediately halt or restore execution by firm, venue, instrument, strategy, account, or trader scope",
     subcommands: ["list", "trip", "reset", "reset-all"],
     subcommandDescriptions: {
       list: "Show every currently tripped kill switch",
@@ -334,10 +344,12 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 2,
     action: "tool",
     target: "skills_manage",
-    whenToUse: "Audit skill hygiene, list every loaded skill, see usage stats, or surface skills needing review",
+    whenToUse:
+      "Audit skill hygiene, list every loaded skill, see usage stats, or surface skills needing review",
     subcommands: ["audit", "list", "usage", "review"],
     subcommandDescriptions: {
-      audit: "Full audit — status breakdown + staleness + usage + clean/needs_attention/degraded verdict",
+      audit:
+        "Full audit — status breakdown + staleness + usage + clean/needs_attention/degraded verdict",
       list: "Every loaded skill with status, source, and last-review age",
       usage: "Per-skill invocation stats from the JSONL ledger (recent 30d + lifetime)",
       review: "Skills flagged stale (>90 days) or never reviewed — oldest first",
@@ -346,35 +358,41 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "investigate",
     aliases: ["inv"],
-    description: "Spawn an isolated synthesis sub-agent on a bounded task — does NOT pollute main context",
+    description:
+      "Spawn an isolated synthesis sub-agent on a bounded task — does NOT pollute main context",
     usage: "/investigate <task>",
     category: "system",
     level: 2,
     action: "tool",
     target: "investigate",
-    whenToUse: "Delegate a focused analytical task without consuming orchestrator context — summaries, comparisons, structured analysis of prior conversation",
+    whenToUse:
+      "Delegate a focused analytical task without consuming orchestrator context — summaries, comparisons, structured analysis of prior conversation",
   },
   {
     name: "fork",
     aliases: ["forkctx"],
-    description: "Fork the conversation context into an isolated sub-agent that inherits recent history (safety-stripped by default)",
+    description:
+      "Fork the conversation context into an isolated sub-agent that inherits recent history (safety-stripped by default)",
     usage: "/fork <task>",
     category: "system",
     level: 2,
     action: "tool",
     target: "fork_context",
-    whenToUse: "Hand off a deep analysis with full context awareness while keeping main conversation clean. Logs to ~/.gordon/fork-audit.jsonl",
+    whenToUse:
+      "Hand off a deep analysis with full context awareness while keeping main conversation clean. Logs to ~/.gordon/fork-audit.jsonl",
   },
   {
     name: "cross-batch",
     aliases: ["cross", "internal-batch"],
-    description: "Net offsetting orders internally before external routing (Budish-style internal crossing)",
+    description:
+      "Net offsetting orders internally before external routing (Budish-style internal crossing)",
     usage: "/cross-batch (operator provides orders via prior context or argument)",
     category: "trading",
     level: 2,
     action: "tool",
     target: "cross_internal_batch",
-    whenToUse: "Before submitting a basket trade or multi-symbol rebalance — find same-symbol opposite-side pairs to cross at midpoint, avoiding the sniping tax twice",
+    whenToUse:
+      "Before submitting a basket trade or multi-symbol rebalance — find same-symbol opposite-side pairs to cross at midpoint, avoiding the sniping tax twice",
   },
   {
     name: "auction-check",
@@ -385,18 +403,21 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 2,
     action: "tool",
     target: "check_auction_window",
-    whenToUse: "Before submitting a non-urgent order — see if waiting for the opening/closing cross (or CoW Swap batch) is worth it",
+    whenToUse:
+      "Before submitting a non-urgent order — see if waiting for the opening/closing cross (or CoW Swap batch) is worth it",
   },
   {
     name: "components",
     aliases: ["composability", "comp"],
-    description: "Audit Gordon's pluggability — LLM providers, exchanges, skills, MCP servers, peer agents, recipes, risk dimensions, alpha diagnostics, audit layers",
+    description:
+      "Audit Gordon's pluggability — LLM providers, exchanges, skills, MCP servers, peer agents, recipes, risk dimensions, alpha diagnostics, audit layers",
     usage: "/components (defaults to structured) | /components text",
     category: "system",
     level: 2,
     action: "tool",
     target: "composability_audit",
-    whenToUse: "When operator wants to see what's swappable, what alternatives exist, or demonstrate Gordon's open-harness composability vs vertically-integrated frontier-lab services",
+    whenToUse:
+      "When operator wants to see what's swappable, what alternatives exist, or demonstrate Gordon's open-harness composability vs vertically-integrated frontier-lab services",
   },
   {
     name: "grid",
@@ -451,13 +472,13 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 1,
     action: "tool",
     target: "rate_response",
-    whenToUse:
-      "User wants to record explicit feedback on the most recent shadow plan or response",
+    whenToUse: "User wants to record explicit feedback on the most recent shadow plan or response",
   },
   {
     name: "effective-n",
     aliases: ["effn"],
-    description: "Compute effective independent signal count from a correlation matrix or raw signal series",
+    description:
+      "Compute effective independent signal count from a correlation matrix or raw signal series",
     usage: "/effective-n",
     category: "system",
     level: 1,
@@ -469,7 +490,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "kalman-beta",
     aliases: ["dynbeta", "kbeta"],
-    description: "Estimate time-varying beta between asset and market returns via Kalman filter (hedge-fund-grade alternative to OLS)",
+    description:
+      "Estimate time-varying beta between asset and market returns via Kalman filter (hedge-fund-grade alternative to OLS)",
     usage: "/kalman-beta",
     category: "trading",
     level: 1,
@@ -481,7 +503,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "range-vol",
     aliases: ["parkinson", "garman-klass"],
-    description: "Compute Parkinson + Garman-Klass annualized volatility from OHLC bars (tighter than close-to-close)",
+    description:
+      "Compute Parkinson + Garman-Klass annualized volatility from OHLC bars (tighter than close-to-close)",
     usage: "/range-vol",
     category: "trading",
     level: 1,
@@ -493,7 +516,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "pca-concentration",
     aliases: ["pca", "concentration"],
-    description: "Run PCA on strategy returns to detect hidden-factor concentration (catches diversified-looking but single-bet books)",
+    description:
+      "Run PCA on strategy returns to detect hidden-factor concentration (catches diversified-looking but single-bet books)",
     usage: "/pca-concentration",
     category: "system",
     level: 1,
@@ -505,7 +529,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "efficiency-ratio",
     aliases: ["er", "efficiency"],
-    description: "Compute Kaufman's efficiency ratio and classify the regime (trending / mixed / choppy)",
+    description:
+      "Compute Kaufman's efficiency ratio and classify the regime (trending / mixed / choppy)",
     usage: "/efficiency-ratio",
     category: "trading",
     level: 1,
@@ -517,7 +542,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "kama",
     aliases: ["kaufman-ma", "adaptive-ma"],
-    description: "Kaufman's Adaptive Moving Average — EMA that varies its smoothing constant by the efficiency ratio",
+    description:
+      "Kaufman's Adaptive Moving Average — EMA that varies its smoothing constant by the efficiency ratio",
     usage: "/kama",
     category: "trading",
     level: 1,
@@ -529,7 +555,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "market-profile",
     aliases: ["mp", "tpo"],
-    description: "Steidlmayer Market Profile: time-at-price TPO distribution with POC and 70% value area",
+    description:
+      "Steidlmayer Market Profile: time-at-price TPO distribution with POC and 70% value area",
     usage: "/market-profile",
     category: "trading",
     level: 1,
@@ -541,7 +568,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "triple-screen",
     aliases: ["elder-screen"],
-    description: "Elder's Triple Screen multi-timeframe gate: combine long-frame trend, mid-frame oscillator, and short-frame trigger",
+    description:
+      "Elder's Triple Screen multi-timeframe gate: combine long-frame trend, mid-frame oscillator, and short-frame trigger",
     usage: "/triple-screen",
     category: "trading",
     level: 1,
@@ -553,7 +581,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "bootstrap",
     aliases: ["fragility", "block-bootstrap"],
-    description: "Stationary block-bootstrap fragility test on a return series — robustness check on Sharpe + drawdown",
+    description:
+      "Stationary block-bootstrap fragility test on a return series — robustness check on Sharpe + drawdown",
     usage: "/bootstrap",
     category: "trading",
     level: 1,
@@ -565,7 +594,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "vol-size",
     aliases: ["vol-sizing", "size-vol"],
-    description: "Map a volatility level to a position multiplier (scale_up or scale_down) with refuse-above guard",
+    description:
+      "Map a volatility level to a position multiplier (scale_up or scale_down) with refuse-above guard",
     usage: "/vol-size",
     category: "trading",
     level: 1,
@@ -631,13 +661,15 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "live",
     aliases: ["real"],
-    description: "Switch back to live trading — exits paper mode, real orders enabled (ask approval required)",
+    description:
+      "Switch back to live trading — exits paper mode, real orders enabled (ask approval required)",
     usage: "/live",
     category: "trading",
     level: 2,
     action: "tool",
     target: "set_permission_mode",
-    whenToUse: "Return to live trading after a paper session; switches venue adapters back to live endpoints",
+    whenToUse:
+      "Return to live trading after a paper session; switches venue adapters back to live endpoints",
   },
   {
     name: "observe",
@@ -674,20 +706,101 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   },
 
   // New Trading Commands
-  { name: "cancel", aliases: [], description: "Cancel open orders by ID or symbol", usage: "/cancel <symbol|orderId>", category: "trading", level: 1, action: "agent", target: "gordon", whenToUse: "Cancel pending orders via permission-gated agent tools" },
-  { name: "close", aliases: [], description: "Close an open position", usage: "/close <symbol> [market|limit <price>]", category: "trading", level: 1, action: "agent", target: "gordon", whenToUse: "Close a position through the full risk + permission stack" },
-  { name: "stop-loss", aliases: ["sl"], description: "Set stop-loss on a position", usage: "/stop-loss <symbol> <price>", category: "trading", level: 2, action: "agent", target: "gordon", whenToUse: "Protect position with stop-loss via agent tools" },
-  { name: "take-profit", aliases: ["tp"], description: "Set take-profit on a position", usage: "/take-profit <symbol> <price>", category: "trading", level: 2, action: "agent", target: "gordon", whenToUse: "Set profit target via agent tools" },
-  { name: "watch", aliases: ["w"], description: "Watch symbol prices live", usage: "/watch <symbol> [interval]", category: "market", level: 1, action: "menu", target: "watch-panel", whenToUse: "Monitor price changes in real-time" },
-  { name: "alerts", aliases: ["alert"], description: "Manage price alerts", usage: "/alerts [set|list|delete] <symbol> [price]", category: "market", level: 1, action: "tool", target: "handle_alerts_command", whenToUse: "Get notified when price hits target" },
-  { name: "queue", aliases: ["tq", "trade-queue"], description: "Trade queue — pending approvals, open positions, radar", usage: "/queue", category: "system", level: 1, action: "menu", target: "trade-queue", whenToUse: "See what needs attention right now across approvals, positions, and radar" },
-  { name: "safety", aliases: ["safety-dashboard"], description: "Safety dashboard — kill switches, approval rules, recent denials", usage: "/safety", category: "system", level: 1, action: "menu", target: "safety", whenToUse: "Inspect armed safety controls before trusting auto or live trading" },
+  {
+    name: "cancel",
+    aliases: [],
+    description: "Cancel open orders by ID or symbol",
+    usage: "/cancel <symbol|orderId>",
+    category: "trading",
+    level: 1,
+    action: "agent",
+    target: "gordon",
+    whenToUse: "Cancel pending orders via permission-gated agent tools",
+  },
+  {
+    name: "close",
+    aliases: [],
+    description: "Close an open position",
+    usage: "/close <symbol> [market|limit <price>]",
+    category: "trading",
+    level: 1,
+    action: "agent",
+    target: "gordon",
+    whenToUse: "Close a position through the full risk + permission stack",
+  },
+  {
+    name: "stop-loss",
+    aliases: ["sl"],
+    description: "Set stop-loss on a position",
+    usage: "/stop-loss <symbol> <price>",
+    category: "trading",
+    level: 2,
+    action: "agent",
+    target: "gordon",
+    whenToUse: "Protect position with stop-loss via agent tools",
+  },
+  {
+    name: "take-profit",
+    aliases: ["tp"],
+    description: "Set take-profit on a position",
+    usage: "/take-profit <symbol> <price>",
+    category: "trading",
+    level: 2,
+    action: "agent",
+    target: "gordon",
+    whenToUse: "Set profit target via agent tools",
+  },
+  {
+    name: "watch",
+    aliases: ["w"],
+    description: "Watch symbol prices live",
+    usage: "/watch <symbol> [interval]",
+    category: "market",
+    level: 1,
+    action: "menu",
+    target: "watch-panel",
+    whenToUse: "Monitor price changes in real-time",
+  },
+  {
+    name: "alerts",
+    aliases: ["alert"],
+    description: "Manage price alerts",
+    usage: "/alerts [set|list|delete] <symbol> [price]",
+    category: "market",
+    level: 1,
+    action: "tool",
+    target: "handle_alerts_command",
+    whenToUse: "Get notified when price hits target",
+  },
+  {
+    name: "queue",
+    aliases: ["tq", "trade-queue"],
+    description: "Trade queue — pending approvals, open positions, radar",
+    usage: "/queue",
+    category: "system",
+    level: 1,
+    action: "menu",
+    target: "trade-queue",
+    whenToUse: "See what needs attention right now across approvals, positions, and radar",
+  },
+  {
+    name: "safety",
+    aliases: ["safety-dashboard"],
+    description: "Safety dashboard — kill switches, approval rules, recent denials",
+    usage: "/safety",
+    category: "system",
+    level: 1,
+    action: "menu",
+    target: "safety",
+    whenToUse: "Inspect armed safety controls before trusting auto or live trading",
+  },
 
   // Radar — proactive mode (unsolicited suggestions from Gordon's observer loop)
   {
     name: "radar",
     aliases: ["proactive"],
-    description: "Radar mode — Gordon watches for setups, risks, and regime shifts and surfaces them unsolicited",
+    description:
+      "Radar mode — Gordon watches for setups, risks, and regime shifts and surfaces them unsolicited",
     usage: "/radar [on|off|status|tune]",
     category: "system",
     level: 1,
@@ -705,13 +818,15 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "ack",
     aliases: ["accept"],
-    description: "Acknowledge a radar suggestion — records Correct-Detection and auto-invokes read-only operations",
+    description:
+      "Acknowledge a radar suggestion — records Correct-Detection and auto-invokes read-only operations",
     usage: "/ack <suggestion-id>",
     category: "system",
     level: 1,
     action: "tool",
     target: "accept_proactive_suggestion",
-    whenToUse: "Acknowledge a useful suggestion — feeds the feedback ledger and may auto-run a tool",
+    whenToUse:
+      "Acknowledge a useful suggestion — feeds the feedback ledger and may auto-run a tool",
   },
   {
     name: "pass",
@@ -722,25 +837,29 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 1,
     action: "tool",
     target: "dismiss_proactive_suggestion",
-    whenToUse: "Dismiss a suggestion you don't want to act on — 3+ passes/hour auto-snoozes the category",
+    whenToUse:
+      "Dismiss a suggestion you don't want to act on — 3+ passes/hour auto-snoozes the category",
   },
   {
     name: "snooze",
     aliases: ["suppress", "mute"],
-    description: "Snooze a radar category for a duration — temporary silence, auto-unsnooze after duration",
+    description:
+      "Snooze a radar category for a duration — temporary silence, auto-unsnooze after duration",
     usage: "/snooze <category> [minutes]",
     category: "system",
     level: 1,
     action: "tool",
     target: "suppress_proactive_category",
-    whenToUse: "Silence an entire category (e.g. 'funding_alert' for 120 minutes) when you need quiet focus",
+    whenToUse:
+      "Silence an entire category (e.g. 'funding_alert' for 120 minutes) when you need quiet focus",
   },
   // Research — backtest research mode (verdict-driven auto-optimizer loop)
   // Named /research (not /lab, which is an existing workspace menu command)
   {
     name: "research",
     aliases: ["loop", "optimize"],
-    description: "Enter research mode — hypothesis-driven backtest loop with verdict screening and experiment journal",
+    description:
+      "Enter research mode — hypothesis-driven backtest loop with verdict screening and experiment journal",
     usage: "/research [start|status|stats]",
     category: "strategy",
     level: 2,
@@ -749,9 +868,11 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     whenToUse: "Iteratively explore strategy hypotheses with the verdict-driven screening pipeline",
     subcommands: ["start", "status", "stats"],
     subcommandDescriptions: {
-      start: "Begin a research loop — Gordon forms hypothesis, runs backtest, screens verdict, journals, iterates",
+      start:
+        "Begin a research loop — Gordon forms hypothesis, runs backtest, screens verdict, journals, iterates",
       status: "Show recent experiments from the journal with verdicts and hypotheses",
-      stats: "Aggregate journal stats — eligible rate %, verdict distribution, avg Sharpe for eligible",
+      stats:
+        "Aggregate journal stats — eligible rate %, verdict distribution, avg Sharpe for eligible",
     },
   },
   // Learn — canonical entry point for walkthroughs and the field guide.
@@ -768,7 +889,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     subcommands: ["radar", "finnhub", "calibration", "best-practices"],
     subcommandDescriptions: {
       radar: "How radar mode works, what categories fire, and how to tune it",
-      finnhub: "Gordon's 59 Finnhub tools across stocks, ETFs, funds, indices, bonds, crypto, macro",
+      finnhub:
+        "Gordon's 59 Finnhub tools across stocks, ETFs, funds, indices, bonds, crypto, macro",
       calibration: "How to track whether stated confidence matches actual accuracy",
       "best-practices": "Field guide — patterns, workflows, and anti-patterns for daily use",
     },
@@ -777,31 +899,36 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "learn-radar",
     aliases: ["learn-proactive"],
-    description: "Walkthrough — learn how radar mode works, what categories fire, and how to tune it",
+    description:
+      "Walkthrough — learn how radar mode works, what categories fire, and how to tune it",
     usage: "/learn-radar (or /learn radar)",
     category: "system",
     level: 1,
     action: "agent",
     target: "gordon",
-    whenToUse: "First time trying radar — Gordon explains categories, acceptance flow, and tuning commands",
+    whenToUse:
+      "First time trying radar — Gordon explains categories, acceptance flow, and tuning commands",
     hideFromTypeahead: true,
   },
   {
     name: "learn-finnhub",
     aliases: ["learn-stocks"],
-    description: "Walkthrough — Gordon's 59 Finnhub tools across stocks, ETFs, funds, indices, bonds, crypto, macro",
+    description:
+      "Walkthrough — Gordon's 59 Finnhub tools across stocks, ETFs, funds, indices, bonds, crypto, macro",
     usage: "/learn-finnhub (or /learn finnhub)",
     category: "system",
     level: 1,
     action: "agent",
     target: "gordon",
-    whenToUse: "When you want to see the full stock/macro data surface and how to wire it into workflows",
+    whenToUse:
+      "When you want to see the full stock/macro data surface and how to wire it into workflows",
     hideFromTypeahead: true,
   },
   {
     name: "learn-calibration",
     aliases: ["learn-confidence"],
-    description: "Walkthrough — how to track whether your stated confidence matches actual accuracy",
+    description:
+      "Walkthrough — how to track whether your stated confidence matches actual accuracy",
     usage: "/learn-calibration (or /learn calibration)",
     category: "system",
     level: 1,
@@ -843,7 +970,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 2,
     action: "agent",
     target: "executor",
-    whenToUse: "Browse flexible/locked earn products, subscribe, redeem, or view positions and history",
+    whenToUse:
+      "Browse flexible/locked earn products, subscribe, redeem, or view positions and history",
   },
   {
     name: "history",
@@ -898,8 +1026,30 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 1,
     action: "menu",
     target: "strategy-panel",
-    subcommands: ["list", "running", "gen", "deploy", "pause", "resume", "stop", "rebalance", "info", "compare"],
-    subcommandDescriptions: { list: "List all strategies", running: "Show running strategies", gen: "Generate a new strategy", deploy: "Deploy to live", pause: "Pause a running strategy", resume: "Resume paused strategy", stop: "Stop a strategy", rebalance: "Rebalance allocations", info: "Strategy details", compare: "Compare strategies" },
+    subcommands: [
+      "list",
+      "running",
+      "gen",
+      "deploy",
+      "pause",
+      "resume",
+      "stop",
+      "rebalance",
+      "info",
+      "compare",
+    ],
+    subcommandDescriptions: {
+      list: "List all strategies",
+      running: "Show running strategies",
+      gen: "Generate a new strategy",
+      deploy: "Deploy to live",
+      pause: "Pause a running strategy",
+      resume: "Resume paused strategy",
+      stop: "Stop a strategy",
+      rebalance: "Rebalance allocations",
+      info: "Strategy details",
+      compare: "Compare strategies",
+    },
   },
   {
     name: "gen",
@@ -1033,12 +1183,14 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 3,
     action: "agent",
     target: "backtester",
-    whenToUse: "Manage A/B experiments: start tests, check progress, promote winners, rank variants, view lineage",
+    whenToUse:
+      "Manage A/B experiments: start tests, check progress, promote winners, rank variants, view lineage",
   },
   {
     name: "systematic",
     aliases: ["sys"],
-    description: "Systematic research status — profile, datasets, experiments, portfolio, lifecycle",
+    description:
+      "Systematic research status — profile, datasets, experiments, portfolio, lifecycle",
     usage: "/systematic [status|portfolio|datasets|experiments|lifecycle] [strategy]",
     category: "strategy",
     level: 2,
@@ -1089,7 +1241,21 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     action: "agent",
     target: "monitor",
     whenToUse: "Inspect active strategy slots and compare live runtime to validated backtests",
-    subcommands: ["state", "plugins", "transcript", "scratchpad", "handoffs", "approvals", "approve", "deny", "bridge", "history", "health", "slots", "diff"],
+    subcommands: [
+      "state",
+      "plugins",
+      "transcript",
+      "scratchpad",
+      "handoffs",
+      "approvals",
+      "approve",
+      "deny",
+      "bridge",
+      "history",
+      "health",
+      "slots",
+      "diff",
+    ],
     subcommandDescriptions: {
       state: "Inspect runtime state and scopes",
       plugins: "Plugin lifecycle and hot-reload",
@@ -1117,7 +1283,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 2,
     action: "agent",
     target: "monitor",
-    whenToUse: "Investigate decision reasoning, review agent activity summaries, or view audit statistics",
+    whenToUse:
+      "Investigate decision reasoning, review agent activity summaries, or view audit statistics",
   },
 
   // Health
@@ -1139,7 +1306,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     name: "help",
     aliases: ["?"],
     description: "Get help and learn concepts",
-    usage: "/help [topic|advanced|all|expert|trading|strategy|analysis|market|account|system|page N]",
+    usage:
+      "/help [topic|advanced|all|expert|trading|strategy|analysis|market|account|system|page N]",
     category: "system",
     level: 1,
     action: "agent",
@@ -1248,7 +1416,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "flags",
     aliases: ["behavior", "feature-flags"],
-    description: "Show or toggle Gordon's operator flags (reasoning passes, trade-halt gates, cost/risk config, safety flags, ACE/subagents/memory)",
+    description:
+      "Show or toggle Gordon's operator flags (reasoning passes, trade-halt gates, cost/risk config, safety flags, ACE/subagents/memory)",
     usage: "/flags [set <name> <value>]",
     category: "system",
     level: 2,
@@ -1268,14 +1437,17 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "exchange",
     aliases: ["ex", "exchanges", "venue", "switch-exchange"],
-    description: "Manage venues — list, switch, add live or sandbox/testnet (e.g. /exchange binance-testnet)",
-    usage: "/exchange [exchange-id | list | add <type> [--sandbox] | setup <type> | switch <id> | status]",
+    description:
+      "Manage venues — list, switch, add live or sandbox/testnet (e.g. /exchange binance-testnet)",
+    usage:
+      "/exchange [exchange-id | list | add <type> [--sandbox] | setup <type> | switch <id> | status]",
     category: "account",
     level: 1,
     action: "tool",
     target: "handle_exchange_command",
     executionTime: "~1-3s",
-    whenToUse: "Switch between live and sandbox/testnet venues, or add a new exchange. Run with no args to list all configured exchanges. Use 'setup <type>' for paper trading credential guides.",
+    whenToUse:
+      "Switch between live and sandbox/testnet venues, or add a new exchange. Run with no args to list all configured exchanges. Use 'setup <type>' for paper trading credential guides.",
     subcommandDescriptions: {
       list: "List all configured exchanges (live and sandbox)",
       "add <type>": "Add a live exchange",
@@ -1358,13 +1530,13 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "compact",
     aliases: [],
-    description: "Manually trigger context compaction to free up token budget",
-    usage: "/compact",
+    description: "Compact the persisted runtime transcript to its configured rolling window",
+    usage: "/compact [max-entries]",
     category: "system",
     level: 2,
     action: "menu",
     target: "compact",
-    whenToUse: "When context feels bloated or you want to force a cleanup",
+    whenToUse: "When the local runtime transcript is long; model memory is bounded separately",
   },
   {
     name: "clear",
@@ -1563,7 +1735,12 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     action: "menu",
     target: "session-info",
     subcommands: ["info", "resume", "new", "browser"],
-    subcommandDescriptions: { info: "Current session info", resume: "Resume previous session", new: "Start new session", browser: "Browse past sessions" },
+    subcommandDescriptions: {
+      info: "Current session info",
+      resume: "Resume previous session",
+      new: "Start new session",
+      browser: "Browse past sessions",
+    },
   },
   {
     name: "runtime-state",
@@ -1674,7 +1851,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 3,
     action: "menu",
     target: "runtime-deny-all",
-    whenToUse: "Bulk-clear a burst of pending approvals, e.g. reject all pending trading actions in one keystroke",
+    whenToUse:
+      "Bulk-clear a burst of pending approvals, e.g. reject all pending trading actions in one keystroke",
     hideFromTypeahead: true,
   },
   {
@@ -1703,7 +1881,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     name: "mcp",
     aliases: ["plugin", "plugins"],
     description: "Manage MCP plugins",
-    usage: "/mcp <list|search|install|uninstall|configure|enable|disable|update|info|showcase|suggest>",
+    usage:
+      "/mcp <list|search|install|uninstall|configure|enable|disable|update|info|showcase|suggest>",
     category: "system",
     level: 2,
     action: "tool",
@@ -1751,7 +1930,16 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     action: "menu",
     target: "thread-panel",
     subcommands: ["list", "clone", "switch", "info", "delete", "rename", "summary", "compact"],
-    subcommandDescriptions: { list: "List recent threads", clone: "Clone current thread", switch: "Switch to thread", info: "Thread details", delete: "Delete a thread", rename: "Rename a thread", summary: "Thread summary", compact: "Compact thread" },
+    subcommandDescriptions: {
+      list: "List recent threads",
+      clone: "Clone current thread",
+      switch: "Switch to thread",
+      info: "Thread details",
+      delete: "Delete a thread",
+      rename: "Rename a thread",
+      summary: "Thread summary",
+      compact: "Compact thread",
+    },
   },
   {
     name: "clone",
@@ -1829,14 +2017,19 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     action: "menu",
     target: "log-panel",
     subcommands: ["actions", "bookmark", "bookmarks"],
-    subcommandDescriptions: { actions: "Recent action log", bookmark: "Bookmark a message", bookmarks: "List bookmarks" },
+    subcommandDescriptions: {
+      actions: "Recent action log",
+      bookmark: "Bookmark a message",
+      bookmarks: "List bookmarks",
+    },
     hideFromTypeahead: true,
   },
   {
     name: "action-log",
     aliases: ["log", "alog", "events"],
     description: "Inspect typed action log entries; verbs: bookmark, bookmarks",
-    usage: "/action-log [type|group|bookmarked|daemon|threadId] [limit]  |  /action-log <bookmark|bookmarks>",
+    usage:
+      "/action-log [type|group|bookmarked|daemon|threadId] [limit]  |  /action-log <bookmark|bookmarks>",
     category: "system",
     level: 3,
     action: "menu",
@@ -1883,8 +2076,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "compact-thread",
     aliases: ["compact", "summarize-thread"],
-    description: "Persist a compact thread summary from recent typed action-log entries",
-    usage: "/compact-thread [threadId] [note] (or /thread compact [id])",
+    description: "Compact the current persisted runtime transcript",
+    usage: "/compact-thread [max-entries]",
     category: "system",
     level: 3,
     action: "menu",
@@ -1934,13 +2127,16 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "goal",
     aliases: [],
-    description: "Set an autonomous goal with measurable end state and constraints; verbs: status, pause, clear",
-    usage: "/goal <work> until <measurable end> without <constraints>  |  /goal <status|pause|clear>",
+    description:
+      "Set an autonomous goal with measurable end state and constraints; verbs: status, pause, clear",
+    usage:
+      "/goal <work> until <measurable end> without <constraints>  |  /goal <status|pause|clear>",
     category: "trading",
     level: 2,
     action: "menu",
     target: "goal",
-    whenToUse: "Long-running autonomous work toward a quantitative target (Sharpe, win rate, trade count, drawdown, time horizon, or checklist).",
+    whenToUse:
+      "Long-running autonomous work toward a quantitative target (Sharpe, win rate, trade count, drawdown, time horizon, or checklist).",
     subcommands: ["status", "pause", "clear"],
     subcommandDescriptions: {
       status: "Show the active goal, its progress, and last score",
@@ -2091,12 +2287,14 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     name: "telemetry",
     aliases: ["analytics", "tracking"],
     description: "Manage telemetry consent and research data collection (opt-in)",
-    usage: "/telemetry [status|enable|disable|research-enable|research-disable|research-status|research-upload|research-clear]",
+    usage:
+      "/telemetry [status|enable|disable|research-enable|research-disable|research-status|research-upload|research-clear]",
     category: "system",
     level: 2,
     action: "menu",
     target: "telemetry",
-    whenToUse: "Enable/disable anonymous usage analytics or trading data collection for AI training",
+    whenToUse:
+      "Enable/disable anonymous usage analytics or trading data collection for AI training",
   },
   {
     name: "context",
@@ -2112,7 +2310,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "cache-audit",
     aliases: ["cacheaudit", "ca"],
-    description: "Audit prompt-cache wiring on the last request (provider markers, prefix size, hashes)",
+    description:
+      "Audit prompt-cache wiring on the last request (provider markers, prefix size, hashes)",
     usage: "/cache-audit",
     category: "system",
     level: 3,
@@ -2164,7 +2363,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "synth",
     aliases: ["synthdata", "sd"],
-    description: "SynthData advanced — volatility, options, LP ranges, liquidation, miners (use /predict for price forecasts)",
+    description:
+      "SynthData advanced — volatility, options, LP ranges, liquidation, miners (use /predict for price forecasts)",
     usage: "/synth [volatility|options|lp|liquidation|miners] <asset>",
     category: "market",
     level: 2,
@@ -2183,7 +2383,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     action: "agent",
     target: "analyst",
     executionTime: "~2-3s",
-    whenToUse: "Forward-looking price forecast (BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX)",
+    whenToUse:
+      "Forward-looking price forecast (BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX)",
   },
 
   // Risk & Simulation
@@ -2395,12 +2596,9 @@ const CORE_PLUS_SKILL_COMMANDS: SlashCommandSeed[] = [
 ];
 
 export const SLASH_COMMANDS: SlashCommand[] = sortCommandsForPresentation(
-  mergeSlashCommands(
-    getGeneratedSlashCommands() as SlashCommandSeed[],
-    CORE_PLUS_SKILL_COMMANDS,
-  )
+  mergeSlashCommands(getGeneratedSlashCommands() as SlashCommandSeed[], CORE_PLUS_SKILL_COMMANDS)
     .map((command) => normalizeCommandUx(command))
-    .map((command) => normalizeSlashCommandRuntime(command))
+    .map((command) => normalizeSlashCommandRuntime(command)),
 );
 
 export function isDeterministicSlashCommand(command: SlashCommand): boolean {
@@ -2419,8 +2617,12 @@ export function isRuntimeHandledSlashCommand(command: SlashCommand): boolean {
   return DIRECT_TOOL_TARGETS.has(command.target);
 }
 
-export function getSlashCommandRuntimeDrift(commands: SlashCommand[] = SLASH_COMMANDS): SlashCommand[] {
-  return commands.filter((command) => isDeterministicSlashCommand(command) && !isRuntimeHandledSlashCommand(command));
+export function getSlashCommandRuntimeDrift(
+  commands: SlashCommand[] = SLASH_COMMANDS,
+): SlashCommand[] {
+  return commands.filter(
+    (command) => isDeterministicSlashCommand(command) && !isRuntimeHandledSlashCommand(command),
+  );
 }
 
 // ============================================================================
@@ -2506,7 +2708,7 @@ export function parseSlashCommand(input: string): {
 
   // Find matching command
   const command = SLASH_COMMANDS.find(
-    (cmd) => cmd.name === commandName || cmd.aliases.includes(commandName)
+    (cmd) => cmd.name === commandName || cmd.aliases.includes(commandName),
   );
 
   if (!command) {
@@ -2540,7 +2742,7 @@ export function parseSlashCommand(input: string): {
  */
 export function getSlashCommandSuggestions(
   partial: string,
-  maxLevel: CommandLevel = 3
+  maxLevel: CommandLevel = 3,
 ): SlashCommand[] {
   if (!partial.startsWith("/")) {
     return [];
@@ -2556,9 +2758,7 @@ export function getSlashCommandSuggestions(
 
   return levelFiltered
     .filter(
-      (cmd) =>
-        cmd.name.startsWith(search) ||
-        cmd.aliases.some((alias) => alias.startsWith(search))
+      (cmd) => cmd.name.startsWith(search) || cmd.aliases.some((alias) => alias.startsWith(search)),
     )
     .sort((left, right) => {
       const workflowDiff = left.workflowOrder - right.workflowOrder;
@@ -2572,4 +2772,9 @@ export function getSlashCommandSuggestions(
 // ============================================================================
 
 export { commandToPrompt } from "./commandPrompts.ts";
-export { formatCommandHelp, formatAnalysisCommandsHelp, formatPaginatedCommandHelp, formatTradingModesHelp } from "./commandHelp.ts";
+export {
+  formatCommandHelp,
+  formatAnalysisCommandsHelp,
+  formatPaginatedCommandHelp,
+  formatTradingModesHelp,
+} from "./commandHelp.ts";

@@ -21,7 +21,9 @@ describe("budgetSignalToStopReason", () => {
   });
 
   it("max_iterations → max_turn_requests", () => {
-    expect(budgetSignalToStopReason({ halt: true, reason: "max_iterations" })).toBe("max_turn_requests");
+    expect(budgetSignalToStopReason({ halt: true, reason: "max_iterations" })).toBe(
+      "max_turn_requests",
+    );
   });
 });
 

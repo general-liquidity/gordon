@@ -50,8 +50,8 @@ describe("readOffloadedResult", () => {
   });
 
   test("refuses traversal out of an offload root", () => {
-    const escape = path.join(threadDir, "..", "..", "..", "etc", "passwd");
-    const res = readOffloadedResult({ path: escape });
+    const traversalPath = path.join(threadDir, "..", "..", "..", "etc", "passwd");
+    const res = readOffloadedResult({ path: traversalPath });
     expect(res.ok).toBe(false);
     expect(res.content).toBeUndefined();
   });

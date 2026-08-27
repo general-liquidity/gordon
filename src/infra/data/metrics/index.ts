@@ -49,11 +49,11 @@ export {
  * self-skips via isAvailable() when its key is unset. */
 export function onchainMetricSources(): OnchainMetricSource[] {
   return [
-    new GlassnodeMetricSource(),    // 30 — gold standard BTC/ETH
-    new CryptoQuantMetricSource(),  // 32 — exchange + miner flows
-    new SantimentMetricSource(),    // 34 — broadest asset coverage
+    new GlassnodeMetricSource(), // 30 — gold standard BTC/ETH
+    new CryptoQuantMetricSource(), // 32 — exchange + miner flows
+    new SantimentMetricSource(), // 34 — broadest asset coverage
     new IntoTheBlockMetricSource(), // 36 — holder cohorts / in-out-of-money
-    new MessariMetricSource(),      // 38 — broad asset metrics
+    new MessariMetricSource(), // 38 — broad asset metrics
   ];
 }
 

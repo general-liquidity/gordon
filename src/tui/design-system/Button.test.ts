@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  DARK_DALTONIZED_THEME,
-  DARK_THEME,
-  type GordonTheme,
-} from "../themes/themes.ts";
+import { DARK_DALTONIZED_THEME, DARK_THEME, type GordonTheme } from "../themes/themes.ts";
 import { buttonVariantColor, type ButtonVariant } from "./Button.tsx";
 
 describe("buttonVariantColor", () => {

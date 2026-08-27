@@ -24,12 +24,8 @@ interface HealthCacheEntry {
 let healthCache: HealthCacheEntry | null = null;
 const HEALTH_TTL_MS = 30_000;
 
-export function isLocalFallbackEnabled(
-  env: NodeJS.ProcessEnv = flagEnv(),
-): boolean {
-  return (
-    env.GORDON_LOCAL_FALLBACK === "1" || env.GORDON_LOCAL_FALLBACK === "true"
-  );
+export function isLocalFallbackEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
+  return env.GORDON_LOCAL_FALLBACK === "1" || env.GORDON_LOCAL_FALLBACK === "true";
 }
 
 export function _resetHealthCacheForTest(): void {
@@ -48,8 +44,7 @@ export async function checkProviderHealth(
   if (healthCache && now - healthCache.checkedAt < HEALTH_TTL_MS) {
     return healthCache.health;
   }
-  const url =
-    process.env.OPENAI_BASE_URL ?? process.env.GORDON_LOCAL_MODEL_URL ?? "";
+  const url = process.env.OPENAI_BASE_URL ?? process.env.GORDON_LOCAL_MODEL_URL ?? "";
   if (url.length === 0) {
     const result: ProviderHealth = "available";
     healthCache = { health: result, checkedAt: now };
@@ -102,8 +97,7 @@ export async function withReadOnlyFallback<T, R>(
       source: "fallback",
       data,
       toolName,
-      fallbackReason:
-        "LLM provider unreachable — returning raw structured data without narration",
+      fallbackReason: "LLM provider unreachable — returning raw structured data without narration",
     };
   }
   const data = await llmFn();

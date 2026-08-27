@@ -14,7 +14,10 @@ export class ScratchpadStore {
     };
   }
 
-  appendEntry(entry: Omit<WorkerScratchpadEntry, "id" | "timestamp"> & Partial<Pick<WorkerScratchpadEntry, "id" | "timestamp">>): WorkerScratchpadEntry {
+  appendEntry(
+    entry: Omit<WorkerScratchpadEntry, "id" | "timestamp"> &
+      Partial<Pick<WorkerScratchpadEntry, "id" | "timestamp">>,
+  ): WorkerScratchpadEntry {
     const nextEntry: WorkerScratchpadEntry = {
       id: entry.id ?? randomUUID(),
       timestamp: entry.timestamp ?? new Date().toISOString(),
@@ -28,7 +31,10 @@ export class ScratchpadStore {
     return nextEntry;
   }
 
-  recordHandoff(artifact: Omit<HandoffArtifact, "id" | "timestamp"> & Partial<Pick<HandoffArtifact, "id" | "timestamp">>): HandoffArtifact {
+  recordHandoff(
+    artifact: Omit<HandoffArtifact, "id" | "timestamp"> &
+      Partial<Pick<HandoffArtifact, "id" | "timestamp">>,
+  ): HandoffArtifact {
     const nextArtifact: HandoffArtifact = {
       id: artifact.id ?? randomUUID(),
       timestamp: artifact.timestamp ?? new Date().toISOString(),
@@ -62,10 +68,7 @@ export class ScratchpadStore {
     return [...this.handoffs];
   }
 
-  replaceState(next: {
-    entries?: WorkerScratchpadEntry[];
-    handoffs?: HandoffArtifact[];
-  }): void {
+  replaceState(next: { entries?: WorkerScratchpadEntry[]; handoffs?: HandoffArtifact[] }): void {
     this.entries.length = 0;
     this.handoffs.length = 0;
     if (next.entries) {

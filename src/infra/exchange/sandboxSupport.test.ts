@@ -1,10 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  resolveSandboxMode,
-  LiveOptInRequiredError,
-  ALLOW_LIVE_ENV,
-} from "./sandboxSupport.ts";
+import { resolveSandboxMode, LiveOptInRequiredError, ALLOW_LIVE_ENV } from "./sandboxSupport.ts";
 
 const NO_ENV: NodeJS.ProcessEnv = {};
 

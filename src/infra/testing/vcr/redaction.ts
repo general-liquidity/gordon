@@ -52,9 +52,7 @@ export function isSensitiveHeaderName(name: string): boolean {
  * header values are still passed through value-format redaction so a
  * credential accidentally placed in a custom header is caught.
  */
-export function redactHeaders(
-  headers: Record<string, string>,
-): Record<string, string> {
+export function redactHeaders(headers: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(headers)) {
     out[k] = isSensitiveHeaderName(k) ? VCR_REDACTED : redactString(v);
@@ -81,10 +79,7 @@ export function redactBody(
  * placeholder. Empty / falsy entries are ignored. Plain literal replace
  * (not regex) so callers don't have to escape anything.
  */
-export function redactPlanted(
-  text: string,
-  plantedSecrets: readonly string[],
-): string {
+export function redactPlanted(text: string, plantedSecrets: readonly string[]): string {
   let out = text;
   for (const secret of plantedSecrets) {
     if (!secret) continue;

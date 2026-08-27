@@ -91,5 +91,7 @@ if (totalFound > 0) {
   process.exit(1);
 }
 
-console.log(`[check-no-sourcemaps] ✓ no .map files in ${DIRECTORIES_TO_CHECK.map((d) => path.relative(ROOT, d)).join(", ")}`);
+console.log(
+  `[check-no-sourcemaps] ✓ no .map files in ${DIRECTORIES_TO_CHECK.map((d) => path.relative(ROOT, d)).join(", ")}`,
+);
 process.exit(0);

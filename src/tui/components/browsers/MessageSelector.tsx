@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text } from "../../ink-custom";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 
@@ -6,8 +6,16 @@ import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.t
 // MessageSelector — Visual message picker for rewind/branch operations
 // ============================================================================
 
-interface Message { role?: string; content?: string; timestamp?: number; }
-interface Props { messages: Message[]; onSelect: (index: number) => void; onClose: () => void; }
+interface Message {
+  role?: string;
+  content?: string;
+  timestamp?: number;
+}
+interface Props {
+  messages: Message[];
+  onSelect: (index: number) => void;
+  onClose: () => void;
+}
 
 function timeAgo(ts?: number): string {
   if (!ts) return "";
@@ -18,19 +26,27 @@ function timeAgo(ts?: number): string {
 }
 
 export function MessageSelector({ messages, onSelect, onClose }: Props) {
-  const userMessages = messages.map((m, i) => ({ ...m, originalIndex: i })).filter((m) => m.role === "user");
+  const userMessages = messages
+    .map((m, i) => ({ ...m, originalIndex: i }))
+    .filter((m) => m.role === "user");
   const [selected, setSelected] = useState(0);
 
-  useRoutedInput((_, key) => {
-    if (key.escape) onClose();
-    else if (key.return && userMessages[selected]) onSelect(userMessages[selected]!.originalIndex);
-    else if (key.upArrow) setSelected((p) => Math.max(0, p - 1));
-    else if (key.downArrow) setSelected((p) => Math.min(userMessages.length - 1, p + 1));
-  }, { id: "messageSelector", priority: FOCUS_PRIORITY.DIALOG });
+  useRoutedInput(
+    (_, key) => {
+      if (key.escape) onClose();
+      else if (key.return && userMessages[selected])
+        onSelect(userMessages[selected]!.originalIndex);
+      else if (key.upArrow) setSelected((p) => Math.max(0, p - 1));
+      else if (key.downArrow) setSelected((p) => Math.min(userMessages.length - 1, p + 1));
+    },
+    { id: "messageSelector", priority: FOCUS_PRIORITY.DIALOG },
+  );
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1}>
-      <Text bold color="yellow">Select a message ({userMessages.length} user messages)</Text>
+      <Text bold color="yellow">
+        Select a message ({userMessages.length} user messages)
+      </Text>
       {userMessages.slice(Math.max(0, selected - 5), selected + 10).map((msg, i) => {
         const actualI = i + Math.max(0, selected - 5);
         return (

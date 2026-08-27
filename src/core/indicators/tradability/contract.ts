@@ -17,10 +17,7 @@
 import type { MaskedSeries, TradabilityMask } from "./mask.ts";
 
 /** A rolling operator that consumes a mask and reports which outputs are usable. */
-export type MaskedOperator = (
-  series: readonly number[],
-  mask: TradabilityMask,
-) => MaskedSeries;
+export type MaskedOperator = (series: readonly number[], mask: TradabilityMask) => MaskedSeries;
 
 export type ContractProperty = "zero_on_mask" | "independence" | "propagation";
 
@@ -174,8 +171,7 @@ export function checkTradabilityContract(
   const output = operator(series, mask);
   const violations = [
     ...checkZeroOnMask(output).violations,
-    ...checkIndependence(operator, series, mask, { sentinels: options.sentinels })
-      .violations,
+    ...checkIndependence(operator, series, mask, { sentinels: options.sentinels }).violations,
     ...checkPropagation(output.mask, mask, options.window).violations,
   ];
   return report(violations);

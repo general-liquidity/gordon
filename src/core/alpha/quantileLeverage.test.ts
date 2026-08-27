@@ -4,7 +4,7 @@ import { quantileOptimalLeverage } from "./quantileLeverage.ts";
 /** Deterministic seeded return series with a positive expected edge. */
 function positiveEdgeReturns(n: number, seed: number): number[] {
   // Simple LCG so the fixture itself is reproducible.
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   const rand = () => {
     s = (Math.imul(1664525, s) + 1013904223) >>> 0;
     return s / 0x100000000;
@@ -23,7 +23,7 @@ function positiveEdgeReturns(n: number, seed: number): number[] {
  * median rather than both saturating at the grid ceiling).
  */
 function moderateEdgeReturns(n: number, seed: number): number[] {
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   const rand = () => {
     s = (Math.imul(1664525, s) + 1013904223) >>> 0;
     return s / 0x100000000;
@@ -47,7 +47,11 @@ describe("quantileOptimalLeverage", () => {
   test("CORE: optimal leverage at q=0.1 is lower than at q=0.5 (conservative ⇒ less leverage)", () => {
     const returns = moderateEdgeReturns(250, 11);
     const median = quantileOptimalLeverage(returns, { quantile: 0.5, seed: 42, nPaths: 2000 });
-    const conservative = quantileOptimalLeverage(returns, { quantile: 0.1, seed: 42, nPaths: 2000 });
+    const conservative = quantileOptimalLeverage(returns, {
+      quantile: 0.1,
+      seed: 42,
+      nPaths: 2000,
+    });
     expect(conservative.leverage).toBeLessThan(median.leverage);
     expect(conservative.leverage).toBeGreaterThan(0);
   });

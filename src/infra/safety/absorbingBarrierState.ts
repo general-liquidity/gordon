@@ -65,15 +65,11 @@ export function readAbsorbingBarrierConfigFromEnv(
 
 export function hasConfiguredLimit(config: AbsorbingBarrierConfig): boolean {
   return (
-    config.inceptionLossFraction !== undefined ||
-    config.trailingDrawdownFraction !== undefined
+    config.inceptionLossFraction !== undefined || config.trailingDrawdownFraction !== undefined
   );
 }
 
-function seedEquity(
-  observedEquityUsd: number,
-  env: NodeJS.ProcessEnv,
-): number {
+function seedEquity(observedEquityUsd: number, env: NodeJS.ProcessEnv): number {
   const declared = Number(env[INCEPTION_EQUITY_ENV] ?? 0);
   return Number.isFinite(declared) && declared > 0 ? declared : observedEquityUsd;
 }

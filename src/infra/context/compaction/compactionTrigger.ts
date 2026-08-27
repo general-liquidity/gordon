@@ -20,7 +20,6 @@ import {
   type ProjectionConfig,
   type ProjectionResult,
   type ThresholdStage,
-  DEFAULT_PROJECTION_CONFIG,
 } from "../budgeting/tokenProjection.ts";
 import { emitAgentEvent } from "../../agents/streaming/coordinator.ts";
 import { createEvent } from "../../agents/streaming/events.ts";
@@ -29,12 +28,7 @@ import { createEvent } from "../../agents/streaming/events.ts";
 // Types
 // ============================================================================
 
-export type CompactionAction =
-  | "none"
-  | "warn"
-  | "microcompact"
-  | "compact"
-  | "halt";
+export type CompactionAction = "none" | "warn" | "microcompact" | "compact" | "halt";
 
 export interface CompactionDecision {
   action: CompactionAction;
@@ -101,7 +95,10 @@ export class CompactionTrigger {
     let action = stageToAction(stage);
 
     // Circuit breaker: if compaction keeps failing, halt instead of looping
-    if (action === "compact" && this.consecutiveCompactFailures >= CompactionTrigger.MAX_CONSECUTIVE_FAILURES) {
+    if (
+      action === "compact" &&
+      this.consecutiveCompactFailures >= CompactionTrigger.MAX_CONSECUTIVE_FAILURES
+    ) {
       action = "halt";
     }
 
@@ -118,11 +115,13 @@ export class CompactionTrigger {
    */
   recordMicrocompact(tokensSaved: number): void {
     this.microcompactCount++;
-    emitAgentEvent(createEvent("microcompact", this.iteration, {
-      cleared: this.microcompactCount,
-      tokensSaved,
-      trigger: "token" as const,
-    }));
+    emitAgentEvent(
+      createEvent("microcompact", this.iteration, {
+        cleared: this.microcompactCount,
+        tokensSaved,
+        trigger: "token" as const,
+      }),
+    );
   }
 
   /**
@@ -132,11 +131,13 @@ export class CompactionTrigger {
   recordFullCompact(beforeTokens: number, afterTokens: number, summary: string): void {
     this.fullCompactCount++;
     this.consecutiveCompactFailures = 0; // Reset circuit breaker on success
-    emitAgentEvent(createEvent("compact", this.iteration, {
-      beforeTokens,
-      afterTokens,
-      summary,
-    }));
+    emitAgentEvent(
+      createEvent("compact", this.iteration, {
+        beforeTokens,
+        afterTokens,
+        summary,
+      }),
+    );
   }
 
   /**
@@ -204,11 +205,13 @@ export class CompactionTrigger {
   }
 
   private emitWarning(projection: ProjectionResult): void {
-    emitAgentEvent(createEvent("context_warning", this.iteration, {
-      currentTokens: projection.currentTokens,
-      threshold: projection.contextWindow,
-      message: projection.recommendation,
-    }));
+    emitAgentEvent(
+      createEvent("context_warning", this.iteration, {
+        currentTokens: projection.currentTokens,
+        threshold: projection.contextWindow,
+        message: projection.recommendation,
+      }),
+    );
   }
 }
 
@@ -226,11 +229,16 @@ function stageOrdinal(stage: ThresholdStage): number {
 
 function stageToAction(stage: ThresholdStage): CompactionAction {
   switch (stage) {
-    case "ok": return "none";
-    case "warn": return "warn";
-    case "microcompact": return "microcompact";
-    case "compact": return "compact";
-    case "hard_limit": return "halt";
+    case "ok":
+      return "none";
+    case "warn":
+      return "warn";
+    case "microcompact":
+      return "microcompact";
+    case "compact":
+      return "compact";
+    case "hard_limit":
+      return "halt";
   }
 }
 

@@ -152,11 +152,7 @@ export interface RuntimeToolingState {
   commands: string[];
 }
 
-export type RuntimeRemoteConnectionStatus =
-  | "offline"
-  | "connecting"
-  | "connected"
-  | "degraded";
+export type RuntimeRemoteConnectionStatus = "offline" | "connecting" | "connected" | "degraded";
 
 export interface RuntimeRemoteState {
   connectionStatus: RuntimeRemoteConnectionStatus;

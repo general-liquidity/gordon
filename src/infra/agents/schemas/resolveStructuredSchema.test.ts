@@ -35,15 +35,11 @@ describe("resolveStructuredSchema", () => {
   });
 
   it("throws on an unknown named schema", () => {
-    expect(() => resolveStructuredSchema({ schemaName: "nope" })).toThrow(
-      /Unknown schema/,
-    );
+    expect(() => resolveStructuredSchema({ schemaName: "nope" })).toThrow(/Unknown schema/);
   });
 
   it("throws when neither schemaName nor jsonSchema is given", () => {
-    expect(() => resolveStructuredSchema({})).toThrow(
-      /either schemaName or jsonSchema/,
-    );
+    expect(() => resolveStructuredSchema({})).toThrow(/either schemaName or jsonSchema/);
   });
 
   it("prefers jsonSchema when both are provided", () => {

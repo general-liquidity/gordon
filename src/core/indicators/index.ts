@@ -53,7 +53,12 @@ export {
 } from "./analysis.ts";
 
 // VWAP
-export { calculateVWAP, calculateVWAPBands, calculateRollingVWAP, calculateAnchoredVWAP } from "./vwap.ts";
+export {
+  calculateVWAP,
+  calculateVWAPBands,
+  calculateRollingVWAP,
+  calculateAnchoredVWAP,
+} from "./vwap.ts";
 export type { RollingVWAPResult, AnchoredVWAPResult } from "./vwap.ts";
 export { calculateGMMA } from "./gmma.ts";
 export type { GmmaResult } from "./gmma.ts";

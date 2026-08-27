@@ -133,9 +133,7 @@ export function getStructuredAxiomPrivacyStatus(): {
 
 export function initializeStructuredAxiom(): void {}
 
-export function refreshStructuredAxiomState(_options?: {
-  clearQueueOnDisable?: boolean;
-}): void {}
+export function refreshStructuredAxiomState(_options?: { clearQueueOnDisable?: boolean }): void {}
 
 export async function shutdownStructuredAxiom(): Promise<void> {}
 

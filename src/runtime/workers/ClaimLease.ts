@@ -84,7 +84,11 @@ export class ClaimLeaseManager {
       };
     }
     if (now >= current.expiresAt) {
-      return { ok: false, reason: `lease for "${token.workUnit}" expired at ${current.expiresAt}`, current };
+      return {
+        ok: false,
+        reason: `lease for "${token.workUnit}" expired at ${current.expiresAt}`,
+        current,
+      };
     }
     const renewed: ClaimToken = { ...current, expiresAt: now + leaseMs };
     this.leases.set(token.workUnit, renewed);

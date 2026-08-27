@@ -14,7 +14,6 @@
  * Pattern: Claude Code agent progress tree with status markers.
  */
 
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 
 // ============================================================================
@@ -84,10 +83,17 @@ export function ConsensusView({ signals, decision, confidence }: Props) {
     >
       {/* Header */}
       <Box>
-        <Text bold color={decisionColor(decision)}>CONSENSUS</Text>
+        <Text bold color={decisionColor(decision)}>
+          CONSENSUS
+        </Text>
         <Text dimColor> {"\u00b7"} </Text>
-        <Text bold color={decisionColor(decision)}>{decision}</Text>
-        <Text dimColor> ({agreeCount}/{total} agree)</Text>
+        <Text bold color={decisionColor(decision)}>
+          {decision}
+        </Text>
+        <Text dimColor>
+          {" "}
+          ({agreeCount}/{total} agree)
+        </Text>
         <Text dimColor> {"\u00b7"} </Text>
         <Text color={confidenceColor(confidence)}>{confidence}% confidence</Text>
       </Box>

@@ -11,12 +11,16 @@ import type { CapabilitySnapshot } from "./types.ts";
 
 function actionCapabilitiesForKind(kind: CapabilitySnapshot["providerKind"]): string[] {
   return getCanonicalActions()
-    .filter((action) => action.providerRequirements.some((requirement) => requirement.kind === kind))
+    .filter((action) =>
+      action.providerRequirements.some((requirement) => requirement.kind === kind),
+    )
     .map((action) => action.id)
     .sort();
 }
 
-export async function discoverProviderCapabilities(config: GordonConfig): Promise<CapabilitySnapshot[]> {
+export async function discoverProviderCapabilities(
+  _config: GordonConfig,
+): Promise<CapabilitySnapshot[]> {
   const snapshots: CapabilitySnapshot[] = [];
 
   for (const exchangeId of ExchangeFactory.getSupportedExchanges()) {
@@ -40,7 +44,9 @@ export async function discoverProviderCapabilities(config: GordonConfig): Promis
       label: integration.displayName,
       supportsExecution: true,
       capabilities: actionCapabilitiesForKind("broker"),
-      notes: ["Read-only discovery is allowed; live broker operations stay behind normalized broker adapters."],
+      notes: [
+        "Read-only discovery is allowed; live broker operations stay behind normalized broker adapters.",
+      ],
       integration,
     });
   }
@@ -93,5 +99,8 @@ export async function discoverProviderCapabilities(config: GordonConfig): Promis
     // Discovery must stay best-effort and read-only.
   }
 
-  return snapshots.sort((a, b) => a.providerKind.localeCompare(b.providerKind) || a.providerId.localeCompare(b.providerId));
+  return snapshots.sort(
+    (a, b) =>
+      a.providerKind.localeCompare(b.providerKind) || a.providerId.localeCompare(b.providerId),
+  );
 }

@@ -7,9 +7,11 @@
  */
 
 // Use Bun's native stringWidth if available (fast path)
-const bunStringWidth = typeof globalThis.Bun !== "undefined" && typeof (globalThis.Bun as any).stringWidth === "function"
-  ? (str: string) => (globalThis.Bun as any).stringWidth(str, { ambiguousIsNarrow: true }) as number
-  : null;
+const bunStringWidth =
+  typeof globalThis.Bun !== "undefined" && typeof (globalThis.Bun as any).stringWidth === "function"
+    ? (str: string) =>
+        (globalThis.Bun as any).stringWidth(str, { ambiguousIsNarrow: true }) as number
+    : null;
 
 const cache = new Map<string, number>();
 const MAX_CACHE = 4096;

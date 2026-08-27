@@ -146,7 +146,10 @@ export function computeCrowdedFragility(
   const concentration = clamp01(Math.abs(inputs.crowdNetScore));
   const sharedFactorExposure = clamp01(inputs.sharedFactorExposure ?? 0.5);
 
-  const notional = Math.max(0, Number.isFinite(inputs.crowdedNotional) ? inputs.crowdedNotional : 0);
+  const notional = Math.max(
+    0,
+    Number.isFinite(inputs.crowdedNotional) ? inputs.crowdedNotional : 0,
+  );
   const dailyCapacity = inputs.exitLiquidity > 0 ? inputs.exitLiquidity * maxParticipation : 0;
 
   let estimatedDaysToExit: number;

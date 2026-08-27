@@ -26,9 +26,7 @@ export interface UserThesis {
 
 const thesisStore = new Map<string, UserThesis>();
 
-export function isExplainFirstEnabled(
-  env: NodeJS.ProcessEnv = flagEnv(),
-): boolean {
+export function isExplainFirstEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   return env.GORDON_EXPLAIN_FIRST === "1" || env.GORDON_EXPLAIN_FIRST === "true";
 }
 
@@ -90,10 +88,7 @@ export function requiresUserThesis(
  * heuristic, not semantic — useful as an observation signal for the
  * ACE Reflector to flag interesting cases, not as a gate.
  */
-export function computeThesisDivergence(
-  thesis: string,
-  rationale: string,
-): number {
+export function computeThesisDivergence(thesis: string, rationale: string): number {
   const toks = (s: string): Set<string> =>
     new Set(
       s

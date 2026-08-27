@@ -65,14 +65,10 @@ export interface SynthesisAgentStepOptions {
  * adapter doesn't loop. Callers wanting multi-round tool-using
  * investigations should use the Mastra adapter (S27, deferred).
  */
-export function createSynthesisAgentStep(
-  opts: SynthesisAgentStepOptions,
-): InvestigationAgentStep {
+export function createSynthesisAgentStep(opts: SynthesisAgentStepOptions): InvestigationAgentStep {
   const surfaceTools = opts.surfaceAllowedTools ?? true;
 
-  return async (
-    input: InvestigationAgentStepInput,
-  ): Promise<InvestigationAgentStepOutput> => {
+  return async (input: InvestigationAgentStepInput): Promise<InvestigationAgentStepOutput> => {
     let messages = input.messages;
     if (surfaceTools && input.allowedToolIds.length > 0) {
       // Inject a system-level note listing the tools the LLM could
@@ -92,10 +88,7 @@ export function createSynthesisAgentStep(
     const response = await opts.llm.call(messages);
     const trimmed = response.trim();
     return {
-      messages: [
-        ...input.messages,
-        { role: "assistant", content: trimmed },
-      ],
+      messages: [...input.messages, { role: "assistant", content: trimmed }],
       toolCalls: [],
       finished: true,
     };
@@ -107,10 +100,7 @@ export function createSynthesisAgentStep(
  * `context.llm.chatWithConfig` directly. The caller passes the
  * provider/model config; this helper handles the call shape.
  */
-export function createSynthesisAgentStepFromChatWithConfig<
-  TMessage = unknown,
-  TConfig = unknown,
->(
+export function createSynthesisAgentStepFromChatWithConfig<TMessage = unknown, TConfig = unknown>(
   chatWithConfig: (messages: TMessage[], config: TConfig) => Promise<{ content?: string }>,
   config: TConfig,
   options: Omit<SynthesisAgentStepOptions, "llm"> = {},
@@ -124,10 +114,7 @@ export function createSynthesisAgentStepFromChatWithConfig<
         // Structurally compatible (the investigation primitive never
         // produces tool-role messages and the extra config fields are
         // optional).
-        const response = await chatWithConfig(
-          messages as unknown as TMessage[],
-          config,
-        );
+        const response = await chatWithConfig(messages as unknown as TMessage[], config);
         return response.content ?? "";
       },
     },

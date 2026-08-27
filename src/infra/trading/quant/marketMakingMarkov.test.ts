@@ -14,10 +14,10 @@ describe("computeMarketMakingMarkov", () => {
     // p01=0.4, p02=0.1, p10=0.3, p11=0.5, p12=0.2
     // waitFillSum = Σ_{n=0..5} 0.5^n · 0.2
     let waitFillSum = 0;
-    for (let n = 0; n <= W; n++) waitFillSum += Math.pow(0.5, n) * 0.2;
+    for (let n = 0; n <= W; n++) waitFillSum += 0.5 ** n * 0.2;
     // = 0.2 * (1 + 0.5 + 0.25 + 0.125 + 0.0625 + 0.03125) = 0.2 * 1.96875 = 0.39375
     const expectedMakeSpread = 0.1 + 0.4 * waitFillSum; // 0.1 + 0.1575 = 0.2575
-    const expectedOneSide = 0.4 * Math.pow(0.5, W) * 0.3; // 0.4 * 0.03125 * 0.3 = 0.00375
+    const expectedOneSide = 0.4 * 0.5 ** W * 0.3; // 0.4 * 0.03125 * 0.3 = 0.00375
 
     expect(expectedMakeSpread).toBeCloseTo(0.2575, 9);
     expect(expectedOneSide).toBeCloseTo(0.00375, 9);

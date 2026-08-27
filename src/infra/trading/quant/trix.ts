@@ -123,7 +123,9 @@ export function trixToPayload(result: TrixResult): Record<string, unknown> {
   return {
     kind: "trix.computed",
     currentTrix: Number.isFinite(result.currentTrix) ? Number(result.currentTrix.toFixed(6)) : null,
-    currentSignal: Number.isFinite(result.currentSignal) ? Number(result.currentSignal.toFixed(6)) : null,
+    currentSignal: Number.isFinite(result.currentSignal)
+      ? Number(result.currentSignal.toFixed(6))
+      : null,
     lastCross: result.lastCross,
     sampleSize: result.sampleSize,
   };

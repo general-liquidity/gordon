@@ -107,7 +107,7 @@ export function computeHilbertTransform(input: HilbertInput): HilbertResult {
     cyclic,
     currentPhase,
     sampleSize: n,
-    reasoning: `phase ${Number.isFinite(currentPhase) ? currentPhase.toFixed(1) + "°" : "n/a"}, ${cyclic ? "cyclic" : "non-cyclic"}`,
+    reasoning: `phase ${Number.isFinite(currentPhase) ? `${currentPhase.toFixed(1)}°` : "n/a"}, ${cyclic ? "cyclic" : "non-cyclic"}`,
   };
 }
 

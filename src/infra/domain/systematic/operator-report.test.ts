@@ -12,16 +12,28 @@ describe("operator report formatting", () => {
       status: "warning",
       summary: "One slot is approaching its drawdown limit.",
       metrics: [{ label: "Active Slots", value: "3", tone: "info" }],
-      tables: [{
-        title: "Slots",
-        columns: [
-          { key: "slot", header: "Slot" },
-          { key: "status", header: "Status" },
-        ],
-        rows: [{ slot: "momentum", status: "running" }],
-      }],
-      gates: [{ name: "walk_forward", status: "warn", score: 55, detail: "Only 2 windows.", blocker: false }],
-      diffs: [{ label: "Win Rate", baseline: "54.0%", current: "49.0%", delta: "-5.0%", status: "worse" }],
+      tables: [
+        {
+          title: "Slots",
+          columns: [
+            { key: "slot", header: "Slot" },
+            { key: "status", header: "Status" },
+          ],
+          rows: [{ slot: "momentum", status: "running" }],
+        },
+      ],
+      gates: [
+        {
+          name: "walk_forward",
+          status: "warn",
+          score: 55,
+          detail: "Only 2 windows.",
+          blocker: false,
+        },
+      ],
+      diffs: [
+        { label: "Win Rate", baseline: "54.0%", current: "49.0%", delta: "-5.0%", status: "worse" },
+      ],
       warnings: ["Drawdown has widened over the last 10 trades."],
       actions: [{ label: "Inspect runtime", command: "/runtime health", priority: "now" }],
     });
@@ -146,7 +158,11 @@ describe("bias diagnostics", () => {
 
     expect(diagnostics.status).toBe("failed");
     expect(diagnostics.blockerCount).toBeGreaterThan(0);
-    expect(diagnostics.checks.some((check) => check.name === "sample_size" && check.blocker)).toBe(true);
-    expect(diagnostics.checks.some((check) => check.name === "walk_forward_oos" && check.blocker)).toBe(true);
+    expect(diagnostics.checks.some((check) => check.name === "sample_size" && check.blocker)).toBe(
+      true,
+    );
+    expect(
+      diagnostics.checks.some((check) => check.name === "walk_forward_oos" && check.blocker),
+    ).toBe(true);
   });
 });

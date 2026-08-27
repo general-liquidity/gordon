@@ -7,7 +7,11 @@
  * post-processing step that does NOT replace the underlying search.
  */
 
-import { applyTemporalDecay, DEFAULT_TEMPORAL_DECAY, type TemporalDecayConfig } from "./temporalDecay.ts";
+import {
+  applyTemporalDecay,
+  DEFAULT_TEMPORAL_DECAY,
+  type TemporalDecayConfig,
+} from "./temporalDecay.ts";
 import { mmrRerank, DEFAULT_MMR_CONFIG, type MMRConfig } from "./mmr.ts";
 
 export interface RankedEntry {

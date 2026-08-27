@@ -35,7 +35,7 @@ export function useStalledAnimation(
 ): StalledAnimationResult {
   const [isStalled, setIsStalled] = useState(false);
   const lastPingRef = useRef<number>(Date.now());
-  const { tick } = useAnimationFrame(isActive);
+  useAnimationFrame(isActive);
 
   // Reset on activation change
   useEffect(() => {
@@ -59,9 +59,7 @@ export function useStalledAnimation(
 
   // Calculate intensity: ramp from 0 to 1 over MAX_RAMP_DURATION after stall starts
   const stalledMs = stalled ? msSinceLastPing - stallThresholdMs : 0;
-  const intensity = stalled
-    ? Math.min(1, stalledMs / MAX_RAMP_DURATION_MS)
-    : 0;
+  const intensity = stalled ? Math.min(1, stalledMs / MAX_RAMP_DURATION_MS) : 0;
 
   const ping = useCallback(() => {
     lastPingRef.current = Date.now();

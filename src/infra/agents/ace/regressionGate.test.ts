@@ -13,7 +13,9 @@ const cand = (text: string): ACELessonCandidate => ({
 
 describe("ACE safety regression gate", () => {
   it("promotes a benign operational lesson", () => {
-    expect(safetyRegressionReason(cand("Pre-validate balance and venue policy before execution"))).toBeNull();
+    expect(
+      safetyRegressionReason(cand("Pre-validate balance and venue policy before execution")),
+    ).toBeNull();
   });
 
   it("REJECTS a lesson that would skip the risk gate on a safety-critical action", () => {
@@ -23,15 +25,23 @@ describe("ACE safety regression gate", () => {
   });
 
   it("promotes a lesson that REINFORCES a safety rule (mentions the tool, no weakening language)", () => {
-    expect(safetyRegressionReason(cand("place_order always requires human approval and a logged rationale"))).toBeNull();
+    expect(
+      safetyRegressionReason(
+        cand("place_order always requires human approval and a logged rationale"),
+      ),
+    ).toBeNull();
   });
 
   it("ignores weakening language aimed at nothing safety-critical", () => {
-    expect(safetyRegressionReason(cand("Skip the verbose debug logging to reduce noise"))).toBeNull();
+    expect(
+      safetyRegressionReason(cand("Skip the verbose debug logging to reduce noise")),
+    ).toBeNull();
   });
 
   it("REJECTS weakening a safety CONTROL even without a specific tool name", () => {
-    const reason = safetyRegressionReason(cand("Skip the human approval step on large orders to save time"));
+    const reason = safetyRegressionReason(
+      cand("Skip the human approval step on large orders to save time"),
+    );
     expect(reason).not.toBeNull();
     expect(reason).toContain("human approval");
   });
@@ -55,7 +65,9 @@ describe("ACE safety regression gate", () => {
   });
 
   it("the safety gate ALWAYS applies, even when the customGate would pass it", () => {
-    const { rejected } = gateLessonCandidates([cand("skip approval on wallet_transfer")], { customGate: () => null });
+    const { rejected } = gateLessonCandidates([cand("skip approval on wallet_transfer")], {
+      customGate: () => null,
+    });
     expect(rejected.length).toBe(1);
     expect(rejected[0]!.reason).toContain("wallet_transfer");
   });

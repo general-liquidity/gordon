@@ -101,7 +101,9 @@ export interface RegisteredAgent {
 export class AgentRegistry {
   private readonly entries: Map<string, RegisteredAgent> = new Map();
 
-  register(entry: Omit<RegisteredAgent, "state"> & { state?: AgentLifecycleState }): RegisteredAgent {
+  register(
+    entry: Omit<RegisteredAgent, "state"> & { state?: AgentLifecycleState },
+  ): RegisteredAgent {
     const e: RegisteredAgent = {
       ...entry,
       state: entry.state ?? "starting",
@@ -176,10 +178,10 @@ export function _resetDefaultAgentRegistryForTests(): void {
 // ============================================================================
 
 export type SendMessageKind =
-  | "instruction"     // parent → child: "do this next"
+  | "instruction" // parent → child: "do this next"
   | "shutdown_request" // parent → child: "stop now"
   | "plan_approval_response" // user → child via parent: "approved"
-  | "plain";          // free-form
+  | "plain"; // free-form
 
 export interface SendMessageEnvelope {
   fromAgent: string;

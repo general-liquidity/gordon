@@ -18,7 +18,13 @@
       "transport": "http",
       "endpoint": "https://mcp.financialdatasets.ai/",
       "install": "claude mcp add --transport http financial-datasets https://mcp.financialdatasets.ai/",
-      "credentials": [{ "env": "FINANCIAL_DATASETS_API_KEY", "required": false, "description": "API key (OAuth available for interactive)" }],
+      "credentials": [
+        {
+          "env": "FINANCIAL_DATASETS_API_KEY",
+          "required": false,
+          "description": "API key (OAuth available for interactive)"
+        }
+      ],
       "docsUrl": "https://docs.financialdatasets.ai/mcp-server",
       "pricing": "freemium",
       "pricingNote": "Free tier available. Developer $200/mo, Pro $2K/mo.",
@@ -32,7 +38,11 @@
       "transport": "stdio",
       "install": "docker run -i --rm hummingbot/mcp",
       "credentials": [
-        { "env": "HUMMINGBOT_API_URL", "required": true, "description": "URL of running Hummingbot instance" },
+        {
+          "env": "HUMMINGBOT_API_URL",
+          "required": true,
+          "description": "URL of running Hummingbot instance"
+        },
         { "env": "HUMMINGBOT_USERNAME", "required": true },
         { "env": "HUMMINGBOT_PASSWORD", "required": true }
       ],
@@ -49,9 +59,21 @@
       "transport": "stdio",
       "install": "docker run -i --rm -e QUANTCONNECT_USER_ID -e QUANTCONNECT_API_TOKEN -e AGENT_NAME quantconnect/mcp-server",
       "credentials": [
-        { "env": "QUANTCONNECT_USER_ID", "required": true, "description": "QuantConnect user ID — find in account settings" },
-        { "env": "QUANTCONNECT_API_TOKEN", "required": true, "description": "QuantConnect API token — request via account settings → Request API Token" },
-        { "env": "AGENT_NAME", "required": false, "description": "Identifier for this Gordon session in QC's request logs. Defaults to 'gordon'." }
+        {
+          "env": "QUANTCONNECT_USER_ID",
+          "required": true,
+          "description": "QuantConnect user ID — find in account settings"
+        },
+        {
+          "env": "QUANTCONNECT_API_TOKEN",
+          "required": true,
+          "description": "QuantConnect API token — request via account settings → Request API Token"
+        },
+        {
+          "env": "AGENT_NAME",
+          "required": false,
+          "description": "Identifier for this Gordon session in QC's request logs. Defaults to 'gordon'."
+        }
       ],
       "docsUrl": "https://github.com/QuantConnect/mcp-server",
       "pricing": "freemium",
@@ -65,7 +87,9 @@
       "category": "data-provider",
       "transport": "stdio",
       "install": "npx -y @coingecko/coingecko-mcp@latest",
-      "credentials": [{ "env": "COINGECKO_DEMO_API_KEY", "required": true, "description": "Demo or Pro API key" }],
+      "credentials": [
+        { "env": "COINGECKO_DEMO_API_KEY", "required": true, "description": "Demo or Pro API key" }
+      ],
       "docsUrl": "https://docs.coingecko.com/docs/mcp-server",
       "pricing": "freemium",
       "pricingNote": "Free: 10K calls/mo. Analyst $129/mo.",
@@ -124,7 +148,13 @@
       "transport": "http",
       "endpoint": "https://mcp.glassnode.com",
       "install": "npx add-mcp https://mcp.glassnode.com",
-      "credentials": [{ "env": "GLASSNODE_API_KEY", "required": false, "description": "Optional — public access with limits" }],
+      "credentials": [
+        {
+          "env": "GLASSNODE_API_KEY",
+          "required": false,
+          "description": "Optional — public access with limits"
+        }
+      ],
       "docsUrl": "https://docs.glassnode.com/guides-and-tutorials/glassnode-mcp-server",
       "pricing": "freemium",
       "pricingNote": "Free: basic T1 metrics. Advanced ~$29-49/mo.",
@@ -164,7 +194,9 @@
       "category": "research",
       "transport": "stdio",
       "install": "npx @coinbase/payments-mcp@latest --client claude-code --auto-config",
-      "credentials": [{ "env": "MESSARI_API_KEY", "required": false, "description": "Or use x402 micropayments" }],
+      "credentials": [
+        { "env": "MESSARI_API_KEY", "required": false, "description": "Or use x402 micropayments" }
+      ],
       "docsUrl": "https://docs.messari.io/user-guides/agents/x402-skill-claude-code",
       "pricing": "freemium",
       "pricingNote": "Free: 10 AI req/day. Enterprise unlimited.",
@@ -222,7 +254,9 @@
       "transport": "http",
       "endpoint": "https://mcp.tradier.com/mcp",
       "install": "claude mcp add --transport http tradier https://mcp.tradier.com/mcp",
-      "credentials": [{ "env": "API_KEY", "required": true, "description": "Tradier access token" }],
+      "credentials": [
+        { "env": "API_KEY", "required": true, "description": "Tradier access token" }
+      ],
       "docsUrl": "https://docs.tradier.com/docs/tradier-mcp",
       "pricing": "freemium",
       "pricingNote": "Lite free (commission-free stocks). Pro $10/mo.",
@@ -382,7 +416,9 @@
       "category": "infrastructure",
       "transport": "stdio",
       "install": "uvx --from git+https://github.com/chainstacklabs/rpc-nodes-mcp.git mcp-evm",
-      "credentials": [{ "env": "ETHEREUM_RPC_URL", "required": true, "description": "RPC endpoint URLs" }],
+      "credentials": [
+        { "env": "ETHEREUM_RPC_URL", "required": true, "description": "RPC endpoint URLs" }
+      ],
       "docsUrl": "https://docs.chainstack.com/docs/mcp-servers-introduction",
       "pricing": "freemium",
       "pricingNote": "Free: 3M req/month. Growth $19/mo.",
@@ -535,7 +571,13 @@
       "category": "data-provider",
       "transport": "stdio",
       "install": "uv run mesh-tool-server",
-      "credentials": [{ "env": "HEURIST_API_KEY", "required": true, "description": "Free credits with invite code 'claude'" }],
+      "credentials": [
+        {
+          "env": "HEURIST_API_KEY",
+          "required": true,
+          "description": "Free credits with invite code 'claude'"
+        }
+      ],
       "docsUrl": "https://docs.heurist.ai/agent-framework/heurist-mesh",
       "pricing": "freemium",
       "pricingNote": "Per-tool credit pricing. Free credits available.",
@@ -591,7 +633,13 @@
       "category": "data-provider",
       "transport": "stdio",
       "install": "uvx mcp-fredapi",
-      "credentials": [{ "env": "FRED_API_KEY", "required": true, "description": "Free key from fred.stlouisfed.org" }],
+      "credentials": [
+        {
+          "env": "FRED_API_KEY",
+          "required": true,
+          "description": "Free key from fred.stlouisfed.org"
+        }
+      ],
       "docsUrl": "https://github.com/Jaldekoa/mcp-fredapi",
       "pricing": "free",
       "pricingNote": "Free API key. 120 req/min. 800K+ economic data series.",
@@ -606,7 +654,11 @@
       "install": "npx -y @polymarket/mcp-server",
       "credentials": [
         { "env": "POLYMARKET_API_KEY", "required": true },
-        { "env": "POLYMARKET_PRIVATE_KEY", "required": true, "description": "Wallet key for order execution" }
+        {
+          "env": "POLYMARKET_PRIVATE_KEY",
+          "required": true,
+          "description": "Wallet key for order execution"
+        }
       ],
       "docsUrl": "https://github.com/polymarket/polymarket-mcp",
       "pricing": "free",
@@ -650,7 +702,11 @@
       "transport": "stdio",
       "install": "npx -y freqtrade-mcp",
       "credentials": [
-        { "env": "FREQTRADE_API_URL", "required": true, "description": "URL of running Freqtrade instance" },
+        {
+          "env": "FREQTRADE_API_URL",
+          "required": true,
+          "description": "URL of running Freqtrade instance"
+        },
         { "env": "FREQTRADE_API_USERNAME", "required": true },
         { "env": "FREQTRADE_API_PASSWORD", "required": true }
       ],
@@ -679,7 +735,13 @@
       "category": "execution",
       "transport": "stdio",
       "install": "uvx armor-crypto-mcp@latest",
-      "credentials": [{ "env": "ARMOR_API_KEY", "required": true, "description": "From codex.armorwallet.ai (requires Armor NFT)" }],
+      "credentials": [
+        {
+          "env": "ARMOR_API_KEY",
+          "required": true,
+          "description": "From codex.armorwallet.ai (requires Armor NFT)"
+        }
+      ],
       "docsUrl": "https://github.com/armorwallet/armor-crypto-mcp",
       "pricing": "freemium",
       "pricingNote": "Requires Armor NFT for API access. Solana live, multi-chain expanding.",
@@ -692,7 +754,13 @@
       "category": "infrastructure",
       "transport": "stdio",
       "install": "npm i -g machine-payments-protocol",
-      "credentials": [{ "env": "MPP_WALLET_KEY", "required": true, "description": "Payment wallet (Stripe, stablecoin, or Lightning)" }],
+      "credentials": [
+        {
+          "env": "MPP_WALLET_KEY",
+          "required": true,
+          "description": "Payment wallet (Stripe, stablecoin, or Lightning)"
+        }
+      ],
       "docsUrl": "https://mpp.dev/",
       "pricing": "free",
       "pricingNote": "Open protocol (Stripe + Tempo). Fees depend on payment rail.",
@@ -705,7 +773,13 @@
       "category": "infrastructure",
       "transport": "stdio",
       "install": "npx @coinbase/payments-mcp@latest --client claude-code --auto-config",
-      "credentials": [{ "env": "COINBASE_CDP_API_KEY", "required": true, "description": "Coinbase Developer Platform API key" }],
+      "credentials": [
+        {
+          "env": "COINBASE_CDP_API_KEY",
+          "required": true,
+          "description": "Coinbase Developer Platform API key"
+        }
+      ],
       "docsUrl": "https://www.x402.org/",
       "pricing": "free",
       "pricingNote": "Zero protocol fees. Backed by Coinbase, AWS, Alchemy, Cloudflare.",
@@ -718,7 +792,9 @@
       "category": "infrastructure",
       "transport": "stdio",
       "install": "npm i @ucp-js/sdk",
-      "credentials": [{ "env": "UCP_API_KEY", "required": true, "description": "Merchant or agent API key" }],
+      "credentials": [
+        { "env": "UCP_API_KEY", "required": true, "description": "Merchant or agent API key" }
+      ],
       "docsUrl": "https://ucp.dev/",
       "pricing": "free",
       "pricingNote": "Open standard (2.5K+ stars). REST + JSON-RPC + MCP transport.",
@@ -731,7 +807,13 @@
       "category": "infrastructure",
       "transport": "stdio",
       "install": "npm i agentic-commerce-protocol",
-      "credentials": [{ "env": "STRIPE_API_KEY", "required": true, "description": "Stripe key for payment processing" }],
+      "credentials": [
+        {
+          "env": "STRIPE_API_KEY",
+          "required": true,
+          "description": "Stripe key for payment processing"
+        }
+      ],
       "docsUrl": "https://www.agenticcommerce.dev/",
       "pricing": "free",
       "pricingNote": "Open standard (1.3K+ stars, Apache 2.0). Stripe is first payment provider.",
@@ -744,7 +826,13 @@
       "category": "infrastructure",
       "transport": "stdio",
       "install": "npm i @ampersend/sdk",
-      "credentials": [{ "env": "AMPERSEND_API_KEY", "required": true, "description": "From ampersend.ai dashboard" }],
+      "credentials": [
+        {
+          "env": "AMPERSEND_API_KEY",
+          "required": true,
+          "description": "From ampersend.ai dashboard"
+        }
+      ],
       "docsUrl": "https://docs.ampersend.io",
       "pricing": "freemium",
       "pricingNote": "Free tier available. Agent treasury management on Base.",
@@ -757,7 +845,13 @@
       "category": "infrastructure",
       "transport": "stdio",
       "install": "npm i @buildersgarden/siwa",
-      "credentials": [{ "env": "AGENT_PRIVATE_KEY", "required": true, "description": "Agent wallet key for signing" }],
+      "credentials": [
+        {
+          "env": "AGENT_PRIVATE_KEY",
+          "required": true,
+          "description": "Agent wallet key for signing"
+        }
+      ],
       "docsUrl": "https://siwa.id/docs",
       "pricing": "free",
       "pricingNote": "Open source. Trustless identity protocol for agentic economy.",
@@ -770,7 +864,13 @@
       "category": "research",
       "transport": "stdio",
       "install": "npx -y @herd/mcp-server",
-      "credentials": [{ "env": "HERD_API_KEY", "required": false, "description": "Optional — public access with limits" }],
+      "credentials": [
+        {
+          "env": "HERD_API_KEY",
+          "required": false,
+          "description": "Optional — public access with limits"
+        }
+      ],
       "docsUrl": "https://docs.herd.eco/herd-mcp/introduction",
       "pricing": "freemium",
       "pricingNote": "Free tier for basic research. Pro for full due diligence.",
@@ -783,7 +883,13 @@
       "category": "infrastructure",
       "transport": "stdio",
       "install": "npm i @faremeter/types @faremeter/wallet-solana",
-      "credentials": [{ "env": "WALLET_PRIVATE_KEY", "required": true, "description": "Solana or EVM wallet for x402 payments" }],
+      "credentials": [
+        {
+          "env": "WALLET_PRIVATE_KEY",
+          "required": true,
+          "description": "Solana or EVM wallet for x402 payments"
+        }
+      ],
       "docsUrl": "https://docs.faremeter.xyz/",
       "pricing": "free",
       "pricingNote": "Open source TypeScript SDK. Built on x402 protocol. Solana + EVM wallets.",
@@ -822,7 +928,9 @@
       "category": "execution",
       "transport": "stdio",
       "install": "npx -y lido-mcp",
-      "credentials": [{ "env": "ETHEREUM_RPC_URL", "required": true, "description": "Ethereum RPC endpoint" }],
+      "credentials": [
+        { "env": "ETHEREUM_RPC_URL", "required": true, "description": "Ethereum RPC endpoint" }
+      ],
       "docsUrl": "https://docs.lido.fi/",
       "pricing": "free",
       "pricingNote": "Free. 67 tools for staking operations.",
@@ -876,7 +984,13 @@
       "category": "infrastructure",
       "transport": "stdio",
       "install": "npx -y @mcpdotdirect/evm-mcp-server",
-      "credentials": [{ "env": "ETHEREUM_RPC_URL", "required": true, "description": "RPC endpoint for target chain" }],
+      "credentials": [
+        {
+          "env": "ETHEREUM_RPC_URL",
+          "required": true,
+          "description": "RPC endpoint for target chain"
+        }
+      ],
       "docsUrl": "https://www.npmjs.com/package/@mcpdotdirect/evm-mcp-server",
       "pricing": "free",
       "pricingNote": "Free. 22 tools. Read state, interact with contracts, transfer tokens on any EVM chain.",
@@ -902,7 +1016,13 @@
       "category": "execution",
       "transport": "stdio",
       "install": "npx -y uniswap-trader-mcp",
-      "credentials": [{ "env": "WALLET_PRIVATE_KEY", "required": true, "description": "Wallet for swap execution" }],
+      "credentials": [
+        {
+          "env": "WALLET_PRIVATE_KEY",
+          "required": true,
+          "description": "Wallet for swap execution"
+        }
+      ],
       "docsUrl": "https://github.com/kukapay/uniswap-trader-mcp",
       "pricing": "free",
       "pricingNote": "Free. Community-maintained. Swap + price + pool tracking MCPs available.",

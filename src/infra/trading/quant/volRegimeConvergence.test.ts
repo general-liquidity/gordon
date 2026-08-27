@@ -1,12 +1,14 @@
 import { describe, it, expect } from "bun:test";
-import {
-  evaluateVolRegimeConvergence,
-  convergenceToPayload,
-} from "./volRegimeConvergence.ts";
+import { evaluateVolRegimeConvergence, convergenceToPayload } from "./volRegimeConvergence.ts";
 import type { KalmanVolatilityResult } from "./kalmanVolatility.ts";
 import type { MarkovRegimeResult, MarkovState } from "./markovRegime.ts";
 
-function mkVol(opts: { current: number; mean: number; min: number; max: number }): KalmanVolatilityResult {
+function mkVol(opts: {
+  current: number;
+  mean: number;
+  min: number;
+  max: number;
+}): KalmanVolatilityResult {
   return {
     variance: [],
     annualVol: [],
@@ -49,7 +51,7 @@ function mkRegime(opts: {
 describe("evaluateVolRegimeConvergence — four verdicts", () => {
   it("vol high + regime bear → aligned_storm, risk_off", () => {
     const r = evaluateVolRegimeConvergence({
-      vol: mkVol({ current: 0.45, mean: 0.20, min: 0.10, max: 0.50 }),
+      vol: mkVol({ current: 0.45, mean: 0.2, min: 0.1, max: 0.5 }),
       regime: mkRegime({ current: "bear", predicted: "bear", confidence: 0.8 }),
     });
     expect(r.verdict).toBe("aligned_storm");
@@ -58,7 +60,7 @@ describe("evaluateVolRegimeConvergence — four verdicts", () => {
 
   it("vol low + regime bull → aligned_calm, risk_on", () => {
     const r = evaluateVolRegimeConvergence({
-      vol: mkVol({ current: 0.10, mean: 0.20, min: 0.10, max: 0.50 }),
+      vol: mkVol({ current: 0.1, mean: 0.2, min: 0.1, max: 0.5 }),
       regime: mkRegime({ current: "bull", predicted: "bull", confidence: 0.8 }),
     });
     expect(r.verdict).toBe("aligned_calm");
@@ -67,7 +69,7 @@ describe("evaluateVolRegimeConvergence — four verdicts", () => {
 
   it("vol calm + regime flipping to bear → regime_only, risk_off", () => {
     const r = evaluateVolRegimeConvergence({
-      vol: mkVol({ current: 0.18, mean: 0.20, min: 0.10, max: 0.50 }),
+      vol: mkVol({ current: 0.18, mean: 0.2, min: 0.1, max: 0.5 }),
       regime: mkRegime({
         current: "neutral",
         predicted: "bear",
@@ -81,7 +83,7 @@ describe("evaluateVolRegimeConvergence — four verdicts", () => {
 
   it("vol spike + regime stable bull → surface_only, investigate", () => {
     const r = evaluateVolRegimeConvergence({
-      vol: mkVol({ current: 0.45, mean: 0.20, min: 0.10, max: 0.50 }),
+      vol: mkVol({ current: 0.45, mean: 0.2, min: 0.1, max: 0.5 }),
       regime: mkRegime({ current: "bull", predicted: "bull", confidence: 0.85 }),
     });
     expect(r.verdict).toBe("surface_only");
@@ -90,7 +92,7 @@ describe("evaluateVolRegimeConvergence — four verdicts", () => {
 
   it("vol neutral + regime neutral → aligned_calm (calm side)", () => {
     const r = evaluateVolRegimeConvergence({
-      vol: mkVol({ current: 0.20, mean: 0.20, min: 0.10, max: 0.30 }),
+      vol: mkVol({ current: 0.2, mean: 0.2, min: 0.1, max: 0.3 }),
       regime: mkRegime({ current: "neutral", predicted: "neutral", confidence: 0.6 }),
     });
     expect(r.verdict).toBe("aligned_calm");
@@ -100,7 +102,7 @@ describe("evaluateVolRegimeConvergence — four verdicts", () => {
 describe("evaluateVolRegimeConvergence — confidence floor", () => {
   it("low-confidence regime flip is ignored", () => {
     const r = evaluateVolRegimeConvergence({
-      vol: mkVol({ current: 0.18, mean: 0.20, min: 0.10, max: 0.50 }),
+      vol: mkVol({ current: 0.18, mean: 0.2, min: 0.1, max: 0.5 }),
       regime: mkRegime({
         current: "neutral",
         predicted: "bear",
@@ -116,11 +118,11 @@ describe("evaluateVolRegimeConvergence — confidence floor", () => {
 describe("evaluateVolRegimeConvergence — joint confidence", () => {
   it("disagreement (surface_only) reduces joint confidence", () => {
     const aligned = evaluateVolRegimeConvergence({
-      vol: mkVol({ current: 0.45, mean: 0.20, min: 0.10, max: 0.50 }),
+      vol: mkVol({ current: 0.45, mean: 0.2, min: 0.1, max: 0.5 }),
       regime: mkRegime({ current: "bear", predicted: "bear", confidence: 0.8 }),
     });
     const disagree = evaluateVolRegimeConvergence({
-      vol: mkVol({ current: 0.45, mean: 0.20, min: 0.10, max: 0.50 }),
+      vol: mkVol({ current: 0.45, mean: 0.2, min: 0.1, max: 0.5 }),
       regime: mkRegime({ current: "bull", predicted: "bull", confidence: 0.8 }),
     });
     expect(aligned.jointConfidence).toBeGreaterThan(disagree.jointConfidence);
@@ -130,7 +132,7 @@ describe("evaluateVolRegimeConvergence — joint confidence", () => {
 describe("convergenceToPayload", () => {
   it("emits stable shape", () => {
     const r = evaluateVolRegimeConvergence({
-      vol: mkVol({ current: 0.20, mean: 0.20, min: 0.10, max: 0.30 }),
+      vol: mkVol({ current: 0.2, mean: 0.2, min: 0.1, max: 0.3 }),
       regime: mkRegime({ current: "neutral", predicted: "neutral", confidence: 0.6 }),
     });
     const p = convergenceToPayload(r) as { kind: string; verdict: string };

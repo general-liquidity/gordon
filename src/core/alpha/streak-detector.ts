@@ -104,7 +104,7 @@ export interface StreakDetectorResult {
 const DEFAULT_FLAT_TOLERANCE = 0;
 const DEFAULT_MIN_STREAK_LENGTH = 2;
 const DEFAULT_EXTREME_P = 0.97;
-const DEFAULT_STRONG_P = 0.90;
+const DEFAULT_STRONG_P = 0.9;
 const DEFAULT_MODERATE_P = 0.75;
 const MIN_HISTORICAL_FOR_PERCENTILE = 10;
 
@@ -195,9 +195,8 @@ export function detectStreak(
   const moderateP = options.moderatePercentile ?? DEFAULT_MODERATE_P;
   const lookback = options.lookback;
 
-  const view = lookback !== undefined && bars.length > lookback
-    ? bars.slice(bars.length - lookback)
-    : bars;
+  const view =
+    lookback !== undefined && bars.length > lookback ? bars.slice(bars.length - lookback) : bars;
 
   if (view.length < 2) {
     return {
@@ -218,9 +217,7 @@ export function detectStreak(
   const sameDirRuns =
     currentDirection === "up" ? upRuns : currentDirection === "down" ? downRuns : [];
   const meanLength =
-    sameDirRuns.length === 0
-      ? 0
-      : sameDirRuns.reduce((a, b) => a + b, 0) / sameDirRuns.length;
+    sameDirRuns.length === 0 ? 0 : sameDirRuns.reduce((a, b) => a + b, 0) / sameDirRuns.length;
   const maxLength = sameDirRuns.length === 0 ? 0 : Math.max(...sameDirRuns);
   const percentile = percentileOf(sameDirRuns, currentLength);
 

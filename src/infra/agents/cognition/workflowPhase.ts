@@ -1,5 +1,9 @@
 import type { GordonConfig } from "../../../types/index.ts";
-import { getFastMastraModel, getMastraModel, type MastraModelConfig } from "../../runtime/providers/registry.ts";
+import {
+  getFastMastraModel,
+  getMastraModel,
+  type MastraModelConfig,
+} from "../../runtime/providers/registry.ts";
 import type { GordonContext } from "../types.ts";
 import type { LLMProvider } from "../../ai/llm/types.ts";
 
@@ -12,14 +16,7 @@ export type WorkflowPhase =
   | "compaction"
   | "ops";
 
-const CRITIQUE_ACTION_HINTS = [
-  "compare",
-  "validate",
-  "review",
-  "diagnose",
-  "decay",
-  "health",
-];
+const CRITIQUE_ACTION_HINTS = ["compare", "validate", "review", "diagnose", "decay", "health"];
 
 const EXECUTION_ACTION_IDS = new Set([
   "trading.market_order",
@@ -28,12 +25,11 @@ const EXECUTION_ACTION_IDS = new Set([
   "trading.cancel_order",
 ]);
 
-const PLANNING_ACTION_IDS = new Set([
-  "trading.plan",
-  "trading.preview_market_order",
-]);
+const PLANNING_ACTION_IDS = new Set(["trading.plan", "trading.preview_market_order"]);
 
-export function determineWorkflowPhase(context: Pick<GordonContext, "requestedActionId" | "requestedTaskScope">): WorkflowPhase {
+export function determineWorkflowPhase(
+  context: Pick<GordonContext, "requestedActionId" | "requestedTaskScope">,
+): WorkflowPhase {
   const actionId = context.requestedActionId ?? "";
 
   if (EXECUTION_ACTION_IDS.has(actionId) || context.requestedTaskScope === "execution") {
@@ -52,7 +48,11 @@ export function determineWorkflowPhase(context: Pick<GordonContext, "requestedAc
     return "analysis";
   }
 
-  if (context.requestedTaskScope === "ops" || context.requestedTaskScope === "setup" || context.requestedTaskScope === "system") {
+  if (
+    context.requestedTaskScope === "ops" ||
+    context.requestedTaskScope === "setup" ||
+    context.requestedTaskScope === "system"
+  ) {
     return "ops";
   }
 
@@ -72,10 +72,6 @@ export function resolveModelForWorkflowPhase(
     case "ops":
     case "compaction":
       return getFastMastraModel();
-    case "analysis":
-    case "planning":
-    case "execution":
-    case "critique":
     default: {
       const provider = config.modelConfig?.provider ?? process.env.GORDON_PROVIDER;
       const model = config.modelConfig?.model ?? process.env.GORDON_MODEL;
@@ -84,7 +80,10 @@ export function resolveModelForWorkflowPhase(
   }
 }
 
-export function resolveWorkflowPhaseModelRoute(phase: WorkflowPhase): { provider: LLMProvider; model: string } {
+export function resolveWorkflowPhaseModelRoute(phase: WorkflowPhase): {
+  provider: LLMProvider;
+  model: string;
+} {
   const isFast = phase === "compaction" || phase === "scan" || phase === "ops";
 
   // First-party only for direct calls — env keys auto-detected by Mastra.
@@ -95,7 +94,10 @@ export function resolveWorkflowPhaseModelRoute(phase: WorkflowPhase): { provider
     return { provider: "openai", model: isFast ? "gpt-5.4-mini" : "gpt-5.6" };
   }
   if (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY) {
-    return { provider: "google", model: isFast ? "gemini-3.5-flash-lite" : "gemini-3.1-pro-preview" };
+    return {
+      provider: "google",
+      model: isFast ? "gemini-3.5-flash-lite" : "gemini-3.1-pro-preview",
+    };
   }
   if (process.env.XAI_API_KEY) {
     return { provider: "xai", model: isFast ? "grok-4.3" : "grok-4.5" };
@@ -133,7 +135,6 @@ export function getPhasePromptGuidance(phase: WorkflowPhase): string[] {
       return [
         "Be concrete and operational. Prefer status, settings, diagnostics, and exact next steps.",
       ];
-    case "analysis":
     default:
       return [
         "Prefer direct evidence, venue-aware interpretation, and concise analytical conclusions.",

@@ -71,7 +71,8 @@ function applyFlexStyles(node: YogaNode, style: PartialStyles): void {
   }
   if ("flexDirection" in style) {
     if (style.flexDirection === "row") node.setFlexDirection(Yoga.FLEX_DIRECTION_ROW);
-    if (style.flexDirection === "row-reverse") node.setFlexDirection(Yoga.FLEX_DIRECTION_ROW_REVERSE);
+    if (style.flexDirection === "row-reverse")
+      node.setFlexDirection(Yoga.FLEX_DIRECTION_ROW_REVERSE);
     if (style.flexDirection === "column") node.setFlexDirection(Yoga.FLEX_DIRECTION_COLUMN);
     if (style.flexDirection === "column-reverse") {
       node.setFlexDirection(Yoga.FLEX_DIRECTION_COLUMN_REVERSE);
@@ -115,7 +116,8 @@ function applyFlexStyles(node: YogaNode, style: PartialStyles): void {
     }
     if (style.justifyContent === "center") node.setJustifyContent(Yoga.JUSTIFY_CENTER);
     if (style.justifyContent === "flex-end") node.setJustifyContent(Yoga.JUSTIFY_FLEX_END);
-    if (style.justifyContent === "space-between") node.setJustifyContent(Yoga.JUSTIFY_SPACE_BETWEEN);
+    if (style.justifyContent === "space-between")
+      node.setJustifyContent(Yoga.JUSTIFY_SPACE_BETWEEN);
     if (style.justifyContent === "space-around") node.setJustifyContent(Yoga.JUSTIFY_SPACE_AROUND);
     if (style.justifyContent === "space-evenly") node.setJustifyContent(Yoga.JUSTIFY_SPACE_EVENLY);
   }
@@ -124,12 +126,14 @@ function applyFlexStyles(node: YogaNode, style: PartialStyles): void {
 function applyDimensionStyles(node: YogaNode, style: PartialStyles): void {
   if ("width" in style) {
     if (typeof style.width === "number") node.setWidth(style.width);
-    else if (typeof style.width === "string") node.setWidthPercent(Number.parseInt(style.width, 10));
+    else if (typeof style.width === "string")
+      node.setWidthPercent(Number.parseInt(style.width, 10));
     else node.setWidthAuto();
   }
   if ("height" in style) {
     if (typeof style.height === "number") node.setHeight(style.height);
-    else if (typeof style.height === "string") node.setHeightPercent(Number.parseInt(style.height, 10));
+    else if (typeof style.height === "string")
+      node.setHeightPercent(Number.parseInt(style.height, 10));
     else node.setHeightAuto();
   }
   if ("minWidth" in style) {

@@ -27,8 +27,18 @@ describe("computeInverseConvexity", () => {
   });
 
   it("scales BTC PnL by notional", () => {
-    const one = computeInverseConvexity({ entryPrice: 10000, movePct: 0.5, side: "long", contractsUsd: 1 });
-    const ten = computeInverseConvexity({ entryPrice: 10000, movePct: 0.5, side: "long", contractsUsd: 10 });
+    const one = computeInverseConvexity({
+      entryPrice: 10000,
+      movePct: 0.5,
+      side: "long",
+      contractsUsd: 1,
+    });
+    const ten = computeInverseConvexity({
+      entryPrice: 10000,
+      movePct: 0.5,
+      side: "long",
+      contractsUsd: 10,
+    });
     expect(ten.adversePnlBtc).toBeCloseTo(one.adversePnlBtc * 10, 8);
   });
 

@@ -32,14 +32,16 @@ const checkPositionsOutputSchema = z.object({
   marketFamily: z.enum(["crypto", "stocks"]).optional(),
   venueRoute: z.enum(["exchange", "broker"]).optional(),
   quoteCurrency: z.string().optional(),
-  capabilities: z.object({
-    supportsQuotes: z.boolean(),
-    supportsBidAsk: z.boolean(),
-    supportsOrderBook: z.boolean(),
-    supportsSessionCalendar: z.boolean(),
-    supportsExtendedHours: z.boolean(),
-    supportsHistoricalBars: z.boolean(),
-  }).optional(),
+  capabilities: z
+    .object({
+      supportsQuotes: z.boolean(),
+      supportsBidAsk: z.boolean(),
+      supportsOrderBook: z.boolean(),
+      supportsSessionCalendar: z.boolean(),
+      supportsExtendedHours: z.boolean(),
+      supportsHistoricalBars: z.boolean(),
+    })
+    .optional(),
   openTrades: z.number(),
   totalUnrealizedPnl: z.number(),
   totalUnrealizedPnlPercent: z.number(),
@@ -51,7 +53,7 @@ const checkPositionsOutputSchema = z.object({
       unrealizedPnlPercent: z.number(),
       minutesOpen: z.number(),
       ppmUsd: z.number(),
-    })
+    }),
   ),
   alerts: z.array(z.string()),
   error: z.string().optional(),
@@ -72,19 +74,26 @@ export const checkPositionsTool = createTool({
   execute: async (_input, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange && !ctx?.broker) {
-      return validateToolOutput(checkPositionsOutputSchema, {
-        ...errors.noExchange,
-        openTrades: 0,
-        totalUnrealizedPnl: 0,
-        totalUnrealizedPnlPercent: 0,
-        positions: [],
-        alerts: [],
-      }, { toolName: "check_positions" });
+      return validateToolOutput(
+        checkPositionsOutputSchema,
+        {
+          ...errors.noExchange,
+          openTrades: 0,
+          totalUnrealizedPnl: 0,
+          totalUnrealizedPnlPercent: 0,
+          positions: [],
+          alerts: [],
+        },
+        { toolName: "check_positions" },
+      );
     }
 
     if (ctx.broker && !ctx.exchange) {
       const positions = await ctx.broker.getPositions();
-      const totalUnrealizedPnl = positions.reduce((sum, position) => sum + position.unrealizedPl, 0);
+      const totalUnrealizedPnl = positions.reduce(
+        (sum, position) => sum + position.unrealizedPl,
+        0,
+      );
       const output = {
         marketFamily: "stocks" as const,
         venueRoute: "broker" as const,
@@ -99,9 +108,8 @@ export const checkPositionsTool = createTool({
         },
         openTrades: positions.length,
         totalUnrealizedPnl,
-        totalUnrealizedPnlPercent: ctx.portfolioValue > 0
-          ? (totalUnrealizedPnl / ctx.portfolioValue) * 100
-          : 0,
+        totalUnrealizedPnlPercent:
+          ctx.portfolioValue > 0 ? (totalUnrealizedPnl / ctx.portfolioValue) * 100 : 0,
         positions: positions.map((position) => ({
           symbol: position.symbol,
           status: position.side,
@@ -113,7 +121,9 @@ export const checkPositionsTool = createTool({
         alerts: [],
       };
 
-      return validateToolOutput(checkPositionsOutputSchema, output, { toolName: "check_positions" });
+      return validateToolOutput(checkPositionsOutputSchema, output, {
+        toolName: "check_positions",
+      });
     }
 
     const result: MonitorResult = await runMonitorCycle(ctx.exchange!);
@@ -148,7 +158,8 @@ export const checkPositionsTool = createTool({
       },
       openTrades: result.updates.length,
       totalUnrealizedPnl,
-      totalUnrealizedPnlPercent: ctx.portfolioValue > 0 ? (totalUnrealizedPnl / ctx.portfolioValue) * 100 : 0,
+      totalUnrealizedPnlPercent:
+        ctx.portfolioValue > 0 ? (totalUnrealizedPnl / ctx.portfolioValue) * 100 : 0,
       positions,
       alerts: result.alerts.map((a) => a.message),
     };

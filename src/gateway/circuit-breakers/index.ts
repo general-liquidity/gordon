@@ -12,4 +12,3 @@ export {
   computeCircuitBreakerLiveData,
   type CircuitBreakerLiveData,
 } from "./data-provider.ts";
-

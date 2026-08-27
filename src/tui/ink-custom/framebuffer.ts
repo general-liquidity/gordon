@@ -16,11 +16,7 @@
 //     tracking in the log-update transport).
 //   * `resize(w, h)` discards all cell state and reallocates both buffers.
 
-import type {
-  CellBuffer,
-  ChangedRegion,
-  FrameBuffer,
-} from "./internal/contracts.ts";
+import type { CellBuffer, ChangedRegion, FrameBuffer } from "./internal/contracts.ts";
 
 /** Factory signature for `CellBuffer` — injected by the caller so this
  *  module does not depend on Phase 1's concrete implementation. */
@@ -37,9 +33,7 @@ export function createFrameBuffer(
   newCellBuffer: NewCellBuffer,
 ): FrameBuffer {
   if (width < 0 || height < 0) {
-    throw new Error(
-      `createFrameBuffer: invalid dimensions ${width}x${height}`,
-    );
+    throw new Error(`createFrameBuffer: invalid dimensions ${width}x${height}`);
   }
 
   let w = width;
@@ -54,19 +48,14 @@ export function createFrameBuffer(
    * cheap for the common case (few rows touched) and avoids collapsing
    * unrelated changes into a single oversized bounding box.
    */
-  function computeChangedRegions(
-    prev: CellBuffer,
-    curr: CellBuffer,
-  ): ChangedRegion[] {
+  function computeChangedRegions(prev: CellBuffer, curr: CellBuffer): ChangedRegion[] {
     if (w === 0 || h === 0) return [];
 
     const a = prev.raw();
     const b = curr.raw();
     if (a.length !== b.length) {
       // Size mismatch — everything is considered changed.
-      return w > 0 && h > 0
-        ? [{ minX: 0, minY: 0, maxX: w - 1, maxY: h - 1 }]
-        : [];
+      return w > 0 && h > 0 ? [{ minX: 0, minY: 0, maxX: w - 1, maxY: h - 1 }] : [];
     }
 
     const regions: ChangedRegion[] = [];
@@ -152,9 +141,7 @@ export function createFrameBuffer(
     },
     resize(nextWidth: number, nextHeight: number): void {
       if (nextWidth < 0 || nextHeight < 0) {
-        throw new Error(
-          `FrameBuffer.resize: invalid dimensions ${nextWidth}x${nextHeight}`,
-        );
+        throw new Error(`FrameBuffer.resize: invalid dimensions ${nextWidth}x${nextHeight}`);
       }
       w = nextWidth;
       h = nextHeight;

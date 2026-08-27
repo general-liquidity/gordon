@@ -31,17 +31,21 @@ describe("validateKeybindings", () => {
   });
 
   test("separates shifted letters from unshifted letters", () => {
-    expect(validateKeybindings([
-      { key: "g", action: "scrollTop", when: "normalMode" },
-      { key: "G", action: "scrollBottom", when: "normalMode" },
-    ])).toEqual([]);
+    expect(
+      validateKeybindings([
+        { key: "g", action: "scrollTop", when: "normalMode" },
+        { key: "G", action: "scrollBottom", when: "normalMode" },
+      ]),
+    ).toEqual([]);
   });
 
   test("honors scope intersections", () => {
-    expect(validateKeybindings([
-      { key: "j", action: "scrollDown", when: "normalMode" },
-      { key: "j", action: "submit", when: "insertMode" },
-    ])).toEqual([]);
+    expect(
+      validateKeybindings([
+        { key: "j", action: "scrollDown", when: "normalMode" },
+        { key: "j", action: "submit", when: "insertMode" },
+      ]),
+    ).toEqual([]);
 
     const conflicts = validateKeybindings([
       { key: "escape", action: "cancel" },
@@ -54,9 +58,11 @@ describe("validateKeybindings", () => {
   });
 
   test("ignores same-action duplicates", () => {
-    expect(validateKeybindings([
-      { key: "ctrl+l", action: "clearInput" },
-      { key: "CTRL+L", action: "clearInput" },
-    ])).toEqual([]);
+    expect(
+      validateKeybindings([
+        { key: "ctrl+l", action: "clearInput" },
+        { key: "CTRL+L", action: "clearInput" },
+      ]),
+    ).toEqual([]);
   });
 });

@@ -29,11 +29,7 @@ function loserTrade(id: string, mae: number, lossPct = 0.05): CalibratorTrade {
 
 describe("calibrateMaeStop", () => {
   test("too few winners → insufficient_data", () => {
-    const trades = [
-      winnerTrade("w1", 0.01),
-      winnerTrade("w2", 0.015),
-      loserTrade("l1", 0.05),
-    ];
+    const trades = [winnerTrade("w1", 0.01), winnerTrade("w2", 0.015), loserTrade("l1", 0.05)];
     const r = calibrateMaeStop(trades);
     expect(r.verdict).toBe("insufficient_data");
   });
@@ -61,7 +57,7 @@ describe("calibrateMaeStop", () => {
     for (let i = 0; i < 10; i++) trades.push(loserTrade(`l${i}`, 0.025));
     const r = calibrateMaeStop(trades, {
       currentStopPct: 0.025,
-      appropriateToleranceFraction: 0.20,
+      appropriateToleranceFraction: 0.2,
     });
     expect(r.verdict).toBe("current_stop_is_appropriate");
   });
@@ -78,7 +74,7 @@ describe("calibrateMaeStop", () => {
 
   test("no currentStopPct supplied → defaults to tighten recommendation", () => {
     const trades: CalibratorTrade[] = [];
-    for (let i = 0; i < 20; i++) winnerTrade(`w${i}`, 0.01), trades.push(winnerTrade(`w${i}`, 0.01));
+    for (let i = 0; i < 20; i++) trades.push(winnerTrade(`w${i}`, 0.01));
     for (let i = 0; i < 10; i++) trades.push(loserTrade(`l${i}`, 0.05));
     const r = calibrateMaeStop(trades);
     expect(r.verdict).toBe("tighten_stop_recommended");
@@ -111,7 +107,7 @@ describe("calibrateMaeStop", () => {
         entryPrice: 100,
         exitPrice: 95,
         highWhileOpen: 102, // adverse for SHORT
-        lowWhileOpen: 93,   // favorable for SHORT
+        lowWhileOpen: 93, // favorable for SHORT
       });
     }
     const r = calibrateMaeStop(trades);

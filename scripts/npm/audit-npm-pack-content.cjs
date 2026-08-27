@@ -62,11 +62,29 @@ const CREDENTIAL_PATTERNS = [
 ];
 
 const SKIP_EXTENSIONS = new Set([
-  ".exe", ".dll", ".so", ".dylib", ".bin",
-  ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".svg",
-  ".gz", ".tgz", ".zip", ".tar",
-  ".woff", ".woff2", ".ttf", ".eot",
-  ".pdf", ".mp4", ".mp3",
+  ".exe",
+  ".dll",
+  ".so",
+  ".dylib",
+  ".bin",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".ico",
+  ".svg",
+  ".gz",
+  ".tgz",
+  ".zip",
+  ".tar",
+  ".woff",
+  ".woff2",
+  ".ttf",
+  ".eot",
+  ".pdf",
+  ".mp4",
+  ".mp3",
 ]);
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB hard cap
@@ -107,7 +125,9 @@ function selfTest() {
       }
     }
     const ok = hit === c.expected;
-    console.log(`${ok ? "PASS" : "FAIL"} | input=${JSON.stringify(c.input).slice(0, 60)} | expected=${c.expected} | got=${hit}`);
+    console.log(
+      `${ok ? "PASS" : "FAIL"} | input=${JSON.stringify(c.input).slice(0, 60)} | expected=${c.expected} | got=${hit}`,
+    );
     if (!ok) failed++;
   }
   if (failed > 0) {
@@ -140,7 +160,9 @@ function getWouldBePublishedFiles(wrapperDir) {
     });
   } catch (err) {
     if (err.code === "ENOENT" || /not found|not recognized/i.test(err.message)) {
-      console.error("audit-npm-pack-content: npm CLI not found in PATH. This audit requires Node + npm; CI has both. Skipping locally.");
+      console.error(
+        "audit-npm-pack-content: npm CLI not found in PATH. This audit requires Node + npm; CI has both. Skipping locally.",
+      );
       process.exit(0);
     }
     console.error(`audit-npm-pack-content: npm pack --dry-run failed: ${err.message}`);
@@ -191,7 +213,7 @@ function scanFile(absPath, relPath) {
         count: matches.length,
         // Show only first 12 chars of the match to avoid leaking the
         // (alleged) secret into the audit log itself.
-        sample: matches[0].slice(0, 12) + "…",
+        sample: `${matches[0].slice(0, 12)}…`,
       });
     }
   }
@@ -206,7 +228,9 @@ function main() {
 
   const wrapperDir = path.resolve(__dirname, "..", "..", "npm");
   if (!fs.existsSync(path.join(wrapperDir, "package.json"))) {
-    console.error(`audit-npm-pack-content: ${wrapperDir}/package.json not found. Run prepare-npm-wrapper.cjs first.`);
+    console.error(
+      `audit-npm-pack-content: ${wrapperDir}/package.json not found. Run prepare-npm-wrapper.cjs first.`,
+    );
     process.exit(2);
   }
 
@@ -232,14 +256,20 @@ function main() {
     console.error("audit-npm-pack-content: FAIL — credential patterns detected:\n");
     for (const f of findings) {
       console.error(`  ${f.file}`);
-      console.error(`    ${f.type}: ${f.count} match${f.count > 1 ? "es" : ""} (sample: ${f.sample})`);
+      console.error(
+        `    ${f.type}: ${f.count} match${f.count > 1 ? "es" : ""} (sample: ${f.sample})`,
+      );
     }
     console.error("\nDo NOT publish. Remove the credentials and re-run the audit.");
-    console.error("If a match is a confirmed false positive (e.g. a placeholder), adjust the regex precision in scripts/npm/audit-npm-pack-content.cjs.");
+    console.error(
+      "If a match is a confirmed false positive (e.g. a placeholder), adjust the regex precision in scripts/npm/audit-npm-pack-content.cjs.",
+    );
     process.exit(1);
   }
 
-  console.log(`audit-npm-pack-content: PASS — ${scanned} text files scanned, ${skipped} binary/asset files skipped, ${files.length} total entries in the pack.`);
+  console.log(
+    `audit-npm-pack-content: PASS — ${scanned} text files scanned, ${skipped} binary/asset files skipped, ${files.length} total entries in the pack.`,
+  );
 }
 
 main();

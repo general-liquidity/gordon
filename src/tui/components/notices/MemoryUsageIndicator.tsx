@@ -1,4 +1,3 @@
-import React from "react";
 import { Text } from "../../ink-custom";
 
 // Memory usage indicator — shows context window fill percentage
@@ -16,7 +15,7 @@ export function MemoryUsageIndicator({ usageRatio, tokenLimit }: Props) {
   const pct = Math.round(usageRatio * 100);
   const color = usageRatio > 0.9 ? "red" : usageRatio > 0.7 ? "yellow" : "gray";
   const tokenStr = tokenLimit
-    ? ` (${Math.round(usageRatio * tokenLimit / 1000)}K/${Math.round(tokenLimit / 1000)}K)`
+    ? ` (${Math.round((usageRatio * tokenLimit) / 1000)}K/${Math.round(tokenLimit / 1000)}K)`
     : "";
 
   return (

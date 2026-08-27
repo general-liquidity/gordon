@@ -23,10 +23,7 @@
  */
 
 import { DeribitOptionsProvider } from "./deribit.ts";
-import {
-  OptionsChainManager,
-  getOptionsChainManager,
-} from "./manager.ts";
+import { type OptionsChainManager, getOptionsChainManager } from "./manager.ts";
 import type { OptionsChainProvider, OptionsChainSnapshot } from "./types.ts";
 
 export type {

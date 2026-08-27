@@ -71,7 +71,7 @@ function computeATR(candles: Candle[], period: number): number[] {
 export function calculateSupertrend(
   candles: Candle[],
   atrPeriod: number = 10,
-  multiplier: number = 2.0
+  multiplier: number = 2.0,
 ): SupertrendResult {
   if (candles.length < atrPeriod + 2) {
     return {
@@ -153,7 +153,7 @@ export function calculateSupertrend(
     currentDir,
     trendChange,
     distance,
-    signal
+    signal,
   );
 
   return {
@@ -169,12 +169,12 @@ export function calculateSupertrend(
 }
 
 function buildSupertrendInterpretation(
-  price: number,
+  _price: number,
   st: number,
   dir: number,
   changed: boolean,
   dist: number,
-  signal: string
+  signal: string,
 ): string {
   const trendStr = dir === 1 ? "BULLISH" : "BEARISH";
   let msg = `Supertrend: ${trendStr} at ${st.toFixed(2)}. Price is ${Math.abs(dist).toFixed(1)}% ${dist > 0 ? "above" : "below"} the line. `;

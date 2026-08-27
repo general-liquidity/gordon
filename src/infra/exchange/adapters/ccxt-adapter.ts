@@ -14,9 +14,9 @@
  * both `BTC/USDT` and `BTCUSDT` on input (heuristic-converts via the
  * `toCcxtSymbol` helper) and returns CCXT's slash format.
  *
- * Sandbox: CCXT exposes `exchange.setSandboxMode(true)` for ~30 venues;
- * the adapter calls it within a try/catch — exchanges without sandbox
- * raise NotSupported and we fall through to live.
+ * Sandbox: CCXT exposes `exchange.setSandboxMode(true)` for ~30 venues.
+ * A requested sandbox that the venue cannot provide is refused; it never
+ * falls through to a live endpoint.
  *
  * Error model: CCXT throws typed errors (`AuthenticationError`,
  * `InsufficientFunds`, `InvalidOrder`, `NetworkError`, `ExchangeError`,
@@ -43,7 +43,6 @@ import ccxt, {
 
 import { randomUUID } from "node:crypto";
 import type {
-  Exchange,
   ExchangeExtended,
   ExchangeId,
   ExchangeInfo,
@@ -60,6 +59,7 @@ import type {
   OrderType,
   OrderStatus,
   Trade,
+  PublicTrade,
   Deposit,
   Withdrawal,
   RateLimitStatus,
@@ -73,7 +73,6 @@ import type {
   ExchangeAccountManagement,
   ExchangeOrderManagement,
   Position,
-  PositionSide,
   MarginMode,
   FundingRate,
   FundingHistoryEntry,
@@ -100,9 +99,25 @@ export const DEFAULT_MAX_LEVERAGE = 5;
 // ---------------------------------------------------------------------------
 
 const COMMON_QUOTES = [
-  "USDT", "USDC", "USDC.E", "BUSD", "DAI", "TUSD", "FDUSD",
-  "BTC", "ETH", "BNB", "SOL", "TRX", "XRP",
-  "EUR", "USD", "GBP", "JPY", "AUD", "CAD",
+  "USDT",
+  "USDC",
+  "USDC.E",
+  "BUSD",
+  "DAI",
+  "TUSD",
+  "FDUSD",
+  "BTC",
+  "ETH",
+  "BNB",
+  "SOL",
+  "TRX",
+  "XRP",
+  "EUR",
+  "USD",
+  "GBP",
+  "JPY",
+  "AUD",
+  "CAD",
 ];
 
 /**
@@ -134,41 +149,63 @@ export function fromCcxtSymbol(symbol: string): string {
 
 function mapOrderTypeToCcxt(type: OrderType): string {
   switch (type) {
-    case "MARKET": return "market";
-    case "LIMIT": return "limit";
-    case "STOP_LOSS": return "stop_market";
-    case "STOP_LOSS_LIMIT": return "stop_limit";
-    case "TAKE_PROFIT": return "take_profit_market";
-    case "TAKE_PROFIT_LIMIT": return "take_profit_limit";
-    case "LIMIT_MAKER": return "limit";
+    case "MARKET":
+      return "market";
+    case "LIMIT":
+      return "limit";
+    case "STOP_LOSS":
+      return "stop_market";
+    case "STOP_LOSS_LIMIT":
+      return "stop_limit";
+    case "TAKE_PROFIT":
+      return "take_profit_market";
+    case "TAKE_PROFIT_LIMIT":
+      return "take_profit_limit";
+    case "LIMIT_MAKER":
+      return "limit";
   }
 }
 
 function mapOrderTypeFromCcxt(ccxtType: string | undefined): OrderType {
-  switch ((ccxtType ?? "limit").toLowerCase()) {
-    case "market": return "MARKET";
-    case "limit": return "LIMIT";
-    case "stop_market": case "stop":
+  switch ((ccxtType ?? "").toLowerCase()) {
+    case "market":
+      return "MARKET";
+    case "limit":
+      return "LIMIT";
+    case "stop_market":
+    case "stop":
       return "STOP_LOSS";
-    case "stop_limit": case "stop_loss_limit":
+    case "stop_limit":
+    case "stop_loss_limit":
       return "STOP_LOSS_LIMIT";
-    case "take_profit_market": case "take_profit":
+    case "take_profit_market":
+    case "take_profit":
       return "TAKE_PROFIT";
     case "take_profit_limit":
       return "TAKE_PROFIT_LIMIT";
-    default: return "LIMIT";
+    default:
+      throw new Error(`CCXT order response has unsupported type '${String(ccxtType)}'`);
   }
 }
 
 function mapOrderStatusFromCcxt(ccxtStatus: string | undefined): OrderStatus {
-  switch ((ccxtStatus ?? "open").toLowerCase()) {
-    case "open": return "NEW";
-    case "closed": return "FILLED";
-    case "canceled": case "cancelled": return "CANCELED";
-    case "expired": return "EXPIRED";
-    case "rejected": return "REJECTED";
-    case "partial": case "partially_filled": return "PARTIALLY_FILLED";
-    default: return "NEW";
+  switch ((ccxtStatus ?? "").toLowerCase()) {
+    case "open":
+      return "NEW";
+    case "closed":
+      return "FILLED";
+    case "canceled":
+    case "cancelled":
+      return "CANCELED";
+    case "expired":
+      return "EXPIRED";
+    case "rejected":
+      return "REJECTED";
+    case "partial":
+    case "partially_filled":
+      return "PARTIALLY_FILLED";
+    default:
+      throw new Error(`CCXT order response has unsupported status '${String(ccxtStatus)}'`);
   }
 }
 
@@ -187,6 +224,13 @@ function requireFiniteOrderField(value: unknown, field: string): number {
   return n;
 }
 
+function requireOrderSide(value: unknown): Order["side"] {
+  const side = typeof value === "string" ? value.toLowerCase() : "";
+  if (side === "buy") return "BUY";
+  if (side === "sell") return "SELL";
+  throw new Error(`CCXT order response has unsupported side '${String(value)}'`);
+}
+
 function ccxtOrderToOrder(ccxtOrder: Record<string, unknown>): Order {
   const orderId = String(ccxtOrder.id ?? "");
   if (orderId.length === 0) {
@@ -196,44 +240,90 @@ function ccxtOrderToOrder(ccxtOrder: Record<string, unknown>): Order {
     throw new Error(`CCXT order response is missing status (order ${orderId})`);
   }
   const symbol = String(ccxtOrder.symbol ?? "");
-  const sideRaw = String(ccxtOrder.side ?? "buy").toLowerCase();
+  if (symbol.length === 0) {
+    throw new Error(`CCXT order response is missing symbol (order ${orderId})`);
+  }
+  const quantity = requireFiniteOrderField(ccxtOrder.amount, "amount");
+  const executedQty = requireFiniteOrderField(ccxtOrder.filled, "filled");
+  const cumulativeQuoteQty = requireFiniteOrderField(ccxtOrder.cost ?? 0, "cost");
+  if (quantity <= 0 || executedQty < 0 || cumulativeQuoteQty < 0 || executedQty > quantity) {
+    throw new Error(`CCXT order response has inconsistent quantities (order ${orderId})`);
+  }
   return {
     orderId,
     clientOrderId: ccxtOrder.clientOrderId ? String(ccxtOrder.clientOrderId) : undefined,
     symbol,
-    side: sideRaw === "sell" ? "SELL" : "BUY",
+    side: requireOrderSide(ccxtOrder.side),
     type: mapOrderTypeFromCcxt(ccxtOrder.type as string | undefined),
     status: mapOrderStatusFromCcxt(ccxtOrder.status as string | undefined),
     price: requireFiniteOrderField(ccxtOrder.price ?? 0, "price"),
-    quantity: requireFiniteOrderField(ccxtOrder.amount ?? 0, "amount"),
-    executedQty: requireFiniteOrderField(ccxtOrder.filled ?? 0, "filled"),
-    cummulativeQuoteQty: Number(ccxtOrder.cost ?? 0),
-    stopPrice: ccxtOrder.stopPrice !== undefined ? Number(ccxtOrder.stopPrice) : undefined,
-    time: ccxtOrder.timestamp !== undefined ? Number(ccxtOrder.timestamp) : undefined,
-    updateTime: ccxtOrder.lastUpdateTimestamp !== undefined
-      ? Number(ccxtOrder.lastUpdateTimestamp)
-      : undefined,
+    quantity,
+    executedQty,
+    cummulativeQuoteQty: cumulativeQuoteQty,
+    stopPrice:
+      ccxtOrder.stopPrice !== undefined
+        ? requireFiniteOrderField(ccxtOrder.stopPrice, "stopPrice")
+        : undefined,
+    time:
+      ccxtOrder.timestamp !== undefined
+        ? requireFiniteOrderField(ccxtOrder.timestamp, "timestamp")
+        : undefined,
+    updateTime:
+      ccxtOrder.lastUpdateTimestamp !== undefined
+        ? requireFiniteOrderField(ccxtOrder.lastUpdateTimestamp, "lastUpdateTimestamp")
+        : undefined,
   };
 }
 
+function requirePositiveTradeField(value: unknown, field: string): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`CCXT trade response has invalid ${field}`);
+  }
+  return parsed;
+}
+
+function requireTradeSide(value: unknown): Trade["side"] {
+  const side = typeof value === "string" ? value.toLowerCase() : "";
+  if (side === "buy") return "BUY";
+  if (side === "sell") return "SELL";
+  throw new Error("CCXT authenticated trade response is missing a valid side");
+}
+
 function ccxtTradeToTrade(ccxtTrade: Record<string, unknown>): Trade {
-  const sideRaw = String(ccxtTrade.side ?? "buy").toLowerCase();
   const fee = ccxtTrade.fee as Record<string, unknown> | undefined;
+  const commission = fee?.cost === undefined ? 0 : Number(fee.cost);
+  if (!Number.isFinite(commission) || commission < 0) {
+    throw new Error("CCXT trade response has invalid commission");
+  }
   return {
     id: String(ccxtTrade.id ?? ""),
     orderId: String(ccxtTrade.order ?? ""),
     symbol: String(ccxtTrade.symbol ?? ""),
-    side: sideRaw === "sell" ? "SELL" : "BUY",
-    price: Number(ccxtTrade.price ?? 0),
-    quantity: Number(ccxtTrade.amount ?? 0),
-    commission: fee?.cost !== undefined ? Number(fee.cost) : 0,
+    side: requireTradeSide(ccxtTrade.side),
+    price: requirePositiveTradeField(ccxtTrade.price, "price"),
+    quantity: requirePositiveTradeField(ccxtTrade.amount, "amount"),
+    commission,
     commissionAsset: fee?.currency ? String(fee.currency) : "",
-    time: Number(ccxtTrade.timestamp ?? 0),
+    time: requirePositiveTradeField(ccxtTrade.timestamp, "timestamp"),
     isMaker: Boolean(ccxtTrade.takerOrMaker === "maker"),
   };
 }
 
-function ccxtBalanceToBalance(asset: string, b: Record<string, unknown>): Balance {
+function ccxtPublicTradeToTrade(ccxtTrade: Record<string, unknown>): PublicTrade {
+  const side = typeof ccxtTrade.side === "string" ? ccxtTrade.side.toLowerCase() : "";
+  return {
+    id: String(ccxtTrade.id ?? ""),
+    symbol: String(ccxtTrade.symbol ?? ""),
+    side: side === "buy" ? "BUY" : side === "sell" ? "SELL" : "UNKNOWN",
+    price: requirePositiveTradeField(ccxtTrade.price, "price"),
+    quantity: requirePositiveTradeField(ccxtTrade.amount, "amount"),
+    time: requirePositiveTradeField(ccxtTrade.timestamp, "timestamp"),
+    isMaker: Boolean(ccxtTrade.takerOrMaker === "maker"),
+  };
+}
+
+function _ccxtBalanceToBalance(asset: string, b: Record<string, unknown>): Balance {
   return {
     asset,
     free: Number(b.free ?? 0),
@@ -254,13 +344,20 @@ function intervalDurationMs(interval: string): number {
   if (!match) return 60_000;
   const n = parseInt(match[1]!, 10);
   switch (match[2]) {
-    case "s": return n * 1000;
-    case "m": return n * 60_000;
-    case "h": return n * 60 * 60_000;
-    case "d": return n * 24 * 60 * 60_000;
-    case "w": return n * 7 * 24 * 60 * 60_000;
-    case "M": return n * 30 * 24 * 60 * 60_000;
-    default: return 60_000;
+    case "s":
+      return n * 1000;
+    case "m":
+      return n * 60_000;
+    case "h":
+      return n * 60 * 60_000;
+    case "d":
+      return n * 24 * 60 * 60_000;
+    case "w":
+      return n * 7 * 24 * 60 * 60_000;
+    case "M":
+      return n * 30 * 24 * 60 * 60_000;
+    default:
+      return 60_000;
   }
 }
 
@@ -293,7 +390,9 @@ function resolveCcxtClass(subId: string): new (config: Record<string, unknown>) 
   if (typeof klass !== "function") {
     throw new Error(`CCXT class for '${subId}' is not constructible`);
   }
-  return klass as new (config: Record<string, unknown>) => CcxtBase;
+  return klass as new (
+    config: Record<string, unknown>,
+  ) => CcxtBase;
 }
 
 // ---------------------------------------------------------------------------
@@ -331,9 +430,10 @@ function ccxtPositionToPosition(p: Record<string, unknown>): Position {
     markPrice: Number(p.markPrice ?? 0),
     notional: Number(p.notional ?? 0),
     leverage: Number(p.leverage ?? 1),
-    liquidationPrice: p.liquidationPrice !== undefined && p.liquidationPrice !== null
-      ? Number(p.liquidationPrice)
-      : null,
+    liquidationPrice:
+      p.liquidationPrice !== undefined && p.liquidationPrice !== null
+        ? Number(p.liquidationPrice)
+        : null,
     marginMode: marginModeRaw === "isolated" ? "isolated" : "cross",
     unrealizedPnl: Number(p.unrealizedPnl ?? 0),
     percentage: Number(p.percentage ?? 0),
@@ -345,12 +445,14 @@ function ccxtFundingRateToFundingRate(f: Record<string, unknown>): FundingRate {
   return {
     symbol: String(f.symbol ?? ""),
     fundingRate: Number(f.fundingRate ?? 0),
-    nextFundingRate: f.nextFundingRate !== undefined && f.nextFundingRate !== null
-      ? Number(f.nextFundingRate)
-      : null,
-    nextFundingTimestamp: f.nextFundingTimestamp !== undefined && f.nextFundingTimestamp !== null
-      ? Number(f.nextFundingTimestamp)
-      : null,
+    nextFundingRate:
+      f.nextFundingRate !== undefined && f.nextFundingRate !== null
+        ? Number(f.nextFundingRate)
+        : null,
+    nextFundingTimestamp:
+      f.nextFundingTimestamp !== undefined && f.nextFundingTimestamp !== null
+        ? Number(f.nextFundingTimestamp)
+        : null,
     timestamp: Number(f.timestamp ?? Date.now()),
   };
 }
@@ -361,7 +463,8 @@ export class CcxtAdapter
     ExchangeDerivatives,
     ExchangeMargin,
     ExchangeAccountManagement,
-    ExchangeOrderManagement {
+    ExchangeOrderManagement
+{
   protected client: CcxtBase;
   readonly exchangeId: ExchangeId;
   readonly displayName: string;
@@ -393,8 +496,11 @@ export class CcxtAdapter
     const Klass = resolveCcxtClass(ccxtSubId);
 
     const envMaxLeverage = Number(resolveFlag("GORDON_RISK_MAX_LEVERAGE"));
-    this.maxLeverage = options?.maxLeverage
-      ?? (Number.isFinite(envMaxLeverage) && envMaxLeverage > 0 ? envMaxLeverage : DEFAULT_MAX_LEVERAGE);
+    this.maxLeverage =
+      options?.maxLeverage ??
+      (Number.isFinite(envMaxLeverage) && envMaxLeverage > 0
+        ? envMaxLeverage
+        : DEFAULT_MAX_LEVERAGE);
 
     const config: Record<string, unknown> = {
       enableRateLimit: true,
@@ -451,10 +557,12 @@ export class CcxtAdapter
     const adapter = Object.create(CcxtAdapter.prototype) as CcxtAdapter;
     (adapter as unknown as { client: unknown }).client = mockClient;
     (adapter as unknown as { ccxtSubId: string }).ccxtSubId = ccxtSubId;
-    (adapter as unknown as { exchangeId: ExchangeId }).exchangeId = `ccxt:${ccxtSubId}` as ExchangeId;
+    (adapter as unknown as { exchangeId: ExchangeId }).exchangeId =
+      `ccxt:${ccxtSubId}` as ExchangeId;
     (adapter as unknown as { displayName: string }).displayName = `${ccxtSubId} (via CCXT)`;
     (adapter as unknown as { isSandbox: boolean }).isSandbox = sandbox;
-    (adapter as unknown as { maxLeverage: number }).maxLeverage = config?.maxLeverage ?? DEFAULT_MAX_LEVERAGE;
+    (adapter as unknown as { maxLeverage: number }).maxLeverage =
+      config?.maxLeverage ?? DEFAULT_MAX_LEVERAGE;
     (adapter as unknown as { callCount: number }).callCount = 0;
     (adapter as unknown as { lastCallReset: number }).lastCallReset = Date.now();
     (adapter as unknown as { cbState: string }).cbState = "closed";
@@ -560,7 +668,12 @@ export class CcxtAdapter
     });
   }
 
-  async getCandles(symbol: string, interval: string, limit = 100, since?: number): Promise<Candle[]> {
+  async getCandles(
+    symbol: string,
+    interval: string,
+    limit = 100,
+    since?: number,
+  ): Promise<Candle[]> {
     return this.withCallTracking(async () => {
       const ccxtInterval = interval;
       const ohlcv = await this.client.fetchOHLCV(toCcxtSymbol(symbol), ccxtInterval, since, limit);
@@ -680,7 +793,9 @@ export class CcxtAdapter
     return this.withCallTracking(async () => {
       const balance = await this.client.fetchBalance();
       const balances: Balance[] = [];
-      const totals = (balance as Record<string, unknown>).total as Record<string, number> | undefined;
+      const totals = (balance as Record<string, unknown>).total as
+        | Record<string, number>
+        | undefined;
       const free = (balance as Record<string, unknown>).free as Record<string, number> | undefined;
       const used = (balance as Record<string, unknown>).used as Record<string, number> | undefined;
       const assets = totals ? Object.keys(totals) : [];
@@ -716,23 +831,38 @@ export class CcxtAdapter
   async getFullAccountDetails(): Promise<AccountDetails> {
     const accountInfo = await this.getAccountInfo();
     const nonZeroBalances = accountInfo.balances.filter((b) => b.total > 0);
-    // Quote total value via tickers — best-effort, falls back to base asset units
+    // Account equity is a risk input, not a display estimate. Returning zero
+    // after a ticker failure makes a funded account look empty, while treating
+    // an unpriced base-asset unit as one dollar is dimensionally invalid.
+    // Refuse the snapshot unless every positive non-stable balance has a mark.
+    const stableAssets = new Set(["USD", "USDT", "USDC", "BUSD", "FDUSD", "DAI"]);
     let totalUsdtValue = 0;
-    try {
-      const tickers = await this.get24hrTickers();
-      const priceMap = new Map(tickers.map((t) => [t.symbol, t.lastPrice]));
-      for (const b of nonZeroBalances) {
-        if (b.asset === "USDT" || b.asset === "USDC" || b.asset === "USD") {
-          totalUsdtValue += b.total;
-        } else {
-          const price = priceMap.get(`${b.asset}/USDT`) ?? priceMap.get(`${b.asset}/USD`) ?? 0;
-          totalUsdtValue += b.total * price;
-        }
+    const tickers = await this.get24hrTickers();
+    const priceMap = new Map(tickers.map((t) => [t.symbol, t.lastPrice]));
+    for (const balance of nonZeroBalances) {
+      if (stableAssets.has(balance.asset)) {
+        totalUsdtValue += balance.total;
+        continue;
       }
-    } catch {
-      // tickers fetch can fail on some venues; leave totalUsdtValue at 0
+
+      const price = priceMap.get(`${balance.asset}/USDT`) ?? priceMap.get(`${balance.asset}/USD`);
+      if (!(typeof price === "number" && Number.isFinite(price) && price > 0)) {
+        throw new Error(
+          `Cannot value positive ${balance.asset} balance: no positive ${balance.asset}/USDT or ${balance.asset}/USD ticker`,
+        );
+      }
+      totalUsdtValue += balance.total * price;
     }
     return { accountInfo, totalUsdtValue, nonZeroBalances };
+  }
+
+  async getRecentTrades(symbol: string, limit = 20): Promise<PublicTrade[]> {
+    return this.withCallTracking(async () => {
+      const trades = await this.client.fetchTrades(toCcxtSymbol(symbol), undefined, limit);
+      return trades.map((trade) =>
+        ccxtPublicTradeToTrade(trade as unknown as Record<string, unknown>),
+      );
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -794,15 +924,20 @@ export class CcxtAdapter
       if (params.stopPrice !== undefined) ccxtParams.stopPrice = params.stopPrice;
       if (params.timeInForce) ccxtParams.timeInForce = params.timeInForce;
 
-      const order = await this.client.createOrder(symbol, ccxtType, side, amount, price, ccxtParams);
+      const order = await this.client.createOrder(
+        symbol,
+        ccxtType,
+        side,
+        amount,
+        price,
+        ccxtParams,
+      );
       return ccxtOrderToOrder(order as unknown as Record<string, unknown>);
     });
   }
 
   async cancelOrder(symbol: string, orderId: string): Promise<void> {
-    await this.withCallTracking(() =>
-      this.client.cancelOrder(orderId, toCcxtSymbol(symbol)),
-    );
+    await this.withCallTracking(() => this.client.cancelOrder(orderId, toCcxtSymbol(symbol)));
   }
 
   async cancelAllOrders(symbol: string): Promise<Order[]> {
@@ -817,13 +952,41 @@ export class CcxtAdapter
       }
       const open = await this.client.fetchOpenOrders(toCcxtSymbol(symbol));
       const cancelled: Order[] = [];
+      const failures: Error[] = [];
       for (const o of open) {
-        try {
-          await this.client.cancelOrder(String((o as unknown as Record<string, unknown>).id ?? ""), toCcxtSymbol(symbol));
-          cancelled.push(ccxtOrderToOrder(o as unknown as Record<string, unknown>));
-        } catch {
-          // continue cancelling; one failure shouldn't block the rest
+        const raw = o as unknown as Record<string, unknown>;
+        const orderId = String(raw.id ?? "");
+        if (orderId.length === 0) {
+          failures.push(new Error("Cannot cancel a CCXT open order with no order id"));
+          continue;
         }
+        try {
+          await this.client.cancelOrder(orderId, toCcxtSymbol(symbol));
+        } catch (error) {
+          failures.push(
+            error instanceof Error
+              ? error
+              : new Error(`Failed to cancel CCXT order ${orderId}: ${String(error)}`),
+          );
+          continue;
+        }
+        try {
+          cancelled.push(ccxtOrderToOrder(raw));
+        } catch (error) {
+          failures.push(
+            error instanceof Error
+              ? error
+              : new Error(
+                  `Cancelled CCXT order ${orderId}, but could not map it: ${String(error)}`,
+                ),
+          );
+        }
+      }
+      if (failures.length > 0) {
+        throw new AggregateError(
+          failures,
+          `CCXT cancel-all completed ${cancelled.length}/${open.length} cancellations cleanly`,
+        );
       }
       return cancelled;
     });
@@ -845,19 +1008,25 @@ export class CcxtAdapter
   }
 
   async testOrder(_params: OrderParams): Promise<boolean> {
-    // CCXT doesn't have a unified test-order endpoint; treat as always
-    // "would dispatch successfully" — operators should use sandbox mode
-    // for real dry runs.
-    return true;
+    // CCXT has no unified test-order endpoint. Returning true here made the
+    // public `test_order` tool claim venue acceptance without contacting a
+    // validator. Unsupported is an error, not evidence that an order is valid.
+    throw new Error(
+      `Exchange ${this.exchangeId} does not expose a non-dispatching order-validation endpoint; use an explicit sandbox venue for an end-to-end dry run`,
+    );
   }
 
   // -------------------------------------------------------------------------
   // History (authenticated)
   // -------------------------------------------------------------------------
 
-  async getTradeHistory(symbol: string, limit = 100): Promise<Trade[]> {
+  async getTradeHistory(symbol?: string, limit = 100): Promise<Trade[]> {
     return this.withCallTracking(async () => {
-      const trades = await this.client.fetchMyTrades(toCcxtSymbol(symbol), undefined, limit);
+      const trades = await this.client.fetchMyTrades(
+        symbol ? toCcxtSymbol(symbol) : undefined,
+        undefined,
+        limit,
+      );
       return trades.map((t) => ccxtTradeToTrade(t as unknown as Record<string, unknown>));
     });
   }
@@ -955,11 +1124,15 @@ export class CcxtAdapter
 
   async getWebSocket(): Promise<ExchangeWebSocket> {
     if (this.wsAdapter) return this.wsAdapter;
-    this.wsAdapter = new CcxtWebSocketImpl(this.ccxtSubId, {
-      apiKey: (this.client as unknown as { apiKey?: string }).apiKey,
-      secret: (this.client as unknown as { secret?: string }).secret,
-      password: (this.client as unknown as { password?: string }).password,
-    }, this.isSandbox);
+    this.wsAdapter = new CcxtWebSocketImpl(
+      this.ccxtSubId,
+      {
+        apiKey: (this.client as unknown as { apiKey?: string }).apiKey,
+        secret: (this.client as unknown as { secret?: string }).secret,
+        password: (this.client as unknown as { password?: string }).password,
+      },
+      this.isSandbox,
+    );
     return this.wsAdapter;
   }
 
@@ -1008,7 +1181,9 @@ export class CcxtAdapter
       };
       const ccxtSymbols = symbols?.map(toCcxtSymbol);
       const rates = await ccxtClient.fetchFundingRates(ccxtSymbols);
-      return Object.values(rates).map((r) => ccxtFundingRateToFundingRate(r as Record<string, unknown>));
+      return Object.values(rates).map((r) =>
+        ccxtFundingRateToFundingRate(r as Record<string, unknown>),
+      );
     });
   }
 
@@ -1116,7 +1291,10 @@ export class CcxtAdapter
     });
   }
 
-  async borrowCrossMargin(currency: string, amount: number): Promise<{ id: string; amount: number }> {
+  async borrowCrossMargin(
+    currency: string,
+    amount: number,
+  ): Promise<{ id: string; amount: number }> {
     return this.withCallTracking(async () => {
       const ccxtClient = this.client as unknown as {
         borrowCrossMargin: (c: string, a: number) => Promise<unknown>;
@@ -1318,7 +1496,12 @@ export class CcxtAdapter
     return this.withCallTracking(async () => {
       const ccxtParams: Record<string, unknown> = {};
       if (until !== undefined) ccxtParams.until = until;
-      const trades = await this.client.fetchMyTrades(toCcxtSymbol(symbol), since, limit, ccxtParams);
+      const trades = await this.client.fetchMyTrades(
+        toCcxtSymbol(symbol),
+        since,
+        limit,
+        ccxtParams,
+      );
       return trades.map((t) => ccxtTradeToTrade(t as unknown as Record<string, unknown>));
     });
   }
@@ -1332,7 +1515,12 @@ export class CcxtAdapter
     return this.withCallTracking(async () => {
       const ccxtParams: Record<string, unknown> = {};
       if (until !== undefined) ccxtParams.until = until;
-      const orders = await this.client.fetchClosedOrders(toCcxtSymbol(symbol), since, limit, ccxtParams);
+      const orders = await this.client.fetchClosedOrders(
+        toCcxtSymbol(symbol),
+        since,
+        limit,
+        ccxtParams,
+      );
       return orders.map((o) => ccxtOrderToOrder(o as unknown as Record<string, unknown>));
     });
   }
@@ -1368,10 +1556,4 @@ export class CcxtAdapter
  * them without importing ccxt directly. The withResultSanitizer wrapper
  * (commit 51b9d0f6) handles the prompt-injection containment regardless.
  */
-export {
-  AuthenticationError,
-  ExchangeNotAvailable,
-  NetworkError,
-  NotSupported,
-  RateLimitExceeded,
-};
+export { AuthenticationError, ExchangeNotAvailable, NetworkError, NotSupported, RateLimitExceeded };

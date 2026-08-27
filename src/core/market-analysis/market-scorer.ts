@@ -74,11 +74,7 @@ export class MarketScorer {
   /**
    * Score a symbol based on technical and flow metrics
    */
-  score(
-    symbol: string,
-    marketData: MarketData,
-    flowFeatures?: FlowFeatures
-  ): ScoreResult {
+  score(symbol: string, marketData: MarketData, flowFeatures?: FlowFeatures): ScoreResult {
     try {
       // Calculate technical score components
       const volatility = Math.abs(marketData.volatility);
@@ -86,20 +82,14 @@ export class MarketScorer {
       const returns30d = marketData.returns30d;
 
       // Volatility score (lower volatility = higher score)
-      const volatilityPenalty = Math.min(
-        volatility / Math.max(this.config.maxVolatility, 1),
-        1.0
-      );
+      const volatilityPenalty = Math.min(volatility / Math.max(this.config.maxVolatility, 1), 1.0);
       const volatilityScore = 1 - volatilityPenalty;
 
       // Trend score (normalized from -1..1 to 0..1)
       const trendScore = (trendNumeric + 1) / 2;
 
       // Momentum score (based on 30d returns, capped)
-      const momentumScore = Math.max(
-        Math.min((returns30d / 50.0) + 0.5, 1.0),
-        0.0
-      );
+      const momentumScore = Math.max(Math.min(returns30d / 50.0 + 0.5, 1.0), 0.0);
 
       // RSI contribution (if available)
       let rsiContribution = 0.5;
@@ -131,10 +121,14 @@ export class MarketScorer {
         let whaleScore = 0.5;
         if (flowFeatures.whaleBias === "bullish") {
           whaleScore = 0.5 + (flowFeatures.whaleStrength ?? 0.5) * 0.3;
-          narrativeBits.push(`Whale bias: bullish (${((flowFeatures.whaleStrength ?? 0.5) * 100).toFixed(0)}%)`);
+          narrativeBits.push(
+            `Whale bias: bullish (${((flowFeatures.whaleStrength ?? 0.5) * 100).toFixed(0)}%)`,
+          );
         } else if (flowFeatures.whaleBias === "bearish") {
           whaleScore = 0.5 - (flowFeatures.whaleStrength ?? 0.5) * 0.3;
-          narrativeBits.push(`Whale bias: bearish (${((flowFeatures.whaleStrength ?? 0.5) * 100).toFixed(0)}%)`);
+          narrativeBits.push(
+            `Whale bias: bearish (${((flowFeatures.whaleStrength ?? 0.5) * 100).toFixed(0)}%)`,
+          );
         }
 
         // Buy/sell pressure
@@ -146,14 +140,15 @@ export class MarketScorer {
             narrativeBits.push(
               pressureDiff > 0
                 ? `Buy pressure: ${(flowFeatures.buyPressure * 100).toFixed(0)}%`
-                : `Sell pressure: ${(flowFeatures.sellPressure * 100).toFixed(0)}%`
+                : `Sell pressure: ${(flowFeatures.sellPressure * 100).toFixed(0)}%`,
             );
           }
         }
 
         // Funding rate (for perpetuals)
         if (flowFeatures.fundingRate !== undefined) {
-          const fundingBias = flowFeatures.fundingRate > 0 ? 0.6 : flowFeatures.fundingRate < 0 ? 0.4 : 0.5;
+          const fundingBias =
+            flowFeatures.fundingRate > 0 ? 0.6 : flowFeatures.fundingRate < 0 ? 0.4 : 0.5;
           flowScore = (whaleScore + pressureScore + fundingBias) / 3;
           narrativeBits.push(`Funding: ${(flowFeatures.fundingRate * 100).toFixed(4)}%`);
         } else {
@@ -163,8 +158,7 @@ export class MarketScorer {
 
       // Combined score
       const combinedScore =
-        technicalScore * (1 - this.config.flowWeight) +
-        flowScore * this.config.flowWeight;
+        technicalScore * (1 - this.config.flowWeight) + flowScore * this.config.flowWeight;
 
       // Determine consensus
       let consensus: "BULLISH" | "BEARISH" | "NEUTRAL";
@@ -210,7 +204,12 @@ export class MarketScorer {
           trendScore,
           volatilityScore,
           momentumScore,
-          whaleScore: flowFeatures?.whaleBias === "bullish" ? 0.7 : flowFeatures?.whaleBias === "bearish" ? 0.3 : 0.5,
+          whaleScore:
+            flowFeatures?.whaleBias === "bullish"
+              ? 0.7
+              : flowFeatures?.whaleBias === "bearish"
+                ? 0.3
+                : 0.5,
           pressureScore: flowFeatures?.buyPressure ?? 0.5,
         },
       };
@@ -243,10 +242,10 @@ export class MarketScorer {
       symbol: string;
       marketData: MarketData;
       flowFeatures?: FlowFeatures;
-    }>
+    }>,
   ): ScoreResult[] {
     const scores = symbols.map(({ symbol, marketData, flowFeatures }) =>
-      this.score(symbol, marketData, flowFeatures)
+      this.score(symbol, marketData, flowFeatures),
     );
 
     // Sort by combined score (highest first)
@@ -259,11 +258,9 @@ export class MarketScorer {
   filterByScore(
     scores: ScoreResult[],
     minScore: number = 0.6,
-    minConfidence: number = 0.3
+    minConfidence: number = 0.3,
   ): ScoreResult[] {
-    return scores.filter(
-      (s) => s.combinedScore >= minScore && s.confidence >= minConfidence
-    );
+    return scores.filter((s) => s.combinedScore >= minScore && s.confidence >= minConfidence);
   }
 }
 

@@ -27,8 +27,16 @@ export const maProximityDiagnosticTool = createTool({
     sma21: z.number().positive().optional().describe("Current 21-period SMA value."),
     sma50: z.number().positive().optional().describe("Current 50-period SMA value."),
     maxStopPct: z.number().positive().optional().describe("Max stop %% for 'ready'. Default 3.0."),
-    stopBufferAbsolute: z.number().min(0).optional().describe("Buffer below MA (price units). Default 0."),
-    proximityAdrMultiple: z.number().positive().optional().describe("× ADR proximity band. Default 1.0."),
+    stopBufferAbsolute: z
+      .number()
+      .min(0)
+      .optional()
+      .describe("Buffer below MA (price units). Default 0."),
+    proximityAdrMultiple: z
+      .number()
+      .positive()
+      .optional()
+      .describe("× ADR proximity band. Default 1.0."),
   }),
   outputSchema: z.object({
     surfingMa: z.enum(["10", "21", "50", "extended"]),

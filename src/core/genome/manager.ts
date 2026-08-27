@@ -9,8 +9,8 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
-import { join } from "path";
-import { writeFileSync, mkdirSync } from "fs";
+import { join } from "node:path";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { playbookRegistry } from "../playbooks/registry.ts";
 import { playbookToProtocol, protocolToMarkdown } from "../playbooks/converter.ts";
@@ -99,7 +99,7 @@ export class GenomeManager {
     const playbook = playbookRegistry.get(playbookName);
     if (!playbook) {
       throw new Error(
-        `Playbook "${playbookName}" not found in registry. Available: ${playbookRegistry.getIds().join(", ") || "none"}`
+        `Playbook "${playbookName}" not found in registry. Available: ${playbookRegistry.getIds().join(", ") || "none"}`,
       );
     }
 
@@ -297,11 +297,7 @@ export class GenomeManager {
   /**
    * Record a trade result for an experiment.
    */
-  recordExperimentTrade(
-    experimentId: string,
-    isVariant: boolean,
-    pnl: number,
-  ): void {
+  recordExperimentTrade(experimentId: string, isVariant: boolean, pnl: number): void {
     const experiment = getExperiment(experimentId);
     if (!experiment) throw new Error(`Experiment ${experimentId} not found`);
     if (experiment.status !== "running") {
@@ -321,9 +317,7 @@ export class GenomeManager {
     }
 
     // Also update the genome's paper trading stats
-    const genomeId = isVariant
-      ? experiment.variant_genome_id
-      : experiment.control_genome_id;
+    const genomeId = isVariant ? experiment.variant_genome_id : experiment.control_genome_id;
     const genome = getGenome(genomeId);
     if (genome) {
       genome.paper_trades += 1;
@@ -331,7 +325,7 @@ export class GenomeManager {
       if (genome.paper_trades > 0) {
         // Simple win rate tracking
         const wins = pnl > 0 ? 1 : 0;
-        const prevWins = (genome.paper_win_rate ?? 0) / 100 * (genome.paper_trades - 1);
+        const prevWins = ((genome.paper_win_rate ?? 0) / 100) * (genome.paper_trades - 1);
         genome.paper_win_rate = ((prevWins + wins) / genome.paper_trades) * 100;
       }
       genome.fitness_score = this.fitness.calculateFitness(genome);
@@ -357,7 +351,8 @@ export class GenomeManager {
     }
 
     // Check duration
-    const daysElapsed = (Date.now() - new Date(experiment.started_at).getTime()) / (1000 * 60 * 60 * 24);
+    const daysElapsed =
+      (Date.now() - new Date(experiment.started_at).getTime()) / (1000 * 60 * 60 * 24);
     const durationExceeded = daysElapsed >= experiment.max_duration_days;
 
     // Check if both sides have enough trades
@@ -380,7 +375,10 @@ export class GenomeManager {
         winner: comparison.winner,
         winner_reason: comparison.reason,
         status: comparison.winner !== "undecided" || durationExceeded ? "completed" : "running",
-        ended_at: comparison.winner !== "undecided" || durationExceeded ? new Date().toISOString() : undefined,
+        ended_at:
+          comparison.winner !== "undecided" || durationExceeded
+            ? new Date().toISOString()
+            : undefined,
       });
     } else if (durationExceeded) {
       // Duration exceeded without enough data
@@ -411,12 +409,10 @@ export class GenomeManager {
       throw new Error(`Experiment ${experimentId} has no clear winner`);
     }
 
-    const winnerGenomeId = experiment.winner === "variant"
-      ? experiment.variant_genome_id
-      : experiment.control_genome_id;
-    const loserGenomeId = experiment.winner === "variant"
-      ? experiment.control_genome_id
-      : experiment.variant_genome_id;
+    const winnerGenomeId =
+      experiment.winner === "variant" ? experiment.variant_genome_id : experiment.control_genome_id;
+    const loserGenomeId =
+      experiment.winner === "variant" ? experiment.control_genome_id : experiment.variant_genome_id;
 
     // Promote winner
     const winner = getGenome(winnerGenomeId);
@@ -526,15 +522,18 @@ export class GenomeManager {
 
     for (let i = 0; i < chain.length; i++) {
       const g = chain[i]!;
-      const prefix = i === 0 ? "" : "  ".repeat(i) + "|--> ";
-      const fitness = g.fitness_score !== undefined ? ` [fitness: ${g.fitness_score.toFixed(1)}]` : "";
+      const prefix = i === 0 ? "" : `${"  ".repeat(i)}|--> `;
+      const fitness =
+        g.fitness_score !== undefined ? ` [fitness: ${g.fitness_score.toFixed(1)}]` : "";
       const status = ` (${g.status})`;
       lines.push(`${prefix}Gen ${g.generation}: ${g.playbook_name}${status}${fitness}`);
 
       if (g.mutations_from_parent.length > 0) {
         for (const m of g.mutations_from_parent) {
-          const mPrefix = "  ".repeat(i + 1) + "  ";
-          lines.push(`${mPrefix}[${m.mutation_type}] ${m.parameter_name}: ${String(m.from_value)} -> ${String(m.to_value)}`);
+          const mPrefix = `${"  ".repeat(i + 1)}  `;
+          lines.push(
+            `${mPrefix}[${m.mutation_type}] ${m.parameter_name}: ${String(m.from_value)} -> ${String(m.to_value)}`,
+          );
           lines.push(`${mPrefix}  Reason: ${m.reason}`);
         }
       }

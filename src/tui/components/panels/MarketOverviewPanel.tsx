@@ -7,8 +7,7 @@
  * Pattern: Claude Code context dashboard with multi-section layout.
  */
 
-import React from "react";
-import { Box, Text } from "../../ink-custom";
+import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 import { ProgressBar } from "../../design-system/ProgressBar.js";
 
@@ -85,6 +84,10 @@ export function MarketOverviewPanel({
   whaleAlerts,
   onClose,
 }: Props) {
+  useInput((_input, key) => {
+    if (key.escape) onClose();
+  });
+
   return (
     <Pane title="MARKET OVERVIEW">
       {/* Market Score */}
@@ -94,7 +97,9 @@ export function MarketOverviewPanel({
         </Box>
         <ProgressBar value={marketScore / 100} width={20} fillColor={scoreColor(marketScore)} />
         <Text> </Text>
-        <Text bold color={scoreColor(marketScore)}>{marketScore}/100</Text>
+        <Text bold color={scoreColor(marketScore)}>
+          {marketScore}/100
+        </Text>
       </Box>
 
       {/* Regime */}
@@ -102,13 +107,17 @@ export function MarketOverviewPanel({
         <Box width={14}>
           <Text dimColor>Regime</Text>
         </Box>
-        <Text bold color={regimeColor(regime)}>{regime.toUpperCase()}</Text>
+        <Text bold color={regimeColor(regime)}>
+          {regime.toUpperCase()}
+        </Text>
       </Box>
 
       {/* Breakouts */}
       {breakouts.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
-          <Text bold dimColor>BREAKOUT SETUPS</Text>
+          <Text bold dimColor>
+            BREAKOUT SETUPS
+          </Text>
           {breakouts.map((b) => {
             const arrow = b.type === "bullish" ? "\u2191" : "\u2193";
             const color = b.type === "bullish" ? "green" : "red";
@@ -117,7 +126,9 @@ export function MarketOverviewPanel({
                 <Box width={10}>
                   <Text bold>{b.symbol}</Text>
                 </Box>
-                <Text color={color}>{arrow} {b.type}</Text>
+                <Text color={color}>
+                  {arrow} {b.type}
+                </Text>
                 <Text dimColor> {"\u00b7"} </Text>
                 <ProgressBar value={b.confidence / 100} width={10} fillColor={color} />
                 <Text dimColor> {b.confidence}%</Text>
@@ -130,7 +141,9 @@ export function MarketOverviewPanel({
       {/* Consolidations */}
       {consolidations.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
-          <Text bold dimColor>CONSOLIDATING</Text>
+          <Text bold dimColor>
+            CONSOLIDATING
+          </Text>
           <Box paddingLeft={2}>
             <Text dimColor>{consolidations.join(", ")}</Text>
           </Box>
@@ -140,7 +153,9 @@ export function MarketOverviewPanel({
       {/* Whale Alerts */}
       {whaleAlerts.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
-          <Text bold dimColor>WHALE ACTIVITY</Text>
+          <Text bold dimColor>
+            WHALE ACTIVITY
+          </Text>
           {whaleAlerts.map((w, i) => {
             const actionColor = w.action === "accumulation" ? "green" : "red";
             return (

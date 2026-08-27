@@ -84,7 +84,10 @@ export function upsertSchedulerTask(input: {
 export function getSchedulerTask(taskId: string): SchedulerTaskRecord | null {
   const db = getDatabase();
   const row = executeWithLogging(
-    () => db.query("SELECT * FROM gateway_scheduler_tasks WHERE taskId = ?").get(taskId) as RawTaskRow | null,
+    () =>
+      db
+        .query("SELECT * FROM gateway_scheduler_tasks WHERE taskId = ?")
+        .get(taskId) as RawTaskRow | null,
     "SELECT gateway_scheduler_tasks one",
   );
   return row ? rowToTask(row) : null;
@@ -94,9 +97,7 @@ export function listSchedulerTasks(): SchedulerTaskRecord[] {
   const db = getDatabase();
   const rows = executeWithLogging(
     () =>
-      db
-        .query("SELECT * FROM gateway_scheduler_tasks ORDER BY taskId ASC")
-        .all() as RawTaskRow[],
+      db.query("SELECT * FROM gateway_scheduler_tasks ORDER BY taskId ASC").all() as RawTaskRow[],
     "SELECT gateway_scheduler_tasks all",
   );
   return rows.map(rowToTask);
@@ -111,10 +112,13 @@ export function deleteSchedulerTask(taskId: string): boolean {
   return Number(result.changes ?? 0) > 0;
 }
 
-export function updateSchedulerTaskRunState(taskId: string, input: {
-  nextRunAt?: string;
-  lastRunAt?: string;
-}): void {
+export function updateSchedulerTaskRunState(
+  taskId: string,
+  input: {
+    nextRunAt?: string;
+    lastRunAt?: string;
+  },
+): void {
   const db = getDatabase();
   const now = new Date().toISOString();
   executeWithLogging(
@@ -129,4 +133,3 @@ export function updateSchedulerTaskRunState(taskId: string, input: {
     "UPDATE gateway_scheduler_tasks run-state",
   );
 }
-

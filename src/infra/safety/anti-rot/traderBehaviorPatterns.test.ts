@@ -67,8 +67,15 @@ describe("detectStopReversal", () => {
 describe("detectMandateOverride", () => {
   it("surfaces when >=3 strategy-mandate-violation blocks appear", () => {
     const entries: ActionLogEntry[] = [
-      entry({ entryType: "execution_result", title: "Execution blocked: strategy_mandate_violation" }),
-      entry({ entryType: "execution_attempt", title: "blocked", content: "strategy mandate violated" }),
+      entry({
+        entryType: "execution_result",
+        title: "Execution blocked: strategy_mandate_violation",
+      }),
+      entry({
+        entryType: "execution_attempt",
+        title: "blocked",
+        content: "strategy mandate violated",
+      }),
       entry({ entryType: "execution_result", title: "strategy mandate violation occurred" }),
     ];
     const patterns = _detectPatternsForTest(entries);

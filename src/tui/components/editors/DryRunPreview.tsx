@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { TitledBox } from "../../design-system/TitledBox.js";
 
@@ -30,26 +29,69 @@ export function DryRunPreview({ order }: Props) {
   return (
     <TitledBox title="DRY RUN · ORDER PREVIEW" tone="warning">
       <Box flexDirection="column">
-        <Box><Text dimColor>Exchange:    </Text><Text bold>{order.exchange}</Text></Box>
-        <Box><Text dimColor>Endpoint:    </Text><Text>{order.method} {order.endpoint}</Text></Box>
-        <Box marginTop={1}>
-          <Text dimColor bold>REQUEST BODY</Text>
-        </Box>
-        <Box><Text dimColor>  symbol:       </Text><Text bold>{p.symbol}</Text></Box>
-        <Box><Text dimColor>  side:         </Text><Text bold color={sideColor}>{p.side.toUpperCase()}</Text></Box>
-        <Box><Text dimColor>  type:         </Text><Text bold>{p.type}</Text></Box>
-        <Box><Text dimColor>  quantity:     </Text><Text bold>{p.quantity}</Text></Box>
-        {p.price !== undefined && <Box><Text dimColor>  price:        </Text><Text bold>${p.price.toFixed(2)}</Text></Box>}
-        {p.stopPrice !== undefined && <Box><Text dimColor>  stopPrice:    </Text><Text bold>${p.stopPrice.toFixed(2)}</Text></Box>}
-        {p.timeInForce && <Box><Text dimColor>  timeInForce:  </Text><Text bold>{p.timeInForce}</Text></Box>}
-        <Box marginTop={1}>
-          <Text dimColor>Est. fee:     </Text><Text color="yellow">${order.estimatedFee.toFixed(2)}</Text>
+        <Box>
+          <Text dimColor>Exchange: </Text>
+          <Text bold>{order.exchange}</Text>
         </Box>
         <Box>
-          <Text dimColor>Est. slippage: </Text><Text color="yellow">${order.estimatedSlippage.toFixed(2)}</Text>
+          <Text dimColor>Endpoint: </Text>
+          <Text>
+            {order.method} {order.endpoint}
+          </Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor italic>This is exactly what will be sent. No modifications.</Text>
+          <Text dimColor bold>
+            REQUEST BODY
+          </Text>
+        </Box>
+        <Box>
+          <Text dimColor> symbol: </Text>
+          <Text bold>{p.symbol}</Text>
+        </Box>
+        <Box>
+          <Text dimColor> side: </Text>
+          <Text bold color={sideColor}>
+            {p.side.toUpperCase()}
+          </Text>
+        </Box>
+        <Box>
+          <Text dimColor> type: </Text>
+          <Text bold>{p.type}</Text>
+        </Box>
+        <Box>
+          <Text dimColor> quantity: </Text>
+          <Text bold>{p.quantity}</Text>
+        </Box>
+        {p.price !== undefined && (
+          <Box>
+            <Text dimColor> price: </Text>
+            <Text bold>${p.price.toFixed(2)}</Text>
+          </Box>
+        )}
+        {p.stopPrice !== undefined && (
+          <Box>
+            <Text dimColor> stopPrice: </Text>
+            <Text bold>${p.stopPrice.toFixed(2)}</Text>
+          </Box>
+        )}
+        {p.timeInForce && (
+          <Box>
+            <Text dimColor> timeInForce: </Text>
+            <Text bold>{p.timeInForce}</Text>
+          </Box>
+        )}
+        <Box marginTop={1}>
+          <Text dimColor>Est. fee: </Text>
+          <Text color="yellow">${order.estimatedFee.toFixed(2)}</Text>
+        </Box>
+        <Box>
+          <Text dimColor>Est. slippage: </Text>
+          <Text color="yellow">${order.estimatedSlippage.toFixed(2)}</Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor italic>
+            This is exactly what will be sent. No modifications.
+          </Text>
         </Box>
       </Box>
     </TitledBox>

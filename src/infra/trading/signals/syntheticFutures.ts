@@ -77,14 +77,17 @@ export interface FuturesResult {
   /** Asset symbols in order. */
   assets: string[];
   /** Summary statistics per scenario per asset. */
-  stats: Record<ScenarioType, Array<{
-    symbol: string;
-    medianReturn: number;
-    p5Return: number;
-    p95Return: number;
-    maxDrawdown: number;
-    endPrice: { median: number; p5: number; p95: number };
-  }>>;
+  stats: Record<
+    ScenarioType,
+    Array<{
+      symbol: string;
+      medianReturn: number;
+      p5Return: number;
+      p95Return: number;
+      maxDrawdown: number;
+      endPrice: { median: number; p5: number; p95: number };
+    }>
+  >;
   /** Total paths generated. */
   totalPaths: number;
 }
@@ -96,7 +99,11 @@ export interface FuturesResult {
 /**
  * Build correlation matrix from pairs. Diagonal = 1.
  */
-function buildCorrelationMatrix(n: number, pairs: CorrelationPair[], assetIndex: Map<string, number>): number[][] {
+function buildCorrelationMatrix(
+  n: number,
+  pairs: CorrelationPair[],
+  assetIndex: Map<string, number>,
+): number[][] {
   const matrix: number[][] = Array.from({ length: n }, (_, i) => {
     const row = new Array(n).fill(0) as number[];
     row[i] = 1; // Diagonal
@@ -151,7 +158,8 @@ function choleskyDecomposition(matrix: number[][]): number[][] {
  * Box-Muller transform: generate standard normal random variable.
  */
 function normalRandom(): number {
-  let u1 = 0, u2 = 0;
+  let u1 = 0,
+    u2 = 0;
   while (u1 === 0) u1 = Math.random();
   while (u2 === 0) u2 = Math.random();
   return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
@@ -179,12 +187,18 @@ function correlatedNormals(L: number[][], n: number): number[] {
 
 function getScenarioModifiers(scenario: ScenarioType): { driftMult: number; volMult: number } {
   switch (scenario) {
-    case "base": return { driftMult: 1.0, volMult: 1.0 };
-    case "bull": return { driftMult: 2.5, volMult: 0.8 };
-    case "bear": return { driftMult: -2.0, volMult: 1.3 };
-    case "tail_down": return { driftMult: -4.0, volMult: 2.5 };
-    case "tail_up": return { driftMult: 4.0, volMult: 2.0 };
-    case "vol_spike": return { driftMult: 0, volMult: 3.0 };
+    case "base":
+      return { driftMult: 1.0, volMult: 1.0 };
+    case "bull":
+      return { driftMult: 2.5, volMult: 0.8 };
+    case "bear":
+      return { driftMult: -2.0, volMult: 1.3 };
+    case "tail_down":
+      return { driftMult: -4.0, volMult: 2.5 };
+    case "tail_up":
+      return { driftMult: 4.0, volMult: 2.0 };
+    case "vol_spike":
+      return { driftMult: 0, volMult: 3.0 };
   }
 }
 
@@ -194,11 +208,16 @@ function getRegimeModifiers(regime: MarketRegime | undefined): {
   volMult: number;
 } {
   switch (regime) {
-    case "trending_up": return { driftScale: 1, driftOffset: 0.75, volMult: 0.95 };
-    case "trending_down": return { driftScale: 1, driftOffset: -1.35, volMult: 1.15 };
-    case "range": return { driftScale: 0.25, driftOffset: 0, volMult: 0.75 };
-    case "high_volatility": return { driftScale: 0.7, driftOffset: 0, volMult: 1.8 };
-    case undefined: return { driftScale: 1, driftOffset: 0, volMult: 1 };
+    case "trending_up":
+      return { driftScale: 1, driftOffset: 0.75, volMult: 0.95 };
+    case "trending_down":
+      return { driftScale: 1, driftOffset: -1.35, volMult: 1.15 };
+    case "range":
+      return { driftScale: 0.25, driftOffset: 0, volMult: 0.75 };
+    case "high_volatility":
+      return { driftScale: 0.7, driftOffset: 0, volMult: 1.8 };
+    case undefined:
+      return { driftScale: 1, driftOffset: 0, volMult: 1 };
   }
 }
 
@@ -240,7 +259,12 @@ export function generateSyntheticFutures(
   }
 
   const scenarios: Record<ScenarioType, SimulatedPath[]> = {
-    base: [], bull: [], bear: [], tail_down: [], tail_up: [], vol_spike: [],
+    base: [],
+    bull: [],
+    bear: [],
+    tail_down: [],
+    tail_up: [],
+    vol_spike: [],
   };
 
   let totalPaths = 0;
@@ -248,12 +272,15 @@ export function generateSyntheticFutures(
   for (const scenario of config.scenarios) {
     const scenarioModifiers = getScenarioModifiers(scenario);
     const regimeModifiers = getRegimeModifiers(config.regime);
-    const driftMult = scenarioModifiers.driftMult * regimeModifiers.driftScale
-      + regimeModifiers.driftOffset;
+    const driftMult =
+      scenarioModifiers.driftMult * regimeModifiers.driftScale + regimeModifiers.driftOffset;
     const volMult = scenarioModifiers.volMult * regimeModifiers.volMult;
 
     for (let p = 0; p < pathsPerScenario; p++) {
-      const prices: number[][] = Array.from({ length: n }, () => new Array(horizonDays + 1).fill(0) as number[]);
+      const prices: number[][] = Array.from(
+        { length: n },
+        () => new Array(horizonDays + 1).fill(0) as number[],
+      );
 
       // Initialize day 0
       for (let i = 0; i < n; i++) {
@@ -271,7 +298,7 @@ export function generateSyntheticFutures(
           const vol = asset.annualVol * volMult * Math.sqrt(dt);
 
           // Geometric Brownian Motion: S(t+1) = S(t) * exp((μ - σ²/2)dt + σ√dt * Z)
-          let logReturn = (drift - 0.5 * vol * vol) + vol * z[i]!;
+          let logReturn = drift - 0.5 * vol * vol + vol * z[i]!;
 
           // Apply event shock if any
           const dayEvents = eventMap.get(day);
@@ -347,9 +374,9 @@ export function formatFuturesSummary(result: FuturesResult): string {
     for (const stat of assetStats) {
       lines.push(
         `    ${stat.symbol.padEnd(8)} median: ${(stat.medianReturn * 100).toFixed(1)}%  ` +
-        `range: [${(stat.p5Return * 100).toFixed(1)}%, ${(stat.p95Return * 100).toFixed(1)}%]  ` +
-        `DD: ${(stat.maxDrawdown * 100).toFixed(1)}%  ` +
-        `price: $${stat.endPrice.median.toFixed(0)} [$${stat.endPrice.p5.toFixed(0)}-$${stat.endPrice.p95.toFixed(0)}]`
+          `range: [${(stat.p5Return * 100).toFixed(1)}%, ${(stat.p95Return * 100).toFixed(1)}%]  ` +
+          `DD: ${(stat.maxDrawdown * 100).toFixed(1)}%  ` +
+          `price: $${stat.endPrice.median.toFixed(0)} [$${stat.endPrice.p5.toFixed(0)}-$${stat.endPrice.p95.toFixed(0)}]`,
       );
     }
     lines.push("");

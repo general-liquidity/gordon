@@ -56,9 +56,7 @@ describe("HandoffCoordinator.filterContextForSubagent (least-context handoff)", 
 
   it("matches the Researcher worker role case-insensitively", () => {
     const coordinator = new HandoffCoordinator();
-    const messages: FilterableMessage[] = [
-      { role: "user", content: "balance: 9999.00 USDT" },
-    ];
+    const messages: FilterableMessage[] = [{ role: "user", content: "balance: 9999.00 USDT" }];
     const result = coordinator.filterContextForSubagent("Researcher", messages);
     expect(result.filteredAgent).toBe(true);
     expect(result.messages[0]!.content).not.toContain("9999.00");

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 
 // ============================================================================
@@ -27,9 +27,9 @@ interface Props {
 }
 
 const STATUS_CONFIG: Record<RecoveryStatus, { color: string; icon: string }> = {
-  retrying:  { color: "yellow",  icon: "\u21BB" },  // ↻
-  failed:    { color: "red",     icon: "\u2717" },  // ✗
-  recovered: { color: "green",   icon: "\u2713" },  // ✓
+  retrying: { color: "yellow", icon: "\u21BB" }, // ↻
+  failed: { color: "red", icon: "\u2717" }, // ✗
+  recovered: { color: "green", icon: "\u2713" }, // ✓
 };
 
 export function OrderRecoveryNotice({
@@ -71,18 +71,16 @@ export function OrderRecoveryNotice({
   const borderColor = cfg.color;
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={borderColor}
-      paddingX={1}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor={borderColor} paddingX={1}>
       {/* Header */}
       <Box>
         <Text color={cfg.color} bold>
           {cfg.icon} Order {status === "recovered" ? "recovered" : "failed"}
         </Text>
-        <Text dimColor>  {symbol} {"\u00b7"} {orderId}</Text>
+        <Text dimColor>
+          {" "}
+          {symbol} {"\u00b7"} {orderId}
+        </Text>
       </Box>
 
       {/* Reason */}
@@ -96,9 +94,7 @@ export function OrderRecoveryNotice({
           <Text color="yellow">
             Recovering... (attempt {attempt}/{maxAttempts})
           </Text>
-          {countdown > 0 && (
-            <Text dimColor>  next retry in {countdown}s</Text>
-          )}
+          {countdown > 0 && <Text dimColor> next retry in {countdown}s</Text>}
         </Box>
       )}
 
@@ -112,9 +108,7 @@ export function OrderRecoveryNotice({
 
       {status === "recovered" && (
         <Box marginTop={1}>
-          <Text color="green">
-            Order recovered successfully on attempt {attempt}.
-          </Text>
+          <Text color="green">Order recovered successfully on attempt {attempt}.</Text>
         </Box>
       )}
 
@@ -122,9 +116,18 @@ export function OrderRecoveryNotice({
       {status !== "recovered" && (
         <Box marginTop={1}>
           <Text dimColor>
-            <Text bold color={cfg.color}>r</Text> retry now{" "}
-            {"\u00b7"} <Text bold color={cfg.color}>c</Text> cancel{" "}
-            {"\u00b7"} <Text bold color={cfg.color}>d</Text> details
+            <Text bold color={cfg.color}>
+              r
+            </Text>{" "}
+            retry now {"\u00b7"}{" "}
+            <Text bold color={cfg.color}>
+              c
+            </Text>{" "}
+            cancel {"\u00b7"}{" "}
+            <Text bold color={cfg.color}>
+              d
+            </Text>{" "}
+            details
           </Text>
         </Box>
       )}

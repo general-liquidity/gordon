@@ -62,12 +62,12 @@ interface Candle {
  */
 function renderCandlestickChart(
   candles: Candle[],
-  options: { height?: number; showVolume?: boolean } = {}
+  options: { height?: number; showVolume?: boolean } = {},
 ): string {
   const { height = 18, showVolume = true } = options;
   const chartHeight = showVolume ? height - 5 : height;
   const candleWidth = 3; // Width of each candle body
-  const spacing = 1;     // Space between candles
+  const spacing = 1; // Space between candles
   const cellWidth = candleWidth + spacing; // Total width per candle
 
   // Find price range
@@ -83,9 +83,7 @@ function renderCandlestickChart(
 
   // Initialize grid - each cell holds a string (with ANSI codes)
   const totalWidth = candles.length * cellWidth;
-  const grid: string[][] = Array.from({ length: chartHeight }, () =>
-    Array(totalWidth).fill(" ")
-  );
+  const grid: string[][] = Array.from({ length: chartHeight }, () => Array(totalWidth).fill(" "));
 
   // Draw each candle
   for (let i = 0; i < candles.length; i++) {
@@ -95,7 +93,7 @@ function renderCandlestickChart(
     const isBullish = c.close >= c.open;
     const color = isBullish ? COLORS.green : COLORS.red;
     const startX = i * cellWidth; // Starting X position for this candle
-    const centerX = startX + 1;   // Center of the candle (for wick)
+    const centerX = startX + 1; // Center of the candle (for wick)
 
     const highY = scaleY(c.high);
     const lowY = scaleY(c.low);
@@ -217,10 +215,7 @@ export const displayPriceChartTool = createTool({
     "Shows closing prices over time as a line chart.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
-    interval: z
-      .enum(["1h", "4h", "1d"])
-      .default("1d")
-      .describe("Candle interval"),
+    interval: z.enum(["1h", "4h", "1d"]).default("1d").describe("Candle interval"),
     periods: z
       .number()
       .min(7)
@@ -272,7 +267,8 @@ export const displayPriceChartTool = createTool({
       });
 
       // Build time labels
-      const intervalLabel = interval === "1h" ? "hours" : interval === "4h" ? "4-hour periods" : "days";
+      const intervalLabel =
+        interval === "1h" ? "hours" : interval === "4h" ? "4-hour periods" : "days";
 
       return {
         symbol: normalizedSymbol,
@@ -308,22 +304,19 @@ export const displayCandlestickChartTool = createTool({
     "Shows open, high, low, close with bullish (green) and bearish (red) candles.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
-    interval: z
-      .enum(["1h", "4h", "1d"])
-      .default("1d")
-      .describe("Candle interval"),
+    interval: z.enum(["1h", "4h", "1d"]).default("1d").describe("Candle interval"),
     periods: z
       .number()
       .min(10)
       .max(50)
       .default(20)
       .describe("Number of candles to show (default: 20)"),
-    showVolume: z
-      .boolean()
-      .default(true)
-      .describe("Show volume bars below chart"),
+    showVolume: z.boolean().default(true).describe("Show volume bars below chart"),
   }),
-  execute: async ({ symbol, interval, periods, showVolume }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, interval, periods, showVolume },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -357,7 +350,8 @@ export const displayCandlestickChartTool = createTool({
       const bullishCount = candles.filter((c) => c.close >= c.open).length;
       const bearishCount = candles.length - bullishCount;
 
-      const intervalLabel = interval === "1h" ? "hours" : interval === "4h" ? "4-hour periods" : "days";
+      const intervalLabel =
+        interval === "1h" ? "hours" : interval === "4h" ? "4-hour periods" : "days";
 
       return {
         symbol: normalizedSymbol,
@@ -402,16 +396,8 @@ export const displayComparisonChartTool = createTool({
       .min(2)
       .max(4)
       .describe("Trading pairs to compare (e.g., ['BTCUSDT', 'ETHUSDT'])"),
-    interval: z
-      .enum(["1h", "4h", "1d"])
-      .default("1d")
-      .describe("Candle interval"),
-    periods: z
-      .number()
-      .min(7)
-      .max(50)
-      .default(14)
-      .describe("Number of periods"),
+    interval: z.enum(["1h", "4h", "1d"]).default("1d").describe("Candle interval"),
+    periods: z.number().min(7).max(50).default(14).describe("Number of periods"),
   }),
   execute: async ({ symbols, interval, periods }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
@@ -447,7 +433,10 @@ export const displayComparisonChartTool = createTool({
           }
         }),
       );
-      const allData = symbolData.filter((item): item is { symbol: string; changes: number[]; currentChange: number } => item !== null);
+      const allData = symbolData.filter(
+        (item): item is { symbol: string; changes: number[]; currentChange: number } =>
+          item !== null,
+      );
 
       if (allData.length === 0) {
         return { error: "No data found for any of the specified symbols" };
@@ -508,16 +497,8 @@ export const displayVolumeChartTool = createTool({
     "Use when user asks about volume trends or trading activity.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair"),
-    interval: z
-      .enum(["1h", "4h", "1d"])
-      .default("1d")
-      .describe("Candle interval"),
-    periods: z
-      .number()
-      .min(7)
-      .max(50)
-      .default(14)
-      .describe("Number of periods"),
+    interval: z.enum(["1h", "4h", "1d"]).default("1d").describe("Candle interval"),
+    periods: z.number().min(7).max(50).default(14).describe("Number of periods"),
   }),
   execute: async ({ symbol, interval, periods }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);

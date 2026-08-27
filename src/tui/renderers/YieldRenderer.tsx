@@ -8,7 +8,6 @@
  * Pattern: Claude Code structured output renderer (DataTable-based).
  */
 
-import React from "react";
 import { Box, Text } from "../ink-custom";
 import { DataTable, fmtNum, type Column } from "../components/charts/DataTable.tsx";
 
@@ -79,9 +78,7 @@ const COLUMNS: Column<YieldData>[] = [
 // ============================================================================
 
 export function YieldRenderer({ data }: Props) {
-  const avgApy = data.length > 0
-    ? data.reduce((sum, d) => sum + d.apy, 0) / data.length
-    : 0;
+  const avgApy = data.length > 0 ? data.reduce((sum, d) => sum + d.apy, 0) / data.length : 0;
 
   const summaryRow: Record<string, string> = {
     protocol: `${data.length} pools`,
@@ -91,7 +88,9 @@ export function YieldRenderer({ data }: Props) {
   return (
     <Box flexDirection="column">
       <Box paddingLeft={2}>
-        <Text bold color="cyanBright">YIELD OPPORTUNITIES</Text>
+        <Text bold color="cyanBright">
+          YIELD OPPORTUNITIES
+        </Text>
         {data.length > 0 && <Text dimColor> ({data.length})</Text>}
       </Box>
       <DataTable

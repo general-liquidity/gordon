@@ -60,11 +60,7 @@ export interface DarkPoolAdverseSelectionOptions {
   breakevenBandBps?: number;
 }
 
-export type DarkPoolVerdict =
-  | "net_benefit"
-  | "breakeven"
-  | "net_loss"
-  | "insufficient_data";
+export type DarkPoolVerdict = "net_benefit" | "breakeven" | "net_loss" | "insufficient_data";
 
 export interface DarkPoolAdverseSelectionResult {
   fillCount: number;
@@ -155,8 +151,7 @@ export function scoreDarkPoolAdverseSelection(
   const avgPrice = totalQuantityWeightedPrice / totalQuantity;
   const netPerShare = avgNominalSavingPerShare - avgAdverseMovePerShare;
 
-  const toBps = (priceUnits: number) =>
-    avgPrice > 0 ? (priceUnits / avgPrice) * 10000 : 0;
+  const toBps = (priceUnits: number) => (avgPrice > 0 ? (priceUnits / avgPrice) * 10000 : 0);
 
   const avgAdverseMoveBps = toBps(avgAdverseMovePerShare);
   const avgNominalSavingBps = toBps(avgNominalSavingPerShare);
@@ -192,9 +187,7 @@ export function scoreDarkPoolAdverseSelection(
   };
 }
 
-export function formatDarkPoolAdverseSelection(
-  result: DarkPoolAdverseSelectionResult,
-): string {
+export function formatDarkPoolAdverseSelection(result: DarkPoolAdverseSelectionResult): string {
   const lines = [
     `Dark-Pool Adverse Selection — ${result.verdict.toUpperCase()}`,
     "",

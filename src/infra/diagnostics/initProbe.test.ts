@@ -1,11 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  runInitProbes,
-  formatProbeReport,
-  probeReportToPayload,
-  type Probe,
-} from "./initProbe.ts";
+import { runInitProbes, formatProbeReport, probeReportToPayload, type Probe } from "./initProbe.ts";
 
 function mkProbe(
   id: string,
@@ -21,7 +16,7 @@ function mkProbe(
       return {
         status,
         message: `${id} ${status}`,
-        fixInstruction: status === "fail" ? options.fixInstruction ?? "fix me" : undefined,
+        fixInstruction: status === "fail" ? (options.fixInstruction ?? "fix me") : undefined,
       };
     },
   };
@@ -77,10 +72,9 @@ describe("runInitProbes — failFast", () => {
   });
 
   it("does not stop on pass when failFast is on", async () => {
-    const report = await runInitProbes(
-      [mkProbe("a", "pass"), mkProbe("b", "pass")],
-      { failFast: true },
-    );
+    const report = await runInitProbes([mkProbe("a", "pass"), mkProbe("b", "pass")], {
+      failFast: true,
+    });
     expect(report.results.length).toBe(2);
   });
 });

@@ -85,10 +85,13 @@ async function main(): Promise<void> {
       await writeFile(file, JSON.stringify(points, null, 2));
       const first = points[0];
       const last = points[points.length - 1];
-      const span = first && last
-        ? `${new Date(first.time * 1000).toISOString().slice(0, 16)} … ${new Date(last.time * 1000).toISOString().slice(0, 16)}`
-        : "(empty)";
-      console.log(`  ${pair.padEnd(9)} → ${sym.padEnd(7)} ${String(points.length).padStart(4)} points  ${span}`);
+      const span =
+        first && last
+          ? `${new Date(first.time * 1000).toISOString().slice(0, 16)} … ${new Date(last.time * 1000).toISOString().slice(0, 16)}`
+          : "(empty)";
+      console.log(
+        `  ${pair.padEnd(9)} → ${sym.padEnd(7)} ${String(points.length).padStart(4)} points  ${span}`,
+      );
     } catch (err) {
       anyFailed = true;
       console.error(`  ${pair.padEnd(9)} → ${sym.padEnd(7)} FAILED: ${(err as Error).message}`);
@@ -96,7 +99,9 @@ async function main(): Promise<void> {
   }
 
   if (anyFailed) {
-    console.error("\nSome pairs failed (network/region block). The validation script can run once data exists.");
+    console.error(
+      "\nSome pairs failed (network/region block). The validation script can run once data exists.",
+    );
     process.exit(1);
   }
   console.log("\nDone. Funding JSONs written to data/momq/funding/");

@@ -8,25 +8,26 @@
  * Optionally supports real-time WebSocket updates for faster detection.
  */
 
-import type { Exchange, OrderParams } from "../../infra/exchange/index.ts";
+import type { Exchange, Order } from "../../infra/exchange/index.ts";
 
-import { listTrades, updateTrade } from "../../infra/storage/entities/trades.ts";
+import { getTrade, listTrades, updateTrade } from "../../infra/storage/entities/trades.ts";
 import { logEvent } from "../../infra/storage/entities/events.ts";
-import { getPlan } from "../../infra/storage/entities/plans.ts";
+import { getPlan, updatePlan } from "../../infra/storage/entities/plans.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
 import type { Trade, Plan, ExitFill, EntryFill } from "../../types/index.ts";
-import {
-  type MarketStream,
-  type MarketStreamTickerUpdate as TickerUpdate,
+import type {
+  MarketStream,
+  MarketStreamTickerUpdate as TickerUpdate,
 } from "../../infra/exchange/marketStream.ts";
 import {
   cleanupExpiredPlans,
+  cancelPlanProtectiveOrders,
+  closePartialPosition,
   generateDeterministicClientOrderId,
   repairProtectiveOrders,
 } from "./executor.ts";
 import { getTrailingStopTracker } from "../orders/trailing-stop.ts";
-import { assertConsentForExposure } from "../../infra/trading/execution/preflight.ts";
 
 const logger = createModuleLogger("monitor");
 
@@ -271,7 +272,7 @@ function checkMultiMetricAnomaly(
  * Round quantity to appropriate precision for exchange orders
  */
 function roundQuantity(quantity: number, precision: number = 8): number {
-  const multiplier = Math.pow(10, precision);
+  const multiplier = 10 ** precision;
   return Math.floor(quantity * multiplier) / multiplier;
 }
 
@@ -279,17 +280,8 @@ function roundQuantity(quantity: number, precision: number = 8): number {
  * Round price to appropriate precision
  */
 function roundPrice(price: number, precision: number = 8): number {
-  const multiplier = Math.pow(10, precision);
+  const multiplier = 10 ** precision;
   return Math.round(price * multiplier) / multiplier;
-}
-
-/**
- * Generate a unique client order ID for tracking
- */
-function generateClientOrderId(planId: string, type: string): string {
-  const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 6);
-  return `gordon_${planId.slice(4, 12)}_${type}_${timestamp}_${random}`;
 }
 
 // ============================================================================
@@ -337,14 +329,7 @@ export async function runMonitorCycle(client: Exchange): Promise<MonitorResult> 
     }
   }
 
-  // 3. Process grid take profit placements
-  try {
-    await processGridTakeProfits(client, alerts);
-  } catch (error) {
-    logger.error("Grid TP processing error", error as Error);
-  }
-
-  // 4. Check for market anomalies
+  // 3. Check for market anomalies
   for (const symbol of symbolsToCheck) {
     try {
       const anomalyAlerts = await checkMarketAnomalies(client, symbol);
@@ -354,7 +339,7 @@ export async function runMonitorCycle(client: Exchange): Promise<MonitorResult> 
     }
   }
 
-  // 5. Update trailing stops
+  // 4. Update trailing stops
   const trailingStopUpdates: TrailingStopUpdate[] = [];
   try {
     const tracker = getTrailingStopTracker();
@@ -412,7 +397,7 @@ export async function runMonitorCycle(client: Exchange): Promise<MonitorResult> 
     logger.error("Trailing stop update error", error as Error);
   }
 
-  // 6. Cleanup expired plans
+  // 5. Cleanup expired plans
   let expiredPlansCleanedUp = 0;
   try {
     expiredPlansCleanedUp = cleanupExpiredPlans();
@@ -461,11 +446,16 @@ async function processTradeUpdate(
 
   const fillAlerts = await checkOrderFills(client, trade, plan);
   alerts.push(...fillAlerts);
+  const reconciledTrade = getTrade(trade.id) ?? trade;
 
-  const { unrealizedPnl, unrealizedPnlPercent } = calculateUnrealizedPnl(trade, currentPrice);
+  const { unrealizedPnl, unrealizedPnlPercent } = calculateUnrealizedPnl(
+    reconciledTrade,
+    currentPrice,
+    plan,
+  );
 
   const distanceToStop = calculateDistanceToStop(currentPrice, plan);
-  const distanceToNextTP = calculateDistanceToNextTP(trade, currentPrice, plan);
+  const distanceToNextTP = calculateDistanceToNextTP(reconciledTrade, currentPrice, plan);
   const status = determineHealthStatus(distanceToStop);
 
   // Generate alerts for approaching stop or TP
@@ -522,7 +512,7 @@ async function processTradeUpdate(
   }
 
   return {
-    trade,
+    trade: reconciledTrade,
     currentPrice,
     unrealizedPnl,
     unrealizedPnlPercent,
@@ -532,167 +522,276 @@ async function processTradeUpdate(
   };
 }
 
+function protectiveReasonForOrder(order: Order, plan: Plan): ExitFill["reason"] | null {
+  const id = order.clientOrderId ?? "";
+  if (id.includes("_stop")) return "STOP";
+  for (let i = 0; i < plan.takeProfit.length; i++) {
+    if (id.includes(`_tp${i + 1}`) || (i === 0 && id.includes("_oco_tp"))) {
+      return `TP${i + 1}` as ExitFill["reason"];
+    }
+  }
+  return null;
+}
+
+function mergeOrders(history: Order[], openOrders: Order[]): Order[] {
+  const byId = new Map<string, Order>();
+  for (const order of [...history, ...openOrders]) {
+    byId.set(order.orderId.toString(), order);
+  }
+  return [...byId.values()].sort(
+    (a, b) => (a.updateTime ?? a.time ?? 0) - (b.updateTime ?? b.time ?? 0),
+  );
+}
+
+async function loadPlanOrders(client: Exchange, symbol: string, planId: string): Promise<Order[]> {
+  const prefix = `gordon_${planId.slice(4, 12)}_`;
+  const [history, openOrders] = await Promise.all([
+    client.getOrderHistory(symbol, 200),
+    client.getOpenOrders(symbol),
+  ]);
+  return mergeOrders(history, openOrders).filter((order) =>
+    order.clientOrderId?.startsWith(prefix),
+  );
+}
+
+async function applyConfirmedProtectiveFills(
+  client: Exchange,
+  trade: Trade,
+  plan: Plan,
+  orders: Order[],
+  alerts: Alert[],
+): Promise<Trade> {
+  const updatedTrade: Trade = { ...trade, exits: [...trade.exits] };
+  let changed = false;
+
+  for (const order of orders) {
+    const reason = protectiveReasonForOrder(order, plan);
+    if (!reason || order.executedQty <= 0) continue;
+    if (order.status !== "FILLED" && order.status !== "PARTIALLY_FILLED") continue;
+
+    const priorForOrder = updatedTrade.exits.filter(
+      (exit) => exit.orderId === order.orderId.toString(),
+    );
+    const priorQuantity = priorForOrder.reduce((sum, exit) => sum + exit.quantity, 0);
+    const deltaQuantity = roundQuantity(order.executedQty - priorQuantity);
+    if (deltaQuantity <= 0) continue;
+
+    const priorQuote = priorForOrder.reduce((sum, exit) => sum + exit.price * exit.quantity, 0);
+    const deltaQuote = order.cummulativeQuoteQty - priorQuote;
+    const fallbackPrice =
+      reason === "STOP"
+        ? plan.stopLoss.price
+        : (plan.takeProfit[Number(reason.slice(2)) - 1]?.price ?? order.price);
+    const fillPrice =
+      deltaQuote > 0
+        ? deltaQuote / deltaQuantity
+        : order.executedQty > 0 && order.cummulativeQuoteQty > 0
+          ? order.cummulativeQuoteQty / order.executedQty
+          : fallbackPrice;
+    const remainingBefore = calculateRemainingQuantity(updatedTrade);
+
+    updatedTrade.exits.push({
+      orderId: order.orderId.toString(),
+      price: fillPrice,
+      quantity: deltaQuantity,
+      filledAt: order.updateTime
+        ? new Date(order.updateTime).toISOString()
+        : new Date().toISOString(),
+      reason,
+    });
+    changed = true;
+
+    if (deltaQuantity > remainingBefore + 1e-8) {
+      alerts.push({
+        type: "order_filled",
+        tradeId: trade.id,
+        message: `${trade.symbol}: protective orders overfilled the position by ${roundQuantity(deltaQuantity - remainingBefore)}`,
+        severity: "critical",
+        data: {
+          orderType: reason,
+          orderId: order.orderId.toString(),
+          executedQuantity: deltaQuantity,
+          remainingBefore,
+        },
+      });
+    }
+
+    alerts.push({
+      type: "order_filled",
+      tradeId: trade.id,
+      message: `${trade.symbol}: exchange confirmed ${reason} fill at ${fillPrice}`,
+      severity: reason === "STOP" ? "critical" : "info",
+      data: {
+        orderType: reason,
+        orderId: order.orderId.toString(),
+        fillPrice,
+        quantity: deltaQuantity,
+        status: order.status,
+      },
+    });
+
+    if (reason.startsWith("TP")) {
+      await emitEvent("alert:tp_hit", {
+        tradeId: trade.id,
+        symbol: trade.symbol,
+        level: Number(reason.slice(2)) as 1 | 2 | 3,
+        price: fillPrice,
+      });
+    }
+
+    logEvent({
+      type: "ORDER_FILLED",
+      data: {
+        orderType: reason,
+        orderId: order.orderId.toString(),
+        fillPrice,
+        quantity: deltaQuantity,
+        exchangeConfirmed: true,
+      },
+      tradeId: trade.id,
+      planId: trade.planId,
+    });
+  }
+
+  if (!changed) return trade;
+
+  const remaining = calculateRemainingQuantity(updatedTrade);
+  updatedTrade.status = remaining <= 1e-8 ? "CLOSED" : "PARTIAL";
+  updatedTrade.closedAt = remaining <= 1e-8 ? new Date().toISOString() : null;
+  const { realizedPnl, realizedPnlPercent } = calculateRealizedPnl(updatedTrade, plan);
+  updatedTrade.realizedPnl = realizedPnl;
+  updatedTrade.realizedPnlPercent = realizedPnlPercent;
+  updateTrade(trade.id, updatedTrade);
+
+  const cancelled = await cancelPlanProtectiveOrders(client, trade.symbol, trade.planId);
+  if (!cancelled.success) {
+    alerts.push({
+      type: "order_filled",
+      tradeId: trade.id,
+      message: `${trade.symbol}: fill confirmed, but sibling protection could not be fully cancelled`,
+      severity: "critical",
+      data: { failures: cancelled.failures },
+    });
+    return updatedTrade;
+  }
+
+  if (remaining <= 1e-8) {
+    updatePlan(trade.planId, { status: "CLOSED" });
+  } else {
+    const repair = await repairProtectiveOrders(trade.planId, client);
+    if (!repair.repaired && repair.reason !== "protective_orders_intact") {
+      alerts.push({
+        type: "order_filled",
+        tradeId: trade.id,
+        message: `${trade.symbol}: partial exit confirmed, but remaining protection was not restored`,
+        severity: "critical",
+        data: { reason: repair.reason },
+      });
+    }
+  }
+
+  return updatedTrade;
+}
+
+async function maybeExecuteManagedTakeProfit(
+  client: Exchange,
+  trade: Trade,
+  plan: Plan,
+  orders: Order[],
+  currentPrice: number,
+  alerts: Alert[],
+): Promise<void> {
+  if (trade.status === "CLOSED" || calculateRemainingQuantity(trade) <= 0) return;
+
+  // A native OCO TP remains venue-managed. Managed exits are only for plans
+  // with no active TP order, which prevents two independent exit mechanisms
+  // from racing one another.
+  const hasActiveVenueTp = orders.some(
+    (order) =>
+      (order.status === "NEW" || order.status === "PARTIALLY_FILLED") &&
+      protectiveReasonForOrder(order, plan)?.startsWith("TP"),
+  );
+  if (hasActiveVenueTp) return;
+
+  const enteredQuantity = trade.entries.reduce((sum, entry) => sum + entry.quantity, 0);
+  const remainingQuantity = calculateRemainingQuantity(trade);
+  const pending = plan.takeProfit
+    .map((tp, index) => {
+      const reason = `TP${index + 1}` as ExitFill["reason"];
+      const alreadyFilled = trade.exits
+        .filter((exit) => exit.reason === reason)
+        .reduce((sum, exit) => sum + exit.quantity, 0);
+      return {
+        tp,
+        reason,
+        remainingTarget: tp ? Math.max(0, enteredQuantity * tp.percentToSell - alreadyFilled) : 0,
+      };
+    })
+    .filter(({ tp, remainingTarget }) => Boolean(tp) && remainingTarget > 1e-8);
+
+  for (const level of pending) {
+    const tp = level.tp!;
+    const crossed =
+      plan.direction === "short" ? currentPrice <= tp.price : currentPrice >= tp.price;
+    if (!crossed) continue;
+
+    const percentageOfRemainder = Math.min(1, level.remainingTarget / remainingQuantity);
+    const result = await closePartialPosition(
+      client,
+      trade.id,
+      percentageOfRemainder,
+      level.reason === "TP1" || level.reason === "TP2" || level.reason === "TP3"
+        ? level.reason
+        : "MANUAL",
+    );
+    alerts.push({
+      type: "order_filled",
+      tradeId: trade.id,
+      message: result.success
+        ? result.protectionRestored === false
+          ? `${trade.symbol}: managed ${level.reason} filled, but protection was not restored`
+          : `${trade.symbol}: managed ${level.reason} executed at ${result.exitPrice}`
+        : `${trade.symbol}: managed ${level.reason} could not be confirmed`,
+      severity:
+        !result.success || result.protectionRestored === false
+          ? "critical"
+          : result.fullyFilled === false
+            ? "warning"
+            : "info",
+      data: result.success
+        ? {
+            orderType: level.reason,
+            fillPrice: result.exitPrice,
+            quantity: result.closedQuantity,
+            exchangeConfirmed: true,
+            fullyFilled: result.fullyFilled,
+            protectionRestored: result.protectionRestored,
+            warning: result.error,
+          }
+        : { orderType: level.reason, error: result.error },
+    });
+    // One exit per cycle. The trade and protection are reloaded on the next
+    // cycle, avoiding decisions based on a stale pre-fill position snapshot.
+    return;
+  }
+}
+
 async function checkOrderFills(client: Exchange, trade: Trade, plan: Plan): Promise<Alert[]> {
   const alerts: Alert[] = [];
-
-  // Check if this is a grid entry plan
   if (plan.strategy === "grid_entry" && plan.grid) {
     return await checkGridFills(client, trade, plan, alerts);
   }
 
   try {
-    const openOrders = await client.getOpenOrders(trade.symbol);
-    const openOrderIds = new Set(openOrders.map((o) => String(o.orderId)));
-
-    let tradeUpdated = false;
-    const updatedTrade = { ...trade };
-
-    const stopPrice = plan.stopLoss.price;
+    const orders = await loadPlanOrders(client, trade.symbol, trade.planId);
+    const reconciled = await applyConfirmedProtectiveFills(client, trade, plan, orders, alerts);
     const currentPrice = await client.getPrice(trade.symbol);
-
-    // If price has crossed below stop loss
-    if (currentPrice <= stopPrice && trade.status !== "CLOSED") {
-      const stopFill: ExitFill = {
-        orderId: `stop_${trade.id}`,
-        price: stopPrice,
-        quantity: calculateRemainingQuantity(trade),
-        filledAt: new Date().toISOString(),
-        reason: "STOP",
-      };
-
-      updatedTrade.exits = [...trade.exits, stopFill];
-      updatedTrade.status = "CLOSED";
-      updatedTrade.closedAt = new Date().toISOString();
-
-      const { realizedPnl, realizedPnlPercent } = calculateRealizedPnl(updatedTrade);
-      updatedTrade.realizedPnl = realizedPnl;
-      updatedTrade.realizedPnlPercent = realizedPnlPercent;
-
-      tradeUpdated = true;
-
-      alerts.push({
-        type: "order_filled",
-        tradeId: trade.id,
-        message: `${trade.symbol}: Stop loss triggered at ${stopPrice}`,
-        severity: "critical",
-        data: {
-          orderType: "STOP",
-          fillPrice: stopPrice,
-          realizedPnl,
-          realizedPnlPercent,
-        },
-      });
-
-      logger.warn("Stop loss triggered", {
-        tradeId: trade.id,
-        symbol: trade.symbol,
-        stopPrice,
-        pnl: realizedPnl,
-      });
-
-      logEvent({
-        type: "ORDER_FILLED",
-        data: {
-          orderType: "STOP",
-          fillPrice: stopPrice,
-          realizedPnl,
-          realizedPnlPercent,
-        },
-        tradeId: trade.id,
-        planId: trade.planId,
-      });
-    }
-
-    // Check take profit fills
-    for (let i = 0; i < plan.takeProfit.length; i++) {
-      const tp = plan.takeProfit[i];
-      if (!tp) {
-        continue;
-      }
-      const tpLabel = `TP${i + 1}` as "TP1" | "TP2" | "TP3";
-
-      const alreadyFilled = trade.exits.some((exit) => exit.reason === tpLabel);
-      if (alreadyFilled) {
-        continue;
-      }
-
-      if (currentPrice >= tp.price && trade.status !== "CLOSED") {
-        const remainingQty = calculateRemainingQuantity(updatedTrade);
-        const tpQuantity = remainingQty * tp.percentToSell;
-
-        const tpFill: ExitFill = {
-          orderId: `tp${i + 1}_${trade.id}`,
-          price: tp.price,
-          quantity: tpQuantity,
-          filledAt: new Date().toISOString(),
-          reason: tpLabel,
-        };
-
-        updatedTrade.exits = [...updatedTrade.exits, tpFill];
-
-        const totalExitPercent = calculateTotalExitPercent(updatedTrade);
-        if (totalExitPercent >= 0.99) {
-          updatedTrade.status = "CLOSED";
-          updatedTrade.closedAt = new Date().toISOString();
-        } else {
-          updatedTrade.status = "PARTIAL";
-        }
-
-        const { realizedPnl, realizedPnlPercent } = calculateRealizedPnl(updatedTrade);
-        updatedTrade.realizedPnl = realizedPnl;
-        updatedTrade.realizedPnlPercent = realizedPnlPercent;
-
-        tradeUpdated = true;
-
-        alerts.push({
-          type: "order_filled",
-          tradeId: trade.id,
-          message: `${trade.symbol}: ${tpLabel} triggered at ${tp.price}`,
-          severity: "info",
-          data: {
-            orderType: tpLabel,
-            fillPrice: tp.price,
-            quantity: tpQuantity,
-            percentSold: tp.percentToSell * 100,
-          },
-        });
-
-        // Emit TP hit event
-        await emitEvent("alert:tp_hit", {
-          tradeId: trade.id,
-          symbol: trade.symbol,
-          level: (i + 1) as 1 | 2 | 3,
-          price: tp.price,
-        });
-
-        logger.info("Take profit triggered", {
-          tradeId: trade.id,
-          symbol: trade.symbol,
-          level: tpLabel,
-          price: tp.price,
-        });
-
-        logEvent({
-          type: "ORDER_FILLED",
-          data: {
-            orderType: tpLabel,
-            fillPrice: tp.price,
-            quantity: tpQuantity,
-            percentSold: tp.percentToSell * 100,
-          },
-          tradeId: trade.id,
-          planId: trade.planId,
-        });
-      }
-    }
-
-    if (tradeUpdated) {
-      updateTrade(trade.id, updatedTrade);
-    }
+    await maybeExecuteManagedTakeProfit(client, reconciled, plan, orders, currentPrice, alerts);
   } catch (error) {
-    logger.error("Error checking order fills", error as Error, { symbol: trade.symbol });
+    // Exchange truth is mandatory. A price crossing is an alert condition, not
+    // evidence that a resting order executed.
+    logger.error("Error reconciling order fills", error as Error, { symbol: trade.symbol });
   }
-
   return alerts;
 }
 
@@ -722,24 +821,12 @@ async function checkGridFills(
   try {
     const currentPrice = await client.getPrice(trade.symbol);
     const openOrders = await client.getOpenOrders(trade.symbol);
-    const stopPrice = plan.stopLoss.price;
-
     let tradeUpdated = false;
     const updatedTrade = { ...trade };
 
-    const knownEntryOrderIds = new Set(trade.entries.map((e) => e.orderId));
     const gridLevels = plan.grid.levels;
 
-    let orderHistory: Awaited<ReturnType<Exchange["getOrderHistory"]>> = [];
-    try {
-      orderHistory = await client.getOrderHistory(trade.symbol, 200);
-    } catch (historyError) {
-      logger.warn("Failed to load order history for grid fill detection", {
-        tradeId: trade.id,
-        symbol: trade.symbol,
-        error: historyError instanceof Error ? historyError.message : String(historyError),
-      });
-    }
+    const orderHistory = await client.getOrderHistory(trade.symbol, 200);
 
     const ordersByClientId = new Map<string, (typeof orderHistory)[number]>();
     for (const order of [...orderHistory, ...openOrders]) {
@@ -759,21 +846,27 @@ async function checkGridFills(
       }
 
       const orderId = exchangeOrder.orderId.toString();
-      if (knownEntryOrderIds.has(orderId)) {
-        continue;
-      }
-
       const isFilled =
         exchangeOrder.status === "FILLED" || exchangeOrder.status === "PARTIALLY_FILLED";
       if (!isFilled || exchangeOrder.executedQty <= 0) {
         continue;
       }
 
+      const priorForOrder = updatedTrade.entries.filter((entry) => entry.orderId === orderId);
+      const priorQuantity = priorForOrder.reduce((sum, entry) => sum + entry.quantity, 0);
+      const levelQuantity = roundQuantity(exchangeOrder.executedQty - priorQuantity);
+      if (levelQuantity <= 0) continue;
+      const priorQuote = priorForOrder.reduce(
+        (sum, entry) => sum + entry.price * entry.quantity,
+        0,
+      );
+      const deltaQuote = exchangeOrder.cummulativeQuoteQty - priorQuote;
       const fillPrice =
-        exchangeOrder.executedQty > 0 && exchangeOrder.cummulativeQuoteQty > 0
-          ? exchangeOrder.cummulativeQuoteQty / exchangeOrder.executedQty
-          : level.price;
-      const levelQuantity = roundQuantity(exchangeOrder.executedQty);
+        deltaQuote > 0
+          ? deltaQuote / levelQuantity
+          : exchangeOrder.cummulativeQuoteQty > 0
+            ? exchangeOrder.cummulativeQuoteQty / exchangeOrder.executedQty
+            : level.price;
 
       const gridFill: EntryFill = {
         orderId,
@@ -785,7 +878,6 @@ async function checkGridFills(
       };
 
       updatedTrade.entries = [...updatedTrade.entries, gridFill];
-      knownEntryOrderIds.add(orderId);
       tradeUpdated = true;
 
       const newAvgEntry = calculateWeightedAverageEntry(updatedTrade.entries);
@@ -833,120 +925,54 @@ async function checkGridFills(
       });
     }
 
-    // Check if stop loss has been hit
-    if (currentPrice <= stopPrice && updatedTrade.status !== "CLOSED") {
-      const remainingQty = calculateRemainingQuantity(updatedTrade);
+    // Do not infer a stop fill from a crossed price. Stop-limit orders can gap
+    // through and remain open; only exchange-reported executedQty below is
+    // allowed to change the trade ledger.
 
-      if (remainingQty > 0) {
-        const stopFill: ExitFill = {
-          orderId: `stop_${trade.id}`,
-          price: stopPrice,
-          quantity: remainingQty,
-          filledAt: new Date().toISOString(),
-          reason: "STOP",
-        };
-
-        updatedTrade.exits = [...updatedTrade.exits, stopFill];
-        updatedTrade.status = "CLOSED";
-        updatedTrade.closedAt = new Date().toISOString();
-
-        const { realizedPnl, realizedPnlPercent } = calculateRealizedPnl(updatedTrade);
-        updatedTrade.realizedPnl = realizedPnl;
-        updatedTrade.realizedPnlPercent = realizedPnlPercent;
-        tradeUpdated = true;
-
-        alerts.push({
-          type: "order_filled",
-          tradeId: trade.id,
-          message: `${trade.symbol}: Grid stop loss triggered at ${stopPrice}`,
-          severity: "critical",
-          data: {
-            orderType: "STOP",
-            fillPrice: stopPrice,
-            quantity: remainingQty,
-            realizedPnl,
-            realizedPnlPercent,
-          },
-        });
-
-        logger.warn("Grid stop loss triggered", {
-          tradeId: trade.id,
-          symbol: trade.symbol,
-          stopPrice,
-          pnl: realizedPnl,
-        });
-
-        logEvent({
-          type: "ORDER_FILLED",
-          data: {
-            orderType: "STOP",
-            fillPrice: stopPrice,
-            realizedPnl,
-            realizedPnlPercent,
-          },
-          tradeId: trade.id,
-          planId: trade.planId,
-        });
-      }
-    }
-
-    // Check if we should place deferred take profits
+    let gridTakeProfitEligible = false;
     if (updatedTrade.status !== "CLOSED" && updatedTrade.entries.length > 0) {
-      const filledLevels = updatedTrade.entries.length;
+      const filledLevels = gridLevels.filter((_, index) => {
+        const clientOrderId = generateDeterministicClientOrderId(trade.planId, `grid${index + 1}`);
+        return (ordersByClientId.get(clientOrderId)?.executedQty ?? 0) > 0;
+      }).length;
       const totalLevels = gridLevels.length;
       const allLevelsFilled = filledLevels >= totalLevels;
 
-      // Find the highest filled level price
-      const highestFilledPrice = Math.max(...updatedTrade.entries.map((e) => e.price));
-
-      // Check for price reversal (1% above highest filled level)
-      const reversalThreshold = highestFilledPrice * (1 + GRID_REVERSAL_THRESHOLD);
-      const priceReversed = currentPrice >= reversalThreshold;
-
-      // Check if TPs have already been placed (by checking for existing TP exits or TP orders)
-      const hasTakeProfitOrders = openOrders.some((o) => o.side === "SELL" && o.type === "LIMIT");
-      const hasFilledTakeProfit = updatedTrade.exits.some((exit) => exit.reason.startsWith("TP"));
-
-      // Place deferred TPs if: (all levels filled OR price reversed) AND no TPs placed yet
-      if ((allLevelsFilled || priceReversed) && !hasTakeProfitOrders && !hasFilledTakeProfit) {
-        const totalQuantity = remainingTradeQuantity(updatedTrade);
-
-        if (totalQuantity <= 0) {
-          logger.info("Skipping deferred take profits because no open quantity remains", {
-            tradeId: trade.id,
-            symbol: trade.symbol,
-          });
-        } else {
-          logger.info("Placing deferred take profits", {
-            tradeId: trade.id,
-            symbol: trade.symbol,
-            reason: allLevelsFilled ? "all_levels_filled" : "price_reversal",
-            totalQuantity,
-            filledLevels,
-            currentPrice,
-          });
-
-          await placeDeferredTakeProfits(client, updatedTrade, plan, totalQuantity, alerts);
-
-          alerts.push({
-            type: "order_filled",
-            tradeId: trade.id,
-            message: `${trade.symbol}: Deferred take profits placed (${allLevelsFilled ? "all levels filled" : "price reversal"})`,
-            severity: "info",
-            data: {
-              reason: allLevelsFilled ? "all_levels_filled" : "price_reversal",
-              filledLevels,
-              totalLevels,
-              currentPrice,
-              reversalThreshold,
-            },
-          });
-        }
-      }
+      const filledPrices = updatedTrade.entries.map((entry) => entry.price);
+      const reversalAnchor =
+        plan.direction === "short" ? Math.min(...filledPrices) : Math.max(...filledPrices);
+      const reversalThreshold =
+        plan.direction === "short"
+          ? reversalAnchor * (1 - GRID_REVERSAL_THRESHOLD)
+          : reversalAnchor * (1 + GRID_REVERSAL_THRESHOLD);
+      const priceReversed =
+        plan.direction === "short"
+          ? currentPrice <= reversalThreshold
+          : currentPrice >= reversalThreshold;
+      gridTakeProfitEligible = allLevelsFilled || priceReversed;
     }
 
-    if (tradeUpdated) {
-      updateTrade(trade.id, updatedTrade);
+    if (tradeUpdated) updateTrade(trade.id, updatedTrade);
+
+    const reconciledTrade = await applyConfirmedProtectiveFills(
+      client,
+      updatedTrade,
+      plan,
+      mergeOrders(orderHistory, openOrders),
+      alerts,
+    );
+    if (gridTakeProfitEligible) {
+      await maybeExecuteManagedTakeProfit(
+        client,
+        reconciledTrade,
+        plan,
+        mergeOrders(orderHistory, openOrders),
+        currentPrice,
+        alerts,
+      );
+    }
+
+    if (tradeUpdated && reconciledTrade.status !== "CLOSED") {
       try {
         const repair = await repairProtectiveOrders(trade.planId, client);
         if (repair.repaired) {
@@ -1009,148 +1035,6 @@ export function remainingTradeQuantity(trade: Pick<Trade, "entries" | "exits">):
   return roundQuantity(Math.max(0, entered - exited));
 }
 
-/**
- * Place deferred take profit orders after grid entries have filled
- *
- * This is called when either all grid levels have filled or price has
- * reversed above the highest filled level, indicating the dip-buying
- * phase is complete.
- *
- * Fixed: Now properly tracks successful placements to calculate remaining
- * quantity correctly even if some TP orders fail.
- */
-async function placeDeferredTakeProfits(
-  client: Exchange,
-  trade: Trade,
-  plan: Plan,
-  totalQuantity: number,
-  alerts: Alert[],
-): Promise<void> {
-  assertConsentForExposure(client, "monitor.deferred_take_profits", {
-    direction: "REDUCES_EXPOSURE",
-    reduction: {
-      side: "SELL",
-      quantity: totalQuantity,
-      exitSide: "SELL",
-      remainingQuantity: remainingTradeQuantity(trade),
-    },
-  });
-
-  // Track successfully placed quantities to properly calculate remaining
-  let placedQuantity = 0;
-  const tpResults: { level: number; success: boolean; quantity: number }[] = [];
-
-  // First pass: attempt to place all TP orders
-  for (let i = 0; i < plan.takeProfit.length; i++) {
-    const tp = plan.takeProfit[i];
-    if (!tp) continue;
-
-    const isLastTP = i === plan.takeProfit.length - 1;
-
-    // Calculate quantity for this TP level
-    // For the last TP, use whatever quantity remains after previous successful placements
-    const unplacedQuantity = roundQuantity(totalQuantity - placedQuantity);
-    const tpQuantity = isLastTP
-      ? unplacedQuantity
-      : roundQuantity(Math.min(unplacedQuantity, totalQuantity * tp.percentToSell));
-
-    if (tpQuantity <= 0) {
-      tpResults.push({ level: i + 1, success: false, quantity: 0 });
-      continue;
-    }
-
-    const tpOrderParams: OrderParams = {
-      symbol: trade.symbol,
-      side: "SELL",
-      type: "LIMIT",
-      quantity: tpQuantity,
-      price: roundPrice(tp.price),
-      timeInForce: "GTC",
-      newClientOrderId: generateClientOrderId(trade.planId, `tp${i + 1}`),
-    };
-
-    try {
-      const tpOrder = await client.placeOrder(tpOrderParams);
-
-      // Only increment placedQuantity on successful placement
-      placedQuantity += tpQuantity;
-      tpResults.push({ level: i + 1, success: true, quantity: tpQuantity });
-
-      logger.info("Deferred take profit order placed", {
-        tradeId: trade.id,
-        level: i + 1,
-        orderId: tpOrder.orderId,
-        price: tp.price,
-        quantity: tpQuantity,
-      });
-
-      logEvent({
-        type: "ORDER_PLACED",
-        data: {
-          action: `DEFERRED_TP_${i + 1}`,
-          orderId: tpOrder.orderId.toString(),
-          symbol: trade.symbol,
-          side: "SELL",
-          type: "LIMIT",
-          price: tp.price,
-          quantity: tpQuantity,
-        },
-        tradeId: trade.id,
-        planId: trade.planId,
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-
-      // Don't increment placedQuantity on failure - the quantity is still available
-      tpResults.push({ level: i + 1, success: false, quantity: 0 });
-
-      logger.error("Failed to place deferred TP order", error as Error, {
-        tradeId: trade.id,
-        level: i + 1,
-        params: tpOrderParams,
-      });
-
-      logEvent({
-        type: "ERROR",
-        data: {
-          action: "DEFERRED_TP_FAILED",
-          tpLevel: i + 1,
-          params: tpOrderParams,
-          error: errorMessage,
-        },
-        tradeId: trade.id,
-        planId: trade.planId,
-      });
-
-      alerts.push({
-        type: "order_filled",
-        tradeId: trade.id,
-        message: `${trade.symbol}: Failed to place deferred TP${i + 1}: ${errorMessage}`,
-        severity: "warning",
-        data: {
-          orderType: `DEFERRED_TP_${i + 1}`,
-          error: errorMessage,
-        },
-      });
-    }
-  }
-
-  // Log summary of TP placement
-  const successCount = tpResults.filter((r) => r.success).length;
-  const failCount = tpResults.filter((r) => !r.success && r.quantity === 0).length;
-
-  if (failCount > 0) {
-    logger.warn("Some deferred TPs failed to place", {
-      tradeId: trade.id,
-      successCount,
-      failCount,
-      placedQuantity,
-      totalQuantity,
-      unplacedQuantity: totalQuantity - placedQuantity,
-    });
-  }
-}
-
 // ============================================================================
 // Grid Take Profit Placement
 // ============================================================================
@@ -1167,44 +1051,17 @@ export interface GridTPPlacementResult {
 }
 
 /**
- * Information about which grid levels have been filled
- */
-interface GridLevelStatus {
-  levelIndex: number;
-  price: number;
-  isFilled: boolean;
-  fillQuantity: number;
-  fillTime?: string;
-}
-
-/**
- * Place Grid Take Profit orders for a trade
- *
- * This function handles the placement of take profit orders for grid entry trades.
- * It is designed to be called during the monitor cycle and handles:
- * - Detecting grid trades without TP orders
- * - Calculating TP price based on grid configuration and average entry
- * - Placing limit sell orders at each TP level
- * - Tracking which grid levels have been filled
- * - Handling partial fills of grid entries
- *
- * @param trade - The trade to place TPs for
- * @param exchange - Authenticated exchange adapter
- * @returns GridTPPlacementResult with status and any alerts generated
+ * Execute at most one eligible grid take-profit through the managed close
+ * path. No resting take-profit order is placed here: a venue without native
+ * OCO cannot make independent stop and take-profit orders mutually exclusive.
  */
 export async function placeGridTakeProfits(
   trade: Trade,
   exchange: Exchange,
 ): Promise<GridTPPlacementResult> {
   const alerts: Alert[] = [];
-
-  // Get the plan for this trade
   const plan = getPlan(trade.planId);
   if (!plan) {
-    logger.warn("Cannot place grid TPs - plan not found", {
-      tradeId: trade.id,
-      planId: trade.planId,
-    });
     return {
       success: false,
       placedCount: 0,
@@ -1213,8 +1070,6 @@ export async function placeGridTakeProfits(
       alerts,
     };
   }
-
-  // Verify this is a grid entry trade
   if (plan.strategy !== "grid_entry" || !plan.grid) {
     return {
       success: false,
@@ -1224,21 +1079,16 @@ export async function placeGridTakeProfits(
       alerts,
     };
   }
-
-  // Skip if trade is already closed
-  if (trade.status === "CLOSED") {
+  if (trade.status === "CLOSED" || remainingTradeQuantity(trade) <= 0) {
     return {
       success: false,
       placedCount: 0,
       failedCount: 0,
-      skippedReason: "Trade is closed",
+      skippedReason: "Trade is closed or has no remaining quantity",
       alerts,
     };
   }
-
-  // Check if any grid entries have filled
   if (trade.entries.length === 0) {
-    logger.debug("No grid entries filled yet", { tradeId: trade.id });
     return {
       success: false,
       placedCount: 0,
@@ -1249,352 +1099,80 @@ export async function placeGridTakeProfits(
   }
 
   try {
-    // Get current price and open orders
     const currentPrice = await exchange.getPrice(trade.symbol);
-    const openOrders = await exchange.getOpenOrders(trade.symbol);
-
-    // Check if TP orders already exist
-    const existingTpOrders = openOrders.filter((o) => o.side === "SELL" && o.type === "LIMIT");
-
-    if (existingTpOrders.length > 0) {
-      logger.debug("Grid TPs already placed", {
-        tradeId: trade.id,
-        existingTpCount: existingTpOrders.length,
-      });
-      return {
-        success: true,
-        placedCount: 0,
-        failedCount: 0,
-        skippedReason: "TP orders already exist",
-        alerts,
-      };
-    }
-
-    // Check if any exits have already occurred (partial TP fills)
-    if (trade.exits.length > 0) {
-      const tpExits = trade.exits.filter((e) => e.reason.startsWith("TP"));
-      if (tpExits.length > 0) {
-        logger.debug("Trade already has TP exits", {
-          tradeId: trade.id,
-          tpExitCount: tpExits.length,
-        });
-        return {
-          success: true,
-          placedCount: 0,
-          failedCount: 0,
-          skippedReason: "TPs already partially filled",
-          alerts,
-        };
-      }
-    }
-
-    // Analyze grid fill status
-    const gridLevels = plan.grid.levels;
-    const filledLevelPrices = new Set(trade.entries.map((e) => e.price));
-    const gridLevelStatus: GridLevelStatus[] = gridLevels.map((level, index) => {
-      const matchingEntry = trade.entries.find((e) => e.price === level.price);
-      return {
-        levelIndex: index + 1,
-        price: level.price,
-        isFilled: filledLevelPrices.has(level.price),
-        fillQuantity: matchingEntry?.quantity ?? 0,
-        fillTime: matchingEntry?.filledAt,
-      };
-    });
-
-    const filledLevels = gridLevelStatus.filter((l) => l.isFilled);
-    const totalLevels = gridLevels.length;
-    const fillPercent = filledLevels.length / totalLevels;
-
-    logger.debug("Grid fill status", {
-      tradeId: trade.id,
-      filledLevels: filledLevels.length,
-      totalLevels,
-      fillPercent: (fillPercent * 100).toFixed(1) + "%",
-    });
-
-    // Determine if we should place TPs
-    const allLevelsFilled = filledLevels.length >= totalLevels;
-
-    // Find the highest filled level price for reversal detection
-    const highestFilledPrice = Math.max(...trade.entries.map((e) => e.price));
-    const reversalThreshold = highestFilledPrice * (1 + GRID_REVERSAL_THRESHOLD);
-    const priceReversed = currentPrice >= reversalThreshold;
-
-    // Check minimum fill threshold (at least 20% of grid should be filled)
-    const minFillThresholdMet = fillPercent >= GRID_TP_MIN_FILL_PERCENT;
-
-    // Determine if conditions are met for TP placement
-    const shouldPlaceTPs = allLevelsFilled || (priceReversed && minFillThresholdMet);
-
-    if (!shouldPlaceTPs) {
-      const reason = !minFillThresholdMet
-        ? `Insufficient fills (${(fillPercent * 100).toFixed(0)}% < ${GRID_TP_MIN_FILL_PERCENT * 100}% required)`
-        : `Waiting for all levels or price reversal (current: ${currentPrice.toFixed(4)}, reversal at: ${reversalThreshold.toFixed(4)})`;
-
-      logger.debug("Conditions not met for grid TP placement", {
-        tradeId: trade.id,
-        allLevelsFilled,
-        priceReversed,
-        minFillThresholdMet,
-        currentPrice,
-        reversalThreshold,
-      });
-
+    const orders = await loadPlanOrders(exchange, trade.symbol, trade.planId);
+    const ordersByClientId = new Map(
+      orders
+        .filter((order): order is Order & { clientOrderId: string } => Boolean(order.clientOrderId))
+        .map((order) => [order.clientOrderId, order]),
+    );
+    const filledLevelCount = plan.grid.levels.filter((_, index) => {
+      const clientOrderId = generateDeterministicClientOrderId(trade.planId, `grid${index + 1}`);
+      return (ordersByClientId.get(clientOrderId)?.executedQty ?? 0) > 0;
+    }).length;
+    const fillPercent = filledLevelCount / plan.grid.levels.length;
+    const allLevelsFilled = filledLevelCount >= plan.grid.levels.length;
+    const filledPrices = trade.entries.map((entry) => entry.price);
+    const reversalAnchor =
+      plan.direction === "short" ? Math.min(...filledPrices) : Math.max(...filledPrices);
+    const reversalThreshold =
+      plan.direction === "short"
+        ? reversalAnchor * (1 - GRID_REVERSAL_THRESHOLD)
+        : reversalAnchor * (1 + GRID_REVERSAL_THRESHOLD);
+    const priceReversed =
+      plan.direction === "short"
+        ? currentPrice <= reversalThreshold
+        : currentPrice >= reversalThreshold;
+    const eligible = allLevelsFilled || (priceReversed && fillPercent >= GRID_TP_MIN_FILL_PERCENT);
+    if (!eligible) {
       return {
         success: false,
         placedCount: 0,
         failedCount: 0,
-        skippedReason: reason,
+        skippedReason:
+          fillPercent < GRID_TP_MIN_FILL_PERCENT
+            ? "Insufficient fills (" +
+              (fillPercent * 100).toFixed(0) +
+              "% < " +
+              GRID_TP_MIN_FILL_PERCENT * 100 +
+              "% required)"
+            : "Waiting for all levels or price reversal (current: " +
+              currentPrice.toFixed(4) +
+              ", reversal at: " +
+              reversalThreshold.toFixed(4) +
+              ")",
         alerts,
       };
     }
 
-    // Filled exits of every kind reduce what these resting sells may close.
-    const totalQuantity = remainingTradeQuantity(trade);
-
-    if (totalQuantity <= 0) {
-      return {
-        success: false,
-        placedCount: 0,
-        failedCount: 0,
-        skippedReason: "No quantity to place TPs for",
-        alerts,
-      };
-    }
-
-    logger.info("Placing grid take profit orders", {
-      tradeId: trade.id,
-      symbol: trade.symbol,
-      reason: allLevelsFilled ? "all_levels_filled" : "price_reversal",
-      filledLevels: filledLevels.length,
-      totalLevels,
-      totalQuantity,
-      averageEntry: trade.averageEntry,
-      currentPrice,
-    });
-
-    assertConsentForExposure(exchange, "monitor.grid_take_profits", {
-      direction: "REDUCES_EXPOSURE",
-      reduction: {
-        side: "SELL",
-        quantity: totalQuantity,
-        exitSide: "SELL",
-        remainingQuantity: totalQuantity,
-      },
-    });
-
-    // Place TP orders
-    let placedCount = 0;
-    let failedCount = 0;
-    let remainingQuantity = totalQuantity;
-
-    for (let i = 0; i < plan.takeProfit.length; i++) {
-      const tp = plan.takeProfit[i];
-      if (!tp) continue;
-
-      const isLastTP = i === plan.takeProfit.length - 1;
-
-      // Calculate quantity for this TP level
-      // For the last TP, use whatever quantity remains
-      const tpQuantity = isLastTP
-        ? roundQuantity(remainingQuantity)
-        : roundQuantity(Math.min(remainingQuantity, totalQuantity * tp.percentToSell));
-
-      if (tpQuantity <= 0) {
-        logger.debug("Skipping TP level - no quantity", { level: i + 1 });
-        continue;
-      }
-
-      remainingQuantity = roundQuantity(remainingQuantity - tpQuantity);
-
-      const tpOrderParams: OrderParams = {
-        symbol: trade.symbol,
-        side: "SELL",
-        type: "LIMIT",
-        quantity: tpQuantity,
-        price: roundPrice(tp.price),
-        timeInForce: "GTC",
-        newClientOrderId: generateClientOrderId(trade.planId, `grid_tp${i + 1}`),
-      };
-
-      try {
-        const tpOrder = await exchange.placeOrder(tpOrderParams);
-        placedCount++;
-
-        logger.info("Grid TP order placed", {
-          tradeId: trade.id,
-          level: i + 1,
-          orderId: tpOrder.orderId,
-          price: tp.price,
-          quantity: tpQuantity,
-          percentToSell: tp.percentToSell * 100,
-        });
-
-        logEvent({
-          type: "ORDER_PLACED",
-          data: {
-            action: `GRID_TP_${i + 1}`,
-            orderId: tpOrder.orderId.toString(),
-            symbol: trade.symbol,
-            side: "SELL",
-            type: "LIMIT",
-            price: tp.price,
-            quantity: tpQuantity,
-            gridLevelsFilled: filledLevels.length,
-            totalGridLevels: totalLevels,
-            placementReason: allLevelsFilled ? "all_levels_filled" : "price_reversal",
-          },
-          tradeId: trade.id,
-          planId: trade.planId,
-        });
-
-        alerts.push({
-          type: "order_filled",
-          tradeId: trade.id,
-          message: `${trade.symbol}: Grid TP${i + 1} order placed at ${tp.price}`,
-          severity: "info",
-          data: {
-            orderType: `GRID_TP_${i + 1}`,
-            price: tp.price,
-            quantity: tpQuantity,
-            orderId: tpOrder.orderId.toString(),
-          },
-        });
-      } catch (error) {
-        failedCount++;
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-
-        logger.error("Failed to place grid TP order", error as Error, {
-          tradeId: trade.id,
-          level: i + 1,
-          params: tpOrderParams,
-        });
-
-        logEvent({
-          type: "ERROR",
-          data: {
-            action: "GRID_TP_FAILED",
-            tpLevel: i + 1,
-            params: tpOrderParams,
-            error: errorMessage,
-          },
-          tradeId: trade.id,
-          planId: trade.planId,
-        });
-
-        alerts.push({
-          type: "order_filled",
-          tradeId: trade.id,
-          message: `${trade.symbol}: Failed to place grid TP${i + 1}: ${errorMessage}`,
-          severity: "warning",
-          data: {
-            orderType: `GRID_TP_${i + 1}`,
-            error: errorMessage,
-          },
-        });
-      }
-    }
-
-    // Log summary
-    const success = placedCount > 0 && failedCount === 0;
-
-    if (placedCount > 0) {
-      logger.info("Grid TP placement complete", {
-        tradeId: trade.id,
-        symbol: trade.symbol,
-        placedCount,
-        failedCount,
-        success,
-      });
-
-      alerts.push({
-        type: "order_filled",
-        tradeId: trade.id,
-        message: `${trade.symbol}: Grid TPs placed (${placedCount}/${plan.takeProfit.length}) - ${allLevelsFilled ? "all levels filled" : "price reversal detected"}`,
-        severity: "info",
-        data: {
-          placedCount,
-          failedCount,
-          reason: allLevelsFilled ? "all_levels_filled" : "price_reversal",
-          filledGridLevels: filledLevels.length,
-          totalGridLevels: totalLevels,
-        },
-      });
-    }
+    const before = new Set(trade.exits.map((exit) => exit.orderId));
+    await maybeExecuteManagedTakeProfit(exchange, trade, plan, orders, currentPrice, alerts);
+    const updated = getTrade(trade.id);
+    const confirmedCount = updated
+      ? updated.exits.filter((exit) => exit.reason.startsWith("TP") && !before.has(exit.orderId))
+          .length
+      : 0;
 
     return {
-      success,
-      placedCount,
-      failedCount,
+      success: confirmedCount > 0,
+      placedCount: confirmedCount,
+      failedCount: alerts.some((alert) => alert.severity === "critical") ? 1 : 0,
+      skippedReason: confirmedCount > 0 ? undefined : "No managed take-profit fill was confirmed",
       alerts,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-
-    logger.error("Error in placeGridTakeProfits", error as Error, {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error("Error executing grid take profit", error as Error, {
       tradeId: trade.id,
       symbol: trade.symbol,
     });
-
     return {
       success: false,
       placedCount: 0,
-      failedCount: 0,
-      skippedReason: `Error: ${errorMessage}`,
+      failedCount: 1,
+      skippedReason: `Error: ${message}`,
       alerts,
     };
-  }
-}
-
-/**
- * Process all grid trades and place TPs where needed
- * Called from runMonitorCycle
- */
-async function processGridTakeProfits(client: Exchange, alerts: Alert[]): Promise<void> {
-  // Get all active trades
-  const openTrades = listTrades({ status: "OPEN" });
-  const partialTrades = listTrades({ status: "PARTIAL" });
-  const allActiveTrades = [...openTrades, ...partialTrades];
-
-  // Filter to grid trades only
-  const gridTrades: Trade[] = [];
-  for (const trade of allActiveTrades) {
-    const plan = getPlan(trade.planId);
-    if (plan?.strategy === "grid_entry" && plan.grid) {
-      gridTrades.push(trade);
-    }
-  }
-
-  if (gridTrades.length === 0) {
-    return;
-  }
-
-  logger.debug("Processing grid TPs", { gridTradeCount: gridTrades.length });
-
-  for (const trade of gridTrades) {
-    try {
-      const result = await placeGridTakeProfits(trade, client);
-
-      // Add any alerts from the placement
-      alerts.push(...result.alerts);
-
-      if (result.placedCount > 0) {
-        logger.info("Grid TPs placed for trade", {
-          tradeId: trade.id,
-          placedCount: result.placedCount,
-        });
-      } else if (result.skippedReason) {
-        logger.debug("Grid TP placement skipped", {
-          tradeId: trade.id,
-          reason: result.skippedReason,
-        });
-      }
-    } catch (error) {
-      logger.error("Error processing grid TPs for trade", error as Error, {
-        tradeId: trade.id,
-      });
-    }
   }
 }
 
@@ -1602,9 +1180,10 @@ async function processGridTakeProfits(client: Exchange, alerts: Alert[]): Promis
 // PnL Calculations
 // ============================================================================
 
-function calculateUnrealizedPnl(
+export function calculateUnrealizedPnl(
   trade: Trade,
   currentPrice: number,
+  plan: Pick<Plan, "direction">,
 ): { unrealizedPnl: number; unrealizedPnlPercent: number } {
   const avgEntry = trade.averageEntry;
   const remainingQty = calculateRemainingQuantity(trade);
@@ -1613,13 +1192,17 @@ function calculateUnrealizedPnl(
     return { unrealizedPnl: 0, unrealizedPnlPercent: 0 };
   }
 
-  const unrealizedPnl = (currentPrice - avgEntry) * remainingQty;
-  const unrealizedPnlPercent = ((currentPrice - avgEntry) / avgEntry) * 100;
+  const multiplier = plan.direction === "short" ? -1 : 1;
+  const unrealizedPnl = multiplier * (currentPrice - avgEntry) * remainingQty;
+  const unrealizedPnlPercent = multiplier * ((currentPrice - avgEntry) / avgEntry) * 100;
 
   return { unrealizedPnl, unrealizedPnlPercent };
 }
 
-function calculateRealizedPnl(trade: Trade): { realizedPnl: number; realizedPnlPercent: number } {
+export function calculateRealizedPnl(
+  trade: Trade,
+  plan: Pick<Plan, "direction">,
+): { realizedPnl: number; realizedPnlPercent: number } {
   const avgEntry = trade.averageEntry;
 
   if (avgEntry === 0 || trade.exits.length === 0) {
@@ -1629,8 +1212,9 @@ function calculateRealizedPnl(trade: Trade): { realizedPnl: number; realizedPnlP
   let totalRealizedPnl = 0;
   let totalExitQty = 0;
 
+  const multiplier = plan.direction === "short" ? -1 : 1;
   for (const exit of trade.exits) {
-    const exitPnl = (exit.price - avgEntry) * exit.quantity;
+    const exitPnl = multiplier * (exit.price - avgEntry) * exit.quantity;
     totalRealizedPnl += exitPnl;
     totalExitQty += exit.quantity;
   }
@@ -1644,10 +1228,10 @@ function calculateRealizedPnl(trade: Trade): { realizedPnl: number; realizedPnlP
 function calculateRemainingQuantity(trade: Trade): number {
   const totalEntryQty = trade.entries.reduce((sum, e) => sum + e.quantity, 0);
   const totalExitQty = trade.exits.reduce((sum, e) => sum + e.quantity, 0);
-  return totalEntryQty - totalExitQty;
+  return Math.max(0, totalEntryQty - totalExitQty);
 }
 
-function calculateTotalExitPercent(trade: Trade): number {
+function _calculateTotalExitPercent(trade: Trade): number {
   const totalEntryQty = trade.entries.reduce((sum, e) => sum + e.quantity, 0);
   const totalExitQty = trade.exits.reduce((sum, e) => sum + e.quantity, 0);
   return totalEntryQty > 0 ? totalExitQty / totalEntryQty : 0;
@@ -1660,7 +1244,9 @@ function calculateTotalExitPercent(trade: Trade): number {
 function calculateDistanceToStop(currentPrice: number, plan: Plan): number {
   const stopPrice = plan.stopLoss.price;
   if (currentPrice === 0) return 0;
-  return ((currentPrice - stopPrice) / currentPrice) * 100;
+  return plan.direction === "short"
+    ? ((stopPrice - currentPrice) / currentPrice) * 100
+    : ((currentPrice - stopPrice) / currentPrice) * 100;
 }
 
 function calculateDistanceToNextTP(trade: Trade, currentPrice: number, plan: Plan): number {
@@ -1675,7 +1261,9 @@ function calculateDistanceToNextTP(trade: Trade, currentPrice: number, plan: Pla
     const tp = plan.takeProfit[i];
     if (!filledTPs.has(tpLabel) && tp) {
       const tpPrice = tp.price;
-      return ((tpPrice - currentPrice) / currentPrice) * 100;
+      return plan.direction === "short"
+        ? ((currentPrice - tpPrice) / currentPrice) * 100
+        : ((tpPrice - currentPrice) / currentPrice) * 100;
     }
   }
 
@@ -1923,7 +1511,10 @@ function checkRealtimePriceAlert(symbol: string, price: number): void {
     if (!plan) continue;
 
     const stopPrice = plan.stopLoss.price;
-    const distanceToStop = ((price - stopPrice) / price) * 100;
+    const distanceToStop =
+      plan.direction === "short"
+        ? ((stopPrice - price) / price) * 100
+        : ((price - stopPrice) / price) * 100;
 
     // Emit critical alert if price is within 1% of stop
     if (distanceToStop <= CRITICAL_THRESHOLD_PERCENT && distanceToStop > 0) {
@@ -1946,7 +1537,8 @@ function checkRealtimePriceAlert(symbol: string, price: number): void {
     }
 
     // Check if stop-loss was breached
-    if (price <= stopPrice) {
+    const stopBreached = plan.direction === "short" ? price >= stopPrice : price <= stopPrice;
+    if (stopBreached) {
       emitEvent("alert:stop_triggered", {
         tradeId: trade.id,
         symbol,

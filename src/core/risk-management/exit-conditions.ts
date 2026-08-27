@@ -93,13 +93,11 @@ export class ExitConditionChecker {
     entryPrice: number,
     currentPrice: number,
     side: "buy" | "sell",
-    quantity?: number
+    quantity?: number,
   ): PnLExitResult {
     try {
       const isLong = side === "buy";
-      const priceDiff = isLong
-        ? currentPrice - entryPrice
-        : entryPrice - currentPrice;
+      const priceDiff = isLong ? currentPrice - entryPrice : entryPrice - currentPrice;
 
       const pnlPercent = (priceDiff / entryPrice) * 100;
       const pnlUsd = quantity ? priceDiff * quantity : null;
@@ -155,12 +153,10 @@ export class ExitConditionChecker {
   checkPnLRateExit(
     entryTime: Date | string,
     currentPnLPercent: number,
-    currentTime?: Date
+    currentTime?: Date,
   ): PnLRateResult {
     try {
-      const entryDate = typeof entryTime === "string"
-        ? new Date(entryTime)
-        : entryTime;
+      const entryDate = typeof entryTime === "string" ? new Date(entryTime) : entryTime;
       const now = currentTime || new Date();
 
       const minutesHeld = (now.getTime() - entryDate.getTime()) / (1000 * 60);
@@ -229,14 +225,9 @@ export class ExitConditionChecker {
   /**
    * Check if position should exit based on time held
    */
-  checkTimeExit(
-    entryTime: Date | string,
-    currentTime?: Date
-  ): TimeExitResult {
+  checkTimeExit(entryTime: Date | string, currentTime?: Date): TimeExitResult {
     try {
-      const entryDate = typeof entryTime === "string"
-        ? new Date(entryTime)
-        : entryTime;
+      const entryDate = typeof entryTime === "string" ? new Date(entryTime) : entryTime;
       const now = currentTime || new Date();
 
       const minutesHeld = (now.getTime() - entryDate.getTime()) / (1000 * 60);
@@ -313,7 +304,7 @@ export class ExitConditionChecker {
       params.entryPrice,
       params.currentPrice,
       params.side,
-      params.quantity
+      params.quantity,
     );
     signals.push(pnlExit);
 
@@ -331,15 +322,16 @@ export class ExitConditionChecker {
 
     // Get highest urgency
     const urgencyOrder = ["low", "medium", "high", "critical"] as const;
-    const highestUrgency = signals.reduce((max, s) => {
-      return urgencyOrder.indexOf(s.urgency) > urgencyOrder.indexOf(max)
-        ? s.urgency
-        : max;
-    }, "low" as "low" | "medium" | "high" | "critical");
+    const highestUrgency = signals.reduce(
+      (max, s) => {
+        return urgencyOrder.indexOf(s.urgency) > urgencyOrder.indexOf(max) ? s.urgency : max;
+      },
+      "low" as "low" | "medium" | "high" | "critical",
+    );
 
     // Primary reason is the highest urgency exit signal
     const primarySignal = exitSignals.sort(
-      (a, b) => urgencyOrder.indexOf(b.urgency) - urgencyOrder.indexOf(a.urgency)
+      (a, b) => urgencyOrder.indexOf(b.urgency) - urgencyOrder.indexOf(a.urgency),
     )[0];
 
     return {

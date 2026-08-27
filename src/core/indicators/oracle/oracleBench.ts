@@ -47,7 +47,13 @@ export function compareSeries(
       ok = Math.abs(a - e) <= Math.max(tol, Math.abs(e) * tol);
     }
     if (ok) matched++;
-    else mismatches.push({ index: i, actual: a, expected: e, absDiff: a !== null && e !== null ? Math.abs(a - e) : undefined });
+    else
+      mismatches.push({
+        index: i,
+        actual: a,
+        expected: e,
+        absDiff: a !== null && e !== null ? Math.abs(a - e) : undefined,
+      });
   }
 
   return { matched, total, matchRate: total === 0 ? 1 : matched / total, mismatches };
@@ -90,11 +96,14 @@ export interface OracleReport {
 /** Aggregate many cases into one report (the LDD "% green" gate). */
 export function runOracleBench(results: OracleResult[]): OracleReport {
   const passed = results.every((r) => r.passed);
-  const matchRate = results.length === 0 ? 1 : results.reduce((s, r) => s + r.matchRate, 0) / results.length;
+  const matchRate =
+    results.length === 0 ? 1 : results.reduce((s, r) => s + r.matchRate, 0) / results.length;
   const failed = results.filter((r) => !r.passed);
   const summary =
     `${results.length} oracle cases: ${results.length - failed.length} matched, ${failed.length} diverged` +
-    (failed.length > 0 ? ` — DIVERGED: ${failed.map((r) => `${r.name} (${r.mismatches})`).join("; ")}` : "");
+    (failed.length > 0
+      ? ` — DIVERGED: ${failed.map((r) => `${r.name} (${r.mismatches})`).join("; ")}`
+      : "");
   return { results, passed, matchRate, summary };
 }
 
@@ -104,7 +113,7 @@ export function runOracleBench(results: OracleResult[]): OracleReport {
  * series every run, so a failure is debuggable.)
  */
 export function makePrng(seed: number): () => number {
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   return () => {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return s / 4294967296;

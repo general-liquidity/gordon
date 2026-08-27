@@ -1,9 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  calculateHurst,
-  hurstToPayload,
-} from "./hurstExponent.ts";
+import { calculateHurst, hurstToPayload } from "./hurstExponent.ts";
 
 function trendingSeries(n: number): number[] {
   // Strongly trending: monotone growth with mild oscillation.

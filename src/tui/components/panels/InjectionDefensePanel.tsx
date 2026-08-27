@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 
@@ -25,10 +24,10 @@ interface Props {
 }
 
 const SEVERITY_CONFIG: Record<string, { color: string; icon: string }> = {
-  critical: { color: "red",    icon: "\u2717" },
-  high:     { color: "red",    icon: "\u26A0" },
-  medium:   { color: "yellow", icon: "\u25C8" },
-  low:      { color: "gray",   icon: "\u00b7" },
+  critical: { color: "red", icon: "\u2717" },
+  high: { color: "red", icon: "\u26A0" },
+  medium: { color: "yellow", icon: "\u25C8" },
+  low: { color: "gray", icon: "\u00b7" },
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -54,14 +53,17 @@ export function InjectionDefensePanel({ matches, inputBlocked, inputText, onClos
         <Text color={inputBlocked ? "red" : "yellow"} bold>
           {inputBlocked ? "\u2717 INPUT BLOCKED" : "\u26A0 PATTERNS DETECTED"}
         </Text>
-        <Text dimColor> {"\u00b7"} {matches.length} match{matches.length !== 1 ? "es" : ""}</Text>
+        <Text dimColor>
+          {" "}
+          {"\u00b7"} {matches.length} match{matches.length !== 1 ? "es" : ""}
+        </Text>
       </Box>
       <Text> </Text>
 
       {/* Input preview (truncated) */}
       <Box>
         <Text dimColor>Input: </Text>
-        <Text>{inputText.length > 60 ? inputText.slice(0, 60) + "\u2026" : inputText}</Text>
+        <Text>{inputText.length > 60 ? `${inputText.slice(0, 60)}\u2026` : inputText}</Text>
       </Box>
       <Text> </Text>
 
@@ -72,7 +74,9 @@ export function InjectionDefensePanel({ matches, inputBlocked, inputText, onClos
           <Box key={i} paddingLeft={2} flexDirection="column" marginBottom={0}>
             <Box>
               <Text color={sev.color}>{sev.icon} </Text>
-              <Text bold color={sev.color}>{match.severity.toUpperCase()}</Text>
+              <Text bold color={sev.color}>
+                {match.severity.toUpperCase()}
+              </Text>
               <Text dimColor> {"\u00b7"} </Text>
               <Text>{CATEGORY_LABELS[match.category] ?? match.category}</Text>
             </Box>
@@ -81,7 +85,8 @@ export function InjectionDefensePanel({ matches, inputBlocked, inputText, onClos
             </Box>
             <Box paddingLeft={4}>
               <Text color={sev.color}>
-                Matched: "{match.matchedText.slice(0, 80)}{match.matchedText.length > 80 ? "\u2026" : ""}"
+                Matched: "{match.matchedText.slice(0, 80)}
+                {match.matchedText.length > 80 ? "\u2026" : ""}"
               </Text>
             </Box>
           </Box>

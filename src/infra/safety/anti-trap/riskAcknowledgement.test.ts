@@ -69,11 +69,9 @@ describe("riskAcknowledgement", () => {
 
     it("rejects when required acks are missing", () => {
       const a = buildAssessment("medium", dims);
-      const r = verifyRiskAcknowledgement(
-        ["Some unrelated text about the market"],
-        a,
-        { GORDON_RISK_ACK: "1" },
-      );
+      const r = verifyRiskAcknowledgement(["Some unrelated text about the market"], a, {
+        GORDON_RISK_ACK: "1",
+      });
       expect(r.ok).toBe(false);
       expect(r.missing.length).toBeGreaterThan(0);
       expect(r.reason).toContain("acknowledgedRisks");
@@ -133,20 +131,15 @@ describe("verifyAcksFromWarnings", () => {
   });
 
   it("rejects boilerplate (<20 chars)", () => {
-    const r = verifyAcksFromWarnings(
-      ["ok", "yes"],
-      ["concentration high", "volatility elevated"],
-      { GORDON_RISK_ACK: "1" },
-    );
+    const r = verifyAcksFromWarnings(["ok", "yes"], ["concentration high", "volatility elevated"], {
+      GORDON_RISK_ACK: "1",
+    });
     expect(r.ok).toBe(false);
   });
 
   it("accepts when enough substantive acks are provided", () => {
     const r = verifyAcksFromWarnings(
-      [
-        "Concentration is 18% — within mandate",
-        "Volatility is elevated but plan sizes for ATR",
-      ],
+      ["Concentration is 18% — within mandate", "Volatility is elevated but plan sizes for ATR"],
       ["concentration approaching cap", "vol regime elevated"],
       { GORDON_RISK_ACK: "1" },
     );

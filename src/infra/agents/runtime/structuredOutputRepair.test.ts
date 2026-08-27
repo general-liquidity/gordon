@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { repairStructuredOutput, parseJsonLenient, jsonValidator } from "./structuredOutputRepair.ts";
+import {
+  repairStructuredOutput,
+  parseJsonLenient,
+  jsonValidator,
+} from "./structuredOutputRepair.ts";
 
 describe("repairStructuredOutput", () => {
   it("succeeds on the first valid output (no repairs)", async () => {

@@ -149,7 +149,7 @@ function normalizeWeights(weights: number[]): number[] {
 function applyMaxWeightCap(weights: number[], maxWeight: number): number[] {
   // Cap each weight, redistribute excess equally to uncapped weights.
   // Iterates because redistribution may push another weight over the cap.
-  let w = [...weights];
+  const w = [...weights];
   const cap = Math.max(1 / weights.length, Math.min(1, maxWeight));
   for (let iter = 0; iter < 10; iter++) {
     let excess = 0;
@@ -231,11 +231,7 @@ function marketNeutralWeights(cov: number[][], means: number[]): number[] | null
  *     [ 1ᵀΣ⁻¹1  1ᵀΣ⁻¹μ ] [A]   [   1   ]
  *     [ μᵀΣ⁻¹1  μᵀΣ⁻¹μ ] [B] = [ target ]
  */
-function targetReturnWeights(
-  cov: number[][],
-  means: number[],
-  target: number,
-): number[] | null {
+function targetReturnWeights(cov: number[][], means: number[], target: number): number[] | null {
   const inv = invert(cov);
   if (inv === null) return null;
   const ones = new Array(cov.length).fill(1);
@@ -278,7 +274,7 @@ function solveWithLongOnly(
   iterationCap: number,
 ): SolveResult | null {
   const n = cov.length;
-  let active = new Set<number>();
+  const active = new Set<number>();
   for (let i = 0; i < n; i++) active.add(i);
   const dropped: number[] = [];
 
@@ -387,7 +383,9 @@ export function optimizePortfolio(input: PortfolioOptimizerInput): OptimalPortfo
       `effective N=${effN.toFixed(2)}` +
       (converged ? "" : ` [fallback: ${fallbackReason}]`) +
       (droppedStrategies.length > 0 ? ` [dropped: ${droppedStrategies.join(", ")}]` : "") +
-      (marketNeutralFlag ? ` [market-neutral: net=${netExposure.toFixed(4)}, gross=${grossExposure.toFixed(4)}]` : "");
+      (marketNeutralFlag
+        ? ` [market-neutral: net=${netExposure.toFixed(4)}, gross=${grossExposure.toFixed(4)}]`
+        : "");
 
     return {
       weights,
@@ -445,7 +443,15 @@ export function optimizePortfolio(input: PortfolioOptimizerInput): OptimalPortfo
   const returnSeries = ids.map((id) => input.strategyReturns[id]!);
   let cov = computeCovarianceMatrix(returnSeries);
   if (cov === null) {
-    return buildResult(equalWeightVector(n), null, [], false, 0, "covariance computation failed", []);
+    return buildResult(
+      equalWeightVector(n),
+      null,
+      [],
+      false,
+      0,
+      "covariance computation failed",
+      [],
+    );
   }
   if (shrinkage > 0) cov = shrinkToDiagonal(cov, shrinkage);
 

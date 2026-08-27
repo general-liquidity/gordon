@@ -9,20 +9,19 @@
  *   GORDON_REACT_COMPILER=0 bun scripts/dev/checks/smoke-react-compiler.ts  → SKIP
  */
 
-const ACTIVE =
-  process.env.GORDON_REACT_COMPILER === "1" ||
-  process.argv.includes("--force");
+const ACTIVE = process.env.GORDON_REACT_COMPILER === "1" || process.argv.includes("--force");
 
 if (!ACTIVE) {
   // eslint-disable-next-line no-console
-  console.log(
-    "[smoke] GORDON_REACT_COMPILER not set — skipping (pass --force to run anyway).",
-  );
+  console.log("[smoke] GORDON_REACT_COMPILER not set — skipping (pass --force to run anyway).");
   process.exit(0);
 }
 
 const { transformAsync } = require("@babel/core") as {
-  transformAsync: (code: string, opts: Record<string, unknown>) => Promise<{ code?: string | null } | null>;
+  transformAsync: (
+    code: string,
+    opts: Record<string, unknown>,
+  ) => Promise<{ code?: string | null } | null>;
 };
 
 const SOURCE = `

@@ -142,7 +142,10 @@ export interface SystematicStrategyProfile {
   latestBacktestResultId?: string;
   latestValidationId?: string;
   liveEligible: boolean;
-  lastMetrics?: Pick<BacktestMetrics, "totalReturn" | "sharpeRatio" | "maxDrawdown" | "winRate" | "totalTrades">;
+  lastMetrics?: Pick<
+    BacktestMetrics,
+    "totalReturn" | "sharpeRatio" | "maxDrawdown" | "winRate" | "totalTrades"
+  >;
   decayScore: number;
   createdAt: string;
   updatedAt: string;

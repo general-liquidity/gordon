@@ -14,10 +14,7 @@ import {
   resetLoopSignals,
 } from "../harness/runtimeHarness.ts";
 import type { GordonContext } from "../types.ts";
-import {
-  TRADER_REMINDER_CATEGORIES,
-  listTraderReminderCategories,
-} from "./traderReminders.ts";
+import { TRADER_REMINDER_CATEGORIES, listTraderReminderCategories } from "./traderReminders.ts";
 
 let tempDir = "";
 
@@ -35,7 +32,8 @@ afterEach(() => {
 });
 
 function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
-  return {    exchange: null,
+  return {
+    exchange: null,
     broker: null,
     llm: {} as GordonContext["llm"],
     config: GordonConfigSchema.parse({
@@ -55,14 +53,16 @@ describe("TraderReminderCategories registry", () => {
   it("registers exactly 6 categories", () => {
     const categories = listTraderReminderCategories();
     expect(categories.length).toBe(6);
-    expect(new Set(categories)).toEqual(new Set([
-      "plan_lifecycle",
-      "execution_approval",
-      "repeated_venue_failure",
-      "stale_mandate",
-      "repeated_loop",
-      "incomplete_runtime_task",
-    ]));
+    expect(new Set(categories)).toEqual(
+      new Set([
+        "plan_lifecycle",
+        "execution_approval",
+        "repeated_venue_failure",
+        "stale_mandate",
+        "repeated_loop",
+        "incomplete_runtime_task",
+      ]),
+    );
   });
 
   it("each category has a description and trigger condition", () => {
@@ -77,7 +77,10 @@ describe("TraderReminderCategories registry", () => {
 
 describe("Reminder triggers wired to runtimeHarness", () => {
   it("plan_lifecycle reminder fires in planning phase with no artifact", () => {
-    const ctx = createContext({ requestedActionId: "trading.plan", requestedTaskScope: "planning" });
+    const ctx = createContext({
+      requestedActionId: "trading.plan",
+      requestedTaskScope: "planning",
+    });
     resetReminderState(ctx);
     const reminders = buildEventDrivenReminders(ctx, "planning");
     expect(reminders.some((r) => /no trade plan/i.test(r))).toBe(true);
@@ -120,7 +123,10 @@ describe("Reminder triggers wired to runtimeHarness", () => {
   });
 
   it("incomplete_runtime_task reminder fires with approved plan + tasks", () => {
-    const ctx = createContext({ requestedActionId: "trading.preview_market_order", requestedTaskScope: "planning" });
+    const ctx = createContext({
+      requestedActionId: "trading.preview_market_order",
+      requestedTaskScope: "planning",
+    });
     resetReminderState(ctx);
     registerPlanningArtifact(ctx, {
       symbol: "BTCUSDT",

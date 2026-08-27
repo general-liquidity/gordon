@@ -187,7 +187,7 @@ export class StrategySandbox {
           this.positions.delete(symbol);
         } else {
           existing.quantity -= quantity;
-          this.capital -= (existing.quantity) * existing.entryPrice; // Adjust
+          this.capital -= existing.quantity * existing.entryPrice; // Adjust
         }
       } else {
         // Opening or adding to short
@@ -217,9 +217,10 @@ export class StrategySandbox {
     const pos = this.positions.get(symbol);
     if (!pos) return;
     pos.currentPrice = currentPrice;
-    pos.unrealizedPnl = pos.side === "long"
-      ? (currentPrice - pos.entryPrice) * pos.quantity
-      : (pos.entryPrice - currentPrice) * pos.quantity;
+    pos.unrealizedPnl =
+      pos.side === "long"
+        ? (currentPrice - pos.entryPrice) * pos.quantity
+        : (pos.entryPrice - currentPrice) * pos.quantity;
     this.updateDrawdown();
   }
 
@@ -254,13 +255,18 @@ export class StrategySandbox {
   }
 
   /** Mark as completed (no more trades). */
-  complete(): void { this.status = "completed"; }
+  complete(): void {
+    this.status = "completed";
+  }
 
   /** Mark as promoted (winner going live). */
-  promote(): void { this.status = "promoted"; }
+  promote(): void {
+    this.status = "promoted";
+  }
 
   private updateDrawdown(): void {
-    const equity = this.capital + [...this.positions.values()].reduce((s, p) => s + p.unrealizedPnl, 0);
+    const equity =
+      this.capital + [...this.positions.values()].reduce((s, p) => s + p.unrealizedPnl, 0);
     if (equity > this.peakEquity) this.peakEquity = equity;
     const dd = ((this.peakEquity - equity) / this.peakEquity) * 100;
     if (dd > this.maxDrawdown) this.maxDrawdown = dd;
@@ -301,11 +307,14 @@ export function compareSandboxes(): {
   bestByWinRate: string | null;
 } {
   const snapshots = listSandboxes();
-  if (snapshots.length === 0) return { sandboxes: [], bestByReturn: null, bestByDrawdown: null, bestByWinRate: null };
+  if (snapshots.length === 0)
+    return { sandboxes: [], bestByReturn: null, bestByDrawdown: null, bestByWinRate: null };
 
-  const bestByReturn = snapshots.reduce((a, b) => a.returnPct > b.returnPct ? a : b).id;
-  const bestByDrawdown = snapshots.reduce((a, b) => a.maxDrawdownPct < b.maxDrawdownPct ? a : b).id;
-  const bestByWinRate = snapshots.reduce((a, b) => a.winRate > b.winRate ? a : b).id;
+  const bestByReturn = snapshots.reduce((a, b) => (a.returnPct > b.returnPct ? a : b)).id;
+  const bestByDrawdown = snapshots.reduce((a, b) =>
+    a.maxDrawdownPct < b.maxDrawdownPct ? a : b,
+  ).id;
+  const bestByWinRate = snapshots.reduce((a, b) => (a.winRate > b.winRate ? a : b)).id;
 
   return { sandboxes: snapshots, bestByReturn, bestByDrawdown, bestByWinRate };
 }

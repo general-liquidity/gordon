@@ -136,11 +136,7 @@ function buildBand(values: number[]): MetricBand {
   };
 }
 
-function resample(
-  returns: ReadonlyArray<number>,
-  blockProb: number,
-  rng: () => number,
-): number[] {
+function resample(returns: ReadonlyArray<number>, blockProb: number, rng: () => number): number[] {
   const n = returns.length;
   const out: number[] = new Array(n);
   let idx = Math.floor(rng() * n);

@@ -47,32 +47,16 @@ export const backtestPlaybookTool = createTool({
   inputSchema: z.object({
     playbook_name: z
       .string()
-      .describe("Playbook ID to backtest (e.g., 'momentum-breakout', 'mean-reversion', 'trend-following')"),
-    symbol: z
-      .string()
-      .describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETHUSDT')"),
-    timeframe: z
-      .string()
-      .default("1h")
-      .describe("Candle timeframe: '1h', '4h', '1d'"),
-    start_date: z
-      .string()
-      .describe("Backtest start date (ISO format, e.g., '2025-01-01')"),
-    end_date: z
-      .string()
-      .describe("Backtest end date (ISO format, e.g., '2025-06-01')"),
-    initial_capital: z
-      .number()
-      .default(10000)
-      .describe("Starting capital in USDT"),
-    fee_percent: z
-      .number()
-      .default(0.1)
-      .describe("Trading fee per side as percentage"),
-    slippage_percent: z
-      .number()
-      .default(0.05)
-      .describe("Slippage per side as percentage"),
+      .describe(
+        "Playbook ID to backtest (e.g., 'momentum-breakout', 'mean-reversion', 'trend-following')",
+      ),
+    symbol: z.string().describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETHUSDT')"),
+    timeframe: z.string().default("1h").describe("Candle timeframe: '1h', '4h', '1d'"),
+    start_date: z.string().describe("Backtest start date (ISO format, e.g., '2025-01-01')"),
+    end_date: z.string().describe("Backtest end date (ISO format, e.g., '2025-06-01')"),
+    initial_capital: z.number().default(10000).describe("Starting capital in USDT"),
+    fee_percent: z.number().default(0.1).describe("Trading fee per side as percentage"),
+    slippage_percent: z.number().default(0.05).describe("Slippage per side as percentage"),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -117,18 +101,30 @@ export const backtestPlaybookTool = createTool({
       const ctx = getGordonContext(execContext ?? undefined);
       const exchange = ctx?.exchange;
       if (!exchange) {
-        return { success: false, error: "Exchange client not connected. Please configure API keys." };
+        return {
+          success: false,
+          error: "Exchange client not connected. Please configure API keys.",
+        };
       }
 
       // Fetch historical data
       const startTime = new Date(start_date).getTime();
       const endTime = new Date(end_date).getTime();
-      if (isNaN(startTime) || isNaN(endTime) || endTime <= startTime) {
-        return { success: false, error: "Invalid date range. Ensure start_date < end_date and both are valid ISO dates." };
+      if (Number.isNaN(startTime) || Number.isNaN(endTime) || endTime <= startTime) {
+        return {
+          success: false,
+          error: "Invalid date range. Ensure start_date < end_date and both are valid ISO dates.",
+        };
       }
 
       logger.info("Fetching historical data", { symbol, timeframe, start_date, end_date });
-      const ohlcData = await fetchHistoricalDataRange(exchange, symbol, timeframe, startTime, endTime);
+      const ohlcData = await fetchHistoricalDataRange(
+        exchange,
+        symbol,
+        timeframe,
+        startTime,
+        endTime,
+      );
 
       if (ohlcData.length < 60) {
         return {
@@ -229,7 +225,7 @@ export const getBacktestResultsTool = createTool({
         win_rate: z.number(),
         total_trades: z.number(),
         created_at: z.string(),
-      })
+      }),
     ),
     count: z.number(),
     error: z.string().optional(),
@@ -278,22 +274,13 @@ export const compareBacktestResultsTool = createTool({
     "Compare multiple playbook backtest results side by side. " +
     "Provide result IDs or let it compare the latest results for given playbooks.",
   inputSchema: z.object({
-    result_ids: z
-      .array(z.string())
-      .optional()
-      .describe("Specific result IDs to compare"),
+    result_ids: z.array(z.string()).optional().describe("Specific result IDs to compare"),
     playbook_names: z
       .array(z.string())
       .optional()
       .describe("Playbook IDs to compare (uses latest result for each)"),
-    symbol: z
-      .string()
-      .optional()
-      .describe("Symbol to filter by when using playbook_names"),
-    timeframe: z
-      .string()
-      .optional()
-      .describe("Timeframe to filter by when using playbook_names"),
+    symbol: z.string().optional().describe("Symbol to filter by when using playbook_names"),
+    timeframe: z.string().optional().describe("Timeframe to filter by when using playbook_names"),
   }),
   outputSchema: z.object({
     comparison: z.string(),
@@ -376,7 +363,7 @@ export const getBestStrategyTool = createTool({
         max_drawdown: z.number(),
         win_rate: z.number(),
         total_trades: z.number(),
-      })
+      }),
     ),
     symbol: z.string(),
     count: z.number(),

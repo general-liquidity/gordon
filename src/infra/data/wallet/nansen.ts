@@ -128,10 +128,11 @@ export class NansenWalletSource implements WalletIntelSource {
 
   async getAddressLabels(query: AddressQuery): Promise<AddressLabel | null> {
     const chain = mapChain(query.chains?.[0] ?? query.chain);
-    const json = await this.post<{ data?: NansenLabel[] }>(
-      "/profiler/address/labels",
-      { address: query.address, chain, pagination: { page: 1, per_page: 100 } },
-    );
+    const json = await this.post<{ data?: NansenLabel[] }>("/profiler/address/labels", {
+      address: query.address,
+      chain,
+      pagination: { page: 1, per_page: 100 },
+    });
     if (!json) return null;
 
     const rows = Array.isArray(json.data) ? json.data : [];
@@ -161,14 +162,11 @@ export class NansenWalletSource implements WalletIntelSource {
 
   async getSmartMoneyFlow(query: SmartMoneyQuery): Promise<SmartMoneyFlowItem[]> {
     const chain = mapChain(query.chain);
-    const json = await this.post<{ data?: NansenNetflowRow[] }>(
-      "/smart-money/netflow",
-      {
-        chains: [chain],
-        order_by: [{ field: "net_flow_24h_usd", direction: "DESC" }],
-        pagination: { page: 1, per_page: query.limit ?? 50 },
-      },
-    );
+    const json = await this.post<{ data?: NansenNetflowRow[] }>("/smart-money/netflow", {
+      chains: [chain],
+      order_by: [{ field: "net_flow_24h_usd", direction: "DESC" }],
+      pagination: { page: 1, per_page: query.limit ?? 50 },
+    });
     if (!json) return [];
 
     const rows = Array.isArray(json.data) ? json.data : [];
@@ -182,8 +180,7 @@ export class NansenWalletSource implements WalletIntelSource {
       ) {
         continue;
       }
-      const netFlowUsd =
-        typeof row.net_flow_24h_usd === "number" ? row.net_flow_24h_usd : 0;
+      const netFlowUsd = typeof row.net_flow_24h_usd === "number" ? row.net_flow_24h_usd : 0;
       items.push({
         tokenAddress: row.token_address,
         symbol: row.token_symbol,

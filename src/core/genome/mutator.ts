@@ -35,7 +35,7 @@ function deepClone<T>(value: T): T {
 /**
  * Get a value from an object using a dot-notation path.
  */
-function getByPath(obj: Record<string, unknown>, path: string): unknown {
+function _getByPath(obj: Record<string, unknown>, path: string): unknown {
   const parts = path.split(".");
   let current: unknown = obj;
   for (const part of parts) {
@@ -149,7 +149,7 @@ const INDICATOR_SWAP_GROUPS: Record<string, string[]> = {
 };
 
 /** Find swap alternatives for an indicator name. */
-function findSwapAlternatives(indicatorName: string): string[] {
+function _findSwapAlternatives(indicatorName: string): string[] {
   const upper = indicatorName.toUpperCase();
   for (const group of Object.values(INDICATOR_SWAP_GROUPS)) {
     if (group.some((g) => g.toUpperCase() === upper)) {
@@ -188,15 +188,15 @@ export class PlaybookMutator {
     }
 
     // Generate a new UUID and bumped version for the mutant
-    mutated["id"] = uuidv4();
+    mutated.id = uuidv4();
     const version = (protocol.version ?? "1.0.0").split(".");
     const patch = parseInt(version[2] ?? "0", 10) + 1;
-    mutated["version"] = `${version[0]}.${version[1]}.${patch}`;
+    mutated.version = `${version[0]}.${version[1]}.${patch}`;
 
     // Update slug to indicate mutation
     const baseName = protocol.slug.replace(/-v\d+$/, "");
-    mutated["slug"] = `${baseName}-v${patch}`;
-    mutated["name"] = `${protocol.name} v${patch}`;
+    mutated.slug = `${baseName}-v${patch}`;
+    mutated.name = `${protocol.name} v${patch}`;
 
     return mutated as unknown as PlaybookProtocol;
   }
@@ -210,21 +210,23 @@ export class PlaybookMutator {
     backtestResult: PlaybookBacktestResult,
   ): Mutation[] {
     const mutations: Mutation[] = [];
-    const proto = protocol as unknown as Record<string, unknown>;
+    const _proto = protocol as unknown as Record<string, unknown>;
 
     // High max drawdown -> tighten stop loss
     if (backtestResult.max_drawdown_percent > 15) {
       const currentSL = protocol.exit.stop_loss.value;
       const tighterSL = Math.max(0.5, currentSL * 0.75);
-      mutations.push(makeMutation(
-        "exit.stop_loss.value",
-        "Stop loss percentage",
-        currentSL,
-        Math.round(tighterSL * 100) / 100,
-        "nudge",
-        `High drawdown (${backtestResult.max_drawdown_percent.toFixed(1)}%) — tightening stop loss from ${currentSL}% to ${tighterSL.toFixed(2)}%`,
-        "Backtester",
-      ));
+      mutations.push(
+        makeMutation(
+          "exit.stop_loss.value",
+          "Stop loss percentage",
+          currentSL,
+          Math.round(tighterSL * 100) / 100,
+          "nudge",
+          `High drawdown (${backtestResult.max_drawdown_percent.toFixed(1)}%) — tightening stop loss from ${currentSL}% to ${tighterSL.toFixed(2)}%`,
+          "Backtester",
+        ),
+      );
     }
 
     // Low win rate -> adjust entry indicator thresholds
@@ -232,15 +234,17 @@ export class PlaybookMutator {
       // Lower confluence requirement if possible
       if (protocol.entry.confluence_required > 1) {
         const newConf = protocol.entry.confluence_required - 1;
-        mutations.push(makeMutation(
-          "entry.confluence_required",
-          "Confluence required",
-          protocol.entry.confluence_required,
-          newConf,
-          "nudge",
-          `Low win rate (${backtestResult.win_rate.toFixed(1)}%) — reducing confluence from ${protocol.entry.confluence_required} to ${newConf} to allow more selective entries`,
-          "Backtester",
-        ));
+        mutations.push(
+          makeMutation(
+            "entry.confluence_required",
+            "Confluence required",
+            protocol.entry.confluence_required,
+            newConf,
+            "nudge",
+            `Low win rate (${backtestResult.win_rate.toFixed(1)}%) — reducing confluence from ${protocol.entry.confluence_required} to ${newConf} to allow more selective entries`,
+            "Backtester",
+          ),
+        );
       }
     }
 
@@ -248,15 +252,17 @@ export class PlaybookMutator {
     if (backtestResult.avg_hold_duration_hours < 2 && protocol.exit.take_profit.length > 0) {
       const firstTP = protocol.exit.take_profit[0]!;
       const widerLevel = firstTP.level * 1.3;
-      mutations.push(makeMutation(
-        "exit.take_profit.0.level",
-        "Take profit level (R:R)",
-        firstTP.level,
-        Math.round(widerLevel * 100) / 100,
-        "nudge",
-        `Short avg hold (${backtestResult.avg_hold_duration_hours.toFixed(1)}h) — widening TP from ${firstTP.level}R to ${widerLevel.toFixed(2)}R`,
-        "Backtester",
-      ));
+      mutations.push(
+        makeMutation(
+          "exit.take_profit.0.level",
+          "Take profit level (R:R)",
+          firstTP.level,
+          Math.round(widerLevel * 100) / 100,
+          "nudge",
+          `Short avg hold (${backtestResult.avg_hold_duration_hours.toFixed(1)}h) — widening TP from ${firstTP.level}R to ${widerLevel.toFixed(2)}R`,
+          "Backtester",
+        ),
+      );
     }
 
     // Too few trades -> loosen entry conditions
@@ -266,15 +272,17 @@ export class PlaybookMutator {
         // Only add if we haven't already added a confluence mutation
         const alreadyHasConf = mutations.some((m) => m.field_path === "entry.confluence_required");
         if (!alreadyHasConf) {
-          mutations.push(makeMutation(
-            "entry.confluence_required",
-            "Confluence required",
-            protocol.entry.confluence_required,
-            Math.max(1, protocol.entry.confluence_required - 1),
-            "nudge",
-            `Too few trades (${backtestResult.total_trades}) — reducing confluence to generate more signals`,
-            "Backtester",
-          ));
+          mutations.push(
+            makeMutation(
+              "entry.confluence_required",
+              "Confluence required",
+              protocol.entry.confluence_required,
+              Math.max(1, protocol.entry.confluence_required - 1),
+              "nudge",
+              `Too few trades (${backtestResult.total_trades}) — reducing confluence to generate more signals`,
+              "Backtester",
+            ),
+          );
         }
       }
 
@@ -282,15 +290,17 @@ export class PlaybookMutator {
       if (protocol.entry.filters && protocol.entry.filters.length > 0) {
         const lastFilter = protocol.entry.filters[protocol.entry.filters.length - 1]!;
         const newFilters = protocol.entry.filters.slice(0, -1);
-        mutations.push(makeMutation(
-          "entry.filters",
-          "Entry filters",
-          protocol.entry.filters,
-          newFilters,
-          "remove",
-          `Too few trades (${backtestResult.total_trades}) — removing filter "${lastFilter}" to loosen entry criteria`,
-          "Backtester",
-        ));
+        mutations.push(
+          makeMutation(
+            "entry.filters",
+            "Entry filters",
+            protocol.entry.filters,
+            newFilters,
+            "remove",
+            `Too few trades (${backtestResult.total_trades}) — removing filter "${lastFilter}" to loosen entry criteria`,
+            "Backtester",
+          ),
+        );
       }
     }
 
@@ -302,15 +312,17 @@ export class PlaybookMutator {
         const alreadyHasTP = mutations.some((m) => m.field_path === "exit.take_profit.0.level");
         if (!alreadyHasTP) {
           const newLevel = firstTP.level * 1.2;
-          mutations.push(makeMutation(
-            "exit.take_profit.0.level",
-            "Take profit level (R:R)",
-            firstTP.level,
-            Math.round(newLevel * 100) / 100,
-            "nudge",
-            `Low profit factor (${backtestResult.profit_factor.toFixed(2)}) with decent win rate — increasing TP target from ${firstTP.level}R to ${newLevel.toFixed(2)}R`,
-            "Backtester",
-          ));
+          mutations.push(
+            makeMutation(
+              "exit.take_profit.0.level",
+              "Take profit level (R:R)",
+              firstTP.level,
+              Math.round(newLevel * 100) / 100,
+              "nudge",
+              `Low profit factor (${backtestResult.profit_factor.toFixed(2)}) with decent win rate — increasing TP target from ${firstTP.level}R to ${newLevel.toFixed(2)}R`,
+              "Backtester",
+            ),
+          );
         }
       }
     }
@@ -321,10 +333,7 @@ export class PlaybookMutator {
   /**
    * Suggest mutations for adapting to a market regime change.
    */
-  suggestMutationsForRegime(
-    protocol: PlaybookProtocol,
-    currentRegime: string,
-  ): Mutation[] {
+  suggestMutationsForRegime(protocol: PlaybookProtocol, currentRegime: string): Mutation[] {
     const mutations: Mutation[] = [];
 
     const regime = currentRegime.toLowerCase();
@@ -333,28 +342,32 @@ export class PlaybookMutator {
       // Tighten stop loss in volatile markets
       const currentSL = protocol.exit.stop_loss.value;
       const tighterSL = currentSL * 0.8;
-      mutations.push(makeMutation(
-        "exit.stop_loss.value",
-        "Stop loss percentage",
-        currentSL,
-        Math.round(tighterSL * 100) / 100,
-        "shift",
-        `Volatile regime detected — tightening stop loss from ${currentSL}% to ${tighterSL.toFixed(2)}%`,
-        "Analyst",
-      ));
+      mutations.push(
+        makeMutation(
+          "exit.stop_loss.value",
+          "Stop loss percentage",
+          currentSL,
+          Math.round(tighterSL * 100) / 100,
+          "shift",
+          `Volatile regime detected — tightening stop loss from ${currentSL}% to ${tighterSL.toFixed(2)}%`,
+          "Analyst",
+        ),
+      );
 
       // Reduce position sizing
       const currentRisk = protocol.risk.max_risk_per_trade_percent;
       const reducedRisk = currentRisk * 0.7;
-      mutations.push(makeMutation(
-        "risk.max_risk_per_trade_percent",
-        "Max risk per trade %",
-        currentRisk,
-        Math.round(reducedRisk * 100) / 100,
-        "shift",
-        `Volatile regime — reducing risk per trade from ${currentRisk}% to ${reducedRisk.toFixed(2)}%`,
-        "Analyst",
-      ));
+      mutations.push(
+        makeMutation(
+          "risk.max_risk_per_trade_percent",
+          "Max risk per trade %",
+          currentRisk,
+          Math.round(reducedRisk * 100) / 100,
+          "shift",
+          `Volatile regime — reducing risk per trade from ${currentRisk}% to ${reducedRisk.toFixed(2)}%`,
+          "Analyst",
+        ),
+      );
     }
 
     if (regime === "ranging" || regime === "sideways") {
@@ -362,28 +375,32 @@ export class PlaybookMutator {
       if (protocol.exit.take_profit.length > 0) {
         const firstTP = protocol.exit.take_profit[0]!;
         const tighterTP = firstTP.level * 0.75;
-        mutations.push(makeMutation(
-          "exit.take_profit.0.level",
-          "Take profit level (R:R)",
-          firstTP.level,
-          Math.round(tighterTP * 100) / 100,
-          "shift",
-          `Ranging regime — reducing TP target from ${firstTP.level}R to ${tighterTP.toFixed(2)}R (smaller moves expected)`,
-          "Analyst",
-        ));
+        mutations.push(
+          makeMutation(
+            "exit.take_profit.0.level",
+            "Take profit level (R:R)",
+            firstTP.level,
+            Math.round(tighterTP * 100) / 100,
+            "shift",
+            `Ranging regime — reducing TP target from ${firstTP.level}R to ${tighterTP.toFixed(2)}R (smaller moves expected)`,
+            "Analyst",
+          ),
+        );
       }
 
       // Increase confluence requirement for more selective entries
       if (protocol.entry.confluence_required < protocol.entry.indicators.length) {
-        mutations.push(makeMutation(
-          "entry.confluence_required",
-          "Confluence required",
-          protocol.entry.confluence_required,
-          protocol.entry.confluence_required + 1,
-          "nudge",
-          "Ranging regime — increasing confluence to filter out false breakouts",
-          "Analyst",
-        ));
+        mutations.push(
+          makeMutation(
+            "entry.confluence_required",
+            "Confluence required",
+            protocol.entry.confluence_required,
+            protocol.entry.confluence_required + 1,
+            "nudge",
+            "Ranging regime — increasing confluence to filter out false breakouts",
+            "Analyst",
+          ),
+        );
       }
     }
 
@@ -392,43 +409,49 @@ export class PlaybookMutator {
       if (protocol.exit.take_profit.length > 0) {
         const firstTP = protocol.exit.take_profit[0]!;
         const widerTP = firstTP.level * 1.4;
-        mutations.push(makeMutation(
-          "exit.take_profit.0.level",
-          "Take profit level (R:R)",
-          firstTP.level,
-          Math.round(widerTP * 100) / 100,
-          "shift",
-          `Trending regime — widening TP target from ${firstTP.level}R to ${widerTP.toFixed(2)}R to capture larger moves`,
-          "Analyst",
-        ));
+        mutations.push(
+          makeMutation(
+            "exit.take_profit.0.level",
+            "Take profit level (R:R)",
+            firstTP.level,
+            Math.round(widerTP * 100) / 100,
+            "shift",
+            `Trending regime — widening TP target from ${firstTP.level}R to ${widerTP.toFixed(2)}R to capture larger moves`,
+            "Analyst",
+          ),
+        );
       }
 
       // Widen stop loss slightly to avoid premature shakeouts
       const currentSL = protocol.exit.stop_loss.value;
       const widerSL = currentSL * 1.2;
-      mutations.push(makeMutation(
-        "exit.stop_loss.value",
-        "Stop loss percentage",
-        currentSL,
-        Math.round(widerSL * 100) / 100,
-        "nudge",
-        `Trending regime — widening stop from ${currentSL}% to ${widerSL.toFixed(2)}% to avoid shakeouts`,
-        "Analyst",
-      ));
+      mutations.push(
+        makeMutation(
+          "exit.stop_loss.value",
+          "Stop loss percentage",
+          currentSL,
+          Math.round(widerSL * 100) / 100,
+          "nudge",
+          `Trending regime — widening stop from ${currentSL}% to ${widerSL.toFixed(2)}% to avoid shakeouts`,
+          "Analyst",
+        ),
+      );
     }
 
     if (regime === "quiet" || regime === "low_volatility") {
       // Loosen entry requirements to get more trades
       if (protocol.entry.confluence_required > 1) {
-        mutations.push(makeMutation(
-          "entry.confluence_required",
-          "Confluence required",
-          protocol.entry.confluence_required,
-          protocol.entry.confluence_required - 1,
-          "nudge",
-          "Quiet regime — reducing confluence to generate more opportunities",
-          "Analyst",
-        ));
+        mutations.push(
+          makeMutation(
+            "entry.confluence_required",
+            "Confluence required",
+            protocol.entry.confluence_required,
+            protocol.entry.confluence_required - 1,
+            "nudge",
+            "Quiet regime — reducing confluence to generate more opportunities",
+            "Analyst",
+          ),
+        );
       }
     }
 
@@ -586,15 +609,17 @@ export class PlaybookMutator {
 
         if (JSON.stringify(fromVal) !== JSON.stringify(toVal)) {
           setByPath(child as unknown as Record<string, unknown>, section.path, deepClone(toVal));
-          mutations.push(makeMutation(
-            section.path,
-            section.name,
-            fromVal,
-            toVal,
-            "swap",
-            `Crossover: took ${section.name} from parent2`,
-            "Mutator",
-          ));
+          mutations.push(
+            makeMutation(
+              section.path,
+              section.name,
+              fromVal,
+              toVal,
+              "swap",
+              `Crossover: took ${section.name} from parent2`,
+              "Mutator",
+            ),
+          );
         }
       }
     }

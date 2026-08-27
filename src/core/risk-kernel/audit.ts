@@ -8,11 +8,27 @@
  */
 
 import { z } from "zod";
+import type { Database, Statement } from "bun:sqlite";
 import { createModuleLogger } from "../../infra/logger/index.ts";
-import { getDatabase, executeWithLogging } from "../../infra/storage/database.ts";
+import {
+  executeWithLogging,
+  getDatabase,
+  getDatabaseGeneration,
+} from "../../infra/storage/database.ts";
 import type { PortfolioContext } from "./portfolio-context.ts";
 
 const logger = createModuleLogger("risk-audit");
+
+function withStatement<T>(db: Database, sql: string, run: (statement: Statement) => T): T {
+  const statement = db.prepare(sql);
+  try {
+    return run(statement);
+  } finally {
+    // Bun otherwise leaves native statements to GC. During eval database
+    // rotation that can retain a Windows file handle beyond Database.close().
+    statement.finalize();
+  }
+}
 
 // ============================================================================
 // Types
@@ -73,16 +89,22 @@ export interface RiskAuditEntry {
 // Database Setup
 // ============================================================================
 
-let tableInitialized = false;
+// A process can legitimately move between database files (most notably the
+// isolated eval sandbox). Schema readiness belongs to the open Database
+// generation, not to the module. A single boolean made every database after
+// the first skip CREATE TABLE and silently lose its risk-audit writes. Store a
+// number rather than the native Database object: retaining a closed handle
+// keeps its file locked on Windows.
+let initializedDatabaseGeneration = -1;
 
 /**
  * Ensure the risk_audit table exists.
  * Called lazily on first log/query operation.
  */
 function ensureTable(): void {
-  if (tableInitialized) return;
-
   const db = getDatabase();
+  const generation = getDatabaseGeneration();
+  if (initializedDatabaseGeneration === generation) return;
 
   executeWithLogging(
     () =>
@@ -101,27 +123,27 @@ function ensureTable(): void {
           strategy_id TEXT
         )
       `),
-    "CREATE TABLE risk_audit"
+    "CREATE TABLE risk_audit",
   );
 
   executeWithLogging(
     () => db.run("CREATE INDEX IF NOT EXISTS idx_risk_audit_timestamp ON risk_audit(timestamp)"),
-    "CREATE INDEX idx_risk_audit_timestamp"
+    "CREATE INDEX idx_risk_audit_timestamp",
   );
   executeWithLogging(
     () => db.run("CREATE INDEX IF NOT EXISTS idx_risk_audit_symbol ON risk_audit(symbol)"),
-    "CREATE INDEX idx_risk_audit_symbol"
+    "CREATE INDEX idx_risk_audit_symbol",
   );
   executeWithLogging(
     () => db.run("CREATE INDEX IF NOT EXISTS idx_risk_audit_action ON risk_audit(action)"),
-    "CREATE INDEX idx_risk_audit_action"
+    "CREATE INDEX idx_risk_audit_action",
   );
   executeWithLogging(
     () => db.run("CREATE INDEX IF NOT EXISTS idx_risk_audit_approved ON risk_audit(approved)"),
-    "CREATE INDEX idx_risk_audit_approved"
+    "CREATE INDEX idx_risk_audit_approved",
   );
 
-  tableInitialized = true;
+  initializedDatabaseGeneration = generation;
   logger.debug("Risk audit table initialized");
 }
 
@@ -155,9 +177,8 @@ export class RiskAuditLog {
       const sql = `INSERT INTO risk_audit (id, timestamp, symbol, side, action, approved, order_data, decision_data, portfolio_snapshot, agent_id, strategy_id)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-      executeWithLogging(
-        () => {
-          const stmt = db.prepare(sql);
+      executeWithLogging(() => {
+        withStatement(db, sql, (stmt) =>
           stmt.run(
             entry.id,
             entry.timestamp,
@@ -170,10 +191,9 @@ export class RiskAuditLog {
             JSON.stringify(entry.portfolioSnapshot),
             entry.order.agentId,
             entry.order.strategyId ?? null,
-          );
-        },
-        "INSERT INTO risk_audit"
-      );
+          ),
+        );
+      }, "INSERT INTO risk_audit");
 
       logger.debug("Risk audit entry logged", {
         id: entry.id,
@@ -190,10 +210,7 @@ export class RiskAuditLog {
   /**
    * Get audit history with optional filters.
    */
-  async getHistory(options?: {
-    limit?: number;
-    since?: string;
-  }): Promise<RiskAuditEntry[]> {
+  async getHistory(options?: { limit?: number; since?: string }): Promise<RiskAuditEntry[]> {
     try {
       ensureTable();
       const db = getDatabase();
@@ -209,16 +226,14 @@ export class RiskAuditLog {
 
       sql += " ORDER BY timestamp DESC LIMIT ?";
 
-      const rows = executeWithLogging(
-        () => {
-          const stmt = db.prepare(sql);
+      const rows = executeWithLogging(() => {
+        return withStatement(db, sql, (stmt) => {
           if (since) {
             return stmt.all(since, limit) as RawAuditRow[];
           }
           return stmt.all(limit) as RawAuditRow[];
-        },
-        sql
-      );
+        });
+      }, sql);
 
       return rows.map(deserializeRow);
     } catch (error) {
@@ -237,8 +252,8 @@ export class RiskAuditLog {
 
       const sql = "SELECT * FROM risk_audit WHERE symbol = ? ORDER BY timestamp DESC";
       const rows = executeWithLogging(
-        () => db.prepare(sql).all(symbol) as RawAuditRow[],
-        sql
+        () => withStatement(db, sql, (stmt) => stmt.all(symbol) as RawAuditRow[]),
+        sql,
       );
 
       return rows.map(deserializeRow);
@@ -258,8 +273,8 @@ export class RiskAuditLog {
 
       const sql = "SELECT * FROM risk_audit WHERE approved = 0 ORDER BY timestamp DESC";
       const rows = executeWithLogging(
-        () => db.prepare(sql).all() as RawAuditRow[],
-        sql
+        () => withStatement(db, sql, (stmt) => stmt.all() as RawAuditRow[]),
+        sql,
       );
 
       return rows.map(deserializeRow);
@@ -279,8 +294,8 @@ export class RiskAuditLog {
 
       const sql = "SELECT * FROM risk_audit WHERE agent_id = ? ORDER BY timestamp DESC";
       const rows = executeWithLogging(
-        () => db.prepare(sql).all(agentId) as RawAuditRow[],
-        sql
+        () => withStatement(db, sql, (stmt) => stmt.all(agentId) as RawAuditRow[]),
+        sql,
       );
 
       return rows.map(deserializeRow);
@@ -324,16 +339,14 @@ export class RiskAuditLog {
         rejected: number;
       };
 
-      const row = executeWithLogging(
-        () => {
-          const stmt = db.prepare(sql);
+      const row = executeWithLogging(() => {
+        return withStatement(db, sql, (stmt) => {
           if (since) {
             return stmt.get(since) as StatsRow | null;
           }
           return stmt.get() as StatsRow | null;
-        },
-        sql
-      );
+        });
+      }, sql);
 
       if (!row) {
         return { total: 0, approved: 0, modified: 0, rejected: 0, approvalRate: 0 };

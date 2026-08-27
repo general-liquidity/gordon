@@ -8,7 +8,7 @@
  * Phase 17 of the TUI rebuild.
  */
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 
@@ -56,16 +56,12 @@ export function EmergencyHalt({
   });
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="double"
-      borderColor="red"
-      paddingX={2}
-      paddingY={1}
-    >
+    <Box flexDirection="column" borderStyle="double" borderColor="red" paddingX={2} paddingY={1}>
       {/* Header */}
       <Box justifyContent="center">
-        <Text color="red" bold inverse>{" EMERGENCY HALT "}</Text>
+        <Text color="red" bold inverse>
+          {" EMERGENCY HALT "}
+        </Text>
       </Box>
       <Text> </Text>
 
@@ -78,10 +74,16 @@ export function EmergencyHalt({
       {/* Position summary */}
       <Box flexDirection="column" paddingLeft={2}>
         <Text>
-          Open positions: <Text bold color="yellow">{openPositionCount}</Text>
+          Open positions:{" "}
+          <Text bold color="yellow">
+            {openPositionCount}
+          </Text>
         </Text>
         <Text>
-          Pending orders:  <Text bold color="yellow">{pendingOrderCount}</Text>
+          Pending orders:{" "}
+          <Text bold color="yellow">
+            {pendingOrderCount}
+          </Text>
         </Text>
       </Box>
       <Text> </Text>
@@ -96,7 +98,11 @@ export function EmergencyHalt({
       {!unlocked ? (
         <Box>
           <Text dimColor>
-            Confirm available in <Text bold color="red">{countdown}s</Text>... (Esc to cancel)
+            Confirm available in{" "}
+            <Text bold color="red">
+              {countdown}s
+            </Text>
+            ... (Esc to cancel)
           </Text>
         </Box>
       ) : (

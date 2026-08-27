@@ -177,10 +177,7 @@ export async function runEvalSuite(input: RunSuiteInput): Promise<RunSuiteResult
         });
       }
     } else {
-      const judgeResult = await judgeTrajectories(
-        { scenario, trajectories },
-        input.judgeOptions,
-      );
+      const judgeResult = await judgeTrajectories({ scenario, trajectories }, input.judgeOptions);
       judgeModelSeen = judgeResult.judgeModel;
       for (const scored of judgeResult.scored) {
         const bucket = perVariantScenarios.get(scored.id);
@@ -209,16 +206,12 @@ export async function runEvalSuite(input: RunSuiteInput): Promise<RunSuiteResult
         ? 0
         : Number(
             (
-              perScenario.filter((p) => p.genericNonActionable === true).length /
-              perScenario.length
+              perScenario.filter((p) => p.genericNonActionable === true).length / perScenario.length
             ).toFixed(4),
           );
     const costAcc = perVariantCost.get(v.variantLabel);
     let cost: TrajectoryCost | undefined;
-    if (
-      costAcc &&
-      (costAcc.meteredCost || costAcc.meteredTokens || costAcc.meteredLatency)
-    ) {
+    if (costAcc && (costAcc.meteredCost || costAcc.meteredTokens || costAcc.meteredLatency)) {
       cost = {
         ...(costAcc.meteredCost && { costUsd: Number(costAcc.costUsd.toFixed(6)) }),
         ...(costAcc.meteredTokens && { tokens: costAcc.tokens }),

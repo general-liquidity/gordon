@@ -25,10 +25,24 @@ export const volScaledSizingDiagnosticTool = createTool({
     mode: z
       .enum(["scale_up", "scale_down"])
       .default("scale_down")
-      .describe("scale_down dampens size in storms (directional strategies); scale_up adds size (premium-collection). Default scale_down."),
-    lowVol: z.number().min(0).default(0.2).describe("Vol level below which 'calm' band applies. Default 0.20."),
-    highVol: z.number().min(0).default(0.3).describe("Vol level above which 'high' band applies. Default 0.30."),
-    refuseAbove: z.number().min(0).default(0.6).describe("Vol level above which size = 0 (refuse). Default 0.60."),
+      .describe(
+        "scale_down dampens size in storms (directional strategies); scale_up adds size (premium-collection). Default scale_down.",
+      ),
+    lowVol: z
+      .number()
+      .min(0)
+      .default(0.2)
+      .describe("Vol level below which 'calm' band applies. Default 0.20."),
+    highVol: z
+      .number()
+      .min(0)
+      .default(0.3)
+      .describe("Vol level above which 'high' band applies. Default 0.30."),
+    refuseAbove: z
+      .number()
+      .min(0)
+      .default(0.6)
+      .describe("Vol level above which size = 0 (refuse). Default 0.60."),
   }),
   outputSchema: z.object({
     multiplier: z.number(),

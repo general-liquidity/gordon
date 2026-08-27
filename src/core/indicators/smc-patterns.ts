@@ -204,10 +204,7 @@ export interface ChangeOfCharacter {
  * CHoCH). Different from a simple breakout: the break must be confirmed by
  * the candle close, not just a wick. Returns events in chronological order.
  */
-export function detectChangeOfCharacter(
-  bars: OHLC[],
-  swingLookback = 5,
-): ChangeOfCharacter[] {
+export function detectChangeOfCharacter(bars: OHLC[], swingLookback = 5): ChangeOfCharacter[] {
   const events: ChangeOfCharacter[] = [];
 
   // Track the most recent confirmed swing high and low
@@ -275,10 +272,7 @@ export interface OrderBlock {
  * breakout; a bearish OB is the last bullish candle before a swing-low
  * breakdown. Returns OBs in chronological order.
  */
-export function detectOrderBlocks(
-  bars: OHLC[],
-  swingLookback = 5,
-): OrderBlock[] {
+export function detectOrderBlocks(bars: OHLC[], swingLookback = 5): OrderBlock[] {
   const blocks: OrderBlock[] = [];
 
   for (let i = swingLookback * 2; i < bars.length; i++) {
@@ -443,10 +437,7 @@ export function detectLiquiditySweeps(
 
   for (let i = swingLookback * 2; i < bars.length; i++) {
     const bar = bars[i]!;
-    const rangeBaseline = rollingAverage(
-      bars.slice(Math.max(0, i - 5), i).map(range),
-      5,
-    );
+    const rangeBaseline = rollingAverage(bars.slice(Math.max(0, i - 5), i).map(range), 5);
     if (rangeBaseline === 0) continue;
     if (range(bar) < rangeBaseline * minRangeMultiple) continue;
 

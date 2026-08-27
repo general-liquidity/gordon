@@ -10,18 +10,17 @@
  * - /strategy compare <id1> <id2>    - Compare two strategies
  */
 
-import { strategyRegistry, type StrategyId } from '../../strategies/index.ts';
+import { strategyRegistry, type StrategyId } from "../../strategies/index.ts";
 import {
   listGeneratedStrategies,
   loadGeneratedStrategy,
   getGeneratedStrategyBacktest,
-  type GeneratedStrategySummary,
-} from '../../infra/storage/entities/generated-strategies.ts';
-import { createModuleLogger } from '../../infra/logger/index.ts';
-import { playbookRegistry } from '../../core/playbooks/index.ts';
-import type { Playbook } from '../../core/playbooks/index.ts';
+} from "../../infra/storage/entities/generated-strategies.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
+import { playbookRegistry } from "../../core/playbooks/index.ts";
+import type { Playbook } from "../../core/playbooks/index.ts";
 
-const logger = createModuleLogger('strategy-commands');
+const _logger = createModuleLogger("strategy-commands");
 
 // ============================================================================
 // Types
@@ -54,8 +53,8 @@ export async function strategyList(): Promise<StrategyCommandResult> {
 
     // Get generated strategies from storage
     const generatedStrategies = listGeneratedStrategies({
-      orderBy: 'createdAt',
-      orderDirection: 'desc',
+      orderBy: "createdAt",
+      orderDirection: "desc",
       limit: 20,
     });
 
@@ -70,7 +69,8 @@ export async function strategyList(): Promise<StrategyCommandResult> {
         id: pb.id,
         tier: pb.tier,
         riskLevel: pb.riskLevel,
-        description: pb.description.length > 80 ? pb.description.slice(0, 77) + '...' : pb.description,
+        description:
+          pb.description.length > 80 ? `${pb.description.slice(0, 77)}...` : pb.description,
       }));
     } catch {
       // Playbook registry may not be initialized yet
@@ -131,7 +131,7 @@ export async function strategyInfo(strategyId: string): Promise<StrategyCommandR
     if (!strategyId) {
       return {
         success: false,
-        message: 'Usage: /strategy info <id>',
+        message: "Usage: /strategy info <id>",
       };
     }
 
@@ -143,7 +143,7 @@ export async function strategyInfo(strategyId: string): Promise<StrategyCommandR
         success: true,
         message: `Strategy: ${builtIn.name}`,
         data: {
-          source: 'built-in',
+          source: "built-in",
           strategy: {
             id: builtIn.id,
             name: builtIn.name,
@@ -167,7 +167,7 @@ export async function strategyInfo(strategyId: string): Promise<StrategyCommandR
         success: true,
         message: `Strategy: ${generated.name}`,
         data: {
-          source: 'generated',
+          source: "generated",
           strategy: {
             id: generated.id,
             name: generated.name,
@@ -249,13 +249,13 @@ Examples:
     success: true,
     message: `Ready to generate strategy from description: "${description}"`,
     data: {
-      action: 'generate_strategy',
+      action: "generate_strategy",
       description: description.trim(),
       suggestedParams: {
-        riskLevel: 'medium',
-        timeframes: ['4h', '1d'],
+        riskLevel: "medium",
+        timeframes: ["4h", "1d"],
         backtestDays: 90,
-        symbol: 'BTCUSDT',
+        symbol: "BTCUSDT",
       },
       prompt: `Generate a trading strategy based on the following description: "${description}".
 Use the strategy_generate tool to create a complete strategy with entry rules, exit rules, and risk management.`,
@@ -272,7 +272,7 @@ Use the strategy_generate tool to create a complete strategy with entry rules, e
  */
 export async function strategyBacktest(
   strategyId: string,
-  symbol?: string
+  symbol?: string,
 ): Promise<StrategyCommandResult> {
   if (!strategyId) {
     return {
@@ -297,18 +297,18 @@ Example:
   }
 
   const strategy = builtIn || generated;
-  const normalizedSymbol = (symbol || 'BTCUSDT').toUpperCase();
+  const normalizedSymbol = (symbol || "BTCUSDT").toUpperCase();
 
   return {
     success: true,
     message: `Ready to backtest strategy "${strategy!.name}" on ${normalizedSymbol}`,
     data: {
-      action: 'backtest_strategy',
+      action: "backtest_strategy",
       strategyId,
       strategyName: strategy!.name,
       symbol: normalizedSymbol,
       suggestedParams: {
-        timeframe: strategy!.timeframes[0] || '4h',
+        timeframe: strategy!.timeframes[0] || "4h",
         days: 90,
       },
       prompt: `Run a backtest for the "${strategyId}" strategy on ${normalizedSymbol} using the default timeframe and 90 days of data.`,
@@ -322,7 +322,7 @@ Example:
  */
 export async function strategyCompare(
   strategyId1: string,
-  strategyId2: string
+  strategyId2: string,
 ): Promise<StrategyCommandResult> {
   if (!strategyId1 || !strategyId2) {
     return {
@@ -335,8 +335,10 @@ Example:
   }
 
   // Load both strategies
-  const strategy1 = strategyRegistry.get(strategyId1 as StrategyId) || (await loadGeneratedStrategy(strategyId1));
-  const strategy2 = strategyRegistry.get(strategyId2 as StrategyId) || (await loadGeneratedStrategy(strategyId2));
+  const strategy1 =
+    strategyRegistry.get(strategyId1 as StrategyId) || (await loadGeneratedStrategy(strategyId1));
+  const strategy2 =
+    strategyRegistry.get(strategyId2 as StrategyId) || (await loadGeneratedStrategy(strategyId2));
 
   if (!strategy1) {
     return {
@@ -395,7 +397,7 @@ Example:
       comparison: {
         riskComparison:
           strategy1.riskLevel === strategy2.riskLevel
-            ? 'Same risk level'
+            ? "Same risk level"
             : `${strategy1.name} is ${strategy1.riskLevel} risk, ${strategy2.name} is ${strategy2.riskLevel} risk`,
         timeframeOverlap: strategy1.timeframes.filter((tf) => strategy2.timeframes.includes(tf)),
         hasBacktestData: !!(backtest1 && backtest2),
@@ -423,15 +425,17 @@ export async function strategyPlaybooks(): Promise<StrategyCommandResult> {
     if (allPlaybooks.length === 0) {
       return {
         success: true,
-        message: 'No playbooks registered. Load playbooks with the PlaybookLoader first.',
+        message: "No playbooks registered. Load playbooks with the PlaybookLoader first.",
       };
     }
 
     // Get protocol validation status for each playbook
-    let validatePlaybook: ((pb: unknown) => { valid: boolean; errors: string[]; warnings: string[] }) | null = null;
+    let validatePlaybook:
+      | ((pb: unknown) => { valid: boolean; errors: string[]; warnings: string[] })
+      | null = null;
     let playbookToProtocol: ((pb: Playbook) => unknown) | null = null;
     try {
-      const validators = await import('../../core/playbooks/index.ts');
+      const validators = await import("../../core/playbooks/index.ts");
       validatePlaybook = validators.validatePlaybook;
       playbookToProtocol = validators.playbookToProtocol;
     } catch {
@@ -439,9 +443,14 @@ export async function strategyPlaybooks(): Promise<StrategyCommandResult> {
     }
 
     // Get backtest results if available
-    let listBacktests: ((query: { playbook_name?: string; limit?: number }) => { playbook_name: string; total_return: number; sharpe_ratio: number }[]) | null = null;
+    let listBacktests:
+      | ((query: {
+          playbook_name?: string;
+          limit?: number;
+        }) => { playbook_name: string; total_return: number; sharpe_ratio: number }[])
+      | null = null;
     try {
-      const backtestStore = await import('../../core/backtesting/index.ts');
+      const backtestStore = await import("../../core/backtesting/index.ts");
       listBacktests = backtestStore.listPlaybookBacktestResults;
     } catch {
       // Backtest store may not be initialized
@@ -449,20 +458,20 @@ export async function strategyPlaybooks(): Promise<StrategyCommandResult> {
 
     const playbookDetails = allPlaybooks.map((pb) => {
       // Validation status
-      let validationStatus = 'unknown';
+      let validationStatus = "unknown";
       let warningCount = 0;
       if (validatePlaybook && playbookToProtocol) {
         try {
           const protocol = playbookToProtocol(pb);
           const result = validatePlaybook(protocol);
           if (result.valid) {
-            validationStatus = result.warnings.length > 0 ? 'valid (with warnings)' : 'valid';
+            validationStatus = result.warnings.length > 0 ? "valid (with warnings)" : "valid";
             warningCount = result.warnings.length;
           } else {
             validationStatus = `invalid (${result.errors.length} errors)`;
           }
         } catch {
-          validationStatus = 'error';
+          validationStatus = "error";
         }
       }
 
@@ -487,7 +496,8 @@ export async function strategyPlaybooks(): Promise<StrategyCommandResult> {
         name: pb.name,
         tier: pb.tier,
         riskLevel: pb.riskLevel,
-        description: pb.description.length > 80 ? pb.description.slice(0, 77) + '...' : pb.description,
+        description:
+          pb.description.length > 80 ? `${pb.description.slice(0, 77)}...` : pb.description,
         timeframes: pb.timeframes,
         markets: pb.markets,
         tags: pb.tags,
@@ -519,7 +529,7 @@ export async function strategyPlaybooks(): Promise<StrategyCommandResult> {
  */
 export async function strategyRunning(): Promise<StrategyCommandResult> {
   try {
-    const { strategyRuntime } = await import('../../core/runtime/index.ts');
+    const { strategyRuntime } = await import("../../core/runtime/index.ts");
 
     const activeSlots = strategyRuntime.getActiveSlots();
     const portfolio = strategyRuntime.getPortfolioState();
@@ -527,14 +537,16 @@ export async function strategyRunning(): Promise<StrategyCommandResult> {
     if (activeSlots.length === 0) {
       return {
         success: true,
-        message: 'No active strategy slots.\n\nUse /deploy <playbook-name> to activate a playbook as a live strategy.',
+        message:
+          "No active strategy slots.\n\nUse /deploy <playbook-name> to activate a playbook as a live strategy.",
       };
     }
 
     const slotDetails = activeSlots.map((slot) => {
-      const winRate = slot.total_trades > 0
-        ? ((slot.winning_trades / slot.total_trades) * 100).toFixed(1)
-        : 'N/A';
+      const winRate =
+        slot.total_trades > 0
+          ? ((slot.winning_trades / slot.total_trades) * 100).toFixed(1)
+          : "N/A";
 
       return {
         slot_id: slot.slot_id,
@@ -579,14 +591,20 @@ export async function strategyRunning(): Promise<StrategyCommandResult> {
  */
 export async function strategyEvolving(): Promise<StrategyCommandResult> {
   try {
-    const { GenomeManager } = await import('../../core/genome/index.ts');
+    const { GenomeManager } = await import("../../core/genome/index.ts");
     const manager = GenomeManager.getInstance();
 
     // Get all playbooks and their genomes
     const allPlaybooks = playbookRegistry.getAll();
     const playbookGenomes: {
       playbook: string;
-      genomes: { genome_id: string; generation: number; status: string; fitness_score?: number; mutations: number }[];
+      genomes: {
+        genome_id: string;
+        generation: number;
+        status: string;
+        fitness_score?: number;
+        mutations: number;
+      }[];
       best_fitness?: number;
     }[] = [];
 
@@ -613,7 +631,15 @@ export async function strategyEvolving(): Promise<StrategyCommandResult> {
     }
 
     // Get active experiments
-    let experiments: { experiment_id: string; name: string; status: string; symbol: string; winner: string; control_trades: number; variant_trades: number }[] = [];
+    let experiments: {
+      experiment_id: string;
+      name: string;
+      status: string;
+      symbol: string;
+      winner: string;
+      control_trades: number;
+      variant_trades: number;
+    }[] = [];
     try {
       const active = manager.getActiveExperiments();
       experiments = active.map((exp) => ({
@@ -632,7 +658,8 @@ export async function strategyEvolving(): Promise<StrategyCommandResult> {
     if (playbookGenomes.length === 0 && experiments.length === 0) {
       return {
         success: true,
-        message: 'No genome variants or experiments found.\n\nUse the genome tools to fork and evolve playbooks.',
+        message:
+          "No genome variants or experiments found.\n\nUse the genome tools to fork and evolve playbooks.",
       };
     }
 
@@ -662,60 +689,60 @@ export async function strategyEvolving(): Promise<StrategyCommandResult> {
  */
 export async function handleStrategyCommand(args: string): Promise<string> {
   const parts = args.trim().split(/\s+/);
-  const subcommand = parts[0]?.toLowerCase() ?? 'list';
+  const subcommand = parts[0]?.toLowerCase() ?? "list";
   const subArgs = parts.slice(1);
 
   let result: StrategyCommandResult;
 
   switch (subcommand) {
-    case 'list':
-    case 'ls':
-    case '':
+    case "list":
+    case "ls":
+    case "":
       result = await strategyList();
       break;
 
-    case 'info':
-    case 'show':
-    case 'details':
-      result = await strategyInfo(subArgs[0] || '');
+    case "info":
+    case "show":
+    case "details":
+      result = await strategyInfo(subArgs[0] || "");
       break;
 
-    case 'playbooks':
-    case 'pb':
+    case "playbooks":
+    case "pb":
       result = await strategyPlaybooks();
       break;
 
-    case 'running':
-    case 'active':
-    case 'slots':
+    case "running":
+    case "active":
+    case "slots":
       result = await strategyRunning();
       break;
 
-    case 'evolving':
-    case 'evolution':
-    case 'genomes':
+    case "evolving":
+    case "evolution":
+    case "genomes":
       result = await strategyEvolving();
       break;
 
-    case 'generate':
-    case 'gen':
-    case 'create':
-      result = await strategyGenerate(subArgs.join(' '));
+    case "generate":
+    case "gen":
+    case "create":
+      result = await strategyGenerate(subArgs.join(" "));
       break;
 
-    case 'backtest':
-    case 'bt':
-    case 'test':
-      result = await strategyBacktest(subArgs[0] || '', subArgs[1]);
+    case "backtest":
+    case "bt":
+    case "test":
+      result = await strategyBacktest(subArgs[0] || "", subArgs[1]);
       break;
 
-    case 'compare':
-    case 'cmp':
-    case 'vs':
-      result = await strategyCompare(subArgs[0] || '', subArgs[1] || '');
+    case "compare":
+    case "cmp":
+    case "vs":
+      result = await strategyCompare(subArgs[0] || "", subArgs[1] || "");
       break;
 
-    case 'help':
+    case "help":
       result = {
         success: true,
         message: `Strategy Management Commands:
@@ -745,7 +772,7 @@ Examples:
       };
       break;
 
-    default:
+    default: {
       // Check if it might be a strategy ID directly
       const possibleId = subcommand;
       const builtIn = strategyRegistry.get(possibleId as StrategyId);
@@ -760,6 +787,7 @@ Examples:
           message: `Unknown subcommand: ${subcommand}. Use "/strategy help" for available commands.`,
         };
       }
+    }
   }
 
   return formatStrategyResult(result);
@@ -805,51 +833,53 @@ function formatStrategyResult(result: StrategyCommandResult): string {
         riskLevel: string;
         backtestReturn?: number;
       }>;
-      const playbooks = data.playbooks as Array<{
-        id: string;
-        tier: number;
-        riskLevel: string;
-        description: string;
-      }> | undefined;
+      const playbooks = data.playbooks as
+        | Array<{
+            id: string;
+            tier: number;
+            riskLevel: string;
+            description: string;
+          }>
+        | undefined;
 
       if (builtIn?.tier1?.length) {
-        lines.push('');
-        lines.push('Beginner Strategies (Tier 1):');
+        lines.push("");
+        lines.push("Beginner Strategies (Tier 1):");
         for (const s of builtIn.tier1) {
           lines.push(`  ${s.id}: ${s.name} [${s.riskLevel}]`);
         }
       }
 
       if (builtIn?.tier2?.length) {
-        lines.push('');
-        lines.push('Intermediate Strategies (Tier 2):');
+        lines.push("");
+        lines.push("Intermediate Strategies (Tier 2):");
         for (const s of builtIn.tier2) {
           lines.push(`  ${s.id}: ${s.name} [${s.riskLevel}]`);
         }
       }
 
       if (generated?.length) {
-        lines.push('');
-        lines.push('Generated Strategies:');
+        lines.push("");
+        lines.push("Generated Strategies:");
         for (const s of generated) {
           const returnStr =
             s.backtestReturn !== undefined
-              ? ` (${s.backtestReturn > 0 ? '+' : ''}${s.backtestReturn.toFixed(1)}%)`
-              : '';
+              ? ` (${s.backtestReturn > 0 ? "+" : ""}${s.backtestReturn.toFixed(1)}%)`
+              : "";
           lines.push(`  ${s.id}: ${s.name} [${s.riskLevel}]${returnStr}`);
         }
       }
 
       if (playbooks && playbooks.length > 0) {
-        lines.push('');
-        lines.push('Playbooks (v0.7):');
+        lines.push("");
+        lines.push("Playbooks (v0.7):");
         for (const pb of playbooks) {
           const tierLabel = `Tier ${pb.tier}`;
           const risk = pb.riskLevel.charAt(0).toUpperCase() + pb.riskLevel.slice(1);
           lines.push(`  ${pb.id.padEnd(25)} ${tierLabel}  ${risk.padEnd(8)} ${pb.description}`);
         }
-        lines.push('');
-        lines.push('Use /deploy <name> to activate a playbook as a live strategy.');
+        lines.push("");
+        lines.push("Use /deploy <name> to activate a playbook as a live strategy.");
       }
     }
 
@@ -869,16 +899,22 @@ function formatStrategyResult(result: StrategyCommandResult): string {
       }>;
 
       for (const pb of pbs) {
-        lines.push('');
+        lines.push("");
         lines.push(`  ${pb.id} (${pb.name})`);
-        lines.push(`    Tier: ${pb.tier}  |  Risk: ${pb.riskLevel}  |  Timeframes: ${pb.timeframes.join(', ')}`);
-        lines.push(`    Tags: ${pb.tags.join(', ') || 'none'}`);
-        lines.push(`    Protocol: ${pb.validationStatus}${pb.warningCount > 0 ? ` (${pb.warningCount} warnings)` : ''}`);
+        lines.push(
+          `    Tier: ${pb.tier}  |  Risk: ${pb.riskLevel}  |  Timeframes: ${pb.timeframes.join(", ")}`,
+        );
+        lines.push(`    Tags: ${pb.tags.join(", ") || "none"}`);
+        lines.push(
+          `    Protocol: ${pb.validationStatus}${pb.warningCount > 0 ? ` (${pb.warningCount} warnings)` : ""}`,
+        );
         if (pb.lastBacktest) {
-          const retSign = pb.lastBacktest.total_return > 0 ? '+' : '';
-          lines.push(`    Last Backtest: ${retSign}${pb.lastBacktest.total_return.toFixed(1)}% return, Sharpe: ${pb.lastBacktest.sharpe_ratio.toFixed(2)}`);
+          const retSign = pb.lastBacktest.total_return > 0 ? "+" : "";
+          lines.push(
+            `    Last Backtest: ${retSign}${pb.lastBacktest.total_return.toFixed(1)}% return, Sharpe: ${pb.lastBacktest.sharpe_ratio.toFixed(2)}`,
+          );
         } else {
-          lines.push('    Last Backtest: none');
+          lines.push("    Last Backtest: none");
         }
         lines.push(`    ${pb.description}`);
       }
@@ -907,22 +943,22 @@ function formatStrategyResult(result: StrategyCommandResult): string {
         drawdown: number;
       };
 
-      lines.push('');
-      lines.push('Portfolio:');
+      lines.push("");
+      lines.push("Portfolio:");
       lines.push(`  Total Capital:   $${portfolio.totalCapital.toFixed(2)}`);
       lines.push(`  Allocated:       $${portfolio.allocatedCapital.toFixed(2)}`);
       lines.push(`  Unallocated:     $${portfolio.unallocatedCapital.toFixed(2)}`);
       lines.push(`  Total PnL:       $${portfolio.totalPnl.toFixed(2)}`);
       lines.push(`  Drawdown:        ${portfolio.drawdown.toFixed(1)}%`);
 
-      lines.push('');
-      lines.push('Active Slots:');
-      lines.push('-'.repeat(80));
+      lines.push("");
+      lines.push("Active Slots:");
+      lines.push("-".repeat(80));
       for (const slot of slots) {
-        const statusIcon = slot.status === 'active' ? '[ON]' : `[${slot.status.toUpperCase()}]`;
+        const statusIcon = slot.status === "active" ? "[ON]" : `[${slot.status.toUpperCase()}]`;
         const pnlStr = `$${slot.pnl.toFixed(2)}`;
         lines.push(
-          `  ${statusIcon} ${slot.playbook.padEnd(25)} | ${slot.allocated} | PnL: ${pnlStr} | Trades: ${slot.trades} | Win: ${slot.winRate}% | DD: ${slot.drawdown.toFixed(1)}%`
+          `  ${statusIcon} ${slot.playbook.padEnd(25)} | ${slot.allocated} | PnL: ${pnlStr} | Trades: ${slot.trades} | Win: ${slot.winRate}% | DD: ${slot.drawdown.toFixed(1)}%`,
         );
       }
     }
@@ -931,7 +967,13 @@ function formatStrategyResult(result: StrategyCommandResult): string {
     if (data.playbookGenomes || data.experiments) {
       const playbookGenomes = (data.playbookGenomes || []) as Array<{
         playbook: string;
-        genomes: Array<{ genome_id: string; generation: number; status: string; fitness_score?: number; mutations: number }>;
+        genomes: Array<{
+          genome_id: string;
+          generation: number;
+          status: string;
+          fitness_score?: number;
+          mutations: number;
+        }>;
         best_fitness?: number;
       }>;
       const experiments = (data.experiments || []) as Array<{
@@ -945,27 +987,31 @@ function formatStrategyResult(result: StrategyCommandResult): string {
       }>;
 
       if (playbookGenomes.length > 0) {
-        lines.push('');
-        lines.push('Genome Variants:');
-        lines.push('-'.repeat(80));
+        lines.push("");
+        lines.push("Genome Variants:");
+        lines.push("-".repeat(80));
         for (const pg of playbookGenomes) {
-          const bestStr = pg.best_fitness !== undefined ? ` (best fitness: ${pg.best_fitness.toFixed(1)})` : '';
+          const bestStr =
+            pg.best_fitness !== undefined ? ` (best fitness: ${pg.best_fitness.toFixed(1)})` : "";
           lines.push(`  ${pg.playbook}: ${pg.genomes.length} variant(s)${bestStr}`);
           for (const g of pg.genomes) {
-            const fitnessStr = g.fitness_score !== undefined ? ` fitness: ${g.fitness_score.toFixed(1)}` : '';
-            const mutStr = g.mutations > 0 ? ` [${g.mutations} mutations]` : '';
+            const fitnessStr =
+              g.fitness_score !== undefined ? ` fitness: ${g.fitness_score.toFixed(1)}` : "";
+            const mutStr = g.mutations > 0 ? ` [${g.mutations} mutations]` : "";
             lines.push(`    Gen ${g.generation}: ${g.status}${fitnessStr}${mutStr}`);
           }
         }
       }
 
       if (experiments.length > 0) {
-        lines.push('');
-        lines.push('Active Experiments:');
-        lines.push('-'.repeat(80));
+        lines.push("");
+        lines.push("Active Experiments:");
+        lines.push("-".repeat(80));
         for (const exp of experiments) {
           lines.push(`  ${exp.name} (${exp.symbol})`);
-          lines.push(`    Status: ${exp.status} | Winner: ${exp.winner} | Control: ${exp.control_trades} trades | Variant: ${exp.variant_trades} trades`);
+          lines.push(
+            `    Status: ${exp.status} | Winner: ${exp.winner} | Control: ${exp.control_trades} trades | Variant: ${exp.variant_trades} trades`,
+          );
         }
       }
     }
@@ -985,28 +1031,30 @@ function formatStrategyResult(result: StrategyCommandResult): string {
         exitRules?: { stopLoss: unknown; takeProfitLevels: number; trailingStop: boolean };
       };
 
-      lines.push('');
+      lines.push("");
       lines.push(`ID: ${strategy.id}`);
       lines.push(`Source: ${data.source}`);
       lines.push(`Description: ${strategy.description}`);
       lines.push(`Risk Level: ${strategy.riskLevel}`);
-      lines.push(`Tier: ${strategy.tier || 'N/A'}`);
-      lines.push(`Timeframes: ${strategy.timeframes.join(', ')}`);
+      lines.push(`Tier: ${strategy.tier || "N/A"}`);
+      lines.push(`Timeframes: ${strategy.timeframes.join(", ")}`);
 
       if (strategy.indicators) {
-        lines.push(`Indicators: ${strategy.indicators.join(', ')}`);
+        lines.push(`Indicators: ${strategy.indicators.join(", ")}`);
       }
       if (strategy.requiredIndicators) {
-        lines.push(`Required Indicators: ${strategy.requiredIndicators.join(', ')}`);
+        lines.push(`Required Indicators: ${strategy.requiredIndicators.join(", ")}`);
       }
 
       if (strategy.entryRules) {
-        lines.push(`Entry Rules: ${strategy.entryRules.longRules} long, ${strategy.entryRules.shortRules} short`);
+        lines.push(
+          `Entry Rules: ${strategy.entryRules.longRules} long, ${strategy.entryRules.shortRules} short`,
+        );
       }
 
       if (strategy.exitRules) {
         lines.push(`Take Profit Levels: ${strategy.exitRules.takeProfitLevels}`);
-        lines.push(`Trailing Stop: ${strategy.exitRules.trailingStop ? 'Enabled' : 'Disabled'}`);
+        lines.push(`Trailing Stop: ${strategy.exitRules.trailingStop ? "Enabled" : "Disabled"}`);
       }
 
       const backtestResult = data.backtestResult as {
@@ -1020,10 +1068,12 @@ function formatStrategyResult(result: StrategyCommandResult): string {
       } | null;
 
       if (backtestResult) {
-        lines.push('');
-        lines.push('Last Backtest Results:');
+        lines.push("");
+        lines.push("Last Backtest Results:");
         lines.push(`  Symbol: ${backtestResult.symbol} (${backtestResult.timeframe})`);
-        lines.push(`  Return: ${backtestResult.totalReturn > 0 ? '+' : ''}${backtestResult.totalReturn.toFixed(2)}%`);
+        lines.push(
+          `  Return: ${backtestResult.totalReturn > 0 ? "+" : ""}${backtestResult.totalReturn.toFixed(2)}%`,
+        );
         lines.push(`  Sharpe: ${backtestResult.sharpeRatio.toFixed(2)}`);
         lines.push(`  Max Drawdown: ${backtestResult.maxDrawdown.toFixed(2)}%`);
         lines.push(`  Win Rate: ${backtestResult.winRate.toFixed(1)}%`);
@@ -1046,39 +1096,47 @@ function formatStrategyResult(result: StrategyCommandResult): string {
         backtest: { totalReturn: number; sharpeRatio: number; winRate: number } | null;
       };
 
-      lines.push('');
+      lines.push("");
       lines.push(`${s1.name.padEnd(30)} vs ${s2.name}`);
-      lines.push('-'.repeat(60));
+      lines.push("-".repeat(60));
       lines.push(`Risk: ${s1.riskLevel.padEnd(24)} | ${s2.riskLevel}`);
-      lines.push(`Timeframes: ${s1.timeframes.join(', ').padEnd(17)} | ${s2.timeframes.join(', ')}`);
+      lines.push(
+        `Timeframes: ${s1.timeframes.join(", ").padEnd(17)} | ${s2.timeframes.join(", ")}`,
+      );
 
       if (s1.backtest && s2.backtest) {
-        lines.push('');
-        lines.push('Backtest Comparison:');
-        lines.push(`Return: ${(s1.backtest.totalReturn > 0 ? '+' : '') + s1.backtest.totalReturn.toFixed(1) + '%'}${' '.repeat(16)} | ${(s2.backtest.totalReturn > 0 ? '+' : '') + s2.backtest.totalReturn.toFixed(1)}%`);
-        lines.push(`Sharpe: ${s1.backtest.sharpeRatio.toFixed(2).padEnd(22)} | ${s2.backtest.sharpeRatio.toFixed(2)}`);
-        lines.push(`Win Rate: ${(s1.backtest.winRate.toFixed(1) + '%').padEnd(20)} | ${s2.backtest.winRate.toFixed(1)}%`);
+        lines.push("");
+        lines.push("Backtest Comparison:");
+        lines.push(
+          `Return: ${`${(s1.backtest.totalReturn > 0 ? "+" : "") + s1.backtest.totalReturn.toFixed(1)}%`}${" ".repeat(16)} | ${(s2.backtest.totalReturn > 0 ? "+" : "") + s2.backtest.totalReturn.toFixed(1)}%`,
+        );
+        lines.push(
+          `Sharpe: ${s1.backtest.sharpeRatio.toFixed(2).padEnd(22)} | ${s2.backtest.sharpeRatio.toFixed(2)}`,
+        );
+        lines.push(
+          `Win Rate: ${(`${s1.backtest.winRate.toFixed(1)}%`).padEnd(20)} | ${s2.backtest.winRate.toFixed(1)}%`,
+        );
       }
     }
 
     // Generate prompt
-    if (data.action === 'generate_strategy') {
-      lines.push('');
-      lines.push('The AI will now generate a strategy based on your description.');
+    if (data.action === "generate_strategy") {
+      lines.push("");
+      lines.push("The AI will now generate a strategy based on your description.");
     }
 
     // Backtest prompt
-    if (data.action === 'backtest_strategy') {
-      lines.push('');
-      lines.push('The AI will now run a backtest for this strategy.');
+    if (data.action === "backtest_strategy") {
+      lines.push("");
+      lines.push("The AI will now run a backtest for this strategy.");
     }
 
     // Additional prompt
-    if (data.prompt && typeof data.prompt === 'string' && !data.action) {
-      lines.push('');
+    if (data.prompt && typeof data.prompt === "string" && !data.action) {
+      lines.push("");
       lines.push(`Note: ${data.prompt}`);
     }
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }

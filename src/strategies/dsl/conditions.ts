@@ -6,12 +6,7 @@
  */
 
 import type { OHLC, IndicatorState } from "../../backtest/types.ts";
-import type {
-  Condition,
-  IndicatorCondition,
-  PriceCondition,
-  PatternCondition,
-} from "./schema.ts";
+import type { Condition, IndicatorCondition, PriceCondition, PatternCondition } from "./schema.ts";
 
 // ============================================================================
 // Types
@@ -59,7 +54,7 @@ export function evaluateCondition(
   bar: OHLC,
   indicators: IndicatorState,
   prevBar?: OHLC,
-  prevIndicators?: IndicatorState
+  prevIndicators?: IndicatorState,
 ): boolean {
   const ctx: EvaluationContext = {
     bar,
@@ -87,7 +82,7 @@ export function evaluateCondition(
  */
 export function evaluateConditionWithResult(
   condition: Condition,
-  ctx: EvaluationContext
+  ctx: EvaluationContext,
 ): EvaluationResult {
   switch (condition.type) {
     case "indicator":
@@ -110,7 +105,7 @@ export function evaluateConditionWithResult(
  */
 export function evaluateIndicatorCondition(
   condition: IndicatorCondition,
-  ctx: EvaluationContext
+  ctx: EvaluationContext,
 ): EvaluationResult {
   const { indicator, comparison, value, params } = condition;
   const { indicators, prevIndicators } = ctx;
@@ -127,9 +122,7 @@ export function evaluateIndicatorCondition(
   }
 
   // Get comparison value
-  const compareValue = typeof value === "number"
-    ? value
-    : getIndicatorReference(value, indicators);
+  const compareValue = typeof value === "number" ? value : getIndicatorReference(value, indicators);
 
   if (compareValue === null || compareValue === undefined) {
     return {
@@ -150,11 +143,15 @@ export function evaluateIndicatorCondition(
     }
 
     const prevValue = getIndicatorValue(indicator, prevIndicators, indicatorParams);
-    const prevCompare = typeof value === "number"
-      ? value
-      : getIndicatorReference(value, prevIndicators);
+    const prevCompare =
+      typeof value === "number" ? value : getIndicatorReference(value, prevIndicators);
 
-    if (prevValue === null || prevValue === undefined || prevCompare === null || prevCompare === undefined) {
+    if (
+      prevValue === null ||
+      prevValue === undefined ||
+      prevCompare === null ||
+      prevCompare === undefined
+    ) {
       return {
         met: false,
         reason: "Previous values not available for crossover",
@@ -220,7 +217,7 @@ export function evaluateIndicatorCondition(
 function getIndicatorValue(
   indicator: string,
   state: IndicatorState,
-  params?: Record<string, number>
+  params?: Record<string, number>,
 ): number | null {
   const period = params?.period;
 
@@ -262,10 +259,7 @@ function getIndicatorValue(
 /**
  * Get indicator value from a reference string like 'sma_20'
  */
-function getIndicatorReference(
-  ref: string,
-  state: IndicatorState
-): number | null {
+function getIndicatorReference(ref: string, state: IndicatorState): number | null {
   // Handle special references
   if (ref === "signal") return state.macdSignal ?? null;
   if (ref === "upper" || ref === "bb_upper") return state.bbUpper ?? null;
@@ -287,12 +281,18 @@ function getIndicatorReference(
  */
 function getOperatorSymbol(op: string): string {
   switch (op) {
-    case "gt": return ">";
-    case "lt": return "<";
-    case "gte": return ">=";
-    case "lte": return "<=";
-    case "eq": return "=";
-    default: return op;
+    case "gt":
+      return ">";
+    case "lt":
+      return "<";
+    case "gte":
+      return ">=";
+    case "lte":
+      return "<=";
+    case "eq":
+      return "=";
+    default:
+      return op;
   }
 }
 
@@ -305,7 +305,7 @@ function getOperatorSymbol(op: string): string {
  */
 export function evaluatePriceCondition(
   condition: PriceCondition,
-  ctx: EvaluationContext
+  ctx: EvaluationContext,
 ): EvaluationResult {
   const { condition: condType, threshold = 3 } = condition;
   const { bar, supportLevels = [], resistanceLevels = [] } = ctx;
@@ -412,7 +412,7 @@ export function evaluatePriceCondition(
  */
 export function evaluatePatternCondition(
   condition: PatternCondition,
-  ctx: EvaluationContext
+  ctx: EvaluationContext,
 ): EvaluationResult {
   const { pattern, direction = "any" } = condition;
   const { bar, prevBar } = ctx;
@@ -456,7 +456,7 @@ export function evaluatePatternCondition(
 function detectEngulfingPattern(
   current: OHLC,
   prev: OHLC,
-  direction: "bullish" | "bearish" | "any"
+  direction: "bullish" | "bearish" | "any",
 ): EvaluationResult {
   const prevBody = prev.close - prev.open;
   const currBody = current.close - current.open;
@@ -507,10 +507,7 @@ function detectEngulfingPattern(
 /**
  * Detect doji pattern
  */
-function detectDojiPattern(
-  bar: OHLC,
-  direction: "bullish" | "bearish" | "any"
-): EvaluationResult {
+function detectDojiPattern(bar: OHLC, direction: "bullish" | "bearish" | "any"): EvaluationResult {
   const body = Math.abs(bar.close - bar.open);
   const range = bar.high - bar.low;
 
@@ -525,7 +522,7 @@ function detectDojiPattern(
 
   if (isDoji) {
     // Direction hint based on position in range
-    const midPoint = (bar.high + bar.low) / 2;
+    const _midPoint = (bar.high + bar.low) / 2;
     const closePosition = (bar.close - bar.low) / range;
 
     let directionHint = "neutral";
@@ -565,7 +562,7 @@ function detectDojiPattern(
  */
 function detectHammerPattern(
   bar: OHLC,
-  direction: "bullish" | "bearish" | "any"
+  direction: "bullish" | "bearish" | "any",
 ): EvaluationResult {
   const body = Math.abs(bar.close - bar.open);
   const range = bar.high - bar.low;
@@ -611,7 +608,7 @@ function detectHammerPattern(
  */
 function detectShootingStarPattern(
   bar: OHLC,
-  direction: "bullish" | "bearish" | "any"
+  direction: "bullish" | "bearish" | "any",
 ): EvaluationResult {
   const body = Math.abs(bar.close - bar.open);
   const range = bar.high - bar.low;
@@ -662,7 +659,7 @@ function detectShootingStarPattern(
 export function evaluateSignalRule(
   conditions: Condition[],
   operator: "AND" | "OR",
-  ctx: EvaluationContext
+  ctx: EvaluationContext,
 ): { met: boolean; confidence: number; reasons: string[] } {
   const results = conditions.map((c) => evaluateConditionWithResult(c, ctx));
   const reasons = results.map((r) => r.reason);
@@ -676,9 +673,7 @@ export function evaluateSignalRule(
   } else {
     const anyMet = results.some((r) => r.met);
     const metResults = results.filter((r) => r.met);
-    const maxConfidence = anyMet
-      ? Math.max(...metResults.map((r) => r.confidence))
-      : 0;
+    const maxConfidence = anyMet ? Math.max(...metResults.map((r) => r.confidence)) : 0;
     return { met: anyMet, confidence: maxConfidence, reasons };
   }
 }

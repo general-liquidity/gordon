@@ -32,11 +32,12 @@ export interface PickerMachineState {
   history: string[];
 }
 
-export type PickerMachineEvent =
-  | { type: "go"; stepId: string }
-  | { type: "back" };
+export type PickerMachineEvent = { type: "go"; stepId: string } | { type: "back" };
 
-export function pickerTransition(state: PickerMachineState, event: PickerMachineEvent): PickerMachineState {
+export function pickerTransition(
+  state: PickerMachineState,
+  event: PickerMachineEvent,
+): PickerMachineState {
   switch (event.type) {
     case "go":
       if (event.stepId === state.stepId) return state;
@@ -91,8 +92,8 @@ export function MultiStepPicker<TData>({
       </Text>
       {showProgress && (
         <Text dimColor>
-          Step {index + 1} of {stepIds.length} {" "}
-          {stepIds.map((id) => id === machine.stepId ? "●" : "○").join(" ")}
+          Step {index + 1} of {stepIds.length}{" "}
+          {stepIds.map((id) => (id === machine.stepId ? "●" : "○")).join(" ")}
         </Text>
       )}
       {current?.title ? <Text bold>{current.title}</Text> : null}

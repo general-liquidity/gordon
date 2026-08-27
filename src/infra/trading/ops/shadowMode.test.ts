@@ -35,8 +35,9 @@ describe("isShadowModeEnabled", () => {
 
 describe("defaultShadowFillsPath", () => {
   it("honors override env var", () => {
-    expect(defaultShadowFillsPath({ [SHADOW_PATH_ENV]: "/custom/path.jsonl" }))
-      .toBe("/custom/path.jsonl");
+    expect(defaultShadowFillsPath({ [SHADOW_PATH_ENV]: "/custom/path.jsonl" })).toBe(
+      "/custom/path.jsonl",
+    );
   });
 
   it("falls back to home-dir default", () => {
@@ -48,17 +49,20 @@ describe("defaultShadowFillsPath", () => {
 
 describe("recordShadowOpen", () => {
   it("appends an open fill to the JSONL", () => {
-    const fill = recordShadowOpen({
-      planId: "p1",
-      symbol: "BTC/USD",
-      side: "long",
-      entryPrice: 50000,
-      intendedSize: 0.1,
-      strategy: "regime-rsi",
-      stopLoss: 49000,
-      takeProfit: 52000,
-      now: 1_700_000_000_000,
-    }, logPath);
+    const fill = recordShadowOpen(
+      {
+        planId: "p1",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 50000,
+        intendedSize: 0.1,
+        strategy: "regime-rsi",
+        stopLoss: 49000,
+        takeProfit: 52000,
+        now: 1_700_000_000_000,
+      },
+      logPath,
+    );
 
     expect(fill.status).toBe("open");
     expect(fill.openedAt).toBe(1_700_000_000_000);
@@ -71,34 +75,43 @@ describe("recordShadowOpen", () => {
 
   it("creates parent dir if missing", () => {
     const nested = join(tempDir, "nested", "deep", "shadow.jsonl");
-    recordShadowOpen({
-      planId: "p1",
-      symbol: "BTC/USD",
-      side: "long",
-      entryPrice: 50000,
-      intendedSize: 0.1,
-      strategy: "x",
-    }, nested);
+    recordShadowOpen(
+      {
+        planId: "p1",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 50000,
+        intendedSize: 0.1,
+        strategy: "x",
+      },
+      nested,
+    );
     expect(existsSync(nested)).toBe(true);
   });
 });
 
 describe("recordShadowClose", () => {
   it("appends a close diff", () => {
-    recordShadowOpen({
-      planId: "p1",
-      symbol: "BTC/USD",
-      side: "long",
-      entryPrice: 50000,
-      intendedSize: 0.1,
-      strategy: "x",
-    }, logPath);
-    recordShadowClose({
-      planId: "p1",
-      exitPrice: 52000,
-      closeReason: "target",
-      now: 1_700_000_999_000,
-    }, logPath);
+    recordShadowOpen(
+      {
+        planId: "p1",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 50000,
+        intendedSize: 0.1,
+        strategy: "x",
+      },
+      logPath,
+    );
+    recordShadowClose(
+      {
+        planId: "p1",
+        exitPrice: 52000,
+        closeReason: "target",
+        now: 1_700_000_999_000,
+      },
+      logPath,
+    );
 
     const content = readFileSync(logPath, "utf8").trim().split("\n");
     expect(content.length).toBe(2);
@@ -114,14 +127,17 @@ describe("readShadowFills", () => {
   });
 
   it("reconciles open + close into closed fill with PnL", () => {
-    recordShadowOpen({
-      planId: "p1",
-      symbol: "BTC/USD",
-      side: "long",
-      entryPrice: 100,
-      intendedSize: 2,
-      strategy: "x",
-    }, logPath);
+    recordShadowOpen(
+      {
+        planId: "p1",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 100,
+        intendedSize: 2,
+        strategy: "x",
+      },
+      logPath,
+    );
     recordShadowClose({ planId: "p1", exitPrice: 110, closeReason: "target" }, logPath);
 
     const fills = readShadowFills({}, logPath);
@@ -133,14 +149,17 @@ describe("readShadowFills", () => {
   });
 
   it("computes short PnL correctly", () => {
-    recordShadowOpen({
-      planId: "p1",
-      symbol: "BTC/USD",
-      side: "short",
-      entryPrice: 100,
-      intendedSize: 1,
-      strategy: "x",
-    }, logPath);
+    recordShadowOpen(
+      {
+        planId: "p1",
+        symbol: "BTC/USD",
+        side: "short",
+        entryPrice: 100,
+        intendedSize: 1,
+        strategy: "x",
+      },
+      logPath,
+    );
     recordShadowClose({ planId: "p1", exitPrice: 90, closeReason: "target" }, logPath);
 
     const fills = readShadowFills({}, logPath);
@@ -148,22 +167,45 @@ describe("readShadowFills", () => {
   });
 
   it("keeps open fill open if no matching close", () => {
-    recordShadowOpen({
-      planId: "p1",
-      symbol: "BTC/USD",
-      side: "long",
-      entryPrice: 100,
-      intendedSize: 1,
-      strategy: "x",
-    }, logPath);
+    recordShadowOpen(
+      {
+        planId: "p1",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 100,
+        intendedSize: 1,
+        strategy: "x",
+      },
+      logPath,
+    );
     const fills = readShadowFills({}, logPath);
     expect(fills[0]!.status).toBe("open");
     expect(fills[0]!.pnl).toBeNull();
   });
 
   it("filters by symbol", () => {
-    recordShadowOpen({ planId: "p1", symbol: "BTC/USD", side: "long", entryPrice: 100, intendedSize: 1, strategy: "x" }, logPath);
-    recordShadowOpen({ planId: "p2", symbol: "ETH/USD", side: "long", entryPrice: 200, intendedSize: 1, strategy: "x" }, logPath);
+    recordShadowOpen(
+      {
+        planId: "p1",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 100,
+        intendedSize: 1,
+        strategy: "x",
+      },
+      logPath,
+    );
+    recordShadowOpen(
+      {
+        planId: "p2",
+        symbol: "ETH/USD",
+        side: "long",
+        entryPrice: 200,
+        intendedSize: 1,
+        strategy: "x",
+      },
+      logPath,
+    );
 
     const btcOnly = readShadowFills({ symbol: "BTC/USD" }, logPath);
     expect(btcOnly.length).toBe(1);
@@ -171,8 +213,28 @@ describe("readShadowFills", () => {
   });
 
   it("filters by status", () => {
-    recordShadowOpen({ planId: "p1", symbol: "BTC/USD", side: "long", entryPrice: 100, intendedSize: 1, strategy: "x" }, logPath);
-    recordShadowOpen({ planId: "p2", symbol: "ETH/USD", side: "long", entryPrice: 200, intendedSize: 1, strategy: "x" }, logPath);
+    recordShadowOpen(
+      {
+        planId: "p1",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 100,
+        intendedSize: 1,
+        strategy: "x",
+      },
+      logPath,
+    );
+    recordShadowOpen(
+      {
+        planId: "p2",
+        symbol: "ETH/USD",
+        side: "long",
+        entryPrice: 200,
+        intendedSize: 1,
+        strategy: "x",
+      },
+      logPath,
+    );
     recordShadowClose({ planId: "p1", exitPrice: 110, closeReason: "target" }, logPath);
 
     expect(readShadowFills({ status: "open" }, logPath).length).toBe(1);
@@ -180,31 +242,104 @@ describe("readShadowFills", () => {
   });
 
   it("filters by strategy", () => {
-    recordShadowOpen({ planId: "p1", symbol: "BTC/USD", side: "long", entryPrice: 100, intendedSize: 1, strategy: "rsi" }, logPath);
-    recordShadowOpen({ planId: "p2", symbol: "ETH/USD", side: "long", entryPrice: 200, intendedSize: 1, strategy: "macd" }, logPath);
+    recordShadowOpen(
+      {
+        planId: "p1",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 100,
+        intendedSize: 1,
+        strategy: "rsi",
+      },
+      logPath,
+    );
+    recordShadowOpen(
+      {
+        planId: "p2",
+        symbol: "ETH/USD",
+        side: "long",
+        entryPrice: 200,
+        intendedSize: 1,
+        strategy: "macd",
+      },
+      logPath,
+    );
 
     expect(readShadowFills({ strategy: "rsi" }, logPath).map((f) => f.planId)).toEqual(["p1"]);
   });
 
   it("filters by sinceMs", () => {
-    recordShadowOpen({ planId: "p1", symbol: "BTC/USD", side: "long", entryPrice: 100, intendedSize: 1, strategy: "x", now: 1000 }, logPath);
-    recordShadowOpen({ planId: "p2", symbol: "ETH/USD", side: "long", entryPrice: 200, intendedSize: 1, strategy: "x", now: 2000 }, logPath);
+    recordShadowOpen(
+      {
+        planId: "p1",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 100,
+        intendedSize: 1,
+        strategy: "x",
+        now: 1000,
+      },
+      logPath,
+    );
+    recordShadowOpen(
+      {
+        planId: "p2",
+        symbol: "ETH/USD",
+        side: "long",
+        entryPrice: 200,
+        intendedSize: 1,
+        strategy: "x",
+        now: 2000,
+      },
+      logPath,
+    );
 
     expect(readShadowFills({ sinceMs: 1500 }, logPath).map((f) => f.planId)).toEqual(["p2"]);
   });
 
   it("limits returned results", () => {
     for (let i = 0; i < 5; i++) {
-      recordShadowOpen({ planId: `p${i}`, symbol: "BTC/USD", side: "long", entryPrice: 100, intendedSize: 1, strategy: "x", now: i * 1000 }, logPath);
+      recordShadowOpen(
+        {
+          planId: `p${i}`,
+          symbol: "BTC/USD",
+          side: "long",
+          entryPrice: 100,
+          intendedSize: 1,
+          strategy: "x",
+          now: i * 1000,
+        },
+        logPath,
+      );
     }
     expect(readShadowFills({ limit: 2 }, logPath).length).toBe(2);
   });
 
   it("tolerates malformed lines", () => {
-    recordShadowOpen({ planId: "p1", symbol: "BTC/USD", side: "long", entryPrice: 100, intendedSize: 1, strategy: "x" }, logPath);
+    recordShadowOpen(
+      {
+        planId: "p1",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 100,
+        intendedSize: 1,
+        strategy: "x",
+      },
+      logPath,
+    );
     const { appendFileSync } = require("node:fs");
     appendFileSync(logPath, "not-json{\n");
-    recordShadowOpen({ planId: "p2", symbol: "ETH/USD", side: "long", entryPrice: 200, intendedSize: 1, strategy: "x" }, logPath);
+    recordShadowOpen(
+      {
+        planId: "p2",
+        symbol: "ETH/USD",
+        side: "long",
+        entryPrice: 200,
+        intendedSize: 1,
+        strategy: "x",
+      },
+      logPath,
+    );
 
     const fills = readShadowFills({}, logPath);
     expect(fills.length).toBe(2);
@@ -220,8 +355,28 @@ describe("summarizeShadowFills", () => {
   });
 
   it("counts winners and losers correctly", () => {
-    recordShadowOpen({ planId: "p1", symbol: "BTC/USD", side: "long", entryPrice: 100, intendedSize: 1, strategy: "x" }, logPath);
-    recordShadowOpen({ planId: "p2", symbol: "BTC/USD", side: "long", entryPrice: 100, intendedSize: 1, strategy: "x" }, logPath);
+    recordShadowOpen(
+      {
+        planId: "p1",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 100,
+        intendedSize: 1,
+        strategy: "x",
+      },
+      logPath,
+    );
+    recordShadowOpen(
+      {
+        planId: "p2",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 100,
+        intendedSize: 1,
+        strategy: "x",
+      },
+      logPath,
+    );
     recordShadowClose({ planId: "p1", exitPrice: 110, closeReason: "target" }, logPath);
     recordShadowClose({ planId: "p2", exitPrice: 90, closeReason: "stop" }, logPath);
 
@@ -234,8 +389,28 @@ describe("summarizeShadowFills", () => {
   });
 
   it("computes mean and std of pnl fractions across closed fills", () => {
-    recordShadowOpen({ planId: "p1", symbol: "BTC/USD", side: "long", entryPrice: 100, intendedSize: 1, strategy: "x" }, logPath);
-    recordShadowOpen({ planId: "p2", symbol: "BTC/USD", side: "long", entryPrice: 100, intendedSize: 1, strategy: "x" }, logPath);
+    recordShadowOpen(
+      {
+        planId: "p1",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 100,
+        intendedSize: 1,
+        strategy: "x",
+      },
+      logPath,
+    );
+    recordShadowOpen(
+      {
+        planId: "p2",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 100,
+        intendedSize: 1,
+        strategy: "x",
+      },
+      logPath,
+    );
     recordShadowClose({ planId: "p1", exitPrice: 110, closeReason: "target" }, logPath);
     recordShadowClose({ planId: "p2", exitPrice: 90, closeReason: "stop" }, logPath);
 
@@ -248,10 +423,42 @@ describe("summarizeShadowFills", () => {
 describe("compareShadowVsReal", () => {
   it("computes divergence", () => {
     const shadow = summarizeShadowFills([
-      { planId: "p1", symbol: "BTC/USD", side: "long", entryPrice: 100, intendedSize: 1, strategy: "x", stopLoss: null, takeProfit: null, openedAt: 0, closedAt: 1, exitPrice: 110, pnl: 10, pnlFraction: 0.1, closeReason: "target", status: "closed" },
+      {
+        planId: "p1",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 100,
+        intendedSize: 1,
+        strategy: "x",
+        stopLoss: null,
+        takeProfit: null,
+        openedAt: 0,
+        closedAt: 1,
+        exitPrice: 110,
+        pnl: 10,
+        pnlFraction: 0.1,
+        closeReason: "target",
+        status: "closed",
+      },
     ]);
     const real = summarizeShadowFills([
-      { planId: "r1", symbol: "BTC/USD", side: "long", entryPrice: 100, intendedSize: 1, strategy: "x", stopLoss: null, takeProfit: null, openedAt: 0, closedAt: 1, exitPrice: 105, pnl: 5, pnlFraction: 0.05, closeReason: "manual", status: "closed" },
+      {
+        planId: "r1",
+        symbol: "BTC/USD",
+        side: "long",
+        entryPrice: 100,
+        intendedSize: 1,
+        strategy: "x",
+        stopLoss: null,
+        takeProfit: null,
+        openedAt: 0,
+        closedAt: 1,
+        exitPrice: 105,
+        pnl: 5,
+        pnlFraction: 0.05,
+        closeReason: "manual",
+        status: "closed",
+      },
     ]);
     const cmp = compareShadowVsReal(shadow, real);
     expect(cmp.divergencePnl).toBe(5);

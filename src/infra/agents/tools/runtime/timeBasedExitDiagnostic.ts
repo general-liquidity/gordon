@@ -31,7 +31,9 @@ export const timeBasedExitDiagnosticTool = createTool({
     avgWinningDuration: z
       .number()
       .positive()
-      .describe("Average duration of historical winning trades for this strategy. Same unit as timeInTrade."),
+      .describe(
+        "Average duration of historical winning trades for this strategy. Same unit as timeInTrade.",
+      ),
     thresholdMultiplier: z
       .number()
       .gt(1)

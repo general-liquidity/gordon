@@ -97,10 +97,7 @@ export interface LoadedSettingsResult {
   totalRejected: number;
 }
 
-function defaultSources(
-  projectRoot: string,
-  userHome: string,
-): SettingsSourceFile[] {
+function defaultSources(projectRoot: string, userHome: string): SettingsSourceFile[] {
   return [
     {
       path: join(projectRoot, ".claude", "settings.json"),
@@ -133,9 +130,10 @@ function readSourceContent(
   }
 }
 
-function extractInterruptOn(
-  parsed: unknown,
-): { interruptOn?: InterruptOnConfig; warning?: string } {
+function extractInterruptOn(parsed: unknown): {
+  interruptOn?: InterruptOnConfig;
+  warning?: string;
+} {
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     return { warning: "settings root must be a JSON object" };
   }
@@ -167,13 +165,10 @@ function ruleKey(rule: RuntimeApprovalRule): string {
  * caller is responsible for calling `runtimeStore.setApprovalState({
  * rules: [...existing, ...loaded.rules] })` or equivalent.
  */
-export function loadOperatorSettings(
-  options: LoadSettingsOptions = {},
-): LoadedSettingsResult {
+export function loadOperatorSettings(options: LoadSettingsOptions = {}): LoadedSettingsResult {
   const projectRoot = options.projectRoot ?? process.cwd();
   const userHome = options.userHome ?? homedir();
-  const sources =
-    options.sources ?? defaultSources(projectRoot, userHome);
+  const sources = options.sources ?? defaultSources(projectRoot, userHome);
 
   const warnings: string[] = [];
   const perSource: LoadedSettingsResult["sources"] = [];
@@ -206,9 +201,7 @@ export function loadOperatorSettings(
     sourceEntry.found = true;
 
     if (read.readError) {
-      warnings.push(
-        `Could not read ${source.path} (${source.origin}): ${read.readError}`,
-      );
+      warnings.push(`Could not read ${source.path} (${source.origin}): ${read.readError}`);
       perSource.push(sourceEntry);
       continue;
     }
@@ -239,8 +232,7 @@ export function loadOperatorSettings(
     }
     sourceEntry.hadInterruptOn = true;
 
-    const createdBy =
-      options.createdByOverride ?? `settings.json:${source.origin}`;
+    const createdBy = options.createdByOverride ?? `settings.json:${source.origin}`;
     const parsed: ParsedInterruptOn = parseInterruptOnConfig(interruptOn, {
       createdBy,
       strict: options.strict,
@@ -288,9 +280,7 @@ export function loadOperatorSettings(
 export function summarizeLoadedSettings(result: LoadedSettingsResult): string {
   const sourcesFound = result.sources.filter((s) => s.found).length;
   const totalSources = result.sources.length;
-  const parts = [
-    `${result.totalAccepted} rule${result.totalAccepted === 1 ? "" : "s"}`,
-  ];
+  const parts = [`${result.totalAccepted} rule${result.totalAccepted === 1 ? "" : "s"}`];
   if (result.totalRejected > 0) parts.push(`${result.totalRejected} dropped`);
   if (result.warnings.length > 0) {
     parts.push(`${result.warnings.length} warning${result.warnings.length === 1 ? "" : "s"}`);

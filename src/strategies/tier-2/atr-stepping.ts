@@ -53,7 +53,7 @@ const LOOKBACK = 100;
 const ATR_PERIOD = 14;
 
 /** SMA period for general trend reference */
-const SMA_PERIOD = 20;
+const _SMA_PERIOD = 20;
 
 // ============================================================================
 // Stepping Algorithm Types
@@ -102,7 +102,7 @@ export class AtrSteppingStrategy extends BaseStrategy {
    */
   private runSteppingAlgorithm(
     candles: Array<{ high: number; low: number; close: number }>,
-    atrValues: number[]
+    atrValues: number[],
   ): SteppingResult {
     const states: SteppingState[] = [];
 
@@ -206,13 +206,9 @@ export class AtrSteppingStrategy extends BaseStrategy {
       const last3 = states.slice(-3);
       const last3Candles = candles.slice(-3);
       if (trend === "bullish") {
-        holdingLine = last3.every(
-          (s, idx) => last3Candles[idx]!.close > s.lowerLine
-        );
+        holdingLine = last3.every((s, idx) => last3Candles[idx]!.close > s.lowerLine);
       } else {
-        holdingLine = last3.every(
-          (s, idx) => last3Candles[idx]!.close < s.upperLine
-        );
+        holdingLine = last3.every((s, idx) => last3Candles[idx]!.close < s.upperLine);
       }
     }
 
@@ -235,7 +231,7 @@ export class AtrSteppingStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, LOOKBACK);
     if (candles.length < 30) {
@@ -260,7 +256,7 @@ export class AtrSteppingStrategy extends BaseStrategy {
     // Run stepping algorithm
     const steppingResult = this.runSteppingAlgorithm(
       candles.map((c) => ({ high: c.high, low: c.low, close: c.close })),
-      atrValues
+      atrValues,
     );
 
     const { currentTrend, currentUpperLine, currentLowerLine, flipBar, holdingLine } =
@@ -273,7 +269,7 @@ export class AtrSteppingStrategy extends BaseStrategy {
 
     if (!freshFlip && !retest) {
       return this.notDetected(
-        `No recent flip or retest. Trend: ${currentTrend}, bars since flip: ${flipBar}`
+        `No recent flip or retest. Trend: ${currentTrend}, bars since flip: ${flipBar}`,
       );
     }
 
@@ -330,9 +326,7 @@ export class AtrSteppingStrategy extends BaseStrategy {
       reasons.push("Price holding above/below stepped line");
     }
     reasons.push(`ADX estimate: ${adxValue.toFixed(1)}`);
-    reasons.push(
-      `Upper: $${currentUpperLine.toFixed(2)}, Lower: $${currentLowerLine.toFixed(2)}`
-    );
+    reasons.push(`Upper: $${currentUpperLine.toFixed(2)}, Lower: $${currentLowerLine.toFixed(2)}`);
 
     return this.detected(confidence, signals, reasons.join(". "));
   }
@@ -352,14 +346,12 @@ export class AtrSteppingStrategy extends BaseStrategy {
     if (result.currentTrend === "bullish") {
       // Retest: price dipped near lower line and bounced
       const nearLower =
-        prevCandle.low <= lastState.lowerLine * 1.01 &&
-        lastCandle.close > lastState.lowerLine;
+        prevCandle.low <= lastState.lowerLine * 1.01 && lastCandle.close > lastState.lowerLine;
       return nearLower;
     } else {
       // Retest: price rose near upper line and rejected
       const nearUpper =
-        prevCandle.high >= lastState.upperLine * 0.99 &&
-        lastCandle.close < lastState.upperLine;
+        prevCandle.high >= lastState.upperLine * 0.99 && lastCandle.close < lastState.upperLine;
       return nearUpper;
     }
   }
@@ -380,7 +372,7 @@ export class AtrSteppingStrategy extends BaseStrategy {
         const tr = Math.max(
           c.high - c.low,
           Math.abs(c.high - prev.close),
-          Math.abs(c.low - prev.close)
+          Math.abs(c.low - prev.close),
         );
         trueRanges.push(tr);
       }
@@ -396,8 +388,7 @@ export class AtrSteppingStrategy extends BaseStrategy {
         atrValues.push(avg);
       } else if (i === period) {
         // First real ATR: SMA of first `period` true ranges
-        const avg =
-          trueRanges.slice(0, period).reduce((sum, v) => sum + v, 0) / period;
+        const avg = trueRanges.slice(0, period).reduce((sum, v) => sum + v, 0) / period;
         atrValues.push(avg);
       } else {
         // Wilder's smoothing: ATR = (prevATR * (period-1) + currentTR) / period
@@ -428,7 +419,7 @@ export class AtrSteppingStrategy extends BaseStrategy {
       const tr = Math.max(
         current.high - current.low,
         Math.abs(current.high - previous.close),
-        Math.abs(current.low - previous.close)
+        Math.abs(current.low - previous.close),
       );
       trueRanges.push(tr);
 
@@ -466,7 +457,7 @@ export class AtrSteppingStrategy extends BaseStrategy {
       const denom = pdi + mdi;
       if (denom === 0) continue;
       const dx = (Math.abs(pdi - mdi) / denom) * 100;
-      if (!isNaN(dx)) dxValues.push(dx);
+      if (!Number.isNaN(dx)) dxValues.push(dx);
     }
 
     // Smooth DX to get ADX
@@ -478,10 +469,7 @@ export class AtrSteppingStrategy extends BaseStrategy {
   // Plan Parameters
   // ==========================================================================
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", LOOKBACK);
     const currentPrice = this.getCurrentPrice(candles, ctx);
 
@@ -490,15 +478,14 @@ export class AtrSteppingStrategy extends BaseStrategy {
 
     const steppingResult = this.runSteppingAlgorithm(
       candles.map((c) => ({ high: c.high, low: c.low, close: c.close })),
-      atrValues
+      atrValues,
     );
 
     const { currentTrend, currentUpperLine, currentLowerLine } = steppingResult;
     const entryPrice = currentPrice;
 
     // Stop at the opposite stepped line
-    const stopLoss =
-      currentTrend === "bullish" ? currentLowerLine : currentUpperLine;
+    const stopLoss = currentTrend === "bullish" ? currentLowerLine : currentUpperLine;
 
     // Risk = distance from entry to stop
     const risk = Math.abs(entryPrice - stopLoss);
@@ -517,15 +504,8 @@ export class AtrSteppingStrategy extends BaseStrategy {
             { price: entryPrice - risk * 3.5, percentToSell: 0.3 },
           ];
 
-    const avgTpPrice = takeProfits.reduce(
-      (sum, tp) => sum + tp.price * tp.percentToSell,
-      0
-    );
-    const riskRewardRatio = this.calculateRiskReward(
-      entryPrice,
-      stopLoss,
-      avgTpPrice
-    );
+    const avgTpPrice = takeProfits.reduce((sum, tp) => sum + tp.price * tp.percentToSell, 0);
+    const riskRewardRatio = this.calculateRiskReward(entryPrice, stopLoss, avgTpPrice);
 
     return {
       entryPrice,
@@ -598,7 +578,7 @@ price makes a significant move (ATR-threshold breach). This means:
     bar: OHLC,
     index: number,
     data: OHLC[],
-    indicators: IndicatorState
+    _indicators: IndicatorState,
   ): Signal | null {
     // Need enough bars for ATR warmup + stepping algorithm
     if (index < ATR_PERIOD + 5) return null;
@@ -613,7 +593,7 @@ price makes a significant move (ATR-threshold breach). This means:
     // Run stepping algorithm on the slice
     const steppingResult = this.runSteppingAlgorithm(
       slice.map((c) => ({ high: c.high, low: c.low, close: c.close })),
-      atrValues
+      atrValues,
     );
 
     const { states } = steppingResult;
@@ -642,18 +622,11 @@ price makes a significant move (ATR-threshold breach). This means:
     }
 
     // Check for retest within a few bars of a flip (continuation signal)
-    if (
-      currentState.barsSinceFlip > 1 &&
-      currentState.barsSinceFlip <= 5 &&
-      slice.length >= 2
-    ) {
+    if (currentState.barsSinceFlip > 1 && currentState.barsSinceFlip <= 5 && slice.length >= 2) {
       const prevBar = slice[slice.length - 2]!;
       if (currentState.trend === "bullish") {
         // Retest: prev bar dipped near lower line, current bar bounced
-        if (
-          prevBar.low <= prevState.lowerLine * 1.01 &&
-          bar.close > currentState.lowerLine
-        ) {
+        if (prevBar.low <= prevState.lowerLine * 1.01 && bar.close > currentState.lowerLine) {
           return {
             type: "BUY",
             price: bar.close,
@@ -663,10 +636,7 @@ price makes a significant move (ATR-threshold breach). This means:
         }
       } else {
         // Retest: prev bar spiked near upper line, current bar rejected
-        if (
-          prevBar.high >= prevState.upperLine * 0.99 &&
-          bar.close < currentState.upperLine
-        ) {
+        if (prevBar.high >= prevState.upperLine * 0.99 && bar.close < currentState.upperLine) {
           return {
             type: "SELL",
             price: bar.close,
@@ -695,7 +665,7 @@ price makes a significant move (ATR-threshold breach). This means:
         const tr = Math.max(
           c.high - c.low,
           Math.abs(c.high - prev.close),
-          Math.abs(c.low - prev.close)
+          Math.abs(c.low - prev.close),
         );
         trueRanges.push(tr);
       }
@@ -708,8 +678,7 @@ price makes a significant move (ATR-threshold breach). This means:
         const avg = slice.reduce((sum, v) => sum + v, 0) / slice.length;
         atrValues.push(avg);
       } else if (i === period) {
-        const avg =
-          trueRanges.slice(0, period).reduce((sum, v) => sum + v, 0) / period;
+        const avg = trueRanges.slice(0, period).reduce((sum, v) => sum + v, 0) / period;
         atrValues.push(avg);
       } else {
         const prevAtr = atrValues[i - 1]!;

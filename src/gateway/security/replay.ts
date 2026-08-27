@@ -12,7 +12,10 @@ export function checkAndRegisterNonce(input: {
 }): ReplayCheckResult {
   const db = getDatabase();
   const existing = executeWithLogging(
-    () => db.query("SELECT nonce FROM gateway_nonce_cache WHERE nonce = ?").get(input.nonce) as { nonce: string } | null,
+    () =>
+      db.query("SELECT nonce FROM gateway_nonce_cache WHERE nonce = ?").get(input.nonce) as {
+        nonce: string;
+      } | null,
     "SELECT gateway_nonce_cache nonce",
   );
   if (existing) {
@@ -44,4 +47,3 @@ export function pruneExpiredNonces(): number {
   );
   return Number(result.changes ?? 0);
 }
-

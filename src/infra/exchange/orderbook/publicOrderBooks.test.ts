@@ -1,9 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  PUBLIC_VENUES,
-  isUsdQuote,
-  splitSymbol,
-} from "./publicOrderBooks.ts";
+import { PUBLIC_VENUES, isUsdQuote, splitSymbol } from "./publicOrderBooks.ts";
 
 describe("splitSymbol", () => {
   it("recognizes USDT pairs", () => {

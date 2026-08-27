@@ -59,9 +59,13 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         ? `Run a quick single analysis on ${args} - get price action, key levels, and trading signal`
         : "What coin should I analyze? (This is a quick ~3-5s analysis)";
     case "whales":
-      return args ? `Check whale orders and flow bias for ${args}` : "What symbol should I check for whale activity?";
+      return args
+        ? `Check whale orders and flow bias for ${args}`
+        : "What symbol should I check for whale activity?";
     case "breakouts":
-      return args ? `Scan ${args} for breakout or breakdown setups` : "Scan the market for breakout and breakdown setups";
+      return args
+        ? `Scan ${args} for breakout or breakdown setups`
+        : "Scan the market for breakout and breakdown setups";
     case "score":
       return args ? `Score ${args} and give me a trading signal` : "What symbol should I score?";
     case "chart":
@@ -91,7 +95,9 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
     case "plan":
       return args ? `Create a trade plan for ${args}` : "What coin should I plan a trade for?";
     case "grid":
-      return args ? `Create a grid entry plan for ${args}` : "What symbol should I create a grid plan for?";
+      return args
+        ? `Create a grid entry plan for ${args}`
+        : "What symbol should I create a grid plan for?";
     case "positions":
       if (STOCK_MARKET_PATTERN.test(args || "")) return "Show my current stock positions";
       return "Check my current positions";
@@ -115,26 +121,24 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return "Set permissionMode to 'observe' — pure observation mode";
     case "planmode":
       return "Set permissionMode to 'plan' — planning-only mode";
-    // NOTE: exchange is also handled directly by toolHandlers.ts → handleExchangeCommand.
-    // commandToPrompt fallback only used if routeToolCommand returns null (shouldn't happen).
-    case "exchange":
-    case "venue":
-    case "switch-exchange":
-      return args?.trim()
-        ? `Switch the active exchange to '${args.trim()}'. Confirm the switch and show the new active venue details.`
-        : "List all configured exchanges and show which one is currently active. Clearly mark which are sandbox/testnet vs live.";
     case "portfolio":
       if (STOCK_MARKET_PATTERN.test(args || "")) return "Show my stock broker account summary";
       return "Show my portfolio";
     case "earn": {
       const earnSub = args?.trim().split(/\s+/)[0]?.toLowerCase();
-      if (earnSub === "products" || earnSub === "browse") return "Show me available flexible and locked earn products with their APY rates and terms";
-      if (earnSub === "flexible") return "Show me available flexible earn products I can subscribe to";
-      if (earnSub === "locked") return "Show me available locked earn products with their lock periods and APY rates";
-      if (earnSub === "subscribe") return "Help me subscribe to an earn product. Show me available options first.";
-      if (earnSub === "redeem") return "Help me redeem from my earn positions. Show my current positions first.";
+      if (earnSub === "products" || earnSub === "browse")
+        return "Show me available flexible and locked earn products with their APY rates and terms";
+      if (earnSub === "flexible")
+        return "Show me available flexible earn products I can subscribe to";
+      if (earnSub === "locked")
+        return "Show me available locked earn products with their lock periods and APY rates";
+      if (earnSub === "subscribe")
+        return "Help me subscribe to an earn product. Show me available options first.";
+      if (earnSub === "redeem")
+        return "Help me redeem from my earn positions. Show my current positions first.";
       if (earnSub === "history") return "Show my earn subscription and redemption history";
-      if (earnSub === "positions") return "Show all my current earn/staking positions with current value and rewards";
+      if (earnSub === "positions")
+        return "Show all my current earn/staking positions with current value and rewards";
       return "Show all my current earn/staking positions with current value and rewards";
     }
     case "history":
@@ -149,7 +153,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return args ? `Open Gordon configure flow for ${args}` : "Open the Gordon configure flow";
     case "doctor":
       return "Run Gordon diagnostics and show me configuration issues";
-    case "config":
+    case "config": {
       if (!args) return "Show my current configuration settings";
       const configParts = args.split(/\s+/);
       const configSubcommand = configParts[0]?.toLowerCase();
@@ -169,10 +173,13 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         default:
           return "Show my current configuration settings";
       }
+    }
     case "model":
       if (!args) return "Show me the current AI model and available providers";
       return `Switch to model provider/model: ${args}`;
-    case "exchange":
+    case "venue":
+    case "switch-exchange":
+    case "exchange": {
       if (!args) return "List my configured trading exchanges";
       const exParts = args.split(/\s+/);
       const exSubcmd = exParts[0]?.toLowerCase();
@@ -207,9 +214,12 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         case "help":
           return "Show help for exchange management commands";
         default:
-          return "List my configured trading exchanges";
+          return args.trim()
+            ? `Switch the active exchange to '${args.trim()}'. Confirm the switch and show the new active venue details.`
+            : "List my configured trading exchanges";
       }
-    case "broker":
+    }
+    case "broker": {
       if (!args) return "List my configured stock brokers";
       const brokerParts = args.split(/\s+/);
       const brokerSubcmd = brokerParts[0]?.toLowerCase();
@@ -241,7 +251,8 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         default:
           return "List my configured stock brokers";
       }
-    case "stocks":
+    }
+    case "stocks": {
       if (!args) return "Show stock broker command help";
       const stockParts = args.split(/\s+/);
       const stockSubcmd = stockParts[0]?.toLowerCase();
@@ -252,20 +263,27 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         case "summary":
           return "Show my stock broker account summary";
         case "quote":
-          return stockArgs ? `Get a stock quote for ${stockArgs.toUpperCase()}` : "Which stock symbol should I quote?";
+          return stockArgs
+            ? `Get a stock quote for ${stockArgs.toUpperCase()}`
+            : "Which stock symbol should I quote?";
         case "positions":
           return "Show my current stock positions";
         case "orders":
           return "Show my stock broker orders";
         case "buy":
-          return stockArgs ? `Place a stock buy order: ${stockArgs}` : "Provide a buy order like: /stocks buy AAPL 5";
+          return stockArgs
+            ? `Place a stock buy order: ${stockArgs}`
+            : "Provide a buy order like: /stocks buy AAPL 5";
         case "sell":
-          return stockArgs ? `Place a stock sell order: ${stockArgs}` : "Provide a sell order like: /stocks sell AAPL 5";
+          return stockArgs
+            ? `Place a stock sell order: ${stockArgs}`
+            : "Provide a sell order like: /stocks sell AAPL 5";
         case "help":
           return "Show help for stocks commands";
         default:
           return "Show stock broker command help";
       }
+    }
     case "backtest":
       if (args) {
         const parts = args.split(/\s+/);
@@ -288,7 +306,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return args
         ? `Compare backtest results for strategies on ${args}`
         : "What strategies and symbol should I compare?";
-    case "strategies":
+    case "strategies": {
       if (!args) return "List all available trading strategies (built-in and generated)";
       const stratParts = args.split(/\s+/);
       const stratSubcmd = stratParts[0]?.toLowerCase();
@@ -326,6 +344,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
           // Might be a strategy ID directly
           return `Show information about the "${stratSubcmd}" strategy`;
       }
+    }
     case "gen":
       return args
         ? `Generate a new trading strategy based on this description: "${args}"`
@@ -373,8 +392,9 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         return `Analyze the pair relationship for ${symA} — what's the second coin to compare?`;
       }
       return "Which two coins should I compare? (e.g., /pairs BTC ETH)";
-    case "autonomous":
-      if (!args) return "Show me the current autonomous trading status, or help me set up a new swing mandate";
+    case "autonomous": {
+      if (!args)
+        return "Show me the current autonomous trading status, or help me set up a new swing mandate";
       const autoParts = args.split(/\s+/);
       const autoSubcmd = autoParts[0]?.toLowerCase();
       switch (autoSubcmd) {
@@ -391,6 +411,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         default:
           return "Show me the current autonomous trading status";
       }
+    }
     case "withdraw":
       if (args) {
         const parts = args.split(/\s+/);
@@ -418,7 +439,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return args ? `Watch prices for ${args}` : "What symbol should I watch?";
     case "alerts":
       return args ? `Manage alerts: ${args}` : "What alert action? (set, list, delete)";
-    case "keyring":
+    case "keyring": {
       if (!args) return "Show keyring status — whether OS keyring is available and enabled";
       const krParts = args.split(/\s+/);
       const krSubcmd = krParts[0]?.toLowerCase();
@@ -438,6 +459,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         default:
           return "Show keyring status";
       }
+    }
     case "shortcuts":
       return "Show keyboard shortcuts";
     case "theme":
@@ -481,7 +503,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       }
       return "Which thread would you like to rename? Use /threads to see available threads.";
     // MCP Plugin Management
-    case "mcp":
+    case "mcp": {
       if (!args) return "Show my installed MCP plugins";
       const mcpParts = args.split(/\s+/);
       const mcpSubcommand = mcpParts[0]?.toLowerCase();
@@ -532,6 +554,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         default:
           return "Show my installed MCP plugins";
       }
+    }
     // Routing command
     case "routing": {
       if (!args) return "List my installed plugins with routing info";
@@ -539,18 +562,31 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       const routingSub = routingParts[0]?.toLowerCase();
       const routingRest = routingParts.slice(1).join(" ");
       switch (routingSub) {
-        case "list": case "ls":
+        case "list":
+        case "ls":
           return "List my installed plugins with routing info";
-        case "search": case "find":
-          return routingRest ? `Search for plugins matching "${routingRest}"` : "Show the plugin marketplace";
-        case "install": case "add":
+        case "search":
+        case "find":
+          return routingRest
+            ? `Search for plugins matching "${routingRest}"`
+            : "Show the plugin marketplace";
+        case "install":
+        case "add":
           return routingRest ? `Install the plugin "${routingRest}"` : "Show available plugins";
-        case "uninstall": case "remove": case "rm":
-          return routingRest ? `Uninstall the plugin "${routingRest}"` : "Which plugin to uninstall?";
-        case "route": case "assign":
+        case "uninstall":
+        case "remove":
+        case "rm":
+          return routingRest
+            ? `Uninstall the plugin "${routingRest}"`
+            : "Which plugin to uninstall?";
+        case "route":
+        case "assign":
           return `Route plugin tools: ${routingRest}`;
-        case "configure": case "config":
-          return routingRest ? `Configure credentials for plugin "${routingRest}"` : "Which plugin to configure?";
+        case "configure":
+        case "config":
+          return routingRest
+            ? `Configure credentials for plugin "${routingRest}"`
+            : "Which plugin to configure?";
         case "enable":
           return routingRest ? `Enable the plugin "${routingRest}"` : "Which plugin to enable?";
         case "disable":
@@ -564,8 +600,9 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       }
     }
     // Workflow command
-    case "workflow":
-      if (!args) return "Show available workflows. Use: /workflow quick <symbol>, /workflow dd <symbol>, or /workflow backtest-cycle <strategy> <symbol>";
+    case "workflow": {
+      if (!args)
+        return "Show available workflows. Use: /workflow quick <symbol>, /workflow dd <symbol>, or /workflow backtest-cycle <strategy> <symbol>";
       const wfParts = args.split(/\s+/);
       const wfType = wfParts[0]?.toLowerCase();
       const wfArgs = wfParts.slice(1);
@@ -586,20 +623,23 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         default:
           return "Available workflows: quick, dd, backtest-cycle";
       }
+    }
     // Export command
-    case "export":
-      if (!args) return "Export data. Usage: /export scan [csv|json|md], /export analysis <symbol> [format], /export backtest [format], /export session [md|json]";
+    case "export": {
+      if (!args)
+        return "Export data. Usage: /export scan [csv|json|md], /export analysis <symbol> [format], /export backtest [format], /export session [md|json]";
       const expParts = args.split(/\s+/);
       const expType = expParts[0]?.toLowerCase();
       const expFormat = expParts[1]?.toLowerCase() || "csv";
       switch (expType) {
         case "scan":
           return `Export the latest scan results to ${expFormat} format`;
-        case "analysis":
+        case "analysis": {
           const expSymbol = expParts[1];
           return expSymbol
             ? `Export analysis for ${expSymbol.toUpperCase()} to ${expParts[2] || "json"} format`
             : "Which symbol's analysis should I export?";
+        }
         case "backtest":
           return `Export the latest backtest results to ${expFormat} format`;
         case "session":
@@ -607,15 +647,22 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         default:
           return "Export types: scan, analysis, backtest, session";
       }
+    }
     case "telemetry":
-      if (!args || args === "status") return "Show my current telemetry status — anonymous telemetry and research data collection";
+      if (!args || args === "status")
+        return "Show my current telemetry status — anonymous telemetry and research data collection";
       if (args === "enable") return "Enable telemetry consent. This allows anonymous telemetry.";
       if (args === "disable") return "Disable telemetry consent and stop anonymous telemetry";
-      if (args === "research-enable" || args === "research enable") return "Enable anonymized trading data collection for AI model training. This collects: trade outcomes (% P&L, strategy, duration, exit reason), backtest results (metrics only), market context (indicators, trend, bias). NO absolute prices, balances, quantities, or wallet addresses are ever collected. Data is stored locally in ~/.gordon/research/ and uploaded only when you choose.";
-      if (args === "research-disable" || args === "research disable") return "Disable anonymized trading data collection";
-      if (args === "research-status" || args === "research status") return "Show research data collection status: how many records collected locally, file sizes, and whether upload is pending";
-      if (args === "research-upload" || args === "research upload") return "Upload collected anonymized research data to help train AI trading models";
-      if (args === "research-clear" || args === "research clear") return "Delete all locally collected research data files";
+      if (args === "research-enable" || args === "research enable")
+        return "Enable anonymized trading data collection for AI model training. This collects: trade outcomes (% P&L, strategy, duration, exit reason), backtest results (metrics only), market context (indicators, trend, bias). NO absolute prices, balances, quantities, or wallet addresses are ever collected. Data is stored locally in ~/.gordon/research/ and uploaded only when you choose.";
+      if (args === "research-disable" || args === "research disable")
+        return "Disable anonymized trading data collection";
+      if (args === "research-status" || args === "research status")
+        return "Show research data collection status: how many records collected locally, file sizes, and whether upload is pending";
+      if (args === "research-upload" || args === "research upload")
+        return "Upload collected anonymized research data to help train AI trading models";
+      if (args === "research-clear" || args === "research clear")
+        return "Delete all locally collected research data files";
       return "Show my current telemetry status";
     case "context":
       return args
@@ -792,7 +839,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       }
     }
     // Audit command
-    case "audit":
+    case "audit": {
       if (!args) return "Show me the most recent decisions from the audit trail.";
       const auditParts = args.split(/\s+/);
       const auditSubcmd = auditParts[0]?.toLowerCase();
@@ -820,6 +867,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         default:
           return "Show me the most recent decisions from the audit trail.";
       }
+    }
     // Health command
     case "health":
       return "Run a portfolio health check. Show risk status, strategy health, and any warnings.";
@@ -827,7 +875,8 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return "Show configured onchain data sources (DexScreener, DefiLlama, CoinGecko-onchain, Birdeye, Codex, 1inch) and wallet-intelligence providers (Nansen, Arkham, Covalent, Moralis, Zerion, DeBank). For each, show availability and missing API keys.";
     // SynthData commands
     case "synth": {
-      if (!args) return "Show me SynthData advanced capabilities (volatility, options, LP, liquidation, miners). For price forecasts use /predict. Assets: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
+      if (!args)
+        return "Show me SynthData advanced capabilities (volatility, options, LP, liquidation, miners). For price forecasts use /predict. Assets: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
       const synthParts = args.split(/\s+/);
       const synthSub = synthParts[0]?.toLowerCase();
       const synthAsset = synthParts[1]?.toUpperCase();
@@ -866,7 +915,8 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       }
     }
     case "predict": {
-      if (!args) return "Which asset to predict? Supported: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
+      if (!args)
+        return "Which asset to predict? Supported: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
       const predParts = args.split(/\s+/);
       const predAsset = predParts[0]?.toUpperCase();
       const predDays = predParts[1];
@@ -874,7 +924,8 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
     }
     // Risk & Simulation commands
     case "liquidation": {
-      if (!args) return "Analyze liquidation risks across my open positions. Show cascade risk, liquidation pressure, and any squeeze candidates.";
+      if (!args)
+        return "Analyze liquidation risks across my open positions. Show cascade risk, liquidation pressure, and any squeeze candidates.";
       const liqParts = args.split(/\s+/);
       const liqSub = liqParts[0]?.toLowerCase();
       const liqSymbol = liqParts[1]?.toUpperCase();
@@ -901,10 +952,14 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
     }
     case "simulate": {
       const simSub = args?.trim().toLowerCase();
-      if (simSub === "orders" || simSub === "bundle") return "Simulate my pending order bundle. Show projected fills, slippage, and execution impact before going live.";
-      if (simSub === "breaker" || simSub === "circuit") return "Generate a circuit breaker proof for the current state. Verify that safety mechanisms are properly configured.";
-      if (simSub === "verify") return "Verify the integrity of a previously generated circuit breaker proof.";
-      if (simSub === "regime") return "Query regime-scoped memory context. Show what the system remembers about current market conditions and how it affects decisions.";
+      if (simSub === "orders" || simSub === "bundle")
+        return "Simulate my pending order bundle. Show projected fills, slippage, and execution impact before going live.";
+      if (simSub === "breaker" || simSub === "circuit")
+        return "Generate a circuit breaker proof for the current state. Verify that safety mechanisms are properly configured.";
+      if (simSub === "verify")
+        return "Verify the integrity of a previously generated circuit breaker proof.";
+      if (simSub === "regime")
+        return "Query regime-scoped memory context. Show what the system remembers about current market conditions and how it affects decisions.";
       if (simSub) return `Simulate: ${args}. Show projected outcomes before executing.`;
       return "Simulate pending orders before execution. Show projected fills, slippage, and impact analysis.";
     }

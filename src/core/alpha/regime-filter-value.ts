@@ -242,7 +242,7 @@ export function computeRegimeFilterValue(input: {
     interpretation =
       `Build the filter: hostile regime(s) [${[...hostileSet].join(", ")}] concentrate losses, and the edge survives ` +
       `a ${lag}-bar lag + ${(flip * 100).toFixed(0)}% flipped calls — degraded filter adds ${pct(filterValue)}/bar ` +
-      `(${edgeRetention == null ? "n/a" : (edgeRetention * 100).toFixed(0) + "%"} of the perfect-filter edge ${pct(cleanFilterValue)}).`;
+      `(${edgeRetention == null ? "n/a" : `${(edgeRetention * 100).toFixed(0)}%`} of the perfect-filter edge ${pct(cleanFilterValue)}).`;
   } else {
     interpretation =
       `Complexity tax: a perfect filter would add ${pct(cleanFilterValue)}/bar, but under a realistic ${lag}-bar lag + ` +

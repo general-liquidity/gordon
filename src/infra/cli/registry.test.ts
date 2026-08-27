@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { CLI_REGISTRY, getCLI, formatCLIRegistryForPrompt } from "./registry.ts";
+import { CLI_REGISTRY, getCLI, formatCLIRegistryForPrompt, isCLIInstalled } from "./registry.ts";
 
 describe("CLI_REGISTRY", () => {
   it("has unique IDs", () => {
@@ -51,5 +51,11 @@ describe("CLI_REGISTRY", () => {
     expect(block).toContain("[GORDON_AVAILABLE_CLIS]");
     expect(block).toContain("binance-cli");
     expect(block).toContain("skills");
+  });
+
+  it("does not interpret a binary lookup as a shell command", async () => {
+    expect(await isCLIInstalled("node; touch /tmp/gordon-cli-injection")).toBe(false);
+    expect(await isCLIInstalled("$(echo injected)")).toBe(false);
+    expect(await isCLIInstalled("../node")).toBe(false);
   });
 });

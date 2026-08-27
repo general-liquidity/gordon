@@ -74,9 +74,7 @@ export const breakoutFailureRegimeDiagnosticTool = createTool({
       component: "analyze_breakout_failure_regime",
       toolName: "analyze_breakout_failure_regime",
       outcome:
-        result.verdict === "bear_like" || result.verdict === "bear_confirmed"
-          ? "failure"
-          : "info",
+        result.verdict === "bear_like" || result.verdict === "bear_confirmed" ? "failure" : "info",
       details: {
         verdict: result.verdict,
         failureRate: result.failureRate,

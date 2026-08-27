@@ -59,8 +59,8 @@ const TOL_LIB = 1e-6;
 
 // Mixed positive/negative per-bar returns (decimals).
 const RETURNS = [
-  0.012, -0.008, 0.021, -0.015, 0.004, 0.018, -0.022, 0.009, -0.003, 0.031,
-  -0.011, 0.006, 0.014, -0.019, 0.027, -0.005, 0.002, 0.016, -0.013, 0.008,
+  0.012, -0.008, 0.021, -0.015, 0.004, 0.018, -0.022, 0.009, -0.003, 0.031, -0.011, 0.006, 0.014,
+  -0.019, 0.027, -0.005, 0.002, 0.016, -0.013, 0.008,
 ];
 
 // Reference implementations mirroring the hand-rolled metrics.ts internals.
@@ -77,7 +77,7 @@ function refSampleStd(x: number[]): number {
 function refMedian(x: number[]): number {
   const s = [...x].sort((a, b) => a - b);
   const n = s.length;
-  return n % 2 === 0 ? ((s[n / 2 - 1]! + s[n / 2]!) / 2) : s[Math.floor(n / 2)]!;
+  return n % 2 === 0 ? (s[n / 2 - 1]! + s[n / 2]!) / 2 : s[Math.floor(n / 2)]!;
 }
 // metrics.ts percentile(): the interpolated (type=7) definition we adopt.
 function refInterpPercentile(sorted: number[], p: number): number {
@@ -117,8 +117,13 @@ describe("base primitives — parity with hand-rolled internals", () => {
     // Reference: adjusted Fisher-Pearson standardized moment coefficient.
     const n = RETURNS.length;
     const m = refMean(RETURNS);
-    let s2 = 0, s3 = 0;
-    for (const v of RETURNS) { const d = v - m; s2 += d * d; s3 += d * d * d; }
+    let s2 = 0,
+      s3 = 0;
+    for (const v of RETURNS) {
+      const d = v - m;
+      s2 += d * d;
+      s3 += d * d * d;
+    }
     const std = Math.sqrt(s2 / (n - 1));
     const ref = (n * s3) / ((n - 1) * (n - 2) * std ** 3);
     expect(Math.abs(skewness(RETURNS) - ref)).toBeLessThan(TOL_LIB);
@@ -127,11 +132,14 @@ describe("base primitives — parity with hand-rolled internals", () => {
   test("kurtosis — bias-corrected (Fisher excess)", () => {
     const n = RETURNS.length;
     const m = refMean(RETURNS);
-    let s2 = 0, s4 = 0;
-    for (const v of RETURNS) { const d = v - m; s2 += d * d; s4 += d * d * d * d; }
-    const ref =
-      ((n - 1) / ((n - 2) * (n - 3))) *
-      ((n * (n + 1) * s4) / (s2 * s2) - 3 * (n - 1));
+    let s2 = 0,
+      s4 = 0;
+    for (const v of RETURNS) {
+      const d = v - m;
+      s2 += d * d;
+      s4 += d * d * d * d;
+    }
+    const ref = ((n - 1) / ((n - 2) * (n - 3))) * ((n * (n + 1) * s4) / (s2 * s2) - 3 * (n - 1));
     expect(Math.abs(kurtosis(RETURNS) - ref)).toBeLessThan(TOL_LIB);
   });
 
@@ -139,9 +147,14 @@ describe("base primitives — parity with hand-rolled internals", () => {
     const xs = RETURNS.map((_, i) => i);
     const ys = RETURNS.map((r, i) => 2 * i + 1 + r); // near-linear
     const n = xs.length;
-    const mx = refMean(xs), my = refMean(ys);
-    let cov = 0, varx = 0;
-    for (let i = 0; i < n; i++) { cov += (xs[i]! - mx) * (ys[i]! - my); varx += (xs[i]! - mx) ** 2; }
+    const mx = refMean(xs),
+      my = refMean(ys);
+    let cov = 0,
+      varx = 0;
+    for (let i = 0; i < n; i++) {
+      cov += (xs[i]! - mx) * (ys[i]! - my);
+      varx += (xs[i]! - mx) ** 2;
+    }
     const slope = cov / varx;
     const intercept = my - slope * mx;
     const got = linearRegression(xs, ys);
@@ -171,8 +184,11 @@ describe("dedup primitives — parity with inline hand-rolled copies", () => {
     const xs = RETURNS.map((_, i) => i);
     const ys = RETURNS.map((r, i) => 0.5 * i - r * 3);
     const n = xs.length;
-    const mx = refMean(xs), my = refMean(ys);
-    let cov = 0, vx = 0, vy = 0;
+    const mx = refMean(xs),
+      my = refMean(ys);
+    let cov = 0,
+      vx = 0,
+      vy = 0;
     for (let i = 0; i < n; i++) {
       cov += (xs[i]! - mx) * (ys[i]! - my);
       vx += (xs[i]! - mx) ** 2;
@@ -191,7 +207,8 @@ describe("dedup primitives — parity with inline hand-rolled copies", () => {
     const xs = RETURNS.map((_, i) => i);
     const ys = RETURNS.map((r) => r * 10);
     const n = xs.length;
-    const mx = refMean(xs), my = refMean(ys);
+    const mx = refMean(xs),
+      my = refMean(ys);
     let cov = 0;
     for (let i = 0; i < n; i++) cov += (xs[i]! - mx) * (ys[i]! - my);
     cov /= n - 1;
@@ -253,16 +270,18 @@ describe("quantile — interpolated (type=7) definition adopted", () => {
 describe("composite metrics — parity with metrics.ts", () => {
   test("volatility", () => {
     for (const ppy of [365, 252, 8760]) {
-      expect(Math.abs(volatility(RETURNS, ppy) - calculateVolatility(RETURNS, ppy)))
-        .toBeLessThan(TOL_ARITH);
+      expect(Math.abs(volatility(RETURNS, ppy) - calculateVolatility(RETURNS, ppy))).toBeLessThan(
+        TOL_ARITH,
+      );
     }
   });
 
   test("sharpe (judged metric)", () => {
     for (const ppy of [365, 252]) {
       for (const rf of [0.02, 0, 0.05]) {
-        expect(Math.abs(sharpe(RETURNS, rf, ppy) - calculateSharpeRatio(RETURNS, rf, ppy)))
-          .toBeLessThan(TOL_ARITH);
+        expect(
+          Math.abs(sharpe(RETURNS, rf, ppy) - calculateSharpeRatio(RETURNS, rf, ppy)),
+        ).toBeLessThan(TOL_ARITH);
       }
     }
   });
@@ -303,7 +322,9 @@ describe("composite metrics — parity with metrics.ts", () => {
       [10000, 12000, 0.5],
     ];
     for (const [init, fin, yrs] of cases) {
-      expect(Math.abs(cagr(init, fin, yrs) - calculateCAGR(init, fin, yrs))).toBeLessThan(TOL_ARITH);
+      expect(Math.abs(cagr(init, fin, yrs) - calculateCAGR(init, fin, yrs))).toBeLessThan(
+        TOL_ARITH,
+      );
     }
   });
 

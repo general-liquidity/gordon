@@ -48,7 +48,9 @@ function PlanApprovalMessageInner({ message }: { message: Message }) {
       paddingX={2}
     >
       <Box>
-        <Text color="cyanBright" bold>{"◈ PLAN READY FOR REVIEW"}</Text>
+        <Text color="cyanBright" bold>
+          {"◈ PLAN READY FOR REVIEW"}
+        </Text>
       </Box>
       {message.content ? (
         <Box paddingLeft={2}>
@@ -72,9 +74,7 @@ function PlanApprovalMessageInner({ message }: { message: Message }) {
           </Box>
           {rubricPayload.verdict !== "accept" && rubricPayload.blockingDimensions.length > 0 ? (
             <Box>
-              <Text dimColor>
-                {`Blocking: ${rubricPayload.blockingDimensions.join(", ")}`}
-              </Text>
+              <Text dimColor>{`Blocking: ${rubricPayload.blockingDimensions.join(", ")}`}</Text>
             </Box>
           ) : null}
         </Box>

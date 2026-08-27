@@ -28,16 +28,8 @@
  * pattern (OS notification grouping) adapted to the radar's card stream.
  */
 
-import type {
-  ProactiveSuggestion,
-  ProactiveSeverity,
-  ProactiveCategory,
-} from "../types.ts";
-import {
-  DEFAULT_SEVERITY,
-  SUMMARY_ROLLUP_MARKER,
-  SUMMARY_ROLLUP_CATEGORY,
-} from "../types.ts";
+import type { ProactiveSuggestion, ProactiveSeverity, ProactiveCategory } from "../types.ts";
+import { DEFAULT_SEVERITY, SUMMARY_ROLLUP_MARKER, SUMMARY_ROLLUP_CATEGORY } from "../types.ts";
 
 /** Pending-undelivered batchable count at which we emit a rollup instead. */
 export const BATCH_THRESHOLD = 4;
@@ -84,8 +76,7 @@ export function effectiveSeverity(suggestion: ProactiveSuggestion): ProactiveSev
  */
 export function buildDedupeKey(suggestion: ProactiveSuggestion): string | undefined {
   const symbol =
-    suggestion.triggers.symbol ??
-    (suggestion.triggers.metadata?.symbol as string | undefined);
+    suggestion.triggers.symbol ?? (suggestion.triggers.metadata?.symbol as string | undefined);
   const trigger = suggestion.triggers.eventType;
   const parts = [suggestion.category, symbol, trigger].filter(
     (p): p is string => typeof p === "string" && p.length > 0,
@@ -226,9 +217,7 @@ export function buildSummaryRollup(
   for (const e of entries) {
     counts.set(e.category, (counts.get(e.category) ?? 0) + 1);
   }
-  const ordered = [...counts.entries()].sort((a, b) =>
-    b[1] - a[1] || a[0].localeCompare(b[0]),
-  );
+  const ordered = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   const total = entries.length;
   const breakdown = ordered.map(([cat, n]) => `${cat}:${n}`).join(" · ");
   const createdAt = new Date(now).toISOString();

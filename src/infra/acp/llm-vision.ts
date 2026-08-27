@@ -42,7 +42,9 @@ export function resolveVisionPath(env: NodeJS.ProcessEnv = process.env): VisionP
       `${VISION_PATH_ENV}=blocks is not supported by Gordon's string-only production LLM boundary; use inline until content-block transport is wired`,
     );
   }
-  throw new Error(`${VISION_PATH_ENV} must be "inline" when set; received ${JSON.stringify(configured)}`);
+  throw new Error(
+    `${VISION_PATH_ENV} must be "inline" when set; received ${JSON.stringify(configured)}`,
+  );
 }
 
 /**

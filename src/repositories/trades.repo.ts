@@ -75,18 +75,23 @@ export class TradesRepository extends BaseRepository<Trade> {
    * Find trades by symbol
    */
   findBySymbol(symbol: string, options?: QueryOptions): Trade[] {
-    return this.findWhere({ symbol: symbol.toUpperCase() } as Partial<Record<keyof Trade, unknown>>, {
-      orderBy: "openedAt",
-      orderDir: "DESC",
-      ...options,
-    });
+    return this.findWhere(
+      { symbol: symbol.toUpperCase() } as Partial<Record<keyof Trade, unknown>>,
+      {
+        orderBy: "openedAt",
+        orderDir: "DESC",
+        ...options,
+      },
+    );
   }
 
   /**
    * Find trade by plan ID
    */
   findByPlanId(planId: string): Trade | null {
-    const trades = this.findWhere({ planId } as Partial<Record<keyof Trade, unknown>>, { limit: 1 });
+    const trades = this.findWhere({ planId } as Partial<Record<keyof Trade, unknown>>, {
+      limit: 1,
+    });
     return trades[0] || null;
   }
 

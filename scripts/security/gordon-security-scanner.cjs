@@ -111,7 +111,9 @@ function scanPackage(pkg) {
   // scripts that were not run."
   const scripts = manifest.scripts;
   if (scripts && typeof scripts === "object") {
-    const lifecycles = FLAGGED_LIFECYCLE_SCRIPTS.filter((name) => typeof scripts[name] === "string");
+    const lifecycles = FLAGGED_LIFECYCLE_SCRIPTS.filter(
+      (name) => typeof scripts[name] === "string",
+    );
     if (lifecycles.length > 0) {
       advisories.push({
         level: "info",

@@ -95,7 +95,7 @@ export class DailyLimitTracker {
   /**
    * Update unrealized PnL (replaces previous unrealized)
    */
-  updateUnrealizedPnL(unrealizedPnL: number): void {
+  updateUnrealizedPnL(_unrealizedPnL: number): void {
     this.resetIfNewDay();
     // Unrealized is tracked separately, not added to todaysPnL
   }
@@ -132,13 +132,12 @@ export class DailyLimitTracker {
     const effectiveLimit = startingBalance
       ? Math.min(
           this.config.dailyLossLimitUsd,
-          startingBalance * (this.config.dailyLossLimitPercent / 100)
+          startingBalance * (this.config.dailyLossLimitPercent / 100),
         )
       : this.config.dailyLossLimitUsd;
 
-    const percentOfLimit = effectiveLimit > 0
-      ? (Math.abs(Math.min(totalPnL, 0)) / effectiveLimit) * 100
-      : 0;
+    const percentOfLimit =
+      effectiveLimit > 0 ? (Math.abs(Math.min(totalPnL, 0)) / effectiveLimit) * 100 : 0;
 
     const isLimitExceeded = totalPnL <= -effectiveLimit;
     const isWarning = percentOfLimit >= this.config.warningThresholdPercent && !isLimitExceeded;
@@ -182,7 +181,10 @@ export class DailyLimitTracker {
   /**
    * Check a proposed trade against remaining allowance
    */
-  canAffordLoss(potentialLoss: number, startingBalance?: number): {
+  canAffordLoss(
+    potentialLoss: number,
+    startingBalance?: number,
+  ): {
     allowed: boolean;
     reason: string;
   } {

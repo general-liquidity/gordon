@@ -8,7 +8,12 @@ function bar(close: number, volume: number): Candle {
 
 /** Build a candle series with one bar's volume explicitly set to a
  *  spike value, and the rest in a baseline band. */
-function seriesWithSpike(n: number, spikeIdx: number, baselineVol = 1_000_000, spikeVol = 10_000_000): Candle[] {
+function seriesWithSpike(
+  n: number,
+  spikeIdx: number,
+  baselineVol = 1_000_000,
+  spikeVol = 10_000_000,
+): Candle[] {
   const out: Candle[] = [];
   let price = 100;
   for (let i = 0; i < n; i++) {
@@ -103,13 +108,21 @@ describe("highestVolumeEver — volume multiple of median", () => {
 
 describe("highestVolumeEver — error handling", () => {
   test("throws on invalid lookback", () => {
-    expect(() => calculateHighestVolumeEver([bar(100, 1)], { lookbackBars: 0 })).toThrow(/lookbackBars/);
-    expect(() => calculateHighestVolumeEver([bar(100, 1)], { lookbackBars: -1 })).toThrow(/lookbackBars/);
+    expect(() => calculateHighestVolumeEver([bar(100, 1)], { lookbackBars: 0 })).toThrow(
+      /lookbackBars/,
+    );
+    expect(() => calculateHighestVolumeEver([bar(100, 1)], { lookbackBars: -1 })).toThrow(
+      /lookbackBars/,
+    );
   });
 
   test("throws on invalid minBars", () => {
-    expect(() => calculateHighestVolumeEver([bar(100, 1)], { minBarsBeforeDetection: 0 })).toThrow(/minBars/);
-    expect(() => calculateHighestVolumeEver([bar(100, 1)], { minBarsBeforeDetection: 1.5 })).toThrow(/minBars/);
+    expect(() => calculateHighestVolumeEver([bar(100, 1)], { minBarsBeforeDetection: 0 })).toThrow(
+      /minBars/,
+    );
+    expect(() =>
+      calculateHighestVolumeEver([bar(100, 1)], { minBarsBeforeDetection: 1.5 }),
+    ).toThrow(/minBars/);
   });
 
   test("empty input returns empty result", () => {

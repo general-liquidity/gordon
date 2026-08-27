@@ -56,11 +56,11 @@ export const skillTool = createTool({
   ].join("\n"),
   inputSchema: z.object({
     action: z.enum(["list", "load"]),
-    id: z.string().optional().describe("Required when action='load'. Skill ID e.g. 'dd', 'backtest-validate'."),
-    filter: z
+    id: z
       .string()
       .optional()
-      .describe("For 'list': filter skills by keyword/tag."),
+      .describe("Required when action='load'. Skill ID e.g. 'dd', 'backtest-validate'."),
+    filter: z.string().optional().describe("For 'list': filter skills by keyword/tag."),
   }),
   outputSchema: z.object({
     action: z.string(),
@@ -82,10 +82,10 @@ export const skillTool = createTool({
     if (!args.id) {
       return { action: "load", error: "id is required when action='load'." };
     }
-    const result = (await (implLoadSkill.execute as any)(
-      { id: args.id },
-      execContext,
-    )) as { skill?: unknown; error?: string };
+    const result = (await (implLoadSkill.execute as any)({ id: args.id }, execContext)) as {
+      skill?: unknown;
+      error?: string;
+    };
     return { action: "load", skill: result.skill, error: result.error };
   },
 });
@@ -122,10 +122,7 @@ export const delegateSubagentTool = createTool({
     result: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async (
-    args: { role: string; task: string },
-    _execContext?: MastraExecutionContext,
-  ) => {
+  execute: async (args: { role: string; task: string }, _execContext?: MastraExecutionContext) => {
     if (!isDynamicSubagentsEnabled()) {
       return {
         status: "disabled" as const,

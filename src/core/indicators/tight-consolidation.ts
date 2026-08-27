@@ -124,7 +124,10 @@ export function calculateTightConsolidation(
   const lastClose = candles[candles.length - 1]!.close;
   const positionFactor = lastClose >= mid ? 1 : 0.4;
   const tightnessScore = inConsolidation
-    ? Math.min(1, rangeFactor * 0.4 + durationFactor * 0.25 + volumeFactor * 0.2 + positionFactor * 0.15)
+    ? Math.min(
+        1,
+        rangeFactor * 0.4 + durationFactor * 0.25 + volumeFactor * 0.2 + positionFactor * 0.15,
+      )
     : 0;
 
   const interpretation = inConsolidation

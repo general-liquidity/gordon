@@ -21,7 +21,8 @@ export function fuzzyMatch(query: string, text: string): FuzzyResult | null {
   const substringIndex = target.indexOf(q);
   if (substringIndex !== -1) {
     const prefixBonus = substringIndex === 0 ? 40 : 0;
-    const boundaryBonus = substringIndex > 0 && WORD_START.test(target[substringIndex - 1] ?? "") ? 20 : 0;
+    const boundaryBonus =
+      substringIndex > 0 && WORD_START.test(target[substringIndex - 1] ?? "") ? 20 : 0;
     return { score: 300 + prefixBonus + boundaryBonus - substringIndex - text.length / 1000 };
   }
 

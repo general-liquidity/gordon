@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../ink-custom";
 import type { KeybindingConflict } from "../keybindings/keybindings.ts";
 
@@ -26,7 +25,10 @@ export function KeybindingWarnings({ conflicts }: Props) {
           <Text color="yellow" bold>
             [{conflict.key}]
           </Text>
-          {` → "${conflict.winner}" wins over ${conflict.actions.slice(1).map((action) => `"${action}"`).join(", ")}`}
+          {` → "${conflict.winner}" wins over ${conflict.actions
+            .slice(1)
+            .map((action) => `"${action}"`)
+            .join(", ")}`}
         </Text>
       ))}
     </Box>

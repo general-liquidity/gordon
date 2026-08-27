@@ -53,9 +53,7 @@ const DEFAULT_STATE: RuntimeSessionState = {
  *   const streamStatus = useRuntimeState((s) => s.stream.status);
  *   const toolCount = useRuntimeState((s) => s.tooling.tools.length);
  */
-export function useRuntimeState<T>(
-  selector: (state: RuntimeSessionState) => T,
-): T {
+export function useRuntimeState<T>(selector: (state: RuntimeSessionState) => T): T {
   const selectorRef = useRef(selector);
   selectorRef.current = selector;
 

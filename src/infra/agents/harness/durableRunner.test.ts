@@ -8,10 +8,7 @@ import {
   type DurableAgentLike,
 } from "./durableRunner.ts";
 import { createMandate, type SwingMandate } from "../../../core/safety/swing-mandate.ts";
-import {
-  tripKillSwitch,
-  resetAllKillSwitches,
-} from "../../safety/killSwitches.ts";
+import { tripKillSwitch, resetAllKillSwitches } from "../../safety/killSwitches.ts";
 
 function mandate(overrides: Partial<SwingMandate> = {}): SwingMandate {
   return createMandate({
@@ -49,7 +46,11 @@ function fakeDurable(calls: FakeCalls): DurableAgentLike {
       return { output: {}, runId, cleanup: () => {} };
     },
     async recoverActiveRuns() {
-      return { recovered: [{ runId: "run_test_1", status: "success" as const }], succeeded: 1, failed: 0 };
+      return {
+        recovered: [{ runId: "run_test_1", status: "success" as const }],
+        succeeded: 1,
+        failed: 0,
+      };
     },
   };
 }

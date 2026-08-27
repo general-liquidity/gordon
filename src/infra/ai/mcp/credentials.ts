@@ -3,7 +3,7 @@
  * Secure credential storage and retrieval for MCP servers
  */
 
-import type { MCPServerManifest } from './types';
+import type { MCPServerManifest } from "./types";
 
 // ============================================================================
 // Credential Manager
@@ -65,14 +65,10 @@ export class MCPCredentialManager {
    * @param envVar - Optional environment variable name for fallback
    * @returns Credential value or null if not found
    */
-  getWithFallback(
-    serverId: string,
-    key: string,
-    envVar?: string
-  ): string | null {
+  getWithFallback(serverId: string, key: string, envVar?: string): string | null {
     // First, check stored credentials
     const storedCreds = this.credentials.get(serverId);
-    if (storedCreds && storedCreds[key]) {
+    if (storedCreds?.[key]) {
       return storedCreds[key];
     }
 
@@ -93,23 +89,19 @@ export class MCPCredentialManager {
     const { authentication } = manifest;
 
     // No authentication required
-    if (authentication.type === 'none') {
+    if (authentication.type === "none") {
       return true;
     }
 
     // API key authentication
-    if (authentication.type === 'api_key') {
+    if (authentication.type === "api_key") {
       if (authentication.envVar) {
-        const value = this.getWithFallback(
-          manifest.id,
-          'apiKey',
-          authentication.envVar
-        );
+        const value = this.getWithFallback(manifest.id, "apiKey", authentication.envVar);
         return value !== null && value.length > 0;
       }
       // Check stored credentials
       const creds = this.credentials.get(manifest.id);
-      return !!(creds && creds.apiKey);
+      return !!creds?.apiKey;
     }
 
     // OAuth or custom field authentication
@@ -139,18 +131,14 @@ export class MCPCredentialManager {
     const { authentication } = manifest;
     const missing: string[] = [];
 
-    if (authentication.type === 'none') {
+    if (authentication.type === "none") {
       return missing;
     }
 
-    if (authentication.type === 'api_key') {
-      const value = this.getWithFallback(
-        manifest.id,
-        'apiKey',
-        authentication.envVar
-      );
+    if (authentication.type === "api_key") {
+      const value = this.getWithFallback(manifest.id, "apiKey", authentication.envVar);
       if (!value) {
-        missing.push(authentication.envVar || 'apiKey');
+        missing.push(authentication.envVar || "apiKey");
       }
       return missing;
     }

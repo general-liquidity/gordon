@@ -8,10 +8,9 @@
  * Phase 2 of the 100% parity plan.
  */
 
-import React, {
+import {
   createContext,
   useContext,
-  useReducer,
   useRef,
   useCallback,
   useSyncExternalStore,
@@ -77,18 +76,14 @@ export function AppStateProvider({ children, initialState }: Props) {
   // Create the store once and keep it stable across renders
   const storeRef = useRef<StateStore | null>(null);
   if (storeRef.current === null) {
-    const merged: AppState = initialState
-      ? { ...INITIAL_STATE, ...initialState }
-      : INITIAL_STATE;
+    const merged: AppState = initialState ? { ...INITIAL_STATE, ...initialState } : INITIAL_STATE;
     storeRef.current = new StateStore(merged, appReducer);
   }
   const store = storeRef.current;
 
   return (
     <StoreContext.Provider value={store}>
-      <DispatchContext.Provider value={store.dispatch}>
-        {children}
-      </DispatchContext.Provider>
+      <DispatchContext.Provider value={store.dispatch}>{children}</DispatchContext.Provider>
     </StoreContext.Provider>
   );
 }
@@ -122,10 +117,7 @@ export function useAppState<T>(selector: (state: AppState) => T): T {
   const selectorRef = useRef(selector);
   selectorRef.current = selector;
 
-  const getSnapshot = useCallback(
-    () => selectorRef.current(store.getState()),
-    [store],
-  );
+  const getSnapshot = useCallback(() => selectorRef.current(store.getState()), [store]);
 
   return useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
 }

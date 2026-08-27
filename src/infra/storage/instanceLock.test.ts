@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { acquireInstanceLock, InstanceLockCollisionError, isPidAlive } from "./instanceLock.ts";
 
 const dir = join(tmpdir(), `gordon-instance-lock-${process.pid}`);
@@ -38,7 +38,10 @@ describe("instanceLock", () => {
   });
 
   test("stale and corrupt locks are recovered", () => {
-    writeFileSync(file, JSON.stringify({ pid: 999999999, startedAt: new Date().toISOString(), cwd: "/tmp" }));
+    writeFileSync(
+      file,
+      JSON.stringify({ pid: 999999999, startedAt: new Date().toISOString(), cwd: "/tmp" }),
+    );
     const stale = acquireInstanceLock("tui", { force: true });
     expect(stale).toBeTruthy();
     stale?.release();
@@ -51,13 +54,19 @@ describe("instanceLock", () => {
 
   test("live foreign lock returns null", () => {
     const pid = process.ppid || process.pid;
-    writeFileSync(file, JSON.stringify({ pid, startedAt: new Date().toISOString(), cwd: "/foreign" }));
+    writeFileSync(
+      file,
+      JSON.stringify({ pid, startedAt: new Date().toISOString(), cwd: "/foreign" }),
+    );
     expect(() => acquireInstanceLock("tui", { force: true })).toThrow(InstanceLockCollisionError);
   });
 
   test("release does not remove a successor lock", () => {
     const lock = acquireInstanceLock("tui", { force: true });
-    writeFileSync(file, JSON.stringify({ pid: 999998, startedAt: new Date().toISOString(), cwd: "/successor" }));
+    writeFileSync(
+      file,
+      JSON.stringify({ pid: 999998, startedAt: new Date().toISOString(), cwd: "/successor" }),
+    );
     lock?.release();
     expect(existsSync(file)).toBe(true);
   });

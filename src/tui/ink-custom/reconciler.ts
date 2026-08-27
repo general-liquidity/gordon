@@ -181,8 +181,8 @@ const reconciler: any = createReconciler({
     }
     const props = diff(oldProps, newProps);
     const style = diff(
-      oldProps["style"] as Record<string, unknown> | undefined,
-      newProps["style"] as Record<string, unknown> | undefined,
+      oldProps.style as Record<string, unknown> | undefined,
+      newProps.style as Record<string, unknown> | undefined,
     );
     if (!props && !style) return;
     if (props) {
@@ -237,7 +237,7 @@ const reconciler: any = createReconciler({
 });
 
 // Dev-tools hook, same as Ink.
-if (process.env["DEV"] === "true") {
+if (process.env.DEV === "true") {
   try {
     reconciler.injectIntoDevTools({
       bundleType: 0,

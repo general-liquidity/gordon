@@ -81,7 +81,7 @@ export function calculateIchimoku(
   tenkanPeriod: number = 9,
   kijunPeriod: number = 26,
   senkouBPeriod: number = 52,
-  chikouPeriod: number = 26
+  _chikouPeriod: number = 26,
 ): IchimokuResult {
   if (candles.length < senkouBPeriod + 1) {
     return {
@@ -160,12 +160,7 @@ export function calculateIchimoku(
 
   // TK cross detection
   let tkCross: "bullish_cross" | "bearish_cross" | "none" = "none";
-  if (
-    tenkan !== null &&
-    kijun !== null &&
-    prevTenkan !== null &&
-    prevKijun !== null
-  ) {
+  if (tenkan !== null && kijun !== null && prevTenkan !== null && prevKijun !== null) {
     if (prevTenkan <= prevKijun && tenkan > kijun) tkCross = "bullish_cross";
     else if (prevTenkan >= prevKijun && tenkan < kijun) tkCross = "bearish_cross";
   }
@@ -182,7 +177,7 @@ export function calculateIchimoku(
     cloudColor,
     pricePosition,
     tkCross,
-    signal
+    signal,
   );
 
   return {
@@ -206,7 +201,7 @@ function computeSignal(
   cloudColor: string,
   tkCross: string,
   tenkan: number | null,
-  kijun: number | null
+  kijun: number | null,
 ): "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell" {
   let score = 0;
 
@@ -236,7 +231,7 @@ function computeSignal(
 }
 
 function buildIchimokuInterpretation(
-  price: number,
+  _price: number,
   tenkan: number | null,
   kijun: number | null,
   cloudTop: number | null,
@@ -244,7 +239,7 @@ function buildIchimokuInterpretation(
   cloudColor: string,
   position: string,
   tkCross: string,
-  signal: string
+  signal: string,
 ): string {
   let msg = "";
 
@@ -266,13 +261,11 @@ function buildIchimokuInterpretation(
 
   if (tkCross === "bullish_cross") {
     msg += `TK BULLISH CROSS — `;
-    if (position === "above_cloud")
-      msg += `strong buy (cross above cloud).`;
+    if (position === "above_cloud") msg += `strong buy (cross above cloud).`;
     else msg += `potential buy (confirm with cloud position).`;
   } else if (tkCross === "bearish_cross") {
     msg += `TK BEARISH CROSS — `;
-    if (position === "below_cloud")
-      msg += `strong sell (cross below cloud).`;
+    if (position === "below_cloud") msg += `strong sell (cross below cloud).`;
     else msg += `potential sell (confirm with cloud position).`;
   } else {
     msg += `No TK cross. Signal: ${signal.replace("_", " ")}.`;

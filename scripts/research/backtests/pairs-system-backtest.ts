@@ -33,9 +33,17 @@ import { Worker, isMainThread, parentPort, workerData } from "node:worker_thread
 
 import { runPairsSystem } from "../../../src/infra/trading/quant/pairsSystem.ts";
 
-const BARS_DIR = join(process.cwd(), process.env.ALPHA_BARS_DIR ?? join("data", "momq", "crypto-extended"));
+const BARS_DIR = join(
+  process.cwd(),
+  process.env.ALPHA_BARS_DIR ?? join("data", "momq", "crypto-extended"),
+);
 const TF = process.env.ALPHA_TF ?? "1d";
-const WANTED = new Set((process.env.PAIRS_SYMBOLS ?? "").split(",").map((s) => s.trim()).filter(Boolean));
+const WANTED = new Set(
+  (process.env.PAIRS_SYMBOLS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
 
 const IS_FRAC = 0.7;
 const COST_BPS_FLOOR = Number(process.env.PAIRS_COST_BPS ?? 5); // both legs, one side.
@@ -45,8 +53,17 @@ const DESIRED_ENTRY_Z = 2.0;
 const KALMAN_DELTA = Number(process.env.PAIRS_KALMAN_DELTA ?? 1e-7);
 const MIN_OBS = 200;
 
-interface RawBar { time: number; close: number; spread: number }
-interface Series { symbol: string; timeToClose: Map<number, number>; times: number[]; spreadBps: number }
+interface RawBar {
+  time: number;
+  close: number;
+  spread: number;
+}
+interface Series {
+  symbol: string;
+  timeToClose: Map<number, number>;
+  times: number[];
+  spreadBps: number;
+}
 
 const mean = (xs: number[]) => xs.reduce((s, v) => s + v, 0) / (xs.length || 1);
 const std = (xs: number[]) => {
@@ -70,7 +87,12 @@ function loadSeries(symbol: string): Series | null {
   const timeToClose = new Map<number, number>();
   for (const b of clean) timeToClose.set(b.time, b.close);
   const bps = clean.filter((b) => b.spread > 0).map((b) => (b.spread / b.close) * 10_000);
-  return { symbol, timeToClose, times: clean.map((b) => b.time), spreadBps: bps.length ? median(bps) : 0 };
+  return {
+    symbol,
+    timeToClose,
+    times: clean.map((b) => b.time),
+    spreadBps: bps.length ? median(bps) : 0,
+  };
 }
 
 /** Common-timestamp aligned close arrays (chronological). */
@@ -111,7 +133,10 @@ function maxDrawdown(rets: number[]): number {
 function curveRoughness(rets: number[]): number {
   const eq: number[] = [];
   let c = 0;
-  for (const r of rets) { c += r; eq.push(c); }
+  for (const r of rets) {
+    c += r;
+    eq.push(c);
+  }
   if (eq.length < 3) return 0;
   const d2: number[] = [];
   for (let i = 2; i < eq.length; i++) d2.push(eq[i]! - 2 * eq[i - 1]! + eq[i - 2]!);
@@ -124,11 +149,7 @@ function curveRoughness(rets: number[]): number {
  * then split IS/OOS. Position held INTO bar t is allocation[t-1]; ΔS_t is the
  * Kalman-spread change. Turnover cost on |Δallocation|.
  */
-function pnlFromSystem(
-  allocation: number[],
-  spread: number[],
-  costFraction: number,
-): number[] {
+function pnlFromSystem(allocation: number[], spread: number[], costFraction: number): number[] {
   const rets: number[] = [];
   for (let i = 1; i < spread.length; i++) {
     const prev = allocation[i - 1]!;
@@ -181,7 +202,7 @@ function evaluatePair(a: Series, b: Series): PairBacktest | null {
   // IS/OOS split on the bar index. Backtest each slice independently using the
   // already-computed full-series positions (the system is causal — z and regime use
   // only trailing data — so slicing the realized position/spread is honest).
-  const cut = Math.floor(n / 1 * IS_FRAC);
+  const cut = Math.floor((n / 1) * IS_FRAC);
   const isRets = pnlFromSystem(allocation.slice(0, cut), spread.slice(0, cut), costFraction);
   const oosRets = pnlFromSystem(allocation.slice(cut), spread.slice(cut), costFraction);
 
@@ -197,28 +218,44 @@ function evaluatePair(a: Series, b: Series): PairBacktest | null {
   }
 
   return {
-    a: a.symbol, b: b.symbol, n,
-    halfLife: sys.selection.halfLife, hurst: sys.selection.hurst, entryZ: sys.entryZ,
-    isSharpe: sharpe(isRets), oosSharpe: sharpe(oosRets),
+    a: a.symbol,
+    b: b.symbol,
+    n,
+    halfLife: sys.selection.halfLife,
+    hurst: sys.selection.hurst,
+    entryZ: sys.entryZ,
+    isSharpe: sharpe(isRets),
+    oosSharpe: sharpe(oosRets),
     oosRet: oosRets.reduce((s, r) => s + r, 0),
-    oosMaxDd: maxDrawdown(oosRets), oosRoughness: curveRoughness(oosRets), oosTrades: trades,
-    oosRets, oosStart: cut, times: alignedTimes,
+    oosMaxDd: maxDrawdown(oosRets),
+    oosRoughness: curveRoughness(oosRets),
+    oosTrades: trades,
+    oosRets,
+    oosStart: cut,
+    times: alignedTimes,
   };
 }
 
 // ── parallel sharding (pair granularity, per pairs-scan.ts pattern) ──
-interface PairUnit { a: string; b: string }
+interface PairUnit {
+  a: string;
+  b: string;
+}
 
 function computeForPairs(units: PairUnit[]): PairBacktest[] {
   const cache = new Map<string, Series | null>();
   const load = (sym: string): Series | null => {
     let s = cache.get(sym);
-    if (s === undefined) { s = loadSeries(sym); cache.set(sym, s); }
+    if (s === undefined) {
+      s = loadSeries(sym);
+      cache.set(sym, s);
+    }
     return s;
   };
   const out: PairBacktest[] = [];
   for (const { a, b } of units) {
-    const sa = load(a); const sb = load(b);
+    const sa = load(a);
+    const sb = load(b);
     if (!sa || !sb) continue;
     const r = evaluatePair(sa, sb);
     if (r) out.push(r);
@@ -234,13 +271,21 @@ if (!isMainThread && parentPort) {
 function runSharded(units: PairUnit[]): Promise<PairBacktest[]> {
   const nWorkers = Math.max(1, Math.min(availableParallelism(), units.length));
   const chunks: PairUnit[][] = Array.from({ length: nWorkers }, () => []);
-  units.forEach((u, i) => chunks[i % nWorkers]!.push(u));
+  units.forEach((u, i) => {
+    chunks[i % nWorkers]!.push(u);
+  });
   return Promise.all(
-    chunks.map((chunk) => new Promise<PairBacktest[]>((resolve, reject) => {
-      const w = new Worker(new URL(import.meta.url), { workerData: { units: chunk } });
-      w.once("message", (r: PairBacktest[]) => { resolve(r); void w.terminate(); });
-      w.once("error", reject);
-    })),
+    chunks.map(
+      (chunk) =>
+        new Promise<PairBacktest[]>((resolve, reject) => {
+          const w = new Worker(new URL(import.meta.url), { workerData: { units: chunk } });
+          w.once("message", (r: PairBacktest[]) => {
+            resolve(r);
+            void w.terminate();
+          });
+          w.once("error", reject);
+        }),
+    ),
   ).then((perChunk) => perChunk.flat());
 }
 
@@ -275,7 +320,7 @@ function aggregatePortfolio(pairs: PairBacktest[]): { rets: number[]; nBars: num
 async function main(): Promise<void> {
   let symbols = readdirSync(BARS_DIR)
     .filter((f) => f.endsWith(`_${TF}.json`))
-    .map((f) => f.slice(0, -(`_${TF}.json`).length))
+    .map((f) => f.slice(0, -`_${TF}.json`.length))
     .sort();
   if (WANTED.size) symbols = symbols.filter((s) => WANTED.has(s));
 
@@ -284,10 +329,14 @@ async function main(): Promise<void> {
   console.log("=".repeat(86));
   console.log("INTEGRATED PAIRS-SYSTEM BACKTEST — 5-layer (coint→Kalman→OU→cost-z→sizing→monitor)");
   console.log("=".repeat(86));
-  console.log(`Dir/TF        : ${process.env.ALPHA_BARS_DIR ?? "data/momq/crypto-extended"} / ${TF}`);
+  console.log(
+    `Dir/TF        : ${process.env.ALPHA_BARS_DIR ?? "data/momq/crypto-extended"} / ${TF}`,
+  );
   console.log(`Symbols       : ${series.length}`);
   console.log(`Pairs to test : ${(series.length * (series.length - 1)) / 2}`);
-  console.log(`Kalman delta  : ${KALMAN_DELTA}   Cost floor: ${COST_BPS_FLOOR} bps   Entry z (desired): ${DESIRED_ENTRY_Z}`);
+  console.log(
+    `Kalman delta  : ${KALMAN_DELTA}   Cost floor: ${COST_BPS_FLOOR} bps   Entry z (desired): ${DESIRED_ENTRY_Z}`,
+  );
 
   const allUnits: PairUnit[] = [];
   for (let i = 0; i < series.length; i++)
@@ -296,7 +345,9 @@ async function main(): Promise<void> {
 
   const serial = process.env.ALPHA_SERIAL === "1" || allUnits.length <= 1;
   const nWorkers = serial ? 1 : Math.min(availableParallelism(), allUnits.length);
-  console.log(`Parallelism   : ${serial ? "serial" : `${nWorkers} workers / ${availableParallelism()} cores`}`);
+  console.log(
+    `Parallelism   : ${serial ? "serial" : `${nWorkers} workers / ${availableParallelism()} cores`}`,
+  );
   console.log("");
 
   const bars = new Map(series.map((s) => [s.symbol, s.times.length]));
@@ -305,7 +356,7 @@ async function main(): Promise<void> {
     results = computeForPairs(allUnits);
   } else {
     const ordered = [...allUnits].sort(
-      (x, y) => (bars.get(y.a)! + bars.get(y.b)!) - (bars.get(x.a)! + bars.get(x.b)!),
+      (x, y) => bars.get(y.a)! + bars.get(y.b)! - (bars.get(x.a)! + bars.get(x.b)!),
     );
     results = await runSharded(ordered);
   }
@@ -313,7 +364,9 @@ async function main(): Promise<void> {
   // Stable order for reporting.
   results.sort((x, y) => (x.a + x.b).localeCompare(y.a + y.b));
 
-  console.log(`Selected pairs (passed Johansen + EG-both + Hurst<0.5 + tradeable HL): ${results.length}`);
+  console.log(
+    `Selected pairs (passed Johansen + EG-both + Hurst<0.5 + tradeable HL): ${results.length}`,
+  );
   console.log("");
 
   if (!results.length) {
@@ -325,23 +378,34 @@ async function main(): Promise<void> {
   console.log("PER-PAIR — ranked by OOS spread Sharpe (per-bar, after costs)");
   console.log("-".repeat(86));
   console.log(
-    ["pair".padEnd(20), "HL".padStart(5), "hurst".padStart(6), "eZ".padStart(5),
-     "isSh".padStart(7), "oosSh".padStart(7), "oosRet".padStart(8), "oosDD".padStart(8),
-     "rough".padStart(7), "trd".padStart(4)].join(" "),
+    [
+      "pair".padEnd(20),
+      "HL".padStart(5),
+      "hurst".padStart(6),
+      "eZ".padStart(5),
+      "isSh".padStart(7),
+      "oosSh".padStart(7),
+      "oosRet".padStart(8),
+      "oosDD".padStart(8),
+      "rough".padStart(7),
+      "trd".padStart(4),
+    ].join(" "),
   );
   for (const r of ranked) {
-    console.log([
-      `${r.a}/${r.b}`.padEnd(20),
-      r.halfLife.toFixed(0).padStart(5),
-      r.hurst.toFixed(2).padStart(6),
-      r.entryZ.toFixed(2).padStart(5),
-      r.isSharpe.toFixed(3).padStart(7),
-      r.oosSharpe.toFixed(3).padStart(7),
-      r.oosRet.toFixed(4).padStart(8),
-      r.oosMaxDd.toFixed(4).padStart(8),
-      r.oosRoughness.toFixed(3).padStart(7),
-      String(r.oosTrades).padStart(4),
-    ].join(" "));
+    console.log(
+      [
+        `${r.a}/${r.b}`.padEnd(20),
+        r.halfLife.toFixed(0).padStart(5),
+        r.hurst.toFixed(2).padStart(6),
+        r.entryZ.toFixed(2).padStart(5),
+        r.isSharpe.toFixed(3).padStart(7),
+        r.oosSharpe.toFixed(3).padStart(7),
+        r.oosRet.toFixed(4).padStart(8),
+        r.oosMaxDd.toFixed(4).padStart(8),
+        r.oosRoughness.toFixed(3).padStart(7),
+        String(r.oosTrades).padStart(4),
+      ].join(" "),
+    );
   }
   console.log("");
 
@@ -362,12 +426,22 @@ async function main(): Promise<void> {
   console.log("=".repeat(86));
   console.log("AGGREGATED PAIRS BOOK (equal-weight, dollar-neutral) — OUT OF SAMPLE");
   console.log("=".repeat(86));
-  console.log(`Pairs in book            : ${results.length}  (${consistent.length} with BOTH IS>0 and OOS>0)`);
+  console.log(
+    `Pairs in book            : ${results.length}  (${consistent.length} with BOTH IS>0 and OOS>0)`,
+  );
   console.log(`Portfolio OOS bars       : ${port.nBars}`);
-  console.log(`Per-bar Sharpe           : ${portSharpe.toFixed(4)}   (annualized ≈ ${ann.toFixed(2)})`);
-  console.log(`Mean per-PAIR OOS Sharpe : ${meanPairOosSharpe.toFixed(4)}   → book Sharpe should EXCEED this (breadth)`);
-  console.log(`Per-bar return std       : ${portStd.toExponential(3)}   (curve variance — lower = smoother)`);
-  console.log(`Curve roughness          : ${portRough.toFixed(4)}   (std of 2nd-diff / range; 0 = straight line)`);
+  console.log(
+    `Per-bar Sharpe           : ${portSharpe.toFixed(4)}   (annualized ≈ ${ann.toFixed(2)})`,
+  );
+  console.log(
+    `Mean per-PAIR OOS Sharpe : ${meanPairOosSharpe.toFixed(4)}   → book Sharpe should EXCEED this (breadth)`,
+  );
+  console.log(
+    `Per-bar return std       : ${portStd.toExponential(3)}   (curve variance — lower = smoother)`,
+  );
+  console.log(
+    `Curve roughness          : ${portRough.toFixed(4)}   (std of 2nd-diff / range; 0 = straight line)`,
+  );
   console.log(`Cumulative OOS return    : ${portRet.toFixed(4)}  (log-spread units)`);
   console.log(`Max drawdown             : ${portDd.toFixed(4)}  (additive equity units)`);
   console.log("");
@@ -378,17 +452,31 @@ async function main(): Promise<void> {
   const smooth = portSharpe > 0.05;
   const breadthLift = portSharpe > meanPairOosSharpe;
   if (positive && smooth) {
-    console.log(`VIABLE low-variance Best-Sharpe vehicle: aggregated OOS per-bar Sharpe ${portSharpe.toFixed(3)} `);
-    console.log(`(annualized ≈ ${ann.toFixed(2)}), positive cumulative return, max DD ${portDd.toFixed(4)}.`);
+    console.log(
+      `VIABLE low-variance Best-Sharpe vehicle: aggregated OOS per-bar Sharpe ${portSharpe.toFixed(3)} `,
+    );
+    console.log(
+      `(annualized ≈ ${ann.toFixed(2)}), positive cumulative return, max DD ${portDd.toFixed(4)}.`,
+    );
   } else if (positive) {
-    console.log(`MARGINAL: positive OOS return but per-bar Sharpe ${portSharpe.toFixed(3)} is thin — low variance`);
-    console.log(`but not a strong Sharpe signal. The smoothness (DD ${portDd.toFixed(4)}) is the real asset here.`);
+    console.log(
+      `MARGINAL: positive OOS return but per-bar Sharpe ${portSharpe.toFixed(3)} is thin — low variance`,
+    );
+    console.log(
+      `but not a strong Sharpe signal. The smoothness (DD ${portDd.toFixed(4)}) is the real asset here.`,
+    );
   } else {
-    console.log(`NOT VIABLE as a return source: cumulative OOS return ${portRet.toFixed(4)} ≤ 0. But the curve`);
-    console.log(`IS low-variance (std ${portStd.toExponential(2)}, DD ${portDd.toFixed(4)}) — a flat-ish dollar-neutral book.`);
+    console.log(
+      `NOT VIABLE as a return source: cumulative OOS return ${portRet.toFixed(4)} ≤ 0. But the curve`,
+    );
+    console.log(
+      `IS low-variance (std ${portStd.toExponential(2)}, DD ${portDd.toFixed(4)}) — a flat-ish dollar-neutral book.`,
+    );
   }
-  console.log(`Breadth lift: book Sharpe ${breadthLift ? "EXCEEDS" : "does NOT exceed"} mean per-pair Sharpe ` +
-    `(${portSharpe.toFixed(3)} vs ${meanPairOosSharpe.toFixed(3)}) — ${breadthLift ? "diversification working as the Fundamental Law predicts." : "pairs too correlated / too few to diversify."}`);
+  console.log(
+    `Breadth lift: book Sharpe ${breadthLift ? "EXCEEDS" : "does NOT exceed"} mean per-pair Sharpe ` +
+      `(${portSharpe.toFixed(3)} vs ${meanPairOosSharpe.toFixed(3)}) — ${breadthLift ? "diversification working as the Fundamental Law predicts." : "pairs too correlated / too few to diversify."}`,
+  );
   console.log("");
 }
 

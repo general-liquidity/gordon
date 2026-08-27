@@ -48,7 +48,10 @@ export interface PositionSizeResult {
  * @param dailyReturns Array of daily percentage returns (decimal).
  * @param tradingDaysPerYear 252 for stocks, 365 for crypto.
  */
-export function computeAnnualizedVol(dailyReturns: number[], tradingDaysPerYear: number = 365): number {
+export function computeAnnualizedVol(
+  dailyReturns: number[],
+  tradingDaysPerYear: number = 365,
+): number {
   if (dailyReturns.length < 2) return 0;
   return sampleStd(dailyReturns) * Math.sqrt(tradingDaysPerYear);
 }
@@ -116,23 +119,20 @@ export function computeVolatilityProfile(
   if (currentVol < 0.15) {
     regime = "low";
     maxAllocationPct = 25;
-  } else if (currentVol < 0.40) {
+  } else if (currentVol < 0.4) {
     regime = "moderate";
     maxAllocationPct = 20 - (currentVol - 0.15) * 40; // Linear interpolation 20→10
-  } else if (currentVol < 0.70) {
+  } else if (currentVol < 0.7) {
     regime = "high";
-    maxAllocationPct = 12 - (currentVol - 0.40) * 23.3; // 12→5
+    maxAllocationPct = 12 - (currentVol - 0.4) * 23.3; // 12→5
   } else {
     regime = "extreme";
-    maxAllocationPct = Math.max(2, 8 - (currentVol - 0.70) * 20); // 8→2
+    maxAllocationPct = Math.max(2, 8 - (currentVol - 0.7) * 20); // 8→2
   }
 
   // Percentile adjustment: if vol is unusually high for this asset, shrink further
-  const percentileMultiplier = pctRank > 90 ? 0.6
-    : pctRank > 75 ? 0.8
-    : pctRank > 50 ? 1.0
-    : pctRank > 25 ? 1.1
-    : 1.2; // Unusually low vol → can take slightly more
+  const percentileMultiplier =
+    pctRank > 90 ? 0.6 : pctRank > 75 ? 0.8 : pctRank > 50 ? 1.0 : pctRank > 25 ? 1.1 : 1.2; // Unusually low vol → can take slightly more
 
   const recommendedSizePct = Math.min(maxAllocationPct, baseAllocationPct * percentileMultiplier);
 

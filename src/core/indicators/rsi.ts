@@ -62,7 +62,7 @@ export function calculateRSI(closes: number[], period: number = 14): RSIResult {
     rsi = 100;
   } else {
     const rs = avgGain / avgLoss;
-    rsi = 100 - (100 / (1 + rs));
+    rsi = 100 - 100 / (1 + rs);
   }
   result.push(rsi);
 
@@ -79,7 +79,7 @@ export function calculateRSI(closes: number[], period: number = 14): RSIResult {
       rsi = 100;
     } else {
       const rs = avgGain / avgLoss;
-      rsi = 100 - (100 / (1 + rs));
+      rsi = 100 - 100 / (1 + rs);
     }
     result.push(rsi);
   }

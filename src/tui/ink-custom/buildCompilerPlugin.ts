@@ -62,12 +62,8 @@ if (ACTIVE) {
             sourceType: "module",
             // preset-typescript strips TS types but preserves JSX, which
             // is exactly what the React Compiler needs to see.
-            presets: [
-              ["@babel/preset-typescript", { isTSX: true, allExtensions: true }],
-            ],
-            plugins: [
-              ["babel-plugin-react-compiler", { target: "19" }],
-            ],
+            presets: [["@babel/preset-typescript", { isTSX: true, allExtensions: true }]],
+            plugins: [["babel-plugin-react-compiler", { target: "19" }]],
           });
 
           if (!result?.code) {
@@ -87,9 +83,7 @@ if (ACTIVE) {
           // fall back to Bun's default transpiler so the app still
           // boots. The compiler is allowed to bail out per-component.
           // eslint-disable-next-line no-console
-          console.warn(
-            `[react-compiler] skipped ${args.path}: ${(err as Error).message}`,
-          );
+          console.warn(`[react-compiler] skipped ${args.path}: ${(err as Error).message}`);
           return undefined;
         }
       });

@@ -8,7 +8,20 @@
   "repository": "https://github.com/general-liquidity/gordon",
   "license": "MIT",
   "categories": ["trading", "finance", "analysis"],
-  "tags": ["trading", "crypto", "equities", "ccxt", "exchange", "binance", "coinbase", "kraken", "hyperliquid", "okx", "risk", "backtest"],
+  "tags": [
+    "trading",
+    "crypto",
+    "equities",
+    "ccxt",
+    "exchange",
+    "binance",
+    "coinbase",
+    "kraken",
+    "hyperliquid",
+    "okx",
+    "risk",
+    "backtest"
+  ],
   "command": "bun",
   "args": ["run", "src/app/acp-entry.ts"],
   "env": {

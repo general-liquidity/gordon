@@ -63,7 +63,7 @@ function computeRsi(closes: number[], period: number): (number | null)[] {
  */
 function findRsiPivotHighs(
   rsi: (number | null)[],
-  window: number
+  window: number,
 ): { value: number; bar: number }[] {
   const pivots: { value: number; bar: number }[] = [];
   for (let i = window; i < rsi.length - window; i++) {
@@ -91,7 +91,7 @@ function findRsiPivotHighs(
  */
 function findRsiPivotLows(
   rsi: (number | null)[],
-  window: number
+  window: number,
 ): { value: number; bar: number }[] {
   const pivots: { value: number; bar: number }[] = [];
   for (let i = window; i < rsi.length - window; i++) {
@@ -123,7 +123,7 @@ function findRsiPivotLows(
  */
 export function calculateRsiTrendline(
   closes: number[],
-  opts?: { rsiPeriod?: number; pivotWindow?: number }
+  opts?: { rsiPeriod?: number; pivotWindow?: number },
 ): RsiTrendlineResult {
   const rsiPeriod = opts?.rsiPeriod ?? 14;
   const pivotWindow = opts?.pivotWindow ?? 2;

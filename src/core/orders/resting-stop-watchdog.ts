@@ -91,22 +91,42 @@ function livenessFromStatus(status: OrderStatus): StopLiveness {
   }
 }
 
-function describe(liveness: StopLiveness): { action: "re-arm" | "reconcile"; severity: StopWatchAlert["severity"]; text: string } {
+function describe(liveness: StopLiveness): {
+  action: "re-arm" | "reconcile";
+  severity: StopWatchAlert["severity"];
+  text: string;
+} {
   switch (liveness) {
     case "absent":
       return { action: "re-arm", severity: "critical", text: "no protective stop on file" };
     case "cancelled":
       return { action: "re-arm", severity: "critical", text: "protective stop was cancelled" };
     case "expired":
-      return { action: "re-arm", severity: "critical", text: "protective stop expired (day-order rollover)" };
+      return {
+        action: "re-arm",
+        severity: "critical",
+        text: "protective stop expired (day-order rollover)",
+      };
     case "rejected":
       return { action: "re-arm", severity: "critical", text: "protective stop was rejected" };
     case "pending_cancel":
-      return { action: "re-arm", severity: "warning", text: "protective stop is pending cancel and will die" };
+      return {
+        action: "re-arm",
+        severity: "warning",
+        text: "protective stop is pending cancel and will die",
+      };
     case "dead":
-      return { action: "re-arm", severity: "critical", text: "protective stop is in a non-working status" };
+      return {
+        action: "re-arm",
+        severity: "critical",
+        text: "protective stop is in a non-working status",
+      };
     case "filled":
-      return { action: "reconcile", severity: "warning", text: "protective stop already filled; verify the position is flat" };
+      return {
+        action: "reconcile",
+        severity: "warning",
+        text: "protective stop already filled; verify the position is flat",
+      };
     case "working":
       return { action: "reconcile", severity: "info", text: "protective stop is working" };
   }
@@ -132,7 +152,10 @@ export function scanRestingStops(input: RestingStopWatchInput): RestingStopWatch
       const order = orderById.get(pos.stopOrderId);
       if (!order) {
         liveness = "absent";
-      } else if (order.isWorking === true || (order.isWorking === undefined && working.has(order.status))) {
+      } else if (
+        order.isWorking === true ||
+        (order.isWorking === undefined && working.has(order.status))
+      ) {
         liveness = "working";
       } else {
         liveness = livenessFromStatus(order.status);

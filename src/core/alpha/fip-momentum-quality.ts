@@ -83,11 +83,7 @@ export interface FipMomentumOptions {
   minAssets?: number;
 }
 
-export type FipQuality =
-  | "smooth_momentum"
-  | "mixed_momentum"
-  | "spiky_momentum"
-  | "no_direction";
+export type FipQuality = "smooth_momentum" | "mixed_momentum" | "spiky_momentum" | "no_direction";
 
 export interface FipAssetResult {
   symbol: string;
@@ -128,8 +124,8 @@ export interface FipMomentumResult {
 }
 
 const DEFAULT_ZERO_TOL = 0;
-const DEFAULT_SMOOTH_THRESHOLD = 0.10;
-const DEFAULT_TOP_RETURN_FRACTION = 0.20;
+const DEFAULT_SMOOTH_THRESHOLD = 0.1;
+const DEFAULT_TOP_RETURN_FRACTION = 0.2;
 const DEFAULT_MIN_SAMPLE = 20;
 const DEFAULT_MIN_ASSETS = 3;
 
@@ -241,9 +237,7 @@ export function scoreFipMomentum(
     };
   });
 
-  const highQualityMomentum = perAsset
-    .filter((p) => p.isHighQualityMomentum)
-    .map((p) => p.symbol);
+  const highQualityMomentum = perAsset.filter((p) => p.isHighQualityMomentum).map((p) => p.symbol);
   const spikyTopReturn = perAsset
     .filter((p) => p.returnRank <= topCount && p.fipQuality === "spiky_momentum")
     .map((p) => p.symbol);
@@ -273,7 +267,7 @@ export function scoreFipMomentum(
   return {
     totalAssets: assets.length,
     validAssets: valid.length,
-    lookbackUsed: options.lookbackDays ?? (valid[0]?.sampleSize ?? 0),
+    lookbackUsed: options.lookbackDays ?? valid[0]?.sampleSize ?? 0,
     topReturnFraction: topFraction,
     smoothFipThreshold: smoothThreshold,
     perAsset,
@@ -298,7 +292,11 @@ export function formatFipMomentum(result: FipMomentumResult): string {
     `  Top assets by return:`,
   ];
   for (const p of result.perAsset.slice(0, 8)) {
-    const tag = p.isHighQualityMomentum ? "[HQ]" : p.fipQuality === "spiky_momentum" ? "[sp]" : "[..]";
+    const tag = p.isHighQualityMomentum
+      ? "[HQ]"
+      : p.fipQuality === "spiky_momentum"
+        ? "[sp]"
+        : "[..]";
     lines.push(
       `    ${tag} ${p.symbol.padEnd(10)} ret=${(p.totalReturn * 100).toFixed(2).padStart(7)}%  ` +
         `fip=${p.fip.toFixed(3).padStart(6)}  ${p.fipQuality}  (+${p.positiveDays}/-${p.negativeDays}/0${p.zeroDays})`,

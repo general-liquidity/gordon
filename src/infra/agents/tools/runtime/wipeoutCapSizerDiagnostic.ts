@@ -23,9 +23,7 @@ export const wipeoutCapSizerDiagnosticTool = createTool({
     "from Kelly sizing (expected-utility-optimal) — this is failure-probability-bounded sizing. Useful " +
     "when downside is binary (full loss vs success) or distributions are hard to estimate.",
   inputSchema: z.object({
-    expectedYield: z
-      .number()
-      .describe("Expected yield as decimal (e.g. 0.10 = 10%)."),
+    expectedYield: z.number().describe("Expected yield as decimal (e.g. 0.10 = 10%)."),
     wipeoutProbability: z
       .number()
       .min(0)

@@ -11,8 +11,6 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
   validateEnvKeys,
-  sanitizeKeyValue,
-  isPlaceholderKey,
   formatValidationResult,
   type ValidationResult,
 } from "./env-validation.ts";
@@ -25,7 +23,7 @@ const GORDON_ENV_PATH = join(GORDON_DIR, ".env");
 const CWD_ENV_PATH = join(process.cwd(), ".env");
 
 // We write to GORDON_ENV_PATH but read from both
-const ENV_FILE_PATH = GORDON_ENV_PATH;
+const _ENV_FILE_PATH = GORDON_ENV_PATH;
 
 export interface EnvKeys {
   ANTHROPIC_API_KEY?: string;
@@ -176,21 +174,57 @@ function findEnvFilePath(): string | null {
 
 /** All tracked env key names (single source of truth) */
 const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
-  "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "XAI_API_KEY",
-  "OPENROUTER_API_KEY", "HF_TOKEN", "TOGETHER_API_KEY", "FIREWORKS_API_KEY",
-  "SILICONFLOW_API_KEY", "DEEPINFRA_API_KEY", "GORDON_LOCAL_MODEL_URL", "GORDON_LOCAL_MODEL_API_KEY",
-  "ALPACA_API_KEY", "ALPACA_API_SECRET", "ALPACA_PAPER",
-  "TASTYTRADE_API_KEY", "TASTYTRADE_API_SECRET", "TASTYTRADE_PAPER", "TASTYTRADE_ACCOUNT_ID",
-  "IBKR_API_KEY", "IBKR_API_SECRET", "IBKR_PAPER", "IBKR_ACCOUNT_ID",
-  "ROBINHOOD_API_KEY", "ROBINHOOD_API_SECRET",
-  "BINANCE_API_KEY", "BINANCE_API_SECRET", "BINANCE_US_API_KEY", "BINANCE_US_API_SECRET",
-  "COINBASE_API_KEY", "COINBASE_API_SECRET", "COINBASE_PASSPHRASE",
-  "KRAKEN_API_KEY", "KRAKEN_API_SECRET",
-  "BITFINEX_API_KEY", "BITFINEX_API_SECRET",
-  "HYPERLIQUID_PRIVATE_KEY", "GORDON_PROVIDER", "GORDON_MODEL",
-  "BIRDEYE_API_KEY", "CODEX_API_KEY", "DEFINED_API_KEY", "ONEINCH_API_KEY", "COINGECKO_API_KEY",
-  "NANSEN_API_KEY", "MORALIS_API_KEY", "ARKHAM_API_KEY", "DEBANK_ACCESS_KEY", "ZERION_API_KEY",
-  "GOLDRUSH_API_KEY", "COVALENT_API_KEY",
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "GOOGLE_GENERATIVE_AI_API_KEY",
+  "XAI_API_KEY",
+  "OPENROUTER_API_KEY",
+  "HF_TOKEN",
+  "TOGETHER_API_KEY",
+  "FIREWORKS_API_KEY",
+  "SILICONFLOW_API_KEY",
+  "DEEPINFRA_API_KEY",
+  "GORDON_LOCAL_MODEL_URL",
+  "GORDON_LOCAL_MODEL_API_KEY",
+  "ALPACA_API_KEY",
+  "ALPACA_API_SECRET",
+  "ALPACA_PAPER",
+  "TASTYTRADE_API_KEY",
+  "TASTYTRADE_API_SECRET",
+  "TASTYTRADE_PAPER",
+  "TASTYTRADE_ACCOUNT_ID",
+  "IBKR_API_KEY",
+  "IBKR_API_SECRET",
+  "IBKR_PAPER",
+  "IBKR_ACCOUNT_ID",
+  "ROBINHOOD_API_KEY",
+  "ROBINHOOD_API_SECRET",
+  "BINANCE_API_KEY",
+  "BINANCE_API_SECRET",
+  "BINANCE_US_API_KEY",
+  "BINANCE_US_API_SECRET",
+  "COINBASE_API_KEY",
+  "COINBASE_API_SECRET",
+  "COINBASE_PASSPHRASE",
+  "KRAKEN_API_KEY",
+  "KRAKEN_API_SECRET",
+  "BITFINEX_API_KEY",
+  "BITFINEX_API_SECRET",
+  "HYPERLIQUID_PRIVATE_KEY",
+  "GORDON_PROVIDER",
+  "GORDON_MODEL",
+  "BIRDEYE_API_KEY",
+  "CODEX_API_KEY",
+  "DEFINED_API_KEY",
+  "ONEINCH_API_KEY",
+  "COINGECKO_API_KEY",
+  "NANSEN_API_KEY",
+  "MORALIS_API_KEY",
+  "ARKHAM_API_KEY",
+  "DEBANK_ACCESS_KEY",
+  "ZERION_API_KEY",
+  "GOLDRUSH_API_KEY",
+  "COVALENT_API_KEY",
   "SYNTHDATA_API_KEY",
 ];
 
@@ -199,27 +233,45 @@ function buildEnvStatus(keys: EnvKeys, fileExists: boolean): EnvStatus {
   return {
     fileExists,
     hasLLMKey: !!(
-      keys.ANTHROPIC_API_KEY || keys.OPENAI_API_KEY || keys.GOOGLE_GENERATIVE_AI_API_KEY
-      || keys.XAI_API_KEY || keys.OPENROUTER_API_KEY || keys.HF_TOKEN
-      || keys.TOGETHER_API_KEY || keys.FIREWORKS_API_KEY || keys.SILICONFLOW_API_KEY
-      || keys.DEEPINFRA_API_KEY || keys.GORDON_LOCAL_MODEL_URL
+      keys.ANTHROPIC_API_KEY ||
+      keys.OPENAI_API_KEY ||
+      keys.GOOGLE_GENERATIVE_AI_API_KEY ||
+      keys.XAI_API_KEY ||
+      keys.OPENROUTER_API_KEY ||
+      keys.HF_TOKEN ||
+      keys.TOGETHER_API_KEY ||
+      keys.FIREWORKS_API_KEY ||
+      keys.SILICONFLOW_API_KEY ||
+      keys.DEEPINFRA_API_KEY ||
+      keys.GORDON_LOCAL_MODEL_URL
     ),
     hasAlpacaKeys: !!(keys.ALPACA_API_KEY && keys.ALPACA_API_SECRET),
     hasRobinhoodKeys: !!(keys.ROBINHOOD_API_KEY && keys.ROBINHOOD_API_SECRET),
     hasBinanceKeys: !!(keys.BINANCE_API_KEY && keys.BINANCE_API_SECRET),
     hasBinanceUSKeys: !!(keys.BINANCE_US_API_KEY && keys.BINANCE_US_API_SECRET),
-    hasCoinbaseKeys: !!(keys.COINBASE_API_KEY && keys.COINBASE_API_SECRET && keys.COINBASE_PASSPHRASE),
+    hasCoinbaseKeys: !!(
+      keys.COINBASE_API_KEY &&
+      keys.COINBASE_API_SECRET &&
+      keys.COINBASE_PASSPHRASE
+    ),
     hasKrakenKeys: !!(keys.KRAKEN_API_KEY && keys.KRAKEN_API_SECRET),
     hasBitfinexKeys: !!(keys.BITFINEX_API_KEY && keys.BITFINEX_API_SECRET),
     hasHyperliquidKey: !!keys.HYPERLIQUID_PRIVATE_KEY,
     hasOnchainDataKey: !!(
-      keys.BIRDEYE_API_KEY || keys.CODEX_API_KEY || keys.DEFINED_API_KEY
-      || keys.ONEINCH_API_KEY || keys.COINGECKO_API_KEY
+      keys.BIRDEYE_API_KEY ||
+      keys.CODEX_API_KEY ||
+      keys.DEFINED_API_KEY ||
+      keys.ONEINCH_API_KEY ||
+      keys.COINGECKO_API_KEY
     ),
     hasWalletIntelKey: !!(
-      keys.NANSEN_API_KEY || keys.MORALIS_API_KEY || keys.ARKHAM_API_KEY
-      || keys.DEBANK_ACCESS_KEY || keys.ZERION_API_KEY
-      || keys.GOLDRUSH_API_KEY || keys.COVALENT_API_KEY
+      keys.NANSEN_API_KEY ||
+      keys.MORALIS_API_KEY ||
+      keys.ARKHAM_API_KEY ||
+      keys.DEBANK_ACCESS_KEY ||
+      keys.ZERION_API_KEY ||
+      keys.GOLDRUSH_API_KEY ||
+      keys.COVALENT_API_KEY
     ),
     hasSynthDataKey: !!keys.SYNTHDATA_API_KEY,
     keys,
@@ -255,7 +307,7 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
  */
 export async function loadEnvFile(): Promise<void> {
   const shellEnvKeys = new Set<string>(
-    ENV_KEY_NAMES.filter((name) => !!process.env[name]).map((name) => String(name))
+    ENV_KEY_NAMES.filter((name) => !!process.env[name]).map((name) => String(name)),
   );
 
   const envPath = findEnvFilePath();
@@ -400,7 +452,7 @@ export async function saveEnvKeys(newKeys: Partial<EnvKeys>): Promise<void> {
   }
 
   // Always write to ~/.gordon/.env
-  await Bun.write(GORDON_ENV_PATH, lines.join("\n") + "\n");
+  await Bun.write(GORDON_ENV_PATH, `${lines.join("\n")}\n`);
   resetProviderRegistry();
 }
 
@@ -578,7 +630,7 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   }
 
   // Always write to ~/.gordon/.env
-  await Bun.write(GORDON_ENV_PATH, lines.join("\n") + "\n");
+  await Bun.write(GORDON_ENV_PATH, `${lines.join("\n")}\n`);
 
   // Also set in process.env for immediate use
   for (const [key, value] of Object.entries(keys)) {
@@ -629,15 +681,23 @@ export async function isReadyForLLM(): Promise<{ ready: boolean; reason?: string
 
   const status = validation.keys as EnvKeys;
   const hasAnyLLMKey = !!(
-    status.ANTHROPIC_API_KEY || status.OPENAI_API_KEY || status.GOOGLE_GENERATIVE_AI_API_KEY
-    || status.XAI_API_KEY || status.OPENROUTER_API_KEY || status.HF_TOKEN
-    || status.TOGETHER_API_KEY || status.FIREWORKS_API_KEY || status.SILICONFLOW_API_KEY
-    || status.DEEPINFRA_API_KEY || status.GORDON_LOCAL_MODEL_URL
+    status.ANTHROPIC_API_KEY ||
+    status.OPENAI_API_KEY ||
+    status.GOOGLE_GENERATIVE_AI_API_KEY ||
+    status.XAI_API_KEY ||
+    status.OPENROUTER_API_KEY ||
+    status.HF_TOKEN ||
+    status.TOGETHER_API_KEY ||
+    status.FIREWORKS_API_KEY ||
+    status.SILICONFLOW_API_KEY ||
+    status.DEEPINFRA_API_KEY ||
+    status.GORDON_LOCAL_MODEL_URL
   );
   if (!hasAnyLLMKey) {
     return {
       ready: false,
-      reason: "No LLM API key configured. Set ANTHROPIC_API_KEY (or OPENAI_API_KEY / another provider key).",
+      reason:
+        "No LLM API key configured. Set ANTHROPIC_API_KEY (or OPENAI_API_KEY / another provider key).",
     };
   }
 

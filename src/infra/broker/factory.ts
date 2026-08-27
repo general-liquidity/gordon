@@ -15,15 +15,11 @@ import { loadOAuthBrokerCredentials, brokerSupportsOAuth } from "./auth/oauth-br
 import { assertBrokerPaperSupported } from "./brokerPaperSupport.ts";
 import type { BrokerAdapter, BrokerCredentials, BrokerId } from "./types.ts";
 
-const SUPPORTED_BROKERS: BrokerId[] = [
-  "alpaca",
-  "tastytrade",
-  "ibkr",
-];
+const SUPPORTED_BROKERS: BrokerId[] = ["alpaca", "tastytrade", "ibkr"];
 
 function getCacheKey(brokerId: BrokerId, credentials: BrokerCredentials): string {
   const keyPrefix = credentials.apiKey.substring(0, 8);
-  const mode = credentials.paper ?? true ? "paper" : "live";
+  const mode = (credentials.paper ?? true) ? "paper" : "live";
   return `${brokerId}:${keyPrefix}:${mode}`;
 }
 
@@ -36,7 +32,7 @@ export class BrokerFactory {
   static create(brokerId: BrokerId, credentials: BrokerCredentials): BrokerAdapter {
     if (!SUPPORTED_BROKERS.includes(brokerId)) {
       throw new Error(
-        `Unsupported broker: ${brokerId}. Supported brokers: ${SUPPORTED_BROKERS.join(", ")}`
+        `Unsupported broker: ${brokerId}. Supported brokers: ${SUPPORTED_BROKERS.join(", ")}`,
       );
     }
     assertBrokerPassesInclusionGate(brokerId);
@@ -44,7 +40,7 @@ export class BrokerFactory {
     assertBrokerPaperSupported(brokerId, credentials.paper === true);
 
     const cacheKey = getCacheKey(brokerId, credentials);
-    const cached = this.instanceCache.get(cacheKey);
+    const cached = BrokerFactory.instanceCache.get(cacheKey);
     if (cached) return cached;
 
     let broker: BrokerAdapter;
@@ -62,7 +58,7 @@ export class BrokerFactory {
         throw new Error(`No adapter available for broker: ${brokerId}`);
     }
 
-    this.instanceCache.set(cacheKey, broker);
+    BrokerFactory.instanceCache.set(cacheKey, broker);
     return broker;
   }
 
@@ -83,10 +79,10 @@ export class BrokerFactory {
         baseUrl: fallbackCredentials.baseUrl,
       });
       if (oauthCreds) {
-        return this.create(brokerId, oauthCreds);
+        return BrokerFactory.create(brokerId, oauthCreds);
       }
     }
-    return this.create(brokerId, fallbackCredentials);
+    return BrokerFactory.create(brokerId, fallbackCredentials);
   }
 
   static brokerSupportsOAuth(brokerId: BrokerId): boolean {
@@ -110,14 +106,14 @@ export class BrokerFactory {
   }
 
   static clearCache(): void {
-    this.instanceCache.clear();
+    BrokerFactory.instanceCache.clear();
   }
 
   static removeFromCache(brokerId: BrokerId, credentials: BrokerCredentials): void {
-    this.instanceCache.delete(getCacheKey(brokerId, credentials));
+    BrokerFactory.instanceCache.delete(getCacheKey(brokerId, credentials));
   }
 
   static getCacheSize(): number {
-    return this.instanceCache.size;
+    return BrokerFactory.instanceCache.size;
   }
 }

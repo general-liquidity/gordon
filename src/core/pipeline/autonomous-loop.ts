@@ -38,7 +38,6 @@ import {
   appendProgressLog,
   persistGoalState,
   isGoalComplete,
-  failGoal,
   type GoalObservation,
 } from "./goalMode.ts";
 import { getCompletionVerifier } from "./completionVerifier.ts";
@@ -148,7 +147,7 @@ interface LoopState {
   equityBaselineUsd: number | null;
 }
 
-let loopState: LoopState = {
+const loopState: LoopState = {
   isRunning: false,
   isPaused: false,
   intervalId: null,
@@ -200,7 +199,9 @@ function runCycleSafely(trigger: "startup" | "interval" | "manual"): Promise<Cyc
 
   if (cycleInFlight) {
     if (trigger !== "manual") {
-      logger.debug("Skipping autonomous cycle because previous cycle is still running", { trigger });
+      logger.debug("Skipping autonomous cycle because previous cycle is still running", {
+        trigger,
+      });
     }
     return cycleInFlight;
   }
@@ -235,7 +236,8 @@ async function runCycle(): Promise<CycleReport | null> {
     return null;
   }
 
-  const { exchange, mandate, onOpportunityFound, onMandateBreach, onCycleComplete } = loopState.config;
+  const { exchange, mandate, onOpportunityFound, onMandateBreach, onCycleComplete } =
+    loopState.config;
 
   // Live budget-ceiling stop (LB1). When a USD ceiling is configured and an
   // injected cost-so-far provider reports spend at/above it, halt the run
@@ -276,7 +278,8 @@ async function runCycle(): Promise<CycleReport | null> {
     if (loopState.equityBaselineUsd === null) {
       loopState.equityBaselineUsd = currentEquity;
     } else if (loopState.equityBaselineUsd > 0) {
-      const pnlPercent = ((currentEquity - loopState.equityBaselineUsd) / loopState.equityBaselineUsd) * 100;
+      const pnlPercent =
+        ((currentEquity - loopState.equityBaselineUsd) / loopState.equityBaselineUsd) * 100;
       const pnlDelta = pnlPercent - mandate.currentPnl;
       const updated = updateMandateTracking(mandate, pnlDelta);
       loopState.mandate = updated;
@@ -310,7 +313,10 @@ async function runCycle(): Promise<CycleReport | null> {
     loopState.mandate!.status = "paused";
     saveMandateState(loopState.mandate!);
     onMandateBreach?.(breach.reason!);
-    await emitEvent("autonomous:mandate_breached", { reason: breach.reason ?? "Unknown breach", mandateId: liveMandate.id });
+    await emitEvent("autonomous:mandate_breached", {
+      reason: breach.reason ?? "Unknown breach",
+      mandateId: liveMandate.id,
+    });
     stopAutonomousLoop(breach.reason);
     return null;
   }
@@ -350,7 +356,7 @@ async function runCycle(): Promise<CycleReport | null> {
 
     // Filter by mandate constraints
     let opportunities = result.coins.filter(
-      (c) => c.setupDetected && c.setupConfidence >= mandate.minConfidence
+      (c) => c.setupDetected && c.setupConfidence >= mandate.minConfidence,
     );
 
     // Filter by symbols if specified
@@ -403,7 +409,9 @@ async function runCycle(): Promise<CycleReport | null> {
             return null;
           }
         } else if (shouldExecute) {
-          logger.info("Opportunity approved (awaiting approval / signal-only)", { symbol: opp.symbol });
+          logger.info("Opportunity approved (awaiting approval / signal-only)", {
+            symbol: opp.symbol,
+          });
         }
       }
     }
@@ -545,29 +553,23 @@ async function runCycle(): Promise<CycleReport | null> {
         });
       }
     }
-
-    // A1 wire: surface the next-priority feature from the trading feature
-    // list. Observation-only — does not change cycle behavior, just logs
-    // what the agent should pick up next.
-    {
-      try {
-        const list = loadFeatureList();
-        if (list) {
-          const next = pickHighestPriority(list);
-          if (next) {
-            logger.info("feature-list next priority", {
-              id: next.id,
-              category: next.category,
-              priority: next.priority,
-              description: next.description,
-            });
-          }
+    try {
+      const list = loadFeatureList();
+      if (list) {
+        const next = pickHighestPriority(list);
+        if (next) {
+          logger.info("feature-list next priority", {
+            id: next.id,
+            category: next.category,
+            priority: next.priority,
+            description: next.description,
+          });
         }
-      } catch (flErr) {
-        logger.warn("feature-list lookup failed", {
-          error: flErr instanceof Error ? flErr.message : String(flErr),
-        });
       }
+    } catch (flErr) {
+      logger.warn("feature-list lookup failed", {
+        error: flErr instanceof Error ? flErr.message : String(flErr),
+      });
     }
 
     onCycleComplete?.(report);
@@ -615,7 +617,8 @@ function startDurableAutonomousLoop(
   loopState.equityBaselineUsd = null;
 
   const objective =
-    config.durableObjective ?? `Run autonomous mandate ${config.mandate.id} to completion within its constraints.`;
+    config.durableObjective ??
+    `Run autonomous mandate ${config.mandate.id} to completion within its constraints.`;
 
   logger.info("Starting autonomous loop (native durable path)", {
     mandateId: config.mandate.id,
@@ -640,12 +643,17 @@ function startDurableAutonomousLoop(
   emitEvent("autonomous:started", {
     mandateId: config.mandate.id,
     intervalMs: 0,
-  }).catch((err) => { logger.error("Failed to emit event", err instanceof Error ? err : { error: String(err) }); });
+  }).catch((err) => {
+    logger.error("Failed to emit event", err instanceof Error ? err : { error: String(err) });
+  });
 
   return { success: true };
 }
 
-export function startAutonomousLoop(config: AutonomousLoopConfig): { success: boolean; error?: string } {
+export function startAutonomousLoop(config: AutonomousLoopConfig): {
+  success: boolean;
+  error?: string;
+} {
   if (loopState.isRunning) {
     return { success: false, error: "Autonomous loop is already running" };
   }
@@ -742,14 +750,19 @@ export function startAutonomousLoop(config: AutonomousLoopConfig): { success: bo
   }, intervalMs);
 
   // Set up heartbeat (every 5 minutes)
-  loopState.heartbeatId = setInterval(() => {
-    updateHeartbeat(loopState.sessionId);
-  }, 5 * 60 * 1000);
+  loopState.heartbeatId = setInterval(
+    () => {
+      updateHeartbeat(loopState.sessionId);
+    },
+    5 * 60 * 1000,
+  );
 
   emitEvent("autonomous:started", {
     mandateId: config.mandate.id,
     intervalMs,
-  }).catch((err) => { logger.error("Failed to emit event", err instanceof Error ? err : { error: String(err) }); });
+  }).catch((err) => {
+    logger.error("Failed to emit event", err instanceof Error ? err : { error: String(err) });
+  });
 
   return { success: true };
 }
@@ -809,21 +822,27 @@ export function stopAutonomousLoop(reason?: string): void {
     reason,
     totalCycles: loopState.cycleCount,
     totalOpportunities: loopState.totalOpportunities,
-  }).catch((err) => { logger.error("Failed to emit event", err instanceof Error ? err : { error: String(err) }); });
+  }).catch((err) => {
+    logger.error("Failed to emit event", err instanceof Error ? err : { error: String(err) });
+  });
 }
 
 export function pauseAutonomousLoop(): void {
   if (!loopState.isRunning) return;
   loopState.isPaused = true;
   logger.info("Autonomous loop paused");
-  emitEvent("autonomous:paused", { mandateId: loopState.mandate?.id }).catch((err) => { logger.error("Failed to emit event", err instanceof Error ? err : { error: String(err) }); });
+  emitEvent("autonomous:paused", { mandateId: loopState.mandate?.id }).catch((err) => {
+    logger.error("Failed to emit event", err instanceof Error ? err : { error: String(err) });
+  });
 }
 
 export function resumeAutonomousLoop(): void {
   if (!loopState.isRunning || !loopState.isPaused) return;
   loopState.isPaused = false;
   logger.info("Autonomous loop resumed");
-  emitEvent("autonomous:resumed", { mandateId: loopState.mandate?.id }).catch((err) => { logger.error("Failed to emit event", err instanceof Error ? err : { error: String(err) }); });
+  emitEvent("autonomous:resumed", { mandateId: loopState.mandate?.id }).catch((err) => {
+    logger.error("Failed to emit event", err instanceof Error ? err : { error: String(err) });
+  });
 }
 
 /**
@@ -850,7 +869,7 @@ export function getAutonomousLoopStatus(): {
   let nextCycleTime: string | null = null;
   if (loopState.isRunning && !loopState.isPaused && loopState.lastCycleTime && loopState.mandate) {
     const nextTime = new Date(
-      loopState.lastCycleTime.getTime() + loopState.mandate.scanIntervalMinutes * 60 * 1000
+      loopState.lastCycleTime.getTime() + loopState.mandate.scanIntervalMinutes * 60 * 1000,
     );
     nextCycleTime = nextTime.toISOString();
   }

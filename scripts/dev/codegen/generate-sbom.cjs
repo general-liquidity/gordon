@@ -48,17 +48,15 @@ try {
   // as an end-user CLI, not a library.
   const stdout = execFileSync(
     "npm",
-    [
-      "sbom",
-      "--sbom-format=cyclonedx",
-      "--sbom-type=application",
-      "--package-lock-only",
-    ],
+    ["sbom", "--sbom-format=cyclonedx", "--sbom-type=application", "--package-lock-only"],
     { cwd: rootDir, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
   );
   sbomJson = stdout;
 } catch (err) {
-  fail("npm sbom failed (is package-lock.json present? Run `npm install --package-lock-only` first)", err);
+  fail(
+    "npm sbom failed (is package-lock.json present? Run `npm install --package-lock-only` first)",
+    err,
+  );
 }
 
 try {

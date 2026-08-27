@@ -70,29 +70,149 @@ export interface ScreenResult {
 
 /** Canonical list of S&P 500 tickers (subset — 100 most well-known). */
 export const SP500_TOP: string[] = [
-  "AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "NVDA", "META", "TSLA", "BRK-B", "AVGO",
-  "JPM", "V", "WMT", "XOM", "LLY", "MA", "UNH", "HD", "PG", "COST",
-  "JNJ", "ABBV", "NFLX", "BAC", "CRM", "CVX", "KO", "TMUS", "ORCL", "AMD",
-  "MRK", "PEP", "CSCO", "ACN", "LIN", "ABT", "ADBE", "MCD", "WFC", "DIS",
-  "TMO", "CAT", "NOW", "PM", "IBM", "TXN", "GE", "ISRG", "QCOM", "DHR",
-  "VZ", "GS", "AXP", "INTU", "PFE", "BKNG", "CMCSA", "MS", "RTX", "T",
-  "NEE", "SPGI", "BLK", "LOW", "PLD", "AMGN", "C", "AMAT", "UBER", "SYK",
-  "HON", "ETN", "PGR", "DE", "BA", "GILD", "LMT", "ADI", "SCHW", "BX",
-  "VRTX", "ADP", "MDLZ", "PANW", "MU", "SBUX", "TJX", "ANET", "ELV", "MMC",
-  "REGN", "INTC", "CB", "SO", "BSX", "FI", "CVS", "DUK", "COP", "KLAC",
+  "AAPL",
+  "MSFT",
+  "GOOGL",
+  "GOOG",
+  "AMZN",
+  "NVDA",
+  "META",
+  "TSLA",
+  "BRK-B",
+  "AVGO",
+  "JPM",
+  "V",
+  "WMT",
+  "XOM",
+  "LLY",
+  "MA",
+  "UNH",
+  "HD",
+  "PG",
+  "COST",
+  "JNJ",
+  "ABBV",
+  "NFLX",
+  "BAC",
+  "CRM",
+  "CVX",
+  "KO",
+  "TMUS",
+  "ORCL",
+  "AMD",
+  "MRK",
+  "PEP",
+  "CSCO",
+  "ACN",
+  "LIN",
+  "ABT",
+  "ADBE",
+  "MCD",
+  "WFC",
+  "DIS",
+  "TMO",
+  "CAT",
+  "NOW",
+  "PM",
+  "IBM",
+  "TXN",
+  "GE",
+  "ISRG",
+  "QCOM",
+  "DHR",
+  "VZ",
+  "GS",
+  "AXP",
+  "INTU",
+  "PFE",
+  "BKNG",
+  "CMCSA",
+  "MS",
+  "RTX",
+  "T",
+  "NEE",
+  "SPGI",
+  "BLK",
+  "LOW",
+  "PLD",
+  "AMGN",
+  "C",
+  "AMAT",
+  "UBER",
+  "SYK",
+  "HON",
+  "ETN",
+  "PGR",
+  "DE",
+  "BA",
+  "GILD",
+  "LMT",
+  "ADI",
+  "SCHW",
+  "BX",
+  "VRTX",
+  "ADP",
+  "MDLZ",
+  "PANW",
+  "MU",
+  "SBUX",
+  "TJX",
+  "ANET",
+  "ELV",
+  "MMC",
+  "REGN",
+  "INTC",
+  "CB",
+  "SO",
+  "BSX",
+  "FI",
+  "CVS",
+  "DUK",
+  "COP",
+  "KLAC",
 ];
 
 export const NASDAQ_100_SAMPLE: string[] = [
-  "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AVGO", "COST", "NFLX",
-  "AMD", "PEP", "CSCO", "ADBE", "INTC", "TMUS", "CMCSA", "QCOM", "TXN", "AMGN",
-  "AMAT", "HON", "INTU", "MU", "ADI", "LRCX", "SBUX", "BKNG", "REGN", "VRTX",
+  "AAPL",
+  "MSFT",
+  "GOOGL",
+  "AMZN",
+  "NVDA",
+  "META",
+  "TSLA",
+  "AVGO",
+  "COST",
+  "NFLX",
+  "AMD",
+  "PEP",
+  "CSCO",
+  "ADBE",
+  "INTC",
+  "TMUS",
+  "CMCSA",
+  "QCOM",
+  "TXN",
+  "AMGN",
+  "AMAT",
+  "HON",
+  "INTU",
+  "MU",
+  "ADI",
+  "LRCX",
+  "SBUX",
+  "BKNG",
+  "REGN",
+  "VRTX",
 ];
 
 // ============================================================================
 // Screening
 // ============================================================================
 
-function inRange(value: number | null | undefined, range?: { min?: number; max?: number }): boolean {
+function inRange(
+  value: number | null | undefined,
+  range?: { min?: number; max?: number },
+): boolean {
   if (!range) return true;
   if (value == null || !Number.isFinite(value)) return false;
   if (range.min !== undefined && value < range.min) return false;
@@ -108,7 +228,10 @@ function countCriteria(criteria: ScreenCriteria): number {
   return n;
 }
 
-function evaluateTicker(f: StockFundamentals, criteria: ScreenCriteria): { matchCount: number; totalCriteria: number; details: Record<string, boolean> } {
+function evaluateTicker(
+  f: StockFundamentals,
+  criteria: ScreenCriteria,
+): { matchCount: number; totalCriteria: number; details: Record<string, boolean> } {
   const details: Record<string, boolean> = {};
 
   if (criteria.marketCap !== undefined) {
@@ -124,10 +247,16 @@ function evaluateTicker(f: StockFundamentals, criteria: ScreenCriteria): { match
     details.priceToBook = inRange(f.priceToBook, criteria.priceToBook);
   }
   if (criteria.dividendYield !== undefined) {
-    details.dividendYield = inRange(f.dividendYield != null ? f.dividendYield * 100 : null, criteria.dividendYield);
+    details.dividendYield = inRange(
+      f.dividendYield != null ? f.dividendYield * 100 : null,
+      criteria.dividendYield,
+    );
   }
   if (criteria.profitMargin !== undefined) {
-    details.profitMargin = inRange(f.profitMargin != null ? f.profitMargin * 100 : null, criteria.profitMargin);
+    details.profitMargin = inRange(
+      f.profitMargin != null ? f.profitMargin * 100 : null,
+      criteria.profitMargin,
+    );
   }
   if (criteria.returnOnEquity !== undefined) {
     details.returnOnEquity = inRange(f.roe != null ? f.roe * 100 : null, criteria.returnOnEquity);
@@ -136,10 +265,16 @@ function evaluateTicker(f: StockFundamentals, criteria: ScreenCriteria): { match
     details.debtToEquity = inRange(f.debtToEquity, criteria.debtToEquity);
   }
   if (criteria.revenueGrowth !== undefined) {
-    details.revenueGrowth = inRange(f.revenueGrowth != null ? f.revenueGrowth * 100 : null, criteria.revenueGrowth);
+    details.revenueGrowth = inRange(
+      f.revenueGrowth != null ? f.revenueGrowth * 100 : null,
+      criteria.revenueGrowth,
+    );
   }
   if (criteria.earningsGrowth !== undefined) {
-    details.earningsGrowth = inRange(f.earningsGrowth != null ? f.earningsGrowth * 100 : null, criteria.earningsGrowth);
+    details.earningsGrowth = inRange(
+      f.earningsGrowth != null ? f.earningsGrowth * 100 : null,
+      criteria.earningsGrowth,
+    );
   }
   if (criteria.sector) {
     details.sector = f.sector?.toLowerCase() === criteria.sector.toLowerCase();
@@ -197,7 +332,7 @@ export async function screenStocks(
     );
 
     for (const entry of fetched) {
-      if (!entry || !entry.fundamentals) continue;
+      if (!entry?.fundamentals) continue;
       const { ticker, fundamentals } = entry;
       const evaluation = evaluateTicker(fundamentals, criteria);
 

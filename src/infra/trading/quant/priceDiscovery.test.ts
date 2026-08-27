@@ -23,7 +23,12 @@ function build(a1: number, a2: number, n = 220): { s1: number[]; s2: number[] } 
 describe("computePriceDiscovery", () => {
   it("identifies market1 as leader when it barely adjusts (small α1)", () => {
     const { s1, s2 } = build(0.05, 0.45); // market1 corrects little → leads
-    const r = computePriceDiscovery({ series1: s1, series2: s2, label1: "venueA", label2: "venueB" });
+    const r = computePriceDiscovery({
+      series1: s1,
+      series2: s2,
+      label1: "venueA",
+      label2: "venueB",
+    });
     expect(r.confidence).toBe("high");
     expect(r.leader).toBe("venueA");
     expect(r.componentShare1).toBeGreaterThan(0.7);

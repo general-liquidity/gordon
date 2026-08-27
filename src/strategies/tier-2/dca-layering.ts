@@ -56,7 +56,7 @@ export class DCALayeringStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, CANDLE_LIMIT);
     if (candles.length < 55) {
@@ -79,7 +79,7 @@ export class DCALayeringStrategy extends BaseStrategy {
     if (discountPct < MIN_DISCOUNT_PCT) {
       return this.notDetected(
         `Price only ${discountPct.toFixed(1)}% below SMA50 (need > ${MIN_DISCOUNT_PCT}%). ` +
-        `Price: $${currentPrice.toFixed(2)}, SMA50: $${sma.current.toFixed(2)}`
+          `Price: $${currentPrice.toFixed(2)}, SMA50: $${sma.current.toFixed(2)}`,
       );
     }
 
@@ -107,7 +107,8 @@ export class DCALayeringStrategy extends BaseStrategy {
     if (discountPct >= DEEP_DISCOUNT_PCT) {
       confidence += 0.15;
     } else {
-      confidence += ((discountPct - MIN_DISCOUNT_PCT) / (DEEP_DISCOUNT_PCT - MIN_DISCOUNT_PCT)) * 0.1;
+      confidence +=
+        ((discountPct - MIN_DISCOUNT_PCT) / (DEEP_DISCOUNT_PCT - MIN_DISCOUNT_PCT)) * 0.1;
     }
 
     // RSI in oversold zone
@@ -126,8 +127,8 @@ export class DCALayeringStrategy extends BaseStrategy {
     // Near support
     const levels = this.detectLevels(candles, currentPrice);
     const supports = this.getSupports(levels, currentPrice);
-    const nearSupport = supports.length > 0 &&
-      Math.abs(supports[0]!.price - currentPrice) / currentPrice < 0.03;
+    const nearSupport =
+      supports.length > 0 && Math.abs(supports[0]!.price - currentPrice) / currentPrice < 0.03;
     if (nearSupport) confidence += 0.1;
 
     // Liquidation filter: check if forced selling is driving this dip
@@ -175,10 +176,7 @@ export class DCALayeringStrategy extends BaseStrategy {
     return this.detected(confidence, signals, reasons.join(". "));
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", CANDLE_LIMIT);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const atr = this.calculateATR(candles);
@@ -193,7 +191,7 @@ export class DCALayeringStrategy extends BaseStrategy {
 
     // Take-profits: target SMA recovery
     const smaTarget = sma.current ?? currentPrice * 1.05;
-    const risk = entryPrice - stopLoss;
+    const _risk = entryPrice - stopLoss;
 
     const takeProfits: TakeProfitLevel[] = [
       { price: smaTarget * 0.98, percentToSell: 0.35 }, // Just below SMA
@@ -312,7 +310,7 @@ When creating a plan using the DCA Layering strategy:
     bar: OHLC,
     index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     if (index < 50) return null;
 

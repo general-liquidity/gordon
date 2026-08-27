@@ -1,9 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  StreamTranslator,
-  classifyToolKind,
-  humanizeToolName,
-} from "./stream-translator.ts";
+import { StreamTranslator, classifyToolKind, humanizeToolName } from "./stream-translator.ts";
 import type { StreamEvent } from "../agents/orchestrator/types.ts";
 
 // =================== classifyToolKind ===================

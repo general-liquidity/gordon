@@ -27,7 +27,10 @@ export interface SizingConfig {
 export function sizePosition(
   confidence: number,
   config: SizingConfig,
-  options: { consensus?: "AGREE" | "SPLIT" | "DISAGREE"; riskMode?: "enforce" | "warn" | "paper" } = {},
+  options: {
+    consensus?: "AGREE" | "SPLIT" | "DISAGREE";
+    riskMode?: "enforce" | "warn" | "paper";
+  } = {},
 ): SizedOrder {
   const {
     capitalUsd,
@@ -77,5 +80,5 @@ export function kellyFraction(confidence: number, rrRatio: number = 2.5): number
   const p = confidence / 10;
   const q = 1 - p;
   const kelly = (p * rrRatio - q) / rrRatio;
-  return Math.max(0, Math.min(kelly * 0.25, 0.10));
+  return Math.max(0, Math.min(kelly * 0.25, 0.1));
 }

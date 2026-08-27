@@ -66,7 +66,7 @@ export interface VolumeExhaustionResult {
 
 const DEFAULT_MIN_POST_ENTRY = 5;
 const DEFAULT_MILD_THRESHOLD = 0.25;
-const DEFAULT_SEVERE_THRESHOLD = 0.50;
+const DEFAULT_SEVERE_THRESHOLD = 0.5;
 
 export function detectVolumeExhaustion(input: VolumeExhaustionInput): VolumeExhaustionResult {
   const minPost = input.minPostEntryCandles ?? DEFAULT_MIN_POST_ENTRY;

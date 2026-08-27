@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeGeneticOptimizer,
-  geneticOptimizerToPayload,
-} from "./geneticOptimizer.ts";
+import { computeGeneticOptimizer, geneticOptimizerToPayload } from "./geneticOptimizer.ts";
 
 describe("computeGeneticOptimizer — convergence on convex problems", () => {
   it("finds 1D quadratic maximum", () => {
@@ -49,9 +46,7 @@ describe("computeGeneticOptimizer — fitness improves over generations", () => 
       expect(r.fitnessHistory[i]!).toBeGreaterThanOrEqual(r.fitnessHistory[i - 1]!);
     }
     // Should improve overall
-    expect(r.fitnessHistory[r.fitnessHistory.length - 1]!).toBeGreaterThan(
-      r.fitnessHistory[0]!,
-    );
+    expect(r.fitnessHistory[r.fitnessHistory.length - 1]!).toBeGreaterThan(r.fitnessHistory[0]!);
   });
 });
 
@@ -113,14 +108,10 @@ describe("computeGeneticOptimizer — stagnation", () => {
 
 describe("computeGeneticOptimizer — validation", () => {
   it("throws on empty bounds", () => {
-    expect(() =>
-      computeGeneticOptimizer({ objective: () => 0, bounds: [] }),
-    ).toThrow();
+    expect(() => computeGeneticOptimizer({ objective: () => 0, bounds: [] })).toThrow();
   });
   it("throws on invalid bound order", () => {
-    expect(() =>
-      computeGeneticOptimizer({ objective: () => 0, bounds: [[5, 1]] }),
-    ).toThrow();
+    expect(() => computeGeneticOptimizer({ objective: () => 0, bounds: [[5, 1]] })).toThrow();
   });
   it("throws on populationSize < 4", () => {
     expect(() =>

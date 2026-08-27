@@ -7,11 +7,7 @@
  */
 
 import { describe, test, expect, beforeEach } from "bun:test";
-import {
-  createKeyringProvider,
-  resetKeyringProvider,
-  KEYRING_SUPPORTED_KEYS,
-} from "./keyring.ts";
+import { createKeyringProvider, resetKeyringProvider, KEYRING_SUPPORTED_KEYS } from "./keyring.ts";
 
 beforeEach(() => {
   resetKeyringProvider();

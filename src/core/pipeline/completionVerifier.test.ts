@@ -15,20 +15,32 @@ import {
 function context(goalText: string, obs: GoalObservation): CompletionContext {
   const goal = parseGoal(goalText);
   const score = scoreGoal(goal, obs, 1);
-  return { goal, score, observation: obs, requirements: deriveRequirements(goal, obs, score), cycle: 1 };
+  return {
+    goal,
+    score,
+    observation: obs,
+    requirements: deriveRequirements(goal, obs, score),
+    cycle: 1,
+  };
 }
 
 afterEach(() => resetCompletionVerifier());
 
 describe("requirementCompletionVerifier", () => {
   it("confirms when all requirements met and self-score agrees", async () => {
-    const verdict = await verifyCompletion(requirementCompletionVerifier, context("trade until Sharpe >= 1.5", { sharpe: 2.0 }));
+    const verdict = await verifyCompletion(
+      requirementCompletionVerifier,
+      context("trade until Sharpe >= 1.5", { sharpe: 2.0 }),
+    );
     expect(verdict.confirmed).toBe(true);
     expect(verdict.unmet).toHaveLength(0);
   });
 
   it("refuses when the end state is not met", async () => {
-    const verdict = await verifyCompletion(requirementCompletionVerifier, context("trade until Sharpe >= 1.5", { sharpe: 1.0 }));
+    const verdict = await verifyCompletion(
+      requirementCompletionVerifier,
+      context("trade until Sharpe >= 1.5", { sharpe: 1.0 }),
+    );
     expect(verdict.confirmed).toBe(false);
     expect(verdict.unmet.length).toBeGreaterThan(0);
   });
@@ -36,13 +48,19 @@ describe("requirementCompletionVerifier", () => {
   it("refuses when a constraint was violated even if the end state is met", async () => {
     const verdict = await verifyCompletion(
       requirementCompletionVerifier,
-      context("trade until Sharpe >= 1.5", { sharpe: 2.0, constraintViolations: ["mandate breached"] }),
+      context("trade until Sharpe >= 1.5", {
+        sharpe: 2.0,
+        constraintViolations: ["mandate breached"],
+      }),
     );
     expect(verdict.confirmed).toBe(false);
   });
 
   it("refuses a custom goal with no measurable end state", async () => {
-    const verdict = await verifyCompletion(requirementCompletionVerifier, context("watch the market", {}));
+    const verdict = await verifyCompletion(
+      requirementCompletionVerifier,
+      context("watch the market", {}),
+    );
     expect(verdict.confirmed).toBe(false);
   });
 });
@@ -55,7 +73,10 @@ describe("verifyCompletion fail-closed", () => {
         throw new Error("boom");
       },
     };
-    const verdict = await verifyCompletion(broken, context("trade until Sharpe >= 1.5", { sharpe: 2.0 }));
+    const verdict = await verifyCompletion(
+      broken,
+      context("trade until Sharpe >= 1.5", { sharpe: 2.0 }),
+    );
     expect(verdict.confirmed).toBe(false);
     expect(verdict.rationale).toContain("fail-closed");
   });

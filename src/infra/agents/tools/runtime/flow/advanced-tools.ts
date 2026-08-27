@@ -14,15 +14,18 @@ export const simulateOrderBundleTool = createTool({
   description:
     "Counterfactual execution twin: simulate an order bundle through risk/circuit checks before live submission.",
   inputSchema: z.object({
-    orders: z.array(
-      z.object({
-        symbol: z.string(),
-        side: z.enum(["BUY", "SELL"]),
-        type: z.enum(["MARKET", "LIMIT", "STOP_LIMIT"]),
-        quantity: z.number().positive(),
-        price: z.number().positive().optional(),
-      }),
-    ).min(1).max(30),
+    orders: z
+      .array(
+        z.object({
+          symbol: z.string(),
+          side: z.enum(["BUY", "SELL"]),
+          type: z.enum(["MARKET", "LIMIT", "STOP_LIMIT"]),
+          quantity: z.number().positive(),
+          price: z.number().positive().optional(),
+        }),
+      )
+      .min(1)
+      .max(30),
   }),
   execute: async ({ orders }, execContext?: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
@@ -35,15 +38,19 @@ export const simulateOrderBundleTool = createTool({
 
 export const generateCircuitBreakerProofTool = createTool({
   id: "generate_circuit_breaker_proof",
-  description:
-    "Generate a machine-checkable commitment proof for baseline circuit breaker state.",
+  description: "Generate a machine-checkable commitment proof for baseline circuit breaker state.",
   inputSchema: z.object({
     correlationShockPercent: z.number().min(0).default(0),
     maxCorrelationShockPercent: z.number().positive().default(15),
     liquidityGapBps: z.number().min(0).default(0),
     maxLiquidityGapBps: z.number().positive().default(250),
   }),
-  execute: async ({ correlationShockPercent, maxCorrelationShockPercent, liquidityGapBps, maxLiquidityGapBps }) => {
+  execute: async ({
+    correlationShockPercent,
+    maxCorrelationShockPercent,
+    liquidityGapBps,
+    maxLiquidityGapBps,
+  }) => {
     const runtime = StrategyRuntime.getInstance();
     const state = runtime.getPortfolioState();
     return generateCircuitBreakerProof({
@@ -117,4 +124,3 @@ export const advancedTools = {
   verify_circuit_breaker_proof: verifyCircuitBreakerProofTool,
   query_regime_scoped_memory: queryRegimeScopedMemoryTool,
 };
-

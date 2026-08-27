@@ -82,7 +82,7 @@ function stddev(xs: ReadonlyArray<number>): number {
 function kurtosis(xs: ReadonlyArray<number>): number {
   const arr = xs as number[];
   if (arr.length < 4) return 3;
-  const m = mean(arr);
+  const _m = mean(arr);
   const s = stddev(arr);
   if (s === 0) return 3;
   return excessKurtosis(arr) + 3;
@@ -106,7 +106,8 @@ function sharpeWithSE(
   const skew = skewness(returns as number[]);
   const kurt = kurtosis(returns);
   // Lo (2002) standard error with non-normal correction.
-  const varSr = (1 - skew * srPerPeriod + ((kurt - 1) / 4) * srPerPeriod * srPerPeriod) / returns.length;
+  const varSr =
+    (1 - skew * srPerPeriod + ((kurt - 1) / 4) * srPerPeriod * srPerPeriod) / returns.length;
   const sePerPeriod = Math.sqrt(Math.max(varSr, 0));
   return { sharpeAnnual, sePerPeriod, sharpePerPeriod: srPerPeriod };
 }
@@ -135,8 +136,7 @@ export function computeOptimizationQuality(
   // Both SEs are per-period; the difference SE is sqrt(sum of variances).
   // Annualize the delta SE the same way as the Sharpes.
   const seDeltaPerPeriod = Math.sqrt(
-    baseline.sePerPeriod * baseline.sePerPeriod +
-      optimized.sePerPeriod * optimized.sePerPeriod,
+    baseline.sePerPeriod * baseline.sePerPeriod + optimized.sePerPeriod * optimized.sePerPeriod,
   );
   const seDeltaAnnual = seDeltaPerPeriod * Math.sqrt(periodsPerYear);
   const qStatistic = seDeltaAnnual > 0 ? deltaSharpe / seDeltaAnnual : 0;

@@ -11,10 +11,7 @@ interface ToolResult {
 async function runSubcommand(
   subcommand: "audit" | "list" | "usage" | "review",
 ): Promise<ToolResult> {
-  return (await skillsManagementTool.execute!(
-    { subcommand },
-    {} as never,
-  )) as ToolResult;
+  return (await skillsManagementTool.execute!({ subcommand }, {} as never)) as ToolResult;
 }
 
 describe("skillsManagementTool — shape", () => {

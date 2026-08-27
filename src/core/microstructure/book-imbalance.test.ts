@@ -1,10 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  microprice,
-  orderBookImbalance,
-  topOfBookSpread,
-  weightedMid,
-} from "./book-imbalance.ts";
+import { microprice, orderBookImbalance, topOfBookSpread, weightedMid } from "./book-imbalance.ts";
 
 describe("orderBookImbalance", () => {
   it("balanced book → 0", () => {

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import type React from "react";
+import { useState, useEffect } from "react";
 
 // ============================================================================
 // BriefSpinner — Spinner that only appears after a minimum delay

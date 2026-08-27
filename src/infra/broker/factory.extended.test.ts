@@ -33,7 +33,7 @@ describe("BrokerFactory extended broker support", () => {
         apiKey: "k",
         apiSecret: "s",
         paper: true,
-      })
+      }),
     ).toThrow("Unsupported broker");
   });
 });
@@ -61,7 +61,7 @@ describe("BrokerFactory paper-mode fail-fast", () => {
           apiKey: "k-paper-check",
           apiSecret: "s",
           paper: true,
-        })
+        }),
       ).toThrow(BrokerPaperNotSupportedError);
     });
   });
@@ -72,7 +72,7 @@ describe("BrokerFactory paper-mode fail-fast", () => {
     expect(adapter.brokerId).toBe("alpaca");
     withUnsupportedPaper("alpaca", () => {
       expect(() => BrokerFactory.create("alpaca", credentials)).toThrow(
-        BrokerPaperNotSupportedError
+        BrokerPaperNotSupportedError,
       );
     });
     BrokerFactory.removeFromCache("alpaca", credentials);

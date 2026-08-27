@@ -57,10 +57,7 @@ function halfLifeForBeta(
   return hl > 0 && Number.isFinite(hl) ? hl : Infinity;
 }
 
-function olsBeta(
-  pricesY: ReadonlyArray<number>,
-  pricesX: ReadonlyArray<number>,
-): number {
+function olsBeta(pricesY: ReadonlyArray<number>, pricesX: ReadonlyArray<number>): number {
   const n = pricesY.length;
   let meanX = 0;
   let meanY = 0;
@@ -188,9 +185,7 @@ export function computeMinHalfLifeHedgeRatio(input: {
 
   const interpretation = `Min-half-life hedge ratio β=${round6(
     bestBeta,
-  )} yields a spread with mean-reversion half-life of ${round6(
-    bestHl,
-  )} bars (OLS β=${round6(
+  )} yields a spread with mean-reversion half-life of ${round6(bestHl)} bars (OLS β=${round6(
     betaOls,
   )}). Lower half-life means faster reversion and faster profit realization.`;
 

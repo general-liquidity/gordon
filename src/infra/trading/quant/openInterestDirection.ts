@@ -48,11 +48,11 @@ export interface OiDirectionInput {
 }
 
 export type OiRegime =
-  | "longs_building"       // price ↑, OI ↑
-  | "short_covering"       // price ↑, OI ↓
-  | "shorts_building"      // price ↓, OI ↑
-  | "long_liquidation"     // price ↓, OI ↓
-  | "flat";                // not enough movement either direction
+  | "longs_building" // price ↑, OI ↑
+  | "short_covering" // price ↑, OI ↓
+  | "shorts_building" // price ↓, OI ↑
+  | "long_liquidation" // price ↓, OI ↓
+  | "flat"; // not enough movement either direction
 
 export type OiTrendStrength = "weak" | "moderate" | "strong";
 
@@ -132,18 +132,21 @@ function computeCashAndCarry(
   const basis = perpPrice - spotPrice;
   const basisPct = basis / spotPrice;
   // Funding APY: 3 funding intervals per day × 365 days, sign-preserving.
-  const fundingApy = fundingRatePer8h !== undefined && Number.isFinite(fundingRatePer8h)
-    ? fundingRatePer8h * 3 * 365
-    : 0;
+  const fundingApy =
+    fundingRatePer8h !== undefined && Number.isFinite(fundingRatePer8h)
+      ? fundingRatePer8h * 3 * 365
+      : 0;
   // Cash-and-carry: long spot, short perp, collect positive funding.
   //   If basis > 0 (perp expensive) and funding positive, short perp + long spot
   //   collects funding. Total carry ≈ funding APY (basis converges to zero at delivery).
   //   For perp swaps there's no delivery, so basis convergence is captured
   //   probabilistically — we conservatively report funding only.
   const direction: CashAndCarryResult["direction"] =
-    basisPct > 0 && fundingApy > 0 ? "short_basis"
-    : basisPct < 0 && fundingApy < 0 ? "long_basis"
-    : "none";
+    basisPct > 0 && fundingApy > 0
+      ? "short_basis"
+      : basisPct < 0 && fundingApy < 0
+        ? "long_basis"
+        : "none";
   const totalCarryApy = direction === "none" ? 0 : Math.abs(fundingApy);
   const attractive = totalCarryApy >= minCarryApy;
   const reasoning =

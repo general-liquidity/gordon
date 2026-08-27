@@ -19,10 +19,10 @@ describe("web tool surface", () => {
     const prev = process.env.GORDON_WEB_SEARCH_ENDPOINT;
     delete process.env.GORDON_WEB_SEARCH_ENDPOINT;
     try {
-      const res = (await webSearchTool.execute!(
-        { query: "btc" } as never,
-        {} as never,
-      )) as { notConfigured: boolean; ok: boolean };
+      const res = (await webSearchTool.execute!({ query: "btc" } as never, {} as never)) as {
+        notConfigured: boolean;
+        ok: boolean;
+      };
       expect(res.ok).toBe(false);
       expect(res.notConfigured).toBe(true);
     } finally {

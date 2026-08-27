@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeFaeFtaCut,
-  faeFtaCutToPayload,
-} from "./faeFtaCut.ts";
+import { computeFaeFtaCut, faeFtaCutToPayload } from "./faeFtaCut.ts";
 
 describe("computeFaeFtaCut — validation", () => {
   const base = {
@@ -25,9 +22,7 @@ describe("computeFaeFtaCut — validation", () => {
   });
 
   it("rejects stoploss on wrong side of entry", () => {
-    expect(() =>
-      computeFaeFtaCut({ ...base, side: "BUY", stoplossPrice: 101 }),
-    ).toThrow();
+    expect(() => computeFaeFtaCut({ ...base, side: "BUY", stoplossPrice: 101 })).toThrow();
     expect(() =>
       computeFaeFtaCut({
         entryPrice: 100,

@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 
 // ============================================================================
@@ -51,16 +50,14 @@ export function CapabilitiesSection({ serverName, capabilities }: Props) {
 
         return (
           <Box key={cap.type}>
-            <Text color={hasAny ? "cyanBright" : "gray"}>{"  "}{icon} </Text>
-            <Text
-              bold={hasAny}
-              color={hasAny ? undefined : "gray"}
-            >
+            <Text color={hasAny ? "cyanBright" : "gray"}>
+              {"  "}
+              {icon}{" "}
+            </Text>
+            <Text bold={hasAny} color={hasAny ? undefined : "gray"}>
               {String(cap.count).padStart(2)} {TYPE_LABEL[cap.type].padEnd(12)}
             </Text>
-            {examplesStr ? (
-              <Text dimColor>{examplesStr}</Text>
-            ) : null}
+            {examplesStr ? <Text dimColor>{examplesStr}</Text> : null}
           </Box>
         );
       })}

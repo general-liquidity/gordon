@@ -16,14 +16,18 @@ const ALERT_COOLDOWN_MS = 30 * 60 * 1000;
 let lastAlertSignature: string | null = null;
 let lastAlertAt = 0;
 
-export const producerHealthAlertProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
+export const producerHealthAlertProducer: CandidateProducer = async (
+  obs,
+): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop" || obs.eventType !== "tick_producer_health") return [];
 
   const report = getProducerHealthTracker().report();
   const unhealthy = report.producers.filter(
     (producer) =>
       producer.name !== "producerHealthAlert" &&
-      (producer.status === "stale" || producer.status === "silent" || producer.status === "errored"),
+      (producer.status === "stale" ||
+        producer.status === "silent" ||
+        producer.status === "errored"),
   );
 
   if (unhealthy.length === 0) return [];
@@ -40,8 +44,13 @@ export const producerHealthAlertProducer: CandidateProducer = async (obs): Promi
   lastAlertAt = now;
 
   const errored = unhealthy.filter((producer) => producer.status === "errored");
-  const stalled = unhealthy.filter((producer) => producer.status === "stale" || producer.status === "silent");
-  const names = unhealthy.slice(0, 5).map((producer) => `${producer.name} (${producer.status})`).join(", ");
+  const stalled = unhealthy.filter(
+    (producer) => producer.status === "stale" || producer.status === "silent",
+  );
+  const names = unhealthy
+    .slice(0, 5)
+    .map((producer) => `${producer.name} (${producer.status})`)
+    .join(", ");
   const suffix = unhealthy.length > 5 ? `, +${unhealthy.length - 5} more` : "";
 
   return [

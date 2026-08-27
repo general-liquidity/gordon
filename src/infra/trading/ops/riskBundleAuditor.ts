@@ -74,9 +74,7 @@ export function auditRiskBundle(input: AuditInput): AuditResult {
   for (const item of input.items) itemsByCategory[item.category] = item;
 
   const uncovered = REQUIRED_CATEGORIES.filter((c) => itemsByCategory[c] === null);
-  const unhedgedNo = input.items.filter(
-    (i) => i.tag === "no" && (!i.hedge || !i.hedge.trim()),
-  );
+  const unhedgedNo = input.items.filter((i) => i.tag === "no" && !i.hedge?.trim());
   const paid = input.items.filter((i) => i.tag === "yes");
 
   const blockers: string[] = [];
@@ -114,7 +112,9 @@ export function formatAudit(result: AuditResult): string {
       lines.push(`  ${cat}: <missing>`);
     } else {
       const hedgeStr = item.hedge ? ` → hedge: ${item.hedge}` : "";
-      lines.push(`  ${cat}: ${item.tag.toUpperCase()} ${item.reason ? `(${item.reason})` : ""}${hedgeStr}`);
+      lines.push(
+        `  ${cat}: ${item.tag.toUpperCase()} ${item.reason ? `(${item.reason})` : ""}${hedgeStr}`,
+      );
     }
   }
   if (result.blockers.length > 0) {

@@ -142,7 +142,8 @@ export class XSearchClient {
     if (cached) return cached;
 
     const wantsContextFields = Boolean(
-      options.includeContextFields || (options.contextAnnotations && options.contextAnnotations.length > 0),
+      options.includeContextFields ||
+        (options.contextAnnotations && options.contextAnnotations.length > 0),
     );
     const tweetFields = wantsContextFields
       ? "created_at,public_metrics,author_id,context_annotations"
@@ -287,7 +288,10 @@ export class XSearchClient {
    * Fetch recent tweets from a user's timeline. Accepts either a numeric user
    * ID or a handle (will be resolved via getUserByUsername).
    */
-  async getUserTimeline(userIdOrUsername: string, options: XTimelineOptions = {}): Promise<XTweet[]> {
+  async getUserTimeline(
+    userIdOrUsername: string,
+    options: XTimelineOptions = {},
+  ): Promise<XTweet[]> {
     const token = getBearerToken();
     if (!token) {
       logger.debug("X API key not configured — skipping timeline", { userIdOrUsername });
@@ -408,14 +412,44 @@ function mapContextAnnotations(
 // ============================================================================
 
 const BULL_WORDS = new Set([
-  "buy", "long", "bull", "bullish", "moon", "pump", "breakout", "rally",
-  "gains", "uptrend", "support", "accumulate", "strong", "beat", "upgrade",
-  "outperform", "overweight", "target raised", "bullish bias",
+  "buy",
+  "long",
+  "bull",
+  "bullish",
+  "moon",
+  "pump",
+  "breakout",
+  "rally",
+  "gains",
+  "uptrend",
+  "support",
+  "accumulate",
+  "strong",
+  "beat",
+  "upgrade",
+  "outperform",
+  "overweight",
+  "target raised",
+  "bullish bias",
 ]);
 const BEAR_WORDS = new Set([
-  "sell", "short", "bear", "bearish", "dump", "crash", "correction",
-  "downtrend", "resistance", "weak", "miss", "downgrade", "underperform",
-  "underweight", "target cut", "bearish bias", "rug",
+  "sell",
+  "short",
+  "bear",
+  "bearish",
+  "dump",
+  "crash",
+  "correction",
+  "downtrend",
+  "resistance",
+  "weak",
+  "miss",
+  "downgrade",
+  "underperform",
+  "underweight",
+  "target cut",
+  "bearish bias",
+  "rug",
 ]);
 
 function scoreSentiment(text: string): number {

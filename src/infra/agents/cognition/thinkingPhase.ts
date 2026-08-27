@@ -10,10 +10,7 @@
 
 import type { GordonContext } from "../types.ts";
 import type { Message } from "../../ai/llm/types.ts";
-import {
-  resolveWorkflowPhaseModelRoute,
-  determineWorkflowPhase,
-} from "./workflowPhase.ts";
+import { resolveWorkflowPhaseModelRoute, determineWorkflowPhase } from "./workflowPhase.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { recordPhaseLLMCost } from "../../platform/costTracker.ts";
 import { resolveFlag } from "../../config/flagResolver.ts";
@@ -54,11 +51,13 @@ const THINKING_DEPTHS = new Set<ThinkingDepth>(["off", "low", "medium", "high"])
 
 function normalizeThinkingDepth(value: unknown): ThinkingDepth | null {
   return typeof value === "string" && THINKING_DEPTHS.has(value as ThinkingDepth)
-    ? value as ThinkingDepth
+    ? (value as ThinkingDepth)
     : null;
 }
 
-export function thinkingDepthForPhase(phase: ReturnType<typeof determineWorkflowPhase>): ThinkingDepth {
+export function thinkingDepthForPhase(
+  phase: ReturnType<typeof determineWorkflowPhase>,
+): ThinkingDepth {
   switch (phase) {
     case "scan":
     case "ops":
@@ -76,13 +75,11 @@ export function thinkingDepthForPhase(phase: ReturnType<typeof determineWorkflow
   }
 }
 
-export function resolveThinkingDepth(
-  options: {
-    context?: Pick<GordonContext, "config">;
-    phase?: ReturnType<typeof determineWorkflowPhase>;
-    overrideDepth?: ThinkingDepth;
-  },
-): ThinkingDepthResolution {
+export function resolveThinkingDepth(options: {
+  context?: Pick<GordonContext, "config">;
+  phase?: ReturnType<typeof determineWorkflowPhase>;
+  overrideDepth?: ThinkingDepth;
+}): ThinkingDepthResolution {
   const overrideDepth = normalizeThinkingDepth(options.overrideDepth);
   if (overrideDepth) {
     return { depth: overrideDepth, source: "override", reason: `overrideDepth=${overrideDepth}` };
@@ -133,7 +130,9 @@ export function shouldRunToolFreeThinking(
   const phase = determineWorkflowPhase(context);
   const resolution = resolveThinkingDepth({ context, phase });
   if (
-    (resolution.source === "config" || resolution.source === "env" || resolution.source === "override") &&
+    (resolution.source === "config" ||
+      resolution.source === "env" ||
+      resolution.source === "override") &&
     resolution.depth === "off"
   ) {
     return { run: false, reason: `${resolution.reason} disables tool-free thinking` };
@@ -142,7 +141,9 @@ export function shouldRunToolFreeThinking(
     return { run: true, reason: "user message > 200 chars" };
   }
   if (
-    (resolution.source === "config" || resolution.source === "env" || resolution.source === "override") &&
+    (resolution.source === "config" ||
+      resolution.source === "env" ||
+      resolution.source === "override") &&
     (resolution.depth === "medium" || resolution.depth === "high")
   ) {
     return { run: true, reason: `thinkingDepth=${resolution.depth}` };

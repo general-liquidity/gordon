@@ -52,20 +52,36 @@ export const recursiveDecomposeTool = createTool({
       .min(500)
       .max(60000)
       .default(8000)
-      .describe("Per-chunk character budget (~4 chars/token). Inputs at or below this pass through undivided."),
-    maxFanOut: z.number().int().min(1).max(16).default(5).describe("Max concurrent chunk sub-queries per level."),
-    maxDepth: z.number().int().min(0).max(5).default(3).describe("Aggregation-tree recursion depth cap."),
+      .describe(
+        "Per-chunk character budget (~4 chars/token). Inputs at or below this pass through undivided.",
+      ),
+    maxFanOut: z
+      .number()
+      .int()
+      .min(1)
+      .max(16)
+      .default(5)
+      .describe("Max concurrent chunk sub-queries per level."),
+    maxDepth: z
+      .number()
+      .int()
+      .min(0)
+      .max(5)
+      .default(3)
+      .describe("Aggregation-tree recursion depth cap."),
   }),
-  outputSchema: z.object({
-    answer: z.string(),
-    decomposed: z.boolean(),
-    chunkCount: z.number(),
-    subQueryCount: z.number(),
-    synthesisCount: z.number(),
-    depthReached: z.number(),
-    llmCallCount: z.number(),
-    error: z.string().optional(),
-  }).partial(),
+  outputSchema: z
+    .object({
+      answer: z.string(),
+      decomposed: z.boolean(),
+      chunkCount: z.number(),
+      subQueryCount: z.number(),
+      synthesisCount: z.number(),
+      depthReached: z.number(),
+      llmCallCount: z.number(),
+      error: z.string().optional(),
+    })
+    .partial(),
   execute: async (
     { query, input, maxChunkChars, maxFanOut, maxDepth },
     execContext: MastraExecutionContext,

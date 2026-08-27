@@ -84,10 +84,7 @@ export function pendingCount(): number {
 /**
  * Convenience: fire-and-forget a file write.
  */
-export function fireAndForgetWrite(
-  path: string,
-  content: string,
-): void {
+export function fireAndForgetWrite(path: string, content: string): void {
   fireAndForget(async () => {
     const { writeFileSync, mkdirSync, existsSync } = await import("node:fs");
     const { dirname } = await import("node:path");

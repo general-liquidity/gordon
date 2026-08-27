@@ -13,16 +13,15 @@ function formatTime(value: string): string {
   return date.toLocaleString();
 }
 
-export function formatActionLogEntries(entries: ActionLogEntry[], title: string = "Action log"): string {
+export function formatActionLogEntries(
+  entries: ActionLogEntry[],
+  title: string = "Action log",
+): string {
   if (entries.length === 0) {
     return `**${title}**\n\nNo entries found.`;
   }
 
-  const lines = [
-    `**${title}**\n`,
-    "| ID | Time | Type | Title |",
-    "|----|------|------|-------|",
-  ];
+  const lines = [`**${title}**\n`, "| ID | Time | Type | Title |", "|----|------|------|-------|"];
 
   for (const entry of entries) {
     const titleText = entry.label ? `${entry.title} (${entry.label})` : entry.title;

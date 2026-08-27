@@ -82,7 +82,8 @@ function correlationMatrix(series: number[][], start: number, end: number): numb
     R[a]![a] = 1;
     for (let b = a + 1; b < k; b++) {
       let cov = 0;
-      for (let t = start; t < end; t++) cov += (series[a]![t]! - means[a]) * (series[b]![t]! - means[b]);
+      for (let t = start; t < end; t++)
+        cov += (series[a]![t]! - means[a]) * (series[b]![t]! - means[b]);
       cov /= len;
       const denom = stds[a]! * stds[b]!;
       const r = denom > 0 ? cov / denom : 0; // constant series → treat as uncorrelated
@@ -93,7 +94,9 @@ function correlationMatrix(series: number[][], start: number, end: number): numb
   return R;
 }
 
-export function computeGeneralizedVariance(input: GeneralizedVarianceInput): GeneralizedVarianceResult {
+export function computeGeneralizedVariance(
+  input: GeneralizedVarianceInput,
+): GeneralizedVarianceResult {
   const series = (input.returns ?? []).filter((s) => Array.isArray(s));
   const k = series.length;
   const window = Math.max(2, Math.floor(input.window ?? 60));
@@ -168,5 +171,16 @@ export function computeGeneralizedVariance(input: GeneralizedVarianceInput): Gen
             ? `Gram volume ${current} high (z=${volumeZ}) — basket well-diversified`
             : `Gram volume ${current} (z=${volumeZ ?? "n/a"}, ${trend})`;
 
-  return { values, logDet, current, currentLogDet, volumeZ, regime, trend, nSeries: k, window, interpretation };
+  return {
+    values,
+    logDet,
+    current,
+    currentLogDet,
+    volumeZ,
+    regime,
+    trend,
+    nSeries: k,
+    window,
+    interpretation,
+  };
 }

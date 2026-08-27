@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { BackgroundTask, type BackgroundTaskData } from "../status/BackgroundTask.tsx";
 
@@ -71,7 +71,9 @@ export function BackgroundTasksDialog({
     >
       {/* Header */}
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">BACKGROUND TASKS</Text>
+        <Text bold color="cyanBright">
+          BACKGROUND TASKS
+        </Text>
         <Text dimColor>
           {"  "}({runningCount} running {"·"} {scheduledCount} scheduled)
         </Text>
@@ -80,9 +82,7 @@ export function BackgroundTasksDialog({
       {/* Task list */}
       {tasks.length === 0 ? (
         <Box paddingLeft={1} paddingY={1}>
-          <Text dimColor>
-            No background tasks. Try /scan or /autonomous to start one.
-          </Text>
+          <Text dimColor>No background tasks. Try /scan or /autonomous to start one.</Text>
         </Box>
       ) : (
         <Box flexDirection="column" gap={1}>
@@ -98,16 +98,8 @@ export function BackgroundTasksDialog({
               >
                 <BackgroundTask
                   task={task}
-                  onPause={
-                    task.status === "running"
-                      ? () => onPauseTask(task.id)
-                      : undefined
-                  }
-                  onResume={
-                    task.status === "paused"
-                      ? () => onResumeTask(task.id)
-                      : undefined
-                  }
+                  onPause={task.status === "running" ? () => onPauseTask(task.id) : undefined}
+                  onResume={task.status === "paused" ? () => onResumeTask(task.id) : undefined}
                   onStop={
                     task.status === "running" || task.status === "paused"
                       ? () => onStopTask(task.id)

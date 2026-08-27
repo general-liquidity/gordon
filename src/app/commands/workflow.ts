@@ -11,7 +11,6 @@ import { analyze, type DetailedAnalysis } from "../../core/pipeline/analyzer.ts"
 import { strategyRegistry, type StrategyId } from "../../strategies/index.ts";
 import { runBacktest } from "../../backtest/engine.ts";
 import { fetchHistoricalData } from "../../backtest/data/historical.ts";
-import { formatBacktestSummary } from "../../backtest/reporting/formatter.ts";
 import type { BacktestResult, BacktestConfig } from "../../backtest/types.ts";
 import { normalizeCryptoSymbol } from "../../infra/domain/markets/instruments.ts";
 
@@ -52,10 +51,7 @@ type WorkflowType = "quick" | "dd" | "backtest-cycle";
  * Quick workflow: scan -> analyze -> plan recommendation
  * Use case: Fast overview of a specific symbol
  */
-async function runQuickWorkflow(
-  symbol: string,
-  ctx: WorkflowContext
-): Promise<WorkflowResult> {
+async function runQuickWorkflow(symbol: string, ctx: WorkflowContext): Promise<WorkflowResult> {
   const steps: WorkflowStep[] = [];
   const normalizedSymbol = normalizeSymbol(symbol);
 
@@ -66,9 +62,7 @@ async function runQuickWorkflow(
     const scanResult = await scan(ctx.exchange, { topN: 20, timeframes: ["1h"] });
     const scanDuration = Date.now() - scanStart;
 
-    const symbolInScan = scanResult.coins.find(
-      (c) => c.symbol === normalizedSymbol
-    );
+    const symbolInScan = scanResult.coins.find((c) => c.symbol === normalizedSymbol);
 
     steps[0] = {
       name: "scan",
@@ -151,9 +145,7 @@ async function runQuickWorkflow(
     };
   }
 
-  const allCompleted = steps.every(
-    (s) => s.status === "completed" || s.status === "skipped"
-  );
+  const allCompleted = steps.every((s) => s.status === "completed" || s.status === "skipped");
 
   return {
     success: allCompleted,
@@ -162,12 +154,14 @@ async function runQuickWorkflow(
     summary: generateQuickSummary(normalizedSymbol, steps, analysis),
     data: {
       symbol: normalizedSymbol,
-      analysis: analysis ? {
-        price: analysis.price,
-        trend: analysis.trend,
-        bias: analysis.bias,
-        setupDetected: analysis.setupDetected,
-      } : null,
+      analysis: analysis
+        ? {
+            price: analysis.price,
+            trend: analysis.trend,
+            bias: analysis.bias,
+            setupDetected: analysis.setupDetected,
+          }
+        : null,
     },
   };
 }
@@ -178,7 +172,7 @@ async function runQuickWorkflow(
  */
 async function runDueDiligenceWorkflow(
   symbol: string,
-  ctx: WorkflowContext
+  ctx: WorkflowContext,
 ): Promise<WorkflowResult> {
   const steps: WorkflowStep[] = [];
   const normalizedSymbol = normalizeSymbol(symbol);
@@ -315,9 +309,7 @@ async function runDueDiligenceWorkflow(
     };
   }
 
-  const allCompleted = steps.every(
-    (s) => s.status === "completed" || s.status === "skipped"
-  );
+  const allCompleted = steps.every((s) => s.status === "completed" || s.status === "skipped");
 
   return {
     success: allCompleted,
@@ -326,13 +318,15 @@ async function runDueDiligenceWorkflow(
     summary: generateDDSummary(normalizedSymbol, steps, analysis),
     data: {
       symbol: normalizedSymbol,
-      analysis: analysis ? {
-        price: analysis.price,
-        trend: analysis.trend,
-        bias: analysis.bias,
-        risk: analysis.risk,
-        setupDetected: analysis.setupDetected,
-      } : null,
+      analysis: analysis
+        ? {
+            price: analysis.price,
+            trend: analysis.trend,
+            bias: analysis.bias,
+            risk: analysis.risk,
+            setupDetected: analysis.setupDetected,
+          }
+        : null,
     },
   };
 }
@@ -344,7 +338,7 @@ async function runDueDiligenceWorkflow(
 async function runBacktestCycleWorkflow(
   strategyId: string,
   symbol: string,
-  ctx: WorkflowContext
+  ctx: WorkflowContext,
 ): Promise<WorkflowResult> {
   const steps: WorkflowStep[] = [];
   const normalizedSymbol = normalizeSymbol(symbol);
@@ -507,9 +501,7 @@ async function runBacktestCycleWorkflow(
     };
   }
 
-  const allCompleted = steps.every(
-    (s) => s.status === "completed" || s.status === "skipped"
-  );
+  const allCompleted = steps.every((s) => s.status === "completed" || s.status === "skipped");
 
   return {
     success: allCompleted,
@@ -519,17 +511,18 @@ async function runBacktestCycleWorkflow(
     data: {
       strategy: strategy.name,
       symbol: normalizedSymbol,
-      backtestResult: backtestResult ? {
-        totalReturn: backtestResult.metrics.totalReturn,
-        sharpeRatio: backtestResult.metrics.sharpeRatio,
-        maxDrawdown: backtestResult.metrics.maxDrawdown,
-        winRate: backtestResult.metrics.winRate,
-        totalTrades: backtestResult.metrics.totalTrades,
-      } : null,
+      backtestResult: backtestResult
+        ? {
+            totalReturn: backtestResult.metrics.totalReturn,
+            sharpeRatio: backtestResult.metrics.sharpeRatio,
+            maxDrawdown: backtestResult.metrics.maxDrawdown,
+            winRate: backtestResult.metrics.winRate,
+            totalTrades: backtestResult.metrics.totalTrades,
+          }
+        : null,
     },
   };
 }
-
 
 // ============================================================================
 // Helper Functions
@@ -599,11 +592,13 @@ function assessRisk(analysis: DetailedAnalysis): {
   factors: { name: string; impact: "positive" | "negative" | "neutral"; weight: number }[];
 } {
   let score = 5; // Start neutral
-  const factors: { name: string; impact: "positive" | "negative" | "neutral"; weight: number }[] = [];
+  const factors: { name: string; impact: "positive" | "negative" | "neutral"; weight: number }[] =
+    [];
 
   // Support strength
   if (analysis.supports.length > 0) {
-    const avgStrength = analysis.supports.reduce((sum, s) => sum + s.strength, 0) / analysis.supports.length;
+    const avgStrength =
+      analysis.supports.reduce((sum, s) => sum + s.strength, 0) / analysis.supports.length;
     if (avgStrength > 0.7) {
       score -= 1;
       factors.push({ name: "Strong support levels", impact: "positive", weight: 1 });
@@ -709,12 +704,13 @@ function generateOptimizationSuggestions(result: BacktestResult): {
 function generateQuickSummary(
   symbol: string,
   steps: WorkflowStep[],
-  analysis: DetailedAnalysis | null
+  analysis: DetailedAnalysis | null,
 ): string {
   const lines: string[] = [`## Quick Analysis: ${symbol}`, ""];
 
   for (const step of steps) {
-    const status = step.status === "completed" ? "[OK]" : step.status === "failed" ? "[FAIL]" : "[SKIP]";
+    const status =
+      step.status === "completed" ? "[OK]" : step.status === "failed" ? "[FAIL]" : "[SKIP]";
     lines.push(`${status} **${step.name}**: ${step.message || "No message"}`);
   }
 
@@ -724,7 +720,9 @@ function generateQuickSummary(
     lines.push(`- Price: $${analysis.price.toFixed(4)}`);
     lines.push(`- Trend: ${analysis.trend}`);
     lines.push(`- Bias: ${analysis.bias}`);
-    lines.push(`- Setup: ${analysis.setupDetected ? `Yes (${(analysis.setupConfidence * 100).toFixed(0)}% confidence)` : "No"}`);
+    lines.push(
+      `- Setup: ${analysis.setupDetected ? `Yes (${(analysis.setupConfidence * 100).toFixed(0)}% confidence)` : "No"}`,
+    );
   }
 
   return lines.join("\n");
@@ -733,13 +731,14 @@ function generateQuickSummary(
 function generateDDSummary(
   symbol: string,
   steps: WorkflowStep[],
-  analysis: DetailedAnalysis | null
+  analysis: DetailedAnalysis | null,
 ): string {
   const lines: string[] = [`## Due Diligence Report: ${symbol}`, ""];
 
   lines.push("### Workflow Steps");
   for (const step of steps) {
-    const status = step.status === "completed" ? "[OK]" : step.status === "failed" ? "[FAIL]" : "[SKIP]";
+    const status =
+      step.status === "completed" ? "[OK]" : step.status === "failed" ? "[FAIL]" : "[SKIP]";
     lines.push(`${status} **${step.name}**: ${step.message || "No message"}`);
   }
 
@@ -767,13 +766,14 @@ function generateBacktestCycleSummary(
   strategyName: string,
   symbol: string,
   steps: WorkflowStep[],
-  result: BacktestResult | null
+  result: BacktestResult | null,
 ): string {
   const lines: string[] = [`## Backtest Cycle: ${strategyName} on ${symbol}`, ""];
 
   lines.push("### Workflow Steps");
   for (const step of steps) {
-    const status = step.status === "completed" ? "[OK]" : step.status === "failed" ? "[FAIL]" : "[SKIP]";
+    const status =
+      step.status === "completed" ? "[OK]" : step.status === "failed" ? "[FAIL]" : "[SKIP]";
     lines.push(`${status} **${step.name}**: ${step.message || "No message"}`);
   }
 
@@ -804,7 +804,7 @@ function generateBacktestCycleSummary(
  */
 export async function handleWorkflowCommand(
   args: string,
-  ctx: WorkflowContext
+  ctx: WorkflowContext,
 ): Promise<WorkflowResult> {
   const parts = args.trim().split(/\s+/);
   const workflowType = parts[0]?.toLowerCase() as WorkflowType | undefined;
@@ -922,12 +922,17 @@ export function formatWorkflowResult(result: WorkflowResult): string {
     lines.push("Steps:");
     for (const step of result.steps) {
       const icon =
-        step.status === "completed" ? "✓" :
-        step.status === "failed" ? "✕" :
-        step.status === "skipped" ? "•" :
-        step.status === "running" ? "…" :
-        "○";
-      const duration = step.duration !== undefined ? ` (${(step.duration / 1000).toFixed(1)}s)` : "";
+        step.status === "completed"
+          ? "✓"
+          : step.status === "failed"
+            ? "✕"
+            : step.status === "skipped"
+              ? "•"
+              : step.status === "running"
+                ? "…"
+                : "○";
+      const duration =
+        step.duration !== undefined ? ` (${(step.duration / 1000).toFixed(1)}s)` : "";
       const message = step.message ? ` - ${step.message}` : "";
       lines.push(`  ${icon} ${step.name}${message}${duration}`);
     }

@@ -85,8 +85,9 @@ function scoreFromLatency(latencyMs: number): { score: number; bucket: Reluctanc
 
 export function computeReluctanceScore(input: ReluctanceInput): ReluctanceResult {
   const now = input.nowMs ?? Date.now();
-  const postTradeStamps = input.journalEntryTimestampsMs
-    .filter((t) => Number.isFinite(t) && t >= input.tradeExecutedAtMs);
+  const postTradeStamps = input.journalEntryTimestampsMs.filter(
+    (t) => Number.isFinite(t) && t >= input.tradeExecutedAtMs,
+  );
   if (postTradeStamps.length === 0) {
     // Never logged. Score grows with how long ago the trade was — a
     // 5-minute-old unlogged trade isn't yet a reluctance signal; a

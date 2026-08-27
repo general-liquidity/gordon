@@ -88,9 +88,9 @@ describe("bitmapCouldContain — necessary condition", () => {
     // must be filtered out.
     const q = computeLetterBitmap("pizza");
     const candidates = [
-      "the quick brown fox",        // no p, no z
-      "buy ethereum",                // no p, no z
-      "stop loss at one half",       // no z
+      "the quick brown fox", // no p, no z
+      "buy ethereum", // no p, no z
+      "stop loss at one half", // no z
     ];
     for (const c of candidates) {
       expect(bitmapCouldContain(computeLetterBitmap(c), q)).toBe(false);
@@ -100,10 +100,10 @@ describe("bitmapCouldContain — necessary condition", () => {
 
 describe("computeLetterBitmap — early-out at full alphabet", () => {
   test("all 26 letters returns 0x3FFFFFF", () => {
-    expect(computeLetterBitmap("abcdefghijklmnopqrstuvwxyz")).toBe(0x3FFFFFF);
+    expect(computeLetterBitmap("abcdefghijklmnopqrstuvwxyz")).toBe(0x3ffffff);
   });
 
   test("pangram with case + punctuation still returns full mask", () => {
-    expect(computeLetterBitmap("The quick brown fox jumps over the lazy dog.")).toBe(0x3FFFFFF);
+    expect(computeLetterBitmap("The quick brown fox jumps over the lazy dog.")).toBe(0x3ffffff);
   });
 });

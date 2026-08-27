@@ -70,8 +70,7 @@ const DESTRUCTIVE_PATTERN =
  * local memory, local audit log, plan construction/verification. These do
  * NOT reach a venue, the web, or a news feed, so `openWorldHint` is false.
  */
-const PURE_COMPUTE_PATTERN =
-  /^(compute_|calculate_|verify_|create_plan|memory_|audit_)/;
+const PURE_COMPUTE_PATTERN = /^(compute_|calculate_|verify_|create_plan|memory_|audit_)/;
 
 /**
  * Read shape — price/account/news reads, scans, searches, and pure

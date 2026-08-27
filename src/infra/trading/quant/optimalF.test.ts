@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeOptimalF,
-  optimalFToPayload,
-} from "./optimalF.ts";
+import { computeOptimalF, optimalFToPayload } from "./optimalF.ts";
 
 describe("computeOptimalF — basic mechanics", () => {
   it("finds an f in (0, 1) for a sequence with wins and losses", () => {
@@ -29,7 +26,7 @@ describe("computeOptimalF — basic mechanics", () => {
     const r = computeOptimalF({
       trades: [100, -50, 75, -30, 60],
     });
-    const expected = Math.pow(r.twrAtOptimal, 1 / r.sampleSize);
+    const expected = r.twrAtOptimal ** (1 / r.sampleSize);
     expect(r.geometricMean).toBeCloseTo(expected, 8);
   });
 
@@ -106,24 +103,14 @@ describe("computeOptimalF — boundary", () => {
 
 describe("computeOptimalF — validation", () => {
   it("throws on invalid step", () => {
-    expect(() =>
-      computeOptimalF({ trades: [1, -1], step: 0 }),
-    ).toThrow();
-    expect(() =>
-      computeOptimalF({ trades: [1, -1], step: 1.5 }),
-    ).toThrow();
+    expect(() => computeOptimalF({ trades: [1, -1], step: 0 })).toThrow();
+    expect(() => computeOptimalF({ trades: [1, -1], step: 1.5 })).toThrow();
   });
 
   it("throws on invalid minF/maxF", () => {
-    expect(() =>
-      computeOptimalF({ trades: [1, -1], minF: 0 }),
-    ).toThrow();
-    expect(() =>
-      computeOptimalF({ trades: [1, -1], maxF: 1.5 }),
-    ).toThrow();
-    expect(() =>
-      computeOptimalF({ trades: [1, -1], minF: 0.5, maxF: 0.3 }),
-    ).toThrow();
+    expect(() => computeOptimalF({ trades: [1, -1], minF: 0 })).toThrow();
+    expect(() => computeOptimalF({ trades: [1, -1], maxF: 1.5 })).toThrow();
+    expect(() => computeOptimalF({ trades: [1, -1], minF: 0.5, maxF: 0.3 })).toThrow();
   });
 });
 

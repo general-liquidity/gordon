@@ -29,7 +29,10 @@ export interface ManipulationContextResult {
   reasoning: string;
 }
 
-const POSTURE_MAP: Record<ToxicityRegime, { posture: TradePosture; sizeMult: number; refuse: boolean }> = {
+const POSTURE_MAP: Record<
+  ToxicityRegime,
+  { posture: TradePosture; sizeMult: number; refuse: boolean }
+> = {
   quiet: { posture: "trade_normal", sizeMult: 1.0, refuse: false },
   elevated: { posture: "size_down", sizeMult: 0.5, refuse: false },
   active: { posture: "refuse", sizeMult: 0, refuse: true },

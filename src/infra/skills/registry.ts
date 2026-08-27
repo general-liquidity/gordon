@@ -14,7 +14,7 @@ import { join, resolve } from "node:path";
 import { GORDON_DIR } from "../storage/paths.ts";
 import { discoverSkillsFromDir } from "./loader.ts";
 import { recordSkillUsage } from "./usage-tracker.ts";
-import type { Skill, SkillSource, SkillInvocation } from "./types.ts";
+import type { Skill, SkillInvocation } from "./types.ts";
 
 // ============================================================================
 // Paths
@@ -153,5 +153,5 @@ export function buildSkillMetadataSection(agentName: string = "Gordon"): string 
     // the description field directly.
     lines.push(`- /${skill.id}: ${skill.description}`);
   }
-  return lines.join("\n") + "\n";
+  return `${lines.join("\n")}\n`;
 }

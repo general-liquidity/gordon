@@ -48,10 +48,7 @@ function calmSeries(n: number, start = 100): number[] {
 
 describe("asset familiarity scores market state, not just the symbol", () => {
   it("keeps the previously-traded symbol unpenalized when the state is ordinary", () => {
-    const assessment = classifyTradeRisk(
-      trade(),
-      context({ targetPriceHistory: calmSeries(200) }),
-    );
+    const assessment = classifyTradeRisk(trade(), context({ targetPriceHistory: calmSeries(200) }));
     expect(familiarityOf(assessment).score).toBe(0);
   });
 
@@ -63,10 +60,7 @@ describe("asset familiarity scores market state, not just the symbol", () => {
       const prev = prices[prices.length - 1] ?? 100;
       prices.push(prev * (i % 2 === 0 ? 0.88 : 1.05));
     }
-    const assessment = classifyTradeRisk(
-      trade(),
-      context({ targetPriceHistory: prices }),
-    );
+    const assessment = classifyTradeRisk(trade(), context({ targetPriceHistory: prices }));
     const dim = familiarityOf(assessment);
     expect(dim.score).toBeGreaterThan(0);
     expect(dim.reason).toContain("outside the distribution");
@@ -81,10 +75,7 @@ describe("asset familiarity scores market state, not just the symbol", () => {
   });
 
   it("falls back to the symbol check when there is too little history to judge state", () => {
-    const assessment = classifyTradeRisk(
-      trade(),
-      context({ targetPriceHistory: calmSeries(20) }),
-    );
+    const assessment = classifyTradeRisk(trade(), context({ targetPriceHistory: calmSeries(20) }));
     const dim = familiarityOf(assessment);
     expect(dim.score).toBe(0);
     expect(dim.reason).not.toContain("outside the distribution");

@@ -37,12 +37,13 @@ export function assertValidProjectName(name: string): void {
 
 function applyTokens(content: string, options: ScaffoldOptions): string {
   const runCmd = options.packageManager === "bun" ? "bun run" : "npx tsx";
-  return content
-    .replace(/\{\{PROJECT_NAME\}\}/g, options.name)
-    .replace(/\{\{RUN_CMD\}\}/g, runCmd);
+  return content.replace(/\{\{PROJECT_NAME\}\}/g, options.name).replace(/\{\{RUN_CMD\}\}/g, runCmd);
 }
 
-export async function scaffoldProject(targetDir: string, options: ScaffoldOptions): Promise<string[]> {
+export async function scaffoldProject(
+  targetDir: string,
+  options: ScaffoldOptions,
+): Promise<string[]> {
   assertValidProjectName(options.name);
 
   const srcDir = join(targetDir, "src");

@@ -81,7 +81,12 @@ describe("placeOrderIdempotent live-consent gate", () => {
     const placed: string[] = [];
     const client = makeClient(false, placed);
 
-    await placeOrderIdempotent(client, { symbol: "BTCUSDT", side: "BUY", type: "MARKET", quantity: 1 });
+    await placeOrderIdempotent(client, {
+      symbol: "BTCUSDT",
+      side: "BUY",
+      type: "MARKET",
+      quantity: 1,
+    });
     expect(placed).toEqual(["BTCUSDT"]);
   });
 
@@ -89,7 +94,12 @@ describe("placeOrderIdempotent live-consent gate", () => {
     const placed: string[] = [];
     const client = makeClient(true, placed);
 
-    await placeOrderIdempotent(client, { symbol: "BTCUSDT", side: "BUY", type: "MARKET", quantity: 1 });
+    await placeOrderIdempotent(client, {
+      symbol: "BTCUSDT",
+      side: "BUY",
+      type: "MARKET",
+      quantity: 1,
+    });
     expect(placed).toEqual(["BTCUSDT"]);
   });
 });
@@ -105,12 +115,13 @@ describe("placeOCOOrders live-consent gate", () => {
     expect(placed).toEqual([]);
   });
 
-  it("places the fallback legs on a sandbox venue without consent", async () => {
+  it("refuses to imitate OCO with two independent sandbox orders", async () => {
     const placed: string[] = [];
     const client = makeClient(true, placed);
 
     const result = await placeOCOOrders(client, "BTCUSDT", "SELL", 1, 49_000, 48_755, 52_000);
-    expect(result.success).toBe(true);
-    expect(placed.length).toBe(2);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Native OCO is not supported/);
+    expect(placed).toEqual([]);
   });
 });

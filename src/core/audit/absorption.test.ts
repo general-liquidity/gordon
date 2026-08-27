@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { computeTraceContentHash, signTrace, verifyAuditChain, GENESIS_SIGNATURE } from "./signing.ts";
+import {
+  computeTraceContentHash,
+  signTrace,
+  verifyAuditChain,
+  GENESIS_SIGNATURE,
+} from "./signing.ts";
 import { classifyHandoffPayload } from "./durability.ts";
 import type { AuditTrace, ParentAbsorptionRecord } from "./types.ts";
 import { HandoffCoordinator } from "../../infra/agents/orchestrator/HandoffCoordinator.ts";

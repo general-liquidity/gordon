@@ -138,8 +138,7 @@ export function resetPolicyWarnings(): void {
  */
 export function loadPolicyLayer(
   env: NodeJS.ProcessEnv = process.env,
-  warn: (msg: string, meta: Record<string, unknown>) => void = (m, meta) =>
-    console.warn(m, meta),
+  warn: (msg: string, meta: Record<string, unknown>) => void = (m, meta) => console.warn(m, meta),
 ): LayeredSettings | null {
   const state = inspectPolicyLayer(env);
   if (state.state === "absent") return null;

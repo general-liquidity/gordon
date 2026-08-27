@@ -9,7 +9,7 @@
  * ANSI: `\x1b[<row>;<col>H` — Cursor Position (CUP), 1-indexed rows/cols.
  */
 
-import type { CursorDeclaration, CursorDeclarationManager } from "./internal/contracts.ts";
+import type { CursorDeclarationManager } from "./internal/contracts.ts";
 
 export function createCursorDeclarationManager(): CursorDeclarationManager {
   const manager: CursorDeclarationManager = {

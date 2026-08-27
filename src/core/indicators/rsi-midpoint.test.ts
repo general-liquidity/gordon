@@ -82,9 +82,7 @@ describe("calculateRsiMidpoint", () => {
     expect(res.pctAbove50).toBe(0);
     expect(res.currentRsi).toBeNull();
     expect(res.distanceFrom50).toBeNull();
-    expect(res.interpretation).toBe(
-      "Insufficient data for RSI midpoint analysis"
-    );
+    expect(res.interpretation).toBe("Insufficient data for RSI midpoint analysis");
   });
 
   it("returns neutral when fewer than ~5 non-null RSI values exist", () => {
@@ -108,9 +106,7 @@ describe("calculateRsiMidpoint", () => {
 
   it("rounds numeric outputs", () => {
     const res = calculateRsiMidpoint(choppyCloses(100));
-    expect(res.meanAbsDevFrom50).toBe(
-      parseFloat(res.meanAbsDevFrom50.toFixed(2))
-    );
+    expect(res.meanAbsDevFrom50).toBe(parseFloat(res.meanAbsDevFrom50.toFixed(2)));
     expect(res.pctAbove50).toBe(parseFloat(res.pctAbove50.toFixed(4)));
   });
 });

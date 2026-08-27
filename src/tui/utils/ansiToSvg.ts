@@ -6,15 +6,33 @@
 // ============================================================================
 
 const ANSI_COLORS: Record<number, string> = {
-  30: "#1e1e1e", 31: "#e06c75", 32: "#98c379", 33: "#e5c07b",
-  34: "#61afef", 35: "#c678dd", 36: "#56b6c2", 37: "#abb2bf",
-  90: "#5c6370", 91: "#e06c75", 92: "#98c379", 93: "#e5c07b",
-  94: "#61afef", 95: "#c678dd", 96: "#56b6c2", 97: "#ffffff",
+  30: "#1e1e1e",
+  31: "#e06c75",
+  32: "#98c379",
+  33: "#e5c07b",
+  34: "#61afef",
+  35: "#c678dd",
+  36: "#56b6c2",
+  37: "#abb2bf",
+  90: "#5c6370",
+  91: "#e06c75",
+  92: "#98c379",
+  93: "#e5c07b",
+  94: "#61afef",
+  95: "#c678dd",
+  96: "#56b6c2",
+  97: "#ffffff",
 };
 
 const BG_COLORS: Record<number, string> = {
-  40: "#1e1e1e", 41: "#e06c75", 42: "#98c379", 43: "#e5c07b",
-  44: "#61afef", 45: "#c678dd", 46: "#56b6c2", 47: "#abb2bf",
+  40: "#1e1e1e",
+  41: "#e06c75",
+  42: "#98c379",
+  43: "#e5c07b",
+  44: "#61afef",
+  45: "#c678dd",
+  46: "#56b6c2",
+  47: "#abb2bf",
 };
 
 interface AnsiSegment {
@@ -48,8 +66,13 @@ function parseAnsi(input: string): AnsiSegment[][] {
       } else {
         const codes = parts[i]!.split(";").map(Number);
         for (const code of codes) {
-          if (code === 0) { fg = undefined; bg = undefined; bold = false; dim = false; underline = false; }
-          else if (code === 1) bold = true;
+          if (code === 0) {
+            fg = undefined;
+            bg = undefined;
+            bold = false;
+            dim = false;
+            underline = false;
+          } else if (code === 1) bold = true;
           else if (code === 2) dim = true;
           else if (code === 4) underline = true;
           else if (code >= 30 && code <= 37) fg = ANSI_COLORS[code];
@@ -86,9 +109,10 @@ export function ansiToSvg(ansiText: string, options: AnsiToSvgOptions = {}): str
   const rowHeight = fontSize * lineHeight;
   const parsed = parseAnsi(ansiText);
 
-  const maxCols = Math.max(...parsed.map((line) =>
-    line.reduce((sum, seg) => sum + seg.text.length, 0),
-  ), 1);
+  const maxCols = Math.max(
+    ...parsed.map((line) => line.reduce((sum, seg) => sum + seg.text.length, 0)),
+    1,
+  );
 
   const width = Math.ceil(maxCols * charWidth + paddingX * 2);
   const height = Math.ceil(parsed.length * rowHeight + paddingY * 2);
@@ -107,10 +131,7 @@ export function ansiToSvg(ansiText: string, options: AnsiToSvgOptions = {}): str
       if (seg.underline) attrs.push('text-decoration="underline"');
       if (styles.length) attrs.push(`style="${styles.join(";")}"`);
 
-      const escaped = seg.text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+      const escaped = seg.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
       x += seg.text.length * charWidth;
       return `<tspan ${attrs.join(" ")}>${escaped}</tspan>`;

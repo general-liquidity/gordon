@@ -15,7 +15,7 @@ import { createModuleLogger } from "../../infra/logger/index.ts";
 import { playbookRegistry } from "../playbooks/registry.ts";
 import { CapitalAllocator } from "./allocator.ts";
 import { PortfolioCoordinator } from "./coordinator.ts";
-import { RuntimeStore, getRuntimeStore } from "./store.ts";
+import { type RuntimeStore, getRuntimeStore } from "./store.ts";
 import type {
   StrategySlot,
   PortfolioState,
@@ -84,13 +84,13 @@ export class StrategyRuntime {
       max_loss_percent?: number;
       genome_id?: string;
       allowed_regimes?: string[];
-    }
+    },
   ): StrategySlot {
     // Verify playbook exists
     const playbook = playbookRegistry.get(playbookName);
     if (!playbook) {
       throw new Error(
-        `Playbook "${playbookName}" not found. Available: ${playbookRegistry.getIds().join(", ") || "none"}`
+        `Playbook "${playbookName}" not found. Available: ${playbookRegistry.getIds().join(", ") || "none"}`,
       );
     }
 
@@ -99,7 +99,7 @@ export class StrategyRuntime {
     if (existing && (existing.status === "active" || existing.status === "paused")) {
       throw new Error(
         `Playbook "${playbookName}" is already deployed (slot: ${existing.slot_id}, status: ${existing.status}). ` +
-          `Stop or drain it before redeploying.`
+          `Stop or drain it before redeploying.`,
       );
     }
 
@@ -131,20 +131,22 @@ export class StrategyRuntime {
 
     // Auto-register genome if not already tracked (fire-and-forget, lazy import)
     if (!slot.genome_id) {
-      import("../genome/manager.ts").then(({ GenomeManager }) => {
-        try {
-          const gm = GenomeManager.getInstance();
-          const genome = gm.registerPlaybook(playbookName);
-          slot.genome_id = genome.genome_id;
-          this.store.saveSlot(slot);
-          logger.debug("Auto-registered genome for deployed slot", {
-            slot_id: slot.slot_id,
-            genome_id: genome.genome_id,
-          });
-        } catch {
-          // Already registered or not available — skip
-        }
-      }).catch(() => {});
+      import("../genome/manager.ts")
+        .then(({ GenomeManager }) => {
+          try {
+            const gm = GenomeManager.getInstance();
+            const genome = gm.registerPlaybook(playbookName);
+            slot.genome_id = genome.genome_id;
+            this.store.saveSlot(slot);
+            logger.debug("Auto-registered genome for deployed slot", {
+              slot_id: slot.slot_id,
+              genome_id: genome.genome_id,
+            });
+          } catch {
+            // Already registered or not available — skip
+          }
+        })
+        .catch(() => {});
     }
 
     logger.info("Strategy deployed", {
@@ -165,7 +167,7 @@ export class StrategyRuntime {
 
     if (slot.status !== "active" && slot.status !== "cooldown") {
       throw new Error(
-        `Cannot pause slot ${slotId} in status "${slot.status}". Must be active or cooldown.`
+        `Cannot pause slot ${slotId} in status "${slot.status}". Must be active or cooldown.`,
       );
     }
 
@@ -185,7 +187,7 @@ export class StrategyRuntime {
 
     if (slot.status !== "paused" && slot.status !== "cooldown") {
       throw new Error(
-        `Cannot resume slot ${slotId} in status "${slot.status}". Must be paused or cooldown.`
+        `Cannot resume slot ${slotId} in status "${slot.status}". Must be paused or cooldown.`,
       );
     }
 
@@ -229,18 +231,10 @@ export class StrategyRuntime {
    */
   getPortfolioState(): PortfolioState {
     const allSlots = this.store.loadAllSlots();
-    const activeSlots = allSlots.filter(
-      (s) => s.status !== "stopped"
-    );
+    const activeSlots = allSlots.filter((s) => s.status !== "stopped");
 
-    const allocatedCapital = activeSlots.reduce(
-      (sum, s) => sum + s.allocated_capital,
-      0
-    );
-    const deployedCapital = activeSlots.reduce(
-      (sum, s) => sum + s.used_capital,
-      0
-    );
+    const allocatedCapital = activeSlots.reduce((sum, s) => sum + s.allocated_capital, 0);
+    const deployedCapital = activeSlots.reduce((sum, s) => sum + s.used_capital, 0);
     const totalPnl = activeSlots.reduce((sum, s) => sum + s.total_pnl, 0);
     const totalOpenPositions = 0; // Would be computed from position manager
 
@@ -252,13 +246,10 @@ export class StrategyRuntime {
         : 0;
 
     // Peak drawdown (simplified -- track from slot peaks)
-    const peakEquitySum = activeSlots.reduce(
-      (sum, s) => sum + s.peak_equity,
-      0
-    );
+    const peakEquitySum = activeSlots.reduce((sum, s) => sum + s.peak_equity, 0);
     const currentEquitySum = activeSlots.reduce(
       (sum, s) => sum + (s.allocated_capital + s.total_pnl),
-      0
+      0,
     );
     const portfolioMaxDrawdown =
       peakEquitySum > 0
@@ -293,7 +284,7 @@ export class StrategyRuntime {
   getActiveSlots(): StrategySlot[] {
     const all = this.store.loadAllSlots();
     return all.filter(
-      (s) => s.status === "active" || s.status === "paused" || s.status === "cooldown"
+      (s) => s.status === "active" || s.status === "paused" || s.status === "cooldown",
     );
   }
 
@@ -316,7 +307,7 @@ export class StrategyRuntime {
       symbol: string;
       side: "long" | "short";
       size_usd: number;
-    }
+    },
   ): { approved: boolean; reasons: string[] } {
     const reasons: string[] = [];
 
@@ -335,22 +326,17 @@ export class StrategyRuntime {
     // Daily trade limit
     const todayCount = this.store.countTodaysTrades(slotId);
     if (todayCount >= slot.max_daily_trades) {
-      reasons.push(
-        `Daily trade limit reached: ${todayCount}/${slot.max_daily_trades}`
-      );
+      reasons.push(`Daily trade limit reached: ${todayCount}/${slot.max_daily_trades}`);
     }
 
     // Portfolio-level checks
     const portfolioState = this.getPortfolioState();
-    const portfolioCheck = this.coordinator.evaluatePortfolioRisk(
-      portfolioState,
-      {
-        slot_id: slotId,
-        symbol: trade.symbol,
-        side: trade.side,
-        size_usd: trade.size_usd,
-      }
-    );
+    const portfolioCheck = this.coordinator.evaluatePortfolioRisk(portfolioState, {
+      slot_id: slotId,
+      symbol: trade.symbol,
+      side: trade.side,
+      size_usd: trade.size_usd,
+    });
 
     if (!portfolioCheck.allowed) {
       reasons.push(...portfolioCheck.reasons);
@@ -379,10 +365,7 @@ export class StrategyRuntime {
    * @param slotId - The slot that executed the trade
    * @param result - The trade outcome
    */
-  recordTradeResult(
-    slotId: string,
-    result: { pnl: number; fees: number }
-  ): void {
+  recordTradeResult(slotId: string, result: { pnl: number; fees: number }): void {
     const slot = this.getSlotOrThrow(slotId);
 
     // Update slot performance
@@ -406,7 +389,7 @@ export class StrategyRuntime {
     // Update available capital
     slot.available_capital = Math.max(
       0,
-      slot.allocated_capital + slot.total_pnl - slot.used_capital
+      slot.allocated_capital + slot.total_pnl - slot.used_capital,
     );
 
     // Auto-cooldown if max loss breached
@@ -435,7 +418,7 @@ export class StrategyRuntime {
       total_trades: slot.total_trades,
       win_rate:
         slot.total_trades > 0
-          ? ((slot.winning_trades / slot.total_trades) * 100).toFixed(1) + "%"
+          ? `${((slot.winning_trades / slot.total_trades) * 100).toFixed(1)}%`
           : "N/A",
     });
   }
@@ -459,11 +442,7 @@ export class StrategyRuntime {
       return [];
     }
 
-    const actions = this.allocator.rebalance(
-      activeSlots,
-      this.totalCapital,
-      effectiveStrategy
-    );
+    const actions = this.allocator.rebalance(activeSlots, this.totalCapital, effectiveStrategy);
 
     // Apply the rebalance actions
     for (const action of actions) {
@@ -474,12 +453,10 @@ export class StrategyRuntime {
 
       slot.allocated_capital = action.to_amount;
       slot.allocated_percent =
-        this.totalCapital > 0
-          ? (action.to_amount / this.totalCapital) * 100
-          : 0;
+        this.totalCapital > 0 ? (action.to_amount / this.totalCapital) * 100 : 0;
       slot.available_capital = Math.max(
         0,
-        slot.allocated_capital + slot.total_pnl - slot.used_capital
+        slot.allocated_capital + slot.total_pnl - slot.used_capital,
       );
 
       this.store.saveSlot(slot);
@@ -568,7 +545,7 @@ export class StrategyRuntime {
       slot.allocated_capital = (slot.allocated_percent / 100) * amount;
       slot.available_capital = Math.max(
         0,
-        slot.allocated_capital + slot.total_pnl - slot.used_capital
+        slot.allocated_capital + slot.total_pnl - slot.used_capital,
       );
       this.store.saveSlot(slot);
     }
@@ -593,7 +570,9 @@ export class StrategyRuntime {
 
     lines.push("=== Portfolio Summary ===");
     lines.push(`Total Capital:      $${state.total_capital.toFixed(2)}`);
-    lines.push(`Allocated:          $${state.allocated_capital.toFixed(2)} (${state.total_capital > 0 ? ((state.allocated_capital / state.total_capital) * 100).toFixed(1) : 0}%)`);
+    lines.push(
+      `Allocated:          $${state.allocated_capital.toFixed(2)} (${state.total_capital > 0 ? ((state.allocated_capital / state.total_capital) * 100).toFixed(1) : 0}%)`,
+    );
     lines.push(`Unallocated:        $${state.unallocated_capital.toFixed(2)}`);
     lines.push(`Deployed:           $${state.deployed_capital.toFixed(2)}`);
     lines.push(`Total PnL:          $${state.total_pnl.toFixed(2)}`);
@@ -614,7 +593,7 @@ export class StrategyRuntime {
             : "N/A";
         const statusIcon = slot.status === "active" ? "[ON]" : `[${slot.status.toUpperCase()}]`;
         lines.push(
-          `  ${statusIcon} ${slot.playbook_name}  |  $${slot.allocated_capital.toFixed(0)} (${slot.allocated_percent.toFixed(0)}%)  |  PnL: $${slot.total_pnl.toFixed(2)}  |  Trades: ${slot.total_trades}  |  Win: ${winRate}%  |  DD: ${slot.current_drawdown_percent.toFixed(1)}%`
+          `  ${statusIcon} ${slot.playbook_name}  |  $${slot.allocated_capital.toFixed(0)} (${slot.allocated_percent.toFixed(0)}%)  |  PnL: $${slot.total_pnl.toFixed(2)}  |  Trades: ${slot.total_trades}  |  Win: ${winRate}%  |  DD: ${slot.current_drawdown_percent.toFixed(1)}%`,
         );
       }
     }
@@ -630,9 +609,7 @@ export class StrategyRuntime {
     if (!slot) return `Slot ${slotId} not found.`;
 
     const winRate =
-      slot.total_trades > 0
-        ? ((slot.winning_trades / slot.total_trades) * 100).toFixed(1)
-        : "N/A";
+      slot.total_trades > 0 ? ((slot.winning_trades / slot.total_trades) * 100).toFixed(1) : "N/A";
 
     const lines: string[] = [];
     lines.push(`=== Strategy Slot: ${slot.playbook_name} ===`);
@@ -644,7 +621,9 @@ export class StrategyRuntime {
     }
     lines.push("");
     lines.push("--- Capital ---");
-    lines.push(`Allocated:          $${slot.allocated_capital.toFixed(2)} (${slot.allocated_percent.toFixed(1)}%)`);
+    lines.push(
+      `Allocated:          $${slot.allocated_capital.toFixed(2)} (${slot.allocated_percent.toFixed(1)}%)`,
+    );
     lines.push(`Used:               $${slot.used_capital.toFixed(2)}`);
     lines.push(`Available:          $${slot.available_capital.toFixed(2)}`);
     lines.push("");

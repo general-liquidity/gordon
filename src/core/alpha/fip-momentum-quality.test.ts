@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  scoreFipMomentum,
-  formatFipMomentum,
-  type FipAsset,
-} from "./fip-momentum-quality.ts";
+import { scoreFipMomentum, formatFipMomentum, type FipAsset } from "./fip-momentum-quality.ts";
 
 function smoothUptrend(perDay: number, days: number, noise = 0.001): number[] {
   // Many small positive days, few negatives — smooth diffusion
@@ -24,7 +20,7 @@ function spikyUptrend(totalReturn: number, days: number): number[] {
   }
   // Compute the spike that brings total compound to ~totalReturn
   // (1 + spike) × (1 - 0.001)^(days-1) = 1 + totalReturn
-  const negProduct = Math.pow(1 - 0.001, days - 1);
+  const negProduct = (1 - 0.001) ** (days - 1);
   const spike = (1 + totalReturn) / negProduct - 1;
   out.splice(Math.floor(days / 2), 0, spike);
   return out.slice(0, days);
@@ -32,9 +28,7 @@ function spikyUptrend(totalReturn: number, days: number): number[] {
 
 describe("scoreFipMomentum", () => {
   test("too few assets → insufficient_data", () => {
-    const r = scoreFipMomentum([
-      { symbol: "A", dailyReturns: smoothUptrend(0.002, 30) },
-    ]);
+    const r = scoreFipMomentum([{ symbol: "A", dailyReturns: smoothUptrend(0.002, 30) }]);
     expect(r.verdict).toBe("insufficient_data");
   });
 
@@ -49,13 +43,13 @@ describe("scoreFipMomentum", () => {
     const r = scoreFipMomentum(assets);
     const smooth = r.perAsset.find((p) => p.symbol === "SMOOTH")!;
     expect(smooth.fipQuality).toBe("smooth_momentum");
-    expect(smooth.fip).toBeLessThan(-0.10);
+    expect(smooth.fip).toBeLessThan(-0.1);
     expect(smooth.isHighQualityMomentum).toBe(true);
   });
 
   test("spiky uptrend → spiky_momentum quality", () => {
     const assets: FipAsset[] = [
-      { symbol: "SPIKY", dailyReturns: spikyUptrend(0.30, 40) },
+      { symbol: "SPIKY", dailyReturns: spikyUptrend(0.3, 40) },
       { symbol: "FLAT1", dailyReturns: new Array(40).fill(0.0001) },
       { symbol: "FLAT2", dailyReturns: new Array(40).fill(0.0001) },
       { symbol: "FLAT3", dailyReturns: new Array(40).fill(0.0001) },
@@ -64,14 +58,14 @@ describe("scoreFipMomentum", () => {
     const r = scoreFipMomentum(assets);
     const spiky = r.perAsset.find((p) => p.symbol === "SPIKY")!;
     expect(spiky.totalReturn).toBeGreaterThan(0);
-    expect(spiky.fip).toBeGreaterThan(0.10);
+    expect(spiky.fip).toBeGreaterThan(0.1);
     expect(spiky.fipQuality).toBe("spiky_momentum");
     expect(spiky.isHighQualityMomentum).toBe(false);
   });
 
   test("identical total returns, different FIP → different quality verdict", () => {
     const smoothSeries = smoothUptrend(0.0067, 40); // ~30% over 40 days
-    const spikySeries = spikyUptrend(0.30, 40);
+    const spikySeries = spikyUptrend(0.3, 40);
     const fillers: FipAsset[] = Array.from({ length: 3 }, (_, i) => ({
       symbol: `F${i}`,
       dailyReturns: new Array(40).fill(0.0001),
@@ -84,8 +78,8 @@ describe("scoreFipMomentum", () => {
     const smooth = r.perAsset.find((p) => p.symbol === "SMOOTH")!;
     const spiky = r.perAsset.find((p) => p.symbol === "SPIKY")!;
     // Both should have high total returns
-    expect(smooth.totalReturn).toBeGreaterThan(0.20);
-    expect(spiky.totalReturn).toBeGreaterThan(0.20);
+    expect(smooth.totalReturn).toBeGreaterThan(0.2);
+    expect(spiky.totalReturn).toBeGreaterThan(0.2);
     // But quality should differ
     expect(smooth.fipQuality).toBe("smooth_momentum");
     expect(spiky.fipQuality).toBe("spiky_momentum");
@@ -137,7 +131,7 @@ describe("scoreFipMomentum", () => {
   test("lookbackDays uses most-recent slice", () => {
     // 60 days total: first 30 spiky, last 30 smooth
     const recentSmooth = smoothUptrend(0.003, 30);
-    const oldSpiky = spikyUptrend(0.20, 30);
+    const oldSpiky = spikyUptrend(0.2, 30);
     const series = [...oldSpiky, ...recentSmooth];
     const recentOnly = scoreFipMomentum(
       [
@@ -212,10 +206,7 @@ describe("scoreFipMomentum", () => {
       symbol: `F${i}`,
       dailyReturns: new Array(30).fill(0),
     }));
-    const r = scoreFipMomentum([
-      { symbol: "X", dailyReturns: returns },
-      ...fillers,
-    ]);
+    const r = scoreFipMomentum([{ symbol: "X", dailyReturns: returns }, ...fillers]);
     const x = r.perAsset.find((p) => p.symbol === "X")!;
     expect(x.totalReturn).toBeGreaterThan(0);
     // FIP = sign(+) × (10 - 20) / 30 = -1/3 ≈ -0.333

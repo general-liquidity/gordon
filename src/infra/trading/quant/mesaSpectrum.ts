@@ -136,7 +136,10 @@ export function computeMesaSpectrum(input: MesaInput): MesaResult {
 
   let dominant = spectrum[0]!;
   for (const s of spectrum) if (s.power > dominant.power) dominant = s;
-  const powers = spectrum.map((s) => s.power).slice().sort((x, y) => x - y);
+  const powers = spectrum
+    .map((s) => s.power)
+    .slice()
+    .sort((x, y) => x - y);
   const median = powers[Math.floor(powers.length / 2)] ?? 0;
   const peakStrength = median > 0 ? dominant.power / median : Number.POSITIVE_INFINITY;
 

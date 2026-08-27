@@ -18,7 +18,11 @@ let currentPath = "";
 const cleanupPaths = new Set<string>();
 
 function safeUnlink(path: string): void {
-  try { if (existsSync(path)) unlinkSync(path); } catch { /* ignore */ }
+  try {
+    if (existsSync(path)) unlinkSync(path);
+  } catch {
+    /* ignore */
+  }
 }
 
 beforeEach(() => {

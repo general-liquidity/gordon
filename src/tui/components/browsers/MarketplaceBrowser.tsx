@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Box, Text } from "../../ink-custom";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
@@ -49,52 +49,72 @@ export function MarketplaceBrowser({ plugins, onInstall, onCancel }: Props) {
     if (selectedCategory !== "all") list = list.filter((p) => p.category === selectedCategory);
     if (query) {
       const q = query.toLowerCase();
-      list = list.filter((p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.id.toLowerCase().includes(q)
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.description.toLowerCase().includes(q) ||
+          p.id.toLowerCase().includes(q),
       );
     }
     return list;
   }, [plugins, selectedCategory, query]);
 
-  useRoutedInput((input, key) => {
-    if (key.escape) {
-      if (detailPlugin) setDetailPlugin(null);
-      else if (query) { setQuery(""); setSelectedIdx(0); }
-      else if (selectedCategory !== "all") { setSelectedCategory("all"); setSelectedIdx(0); }
-      else onCancel();
-      return;
-    }
-    if (detailPlugin) return; // Detail view handles its own input
-    if (key.return) {
-      const plugin = filtered[selectedIdx];
-      if (plugin) setDetailPlugin(plugin);
-      return;
-    }
-    if (key.upArrow) setSelectedIdx((i) => Math.max(0, i - 1));
-    if (key.downArrow) setSelectedIdx((i) => Math.min(filtered.length - 1, i + 1));
-    if (key.tab) {
-      const idx = categories.indexOf(selectedCategory);
-      setSelectedCategory(categories[(idx + 1) % categories.length]!);
-      setSelectedIdx(0);
-      return;
-    }
-    if (key.backspace) { setQuery((q) => q.slice(0, -1)); setSelectedIdx(0); return; }
-    if (input && !key.ctrl && !key.meta) { setQuery((q) => q + input); setSelectedIdx(0); }
-  }, { id: "marketplaceBrowser", priority: FOCUS_PRIORITY.DIALOG });
+  useRoutedInput(
+    (input, key) => {
+      if (key.escape) {
+        if (detailPlugin) setDetailPlugin(null);
+        else if (query) {
+          setQuery("");
+          setSelectedIdx(0);
+        } else if (selectedCategory !== "all") {
+          setSelectedCategory("all");
+          setSelectedIdx(0);
+        } else onCancel();
+        return;
+      }
+      if (detailPlugin) return; // Detail view handles its own input
+      if (key.return) {
+        const plugin = filtered[selectedIdx];
+        if (plugin) setDetailPlugin(plugin);
+        return;
+      }
+      if (key.upArrow) setSelectedIdx((i) => Math.max(0, i - 1));
+      if (key.downArrow) setSelectedIdx((i) => Math.min(filtered.length - 1, i + 1));
+      if (key.tab) {
+        const idx = categories.indexOf(selectedCategory);
+        setSelectedCategory(categories[(idx + 1) % categories.length]!);
+        setSelectedIdx(0);
+        return;
+      }
+      if (key.backspace) {
+        setQuery((q) => q.slice(0, -1));
+        setSelectedIdx(0);
+        return;
+      }
+      if (input && !key.ctrl && !key.meta) {
+        setQuery((q) => q + input);
+        setSelectedIdx(0);
+      }
+    },
+    { id: "marketplaceBrowser", priority: FOCUS_PRIORITY.DIALOG },
+  );
 
   // ── Detail view ──
   if (detailPlugin) {
     return (
       <Box flexDirection="column" paddingX={1} paddingY={1}>
-        <Text bold color="cyanBright">{detailPlugin.name}</Text>
+        <Text bold color="cyanBright">
+          {detailPlugin.name}
+        </Text>
         <Text dimColor>{detailPlugin.description}</Text>
         <Box marginTop={1} flexDirection="column">
           <Text>Category: {detailPlugin.category}</Text>
           <Text>Transport: {detailPlugin.transport}</Text>
           <Text>Tools: {detailPlugin.toolCount}</Text>
-          <Text>Pricing: {detailPlugin.pricing}{detailPlugin.pricingNote ? ` — ${detailPlugin.pricingNote}` : ""}</Text>
+          <Text>
+            Pricing: {detailPlugin.pricing}
+            {detailPlugin.pricingNote ? ` — ${detailPlugin.pricingNote}` : ""}
+          </Text>
           <Text>Docs: {detailPlugin.docsUrl}</Text>
           <Text color="green">Install: {detailPlugin.install}</Text>
         </Box>
@@ -110,7 +130,9 @@ export function MarketplaceBrowser({ plugins, onInstall, onCancel }: Props) {
             }}
           />
         </Box>
-        <Box marginTop={1}><Text dimColor>Esc to go back</Text></Box>
+        <Box marginTop={1}>
+          <Text dimColor>Esc to go back</Text>
+        </Box>
       </Box>
     );
   }
@@ -125,21 +147,38 @@ export function MarketplaceBrowser({ plugins, onInstall, onCancel }: Props) {
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">MARKETPLACE</Text>
-        <Text dimColor>  ({filtered.length} of {plugins.length} plugins)</Text>
+        <Text bold color="cyanBright">
+          MARKETPLACE
+        </Text>
+        <Text dimColor>
+          {" "}
+          ({filtered.length} of {plugins.length} plugins)
+        </Text>
       </Box>
 
       {/* Search */}
       <Box>
         <Text color="cyanBright">{"\uD83D\uDD0D"} </Text>
-        {query ? <Text>{query}<Text color="cyanBright">{"\u2588"}</Text></Text> : <Text dimColor>Type to search...</Text>}
+        {query ? (
+          <Text>
+            {query}
+            <Text color="cyanBright">{"\u2588"}</Text>
+          </Text>
+        ) : (
+          <Text dimColor>Type to search...</Text>
+        )}
       </Box>
 
       {/* Categories */}
       <Box marginTop={1}>
         {categories.map((cat) => (
-          <Text key={cat} color={cat === selectedCategory ? "cyanBright" : undefined} dimColor={cat !== selectedCategory}>
-            {" "}{cat}{" "}
+          <Text
+            key={cat}
+            color={cat === selectedCategory ? "cyanBright" : undefined}
+            dimColor={cat !== selectedCategory}
+          >
+            {" "}
+            {cat}{" "}
           </Text>
         ))}
       </Box>
@@ -151,10 +190,17 @@ export function MarketplaceBrowser({ plugins, onInstall, onCancel }: Props) {
           const isFocused = globalIdx === selectedIdx;
           return (
             <Box key={plugin.id}>
-              <Text color={isFocused ? "cyanBright" : undefined}>{isFocused ? " \u25B8" : "  "}</Text>
-              <Text color={isFocused ? "cyanBright" : undefined} bold={isFocused}> {plugin.name.padEnd(22)}</Text>
+              <Text color={isFocused ? "cyanBright" : undefined}>
+                {isFocused ? " \u25B8" : "  "}
+              </Text>
+              <Text color={isFocused ? "cyanBright" : undefined} bold={isFocused}>
+                {" "}
+                {plugin.name.padEnd(22)}
+              </Text>
               <Text color={PRICING_COLORS[plugin.pricing] as any}>{plugin.pricing.padEnd(10)}</Text>
-              <Text dimColor={!isFocused} wrap="truncate-end">{plugin.description}</Text>
+              <Text dimColor={!isFocused} wrap="truncate-end">
+                {plugin.description}
+              </Text>
             </Box>
           );
         })}
@@ -165,7 +211,10 @@ export function MarketplaceBrowser({ plugins, onInstall, onCancel }: Props) {
       )}
 
       <Box marginTop={1}>
-        <Text dimColor>{"\u2191\u2193"} scroll {"\u00B7"} Tab category {"\u00B7"} Enter details {"\u00B7"} Esc {query ? "clear" : selectedCategory !== "all" ? "all" : "close"}</Text>
+        <Text dimColor>
+          {"\u2191\u2193"} scroll {"\u00B7"} Tab category {"\u00B7"} Enter details {"\u00B7"} Esc{" "}
+          {query ? "clear" : selectedCategory !== "all" ? "all" : "close"}
+        </Text>
       </Box>
     </Box>
   );

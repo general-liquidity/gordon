@@ -56,7 +56,7 @@ const DEFAULT_CONFIG: SchedulerConfig = {
 };
 
 // Global state
-let state: SchedulerState = {
+const state: SchedulerState = {
   isRunning: false,
   intervalId: null,
   lastScanTime: null,
@@ -68,10 +68,14 @@ let currentConfig: SchedulerConfig = { ...DEFAULT_CONFIG };
 let exchangeClient: Exchange | null = null;
 let scanInFlight: Promise<CoinAnalysis[]> | null = null;
 
-function runScheduledScanSafely(trigger: "startup" | "interval" | "manual"): Promise<CoinAnalysis[]> {
+function runScheduledScanSafely(
+  trigger: "startup" | "interval" | "manual",
+): Promise<CoinAnalysis[]> {
   if (scanInFlight) {
     if (trigger !== "manual") {
-      logger.debug("Skipping scheduled scan trigger because previous scan is still running", { trigger });
+      logger.debug("Skipping scheduled scan trigger because previous scan is still running", {
+        trigger,
+      });
     }
     return scanInFlight;
   }
@@ -113,7 +117,7 @@ async function runScheduledScan(): Promise<CoinAnalysis[]> {
 
     // Filter opportunities by confidence threshold
     const opportunities = result.coins.filter(
-      (c) => c.setupDetected && c.setupConfidence >= (currentConfig.minConfidence ?? 0.5)
+      (c) => c.setupDetected && c.setupConfidence >= (currentConfig.minConfidence ?? 0.5),
     );
 
     state.opportunitiesFound += opportunities.length;
@@ -151,10 +155,7 @@ async function runScheduledScan(): Promise<CoinAnalysis[]> {
 /**
  * Start the scheduled scanner
  */
-export function startScheduler(
-  client: Exchange,
-  config?: Partial<SchedulerConfig>
-): void {
+export function startScheduler(client: Exchange, config?: Partial<SchedulerConfig>): void {
   if (state.isRunning) {
     logger.warn("Scheduler already running");
     return;
@@ -180,7 +181,12 @@ export function startScheduler(
 
   emitEvent("scheduler:started", {
     intervalMs: currentConfig.intervalMs,
-  }).catch((err) => { logger.error("Failed to emit scheduler event", err instanceof Error ? err : { error: String(err) }); });
+  }).catch((err) => {
+    logger.error(
+      "Failed to emit scheduler event",
+      err instanceof Error ? err : { error: String(err) },
+    );
+  });
 }
 
 /**
@@ -207,7 +213,12 @@ export function stopScheduler(): void {
   emitEvent("scheduler:stopped", {
     totalScans: state.scanCount,
     totalOpportunities: state.opportunitiesFound,
-  }).catch((err) => { logger.error("Failed to emit scheduler event", err instanceof Error ? err : { error: String(err) }); });
+  }).catch((err) => {
+    logger.error(
+      "Failed to emit scheduler event",
+      err instanceof Error ? err : { error: String(err) },
+    );
+  });
 }
 
 /**

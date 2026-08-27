@@ -29,4 +29,3 @@ export const GatewayEventEnvelopeSchema = z.object({
 });
 
 export type GatewayEventEnvelope = z.infer<typeof GatewayEventEnvelopeSchema>;
-

@@ -114,7 +114,11 @@ export function calculateUndercutRally(
     }
   }
   if (undercutIdx === -1) {
-    return { ...empty, brokenSupport: support, interpretation: "Support held — no undercut in window." };
+    return {
+      ...empty,
+      brokenSupport: support,
+      interpretation: "Support held — no undercut in window.",
+    };
   }
 
   // Find a later bar in the window that closed above support + margin.

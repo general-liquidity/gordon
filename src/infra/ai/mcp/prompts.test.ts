@@ -10,7 +10,10 @@ function makeSkill(overrides: Partial<Skill> & { id?: string } = {}): Skill {
     name: overrides.name ?? "Test Skill",
     description: overrides.description ?? "A test skill",
     body: overrides.body ?? "Default body",
-    frontmatter: overrides.frontmatter ?? { name: overrides.id ?? "test-skill", description: "A test skill" },
+    frontmatter: overrides.frontmatter ?? {
+      name: overrides.id ?? "test-skill",
+      description: "A test skill",
+    },
     source: overrides.source ?? "builtin",
     filePath: overrides.filePath ?? "/tmp/test-skill/SKILL.md",
   };

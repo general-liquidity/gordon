@@ -25,17 +25,39 @@ export function applyMotion(text: string, cursor: number, motion: string, count 
 
   for (let i = 0; i < count; i++) {
     switch (motion) {
-      case "h": pos = Math.max(0, pos - 1); break;
-      case "l": pos = Math.min(len - 1, pos + 1); break;
-      case "w": pos = nextWordStart(graphemes, text, pos); break;
-      case "b": pos = prevWordStart(graphemes, text, pos); break;
-      case "e": pos = wordEnd(graphemes, text, pos); break;
-      case "W": pos = nextWORDStart(graphemes, pos); break;
-      case "B": pos = prevWORDStart(graphemes, pos); break;
-      case "E": pos = WORDEnd(graphemes, pos); break;
-      case "0": pos = 0; break;
-      case "$": pos = len > 0 ? len - 1 : 0; break;
-      case "^": pos = firstNonSpace(graphemes); break;
+      case "h":
+        pos = Math.max(0, pos - 1);
+        break;
+      case "l":
+        pos = Math.min(len - 1, pos + 1);
+        break;
+      case "w":
+        pos = nextWordStart(graphemes, text, pos);
+        break;
+      case "b":
+        pos = prevWordStart(graphemes, text, pos);
+        break;
+      case "e":
+        pos = wordEnd(graphemes, text, pos);
+        break;
+      case "W":
+        pos = nextWORDStart(graphemes, pos);
+        break;
+      case "B":
+        pos = prevWORDStart(graphemes, pos);
+        break;
+      case "E":
+        pos = WORDEnd(graphemes, pos);
+        break;
+      case "0":
+        pos = 0;
+        break;
+      case "$":
+        pos = len > 0 ? len - 1 : 0;
+        break;
+      case "^":
+        pos = firstNonSpace(graphemes);
+        break;
     }
   }
 

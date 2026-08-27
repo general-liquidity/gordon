@@ -271,10 +271,7 @@ describe("recordPhaseLLMCost — workflow-phase cost recording", () => {
 
   it("records token usage on the global tracker", () => {
     const tracker = getCostTracker("phase-test-1");
-    recordPhaseLLMCost(
-      { promptTokens: 1000, completionTokens: 200 },
-      "claude-sonnet-4-5",
-    );
+    recordPhaseLLMCost({ promptTokens: 1000, completionTokens: 200 }, "claude-sonnet-4-5");
     const snapshot = tracker.snapshot();
     expect(snapshot.totalInputTokens).toBe(1000);
     expect(snapshot.totalOutputTokens).toBe(200);

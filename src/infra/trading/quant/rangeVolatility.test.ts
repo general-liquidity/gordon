@@ -10,12 +10,7 @@ function makeBar(open: number, high: number, low: number, close: number): OhlcBa
   return { open, high, low, close };
 }
 
-function gbmBars(
-  n: number,
-  sigmaAnn: number,
-  ppy: number,
-  seed = 1,
-): OhlcBar[] {
+function gbmBars(n: number, sigmaAnn: number, ppy: number, seed = 1): OhlcBar[] {
   // Deterministic LCG so the test is reproducible.
   let s = seed;
   const rand = () => {
@@ -84,7 +79,7 @@ describe("computeRangeVolatility — recovers known vol", () => {
   it("higher vol → higher estimates", () => {
     const ppy = 365;
     const lowVolBars = gbmBars(500, 0.15, ppy, 7);
-    const highVolBars = gbmBars(500, 0.60, ppy, 7);
+    const highVolBars = gbmBars(500, 0.6, ppy, 7);
     const lowR = computeRangeVolatility({ bars: lowVolBars, periodsPerYear: ppy });
     const highR = computeRangeVolatility({ bars: highVolBars, periodsPerYear: ppy });
     expect(highR.parkinsonAnnualized).toBeGreaterThan(lowR.parkinsonAnnualized * 2);
@@ -135,9 +130,9 @@ describe("computeRangeVolatility — Yang-Zhang (drift-independent)", () => {
     const ppy = 365;
     const driftBars = gbmBars(500, 0.3, ppy, 99);
     const muPerBar = 0.4 / ppy; // 40% annual drift
-    let drift = 1;
+    let _drift = 1;
     const drifted: OhlcBar[] = driftBars.map((b, i) => {
-      drift = Math.exp(muPerBar * (i + 1));
+      _drift = Math.exp(muPerBar * (i + 1));
       const baseDrift = Math.exp(muPerBar * i);
       return {
         open: b.open * baseDrift,

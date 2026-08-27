@@ -157,15 +157,17 @@ export class BirdeyeDataSource implements DataSource {
         ) {
           return [];
         }
-        return [{
-          openTime,
-          open: item.o,
-          high: item.h,
-          low: item.l,
-          close: item.c,
-          volume: Number.isFinite(item.v) ? item.v : 0,
-          closeTime: openTime + intervalMs - 1,
-        }];
+        return [
+          {
+            openTime,
+            open: item.o,
+            high: item.h,
+            low: item.l,
+            close: item.c,
+            volume: Number.isFinite(item.v) ? item.v : 0,
+            closeTime: openTime + intervalMs - 1,
+          },
+        ];
       });
 
       return candles

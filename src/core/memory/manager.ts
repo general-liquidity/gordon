@@ -10,10 +10,7 @@
  */
 
 import { createModuleLogger } from "../../infra/logger/index.ts";
-import {
-  createEmbeddingProvider,
-  type EmbeddingProvider,
-} from "./embeddings.ts";
+import { createEmbeddingProvider, type EmbeddingProvider } from "./embeddings.ts";
 import { extractTokens, MemoryStore } from "./store.ts";
 import { TradeJournal } from "./trade-journal.ts";
 
@@ -80,11 +77,7 @@ export class MemoryManager {
   private _embedder: EmbeddingProvider;
   private initialized = false;
 
-  constructor(
-    store?: MemoryStore,
-    journal?: TradeJournal,
-    embedder?: EmbeddingProvider
-  ) {
+  constructor(store?: MemoryStore, journal?: TradeJournal, embedder?: EmbeddingProvider) {
     this._embedder = embedder ?? createEmbeddingProvider();
     this._store = store ?? new MemoryStore();
     this._journal = journal ?? new TradeJournal(this._store, this._embedder);
@@ -178,9 +171,10 @@ export class MemoryManager {
       setupDescription: `Position closed via ${event.reason ?? "manual"}`,
       analysisNotes: `PnL: ${event.pnlPercent.toFixed(2)}%`,
       executionNotes: `${event.side} ${event.symbol} from $${event.entryPrice} to $${event.exitPrice}`,
-      lessonsLearned: event.pnl >= 0
-        ? "Profitable trade — review what went right"
-        : "Loss trade — review what could be improved",
+      lessonsLearned:
+        event.pnl >= 0
+          ? "Profitable trade — review what went right"
+          : "Loss trade — review what could be improved",
       rating: event.pnl >= 0 ? 3 : 2, // Default ratings, agents can update later
     });
 
@@ -252,10 +246,7 @@ export class MemoryManager {
    * @param currentQuery - The user's current query (used for semantic retrieval)
    * @returns Formatted context string for prompt injection
    */
-  async getContextForAgent(
-    agentId: string,
-    currentQuery?: string
-  ): Promise<string> {
+  async getContextForAgent(agentId: string, currentQuery?: string): Promise<string> {
     this.ensureInit();
 
     const parts: string[] = [];
@@ -283,9 +274,7 @@ export class MemoryManager {
           const formatted = results
             .map((r) => {
               const age = formatAge(r.entry.createdAt);
-              const symbolTag = r.entry.symbols?.length
-                ? ` [${r.entry.symbols.join(", ")}]`
-                : "";
+              const symbolTag = r.entry.symbols?.length ? ` [${r.entry.symbols.join(", ")}]` : "";
               return `- (${r.entry.type}${symbolTag}, ${age}, relevance: ${(r.score * 100).toFixed(0)}%) ${r.entry.content.slice(0, 200)}`;
             })
             .join("\n");

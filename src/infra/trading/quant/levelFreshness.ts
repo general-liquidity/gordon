@@ -149,9 +149,7 @@ export function evaluateLevelFreshness(input: LevelFreshnessInput): LevelFreshne
   };
 }
 
-export function levelFreshnessToPayload(
-  result: LevelFreshnessResult,
-): Record<string, unknown> {
+export function levelFreshnessToPayload(result: LevelFreshnessResult): Record<string, unknown> {
   return {
     kind: "level_freshness.evaluated",
     touchCount: result.touchCount,

@@ -11,7 +11,7 @@
  */
 
 import { createModuleLogger } from "../infra/logger/index.ts";
-import { EventBus, getEventBus } from "./bus.ts";
+import { type EventBus, getEventBus } from "./bus.ts";
 import type { EventType } from "./types.ts";
 import type {
   CandleCloseEvent,
@@ -393,7 +393,11 @@ export class MarketEventEmitter {
     if (!watched) return;
 
     // Check for candle close
-    if (update.isClosed && watched.watchTypes.has("candles") && watched.timeframes.has(update.interval)) {
+    if (
+      update.isClosed &&
+      watched.watchTypes.has("candles") &&
+      watched.timeframes.has(update.interval)
+    ) {
       this.emitCandleClose({
         symbol: update.symbol,
         timeframe: update.interval,
@@ -404,7 +408,10 @@ export class MarketEventEmitter {
         volume: update.volume,
         quoteVolume: 0, // Not available in kline update
       }).catch((err) => {
-        logger.error("Failed to emit candle close event", err instanceof Error ? err : new Error(String(err)));
+        logger.error(
+          "Failed to emit candle close event",
+          err instanceof Error ? err : new Error(String(err)),
+        );
       });
     }
 
@@ -419,7 +426,7 @@ export class MarketEventEmitter {
    */
   private handleTickerUpdate(update: TickerUpdate): void {
     const watched = this.watched.get(update.symbol);
-    if (!watched || !watched.watchTypes.has("price")) return;
+    if (!watched?.watchTypes.has("price")) return;
 
     // Throttle price tick emissions
     const now = Date.now();
@@ -438,7 +445,10 @@ export class MarketEventEmitter {
       priceChange24h: update.priceChange,
       priceChangePercent24h: update.priceChangePercent,
     }).catch((err) => {
-      logger.error("Failed to emit price tick event", err instanceof Error ? err : new Error(String(err)));
+      logger.error(
+        "Failed to emit price tick event",
+        err instanceof Error ? err : new Error(String(err)),
+      );
     });
   }
 
@@ -472,7 +482,10 @@ export class MarketEventEmitter {
         timeframe: kline.interval,
         price: kline.close,
       }).catch((err) => {
-        logger.error("Failed to emit volume spike event", err instanceof Error ? err : new Error(String(err)));
+        logger.error(
+          "Failed to emit volume spike event",
+          err instanceof Error ? err : new Error(String(err)),
+        );
       });
     }
   }

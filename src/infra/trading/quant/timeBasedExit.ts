@@ -60,7 +60,9 @@ export function computeTimeBasedExit(input: TimeBasedExitInput): TimeBasedExitRe
   }
   const thresholdMultiplier = input.thresholdMultiplier ?? DEFAULT_THRESHOLD;
   if (thresholdMultiplier <= 1) {
-    throw new Error("thresholdMultiplier must be > 1 (no point cutting at or below average duration)");
+    throw new Error(
+      "thresholdMultiplier must be > 1 (no point cutting at or below average duration)",
+    );
   }
 
   const durationRatio = input.timeInTrade / input.avgWinningDuration;

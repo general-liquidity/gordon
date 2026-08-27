@@ -1,8 +1,16 @@
 import { createKeyringProvider, KEYRING_SUPPORTED_KEYS } from "../../infra/storage/keyring.ts";
-import { checkEnvStatus, createEnvFile, saveEnvKeys, type EnvKeys } from "../../infra/storage/config/env.ts";
+import {
+  checkEnvStatus,
+  createEnvFile,
+  saveEnvKeys,
+  type EnvKeys,
+} from "../../infra/storage/config/env.ts";
 import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
 import { resolveFlag } from "../../infra/config/flagResolver.ts";
-import { getProviderCredentialStatuses, type ProviderCredentialStatus } from "../../infra/runtime/actions/index.ts";
+import {
+  getProviderCredentialStatuses,
+  type ProviderCredentialStatus,
+} from "../../infra/runtime/actions/index.ts";
 import { BROKER_ENV_MAP, type BrokerId } from "../../infra/broker/types.ts";
 import {
   EXCHANGE_ENV_MAP,
@@ -15,7 +23,10 @@ import {
 } from "../../infra/exchange/types.ts";
 import { pluginInstaller } from "../../infra/ai/mcp/marketplace/installer.ts";
 import { recordStructuredObservation } from "../../infra/platform/observability/index.ts";
-import { getExecutionVenueMetadata, getIntegrationSurfaceMetadata } from "../../infra/domain/integrations/index.ts";
+import {
+  getExecutionVenueMetadata,
+  getIntegrationSurfaceMetadata,
+} from "../../infra/domain/integrations/index.ts";
 import { setCostBudget } from "../../infra/platform/costTracker.ts";
 import type {
   GordonConfig,
@@ -145,25 +156,32 @@ export function parseBootstrapArgs(args: string[]): BootstrapOptions {
   return {
     profile,
     llmProvider:
-      parsed["llm-provider"] === "openai"
-      || parsed["llm-provider"] === "anthropic"
+      parsed["llm-provider"] === "openai" || parsed["llm-provider"] === "anthropic"
         ? parsed["llm-provider"]
         : undefined,
     llmKey: typeof parsed["llm-key"] === "string" ? parsed["llm-key"] : undefined,
-    exchange: typeof parsed.exchange === "string" ? parsed.exchange as ExchangeId : undefined,
+    exchange: typeof parsed.exchange === "string" ? (parsed.exchange as ExchangeId) : undefined,
     exchangeKey: typeof parsed["exchange-key"] === "string" ? parsed["exchange-key"] : undefined,
-    exchangeSecret: typeof parsed["exchange-secret"] === "string" ? parsed["exchange-secret"] : undefined,
-    exchangePassphrase: typeof parsed["exchange-passphrase"] === "string" ? parsed["exchange-passphrase"] : undefined,
-    exchangeWallet: typeof parsed["exchange-wallet"] === "string" ? parsed["exchange-wallet"] : undefined,
-    exchangeLive: parsed["exchange-live"] === true || parseBoolean(parsed["exchange-live"]) === true,
-    broker: typeof parsed.broker === "string" ? parsed.broker as BrokerId : undefined,
+    exchangeSecret:
+      typeof parsed["exchange-secret"] === "string" ? parsed["exchange-secret"] : undefined,
+    exchangePassphrase:
+      typeof parsed["exchange-passphrase"] === "string" ? parsed["exchange-passphrase"] : undefined,
+    exchangeWallet:
+      typeof parsed["exchange-wallet"] === "string" ? parsed["exchange-wallet"] : undefined,
+    exchangeLive:
+      parsed["exchange-live"] === true || parseBoolean(parsed["exchange-live"]) === true,
+    broker: typeof parsed.broker === "string" ? (parsed.broker as BrokerId) : undefined,
     brokerKey: typeof parsed["broker-key"] === "string" ? parsed["broker-key"] : undefined,
     brokerSecret: typeof parsed["broker-secret"] === "string" ? parsed["broker-secret"] : undefined,
     brokerPaper: parseBoolean(parsed["broker-paper"]),
-    brokerAccountId: typeof parsed["broker-account-id"] === "string" ? parsed["broker-account-id"] : undefined,
-    synthDataApiKey: typeof parsed["synthdata-api-key"] === "string" ? parsed["synthdata-api-key"] : undefined,
+    brokerAccountId:
+      typeof parsed["broker-account-id"] === "string" ? parsed["broker-account-id"] : undefined,
+    synthDataApiKey:
+      typeof parsed["synthdata-api-key"] === "string" ? parsed["synthdata-api-key"] : undefined,
     cashReservePercent: parseDecimalPercent(
-      typeof parsed["cash-reserve-percent"] === "string" ? parsed["cash-reserve-percent"] : undefined,
+      typeof parsed["cash-reserve-percent"] === "string"
+        ? parsed["cash-reserve-percent"]
+        : undefined,
     ),
     useKeyring: parseBoolean(parsed["use-keyring"]),
     json: Boolean(parsed.json),
@@ -215,10 +233,12 @@ function upsertExchange(
   return {
     ...config,
     exchanges: [
-      ...config.exchanges.filter((exchange) => exchange.type !== canonicalType).map((exchange) => ({
-        ...exchange,
-        isDefault: false,
-      })),
+      ...config.exchanges
+        .filter((exchange) => exchange.type !== canonicalType)
+        .map((exchange) => ({
+          ...exchange,
+          isDefault: false,
+        })),
       next,
     ],
     activeExchangeId: id,
@@ -247,10 +267,12 @@ function upsertBroker(
   return {
     ...config,
     brokers: [
-      ...config.brokers.filter((broker) => broker.type !== brokerType).map((broker) => ({
-        ...broker,
-        isDefault: false,
-      })),
+      ...config.brokers
+        .filter((broker) => broker.type !== brokerType)
+        .map((broker) => ({
+          ...broker,
+          isDefault: false,
+        })),
       next,
     ],
     activeBrokerId: id,
@@ -282,7 +304,7 @@ async function persistKeysToKeyring(
   const stored: string[] = [];
   for (const [key, value] of Object.entries(keys)) {
     if (!value) continue;
-    if (!KEYRING_SUPPORTED_KEYS.includes(key as typeof KEYRING_SUPPORTED_KEYS[number])) continue;
+    if (!KEYRING_SUPPORTED_KEYS.includes(key as (typeof KEYRING_SUPPORTED_KEYS)[number])) continue;
     await provider.set(key, value);
     stored.push(key);
   }
@@ -290,7 +312,7 @@ async function persistKeysToKeyring(
 }
 
 export async function collectDoctorReport(configInput?: GordonConfig): Promise<DoctorReport> {
-  const config = configInput ?? await loadConfig();
+  const config = configInput ?? (await loadConfig());
   const envStatus = await checkEnvStatus();
   const keyring = createKeyringProvider();
   const keyringAvailable = await keyring.isAvailable();
@@ -308,12 +330,14 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
     enabledMcpPlugins = 0;
   }
 
-  const activeExchange = config.exchanges.find((exchange) => exchange.id === config.activeExchangeId)
-    ?? config.exchanges.find((exchange) => exchange.isDefault)
-    ?? null;
-  const activeBroker = config.brokers.find((broker) => broker.id === config.activeBrokerId)
-    ?? config.brokers.find((broker) => broker.isDefault)
-    ?? null;
+  const activeExchange =
+    config.exchanges.find((exchange) => exchange.id === config.activeExchangeId) ??
+    config.exchanges.find((exchange) => exchange.isDefault) ??
+    null;
+  const activeBroker =
+    config.brokers.find((broker) => broker.id === config.activeBrokerId) ??
+    config.brokers.find((broker) => broker.isDefault) ??
+    null;
 
   const checks: DoctorCheck[] = [
     {
@@ -367,10 +391,16 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
   ];
 
   const nextActions: string[] = [];
-  if (!envStatus.hasLLMKey) nextActions.push("Run `gordon configure llm` or QuickStart to set an LLM provider key.");
-  if (!activeExchange) nextActions.push("Run `gordon configure exchange` to add a primary trading venue.");
-  if (config.useKeyring && !keyringAvailable) nextActions.push("Disable keyring or install a supported OS keyring backend.");
-  if (!config.onboardingComplete) nextActions.push("Finish QuickStart or Advanced onboarding so Gordon can skip first-run setup next time.");
+  if (!envStatus.hasLLMKey)
+    nextActions.push("Run `gordon configure llm` or QuickStart to set an LLM provider key.");
+  if (!activeExchange)
+    nextActions.push("Run `gordon configure exchange` to add a primary trading venue.");
+  if (config.useKeyring && !keyringAvailable)
+    nextActions.push("Disable keyring or install a supported OS keyring backend.");
+  if (!config.onboardingComplete)
+    nextActions.push(
+      "Finish QuickStart or Advanced onboarding so Gordon can skip first-run setup next time.",
+    );
 
   // Harness wires (A3 + A4 + sandbox + kv-cache + claude.md linter):
   // cold by default, surface in doctor report when their flags are on.
@@ -389,7 +419,14 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
     const kvCacheChecks = collectKvCacheCheck();
     const claudeMdChecks = collectClaudeMdLintChecks();
     const readinessChecks = await collectAgentReadinessChecks();
-    checks.push(...probeChecks, ...safetyChecks, ...sandboxChecks, ...kvCacheChecks, ...claudeMdChecks, ...readinessChecks);
+    checks.push(
+      ...probeChecks,
+      ...safetyChecks,
+      ...sandboxChecks,
+      ...kvCacheChecks,
+      ...claudeMdChecks,
+      ...readinessChecks,
+    );
   } catch {
     // harness-checks failures must not break the doctor report
   }
@@ -538,7 +575,11 @@ export async function applyBootstrap(options: BootstrapOptions): Promise<Bootstr
       const envMap = EXCHANGE_ENV_MAP[options.exchange as NativeExchangeId];
       setEnvKey(envKeys, envMap.key as keyof EnvKeys | undefined, options.exchangeKey);
       setEnvKey(envKeys, envMap.secret as keyof EnvKeys | undefined, options.exchangeSecret);
-      setEnvKey(envKeys, envMap.passphrase as keyof EnvKeys | undefined, options.exchangePassphrase);
+      setEnvKey(
+        envKeys,
+        envMap.passphrase as keyof EnvKeys | undefined,
+        options.exchangePassphrase,
+      );
       setEnvKey(envKeys, envMap.wallet as keyof EnvKeys | undefined, options.exchangeWallet);
     }
     // Both CCXT and native exchanges that use API keys store "***" placeholders
@@ -605,7 +646,8 @@ export async function applyBootstrap(options: BootstrapOptions): Promise<Bootstr
   await saveConfig(config);
 
   const exchangeSummary = options.exchange
-    ? config.exchanges.find((exchange) => exchange.type === normalizeExchangeId(options.exchange!))?.sandbox
+    ? config.exchanges.find((exchange) => exchange.type === normalizeExchangeId(options.exchange!))
+        ?.sandbox
       ? `${options.exchange} (sandbox/paper — pass --exchange-live to trade real money)`
       : `${options.exchange} (live)`
     : "unchanged";

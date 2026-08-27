@@ -128,12 +128,7 @@ export const getMarketDataTool = createTool({
       .positive()
       .optional()
       .describe("Candles: number of bars. Orderbook: levels of depth. Default 100/20."),
-    depth: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe("Alias for limit on orderbook."),
+    depth: z.number().int().positive().optional().describe("Alias for limit on orderbook."),
     asOf: z
       .string()
       .optional()
@@ -367,30 +362,47 @@ export const getPortfolioTool = createTool({
     try {
       const manager = await getPositionManager(getEventBus());
       const activeRecords = await manager.getActivePositions();
-      const livePositions = activeRecords.filter((position) => LIVE_PORTFOLIO_STATES.has(position.state));
+      const livePositions = activeRecords.filter((position) =>
+        LIVE_PORTFOLIO_STATES.has(position.state),
+      );
       const dayStart = new Date();
       dayStart.setUTCHours(0, 0, 0, 0);
       const dayStartMs = dayStart.getTime();
       const closedToday = _args.includeClosedToday
-        ? (await manager.getTradeHistory({ since: dayStart.toISOString() })).filter((position) =>
-            (position.state === "closed" || position.state === "reviewed") &&
-            isClosedToday(position, dayStartMs)
+        ? (await manager.getTradeHistory({ since: dayStart.toISOString() })).filter(
+            (position) =>
+              (position.state === "closed" || position.state === "reviewed") &&
+              isClosedToday(position, dayStartMs),
           )
         : [];
 
       if (livePositions.length > 0 || closedToday.length > 0) {
-        const totalExposureUsd = livePositions.reduce((sum, position) => sum + positionMarketValue(position), 0);
-        const highWaterUsd = livePositions.reduce((sum, position) => sum + positionHighWaterValue(position), 0);
-        const unrealizedPnlUsd = livePositions.reduce((sum, position) => sum + positionUnrealizedPnl(position), 0);
-        const realizedPnlUsd = closedToday.reduce((sum, position) => sum + (position.realizedPnL ?? 0), 0);
-        const drawdownPct = highWaterUsd > 0
-          ? Math.max(0, ((highWaterUsd - totalExposureUsd) / highWaterUsd) * 100)
-          : 0;
+        const totalExposureUsd = livePositions.reduce(
+          (sum, position) => sum + positionMarketValue(position),
+          0,
+        );
+        const highWaterUsd = livePositions.reduce(
+          (sum, position) => sum + positionHighWaterValue(position),
+          0,
+        );
+        const unrealizedPnlUsd = livePositions.reduce(
+          (sum, position) => sum + positionUnrealizedPnl(position),
+          0,
+        );
+        const realizedPnlUsd = closedToday.reduce(
+          (sum, position) => sum + (position.realizedPnL ?? 0),
+          0,
+        );
+        const drawdownPct =
+          highWaterUsd > 0
+            ? Math.max(0, ((highWaterUsd - totalExposureUsd) / highWaterUsd) * 100)
+            : 0;
 
         return {
           venue: exchange?.exchangeId,
           positions: [...livePositions, ...closedToday],
-          totalValueUsd: ctx?.portfolioValue && ctx.portfolioValue > 0 ? ctx.portfolioValue : totalExposureUsd,
+          totalValueUsd:
+            ctx?.portfolioValue && ctx.portfolioValue > 0 ? ctx.portfolioValue : totalExposureUsd,
           totalExposureUsd,
           unrealizedPnlUsd,
           realizedPnlUsd,
@@ -401,9 +413,12 @@ export const getPortfolioTool = createTool({
         };
       }
     } catch (err) {
-      logger.warn("Position-tracking portfolio snapshot failed; falling back to exchange balances", {
-        error: err instanceof Error ? err.message : String(err),
-      });
+      logger.warn(
+        "Position-tracking portfolio snapshot failed; falling back to exchange balances",
+        {
+          error: err instanceof Error ? err.message : String(err),
+        },
+      );
     }
 
     if (exchange) {
@@ -623,11 +638,7 @@ export const getFundamentalsTool = createTool({
         case "balance":
         case "cashflow": {
           const freq =
-            args.metric === "income"
-              ? "annual"
-              : args.metric === "balance"
-                ? "annual"
-                : "annual";
+            args.metric === "income" ? "annual" : args.metric === "balance" ? "annual" : "annual";
           const r = (await (implFinancialsReported.execute as any)(
             { symbol, freq },
             execContext,
@@ -635,24 +646,39 @@ export const getFundamentalsTool = createTool({
           return { ticker: symbol, metric: args.metric, data: r, fetchedAt };
         }
         case "estimates": {
-          const r = (await (implRevenueEstimates.execute as any)({ symbol }, execContext)) as unknown;
+          const r = (await (implRevenueEstimates.execute as any)(
+            { symbol },
+            execContext,
+          )) as unknown;
           return { ticker: symbol, metric: "estimates", data: r, fetchedAt };
         }
         case "earnings": {
-          const r = (await (implEarningsSurprises.execute as any)({ symbol }, execContext)) as unknown;
+          const r = (await (implEarningsSurprises.execute as any)(
+            { symbol },
+            execContext,
+          )) as unknown;
           return { ticker: symbol, metric: "earnings", data: r, fetchedAt };
         }
         case "analysts": {
-          const r = (await (implUpgradeDowngrade.execute as any)({ symbol }, execContext)) as unknown;
+          const r = (await (implUpgradeDowngrade.execute as any)(
+            { symbol },
+            execContext,
+          )) as unknown;
           return { ticker: symbol, metric: "analysts", data: r, fetchedAt };
         }
         case "insider": {
-          const r = (await (implInsiderSentiment.execute as any)({ symbol }, execContext)) as unknown;
+          const r = (await (implInsiderSentiment.execute as any)(
+            { symbol },
+            execContext,
+          )) as unknown;
           return { ticker: symbol, metric: "insider", data: r, fetchedAt };
         }
         default: {
           // Fall back to basic financials for any unrecognized metric.
-          const r = (await (implBasicFinancials.execute as any)({ symbol }, execContext)) as unknown;
+          const r = (await (implBasicFinancials.execute as any)(
+            { symbol },
+            execContext,
+          )) as unknown;
           return { ticker: symbol, metric: args.metric, data: r, fetchedAt };
         }
       }

@@ -90,8 +90,8 @@ const DEFAULT_MIN = 4;
 const DEFAULT_BODY = -1.0;
 const DEFAULT_RANGE = -1.0;
 const DEFAULT_VOLUME = -2.0;
-const DEFAULT_REL_VOL = 0.70;
-const DEFAULT_MAX_RANGE_OVER_LOW = 0.10;
+const DEFAULT_REL_VOL = 0.7;
+const DEFAULT_MAX_RANGE_OVER_LOW = 0.1;
 const DEFAULT_BASELINE_VOL_WINDOW = 20;
 
 function slopePctOfMean(values: number[]): number {
@@ -163,7 +163,8 @@ export function analyzeVcpContraction(
   const bodyContracts = bodySlopePct <= bodyT;
   const rangeContracts = rangeSlopePct <= rangeT;
   const volContracts = volSlopePct <= volT;
-  const contractingAxes = (bodyContracts ? 1 : 0) + (rangeContracts ? 1 : 0) + (volContracts ? 1 : 0);
+  const contractingAxes =
+    (bodyContracts ? 1 : 0) + (rangeContracts ? 1 : 0) + (volContracts ? 1 : 0);
 
   // Spring ready = all 3 axes contracting AND tight range AND low relative vol
   const tightRange = windowRangeOverLow <= maxRange;

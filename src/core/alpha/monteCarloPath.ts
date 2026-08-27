@@ -123,7 +123,10 @@ function buildReturnTransitionMatrix(
   nStates: number,
 ): { matrix: number[][]; binEdges: number[]; stateReturns: number[][] } {
   if (rets.length < 2) {
-    const empty = Array.from({ length: nStates }, () => new Array(nStates).fill(1 / nStates) as number[]);
+    const empty = Array.from(
+      { length: nStates },
+      () => new Array(nStates).fill(1 / nStates) as number[],
+    );
     return { matrix: empty, binEdges: [], stateReturns: Array.from({ length: nStates }, () => []) };
   }
   const sorted = [...rets].sort((a, b) => a - b);
@@ -138,7 +141,10 @@ function buildReturnTransitionMatrix(
     }
     return Math.min(s, nStates - 1);
   };
-  const matrix: number[][] = Array.from({ length: nStates }, () => new Array(nStates).fill(0) as number[]);
+  const matrix: number[][] = Array.from(
+    { length: nStates },
+    () => new Array(nStates).fill(0) as number[],
+  );
   const stateReturns: number[][] = Array.from({ length: nStates }, () => [] as number[]);
   for (let i = 0; i < rets.length; i++) {
     stateReturns[stateOf(rets[i]!)]!.push(rets[i]!);
@@ -171,7 +177,13 @@ function sampleState(probs: number[], rng: () => number): number {
   return probs.length - 1;
 }
 
-function sampleStateReturn(stateReturns: number[][], state: number, rng: () => number, fallbackMu: number, fallbackSigma: number): number {
+function sampleStateReturn(
+  stateReturns: number[][],
+  state: number,
+  rng: () => number,
+  fallbackMu: number,
+  fallbackSigma: number,
+): number {
   const pool = stateReturns[state] ?? [];
   if (pool.length === 0) return fallbackMu + fallbackSigma * gaussian(rng);
   return pool[Math.floor(rng() * pool.length)]!;

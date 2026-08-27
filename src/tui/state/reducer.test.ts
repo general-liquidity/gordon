@@ -47,7 +47,9 @@ describe("appReducer", () => {
   it("updates a streaming message and stream buffer atomically", () => {
     const base = state({
       streamBuffer: "",
-      messages: [{ id: "streaming-1", role: "gordon", content: "", timestamp: "t", streaming: true }],
+      messages: [
+        { id: "streaming-1", role: "gordon", content: "", timestamp: "t", streaming: true },
+      ],
     });
     const next = appReducer(base, {
       type: "UPDATE_STREAMING_MESSAGE",
@@ -61,12 +63,14 @@ describe("appReducer", () => {
 
   it("returns same reference when streaming message id is absent", () => {
     const base = state();
-    expect(appReducer(base, {
-      type: "UPDATE_STREAMING_MESSAGE",
-      id: "missing",
-      content: "x",
-      streamBuffer: "x",
-    })).toBe(base);
+    expect(
+      appReducer(base, {
+        type: "UPDATE_STREAMING_MESSAGE",
+        id: "missing",
+        content: "x",
+        streamBuffer: "x",
+      }),
+    ).toBe(base);
   });
 
   it("sets and clears active tool calls", () => {
@@ -85,11 +89,15 @@ describe("appReducer", () => {
         streamBuffer: "x",
         isStreaming: true,
         activeThinking: "thinking...",
-        activeToolCalls: [{ id: "tc-1", toolName: "get_price", status: "running", startedAt: 1 } as never],
+        activeToolCalls: [
+          { id: "tc-1", toolName: "get_price", status: "running", startedAt: 1 } as never,
+        ],
         activeAgents: [{ id: "chain-1" } as never],
         handoffHistory: [{ from: "gordon", to: "executor", timestamp: 1 } as never],
         pendingApprovals: [{ id: "approval-1" } as never],
-        notifications: [{ id: "n1", type: "trade:opened", variant: "fill", message: "filled", timestamp: "t" }],
+        notifications: [
+          { id: "n1", type: "trade:opened", variant: "fill", message: "filled", timestamp: "t" },
+        ],
         backgroundTasks: [{ id: "bt-1", label: "scan", status: "running" }],
         contextTokens: 1234,
         lastTurnDurationMs: 8200,
@@ -166,11 +174,19 @@ describe("appReducer", () => {
 
   it("maintains a dialog stack", () => {
     const settings = appReducer(state(), { type: "OPEN_DIALOG", id: "settings" });
-    const theme = appReducer(settings, { type: "OPEN_DIALOG", id: "themePicker", payload: { source: "settings" } });
+    const theme = appReducer(settings, {
+      type: "OPEN_DIALOG",
+      id: "themePicker",
+      payload: { source: "settings" },
+    });
     expect(theme.openDialogs.map((dialog) => dialog.id)).toEqual(["settings", "themePicker"]);
     expect(theme.openDialogs[1]?.payload).toEqual({ source: "settings" });
 
-    const reopened = appReducer(theme, { type: "OPEN_DIALOG", id: "settings", payload: { tab: "general" } });
+    const reopened = appReducer(theme, {
+      type: "OPEN_DIALOG",
+      id: "settings",
+      payload: { tab: "general" },
+    });
     expect(reopened.openDialogs.map((dialog) => dialog.id)).toEqual(["themePicker", "settings"]);
     expect(reopened.openDialogs[1]?.payload).toEqual({ tab: "general" });
 
@@ -182,7 +198,10 @@ describe("appReducer", () => {
   });
 
   it("opens overlay views and closes the palette", () => {
-    const next = appReducer(state({ showPalette: true }), { type: "OPEN_OVERLAY_VIEW", view: "tradeQueue" });
+    const next = appReducer(state({ showPalette: true }), {
+      type: "OPEN_OVERLAY_VIEW",
+      view: "tradeQueue",
+    });
     expect(next.activeOverlayView).toBe("tradeQueue");
     expect(next.showPalette).toBe(false);
   });

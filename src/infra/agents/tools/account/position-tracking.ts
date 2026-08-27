@@ -49,18 +49,20 @@ const transitionOutputSchema = z.object({
 
 const positionListOutputSchema = z.object({
   count: z.number(),
-  positions: z.array(z.object({
-    id: z.string(),
-    symbol: z.string(),
-    state: z.string(),
-    side: z.string(),
-    entryPrice: z.number().optional(),
-    currentPrice: z.number().optional(),
-    unrealizedPnL: z.number().optional(),
-    realizedPnL: z.number().optional(),
-    strategyId: z.string().optional(),
-    createdAt: z.string(),
-  })),
+  positions: z.array(
+    z.object({
+      id: z.string(),
+      symbol: z.string(),
+      state: z.string(),
+      side: z.string(),
+      entryPrice: z.number().optional(),
+      currentPrice: z.number().optional(),
+      unrealizedPnL: z.number().optional(),
+      realizedPnL: z.number().optional(),
+      strategyId: z.string().optional(),
+      createdAt: z.string(),
+    }),
+  ),
   error: z.string().optional(),
 });
 
@@ -126,8 +128,7 @@ export const reportSetupTool = createTool({
 
 export const reportAnalysisTool = createTool({
   id: "report_analysis",
-  description:
-    "Record analysis results on an existing position. Transitions idea -> analyzed.",
+  description: "Record analysis results on an existing position. Transitions idea -> analyzed.",
   inputSchema: z.object({
     positionId: z.string().describe("Position ID to attach analysis to"),
     bias: z.enum(["bullish", "bearish", "neutral"]).describe("Directional bias"),
@@ -168,8 +169,7 @@ export const reportAnalysisTool = createTool({
 
 export const reportPlanTool = createTool({
   id: "report_plan",
-  description:
-    "Record a trade plan on an analyzed position. Transitions analyzed -> planned.",
+  description: "Record a trade plan on an analyzed position. Transitions analyzed -> planned.",
   inputSchema: z.object({
     positionId: z.string().describe("Position ID to attach plan to"),
     entryPrice: z.number().describe("Planned entry price"),
@@ -182,7 +182,17 @@ export const reportPlanTool = createTool({
     notes: z.string().optional().describe("Plan notes or reasoning"),
   }),
   outputSchema: transitionOutputSchema,
-  execute: async ({ positionId, entryPrice, entryType, stopLoss, takeProfit, positionSize, allocationAmount, riskRewardRatio, notes }) => {
+  execute: async ({
+    positionId,
+    entryPrice,
+    entryType,
+    stopLoss,
+    takeProfit,
+    positionSize,
+    allocationAmount,
+    riskRewardRatio,
+    notes,
+  }) => {
     try {
       const mgr = await getManager();
       const position = await mgr.reportPlan(positionId, {
@@ -216,8 +226,7 @@ export const reportPlanTool = createTool({
 
 export const approvePositionTool = createTool({
   id: "approve_position",
-  description:
-    "Approve a planned position for execution. Transitions planned -> approved.",
+  description: "Approve a planned position for execution. Transitions planned -> approved.",
   inputSchema: z.object({
     positionId: z.string().describe("Position ID to approve"),
   }),
@@ -239,8 +248,7 @@ export const approvePositionTool = createTool({
 
 export const rejectPositionTool = createTool({
   id: "reject_position",
-  description:
-    "Reject a planned position. Transitions planned -> rejected (terminal).",
+  description: "Reject a planned position. Transitions planned -> rejected (terminal).",
   inputSchema: z.object({
     positionId: z.string().describe("Position ID to reject"),
     reason: z.string().describe("Reason for rejection"),
@@ -267,8 +275,7 @@ export const rejectPositionTool = createTool({
 
 export const listActivePositionsTool = createTool({
   id: "list_active_positions",
-  description:
-    "List all active (non-terminal) positions across all states.",
+  description: "List all active (non-terminal) positions across all states.",
   inputSchema: z.object({}),
   outputSchema: positionListOutputSchema,
   execute: async () => {
@@ -305,8 +312,7 @@ export const listActivePositionsTool = createTool({
 
 export const getPositionDetailTool = createTool({
   id: "get_position_detail",
-  description:
-    "Get full details for a single position including state history and summary.",
+  description: "Get full details for a single position including state history and summary.",
   inputSchema: z.object({
     positionId: z.string().describe("Position ID to look up"),
   }),
@@ -337,8 +343,7 @@ export const getPositionDetailTool = createTool({
 
 export const updatePositionLiveTool = createTool({
   id: "update_position_live",
-  description:
-    "Update live market data on a monitoring position. Does not change state.",
+  description: "Update live market data on a monitoring position. Does not change state.",
   inputSchema: z.object({
     positionId: z.string().describe("Position ID to update"),
     currentPrice: z.number().describe("Current market price"),
@@ -352,6 +357,7 @@ export const updatePositionLiveTool = createTool({
       const position = await mgr.updateLive(positionId, {
         currentPrice,
         unrealizedPnL: unrealizedPnl ?? 0,
+        unrealizedPnLPercent: unrealizedPnlPercent,
         highWaterMark: currentPrice, // Let the state machine track the actual HWM
       });
 
@@ -370,15 +376,17 @@ export const updatePositionLiveTool = createTool({
 
 export const closePositionTrackingTool = createTool({
   id: "close_position_tracking",
-  description:
-    "Record that a position has been closed. Transitions monitoring/closing -> closed.",
+  description: "Record that a position has been closed. Transitions monitoring/closing -> closed.",
   inputSchema: z.object({
     positionId: z.string().describe("Position ID to close"),
     exitPrice: z.number().describe("Actual exit/fill price"),
     realizedPnl: z.number().describe("Realized PnL in dollars"),
     realizedPnlPercent: z.number().optional().describe("Realized PnL as percentage"),
     fees: z.number().optional().describe("Total fees paid"),
-    reason: z.string().optional().describe("Reason for closing (e.g. stop-loss, take-profit, manual)"),
+    reason: z
+      .string()
+      .optional()
+      .describe("Reason for closing (e.g. stop-loss, take-profit, manual)"),
   }),
   outputSchema: simpleResultSchema,
   execute: async ({ positionId, exitPrice, realizedPnl, realizedPnlPercent, fees, reason }) => {
@@ -387,6 +395,9 @@ export const closePositionTrackingTool = createTool({
       const position = await mgr.reportClosed(positionId, {
         exitPrice,
         realizedPnL: realizedPnl,
+        realizedPnLPercent: realizedPnlPercent,
+        fees,
+        reason,
       });
 
       logger.info("Position closed", { positionId, exitPrice, realizedPnl });
@@ -416,7 +427,14 @@ export const reviewPositionTool = createTool({
     wouldTakeAgain: z.boolean().optional().describe("Whether this setup would be taken again"),
   }),
   outputSchema: simpleResultSchema,
-  execute: async ({ positionId, rating, lessonsLearned, whatWentWell, whatWentWrong, wouldTakeAgain }) => {
+  execute: async ({
+    positionId,
+    rating,
+    lessonsLearned,
+    whatWentWell,
+    whatWentWrong,
+    wouldTakeAgain,
+  }) => {
     try {
       const mgr = await getManager();
 
@@ -424,7 +442,8 @@ export const reviewPositionTool = createTool({
       const notesParts: string[] = [];
       if (whatWentWell) notesParts.push(`Went well: ${whatWentWell}`);
       if (whatWentWrong) notesParts.push(`Went wrong: ${whatWentWrong}`);
-      if (wouldTakeAgain !== undefined) notesParts.push(`Would take again: ${wouldTakeAgain ? "yes" : "no"}`);
+      if (wouldTakeAgain !== undefined)
+        notesParts.push(`Would take again: ${wouldTakeAgain ? "yes" : "no"}`);
 
       const position = await mgr.reportReview(positionId, {
         grade: rating,

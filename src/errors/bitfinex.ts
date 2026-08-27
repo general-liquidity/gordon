@@ -15,7 +15,7 @@ export class BitfinexError extends GordonError {
     message: string,
     bitfinexCode?: string,
     endpoint?: string,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, "BITFINEX_ERROR", { ...context, bitfinexCode, endpoint });
     this.name = "BitfinexError";
@@ -37,7 +37,7 @@ export class BitfinexError extends GordonError {
     return (
       this.bitfinexCode === "10100" || // apikey: invalid
       this.bitfinexCode === "10111" || // apikey: nonce is too small
-      this.bitfinexCode === "10112"    // apikey: invalid signature
+      this.bitfinexCode === "10112" // apikey: invalid signature
     );
   }
 }
@@ -48,16 +48,12 @@ export class BitfinexError extends GordonError {
 export class BitfinexRateLimitError extends BitfinexError {
   public readonly retryAfter?: number;
 
-  constructor(
-    retryAfter?: number,
-    endpoint?: string,
-    context?: Record<string, unknown>
-  ) {
+  constructor(retryAfter?: number, endpoint?: string, context?: Record<string, unknown>) {
     super(
       `Rate limit exceeded${retryAfter ? `. Retry after ${retryAfter}ms` : ""}`,
       "RATE_LIMIT",
       endpoint,
-      { ...context, retryAfter }
+      { ...context, retryAfter },
     );
     this.name = "BitfinexRateLimitError";
     this.retryAfter = retryAfter;
@@ -71,7 +67,7 @@ export class BitfinexAuthError extends BitfinexError {
   constructor(
     message: string = "Invalid API key or signature",
     bitfinexCode: string = "10100",
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, bitfinexCode, undefined, context);
     this.name = "BitfinexAuthError";
@@ -90,13 +86,13 @@ export class BitfinexInsufficientBalanceError extends BitfinexError {
     asset: string,
     required: number,
     available: number,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(
       `Insufficient ${asset} balance. Required: ${required}, Available: ${available}`,
       "10001",
       "/auth/w/order/submit",
-      { ...context, asset, required, available }
+      { ...context, asset, required, available },
     );
     this.name = "BitfinexInsufficientBalanceError";
     this.asset = asset;
@@ -127,7 +123,7 @@ export class BitfinexInvalidSymbolError extends BitfinexError {
 export class BitfinexConnectionError extends GordonError {
   constructor(
     message: string = "Failed to connect to Bitfinex API",
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, "BITFINEX_CONNECTION_ERROR", context);
     this.name = "BitfinexConnectionError";
@@ -140,7 +136,7 @@ export class BitfinexConnectionError extends GordonError {
 export function createBitfinexError(
   code: string,
   message: string,
-  endpoint?: string
+  endpoint?: string,
 ): BitfinexError {
   switch (code) {
     case "10114":

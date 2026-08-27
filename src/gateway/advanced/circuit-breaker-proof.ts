@@ -15,7 +15,9 @@ export interface CircuitBreakerProof {
 /**
  * Generate a machine-checkable proof object for baseline circuit breaker state.
  */
-export function generateCircuitBreakerProof(input: BaselineCircuitBreakerInput): CircuitBreakerProof {
+export function generateCircuitBreakerProof(
+  input: BaselineCircuitBreakerInput,
+): CircuitBreakerProof {
   const result = evaluateBaselineCircuitBreakers(input);
   const generatedAt = new Date().toISOString();
   const canonical = JSON.stringify({
@@ -45,4 +47,3 @@ export function verifyCircuitBreakerProof(proof: CircuitBreakerProof): boolean {
   const expected = createHash("sha256").update(canonical).digest("hex");
   return expected === proof.commitment;
 }
-

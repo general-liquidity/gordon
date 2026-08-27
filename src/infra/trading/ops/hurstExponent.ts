@@ -48,9 +48,7 @@ function rescaledRange(returns: number[], chunkSize: number): number {
       cumDev.push(running);
     }
     const range = Math.max(...cumDev) - Math.min(...cumDev);
-    const stddev = Math.sqrt(
-      deviations.reduce((s, d) => s + d * d, 0) / chunk.length,
-    );
+    const stddev = Math.sqrt(deviations.reduce((s, d) => s + d * d, 0) / chunk.length);
     if (stddev > 0) {
       totalRS += range / stddev;
       chunks += 1;

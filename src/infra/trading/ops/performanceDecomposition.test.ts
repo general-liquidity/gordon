@@ -10,7 +10,7 @@ describe("decomposeReturns — Wright's worked example", () => {
   it("35% return decomposes to 24% beta + 6.4% factors + 4.6% alpha", () => {
     const r = decomposeReturns({
       totalReturn: 0.35,
-      marketReturn: 0.20,
+      marketReturn: 0.2,
       marketBeta: 1.2,
       factors: [
         { factor: "sector", loading: 0.3, factorReturn: 0.08 },
@@ -27,7 +27,7 @@ describe("decomposeReturns — Wright's worked example", () => {
 describe("decomposeReturns — verdict classification", () => {
   it("skill when alpha >50% of total", () => {
     const r = decomposeReturns({
-      totalReturn: 0.20,
+      totalReturn: 0.2,
       marketReturn: 0.05,
       marketBeta: 1.0,
       factors: [],
@@ -39,7 +39,7 @@ describe("decomposeReturns — verdict classification", () => {
   it("leveraged_beta when beta dwarfs alpha (Archegos)", () => {
     const r = decomposeReturns({
       totalReturn: 1.0,
-      marketReturn: 0.20,
+      marketReturn: 0.2,
       marketBeta: 5.0,
       factors: [{ factor: "momentum", loading: 0.2, factorReturn: 0.06 }],
     });
@@ -48,11 +48,11 @@ describe("decomposeReturns — verdict classification", () => {
 
   it("factor_harvester when factor contributions exceed alpha", () => {
     const r = decomposeReturns({
-      totalReturn: 0.20,
+      totalReturn: 0.2,
       marketReturn: 0.05,
       marketBeta: 0.5,
       factors: [
-        { factor: "momentum", loading: 1.0, factorReturn: 0.10 },
+        { factor: "momentum", loading: 1.0, factorReturn: 0.1 },
         { factor: "value", loading: 1.0, factorReturn: 0.05 },
       ],
     });
@@ -74,11 +74,11 @@ describe("decomposeReturns — Archegos scenario", () => {
   it("17,500% leveraged-beta run shows zero alpha verdict", () => {
     const r = decomposeReturns({
       totalReturn: 1.75,
-      marketReturn: 0.30,
+      marketReturn: 0.3,
       marketBeta: 5.0,
       factors: [
-        { factor: "momentum", loading: 0.3, factorReturn: 0.10 },
-        { factor: "sector", loading: 0.5, factorReturn: 0.40 },
+        { factor: "momentum", loading: 0.3, factorReturn: 0.1 },
+        { factor: "sector", loading: 0.5, factorReturn: 0.4 },
       ],
     });
     expect(r.alpha).toBeCloseTo(1.75 - 1.5 - 0.23, 3);
@@ -90,7 +90,7 @@ describe("formatDecomposition + decompositionToPayload", () => {
   it("formats and emits payload", () => {
     const r = decomposeReturns({
       totalReturn: 0.35,
-      marketReturn: 0.20,
+      marketReturn: 0.2,
       marketBeta: 1.2,
       factors: [{ factor: "momentum", loading: 0.5, factorReturn: 0.06 }],
     });

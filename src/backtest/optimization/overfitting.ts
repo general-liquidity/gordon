@@ -75,16 +75,19 @@ export interface OverfittingResult {
   };
 
   /** Parameter sensitivity analysis */
-  parameterSensitivity: Record<string, {
-    /** Sensitivity score (0-100) - higher means more sensitive */
-    sensitivityScore: number;
+  parameterSensitivity: Record<
+    string,
+    {
+      /** Sensitivity score (0-100) - higher means more sensitive */
+      sensitivityScore: number;
 
-    /** Best value for this parameter */
-    bestValue: number;
+      /** Best value for this parameter */
+      bestValue: number;
 
-    /** Average performance at each value */
-    valuePerformance: Record<number, number>;
-  }>;
+      /** Average performance at each value */
+      valuePerformance: Record<number, number>;
+    }
+  >;
 
   /** Warning messages */
   warnings: string[];
@@ -139,7 +142,7 @@ export interface OverfittingDetectionOptions {
  */
 export function detectOverfitting(
   results: OptimizationEntry[],
-  options: OverfittingDetectionOptions = {}
+  options: OverfittingDetectionOptions = {},
 ): OverfittingResult {
   const {
     metric = "sharpeRatio",
@@ -171,14 +174,11 @@ export function detectOverfitting(
   const scoreStdDev = calculateStdDev(scores);
 
   // Calculate coefficient of variation
-  const coefficientOfVariation = meanScore !== 0
-    ? Math.abs(scoreStdDev / meanScore)
-    : 0;
+  const coefficientOfVariation = meanScore !== 0 ? Math.abs(scoreStdDev / meanScore) : 0;
 
   // Calculate overfitting score (best / median ratio)
-  const overfitScore = medianScore !== 0 && medianScore > 0
-    ? bestScore / medianScore
-    : bestScore > 0 ? Infinity : 1;
+  const overfitScore =
+    medianScore !== 0 && medianScore > 0 ? bestScore / medianScore : bestScore > 0 ? Infinity : 1;
 
   // Determine if overfitting is likely
   const isLikelyOverfit = overfitScore > overfitThreshold;
@@ -194,9 +194,7 @@ export function detectOverfitting(
   const profitablePercent = (profitableCount / results.length) * 100;
 
   // Analyze parameter sensitivity if enabled
-  const parameterSensitivity = analyzeParameterSensitivity
-    ? analyzeParameters(results)
-    : {};
+  const parameterSensitivity = analyzeParameterSensitivity ? analyzeParameters(results) : {};
 
   // Generate warnings and recommendations
   const { warnings, recommendations } = generateInsights(
@@ -204,7 +202,7 @@ export function detectOverfitting(
     severity,
     coefficientOfVariation,
     profitablePercent,
-    parameterSensitivity
+    parameterSensitivity,
   );
 
   const result: OverfittingResult = {
@@ -246,9 +244,7 @@ const calculateStdDev = statsSampleStd;
 /**
  * Determine severity level from overfit score.
  */
-function determineSeverity(
-  overfitScore: number
-): OverfittingResult["severity"] {
+function determineSeverity(overfitScore: number): OverfittingResult["severity"] {
   if (!Number.isFinite(overfitScore) || overfitScore > 5) {
     return "severe";
   }
@@ -268,7 +264,7 @@ function determineSeverity(
  * Analyze parameter sensitivity.
  */
 function analyzeParameters(
-  results: OptimizationEntry[]
+  results: OptimizationEntry[],
 ): OverfittingResult["parameterSensitivity"] {
   if (results.length === 0) return {};
 
@@ -339,7 +335,7 @@ function generateInsights(
   severity: OverfittingResult["severity"],
   coefficientOfVariation: number,
   profitablePercent: number,
-  parameterSensitivity: OverfittingResult["parameterSensitivity"]
+  parameterSensitivity: OverfittingResult["parameterSensitivity"],
 ): { warnings: string[]; recommendations: string[] } {
   const warnings: string[] = [];
   const recommendations: string[] = [];
@@ -348,7 +344,7 @@ function generateInsights(
   if (severity === "severe") {
     warnings.push(
       `Severe overfitting detected (score: ${overfitScore.toFixed(2)}). ` +
-      "Best parameters are extreme outliers."
+        "Best parameters are extreme outliers.",
     );
     recommendations.push("Use walk-forward testing to validate strategy robustness.");
     recommendations.push("Consider reducing the number of optimized parameters.");
@@ -356,36 +352,32 @@ function generateInsights(
   } else if (severity === "high") {
     warnings.push(
       `High overfitting risk (score: ${overfitScore.toFixed(2)}). ` +
-      "Best parameters significantly outperform median."
+        "Best parameters significantly outperform median.",
     );
     recommendations.push("Verify results with walk-forward analysis.");
     recommendations.push("Consider using Monte Carlo simulation to assess stability.");
   } else if (severity === "moderate") {
     warnings.push(
       `Moderate overfitting risk (score: ${overfitScore.toFixed(2)}). ` +
-      "Exercise caution with these parameters."
+        "Exercise caution with these parameters.",
     );
     recommendations.push("Consider validating on additional out-of-sample data.");
   }
 
   // Coefficient of variation warnings
   if (coefficientOfVariation > 1) {
-    warnings.push(
-      "High variance in optimization results. Strategy performance is unstable."
-    );
+    warnings.push("High variance in optimization results. Strategy performance is unstable.");
     recommendations.push("Look for more robust parameter combinations.");
   }
 
   // Profitable percentage warnings
   if (profitablePercent < 30) {
     warnings.push(
-      `Only ${profitablePercent.toFixed(0)}% of parameter combinations are profitable.`
+      `Only ${profitablePercent.toFixed(0)}% of parameter combinations are profitable.`,
     );
     recommendations.push("Strategy may not be viable. Consider alternative approaches.");
   } else if (profitablePercent < 50) {
-    warnings.push(
-      `${profitablePercent.toFixed(0)}% of combinations are profitable (below 50%).`
-    );
+    warnings.push(`${profitablePercent.toFixed(0)}% of combinations are profitable (below 50%).`);
   }
 
   // Parameter sensitivity warnings
@@ -396,10 +388,10 @@ function generateInsights(
   if (highSensitivityParams.length > 0) {
     warnings.push(
       `High sensitivity parameters: ${highSensitivityParams.join(", ")}. ` +
-      "Small changes significantly affect performance."
+        "Small changes significantly affect performance.",
     );
     recommendations.push(
-      "Use wider parameter ranges or consider fixing high-sensitivity parameters."
+      "Use wider parameter ranges or consider fixing high-sensitivity parameters.",
     );
   }
 
@@ -449,10 +441,7 @@ function createEmptyResult(): OverfittingResult {
  * @param overfitScore - Overfitting score from detectOverfitting
  * @returns Adjusted score accounting for overfitting risk
  */
-export function adjustForOverfitting(
-  rawScore: number,
-  overfitScore: number
-): number {
+export function adjustForOverfitting(rawScore: number, overfitScore: number): number {
   if (overfitScore <= 1) {
     return rawScore;
   }
@@ -461,7 +450,7 @@ export function adjustForOverfitting(
   // At overfitScore = 2, penalty is ~50%
   // At overfitScore = 3, penalty is ~66%
   // At overfitScore = 4, penalty is ~75%
-  const penalty = 1 - (1 / overfitScore);
+  const penalty = 1 - 1 / overfitScore;
   return rawScore * (1 - penalty * 0.5);
 }
 
@@ -476,7 +465,7 @@ export function adjustForOverfitting(
  */
 export function calculateRandomChanceProbability(
   results: OptimizationEntry[],
-  iterations: number = 1000
+  iterations: number = 1000,
 ): number {
   if (results.length < 2) return 1;
 

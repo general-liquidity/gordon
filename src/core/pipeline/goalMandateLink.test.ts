@@ -16,9 +16,7 @@ describe("isGoalMandateLinkEnabled", () => {
 
 describe("linkGoalToMandate — validation", () => {
   it("rejects empty path", () => {
-    expect(() =>
-      linkGoalToMandate({ mandateContent: "{}", mandatePath: "" }),
-    ).toThrow();
+    expect(() => linkGoalToMandate({ mandateContent: "{}", mandatePath: "" })).toThrow();
   });
 
   it("rejects invalid ISO timestamp", () => {
@@ -48,9 +46,7 @@ describe("linkGoalToMandate — hashing", () => {
   it("known SHA-256 vector — empty string → standard digest", () => {
     const r = linkGoalToMandate({ mandateContent: "", mandatePath: "/x/m.json" });
     // SHA-256("") canonical = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-    expect(r.sha256).toBe(
-      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    );
+    expect(r.sha256).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
     expect(r.byteLength).toBe(0);
   });
 

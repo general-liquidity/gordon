@@ -8,8 +8,6 @@ module.exports = (api) => {
   api.cache(false);
   const useReactCompiler = process.env.GORDON_REACT_COMPILER === "1";
   return {
-    plugins: useReactCompiler
-      ? [["babel-plugin-react-compiler", { target: "19" }]]
-      : [],
+    plugins: useReactCompiler ? [["babel-plugin-react-compiler", { target: "19" }]] : [],
   };
 };

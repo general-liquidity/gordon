@@ -129,7 +129,7 @@ const DEFAULT_GRACE = 2;
 const DEFAULT_ON_TRACK = 0.5;
 const DEFAULT_VOL_CONFIRM = 1.0;
 const DEFAULT_DEAD_EXTENSION = 1.5;
-const DEFAULT_DEAD_PROGRESS = 0.10;
+const DEFAULT_DEAD_PROGRESS = 0.1;
 
 function meanOf(values: number[]): number {
   if (values.length === 0) return 0;
@@ -158,8 +158,7 @@ export function analyzeStallCut(
       ? (currentPrice - input.entryPrice) / input.entryPrice
       : (input.entryPrice - currentPrice) / input.entryPrice;
 
-  const progressVsExpected =
-    input.expectedMove > 0 ? rawProgress / input.expectedMove : 0;
+  const progressVsExpected = input.expectedMove > 0 ? rawProgress / input.expectedMove : 0;
 
   // Linearly pro-rate expected progress
   const proRatedExpected =

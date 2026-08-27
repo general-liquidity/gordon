@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 
@@ -62,20 +61,27 @@ export function DebateViewer({ data }: { data: DebateViewerData }) {
   return (
     <Pane title={`DEBATE — ${data.symbol}`}>
       <Box flexDirection="column">
-        <Text dimColor bold>INVESTMENT DEBATE</Text>
+        <Text dimColor bold>
+          INVESTMENT DEBATE
+        </Text>
         {data.investmentRounds.map((r, i) => (
           <Box key={i} flexDirection="column" marginTop={1}>
             <Box>
               <Text color={ROLE_COLORS[r.role]} bold>
                 {ROLE_ICONS[r.role]} {r.role.toUpperCase()} (round {r.roundNumber})
               </Text>
-              <Text dimColor>  confidence: {r.confidence}/10</Text>
+              <Text dimColor> confidence: {r.confidence}/10</Text>
             </Box>
-            <Box paddingLeft={2}><Text>{r.argument}</Text></Box>
+            <Box paddingLeft={2}>
+              <Text>{r.argument}</Text>
+            </Box>
             {r.keyPoints.length > 0 && (
               <Box paddingLeft={2} flexDirection="column">
                 {r.keyPoints.slice(0, 3).map((p, j) => (
-                  <Text key={j} dimColor>  • {p}</Text>
+                  <Text key={j} dimColor>
+                    {" "}
+                    • {p}
+                  </Text>
                 ))}
               </Box>
             )}
@@ -84,22 +90,34 @@ export function DebateViewer({ data }: { data: DebateViewerData }) {
 
         {data.managerSynthesis && (
           <Box flexDirection="column" marginTop={1}>
-            <Text color="cyan" bold>⚖ RESEARCH MANAGER</Text>
-            <Box paddingLeft={2}><Text>{data.managerSynthesis.conclusion}</Text></Box>
-            <Box paddingLeft={2}><Text dimColor>Plan: {data.managerSynthesis.investmentPlan}</Text></Box>
+            <Text color="cyan" bold>
+              ⚖ RESEARCH MANAGER
+            </Text>
+            <Box paddingLeft={2}>
+              <Text>{data.managerSynthesis.conclusion}</Text>
+            </Box>
+            <Box paddingLeft={2}>
+              <Text dimColor>Plan: {data.managerSynthesis.investmentPlan}</Text>
+            </Box>
           </Box>
         )}
 
-        <Box marginTop={1}><Text dimColor bold>RISK DEBATE</Text></Box>
+        <Box marginTop={1}>
+          <Text dimColor bold>
+            RISK DEBATE
+          </Text>
+        </Box>
         {data.riskRounds.map((r, i) => (
           <Box key={i} flexDirection="column" marginTop={1}>
             <Box>
               <Text color={ROLE_COLORS[r.role]} bold>
                 {ROLE_ICONS[r.role]} {r.role.toUpperCase()}
               </Text>
-              <Text dimColor>  confidence: {r.confidence}/10</Text>
+              <Text dimColor> confidence: {r.confidence}/10</Text>
             </Box>
-            <Box paddingLeft={2}><Text>{r.argument}</Text></Box>
+            <Box paddingLeft={2}>
+              <Text>{r.argument}</Text>
+            </Box>
           </Box>
         ))}
 
@@ -112,9 +130,13 @@ export function DebateViewer({ data }: { data: DebateViewerData }) {
             paddingX={1}
           >
             <Box>
-              <Text color="cyanBright" bold>◆ FINAL DECISION: </Text>
-              <Text color={actionColor} bold>{data.finalDecision.action}</Text>
-              <Text dimColor>  ({data.finalDecision.confidence}/10)</Text>
+              <Text color="cyanBright" bold>
+                ◆ FINAL DECISION:{" "}
+              </Text>
+              <Text color={actionColor} bold>
+                {data.finalDecision.action}
+              </Text>
+              <Text dimColor> ({data.finalDecision.confidence}/10)</Text>
             </Box>
             <Text>{data.finalDecision.reasoning}</Text>
           </Box>

@@ -104,10 +104,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
   /**
    * Find entities matching criteria
    */
-  findWhere(
-    criteria: Partial<Record<keyof T, unknown>>,
-    options: QueryOptions = {}
-  ): T[] {
+  findWhere(criteria: Partial<Record<keyof T, unknown>>, options: QueryOptions = {}): T[] {
     const keys = Object.keys(criteria).filter((k) => criteria[k as keyof T] !== undefined);
 
     if (keys.length === 0) {
@@ -206,7 +203,9 @@ export abstract class BaseRepository<T extends BaseEntity> {
     const conditions = keys.map((k) => `${k} = ?`).join(" AND ");
     const values = keys.map((k) => criteria[k as keyof T]) as (string | number | boolean | null)[];
 
-    const stmt = this.db.prepare(`SELECT COUNT(*) as count FROM ${this.tableName} WHERE ${conditions}`);
+    const stmt = this.db.prepare(
+      `SELECT COUNT(*) as count FROM ${this.tableName} WHERE ${conditions}`,
+    );
     const row = stmt.get(...values) as { count: number };
     return row.count;
   }

@@ -28,7 +28,11 @@ const NOISY = series(40, 0.05);
 describe("uncertainty decomposition", () => {
   test("the same total uncertainty demands opposite actions depending on its composition", () => {
     const noisyButKnown = legsFromValues({ aleatoric: 0.7, epistemic: 0.05, distributional: 0.05 });
-    const quietButUnknown = legsFromValues({ aleatoric: 0.05, epistemic: 0.7, distributional: 0.05 });
+    const quietButUnknown = legsFromValues({
+      aleatoric: 0.05,
+      epistemic: 0.7,
+      distributional: 0.05,
+    });
 
     const totalA = collapseToScalar(noisyButKnown);
     const totalB = collapseToScalar(quietButUnknown);

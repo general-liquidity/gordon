@@ -33,11 +33,7 @@ export const ensembleSignalCombinerDiagnosticTool = createTool({
           value: z
             .number()
             .describe("Directional signal in [-1, +1]. Out-of-range clipped by default."),
-          weight: z
-            .number()
-            .min(0)
-            .optional()
-            .describe("Optional non-negative weight. Default 1."),
+          weight: z.number().min(0).optional().describe("Optional non-negative weight. Default 1."),
           description: z.string().optional(),
         }),
       )
@@ -66,10 +62,7 @@ export const ensembleSignalCombinerDiagnosticTool = createTool({
       .max(1)
       .optional()
       .describe("Min agreement fraction (else disagreement). Default 0.6."),
-    clipOutOfRange: z
-      .boolean()
-      .optional()
-      .describe("Clip values outside [-1, +1] (default true)."),
+    clipOutOfRange: z.boolean().optional().describe("Clip values outside [-1, +1] (default true)."),
   }),
   outputSchema: z.object({
     totalSources: z.number(),
@@ -115,8 +108,7 @@ export const ensembleSignalCombinerDiagnosticTool = createTool({
       component: "combine_ensemble_signals",
       toolName: "combine_ensemble_signals",
       outcome:
-        result.verdict === "insufficient_data" ||
-        result.verdict === "disagreement"
+        result.verdict === "insufficient_data" || result.verdict === "disagreement"
           ? "failure"
           : "info",
       details: {

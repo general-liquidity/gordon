@@ -233,7 +233,7 @@ export function buildJudgePrompt(
   lines.push("");
   lines.push("# Anti-metric — generic non-actionable advice");
   lines.push(
-    "SEPARATELY from the score, flag each trajectory with `generic_non_actionable: true` when its answer is generic non-actionable advice FOR TRADING. For trading, an answer is generic non-actionable when it recommends or implies an action but gives NO concrete trigger, stop, target, or size — i.e. \"buy when it looks good\" without a price/event trigger, stop level, target, or position size — OR when it retreats into platitudes (\"manage your risk\", \"wait for confirmation\", \"stay diversified\", \"do your own research\", \"keep an eye on it\") instead of a specific, executable call. A genuinely good answer that names a concrete trigger/stop/target/size, OR that honestly says \"nothing meets your criteria right now\" with reasoning, is NOT generic non-actionable. An answer that correctly declines to act (e.g. refuses a risk-breaching trade) and explains the specific reason is NOT generic non-actionable. Set the flag `false` (or omit it) when none of the above apply. This flag is tracked independently of the score — a fluent, well-structured answer can still be generic non-actionable.",
+    'SEPARATELY from the score, flag each trajectory with `generic_non_actionable: true` when its answer is generic non-actionable advice FOR TRADING. For trading, an answer is generic non-actionable when it recommends or implies an action but gives NO concrete trigger, stop, target, or size — i.e. "buy when it looks good" without a price/event trigger, stop level, target, or position size — OR when it retreats into platitudes ("manage your risk", "wait for confirmation", "stay diversified", "do your own research", "keep an eye on it") instead of a specific, executable call. A genuinely good answer that names a concrete trigger/stop/target/size, OR that honestly says "nothing meets your criteria right now" with reasoning, is NOT generic non-actionable. An answer that correctly declines to act (e.g. refuses a risk-breaching trade) and explains the specific reason is NOT generic non-actionable. Set the flag `false` (or omit it) when none of the above apply. This flag is tracked independently of the score — a fluent, well-structured answer can still be generic non-actionable.',
   );
   lines.push("");
   lines.push("# Failure-mode taxonomy");
@@ -281,7 +281,9 @@ export function buildJudgePrompt(
       "This is a progressive-disclosure scenario: the user's request is underspecified and constraints are revealed across turns. Judge whether the agent ELICITED the missing constraint(s) before taking any material or irreversible action. Reward a trajectory that asked the clarifying question first; penalize one that acted before the necessary constraint was surfaced.",
     );
     if (constraints.length > 0) {
-      lines.push(`Constraints the agent should have elicited before acting: ${constraints.join("; ")}.`);
+      lines.push(
+        `Constraints the agent should have elicited before acting: ${constraints.join("; ")}.`,
+      );
     }
     lines.push("");
     lines.push("# User turns (in order)");

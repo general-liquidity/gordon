@@ -13,10 +13,14 @@ afterEach(() => {
 
 /** A controllable fake fetch standing in for the real network. */
 function fakeFetch(
-  handler: (url: string, init?: RequestInit) => { body: string; status?: number; headers?: Record<string, string> },
+  handler: (
+    url: string,
+    init?: RequestInit,
+  ) => { body: string; status?: number; headers?: Record<string, string> },
 ): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    const url =
+      typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     const r = handler(url, init);
     return new Response(r.body, { status: r.status ?? 200, headers: r.headers });
   }) as typeof fetch;
@@ -31,9 +35,17 @@ describe("VCR record→replay round-trip", () => {
     });
 
     // RECORD
-    const rec = new VcrSession({ name: "roundtrip", mode: "record", cassetteDir: TMP_DIR, realFetch: real });
+    const rec = new VcrSession({
+      name: "roundtrip",
+      mode: "record",
+      cassetteDir: TMP_DIR,
+      realFetch: real,
+    });
     const recResp = await rec.fetch("https://api.example.com/v1/price?symbol=BTC");
-    expect(await recResp.json()).toEqual({ url: "https://api.example.com/v1/price?symbol=BTC", ok: true });
+    expect(await recResp.json()).toEqual({
+      url: "https://api.example.com/v1/price?symbol=BTC",
+      ok: true,
+    });
     rec.save();
     expect(realCalls).toBe(1);
     expect(existsSync(join(TMP_DIR, "roundtrip.json"))).toBe(true);
@@ -42,21 +54,39 @@ describe("VCR record→replay round-trip", () => {
     const throwingReal = fakeFetch(() => {
       throw new Error("network hit during replay");
     });
-    const play = new VcrSession({ name: "roundtrip", mode: "replay", cassetteDir: TMP_DIR, realFetch: throwingReal });
+    const play = new VcrSession({
+      name: "roundtrip",
+      mode: "replay",
+      cassetteDir: TMP_DIR,
+      realFetch: throwingReal,
+    });
     const playResp = await play.fetch("https://api.example.com/v1/price?symbol=BTC");
     expect(playResp.status).toBe(200);
-    expect(await playResp.json()).toEqual({ url: "https://api.example.com/v1/price?symbol=BTC", ok: true });
+    expect(await playResp.json()).toEqual({
+      url: "https://api.example.com/v1/price?symbol=BTC",
+      ok: true,
+    });
     expect(realCalls).toBe(1); // unchanged — replay used no real fetch
   });
 
   it("auto mode records then replays on second run", async () => {
     const real = fakeFetch(() => ({ body: "hello", status: 200 }));
-    const first = new VcrSession({ name: "automode", mode: "auto", cassetteDir: TMP_DIR, realFetch: real });
+    const first = new VcrSession({
+      name: "automode",
+      mode: "auto",
+      cassetteDir: TMP_DIR,
+      realFetch: real,
+    });
     expect(first.mode).toBe("record");
     await first.fetch("https://x.test/a");
     first.save();
 
-    const second = new VcrSession({ name: "automode", mode: "auto", cassetteDir: TMP_DIR, realFetch: real });
+    const second = new VcrSession({
+      name: "automode",
+      mode: "auto",
+      cassetteDir: TMP_DIR,
+      realFetch: real,
+    });
     expect(second.mode).toBe("replay");
     expect(await (await second.fetch("https://x.test/a")).text()).toBe("hello");
   });
@@ -64,8 +94,14 @@ describe("VCR record→replay round-trip", () => {
 
 describe("matcher ignores volatile fields", () => {
   it("strips ignored query params so timestamp/nonce don't break the match", () => {
-    const a = canonicalizeUrl("https://api.test/o?symbol=BTC&timestamp=111&nonce=aaa", ["timestamp", "nonce"]);
-    const b = canonicalizeUrl("https://api.test/o?symbol=BTC&timestamp=999&nonce=zzz", ["timestamp", "nonce"]);
+    const a = canonicalizeUrl("https://api.test/o?symbol=BTC&timestamp=111&nonce=aaa", [
+      "timestamp",
+      "nonce",
+    ]);
+    const b = canonicalizeUrl("https://api.test/o?symbol=BTC&timestamp=999&nonce=zzz", [
+      "timestamp",
+      "nonce",
+    ]);
     expect(a).toBe(b);
   });
 
@@ -77,7 +113,12 @@ describe("matcher ignores volatile fields", () => {
 
   it("default matcher matches across volatile timestamp param at the session level", async () => {
     const real = fakeFetch(() => ({ body: "signed-ok", status: 200 }));
-    const rec = new VcrSession({ name: "volatile", mode: "record", cassetteDir: TMP_DIR, realFetch: real });
+    const rec = new VcrSession({
+      name: "volatile",
+      mode: "record",
+      cassetteDir: TMP_DIR,
+      realFetch: real,
+    });
     await rec.fetch("https://api.test/order?symbol=BTC&timestamp=1000&nonce=abc");
     rec.save();
 
@@ -127,7 +168,7 @@ describe("secret redaction on record", () => {
     expect(serialized).not.toContain(ACCOUNT_LOGIN);
     // Sensitive headers redacted by name (value replaced, key kept).
     const first = interactions[0]!;
-    expect(first.request.headers["authorization"]).toBe(VCR_REDACTED);
+    expect(first.request.headers.authorization).toBe(VCR_REDACTED);
     expect(first.request.headers["x-api-key"]).toBe(VCR_REDACTED);
     expect(first.response.headers["set-cookie"]).toBe(VCR_REDACTED);
 
@@ -147,7 +188,7 @@ describe("secret redaction on record", () => {
       "x-account-id": "12345",
     });
     expect(out["content-type"]).toBe("application/json");
-    expect(out["authorization"]).toBe(VCR_REDACTED);
+    expect(out.authorization).toBe(VCR_REDACTED);
     expect(out["x-account-id"]).toBe(VCR_REDACTED);
   });
 
@@ -162,16 +203,25 @@ describe("secret redaction on record", () => {
 describe("unmatched replay fails loudly", () => {
   it("throws VcrNoMatchError instead of silently passing through", async () => {
     const real = fakeFetch(() => ({ body: "ok" }));
-    const rec = new VcrSession({ name: "nomatch", mode: "record", cassetteDir: TMP_DIR, realFetch: real });
+    const rec = new VcrSession({
+      name: "nomatch",
+      mode: "record",
+      cassetteDir: TMP_DIR,
+      realFetch: real,
+    });
     await rec.fetch("https://api.test/recorded");
     rec.save();
 
     const play = new VcrSession({ name: "nomatch", mode: "replay", cassetteDir: TMP_DIR });
-    await expect(play.fetch("https://api.test/NOT-recorded")).rejects.toBeInstanceOf(VcrNoMatchError);
+    await expect(play.fetch("https://api.test/NOT-recorded")).rejects.toBeInstanceOf(
+      VcrNoMatchError,
+    );
   });
 
   it("throws when constructing a replay session with no cassette", () => {
-    expect(() => new VcrSession({ name: "ghost", mode: "replay", cassetteDir: TMP_DIR })).toThrow(/cassette not found/);
+    expect(() => new VcrSession({ name: "ghost", mode: "replay", cassetteDir: TMP_DIR })).toThrow(
+      /cassette not found/,
+    );
   });
 });
 
@@ -180,11 +230,14 @@ describe("withCassette scoped global install", () => {
     const sentinel = globalThis.fetch;
     const real = fakeFetch(() => ({ body: "global-ok" }));
 
-    await withCassette({ name: "scoped", mode: "record", cassetteDir: TMP_DIR, realFetch: real }, async () => {
-      expect(globalThis.fetch).not.toBe(sentinel);
-      const resp = await fetch("https://global.test/x");
-      expect(await resp.text()).toBe("global-ok");
-    });
+    await withCassette(
+      { name: "scoped", mode: "record", cassetteDir: TMP_DIR, realFetch: real },
+      async () => {
+        expect(globalThis.fetch).not.toBe(sentinel);
+        const resp = await fetch("https://global.test/x");
+        expect(await resp.text()).toBe("global-ok");
+      },
+    );
 
     expect(globalThis.fetch).toBe(sentinel);
   });
@@ -193,9 +246,12 @@ describe("withCassette scoped global install", () => {
     const sentinel = globalThis.fetch;
     const real = fakeFetch(() => ({ body: "x" }));
     await expect(
-      withCassette({ name: "throwy", mode: "record", cassetteDir: TMP_DIR, realFetch: real }, async () => {
-        throw new Error("boom");
-      }),
+      withCassette(
+        { name: "throwy", mode: "record", cassetteDir: TMP_DIR, realFetch: real },
+        async () => {
+          throw new Error("boom");
+        },
+      ),
     ).rejects.toThrow("boom");
     expect(globalThis.fetch).toBe(sentinel);
   });

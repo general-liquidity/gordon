@@ -55,13 +55,8 @@ export function isNativeApprovalTool(toolId: string): toolId is NativeApprovalTo
   return (NATIVE_APPROVAL_TOOL_IDS as readonly string[]).includes(toolId);
 }
 
-export function isNativeToolApprovalEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env.GORDON_NATIVE_TOOL_APPROVAL === "1" ||
-    env.GORDON_NATIVE_TOOL_APPROVAL === "true"
-  );
+export function isNativeToolApprovalEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.GORDON_NATIVE_TOOL_APPROVAL === "1" || env.GORDON_NATIVE_TOOL_APPROVAL === "true";
 }
 
 // ---------------------------------------------------------------------------
@@ -144,10 +139,7 @@ export function buildRequireApproval(
 export function buildRequireToolApproval(
   env: NodeJS.ProcessEnv = process.env,
 ): (ctx: { toolName: string; args?: Record<string, unknown> }) => Promise<boolean> {
-  return async (ctx: {
-    toolName: string;
-    args?: Record<string, unknown>;
-  }): Promise<boolean> => {
+  return async (ctx: { toolName: string; args?: Record<string, unknown> }): Promise<boolean> => {
     if (!isNativeToolApprovalEnabled(env)) return false;
     if (!isNativeApprovalTool(ctx.toolName)) return false;
     return buildRequireApproval(ctx.toolName, env)(ctx.args ?? {});
@@ -210,9 +202,7 @@ export interface NativeApprovalDecision {
  * existing gate: any blocking condition forces `decline`; only a permitted
  * call reaches the human `prompt`.
  */
-export function decideNativeApproval(
-  outcome: DenyFirstOutcome,
-): NativeApprovalDecision {
+export function decideNativeApproval(outcome: DenyFirstOutcome): NativeApprovalDecision {
   if (outcome.blocked) {
     return {
       action: "decline",
@@ -232,8 +222,7 @@ export function decideNativeApproval(
   if (outcome.recommendation === "block") {
     return {
       action: "decline",
-      reason:
-        "Risk classifier recommends block (critical tier). Native approval declines.",
+      reason: "Risk classifier recommends block (critical tier). Native approval declines.",
     };
   }
   return {

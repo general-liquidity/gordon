@@ -46,8 +46,8 @@ function warnLibsqlFallbackOnce(reason: unknown): void {
   warnedAboutFallback = true;
   const message = reason instanceof Error ? reason.message : String(reason);
   console.warn(
-    `[Gordon] LibSQL runtime unavailable; using in-memory Mastra storage instead. `
-    + `Thread memory will reset when Gordon exits. (${message})`
+    `[Gordon] LibSQL runtime unavailable; using in-memory Mastra storage instead. ` +
+      `Thread memory will reset when Gordon exits. (${message})`,
   );
 }
 
@@ -62,7 +62,10 @@ function loadLibsqlRuntime(): LibSQLRuntime | null {
 
   try {
     const moduleExports = runtimeRequire("@mastra/libsql") as Partial<LibSQLRuntime>;
-    if (typeof moduleExports.LibSQLStore !== "function" || typeof moduleExports.LibSQLVector !== "function") {
+    if (
+      typeof moduleExports.LibSQLStore !== "function" ||
+      typeof moduleExports.LibSQLVector !== "function"
+    ) {
       cachedLibsqlRuntime = null;
       return null;
     }
@@ -88,9 +91,9 @@ export function createMastraStorageConfig(options: MastraStorageOptions): Mastra
         }),
         vector: options.enableVector
           ? new libsql.LibSQLVector({
-            id: options.vectorId ?? `${options.storeId}-vector`,
-            url: options.vectorDbUrl ?? options.dbUrl,
-          })
+              id: options.vectorId ?? `${options.storeId}-vector`,
+              url: options.vectorDbUrl ?? options.dbUrl,
+            })
           : false,
         mode: "libsql",
       };

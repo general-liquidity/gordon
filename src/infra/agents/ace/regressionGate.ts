@@ -21,16 +21,43 @@ import type { ACELessonCandidate } from "./Reflector.ts";
 
 /** Language that would WEAKEN a control if applied to a safety-critical action/control. */
 const WEAKENING_PHRASES: readonly string[] = [
-  "skip", "bypass", "circumvent", "override", "ignore", "disable", "avoid",
-  "without approval", "without confirmation", "without human", "no approval",
-  "no confirmation", "auto-approve", "auto approve", "auto-execute", "auto execute",
-  "don't need approval", "do not need approval", "skip the gate", "skip the risk",
-  "skip the check", "without the gate", "without a rationale", "no rationale",
+  "skip",
+  "bypass",
+  "circumvent",
+  "override",
+  "ignore",
+  "disable",
+  "avoid",
+  "without approval",
+  "without confirmation",
+  "without human",
+  "no approval",
+  "no confirmation",
+  "auto-approve",
+  "auto approve",
+  "auto-execute",
+  "auto execute",
+  "don't need approval",
+  "do not need approval",
+  "skip the gate",
+  "skip the risk",
+  "skip the check",
+  "without the gate",
+  "without a rationale",
+  "no rationale",
 ];
 /** Safety CONTROLS a lesson must not propose weakening (even without a specific tool name). */
 const SAFETY_CONTROLS: readonly string[] = [
-  "risk gate", "risk classifier", "risk-gate", "human approval", "approval requirement",
-  "confirmation", "deny-list", "denylist", "the gate", "rationale",
+  "risk gate",
+  "risk classifier",
+  "risk-gate",
+  "human approval",
+  "approval requirement",
+  "confirmation",
+  "deny-list",
+  "denylist",
+  "the gate",
+  "rationale",
 ];
 
 export interface LessonRejection {

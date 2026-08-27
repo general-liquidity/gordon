@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { createRequire } from "module";
+import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const globalWithRequire = globalThis as typeof globalThis & { require?: typeof require };

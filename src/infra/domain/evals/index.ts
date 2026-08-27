@@ -21,23 +21,19 @@ export {
   type TradeRecommendation,
   type StrategyPerformance,
   type AgentPerformance,
-
   // Recommendation tracking
   trackRecommendation,
   updateRecommendationStatus,
   getRecommendationByPlanId,
   getActiveRecommendations,
-
   // Outcome recording
   recordTradeOutcome,
   getTradeOutcomes,
-
   // Performance calculations
   getStrategyPerformance,
   getAgentPerformance,
   getAllStrategyPerformances,
   getRecentTradeSummary,
-
   // Database initialization
   initTradeEvaluatorTables,
 } from "./tradeEvaluator.ts";
@@ -55,23 +51,17 @@ export {
   type TimeBasedPerformance,
   type SymbolPerformance,
   type PerformanceReport,
-
   // Win rate analysis
   getWinRateByStrategy,
   getWinRateByTimeframe,
-
   // Risk-reward analysis
   getRiskRewardAnalysis,
-
   // Market condition analysis
   getPerformanceByMarketCondition,
-
   // Symbol analysis
   getPerformanceBySymbol,
-
   // Time-based analysis
   getTimeBasedPerformance,
-
   // Comprehensive reporting
   generatePerformanceReport,
   formatPerformanceReport,
@@ -85,20 +75,16 @@ export {
   // Types
   type PerformanceContext,
   type LearningInsights,
-
   // Outcome recording
   recordTradeClose,
   trackPlanRecommendation,
   processUnrecordedTrades,
-
   // Performance context
   generatePerformanceContext,
   formatPerformanceContextForPrompt,
-
   // Learning insights
   generateLearningInsights,
   formatLearningInsights,
-
   // Confidence adjustments
   getStrategyConfidenceMultiplier,
   getAgentConfidenceMultiplier,
@@ -116,7 +102,6 @@ export {
   HorizonObservationSchema,
   RegretOutcomeSchema,
   DEFAULT_HORIZON_DAYS,
-
   // Types
   type RegretSide,
   type HypotheticalBracket,
@@ -129,7 +114,6 @@ export {
   type RegretReview,
   type SummarizeOptions,
   type ReviewParams,
-
   // Functions
   buildRejectedCandidate,
   elapsedDays,
@@ -155,7 +139,6 @@ export {
   getWinRateAnalysisTool,
   getRiskRewardAnalysisTool,
   getMarketConditionPerformanceTool,
-
   // Combined tools object
   evalTools,
 } from "./tools.ts";

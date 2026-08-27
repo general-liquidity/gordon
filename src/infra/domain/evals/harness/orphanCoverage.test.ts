@@ -1,9 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  findOrphanRules,
-  formatOrphans,
-  type OrphanRule,
-} from "./orphanCoverage.ts";
+import { findOrphanRules, formatOrphans, type OrphanRule } from "./orphanCoverage.ts";
 import { TRADING_CONSTITUTION } from "../../../safety/defense/tradingConstitution.ts";
 import { SAFETY_CRITICAL_PATTERNS } from "../../../../runtime/permissions/trustTrajectory.ts";
 import { CATEGORY_RUBRIC_DATA, ALL_CATEGORIES } from "./categoryRubrics.ts";
@@ -26,9 +22,7 @@ describe("spec→eval orphan detection", () => {
   it("every constitution rule the suite derives is a real, covered TRADING_CONSTITUTION key", () => {
     // Sanity: the constitution source's declared rules all resolve, and
     // each is a genuine key on the live constitution table.
-    const constitutionOrphans = findOrphanRules().filter(
-      (o) => o.source === "constitution",
-    );
+    const constitutionOrphans = findOrphanRules().filter((o) => o.source === "constitution");
     expect(constitutionOrphans).toEqual([]);
     // And the keys it covers are non-empty + actually exist on the table.
     const keys = Object.keys(TRADING_CONSTITUTION);

@@ -7,7 +7,7 @@
 // All paths are reference-counted and clean up on shutdown.
 // ============================================================================
 
-import { spawn, type ChildProcess } from "child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 
 let inhibitorProcess: ChildProcess | null = null;
 let refCount = 0;
@@ -22,7 +22,14 @@ function spawnInhibitor(): void {
       // The --who flag identifies us in the inhibitor list (loginctl list-inhibitors).
       inhibitorProcess = spawn(
         "systemd-inhibit",
-        ["--what=idle:sleep", "--who=gordon", "--why=active-trading", "--mode=block", "sleep", "infinity"],
+        [
+          "--what=idle:sleep",
+          "--who=gordon",
+          "--why=active-trading",
+          "--mode=block",
+          "sleep",
+          "infinity",
+        ],
         { stdio: "ignore", detached: true },
       );
       // If systemd-inhibit isn't installed, the spawn itself succeeds but
@@ -80,10 +87,13 @@ export function startPreventSleep(): void {
     // Auto-restart every 4 minutes (before caffeinate's 5-min default
     // timeout). systemd-inhibit and the Windows PowerShell loop don't
     // need this but the restart is harmless.
-    restartInterval = setInterval(() => {
-      killInhibitor();
-      spawnInhibitor();
-    }, 4 * 60 * 1000);
+    restartInterval = setInterval(
+      () => {
+        killInhibitor();
+        spawnInhibitor();
+      },
+      4 * 60 * 1000,
+    );
   }
 }
 

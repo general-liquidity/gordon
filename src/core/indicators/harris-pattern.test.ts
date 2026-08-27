@@ -42,13 +42,7 @@ describe("calculateHarrisPattern", () => {
   });
 
   test("flat / non-overlapping series → no signal", () => {
-    const candles: Candle[] = [
-      bar(10, 9),
-      bar(10, 9),
-      bar(10, 9),
-      bar(10, 9),
-      bar(10, 9),
-    ];
+    const candles: Candle[] = [bar(10, 9), bar(10, 9), bar(10, 9), bar(10, 9), bar(10, 9)];
     const r = calculateHarrisPattern(candles);
     expect(r.signals).toEqual([0, 0, 0, 0, 0]);
     expect(r.current).toBe(0);
@@ -59,14 +53,7 @@ describe("calculateHarrisPattern", () => {
   test("alignment: signals.length === candles.length, first 3 bars are 0", () => {
     // Embed a BUY window at the tail of a longer series.
     const noise = bar(100, 90);
-    const candles: Candle[] = [
-      noise,
-      noise,
-      bar(15, 13),
-      bar(17, 14),
-      bar(19, 16),
-      bar(20, 18),
-    ];
+    const candles: Candle[] = [noise, noise, bar(15, 13), bar(17, 14), bar(19, 16), bar(20, 18)];
     const r = calculateHarrisPattern(candles);
     expect(r.signals.length).toBe(candles.length);
     expect(r.signals.slice(0, 3)).toEqual([0, 0, 0]);

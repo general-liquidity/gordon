@@ -17,8 +17,20 @@ function fixture(overrides: Partial<BootStaticInfo> = {}): BootStaticInfo {
     permissionMode: "ask",
     threadDisplay: "thr_01HZXK24M9QW",
     cwd: "/very/long/path/to/gordon-cli-alpha",
-    fetchGuard: { installed: true, enabled: true, mode: "warn", warnViolations: 0, recentViolations: [] },
-    fsGuard: { installed: true, enabled: true, mode: "warn", warnViolations: 0, recentViolations: [] },
+    fetchGuard: {
+      installed: true,
+      enabled: true,
+      mode: "warn",
+      warnViolations: 0,
+      recentViolations: [],
+    },
+    fsGuard: {
+      installed: true,
+      enabled: true,
+      mode: "warn",
+      warnViolations: 0,
+      recentViolations: [],
+    },
     trippedSwitches: [],
     radar: { running: true, producerCount: 21, lastCardAgeMs: 4 * 60 * 1000 },
     ...overrides,
@@ -62,47 +74,95 @@ describe("renderBootStaticRows", () => {
   });
 
   test("renders firm and scoped kill-switch summaries", () => {
-    const firm = renderBootStaticRows(fixture({
-      trippedSwitches: [{ key: { scope: "firm" }, reason: "test halt rationale", trippedAt: 1 }],
-    }), 100);
+    const firm = renderBootStaticRows(
+      fixture({
+        trippedSwitches: [{ key: { scope: "firm" }, reason: "test halt rationale", trippedAt: 1 }],
+      }),
+      100,
+    );
     expect(stripAnsi(firm[6]!)).toContain("HALTED: firm — test halt rationale");
 
-    const scoped = renderBootStaticRows(fixture({
-      trippedSwitches: [
-        { key: { scope: "venue", id: "binance" }, reason: "venue offline", trippedAt: 1 },
-        { key: { scope: "strategy", id: "s1" }, reason: "bad fills", trippedAt: 2 },
-      ],
-    }), 100);
+    const scoped = renderBootStaticRows(
+      fixture({
+        trippedSwitches: [
+          { key: { scope: "venue", id: "binance" }, reason: "venue offline", trippedAt: 1 },
+          { key: { scope: "strategy", id: "s1" }, reason: "bad fills", trippedAt: 2 },
+        ],
+      }),
+      100,
+    );
     expect(stripAnsi(scoped[6]!)).toContain("tripped: venue:binance, strategy:s1");
   });
 
   test("renders guard failure states", () => {
-    const rows = renderBootStaticRows(fixture({
-      fetchGuard: { installed: false, enabled: true, mode: "warn", warnViolations: 0, recentViolations: [] },
-      fsGuard: { installed: true, enabled: false, mode: "warn", warnViolations: 0, recentViolations: [] },
-    }), 100);
+    const rows = renderBootStaticRows(
+      fixture({
+        fetchGuard: {
+          installed: false,
+          enabled: true,
+          mode: "warn",
+          warnViolations: 0,
+          recentViolations: [],
+        },
+        fsGuard: {
+          installed: true,
+          enabled: false,
+          mode: "warn",
+          warnViolations: 0,
+          recentViolations: [],
+        },
+      }),
+      100,
+    );
     const guardRow = stripAnsi(rows[5]!);
     expect(guardRow).toContain("fetch ✗ NOT INSTALLED");
     expect(guardRow).toContain("fs ✗ off");
   });
 
   test("renders radar off, warming, and aged variants", () => {
-    expect(stripAnsi(renderBootStaticRows(fixture({
-      radar: { running: false, producerCount: 0, lastCardAgeMs: null },
-    }), 120)[7]!)).toContain("off — set GORDON_PROACTIVE_AUTO_START=1 or /radar start");
-    expect(stripAnsi(renderBootStaticRows(fixture({
-      radar: { running: true, producerCount: 21, lastCardAgeMs: null },
-    }), 100)[7]!)).toContain("21 producers · warming up");
-    expect(stripAnsi(renderBootStaticRows(fixture({
-      radar: { running: true, producerCount: 21, lastCardAgeMs: 2 * 60 * 60 * 1000 },
-    }), 100)[7]!)).toContain("21 producers · last card 2h ago");
+    expect(
+      stripAnsi(
+        renderBootStaticRows(
+          fixture({
+            radar: { running: false, producerCount: 0, lastCardAgeMs: null },
+          }),
+          120,
+        )[7]!,
+      ),
+    ).toContain("off — set GORDON_PROACTIVE_AUTO_START=1 or /radar start");
+    expect(
+      stripAnsi(
+        renderBootStaticRows(
+          fixture({
+            radar: { running: true, producerCount: 21, lastCardAgeMs: null },
+          }),
+          100,
+        )[7]!,
+      ),
+    ).toContain("21 producers · warming up");
+    expect(
+      stripAnsi(
+        renderBootStaticRows(
+          fixture({
+            radar: { running: true, producerCount: 21, lastCardAgeMs: 2 * 60 * 60 * 1000 },
+          }),
+          100,
+        )[7]!,
+      ),
+    ).toContain("21 producers · last card 2h ago");
   });
 
   test("keeps every output row within the terminal budget", () => {
     const info = fixture({
       model: "claude-sonnet-4-6-with-a-very-long-suffix",
       cwd: "/this/is/a/very/long/path/that/should/be/left/truncated/for/the/static/boot/panel",
-      trippedSwitches: [{ key: { scope: "firm" }, reason: "a very long halt rationale that must not overflow the terminal", trippedAt: 1 }],
+      trippedSwitches: [
+        {
+          key: { scope: "firm" },
+          reason: "a very long halt rationale that must not overflow the terminal",
+          trippedAt: 1,
+        },
+      ],
       radar: { running: false, producerCount: 0, lastCardAgeMs: null },
     });
     for (const width of [50, 60, 80, 120]) {

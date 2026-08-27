@@ -70,7 +70,7 @@ export class SupportBounceStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     // Fetch candles
     const candles = await this.fetchCandles(ctx, symbol, timeframe, 100);
@@ -98,28 +98,23 @@ export class SupportBounceStrategy extends BaseStrategy {
     }
 
     // Check distance to support
-    const distancePercent = this.calculateDistancePercent(
-      currentPrice,
-      nearestSupport.price
-    );
+    const distancePercent = this.calculateDistancePercent(currentPrice, nearestSupport.price);
 
     // Price must be above support (positive distance) and within threshold
     if (distancePercent < 0) {
-      return this.notDetected(
-        `Price is below support ($${nearestSupport.price.toFixed(2)})`
-      );
+      return this.notDetected(`Price is below support ($${nearestSupport.price.toFixed(2)})`);
     }
 
     if (distancePercent > MAX_DISTANCE_PERCENT) {
       return this.notDetected(
-        `Too far from support (${distancePercent.toFixed(1)}% > ${MAX_DISTANCE_PERCENT}%)`
+        `Too far from support (${distancePercent.toFixed(1)}% > ${MAX_DISTANCE_PERCENT}%)`,
       );
     }
 
     // Check support strength
     if (nearestSupport.strength < MIN_SUPPORT_STRENGTH) {
       return this.notDetected(
-        `Support too weak (strength ${(nearestSupport.strength * 100).toFixed(0)}% < ${MIN_SUPPORT_STRENGTH * 100}%)`
+        `Support too weak (strength ${(nearestSupport.strength * 100).toFixed(0)}% < ${MIN_SUPPORT_STRENGTH * 100}%)`,
       );
     }
 
@@ -130,9 +125,7 @@ export class SupportBounceStrategy extends BaseStrategy {
 
     // Disqualifiers
     if (rsi.current !== null && rsi.current > RSI_OVERBOUGHT) {
-      return this.notDetected(
-        `RSI overbought (${rsi.current.toFixed(1)} > ${RSI_OVERBOUGHT})`
-      );
+      return this.notDetected(`RSI overbought (${rsi.current.toFixed(1)} > ${RSI_OVERBOUGHT})`);
     }
 
     if (macd.trend === "bearish" && macd.crossover === "bearish_cross") {
@@ -143,8 +136,7 @@ export class SupportBounceStrategy extends BaseStrategy {
     let confidence = 0.5; // Base confidence
 
     // Distance bonus (closer = better)
-    const proximityBonus =
-      (MAX_DISTANCE_PERCENT - distancePercent) / MAX_DISTANCE_PERCENT;
+    const proximityBonus = (MAX_DISTANCE_PERCENT - distancePercent) / MAX_DISTANCE_PERCENT;
     confidence += proximityBonus * 0.15;
 
     // Support strength bonus
@@ -192,10 +184,10 @@ export class SupportBounceStrategy extends BaseStrategy {
     // Build reasoning
     const reasons: string[] = [];
     reasons.push(
-      `Price ${distancePercent.toFixed(1)}% above support at $${nearestSupport.price.toFixed(2)}`
+      `Price ${distancePercent.toFixed(1)}% above support at $${nearestSupport.price.toFixed(2)}`,
     );
     reasons.push(
-      `Support strength: ${(nearestSupport.strength * 100).toFixed(0)}% (${nearestSupport.touches} touches)`
+      `Support strength: ${(nearestSupport.strength * 100).toFixed(0)}% (${nearestSupport.touches} touches)`,
     );
     if (rsi.current !== null) {
       reasons.push(`RSI: ${rsi.current.toFixed(1)} (${rsi.signal})`);
@@ -209,10 +201,7 @@ export class SupportBounceStrategy extends BaseStrategy {
   /**
    * Calculate plan parameters for Support Bounce
    */
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", 100);
     const currentPrice = this.getCurrentPrice(candles, ctx);
 
@@ -231,27 +220,19 @@ export class SupportBounceStrategy extends BaseStrategy {
       : entryPrice * 0.95; // Fallback: 5% below entry
 
     // Take-profit at resistances or R:R targets
-    const takeProfits = this.calculateTakeProfits(
-      entryPrice,
-      stopLoss,
-      resistances
-    );
+    const takeProfits = this.calculateTakeProfits(entryPrice, stopLoss, resistances);
 
     // Calculate average R:R
-    const avgTpPrice =
-      takeProfits.reduce((sum, tp) => sum + tp.price * tp.percentToSell, 0);
-    const riskRewardRatio = this.calculateRiskReward(
-      entryPrice,
-      stopLoss,
-      avgTpPrice
-    );
+    const avgTpPrice = takeProfits.reduce((sum, tp) => sum + tp.price * tp.percentToSell, 0);
+    const riskRewardRatio = this.calculateRiskReward(entryPrice, stopLoss, avgTpPrice);
 
     return {
       entryPrice,
       stopLoss,
       takeProfits,
       riskRewardRatio,
-      notes: `Support Bounce setup. Entry near $${entryPrice.toFixed(2)}, ` +
+      notes:
+        `Support Bounce setup. Entry near $${entryPrice.toFixed(2)}, ` +
         `stop below support at $${stopLoss.toFixed(2)}. ` +
         `R:R ${riskRewardRatio.toFixed(1)}:1`,
     };
@@ -263,7 +244,7 @@ export class SupportBounceStrategy extends BaseStrategy {
   private calculateTakeProfits(
     entryPrice: number,
     stopLoss: number,
-    resistances: { price: number; strength: number }[]
+    resistances: { price: number; strength: number }[],
   ): { price: number; percentToSell: number }[] {
     const risk = entryPrice - stopLoss;
 
@@ -303,15 +284,10 @@ export class SupportBounceStrategy extends BaseStrategy {
     bar: OHLC,
     _index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     const price = bar.close;
-    const {
-      rsi14,
-      nearestSupport,
-      nearestResistance,
-      volumeRatio,
-    } = indicators;
+    const { rsi14, nearestSupport, nearestResistance, volumeRatio } = indicators;
 
     // Check for SELL signal first (exit conditions)
     if (nearestResistance && price >= nearestResistance) {

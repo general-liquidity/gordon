@@ -139,9 +139,7 @@ describe("registry / dispatcher", () => {
   });
   test("unknown name -> null (no throw)", () => {
     const tk = ["A"];
-    expect(
-      computeFormulaicAlpha("alpha999", { close: panel(tk, [[1]]) }),
-    ).toBeNull();
+    expect(computeFormulaicAlpha("alpha999", { close: panel(tk, [[1]]) })).toBeNull();
   });
   test("IMPLEMENTED_ALPHAS lists 11 alphas", () => {
     expect(IMPLEMENTED_ALPHAS.length).toBe(11);
@@ -149,8 +147,6 @@ describe("registry / dispatcher", () => {
   test("missing required panel throws at boundary", () => {
     const tk = ["A"];
     // alpha006 needs open + volume
-    expect(() =>
-      computeFormulaicAlpha("alpha006", { close: panel(tk, [[1, 2]]) }),
-    ).toThrow();
+    expect(() => computeFormulaicAlpha("alpha006", { close: panel(tk, [[1, 2]]) })).toThrow();
   });
 });

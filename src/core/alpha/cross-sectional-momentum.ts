@@ -82,10 +82,7 @@ export interface RankedAsset {
   position: RankPosition;
 }
 
-export type MomentumVerdict =
-  | "ranked"
-  | "insufficient_data"
-  | "tied_returns_no_basket";
+export type MomentumVerdict = "ranked" | "insufficient_data" | "tied_returns_no_basket";
 
 export interface CrossSectionalMomentumResult {
   totalSymbols: number;
@@ -111,8 +108,8 @@ export interface CrossSectionalMomentumResult {
   summary: string;
 }
 
-const DEFAULT_TOP_FRACTION = 0.20;
-const DEFAULT_BOTTOM_FRACTION = 0.20;
+const DEFAULT_TOP_FRACTION = 0.2;
+const DEFAULT_BOTTOM_FRACTION = 0.2;
 const DEFAULT_MIN_SYMBOLS = 5;
 
 function returnOf(prices: ReadonlyArray<number>): number {
@@ -228,12 +225,8 @@ export function rankCrossSectionalMomentum(
   const meanRet = mean(allReturns);
   const medianRet = median(allReturns);
 
-  const longMean = mean(
-    ranked.filter((r) => r.position === "long").map((r) => r.returnFraction),
-  );
-  const shortMean = mean(
-    ranked.filter((r) => r.position === "short").map((r) => r.returnFraction),
-  );
+  const longMean = mean(ranked.filter((r) => r.position === "long").map((r) => r.returnFraction));
+  const shortMean = mean(ranked.filter((r) => r.position === "short").map((r) => r.returnFraction));
   const longShortSpread = longMean - shortMean;
 
   const verdict: MomentumVerdict = "ranked";
@@ -258,9 +251,7 @@ export function rankCrossSectionalMomentum(
   };
 }
 
-export function formatCrossSectionalMomentum(
-  result: CrossSectionalMomentumResult,
-): string {
+export function formatCrossSectionalMomentum(result: CrossSectionalMomentumResult): string {
   const lines = [
     `Cross-Sectional Momentum — ${result.verdict.toUpperCase()}`,
     "",

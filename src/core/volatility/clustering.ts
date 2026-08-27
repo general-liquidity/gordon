@@ -69,15 +69,39 @@ const DEFAULT_OPTIONS: Required<ClusteringOptions> = {
  * Sourced from standard chi-square tables.
  */
 const CHI2_CRIT_005: Record<number, number> = {
-  1: 3.841, 2: 5.991, 3: 7.815, 4: 9.488, 5: 11.070,
-  6: 12.592, 7: 14.067, 8: 15.507, 9: 16.919, 10: 18.307,
-  11: 19.675, 12: 21.026, 13: 22.362, 14: 23.685, 15: 24.996,
+  1: 3.841,
+  2: 5.991,
+  3: 7.815,
+  4: 9.488,
+  5: 11.07,
+  6: 12.592,
+  7: 14.067,
+  8: 15.507,
+  9: 16.919,
+  10: 18.307,
+  11: 19.675,
+  12: 21.026,
+  13: 22.362,
+  14: 23.685,
+  15: 24.996,
 };
 
 const CHI2_CRIT_001: Record<number, number> = {
-  1: 6.635, 2: 9.210, 3: 11.345, 4: 13.277, 5: 15.086,
-  6: 16.812, 7: 18.475, 8: 20.090, 9: 21.666, 10: 23.209,
-  11: 24.725, 12: 26.217, 13: 27.688, 14: 29.141, 15: 30.578,
+  1: 6.635,
+  2: 9.21,
+  3: 11.345,
+  4: 13.277,
+  5: 15.086,
+  6: 16.812,
+  7: 18.475,
+  8: 20.09,
+  9: 21.666,
+  10: 23.209,
+  11: 24.725,
+  12: 26.217,
+  13: 27.688,
+  14: 29.141,
+  15: 30.578,
 };
 
 function approxChiSquarePValue(chi2: number, df: number): number {
@@ -85,7 +109,7 @@ function approxChiSquarePValue(chi2: number, df: number): number {
   const crit01 = CHI2_CRIT_001[df];
   if (crit05 === undefined || crit01 === undefined) return 0.5;
   if (chi2 < crit05) {
-    return 0.05 + (crit05 - chi2) / Math.max(crit05, 1) * 0.45;
+    return 0.05 + ((crit05 - chi2) / Math.max(crit05, 1)) * 0.45;
   }
   if (chi2 > crit01) {
     return Math.max(0.0001, 0.01 * (crit01 / Math.max(chi2, crit01)));

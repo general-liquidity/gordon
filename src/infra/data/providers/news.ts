@@ -79,9 +79,7 @@ function stripHtmlEntities(s: string): string {
 function parseRssItems(xml: string): NewsItem[] {
   const items: NewsItem[] = [];
   const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
-  let match: RegExpExecArray | null;
-
-  while ((match = itemRegex.exec(xml)) !== null) {
+  for (const match of xml.matchAll(itemRegex)) {
     const block = match[1]!;
 
     const titleMatch = block.match(/<title>([\s\S]*?)<\/title>/);
@@ -104,9 +102,7 @@ function parseRssItems(xml: string): NewsItem[] {
 
     const url = linkMatch?.[1]?.trim() ?? "";
     const publishedAt = pubDateMatch?.[1]?.trim() ?? "";
-    const snippet = descMatch
-      ? stripHtmlEntities(descMatch[1]!.trim()).slice(0, 200)
-      : "";
+    const snippet = descMatch ? stripHtmlEntities(descMatch[1]!.trim()).slice(0, 200) : "";
 
     if (title) {
       items.push({ title, source, url, publishedAt, snippet });
@@ -186,9 +182,7 @@ export class NewsClient {
     const companyName = TICKER_NAMES[upper];
 
     // Search with both ticker and company name for better coverage
-    const query = companyName
-      ? `${upper} ${companyName} stock`
-      : `${upper} stock market`;
+    const query = companyName ? `${upper} ${companyName} stock` : `${upper} stock market`;
 
     return this.getNews(query, limit);
   }

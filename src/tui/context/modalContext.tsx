@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 
 // ============================================================================
 // Modal Context — Scroll-owning modal dialog management
@@ -18,7 +18,10 @@ interface ModalActions {
 }
 
 const ModalStateContext = createContext<ModalState>({ isModalOpen: false, modalId: null });
-const ModalActionsContext = createContext<ModalActions>({ openModal: () => {}, closeModal: () => {} });
+const ModalActionsContext = createContext<ModalActions>({
+  openModal: () => {},
+  closeModal: () => {},
+});
 
 export function ModalProvider({ children }: { children: ReactNode }) {
   const [modalId, setModalId] = useState<string | null>(null);

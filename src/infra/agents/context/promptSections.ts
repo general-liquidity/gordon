@@ -61,7 +61,9 @@ const fallbackSectionContent = new Map<
   string | ((options: PromptSectionRenderOptions) => string)
 >([
   ...SHARED_PROMPT_SECTIONS.map((section) => [section.id, section.content] as const),
-  ...Object.values(ROLE_PROMPT_SECTIONS).flat().map((section) => [section.id, section.content] as const),
+  ...Object.values(ROLE_PROMPT_SECTIONS)
+    .flat()
+    .map((section) => [section.id, section.content] as const),
   [
     "context.execution-blocked",
     `## Runtime Execution Block
@@ -142,7 +144,7 @@ function loadRegistry(): PromptSectionRegistryRecord[] {
         mount: "instructions" as const,
         priority: section.priority,
         roles: [role as PromptAgentRole],
-      }))
+      })),
     ),
   ];
   return registryCache;
@@ -171,20 +173,23 @@ function formatMCPServerSummary(): string {
 function renderTemplate(template: string, options: PromptSectionRenderOptions): string {
   const context = options.context;
   const workflowPhase = context ? determineWorkflowPhase(context) : "unknown";
-  const executionReadiness = context?.requestedTaskScope === "execution"
-    ? context
-      ? (() => {
-          const readiness = getExecutionReadiness(context);
-          return readiness.ready
-            ? "Execution may proceed, but remain within the most recent approved plan or preview."
-            : readiness.reason ?? "Execution is blocked because Gordon is not live-enabled.";
-        })()
-      : "Execution readiness unknown."
-    : "not_applicable";
+  const executionReadiness =
+    context?.requestedTaskScope === "execution"
+      ? context
+        ? (() => {
+            const readiness = getExecutionReadiness(context);
+            return readiness.ready
+              ? "Execution may proceed, but remain within the most recent approved plan or preview."
+              : (readiness.reason ?? "Execution is blocked because Gordon is not live-enabled.");
+          })()
+        : "Execution readiness unknown."
+      : "not_applicable";
   const activeVenue = context?.exchange?.exchangeId ?? context?.broker?.brokerId ?? "none";
   const modelProvider = context?.config.modelConfig?.provider ?? "current provider";
   const requestedScope = context?.requestedTaskScope ?? "none";
-  const planningHandoff = context ? getPlanningHandoff(context)?.handoffSummary ?? "No current planning handoff." : "No current planning handoff.";
+  const planningHandoff = context
+    ? (getPlanningHandoff(context)?.handoffSummary ?? "No current planning handoff.")
+    : "No current planning handoff.";
   const thinkingDepth = context ? getThinkingDepthFromContext(context) : "off";
 
   return template
@@ -201,7 +206,10 @@ function renderTemplate(template: string, options: PromptSectionRenderOptions): 
     .trim();
 }
 
-function loadSectionContent(record: PromptSectionRegistryRecord, options: PromptSectionRenderOptions): string {
+function loadSectionContent(
+  record: PromptSectionRegistryRecord,
+  options: PromptSectionRenderOptions,
+): string {
   const cacheKey = `${record.id}:${options.role ?? "none"}:${options.context?.requestedTaskScope ?? "none"}:${options.context?.config.modelConfig?.provider ?? "none"}:${options.context?.exchange?.exchangeId ?? "no-exchange"}:${options.context?.broker?.brokerId ?? "no-broker"}`;
   // ACE is backed by a governed, revisioned on-disk store. It must not use the
   // process-lifetime template cache: a daemon can host many sessions and a
@@ -228,7 +236,10 @@ function loadSectionContent(record: PromptSectionRegistryRecord, options: Prompt
   return rendered;
 }
 
-function recordMatches(record: PromptSectionRegistryRecord, options: PromptSectionRenderOptions): boolean {
+function recordMatches(
+  record: PromptSectionRegistryRecord,
+  options: PromptSectionRenderOptions,
+): boolean {
   const { role, context } = options;
   const workflowPhase = context ? determineWorkflowPhase(context) : undefined;
   const provider = context?.config.modelConfig?.provider;
@@ -236,10 +247,16 @@ function recordMatches(record: PromptSectionRegistryRecord, options: PromptSecti
   if (record.roles?.length && (!role || !record.roles.includes(role))) {
     return false;
   }
-  if (record.workflowPhases?.length && (!workflowPhase || !record.workflowPhases.includes(workflowPhase))) {
+  if (
+    record.workflowPhases?.length &&
+    (!workflowPhase || !record.workflowPhases.includes(workflowPhase))
+  ) {
     return false;
   }
-  if (record.taskScopes?.length && (!context?.requestedTaskScope || !record.taskScopes.includes(context.requestedTaskScope))) {
+  if (
+    record.taskScopes?.length &&
+    (!context?.requestedTaskScope || !record.taskScopes.includes(context.requestedTaskScope))
+  ) {
     return false;
   }
   if (record.providers?.length && (!provider || !record.providers.includes(provider))) {
@@ -284,7 +301,10 @@ function recordMatches(record: PromptSectionRegistryRecord, options: PromptSecti
   return true;
 }
 
-function getSectionsForMount(mount: PromptSectionMount, options: PromptSectionRenderOptions): PromptSectionRegistryRecord[] {
+function getSectionsForMount(
+  mount: PromptSectionMount,
+  options: PromptSectionRenderOptions,
+): PromptSectionRegistryRecord[] {
   return loadRegistry()
     .filter((record) => record.mount === mount)
     .filter((record) => recordMatches(record, options))

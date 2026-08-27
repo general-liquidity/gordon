@@ -134,7 +134,7 @@ export function savePlaybookBacktestResult(result: PlaybookBacktestResult): stri
       result.win_rate,
       result.profit_factor,
       result.total_trades,
-      result.duration_ms
+      result.duration_ms,
     );
 
     logger.info("Saved playbook backtest result", {
@@ -164,7 +164,7 @@ export function loadPlaybookBacktestResult(id: string): PlaybookBacktestResult |
     initPlaybookBacktestTable();
 
     const stmt = db.prepare<PlaybookBacktestRow, [string]>(
-      "SELECT * FROM playbook_backtest_results WHERE id = ?"
+      "SELECT * FROM playbook_backtest_results WHERE id = ?",
     );
     const row = stmt.get(id);
     if (!row) return null;
@@ -210,7 +210,7 @@ export interface PlaybookBacktestSummary {
  * List playbook backtest results with optional filters.
  */
 export function listPlaybookBacktestResults(
-  query: PlaybookBacktestQuery = {}
+  query: PlaybookBacktestQuery = {},
 ): PlaybookBacktestSummary[] {
   try {
     const db = getDatabase();
@@ -270,7 +270,7 @@ export function listPlaybookBacktestResults(
 export function getLatestPlaybookBacktest(
   playbookName: string,
   symbol: string,
-  timeframe: string
+  timeframe: string,
 ): PlaybookBacktestResult | null {
   try {
     const db = getDatabase();
@@ -299,14 +299,9 @@ export function getLatestPlaybookBacktest(
 export function cleanupPlaybookBacktests(olderThanDays: number): number {
   try {
     const db = getDatabase();
-    const cutoff = new Date(
-      Date.now() - olderThanDays * 24 * 60 * 60 * 1000
-    ).toISOString();
+    const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000).toISOString();
 
-    const result = db.run(
-      "DELETE FROM playbook_backtest_results WHERE created_at < ?",
-      [cutoff]
-    );
+    const result = db.run("DELETE FROM playbook_backtest_results WHERE created_at < ?", [cutoff]);
 
     if (result.changes > 0) {
       logger.info("Cleaned up old playbook backtest results", {

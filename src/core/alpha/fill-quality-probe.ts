@@ -118,7 +118,7 @@ export interface FillQualityProbeResult {
   summary: string;
 }
 
-const DEFAULT_POOR_FILL = 0.60;
+const DEFAULT_POOR_FILL = 0.6;
 const DEFAULT_POOR_SLIPPAGE = 2.0;
 const DEFAULT_POOR_LATENCY = 2.0;
 const DEFAULT_CLEAN_FILL = 0.95;
@@ -229,9 +229,7 @@ export function analyzeFillQualityProbe(
     if (a.classification === "clean") return 0;
     return 0.5;
   }
-  const demandScore = parseFloat(
-    (axes.reduce((s, a) => s + axisToScore(a), 0) / 3).toFixed(4),
-  );
+  const demandScore = parseFloat((axes.reduce((s, a) => s + axisToScore(a), 0) / 3).toFixed(4));
 
   const summary =
     `${verdict.toUpperCase()} — ${poorAxesCount} poor / ${cleanAxesCount} clean axes ` +
@@ -268,11 +266,7 @@ export function formatFillQualityProbe(result: FillQualityProbeResult): string {
   ];
   for (const a of result.axes) {
     const tag =
-      a.classification === "poor"
-        ? "[POOR]"
-        : a.classification === "clean"
-          ? "[CLEAN]"
-          : "[NEUT]";
+      a.classification === "poor" ? "[POOR]" : a.classification === "clean" ? "[CLEAN]" : "[NEUT]";
     lines.push(`    ${tag} ${a.axis}: ${a.description}`);
   }
   lines.push("");

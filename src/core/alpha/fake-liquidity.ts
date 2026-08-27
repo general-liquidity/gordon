@@ -92,7 +92,7 @@ export interface FakeLiquidityResult {
 const DEFAULT_WINDOW = 60;
 const DEFAULT_MIN_CANDLES = 20;
 const DEFAULT_OUTLIER_Z = 3.5;
-const DEFAULT_OUTLIER_FRAC = 0.10;
+const DEFAULT_OUTLIER_FRAC = 0.1;
 const DEFAULT_MIN_VOL_USD = 1;
 const MODIFIED_Z_CONST = 0.6745;
 
@@ -175,8 +175,7 @@ export function analyzeFakeLiquidity(
       outlierFraction: 0,
       candleSamples: efficiencies,
       verdict: "insufficient_data",
-      summary:
-        `Insufficient candles with non-zero USD volume (${finiteValues.length} < ${minCandles}).`,
+      summary: `Insufficient candles with non-zero USD volume (${finiteValues.length} < ${minCandles}).`,
     };
   }
 

@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../ink-custom";
 
 /**
@@ -19,12 +18,12 @@ interface Props {
 
 /** Workflow group icons matching WORKFLOW_CONFIG from commandUx.ts */
 const WORKFLOW_ICONS: Record<string, { icon: string; color: string }> = {
-  discover: { icon: "\u25C6", color: "cyanBright" },   // filled diamond
-  analyze:  { icon: "\u25C8", color: "magenta" },      // diamond in circle
-  trade:    { icon: "\u25B2", color: "green" },         // up triangle
-  run:      { icon: "\u25C7", color: "yellow" },        // open diamond
-  accounts: { icon: "\u25A0", color: "blue" },          // filled square
-  operate:  { icon: "\u25CF", color: "white" },         // filled circle
+  discover: { icon: "\u25C6", color: "cyanBright" }, // filled diamond
+  analyze: { icon: "\u25C8", color: "magenta" }, // diamond in circle
+  trade: { icon: "\u25B2", color: "green" }, // up triangle
+  run: { icon: "\u25C7", color: "yellow" }, // open diamond
+  accounts: { icon: "\u25A0", color: "blue" }, // filled square
+  operate: { icon: "\u25CF", color: "white" }, // filled circle
 };
 
 /** Display order for workflow groups */

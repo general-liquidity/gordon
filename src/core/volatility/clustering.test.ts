@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  testVolatilityClustering,
-  testVolatilityClusteringFromPrices,
-} from "./clustering.ts";
+import { testVolatilityClustering, testVolatilityClusteringFromPrices } from "./clustering.ts";
 
 describe("testVolatilityClustering — basics", () => {
   it("returns insufficient_data for short series", () => {

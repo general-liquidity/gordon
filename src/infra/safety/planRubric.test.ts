@@ -145,12 +145,20 @@ describe("compareRubrics", () => {
 
   it("captures verdict change", () => {
     const before: PlanRubric = {
-      correctness: 1, verification: 1, scopeDiscipline: 1,
-      reliability: 1, maintainability: 1, handoffReadiness: 1,
+      correctness: 1,
+      verification: 1,
+      scopeDiscipline: 1,
+      reliability: 1,
+      maintainability: 1,
+      handoffReadiness: 1,
     };
     const after: PlanRubric = {
-      correctness: 2, verification: 2, scopeDiscipline: 2,
-      reliability: 2, maintainability: 1, handoffReadiness: 1,
+      correctness: 2,
+      verification: 2,
+      scopeDiscipline: 2,
+      reliability: 2,
+      maintainability: 1,
+      handoffReadiness: 1,
     };
     const delta = compareRubrics(before, after);
     expect(delta.verdictChange.from).toBe("block");

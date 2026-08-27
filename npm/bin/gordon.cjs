@@ -8,9 +8,9 @@
 // launcher never touches the network — it just resolves the installed
 // sub-package and spawns the binary inside it.
 
-const fs = require("fs");
-const path = require("path");
-const { spawn } = require("child_process");
+const fs = require("node:fs");
+const path = require("node:path");
+const { spawn } = require("node:child_process");
 
 const SCOPE = "@general-liquidity";
 
@@ -20,10 +20,10 @@ function isMuslLinux() {
   if (process.platform !== "linux") return false;
   if (fs.existsSync("/etc/alpine-release")) return true;
   try {
-    const { execFileSync } = require("child_process");
+    const { execFileSync } = require("node:child_process");
     const out = execFileSync("ldd", ["--version"], {
       stdio: ["ignore", "pipe", "pipe"],
-      encoding: "utf-8"
+      encoding: "utf-8",
     });
     if (/musl/i.test(out)) return true;
   } catch {
@@ -34,7 +34,7 @@ function isMuslLinux() {
   try {
     const report =
       typeof process.report?.getReport === "function" ? process.report.getReport() : null;
-    if (report && report.header && !report.header.glibcVersionRuntime) return true;
+    if (report?.header && !report.header.glibcVersionRuntime) return true;
   } catch {
     // report unavailable — assume glibc.
   }
@@ -70,15 +70,11 @@ const binaryPath = resolveBinaryPath();
 if (!binaryPath || !fs.existsSync(binaryPath)) {
   console.error(
     `[gordon] No prebuilt binary is available for ${process.platform}-${process.arch}` +
-      `${target.endsWith("-musl") ? " (musl libc)" : ""}.`
+      `${target.endsWith("-musl") ? " (musl libc)" : ""}.`,
   );
   console.error(`[gordon] Expected optional dependency "${packageName}" to be installed.`);
-  console.error(
-    "[gordon] Your platform may have no published binary, or the optional dependency"
-  );
-  console.error(
-    "[gordon] was skipped (--no-optional, --omit=optional, or an offline install)."
-  );
+  console.error("[gordon] Your platform may have no published binary, or the optional dependency");
+  console.error("[gordon] was skipped (--no-optional, --omit=optional, or an offline install).");
   console.error("[gordon] Reinstall with optional dependencies enabled, or build from source:");
   console.error("[gordon]   https://github.com/general-liquidity/gordon#install");
   process.exit(1);
@@ -101,7 +97,7 @@ if (process.platform === "win32") {
   child = spawn(
     "/bin/sh",
     ["-c", 'ulimit -c 0 2>/dev/null; exec "$@"', "sh", binaryPath, ...args],
-    { stdio: "inherit" }
+    { stdio: "inherit" },
   );
 }
 

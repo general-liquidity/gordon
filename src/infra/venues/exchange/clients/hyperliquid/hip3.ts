@@ -257,7 +257,7 @@ export function getHIP3AssetInfo(symbol: string): HIP3AssetInfo {
   if (!asset) {
     throw new HyperliquidError(
       `Unknown HIP-3 asset: ${symbol}. Available: ${[...HIP3_ASSETS.keys()].join(", ")}`,
-      "HIP3_UNKNOWN_ASSET"
+      "HIP3_UNKNOWN_ASSET",
     );
   }
   return asset;
@@ -266,9 +266,7 @@ export function getHIP3AssetInfo(symbol: string): HIP3AssetInfo {
 /**
  * Get all HIP-3 assets for a given category
  */
-export function getHIP3AssetsByCategory(
-  category: HIP3AssetCategory
-): HIP3CategorizedAsset[] {
+export function getHIP3AssetsByCategory(category: HIP3AssetCategory): HIP3CategorizedAsset[] {
   return [...HIP3_ASSETS.values()].filter((a) => a.category === category);
 }
 
@@ -299,7 +297,7 @@ export async function resolveDexOffset(dex: string): Promise<number> {
   if (!response.ok) {
     throw new HyperliquidError(
       `Failed to fetch perpDexs: HTTP ${response.status}`,
-      "HIP3_API_ERROR"
+      "HIP3_API_ERROR",
     );
   }
 
@@ -314,10 +312,7 @@ export async function resolveDexOffset(dex: string): Promise<number> {
     dexIdx++;
   }
 
-  throw new HyperliquidError(
-    `HIP-3 dex '${dex}' not found`,
-    "HIP3_DEX_NOT_FOUND"
-  );
+  throw new HyperliquidError(`HIP-3 dex '${dex}' not found`, "HIP3_DEX_NOT_FOUND");
 }
 
 /**
@@ -327,7 +322,7 @@ export async function resolveDexOffset(dex: string): Promise<number> {
  */
 export async function resolveAssetInDex(
   dex: string,
-  assetName: string
+  assetName: string,
 ): Promise<{ localIndex: number; szDecimals: number }> {
   const response = await fetch(INFO_URL, {
     method: "POST",
@@ -338,7 +333,7 @@ export async function resolveAssetInDex(
   if (!response.ok) {
     throw new HyperliquidError(
       `Failed to fetch dex meta for '${dex}': HTTP ${response.status}`,
-      "HIP3_API_ERROR"
+      "HIP3_API_ERROR",
     );
   }
 
@@ -360,7 +355,7 @@ export async function resolveAssetInDex(
 
   throw new HyperliquidError(
     `Asset '${assetName}' not found in HIP-3 dex '${dex}'`,
-    "HIP3_ASSET_NOT_FOUND"
+    "HIP3_ASSET_NOT_FOUND",
   );
 }
 
@@ -371,7 +366,7 @@ export async function resolveAssetInDex(
  * Mirrors fintool hip3.rs::resolve_hip3_asset
  */
 export async function resolveHIP3GlobalIndex(
-  symbol: string
+  symbol: string,
 ): Promise<{ globalIndex: number; szDecimals: number }> {
   const info = getHIP3AssetInfo(symbol);
   const [offset, assetData] = await Promise.all([
@@ -401,7 +396,7 @@ export async function fetchDexMeta(dex: string): Promise<HIP3DexMeta> {
   if (!metaResponse.ok) {
     throw new HyperliquidError(
       `Failed to fetch meta for dex '${dex}': HTTP ${metaResponse.status}`,
-      "HIP3_API_ERROR"
+      "HIP3_API_ERROR",
     );
   }
 
@@ -452,7 +447,7 @@ export async function getHIP3Quote(symbol: string): Promise<HIP3Quote> {
   if (!response.ok) {
     throw new HyperliquidError(
       `Failed to fetch HIP-3 quote for ${upper}: HTTP ${response.status}`,
-      "HIP3_API_ERROR"
+      "HIP3_API_ERROR",
     );
   }
 
@@ -484,7 +479,7 @@ export async function getHIP3Quote(symbol: string): Promise<HIP3Quote> {
   if (assetIdx < 0 || !assetCtxs[assetIdx]) {
     throw new HyperliquidError(
       `HIP-3 asset '${upper}' not found in dex '${info.builder}' universe`,
-      "HIP3_ASSET_NOT_FOUND"
+      "HIP3_ASSET_NOT_FOUND",
     );
   }
 
@@ -595,7 +590,7 @@ export async function getHIP3L2Book(symbol: string): Promise<{
   if (!response.ok) {
     throw new HyperliquidError(
       `Failed to fetch L2 book for ${upper}: HTTP ${response.status}`,
-      "HIP3_API_ERROR"
+      "HIP3_API_ERROR",
     );
   }
 
@@ -621,17 +616,14 @@ export async function getHIP3L2Book(symbol: string): Promise<{
  * Must match the SDK's float_to_string_for_hashing exactly.
  */
 function floatToWireString(val: number): string {
-  return val
-    .toFixed(8)
-    .replace(/0+$/, "")
-    .replace(/\.$/, "");
+  return val.toFixed(8).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 /**
  * Format size for wire — truncate to szDecimals, then wire format.
  */
 export function sizeToWire(val: number, szDecimals: number): string {
-  const factor = Math.pow(10, szDecimals);
+  const factor = 10 ** szDecimals;
   const truncated = Math.floor(val * factor + 1e-9) / factor;
   return floatToWireString(truncated);
 }
@@ -643,7 +635,7 @@ export function priceToWire(price: number): string {
   if (price === 0) return "0";
   const magnitude = Math.floor(Math.log10(Math.abs(price)));
   const decimals = Math.max(0, 4 - magnitude);
-  const factor = Math.pow(10, decimals);
+  const factor = 10 ** decimals;
   const rounded = Math.round(price * factor) / factor;
   return floatToWireString(rounded);
 }
@@ -676,9 +668,9 @@ export async function placeHIP3Order(
   signer?: {
     signAction: (
       action: Record<string, unknown>,
-      nonce: number
+      nonce: number,
     ) => Promise<{ r: string; s: string; v: number }>;
-  }
+  },
 ): Promise<HIP3OrderResult> {
   const upper = params.symbol.toUpperCase();
   const info = getHIP3AssetInfo(upper);
@@ -728,8 +720,7 @@ export async function placeHIP3Order(
       status: "error",
       filledSize: 0,
       avgPrice: 0,
-      error:
-        "No signer provided. Pass a HyperliquidSigner to placeHIP3Order to sign and submit.",
+      error: "No signer provided. Pass a HyperliquidSigner to placeHIP3Order to sign and submit.",
     };
   }
 
@@ -768,9 +759,7 @@ export async function placeHIP3Order(
   if (data.status === "err") {
     const errMsg =
       data.error ??
-      (typeof data.response === "string"
-        ? data.response
-        : "Unknown HIP-3 order error");
+      (typeof data.response === "string" ? data.response : "Unknown HIP-3 order error");
     logger.error("HIP-3 order rejected", undefined, { error: errMsg });
     return {
       orderId: null,
@@ -840,9 +829,9 @@ export async function updateHIP3Leverage(
   signer?: {
     signAction: (
       action: Record<string, unknown>,
-      nonce: number
+      nonce: number,
     ) => Promise<{ r: string; s: string; v: number }>;
-  }
+  },
 ): Promise<{ status: string; error?: string }> {
   const upper = symbol.toUpperCase();
   const { globalIndex } = await resolveHIP3GlobalIndex(upper);
@@ -875,10 +864,7 @@ export async function updateHIP3Leverage(
   if (data.status === "err") {
     return {
       status: "error",
-      error:
-        typeof data.response === "string"
-          ? data.response
-          : "Leverage update failed",
+      error: typeof data.response === "string" ? data.response : "Leverage update failed",
     };
   }
 

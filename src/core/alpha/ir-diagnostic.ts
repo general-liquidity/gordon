@@ -122,12 +122,10 @@ export function computeIrDiagnostic(
     };
   }
 
-  const meanAbsIc =
-    usableAbsIcs.reduce((sum, v) => sum + v, 0) / usableAbsIcs.length;
+  const meanAbsIc = usableAbsIcs.reduce((sum, v) => sum + v, 0) / usableAbsIcs.length;
   const variance =
     usableAbsIcs.length > 1
-      ? usableAbsIcs.reduce((sum, v) => sum + (v - meanAbsIc) ** 2, 0) /
-        (usableAbsIcs.length - 1)
+      ? usableAbsIcs.reduce((sum, v) => sum + (v - meanAbsIc) ** 2, 0) / (usableAbsIcs.length - 1)
       : 0;
   const dispersion = Math.sqrt(variance);
 
@@ -136,8 +134,7 @@ export function computeIrDiagnostic(
 
   // Approx IR 95% CI: propagate the mean-IC CI through the √N scaling.
   // SE_IC ≈ mean of per-signal IC half-widths / √k where k = signals used.
-  const meanHalfWidth =
-    usableHalfWidths.reduce((s, v) => s + v, 0) / usableHalfWidths.length;
+  const meanHalfWidth = usableHalfWidths.reduce((s, v) => s + v, 0) / usableHalfWidths.length;
   const seIc = meanHalfWidth / Math.sqrt(usableAbsIcs.length);
   const ir95 = seIc * sqrtN;
 

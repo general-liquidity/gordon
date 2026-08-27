@@ -26,7 +26,10 @@ export interface SymbolPulse {
 export async function scanMarketPulse(
   tickers: string[],
   analyzeNews: (title: string, ticker: string) => Promise<{ signal: string; confidence: number }>,
-  fetchNews: (ticker: string, limit: number) => Promise<Array<{ title: string; timestamp: number }>>,
+  fetchNews: (
+    ticker: string,
+    limit: number,
+  ) => Promise<Array<{ title: string; timestamp: number }>>,
   newsPerTicker: number = 3,
 ): Promise<SymbolPulse[]> {
   const results: SymbolPulse[] = [];
@@ -52,8 +55,8 @@ export async function scanMarketPulse(
       const bull = entries.filter((e) => e.signal === "BULLISH").length;
       const bear = entries.filter((e) => e.signal === "BEARISH").length;
       const neutral = entries.filter((e) => e.signal === "NEUTRAL").length;
-      const avgConf = entries.length > 0
-        ? entries.reduce((s, e) => s + e.confidence, 0) / entries.length : 0;
+      const avgConf =
+        entries.length > 0 ? entries.reduce((s, e) => s + e.confidence, 0) / entries.length : 0;
 
       let dominant: SymbolPulse["dominantSignal"] = "NEUTRAL";
       if (bull > bear && bull > neutral) dominant = "BULLISH";
@@ -61,8 +64,13 @@ export async function scanMarketPulse(
       else if (bull === bear && bull > 0) dominant = "MIXED";
 
       results.push({
-        ticker, bullCount: bull, bearCount: bear, neutralCount: neutral,
-        avgConfidence: avgConf, dominantSignal: dominant, entries,
+        ticker,
+        bullCount: bull,
+        bearCount: bear,
+        neutralCount: neutral,
+        avgConfidence: avgConf,
+        dominantSignal: dominant,
+        entries,
       });
     } catch {}
   }

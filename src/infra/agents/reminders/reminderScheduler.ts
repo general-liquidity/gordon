@@ -98,7 +98,7 @@ export class ReminderScheduler {
         // Handler bugs must never crash the scheduler.
         continue;
       }
-      if (!text || !text.trim()) continue;
+      if (!text?.trim()) continue;
 
       due.push({ id: reg.id, priority: reg.priority ?? 100, text: text.trim() });
     }

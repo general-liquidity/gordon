@@ -25,8 +25,8 @@ describe("calculateTailRatio", () => {
   test("MATH ANCHOR: fat right tail → ratio > 1", () => {
     // 20 small negatives + huge positives skew the 95th up.
     const returns = [
-      -0.01, -0.01, -0.01, -0.01, -0.01, -0.01, -0.01, -0.01, -0.01, -0.01,
-      0.20, 0.18, 0.16, 0.14, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02,
+      -0.01, -0.01, -0.01, -0.01, -0.01, -0.01, -0.01, -0.01, -0.01, -0.01, 0.2, 0.18, 0.16, 0.14,
+      0.12, 0.1, 0.08, 0.06, 0.04, 0.02,
     ];
     const ratio = calculateTailRatio(returns);
     expect(ratio).not.toBeNull();

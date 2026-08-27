@@ -183,9 +183,7 @@ export class CoinGeckoClient {
   /**
    * Internal: call the /simple/price endpoint.
    */
-  private async fetchSimplePrice(
-    coinIds: string[]
-  ): Promise<Map<string, CoinGeckoPrice>> {
+  private async fetchSimplePrice(coinIds: string[]): Promise<Map<string, CoinGeckoPrice>> {
     const result = new Map<string, CoinGeckoPrice>();
 
     if (coinIds.length === 0) {

@@ -75,7 +75,10 @@ async function loadTickerMap(signal?: AbortSignal): Promise<Map<string, TickerMa
       headers: { "User-Agent": SEC_USER_AGENT, Accept: "application/json" },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status} fetching SEC ticker map`);
-    const json = (await res.json()) as Record<string, { cik_str: number; ticker: string; title: string }>;
+    const json = (await res.json()) as Record<
+      string,
+      { cik_str: number; ticker: string; title: string }
+    >;
     const map = new Map<string, TickerMapEntry>();
     for (const row of Object.values(json)) {
       const cik = String(row.cik_str).padStart(10, "0");
@@ -98,7 +101,7 @@ function decodeEntities(s: string): string {
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, "\"")
+    .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'")
     .replace(/<[^>]+>/g, "")
@@ -229,7 +232,8 @@ async function fetchSourceForTicker(
   const hit = cache.get(key);
   if (hit && Date.now() - hit.fetchedAt < CACHE_TTL_MS) return hit.headlines;
 
-  const headlines = src === "yahoo" ? await fetchYahoo(ticker, signal) : await fetchEdgar8k(ticker, signal);
+  const headlines =
+    src === "yahoo" ? await fetchYahoo(ticker, signal) : await fetchEdgar8k(ticker, signal);
   cache.set(key, { fetchedAt: Date.now(), headlines });
   return headlines;
 }
@@ -297,11 +301,16 @@ export function _resetStockHeadlinesCacheForTests(): void {
   tickerMap = null;
 }
 
-export function _peekStockCacheForTests(src: StockNewsSource, ticker: string): StockHeadline[] | undefined {
+export function _peekStockCacheForTests(
+  src: StockNewsSource,
+  ticker: string,
+): StockHeadline[] | undefined {
   return cache.get(cacheKey(src, ticker.toUpperCase()))?.headlines;
 }
 
-export function _seedTickerMapForTests(rows: Array<{ ticker: string; cik: string; name: string }>): void {
+export function _seedTickerMapForTests(
+  rows: Array<{ ticker: string; cik: string; name: string }>,
+): void {
   const map = new Map<string, TickerMapEntry>();
   for (const r of rows) {
     map.set(r.ticker.toUpperCase(), { cik: r.cik.padStart(10, "0"), name: r.name });

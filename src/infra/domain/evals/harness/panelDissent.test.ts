@@ -74,9 +74,21 @@ describe("computePanelDissent", () => {
     const levelOnly = computePanelDissent(
       "s",
       [
-        judge("anthropic/j", [["a", 0.9], ["b", 0.6], ["c", 0.3]]),
-        judge("openai/j", [["a", 0.6], ["b", 0.3], ["c", 0.05]]),
-        judge("google/j", [["a", 0.45], ["b", 0.2], ["c", 0.02]]),
+        judge("anthropic/j", [
+          ["a", 0.9],
+          ["b", 0.6],
+          ["c", 0.3],
+        ]),
+        judge("openai/j", [
+          ["a", 0.6],
+          ["b", 0.3],
+          ["c", 0.05],
+        ]),
+        judge("google/j", [
+          ["a", 0.45],
+          ["b", 0.2],
+          ["c", 0.02],
+        ]),
       ],
       [traj("a"), traj("b"), traj("c")],
     );
@@ -87,9 +99,21 @@ describe("computePanelDissent", () => {
     const rankOnly = computePanelDissent(
       "s",
       [
-        judge("anthropic/j", [["a", 0.9], ["b", 0.6], ["c", 0.3]]),
-        judge("openai/j", [["a", 0.3], ["b", 0.6], ["c", 0.9]]),
-        judge("google/j", [["a", 0.6], ["b", 0.9], ["c", 0.3]]),
+        judge("anthropic/j", [
+          ["a", 0.9],
+          ["b", 0.6],
+          ["c", 0.3],
+        ]),
+        judge("openai/j", [
+          ["a", 0.3],
+          ["b", 0.6],
+          ["c", 0.9],
+        ]),
+        judge("google/j", [
+          ["a", 0.6],
+          ["b", 0.9],
+          ["c", 0.3],
+        ]),
       ],
       [traj("a"), traj("b"), traj("c")],
     );
@@ -214,9 +238,18 @@ describe("computePanelDissent", () => {
       computePanelDissent(
         "s",
         [
-          judge("anthropic/j", [["a", 0.2], ["b", 0.7]]),
-          judge("openai/j", [["a", 0.9], ["b", 0.1]]),
-          judge("google/j", [["a", 0.55], ["b", 0.4]]),
+          judge("anthropic/j", [
+            ["a", 0.2],
+            ["b", 0.7],
+          ]),
+          judge("openai/j", [
+            ["a", 0.9],
+            ["b", 0.1],
+          ]),
+          judge("google/j", [
+            ["a", 0.55],
+            ["b", 0.4],
+          ]),
         ],
         [traj("a"), traj("b")],
       );
@@ -230,9 +263,7 @@ describe("computePanelDissent", () => {
 
 describe("detectDissentConvergence", () => {
   it("flags a panel drifting toward agreement over successive runs", () => {
-    const history = [0.6, 0.5, 0.4, 0.2].map(
-      (maxSpread) => ({ maxSpread }) as PanelDissentReport,
-    );
+    const history = [0.6, 0.5, 0.4, 0.2].map((maxSpread) => ({ maxSpread }) as PanelDissentReport);
     const trend = detectDissentConvergence(history);
     expect(trend.n).toBe(4);
     expect(trend.slope).toBeLessThan(0);
@@ -250,16 +281,30 @@ describe("detectDissentConvergence", () => {
 describe("judgeTrajectoriesPanel dissent field", () => {
   it("leaves the consensus scores untouched while adding the dissent report", async () => {
     const client = buildMockJudgeClient({
-      responses: { "dissent-test": [{ id: "a", score: 0.5 }, { id: "b", score: 0.5 }] },
+      responses: {
+        "dissent-test": [
+          { id: "a", score: 0.5 },
+          { id: "b", score: 0.5 },
+        ],
+      },
       byModel: {
         "anthropic/test": {
-          "dissent-test": [{ id: "a", score: 0.9 }, { id: "b", score: 0.2 }],
+          "dissent-test": [
+            { id: "a", score: 0.9 },
+            { id: "b", score: 0.2 },
+          ],
         },
         "openai/test": {
-          "dissent-test": [{ id: "a", score: 0.8 }, { id: "b", score: 0.3 }],
+          "dissent-test": [
+            { id: "a", score: 0.8 },
+            { id: "b", score: 0.3 },
+          ],
         },
         "google/test": {
-          "dissent-test": [{ id: "a", score: 0.7 }, { id: "b", score: 0.4 }],
+          "dissent-test": [
+            { id: "a", score: 0.7 },
+            { id: "b", score: 0.4 },
+          ],
         },
       },
     });
@@ -284,7 +329,12 @@ describe("judgeTrajectoriesPanel dissent field", () => {
 
   it("reports a dropped-judge panel with the survivors it actually had", async () => {
     const client = buildMockJudgeClient({
-      responses: { "dissent-test": [{ id: "a", score: 0.7 }, { id: "b", score: 0.3 }] },
+      responses: {
+        "dissent-test": [
+          { id: "a", score: 0.7 },
+          { id: "b", score: 0.3 },
+        ],
+      },
       throwForModel: "openai/test",
     });
     const result = await judgeTrajectoriesPanel(

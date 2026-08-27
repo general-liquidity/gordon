@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 
 // ============================================================================
@@ -31,7 +30,8 @@ export function McpParsingWarnings({ warnings }: Props) {
           <Text color="yellow">: {w.message}</Text>
           {w.field && (
             <Text color="yellow" dimColor>
-              {" — field: "}{w.field}
+              {" — field: "}
+              {w.field}
             </Text>
           )}
         </Box>

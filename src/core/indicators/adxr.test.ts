@@ -24,7 +24,7 @@ describe("ADXR", () => {
     const adx = calculateADX(candles, period);
     const series = adx.adxValues;
     const expected = parseFloat(
-      ((series[series.length - 1]! + series[series.length - 1 - period]!) / 2).toFixed(2)
+      ((series[series.length - 1]! + series[series.length - 1 - period]!) / 2).toFixed(2),
     );
     const adxr = calculateADXR(candles, period);
     expect(adxr.current).toBeCloseTo(expected, 2);

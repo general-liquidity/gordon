@@ -14,11 +14,7 @@ import type { Node as YogaNode } from "yoga-layout";
 import type { Styles } from "./styles.ts";
 
 export type TextName = "#text";
-export type ElementNames =
-  | "ink-root"
-  | "ink-box"
-  | "ink-text"
-  | "ink-virtual-text";
+export type ElementNames = "ink-root" | "ink-box" | "ink-text" | "ink-virtual-text";
 export type NodeNames = ElementNames | TextName;
 
 export type DOMNodeAttribute = boolean | string | number;
@@ -79,9 +75,9 @@ export type TextNode = {
   nodeValue: string;
 } & InkNode;
 
-export type DOMNode<
-  T extends { nodeName: NodeNames } = { nodeName: NodeNames },
-> = T extends { nodeName: infer U }
+export type DOMNode<T extends { nodeName: NodeNames } = { nodeName: NodeNames }> = T extends {
+  nodeName: infer U;
+}
   ? U extends "#text"
     ? TextNode
     : DOMElement

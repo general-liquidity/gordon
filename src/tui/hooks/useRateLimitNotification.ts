@@ -15,13 +15,16 @@ export function useRateLimitNotification() {
   const [events, setEvents] = useState<RateLimitEvent[]>([]);
   const [isThrottled, setIsThrottled] = useState(false);
 
-  const recordRateLimit = useCallback((provider: string, weight: number, limit: number, resetMs: number) => {
-    const event: RateLimitEvent = { provider, weight, limit, resetMs, timestamp: Date.now() };
-    setEvents((prev) => [...prev.slice(-10), event]); // Keep last 10
-    setIsThrottled(true);
-    // Auto-clear after reset
-    setTimeout(() => setIsThrottled(false), resetMs);
-  }, []);
+  const recordRateLimit = useCallback(
+    (provider: string, weight: number, limit: number, resetMs: number) => {
+      const event: RateLimitEvent = { provider, weight, limit, resetMs, timestamp: Date.now() };
+      setEvents((prev) => [...prev.slice(-10), event]); // Keep last 10
+      setIsThrottled(true);
+      // Auto-clear after reset
+      setTimeout(() => setIsThrottled(false), resetMs);
+    },
+    [],
+  );
 
   const dismiss = useCallback(() => setIsThrottled(false), []);
 

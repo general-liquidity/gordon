@@ -24,7 +24,6 @@ import {
   type CostInput,
 } from "../../../exchange/orderbook/orderBookCost.ts";
 import {
-  PUBLIC_VENUES,
   fetchPublicBooks,
   isUsdQuote,
   splitSymbol,
@@ -55,7 +54,7 @@ export const compareExecutionCostTool = createTool({
       .optional()
       .describe(
         "Venues to compare. Default: all four (Binance, Coinbase, " +
-        "Kraken, OKX). Pass a single venue to skip cross-venue fetches.",
+          "Kraken, OKX). Pass a single venue to skip cross-venue fetches.",
       ),
     referenceBasis: z
       .enum(["best", "mid"])
@@ -176,9 +175,7 @@ export const compareExecutionCostTool = createTool({
     // Single-venue path bypasses compareVenues so we don't pay the sort
     // overhead for one item — but the structure stays the same for
     // callers.
-    let ranked = inputs.length === 1
-      ? [computeCost(inputs[0]!)]
-      : compareVenues(inputs).ranked;
+    const ranked = inputs.length === 1 ? [computeCost(inputs[0]!)] : compareVenues(inputs).ranked;
     const buyMode = side === "buy";
     const best = ranked[0]!.allInQuote;
 
@@ -207,7 +204,9 @@ export const compareExecutionCostTool = createTool({
     });
 
     const top = enriched[0]!;
-    const ladder = enriched.map((r) => `${r.venue} ${r.allInQuote.toFixed(4)}${quoteAsset ?? ""}`).join(" · ");
+    const ladder = enriched
+      .map((r) => `${r.venue} ${r.allInQuote.toFixed(4)}${quoteAsset ?? ""}`)
+      .join(" · ");
     const summary =
       `${side.toUpperCase()} ${sizeBase} ${symbol} → cheapest: ${top.venue} ` +
       `(eff ${top.effectivePrice.toFixed(4)}, slip ${top.slippageBps} bps, ` +

@@ -49,10 +49,7 @@ export const verifyQuoteInTextTool = createTool({
         .array(z.string().min(1))
         .optional()
         .describe("Batch of quotes to verify against the same source."),
-      sourceText: z
-        .string()
-        .min(1)
-        .describe("The full source text the quote was extracted from."),
+      sourceText: z.string().min(1).describe("The full source text the quote was extracted from."),
       method: z
         .enum(["string_match", "regex", "manual"])
         .optional()

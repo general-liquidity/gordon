@@ -191,33 +191,33 @@ export class PositionStore {
             closedAt TEXT
           )
         `),
-      "CREATE TABLE positions"
+      "CREATE TABLE positions",
     );
 
     // Indexes for common query patterns
     executeWithLogging(
       () => db.run("CREATE INDEX IF NOT EXISTS idx_positions_state ON positions(state)"),
-      "CREATE INDEX idx_positions_state"
+      "CREATE INDEX idx_positions_state",
     );
     executeWithLogging(
       () => db.run("CREATE INDEX IF NOT EXISTS idx_positions_symbol ON positions(symbol)"),
-      "CREATE INDEX idx_positions_symbol"
+      "CREATE INDEX idx_positions_symbol",
     );
     executeWithLogging(
       () => db.run("CREATE INDEX IF NOT EXISTS idx_positions_exchangeId ON positions(exchangeId)"),
-      "CREATE INDEX idx_positions_exchangeId"
+      "CREATE INDEX idx_positions_exchangeId",
     );
     executeWithLogging(
       () => db.run("CREATE INDEX IF NOT EXISTS idx_positions_createdAt ON positions(createdAt)"),
-      "CREATE INDEX idx_positions_createdAt"
+      "CREATE INDEX idx_positions_createdAt",
     );
     executeWithLogging(
       () => db.run("CREATE INDEX IF NOT EXISTS idx_positions_closedAt ON positions(closedAt)"),
-      "CREATE INDEX idx_positions_closedAt"
+      "CREATE INDEX idx_positions_closedAt",
     );
     executeWithLogging(
       () => db.run("CREATE INDEX IF NOT EXISTS idx_positions_strategyId ON positions(strategyId)"),
-      "CREATE INDEX idx_positions_strategyId"
+      "CREATE INDEX idx_positions_strategyId",
     );
 
     logger.info("Position store initialized");
@@ -241,8 +241,9 @@ export class PositionStore {
         );
       }
     }
-    withTransaction(() => {
-      const stmt = this.db.prepare(`
+    withTransaction(
+      () => {
+        const stmt = this.db.prepare(`
         INSERT OR REPLACE INTO positions (
           id, symbol, exchangeId, side, state, stateHistory,
           setupSignal, analysis, plan, riskDecision,
@@ -264,51 +265,53 @@ export class PositionStore {
         )
       `);
 
-      executeWithLogging(
-        () =>
-          stmt.run(
-            position.id,
-            position.symbol,
-            position.exchangeId,
-            position.side,
-            position.state,
-            JSON.stringify(position.stateHistory),
-            // Setup phase
-            position.setupSignal ? JSON.stringify(position.setupSignal) : null,
-            position.analysis ? JSON.stringify(position.analysis) : null,
-            position.plan ? JSON.stringify(position.plan) : null,
-            position.riskDecision ? JSON.stringify(position.riskDecision) : null,
-            // Execution phase
-            position.entryOrder ? JSON.stringify(position.entryOrder) : null,
-            position.entryPrice ?? null,
-            position.quantity ?? null,
-            // Management phase
-            position.stopLoss ?? null,
-            position.takeProfit ?? null,
-            position.trailingStop ? JSON.stringify(position.trailingStop) : null,
-            position.currentPrice ?? null,
-            position.unrealizedPnL ?? null,
-            position.highWaterMark ?? null,
-            // Close phase
-            position.exitOrder ? JSON.stringify(position.exitOrder) : null,
-            position.exitPrice ?? null,
-            position.realizedPnL ?? null,
-            // Review phase
-            position.review ? JSON.stringify(position.review) : null,
-            // Metadata
-            position.strategyId ?? null,
-            position.playbookId ?? null,
-            position.tags ? JSON.stringify(position.tags) : null,
-            position.cancelReason ?? null,
-            position.rejectReason ?? null,
-            position.closeReason ?? null,
-            position.createdAt,
-            position.updatedAt,
-            position.closedAt ?? null
-          ),
-        "INSERT OR REPLACE INTO positions"
-      );
-    }, { mode: "IMMEDIATE" });
+        executeWithLogging(
+          () =>
+            stmt.run(
+              position.id,
+              position.symbol,
+              position.exchangeId,
+              position.side,
+              position.state,
+              JSON.stringify(position.stateHistory),
+              // Setup phase
+              position.setupSignal ? JSON.stringify(position.setupSignal) : null,
+              position.analysis ? JSON.stringify(position.analysis) : null,
+              position.plan ? JSON.stringify(position.plan) : null,
+              position.riskDecision ? JSON.stringify(position.riskDecision) : null,
+              // Execution phase
+              position.entryOrder ? JSON.stringify(position.entryOrder) : null,
+              position.entryPrice ?? null,
+              position.quantity ?? null,
+              // Management phase
+              position.stopLoss ?? null,
+              position.takeProfit ?? null,
+              position.trailingStop ? JSON.stringify(position.trailingStop) : null,
+              position.currentPrice ?? null,
+              position.unrealizedPnL ?? null,
+              position.highWaterMark ?? null,
+              // Close phase
+              position.exitOrder ? JSON.stringify(position.exitOrder) : null,
+              position.exitPrice ?? null,
+              position.realizedPnL ?? null,
+              // Review phase
+              position.review ? JSON.stringify(position.review) : null,
+              // Metadata
+              position.strategyId ?? null,
+              position.playbookId ?? null,
+              position.tags ? JSON.stringify(position.tags) : null,
+              position.cancelReason ?? null,
+              position.rejectReason ?? null,
+              position.closeReason ?? null,
+              position.createdAt,
+              position.updatedAt,
+              position.closedAt ?? null,
+            ),
+          "INSERT OR REPLACE INTO positions",
+        );
+      },
+      { mode: "IMMEDIATE" },
+    );
   }
 
   /**
@@ -318,7 +321,7 @@ export class PositionStore {
     const stmt = this.db.prepare("SELECT * FROM positions WHERE id = ?");
     const row = executeWithLogging(
       () => stmt.get(id) as Record<string, unknown> | null,
-      "SELECT position by id"
+      "SELECT position by id",
     );
     if (!row) return null;
     return rowToPosition(row);
@@ -328,12 +331,10 @@ export class PositionStore {
    * Get all positions in a given state.
    */
   async getByState(state: PositionState): Promise<PositionRecord[]> {
-    const stmt = this.db.prepare(
-      "SELECT * FROM positions WHERE state = ? ORDER BY updatedAt DESC"
-    );
+    const stmt = this.db.prepare("SELECT * FROM positions WHERE state = ? ORDER BY updatedAt DESC");
     const rows = executeWithLogging(
       () => stmt.all(state) as Record<string, unknown>[],
-      "SELECT positions by state"
+      "SELECT positions by state",
     );
     return rows.map(rowToPosition);
   }
@@ -354,7 +355,7 @@ export class PositionStore {
     const stmt = this.db.prepare(query);
     const rows = executeWithLogging(
       () => stmt.all(phantomCutoffIso()) as Record<string, unknown>[],
-      "SELECT active positions"
+      "SELECT active positions",
     );
     return rows.map(rowToPosition);
   }
@@ -374,7 +375,7 @@ export class PositionStore {
     const stmt = this.db.prepare(query);
     const rows = executeWithLogging(
       () => stmt.all(phantomCutoffIso()) as Record<string, unknown>[],
-      "SELECT phantom positions"
+      "SELECT phantom positions",
     );
     return rows.map(rowToPosition);
   }
@@ -384,11 +385,11 @@ export class PositionStore {
    */
   async getBySymbol(symbol: string): Promise<PositionRecord[]> {
     const stmt = this.db.prepare(
-      "SELECT * FROM positions WHERE symbol = ? ORDER BY createdAt DESC"
+      "SELECT * FROM positions WHERE symbol = ? ORDER BY createdAt DESC",
     );
     const rows = executeWithLogging(
       () => stmt.all(symbol) as Record<string, unknown>[],
-      "SELECT positions by symbol"
+      "SELECT positions by symbol",
     );
     return rows.map(rowToPosition);
   }
@@ -422,7 +423,7 @@ export class PositionStore {
 
     let query = "SELECT * FROM positions";
     if (conditions.length > 0) {
-      query += " WHERE " + conditions.join(" AND ");
+      query += ` WHERE ${conditions.join(" AND ")}`;
     }
     query += " ORDER BY createdAt DESC";
 
@@ -433,7 +434,7 @@ export class PositionStore {
     const stmt = this.db.prepare(query);
     const rows = executeWithLogging(
       () => (params.length > 0 ? stmt.all(...params) : stmt.all()) as Record<string, unknown>[],
-      "SELECT position history"
+      "SELECT position history",
     );
     return rows.map(rowToPosition);
   }
@@ -463,7 +464,7 @@ export class PositionStore {
     const active = all.filter((p) => !TERMINAL_STATES.has(p.state));
 
     const wins = closed.filter((p) => (p.realizedPnL ?? 0) > 0);
-    const losses = closed.filter((p) => (p.realizedPnL ?? 0) < 0);
+    const _losses = closed.filter((p) => (p.realizedPnL ?? 0) < 0);
     const totalPnL = closed.reduce((sum, p) => sum + (p.realizedPnL ?? 0), 0);
 
     const pnlValues = closed.map((p) => p.realizedPnL ?? 0);

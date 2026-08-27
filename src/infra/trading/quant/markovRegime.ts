@@ -195,7 +195,8 @@ export function analyzeMarkovRegime(
   const pNeutral = (transitionProbabilities.neutral * 100).toFixed(0);
   const pBear = (transitionProbabilities.bear * 100).toFixed(0);
 
-  const summary = `Current: ${currentState.toUpperCase()} | Next: ${pBull}% bull, ${pNeutral}% neutral, ${pBear}% bear | ` +
+  const summary =
+    `Current: ${currentState.toUpperCase()} | Next: ${pBull}% bull, ${pNeutral}% neutral, ${pBear}% bear | ` +
     `Predicted: ${predictedNextState.toUpperCase()} (${(maxProb * 100).toFixed(0)}%) | ` +
     `Regime strength: ${(regimeStrength * 100).toFixed(0)}% | Signal: ${signal.replace("_", " ")}`;
 

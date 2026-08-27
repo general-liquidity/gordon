@@ -23,9 +23,7 @@ import {
 // only exercising the migrator.
 // ---------------------------------------------------------------------------
 
-function makeFakeStringPool(
-  capacity: number,
-): CharPool & { __tag: "char" } {
+function makeFakeStringPool(capacity: number): CharPool & { __tag: "char" } {
   const strToId = new Map<string, number>();
   const idToStr = new Map<number, string>();
   let nextId = 0;
@@ -59,9 +57,7 @@ function makeFakeStringPool(
   return Object.assign(pool, { __tag: "char" as const });
 }
 
-function makeFakeStylePool(
-  capacity: number,
-): StylePool & { __tag: "style" } {
+function makeFakeStylePool(capacity: number): StylePool & { __tag: "style" } {
   const strToId = new Map<string, number>();
   const idToStr = new Map<number, string>();
   let nextId = 0;
@@ -95,9 +91,7 @@ function makeFakeStylePool(
   return Object.assign(pool, { __tag: "style" as const });
 }
 
-function makeFakeHyperlinkPool(
-  capacity: number,
-): HyperlinkPool & { __tag: "hyperlink" } {
+function makeFakeHyperlinkPool(capacity: number): HyperlinkPool & { __tag: "hyperlink" } {
   const urlToId = new Map<string, number>();
   const idToUrl = new Map<number, string>();
   let nextId = 0;
@@ -272,8 +266,12 @@ describe("poolMigration.rebase", () => {
     expect(snap.liveHyperlinks.has(hP)).toBe(true);
     expect(snap.liveHyperlinks.has(hQ)).toBe(true);
 
-    const { newCharPool, newStylePool, newHyperlinkPool, remapping } =
-      migrator.rebase(snap, charPool, stylePool, hyperlinkPool);
+    const { newCharPool, newStylePool, newHyperlinkPool, remapping } = migrator.rebase(
+      snap,
+      charPool,
+      stylePool,
+      hyperlinkPool,
+    );
 
     // New char pool contains only "A" and "C" (plus the blank/empty id 0
     // from the second half of the frame — but frame is 2x1 with both cells
@@ -304,12 +302,8 @@ describe("poolMigration.rebase", () => {
 
     // Hyperlink remapping covers both (conservative).
     expect(remapping.hyperlinks.size).toBe(2);
-    expect(newHyperlinkPool.get(remapping.hyperlinks.get(hP)!)).toBe(
-      "https://p.com",
-    );
-    expect(newHyperlinkPool.get(remapping.hyperlinks.get(hQ)!)).toBe(
-      "https://q.com",
-    );
+    expect(newHyperlinkPool.get(remapping.hyperlinks.get(hP)!)).toBe("https://p.com");
+    expect(newHyperlinkPool.get(remapping.hyperlinks.get(hQ)!)).toBe("https://q.com");
   });
 
   test("skips snapshot IDs that no longer resolve in the old pool", () => {
@@ -331,12 +325,7 @@ describe("poolMigration.rebase", () => {
       liveHyperlinks: new Set<number>([42]),
     };
 
-    const { newCharPool, remapping } = migrator.rebase(
-      snap,
-      charPool,
-      stylePool,
-      hyperlinkPool,
-    );
+    const { newCharPool, remapping } = migrator.rebase(snap, charPool, stylePool, hyperlinkPool);
 
     // Stale ids are dropped; only the resolvable one lands in the new pool.
     expect(newCharPool.size).toBe(1);
@@ -370,12 +359,7 @@ describe("poolMigration.applyRemapping", () => {
     raw[1] = (raw[1] ?? 0) & ~CELL_DIRTY_BIT;
 
     const snap = migrator.captureSnapshot(frame, hyperlinkPool);
-    const { remapping } = migrator.rebase(
-      snap,
-      charPool,
-      stylePool,
-      hyperlinkPool,
-    );
+    const { remapping } = migrator.rebase(snap, charPool, stylePool, hyperlinkPool);
 
     migrator.applyRemapping(frame, remapping);
 

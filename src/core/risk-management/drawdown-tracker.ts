@@ -87,9 +87,7 @@ export class DrawdownTracker {
 
     // Calculate current drawdown
     const drawdownAmount = this.peakBalance - this.currentBalance;
-    const drawdownPercent = this.peakBalance > 0
-      ? (drawdownAmount / this.peakBalance) * 100
-      : 0;
+    const drawdownPercent = this.peakBalance > 0 ? (drawdownAmount / this.peakBalance) * 100 : 0;
 
     // Update max drawdown if current is worse
     if (drawdownPercent > this.maxDrawdownSeen) {
@@ -117,14 +115,11 @@ export class DrawdownTracker {
    */
   getStatus(): DrawdownStatus {
     const drawdownAmount = this.peakBalance - this.currentBalance;
-    const drawdownPercent = this.peakBalance > 0
-      ? (drawdownAmount / this.peakBalance) * 100
-      : 0;
+    const drawdownPercent = this.peakBalance > 0 ? (drawdownAmount / this.peakBalance) * 100 : 0;
 
     // Calculate recovery needed
-    const recoveryNeeded = this.currentBalance > 0
-      ? (drawdownAmount / this.currentBalance) * 100
-      : 0;
+    const recoveryNeeded =
+      this.currentBalance > 0 ? (drawdownAmount / this.currentBalance) * 100 : 0;
 
     // Determine status
     let status: "healthy" | "warning" | "critical" | "exceeded";
@@ -284,9 +279,8 @@ export class DrawdownTracker {
       .filter((e) => e.drawdownPercent > 0)
       .map((e) => e.drawdownPercent);
 
-    const avgDrawdown = drawdowns.length > 0
-      ? drawdowns.reduce((a, b) => a + b, 0) / drawdowns.length
-      : 0;
+    const avgDrawdown =
+      drawdowns.length > 0 ? drawdowns.reduce((a, b) => a + b, 0) / drawdowns.length : 0;
 
     return {
       currentDrawdown: this.getStatus().drawdownPercent,

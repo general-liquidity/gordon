@@ -68,7 +68,7 @@ function emitEventLog(quiet: boolean): () => void {
   const unsub = bus.onAny((event) => {
     try {
       const line = JSON.stringify({ ts: new Date().toISOString(), event });
-      process.stderr.write(line + "\n");
+      process.stderr.write(`${line}\n`);
     } catch {
       // Swallow serialization failures — never crash the headless run.
     }
@@ -87,7 +87,9 @@ export async function runHeadless(options: HeadlessOptions): Promise<HeadlessRes
   const startedAt = new Date(startMs).toISOString();
   const threadId = options.threadId ?? `headless-${startMs}`;
 
-  function finish(partial: Pick<HeadlessResult, "exitCode" | "response" | "error">): HeadlessResult {
+  function finish(
+    partial: Pick<HeadlessResult, "exitCode" | "response" | "error">,
+  ): HeadlessResult {
     const finishMs = Date.now();
     return {
       ...partial,
@@ -98,10 +100,11 @@ export async function runHeadless(options: HeadlessOptions): Promise<HeadlessRes
     };
   }
 
-  if (!prompt || !prompt.trim()) {
+  if (!prompt?.trim()) {
     return finish({
       exitCode: 2,
-      error: "Empty prompt — pass the message as the trailing argument: gordon --headless \"<prompt>\"",
+      error:
+        'Empty prompt — pass the message as the trailing argument: gordon --headless "<prompt>"',
     });
   }
 
@@ -173,12 +176,12 @@ export async function runHeadlessAndPrint(
   const result = await runHeadless({ prompt, quiet });
 
   if (json) {
-    process.stdout.write(headlessResultToJson(result) + "\n");
+    process.stdout.write(`${headlessResultToJson(result)}\n`);
     return result.exitCode;
   }
 
   if (result.exitCode === 0 && result.response !== undefined) {
-    process.stdout.write(result.response.endsWith("\n") ? result.response : result.response + "\n");
+    process.stdout.write(result.response.endsWith("\n") ? result.response : `${result.response}\n`);
   } else if (result.error) {
     process.stderr.write(`error: ${result.error}\n`);
   }

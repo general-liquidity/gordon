@@ -89,11 +89,9 @@ export function installAcpPermissionHook(
 
     if (
       policy.approvalClass === "none" ||
-      (
-        policy.tool.sideEffectLevel === "read" &&
+      (policy.tool.sideEffectLevel === "read" &&
         policy.tool.riskClass === "low" &&
-        policy.approvalClass !== "always_require_human"
-      )
+        policy.approvalClass !== "always_require_human")
     ) {
       return { decision: "abstain" };
     }
@@ -133,17 +131,17 @@ export function installAcpPermissionHook(
 
       return verdict.kind === "approve"
         ? {
-          decision: "allow",
-          actor: "acp-editor",
-          persist: verdict.persist,
-          scope: verdict.persist ? "persistent" : undefined,
-        }
+            decision: "allow",
+            actor: "acp-editor",
+            persist: verdict.persist,
+            scope: verdict.persist ? "persistent" : undefined,
+          }
         : {
-          decision: "deny",
-          actor: "acp-editor",
-          persist: verdict.persist,
-          scope: verdict.persist ? "persistent" : undefined,
-        };
+            decision: "deny",
+            actor: "acp-editor",
+            persist: verdict.persist,
+            scope: verdict.persist ? "persistent" : undefined,
+          };
     } catch (err) {
       logger.warn("ACP permission hook failed — falling through to default policy", {
         toolName,

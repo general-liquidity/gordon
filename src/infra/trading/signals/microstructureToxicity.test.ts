@@ -123,7 +123,11 @@ describe("scoreMicrostructureToxicity — half-life sub-metric", () => {
   it("long-lived cancels → low half-life score", () => {
     const cycles: LevelLifecycle[] = [];
     for (let i = 0; i < 20; i++) {
-      cycles.push({ appearedAt: i * 1000, disappearedAt: i * 1000 + 10_000, filledBeforeRemoval: false });
+      cycles.push({
+        appearedAt: i * 1000,
+        disappearedAt: i * 1000 + 10_000,
+        filledBeforeRemoval: false,
+      });
     }
     const r = scoreMicrostructureToxicity({ levelLifecycles: cycles });
     expect(r.components.displayedHalfLife).toBeLessThanOrEqual(0.2);

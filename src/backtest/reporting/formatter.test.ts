@@ -115,9 +115,7 @@ describe("formatBacktestSummary: deflated Sharpe honesty (Tier-0 Group B, item 3
   it("treats a trial count below 2 as no deflation at all", () => {
     // A DSR at one trial is arithmetically the PSR, so claiming deflation there
     // is the bug, not a degenerate-but-harmless case.
-    expect(formatBacktestSummary(makeResult(), { trialsTested: 1 })).toContain(
-      "not deflated",
-    );
+    expect(formatBacktestSummary(makeResult(), { trialsTested: 1 })).toContain("not deflated");
   });
 });
 
@@ -142,9 +140,7 @@ describe("tradeReturnsPerYear: per-trade annualization (Tier-0 Group B, item 3)"
   });
 
   it("falls back to 365 on an unusable span rather than throwing", () => {
-    expect(
-      tradeReturnsPerYear(makeResult({ startDate: "not-a-date" }), 24),
-    ).toBe(365);
+    expect(tradeReturnsPerYear(makeResult({ startDate: "not-a-date" }), 24)).toBe(365);
     expect(
       tradeReturnsPerYear(
         makeResult({ endDate: new Date(Date.UTC(2024, 0, 1)).toISOString() }),

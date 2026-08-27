@@ -214,7 +214,7 @@ export function computeRangeVolatility(input: RangeVolatilityInput): RangeVolati
   const reasoning =
     n < 10
       ? `small sample (${n} bars) — range estimators have a relative advantage here, but the absolute estimate is noisy`
-      : `${n} bars: parkinson ${(parkAnn * 100).toFixed(1)}%, garman-klass ${(gkAnn * 100).toFixed(1)}%, yang-zhang ${Number.isFinite(yzAnn) ? (yzAnn * 100).toFixed(1) + "%" : "n/a"}, close-to-close ${Number.isFinite(ccAnn) ? (ccAnn * 100).toFixed(1) + "%" : "n/a"}${Number.isFinite(efficiencyGain) ? `; GK is ${efficiencyGain.toFixed(1)}× more efficient than CC` : ""}`;
+      : `${n} bars: parkinson ${(parkAnn * 100).toFixed(1)}%, garman-klass ${(gkAnn * 100).toFixed(1)}%, yang-zhang ${Number.isFinite(yzAnn) ? `${(yzAnn * 100).toFixed(1)}%` : "n/a"}, close-to-close ${Number.isFinite(ccAnn) ? `${(ccAnn * 100).toFixed(1)}%` : "n/a"}${Number.isFinite(efficiencyGain) ? `; GK is ${efficiencyGain.toFixed(1)}× more efficient than CC` : ""}`;
 
   return {
     parkinsonAnnualized: parkAnn,

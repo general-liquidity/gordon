@@ -246,14 +246,18 @@ export function pruneAuditLog(retentionDays: number): number {
   const cutoffIso = new Date(Date.now() - retentionDays * 86_400_000).toISOString();
   const db = getDatabase();
   try {
-    const result = db.run("DELETE FROM audit_log WHERE timestamp < ?", [cutoffIso]) as { changes?: number };
+    const result = db.run("DELETE FROM audit_log WHERE timestamp < ?", [cutoffIso]) as {
+      changes?: number;
+    };
     const deleted = result?.changes ?? 0;
     if (deleted > 0) {
       logger.info("Audit log pruned", { rowsDeleted: deleted, retentionDays });
     }
     return deleted;
   } catch (err) {
-    logger.warn("Audit log prune failed", { err: err instanceof Error ? err.message : String(err) });
+    logger.warn("Audit log prune failed", {
+      err: err instanceof Error ? err.message : String(err),
+    });
     return 0;
   }
 }
@@ -286,6 +290,11 @@ export class AuditLogger {
     initAuditTable();
   }
 
+  /** Compare identities without exposing the logger's mutable internals. */
+  isForUser(userId: string): boolean {
+    return this.userId === userId;
+  }
+
   /**
    * Record an audit entry
    */
@@ -298,7 +307,7 @@ export class AuditLogger {
       tradeId?: string;
       planId?: string;
       metadata?: Record<string, unknown>;
-    }
+    },
   ): AuditEntry {
     const entry: AuditEntry = {
       id: uuidv4(),
@@ -341,7 +350,7 @@ export class AuditLogger {
       entry.tradeId || null,
       entry.planId || null,
       entry.metadata ? JSON.stringify(entry.metadata) : null,
-      signature
+      signature,
     );
 
     logger.info("Audit entry recorded", {
@@ -385,7 +394,7 @@ export class AuditLogger {
       tradeId?: string;
       planId?: string;
       metadata?: Record<string, unknown>;
-    }
+    },
   ): AuditEntry {
     return this.record(action, parameters, "SUCCESS", options);
   }
@@ -401,7 +410,7 @@ export class AuditLogger {
       tradeId?: string;
       planId?: string;
       metadata?: Record<string, unknown>;
-    }
+    },
   ): AuditEntry {
     return this.record(action, parameters, "FAILURE", {
       ...options,
@@ -420,7 +429,7 @@ export class AuditLogger {
       tradeId?: string;
       planId?: string;
       metadata?: Record<string, unknown>;
-    }
+    },
   ): AuditEntry {
     return this.record(action, parameters, "BLOCKED", {
       ...options,
@@ -531,21 +540,23 @@ export function getAuditEntry(id: string): AuditEntry | null {
   initAuditTable();
 
   const db = getDatabase();
-  const row = db.prepare("SELECT * FROM audit_log WHERE id = ?").get(id) as {
-    id: string;
-    timestamp: string;
-    userId: string;
-    action: string;
-    parameters: string;
-    result: string;
-    resultDetails: string | null;
-    ipAddress: string | null;
-    userAgent: string | null;
-    sessionId: string | null;
-    tradeId: string | null;
-    planId: string | null;
-    metadata: string | null;
-  } | undefined;
+  const row = db.prepare("SELECT * FROM audit_log WHERE id = ?").get(id) as
+    | {
+        id: string;
+        timestamp: string;
+        userId: string;
+        action: string;
+        parameters: string;
+        result: string;
+        resultDetails: string | null;
+        ipAddress: string | null;
+        userAgent: string | null;
+        sessionId: string | null;
+        tradeId: string | null;
+        planId: string | null;
+        metadata: string | null;
+      }
+    | undefined;
 
   if (!row) return null;
 
@@ -590,7 +601,9 @@ export function getPlanAuditHistory(planId: string): AuditEntry[] {
 /**
  * Count audit entries matching criteria
  */
-export function countAuditEntries(options: Omit<AuditQueryOptions, "limit" | "offset"> = {}): number {
+export function countAuditEntries(
+  options: Omit<AuditQueryOptions, "limit" | "offset"> = {},
+): number {
   initAuditTable();
 
   const db = getDatabase();
@@ -640,7 +653,7 @@ let globalAuditLogger: AuditLogger | null = null;
  * Get or create a global audit logger instance
  */
 export function getAuditLogger(userId: string = "system"): AuditLogger {
-  if (!globalAuditLogger || globalAuditLogger["userId"] !== userId) {
+  if (!globalAuditLogger?.isForUser(userId)) {
     globalAuditLogger = new AuditLogger({ userId });
   }
   return globalAuditLogger;
@@ -660,7 +673,7 @@ export const auditLog = {
       tradeId?: string;
       planId?: string;
       metadata?: Record<string, unknown>;
-    }
+    },
   ): AuditEntry => {
     const auditLogger = new AuditLogger({ userId });
     return auditLogger.record(action, parameters, result, options);
@@ -675,7 +688,7 @@ export const auditLog = {
       tradeId?: string;
       planId?: string;
       metadata?: Record<string, unknown>;
-    }
+    },
   ): AuditEntry => {
     const auditLogger = new AuditLogger({ userId });
     return auditLogger.success(action, parameters, options);
@@ -690,7 +703,7 @@ export const auditLog = {
       tradeId?: string;
       planId?: string;
       metadata?: Record<string, unknown>;
-    }
+    },
   ): AuditEntry => {
     const auditLogger = new AuditLogger({ userId });
     return auditLogger.failure(action, parameters, error, options);
@@ -705,7 +718,7 @@ export const auditLog = {
       tradeId?: string;
       planId?: string;
       metadata?: Record<string, unknown>;
-    }
+    },
   ): AuditEntry => {
     const auditLogger = new AuditLogger({ userId });
     return auditLogger.blocked(action, parameters, reason, options);
@@ -746,30 +759,38 @@ export function getAuditSummary(options: { startTime?: string; endTime?: string 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   // Total count
-  const totalRow = db.prepare(`SELECT COUNT(*) as count FROM audit_log ${whereClause}`).get(...params) as { count: number };
+  const totalRow = db
+    .prepare(`SELECT COUNT(*) as count FROM audit_log ${whereClause}`)
+    .get(...params) as { count: number };
 
   // By action
-  const actionRows = db.prepare(`
+  const actionRows = db
+    .prepare(`
     SELECT action, COUNT(*) as count FROM audit_log ${whereClause} GROUP BY action
-  `).all(...params) as Array<{ action: string; count: number }>;
+  `)
+    .all(...params) as Array<{ action: string; count: number }>;
   const byAction: Record<string, number> = {};
   for (const row of actionRows) {
     byAction[row.action] = row.count;
   }
 
   // By result
-  const resultRows = db.prepare(`
+  const resultRows = db
+    .prepare(`
     SELECT result, COUNT(*) as count FROM audit_log ${whereClause} GROUP BY result
-  `).all(...params) as Array<{ result: string; count: number }>;
+  `)
+    .all(...params) as Array<{ result: string; count: number }>;
   const byResult: Record<string, number> = {};
   for (const row of resultRows) {
     byResult[row.result] = row.count;
   }
 
   // By user
-  const userRows = db.prepare(`
+  const userRows = db
+    .prepare(`
     SELECT userId, COUNT(*) as count FROM audit_log ${whereClause} GROUP BY userId
-  `).all(...params) as Array<{ userId: string; count: number }>;
+  `)
+    .all(...params) as Array<{ userId: string; count: number }>;
   const byUser: Record<string, number> = {};
   for (const row of userRows) {
     byUser[row.userId] = row.count;

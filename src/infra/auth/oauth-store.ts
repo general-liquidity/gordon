@@ -158,7 +158,9 @@ export async function loadOAuthEntry(
 }
 
 /** List all stored OAuth entries (tokens redacted). */
-export async function listOAuthEntries(): Promise<Array<Omit<StoredOAuthEntry, "accessToken" | "refreshToken" | "clientSecret">>> {
+export async function listOAuthEntries(): Promise<
+  Array<Omit<StoredOAuthEntry, "accessToken" | "refreshToken" | "clientSecret">>
+> {
   const store = await readStore();
   return store.entries.map((e) => ({
     venue: e.venue,
@@ -177,9 +179,7 @@ export async function listOAuthEntries(): Promise<Array<Omit<StoredOAuthEntry, "
 export async function removeOAuthEntry(venue: OAuthVenueId, clientId: string): Promise<boolean> {
   const store = await readStore();
   const before = store.entries.length;
-  const filtered = store.entries.filter(
-    (e) => !(e.venue === venue && e.clientId === clientId),
-  );
+  const filtered = store.entries.filter((e) => !(e.venue === venue && e.clientId === clientId));
   if (filtered.length === before) return false;
 
   try {
@@ -199,7 +199,10 @@ export async function removeOAuthEntry(venue: OAuthVenueId, clientId: string): P
 export async function updateOAuthTokens(
   venue: OAuthVenueId,
   clientId: string,
-  tokens: Pick<OAuthTokens, "accessToken" | "refreshToken" | "expiresAt" | "tokenType" | "scope" | "obtainedAt">,
+  tokens: Pick<
+    OAuthTokens,
+    "accessToken" | "refreshToken" | "expiresAt" | "tokenType" | "scope" | "obtainedAt"
+  >,
 ): Promise<void> {
   const store = await readStore();
   const entry = store.entries.find((e) => e.venue === venue && e.clientId === clientId);

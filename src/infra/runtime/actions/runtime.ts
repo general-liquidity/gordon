@@ -67,7 +67,10 @@ const MCP_SCOPE_MATRIX: Record<MCPCategory, ActionTaskScope[]> = {
   utility: ["planning", "ops", "funding", "setup", "system"],
 };
 
-function isCompatibleTaskScope(requestedScope: ActionTaskScope, toolScope: ActionTaskScope): boolean {
+function isCompatibleTaskScope(
+  requestedScope: ActionTaskScope,
+  toolScope: ActionTaskScope,
+): boolean {
   return REQUEST_SCOPE_MATRIX[requestedScope]?.includes(toolScope) ?? false;
 }
 
@@ -79,7 +82,11 @@ function formatMissingProviders(missing: string[]): string {
   return missing.join(", ");
 }
 
-function buildCredentialStep(planTitle: string, ready: boolean, missing: string[]): ActionExecutionStep {
+function buildCredentialStep(
+  planTitle: string,
+  ready: boolean,
+  missing: string[],
+): ActionExecutionStep {
   if (ready) {
     return {
       id: "credentials",
@@ -109,10 +116,13 @@ async function buildMarketOrderPlan(
 ): Promise<ActionExecutionPlan> {
   const instrument = await resolveInstrument(context, input.symbol);
   const normalizedSymbol = instrument.normalizedSymbol;
-  const providerKinds = action.providerRequirements.filter((entry) => !entry.optional).map((entry) => entry.kind);
-  const credentialSummary = providerKinds.length > 0
-    ? await getCredentialSummaryForKinds(context.config, providerKinds)
-    : { ready: true, providers: [], missing: [], statuses: [] };
+  const providerKinds = action.providerRequirements
+    .filter((entry) => !entry.optional)
+    .map((entry) => entry.kind);
+  const credentialSummary =
+    providerKinds.length > 0
+      ? await getCredentialSummaryForKinds(context.config, providerKinds)
+      : { ready: true, providers: [], missing: [], statuses: [] };
 
   const steps: ActionExecutionStep[] = [];
   const blockers: string[] = [];
@@ -194,9 +204,10 @@ async function buildMarketOrderPlan(
 
   const liveExecutionReady = action.id === "trading.market_order";
   if (context.config.permissionMode === "strict") {
-    const detail = action.id === "trading.preview_market_order"
-      ? "Preview is available, but live execution is blocked in strict permissionMode."
-      : "Live execution requires permissionMode 'auto' or 'ask'.";
+    const detail =
+      action.id === "trading.preview_market_order"
+        ? "Preview is available, but live execution is blocked in strict permissionMode."
+        : "Live execution requires permissionMode 'auto' or 'ask'.";
     steps.push({
       id: "permissionMode",
       title: "Permission mode",
@@ -225,8 +236,15 @@ async function buildMarketOrderPlan(
         preview.estimatedBaseQty = Number((input.quoteOrderQty / price).toFixed(8));
       }
 
-      if (input.side === "BUY" && typeof preview.estimatedNotional === "number" && preview.estimatedNotional > context.availableCash && context.availableCash > 0) {
-        blockers.push(`Estimated notional ${preview.estimatedNotional} exceeds available cash ${context.availableCash}.`);
+      if (
+        input.side === "BUY" &&
+        typeof preview.estimatedNotional === "number" &&
+        preview.estimatedNotional > context.availableCash &&
+        context.availableCash > 0
+      ) {
+        blockers.push(
+          `Estimated notional ${preview.estimatedNotional} exceeds available cash ${context.availableCash}.`,
+        );
       }
 
       steps.push({
@@ -264,8 +282,14 @@ async function buildMarketOrderPlan(
         preview.estimatedNotional = Number(input.quoteOrderQty.toFixed(2));
       }
 
-      if (input.side === "BUY" && typeof preview.estimatedNotional === "number" && preview.estimatedNotional > account.buyingPower) {
-        blockers.push(`Estimated notional ${preview.estimatedNotional} exceeds available buying power ${account.buyingPower}.`);
+      if (
+        input.side === "BUY" &&
+        typeof preview.estimatedNotional === "number" &&
+        preview.estimatedNotional > account.buyingPower
+      ) {
+        blockers.push(
+          `Estimated notional ${preview.estimatedNotional} exceeds available buying power ${account.buyingPower}.`,
+        );
       }
 
       steps.push({
@@ -293,8 +317,8 @@ async function buildMarketOrderPlan(
     try {
       const { evaluateOrderRisk } = await import("../../agents/tools/trading/risk-gate.ts");
       const price = Number(preview.estimatedPrice ?? 1);
-      const quantity = input.quantity
-        ?? (input.quoteOrderQty && price > 0 ? input.quoteOrderQty / price : 0);
+      const quantity =
+        input.quantity ?? (input.quoteOrderQty && price > 0 ? input.quoteOrderQty / price : 0);
       if (quantity > 0) {
         const risk = await evaluateOrderRisk(
           {
@@ -369,12 +393,14 @@ function buildGenericPlan(action: ActionDefinition): ActionExecutionPlan {
     ready: true,
     summary: `${action.title} is available.`,
     blockers: [],
-    steps: [{
-      id: "action",
-      title: "Action availability",
-      status: "ready",
-      detail: action.description,
-    }],
+    steps: [
+      {
+        id: "action",
+        title: "Action availability",
+        status: "ready",
+        detail: action.description,
+      },
+    ],
     approvalPolicy: action.approvalPolicy,
     sideEffectLevel: action.sideEffectLevel,
   };
@@ -401,12 +427,16 @@ export async function evaluateToolRequestPolicy(
   toolName: string,
   context: GordonContext,
 ): Promise<ToolRequestPolicyDecision> {
-  const requestedAction = context.requestedActionId ? getActionById(context.requestedActionId) : undefined;
+  const requestedAction = context.requestedActionId
+    ? getActionById(context.requestedActionId)
+    : undefined;
   const requestedScope = context.requestedTaskScope ?? requestedAction?.taskScope;
 
   const toolAction = getActionByToolName(toolName);
   if (toolAction) {
-    const supportedActions = requestedAction ? REQUEST_ACTION_SUPPORT[requestedAction.id] ?? [] : [];
+    const supportedActions = requestedAction
+      ? (REQUEST_ACTION_SUPPORT[requestedAction.id] ?? [])
+      : [];
 
     if (requestedAction) {
       if (requestedAction.id === toolAction.id || supportedActions.includes(toolAction.id)) {
@@ -417,7 +447,10 @@ export async function evaluateToolRequestPolicy(
         };
       }
 
-      if (isRiskySideEffect(toolAction.sideEffectLevel) && !isRiskySideEffect(requestedAction.sideEffectLevel)) {
+      if (
+        isRiskySideEffect(toolAction.sideEffectLevel) &&
+        !isRiskySideEffect(requestedAction.sideEffectLevel)
+      ) {
         return {
           allowed: false,
           requiresTradePermission: toolAction.approvalPolicy === "trade_permission",
@@ -444,7 +477,11 @@ export async function evaluateToolRequestPolicy(
   }
 
   const requiresTradePermission = isTradeTool(toolName);
-  if (requestedAction && requiresTradePermission && !isRiskySideEffect(requestedAction.sideEffectLevel)) {
+  if (
+    requestedAction &&
+    requiresTradePermission &&
+    !isRiskySideEffect(requestedAction.sideEffectLevel)
+  ) {
     return {
       allowed: false,
       requiresTradePermission: true,
@@ -485,7 +522,10 @@ export async function evaluateToolRequestPolicy(
   };
 }
 
-export async function enforceExecutionPolicy(toolName: string, context: GordonContext): Promise<{
+export async function enforceExecutionPolicy(
+  toolName: string,
+  context: GordonContext,
+): Promise<{
   allowed: boolean;
   reason?: string;
 }> {
@@ -499,7 +539,10 @@ export async function enforceExecutionPolicy(toolName: string, context: GordonCo
     return { allowed: true };
   }
 
-  const sandboxActive = (context.exchange as { isSandbox?: boolean } | null)?.isSandbox ?? context.broker?.isPaper ?? false;
+  const sandboxActive =
+    (context.exchange as { isSandbox?: boolean } | null)?.isSandbox ??
+    context.broker?.isPaper ??
+    false;
   const access = await checkToolAccess(toolName, context.config, userId, { sandboxActive });
   if (!access.allowed) {
     return { allowed: false, reason: access.reason };
@@ -539,11 +582,7 @@ export async function planActionExecution(
 }
 
 export function formatActionPlanMarkdown(plan: ActionExecutionPlan): string {
-  const lines: string[] = [
-    `**${plan.title}**`,
-    "",
-    plan.summary,
-  ];
+  const lines: string[] = [`**${plan.title}**`, "", plan.summary];
 
   if (plan.blockers.length > 0) {
     lines.push("", "**Blockers**");
@@ -555,11 +594,8 @@ export function formatActionPlanMarkdown(plan: ActionExecutionPlan): string {
   if (plan.steps.length > 0) {
     lines.push("", "**Steps**");
     for (const step of plan.steps) {
-      const prefix = step.status === "ready"
-        ? "[ready]"
-        : step.status === "blocked"
-        ? "[blocked]"
-        : "[info]";
+      const prefix =
+        step.status === "ready" ? "[ready]" : step.status === "blocked" ? "[blocked]" : "[info]";
       lines.push(`- ${prefix} ${step.title}: ${step.detail}`);
     }
   }

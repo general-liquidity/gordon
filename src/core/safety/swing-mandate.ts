@@ -8,7 +8,7 @@ import { createModuleLogger } from "../../infra/logger/index.ts";
 const logger = createModuleLogger("swing-mandate");
 
 export const MANDATE_TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"] as const;
-export type MandateTimeframe = typeof MANDATE_TIMEFRAMES[number];
+export type MandateTimeframe = (typeof MANDATE_TIMEFRAMES)[number];
 
 // ============================================================================
 // Types
@@ -103,7 +103,7 @@ export function createMandate(params: Partial<SwingMandate>): SwingMandate {
     scanIntervalMinutes: params.scanIntervalMinutes ?? 60,
     minConfidence: params.minConfidence ?? 0.6,
     requireApproval: params.requireApproval ?? true,
-    signalOnly: params.signalOnly ?? (params.requireApproval ?? true),
+    signalOnly: params.signalOnly ?? params.requireApproval ?? true,
     expiresAt: params.expiresAt ?? defaultExpiry.toISOString(),
     maxTradesPerSessionPerSymbol: params.maxTradesPerSessionPerSymbol,
     stopAfterConsecutiveLosses: params.stopAfterConsecutiveLosses,
@@ -160,14 +160,14 @@ export function validateMandate(mandate: SwingMandate): { valid: boolean; errors
     errors.push(`trendTimeframe must be one of: ${MANDATE_TIMEFRAMES.join(", ")}`);
   }
   if (
-    mandate.maxTradesPerSessionPerSymbol !== undefined
-    && (mandate.maxTradesPerSessionPerSymbol < 1 || mandate.maxTradesPerSessionPerSymbol > 100)
+    mandate.maxTradesPerSessionPerSymbol !== undefined &&
+    (mandate.maxTradesPerSessionPerSymbol < 1 || mandate.maxTradesPerSessionPerSymbol > 100)
   ) {
     errors.push("maxTradesPerSessionPerSymbol must be between 1 and 100");
   }
   if (
-    mandate.stopAfterConsecutiveLosses !== undefined
-    && (mandate.stopAfterConsecutiveLosses < 1 || mandate.stopAfterConsecutiveLosses > 20)
+    mandate.stopAfterConsecutiveLosses !== undefined &&
+    (mandate.stopAfterConsecutiveLosses < 1 || mandate.stopAfterConsecutiveLosses > 20)
   ) {
     errors.push("stopAfterConsecutiveLosses must be between 1 and 20");
   }
@@ -189,7 +189,10 @@ export function isMandateBreached(mandate: SwingMandate): { breached: boolean; r
   if (mandate.peakPnl > 0) {
     const drawdownPercent = ((mandate.peakPnl - mandate.currentPnl) / mandate.peakPnl) * 100;
     if (drawdownPercent >= mandate.maxDrawdown) {
-      return { breached: true, reason: `Max drawdown breached: ${drawdownPercent.toFixed(2)}% >= ${mandate.maxDrawdown}%` };
+      return {
+        breached: true,
+        reason: `Max drawdown breached: ${drawdownPercent.toFixed(2)}% >= ${mandate.maxDrawdown}%`,
+      };
     }
   }
 
@@ -198,7 +201,10 @@ export function isMandateBreached(mandate: SwingMandate): { breached: boolean; r
     const absDrawdown = Math.abs(mandate.currentPnl);
     // Use maxDrawdown as absolute % threshold too
     if (absDrawdown >= mandate.maxDrawdown) {
-      return { breached: true, reason: `Absolute loss breached: ${absDrawdown.toFixed(2)}% >= ${mandate.maxDrawdown}%` };
+      return {
+        breached: true,
+        reason: `Absolute loss breached: ${absDrawdown.toFixed(2)}% >= ${mandate.maxDrawdown}%`,
+      };
     }
   }
 
@@ -206,11 +212,14 @@ export function isMandateBreached(mandate: SwingMandate): { breached: boolean; r
   const today = new Date().toISOString().split("T")[0]!;
   const dailyPnl = mandate.dailyPnlDate === today ? mandate.dailyPnl : 0;
   if (dailyPnl < 0 && Math.abs(dailyPnl) >= mandate.maxDailyLoss) {
-    return { breached: true, reason: `Daily loss limit breached: ${Math.abs(dailyPnl).toFixed(2)}% >= ${mandate.maxDailyLoss}%` };
+    return {
+      breached: true,
+      reason: `Daily loss limit breached: ${Math.abs(dailyPnl).toFixed(2)}% >= ${mandate.maxDailyLoss}%`,
+    };
   }
   if (
-    mandate.stopAfterConsecutiveLosses !== undefined
-    && mandate.consecutiveLosses >= mandate.stopAfterConsecutiveLosses
+    mandate.stopAfterConsecutiveLosses !== undefined &&
+    mandate.consecutiveLosses >= mandate.stopAfterConsecutiveLosses
   ) {
     return {
       breached: true,
@@ -225,9 +234,7 @@ export function updateMandateTracking(mandate: SwingMandate, pnlDelta: number): 
   const today = new Date().toISOString().split("T")[0]!;
 
   // Reset daily P&L if new day
-  const dailyPnl = mandate.dailyPnlDate === today
-    ? mandate.dailyPnl + pnlDelta
-    : pnlDelta;
+  const dailyPnl = mandate.dailyPnlDate === today ? mandate.dailyPnl + pnlDelta : pnlDelta;
 
   const newPnl = mandate.currentPnl + pnlDelta;
   const newPeak = Math.max(mandate.peakPnl, newPnl);

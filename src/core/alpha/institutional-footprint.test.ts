@@ -59,10 +59,10 @@ describe("analyzeInstitutionalFootprint", () => {
     const r = analyzeInstitutionalFootprint(bars);
     expect(r.verdict).toBe("accumulation_visible");
     expect(r.axesPassed).toBe(5);
-    expect(r.runMoveFraction).toBeGreaterThanOrEqual(0.20);
-    expect(r.runMoveFraction).toBeLessThanOrEqual(0.40);
+    expect(r.runMoveFraction).toBeGreaterThanOrEqual(0.2);
+    expect(r.runMoveFraction).toBeLessThanOrEqual(0.4);
     expect(r.longestConsecutiveVolumeBars).toBeGreaterThanOrEqual(4);
-    expect(r.maxSignalBarBody).toBeGreaterThanOrEqual(0.10);
+    expect(r.maxSignalBarBody).toBeGreaterThanOrEqual(0.1);
   });
 
   test("parabolic blowoff: 60% move + heavy volume but exceeds band", () => {
@@ -88,7 +88,9 @@ describe("analyzeInstitutionalFootprint", () => {
       const drift = Math.sin(i * 0.7) * 0.5;
       const o = p;
       p = p + drift;
-      bars.push(bar(o, Math.max(o, p) + 0.3, Math.min(o, p) - 0.3, p, 1_000_000 + (i % 3) * 50_000));
+      bars.push(
+        bar(o, Math.max(o, p) + 0.3, Math.min(o, p) - 0.3, p, 1_000_000 + (i % 3) * 50_000),
+      );
     }
     const r = analyzeInstitutionalFootprint(bars);
     expect(["chop_no_accumulation", "partial_signature"]).toContain(r.verdict);

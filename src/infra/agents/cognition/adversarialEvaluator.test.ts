@@ -11,10 +11,7 @@ import {
   type FailureMode,
 } from "./adversarialEvaluator.ts";
 
-function fm(
-  i: number,
-  overrides: Partial<FailureMode> = {},
-): FailureMode {
+function fm(i: number, overrides: Partial<FailureMode> = {}): FailureMode {
   return {
     id: `fm-${i}`,
     category: "logic",
@@ -30,7 +27,9 @@ describe("isAdversarialEvaluatorEnabled", () => {
     expect(isAdversarialEvaluatorEnabled({ [ADVERSARIAL_EVALUATOR_FLAG_ENV]: "1" })).toBe(true);
     expect(isAdversarialEvaluatorEnabled({ [ADVERSARIAL_EVALUATOR_FLAG_ENV]: "true" })).toBe(true);
     expect(isAdversarialEvaluatorEnabled({ [ADVERSARIAL_EVALUATOR_FLAG_ENV]: "0" })).toBe(false);
-    expect(isAdversarialEvaluatorEnabled({ [ADVERSARIAL_EVALUATOR_FLAG_ENV]: "false" })).toBe(false);
+    expect(isAdversarialEvaluatorEnabled({ [ADVERSARIAL_EVALUATOR_FLAG_ENV]: "false" })).toBe(
+      false,
+    );
   });
 });
 
@@ -157,10 +156,7 @@ describe("acceptIfAdversarial — option overrides", () => {
     const report: AdversarialReport = {
       passed: true,
       baseScore: 5,
-      failureModes: [
-        fm(1, { category: "logic" }),
-        fm(2, { category: "safety" }),
-      ],
+      failureModes: [fm(1, { category: "logic" }), fm(2, { category: "safety" })],
       rationale: "",
     };
     const r = acceptIfAdversarial(report, { minFailureModes: 2, minDistinctCategories: 2 });
@@ -196,7 +192,11 @@ describe("acceptIfAdversarial — hostility score", () => {
     const big: AdversarialReport = {
       passed: true,
       baseScore: 4,
-      failureModes: [fm(1, { severity: "critical" }), fm(2, { severity: "critical", category: "safety" }), fm(3, { severity: "high", category: "data" })],
+      failureModes: [
+        fm(1, { severity: "critical" }),
+        fm(2, { severity: "critical", category: "safety" }),
+        fm(3, { severity: "high", category: "data" }),
+      ],
       rationale: "",
     };
     expect(acceptIfAdversarial(big).hostilityScore).toBeGreaterThan(

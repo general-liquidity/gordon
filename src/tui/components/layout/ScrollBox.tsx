@@ -1,4 +1,11 @@
-import React, { useState, useCallback, useImperativeHandle, useRef, forwardRef, type ReactNode } from "react";
+import {
+  useState,
+  useCallback,
+  useImperativeHandle,
+  useRef,
+  forwardRef,
+  type ReactNode,
+} from "react";
 import { Box } from "../../ink-custom";
 
 // ============================================================================
@@ -78,7 +85,9 @@ export const ScrollBox = forwardRef<ScrollBoxHandle, Props>(function ScrollBox(
       onScroll?.(clamped);
       onScrollChange?.(clamped);
       // Notify all subscribers
-      listenersRef.current.forEach((listener) => listener(clamped));
+      listenersRef.current.forEach((listener) => {
+        listener(clamped);
+      });
     },
     [clamp, maxScroll, onScroll, onScrollChange],
   );
@@ -114,7 +123,7 @@ export const ScrollBox = forwardRef<ScrollBoxHandle, Props>(function ScrollBox(
     scrollToElement: (measureId: string) => {
       try {
         const registry = (globalThis as any).__inkNodeRegistry;
-        if (!registry || !registry[measureId]) {
+        if (!registry?.[measureId]) {
           updateScroll(0);
           return;
         }

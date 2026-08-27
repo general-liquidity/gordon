@@ -32,7 +32,7 @@ export function DataTable<T extends Record<string, unknown>>({
   summaryRow,
 }: Props<T>) {
   if (data.length === 0) {
-    return <Text dimColor>  No data.</Text>;
+    return <Text dimColor> No data.</Text>;
   }
 
   return (
@@ -42,7 +42,9 @@ export function DataTable<T extends Record<string, unknown>>({
         {columns.map((col) => (
           <Box key={col.key} width={col.width}>
             <Text bold dimColor>
-              {col.align === "right" ? padLeft(col.header, col.width) : padRight(col.header, col.width)}
+              {col.align === "right"
+                ? padLeft(col.header, col.width)
+                : padRight(col.header, col.width)}
             </Text>
           </Box>
         ))}
@@ -66,7 +68,8 @@ export function DataTable<T extends Record<string, unknown>>({
           <Box>
             {columns.map((col) => {
               const val = summaryRow[col.key] ?? "";
-              const aligned = col.align === "right" ? padLeft(val, col.width) : padRight(val, col.width);
+              const aligned =
+                col.align === "right" ? padLeft(val, col.width) : padRight(val, col.width);
               return (
                 <Box key={col.key} width={col.width}>
                   <Text bold>{aligned}</Text>
@@ -93,7 +96,8 @@ const DataTableRowInner = function DataTableRow<T extends Record<string, unknown
         const raw = row[col.key];
         const formatted = col.format ? col.format(raw, row) : formatValue(raw);
         const cellColor = col.color ? col.color(raw, row) : undefined;
-        const aligned = col.align === "right" ? padLeft(formatted, col.width) : padRight(formatted, col.width);
+        const aligned =
+          col.align === "right" ? padLeft(formatted, col.width) : padRight(formatted, col.width);
 
         return (
           <Box key={col.key} width={col.width}>
@@ -130,8 +134,9 @@ export function fmtNum(n: number): string {
   if (n === 0) return "0";
   const abs = Math.abs(n);
   let formatted: string;
-  if (abs >= 1_000_000) formatted = (n / 1_000_000).toFixed(1) + "M";
-  else if (abs >= 1_000) formatted = n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (abs >= 1_000_000) formatted = `${(n / 1_000_000).toFixed(1)}M`;
+  else if (abs >= 1_000)
+    formatted = n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   else if (abs >= 1) formatted = n.toFixed(2);
   else if (abs >= 0.01) formatted = n.toFixed(4);
   else formatted = n.toFixed(6);

@@ -25,6 +25,6 @@ export function useAnimationFrame(isActive: boolean = true): AnimationFrameResul
   return {
     tick: frame,
     elapsedMs: frame * 50,
-    cycle: (period: number) => period > 0 ? (frame % period) / period : 0,
+    cycle: (period: number) => (period > 0 ? (frame % period) / period : 0),
   };
 }

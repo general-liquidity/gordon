@@ -14,9 +14,7 @@ const DYNAMIC = "y".repeat(800);
 
 describe("auditCacheBlocks", () => {
   it("returns null hashes when no system messages are present", () => {
-    const messages: GroundedPromptMessage[] = [
-      { role: "user", content: "hi" },
-    ];
+    const messages: GroundedPromptMessage[] = [{ role: "user", content: "hi" }];
     const result = auditCacheBlocks(messages, "anthropic");
     expect(result.stablePrefixHash).toBeNull();
     expect(result.dynamicBlockHash).toBeNull();

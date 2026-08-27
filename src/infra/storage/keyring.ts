@@ -76,7 +76,7 @@ interface SpawnResult {
 async function runCommand(
   cmd: string,
   args: string[],
-  options?: { stdin?: string; timeout?: number }
+  options?: { stdin?: string; timeout?: number },
 ): Promise<SpawnResult> {
   const timeout = options?.timeout ?? 5000;
 
@@ -96,7 +96,7 @@ async function runCommand(
       setTimeout(() => {
         proc.kill();
         reject(new Error(`Command timed out after ${timeout}ms`));
-      }, timeout)
+      }, timeout),
     );
 
     const exitCode = await Promise.race([proc.exited, timeoutPromise]);
@@ -123,8 +123,10 @@ class DarwinKeyringProvider implements KeyringProvider {
   async get(key: string): Promise<string | null> {
     const result = await runCommand("/usr/bin/security", [
       "find-generic-password",
-      "-s", SERVICE_NAME,
-      "-a", key,
+      "-s",
+      SERVICE_NAME,
+      "-a",
+      key,
       "-w",
     ]);
     if (result.exitCode !== 0) return null;
@@ -136,9 +138,12 @@ class DarwinKeyringProvider implements KeyringProvider {
     const result = await runCommand("/usr/bin/security", [
       "add-generic-password",
       "-U",
-      "-s", SERVICE_NAME,
-      "-a", key,
-      "-w", value,
+      "-s",
+      SERVICE_NAME,
+      "-a",
+      key,
+      "-w",
+      value,
     ]);
     if (result.exitCode !== 0) {
       throw new Error(`Failed to store key in Keychain: ${result.stderr}`);
@@ -148,17 +153,17 @@ class DarwinKeyringProvider implements KeyringProvider {
   async delete(key: string): Promise<boolean> {
     const result = await runCommand("/usr/bin/security", [
       "delete-generic-password",
-      "-s", SERVICE_NAME,
-      "-a", key,
+      "-s",
+      SERVICE_NAME,
+      "-a",
+      key,
     ]);
     return result.exitCode === 0;
   }
 
   async list(): Promise<string[]> {
     // dump-keychain and grep for our service entries
-    const result = await runCommand("/usr/bin/security", [
-      "dump-keychain",
-    ]);
+    const result = await runCommand("/usr/bin/security", ["dump-keychain"]);
     if (result.exitCode !== 0) return [];
 
     const keys: string[] = [];
@@ -253,11 +258,9 @@ class WindowsKeyringProvider implements KeyringProvider {
       $encrypted = [Security.Cryptography.ProtectedData]::Protect($bytes, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser)
       [Convert]::ToBase64String($encrypted)
     `;
-    const result = await runCommand(
-      "powershell.exe",
-      ["-NoProfile", "-Command", script],
-      { stdin: value }
-    );
+    const result = await runCommand("powershell.exe", ["-NoProfile", "-Command", script], {
+      stdin: value,
+    });
     if (result.exitCode !== 0) {
       throw new Error(`DPAPI encryption failed: ${result.stderr}`);
     }
@@ -294,11 +297,7 @@ class LinuxKeyringProvider implements KeyringProvider {
   }
 
   async get(key: string): Promise<string | null> {
-    const result = await runCommand("secret-tool", [
-      "lookup",
-      "service", SERVICE_NAME,
-      "key", key,
-    ]);
+    const result = await runCommand("secret-tool", ["lookup", "service", SERVICE_NAME, "key", key]);
     if (result.exitCode !== 0 || !result.stdout) return null;
     return result.stdout;
   }
@@ -307,13 +306,8 @@ class LinuxKeyringProvider implements KeyringProvider {
     // secret-tool reads the secret from stdin
     const result = await runCommand(
       "secret-tool",
-      [
-        "store",
-        "--label", `Gordon CLI: ${key}`,
-        "service", SERVICE_NAME,
-        "key", key,
-      ],
-      { stdin: value }
+      ["store", "--label", `Gordon CLI: ${key}`, "service", SERVICE_NAME, "key", key],
+      { stdin: value },
     );
     if (result.exitCode !== 0) {
       throw new Error(`Failed to store in Secret Service: ${result.stderr}`);
@@ -321,20 +315,12 @@ class LinuxKeyringProvider implements KeyringProvider {
   }
 
   async delete(key: string): Promise<boolean> {
-    const result = await runCommand("secret-tool", [
-      "clear",
-      "service", SERVICE_NAME,
-      "key", key,
-    ]);
+    const result = await runCommand("secret-tool", ["clear", "service", SERVICE_NAME, "key", key]);
     return result.exitCode === 0;
   }
 
   async list(): Promise<string[]> {
-    const result = await runCommand("secret-tool", [
-      "search",
-      "--all",
-      "service", SERVICE_NAME,
-    ]);
+    const result = await runCommand("secret-tool", ["search", "--all", "service", SERVICE_NAME]);
     if (result.exitCode !== 0) return [];
 
     const keys: string[] = [];
@@ -380,7 +366,11 @@ function tryGetBunSecrets(): BunSecretsApi | null {
   const secrets = bun?.secrets;
   if (!secrets || typeof secrets !== "object") return null;
   const api = secrets as Partial<BunSecretsApi>;
-  if (typeof api.get !== "function" || typeof api.set !== "function" || typeof api.delete !== "function") {
+  if (
+    typeof api.get !== "function" ||
+    typeof api.set !== "function" ||
+    typeof api.delete !== "function"
+  ) {
     return null;
   }
   return api as BunSecretsApi;

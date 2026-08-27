@@ -21,7 +21,9 @@ export class SessionController {
     await saveSessionState(state);
   }
 
-  async initializeSession(options: { autoResume?: boolean; forceNewThread?: boolean } = {}): Promise<SessionInfo> {
+  async initializeSession(
+    options: { autoResume?: boolean; forceNewThread?: boolean } = {},
+  ): Promise<SessionInfo> {
     return initializeSession(options);
   }
 

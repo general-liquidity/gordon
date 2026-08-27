@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  analyzeSmtDivergence,
-  formatSmtDivergence,
-  type AssetSnapshot,
-} from "./smt-divergence.ts";
+import { analyzeSmtDivergence, formatSmtDivergence, type AssetSnapshot } from "./smt-divergence.ts";
 
 function snap(
   symbol: string,
@@ -23,11 +19,7 @@ describe("analyzeSmtDivergence", () => {
 
   test("all three sweep up → confirmed_sweep", () => {
     const r = analyzeSmtDivergence(
-      [
-        snap("NQ", 105, 95, 99),
-        snap("ES", 104, 95, 99),
-        snap("YM", 106, 95, 99),
-      ],
+      [snap("NQ", 105, 95, 99), snap("ES", 104, 95, 99), snap("YM", 106, 95, 99)],
       { direction: "up" },
     );
     expect(r.verdict).toBe("confirmed_sweep");
@@ -65,11 +57,7 @@ describe("analyzeSmtDivergence", () => {
 
   test("nobody crosses → no_sweep", () => {
     const r = analyzeSmtDivergence(
-      [
-        snap("NQ", 98, 95, 99),
-        snap("ES", 97, 95, 99),
-        snap("YM", 97, 95, 99),
-      ],
+      [snap("NQ", 98, 95, 99), snap("ES", 97, 95, 99), snap("YM", 97, 95, 99)],
       { direction: "up" },
     );
     expect(r.verdict).toBe("no_sweep");
@@ -78,11 +66,7 @@ describe("analyzeSmtDivergence", () => {
 
   test("two sweep, one refuses → partial_confirmation", () => {
     const r = analyzeSmtDivergence(
-      [
-        snap("NQ", 105, 95, 99),
-        snap("ES", 104, 95, 99),
-        snap("YM", 97, 90, 99),
-      ],
+      [snap("NQ", 105, 95, 99), snap("ES", 104, 95, 99), snap("YM", 97, 90, 99)],
       { direction: "up" },
     );
     expect(r.verdict).toBe("partial_confirmation");
@@ -92,11 +76,7 @@ describe("analyzeSmtDivergence", () => {
   test("oversized sweep (full breakout) NOT treated as sweep", () => {
     // 30 above ref on ADR of 10 = 3.0 → above maxSweepFraction default 1.5
     const r = analyzeSmtDivergence(
-      [
-        snap("NQ", 130, 95, 99),
-        snap("ES", 96, 90, 99),
-        snap("YM", 96, 90, 99),
-      ],
+      [snap("NQ", 130, 95, 99), snap("ES", 96, 90, 99), snap("YM", 96, 90, 99)],
       { direction: "up" },
     );
     expect(r.assetStatuses[0]!.swept).toBe(false);
@@ -115,10 +95,9 @@ describe("analyzeSmtDivergence", () => {
   });
 
   test("two assets — one sweeps, one refuses → divergent_sweep", () => {
-    const r = analyzeSmtDivergence(
-      [snap("BTC", 110, 95, 99), snap("ETH", 97, 90, 99)],
-      { direction: "up" },
-    );
+    const r = analyzeSmtDivergence([snap("BTC", 110, 95, 99), snap("ETH", 97, 90, 99)], {
+      direction: "up",
+    });
     expect(r.verdict).toBe("divergent_sweep");
     expect(r.isolatedSweeper).toBe("BTC");
   });
@@ -138,11 +117,7 @@ describe("analyzeSmtDivergence", () => {
 describe("formatSmtDivergence", () => {
   test("renders sweep table + isolated sweeper note when divergent", () => {
     const r = analyzeSmtDivergence(
-      [
-        snap("NQ", 105, 95, 99),
-        snap("ES", 98, 95, 99),
-        snap("YM", 97, 90, 99),
-      ],
+      [snap("NQ", 105, 95, 99), snap("ES", 98, 95, 99), snap("YM", 97, 90, 99)],
       { direction: "up" },
     );
     const text = formatSmtDivergence(r);

@@ -62,12 +62,8 @@ function ensureRegimeTable(): void {
       timeframe TEXT NOT NULL
     )
   `);
-  db.run(
-    "CREATE INDEX IF NOT EXISTS idx_regime_history_symbol ON regime_history(symbol)"
-  );
-  db.run(
-    "CREATE INDEX IF NOT EXISTS idx_regime_history_started_at ON regime_history(started_at)"
-  );
+  db.run("CREATE INDEX IF NOT EXISTS idx_regime_history_symbol ON regime_history(symbol)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_regime_history_started_at ON regime_history(started_at)");
 }
 
 // ============================================================================
@@ -118,11 +114,7 @@ export class RegimeDetector {
    * @param timeframe - Candle interval (default "1h")
    * @returns RegimeSignal with classification, confidence, and metrics
    */
-  detectRegime(
-    candles: Candle[],
-    symbol: string,
-    timeframe = "1h",
-  ): RegimeSignal {
+  detectRegime(candles: Candle[], symbol: string, timeframe = "1h"): RegimeSignal {
     const raw = this.classifier.classify(candles, symbol, timeframe);
     const signal = this.applyHysteresisIfEnabled(raw);
 
@@ -217,10 +209,7 @@ export class RegimeDetector {
 
     // Check the most recent record for this symbol+timeframe
     const lastRow = db
-      .query<
-        { id: number; regime: string; started_at: string },
-        [string, string]
-      >(
+      .query<{ id: number; regime: string; started_at: string }, [string, string]>(
         `SELECT id, regime, started_at FROM regime_history
          WHERE symbol = ? AND timeframe = ?
          ORDER BY started_at DESC LIMIT 1`,
@@ -234,10 +223,7 @@ export class RegimeDetector {
 
     // Close the previous regime span
     if (lastRow) {
-      db.run(
-        `UPDATE regime_history SET ended_at = ? WHERE id = ?`,
-        [signal.timestamp, lastRow.id],
-      );
+      db.run(`UPDATE regime_history SET ended_at = ? WHERE id = ?`, [signal.timestamp, lastRow.id]);
     }
 
     // Insert new regime span
@@ -290,9 +276,7 @@ export class RegimeDetector {
       symbol,
       regimes: rows.map((r) => {
         const startMs = new Date(r.started_at).getTime();
-        const endMs = r.ended_at
-          ? new Date(r.ended_at).getTime()
-          : Date.now();
+        const endMs = r.ended_at ? new Date(r.ended_at).getTime() : Date.now();
         const durationHours = (endMs - startMs) / (1000 * 60 * 60);
         return {
           regime: r.regime as MarketRegime,
@@ -321,9 +305,7 @@ export class RegimeDetector {
     for (const pb of allPlaybooks) {
       const pbTagsLower = pb.tags.map((t) => t.toLowerCase());
       const hasMatch = regimeTags.some((rt) =>
-        pbTagsLower.some(
-          (pt) => pt === rt || pt.includes(rt) || rt.includes(pt),
-        ),
+        pbTagsLower.some((pt) => pt === rt || pt.includes(rt) || rt.includes(pt)),
       );
       if (hasMatch) {
         matches.push(pb.name);

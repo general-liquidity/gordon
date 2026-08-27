@@ -42,7 +42,12 @@ export function loadLabsFlagsIntoEnv(): string[] {
   try {
     const raw = fs.readFileSync(labsPath(), "utf8");
     const parsed = JSON.parse(raw) as Partial<LabsFile>;
-    if (!parsed || typeof parsed !== "object" || !parsed.flags || typeof parsed.flags !== "object") {
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      !parsed.flags ||
+      typeof parsed.flags !== "object"
+    ) {
       return [];
     }
     file = { flags: parsed.flags as Record<string, "true" | "false"> };

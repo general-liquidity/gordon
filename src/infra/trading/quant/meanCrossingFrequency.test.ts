@@ -56,10 +56,7 @@ describe("computeMeanCrossingFrequency — annualisation", () => {
     const series = [1, -1, 1, -1]; // 3 crossings, N=4
     const daily = computeMeanCrossingFrequency({ series, periodsPerYear: 252 });
     const weekly = computeMeanCrossingFrequency({ series, periodsPerYear: 52 });
-    expect(daily.crossingsPerYear / weekly.crossingsPerYear).toBeCloseTo(
-      252 / 52,
-      6,
-    );
+    expect(daily.crossingsPerYear / weekly.crossingsPerYear).toBeCloseTo(252 / 52, 6);
   });
 
   it("Sarmento threshold sanity: 12 crossings in 252 daily samples ≈ 12/year", () => {

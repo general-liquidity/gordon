@@ -113,8 +113,8 @@ export interface VolTargetSizerResult {
 }
 
 const DEFAULT_CAP = 2.0;
-const DEFAULT_FLOOR = 0.20;
-const DEFAULT_NO_TRADE_BAND = 0.10;
+const DEFAULT_FLOOR = 0.2;
+const DEFAULT_NO_TRADE_BAND = 0.1;
 const DEFAULT_MIN_VOL = 1e-6;
 
 function fmtPct(x: number): string {

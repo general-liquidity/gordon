@@ -110,14 +110,25 @@ export function computePortfolioDiff(
     const aWeight = a?.weightPct ?? 0;
 
     let action: DiffAction;
-    if (!b && a) { action = "added"; summary.added++; }
-    else if (b && !a) { action = "removed"; summary.removed++; }
-    else if (aQty > bQty) { action = "increased"; summary.increased++; }
-    else if (aQty < bQty) { action = "decreased"; summary.decreased++; }
-    else if (b && a && (b.side !== a.side || Math.abs(b.avgPrice - a.avgPrice) > 0.01)) {
-      action = "modified"; summary.decreased++; // Count as change
+    if (!b && a) {
+      action = "added";
+      summary.added++;
+    } else if (b && !a) {
+      action = "removed";
+      summary.removed++;
+    } else if (aQty > bQty) {
+      action = "increased";
+      summary.increased++;
+    } else if (aQty < bQty) {
+      action = "decreased";
+      summary.decreased++;
+    } else if (b && a && (b.side !== a.side || Math.abs(b.avgPrice - a.avgPrice) > 0.01)) {
+      action = "modified";
+      summary.decreased++; // Count as change
+    } else {
+      action = "unchanged";
+      summary.unchanged++;
     }
-    else { action = "unchanged"; summary.unchanged++; }
 
     const qtyDelta = aQty - bQty;
     const notionalDelta = aNotional - bNotional;
@@ -128,9 +139,8 @@ export function computePortfolioDiff(
     let pnlImpact = 0;
     if (b && (action === "removed" || action === "decreased")) {
       const closingQty = Math.abs(qtyDelta);
-      const pnlPerUnit = b.side === "long"
-        ? b.currentPrice - b.avgPrice
-        : b.avgPrice - b.currentPrice;
+      const pnlPerUnit =
+        b.side === "long" ? b.currentPrice - b.avgPrice : b.avgPrice - b.currentPrice;
       pnlImpact = pnlPerUnit * closingQty - fees;
     }
 
@@ -155,7 +165,12 @@ export function computePortfolioDiff(
 
   // Sort: changes first (added, removed, modified), then unchanged
   const actionOrder: Record<DiffAction, number> = {
-    added: 0, removed: 1, increased: 2, decreased: 3, modified: 4, unchanged: 5,
+    added: 0,
+    removed: 1,
+    increased: 2,
+    decreased: 3,
+    modified: 4,
+    unchanged: 5,
   };
   positions.sort((a, b) => actionOrder[a.action] - actionOrder[b.action]);
 
@@ -203,8 +218,14 @@ export function formatPortfolioDiff(diff: PortfolioDiff): Array<{
   const lines: Array<{ text: string; color: "green" | "red" | "yellow" | "dim" | "default" }> = [];
 
   lines.push({ text: "Portfolio Diff", color: "default" });
-  lines.push({ text: `  ${diff.summary.added} added, ${diff.summary.removed} removed, ${diff.summary.increased} increased, ${diff.summary.decreased} decreased`, color: "default" });
-  lines.push({ text: `  ${diff.tradesRequired} trades, ~$${diff.totalFeesUsd.toFixed(2)} fees, ~$${diff.totalPnlImpact.toFixed(2)} P&L impact`, color: "default" });
+  lines.push({
+    text: `  ${diff.summary.added} added, ${diff.summary.removed} removed, ${diff.summary.increased} increased, ${diff.summary.decreased} decreased`,
+    color: "default",
+  });
+  lines.push({
+    text: `  ${diff.tradesRequired} trades, ~$${diff.totalFeesUsd.toFixed(2)} fees, ~$${diff.totalPnlImpact.toFixed(2)} P&L impact`,
+    color: "default",
+  });
   lines.push({ text: "", color: "default" });
 
   for (const pos of diff.positions) {

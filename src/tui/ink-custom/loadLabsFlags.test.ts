@@ -9,11 +9,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { loadLabsFlagsIntoEnv, _resetLoadLabsFlagsLatch } from "./loadLabsFlags.ts";
 
-const TEST_FLAGS = [
-  "GORDON_TEST_FLAG_A",
-  "GORDON_TEST_FLAG_B",
-  "GORDON_TEST_FLAG_C",
-];
+const TEST_FLAGS = ["GORDON_TEST_FLAG_A", "GORDON_TEST_FLAG_B", "GORDON_TEST_FLAG_C"];
 
 let tmpHome: string;
 let prevHome: string | undefined;
@@ -34,7 +30,9 @@ afterEach(() => {
   if (prevHome !== undefined) process.env.GORDON_HOME = prevHome;
   else delete process.env.GORDON_HOME;
   clearTestEnv();
-  try { fs.rmSync(tmpHome, { recursive: true, force: true }); } catch {}
+  try {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  } catch {}
 });
 
 function writeLabsJson(flags: Record<string, "true" | "false">) {

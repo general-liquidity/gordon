@@ -44,7 +44,7 @@ export interface VolumeProfileResult {
 export function calculateVolumeProfile(
   candles: Candle[],
   numBins: number = 24,
-  currentPrice?: number
+  currentPrice?: number,
 ): VolumeProfileResult {
   if (candles.length < 1) {
     return {
@@ -69,9 +69,7 @@ export function calculateVolumeProfile(
   // If no range exists (all prices identical), return minimal result
   if (overallHigh === overallLow) {
     const totalVolume = candles.reduce((sum, c) => sum + c.volume, 0);
-    const buyVol = candles
-      .filter((c) => c.close > c.open)
-      .reduce((sum, c) => sum + c.volume, 0);
+    const buyVol = candles.filter((c) => c.close > c.open).reduce((sum, c) => sum + c.volume, 0);
     const sellVol = totalVolume - buyVol;
 
     const singleBin: ProfileBin = {
@@ -154,16 +152,11 @@ export function calculateVolumeProfile(
   const poc = bins[pocIndex]!.priceLevel;
 
   // Calculate Value Area (70% of total volume, expanding outward from POC)
-  const { valueAreaHigh, valueAreaLow } = calculateValueArea(
-    bins,
-    pocIndex,
-    totalVolume,
-    binSize
-  );
+  const { valueAreaHigh, valueAreaLow } = calculateValueArea(bins, pocIndex, totalVolume, binSize);
 
   // Determine current price position relative to value area
   const lastCandle = candles[candles.length - 1];
-  const price = currentPrice ?? (lastCandle?.close ?? 0);
+  const price = currentPrice ?? lastCandle?.close ?? 0;
   const pricePosition = determinePricePosition(price, valueAreaHigh, valueAreaLow);
 
   // Generate interpretation
@@ -173,7 +166,7 @@ export function calculateVolumeProfile(
     valueAreaHigh,
     valueAreaLow,
     pricePosition,
-    bins[pocIndex]!
+    bins[pocIndex]!,
   );
 
   return {
@@ -193,7 +186,7 @@ function calculateValueArea(
   bins: ProfileBin[],
   pocIndex: number,
   totalVolume: number,
-  binSize: number
+  binSize: number,
 ): { valueAreaHigh: number; valueAreaLow: number } {
   const targetVolume = totalVolume * 0.7;
   let accumulatedVolume = bins[pocIndex]!.volume;
@@ -233,7 +226,7 @@ function calculateValueArea(
 function determinePricePosition(
   price: number,
   vaHigh: number,
-  vaLow: number
+  vaLow: number,
 ): "above_va" | "in_va" | "below_va" {
   if (price > vaHigh) return "above_va";
   if (price < vaLow) return "below_va";
@@ -248,13 +241,10 @@ function buildInterpretation(
   vaHigh: number,
   vaLow: number,
   position: "above_va" | "in_va" | "below_va",
-  pocBin: ProfileBin
+  pocBin: ProfileBin,
 ): string {
   const pocDistance = ((Math.abs(price - poc) / poc) * 100).toFixed(2);
-  const buyRatio =
-    pocBin.volume > 0
-      ? ((pocBin.buyVolume / pocBin.volume) * 100).toFixed(1)
-      : "0";
+  const buyRatio = pocBin.volume > 0 ? ((pocBin.buyVolume / pocBin.volume) * 100).toFixed(1) : "0";
 
   if (position === "above_va") {
     return (

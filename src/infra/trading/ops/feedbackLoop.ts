@@ -90,20 +90,31 @@ function ensureDir(): void {
 function loadOutcomes(): TradeOutcome[] {
   const file = outcomesFile();
   if (!existsSync(file)) return [];
-  try { return JSON.parse(readFileSync(file, "utf-8")); } catch { return []; }
+  try {
+    return JSON.parse(readFileSync(file, "utf-8"));
+  } catch {
+    return [];
+  }
 }
 
 function saveOutcomes(outcomes: TradeOutcome[]): void {
   ensureDir();
   // Keep last 500 outcomes
   const trimmed = outcomes.slice(-500);
-  writeFileSync(outcomesFile(), JSON.stringify(trimmed, null, 2), { encoding: "utf-8", mode: 0o600 });
+  writeFileSync(outcomesFile(), JSON.stringify(trimmed, null, 2), {
+    encoding: "utf-8",
+    mode: 0o600,
+  });
 }
 
 function loadPatternStats(): Record<string, PatternStats> {
   const file = statsFile();
   if (!existsSync(file)) return {};
-  try { return JSON.parse(readFileSync(file, "utf-8")); } catch { return {}; }
+  try {
+    return JSON.parse(readFileSync(file, "utf-8"));
+  } catch {
+    return {};
+  }
 }
 
 function savePatternStats(stats: Record<string, PatternStats>): void {
@@ -129,9 +140,16 @@ export function recordTradeOutcome(outcome: TradeOutcome): PatternStats {
   const stats = allStats[outcome.pattern] ?? createEmptyStats(outcome.pattern);
 
   stats.totalTrades++;
-  if (outcome.result === "win") { stats.wins++; stats.streak = Math.max(1, stats.streak + 1); }
-  else if (outcome.result === "loss") { stats.losses++; stats.streak = Math.min(-1, stats.streak - 1); }
-  else { stats.breakevens++; stats.streak = 0; }
+  if (outcome.result === "win") {
+    stats.wins++;
+    stats.streak = Math.max(1, stats.streak + 1);
+  } else if (outcome.result === "loss") {
+    stats.losses++;
+    stats.streak = Math.min(-1, stats.streak - 1);
+  } else {
+    stats.breakevens++;
+    stats.streak = 0;
+  }
 
   stats.winRate = stats.wins / Math.max(1, stats.wins + stats.losses);
 
@@ -239,13 +257,17 @@ export function formatFeedbackForPrompt(): string {
   const stats = getAllPatternStats();
   if (stats.length === 0) return "";
 
-  const notable = stats.filter((s) => s.totalTrades >= 5 && (s.confidenceMultiplier < 0.7 || s.confidenceMultiplier > 1.15));
+  const notable = stats.filter(
+    (s) => s.totalTrades >= 5 && (s.confidenceMultiplier < 0.7 || s.confidenceMultiplier > 1.15),
+  );
   if (notable.length === 0) return "";
 
   const lines = ["[GORDON_PATTERN_FEEDBACK]"];
   for (const s of notable) {
     const direction = s.confidenceMultiplier > 1.0 ? "STRONG" : "WEAK";
-    lines.push(`- ${s.pattern}: ${direction} (${(s.winRate * 100).toFixed(0)}% WR, ${s.totalTrades} trades, streak ${s.streak}, confidence ${s.confidenceMultiplier.toFixed(2)}x)`);
+    lines.push(
+      `- ${s.pattern}: ${direction} (${(s.winRate * 100).toFixed(0)}% WR, ${s.totalTrades} trades, streak ${s.streak}, confidence ${s.confidenceMultiplier.toFixed(2)}x)`,
+    );
   }
-  return lines.join("\n") + "\n";
+  return `${lines.join("\n")}\n`;
 }

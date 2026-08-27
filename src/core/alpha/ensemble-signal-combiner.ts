@@ -220,8 +220,7 @@ export function combineEnsembleSignals(
     const agrees =
       direction === "neutral"
         ? true
-        : (direction === "long" && v.value >= 0) ||
-          (direction === "short" && v.value <= 0);
+        : (direction === "long" && v.value >= 0) || (direction === "short" && v.value <= 0);
     return {
       id: v.id,
       value: parseFloat(v.value.toFixed(6)),

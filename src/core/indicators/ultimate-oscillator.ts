@@ -38,7 +38,7 @@ export function calculateUltimateOscillator(
   candles: Candle[],
   short: number = 7,
   medium: number = 14,
-  long: number = 28
+  long: number = 28,
 ): UltimateOscResult {
   const periods: [number, number, number] = [short, medium, long];
 

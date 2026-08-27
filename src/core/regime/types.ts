@@ -13,12 +13,12 @@ import { z } from "zod";
 // ============================================================================
 
 export const MarketRegimeSchema = z.enum([
-  "trending_up",   // strong bullish trend
+  "trending_up", // strong bullish trend
   "trending_down", // strong bearish trend
-  "ranging",       // sideways, mean-reverting
-  "volatile",      // high volatility, no clear direction
-  "quiet",         // low volatility, low volume
-  "breakout",      // transitioning from quiet/ranging to trending
+  "ranging", // sideways, mean-reverting
+  "volatile", // high volatility, no clear direction
+  "quiet", // low volatility, low volume
+  "breakout", // transitioning from quiet/ranging to trending
 ]);
 export type MarketRegime = z.infer<typeof MarketRegimeSchema>;
 

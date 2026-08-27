@@ -13,20 +13,24 @@ function bar(opts: Partial<Candle> & { close: number }): Candle {
 }
 
 /** Helper — touch a level at index then pull back. Returns candles. */
-function buildTestSeries(
-  options: {
-    level: number;
-    touches: number[];        // bar indices where price touches the level
-    pullbackPct: number;      // pullback after each touch
-    totalBars: number;
-    baselineClose: number;
-  },
-): Candle[] {
+function buildTestSeries(options: {
+  level: number;
+  touches: number[]; // bar indices where price touches the level
+  pullbackPct: number; // pullback after each touch
+  totalBars: number;
+  baselineClose: number;
+}): Candle[] {
   const { level, touches, pullbackPct, totalBars, baselineClose } = options;
   const candles: Candle[] = [];
   for (let i = 0; i < totalBars; i++) {
     if (touches.includes(i)) {
-      candles.push(bar({ close: level * (1 - pullbackPct), high: level * 1.001, low: level * (1 - pullbackPct) * 0.99 }));
+      candles.push(
+        bar({
+          close: level * (1 - pullbackPct),
+          high: level * 1.001,
+          low: level * (1 - pullbackPct) * 0.99,
+        }),
+      );
     } else {
       candles.push(bar({ close: baselineClose }));
     }
@@ -127,20 +131,29 @@ describe("calculateResistanceTests", () => {
   });
 
   test("interpretation reflects test count", () => {
-    const none = calculateResistanceTests(
-      [bar({ close: 50 }), bar({ close: 51 })],
-      100,
-    );
+    const none = calculateResistanceTests([bar({ close: 50 }), bar({ close: 51 })], 100);
     expect(none.interpretation).toContain("hasn't been tested");
 
     const single = calculateResistanceTests(
-      buildTestSeries({ level: 100, touches: [10], pullbackPct: 0.025, totalBars: 30, baselineClose: 93 }),
+      buildTestSeries({
+        level: 100,
+        touches: [10],
+        pullbackPct: 0.025,
+        totalBars: 30,
+        baselineClose: 93,
+      }),
       100,
     );
     expect(single.interpretation).toContain("once");
 
     const multi = calculateResistanceTests(
-      buildTestSeries({ level: 100, touches: [10, 20, 30], pullbackPct: 0.025, totalBars: 40, baselineClose: 93 }),
+      buildTestSeries({
+        level: 100,
+        touches: [10, 20, 30],
+        pullbackPct: 0.025,
+        totalBars: 40,
+        baselineClose: 93,
+      }),
       100,
     );
     expect(multi.interpretation).toContain("well-defined");

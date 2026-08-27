@@ -1,9 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  detectCrossVenueDivergence,
-  divergenceToPayload,
-} from "./crossVenueDivergence.ts";
+import { detectCrossVenueDivergence, divergenceToPayload } from "./crossVenueDivergence.ts";
 
 describe("detectCrossVenueDivergence — aligned venues → no alert", () => {
   it("two venues with identical mids → no alert", () => {

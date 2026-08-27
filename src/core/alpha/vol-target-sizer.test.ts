@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  sizeWithVolTarget,
-  formatVolTargetSizer,
-} from "./vol-target-sizer.ts";
+import { sizeWithVolTarget, formatVolTargetSizer } from "./vol-target-sizer.ts";
 
 describe("sizeWithVolTarget", () => {
   test("zero or negative target vol → insufficient_data", () => {
@@ -23,8 +20,8 @@ describe("sizeWithVolTarget", () => {
 
   test("target = current → multiplier 1, no rebalance", () => {
     const r = sizeWithVolTarget({
-      targetAnnualVol: 0.10,
-      currentAnnualVol: 0.10,
+      targetAnnualVol: 0.1,
+      currentAnnualVol: 0.1,
       currentNotionalFraction: 1.0,
     });
     expect(r.rawMultiplier).toBeCloseTo(1.0, 4);
@@ -34,8 +31,8 @@ describe("sizeWithVolTarget", () => {
 
   test("current vol 2× target → de-risk to 50%, rebalance", () => {
     const r = sizeWithVolTarget({
-      targetAnnualVol: 0.10,
-      currentAnnualVol: 0.20,
+      targetAnnualVol: 0.1,
+      currentAnnualVol: 0.2,
       currentNotionalFraction: 1.0,
     });
     expect(r.rawMultiplier).toBeCloseTo(0.5, 4);
@@ -46,7 +43,7 @@ describe("sizeWithVolTarget", () => {
 
   test("current vol 0.5× target → lever to 2×, hits cap", () => {
     const r = sizeWithVolTarget({
-      targetAnnualVol: 0.10,
+      targetAnnualVol: 0.1,
       currentAnnualVol: 0.05,
       currentNotionalFraction: 1.0,
     });
@@ -57,7 +54,7 @@ describe("sizeWithVolTarget", () => {
 
   test("current vol 0.25× target → would want 4×, clipped to 2× cap", () => {
     const r = sizeWithVolTarget({
-      targetAnnualVol: 0.10,
+      targetAnnualVol: 0.1,
       currentAnnualVol: 0.025,
       currentNotionalFraction: 1.0,
     });
@@ -70,7 +67,7 @@ describe("sizeWithVolTarget", () => {
 
   test("current vol 10× target → floor binds at 0.20×", () => {
     const r = sizeWithVolTarget({
-      targetAnnualVol: 0.10,
+      targetAnnualVol: 0.1,
       currentAnnualVol: 1.0,
       currentNotionalFraction: 1.0,
     });
@@ -83,7 +80,7 @@ describe("sizeWithVolTarget", () => {
   test("floor of 0 allows full exit", () => {
     const r = sizeWithVolTarget(
       {
-        targetAnnualVol: 0.10,
+        targetAnnualVol: 0.1,
         currentAnnualVol: 1.0,
         currentNotionalFraction: 1.0,
       },
@@ -99,7 +96,7 @@ describe("sizeWithVolTarget", () => {
     // Target/current ratio of 1.05 → 5% drift, below default 10% band
     const r = sizeWithVolTarget({
       targetAnnualVol: 0.105,
-      currentAnnualVol: 0.10,
+      currentAnnualVol: 0.1,
       currentNotionalFraction: 1.0,
     });
     expect(r.driftFraction).toBeCloseTo(0.05, 2);
@@ -111,7 +108,7 @@ describe("sizeWithVolTarget", () => {
     // target/current = 1.07 → 7% drift; default 10% band holds, 4% band trips.
     const input = {
       targetAnnualVol: 0.107,
-      currentAnnualVol: 0.10,
+      currentAnnualVol: 0.1,
       currentNotionalFraction: 1.0,
     };
     const lax = sizeWithVolTarget(input);
@@ -131,18 +128,18 @@ describe("sizeWithVolTarget", () => {
 
   test("expected vol < target when capped", () => {
     const r = sizeWithVolTarget({
-      targetAnnualVol: 0.10,
+      targetAnnualVol: 0.1,
       currentAnnualVol: 0.02,
       currentNotionalFraction: 1.0,
     });
     expect(r.cappedAtLimit).toBe("cap");
-    expect(r.expectedAnnualVol).toBeLessThan(0.10);
+    expect(r.expectedAnnualVol).toBeLessThan(0.1);
   });
 
   test("starting from notional 0.5: applies multiplier on top", () => {
     const r = sizeWithVolTarget({
-      targetAnnualVol: 0.10,
-      currentAnnualVol: 0.10,
+      targetAnnualVol: 0.1,
+      currentAnnualVol: 0.1,
       currentNotionalFraction: 0.5,
     });
     expect(r.clippedMultiplier).toBeCloseTo(1.0, 4);
@@ -153,8 +150,8 @@ describe("sizeWithVolTarget", () => {
   test("invalid floor > cap → insufficient_data", () => {
     const r = sizeWithVolTarget(
       {
-        targetAnnualVol: 0.10,
-        currentAnnualVol: 0.10,
+        targetAnnualVol: 0.1,
+        currentAnnualVol: 0.1,
       },
       { leverageFloor: 3, leverageCap: 2 },
     );
@@ -164,7 +161,7 @@ describe("sizeWithVolTarget", () => {
   test("custom cap overrides default", () => {
     const r = sizeWithVolTarget(
       {
-        targetAnnualVol: 0.10,
+        targetAnnualVol: 0.1,
         currentAnnualVol: 0.02,
         currentNotionalFraction: 1.0,
       },
@@ -178,8 +175,8 @@ describe("sizeWithVolTarget", () => {
 describe("formatVolTargetSizer", () => {
   test("renders verdict + diagnostic table", () => {
     const r = sizeWithVolTarget({
-      targetAnnualVol: 0.10,
-      currentAnnualVol: 0.20,
+      targetAnnualVol: 0.1,
+      currentAnnualVol: 0.2,
       currentNotionalFraction: 1.0,
     });
     const text = formatVolTargetSizer(r);

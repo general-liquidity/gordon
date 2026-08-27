@@ -90,7 +90,9 @@ export const StatusLine = React.memo(function StatusLine({
         <TradingModeBadge mode={permissionMode} />
         <KillSwitchBadge status={killSwitches} />
         <CostDisplay />
-        <Text color={muted}>{"·"} Ctrl+P {"·"} ? help</Text>
+        <Text color={muted}>
+          {"·"} Ctrl+P {"·"} ? help
+        </Text>
       </Box>
     </Box>
   );

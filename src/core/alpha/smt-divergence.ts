@@ -108,10 +108,7 @@ export interface SmtDivergenceResult {
 const DEFAULT_MIN_SWEEP_FRACTION = 0.05;
 const DEFAULT_MAX_SWEEP_FRACTION = 1.5;
 
-function sweepFraction(
-  asset: AssetSnapshot,
-  direction: "up" | "down",
-): number {
+function sweepFraction(asset: AssetSnapshot, direction: "up" | "down"): number {
   if (asset.adr <= 0) return 0;
   if (direction === "up") {
     return (asset.windowHigh - asset.referenceLevel) / asset.adr;
@@ -214,7 +211,9 @@ export function formatSmtDivergence(result: SmtDivergenceResult): string {
   ];
   for (const a of result.assetStatuses) {
     const tag = a.swept ? "✓ swept" : a.refused ? "✗ refused" : "· partial";
-    lines.push(`    ${a.symbol.padEnd(8)} ${tag.padEnd(12)} ${(a.sweepFractionOfAdr * 100).toFixed(1)}% of ADR`);
+    lines.push(
+      `    ${a.symbol.padEnd(8)} ${tag.padEnd(12)} ${(a.sweepFractionOfAdr * 100).toFixed(1)}% of ADR`,
+    );
   }
   if (result.isolatedSweeper) {
     lines.push("");

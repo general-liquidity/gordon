@@ -25,10 +25,7 @@ function scriptedAgentStep(
     }
     cursor += 1;
     return {
-      messages: [
-        ...messages,
-        { role: "assistant" as const, content: next.appendAssistant },
-      ],
+      messages: [...messages, { role: "assistant" as const, content: next.appendAssistant }],
       toolCalls: next.toolCalls,
       finished: next.finished,
     };
@@ -92,9 +89,7 @@ describe("runInvestigation — safety deny-list", () => {
         allowedTools: ["scan_market", "execute_plan"],
       },
       {
-        agentStep: scriptedAgentStep([
-          { appendAssistant: "ok", toolCalls: [], finished: true },
-        ]),
+        agentStep: scriptedAgentStep([{ appendAssistant: "ok", toolCalls: [], finished: true }]),
       },
     );
     expect(result.deniedTools).toContain("execute_plan");
@@ -116,9 +111,7 @@ describe("runInvestigation — safety deny-list", () => {
         ],
       },
       {
-        agentStep: scriptedAgentStep([
-          { appendAssistant: "ok", toolCalls: [], finished: true },
-        ]),
+        agentStep: scriptedAgentStep([{ appendAssistant: "ok", toolCalls: [], finished: true }]),
       },
     );
     expect(result.deniedTools.length).toBe(6);

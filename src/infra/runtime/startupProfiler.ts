@@ -129,7 +129,7 @@ export function renderStartupProfile(
     lines.push("  parallel tasks");
     for (const t of tasks) {
       const flag = t.timedOut ? " (timeout)" : t.success === false ? " (failed)" : "";
-      lines.push(`  ${pad("  " + t.id)}  ${fmtMs(t.durationMs).padStart(9)}${flag}`);
+      lines.push(`  ${pad(`  ${t.id}`)}  ${fmtMs(t.durationMs).padStart(9)}${flag}`);
     }
   }
 
@@ -140,5 +140,5 @@ export function renderStartupProfile(
 export function printStartupProfile(): void {
   if (!isStartupProfilingEnabled()) return;
   const report = renderStartupProfile(checkpoints, taskTimings);
-  if (report) process.stderr.write(report + "\n");
+  if (report) process.stderr.write(`${report}\n`);
 }

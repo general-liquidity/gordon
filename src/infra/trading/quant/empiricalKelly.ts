@@ -44,7 +44,7 @@ const DEFAULT_BOOTSTRAP_SAMPLES = 10_000;
 
 function makeRng(seed?: number): () => number {
   if (seed === undefined) return Math.random;
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   return () => {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return s / 0x100000000;
@@ -105,9 +105,7 @@ export function empiricalKelly(input: EmpiricalKellyInput): EmpiricalKellyResult
   const uncertainty = classifyUncertainty(cv);
 
   const fEmpirical =
-    uncertainty === "untradable" || fKelly <= 0
-      ? 0
-      : Math.max(fKelly * (1 - cv), 0);
+    uncertainty === "untradable" || fKelly <= 0 ? 0 : Math.max(fKelly * (1 - cv), 0);
 
   return {
     fKelly,

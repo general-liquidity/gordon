@@ -7,12 +7,12 @@
  * - Workspace playbooks from a given directory
  */
 
-import { readdir, stat, mkdir, watch as fsWatch } from "fs/promises";
-import { join, resolve } from "path";
+import { readdir, stat, mkdir, watch as fsWatch } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { createModuleLogger } from "../../infra/logger/logger.ts";
 import { GORDON_DIR } from "../../infra/storage/paths.ts";
-import { PlaybookParser } from "./parser.ts";
-import { PlaybookRegistry } from "./registry.ts";
+import type { PlaybookParser } from "./parser.ts";
+import type { PlaybookRegistry } from "./registry.ts";
 import type { Playbook } from "./types.ts";
 
 const log = createModuleLogger("playbook-loader");
@@ -79,7 +79,7 @@ export class PlaybookLoader {
    */
   async loadFromDirectory(
     dir: string,
-    source: "builtin" | "workspace" | "hub" = "workspace"
+    source: "builtin" | "workspace" | "hub" = "workspace",
   ): Promise<number> {
     const absDir = resolve(dir);
     let count = 0;
@@ -128,22 +128,18 @@ export class PlaybookLoader {
    */
   async loadFile(
     path: string,
-    source: "builtin" | "workspace" | "hub" = "workspace"
+    source: "builtin" | "workspace" | "hub" = "workspace",
   ): Promise<Playbook | null> {
     const playbook = await this.parser.parseFile(path, source);
     const validation = this.parser.validate(playbook);
 
     if (!validation.valid) {
-      log.warn(
-        `Playbook ${path} has validation errors: ${validation.errors.join("; ")}`
-      );
+      log.warn(`Playbook ${path} has validation errors: ${validation.errors.join("; ")}`);
       return null;
     }
 
     if (validation.warnings.length > 0) {
-      log.debug(
-        `Playbook ${playbook.id} warnings: ${validation.warnings.join("; ")}`
-      );
+      log.debug(`Playbook ${playbook.id} warnings: ${validation.warnings.join("; ")}`);
     }
 
     // Register (replace if already exists to support reload)
@@ -176,8 +172,7 @@ export class PlaybookLoader {
 
         for await (const event of watcher) {
           if (
-            event.filename &&
-            event.filename.endsWith(".md") &&
+            event.filename?.endsWith(".md") &&
             (event.eventType === "change" || event.eventType === "rename")
           ) {
             const filePath = join(absDir, event.filename);

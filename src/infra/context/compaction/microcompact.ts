@@ -20,7 +20,8 @@
  */
 
 // Cleared, not spilled: nothing on disk to recover, so re-invoke is the path.
-export const MC_CLEARED_MARKER = "[Old tool result content cleared — re-invoke the tool if you need it again]";
+export const MC_CLEARED_MARKER =
+  "[Old tool result content cleared — re-invoke the tool if you need it again]";
 
 export const COUNT_TRIGGER_THRESHOLD = 8;
 export const COUNT_KEEP_RECENT = 4;
@@ -165,7 +166,9 @@ export function microcompactMessages<T>(messages: T[]): MicrocompactResult<T> {
         toolName: m.toolName ?? m.name,
         toolCallId: m.toolCallId ?? m.tool_call_id,
       });
-    } catch { /* non-critical — tombstone recording must never crash microcompact */ }
+    } catch {
+      /* non-critical — tombstone recording must never crash microcompact */
+    }
     return { ...m, content: MC_CLEARED_MARKER } as unknown as T;
   });
 

@@ -44,9 +44,7 @@ describe("computePnlDistributionShape — symmetric distribution", () => {
 describe("computePnlDistributionShape — long convexity (right-skewed)", () => {
   test("trend-following-like shape", () => {
     // Many small losses, occasional big wins
-    const data = [
-      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -0.5, -0.5, -0.5, -0.5, 8, 12,
-    ];
+    const data = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -0.5, -0.5, -0.5, -0.5, 8, 12];
     const shape = computePnlDistributionShape(data);
     expect(shape.skewness).toBeGreaterThan(0.25);
     expect(shape.verdict).toBe("long_convexity");
@@ -63,9 +61,7 @@ describe("computePnlDistributionShape — long convexity (right-skewed)", () => 
 
 describe("computePnlDistributionShape — short convexity (left-skewed)", () => {
   test("mean-reversion-like shape (lots of small wins, rare big loss)", () => {
-    const data = [
-      0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3, -8, -12,
-    ];
+    const data = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3, -8, -12];
     const shape = computePnlDistributionShape(data);
     expect(shape.skewness).toBeLessThan(-0.25);
     expect(shape.verdict).toBe("short_convexity");
@@ -75,9 +71,7 @@ describe("computePnlDistributionShape — short convexity (left-skewed)", () => 
 describe("computePnlDistributionShape — kurtosis", () => {
   test("fat-tailed series has positive excess kurtosis", () => {
     // Mix of moderate values + extreme outliers
-    const data = [
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10, 10,
-    ];
+    const data = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -10, 10];
     const shape = computePnlDistributionShape(data);
     expect(shape.excessKurtosis).toBeGreaterThan(1);
   });
@@ -97,9 +91,7 @@ describe("summarizePnlDistributionShape", () => {
   });
 
   test("long convexity message", () => {
-    const data = [
-      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -0.5, -0.5, -0.5, -0.5, 8, 12,
-    ];
+    const data = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -0.5, -0.5, -0.5, -0.5, 8, 12];
     const shape = computePnlDistributionShape(data);
     const summary = summarizePnlDistributionShape(shape);
     expect(summary).toContain("long convexity");
@@ -107,9 +99,7 @@ describe("summarizePnlDistributionShape", () => {
   });
 
   test("short convexity message", () => {
-    const data = [
-      0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3, -8, -12,
-    ];
+    const data = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3, -8, -12];
     const shape = computePnlDistributionShape(data);
     const summary = summarizePnlDistributionShape(shape);
     expect(summary).toContain("short convexity");

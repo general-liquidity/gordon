@@ -11,14 +11,14 @@
  * MCP Server categories for organization and discovery
  */
 export type MCPCategory =
-  | 'data-provider'    // Historical data, market data feeds
-  | 'analytics'        // Technical analysis, trading signals
-  | 'execution'        // Additional exchanges, DEX integrations
-  | 'exchange'         // Exchange integrations (Bitget, etc.)
-  | 'infrastructure'   // RPC providers, node services
-  | 'portfolio'        // Portfolio tracking, tax reporting
-  | 'research'         // News aggregation, social sentiment, on-chain analysis
-  | 'utility';         // Alerts, notifications, general utilities
+  | "data-provider" // Historical data, market data feeds
+  | "analytics" // Technical analysis, trading signals
+  | "execution" // Additional exchanges, DEX integrations
+  | "exchange" // Exchange integrations (Bitget, etc.)
+  | "infrastructure" // RPC providers, node services
+  | "portfolio" // Portfolio tracking, tax reporting
+  | "research" // News aggregation, social sentiment, on-chain analysis
+  | "utility"; // Alerts, notifications, general utilities
 
 // ============================================================================
 // Tool Definitions
@@ -45,7 +45,7 @@ export interface MCPToolDefinition {
  */
 export interface MCPAuthConfig {
   /** Authentication type required by the server */
-  type: 'api_key' | 'oauth' | 'none';
+  type: "api_key" | "oauth" | "none";
   /** Environment variable name for API key (if type is 'api_key') */
   envVar?: string;
   /** Custom credential fields (for complex auth scenarios) */
@@ -93,7 +93,7 @@ export interface MCPServerManifest {
 /**
  * Server instance status
  */
-export type MCPServerStatus = 'stopped' | 'starting' | 'running' | 'error';
+export type MCPServerStatus = "stopped" | "starting" | "running" | "error";
 
 /**
  * Running instance of an MCP server
@@ -148,10 +148,10 @@ export interface MCPServerConfig {
  * Events emitted by MCP servers
  */
 export type MCPServerEvent =
-  | { type: 'started'; serverId: string; timestamp: number }
-  | { type: 'stopped'; serverId: string; timestamp: number }
-  | { type: 'error'; serverId: string; error: string; timestamp: number }
-  | { type: 'tool_called'; serverId: string; toolName: string; timestamp: number };
+  | { type: "started"; serverId: string; timestamp: number }
+  | { type: "stopped"; serverId: string; timestamp: number }
+  | { type: "error"; serverId: string; error: string; timestamp: number }
+  | { type: "tool_called"; serverId: string; toolName: string; timestamp: number };
 
 /**
  * Event handler for MCP server events

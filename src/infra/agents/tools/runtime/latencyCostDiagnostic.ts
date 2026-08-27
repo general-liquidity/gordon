@@ -29,10 +29,7 @@ export const latencyCostDiagnosticTool = createTool({
       .number()
       .min(0)
       .describe("Annualized volatility as decimal (e.g. 0.30 = 30%)."),
-    bidAskSpread: z
-      .number()
-      .min(0)
-      .describe("Bid-ask spread in price units (e.g. $0.01)."),
+    bidAskSpread: z.number().min(0).describe("Bid-ask spread in price units (e.g. $0.01)."),
     latencyMs: z.number().min(0).describe("Operator's end-to-end latency in milliseconds."),
     timeHorizonSeconds: z
       .number()

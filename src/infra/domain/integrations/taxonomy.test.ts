@@ -1,9 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import {
-  getExecutionVenueMetadata,
-  getIntegrationSurfaceMetadata,
-} from "./taxonomy.ts";
+import { getExecutionVenueMetadata, getIntegrationSurfaceMetadata } from "./taxonomy.ts";
 
 describe("integration taxonomy", () => {
   it("derives crypto venue metadata from the ccxt id (no hardcoded venue list)", () => {
@@ -36,6 +33,8 @@ describe("integration taxonomy", () => {
 
   it("classifies the model providers + observability (non-crypto surfaces retained)", () => {
     expect(getIntegrationSurfaceMetadata("openai").integrationDomain).toBe("model_provider");
-    expect(getIntegrationSurfaceMetadata("opentelemetry").integrationDomain).toBe("observability_provider");
+    expect(getIntegrationSurfaceMetadata("opentelemetry").integrationDomain).toBe(
+      "observability_provider",
+    );
   });
 });

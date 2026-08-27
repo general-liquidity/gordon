@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { buildSynthesisManifest, summarizeManifest } from "./synthesisManifest.ts";
-import {
-  _resetObservationsForTests,
-  recordSymbolObservation,
-} from "./symbolObservationTracker.ts";
+import { _resetObservationsForTests, recordSymbolObservation } from "./symbolObservationTracker.ts";
 import { _resetCacheForTests } from "../../news/cryptoHeadlines.ts";
 import { unlinkSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -90,9 +87,7 @@ describe("buildSynthesisManifest", () => {
   });
 
   test("strips quote suffix to find base token (BTCUSDT → btc)", () => {
-    writeLessons([
-      { id: "op::btc-rule", text: "BTC entries during overnight Asia tend to fade." },
-    ]);
+    writeLessons([{ id: "op::btc-rule", text: "BTC entries during overnight Asia tend to fade." }]);
     const m = buildSynthesisManifest("BTCUSDT");
     expect(m.matchedLessonIds).toContain("op::btc-rule");
   });

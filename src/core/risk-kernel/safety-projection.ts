@@ -405,7 +405,13 @@ function dykstra(
   ctx: ProjectionContext,
   slack: number,
 ): { x: number[]; iterations: number; converged: boolean } {
-  return sweep(xNom, ctx, buildBox(ctx, slack), ctx.leverageRadius + slack, ctx.drawdownRadius + slack);
+  return sweep(
+    xNom,
+    ctx,
+    buildBox(ctx, slack),
+    ctx.leverageRadius + slack,
+    ctx.drawdownRadius + slack,
+  );
 }
 
 function sweep(
@@ -452,11 +458,7 @@ function sweep(
   return { x, iterations, converged };
 }
 
-function applySet(
-  x: number[],
-  correction: number[],
-  project: (v: number[]) => number[],
-): number[] {
+function applySet(x: number[], correction: number[], project: (v: number[]) => number[]): number[] {
   const shifted = x.map((xi, i) => xi + correction[i]!);
   const projected = project(shifted);
   for (let i = 0; i < x.length; i++) correction[i] = shifted[i]! - projected[i]!;

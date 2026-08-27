@@ -121,9 +121,7 @@ function annualizedSharpe(returns: number[], periodsPerYear: number): number {
  *
  * Returns null (never throws) when there are no trades or no schedules.
  */
-export function runFeeSensitivitySweep(
-  input: FeeSensitivityInput,
-): FeeSensitivityResult | null {
+export function runFeeSensitivitySweep(input: FeeSensitivityInput): FeeSensitivityResult | null {
   const { grossReturns, schedules } = input;
   if (!grossReturns || grossReturns.length === 0) return null;
   if (!schedules || schedules.length === 0) return null;

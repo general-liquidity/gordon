@@ -78,12 +78,25 @@ export const GORDON_DEFAULT_RULES: readonly BoundaryRule[] = [
   },
   {
     from: "src/events",
-    forbidden: ["src/infra", "src/app", "src/tui", "src/runtime", "src/core", "src/backtest", "src/gateway"],
+    forbidden: [
+      "src/infra",
+      "src/app",
+      "src/tui",
+      "src/runtime",
+      "src/core",
+      "src/backtest",
+      "src/gateway",
+    ],
     why: "events/ is a leaf type module — must not depend on any other src/ subtree",
   },
   {
     from: "src/tui",
-    forbidden: ["src/app/setup", "src/runtime/permissions", "src/infra/exchange", "src/infra/broker"],
+    forbidden: [
+      "src/app/setup",
+      "src/runtime/permissions",
+      "src/infra/exchange",
+      "src/infra/broker",
+    ],
     why: "tui/ renders state — must not reach into runtime/permission or broker wiring directly",
   },
 ] as const;
@@ -101,7 +114,7 @@ function listSourceFiles(
   if (!existsSync(dir)) return;
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
-    let st;
+    let st: ReturnType<typeof statSync>;
     try {
       st = statSync(full);
     } catch {
@@ -123,13 +136,10 @@ const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g;
 
 export function extractImports(source: string): string[] {
   const out: string[] = [];
-  let m: RegExpExecArray | null;
-  IMPORT_RE.lastIndex = 0;
-  while ((m = IMPORT_RE.exec(source)) !== null) {
+  for (const m of source.matchAll(IMPORT_RE)) {
     out.push(m[1]!);
   }
-  DYNAMIC_IMPORT_RE.lastIndex = 0;
-  while ((m = DYNAMIC_IMPORT_RE.exec(source)) !== null) {
+  for (const m of source.matchAll(DYNAMIC_IMPORT_RE)) {
     out.push(m[1]!);
   }
   return out;
@@ -150,7 +160,7 @@ function pathStartsWith(path: string, prefix: string): boolean {
   const a = toPosix(path);
   const b = toPosix(prefix);
   if (a === b) return true;
-  return a.startsWith(b.endsWith("/") ? b : b + "/");
+  return a.startsWith(b.endsWith("/") ? b : `${b}/`);
 }
 
 export function checkBoundaries(

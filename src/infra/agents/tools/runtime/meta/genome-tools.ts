@@ -15,10 +15,7 @@ import { z } from "zod";
 import { GenomeManager } from "../../../../../core/genome/index.ts";
 import { playbookRegistry } from "../../../../../core/playbooks/registry.ts";
 import { playbookToProtocol } from "../../../../../core/playbooks/converter.ts";
-import {
-  getGenomesByPlaybook,
-  getGenome,
-} from "../../../../../core/genome/store.ts";
+import { getGenomesByPlaybook } from "../../../../../core/genome/store.ts";
 import {
   listPlaybookBacktestResults,
   loadPlaybookBacktestResult,
@@ -45,11 +42,13 @@ export const forkPlaybookTool = createTool({
     mutations: z
       .array(
         z.object({
-          field_path: z.string().describe("Dot-notation path into the protocol, e.g. 'exit.stop_loss.value'"),
+          field_path: z
+            .string()
+            .describe("Dot-notation path into the protocol, e.g. 'exit.stop_loss.value'"),
           parameter_name: z.string().describe("Human-readable name, e.g. 'Stop loss percentage'"),
           to_value: z.unknown().describe("New value to set"),
           reason: z.string().describe("Why this mutation is being made"),
-        })
+        }),
       )
       .optional()
       .describe("Specific mutations to apply. If omitted, auto-generates nudge mutations."),
@@ -68,7 +67,7 @@ export const forkPlaybookTool = createTool({
           to: z.string(),
           type: z.string(),
           reason: z.string(),
-        })
+        }),
       )
       .optional(),
     playbook_preview: z.string().optional(),
@@ -81,12 +80,12 @@ export const forkPlaybookTool = createTool({
       // Register the playbook if not already tracked
       const parentGenome = manager.registerPlaybook(playbook_name);
 
-      let result;
+      let result: ReturnType<typeof manager.forkWithMutations>;
       if (userMutations && userMutations.length > 0) {
         // Build full mutation objects from user input
         const playbook = playbookRegistry.getOrThrow(playbook_name);
         const protocol = playbookToProtocol(playbook);
-        const mutator = manager.getMutator();
+        const _mutator = manager.getMutator();
 
         const fullMutations = userMutations.map((m) => {
           const protoAsRecord = protocol as unknown as Record<string, unknown>;
@@ -124,7 +123,7 @@ export const forkPlaybookTool = createTool({
           type: m.mutation_type,
           reason: m.reason,
         })),
-        playbook_preview: result.playbookMarkdown.slice(0, 500) + "...",
+        playbook_preview: `${result.playbookMarkdown.slice(0, 500)}...`,
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -159,7 +158,7 @@ export const suggestMutationsTool = createTool({
           to: z.string(),
           type: z.string(),
           reason: z.string(),
-        })
+        }),
       )
       .optional(),
     backtest_used: z.string().optional(),
@@ -186,7 +185,7 @@ export const suggestMutationsTool = createTool({
             from: String(m.from_value),
             to: String(m.to_value),
             type: m.mutation_type,
-            reason: m.reason + " (no backtest data available, using random nudges)",
+            reason: `${m.reason} (no backtest data available, using random nudges)`,
           })),
           backtest_used: "none",
         };
@@ -236,18 +235,10 @@ export const startAbExperimentTool = createTool({
     "Both variants will run in paper trading mode on the specified symbol. " +
     "Use when the user wants to compare two strategy versions head-to-head.",
   inputSchema: z.object({
-    control_playbook: z
-      .string()
-      .describe("Playbook ID of the control (original) strategy"),
-    variant_playbook: z
-      .string()
-      .describe("Playbook ID of the variant (mutated) strategy"),
+    control_playbook: z.string().describe("Playbook ID of the control (original) strategy"),
+    variant_playbook: z.string().describe("Playbook ID of the variant (mutated) strategy"),
     symbol: z.string().describe("Trading symbol for the experiment, e.g. 'BTCUSDT'"),
-    min_trades: z
-      .number()
-      .min(1)
-      .default(10)
-      .describe("Minimum trades before judging the winner"),
+    min_trades: z.number().min(1).default(10).describe("Minimum trades before judging the winner"),
     max_duration_days: z
       .number()
       .min(1)
@@ -265,7 +256,13 @@ export const startAbExperimentTool = createTool({
     status: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ control_playbook, variant_playbook, symbol, min_trades, max_duration_days }) => {
+  execute: async ({
+    control_playbook,
+    variant_playbook,
+    symbol,
+    min_trades,
+    max_duration_days,
+  }) => {
     try {
       const manager = GenomeManager.getInstance();
 
@@ -309,9 +306,7 @@ export const checkExperimentTool = createTool({
     "Shows trade counts, PnL, and winner determination for both control and variant. " +
     "Use when the user asks about experiment progress.",
   inputSchema: z.object({
-    experiment_id: z
-      .string()
-      .describe("Experiment ID to check"),
+    experiment_id: z.string().describe("Experiment ID to check"),
   }),
   outputSchema: z.object({
     experiment_id: z.string().optional(),
@@ -370,9 +365,7 @@ export const promoteWinnerTool = createTool({
     "The winner is marked as 'live' and the loser as 'deprecated'. " +
     "Use when an experiment has completed and the user wants to adopt the winner.",
   inputSchema: z.object({
-    experiment_id: z
-      .string()
-      .describe("Experiment ID whose winner to promote"),
+    experiment_id: z.string().describe("Experiment ID whose winner to promote"),
   }),
   outputSchema: z.object({
     promoted_genome_id: z.string().optional(),
@@ -411,9 +404,7 @@ export const getPlaybookLineageTool = createTool({
     "Shows the lineage tree from the original to all forked variants with their mutations. " +
     "Use when the user wants to see how a playbook has evolved over time.",
   inputSchema: z.object({
-    playbook_name: z
-      .string()
-      .describe("Playbook ID (kebab-case) to get lineage for"),
+    playbook_name: z.string().describe("Playbook ID (kebab-case) to get lineage for"),
   }),
   outputSchema: z.object({
     playbook_name: z.string().optional(),
@@ -427,7 +418,7 @@ export const getPlaybookLineageTool = createTool({
           fitness_score: z.number().optional(),
           mutations_count: z.number(),
           parent_genome_id: z.string().optional(),
-        })
+        }),
       )
       .optional(),
     lineage_tree: z.string().optional(),
@@ -439,7 +430,7 @@ export const getPlaybookLineageTool = createTool({
           net_fitness_drop: z.number(),
           observations: z.number(),
           reason: z.string(),
-        })
+        }),
       )
       .optional()
       .describe("Mutations this lineage has learned to avoid (net-regressive across forks)."),
@@ -513,9 +504,7 @@ export const rankPlaybookVariantsTool = createTool({
     "Shows a sorted list of all genome variants with their performance metrics. " +
     "Use when the user wants to compare all versions of a strategy.",
   inputSchema: z.object({
-    playbook_name: z
-      .string()
-      .describe("Playbook ID (kebab-case) to rank variants for"),
+    playbook_name: z.string().describe("Playbook ID (kebab-case) to rank variants for"),
   }),
   outputSchema: z.object({
     playbook_name: z.string().optional(),
@@ -534,7 +523,7 @@ export const rankPlaybookVariantsTool = createTool({
           backtest_max_drawdown: z.number().optional(),
           paper_trades: z.number(),
           paper_pnl: z.number(),
-        })
+        }),
       )
       .optional(),
     total_variants: z.number().optional(),

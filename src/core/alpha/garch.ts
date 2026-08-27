@@ -65,11 +65,7 @@ export interface GarchResult {
  * Filter the conditional-variance series for given params on demeaned
  * residuals. σ²_0 seeded with the sample variance of the residuals.
  */
-function filterVariance(
-  resid: number[],
-  p: GarchParams,
-  sampleVar: number,
-): number[] {
+function filterVariance(resid: number[], p: GarchParams, sampleVar: number): number[] {
   const n = resid.length;
   const cv: number[] = new Array(n);
   let prevVar = sampleVar > 0 ? sampleVar : VAR_FLOOR;
@@ -160,7 +156,8 @@ function nelderMead(
   start: GarchParams,
   iterations: number,
 ): GarchParams {
-  const f = (v: Vec3): number => negLogLikelihood(resid, clampParams(toParams(v), sampleVar), sampleVar);
+  const f = (v: Vec3): number =>
+    negLogLikelihood(resid, clampParams(toParams(v), sampleVar), sampleVar);
 
   const s0 = toVec(start);
   // Fixed, scale-aware perturbations (no randomness).
@@ -171,7 +168,7 @@ function nelderMead(
     [s0[0], Math.min(0.6, s0[1] + 0.05), s0[2]],
     [s0[0], s0[1], Math.min(0.98, s0[2] + 0.05)],
   ];
-  let fvals = simplex.map(f);
+  const fvals = simplex.map(f);
 
   const alphaR = 1; // reflection
   const gamma = 2; // expansion
@@ -328,7 +325,7 @@ export function fitGarch(returns: number[], options: GarchOptions = {}): GarchRe
     `β=${params.beta.toFixed(3)}, persistence α+β=${persistence.toFixed(3)} → ${regime}. ` +
     `Long-run vol ${(Math.sqrt(longRunVariance) * 100).toFixed(2)}%/period, ` +
     `current vol ${(Math.sqrt(currentVariance) * 100).toFixed(2)}%/period, ` +
-    `shock half-life ${Number.isFinite(shockHalfLifePeriods) ? shockHalfLifePeriods.toFixed(1) + " periods" : "∞"}.`;
+    `shock half-life ${Number.isFinite(shockHalfLifePeriods) ? `${shockHalfLifePeriods.toFixed(1)} periods` : "∞"}.`;
 
   return {
     params: {

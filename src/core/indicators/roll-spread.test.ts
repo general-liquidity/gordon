@@ -43,9 +43,7 @@ describe("calculateRollSpread — Corwin-Schultz (2012)", () => {
     }
     const wideRes = calculateRollSpread(wide);
     const tightRes = calculateRollSpread(tight);
-    expect(wideRes.corwinSchultzSpread).toBeGreaterThan(
-      tightRes.corwinSchultzSpread,
-    );
+    expect(wideRes.corwinSchultzSpread).toBeGreaterThan(tightRes.corwinSchultzSpread);
   });
 
   test("CS spread sits in sane fractional range [0, ~0.5]", () => {

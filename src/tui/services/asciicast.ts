@@ -2,7 +2,7 @@
 // ASCIICast Recorder — Records terminal sessions in asciicast v2 format
 // ============================================================================
 
-import { writeFileSync, appendFileSync } from "fs";
+import { writeFileSync, appendFileSync } from "node:fs";
 
 export class AsciicastRecorder {
   private filePath: string | null = null;
@@ -17,19 +17,20 @@ export class AsciicastRecorder {
     this.buffer = [];
 
     const header = JSON.stringify({
-      version: 2, width: process.stdout.columns ?? 80,
-      height: process.stdout.rows ?? 24, timestamp: Math.floor(this.startTime / 1000),
+      version: 2,
+      width: process.stdout.columns ?? 80,
+      height: process.stdout.rows ?? 24,
+      timestamp: Math.floor(this.startTime / 1000),
     });
-    writeFileSync(filePath, header + "\n");
+    writeFileSync(filePath, `${header}\n`);
 
     this.originalWrite = process.stdout.write.bind(process.stdout);
-    const self = this;
-    process.stdout.write = function (chunk: any, ...args: any[]): boolean {
+    process.stdout.write = ((chunk: any, ...args: any[]): boolean => {
       const str = typeof chunk === "string" ? chunk : chunk.toString();
-      const relTime = (Date.now() - self.startTime) / 1000;
-      self.buffer.push(JSON.stringify([relTime, "o", str]));
-      return self.originalWrite!.call(process.stdout, chunk, ...args as [any]);
-    } as any;
+      const relTime = (Date.now() - this.startTime) / 1000;
+      this.buffer.push(JSON.stringify([relTime, "o", str]));
+      return this.originalWrite!.call(process.stdout, chunk, ...(args as [any]));
+    }) as any;
 
     this.flushInterval = setInterval(() => this.flush(), 500);
   }
@@ -40,15 +41,20 @@ export class AsciicastRecorder {
       process.stdout.write = this.originalWrite as any;
       this.originalWrite = null;
     }
-    if (this.flushInterval) { clearInterval(this.flushInterval); this.flushInterval = null; }
+    if (this.flushInterval) {
+      clearInterval(this.flushInterval);
+      this.flushInterval = null;
+    }
     this.filePath = null;
   }
 
-  isRecording(): boolean { return this.filePath !== null; }
+  isRecording(): boolean {
+    return this.filePath !== null;
+  }
 
   private flush(): void {
     if (!this.filePath || this.buffer.length === 0) return;
-    appendFileSync(this.filePath, this.buffer.join("\n") + "\n");
+    appendFileSync(this.filePath, `${this.buffer.join("\n")}\n`);
     this.buffer = [];
   }
 }

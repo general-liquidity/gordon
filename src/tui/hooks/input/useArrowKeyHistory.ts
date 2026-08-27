@@ -83,9 +83,7 @@ export function useArrowKeyHistory(
     forceRender((n) => n + 1);
   }, []);
 
-  const current = indexRef.current >= 0
-    ? entries[indexRef.current] ?? ""
-    : "";
+  const current = indexRef.current >= 0 ? (entries[indexRef.current] ?? "") : "";
 
   return {
     push,

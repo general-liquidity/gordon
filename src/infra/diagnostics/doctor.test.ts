@@ -42,6 +42,8 @@ afterEach(() => {
 });
 
 describe("doctor.runDoctorChecks", () => {
+  // checkAuditAdvisories shells out to `bun audit --json`; allow the full
+  // integration pass a longer budget than Bun's default five seconds.
   it("returns an array of checks with required fields", () => {
     const results = runDoctorChecks();
     expect(results.length).toBeGreaterThan(5);
@@ -58,25 +60,13 @@ describe("doctor.runDoctorChecks", () => {
     expect(ids).toContain("filesystem-write-guard");
     expect(ids).toContain("kill-switches");
     expect(ids).toContain("audit-chain");
-  },
-  // Same budget as the stable-order test below — runDoctorChecks shells
-  // out to `bun audit --json`, which can take 10-15s on a cold cache.
-  60_000);
+  }, 60_000);
 
-  it(
-    "returns results in a stable order",
-    () => {
-      const a = runDoctorChecks();
-      const b = runDoctorChecks();
-      expect(a.map((c) => c.id)).toEqual(b.map((c) => c.id));
-    },
-    // checkAuditAdvisories shells out to `bun audit --json` against the
-    // npm registry — can take 10-15s on a cold cache. The doctor runs
-    // every check in sequence, so the integration test needs a longer
-    // budget than the default 5s. Individual checks have their own
-    // unit-test mocks that don't hit the network.
-    60_000,
-  );
+  it("returns results in a stable order", () => {
+    const a = runDoctorChecks();
+    const b = runDoctorChecks();
+    expect(a.map((c) => c.id)).toEqual(b.map((c) => c.id));
+  }, 60_000);
 });
 
 describe("doctor — safety deny-list check", () => {
@@ -160,7 +150,11 @@ describe("doctor — filesystem write guard check", () => {
   });
 
   it("warns when disabled via env", () => {
-    const check = _internal.checkFilesystemWriteGuard({ ...base, enabled: false, installed: false });
+    const check = _internal.checkFilesystemWriteGuard({
+      ...base,
+      enabled: false,
+      installed: false,
+    });
     expect(check.status).toBe("warn");
     expect(check.message).toContain("GORDON_FILESYSTEM_WRITE_GUARD");
   });
@@ -391,11 +385,14 @@ describe("doctor — MCP marketplace catalog check", () => {
 
   it("passes when catalog has plugins array", () => {
     const path = join(tempDir, "catalog.json");
-    writeFileSync(path, JSON.stringify({
-      version: "1.0.0",
-      lastUpdated: "2026-05-12T00:00:00.000Z",
-      plugins: [{ id: "a" }, { id: "b" }, { id: "c" }],
-    }));
+    writeFileSync(
+      path,
+      JSON.stringify({
+        version: "1.0.0",
+        lastUpdated: "2026-05-12T00:00:00.000Z",
+        plugins: [{ id: "a" }, { id: "b" }, { id: "c" }],
+      }),
+    );
     const check = _internal.checkMcpMarketplaceCatalog(path);
     expect(check.status).toBe("pass");
     expect(check.message).toContain("3 plugin");
@@ -514,10 +511,12 @@ describe("doctor — supply-chain IOC scan", () => {
       join(tempDir, ".claude", "settings.json"),
       JSON.stringify({
         hooks: {
-          SessionStart: [{
-            matcher: "*",
-            hooks: [{ type: "command", command: "node .vscode/setup.mjs" }],
-          }],
+          SessionStart: [
+            {
+              matcher: "*",
+              hooks: [{ type: "command", command: "node .vscode/setup.mjs" }],
+            },
+          ],
         },
       }),
     );
@@ -665,7 +664,10 @@ describe("doctor — trustedDependencies allowlist check", () => {
 
   it("warns when shape is wrong (not an array)", () => {
     const path = join(tempDir, "package.json");
-    writeFileSync(path, JSON.stringify({ name: "x", version: "1.0.0", trustedDependencies: "esbuild" }));
+    writeFileSync(
+      path,
+      JSON.stringify({ name: "x", version: "1.0.0", trustedDependencies: "esbuild" }),
+    );
     const check = _internal.checkTrustedDependencies(path);
     expect(check.status).toBe("warn");
   });
@@ -732,8 +734,16 @@ describe("checkAuditAdvisories", () => {
   it("passes when only accepted-baseline advisories are present", () => {
     const json = JSON.stringify({
       advisories: {
-        "1": { github_advisory_id: "GHSA-xq3m-2v4x-88gg", severity: "critical", module_name: "protobufjs" },
-        "2": { github_advisory_id: "GHSA-vjh7-7g9h-fjfh", severity: "critical", module_name: "elliptic" },
+        "1": {
+          github_advisory_id: "GHSA-xq3m-2v4x-88gg",
+          severity: "critical",
+          module_name: "protobufjs",
+        },
+        "2": {
+          github_advisory_id: "GHSA-vjh7-7g9h-fjfh",
+          severity: "critical",
+          module_name: "elliptic",
+        },
       },
     });
     const check = _internal.checkAuditAdvisories(() => ({ output: json, error: null }));
@@ -743,8 +753,16 @@ describe("checkAuditAdvisories", () => {
   it("warns when a high/critical advisory outside the baseline appears", () => {
     const json = JSON.stringify({
       advisories: {
-        "1": { github_advisory_id: "GHSA-xq3m-2v4x-88gg", severity: "critical", module_name: "protobufjs" },
-        "2": { github_advisory_id: "GHSA-new-advisory-xyz", severity: "high", module_name: "some-dep" },
+        "1": {
+          github_advisory_id: "GHSA-xq3m-2v4x-88gg",
+          severity: "critical",
+          module_name: "protobufjs",
+        },
+        "2": {
+          github_advisory_id: "GHSA-new-advisory-xyz",
+          severity: "high",
+          module_name: "some-dep",
+        },
       },
     });
     const check = _internal.checkAuditAdvisories(() => ({ output: json, error: null }));
@@ -809,10 +827,7 @@ describe("checkLockfileDrift", () => {
 
   it("returns info when bun pm hash output is empty", () => {
     const baseline = join(tempDir, "baseline.txt");
-    const check = _internal.checkLockfileDrift(
-      () => ({ output: "", error: null }),
-      baseline,
-    );
+    const check = _internal.checkLockfileDrift(() => ({ output: "", error: null }), baseline);
     expect(check.status).toBe("info");
   });
 });

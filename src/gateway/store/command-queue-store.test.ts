@@ -72,9 +72,7 @@ describe("resetOrphanedRunningCommands", () => {
     expect(row.lastError).toContain("orphaned");
     expect(new Date(row.availableAt).getTime()).toBeLessThanOrEqual(Date.now());
     expect(result.requeued).toBeGreaterThanOrEqual(1);
-    expect(
-      result.entries.find((e) => e.id === id)?.outcome,
-    ).toBe("pending");
+    expect(result.entries.find((e) => e.id === id)?.outcome).toBe("pending");
 
     // Requeued entry must be dequeuable again — the session is unblocked.
     const redequeued = dequeueNextCommand("sess-retry-safe");

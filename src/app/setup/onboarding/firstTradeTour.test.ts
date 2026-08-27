@@ -30,7 +30,9 @@ describe("firstTradeTour", () => {
 
     expect(firstTradeTour.shouldShowFirstTradeTour(fresh, false)).toBe(true);
     expect(firstTradeTour.shouldShowFirstTradeTour(fresh, true)).toBe(false);
-    expect(firstTradeTour.shouldShowFirstTradeTour({ ...fresh, firstTradeTourDone: true }, false)).toBe(false);
+    expect(
+      firstTradeTour.shouldShowFirstTradeTour({ ...fresh, firstTradeTourDone: true }, false),
+    ).toBe(false);
   });
 
   test("markFirstTradeTourDone persists and round-trips", () => {

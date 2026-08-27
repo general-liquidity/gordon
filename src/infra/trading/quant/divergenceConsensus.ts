@@ -41,11 +41,7 @@ export interface DivergenceConsensusInput {
   minAgreeingCount?: number;
 }
 
-export type DivergenceConsensusDirection =
-  | "bullish"
-  | "bearish"
-  | "mixed"
-  | "none";
+export type DivergenceConsensusDirection = "bullish" | "bearish" | "mixed" | "none";
 
 export interface DivergenceConsensusResult {
   direction: DivergenceConsensusDirection;

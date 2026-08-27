@@ -36,7 +36,7 @@ describe("classifyTradeRisk — regime-transition risk dimension", () => {
   it("scores zero when shift probability is below threshold", () => {
     const ctx = baseContext();
     ctx.regimeTransition = {
-      probShift: 0.20, // below default 0.30
+      probShift: 0.2, // below default 0.30
       currentState: "bull",
       matrixStability: "stable",
     };
@@ -49,7 +49,7 @@ describe("classifyTradeRisk — regime-transition risk dimension", () => {
   it("scales score with shift probability above threshold", () => {
     const ctx = baseContext();
     ctx.regimeTransition = {
-      probShift: 0.50,
+      probShift: 0.5,
       currentState: "bull",
       matrixStability: "stable",
     };
@@ -62,7 +62,7 @@ describe("classifyTradeRisk — regime-transition risk dimension", () => {
   it("adds penalty when matrix is drifting", () => {
     const ctx = baseContext();
     ctx.regimeTransition = {
-      probShift: 0.10, // below threshold on its own
+      probShift: 0.1, // below threshold on its own
       currentState: "bull",
       matrixStability: "drifting",
     };
@@ -75,7 +75,7 @@ describe("classifyTradeRisk — regime-transition risk dimension", () => {
   it("adds larger penalty when matrix is unstable", () => {
     const ctx = baseContext();
     ctx.regimeTransition = {
-      probShift: 0.10,
+      probShift: 0.1,
       currentState: "bull",
       matrixStability: "unstable",
     };
@@ -101,7 +101,7 @@ describe("classifyTradeRisk — regime-transition risk dimension", () => {
   it("flags insufficient_data with a moderate score and clear reason", () => {
     const ctx = baseContext();
     ctx.regimeTransition = {
-      probShift: 0.10,
+      probShift: 0.1,
       currentState: "bull",
       matrixStability: "insufficient_data",
     };
@@ -114,19 +114,19 @@ describe("classifyTradeRisk — regime-transition risk dimension", () => {
   it("respects custom threshold via classifier config", () => {
     const ctx = baseContext();
     ctx.regimeTransition = {
-      probShift: 0.40,
+      probShift: 0.4,
       currentState: "bull",
       matrixStability: "stable",
     };
     // Strict operator: any shift probability above 20% escalates
     const strictResult = classifyTradeRisk(baseTrade(), ctx, {
       ...DEFAULT_CLASSIFIER_CONFIG,
-      regimeTransitionThreshold: 0.20,
+      regimeTransitionThreshold: 0.2,
     });
     // Lax operator: only escalate above 60%
     const laxResult = classifyTradeRisk(baseTrade(), ctx, {
       ...DEFAULT_CLASSIFIER_CONFIG,
-      regimeTransitionThreshold: 0.60,
+      regimeTransitionThreshold: 0.6,
     });
     const strictDim = strictResult.dimensions.find((d) => d.name === "Regime Transition Risk")!;
     const laxDim = laxResult.dimensions.find((d) => d.name === "Regime Transition Risk")!;
@@ -149,7 +149,7 @@ describe("classifyTradeRisk — regime-transition risk dimension", () => {
   it("contributes to composite + recommendation when severe", () => {
     const ctx = baseContext();
     ctx.regimeTransition = {
-      probShift: 0.90,
+      probShift: 0.9,
       currentState: "bull",
       matrixStability: "unstable",
     };

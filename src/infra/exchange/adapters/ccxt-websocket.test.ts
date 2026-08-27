@@ -4,9 +4,7 @@ import { isPermanentSubscribeError } from "./ccxt-websocket.ts";
 // Fabricate a CCXT-shaped error: a subclass whose constructor.name matches
 // the CCXT error class (e.g. "BadSymbol"), the way ccxt instances expose it.
 function ccxtError(className: string, message = ""): Error {
-  const ctor = { [className]: class extends Error {} }[className] as new (
-    m?: string,
-  ) => Error;
+  const ctor = { [className]: class extends Error {} }[className] as new (m?: string) => Error;
   return new ctor(message);
 }
 
@@ -16,16 +14,12 @@ describe("isPermanentSubscribeError", () => {
   });
 
   it("treats a does-not-have-market message as permanent", () => {
-    const err = new Error(
-      "binance does not have market symbol GORDONTEST/USDT",
-    );
+    const err = new Error("binance does not have market symbol GORDONTEST/USDT");
     expect(isPermanentSubscribeError(err)).toBe(true);
   });
 
   it("treats AuthenticationError class as permanent", () => {
-    expect(isPermanentSubscribeError(ccxtError("AuthenticationError"))).toBe(
-      true,
-    );
+    expect(isPermanentSubscribeError(ccxtError("AuthenticationError"))).toBe(true);
   });
 
   it("treats BadRequest / ArgumentsRequired / PermissionDenied / NotSupported as permanent", () => {

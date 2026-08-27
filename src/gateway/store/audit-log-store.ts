@@ -76,9 +76,10 @@ export function appendImmutableAuditEntry(input: {
 
   const previous = executeWithLogging(
     () =>
-      db
-        .query("SELECT id, entryHash FROM gateway_audit_log ORDER BY id DESC LIMIT 1")
-        .get() as { id: number; entryHash: string } | null,
+      db.query("SELECT id, entryHash FROM gateway_audit_log ORDER BY id DESC LIMIT 1").get() as {
+        id: number;
+        entryHash: string;
+      } | null,
     "SELECT gateway_audit_log last",
   );
 
@@ -205,4 +206,3 @@ export function safeAppendAudit(input: {
     logger.error("Failed to append immutable audit entry", error as Error);
   }
 }
-

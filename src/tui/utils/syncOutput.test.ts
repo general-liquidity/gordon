@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import {
-  initSyncOutputFromEnv,
-  isSyncOutputEnabled,
-  enableSyncOutput,
-} from "./syncOutput.ts";
+import { initSyncOutputFromEnv, isSyncOutputEnabled, enableSyncOutput } from "./syncOutput.ts";
 
 afterEach(() => {
   // Restore module state from the real env so ordering can't leak between tests.

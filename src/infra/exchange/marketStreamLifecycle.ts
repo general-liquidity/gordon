@@ -31,10 +31,8 @@ function timestamp(): string {
 async function resolveActiveExchangeType(): Promise<ExchangeId | null> {
   const config = await loadConfig();
   if (config.exchanges.length === 0) return null;
-  const activeId = config.activeExchangeId
-    ?? config.exchanges.find((ex) => ex.isDefault)?.id;
-  const active = config.exchanges.find((ex) => ex.id === activeId)
-    ?? config.exchanges[0];
+  const activeId = config.activeExchangeId ?? config.exchanges.find((ex) => ex.isDefault)?.id;
+  const active = config.exchanges.find((ex) => ex.id === activeId) ?? config.exchanges[0];
   return active?.type ?? null;
 }
 
@@ -79,13 +77,11 @@ function stopRateLimitWatch(): void {
 async function startRateLimitWatch(exchangeId: ExchangeId): Promise<void> {
   stopRateLimitWatch();
   const config = await loadConfig();
-  const activeId = config.activeExchangeId
-    ?? config.exchanges.find((ex) => ex.isDefault)?.id;
-  const active = config.exchanges.find((ex) => ex.id === activeId)
-    ?? config.exchanges[0];
+  const activeId = config.activeExchangeId ?? config.exchanges.find((ex) => ex.isDefault)?.id;
+  const active = config.exchanges.find((ex) => ex.id === activeId) ?? config.exchanges[0];
   if (!active?.apiKey || !active.apiSecret) return;
 
-  let exchange;
+  let exchange: ReturnType<typeof ExchangeFactory.create>;
   try {
     exchange = ExchangeFactory.create(exchangeId, {
       apiKey: active.apiKey,

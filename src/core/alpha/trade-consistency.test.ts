@@ -21,13 +21,17 @@ function makeTrade(
 
 describe("computeTradeConsistency", () => {
   test("insufficient_data with too few trades", () => {
-    const trades = Array(5).fill(0).map(() => makeTrade("A", "X", 1, 2));
+    const trades = Array(5)
+      .fill(0)
+      .map(() => makeTrade("A", "X", 1, 2));
     const r = computeTradeConsistency(trades);
     expect(r.verdict).toBe("insufficient_data");
   });
 
   test("identical trades → highly_consistent (composite = 1)", () => {
-    const trades = Array(20).fill(0).map(() => makeTrade("A", "X", 1, 2));
+    const trades = Array(20)
+      .fill(0)
+      .map(() => makeTrade("A", "X", 1, 2));
     const r = computeTradeConsistency(trades);
     expect(r.compositeScore).toBeCloseTo(1, 3);
     expect(r.verdict).toBe("highly_consistent");
@@ -95,7 +99,9 @@ describe("computeTradeConsistency", () => {
   });
 
   test("weights respected", () => {
-    const trades = Array(20).fill(0).map(() => makeTrade("A", "X", 1, 2));
+    const trades = Array(20)
+      .fill(0)
+      .map(() => makeTrade("A", "X", 1, 2));
     // Even when weights are all set differently, identical trades should
     // still produce composite ~1.
     const r = computeTradeConsistency(trades, {
@@ -108,7 +114,9 @@ describe("computeTradeConsistency", () => {
   });
 
   test("respects custom minTrades", () => {
-    const trades = Array(8).fill(0).map(() => makeTrade("A", "X", 1, 2));
+    const trades = Array(8)
+      .fill(0)
+      .map(() => makeTrade("A", "X", 1, 2));
     const strict = computeTradeConsistency(trades, { minTrades: 10 });
     const lax = computeTradeConsistency(trades, { minTrades: 5 });
     expect(strict.verdict).toBe("insufficient_data");
@@ -116,7 +124,9 @@ describe("computeTradeConsistency", () => {
   });
 
   test("zero-mean stop distances handle gracefully", () => {
-    const trades = Array(15).fill(0).map(() => makeTrade("A", "X", 0, 2));
+    const trades = Array(15)
+      .fill(0)
+      .map(() => makeTrade("A", "X", 0, 2));
     const r = computeTradeConsistency(trades);
     expect(r.stopCv).toBe(0);
     expect(r.subscores.stopDistance).toBe(1);
@@ -125,7 +135,9 @@ describe("computeTradeConsistency", () => {
 
 describe("formatTradeConsistency", () => {
   test("renders header + subscores", () => {
-    const trades = Array(20).fill(0).map(() => makeTrade("A", "X", 1, 2));
+    const trades = Array(20)
+      .fill(0)
+      .map(() => makeTrade("A", "X", 1, 2));
     const r = computeTradeConsistency(trades);
     const text = formatTradeConsistency(r);
     expect(text).toContain("Trade Consistency");

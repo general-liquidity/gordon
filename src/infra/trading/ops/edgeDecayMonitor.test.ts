@@ -1,9 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  evaluateDecay,
-  decayToPayload,
-} from "./edgeDecayMonitor.ts";
+import { evaluateDecay, decayToPayload } from "./edgeDecayMonitor.ts";
 
 const goodRuns = (n: number): number[] => {
   const out: number[] = [];

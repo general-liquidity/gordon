@@ -75,12 +75,7 @@ export type OrderSubmitter = (params: OrderParams) => Promise<Order>;
 // Execution Session
 // ============================================================================
 
-export type ExecutionSessionStatus =
-  | "running"
-  | "paused"
-  | "completed"
-  | "cancelled"
-  | "failed";
+export type ExecutionSessionStatus = "running" | "paused" | "completed" | "cancelled" | "failed";
 
 export interface ExecutionSession {
   sessionId: string;

@@ -103,9 +103,7 @@ export function computeFundamentalRatios(input: FundamentalRatiosInput): Fundame
       : null;
 
   const nopat =
-    input.ebit != null && input.taxRate != null
-      ? input.ebit * (1 - input.taxRate)
-      : null;
+    input.ebit != null && input.taxRate != null ? input.ebit * (1 - input.taxRate) : null;
   const roic = safeRatio(nopat ?? undefined, input.investedCapital);
   const roiic = safeRatio(input.deltaNopat, input.deltaInvestedCapital);
   const roe = safeRatio(input.netIncome, input.bookEquity);
@@ -122,7 +120,8 @@ export function computeFundamentalRatios(input: FundamentalRatiosInput): Fundame
   if (peRatio != null) parts.push(`P/E ${peRatio.toFixed(1)}x`);
   if (evToEbitda != null) parts.push(`EV/EBITDA ${evToEbitda.toFixed(1)}x`);
   if (fcfYield != null) parts.push(`FCF yield ${(fcfYield * 100).toFixed(2)}%`);
-  const interpretation = parts.length > 0 ? parts.join(" | ") : "No ratios computable from supplied inputs.";
+  const interpretation =
+    parts.length > 0 ? parts.join(" | ") : "No ratios computable from supplied inputs.";
 
   return {
     netCash,

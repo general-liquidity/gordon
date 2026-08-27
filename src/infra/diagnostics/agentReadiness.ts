@@ -48,7 +48,9 @@ export function checkAgentReadiness(inputs: ReadinessInputs = {}): ReadinessResu
     {
       id: "can_start",
       ok: existsSync(home),
-      message: existsSync(home) ? `Gordon home present at ${home}` : `Missing Gordon home at ${home}`,
+      message: existsSync(home)
+        ? `Gordon home present at ${home}`
+        : `Missing Gordon home at ${home}`,
     },
     {
       id: "can_see_progress",
@@ -58,7 +60,8 @@ export function checkAgentReadiness(inputs: ReadinessInputs = {}): ReadinessResu
     {
       id: "can_hand_off",
       ok: inputs.hasLlmKey !== false,
-      message: inputs.hasLlmKey === false ? "No LLM provider key configured" : "LLM credentials available",
+      message:
+        inputs.hasLlmKey === false ? "No LLM provider key configured" : "LLM credentials available",
     },
   ];
 

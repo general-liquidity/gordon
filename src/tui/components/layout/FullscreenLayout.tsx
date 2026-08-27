@@ -82,14 +82,10 @@ export function FullscreenLayout({
         <Box height={1}>
           <Text dimColor>{"\u2500".repeat(stdout?.columns ?? 80)}</Text>
         </Box>
-        <Box height={1}>
-          {statusBar}
-        </Box>
+        <Box height={1}>{statusBar}</Box>
 
         {/* Input zone (fixed at bottom) */}
-        <Box flexDirection="column">
-          {input}
-        </Box>
+        <Box flexDirection="column">{input}</Box>
       </Box>
     </FullscreenLayoutContext.Provider>
   );

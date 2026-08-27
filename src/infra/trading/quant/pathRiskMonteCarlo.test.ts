@@ -18,7 +18,8 @@ function clusteredReturns(n: number, seed: number): number[] {
   let stressed = false;
   for (let i = 0; i < n; i++) {
     if (rng() < 0.04) stressed = !stressed; // regime flips occasionally → clustering
-    if (stressed) out.push(-0.02 + (rng() - 0.5) * 0.01); // clustered losses
+    if (stressed)
+      out.push(-0.02 + (rng() - 0.5) * 0.01); // clustered losses
     else out.push(0.001 + (rng() - 0.5) * 0.004); // calm small gains
   }
   return out;
@@ -128,7 +129,9 @@ describe("antithetic variance reduction (GARCH)", () => {
     expect(anti.nPaths).toBe(plain.nPaths);
     expect(anti.returnStdError).toBeLessThan(plain.returnStdError);
     // …and it converges to the same expected return (within a few plain SEs).
-    expect(Math.abs(anti.expectedReturn - plain.expectedReturn)).toBeLessThan(5 * plain.returnStdError);
+    expect(Math.abs(anti.expectedReturn - plain.expectedReturn)).toBeLessThan(
+      5 * plain.returnStdError,
+    );
   }, 30000);
 
   it("expected shortfall is a left-tail mean: ES₅ ≤ returnP5 ≤ expectedReturn", () => {

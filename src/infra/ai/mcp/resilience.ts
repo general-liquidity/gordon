@@ -69,7 +69,7 @@ const failureCache = new Map<string, FailureEntry>();
  */
 export function isServerCachedAsFailing(serverId: string): boolean {
   const entry = failureCache.get(serverId);
-  if (!entry || !entry.cached) return false;
+  if (!entry?.cached) return false;
   if (Date.now() > entry.cachedUntil) {
     // Cache expired — give it another chance
     failureCache.delete(serverId);
@@ -100,11 +100,14 @@ export function recordServerFailure(
   if (entry.consecutiveFailures >= config.failureThreshold) {
     entry.cached = true;
     entry.cachedUntil = Date.now() + config.failureCacheDurationMs;
-    logger.warn(`Server ${serverId} cached as failing for ${config.failureCacheDurationMs / 60000}min after ${entry.consecutiveFailures} failures`, {
-      serverId,
-      lastError: error,
-      cachedUntil: new Date(entry.cachedUntil).toISOString(),
-    });
+    logger.warn(
+      `Server ${serverId} cached as failing for ${config.failureCacheDurationMs / 60000}min after ${entry.consecutiveFailures} failures`,
+      {
+        serverId,
+        lastError: error,
+        cachedUntil: new Date(entry.cachedUntil).toISOString(),
+      },
+    );
   }
 
   failureCache.set(serverId, entry);
@@ -172,7 +175,7 @@ export function computeBackoff(
   attempt: number,
   config: ResilienceConfig = DEFAULT_RESILIENCE_CONFIG,
 ): number {
-  const delay = config.initialBackoffMs * Math.pow(config.backoffMultiplier, attempt);
+  const delay = config.initialBackoffMs * config.backoffMultiplier ** attempt;
   // Add jitter (±20%)
   const jitter = delay * 0.2 * (Math.random() * 2 - 1);
   return Math.min(config.maxBackoffMs, delay + jitter);
@@ -218,7 +221,9 @@ export function shouldAttemptReconnect(
   const delay = computeBackoff(state.attempt, config);
   state.nextRetryAt = Date.now() + delay;
 
-  logger.info(`Server ${serverId} reconnecting (attempt ${state.attempt}/${state.maxAttempts}, delay ${Math.round(delay)}ms)`);
+  logger.info(
+    `Server ${serverId} reconnecting (attempt ${state.attempt}/${state.maxAttempts}, delay ${Math.round(delay)}ms)`,
+  );
 
   return { shouldRetry: true, delayMs: delay, attempt: state.attempt };
 }
@@ -263,7 +268,10 @@ export async function withRetry<T>(
       const result = await Promise.race([
         operation(),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Timeout after ${config.requestTimeoutMs}ms`)), config.requestTimeoutMs),
+          setTimeout(
+            () => reject(new Error(`Timeout after ${config.requestTimeoutMs}ms`)),
+            config.requestTimeoutMs,
+          ),
         ),
       ]);
 
@@ -273,9 +281,12 @@ export async function withRetry<T>(
       return result;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      logger.warn(`Server ${serverId} operation failed (attempt ${attempt + 1}/${config.maxReconnectAttempts + 1})`, {
-        error: lastError.message,
-      });
+      logger.warn(
+        `Server ${serverId} operation failed (attempt ${attempt + 1}/${config.maxReconnectAttempts + 1})`,
+        {
+          error: lastError.message,
+        },
+      );
 
       recordServerFailure(serverId, lastError.message, config);
 

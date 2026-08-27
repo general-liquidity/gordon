@@ -169,7 +169,8 @@ export class MoralisWalletSource implements WalletIntelSource {
           timestamp: r.block_timestamp ? Date.parse(r.block_timestamp) : 0,
           from,
           to,
-          direction: from.toLowerCase() === addr ? "out" : to.toLowerCase() === addr ? "in" : undefined,
+          direction:
+            from.toLowerCase() === addr ? "out" : to.toLowerCase() === addr ? "in" : undefined,
           type: r.category ?? r.method_label ?? undefined,
         };
       })

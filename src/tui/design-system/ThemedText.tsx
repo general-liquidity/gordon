@@ -1,4 +1,3 @@
-import React from "react";
 import { Text, type TextProps } from "../ink-custom";
 import type { GordonTheme } from "../themes/themes.ts";
 import { useTheme } from "../themes/ThemeProvider.tsx";
@@ -15,7 +14,10 @@ interface Props extends TextProps {
   tone?: TextTone;
 }
 
-export function toneColor(tone: TextTone, theme: GordonTheme): { color?: string; dimColor?: boolean } {
+export function toneColor(
+  tone: TextTone,
+  theme: GordonTheme,
+): { color?: string; dimColor?: boolean } {
   switch (tone) {
     case "brand":
       return { color: theme.uiBrand };

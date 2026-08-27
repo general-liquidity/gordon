@@ -8,7 +8,7 @@
  * Phase 17 of the TUI rebuild.
  */
 
-import React, { useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Select, TextInput } from "@inkjs/ui";
 import * as fs from "node:fs";
@@ -47,10 +47,7 @@ function saveFeedback(feedback: TradeFeedback): void {
     if (!fs.existsSync(FEEDBACK_DIR)) {
       fs.mkdirSync(FEEDBACK_DIR, { recursive: true });
     }
-    const filePath = path.join(
-      FEEDBACK_DIR,
-      `${feedback.symbol}-${feedback.tradeId}.json`,
-    );
+    const filePath = path.join(FEEDBACK_DIR, `${feedback.symbol}-${feedback.tradeId}.json`);
     fs.writeFileSync(filePath, JSON.stringify(feedback, null, 2), "utf-8");
   } catch {
     // Best-effort persistence
@@ -61,16 +58,9 @@ function saveFeedback(feedback: TradeFeedback): void {
 // Component
 // ============================================================================
 
-export function FeedbackSurvey({
-  tradeId,
-  symbol,
-  pnl,
-  pnlPercent,
-  onComplete,
-  onSkip,
-}: Props) {
+export function FeedbackSurvey({ tradeId, symbol, pnl, pnlPercent, onComplete, onSkip }: Props) {
   const [rating, setRating] = useState<number | null>(null);
-  const [notes, setNotes] = useState("");
+  const [_notes, _setNotes] = useState("");
   const [phase, setPhase] = useState<"rating" | "notes" | "done">("rating");
 
   useInput((_, key) => {
@@ -100,16 +90,12 @@ export function FeedbackSurvey({
   );
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="yellow"
-      paddingX={2}
-      paddingY={1}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={2} paddingY={1}>
       {/* Header */}
       <Box>
-        <Text bold color="yellow">TRADE FEEDBACK</Text>
+        <Text bold color="yellow">
+          TRADE FEEDBACK
+        </Text>
         <Text dimColor> — {symbol}</Text>
       </Box>
 
@@ -124,7 +110,9 @@ export function FeedbackSurvey({
             </Text>
             {pnlPercent != null && (
               <Text dimColor>
-                {" "}({pnlPercent >= 0 ? "+" : ""}{pnlPercent.toFixed(2)}%)
+                {" "}
+                ({pnlPercent >= 0 ? "+" : ""}
+                {pnlPercent.toFixed(2)}%)
               </Text>
             )}
           </Text>
@@ -154,24 +142,22 @@ export function FeedbackSurvey({
       {phase === "notes" && (
         <Box flexDirection="column">
           <Text>
-            Rating: <Text bold color="yellow">{rating}/5</Text>
+            Rating:{" "}
+            <Text bold color="yellow">
+              {rating}/5
+            </Text>
           </Text>
           <Text> </Text>
           <Text dimColor>Add notes (optional, Enter to submit):</Text>
           <Box paddingLeft={2}>
             <Text color="yellow">{"\u25B6"} </Text>
-            <TextInput
-              placeholder="What went well or poorly..."
-              onSubmit={handleNotesSubmit}
-            />
+            <TextInput placeholder="What went well or poorly..." onSubmit={handleNotesSubmit} />
           </Box>
         </Box>
       )}
 
       {/* Done */}
-      {phase === "done" && (
-        <Text color="green">{"\u2713"} Feedback saved</Text>
-      )}
+      {phase === "done" && <Text color="green">{"\u2713"} Feedback saved</Text>}
 
       <Text> </Text>
       <Text dimColor>Esc to skip</Text>

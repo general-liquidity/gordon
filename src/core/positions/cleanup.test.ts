@@ -6,7 +6,11 @@ import type { PositionRecord } from "./types.ts";
 
 installTempGordonHome("gordon-poscleanup-test-");
 
-function agedRecord(id: string, symbol: string, overrides: Partial<PositionRecord> = {}): PositionRecord {
+function agedRecord(
+  id: string,
+  symbol: string,
+  overrides: Partial<PositionRecord> = {},
+): PositionRecord {
   const ts = new Date(Date.now() - PHANTOM_GRACE_MS - 60_000).toISOString();
   return {
     id,
@@ -26,11 +30,13 @@ describe("archivePhantomPositions", () => {
     const store = await getPositionStore();
     await store.save(agedRecord("pos_ph_1", "BTCUSDT"));
     await store.save(agedRecord("pos_ph_2", "GORDONTESTUSDT"));
-    await store.save(agedRecord("pos_real", "ETHUSDT", {
-      state: "filled",
-      entryPrice: 3_000,
-      quantity: 1,
-    }));
+    await store.save(
+      agedRecord("pos_real", "ETHUSDT", {
+        state: "filled",
+        entryPrice: 3_000,
+        quantity: 1,
+      }),
+    );
 
     const result = await archivePhantomPositions(async () => false);
     expect(result.archived).toBe(2);

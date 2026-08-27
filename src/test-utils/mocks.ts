@@ -38,7 +38,7 @@ export function createMockCandles(
     startPrice?: number;
     trend?: "up" | "down" | "flat";
     volatility?: number;
-  } = {}
+  } = {},
 ): Candle[] {
   const { startPrice = 100, trend = "flat", volatility = 0.02 } = options;
   const candles: Candle[] = [];
@@ -152,7 +152,7 @@ export function createMockPlan(overrides: Partial<Plan> = {}): Plan {
       price: 48000,
     },
     takeProfit: [
-      { price: 52500, percentToSell: 0.5 },  // R:R = 2500/2000 = 1.25:1 (above min 1.2)
+      { price: 52500, percentToSell: 0.5 }, // R:R = 2500/2000 = 1.25:1 (above min 1.2)
       { price: 55000, percentToSell: 0.5 },
     ],
     reasoning: "Support bounce setup detected with strong confluence.",
@@ -241,11 +241,9 @@ export function createMockConfig(overrides: Partial<GordonConfig> = {}): GordonC
 /**
  * Create a mock portfolio
  */
-export function createMockPortfolio(overrides: {
-  totalValue?: number;
-  availableCash?: number;
-  openPositions?: number;
-} = {}): { totalValue: number; availableCash: number; openPositions: number } {
+export function createMockPortfolio(
+  overrides: { totalValue?: number; availableCash?: number; openPositions?: number } = {},
+): { totalValue: number; availableCash: number; openPositions: number } {
   return {
     totalValue: 10000,
     availableCash: 8000,

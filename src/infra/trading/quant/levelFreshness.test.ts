@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  evaluateLevelFreshness,
-  levelFreshnessToPayload,
-} from "./levelFreshness.ts";
+import { evaluateLevelFreshness, levelFreshnessToPayload } from "./levelFreshness.ts";
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -13,9 +10,7 @@ function mkCandle(timestamp: number, high: number, low: number) {
 
 describe("evaluateLevelFreshness — validation", () => {
   it("rejects non-positive level", () => {
-    expect(() =>
-      evaluateLevelFreshness({ level: 0, candles: [mkCandle(0, 100, 99)] }),
-    ).toThrow();
+    expect(() => evaluateLevelFreshness({ level: 0, candles: [mkCandle(0, 100, 99)] })).toThrow();
   });
 
   it("rejects empty candles", () => {
@@ -185,10 +180,7 @@ describe("evaluateLevelFreshness — classification", () => {
     const now = 100 * HOUR;
     const r = evaluateLevelFreshness({
       level: 100,
-      candles: [
-        mkCandle(now - 1 * HOUR, 100.05, 99.95),
-        mkCandle(now - 2 * HOUR, 100.05, 99.95),
-      ],
+      candles: [mkCandle(now - 1 * HOUR, 100.05, 99.95), mkCandle(now - 2 * HOUR, 100.05, 99.95)],
       windowEndMs: now,
     });
     expect(r.touchCount).toBe(2);
@@ -238,10 +230,7 @@ describe("levelFreshnessToPayload", () => {
     const now = 100 * HOUR;
     const r = evaluateLevelFreshness({
       level: 100,
-      candles: [
-        mkCandle(now - 1 * HOUR, 100.05, 99.95),
-        mkCandle(now - 2 * HOUR, 100.05, 99.95),
-      ],
+      candles: [mkCandle(now - 1 * HOUR, 100.05, 99.95), mkCandle(now - 2 * HOUR, 100.05, 99.95)],
       windowEndMs: now,
     });
     const p = levelFreshnessToPayload(r) as {

@@ -7,7 +7,6 @@
  * Keybindings: R = resume, N = new session, Escape = cancel.
  */
 
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 
 // ============================================================================
@@ -60,60 +59,57 @@ function formatPnl(pnl: number): string {
 // ============================================================================
 
 export function SessionPreview({ preview, onResume, onClose, embedded = false }: Props) {
-  useInput((input, key) => {
-    if (key.escape || input === "n" || input === "N") {
-      onClose();
-      return;
-    }
-    if (input === "r" || input === "R") {
-      onResume();
-    }
-  }, { isActive: !embedded });
+  useInput(
+    (input, key) => {
+      if (key.escape || input === "n" || input === "N") {
+        onClose();
+        return;
+      }
+      if (input === "r" || input === "R") {
+        onResume();
+      }
+    },
+    { isActive: !embedded },
+  );
 
   const lastAgent = preview.lastAgent ?? "Gordon";
   const hasPnl = preview.pnlUsd != null;
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
-      paddingX={2}
-      paddingY={1}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
       {/* Title */}
       <Box justifyContent="center">
-        <Text bold color="cyan">{"↻ RESUME SESSION"}</Text>
+        <Text bold color="cyan">
+          {"↻ RESUME SESSION"}
+        </Text>
       </Box>
       <Text> </Text>
 
       {/* Details */}
       <Box flexDirection="column" paddingLeft={1}>
         <Box>
-          <Text dimColor>Last agent:      </Text>
+          <Text dimColor>Last agent: </Text>
           <Text>{lastAgent}</Text>
         </Box>
         <Box>
-          <Text dimColor>Open positions:  </Text>
+          <Text dimColor>Open positions: </Text>
           <Text>{preview.openPositions}</Text>
         </Box>
         {hasPnl && (
           <Box>
             <Text dimColor>{"P&L:             "}</Text>
-            <Text color={preview.pnlUsd! >= 0 ? "green" : "red"}>
-              {formatPnl(preview.pnlUsd!)}
-            </Text>
+            <Text color={preview.pnlUsd! >= 0 ? "green" : "red"}>{formatPnl(preview.pnlUsd!)}</Text>
           </Box>
         )}
         {preview.lastActivity && (
           <Box>
-            <Text dimColor>Last active:     </Text>
+            <Text dimColor>Last active: </Text>
             <Text>{formatTimeAgo(preview.lastActivity)}</Text>
           </Box>
         )}
         {preview.messageCount != null && (
           <Box>
-            <Text dimColor>Messages:        </Text>
+            <Text dimColor>Messages: </Text>
             <Text>{preview.messageCount}</Text>
           </Box>
         )}

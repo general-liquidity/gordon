@@ -229,9 +229,7 @@ export function loadLayeredSettings(options: LoadSettingsOptions = {}): MergedSe
   }
 
   // Sort by priority (lowest first so higher overwrites)
-  layers.sort(
-    (a, b) => LAYER_PRIORITY.indexOf(a.layer) - LAYER_PRIORITY.indexOf(b.layer),
-  );
+  layers.sort((a, b) => LAYER_PRIORITY.indexOf(a.layer) - LAYER_PRIORITY.indexOf(b.layer));
 
   // Merge
   let config: Record<string, unknown> = {};
@@ -250,7 +248,10 @@ export function loadLayeredSettings(options: LoadSettingsOptions = {}): MergedSe
 /**
  * Get which layer a specific setting came from.
  */
-export function getSettingProvenance(key: string, options?: LoadSettingsOptions): SettingsLayer | null {
+export function getSettingProvenance(
+  key: string,
+  options?: LoadSettingsOptions,
+): SettingsLayer | null {
   const { provenance } = loadLayeredSettings(options);
   return provenance[key] ?? null;
 }

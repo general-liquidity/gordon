@@ -36,7 +36,8 @@ function categoryForTags(tags: ReadonlyArray<string>): SkillSlashSeed["category"
   if (t.some((x) => ["scan", "discovery", "market", "news"].includes(x))) return "market";
   if (t.some((x) => ["portfolio", "account", "balances"].includes(x))) return "account";
   if (t.some((x) => ["strategy", "backtest", "validation"].includes(x))) return "strategy";
-  if (t.some((x) => ["system", "config", "diagnostic", "docs", "documentation"].includes(x))) return "system";
+  if (t.some((x) => ["system", "config", "diagnostic", "docs", "documentation"].includes(x)))
+    return "system";
   return "trading";
 }
 

@@ -1,9 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  gradePeadGapUp,
-  formatPeadGapGrade,
-  type PeadGapInput,
-} from "./pead-gap-grader.ts";
+import { gradePeadGapUp, formatPeadGapGrade, type PeadGapInput } from "./pead-gap-grader.ts";
 
 const STRONG: PeadGapInput = {
   gapPercent: 12,

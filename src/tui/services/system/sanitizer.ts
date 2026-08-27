@@ -22,11 +22,19 @@ const DEFAULT_PATTERNS: RedactionPattern[] = [
   { name: "private-key", regex: /(?:0x)?[a-fA-F0-9]{64}/g, replacement: "***PRIVATE_KEY***" },
   { name: "btc-address", regex: /[13][a-km-zA-HJ-NP-Z1-9]{25,34}/g, replacement: "***BTC_ADDR***" },
   { name: "solana-address", regex: /[1-9A-HJ-NP-Za-km-z]{32,44}/g, replacement: "***SOL_ADDR***" },
-  { name: "bearer-token", regex: /Bearer\s+[a-zA-Z0-9\-_.~+/]+=*/g, replacement: "Bearer ***TOKEN***" },
-  { name: "password-field", regex: /(password|secret|token)\s*[=:]\s*\S+/gi, replacement: "$1=***REDACTED***" },
+  {
+    name: "bearer-token",
+    regex: /Bearer\s+[a-zA-Z0-9\-_.~+/]+=*/g,
+    replacement: "Bearer ***TOKEN***",
+  },
+  {
+    name: "password-field",
+    regex: /(password|secret|token)\s*[=:]\s*\S+/gi,
+    replacement: "$1=***REDACTED***",
+  },
 ];
 
-let config: SanitizeConfig = {
+const config: SanitizeConfig = {
   enabled: true,
   patterns: [...DEFAULT_PATTERNS],
 };

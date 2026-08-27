@@ -47,7 +47,9 @@ function factorLoadedSeries(
 describe("computePcaConcentration — edge cases", () => {
   it("0 or 1 strategy → diverse, undefined", () => {
     expect(computePcaConcentration({ series: [] }).verdict).toBe("diverse");
-    expect(computePcaConcentration({ series: [{ strategyId: "a", returns: [0.1, 0.2] }] }).verdict).toBe("diverse");
+    expect(
+      computePcaConcentration({ series: [{ strategyId: "a", returns: [0.1, 0.2] }] }).verdict,
+    ).toBe("diverse");
   });
 
   it("too-short series → diverse + reason mentions length", () => {

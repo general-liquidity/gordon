@@ -64,7 +64,7 @@ function neutralResult(window: number): VpinResult {
  */
 export function calculateVpin(
   candles: Candle[],
-  opts?: { bucketVolume?: number; numBuckets?: number; window?: number; sigmaWindow?: number }
+  opts?: { bucketVolume?: number; numBuckets?: number; window?: number; sigmaWindow?: number },
 ): VpinResult {
   const numBuckets = opts?.numBuckets ?? 50;
   const window = opts?.window ?? 50;
@@ -221,7 +221,7 @@ export function calculateVpin(
 function buildInterpretation(
   current: number | null,
   percentile: number | null,
-  signal: "toxic" | "elevated" | "benign"
+  signal: "toxic" | "elevated" | "benign",
 ): string {
   if (current === null) return "Insufficient data/volume for VPIN.";
   const v = current.toFixed(4);

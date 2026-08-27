@@ -12,7 +12,7 @@
  * Pure function — caller threads in the registry; no global state.
  */
 
-import type { Playbook, SubPlaybookReference } from "./types.ts";
+import type { Playbook } from "./types.ts";
 
 export interface ResolvedSubPlaybook {
   /** The composed child playbook. */
@@ -25,10 +25,7 @@ export interface ResolvedSubPlaybook {
   path: string[];
 }
 
-export type ResolveErrorKind =
-  | "missing_reference"
-  | "cycle_detected"
-  | "max_depth_exceeded";
+export type ResolveErrorKind = "missing_reference" | "cycle_detected" | "max_depth_exceeded";
 
 export interface ResolveError {
   kind: ResolveErrorKind;

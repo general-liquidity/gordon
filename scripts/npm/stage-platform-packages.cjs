@@ -26,9 +26,9 @@
  *   staged packages + per-asset sha256 (for Formula/Scoop templating + SHA256SUMS).
  */
 
-const fs = require("fs");
-const path = require("path");
-const crypto = require("crypto");
+const fs = require("node:fs");
+const path = require("node:path");
+const crypto = require("node:crypto");
 
 const SCOPE = "@general-liquidity";
 
@@ -40,12 +40,24 @@ const SCOPE = "@general-liquidity";
 const TARGETS = [
   { target: "linux-x64", asset: "gordon-linux-x64", os: "linux", cpu: "x64", libc: "glibc" },
   { target: "linux-arm64", asset: "gordon-linux-arm64", os: "linux", cpu: "arm64", libc: "glibc" },
-  { target: "linux-x64-musl", asset: "gordon-linux-x64-musl", os: "linux", cpu: "x64", libc: "musl" },
-  { target: "linux-arm64-musl", asset: "gordon-linux-arm64-musl", os: "linux", cpu: "arm64", libc: "musl" },
+  {
+    target: "linux-x64-musl",
+    asset: "gordon-linux-x64-musl",
+    os: "linux",
+    cpu: "x64",
+    libc: "musl",
+  },
+  {
+    target: "linux-arm64-musl",
+    asset: "gordon-linux-arm64-musl",
+    os: "linux",
+    cpu: "arm64",
+    libc: "musl",
+  },
   { target: "darwin-x64", asset: "gordon-darwin-x64", os: "darwin", cpu: "x64" },
   { target: "darwin-arm64", asset: "gordon-darwin-arm64", os: "darwin", cpu: "arm64" },
   { target: "win32-x64", asset: "gordon-windows-x64.exe", os: "win32", cpu: "x64" },
-  { target: "win32-arm64", asset: "gordon-windows-arm64.exe", os: "win32", cpu: "arm64" }
+  { target: "win32-arm64", asset: "gordon-windows-arm64.exe", os: "win32", cpu: "arm64" },
 ];
 
 function parseArgs(argv) {
@@ -70,7 +82,7 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.binaries || !args.out || !args.version) {
     console.error(
-      "Usage: node scripts/npm/stage-platform-packages.cjs --binaries <dir> --out <dir> --version <v> [--manifest <file>]"
+      "Usage: node scripts/npm/stage-platform-packages.cjs --binaries <dir> --out <dir> --version <v> [--manifest <file>]",
     );
     process.exit(1);
   }
@@ -115,11 +127,11 @@ function main() {
       license: "MIT",
       repository: {
         type: "git",
-        url: "https://github.com/general-liquidity/gordon.git"
+        url: "https://github.com/general-liquidity/gordon.git",
       },
       os: [entry.os],
       cpu: [entry.cpu],
-      files: ["vendor"]
+      files: ["vendor"],
     };
     // libc gates glibc vs musl automatically at install time (npm >= 10 /
     // pnpm / yarn honour it). Only meaningful on linux.
@@ -130,7 +142,7 @@ function main() {
     fs.writeFileSync(
       path.join(packageDir, "package.json"),
       `${JSON.stringify(pkg, null, 2)}\n`,
-      "utf8"
+      "utf8",
     );
 
     staged.push({
@@ -138,7 +150,7 @@ function main() {
       target: entry.target,
       asset: entry.asset,
       dir: packageDir,
-      sha256: sha256OfFile(assetPath)
+      sha256: sha256OfFile(assetPath),
     });
   }
 

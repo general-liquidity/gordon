@@ -12,10 +12,12 @@ import {
 } from "./index.ts";
 
 describe("isPeerDelegationEnabled", () => {
-  it("defaults to true when flag is unset", () => {
-    expect(isPeerDelegationEnabled({})).toBe(true);
+  it("defaults to false when flag is unset", () => {
+    expect(isPeerDelegationEnabled({})).toBe(false);
   });
-  it("returns false when explicitly disabled", () => {
+  it("requires an explicit true value", () => {
+    expect(isPeerDelegationEnabled({ [PEER_DELEGATION_FLAG_ENV]: "1" })).toBe(true);
+    expect(isPeerDelegationEnabled({ [PEER_DELEGATION_FLAG_ENV]: "true" })).toBe(true);
     expect(isPeerDelegationEnabled({ [PEER_DELEGATION_FLAG_ENV]: "0" })).toBe(false);
     expect(isPeerDelegationEnabled({ [PEER_DELEGATION_FLAG_ENV]: "false" })).toBe(false);
   });
@@ -50,12 +52,14 @@ interface FakeSpawnCall {
   env?: Record<string, string>;
 }
 
-function makeFakeSpawn(
-  scripts: ((child: FakeChild, call: FakeSpawnCall) => void)[],
-) {
+function makeFakeSpawn(scripts: ((child: FakeChild, call: FakeSpawnCall) => void)[]) {
   const calls: FakeSpawnCall[] = [];
   let n = 0;
-  const fn = ((cmd: string, args: readonly string[] = [], opts: { cwd?: string; env?: Record<string, string> } = {}) => {
+  const fn = ((
+    cmd: string,
+    args: readonly string[] = [],
+    opts: { cwd?: string; env?: Record<string, string> } = {},
+  ) => {
     const child = new FakeChild();
     const call: FakeSpawnCall = {
       command: cmd,
@@ -179,10 +183,7 @@ describe("CliSubprocessPeer — failure modes", () => {
         // never emit close — wait for timeout
       },
     ]);
-    const peer = new CliSubprocessPeer(
-      { ...baseConfig, defaultTimeoutMs: 30 },
-      spawn.fn,
-    );
+    const peer = new CliSubprocessPeer({ ...baseConfig, defaultTimeoutMs: 30 }, spawn.fn);
     const r = await peer.delegate("do");
     expect(r.success).toBe(false);
     expect(r.error).toBe("timeout");
@@ -228,7 +229,11 @@ describe("CliSubprocessPeer — config", () => {
     ).toThrow();
   });
 
-  it("layers env: process.env → defaultEnv → opts.env", async () => {
+  it("passes only the base environment, peer-specific keys, and explicit overrides", async () => {
+    const previousSecret = process.env.UNRELATED_SECRET;
+    const previousPeerKey = process.env.TEST_PEER_KEY;
+    process.env.UNRELATED_SECRET = "must-not-leak";
+    process.env.TEST_PEER_KEY = "peer-key";
     const spawn = makeFakeSpawn([
       (child) => {
         child.emit("close", 0);
@@ -238,14 +243,53 @@ describe("CliSubprocessPeer — config", () => {
       {
         ...baseConfig,
         defaultEnv: { FOO: "default", BAR: "default" },
+        inheritedEnvKeys: ["TEST_PEER_KEY"],
       },
       spawn.fn,
     );
-    await peer.delegate("do", { env: { BAR: "override", BAZ: "extra" } });
-    const env = spawn.calls[0]!.env!;
-    expect(env.FOO).toBe("default");
-    expect(env.BAR).toBe("override");
-    expect(env.BAZ).toBe("extra");
+    try {
+      await peer.delegate("do", { env: { BAR: "override", BAZ: "extra" } });
+      const env = spawn.calls[0]!.env!;
+      expect(env.FOO).toBe("default");
+      expect(env.BAR).toBe("override");
+      expect(env.BAZ).toBe("extra");
+      expect(env.TEST_PEER_KEY).toBe("peer-key");
+      expect(env.UNRELATED_SECRET).toBeUndefined();
+    } finally {
+      if (previousSecret === undefined) delete process.env.UNRELATED_SECRET;
+      else process.env.UNRELATED_SECRET = previousSecret;
+      if (previousPeerKey === undefined) delete process.env.TEST_PEER_KEY;
+      else process.env.TEST_PEER_KEY = previousPeerKey;
+    }
+  });
+
+  it("kills a peer whose combined stdout and stderr exceed the cap", async () => {
+    let child: FakeChild | undefined;
+    const spawn = makeFakeSpawn([
+      (spawned) => {
+        child = spawned;
+        spawned.stdout.emit("data", Buffer.from("12345678"));
+        spawned.stderr.emit("data", Buffer.from("abcdef"));
+      },
+    ]);
+    const peer = new CliSubprocessPeer({ ...baseConfig, maxOutputBytes: 10 }, spawn.fn);
+
+    const result = await peer.delegate("do");
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("output_limit");
+    expect(Buffer.byteLength(result.output) + Buffer.byteLength(result.stderr)).toBe(10);
+    expect(child?.killed).toBe(true);
+  });
+
+  it("does not spawn when the caller signal is already aborted", async () => {
+    const spawn = makeFakeSpawn([]);
+    const controller = new AbortController();
+    controller.abort();
+    const peer = new CliSubprocessPeer(baseConfig, spawn.fn);
+
+    const result = await peer.delegate("do", { signal: controller.signal });
+    expect(result.error).toBe("aborted");
+    expect(spawn.calls).toHaveLength(0);
   });
 
   it("honors opts.workdir override", async () => {
@@ -254,10 +298,7 @@ describe("CliSubprocessPeer — config", () => {
         child.emit("close", 0);
       },
     ]);
-    const peer = new CliSubprocessPeer(
-      { ...baseConfig, defaultWorkdir: "/tmp/default" },
-      spawn.fn,
-    );
+    const peer = new CliSubprocessPeer({ ...baseConfig, defaultWorkdir: "/tmp/default" }, spawn.fn);
     await peer.delegate("do", { workdir: "/tmp/override" });
     expect(spawn.calls[0]!.cwd).toBe("/tmp/override");
   });

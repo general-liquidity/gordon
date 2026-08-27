@@ -110,9 +110,7 @@ export function enforceResultBudget(entries: ToolResultEntry[]): SpillDecision[]
 
   // Sort by size (largest first) to choose spill candidates.
   const indexed = entries.map((entry, index) => ({ entry, index }));
-  const bySize = [...indexed].sort(
-    (a, b) => b.entry.content.length - a.entry.content.length,
-  );
+  const bySize = [...indexed].sort((a, b) => b.entry.content.length - a.entry.content.length);
 
   let remaining = totalChars;
   const spillIdx = new Set<number>();

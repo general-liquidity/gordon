@@ -5,10 +5,7 @@
 
 import { z } from "zod";
 
-import {
-  jsonSchemaToZod,
-  type JsonSchema,
-} from "../tools/structuredOutput/jsonSchemaToZod.ts";
+import { jsonSchemaToZod, type JsonSchema } from "../tools/structuredOutput/jsonSchemaToZod.ts";
 
 /** Individual trade signal from scan or analysis */
 export const TradeSignalSchema = z.object({
@@ -113,14 +110,12 @@ export function resolveStructuredSchema(payload: {
     const named = getSchemaByName(payload.schemaName);
     if (!named) {
       throw new Error(
-        `Unknown schema: "${payload.schemaName}". Available: ${Object.keys(
-          RESPONSE_SCHEMAS,
-        ).join(", ")} — or pass jsonSchema for an arbitrary shape.`,
+        `Unknown schema: "${payload.schemaName}". Available: ${Object.keys(RESPONSE_SCHEMAS).join(
+          ", ",
+        )} — or pass jsonSchema for an arbitrary shape.`,
       );
     }
     return named;
   }
-  throw new Error(
-    "structured_message requires either schemaName or jsonSchema.",
-  );
+  throw new Error("structured_message requires either schemaName or jsonSchema.");
 }

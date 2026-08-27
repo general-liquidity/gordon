@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  createMigrationScheduler,
-  type SchedulerTimers,
-} from "./migrationScheduler.ts";
+import { createMigrationScheduler, type SchedulerTimers } from "./migrationScheduler.ts";
 
 // ---------------------------------------------------------------------------
 // Manual timer: tests control when ticks fire instead of relying on real
@@ -57,9 +54,12 @@ describe("migrationScheduler lifecycle", () => {
   test("start() runs the migration on each tick until stop()", () => {
     const timers = makeManualTimers();
     let calls = 0;
-    const scheduler = createMigrationScheduler(() => {
-      calls++;
-    }, { timers });
+    const scheduler = createMigrationScheduler(
+      () => {
+        calls++;
+      },
+      { timers },
+    );
 
     const handle = scheduler.start(1000);
 
@@ -97,23 +97,25 @@ describe("migrationScheduler lifecycle", () => {
   });
 
   test("rejects a non-function migration callback", () => {
-    expect(() =>
-      createMigrationScheduler(
-        undefined as unknown as () => void,
-      ),
-    ).toThrow();
+    expect(() => createMigrationScheduler(undefined as unknown as () => void)).toThrow();
   });
 
   test("supports multiple independent scheduler handles", () => {
     const timers = makeManualTimers();
     let callsA = 0;
     let callsB = 0;
-    const schedA = createMigrationScheduler(() => {
-      callsA++;
-    }, { timers });
-    const schedB = createMigrationScheduler(() => {
-      callsB++;
-    }, { timers });
+    const schedA = createMigrationScheduler(
+      () => {
+        callsA++;
+      },
+      { timers },
+    );
+    const schedB = createMigrationScheduler(
+      () => {
+        callsB++;
+      },
+      { timers },
+    );
 
     const hA = schedA.start(1000);
     const hB = schedB.start(1000);
@@ -139,15 +141,18 @@ describe("migrationScheduler reentrancy guard", () => {
     let maxDepth = 0;
     let calls = 0;
 
-    const scheduler = createMigrationScheduler(() => {
-      calls++;
-      depth++;
-      maxDepth = Math.max(maxDepth, depth);
-      // While this migration is "running", fire a nested tick. The guard
-      // must refuse to reenter.
-      timers.tick();
-      depth--;
-    }, { timers });
+    const scheduler = createMigrationScheduler(
+      () => {
+        calls++;
+        depth++;
+        maxDepth = Math.max(maxDepth, depth);
+        // While this migration is "running", fire a nested tick. The guard
+        // must refuse to reenter.
+        timers.tick();
+        depth--;
+      },
+      { timers },
+    );
 
     const handle = scheduler.start(1000);
 
@@ -230,9 +235,12 @@ describe("migrationScheduler error handling", () => {
     };
 
     try {
-      const scheduler = createMigrationScheduler(() => {
-        throw new Error("default-path");
-      }, { timers });
+      const scheduler = createMigrationScheduler(
+        () => {
+          throw new Error("default-path");
+        },
+        { timers },
+      );
 
       const handle = scheduler.start(1000);
       timers.tick();

@@ -59,7 +59,9 @@ export const loadSkillTool = createTool({
     "in the canonical approach rather than improvising. If the skill id is not " +
     "found, returns error with a suggestion to call list_skills.",
   inputSchema: z.object({
-    id: z.string().describe("Skill id (e.g. 'quick-scan', 'dd', 'swing-entry', 'radar', 'research')"),
+    id: z
+      .string()
+      .describe("Skill id (e.g. 'quick-scan', 'dd', 'swing-entry', 'radar', 'research')"),
   }),
   outputSchema: z.object({
     found: z.boolean(),

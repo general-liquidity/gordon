@@ -71,7 +71,8 @@ export function fitOU(input: { series: ReadonlyArray<number>; dt?: number }): Ou
       ar1Beta: 0,
       isMeanReverting: false,
       sampleSize: n,
-      interpretation: "Series has no variance in lagged values; OU fit is undefined. Result is neutral.",
+      interpretation:
+        "Series has no variance in lagged values; OU fit is undefined. Result is neutral.",
     };
   }
 

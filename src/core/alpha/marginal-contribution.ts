@@ -222,7 +222,10 @@ export function computeMarginalContribution(
 
   // Effective N: before vs. after
   const baseEffN = computeEffectiveN(existingReturns).effectiveN;
-  const withCandidate: Record<string, number[]> = { ...existingReturns, [candidateId]: candidateReturns };
+  const withCandidate: Record<string, number[]> = {
+    ...existingReturns,
+    [candidateId]: candidateReturns,
+  };
   const withCandidateEffN = computeEffectiveN(withCandidate).effectiveN;
   const effectiveNDelta = withCandidateEffN - baseEffN;
 
@@ -253,7 +256,10 @@ export function computeMarginalContribution(
     overlapRatio < opts.moderateOverlapThreshold
   ) {
     verdict = "adds_diversification";
-  } else if (effectiveNDelta < opts.marginalThreshold && overlapRatio >= opts.highOverlapThreshold) {
+  } else if (
+    effectiveNDelta < opts.marginalThreshold &&
+    overlapRatio >= opts.highOverlapThreshold
+  ) {
     verdict = "redundant";
   } else {
     verdict = "marginal";

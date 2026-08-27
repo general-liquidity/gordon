@@ -9,7 +9,7 @@ import { getDatabase } from "../../infra/storage/database.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import type { CounterfactualReport, CounterfactualInsight } from "./counterfactual-analyzer.ts";
 
-const logger = createModuleLogger("insight-store");
+const _logger = createModuleLogger("insight-store");
 
 let initialized = false;
 
@@ -51,8 +51,12 @@ function ensureTables(): void {
   `);
 
   db.run("CREATE INDEX IF NOT EXISTS idx_cf_reports_symbol ON counterfactual_reports(symbol)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_cf_insights_category ON counterfactual_insights(category)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_cf_insights_playbook ON counterfactual_insights(playbook_name)");
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_cf_insights_category ON counterfactual_insights(category)",
+  );
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_cf_insights_playbook ON counterfactual_insights(playbook_name)",
+  );
 
   initialized = true;
 }
@@ -171,17 +175,14 @@ export function getRecurringInsights(
     avgPnlDelta: r.avg_pnl_delta,
     occurrences: r.cnt,
     avgConfidence: r.avg_confidence,
-    direction: r.avg_optimal > r.avg_actual ? "increase" as const : "decrease" as const,
+    direction: r.avg_optimal > r.avg_actual ? ("increase" as const) : ("decrease" as const),
   }));
 }
 
 /**
  * Get insights for a specific symbol.
  */
-export function getInsightsForSymbol(
-  symbol: string,
-  limit: number = 20,
-): CounterfactualInsight[] {
+export function getInsightsForSymbol(symbol: string, limit: number = 20): CounterfactualInsight[] {
   ensureTables();
   const db = getDatabase();
 
@@ -233,9 +234,7 @@ export function getAnalysisSummary(): {
     .get();
 
   const insightCount = db
-    .query<{ cnt: number }, []>(
-      "SELECT COUNT(*) as cnt FROM counterfactual_insights",
-    )
+    .query<{ cnt: number }, []>("SELECT COUNT(*) as cnt FROM counterfactual_insights")
     .get();
 
   return {

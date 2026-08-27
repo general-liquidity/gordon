@@ -42,7 +42,9 @@ describe("installProcessHardening", () => {
   });
 
   test("does NOT touch NODE_OPTIONS unless the opt-in flag is set", () => {
-    const env: NodeJS.ProcessEnv = { NODE_OPTIONS: "--report-on-fatalerror --max-old-space-size=4096" };
+    const env: NodeJS.ProcessEnv = {
+      NODE_OPTIONS: "--report-on-fatalerror --max-old-space-size=4096",
+    };
     installProcessHardening(env);
     expect(env.NODE_OPTIONS).toBe("--report-on-fatalerror --max-old-space-size=4096");
   });

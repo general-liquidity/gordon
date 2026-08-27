@@ -80,7 +80,9 @@ export function saveSessionMemories(entries: SessionMemoryEntry[]): void {
   writeFileSync(MEMORY_FILE, JSON.stringify(entries, null, 2), { encoding: "utf-8", mode: 0o600 });
 }
 
-export function addSessionMemory(entry: Omit<SessionMemoryEntry, "id" | "extractedAt">): SessionMemoryEntry {
+export function addSessionMemory(
+  entry: Omit<SessionMemoryEntry, "id" | "extractedAt">,
+): SessionMemoryEntry {
   const memories = loadSessionMemories();
   const newEntry: SessionMemoryEntry = {
     ...entry,

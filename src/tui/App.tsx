@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Box, Text, Spacer, useApp } from "./ink-custom";
+import { Box, Text, useApp } from "./ink-custom";
 
 // ── Providers ──
 import { SettingsProvider } from "./state/SettingsProvider.js";
@@ -21,15 +21,17 @@ import { evaluatePermissionModeTransition } from "./state/permissionModeFsm.ts";
 // require whose transitive deps contain a top-level await (ink -> yoga-layout).
 import { ThemeProvider } from "./themes/ThemeProvider.tsx";
 import { GordonInkUITheme } from "./themes/inkUiTheme.tsx";
-import { type Message, type MessageVariant } from "./components/messages/MessageBubble.tsx";
-import { StreamingText } from "./components/messages/StreamingText.tsx";
+import { recordInput } from "./history/sessionHistory.ts";
+import type { Message, MessageVariant } from "./components/messages/MessageBubble.tsx";
 import { AgentProgress } from "./components/status/AgentProgress.tsx";
 import { SwarmTree } from "./components/charts/SwarmTree.tsx";
 import { ApprovalDialog } from "./components/dialogs/ApprovalDialog.tsx";
-import { WorkerBadge } from "./components/status/WorkerBadge.tsx";
 import { InlineHelp } from "./components/InlineHelp.js";
-import { CommandPalette, type PaletteItem, type PaletteWorkspaceSection } from "./components/CommandPalette.js";
-import { BootScreen } from "./components/layout/BootScreen.tsx";
+import {
+  CommandPalette,
+  type PaletteItem,
+  type PaletteWorkspaceSection,
+} from "./components/CommandPalette.js";
 import { SetupWizard, type SetupPreflight } from "./components/wizards/SetupWizard.tsx";
 import { PrivacyConsent, type PrivacyChoices } from "./components/editors/PrivacyConsent.tsx";
 // HandoffArrow no longer rendered inline (suppress routing noise) — keep
@@ -44,15 +46,22 @@ import { defaultMessageQueue } from "../infra/runtime/messageQueue.js";
 import { saveEnvKeys } from "../infra/storage/config/env.ts";
 import { providerRegistry } from "../infra/runtime/providers/registry.js";
 import { loadConfig, saveConfig } from "../infra/storage/config/config.js";
-import { normalizeExchangeId, ccxtEnvNames, extractCcxtSubId, ccxtIdToNativeVenue } from "../infra/exchange/types.ts";
+import {
+  normalizeExchangeId,
+  ccxtEnvNames,
+  extractCcxtSubId,
+  ccxtIdToNativeVenue,
+} from "../infra/exchange/types.ts";
 import { checkForInjection } from "../infra/safety/defense/injectionDefense.ts";
 import type { ExchangeType } from "../types/config.ts";
 import { refreshRuntimeCredentials } from "./bridge/runtime.js";
 import { VirtualMessageList } from "./components/display/VirtualMessageList.tsx";
-import { CostDisplay } from "./components/status/CostDisplay.tsx";
 import { updateTerminalTab, resetTerminalTab } from "./terminalTab.js";
-import { getActionsForKey, isVimModeEnabled, validateKeybindings } from "./keybindings/keybindings.js";
-import { getNotificationFolder } from "./notifications/notificationFolder.js";
+import {
+  getActionsForKey,
+  isVimModeEnabled,
+  validateKeybindings,
+} from "./keybindings/keybindings.js";
 import { useFpsTracker } from "./hooks/animation/useFpsTracker.ts";
 import {
   getPerformanceMonitor,
@@ -104,17 +113,10 @@ import { PrivacyScreen } from "./components/layout/PrivacyScreen.tsx";
 import { FeedbackSurvey } from "./components/status/FeedbackSurvey.tsx";
 import { ThinkStep } from "./components/status/ThinkStep.tsx";
 import { TradingSpinner } from "./components/spinners/TradingSpinner.tsx";
-import { GlimmerMessage } from "./components/spinners/GlimmerMessage.tsx";
 import { ToolCallInline } from "./components/status/ToolCallInline.tsx";
-import { StreamingMarkdown } from "./components/messages/StreamingMarkdown.tsx";
-import { NoSelect } from "./components/layout/NoSelect.tsx";
 import { QueuedCommandsNotice } from "./components/notices/QueuedCommandsNotice.tsx";
-import { MemoryUsageIndicator } from "./components/notices/MemoryUsageIndicator.tsx";
 import { usePromptSuggestions } from "./hooks/usePromptSuggestions.js";
-import { StashNotice } from "./components/notices/StashNotice.tsx";
 import { ExitFlow } from "./components/editors/ExitFlow.tsx";
-import { AwaySummary } from "./components/status/AwaySummary.tsx";
-import { PressEnterToContinue } from "./components/layout/PressEnterToContinue.tsx";
 import { OrderbookView } from "./components/charts/OrderbookView.tsx";
 import { AutonomousControlDialog } from "./components/dialogs/AutonomousControlDialog.tsx";
 import { SkillExecutionViewer } from "./components/display/SkillExecutionViewer.tsx";
@@ -128,25 +130,18 @@ import { RegimeStatusPanel } from "./components/panels/RegimeStatusPanel.tsx";
 import { StatsDialog } from "./components/dialogs/StatsDialog.tsx";
 import { GlobalSearchDialog } from "./components/dialogs/GlobalSearchDialog.tsx";
 import { ResetSessionDialog } from "./components/dialogs/ResetSessionDialog.tsx";
-import { PagerDialog, PAGER_LINE_THRESHOLD, findLastLongMessage } from "./components/dialogs/PagerDialog.tsx";
+import {
+  PagerDialog,
+  PAGER_LINE_THRESHOLD,
+  findLastLongMessage,
+} from "./components/dialogs/PagerDialog.tsx";
 import { DialogHost } from "./components/dialogs/DialogHost.tsx";
 
-// ── Previously unwired components ──
-import { ActionableRiskAlerts } from "./components/notices/ActionableRiskAlerts.tsx";
-import { AlgoExecutionProgress } from "./components/status/AlgoExecutionProgress.tsx";
 import { BacktestWizard } from "./components/wizards/BacktestWizard.tsx";
 import { BrokerManagerPanel } from "./components/panels/BrokerManagerPanel.tsx";
-import { ConsensusDetailPanel } from "./components/panels/ConsensusDetailPanel.tsx";
-import { ContextSuggestions } from "./components/ContextSuggestions.js";
-import { CoordinatorAgentStatus } from "./components/status/CoordinatorAgentStatus.tsx";
-import { CostThresholdDialog } from "./components/dialogs/CostThresholdDialog.tsx";
-import { DiffDialog } from "./components/dialogs/DiffDialog.tsx";
-import { DryRunPreview } from "./components/editors/DryRunPreview.tsx";
-import { EffortIndicator } from "./components/status/EffortIndicator.tsx";
 import { ExchangeManagerPanel } from "./components/panels/ExchangeManagerPanel.tsx";
 import { GenomeEvolutionPanel } from "./components/panels/GenomeEvolutionPanel.tsx";
 import { HistorySearchDialog } from "./components/dialogs/HistorySearchDialog.tsx";
-import { IdleReturnDialog } from "./components/dialogs/IdleReturnDialog.tsx";
 import { IndicatorValueViewer } from "./components/charts/IndicatorValueViewer.tsx";
 import { InsightBrowser } from "./components/browsers/InsightBrowser.tsx";
 import { MarketPulsePanel } from "./components/panels/MarketPulsePanel.tsx";
@@ -161,17 +156,23 @@ import { WalkForwardResults } from "./components/display/WalkForwardResults.tsx"
 import { PlanDiff, type PlanVersion } from "./components/editors/PlanDiff.tsx";
 import { PostTradeFeedback } from "./components/status/PostTradeFeedback.tsx";
 import { HIP3AssetBrowser } from "./components/browsers/HIP3AssetBrowser.tsx";
-import { CounterfactualPanel, type TradeOutcome, type Scenario } from "./components/panels/CounterfactualPanel.tsx";
-import { DebateViewer, type DebateViewerData, type DebateRole } from "./components/display/DebateViewer.tsx";
+import {
+  CounterfactualPanel,
+  type TradeOutcome,
+  type Scenario,
+} from "./components/panels/CounterfactualPanel.tsx";
+import {
+  DebateViewer,
+  type DebateViewerData,
+  type DebateRole,
+} from "./components/display/DebateViewer.tsx";
 import { SideQuestionDialog } from "./components/dialogs/SideQuestionDialog.tsx";
 import { ElicitationDialog, type FormField } from "./components/dialogs/ElicitationDialog.tsx";
 import type { SideQuestion } from "./services/suggestions/sideQuestion.ts";
 
 // ── Backend Module UI Components ──
 import { LivePositions } from "./components/status/LivePositions.tsx";
-import { TradingModeBadge } from "./components/status/TradingModeBadge.tsx";
 import { TradingModeBanner } from "./components/status/TradingModeBanner.tsx";
-import { KillSwitchBadge } from "./components/status/KillSwitchBadge.tsx";
 import { RadarFocusBar } from "./components/status/RadarFocusBar.tsx";
 import { FirstTradeTour } from "./components/wizards/FirstTradeTour.tsx";
 import { TradeQueueView } from "./components/views/TradeQueueView.tsx";
@@ -184,7 +185,6 @@ import { StrategyBrowser } from "./components/browsers/StrategyBrowser.tsx";
 import { GenomeDiffViewer } from "./components/charts/GenomeDiffViewer.tsx";
 import { IndicatorDashboard } from "./components/charts/IndicatorDashboard.tsx";
 import { ConsensusView } from "./components/display/ConsensusView.tsx";
-import { ExecutionAlgoSelector } from "./components/browsers/ExecutionAlgoSelector.tsx";
 import { DaemonStatus } from "./components/status/DaemonStatus.tsx";
 import { TrailingStopDisplay } from "./components/status/TrailingStopDisplay.tsx";
 import { OrderRecoveryNotice } from "./components/notices/OrderRecoveryNotice.tsx";
@@ -195,13 +195,13 @@ import { useDoublePress } from "./hooks/input/useDoublePress.ts";
 import { useElapsedTime, formatElapsed } from "./hooks/animation/useElapsedTime.ts";
 
 /** Format a millisecond duration the same way the spinner does. */
-function formatElapsedMs(ms: number): string {
+function _formatElapsedMs(ms: number): string {
   return formatElapsed(ms / 1000);
 }
 
 /** Compact token-count formatter — '432', '12.4K', '1.8M'. Used in the
  *  status line for both context tokens and last-turn tokens. */
-function formatTokenCount(n: number): string {
+function _formatTokenCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return `${Math.round(n)}`;
@@ -212,14 +212,30 @@ import { useSkillTracking } from "./hooks/useSkillTracking.ts";
 import { useScreenReader } from "./hooks/useScreenReader.js";
 import { useKillSwitchStatus } from "./hooks/useKillSwitchStatus.ts";
 import { getSessionTip } from "./boot/tips.ts";
-import { installRenderBudget, isRenderBudgetEnabled, isRenderBudgetStrict, getRenderBudgetBreachCount } from "./diagnostics/renderBudget.ts";
+import {
+  installRenderBudget,
+  isRenderBudgetEnabled,
+  isRenderBudgetStrict,
+  getRenderBudgetBreachCount,
+} from "./diagnostics/renderBudget.ts";
 import { enterAltScreen, leaveAltScreen } from "./utils/altScreen.ts";
 import { radarQuickKeyCommand } from "./input/radarQuickKeys.ts";
-import { InputRouterProvider, useRoutedInput, FOCUS_PRIORITY } from "./input/InputRouterContext.tsx";
+import {
+  InputRouterProvider,
+  useRoutedInput,
+  FOCUS_PRIORITY,
+} from "./input/InputRouterContext.tsx";
 import { getSuggestionStore } from "../infra/proactive/storage/suggestionStore.ts";
 
 // ── Bridge ──
-import { initializeRuntime, handleInput, handleApprovalDecision, performSessionReset, getRuntime, abortActiveTurn } from "./bridge/runtime.js";
+import {
+  initializeRuntime,
+  handleInput,
+  handleApprovalDecision,
+  performSessionReset,
+  getRuntime,
+  abortActiveTurn,
+} from "./bridge/runtime.js";
 
 // ============================================================================
 // Gordon App — Claude Code for Vibe Trading
@@ -258,14 +274,19 @@ const EXAMPLE_PROMPTS = [
  * DebateViewer has no onClose prop, so we attach key handling here.
  */
 function DebateViewerOverlay({ data, onClose }: { data: DebateViewerData; onClose: () => void }) {
-  useRoutedInput((_input, key) => {
-    if (!key.escape) return false;
-    onClose();
-  }, { id: "dialog:debate-view", priority: FOCUS_PRIORITY.DIALOG });
+  useRoutedInput(
+    (_input, key) => {
+      if (!key.escape) return false;
+      onClose();
+    },
+    { id: "dialog:debate-view", priority: FOCUS_PRIORITY.DIALOG },
+  );
   return (
     <Box flexDirection="column">
       <DebateViewer data={data} />
-      <Box paddingX={2}><Text dimColor>Press Esc to dismiss.</Text></Box>
+      <Box paddingX={2}>
+        <Text dimColor>Press Esc to dismiss.</Text>
+      </Box>
     </Box>
   );
 }
@@ -289,13 +310,17 @@ function formatPerfSnapshot(
   lines.push(`  Mean write:  ${fmt(h.meanWriteMs)}ms`);
   lines.push(`  Byte churn:  ~${Math.round(h.meanBytes)} bytes/frame`);
   if (snap.latestMemory) {
-    lines.push(`  Memory:      heap=${mb(snap.latestMemory.heapUsed)}  rss=${mb(snap.latestMemory.rss)}`);
+    lines.push(
+      `  Memory:      heap=${mb(snap.latestMemory.heapUsed)}  rss=${mb(snap.latestMemory.rss)}`,
+    );
   } else {
     lines.push(`  Memory:      (no samples yet)`);
   }
   lines.push(`  Renders:     ${snap.totalRenders} total  /  ${snap.totalFrames} frames`);
   if (isRenderBudgetEnabled()) {
-    lines.push(`  Budget:      ${budgetBreaches} breach${budgetBreaches === 1 ? "" : "es"} recorded`);
+    lines.push(
+      `  Budget:      ${budgetBreaches} breach${budgetBreaches === 1 ? "" : "es"} recorded`,
+    );
   }
   lines.push(`  Log:         ${flushPath ?? "(no flush path; use /perf start <path>)"}`);
   return lines.join("\n");
@@ -305,7 +330,7 @@ function formatPerfSnapshot(
  * AppInner — The core UI, mounted inside the provider tree.
  * Reads all state via useAppState selectors and dispatches via useDispatch.
  */
-function AppInner() {
+function AppRuntime() {
   const dispatch = useDispatch();
   const { getState } = useAppStore();
   // Separate handle for perf instrumentation — avoids mutating the shape of
@@ -313,16 +338,6 @@ function AppInner() {
   const perfStore = useAppStore();
   const { exit } = useApp();
   useKillSwitchStatus(dispatch);
-
-  // Boot-time config error: render a dialog instead of crashing the process.
-  const configErrorType = process.env.GORDON_CONFIG_ERROR_TYPE;
-  const configErrorMsg = process.env.GORDON_CONFIG_ERROR_MSG ?? "Unknown config error";
-  if (configErrorType === "syntax") {
-    return <InvalidConfigDialog errors={[configErrorMsg]} onClose={() => exit()} />;
-  }
-  if (configErrorType === "settings") {
-    return <InvalidSettingsDialog errors={[configErrorMsg]} onClose={() => exit()} />;
-  }
 
   // Subscribe to proactive:suggestion_fired events on the Gordon event bus
   // and push them into the chat stream as proactive_suggestion messages.
@@ -352,7 +367,10 @@ function AppInner() {
       unsubPlan = bus.on("plan:created", (event) => {
         const p: any = event.plan ?? {};
         const symbol = String(p.symbol ?? p.id ?? "unknown");
-        const tp = Array.isArray(p.takeProfit) && p.takeProfit.length > 0 ? Number(p.takeProfit[0]?.price ?? 0) : 0;
+        const tp =
+          Array.isArray(p.takeProfit) && p.takeProfit.length > 0
+            ? Number(p.takeProfit[0]?.price ?? 0)
+            : 0;
         const current: PlanVersion = {
           version: Date.now(),
           entry: Number(p.entry?.price ?? 0),
@@ -372,7 +390,8 @@ function AppInner() {
         const side = String(t.side ?? "").toUpperCase();
         const qty = Number(t.entries?.[0]?.quantity ?? t.quantity ?? 0);
         const price = Number(t.averageEntry ?? t.entries?.[0]?.price ?? 0);
-        const desc = `${side || "TRADE"} ${qty || ""} ${t.symbol ?? ""}${price ? ` @ $${price.toFixed(2)}` : ""}`.trim();
+        const desc =
+          `${side || "TRADE"} ${qty || ""} ${t.symbol ?? ""}${price ? ` @ $${price.toFixed(2)}` : ""}`.trim();
         setPostTradeFeedback(desc);
       });
       // Wire CounterfactualPanel: auto-overlay "what if" scenarios on trade:closed
@@ -382,7 +401,7 @@ function AppInner() {
         const exits = Array.isArray(t.exits) ? t.exits : [];
         const exit = Number(exits[exits.length - 1]?.price ?? entry);
         if (!entry || !exit) return; // skip if we don't have prices
-        const side = entry <= exit ? "long" : (Number(event.pnl) >= 0 ? "long" : "short");
+        const side = entry <= exit ? "long" : Number(event.pnl) >= 0 ? "long" : "short";
         const trade: TradeOutcome = {
           symbol: String(t.symbol ?? "?"),
           side,
@@ -396,8 +415,14 @@ function AppInner() {
         const mkScenario = (description: string, altExit: number): Scenario => {
           const dir = side === "long" ? 1 : -1;
           const altPct = ((altExit - entry) / entry) * 100 * dir;
-          const altPnl = trade.pnl === 0 ? 0 : trade.pnl * (altPct / (trade.pnlPercent || altPct || 1));
-          return { description, alternateExit: altExit, alternatePnl: altPnl, alternatePnlPercent: altPct };
+          const altPnl =
+            trade.pnl === 0 ? 0 : trade.pnl * (altPct / (trade.pnlPercent || altPct || 1));
+          return {
+            description,
+            alternateExit: altExit,
+            alternatePnl: altPnl,
+            alternatePnlPercent: altPct,
+          };
         };
         const scenarios: Scenario[] = [
           mkScenario("Exit 1% earlier", scale(side === "long" ? 0.99 : 1.01)),
@@ -425,8 +450,15 @@ function AppInner() {
         const riskRounds: DebateViewerData["riskRounds"] = [];
         transcript.forEach((t, i) => {
           const role = roleOf(t.speaker);
-          const entry = { roundNumber: i + 1, role, argument: t.argument, keyPoints: [], confidence: 5 };
-          if (role === "bull" || role === "bear" || role === "manager") investmentRounds.push(entry);
+          const entry = {
+            roundNumber: i + 1,
+            role,
+            argument: t.argument,
+            keyPoints: [],
+            confidence: 5,
+          };
+          if (role === "bull" || role === "bear" || role === "manager")
+            investmentRounds.push(entry);
           else riskRounds.push(entry);
         });
         setDebateView({
@@ -446,13 +478,20 @@ function AppInner() {
         });
       });
     });
-    return () => { unsubRate?.(); unsubPlan?.(); unsubTrade?.(); unsubTradeClosed?.(); unsubDebate?.(); unsubElicit?.(); };
+    return () => {
+      unsubRate?.();
+      unsubPlan?.();
+      unsubTrade?.();
+      unsubTradeClosed?.();
+      unsubDebate?.();
+      unsubElicit?.();
+    };
     // Empty deps: rateLimit.recordRateLimit is useCallback-stable and all
     // setState dispatchers are guaranteed stable by React. Using [rateLimit]
     // caused re-subscribe on every render (rateLimit is a fresh object
     // literal per render) which in turn re-fired handlers → infinite loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [rateLimit.recordRateLimit]);
 
   // Mirror warning/critical alerts to the audit log so they survive TUI
   // restarts and reach daemons running without a UI. Idempotent — safe to
@@ -462,7 +501,9 @@ function AppInner() {
     void import("../infra/platform/observability/alertAuditMirror.ts").then((m) => {
       stop = m.startAlertAuditMirror();
     });
-    return () => { stop?.(); };
+    return () => {
+      stop?.();
+    };
   }, []);
 
   // ── Selectors (fine-grained subscriptions) ──
@@ -484,7 +525,7 @@ function AppInner() {
     (async () => {
       try {
         const { getStatus } = await import("../infra/platform/telemetry/telemetry.ts");
-        const s = getStatus();
+        const _s = getStatus();
         // We treat anonymousId presence as "telemetry state file exists"; the
         // real check is whether the user was ever shown the consent screen.
         // The telemetry module exposes `notifiedAt` indirectly — if telemetry
@@ -519,7 +560,10 @@ function AppInner() {
   const activeWorkspace = useAppState((s) => s.activeWorkspace);
   const openDialogs = useAppState((s) => s.openDialogs);
   const permissionMode = useAppState((s) => s.permissionMode);
-  const [connectivityHints, setConnectivityHints] = useState({ hasExchange: false, hasBroker: false });
+  const [connectivityHints, setConnectivityHints] = useState({
+    hasExchange: false,
+    hasBroker: false,
+  });
   const messages = useAppState((s) => s.messages);
   const isStreaming = useAppState((s) => s.isStreaming);
   const streamBuffer = useAppState((s) => s.streamBuffer);
@@ -528,7 +572,7 @@ function AppInner() {
   const swarmMode = useAppState((s) => s.swarmMode);
   const handoffHistory = useAppState((s) => s.handoffHistory);
   const pendingApprovals = useAppState((s) => s.pendingApprovals);
-  const sessionId = useAppState((s) => s.sessionId);
+  const _sessionId = useAppState((s) => s.sessionId);
 
   // ── FPS tracking + animation clock ──
   const fpsMetrics = useFpsTracker(2000); // Report every 2s
@@ -594,13 +638,13 @@ function AppInner() {
       resetPerformanceMonitor();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch]);
-  const isScreenReaderActive = useScreenReader();
+  }, [dispatch, perfStore.getState, perfStore.subscribe]);
+  const _isScreenReaderActive = useScreenReader();
   const vimModeActive = isVimModeEnabled();
   const vimModeRef = React.useRef<"insert" | "normal" | "visual">("insert");
   const useAltScreen = process.env.GORDON_ALT_SCREEN !== "false";
   const threadId = useAppState((s) => s.threadId);
-  const isResumedSession = useAppState((s) => s.isResumedSession);
+  const _isResumedSession = useAppState((s) => s.isResumedSession);
   const tokenCount = useAppState((s) => s.tokenCount);
   const contextTokens = useAppState((s) => s.contextTokens);
   const lastTurnDurationMs = useAppState((s) => s.lastTurnDurationMs);
@@ -652,7 +696,9 @@ function AppInner() {
 
   // PlanDiff overlay — auto-shown when a second plan:created fires for the
   // same symbol and any numeric field changed. Previous snapshot kept per symbol.
-  const [planDiff, setPlanDiff] = useState<{ previous: PlanVersion; current: PlanVersion } | null>(null);
+  const [planDiff, setPlanDiff] = useState<{ previous: PlanVersion; current: PlanVersion } | null>(
+    null,
+  );
   const prevPlansRef = React.useRef<Map<string, PlanVersion>>(new Map());
 
   // PostTradeFeedback overlay — shown when trade:opened fires (order fill).
@@ -663,7 +709,10 @@ function AppInner() {
   const setShowHIP3 = dialogSetter("hip3");
 
   // CounterfactualPanel overlay — auto-shown on trade:closed (or /review-trade fallback).
-  const [counterfactual, setCounterfactual] = useState<{ trade: TradeOutcome; scenarios: Scenario[] } | null>(null);
+  const [counterfactual, setCounterfactual] = useState<{
+    trade: TradeOutcome;
+    scenarios: Scenario[];
+  } | null>(null);
 
   // DebateViewer overlay — populated from debate:resolved events (see useEffect above).
   const [debateView, setDebateView] = useState<DebateViewerData | null>(null);
@@ -708,17 +757,21 @@ function AppInner() {
     void listThreads()
       .then((records) => {
         if (!alive) return;
-        setThreadList(records.map((r) => ({
-          id: r.threadId,
-          name: r.title || undefined,
-          createdAt: r.startedAt,
-          messageCount: 0,
-          lastActivity: r.lastActiveAt,
-          isActive: r.threadId === threadId,
-        })));
+        setThreadList(
+          records.map((r) => ({
+            id: r.threadId,
+            name: r.title || undefined,
+            createdAt: r.startedAt,
+            messageCount: 0,
+            lastActivity: r.lastActiveAt,
+            isActive: r.threadId === threadId,
+          })),
+        );
       })
       .catch(() => {});
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [showThreadBrowser, threadId]);
   const showJournal = isDialogOpen("journal");
   const setShowJournal = dialogSetter("journal");
@@ -739,11 +792,11 @@ function AppInner() {
   const showStrategies = isDialogOpen("strategies");
   const setShowStrategies = dialogSetter("strategies");
   const showGenome = isDialogOpen("genome");
-  const setShowGenome = dialogSetter("genome");
+  const _setShowGenome = dialogSetter("genome");
   const showIndicators = isDialogOpen("indicators");
   const setShowIndicators = dialogSetter("indicators");
   const showConsensus = isDialogOpen("consensus");
-  const setShowConsensus = dialogSetter("consensus");
+  const _setShowConsensus = dialogSetter("consensus");
   const showOrderbook = isDialogOpen("orderbook");
   const setShowOrderbook = dialogSetter("orderbook");
   const showAutonomous = isDialogOpen("autonomous");
@@ -803,18 +856,32 @@ function AppInner() {
   const setShowTaskDeps = dialogSetter("taskDeps");
   const showWalkForward = isDialogOpen("walkForward");
   const setShowWalkForward = dialogSetter("walkForward");
-  const [orderRecovery, setOrderRecovery] = useState<{
-    orderId: string; symbol: string; reason: string; attempt: number; maxAttempts: number;
+  const [orderRecovery, _setOrderRecovery] = useState<{
+    orderId: string;
+    symbol: string;
+    reason: string;
+    attempt: number;
+    maxAttempts: number;
   } | null>(null);
-  const [daemonStatus, setDaemonStatus] = useState<{
-    status: "running" | "stopped" | "error"; taskCount: number; uptime: number;
+  const [daemonStatus, _setDaemonStatus] = useState<{
+    status: "running" | "stopped" | "error";
+    taskCount: number;
+    uptime: number;
   }>({ status: "stopped", taskCount: 0, uptime: 0 });
-  const [marketFeeds, setMarketFeeds] = useState<Array<{
-    name: string; status: "connected" | "degraded" | "disconnected"; latencyMs: number;
-  }>>([]);
-  const [genomeMutation, setGenomeMutation] = useState<MutationResult | null>(null);
-  const [trailingStop, setTrailingStop] = useState<{
-    symbol: string; currentPrice: number; stopLevel: number; trailAmount: number; side: "long" | "short";
+  const [marketFeeds, _setMarketFeeds] = useState<
+    Array<{
+      name: string;
+      status: "connected" | "degraded" | "disconnected";
+      latencyMs: number;
+    }>
+  >([]);
+  const [genomeMutation, _setGenomeMutation] = useState<MutationResult | null>(null);
+  const [trailingStop, _setTrailingStop] = useState<{
+    symbol: string;
+    currentPrice: number;
+    stopLevel: number;
+    trailAmount: number;
+    side: "long" | "short";
   } | null>(null);
 
   // ── Custom hooks ──
@@ -831,7 +898,10 @@ function AppInner() {
     if (conflicts.length === 0) return;
     const preview = conflicts
       .slice(0, 3)
-      .map((conflict) => `${conflict.key} -> ${conflict.winner} wins over ${conflict.actions.filter((action) => action !== conflict.winner).join(", ")}`)
+      .map(
+        (conflict) =>
+          `${conflict.key} -> ${conflict.winner} wins over ${conflict.actions.filter((action) => action !== conflict.winner).join(", ")}`,
+      )
       .join("\n");
     dispatch({
       type: "INJECT_NOTIFICATION",
@@ -867,22 +937,62 @@ function AppInner() {
 
   // Check if any dialog is open (to suppress other keybindings)
   const anyDialogOpen =
-    showSettings || showExport || showEmergency || showContext ||
-    showSessions || showMemory || showFeedback ||
-    showAudit || showScheduler || showPlaybooks || showStrategies ||
-    showGenome || showIndicators || showConsensus ||
-    showOrderbook || showAutonomous || showSkills || showConstitution ||
-    showInjectionDefense || showDataHealth || showRiskConfig || showDefi ||
-    showMarketOverview || showRegime || showStats || showGlobalSearch || showExitFlow ||
-    showBacktestWizard || showBrokerManager || showExchangeManager || showGenomeEvolution ||
-    showHistorySearch || showIndicatorValue || showInsights || showMarketPulse ||
-    showMessageSelector || showOptimization || showPlanEditor || showPlugins ||
-    showQuickOpen || showReconciliation || showTaskDeps || showWalkForward ||
-    showResetConfirm || !!pager || activeOverlayView !== null ||
-    !!counterfactual || !!debateView || !!elicitationRequest;
+    showSettings ||
+    showExport ||
+    showEmergency ||
+    showContext ||
+    showSessions ||
+    showMemory ||
+    showFeedback ||
+    showAudit ||
+    showScheduler ||
+    showPlaybooks ||
+    showStrategies ||
+    showGenome ||
+    showIndicators ||
+    showConsensus ||
+    showOrderbook ||
+    showAutonomous ||
+    showSkills ||
+    showConstitution ||
+    showInjectionDefense ||
+    showDataHealth ||
+    showRiskConfig ||
+    showDefi ||
+    showMarketOverview ||
+    showRegime ||
+    showStats ||
+    showGlobalSearch ||
+    showExitFlow ||
+    showBacktestWizard ||
+    showBrokerManager ||
+    showExchangeManager ||
+    showGenomeEvolution ||
+    showHistorySearch ||
+    showIndicatorValue ||
+    showInsights ||
+    showMarketPulse ||
+    showMessageSelector ||
+    showOptimization ||
+    showPlanEditor ||
+    showPlugins ||
+    showQuickOpen ||
+    showReconciliation ||
+    showTaskDeps ||
+    showWalkForward ||
+    showResetConfirm ||
+    !!pager ||
+    activeOverlayView !== null ||
+    !!counterfactual ||
+    !!debateView ||
+    !!elicitationRequest;
 
   // ── Prompt suggestions based on conversation context ──
-  const promptSuggestions = usePromptSuggestions(messages, isStreaming, connectivityHints.hasExchange);
+  const _promptSuggestions = usePromptSuggestions(
+    messages,
+    isStreaming,
+    connectivityHints.hasExchange,
+  );
 
   const paletteWorkspaceSection = React.useMemo<PaletteWorkspaceSection>(() => {
     const workspace = coerceWorkspace(activeWorkspace);
@@ -897,23 +1007,33 @@ function AppInner() {
       label: item.command,
       description: item.label,
       category: "workspace",
-      workflowId: item.workflow ? ({
-        discover: "discover",
-        analyze: "discover",
-        trade: "execute",
-        run: "plan",
-        accounts: "monitor",
-        monitor: "monitor",
-        build: "system",
-        operate: "system",
-      } as const)[item.workflow] : "system",
+      workflowId: item.workflow
+        ? (
+            {
+              discover: "discover",
+              analyze: "discover",
+              trade: "execute",
+              run: "plan",
+              accounts: "monitor",
+              monitor: "monitor",
+              build: "system",
+              operate: "system",
+            } as const
+          )[item.workflow]
+        : "system",
     }));
     return {
       label: `${workspace.toUpperCase()} QUICK ACTIONS`,
       items,
       colorToken: "uiFocus",
     };
-  }, [activeWorkspace, permissionMode, showSetup, connectivityHints.hasExchange, connectivityHints.hasBroker]);
+  }, [
+    activeWorkspace,
+    permissionMode,
+    showSetup,
+    connectivityHints.hasExchange,
+    connectivityHints.hasBroker,
+  ]);
 
   // ── Queued message count ──
   const queuedCount = defaultMessageQueue.length?.() ?? 0;
@@ -1039,9 +1159,11 @@ function AppInner() {
         dispatch({ type: "SET_ACTIVE_WORKSPACE", workspace: next.activeWorkspace });
       }
       if (next.activeOverlayView !== prev.activeOverlayView) {
-        dispatch(next.activeOverlayView
-          ? { type: "OPEN_OVERLAY_VIEW", view: next.activeOverlayView }
-          : { type: "CLOSE_OVERLAY_VIEW" });
+        dispatch(
+          next.activeOverlayView
+            ? { type: "OPEN_OVERLAY_VIEW", view: next.activeOverlayView }
+            : { type: "CLOSE_OVERLAY_VIEW" },
+        );
       }
       if (next.pager !== prev.pager) {
         dispatch(next.pager ? { type: "OPEN_PAGER", pager: next.pager } : { type: "CLOSE_PAGER" });
@@ -1059,9 +1181,7 @@ function AppInner() {
       ];
       for (const [field, id] of legacyDialogs) {
         if (next[field] === undefined) continue;
-        dispatch(next[field]
-          ? { type: "OPEN_DIALOG", id }
-          : { type: "CLOSE_DIALOG", id });
+        dispatch(next[field] ? { type: "OPEN_DIALOG", id } : { type: "CLOSE_DIALOG", id });
       }
       if (next.__resetSession) {
         dispatch({ type: "RESET_SESSION" });
@@ -1109,7 +1229,8 @@ function AppInner() {
               message: {
                 id: "first-run-setup",
                 role: "system" as const,
-                content: "No LLM provider configured. Launching setup wizard — add an API key to continue.",
+                content:
+                  "No LLM provider configured. Launching setup wizard — add an API key to continue.",
                 timestamp: new Date().toISOString(),
               },
             });
@@ -1133,7 +1254,7 @@ function AppInner() {
         });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bootPhase]);
+  }, [bootPhase, stateUpdater, dispatch, runtimeReady]);
 
   useEffect(() => {
     if (!runtimeReady) return;
@@ -1145,7 +1266,9 @@ function AppInner() {
       });
       if (hasExchange) {
         try {
-          const { syncExchangeMarketFeeds } = await import("../infra/exchange/marketStreamLifecycle.ts");
+          const { syncExchangeMarketFeeds } = await import(
+            "../infra/exchange/marketStreamLifecycle.ts"
+          );
           await syncExchangeMarketFeeds();
         } catch {
           // Non-critical — feeds also restart on credential refresh
@@ -1181,8 +1304,14 @@ function AppInner() {
         },
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runtimeReady, connectivityHints.hasExchange, connectivityHints.hasBroker]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    runtimeReady,
+    connectivityHints.hasExchange,
+    connectivityHints.hasBroker,
+    dispatch,
+    permissionMode,
+  ]);
 
   useEffect(() => {
     if (!runtimeReady || showSetup) return;
@@ -1204,168 +1333,197 @@ function AppInner() {
   }, [ctrlC.isDoublePressed, exit]);
 
   // ── Global keybindings (dynamic via keybindings.json) ──
-  useRoutedInput((input, key) => {
-    // Build key string from Ink's key object
-    const parts: string[] = [];
-    if (key.ctrl) parts.push("ctrl");
-    if (key.shift || (input.length === 1 && input === input.toUpperCase() && input !== input.toLowerCase())) parts.push("shift");
-    const keyName = key.return ? "return" : key.escape ? "escape" : key.tab ? "tab"
-      : key.upArrow ? "up" : key.downArrow ? "down" : key.leftArrow ? "left" : key.rightArrow ? "right"
-      : key.pageDown ? "pagedown" : key.pageUp ? "pageup" : input.toLowerCase();
-    parts.push(keyName);
-    const keyCombo = parts.join("+");
+  useRoutedInput(
+    (input, key) => {
+      // Build key string from Ink's key object
+      const parts: string[] = [];
+      if (key.ctrl) parts.push("ctrl");
+      if (
+        key.shift ||
+        (input.length === 1 && input === input.toUpperCase() && input !== input.toLowerCase())
+      )
+        parts.push("shift");
+      const keyName = key.return
+        ? "return"
+        : key.escape
+          ? "escape"
+          : key.tab
+            ? "tab"
+            : key.upArrow
+              ? "up"
+              : key.downArrow
+                ? "down"
+                : key.leftArrow
+                  ? "left"
+                  : key.rightArrow
+                    ? "right"
+                    : key.pageDown
+                      ? "pagedown"
+                      : key.pageUp
+                        ? "pageup"
+                        : input.toLowerCase();
+      parts.push(keyName);
+      const keyCombo = parts.join("+");
 
-    if (radarFocus && !key.ctrl && !key.meta) {
-      if (key.escape) {
-        dispatch({ type: "SET_RADAR_FOCUS", focus: null });
+      if (radarFocus && !key.ctrl && !key.meta) {
+        if (key.escape) {
+          dispatch({ type: "SET_RADAR_FOCUS", focus: null });
+          return;
+        }
+        const command = radarQuickKeyCommand(input, radarFocus);
+        if (command) {
+          dispatch({ type: "SET_RADAR_FOCUS", focus: null });
+          submitRef.current(command);
+          return;
+        }
+      }
+
+      if (anyDialogOpen) return false;
+
+      // Resolve actions via keybinding system
+      const vimMode = isVimModeEnabled()
+        ? vimModeRef.current === "insert"
+          ? "insertMode"
+          : "normalMode"
+        : "always";
+      const actions = getActionsForKey(keyCombo, vimMode);
+
+      for (const action of actions) {
+        switch (action) {
+          case "interruptStream":
+            ctrlC.onPress();
+            return;
+          case "togglePalette":
+            dispatch({ type: "TOGGLE_PALETTE" });
+            return;
+          case "togglePrivacy":
+            setPrivacyMode((prev) => !prev);
+            return;
+          case "toggleEmergencyHalt":
+            setShowEmergency((prev) => !prev);
+            return;
+          case "toggleSettings":
+            setShowSettings((prev) => !prev);
+            return;
+          case "toggleExport":
+            setShowExport((prev) => !prev);
+            return;
+          case "toggleContextView":
+            setShowContext((prev) => !prev);
+            return;
+          case "toggleTradeQueue":
+            dispatch(
+              activeOverlayView === "tradeQueue"
+                ? { type: "CLOSE_OVERLAY_VIEW" }
+                : { type: "OPEN_OVERLAY_VIEW", view: "tradeQueue" },
+            );
+            return;
+          case "toggleSafetyDashboard":
+            dispatch(
+              activeOverlayView === "safety"
+                ? { type: "CLOSE_OVERLAY_VIEW" }
+                : { type: "OPEN_OVERLAY_VIEW", view: "safety" },
+            );
+            return;
+          case "focusRadar": {
+            if (radarFocus) {
+              dispatch({ type: "SET_RADAR_FOCUS", focus: null });
+              return;
+            }
+            const suggestion = getSuggestionStore().getRecent(1, { status: "pending" })[0];
+            if (!suggestion) {
+              dispatch({
+                type: "INJECT_NOTIFICATION",
+                notification: {
+                  id: `radar-focus-empty-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  type: "tui:radar_focus",
+                  variant: "info",
+                  message: "No pending radar card to focus.",
+                  timestamp: new Date().toISOString(),
+                },
+              });
+              return;
+            }
+            dispatch({
+              type: "SET_RADAR_FOCUS",
+              focus: {
+                id: suggestion.id,
+                category: suggestion.category,
+                title: suggestion.title,
+              },
+            });
+            return;
+          }
+          case "openPager": {
+            const longMessage = findLastLongMessage(messages, PAGER_LINE_THRESHOLD);
+            if (!longMessage) {
+              dispatch({
+                type: "INJECT_NOTIFICATION",
+                notification: {
+                  id: `pager-empty-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  type: "tui:pager",
+                  variant: "info",
+                  message: "No long message available for pager.",
+                  timestamp: new Date().toISOString(),
+                },
+              });
+              return;
+            }
+            dispatch({
+              type: "OPEN_PAGER",
+              pager: {
+                title: longMessage.role === "gordon" ? "Gordon Response" : "Conversation Message",
+                content: longMessage.content,
+              },
+            });
+            return;
+          }
+          case "toggleAutoMode":
+          case "toggleStrictMode": {
+            const mode = action === "toggleAutoMode" ? ("auto" as const) : ("strict" as const);
+            // FSM verdict at the call site so the rejection message renders even
+            // though the reducer backstop would also block the transition.
+            const snapshot = getState();
+            const verdict = evaluatePermissionModeTransition({
+              from: snapshot.permissionMode,
+              to: mode,
+              pendingApprovals: snapshot.pendingApprovals.length,
+              isStreaming: snapshot.isStreaming,
+            });
+            if (!verdict.allowed) {
+              dispatch({
+                type: "ADD_MESSAGE",
+                message: {
+                  id: `mode-blocked-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  role: "system" as const,
+                  variant: "error" as const,
+                  content: verdict.reason ?? `Cannot switch permission mode to ${mode}.`,
+                  timestamp: new Date().toISOString(),
+                },
+              });
+              return;
+            }
+            dispatch({ type: "SET_PERMISSION_MODE", mode });
+            return;
+          }
+          case "exit":
+            exit();
+            return;
+          // Other actions handled by PromptInput or scroll components
+          default:
+            break;
+        }
+      }
+
+      // Fallback: Ctrl+C always works even if keybindings fail
+      if (key.ctrl && input === "c") {
+        ctrlC.onPress();
         return;
       }
-      const command = radarQuickKeyCommand(input, radarFocus);
-      if (command) {
-        dispatch({ type: "SET_RADAR_FOCUS", focus: null });
-        submitRef.current(command);
-        return;
-      }
-    }
-
-    if (anyDialogOpen) return false;
-
-    // Resolve actions via keybinding system
-    const vimMode = isVimModeEnabled()
-      ? vimModeRef.current === "insert" ? "insertMode" : "normalMode"
-      : "always";
-    const actions = getActionsForKey(keyCombo, vimMode);
-
-    for (const action of actions) {
-      switch (action) {
-        case "interruptStream":
-          ctrlC.onPress();
-          return;
-        case "togglePalette":
-          dispatch({ type: "TOGGLE_PALETTE" });
-          return;
-        case "togglePrivacy":
-          setPrivacyMode((prev) => !prev);
-          return;
-        case "toggleEmergencyHalt":
-          setShowEmergency((prev) => !prev);
-          return;
-        case "toggleSettings":
-          setShowSettings((prev) => !prev);
-          return;
-        case "toggleExport":
-          setShowExport((prev) => !prev);
-          return;
-        case "toggleContextView":
-          setShowContext((prev) => !prev);
-          return;
-        case "toggleTradeQueue":
-          dispatch(activeOverlayView === "tradeQueue"
-            ? { type: "CLOSE_OVERLAY_VIEW" }
-            : { type: "OPEN_OVERLAY_VIEW", view: "tradeQueue" });
-          return;
-        case "toggleSafetyDashboard":
-          dispatch(activeOverlayView === "safety"
-            ? { type: "CLOSE_OVERLAY_VIEW" }
-            : { type: "OPEN_OVERLAY_VIEW", view: "safety" });
-          return;
-        case "focusRadar": {
-          if (radarFocus) {
-            dispatch({ type: "SET_RADAR_FOCUS", focus: null });
-            return;
-          }
-          const suggestion = getSuggestionStore().getRecent(1, { status: "pending" })[0];
-          if (!suggestion) {
-            dispatch({
-              type: "INJECT_NOTIFICATION",
-              notification: {
-                id: `radar-focus-empty-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                type: "tui:radar_focus",
-                variant: "info",
-                message: "No pending radar card to focus.",
-                timestamp: new Date().toISOString(),
-              },
-            });
-            return;
-          }
-          dispatch({
-            type: "SET_RADAR_FOCUS",
-            focus: {
-              id: suggestion.id,
-              category: suggestion.category,
-              title: suggestion.title,
-            },
-          });
-          return;
-        }
-        case "openPager": {
-          const longMessage = findLastLongMessage(messages, PAGER_LINE_THRESHOLD);
-          if (!longMessage) {
-            dispatch({
-              type: "INJECT_NOTIFICATION",
-              notification: {
-                id: `pager-empty-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                type: "tui:pager",
-                variant: "info",
-                message: "No long message available for pager.",
-                timestamp: new Date().toISOString(),
-              },
-            });
-            return;
-          }
-          dispatch({
-            type: "OPEN_PAGER",
-            pager: {
-              title: longMessage.role === "gordon" ? "Gordon Response" : "Conversation Message",
-              content: longMessage.content,
-            },
-          });
-          return;
-        }
-        case "toggleAutoMode":
-        case "toggleStrictMode": {
-          const mode = action === "toggleAutoMode" ? ("auto" as const) : ("strict" as const);
-          // FSM verdict at the call site so the rejection message renders even
-          // though the reducer backstop would also block the transition.
-          const snapshot = getState();
-          const verdict = evaluatePermissionModeTransition({
-            from: snapshot.permissionMode,
-            to: mode,
-            pendingApprovals: snapshot.pendingApprovals.length,
-            isStreaming: snapshot.isStreaming,
-          });
-          if (!verdict.allowed) {
-            dispatch({
-              type: "ADD_MESSAGE",
-              message: {
-                id: `mode-blocked-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                role: "system" as const,
-                variant: "error" as const,
-                content: verdict.reason ?? `Cannot switch permission mode to ${mode}.`,
-                timestamp: new Date().toISOString(),
-              },
-            });
-            return;
-          }
-          dispatch({ type: "SET_PERMISSION_MODE", mode });
-          return;
-        }
-        case "exit":
-          exit();
-          return;
-        // Other actions handled by PromptInput or scroll components
-        default:
-          break;
-      }
-    }
-
-    // Fallback: Ctrl+C always works even if keybindings fail
-    if (key.ctrl && input === "c") {
-      ctrlC.onPress();
-      return;
-    }
-    return false;
-  }, { id: "global-keys", priority: FOCUS_PRIORITY.GLOBAL_GUARD });
+      return false;
+    },
+    { id: "global-keys", priority: FOCUS_PRIORITY.GLOBAL_GUARD },
+  );
 
   // ── Handlers ──
   const handleSubmit = useCallback(
@@ -1645,7 +1803,8 @@ function AppInner() {
             message: {
               id: `review-trade-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               role: "system",
-              content: "No closed trade observed this session. Run a trade first, or close one to see what-if analysis.",
+              content:
+                "No closed trade observed this session. Run a trade first, or close one to see what-if analysis.",
               timestamp: new Date().toISOString(),
             },
           });
@@ -1663,7 +1822,8 @@ function AppInner() {
             message: {
               id: `debate-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               role: "system",
-              content: "No debate captured yet. Debate view will populate once a multi-agent deliberation runs.",
+              content:
+                "No debate captured yet. Debate view will populate once a multi-agent deliberation runs.",
               timestamp: new Date().toISOString(),
             },
           });
@@ -1699,7 +1859,12 @@ function AppInner() {
           }
         } else if (sub === "report") {
           const snap = monitor.snapshot();
-          body = formatPerfSnapshot(snap, monitor.getFlushPath(), monitor.isRunning() ? "running" : "idle", getRenderBudgetBreachCount());
+          body = formatPerfSnapshot(
+            snap,
+            monitor.getFlushPath(),
+            monitor.isRunning() ? "running" : "idle",
+            getRenderBudgetBreachCount(),
+          );
         } else {
           body = "Usage: /perf [start [path] | stop | report]";
         }
@@ -1729,13 +1894,77 @@ function AppInner() {
       };
       // Wire: record input to session history for Ctrl+R browsing
       try {
-        const { recordInput } = require("./history/sessionHistory.js") as typeof import("./history/sessionHistory.js");
         recordInput(trimmed, `session_${Date.now()}`);
-      } catch { /* non-critical */ }
+      } catch {
+        /* non-critical */
+      }
       dispatch({ type: "ADD_MESSAGE", message: userMsg });
       handleInput(trimmed, stateUpdater);
     },
-    [isStreaming, dispatch, stateUpdater, recordCommandUsage],
+    [
+      isStreaming,
+      dispatch,
+      stateUpdater,
+      recordCommandUsage,
+      setShowExchangePicker,
+      setShowApprovalBrowser,
+      setShowSettings,
+      setShowEmergency,
+      setShowExchangeManager,
+      setShowExitFlow,
+      setShowExport,
+      setShowGenomeEvolution,
+      setShowGlobalSearch,
+      setShowHIP3,
+      setShowHelpBrowser,
+      setShowHistorySearch,
+      setShowIndicatorValue,
+      setShowIndicators,
+      setShowInjectionDefense,
+      setShowInsights,
+      setShowJournal,
+      setShowLabs,
+      setShowMCPManager,
+      setShowMarketOverview,
+      setShowMarketPulse,
+      setShowMarketplace,
+      setShowMemory,
+      setShowMessageSelector,
+      setShowModelPicker,
+      setShowOptimization,
+      setShowOrderbook,
+      setShowPlanEditor,
+      setShowPlaybooks,
+      setShowPlugins,
+      setShowQuickOpen,
+      setShowReconciliation,
+      setShowRegime,
+      setShowRiskConfig,
+      setShowScheduler,
+      setShowSessions,
+      setShowShortcuts,
+      setShowSkills,
+      setShowStats,
+      setShowStrategies,
+      setShowTaskDeps,
+      setShowThemePicker,
+      setShowThreadBrowser,
+      setShowDoctor,
+      setShowWalkForward,
+      setShowDefi,
+      setShowDataHealth,
+      setShowContext,
+      setShowConstitution,
+      setShowConfigEditor,
+      setShowBrokerManager,
+      setShowCLIBrowser,
+      setShowBacktestWizard,
+      debateView,
+      setShowBrokerPicker,
+      setShowAutonomous,
+      setShowAudit,
+      counterfactual,
+    ],
   );
   submitRef.current = handleSubmit;
 
@@ -1797,7 +2026,12 @@ function AppInner() {
 
   // Restore the tab name only when the TUI actually exits — not on every
   // activity/permission change, which flickered the title to "Terminal".
-  useEffect(() => () => { resetTerminalTab(); }, []);
+  useEffect(
+    () => () => {
+      resetTerminalTab();
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!useAltScreen || activeOverlayView === null) return;
@@ -1816,7 +2050,9 @@ function AppInner() {
   // Wire: log FPS warning if TUI is lagging
   useEffect(() => {
     if (fpsMetrics.isLagging) {
-      console.warn(`[gordon] TUI lagging: ${fpsMetrics.avgFps}fps avg, ${fpsMetrics.droppedFrames} dropped`);
+      console.warn(
+        `[gordon] TUI lagging: ${fpsMetrics.avgFps}fps avg, ${fpsMetrics.droppedFrames} dropped`,
+      );
     }
   }, [fpsMetrics.isLagging, fpsMetrics.avgFps, fpsMetrics.droppedFrames]);
 
@@ -1853,7 +2089,7 @@ function AppInner() {
         timestamp: new Date().toISOString(),
       },
     });
-  }, [dispatch]);
+  }, [dispatch, setShowEmergency]);
 
   // ── Session resume ──
   const handleSessionSelect = useCallback(
@@ -1869,30 +2105,39 @@ function AppInner() {
         },
       });
     },
-    [dispatch],
+    [dispatch, setShowSessions],
   );
 
   // ── Feedback handlers ──
   const handleFeedbackComplete = useCallback(() => {
     setShowFeedback(false);
     setFeedbackTradeData(null);
-  }, []);
+  }, [setShowFeedback]);
 
   // Must precede every conditional return below — a hook after an early
   // return crashes React ("rendered more hooks") when the condition flips.
-  const placeholder = React.useMemo(() => (
-    isStreaming
-      ? ""
-      : ctrlC.isPending
-        ? "Press Ctrl+C again to exit"
-        : !runtimeReady
-          ? "Initializing..."
-          : pendingApprovals.length > 0
-            ? `${pendingApprovals.length} approval(s) pending — approve <id> or deny <id>`
-            : messages.length === 0
-              ? EXAMPLE_PROMPTS[exampleIdx % EXAMPLE_PROMPTS.length]!
-              : ""
-  ), [isStreaming, ctrlC.isPending, runtimeReady, pendingApprovals.length, messages.length, exampleIdx]);
+  const placeholder = React.useMemo(
+    () =>
+      isStreaming
+        ? ""
+        : ctrlC.isPending
+          ? "Press Ctrl+C again to exit"
+          : !runtimeReady
+            ? "Initializing..."
+            : pendingApprovals.length > 0
+              ? `${pendingApprovals.length} approval(s) pending — approve <id> or deny <id>`
+              : messages.length === 0
+                ? EXAMPLE_PROMPTS[exampleIdx % EXAMPLE_PROMPTS.length]!
+                : "",
+    [
+      isStreaming,
+      ctrlC.isPending,
+      runtimeReady,
+      pendingApprovals.length,
+      messages.length,
+      exampleIdx,
+    ],
+  );
 
   // ── Skip boot screen — go straight to chat ──
   if (bootPhase === "boot") {
@@ -1914,7 +2159,12 @@ function AppInner() {
             const telemetryStateFile = path.join(GORDON_DIR, ".telemetry");
 
             // Read existing state to preserve anonymousId/salt
-            let state: { enabled?: boolean; anonymousId?: string; salt?: string; notifiedAt?: number | null } = {};
+            let state: {
+              enabled?: boolean;
+              anonymousId?: string;
+              salt?: string;
+              notifiedAt?: number | null;
+            } = {};
             if (fs.existsSync(telemetryStateFile)) {
               try {
                 state = JSON.parse(fs.readFileSync(telemetryStateFile, "utf-8"));
@@ -1979,7 +2229,9 @@ function AppInner() {
                   providerRegistry.reset();
                   summary.push(`${provider} key saved`);
                 } catch (err) {
-                  errors.push(`LLM key save failed: ${err instanceof Error ? err.message : String(err)}`);
+                  errors.push(
+                    `LLM key save failed: ${err instanceof Error ? err.message : String(err)}`,
+                  );
                 }
               }
             }
@@ -1987,11 +2239,7 @@ function AppInner() {
             // ── 2. Exchange + credentials ────────────────────────────────
             const exchangeRaw = data.exchange;
             const exchangeConflict = data.exchangeConflictAction;
-            if (
-              exchangeRaw &&
-              exchangeRaw !== "skip" &&
-              exchangeConflict !== "skip"
-            ) {
+            if (exchangeRaw && exchangeRaw !== "skip" && exchangeConflict !== "skip") {
               // Resolve base type and sandbox flag from wizard selection
               // (sandbox variants: "binance-testnet", "coinbase-sandbox", etc.)
               const isSandboxSetup =
@@ -2013,7 +2261,9 @@ function AppInner() {
 
                 // Conflict resolution: update existing entry in place when
                 // the user asked to update, rather than creating a duplicate.
-                const existing = config.exchanges.find((e) => e.type === exchangeType && e.sandbox === isSandboxSetup);
+                const existing = config.exchanges.find(
+                  (e) => e.type === exchangeType && e.sandbox === isSandboxSetup,
+                );
                 let exchangeId: string;
                 if (existing && exchangeConflict === "update") {
                   existing.apiKey = isWalletBased ? "" : apiKey;
@@ -2021,7 +2271,9 @@ function AppInner() {
                   if (passphrase) existing.passphrase = passphrase;
                   if (walletKey) existing.walletPrivateKey = walletKey;
                   exchangeId = existing.id;
-                  summary.push(`${exchangeType}${isSandboxSetup ? " (sandbox)" : ""} credentials updated`);
+                  summary.push(
+                    `${exchangeType}${isSandboxSetup ? " (sandbox)" : ""} credentials updated`,
+                  );
                 } else {
                   // Fresh add OR user chose "add as second account"
                   exchangeId = suggestedId;
@@ -2039,7 +2291,9 @@ function AppInner() {
                     ...(passphrase ? { passphrase } : {}),
                     ...(walletKey ? { walletPrivateKey: walletKey } : {}),
                   });
-                  summary.push(`${exchangeType}${isSandboxSetup ? " (sandbox)" : ""} connected as '${exchangeId}'`);
+                  summary.push(
+                    `${exchangeType}${isSandboxSetup ? " (sandbox)" : ""} connected as '${exchangeId}'`,
+                  );
                 }
                 if (!config.activeExchangeId) config.activeExchangeId = exchangeId;
                 await saveConfig(config);
@@ -2054,7 +2308,17 @@ function AppInner() {
                   envUpdates[ccxtEnv.key] = apiKey;
                   envUpdates[ccxtEnv.secret] = apiSecret;
                   if (nativeVenue) {
-                    const venueEnvPrefix = { binance: "BINANCE", binance_us: "BINANCE_US", coinbase: "COINBASE", kraken: "KRAKEN", bitfinex: "BITFINEX", hyperliquid: "HYPERLIQUID", robinhood: "ROBINHOOD", okx: "OKX", gemini: "GEMINI" } as const;
+                    const venueEnvPrefix = {
+                      binance: "BINANCE",
+                      binance_us: "BINANCE_US",
+                      coinbase: "COINBASE",
+                      kraken: "KRAKEN",
+                      bitfinex: "BITFINEX",
+                      hyperliquid: "HYPERLIQUID",
+                      robinhood: "ROBINHOOD",
+                      okx: "OKX",
+                      gemini: "GEMINI",
+                    } as const;
                     const prefix = venueEnvPrefix[nativeVenue];
                     envUpdates[`${prefix}_API_KEY`] = apiKey;
                     envUpdates[`${prefix}_API_SECRET`] = apiSecret;
@@ -2068,18 +2332,16 @@ function AppInner() {
                 }
                 // Summary already pushed inside the update/add branches above.
               } catch (err) {
-                errors.push(`exchange save failed: ${err instanceof Error ? err.message : String(err)}`);
+                errors.push(
+                  `exchange save failed: ${err instanceof Error ? err.message : String(err)}`,
+                );
               }
             }
 
             // ── 3. Broker + credentials ──────────────────────────────────
             const brokerType = data.broker;
             const brokerConflict = data.brokerConflictAction;
-            if (
-              brokerType &&
-              brokerType !== "skip" &&
-              brokerConflict !== "skip"
-            ) {
+            if (brokerType && brokerType !== "skip" && brokerConflict !== "skip") {
               try {
                 const config = await loadConfig();
                 const apiKey = data.brokerApiKey?.trim() ?? "";
@@ -2123,7 +2385,9 @@ function AppInner() {
                 process.env[`${upperType}_API_SECRET`] = apiSecret;
                 process.env[`${upperType}_PAPER`] = paper ? "true" : "false";
               } catch (err) {
-                errors.push(`broker save failed: ${err instanceof Error ? err.message : String(err)}`);
+                errors.push(
+                  `broker save failed: ${err instanceof Error ? err.message : String(err)}`,
+                );
               }
             }
 
@@ -2131,7 +2395,13 @@ function AppInner() {
             if (data.permissionMode) {
               try {
                 const config = await loadConfig();
-                config.permissionMode = data.permissionMode as "auto" | "ask" | "strict" | "paper" | "observe" | "plan";
+                config.permissionMode = data.permissionMode as
+                  | "auto"
+                  | "ask"
+                  | "strict"
+                  | "paper"
+                  | "observe"
+                  | "plan";
                 await saveConfig(config);
                 summary.push(`permissionMode=${data.permissionMode}`);
               } catch {
@@ -2206,16 +2476,23 @@ function AppInner() {
         currentModel={(getState() as any).modelName ?? "default"}
         onSelect={async (provider, model) => {
           try {
-            const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config/config.ts");
+            const { loadConfig: lc, saveConfig: sc } = await import(
+              "../infra/storage/config/config.ts"
+            );
             const cfg = await lc();
-            await sc({ ...cfg, modelConfig: { ...cfg.modelConfig, provider: provider as any, model } });
+            await sc({
+              ...cfg,
+              modelConfig: { ...cfg.modelConfig, provider: provider as any, model },
+            });
             // Update env vars so resolveRuntimeModel() picks up the change
             process.env.GORDON_PROVIDER = provider;
             if (model) process.env.GORDON_MODEL = model;
             // Reset agent cache so the agent gets recreated with the new model
             const { resetAgents } = await import("../infra/agents/agents.ts");
             resetAgents();
-          } catch { /* best-effort */ }
+          } catch {
+            /* best-effort */
+          }
           dispatch({
             type: "ADD_MESSAGE",
             message: {
@@ -2235,81 +2512,242 @@ function AppInner() {
   // ── Interactive dialogs (Claude Code pattern: full-screen replacement) ──
 
   if (showThemePicker) {
-    return <ThemePicker onSelect={async (theme: string) => {
-      try { const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config/config.ts"); const cfg = await lc(); await sc({ ...cfg, theme } as any); } catch {}
-      dispatch({ type: "ADD_MESSAGE", message: { id: `theme-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Theme changed to ${theme}. Restart for full effect.`, timestamp: new Date().toISOString() } });
-      setShowThemePicker(false);
-    }} onClose={() => setShowThemePicker(false)} />;
+    return (
+      <ThemePicker
+        onSelect={async (theme: string) => {
+          try {
+            const { loadConfig: lc, saveConfig: sc } = await import(
+              "../infra/storage/config/config.ts"
+            );
+            const cfg = await lc();
+            await sc({ ...cfg, theme } as any);
+          } catch {}
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `theme-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              role: "system",
+              content: `Theme changed to ${theme}. Restart for full effect.`,
+              timestamp: new Date().toISOString(),
+            },
+          });
+          setShowThemePicker(false);
+        }}
+        onClose={() => setShowThemePicker(false)}
+      />
+    );
   }
 
   if (showExchangePicker) {
-    return <ExchangePicker onComplete={(msg) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `exchange-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: msg, timestamp: new Date().toISOString() } });
-      setShowExchangePicker(false);
-    }} onCancel={() => setShowExchangePicker(false)} />;
+    return (
+      <ExchangePicker
+        onComplete={(msg) => {
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `exchange-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              role: "system",
+              content: msg,
+              timestamp: new Date().toISOString(),
+            },
+          });
+          setShowExchangePicker(false);
+        }}
+        onCancel={() => setShowExchangePicker(false)}
+      />
+    );
   }
 
   if (showLabs) {
-    return <LabsPanel onComplete={(msg) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `labs-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: msg, timestamp: new Date().toISOString() } });
-      setShowLabs(false);
-    }} onCancel={() => setShowLabs(false)} />;
+    return (
+      <LabsPanel
+        onComplete={(msg) => {
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `labs-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              role: "system",
+              content: msg,
+              timestamp: new Date().toISOString(),
+            },
+          });
+          setShowLabs(false);
+        }}
+        onCancel={() => setShowLabs(false)}
+      />
+    );
   }
 
   if (showBrokerPicker) {
-    return <BrokerPicker activeBroker={null} configuredBrokers={[]} onComplete={(action, broker, creds) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `broker-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Broker ${action}: ${broker}${creds ? " (credentials saved)" : ""}`, timestamp: new Date().toISOString() } });
-      setShowBrokerPicker(false);
-    }} onCancel={() => setShowBrokerPicker(false)} />;
+    return (
+      <BrokerPicker
+        activeBroker={null}
+        configuredBrokers={[]}
+        onComplete={(action, broker, creds) => {
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `broker-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              role: "system",
+              content: `Broker ${action}: ${broker}${creds ? " (credentials saved)" : ""}`,
+              timestamp: new Date().toISOString(),
+            },
+          });
+          setShowBrokerPicker(false);
+        }}
+        onCancel={() => setShowBrokerPicker(false)}
+      />
+    );
   }
 
   if (showDoctor) {
-    return <DoctorDialog checks={runDoctorChecks()} onRunFix={(cmd) => { setShowDoctor(false); handleSubmit(cmd); }} onCancel={() => setShowDoctor(false)} />;
+    return (
+      <DoctorDialog
+        checks={runDoctorChecks()}
+        onRunFix={(cmd) => {
+          setShowDoctor(false);
+          handleSubmit(cmd);
+        }}
+        onCancel={() => setShowDoctor(false)}
+      />
+    );
   }
 
   if (showHelpBrowser) {
-    return <HelpBrowser onRunCommand={(cmd) => { setShowHelpBrowser(false); handleSubmit(cmd); }} onCancel={() => setShowHelpBrowser(false)} />;
+    return (
+      <HelpBrowser
+        onRunCommand={(cmd) => {
+          setShowHelpBrowser(false);
+          handleSubmit(cmd);
+        }}
+        onCancel={() => setShowHelpBrowser(false)}
+      />
+    );
   }
 
   if (showConfigEditor) {
-    return <ConfigEditor items={[
-      { key: "permissionMode", label: "Permission Mode", category: "Trading", currentValue: permissionMode ?? "ask", type: "select", options: [{ label: "auto", value: "auto" }, { label: "ask", value: "ask" }, { label: "strict", value: "strict" }, { label: "paper", value: "paper" }, { label: "observe", value: "observe" }, { label: "plan", value: "plan" }], description: "How Gordon handles trade execution" },
-      { key: "startupBannerMode", label: "Startup Banner", category: "UI", currentValue: "full", type: "select", options: [{ label: "full", value: "full" }, { label: "quiet", value: "quiet" }] },
-      { key: "useKeyring", label: "Use Keyring", category: "Security", currentValue: "false", type: "boolean", description: "Store credentials in OS keyring" },
-    ]} onSave={async (key, value) => {
-      try { const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config/config.ts"); const cfg = await lc(); await sc({ ...cfg, [key]: value }); } catch {}
-      dispatch({ type: "ADD_MESSAGE", message: { id: `config-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Config updated: ${key} = ${value}`, timestamp: new Date().toISOString() } });
-    }} onCancel={() => setShowConfigEditor(false)} />;
+    return (
+      <ConfigEditor
+        items={[
+          {
+            key: "permissionMode",
+            label: "Permission Mode",
+            category: "Trading",
+            currentValue: permissionMode ?? "ask",
+            type: "select",
+            options: [
+              { label: "auto", value: "auto" },
+              { label: "ask", value: "ask" },
+              { label: "strict", value: "strict" },
+              { label: "paper", value: "paper" },
+              { label: "observe", value: "observe" },
+              { label: "plan", value: "plan" },
+            ],
+            description: "How Gordon handles trade execution",
+          },
+          {
+            key: "startupBannerMode",
+            label: "Startup Banner",
+            category: "UI",
+            currentValue: "full",
+            type: "select",
+            options: [
+              { label: "full", value: "full" },
+              { label: "quiet", value: "quiet" },
+            ],
+          },
+          {
+            key: "useKeyring",
+            label: "Use Keyring",
+            category: "Security",
+            currentValue: "false",
+            type: "boolean",
+            description: "Store credentials in OS keyring",
+          },
+        ]}
+        onSave={async (key, value) => {
+          try {
+            const { loadConfig: lc, saveConfig: sc } = await import(
+              "../infra/storage/config/config.ts"
+            );
+            const cfg = await lc();
+            await sc({ ...cfg, [key]: value });
+          } catch {}
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `config-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              role: "system",
+              content: `Config updated: ${key} = ${value}`,
+              timestamp: new Date().toISOString(),
+            },
+          });
+        }}
+        onCancel={() => setShowConfigEditor(false)}
+      />
+    );
   }
 
   if (showThreadBrowser) {
-    return <ThreadBrowser threads={threadList} activeThreadId={threadId} onSwitch={(id) => {
-      setShowThreadBrowser(false);
-      void (async () => {
-        try {
-          await switchThread(id);
-          const rt = getRuntime();
-          if (rt) {
-            await rt.resumeSession();
-            const transcript = rt.getTranscript();
-            dispatch({
-              type: "SET_MESSAGES",
-              messages: transcript.map((entry, i) => ({
-                id: `resumed-${i}-${Date.now()}`,
-                role: entry.role === "user" ? "user" as const : "gordon" as const,
-                content: entry.content,
-                timestamp: entry.timestamp,
-              })),
-            });
-          }
-          dispatch({ type: "ADD_MESSAGE", message: { id: `thread-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Resumed conversation ${id}`, timestamp: new Date().toISOString() } });
-        } catch {
-          dispatch({ type: "ADD_MESSAGE", message: { id: `thread-err-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Could not resume thread ${id}`, timestamp: new Date().toISOString() } });
-        }
-      })();
-    }} onDelete={(id) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `thread-del-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Thread delete isn't supported yet (${id})`, timestamp: new Date().toISOString() } });
-    }} onCancel={() => setShowThreadBrowser(false)} />;
+    return (
+      <ThreadBrowser
+        threads={threadList}
+        activeThreadId={threadId}
+        onSwitch={(id) => {
+          setShowThreadBrowser(false);
+          void (async () => {
+            try {
+              await switchThread(id);
+              const rt = getRuntime();
+              if (rt) {
+                await rt.resumeSession();
+                const transcript = rt.getTranscript();
+                dispatch({
+                  type: "SET_MESSAGES",
+                  messages: transcript.map((entry, i) => ({
+                    id: `resumed-${i}-${Date.now()}`,
+                    role: entry.role === "user" ? ("user" as const) : ("gordon" as const),
+                    content: entry.content,
+                    timestamp: entry.timestamp,
+                  })),
+                });
+              }
+              dispatch({
+                type: "ADD_MESSAGE",
+                message: {
+                  id: `thread-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  role: "system",
+                  content: `Resumed conversation ${id}`,
+                  timestamp: new Date().toISOString(),
+                },
+              });
+            } catch {
+              dispatch({
+                type: "ADD_MESSAGE",
+                message: {
+                  id: `thread-err-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  role: "system",
+                  content: `Could not resume thread ${id}`,
+                  timestamp: new Date().toISOString(),
+                },
+              });
+            }
+          })();
+        }}
+        onDelete={(id) => {
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `thread-del-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              role: "system",
+              content: `Thread delete isn't supported yet (${id})`,
+              timestamp: new Date().toISOString(),
+            },
+          });
+        }}
+        onCancel={() => setShowThreadBrowser(false)}
+      />
+    );
   }
 
   if (showJournal) {
@@ -2321,49 +2759,127 @@ function AppInner() {
   }
 
   if (showApprovalBrowser) {
-    return <ApprovalBrowser pending={[]} recent={[]} onApprove={(id, persist) => {
-      handleSubmit(`approve ${id}${persist ? " persist" : ""}`);
-      setShowApprovalBrowser(false);
-    }} onDeny={(id) => {
-      handleSubmit(`deny ${id}`);
-      setShowApprovalBrowser(false);
-    }} onCancel={() => setShowApprovalBrowser(false)} />;
+    return (
+      <ApprovalBrowser
+        pending={[]}
+        recent={[]}
+        onApprove={(id, persist) => {
+          handleSubmit(`approve ${id}${persist ? " persist" : ""}`);
+          setShowApprovalBrowser(false);
+        }}
+        onDeny={(id) => {
+          handleSubmit(`deny ${id}`);
+          setShowApprovalBrowser(false);
+        }}
+        onCancel={() => setShowApprovalBrowser(false)}
+      />
+    );
   }
 
   if (showMCPManager) {
-    return <MCPManager servers={[]} onAdd={(config) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `mcp-add-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `MCP server added: ${config.name} (${config.transport})`, timestamp: new Date().toISOString() } });
-      setShowMCPManager(false);
-    }} onRemove={(id) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `mcp-rm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `MCP server removed: ${id}`, timestamp: new Date().toISOString() } });
-    }} onReconnect={(id) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `mcp-rc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Reconnecting MCP server: ${id}`, timestamp: new Date().toISOString() } });
-    }} onCancel={() => setShowMCPManager(false)} />;
+    return (
+      <MCPManager
+        servers={[]}
+        onAdd={(config) => {
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `mcp-add-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              role: "system",
+              content: `MCP server added: ${config.name} (${config.transport})`,
+              timestamp: new Date().toISOString(),
+            },
+          });
+          setShowMCPManager(false);
+        }}
+        onRemove={(id) => {
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `mcp-rm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              role: "system",
+              content: `MCP server removed: ${id}`,
+              timestamp: new Date().toISOString(),
+            },
+          });
+        }}
+        onReconnect={(id) => {
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `mcp-rc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              role: "system",
+              content: `Reconnecting MCP server: ${id}`,
+              timestamp: new Date().toISOString(),
+            },
+          });
+        }}
+        onCancel={() => setShowMCPManager(false)}
+      />
+    );
   }
 
   if (showMarketplace) {
-    return <MarketplaceBrowser plugins={[]} onInstall={(pluginId, cmd) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `mkt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Installing ${pluginId}...\nRun: ${cmd}`, timestamp: new Date().toISOString() } });
-      setShowMarketplace(false);
-    }} onCancel={() => setShowMarketplace(false)} />;
+    return (
+      <MarketplaceBrowser
+        plugins={[]}
+        onInstall={(pluginId, cmd) => {
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `mkt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              role: "system",
+              content: `Installing ${pluginId}...\nRun: ${cmd}`,
+              timestamp: new Date().toISOString(),
+            },
+          });
+          setShowMarketplace(false);
+        }}
+        onCancel={() => setShowMarketplace(false)}
+      />
+    );
   }
 
   if (showCLIBrowser) {
-    return <CLIBrowser tools={[]} onInstall={(toolId, cmd) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `cli-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Install ${toolId}:\n${cmd}`, timestamp: new Date().toISOString() } });
-      setShowCLIBrowser(false);
-    }} onCancel={() => setShowCLIBrowser(false)} />;
+    return (
+      <CLIBrowser
+        tools={[]}
+        onInstall={(toolId, cmd) => {
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `cli-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              role: "system",
+              content: `Install ${toolId}:\n${cmd}`,
+              timestamp: new Date().toISOString(),
+            },
+          });
+          setShowCLIBrowser(false);
+        }}
+        onCancel={() => setShowCLIBrowser(false)}
+      />
+    );
   }
 
   // HIP-3 asset browser — full-screen picker like ExchangePicker
   if (showHIP3) {
-    return <HIP3AssetBrowser
-      onSelect={(req) => {
-        dispatch({ type: "ADD_MESSAGE", message: { id: `hip3-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `HIP-3 selected: ${req.symbol} @ $${req.price.toFixed(2)} · ${req.builder}/${req.collateral} · ${req.maxLeverage}x`, timestamp: new Date().toISOString() } });
-        setShowHIP3(false);
-      }}
-      onClose={() => setShowHIP3(false)}
-    />;
+    return (
+      <HIP3AssetBrowser
+        onSelect={(req) => {
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `hip3-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              role: "system",
+              content: `HIP-3 selected: ${req.symbol} @ $${req.price.toFixed(2)} · ${req.builder}/${req.collateral} · ${req.maxLeverage}x`,
+              timestamp: new Date().toISOString(),
+            },
+          });
+          setShowHIP3(false);
+        }}
+        onClose={() => setShowHIP3(false)}
+      />
+    );
   }
 
   // ── Placeholder text for PromptInput (Claude Code: rotating example commands) ──
@@ -2408,8 +2924,9 @@ function AppInner() {
               SwarmTree / AgentProgress views when those are active. */}
 
           {/* Agent progress (parallel chains) or swarm tree */}
-          {isStreaming && activeAgents.length > 0 && (
-            swarmMode ? (
+          {isStreaming &&
+            activeAgents.length > 0 &&
+            (swarmMode ? (
               <SwarmTree
                 agents={activeAgents.map((c) => ({
                   id: c.id,
@@ -2430,8 +2947,7 @@ function AppInner() {
                 handoffs={handoffHistory}
                 tokenCount={tokenCount}
               />
-            )
-          )}
+            ))}
 
           {/* ThinkStep — collapsible, trading-adapted. Shows during thinking, then "analyzed for Xs" on completion */}
           {(isThinking || (isStreaming && streamBuffer && thinkingAgent)) && thinkingAgent && (
@@ -2444,9 +2960,7 @@ function AppInner() {
           )}
 
           {/* Inline tool calls — ● Price BTC/USDT → ⎿ $68,432 */}
-          {isStreaming && activeToolCalls.length > 0 && (
-            <ToolCallInline calls={activeToolCalls} />
-          )}
+          {isStreaming && activeToolCalls.length > 0 && <ToolCallInline calls={activeToolCalls} />}
 
           {/* Spinner moved out of the conversation flow — it now renders pinned
               just above the StatusLine / input (Claude Code pattern). */}
@@ -2492,9 +3006,7 @@ function AppInner() {
           )}
 
           {/* ── Genome diff viewer — inline after mutation events ── */}
-          {genomeMutation && (
-            <GenomeDiffViewer mutation={genomeMutation} />
-          )}
+          {genomeMutation && <GenomeDiffViewer mutation={genomeMutation} />}
         </Box>
       </PrivacyScreen>
 
@@ -2527,13 +3039,9 @@ function AppInner() {
       <DialogHost />
 
       {/* ── Phase 15-18 dialog overlays ── */}
-      {showSettings && (
-        <SettingsDialog onClose={() => setShowSettings(false)} />
-      )}
+      {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
 
-      {showExport && (
-        <ExportDialog onClose={() => setShowExport(false)} />
-      )}
+      {showExport && <ExportDialog onClose={() => setShowExport(false)} />}
 
       {showEmergency && (
         <EmergencyHalt
@@ -2562,11 +3070,7 @@ function AppInner() {
         />
       )}
 
-      {showMemory && (
-        <MemorySelector
-          onSelect={() => setShowMemory(false)}
-        />
-      )}
+      {showMemory && <MemorySelector onSelect={() => setShowMemory(false)} />}
 
       {showFeedback && feedbackTradeData && (
         <FeedbackSurvey
@@ -2580,9 +3084,7 @@ function AppInner() {
       )}
 
       {/* Auto-shown plan revision diff */}
-      {planDiff && (
-        <PlanDiff previous={planDiff.previous} current={planDiff.current} />
-      )}
+      {planDiff && <PlanDiff previous={planDiff.previous} current={planDiff.current} />}
 
       {/* Post-trade rating prompt — dismiss on rate or skip */}
       {postTradeFeedback && (
@@ -2603,62 +3105,61 @@ function AppInner() {
       )}
 
       {/* Debate viewer — manual via /debate. Wrap to handle Esc dismissal since component has no onClose. */}
-      {debateView && (
-        <DebateViewerOverlay data={debateView} onClose={() => setDebateView(null)} />
-      )}
+      {debateView && <DebateViewerOverlay data={debateView} onClose={() => setDebateView(null)} />}
 
       {/* Elicitation dialog — shown when an agent calls ask_user. Emits agent:elicitation_answered on answer. */}
-      {elicitationRequest && (() => {
-        const answer = (response: string) => {
-          void import("../events/index.ts").then((m) => {
-            void m.emitEvent("agent:elicitation_answered", {
-              requestId: elicitationRequest.requestId,
-              answer: response,
+      {elicitationRequest &&
+        (() => {
+          const answer = (response: string) => {
+            void import("../events/index.ts").then((m) => {
+              void m.emitEvent("agent:elicitation_answered", {
+                requestId: elicitationRequest.requestId,
+                answer: response,
+              });
             });
-          });
-          setElicitationRequest(null);
-        };
-        const dismiss = () => answer(""); // empty answer signals dismissal
-        if (elicitationRequest.kind === "choice" || elicitationRequest.kind === "confirm") {
-          const opts = elicitationRequest.kind === "confirm"
-            ? ["Yes", "No"]
-            : (elicitationRequest.options ?? []).map((o) => o.label);
-          const sq: SideQuestion = {
-            id: elicitationRequest.requestId,
-            question: elicitationRequest.prompt,
-            options: opts.length > 0 ? opts : undefined,
-            context: "",
-            kind: elicitationRequest.kind,
+            setElicitationRequest(null);
           };
-          return <SideQuestionDialog question={sq} onAnswer={answer} onDismiss={dismiss} />;
-        }
-        // "text" kind → ElicitationDialog with a single text field
-        const fields: FormField[] = [
-          { id: "answer", label: elicitationRequest.prompt, type: "text", required: true },
-        ];
-        return (
-          <ElicitationDialog
-            title="Agent Question"
-            fields={fields}
-            onSubmit={(values) => answer(String(values.answer ?? ""))}
-            onCancel={dismiss}
-          />
-        );
-      })()}
+          const dismiss = () => answer(""); // empty answer signals dismissal
+          if (elicitationRequest.kind === "choice" || elicitationRequest.kind === "confirm") {
+            const opts =
+              elicitationRequest.kind === "confirm"
+                ? ["Yes", "No"]
+                : (elicitationRequest.options ?? []).map((o) => o.label);
+            const sq: SideQuestion = {
+              id: elicitationRequest.requestId,
+              question: elicitationRequest.prompt,
+              options: opts.length > 0 ? opts : undefined,
+              context: "",
+              kind: elicitationRequest.kind,
+            };
+            return <SideQuestionDialog question={sq} onAnswer={answer} onDismiss={dismiss} />;
+          }
+          // "text" kind → ElicitationDialog with a single text field
+          const fields: FormField[] = [
+            { id: "answer", label: elicitationRequest.prompt, type: "text", required: true },
+          ];
+          return (
+            <ElicitationDialog
+              title="Agent Question"
+              fields={fields}
+              onSubmit={(values) => answer(String(values.answer ?? ""))}
+              onCancel={dismiss}
+            />
+          );
+        })()}
 
       {/* Rate-limit banner — auto-clears when resetMs elapses */}
       {rateLimit.isThrottled && rateLimit.latestEvent && (
         <Box paddingX={2}>
           <Text color="yellow">
-            {"⚠"} Rate limit: {rateLimit.latestEvent.provider} {rateLimit.latestEvent.weight}/{rateLimit.latestEvent.limit}
+            {"⚠"} Rate limit: {rateLimit.latestEvent.provider} {rateLimit.latestEvent.weight}/
+            {rateLimit.latestEvent.limit}
           </Text>
         </Box>
       )}
 
       {/* ── Backend module dialog overlays ── */}
-      {showAudit && (
-        <AuditBrowser entries={[]} onClose={() => setShowAudit(false)} />
-      )}
+      {showAudit && <AuditBrowser entries={[]} onClose={() => setShowAudit(false)} />}
 
       {showScheduler && (
         <SchedulerPanel
@@ -2699,17 +3200,18 @@ function AppInner() {
         />
       )}
 
-      {showConsensus && (
-        <ConsensusView
-          signals={[]}
-          decision="NEUTRAL"
-          confidence={0}
-        />
-      )}
+      {showConsensus && <ConsensusView signals={[]} decision="NEUTRAL" confidence={0} />}
 
       {/* ── New panel dialogs ── */}
       {showOrderbook && (
-        <OrderbookView symbol="BTC/USDT" bids={[]} asks={[]} spread={0} spreadPercent={0} onClose={() => setShowOrderbook(false)} />
+        <OrderbookView
+          symbol="BTC/USDT"
+          bids={[]}
+          asks={[]}
+          spread={0}
+          spreadPercent={0}
+          onClose={() => setShowOrderbook(false)}
+        />
       )}
       {showAutonomous && (
         <AutonomousControlDialog
@@ -2722,49 +3224,62 @@ function AppInner() {
           onClose={() => setShowAutonomous(false)}
         />
       )}
-      {showSkills && (
-        <SkillExecutionViewer runs={[]} onClose={() => setShowSkills(false)} />
-      )}
+      {showSkills && <SkillExecutionViewer runs={[]} onClose={() => setShowSkills(false)} />}
       {showConstitution && (
-        <ConstitutionPanel results={[]} blockedCount={0} passedCount={0} onClose={() => setShowConstitution(false)} />
+        <ConstitutionPanel
+          results={[]}
+          blockedCount={0}
+          passedCount={0}
+          onClose={() => setShowConstitution(false)}
+        />
       )}
       {showInjectionDefense && (
-        <InjectionDefensePanel matches={[]} inputBlocked={false} inputText="" onClose={() => setShowInjectionDefense(false)} />
+        <InjectionDefensePanel
+          matches={[]}
+          inputBlocked={false}
+          inputText=""
+          onClose={() => setShowInjectionDefense(false)}
+        />
       )}
-      {showDataHealth && (
-        <DataSourceHealth sources={[]} onClose={() => setShowDataHealth(false)} />
-      )}
+      {showDataHealth && <DataSourceHealth sources={[]} onClose={() => setShowDataHealth(false)} />}
       {showRiskConfig && (
         <RiskConfigPanel checks={[]} mode={"warn"} onClose={() => setShowRiskConfig(false)} />
       )}
-      {showDefi && (
-        <DeFiOverviewPanel onClose={() => setShowDefi(false)} />
-      )}
+      {showDefi && <DeFiOverviewPanel onClose={() => setShowDefi(false)} />}
       {showMarketOverview && (
-        <MarketOverviewPanel marketScore={0} regime="" breakouts={[]} consolidations={[]} whaleAlerts={[]} onClose={() => setShowMarketOverview(false)} />
+        <MarketOverviewPanel
+          marketScore={0}
+          regime=""
+          breakouts={[]}
+          consolidations={[]}
+          whaleAlerts={[]}
+          onClose={() => setShowMarketOverview(false)}
+        />
       )}
-      {showRegime && (
-        <RegimeStatusPanel regimes={[]} onClose={() => setShowRegime(false)} />
-      )}
-      {showStats && (
-        <StatsDialog stats={{} as any} onClose={() => setShowStats(false)} />
-      )}
-      {showGlobalSearch && (
-        <GlobalSearchDialog onClose={() => setShowGlobalSearch(false)} />
-      )}
+      {showRegime && <RegimeStatusPanel regimes={[]} onClose={() => setShowRegime(false)} />}
+      {showStats && <StatsDialog stats={{} as any} onClose={() => setShowStats(false)} />}
+      {showGlobalSearch && <GlobalSearchDialog onClose={() => setShowGlobalSearch(false)} />}
       {showExitFlow && (
         <ExitFlow
           openPositionCount={0}
           autonomousActive={autonomousActive}
-          onSaveAndExit={() => { exit(); }}
-          onExitWithoutSave={() => { exit(); }}
+          onSaveAndExit={() => {
+            exit();
+          }}
+          onExitWithoutSave={() => {
+            exit();
+          }}
           onCancel={() => setShowExitFlow(false)}
         />
       )}
 
       {/* ── Additional panel dialogs ── */}
       {showBacktestWizard && (
-        <BacktestWizard strategies={[]} onRun={() => setShowBacktestWizard(false)} onCancel={() => setShowBacktestWizard(false)} />
+        <BacktestWizard
+          strategies={[]}
+          onRun={() => setShowBacktestWizard(false)}
+          onCancel={() => setShowBacktestWizard(false)}
+        />
       )}
       {showBrokerManager && (
         <BrokerManagerPanel brokers={[]} onClose={() => setShowBrokerManager(false)} />
@@ -2773,43 +3288,82 @@ function AppInner() {
         <ExchangeManagerPanel exchanges={[]} onClose={() => setShowExchangeManager(false)} />
       )}
       {showGenomeEvolution && (
-        <GenomeEvolutionPanel isRunning={false} generation={0} bestFitness={0} populationSize={0} mutationRate={0} variants={[]} onClose={() => setShowGenomeEvolution(false)} />
+        <GenomeEvolutionPanel
+          isRunning={false}
+          generation={0}
+          bestFitness={0}
+          populationSize={0}
+          mutationRate={0}
+          variants={[]}
+          onClose={() => setShowGenomeEvolution(false)}
+        />
       )}
       {showHistorySearch && (
-        <HistorySearchDialog entries={messages.map((m) => ({ command: m.content, timestamp: m.timestamp ? Date.parse(m.timestamp) : Date.now() }))} onClose={() => setShowHistorySearch(false)} onSelect={() => setShowHistorySearch(false)} />
+        <HistorySearchDialog
+          entries={messages.map((m) => ({
+            command: m.content,
+            timestamp: m.timestamp ? Date.parse(m.timestamp) : Date.now(),
+          }))}
+          onClose={() => setShowHistorySearch(false)}
+          onSelect={() => setShowHistorySearch(false)}
+        />
       )}
       {showIndicatorValue && (
-        <IndicatorValueViewer symbol="" indicators={[]} onClose={() => setShowIndicatorValue(false)} />
+        <IndicatorValueViewer
+          symbol=""
+          indicators={[]}
+          onClose={() => setShowIndicatorValue(false)}
+        />
       )}
-      {showInsights && (
-        <InsightBrowser insights={[]} onClose={() => setShowInsights(false)} />
-      )}
-      {showMarketPulse && (
-        <MarketPulsePanel pulses={[]} />
-      )}
+      {showInsights && <InsightBrowser insights={[]} onClose={() => setShowInsights(false)} />}
+      {showMarketPulse && <MarketPulsePanel pulses={[]} />}
       {showMessageSelector && (
-        <MessageSelector messages={messages as any} onSelect={() => setShowMessageSelector(false)} onClose={() => setShowMessageSelector(false)} />
+        <MessageSelector
+          messages={messages as any}
+          onSelect={() => setShowMessageSelector(false)}
+          onClose={() => setShowMessageSelector(false)}
+        />
       )}
       {showOptimization && (
-        <OptimizationResults results={[]} param1Name="" param2Name="" onClose={() => setShowOptimization(false)} />
+        <OptimizationResults
+          results={[]}
+          param1Name=""
+          param2Name=""
+          onClose={() => setShowOptimization(false)}
+        />
       )}
       {showPlanEditor && (
-        <PlanEditor plan={{} as any} onSave={() => setShowPlanEditor(false)} onCancel={() => setShowPlanEditor(false)} onApprove={() => setShowPlanEditor(false)} />
+        <PlanEditor
+          plan={{} as any}
+          onSave={() => setShowPlanEditor(false)}
+          onCancel={() => setShowPlanEditor(false)}
+          onApprove={() => setShowPlanEditor(false)}
+        />
       )}
-      {showPlugins && (
-        <PluginBrowser plugins={[]} onClose={() => setShowPlugins(false)} />
-      )}
+      {showPlugins && <PluginBrowser plugins={[]} onClose={() => setShowPlugins(false)} />}
       {showQuickOpen && (
-        <QuickOpenDialog items={[]} onSelect={() => setShowQuickOpen(false)} onClose={() => setShowQuickOpen(false)} />
+        <QuickOpenDialog
+          items={[]}
+          onSelect={() => setShowQuickOpen(false)}
+          onClose={() => setShowQuickOpen(false)}
+        />
       )}
       {showReconciliation && (
-        <ReconciliationStatus status="ok" discrepancies={[]} lastRunAt={new Date().toISOString()} nextRunAt={new Date().toISOString()} onClose={() => setShowReconciliation(false)} />
+        <ReconciliationStatus
+          status="ok"
+          discrepancies={[]}
+          lastRunAt={new Date().toISOString()}
+          nextRunAt={new Date().toISOString()}
+          onClose={() => setShowReconciliation(false)}
+        />
       )}
-      {showTaskDeps && (
-        <TaskDependencyView tasks={[]} onClose={() => setShowTaskDeps(false)} />
-      )}
+      {showTaskDeps && <TaskDependencyView tasks={[]} onClose={() => setShowTaskDeps(false)} />}
       {showWalkForward && (
-        <WalkForwardResults windows={[]} overallScore={0} onClose={() => setShowWalkForward(false)} />
+        <WalkForwardResults
+          windows={[]}
+          overallScore={0}
+          onClose={() => setShowWalkForward(false)}
+        />
       )}
 
       {/* ── DaemonStatus + MarketDataStatus — only show when there's something active ── */}
@@ -2827,9 +3381,7 @@ function AppInner() {
       )}
 
       {/* ── Queued commands notice ── */}
-      {isStreaming && queuedCount > 0 && (
-        <QueuedCommandsNotice count={queuedCount} />
-      )}
+      {isStreaming && queuedCount > 0 && <QueuedCommandsNotice count={queuedCount} />}
 
       {/* Thinking animation — pinned directly above the status line / input
           (next to the context % readout), Claude Code style, instead of being
@@ -2858,11 +3410,7 @@ function AppInner() {
       <RadarFocusBar focus={radarFocus} />
 
       {/* ── Input area — clean, just the prompt ── */}
-      <Box
-        borderStyle="round"
-        borderColor="gray"
-        paddingX={1}
-      >
+      <Box borderStyle="round" borderColor="gray" paddingX={1}>
         <PromptInput
           onSubmit={handleSubmit}
           onStop={abortActiveTurn}
@@ -2884,6 +3432,20 @@ function AppInner() {
       </Box>
     </Box>
   );
+}
+
+function AppInner() {
+  const { exit } = useApp();
+  const configErrorType = process.env.GORDON_CONFIG_ERROR_TYPE;
+  const configErrorMsg = process.env.GORDON_CONFIG_ERROR_MSG ?? "Unknown config error";
+
+  if (configErrorType === "syntax") {
+    return <InvalidConfigDialog errors={[configErrorMsg]} onClose={exit} />;
+  }
+  if (configErrorType === "settings") {
+    return <InvalidSettingsDialog errors={[configErrorMsg]} onClose={exit} />;
+  }
+  return <AppRuntime />;
 }
 
 function coerceWorkspace(value: string | null): WorkspaceId {
@@ -2909,21 +3471,21 @@ function coerceWorkspace(value: string | null): WorkspaceId {
 export function App() {
   return (
     <ThemeProvider>
-    <GordonInkUITheme>
-    <SettingsProvider>
-      <MemoryProvider>
-        <StatsProvider>
-          <NotificationsProvider>
-            <AppStateProvider>
-              <InputRouterProvider>
-                <AppInner />
-              </InputRouterProvider>
-            </AppStateProvider>
-          </NotificationsProvider>
-        </StatsProvider>
-      </MemoryProvider>
-    </SettingsProvider>
-    </GordonInkUITheme>
+      <GordonInkUITheme>
+        <SettingsProvider>
+          <MemoryProvider>
+            <StatsProvider>
+              <NotificationsProvider>
+                <AppStateProvider>
+                  <InputRouterProvider>
+                    <AppInner />
+                  </InputRouterProvider>
+                </AppStateProvider>
+              </NotificationsProvider>
+            </StatsProvider>
+          </MemoryProvider>
+        </SettingsProvider>
+      </GordonInkUITheme>
     </ThemeProvider>
   );
 }

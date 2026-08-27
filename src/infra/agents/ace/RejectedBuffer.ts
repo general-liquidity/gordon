@@ -50,7 +50,7 @@ export interface RejectedBufferStore {
 
 export function getRejectedBufferPath(): string {
   const override = process.env.GORDON_ACE_REJECTED_PATH;
-  if (override && override.trim()) return override;
+  if (override?.trim()) return override;
   return join(homedir(), ".gordon", "ace-rejected.json");
 }
 
@@ -69,7 +69,7 @@ export function loadRejectedBuffer(): RejectedBufferStore {
   try {
     const raw = readFileSync(path, "utf8");
     const parsed = JSON.parse(raw) as Partial<RejectedBufferStore>;
-    if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.rejected)) {
+    if (parsed?.version !== 1 || !Array.isArray(parsed.rejected)) {
       return emptyStore();
     }
     return {
@@ -105,7 +105,11 @@ export function rejectedIds(): Set<string> {
 
 /** Record a rejection. Idempotent on (id, reason): updates the existing
  *  entry's timestamp and resets the repropose counter. */
-export function rejectLesson(input: { id: string; reason: "operator" | "auto"; note?: string }): RejectedBufferStore {
+export function rejectLesson(input: {
+  id: string;
+  reason: "operator" | "auto";
+  note?: string;
+}): RejectedBufferStore {
   const store = loadRejectedBuffer();
   const now = new Date().toISOString();
   const existing = store.rejected.find((r) => r.id === input.id);

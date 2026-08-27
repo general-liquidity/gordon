@@ -35,7 +35,9 @@ export const tradeConsistencyDiagnosticTool = createTool({
           stopDistance: z
             .number()
             .min(0)
-            .describe("Stop distance from entry (R-multiples or %, just be consistent across array)."),
+            .describe(
+              "Stop distance from entry (R-multiples or %, just be consistent across array).",
+            ),
           targetDistance: z
             .number()
             .min(0)
@@ -44,12 +46,41 @@ export const tradeConsistencyDiagnosticTool = createTool({
       )
       .min(1)
       .describe("Recent trade executions. Default minTrades = 10 before a verdict is emitted."),
-    strategyWeight: z.number().min(0).max(1).optional().describe("Weight for strategy subscore. Default 0.30."),
-    entryTriggerWeight: z.number().min(0).max(1).optional().describe("Weight for entry-trigger subscore. Default 0.25."),
-    stopWeight: z.number().min(0).max(1).optional().describe("Weight for stop-distance subscore. Default 0.225."),
-    targetWeight: z.number().min(0).max(1).optional().describe("Weight for target-distance subscore. Default 0.225."),
-    minTrades: z.number().int().min(1).optional().describe("Minimum trades for a verdict. Default 10."),
-    cvCeiling: z.number().positive().optional().describe("CV at which subscore collapses to 0. Default 1.0."),
+    strategyWeight: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe("Weight for strategy subscore. Default 0.30."),
+    entryTriggerWeight: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe("Weight for entry-trigger subscore. Default 0.25."),
+    stopWeight: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe("Weight for stop-distance subscore. Default 0.225."),
+    targetWeight: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe("Weight for target-distance subscore. Default 0.225."),
+    minTrades: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe("Minimum trades for a verdict. Default 10."),
+    cvCeiling: z
+      .number()
+      .positive()
+      .optional()
+      .describe("CV at which subscore collapses to 0. Default 1.0."),
   }),
   outputSchema: z.object({
     sampleSize: z.number(),

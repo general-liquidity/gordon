@@ -88,7 +88,10 @@ export interface AlphaVantageEarnings {
   }>;
 }
 
-interface CacheEntry<T> { data: T; timestamp: number; }
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
 
 export class AlphaVantageClient {
   private apiKey: string | undefined;
@@ -121,11 +124,11 @@ export class AlphaVantageClient {
         signal: AbortSignal.timeout(10000),
       });
       if (!response.ok) return null;
-      const data = await response.json() as any;
+      const data = (await response.json()) as any;
 
       // Alpha Vantage returns error info in the body
-      if (data["Error Message"] || data["Note"]) {
-        console.warn("[alpha-vantage]", data["Error Message"] ?? data["Note"]);
+      if (data["Error Message"] || data.Note) {
+        console.warn("[alpha-vantage]", data["Error Message"] ?? data.Note);
         return null;
       }
 
@@ -147,14 +150,17 @@ export class AlphaVantageClient {
       open: parseFloat(q["02. open"] ?? "0"),
       high: parseFloat(q["03. high"] ?? "0"),
       low: parseFloat(q["04. low"] ?? "0"),
-      volume: parseInt(q["06. volume"] ?? "0"),
+      volume: parseInt(q["06. volume"] ?? "0", 10),
       change: parseFloat(q["09. change"] ?? "0"),
       changePercent: parseFloat(q["10. change percent"]?.replace("%", "") ?? "0") / 100,
       latestTradingDay: q["07. latest trading day"] ?? "",
     };
   }
 
-  async getIntraday(symbol: string, interval: "1min" | "5min" | "15min" | "30min" | "60min" = "5min"): Promise<AlphaVantageIntradayBar[]> {
+  async getIntraday(
+    symbol: string,
+    interval: "1min" | "5min" | "15min" | "30min" | "60min" = "5min",
+  ): Promise<AlphaVantageIntradayBar[]> {
     const data = await this.fetch<any>({
       function: "TIME_SERIES_INTRADAY",
       symbol: symbol.toUpperCase(),
@@ -165,14 +171,16 @@ export class AlphaVantageClient {
     const series = data?.[`Time Series (${interval})`];
     if (!series) return [];
 
-    return Object.entries(series).map(([timestamp, bar]: [string, any]) => ({
-      timestamp,
-      open: parseFloat(bar["1. open"]),
-      high: parseFloat(bar["2. high"]),
-      low: parseFloat(bar["3. low"]),
-      close: parseFloat(bar["4. close"]),
-      volume: parseInt(bar["5. volume"]),
-    })).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    return Object.entries(series)
+      .map(([timestamp, bar]: [string, any]) => ({
+        timestamp,
+        open: parseFloat(bar["1. open"]),
+        high: parseFloat(bar["2. high"]),
+        low: parseFloat(bar["3. low"]),
+        close: parseFloat(bar["4. close"]),
+        volume: parseInt(bar["5. volume"], 10),
+      }))
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   }
 
   async getFundamentals(symbol: string): Promise<AlphaVantageFundamentals | null> {
@@ -258,7 +266,9 @@ export class AlphaVantageClient {
     };
   }
 
-  clearCache(): void { this.cache.clear(); }
+  clearCache(): void {
+    this.cache.clear();
+  }
 }
 
 let instance: AlphaVantageClient | null = null;

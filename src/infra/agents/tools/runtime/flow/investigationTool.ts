@@ -32,14 +32,8 @@ import { dirname, join } from "node:path";
 import { GORDON_DIR } from "../../../../storage/paths.ts";
 import { getGordonContext, type MastraExecutionContext } from "../../types.ts";
 import { resolveWorkflowPhaseModelRoute } from "../../../cognition/workflowPhase.ts";
-import {
-  runInvestigation,
-  type InvestigationResult,
-} from "../../../investigation.ts";
-import {
-  forkContext,
-  type ContextForkAuditEntry,
-} from "../../../contextFork.ts";
+import { runInvestigation, type InvestigationResult } from "../../../investigation.ts";
+import { forkContext, type ContextForkAuditEntry } from "../../../contextFork.ts";
 import { createSynthesisAgentStepFromChatWithConfig } from "../../../wiring/synthesisAgentStep.ts";
 import {
   withTimelineEntry,
@@ -66,7 +60,7 @@ function appendForkAudit(entry: ContextForkAuditEntry): void {
     const path = defaultForkAuditPath();
     const dir = dirname(path);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    appendFileSync(path, JSON.stringify(entry) + "\n");
+    appendFileSync(path, `${JSON.stringify(entry)}\n`);
   } catch {
     // Audit failure must not break the fork
   }
@@ -90,21 +84,31 @@ export const investigateTool = createTool({
     "BTCUSDT vs ETHUSDT mentioned earlier'.",
   inputSchema: z.object({
     task: z.string().min(3).describe("The synthesis task for the sub-agent."),
-    maxToolCalls: z.number().int().min(1).max(50).default(20).describe("Tool-call budget cap (informational; sub-agent runs synthesis-only today)."),
+    maxToolCalls: z
+      .number()
+      .int()
+      .min(1)
+      .max(50)
+      .default(20)
+      .describe("Tool-call budget cap (informational; sub-agent runs synthesis-only today)."),
     allowedTools: z
       .array(z.string())
       .default([])
-      .describe("Optional list of tool ids the sub-agent should reference. Tools never execute in the sub-agent — they're surfaced as context only."),
+      .describe(
+        "Optional list of tool ids the sub-agent should reference. Tools never execute in the sub-agent — they're surfaced as context only.",
+      ),
   }),
-  outputSchema: z.object({
-    synthesis: z.string(),
-    toolCallCount: z.number(),
-    deniedTools: z.array(z.string()),
-    budgetExhausted: z.boolean(),
-    durationMs: z.number(),
-    rounds: z.number(),
-    error: z.string().optional(),
-  }).partial(),
+  outputSchema: z
+    .object({
+      synthesis: z.string(),
+      toolCallCount: z.number(),
+      deniedTools: z.array(z.string()),
+      budgetExhausted: z.boolean(),
+      durationMs: z.number(),
+      rounds: z.number(),
+      error: z.string().optional(),
+    })
+    .partial(),
   execute: async ({ task, maxToolCalls, allowedTools }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.llm) return errors.noLlm;
@@ -179,25 +183,31 @@ export const forkContextTool = createTool({
           content: z.string(),
         }),
       )
-      .describe("Parent conversation messages to inherit. Caller is responsible for supplying these."),
+      .describe(
+        "Parent conversation messages to inherit. Caller is responsible for supplying these.",
+      ),
     stripSafetyMessages: z
       .boolean()
       .default(true)
-      .describe("Strip messages containing safety markers (rationale, permission grants, execution records). Default true."),
+      .describe(
+        "Strip messages containing safety markers (rationale, permission grants, execution records). Default true.",
+      ),
     maxToolCalls: z.number().int().min(1).max(50).default(20),
     allowedTools: z.array(z.string()).default([]),
   }),
-  outputSchema: z.object({
-    synthesis: z.string(),
-    inheritedMessageCount: z.number(),
-    strippedMessageCount: z.number(),
-    deniedTools: z.array(z.string()),
-    toolCallCount: z.number(),
-    budgetExhausted: z.boolean(),
-    durationMs: z.number(),
-    rounds: z.number(),
-    error: z.string().optional(),
-  }).partial(),
+  outputSchema: z
+    .object({
+      synthesis: z.string(),
+      inheritedMessageCount: z.number(),
+      strippedMessageCount: z.number(),
+      deniedTools: z.array(z.string()),
+      toolCallCount: z.number(),
+      budgetExhausted: z.boolean(),
+      durationMs: z.number(),
+      rounds: z.number(),
+      error: z.string().optional(),
+    })
+    .partial(),
   execute: async (
     { task, parentMessages, stripSafetyMessages, maxToolCalls, allowedTools },
     execContext: MastraExecutionContext,

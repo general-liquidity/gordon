@@ -52,7 +52,6 @@ export function getDiffColor(type: DiffLine["type"]): string {
       return "red";
     case "header":
       return "gray";
-    case "unchanged":
     default:
       return "dimColor"; // special — callers should use `dimColor` prop
   }

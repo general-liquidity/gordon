@@ -21,12 +21,15 @@ export const scanOpportunityProducer: CandidateProducer = (obs): ProactiveSugges
   if (obs.source !== "event_bus" || obs.eventType !== "scan:opportunity") return [];
 
   const symbol = obs.symbol ?? (obs.metadata?.symbol as string | undefined);
-  const scannerConfidence = typeof obs.metadata?.confidence === "number"
-    ? (obs.metadata.confidence as number)
-    : undefined;
+  const scannerConfidence =
+    typeof obs.metadata?.confidence === "number" ? (obs.metadata.confidence as number) : undefined;
   const bias = obs.metadata?.bias as string | undefined;
 
-  if (!symbol || scannerConfidence === undefined || scannerConfidence < MIN_OPPORTUNITY_CONFIDENCE) {
+  if (
+    !symbol ||
+    scannerConfidence === undefined ||
+    scannerConfidence < MIN_OPPORTUNITY_CONFIDENCE
+  ) {
     return [];
   }
 

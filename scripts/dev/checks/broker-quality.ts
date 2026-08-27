@@ -13,7 +13,9 @@ async function main(): Promise<void> {
   const iterationsArg = process.argv.find((arg) => arg.startsWith("--iterations="));
   const iterations = iterationsArg ? Number(iterationsArg.split("=")[1]) : 8;
 
-  const reports = await runBrokerBenchmarks({ iterations: Number.isFinite(iterations) ? iterations : 8 });
+  const reports = await runBrokerBenchmarks({
+    iterations: Number.isFinite(iterations) ? iterations : 8,
+  });
   const summary = formatBenchmarkSummary(reports);
   console.log(summary);
 
@@ -30,4 +32,3 @@ async function main(): Promise<void> {
 }
 
 await main();
-

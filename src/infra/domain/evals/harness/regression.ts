@@ -120,12 +120,8 @@ export function detectRegressions(
   const blockOnCostRegression = options.blockOnCostRegression ?? false;
 
   // Build lookup maps so we can match scenarios across the two runs.
-  const baselineByScenario = new Map(
-    baseline.perScenario.map((p) => [p.scenarioId, p]),
-  );
-  const candidateByScenario = new Map(
-    candidate.perScenario.map((p) => [p.scenarioId, p]),
-  );
+  const baselineByScenario = new Map(baseline.perScenario.map((p) => [p.scenarioId, p]));
+  const candidateByScenario = new Map(candidate.perScenario.map((p) => [p.scenarioId, p]));
 
   const regressions: RegressionReport["regressions"][number][] = [];
   const improvements: RegressionReport["improvements"][number][] = [];
@@ -171,9 +167,7 @@ export function detectRegressions(
         }
       : undefined;
 
-  const aggregateDelta = Number(
-    (candidate.aggregate - baseline.aggregate).toFixed(4),
-  );
+  const aggregateDelta = Number((candidate.aggregate - baseline.aggregate).toFixed(4));
   const costRegression = evaluateCostRegression(
     baseline,
     candidate,

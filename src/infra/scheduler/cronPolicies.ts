@@ -106,10 +106,7 @@ export interface RunOutcome {
   durationMs?: number;
 }
 
-export function updateStateAfterRun(
-  state: JobRunState,
-  outcome: RunOutcome,
-): JobRunState {
+export function updateStateAfterRun(state: JobRunState, outcome: RunOutcome): JobRunState {
   const next: JobRunState = { ...state };
   next.lastRunAtMs = Date.now();
   next.lastRunStatus = outcome.status;
@@ -127,6 +124,9 @@ export function updateStateAfterRun(
   return next;
 }
 
-export function shouldAutoDisable(state: JobRunState, threshold: number = DEFAULT_ERROR_DISABLE_THRESHOLD): boolean {
+export function shouldAutoDisable(
+  state: JobRunState,
+  threshold: number = DEFAULT_ERROR_DISABLE_THRESHOLD,
+): boolean {
   return state.consecutiveErrors >= threshold;
 }

@@ -114,10 +114,7 @@ export function normalizeAltSeries(
  * Before the first alt observation, emit 0. Returns one number per returns
  * point, in the returns array's order. Pure.
  */
-export function alignToReturns(
-  series: AltDataSeries,
-  returns: { time: number }[],
-): number[] {
+export function alignToReturns(series: AltDataSeries, returns: { time: number }[]): number[] {
   const sorted = series.points
     .filter(isFinitePoint)
     .slice()
@@ -183,8 +180,7 @@ export function parseHashrateChart(json: unknown): AltDataPoint[] {
  * source/proxy; this parser only fixes the expected shape.
  */
 export function parseTrendsTimeline(json: unknown): AltDataPoint[] {
-  const timeline = (json as { default?: { timelineData?: unknown } })?.default
-    ?.timelineData;
+  const timeline = (json as { default?: { timelineData?: unknown } })?.default?.timelineData;
   if (!Array.isArray(timeline)) return [];
   const out: AltDataPoint[] = [];
   for (const t of timeline) {

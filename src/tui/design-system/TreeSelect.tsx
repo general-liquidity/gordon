@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../ink-custom";
 
 // ============================================================================
@@ -11,13 +11,32 @@ import { Box, Text, useInput } from "../ink-custom";
 //   ▸ Coinbase
 // ============================================================================
 
-export interface TreeNode { id: string; label: string; children?: TreeNode[]; }
+export interface TreeNode {
+  id: string;
+  label: string;
+  children?: TreeNode[];
+}
 
-interface Props { tree: TreeNode[]; onSelect: (node: TreeNode) => void; onClose: () => void; }
+interface Props {
+  tree: TreeNode[];
+  onSelect: (node: TreeNode) => void;
+  onClose: () => void;
+}
 
-interface FlatNode { node: TreeNode; depth: number; hasChildren: boolean; expanded: boolean; path: string; }
+interface FlatNode {
+  node: TreeNode;
+  depth: number;
+  hasChildren: boolean;
+  expanded: boolean;
+  path: string;
+}
 
-function flatten(nodes: TreeNode[], expandedSet: Set<string>, depth = 0, parentPath = ""): FlatNode[] {
+function flatten(
+  nodes: TreeNode[],
+  expandedSet: Set<string>,
+  depth = 0,
+  parentPath = "",
+): FlatNode[] {
   const result: FlatNode[] = [];
   for (const node of nodes) {
     const path = parentPath ? `${parentPath}/${node.id}` : node.id;
@@ -48,7 +67,11 @@ export function TreeSelect({ tree, onSelect, onClose }: Props) {
     } else if (key.leftArrow) {
       const item = flat[cursor];
       if (item?.hasChildren && item.expanded) {
-        setExpandedSet((prev) => { const s = new Set(prev); s.delete(item.path); return s; });
+        setExpandedSet((prev) => {
+          const s = new Set(prev);
+          s.delete(item.path);
+          return s;
+        });
       }
     } else if (key.return) {
       const item = flat[cursor];
@@ -56,7 +79,8 @@ export function TreeSelect({ tree, onSelect, onClose }: Props) {
         if (item.hasChildren) {
           setExpandedSet((prev) => {
             const s = new Set(prev);
-            if (s.has(item.path)) s.delete(item.path); else s.add(item.path);
+            if (s.has(item.path)) s.delete(item.path);
+            else s.add(item.path);
             return s;
           });
         } else {

@@ -27,9 +27,9 @@ if (!fs.existsSync(NPM_DIR)) {
 
 // Patterns that should NEVER appear in the published tarball
 const FORBIDDEN_PATTERNS = [
-  /\.tsx?$/i,           // TypeScript source
-  /\.map$/i,            // source maps
-  /\.env(\..*)?$/i,     // env files
+  /\.tsx?$/i, // TypeScript source
+  /\.map$/i, // source maps
+  /\.env(\..*)?$/i, // env files
   /\.gitignore$/i,
   /\.git\//,
   /credentials?/i,
@@ -48,12 +48,7 @@ const FORBIDDEN_PATTERNS = [
 ];
 
 // Patterns that are EXPECTED in the wrapper tarball
-const EXPECTED_PATTERNS = [
-  /^package\.json$/,
-  /^README(\.md)?$/i,
-  /^LICEN[CS]E(\.md)?$/i,
-  /^bin\//,
-];
+const EXPECTED_PATTERNS = [/^package\.json$/, /^README(\.md)?$/i, /^LICEN[CS]E(\.md)?$/i, /^bin\//];
 
 let output;
 try {
@@ -87,7 +82,7 @@ try {
 
 // npm pack --dry-run --json returns an array of package objects
 const pkg = Array.isArray(parsed) ? parsed[0] : parsed;
-if (!pkg || !pkg.files) {
+if (!pkg?.files) {
   console.error("[audit-npm-pack] no files reported by npm pack");
   process.exit(1);
 }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Divider } from "../layout/Divider.tsx";
 
@@ -100,8 +100,10 @@ export function MCPRemoteServerMenu({ onAdd, onClose }: Props) {
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">ADD REMOTE MCP SERVER</Text>
-        <Text dimColor>  (HTTP / SSE)</Text>
+        <Text bold color="cyanBright">
+          ADD REMOTE MCP SERVER
+        </Text>
+        <Text dimColor> (HTTP / SSE)</Text>
       </Box>
 
       <Divider />
@@ -112,11 +114,11 @@ export function MCPRemoteServerMenu({ onAdd, onClose }: Props) {
           if (s === "confirm") return null;
           const display =
             s === "apiKey" && values[s]
-              ? "•".repeat(Math.min(values[s].length, 8)) + "..."
+              ? `${"•".repeat(Math.min(values[s].length, 8))}...`
               : values[s] || "(blank)";
           return (
             <Box key={s}>
-              <Text dimColor>  {STEP_LABEL[s].padEnd(20)}</Text>
+              <Text dimColor> {STEP_LABEL[s].padEnd(20)}</Text>
               <Text color="green">{display}</Text>
             </Box>
           );
@@ -136,11 +138,9 @@ export function MCPRemoteServerMenu({ onAdd, onClose }: Props) {
             <Text dimColor>{STEP_PLACEHOLDER[step]}</Text>
           </Box>
           {(step === "name" || step === "url") && input.trim() === "" && (
-            <Text color="yellow">  (required)</Text>
+            <Text color="yellow"> (required)</Text>
           )}
-          {step === "apiKey" && (
-            <Text dimColor>  Press Enter to skip</Text>
-          )}
+          {step === "apiKey" && <Text dimColor> Press Enter to skip</Text>}
         </Box>
       )}
 
@@ -149,16 +149,16 @@ export function MCPRemoteServerMenu({ onAdd, onClose }: Props) {
         <Box flexDirection="column" marginTop={1}>
           <Text bold>Ready to add:</Text>
           <Box>
-            <Text dimColor>  {"Name".padEnd(20)}</Text>
+            <Text dimColor> {"Name".padEnd(20)}</Text>
             <Text>{values.name}</Text>
           </Box>
           <Box>
-            <Text dimColor>  {"URL".padEnd(20)}</Text>
+            <Text dimColor> {"URL".padEnd(20)}</Text>
             <Text>{values.url}</Text>
           </Box>
           {values.apiKey && (
             <Box>
-              <Text dimColor>  {"API Key".padEnd(20)}</Text>
+              <Text dimColor> {"API Key".padEnd(20)}</Text>
               <Text>{"•".repeat(Math.min(values.apiKey.length, 8))}...</Text>
             </Box>
           )}

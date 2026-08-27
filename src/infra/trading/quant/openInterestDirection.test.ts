@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeOiDirection,
-  oiDirectionToPayload,
-} from "./openInterestDirection.ts";
+import { computeOiDirection, oiDirectionToPayload } from "./openInterestDirection.ts";
 
 describe("computeOiDirection — regime classification", () => {
   it("price ↑ + OI ↑ → longs_building", () => {
@@ -60,9 +57,7 @@ describe("computeOiDirection — strength scaling", () => {
 
 describe("computeOiDirection — input validation", () => {
   it("length mismatch throws", () => {
-    expect(() =>
-      computeOiDirection({ prices: [1, 2, 3], openInterest: [1, 2] }),
-    ).toThrow();
+    expect(() => computeOiDirection({ prices: [1, 2, 3], openInterest: [1, 2] })).toThrow();
   });
 
   it("short input returns flat with reason", () => {

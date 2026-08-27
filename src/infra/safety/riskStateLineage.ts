@@ -65,7 +65,7 @@ export interface ProposalResult {
 // ============================================================================
 
 /** Is `value` safer-than-or-equal-to `ref` on this dimension? */
-function isSaferOrEqual(dim: RiskDimension, value: number, ref: number): boolean {
+function _isSaferOrEqual(dim: RiskDimension, value: number, ref: number): boolean {
   return dim.saferDirection === "lower" ? value <= ref : value >= ref;
 }
 

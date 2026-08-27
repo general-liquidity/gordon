@@ -64,9 +64,7 @@ export const GENERAL_PURPOSE_PROFILE: SubagentProfile = {
  * Gate flag — opt OUT of the auto-include. Default behavior is to
  * include general-purpose when operator profiles are empty.
  */
-export function isGeneralPurposeDisabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function isGeneralPurposeDisabled(env: NodeJS.ProcessEnv = process.env): boolean {
   const raw = env.GORDON_DYNAMIC_SUBAGENTS_NO_GP;
   if (typeof raw !== "string") return false;
   const normalized = raw.trim().toLowerCase();

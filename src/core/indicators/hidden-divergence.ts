@@ -98,7 +98,7 @@ function calcRSI(closes: number[], period: number): number[] {
  */
 export function calculateHiddenDivergence(
   candles: Candle[],
-  opts?: { rsiPeriod?: number; lookback?: number; priceTolerance?: number; rsiTolerance?: number }
+  opts?: { rsiPeriod?: number; lookback?: number; priceTolerance?: number; rsiTolerance?: number },
 ): HiddenDivergenceResult {
   const rsiPeriod = opts?.rsiPeriod ?? 14;
   const lookback = opts?.lookback ?? 10;
@@ -117,9 +117,9 @@ export function calculateHiddenDivergence(
     };
   }
 
-  const closes = candles.map(c => c.close);
-  const highs = candles.map(c => c.high);
-  const lows = candles.map(c => c.low);
+  const closes = candles.map((c) => c.close);
+  const highs = candles.map((c) => c.high);
+  const lows = candles.map((c) => c.low);
   const rsiValues = calcRSI(closes, rsiPeriod);
 
   // Rolling extremes for price and RSI
@@ -201,8 +201,9 @@ export function calculateHiddenDivergence(
 
   // Find most recent hidden divergence
   const lastBar = candles.length - 1;
-  const recentDivergences = divergences.filter(d => lastBar - d.currentBar <= lookback);
-  const mostRecent = recentDivergences.length > 0 ? recentDivergences[recentDivergences.length - 1]! : null;
+  const recentDivergences = divergences.filter((d) => lastBar - d.currentBar <= lookback);
+  const mostRecent =
+    recentDivergences.length > 0 ? recentDivergences[recentDivergences.length - 1]! : null;
 
   const currentRSI = rsiValues[rsiValues.length - 1] ?? null;
   const divergenceDetected = mostRecent !== null;
@@ -219,12 +220,12 @@ export function calculateHiddenDivergence(
     signal,
     strength,
     mostRecent,
-    divergences.length
+    divergences.length,
   );
 
   return {
     rsi: currentRSI !== null ? parseFloat(currentRSI.toFixed(1)) : null,
-    rsiValues: rsiValues.map(v => parseFloat(v.toFixed(2))),
+    rsiValues: rsiValues.map((v) => parseFloat(v.toFixed(2))),
     divergenceDetected,
     signal,
     divergences: recentDivergences,
@@ -285,7 +286,7 @@ function buildHiddenDivergenceInterpretation(
   signal: string,
   strength: number,
   recent: HiddenDivergenceSignal | null,
-  totalCount: number
+  totalCount: number,
 ): string {
   if (rsi === null) return "Insufficient data for hidden divergence.";
 

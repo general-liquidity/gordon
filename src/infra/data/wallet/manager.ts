@@ -75,48 +75,60 @@ export class WalletIntelManager {
 
   getTokenBalances(query: AddressQuery): Promise<TokenBalance[]> {
     return this.route<TokenBalance[]>(
-      "balances", "getTokenBalances",
-      (r) => r.length === 0, [],
+      "balances",
+      "getTokenBalances",
+      (r) => r.length === 0,
+      [],
       (s) => s.getTokenBalances!(query),
     );
   }
 
   getPortfolio(query: AddressQuery): Promise<Portfolio | null> {
     return this.route<Portfolio | null>(
-      "portfolio", "getPortfolio",
-      (r) => r === null, null,
+      "portfolio",
+      "getPortfolio",
+      (r) => r === null,
+      null,
       (s) => s.getPortfolio!(query),
     );
   }
 
   getTransactions(query: TxQuery): Promise<WalletTx[]> {
     return this.route<WalletTx[]>(
-      "transactions", "getTransactions",
-      (r) => r.length === 0, [],
+      "transactions",
+      "getTransactions",
+      (r) => r.length === 0,
+      [],
       (s) => s.getTransactions!(query),
     );
   }
 
   getTokenHolders(query: TokenQuery): Promise<TokenHolder[]> {
     return this.route<TokenHolder[]>(
-      "tokenHolders", "getTokenHolders",
-      (r) => r.length === 0, [],
+      "tokenHolders",
+      "getTokenHolders",
+      (r) => r.length === 0,
+      [],
       (s) => s.getTokenHolders!(query),
     );
   }
 
   getAddressLabels(query: AddressQuery): Promise<AddressLabel | null> {
     return this.route<AddressLabel | null>(
-      "labels", "getAddressLabels",
-      (r) => r === null, null,
+      "labels",
+      "getAddressLabels",
+      (r) => r === null,
+      null,
       (s) => s.getAddressLabels!(query),
     );
   }
 
   getSmartMoneyFlow(query: SmartMoneyQuery): Promise<SmartMoneyFlowItem[]> {
     return this.route<SmartMoneyFlowItem[]>(
-      "smartMoneyFlow", "getSmartMoneyFlow",
-      (r) => r.length === 0, [],
+      "smartMoneyFlow",
+      "getSmartMoneyFlow",
+      (r) => r.length === 0,
+      [],
       (s) => s.getSmartMoneyFlow!(query),
     );
   }

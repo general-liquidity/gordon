@@ -232,7 +232,8 @@ export function getHistoricalDataStats(): {
   const db = getDatabase();
 
   const totalRows = Number(
-    db.prepare<{ count: number }, []>("SELECT COUNT(*) as count FROM data_source_cache").get()?.count ?? 0,
+    db.prepare<{ count: number }, []>("SELECT COUNT(*) as count FROM data_source_cache").get()
+      ?.count ?? 0,
   );
 
   const symbolCounts: Record<string, number> = {};
@@ -262,12 +263,18 @@ export function getHistoricalDataStats(): {
     sourceCounts[row.source_id] = row.count;
   }
 
-  const oldestTimestamp = db
-    .prepare<{ min_ts: number | null }, []>("SELECT MIN(timestamp) as min_ts FROM data_source_cache")
-    .get()?.min_ts ?? null;
-  const newestTimestamp = db
-    .prepare<{ max_ts: number | null }, []>("SELECT MAX(timestamp) as max_ts FROM data_source_cache")
-    .get()?.max_ts ?? null;
+  const oldestTimestamp =
+    db
+      .prepare<{ min_ts: number | null }, []>(
+        "SELECT MIN(timestamp) as min_ts FROM data_source_cache",
+      )
+      .get()?.min_ts ?? null;
+  const newestTimestamp =
+    db
+      .prepare<{ max_ts: number | null }, []>(
+        "SELECT MAX(timestamp) as max_ts FROM data_source_cache",
+      )
+      .get()?.max_ts ?? null;
 
   return {
     totalRows,

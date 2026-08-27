@@ -13,10 +13,7 @@ import {
   getResolvedRoutings,
   writeRoutingManifest,
 } from "../../infra/runtime/routing/manager.ts";
-import type {
-  AgentAffinity,
-  RoutingManifest,
-} from "../../infra/runtime/routing/types.ts";
+import type { AgentAffinity, RoutingManifest } from "../../infra/runtime/routing/types.ts";
 
 // ============================================================================
 // Types
@@ -28,11 +25,7 @@ export interface RoutingCommandResult {
   data?: unknown;
 }
 
-const VALID_AGENTS: AgentAffinity[] = [
-  "Gordon",
-  "Executor",
-  "Researcher",
-];
+const VALID_AGENTS: AgentAffinity[] = ["Gordon", "Executor", "Researcher"];
 
 function isValidAgent(name: string): name is AgentAffinity {
   return VALID_AGENTS.includes(name as AgentAffinity);
@@ -164,9 +157,7 @@ export async function routingRoute(
 /**
  * /routing uninstall <pluginId>
  */
-export async function routingUninstall(
-  pluginId: string,
-): Promise<RoutingCommandResult> {
+export async function routingUninstall(pluginId: string): Promise<RoutingCommandResult> {
   const plugin = pluginInstaller.getPlugin(pluginId);
   if (!plugin) {
     return {
@@ -186,9 +177,7 @@ export async function routingUninstall(
 /**
  * /routing enable <pluginId>
  */
-export async function routingEnable(
-  pluginId: string,
-): Promise<RoutingCommandResult> {
+export async function routingEnable(pluginId: string): Promise<RoutingCommandResult> {
   if (!pluginInstaller.isInstalled(pluginId)) {
     return {
       success: false,
@@ -205,9 +194,7 @@ export async function routingEnable(
 /**
  * /routing disable <pluginId>
  */
-export async function routingDisable(
-  pluginId: string,
-): Promise<RoutingCommandResult> {
+export async function routingDisable(pluginId: string): Promise<RoutingCommandResult> {
   if (!pluginInstaller.isInstalled(pluginId)) {
     return {
       success: false,
@@ -228,9 +215,7 @@ export async function routingDisable(
 /**
  * Handle /routing command routing
  */
-export async function handleRoutingCommand(
-  args: string[],
-): Promise<RoutingCommandResult> {
+export async function handleRoutingCommand(args: string[]): Promise<RoutingCommandResult> {
   const subcommand = args[0]?.toLowerCase() ?? "list";
   const subArgs = args.slice(1);
 
@@ -244,7 +229,7 @@ export async function handleRoutingCommand(
       if (!subArgs[0]) {
         return {
           success: false,
-          message: 'Usage: /routing install <id> [--agent <name>]',
+          message: "Usage: /routing install <id> [--agent <name>]",
         };
       }
       const agentIdx = subArgs.indexOf("--agent");
@@ -329,9 +314,7 @@ export async function handleRoutingCommand(
         const rm = routing.routingManifest;
         const routes =
           rm.toolAgentMap && rm.toolAgentMap.length > 0
-            ? rm.toolAgentMap
-                .map((m) => `  ${m.toolName} -> ${m.agent}`)
-                .join("\n")
+            ? rm.toolAgentMap.map((m) => `  ${m.toolName} -> ${m.agent}`).join("\n")
             : `  all -> ${rm.defaultAgent}`;
         infoResult.message += `\n\nRouting:\n${routes}`;
         if (rm.alsoOnGordon) {

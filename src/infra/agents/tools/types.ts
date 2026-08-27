@@ -3,7 +3,7 @@
  */
 
 import type { RequestContext } from "@mastra/core/request-context";
-import type { z, ZodType } from "zod";
+import type { ZodType } from "zod";
 
 import type { GordonContext } from "../types.ts";
 import type { ActionTaskScope, CredentialProfile } from "../../runtime/actions/types.ts";
@@ -138,7 +138,7 @@ export interface ValidationResult<T> {
 export function validateToolOutput<T>(
   schema: ZodType<T>,
   result: unknown,
-  options: ValidateToolOutputOptions = {}
+  options: ValidateToolOutputOptions = {},
 ): T {
   const { errorStrategy = "throw", toolName } = options;
   const prefix = toolName ? `Tool '${toolName}'` : "Tool";
@@ -150,7 +150,7 @@ export function validateToolOutput<T>(
   }
 
   const errorMessages = parseResult.error.issues.map(
-    (issue) => `${issue.path.join(".")}: ${issue.message}`
+    (issue) => `${issue.path.join(".")}: ${issue.message}`,
   );
   const errorSummary = errorMessages.join("; ");
 
@@ -207,7 +207,7 @@ export interface ToolErrorResponse {
 export function createToolErrorResponse(
   error: Error,
   operation: string,
-  context?: Record<string, unknown>
+  context?: Record<string, unknown>,
 ): ToolErrorResponse {
   const errorCtx = createErrorContext(error, operation, context);
 
@@ -253,11 +253,11 @@ export function formatToolError(response: ToolErrorResponse): string {
  */
 export function withErrorContext<TInput extends Record<string, unknown>, TOutput>(
   operation: string,
-  executor: (input: TInput, context?: MastraExecutionContext) => Promise<TOutput>
+  executor: (input: TInput, context?: MastraExecutionContext) => Promise<TOutput>,
 ): (input: TInput, context?: MastraExecutionContext) => Promise<TOutput | ToolErrorResponse> {
   return async (
     input: TInput,
-    context?: MastraExecutionContext
+    context?: MastraExecutionContext,
   ): Promise<TOutput | ToolErrorResponse> => {
     try {
       return await executor(input, context);
@@ -265,7 +265,7 @@ export function withErrorContext<TInput extends Record<string, unknown>, TOutput
       return createToolErrorResponse(
         error instanceof Error ? error : new Error(String(error)),
         operation,
-        input as Record<string, unknown>
+        input as Record<string, unknown>,
       );
     }
   };

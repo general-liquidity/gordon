@@ -8,4 +8,3 @@ export {
 } from "./auth.ts";
 
 export { checkAndRegisterNonce, pruneExpiredNonces, type ReplayCheckResult } from "./replay.ts";
-

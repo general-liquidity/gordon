@@ -31,11 +31,21 @@ export function getCachedStyle(key: string): string {
   const parts: string[] = [RESET];
   for (const token of key.split(",")) {
     switch (token.trim()) {
-      case "bold": parts.push(BOLD); break;
-      case "dim": parts.push(DIM); break;
-      case "italic": parts.push(ITALIC); break;
-      case "underline": parts.push(UNDERLINE); break;
-      case "inverse": parts.push(INVERSE); break;
+      case "bold":
+        parts.push(BOLD);
+        break;
+      case "dim":
+        parts.push(DIM);
+        break;
+      case "italic":
+        parts.push(ITALIC);
+        break;
+      case "underline":
+        parts.push(UNDERLINE);
+        break;
+      case "inverse":
+        parts.push(INVERSE);
+        break;
       default:
         if (token.startsWith("color:")) {
           const color = token.slice(6);

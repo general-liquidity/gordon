@@ -48,7 +48,11 @@ async function fetchBookViaCcxt(
     // pair"; transport/venue failures must throw so cost previews report
     // an outage instead of "not listed".
     const msg = e instanceof Error ? e.message : String(e);
-    if (/bad.?symbol|does not have market|invalid symbol|unknown symbol|symbol not (found|listed|supported)/i.test(msg)) {
+    if (
+      /bad.?symbol|does not have market|invalid symbol|unknown symbol|symbol not (found|listed|supported)/i.test(
+        msg,
+      )
+    ) {
       return null;
     }
     throw new Error(`${venue} order book unavailable: ${msg}`);
@@ -59,7 +63,7 @@ const binance: PublicVenueConfig = {
   label: "Binance",
   takerBps: 10,
   makerBps: 10,
-  toNativeSymbol: (s) => s.toUpperCase().replace(/[\-_/]/g, ""),
+  toNativeSymbol: (s) => s.toUpperCase().replace(/[-_/]/g, ""),
   fetchBook: (symbol, levels, signal) => fetchBookViaCcxt("binance", symbol, levels, signal),
 };
 
@@ -71,7 +75,7 @@ const coinbase: PublicVenueConfig = {
   makerBps: 40,
   toNativeSymbol: (s) => {
     // BTCUSDT → BTC-USD (Coinbase quotes vs USD/USDT/USDC, "-" separated).
-    const upper = s.toUpperCase().replace(/[\-_/]/g, "");
+    const upper = s.toUpperCase().replace(/[-_/]/g, "");
     const fiats = ["USDT", "USDC", "USD", "EUR", "GBP"];
     for (const f of fiats) {
       if (upper.endsWith(f)) {
@@ -97,9 +101,9 @@ const kraken: PublicVenueConfig = {
     // for fiat. Their /Depth endpoint accepts the modern ticker form
     // (XBTUSD, ETHUSD), so map BTC↔XBT and drop the T from USDT for
     // non-tether pairs.
-    let upper = s.toUpperCase().replace(/[\-_/]/g, "");
+    let upper = s.toUpperCase().replace(/[-_/]/g, "");
     upper = upper.replace(/^BTC/, "XBT");
-    if (upper.endsWith("USDT")) upper = upper.slice(0, -4) + "USDT";
+    if (upper.endsWith("USDT")) upper = `${upper.slice(0, -4)}USDT`;
     return upper;
   },
   fetchBook: (symbol, levels, signal) => fetchBookViaCcxt("kraken", symbol, levels, signal),
@@ -170,7 +174,13 @@ export async function fetchPublicBooks(
   return results.map((r, i) =>
     r.status === "fulfilled"
       ? r.value
-      : { venue: venues[i]!, label: PUBLIC_VENUES[venues[i]!].label, takerBps: PUBLIC_VENUES[venues[i]!].takerBps, book: null, error: String(r.reason) },
+      : {
+          venue: venues[i]!,
+          label: PUBLIC_VENUES[venues[i]!].label,
+          takerBps: PUBLIC_VENUES[venues[i]!].takerBps,
+          book: null,
+          error: String(r.reason),
+        },
   );
 }
 
@@ -191,8 +201,22 @@ export function isUsdQuote(quoteAsset: string): boolean {
  *  null if the suffix isn't a known fiat / stable. Used to compute the
  *  USD conversion target. */
 export function splitSymbol(symbol: string): { base: string; quote: string } | null {
-  const upper = symbol.toUpperCase().replace(/[\-_/]/g, "");
-  const candidates = ["USDT", "USDC", "FDUSD", "TUSD", "BUSD", "DAI", "USDP", "USD", "EUR", "GBP", "JPY", "BTC", "ETH"];
+  const upper = symbol.toUpperCase().replace(/[-_/]/g, "");
+  const candidates = [
+    "USDT",
+    "USDC",
+    "FDUSD",
+    "TUSD",
+    "BUSD",
+    "DAI",
+    "USDP",
+    "USD",
+    "EUR",
+    "GBP",
+    "JPY",
+    "BTC",
+    "ETH",
+  ];
   // Sort longest-first so USDT wins over USD when scanning BTCUSDT.
   candidates.sort((a, b) => b.length - a.length);
   for (const q of candidates) {

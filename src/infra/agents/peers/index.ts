@@ -48,13 +48,9 @@ const logger = createModuleLogger("peer-delegation");
 
 export const PEER_DELEGATION_FLAG_ENV = "GORDON_PEER_DELEGATION";
 
-export function isPeerDelegationEnabled(
-  env: NodeJS.ProcessEnv = flagEnv(),
-): boolean {
-  // Default-on. Operators disable via env=0 / env=false. Cold-toggleable
-  // matches the pattern of tradeLedger / withResultSanitizer.
+export function isPeerDelegationEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   const raw = env[PEER_DELEGATION_FLAG_ENV];
-  return raw !== "0" && raw !== "false";
+  return raw === "1" || raw === "true";
 }
 
 // -------------------- types --------------------
@@ -84,7 +80,7 @@ export interface PeerResult {
   /** Wall-clock duration of the delegation. */
   durationMs: number;
   /** Reason for failure if `success === false`. */
-  error?: "timeout" | "aborted" | "exit_nonzero" | "spawn_error";
+  error?: "timeout" | "aborted" | "output_limit" | "exit_nonzero" | "spawn_error";
   /** Human-readable detail (peer's stderr tail or spawn error message). */
   errorDetail?: string;
 }
@@ -118,6 +114,10 @@ export interface CliSubprocessPeerConfig {
   defaultWorkdir?: string;
   /** Env vars merged onto `process.env` for the child. */
   defaultEnv?: Record<string, string>;
+  /** Additional process-env keys this peer needs, typically its own API key. */
+  inheritedEnvKeys?: string[];
+  /** Combined stdout/stderr cap. Default 1 MiB. */
+  maxOutputBytes?: number;
 }
 
 /**
@@ -126,6 +126,38 @@ export interface CliSubprocessPeerConfig {
 type SpawnFn = typeof nodeSpawn;
 
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
+const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024;
+const BASE_CHILD_ENV_KEYS = [
+  "PATH",
+  "PATHEXT",
+  "SYSTEMROOT",
+  "WINDIR",
+  "COMSPEC",
+  "HOME",
+  "USERPROFILE",
+  "APPDATA",
+  "LOCALAPPDATA",
+  "TEMP",
+  "TMP",
+  "SHELL",
+  "TERM",
+  "LANG",
+  "LC_ALL",
+] as const;
+
+function selectChildEnv(keys: readonly string[]): Record<string, string> {
+  const selected: Record<string, string> = {};
+  for (const key of keys) {
+    const value = process.env[key];
+    if (value !== undefined) selected[key] = value;
+  }
+  return selected;
+}
+
+function appendWithinLimit(current: string, chunk: Buffer, remainingBytes: number): string {
+  if (remainingBytes <= 0) return current;
+  return current + chunk.subarray(0, remainingBytes).toString("utf-8");
+}
 
 export class CliSubprocessPeer implements PeerAgent {
   readonly id: string;
@@ -135,9 +167,7 @@ export class CliSubprocessPeer implements PeerAgent {
 
   constructor(config: CliSubprocessPeerConfig, spawnFn: SpawnFn = nodeSpawn) {
     if (config.promptMode === "flag-then-value" && !config.promptFlag) {
-      throw new Error(
-        `Peer ${config.id}: promptMode="flag-then-value" requires promptFlag`,
-      );
+      throw new Error(`Peer ${config.id}: promptMode="flag-then-value" requires promptFlag`);
     }
     this.id = config.id;
     this.description = config.description;
@@ -158,14 +188,29 @@ export class CliSubprocessPeer implements PeerAgent {
         errorDetail: "empty prompt",
       };
     }
+    if (opts.signal?.aborted) {
+      return {
+        success: false,
+        output: "",
+        stderr: "",
+        exitCode: null,
+        durationMs: 0,
+        error: "aborted",
+        errorDetail: "delegation aborted by caller",
+      };
+    }
 
     const timeoutMs = opts.timeoutMs ?? this.config.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS;
     const workdir = opts.workdir ?? this.config.defaultWorkdir ?? process.cwd();
     const childEnv: Record<string, string> = {
-      ...(process.env as Record<string, string>),
+      ...selectChildEnv([...BASE_CHILD_ENV_KEYS, ...(this.config.inheritedEnvKeys ?? [])]),
       ...(this.config.defaultEnv ?? {}),
       ...(opts.env ?? {}),
     };
+    const maxOutputBytes = this.config.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
+    if (!Number.isSafeInteger(maxOutputBytes) || maxOutputBytes <= 0) {
+      throw new Error(`Peer ${this.id}: maxOutputBytes must be a positive safe integer`);
+    }
 
     const args = [...this.config.args];
     if (this.config.promptMode === "flag-then-value") {
@@ -180,7 +225,7 @@ export class CliSubprocessPeer implements PeerAgent {
     };
 
     return new Promise<PeerResult>((resolve) => {
-      let child;
+      let child: ReturnType<SpawnFn>;
       try {
         child = this.spawnFn(this.config.command, args, spawnOptions);
       } catch (err) {
@@ -198,6 +243,7 @@ export class CliSubprocessPeer implements PeerAgent {
 
       let stdout = "";
       let stderr = "";
+      let outputBytes = 0;
       let settled = false;
 
       const settle = (result: PeerResult) => {
@@ -248,12 +294,31 @@ export class CliSubprocessPeer implements PeerAgent {
 
       opts.signal?.addEventListener("abort", onAbort, { once: true });
 
-      child.stdout?.on("data", (buf: Buffer) => {
-        stdout += buf.toString("utf-8");
-      });
-      child.stderr?.on("data", (buf: Buffer) => {
-        stderr += buf.toString("utf-8");
-      });
+      const capture = (stream: "stdout" | "stderr", buf: Buffer) => {
+        if (settled) return;
+        const remaining = maxOutputBytes - outputBytes;
+        if (stream === "stdout") stdout = appendWithinLimit(stdout, buf, remaining);
+        else stderr = appendWithinLimit(stderr, buf, remaining);
+        outputBytes += Math.min(buf.byteLength, Math.max(remaining, 0));
+        if (buf.byteLength <= remaining) return;
+        try {
+          child?.kill("SIGTERM");
+        } catch {
+          /* child already exited */
+        }
+        settle({
+          success: false,
+          output: stdout,
+          stderr,
+          exitCode: null,
+          durationMs: Date.now() - started,
+          error: "output_limit",
+          errorDetail: `peer output exceeded ${maxOutputBytes} bytes`,
+        });
+      };
+
+      child.stdout?.on("data", (buf: Buffer) => capture("stdout", buf));
+      child.stderr?.on("data", (buf: Buffer) => capture("stderr", buf));
 
       child.on("error", (err: Error) => {
         settle({
@@ -333,6 +398,7 @@ export const PEER_REGISTRY: Record<string, PeerAgent> = {
     promptMode: "flag-then-value",
     promptFlag: "-p",
     defaultTimeoutMs: 5 * 60 * 1000,
+    inheritedEnvKeys: ["CURSOR_API_KEY"],
   }),
   warp: new CliSubprocessPeer({
     id: "warp",
@@ -345,6 +411,7 @@ export const PEER_REGISTRY: Record<string, PeerAgent> = {
     promptMode: "flag-then-value",
     promptFlag: "--prompt",
     defaultTimeoutMs: 10 * 60 * 1000,
+    inheritedEnvKeys: ["WARP_API_KEY"],
   }),
 };
 
@@ -362,8 +429,8 @@ export function peerResultToPayload(result: PeerResult): Record<string, unknown>
     success: result.success,
     exitCode: result.exitCode,
     durationMs: result.durationMs,
-    outputBytes: result.output.length,
-    stderrBytes: result.stderr.length,
+    outputBytes: Buffer.byteLength(result.output),
+    stderrBytes: Buffer.byteLength(result.stderr),
     error: result.error ?? null,
     errorDetail: result.errorDetail ?? null,
     // Output itself is returned separately by the tool so the model sees

@@ -22,15 +22,14 @@ const validStamp: StampEditPredictionInput = {
     baseline: 52,
     verificationWindow: { type: "trades", n: 30 },
   },
-  rationale: "MAE distribution of recent winners suggests -0.4R captures 80%+ without false positives",
+  rationale:
+    "MAE distribution of recent winners suggests -0.4R captures 80%+ without false positives",
 };
 
 describe("isDecisionObservabilityEnabled", () => {
   it("respects the flag", () => {
     expect(isDecisionObservabilityEnabled({})).toBe(false);
-    expect(
-      isDecisionObservabilityEnabled({ [DECISION_OBSERVABILITY_FLAG_ENV]: "1" }),
-    ).toBe(true);
+    expect(isDecisionObservabilityEnabled({ [DECISION_OBSERVABILITY_FLAG_ENV]: "1" })).toBe(true);
   });
 });
 
@@ -40,9 +39,7 @@ describe("stampEditPrediction — validation", () => {
   });
 
   it("rejects too-short editDescription", () => {
-    expect(() =>
-      stampEditPrediction({ ...validStamp, editDescription: "short" }),
-    ).toThrow();
+    expect(() => stampEditPrediction({ ...validStamp, editDescription: "short" })).toThrow();
   });
 
   it("rejects empty metric", () => {
@@ -100,9 +97,7 @@ describe("stampEditPrediction — validation", () => {
   });
 
   it("rejects invalid stampedAt ISO", () => {
-    expect(() =>
-      stampEditPrediction({ ...validStamp, stampedAt: "not-a-date" }),
-    ).toThrow();
+    expect(() => stampEditPrediction({ ...validStamp, stampedAt: "not-a-date" })).toThrow();
   });
 });
 

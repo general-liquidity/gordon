@@ -14,7 +14,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, isBinanceFamily, normalizeSymbol, type MastraExecutionContext } from "../../types.ts";
+import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "../../types.ts";
 
 // ============================================================================
 // Error Messages
@@ -42,24 +42,28 @@ export const getTradeHistoryTool = createTool({
   }),
   outputSchema: z.object({
     message: z.string().optional(),
-    trades: z.array(
-      z.object({
-        symbol: z.string(),
-        side: z.enum(["BUY", "SELL"]),
-        price: z.number(),
-        quantity: z.number(),
-        quoteQty: z.number(),
-        commission: z.string(),
-        time: z.string(),
-        isMaker: z.boolean(),
+    trades: z
+      .array(
+        z.object({
+          symbol: z.string(),
+          side: z.enum(["BUY", "SELL"]),
+          price: z.number(),
+          quantity: z.number(),
+          quoteQty: z.number(),
+          commission: z.string(),
+          time: z.string(),
+          isMaker: z.boolean(),
+        }),
+      )
+      .optional(),
+    stats: z
+      .object({
+        totalTrades: z.number(),
+        totalBuyVolume: z.string(),
+        totalSellVolume: z.string(),
+        avgTradeSize: z.string(),
       })
-    ).optional(),
-    stats: z.object({
-      totalTrades: z.number(),
-      totalBuyVolume: z.string(),
-      totalSellVolume: z.string(),
-      avgTradeSize: z.string(),
-    }).optional(),
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol, limit }, execContext: MastraExecutionContext) => {
@@ -103,7 +107,7 @@ export const getTradeHistoryTool = createTool({
 
       let totalBuyVolume = 0;
       let totalSellVolume = 0;
-      let totalCommission = 0;
+      let _totalCommission = 0;
 
       const formattedTrades = trades.map((t) => {
         const quoteQty = t.price * t.quantity;
@@ -112,7 +116,7 @@ export const getTradeHistoryTool = createTool({
         } else {
           totalSellVolume += quoteQty;
         }
-        totalCommission += t.commission;
+        _totalCommission += t.commission;
 
         return {
           symbol: t.symbol,
@@ -160,29 +164,33 @@ export const getTransferHistoryTool = createTool({
     limit: z.number().min(1).max(50).default(10).describe("Max records to return per type"),
   }),
   outputSchema: z.object({
-    deposits: z.array(
-      z.object({
-        coin: z.string(),
-        amount: z.number(),
-        network: z.string(),
-        status: z.string(),
-        txId: z.string().nullable(),
-        time: z.string(),
-      })
-    ).optional(),
+    deposits: z
+      .array(
+        z.object({
+          coin: z.string(),
+          amount: z.number(),
+          network: z.string(),
+          status: z.string(),
+          txId: z.string().nullable(),
+          time: z.string(),
+        }),
+      )
+      .optional(),
     totalDeposits: z.number().optional(),
-    withdrawals: z.array(
-      z.object({
-        coin: z.string(),
-        amount: z.number(),
-        fee: z.number(),
-        network: z.string(),
-        status: z.string(),
-        address: z.string(),
-        applyTime: z.string(),
-        completeTime: z.string().nullable(),
-      })
-    ).optional(),
+    withdrawals: z
+      .array(
+        z.object({
+          coin: z.string(),
+          amount: z.number(),
+          fee: z.number(),
+          network: z.string(),
+          status: z.string(),
+          address: z.string(),
+          applyTime: z.string(),
+          completeTime: z.string().nullable(),
+        }),
+      )
+      .optional(),
     totalWithdrawals: z.number().optional(),
     error: z.string().optional(),
   }),
@@ -212,8 +220,13 @@ export const getTransferHistoryTool = createTool({
       if (type === "withdrawals" || type === "both") {
         const withdrawals = await ctx.exchange.getWithdrawalHistory(limit);
         const wStatusMap: Record<number, string> = {
-          0: "email_sent", 1: "cancelled", 2: "awaiting_approval",
-          3: "rejected", 4: "processing", 5: "failure", 6: "completed",
+          0: "email_sent",
+          1: "cancelled",
+          2: "awaiting_approval",
+          3: "rejected",
+          4: "processing",
+          5: "failure",
+          6: "completed",
         };
         response.withdrawals = withdrawals.map((w) => ({
           coin: w.coin,

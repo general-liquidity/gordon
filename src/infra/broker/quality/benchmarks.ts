@@ -1,5 +1,5 @@
 import { BrokerFactory } from "../factory.ts";
-import type { BrokerAdapter, BrokerCredentials, BrokerId } from "../types.ts";
+import type { BrokerCredentials, BrokerId } from "../types.ts";
 import { installMockBrokerApi } from "../testing/mock-api.ts";
 
 /**
@@ -92,7 +92,10 @@ async function measureLatencyMs(fn: () => Promise<unknown>): Promise<number> {
   return Number((performance.now() - start).toFixed(3));
 }
 
-async function runLatencyBenchmarks(brokerId: BrokerId, iterations: number): Promise<BrokerLatencyBenchmarks> {
+async function runLatencyBenchmarks(
+  brokerId: BrokerId,
+  iterations: number,
+): Promise<BrokerLatencyBenchmarks> {
   const mock = installMockBrokerApi(brokerId);
   try {
     const adapter = BrokerFactory.create(brokerId, createCredentials(brokerId));
@@ -104,13 +107,17 @@ async function runLatencyBenchmarks(brokerId: BrokerId, iterations: number): Pro
 
     for (let i = 0; i < iterations; i += 1) {
       quoteLatencies.push(await measureLatencyMs(() => adapter.getLatestQuote("AAPL")));
-      orderAckLatencies.push(await measureLatencyMs(() => adapter.placeOrder({
-        symbol: "AAPL",
-        side: "buy",
-        type: "market",
-        timeInForce: "day",
-        qty: 1,
-      })));
+      orderAckLatencies.push(
+        await measureLatencyMs(() =>
+          adapter.placeOrder({
+            symbol: "AAPL",
+            side: "buy",
+            type: "market",
+            timeInForce: "day",
+            qty: 1,
+          }),
+        ),
+      );
       statusLatencies.push(await measureLatencyMs(() => adapter.getOrder("order-1")));
     }
 
@@ -224,10 +231,14 @@ export function validateBenchmarkReport(
 
   for (const report of reports) {
     if (report.latency.quote.p95Ms > maxP95Ms) {
-      failures.push(`${report.brokerId}: quote p95 ${report.latency.quote.p95Ms}ms exceeded ${maxP95Ms}ms`);
+      failures.push(
+        `${report.brokerId}: quote p95 ${report.latency.quote.p95Ms}ms exceeded ${maxP95Ms}ms`,
+      );
     }
     if (report.latency.orderAck.p95Ms > maxP95Ms) {
-      failures.push(`${report.brokerId}: orderAck p95 ${report.latency.orderAck.p95Ms}ms exceeded ${maxP95Ms}ms`);
+      failures.push(
+        `${report.brokerId}: orderAck p95 ${report.latency.orderAck.p95Ms}ms exceeded ${maxP95Ms}ms`,
+      );
     }
     if (report.latency.orderStatusPropagation.p95Ms > maxP95Ms) {
       failures.push(

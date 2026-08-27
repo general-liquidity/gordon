@@ -104,14 +104,17 @@ interface AlpacaLatestQuoteResponse {
 }
 
 interface AlpacaBarsResponse {
-  bars: Record<string, Array<{
-    t: string;
-    o: number;
-    h: number;
-    l: number;
-    c: number;
-    v: number;
-  }>>;
+  bars: Record<
+    string,
+    Array<{
+      t: string;
+      o: number;
+      h: number;
+      l: number;
+      c: number;
+      v: number;
+    }>
+  >;
 }
 
 const ALPACA_TIMEFRAME_MAP: Record<string, string> = {
@@ -207,10 +210,12 @@ export class AlpacaAdapter implements BrokerAdapter {
 
     const paper = credentials.paper ?? true;
     this.isPaper = paper;
-    this.tradingBaseUrl = credentials.baseUrl
-      || (paper ? DEFAULT_ALPACA_PAPER_TRADING_BASE_URL : DEFAULT_ALPACA_TRADING_BASE_URL);
-    this.dataBaseUrl = credentials.dataBaseUrl
-      || (paper ? DEFAULT_ALPACA_PAPER_DATA_BASE_URL : DEFAULT_ALPACA_DATA_BASE_URL);
+    this.tradingBaseUrl =
+      credentials.baseUrl ||
+      (paper ? DEFAULT_ALPACA_PAPER_TRADING_BASE_URL : DEFAULT_ALPACA_TRADING_BASE_URL);
+    this.dataBaseUrl =
+      credentials.dataBaseUrl ||
+      (paper ? DEFAULT_ALPACA_PAPER_DATA_BASE_URL : DEFAULT_ALPACA_DATA_BASE_URL);
   }
 
   private async request<T>(
@@ -323,7 +328,9 @@ export class AlpacaAdapter implements BrokerAdapter {
   }
 
   async getOrder(orderId: string): Promise<BrokerOrder> {
-    const order = await this.request<AlpacaOrderResponse>(`/v2/orders/${encodeURIComponent(orderId)}`);
+    const order = await this.request<AlpacaOrderResponse>(
+      `/v2/orders/${encodeURIComponent(orderId)}`,
+    );
     return this.toBrokerOrder(order);
   }
 
@@ -334,9 +341,14 @@ export class AlpacaAdapter implements BrokerAdapter {
 
     // Kill-switch chokepoint — read-only, idempotent.
     if (isKillSwitchesEnabled()) {
-      const decision = isExecutionAllowed({ venue: this.brokerId, instrument: params.symbol.toUpperCase() });
+      const decision = isExecutionAllowed({
+        venue: this.brokerId,
+        instrument: params.symbol.toUpperCase(),
+      });
       if (!decision.allowed) {
-        throw new Error(`${decision.reason}. Reset the relevant kill switch before placing this order.`);
+        throw new Error(
+          `${decision.reason}. Reset the relevant kill switch before placing this order.`,
+        );
       }
     }
 

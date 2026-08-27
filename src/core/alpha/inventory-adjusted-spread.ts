@@ -87,11 +87,7 @@ export interface InventoryAdjustedSpreadInput {
   inventoryHardLimit?: number;
 }
 
-export type SpreadVerdict =
-  | "two_sided"
-  | "long_capped"
-  | "short_capped"
-  | "invalid_inputs";
+export type SpreadVerdict = "two_sided" | "long_capped" | "short_capped" | "invalid_inputs";
 
 export interface InventoryAdjustedSpreadResult {
   midPrice: number;
@@ -138,7 +134,8 @@ export function computeInventoryAdjustedSpread(
       bidPulled: false,
       askPulled: false,
       verdict: "invalid_inputs",
-      summary: "Invalid inputs: midPrice/timeRemaining/intensityDecay/gamma must be > 0; volatility ≥ 0.",
+      summary:
+        "Invalid inputs: midPrice/timeRemaining/intensityDecay/gamma must be > 0; volatility ≥ 0.",
     };
   }
 
@@ -197,9 +194,7 @@ export function computeInventoryAdjustedSpread(
   };
 }
 
-export function formatInventoryAdjustedSpread(
-  result: InventoryAdjustedSpreadResult,
-): string {
+export function formatInventoryAdjustedSpread(result: InventoryAdjustedSpreadResult): string {
   const lines = [
     `Inventory-Adjusted Spread — ${result.verdict.toUpperCase()}`,
     "",

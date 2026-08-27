@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text } from "../../ink-custom";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
@@ -37,35 +37,44 @@ export function ApprovalBrowser({ pending, recent, onApprove, onDeny, onCancel }
 
   const items = view === "pending" ? pending : recent;
 
-  useRoutedInput((_input, key) => {
-    if (key.escape) {
-      if (decidingId) setDecidingId(null);
-      else onCancel();
-    }
-    if (key.upArrow) setSelectedIdx((i) => Math.max(0, i - 1));
-    if (key.downArrow) setSelectedIdx((i) => Math.min(items.length - 1, i + 1));
-    if (key.return && view === "pending" && !decidingId) {
-      const item = pending[selectedIdx];
-      if (item) setDecidingId(item.id);
-    }
-    if (key.tab) {
-      setView((v) => v === "pending" ? "recent" : "pending");
-      setSelectedIdx(0);
-    }
-  }, { id: "approvalBrowser", priority: FOCUS_PRIORITY.DIALOG });
-
-  const riskTone = (level: ApprovalItem["riskLevel"]) => (
-    getRiskColor(level === "standard" ? "low" : level as RiskLevel, theme)
+  useRoutedInput(
+    (_input, key) => {
+      if (key.escape) {
+        if (decidingId) setDecidingId(null);
+        else onCancel();
+      }
+      if (key.upArrow) setSelectedIdx((i) => Math.max(0, i - 1));
+      if (key.downArrow) setSelectedIdx((i) => Math.min(items.length - 1, i + 1));
+      if (key.return && view === "pending" && !decidingId) {
+        const item = pending[selectedIdx];
+        if (item) setDecidingId(item.id);
+      }
+      if (key.tab) {
+        setView((v) => (v === "pending" ? "recent" : "pending"));
+        setSelectedIdx(0);
+      }
+    },
+    { id: "approvalBrowser", priority: FOCUS_PRIORITY.DIALOG },
   );
+
+  const riskTone = (level: ApprovalItem["riskLevel"]) =>
+    getRiskColor(level === "standard" ? "low" : (level as RiskLevel), theme);
 
   if (decidingId) {
     const item = pending.find((p) => p.id === decidingId);
-    if (!item) { setDecidingId(null); return null; }
+    if (!item) {
+      setDecidingId(null);
+      return null;
+    }
     return (
       <Box flexDirection="column" paddingX={1} paddingY={1}>
-        <Text bold color={theme.uiBrand}>DECIDE: {item.toolName}</Text>
+        <Text bold color={theme.uiBrand}>
+          DECIDE: {item.toolName}
+        </Text>
         <Text dimColor>{item.summary}</Text>
-        <Text>Risk: <Text color={riskTone(item.riskLevel)}>{item.riskLevel}</Text></Text>
+        <Text>
+          Risk: <Text color={riskTone(item.riskLevel)}>{item.riskLevel}</Text>
+        </Text>
         <Box marginTop={1}>
           <Select
             options={[
@@ -81,7 +90,9 @@ export function ApprovalBrowser({ pending, recent, onApprove, onDeny, onCancel }
             }}
           />
         </Box>
-        <Box marginTop={1}><Text dimColor>Esc to go back</Text></Box>
+        <Box marginTop={1}>
+          <Text dimColor>Esc to go back</Text>
+        </Box>
       </Box>
     );
   }
@@ -89,33 +100,55 @@ export function ApprovalBrowser({ pending, recent, onApprove, onDeny, onCancel }
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color={theme.uiBrand}>APPROVALS</Text>
-        <Text dimColor>  ({pending.length} pending)</Text>
+        <Text bold color={theme.uiBrand}>
+          APPROVALS
+        </Text>
+        <Text dimColor> ({pending.length} pending)</Text>
       </Box>
 
       <Box>
-        <Text color={view === "pending" ? theme.uiBrand : undefined} dimColor={view !== "pending"}> pending </Text>
-        <Text color={view === "recent" ? theme.uiBrand : undefined} dimColor={view !== "recent"}> recent </Text>
+        <Text color={view === "pending" ? theme.uiBrand : undefined} dimColor={view !== "pending"}>
+          {" "}
+          pending{" "}
+        </Text>
+        <Text color={view === "recent" ? theme.uiBrand : undefined} dimColor={view !== "recent"}>
+          {" "}
+          recent{" "}
+        </Text>
       </Box>
 
       <Box flexDirection="column" marginTop={1}>
-        {items.length === 0 && <Text dimColor>  No {view} approvals.</Text>}
+        {items.length === 0 && <Text dimColor> No {view} approvals.</Text>}
         {items.slice(0, 15).map((item, i) => {
           const isFocused = i === selectedIdx;
           return (
             <Box key={item.id}>
-              <Text color={isFocused ? theme.uiBrand : undefined}>{isFocused ? " \u25B8" : "  "}</Text>
+              <Text color={isFocused ? theme.uiBrand : undefined}>
+                {isFocused ? " \u25B8" : "  "}
+              </Text>
               <Text color={riskTone(item.riskLevel)}> [{item.riskLevel[0]!.toUpperCase()}] </Text>
               <Text bold={isFocused}>{item.toolName.padEnd(20)}</Text>
-              <Text dimColor={!isFocused} wrap="truncate-end">{item.summary}</Text>
-              {"decision" in item && <Text color={(item as any).decision === "approved" ? theme.riskSafe : theme.riskDanger}> {(item as any).decision}</Text>}
+              <Text dimColor={!isFocused} wrap="truncate-end">
+                {item.summary}
+              </Text>
+              {"decision" in item && (
+                <Text
+                  color={(item as any).decision === "approved" ? theme.riskSafe : theme.riskDanger}
+                >
+                  {" "}
+                  {(item as any).decision}
+                </Text>
+              )}
             </Box>
           );
         })}
       </Box>
 
       <Box marginTop={1}>
-        <Text dimColor>{"\u2191\u2193"} navigate {"\u00B7"} Tab {view === "pending" ? "recent" : "pending"} {"\u00B7"} {view === "pending" ? "Enter decide" : ""} {"\u00B7"} Esc close</Text>
+        <Text dimColor>
+          {"\u2191\u2193"} navigate {"\u00B7"} Tab {view === "pending" ? "recent" : "pending"}{" "}
+          {"\u00B7"} {view === "pending" ? "Enter decide" : ""} {"\u00B7"} Esc close
+        </Text>
       </Box>
     </Box>
   );

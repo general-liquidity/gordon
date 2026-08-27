@@ -52,7 +52,10 @@ const SEVERITY_RANK: Record<SkillSecurityScan["riskLevel"], number> = {
   critical: 4,
 };
 
-function maxRisk(a: SkillSecurityScan["riskLevel"], b: SkillSecurityScan["riskLevel"]): SkillSecurityScan["riskLevel"] {
+function maxRisk(
+  a: SkillSecurityScan["riskLevel"],
+  b: SkillSecurityScan["riskLevel"],
+): SkillSecurityScan["riskLevel"] {
   return SEVERITY_RANK[a] >= SEVERITY_RANK[b] ? a : b;
 }
 

@@ -13,11 +13,7 @@
  */
 
 import { createModuleLogger } from "../../infra/logger/logger.ts";
-import type {
-  Playbook,
-  FormattedPlaybook,
-  FormattedPlaybookList,
-} from "./types.ts";
+import type { Playbook, FormattedPlaybook, FormattedPlaybookList } from "./types.ts";
 
 const log = createModuleLogger("playbook-registry");
 
@@ -42,9 +38,7 @@ export class PlaybookRegistry {
    */
   register(playbook: Playbook): void {
     if (this.playbooks.has(playbook.id)) {
-      throw new Error(
-        `Playbook "${playbook.id}" is already registered. Use replace() to update.`
-      );
+      throw new Error(`Playbook "${playbook.id}" is already registered. Use replace() to update.`);
     }
     this.playbooks.set(playbook.id, playbook);
     log.debug(`Registered playbook: ${playbook.id}`);
@@ -81,9 +75,7 @@ export class PlaybookRegistry {
   getOrThrow(id: string): Playbook {
     const pb = this.playbooks.get(id);
     if (!pb) {
-      throw new Error(
-        `Playbook "${id}" not found. Available: ${this.getIds().join(", ")}`
-      );
+      throw new Error(`Playbook "${id}" not found. Available: ${this.getIds().join(", ")}`);
     }
     return pb;
   }
@@ -132,9 +124,7 @@ export class PlaybookRegistry {
    */
   getByMarket(market: string): Playbook[] {
     const lower = market.toLowerCase();
-    return this.getAll().filter((pb) =>
-      pb.markets.some((m) => m.toLowerCase() === lower)
-    );
+    return this.getAll().filter((pb) => pb.markets.some((m) => m.toLowerCase() === lower));
   }
 
   /**
@@ -153,9 +143,7 @@ export class PlaybookRegistry {
    */
   getByTag(tag: string): Playbook[] {
     const lower = tag.toLowerCase();
-    return this.getAll().filter((pb) =>
-      pb.tags.some((t) => t.toLowerCase() === lower)
-    );
+    return this.getAll().filter((pb) => pb.tags.some((t) => t.toLowerCase() === lower));
   }
 
   // ---------- Search ----------
@@ -256,9 +244,7 @@ function formatPlaybook(pb: Playbook): FormattedPlaybook {
     markets: pb.markets.join(", "),
     timeframes: pb.timeframes.join(", "),
     tags: pb.tags.join(", "),
-    description: pb.description.length > 100
-      ? pb.description.slice(0, 97) + "..."
-      : pb.description,
+    description: pb.description.length > 100 ? `${pb.description.slice(0, 97)}...` : pb.description,
   };
 }
 

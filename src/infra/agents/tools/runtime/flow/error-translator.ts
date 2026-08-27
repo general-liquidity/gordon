@@ -123,7 +123,8 @@ const BINANCE_ERROR_MESSAGES: Record<
     message: "Invalid quantity for this order.",
     category: "validation",
     recoverable: false,
-    suggestion: "The order quantity does not meet the minimum, maximum, or step size requirements for this trading pair. Check the symbol's LOT_SIZE filter and adjust your quantity.",
+    suggestion:
+      "The order quantity does not meet the minimum, maximum, or step size requirements for this trading pair. Check the symbol's LOT_SIZE filter and adjust your quantity.",
   },
   "-1015": {
     message: "Too many orders. Rate limit exceeded.",
@@ -147,7 +148,8 @@ const BINANCE_ERROR_MESSAGES: Record<
     message: "Timestamp is outside the valid window.",
     category: "system",
     recoverable: true,
-    suggestion: "Your system clock may be out of sync. Synchronize your computer's time (e.g., enable automatic time sync in your OS settings) and try again.",
+    suggestion:
+      "Your system clock may be out of sync. Synchronize your computer's time (e.g., enable automatic time sync in your OS settings) and try again.",
   },
   "-1022": {
     message: "Invalid API signature.",
@@ -320,7 +322,8 @@ const BINANCE_ERROR_MESSAGES: Record<
     message: "Invalid API key, IP, or permissions.",
     category: "authentication",
     recoverable: false,
-    suggestion: "Please verify your API key has the required permissions and IP whitelist settings.",
+    suggestion:
+      "Please verify your API key has the required permissions and IP whitelist settings.",
   },
   "-2016": {
     message: "No trading window found.",
@@ -402,19 +405,22 @@ const COINBASE_ERROR_MESSAGES: Record<
     message: "Insufficient funds on Coinbase.",
     category: "insufficient_funds",
     recoverable: false,
-    suggestion: "You don't have enough balance to complete this order. Deposit more funds or reduce the order size.",
+    suggestion:
+      "You don't have enough balance to complete this order. Deposit more funds or reduce the order size.",
   },
   INVALID_AMOUNT: {
     message: "Invalid amount for this Coinbase order.",
     category: "validation",
     recoverable: false,
-    suggestion: "The order amount does not meet Coinbase requirements. Check the minimum order size and increment for this trading pair.",
+    suggestion:
+      "The order amount does not meet Coinbase requirements. Check the minimum order size and increment for this trading pair.",
   },
   NOT_FOUND: {
     message: "Resource not found on Coinbase.",
     category: "validation",
     recoverable: false,
-    suggestion: "The requested order, product, or account was not found. Verify the ID or symbol is correct.",
+    suggestion:
+      "The requested order, product, or account was not found. Verify the ID or symbol is correct.",
   },
 };
 
@@ -434,13 +440,15 @@ const KRAKEN_ERROR_MESSAGES: Record<
     message: "Insufficient funds on Kraken.",
     category: "insufficient_funds",
     recoverable: false,
-    suggestion: "You don't have enough balance to place this order. Deposit more funds or reduce the order size.",
+    suggestion:
+      "You don't have enough balance to place this order. Deposit more funds or reduce the order size.",
   },
   "EGeneral:Invalid arguments": {
     message: "Invalid arguments in Kraken request.",
     category: "validation",
     recoverable: false,
-    suggestion: "One or more parameters are invalid. Check the order type, pair name, volume, and price values.",
+    suggestion:
+      "One or more parameters are invalid. Check the order type, pair name, volume, and price values.",
   },
 };
 
@@ -523,7 +531,8 @@ export function isBinanceApiError(error: unknown): error is BinanceApiError {
  * @returns Translated error with context
  */
 export function translateBinanceError(code: number, originalMessage?: string): TranslatedError {
-  const errorInfo = BINANCE_ERROR_MESSAGES[code.toString() as unknown as keyof typeof BINANCE_ERROR_MESSAGES];
+  const errorInfo =
+    BINANCE_ERROR_MESSAGES[code.toString() as unknown as keyof typeof BINANCE_ERROR_MESSAGES];
 
   if (errorInfo) {
     return {
@@ -552,7 +561,10 @@ export function translateBinanceError(code: number, originalMessage?: string): T
  * @param originalMessage - Original error message from Coinbase
  * @returns Translated error with context, or null if not a known Coinbase error
  */
-export function translateCoinbaseError(errorCode: string, originalMessage?: string): TranslatedError | null {
+export function translateCoinbaseError(
+  errorCode: string,
+  _originalMessage?: string,
+): TranslatedError | null {
   const errorInfo = COINBASE_ERROR_MESSAGES[errorCode];
   if (errorInfo) {
     return {
@@ -573,7 +585,10 @@ export function translateCoinbaseError(errorCode: string, originalMessage?: stri
  * @param originalMessage - Original error message from Kraken
  * @returns Translated error with context, or null if not a known Kraken error
  */
-export function translateKrakenError(errorString: string, originalMessage?: string): TranslatedError | null {
+export function translateKrakenError(
+  errorString: string,
+  _originalMessage?: string,
+): TranslatedError | null {
   const errorInfo = KRAKEN_ERROR_MESSAGES[errorString];
   if (errorInfo) {
     return {

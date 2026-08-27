@@ -100,15 +100,11 @@ export interface RecordDecisionInput {
   refs?: Record<string, string>;
 }
 
-export function isDecisionsLogEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function isDecisionsLogEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.GORDON_DECISIONS_LOG === "1" || env.GORDON_DECISIONS_LOG === "true";
 }
 
-export function defaultDecisionsLogPath(
-  env: NodeJS.ProcessEnv = process.env,
-): string {
+export function defaultDecisionsLogPath(env: NodeJS.ProcessEnv = process.env): string {
   return env.GORDON_DECISIONS_LOG_PATH || join(homedir(), ".gordon", "decisions.jsonl");
 }
 
@@ -130,9 +126,7 @@ function normalizeRecordInput(input: RecordDecisionInput): {
   const context = (input.context ?? input.summary ?? "").trim();
   const selected = (input.selected ?? input.summary ?? context).trim();
   const rationale = (input.rationale ?? input.summary ?? selected).trim();
-  const symbols =
-    input.symbols ??
-    (input.symbol ? [input.symbol] : undefined);
+  const symbols = input.symbols ?? (input.symbol ? [input.symbol] : undefined);
   return { context, selected, rationale, symbols };
 }
 
@@ -162,7 +156,7 @@ export function recordDecision(
   };
   try {
     mkdirSync(dirname(path), { recursive: true });
-    appendFileSync(path, JSON.stringify(entry) + "\n", "utf8");
+    appendFileSync(path, `${JSON.stringify(entry)}\n`, "utf8");
   } catch {
     // Best-effort: don't break the calling code path if the disk write
     // fails. The decision is still expressed in the call site's own
@@ -267,18 +261,28 @@ export interface DecisionsByStageReport {
   totalCount: number;
   withStage: number;
   withoutStage: number;
-  byStage: Record<TradeLifecycleStage, {
-    count: number;
-    categories: Record<DecisionCategory, number>;
-    sampleContexts: string[];
-  }>;
+  byStage: Record<
+    TradeLifecycleStage,
+    {
+      count: number;
+      categories: Record<DecisionCategory, number>;
+      sampleContexts: string[];
+    }
+  >;
 }
 
 export function groupDecisionsByStage(decisions: readonly DecisionEntry[]): DecisionsByStageReport {
-  const byStage: Record<TradeLifecycleStage, { count: number; categories: Record<DecisionCategory, number>; sampleContexts: string[] }> = {
+  const byStage: Record<
+    TradeLifecycleStage,
+    { count: number; categories: Record<DecisionCategory, number>; sampleContexts: string[] }
+  > = {
     planning: { count: 0, categories: {} as Record<DecisionCategory, number>, sampleContexts: [] },
     execution: { count: 0, categories: {} as Record<DecisionCategory, number>, sampleContexts: [] },
-    management: { count: 0, categories: {} as Record<DecisionCategory, number>, sampleContexts: [] },
+    management: {
+      count: 0,
+      categories: {} as Record<DecisionCategory, number>,
+      sampleContexts: [],
+    },
     closure: { count: 0, categories: {} as Record<DecisionCategory, number>, sampleContexts: [] },
   };
   let withStage = 0;

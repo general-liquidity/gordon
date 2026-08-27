@@ -91,15 +91,13 @@ describe("verifyStrategyClaims", () => {
     const betaCheck = r.checks[0]!;
     expect(betaCheck.claim).toBe("beta");
     // Won't be exactly zero from random data but should be small
-    expect(Math.abs(parseFloat(betaCheck.realizedValue))).toBeLessThan(0.20);
+    expect(Math.abs(parseFloat(betaCheck.realizedValue))).toBeLessThan(0.2);
   });
 
   test("market-neutral claim with hidden beta → inconsistent", () => {
     const benchmark = gaussianReturns(252, 0.0005, 0.012, 1);
     // Strategy carries 0.5 beta to benchmark
-    const strategy = benchmark.map(
-      (b, i) => 0.5 * b + 0.005 * (mulberry32(99 + i)() - 0.5),
-    );
+    const strategy = benchmark.map((b, i) => 0.5 * b + 0.005 * (mulberry32(99 + i)() - 0.5));
     const r = verifyStrategyClaims({
       strategyReturns: strategy,
       benchmarkReturns: benchmark,
@@ -179,7 +177,7 @@ describe("verifyStrategyClaims", () => {
     });
     const check = r.checks.find((c) => c.claim === "maxDrawdown")!;
     expect(check.verdict).toBe("inconsistent");
-    expect(r.realized.maxDrawdown).toBeGreaterThan(0.20);
+    expect(r.realized.maxDrawdown).toBeGreaterThan(0.2);
   });
 
   test("holding period claim with high autocorrelation → consistent long hold", () => {
@@ -196,7 +194,7 @@ describe("verifyStrategyClaims", () => {
       strategyReturns: returns,
       claims: { holdingPeriodPeriods: 5 },
     });
-    const check = r.checks.find((c) => c.claim === "holdingPeriodPeriods")!;
+    const _check = r.checks.find((c) => c.claim === "holdingPeriodPeriods")!;
     // Implied period should be > 1
     expect(r.realized.autocorrelation).toBeGreaterThan(0.3);
   });
@@ -213,7 +211,7 @@ describe("verifyStrategyClaims", () => {
         sharpe: 0.6, // realistic
         maxDrawdown: 0.5, // very loose claim
       },
-      betaTolerance: 0.20,
+      betaTolerance: 0.2,
       sharpeTolerance: 1.0, // very loose
       drawdownTolerance: 1.0,
     });
@@ -263,9 +261,7 @@ describe("verifyStrategyClaims", () => {
   test("Tom's basis-trader hidden-beta example", () => {
     // Strategy claims market-neutral but actually carries 0.4 beta
     const benchmark = gaussianReturns(252, 0.0005, 0.012, 1);
-    const strategy = benchmark.map(
-      (b, i) => 0.4 * b + 0.003 * (mulberry32(123 + i)() - 0.5),
-    );
+    const strategy = benchmark.map((b, i) => 0.4 * b + 0.003 * (mulberry32(123 + i)() - 0.5));
     const r = verifyStrategyClaims({
       strategyReturns: strategy,
       benchmarkReturns: benchmark,

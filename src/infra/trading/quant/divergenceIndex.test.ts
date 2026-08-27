@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeDivergenceIndex,
-  divergenceIndexToPayload,
-} from "./divergenceIndex.ts";
+import { computeDivergenceIndex, divergenceIndexToPayload } from "./divergenceIndex.ts";
 
 describe("computeDivergenceIndex", () => {
   it("short series → NaN with reason", () => {

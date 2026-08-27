@@ -34,12 +34,7 @@ export const volumePatternEdgeDiagnosticTool = createTool({
       )
       .min(1)
       .describe("OHLCV bars ordered oldest → newest. Last bar is the spike candidate."),
-    window: z
-      .number()
-      .int()
-      .min(2)
-      .optional()
-      .describe("Lookback window in bars. Default 20."),
+    window: z.number().int().min(2).optional().describe("Lookback window in bars. Default 20."),
     trendingSlopePctPerBar: z
       .number()
       .min(0)

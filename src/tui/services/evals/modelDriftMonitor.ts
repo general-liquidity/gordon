@@ -23,7 +23,9 @@ export class ModelDriftMonitor {
   private windowSize: number;
   private minSamples: number;
 
-  constructor(options: { baselineAccuracy?: number; windowSize?: number; minSamples?: number } = {}) {
+  constructor(
+    options: { baselineAccuracy?: number; windowSize?: number; minSamples?: number } = {},
+  ) {
     this.baselineAccuracy = options.baselineAccuracy ?? 0.65;
     this.windowSize = options.windowSize ?? 100;
     this.minSamples = options.minSamples ?? 30;
@@ -39,8 +41,10 @@ export class ModelDriftMonitor {
     if (n < this.minSamples) {
       return {
         status: "WARMING_UP",
-        accuracy: 0, rollingSharpe: 0,
-        totalPredictions: n, baseline: this.baselineAccuracy,
+        accuracy: 0,
+        rollingSharpe: 0,
+        totalPredictions: n,
+        baseline: this.baselineAccuracy,
         action: `Collecting data (${n}/${this.minSamples})`,
       };
     }
@@ -55,40 +59,54 @@ export class ModelDriftMonitor {
     });
     const active = strategyReturns.filter((r) => r !== 0);
     const mean = active.length > 0 ? active.reduce((s, r) => s + r, 0) / active.length : 0;
-    const variance = active.length > 0
-      ? active.reduce((s, r) => s + (r - mean) ** 2, 0) / active.length : 0;
+    const variance =
+      active.length > 0 ? active.reduce((s, r) => s + (r - mean) ** 2, 0) / active.length : 0;
     const stddev = Math.sqrt(variance);
     const sharpe = stddev > 0 ? (mean / stddev) * Math.sqrt(252) : 0;
 
     if (accuracy < this.baselineAccuracy * 0.8 || sharpe < 0) {
       return {
-        status: "HALT", accuracy, rollingSharpe: sharpe,
-        totalPredictions: n, baseline: this.baselineAccuracy,
+        status: "HALT",
+        accuracy,
+        rollingSharpe: sharpe,
+        totalPredictions: n,
+        baseline: this.baselineAccuracy,
         action: "Stop trading immediately. Retrain model.",
-        reason: accuracy < this.baselineAccuracy * 0.8
-          ? `Accuracy ${(accuracy * 100).toFixed(1)}% below threshold ${(this.baselineAccuracy * 0.8 * 100).toFixed(1)}%`
-          : `Sharpe ${sharpe.toFixed(2)} is negative`,
+        reason:
+          accuracy < this.baselineAccuracy * 0.8
+            ? `Accuracy ${(accuracy * 100).toFixed(1)}% below threshold ${(this.baselineAccuracy * 0.8 * 100).toFixed(1)}%`
+            : `Sharpe ${sharpe.toFixed(2)} is negative`,
       };
     }
 
     if (accuracy < this.baselineAccuracy * 0.9) {
       return {
-        status: "CAUTION", accuracy, rollingSharpe: sharpe,
-        totalPredictions: n, baseline: this.baselineAccuracy,
+        status: "CAUTION",
+        accuracy,
+        rollingSharpe: sharpe,
+        totalPredictions: n,
+        baseline: this.baselineAccuracy,
         action: "Reduce position sizes by 50%",
         reason: `Accuracy ${(accuracy * 100).toFixed(1)}% showing degradation`,
       };
     }
 
     return {
-      status: "HEALTHY", accuracy, rollingSharpe: sharpe,
-      totalPredictions: n, baseline: this.baselineAccuracy,
+      status: "HEALTHY",
+      accuracy,
+      rollingSharpe: sharpe,
+      totalPredictions: n,
+      baseline: this.baselineAccuracy,
       action: "Continue normal operations",
     };
   }
 
-  reset(): void { this.predictions = []; }
-  shouldHalt(): boolean { return this.getStatus().status === "HALT"; }
+  reset(): void {
+    this.predictions = [];
+  }
+  shouldHalt(): boolean {
+    return this.getStatus().status === "HALT";
+  }
 }
 
 let instance: ModelDriftMonitor | null = null;

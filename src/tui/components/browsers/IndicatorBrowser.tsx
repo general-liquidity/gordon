@@ -8,7 +8,7 @@
  * Pattern: Claude Code MCP/plugin browser (grouped list with descriptions).
  */
 
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Box, Text } from "../../ink-custom";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { Pane } from "../../design-system/Pane.js";
@@ -36,48 +36,234 @@ interface Props {
 
 const INDICATORS: IndicatorInfo[] = [
   // Trend (6)
-  { id: "sma", name: "SMA", category: "Trend", description: "Simple Moving Average", parameters: ["period"] },
-  { id: "ema", name: "EMA", category: "Trend", description: "Exponential Moving Average", parameters: ["period"] },
-  { id: "wma", name: "WMA", category: "Trend", description: "Weighted Moving Average", parameters: ["period"] },
-  { id: "dema", name: "DEMA", category: "Trend", description: "Double Exponential Moving Average", parameters: ["period"] },
-  { id: "supertrend", name: "SuperTrend", category: "Trend", description: "Trend-following overlay with ATR bands", parameters: ["period", "multiplier"] },
-  { id: "ichimoku", name: "Ichimoku", category: "Trend", description: "Ichimoku Cloud with 5 components", parameters: ["tenkan", "kijun", "senkou"] },
+  {
+    id: "sma",
+    name: "SMA",
+    category: "Trend",
+    description: "Simple Moving Average",
+    parameters: ["period"],
+  },
+  {
+    id: "ema",
+    name: "EMA",
+    category: "Trend",
+    description: "Exponential Moving Average",
+    parameters: ["period"],
+  },
+  {
+    id: "wma",
+    name: "WMA",
+    category: "Trend",
+    description: "Weighted Moving Average",
+    parameters: ["period"],
+  },
+  {
+    id: "dema",
+    name: "DEMA",
+    category: "Trend",
+    description: "Double Exponential Moving Average",
+    parameters: ["period"],
+  },
+  {
+    id: "supertrend",
+    name: "SuperTrend",
+    category: "Trend",
+    description: "Trend-following overlay with ATR bands",
+    parameters: ["period", "multiplier"],
+  },
+  {
+    id: "ichimoku",
+    name: "Ichimoku",
+    category: "Trend",
+    description: "Ichimoku Cloud with 5 components",
+    parameters: ["tenkan", "kijun", "senkou"],
+  },
 
   // Momentum (6)
-  { id: "rsi", name: "RSI", category: "Momentum", description: "Relative Strength Index", parameters: ["period"] },
-  { id: "macd", name: "MACD", category: "Momentum", description: "Moving Average Convergence Divergence", parameters: ["fast", "slow", "signal"] },
-  { id: "stoch", name: "Stochastic", category: "Momentum", description: "Stochastic Oscillator %K/%D", parameters: ["kPeriod", "dPeriod", "smooth"] },
-  { id: "cci", name: "CCI", category: "Momentum", description: "Commodity Channel Index", parameters: ["period"] },
-  { id: "williams", name: "Williams %R", category: "Momentum", description: "Williams Percent Range", parameters: ["period"] },
-  { id: "roc", name: "ROC", category: "Momentum", description: "Rate of Change", parameters: ["period"] },
+  {
+    id: "rsi",
+    name: "RSI",
+    category: "Momentum",
+    description: "Relative Strength Index",
+    parameters: ["period"],
+  },
+  {
+    id: "macd",
+    name: "MACD",
+    category: "Momentum",
+    description: "Moving Average Convergence Divergence",
+    parameters: ["fast", "slow", "signal"],
+  },
+  {
+    id: "stoch",
+    name: "Stochastic",
+    category: "Momentum",
+    description: "Stochastic Oscillator %K/%D",
+    parameters: ["kPeriod", "dPeriod", "smooth"],
+  },
+  {
+    id: "cci",
+    name: "CCI",
+    category: "Momentum",
+    description: "Commodity Channel Index",
+    parameters: ["period"],
+  },
+  {
+    id: "williams",
+    name: "Williams %R",
+    category: "Momentum",
+    description: "Williams Percent Range",
+    parameters: ["period"],
+  },
+  {
+    id: "roc",
+    name: "ROC",
+    category: "Momentum",
+    description: "Rate of Change",
+    parameters: ["period"],
+  },
 
   // Volatility (5)
-  { id: "bb", name: "Bollinger Bands", category: "Volatility", description: "Price bands at N standard deviations", parameters: ["period", "stdDev"] },
-  { id: "atr", name: "ATR", category: "Volatility", description: "Average True Range", parameters: ["period"] },
-  { id: "keltner", name: "Keltner Channels", category: "Volatility", description: "EMA-based volatility channels", parameters: ["period", "multiplier"] },
-  { id: "donchian", name: "Donchian Channels", category: "Volatility", description: "Highest high / lowest low channels", parameters: ["period"] },
-  { id: "stddev", name: "Std Deviation", category: "Volatility", description: "Rolling standard deviation of price", parameters: ["period"] },
+  {
+    id: "bb",
+    name: "Bollinger Bands",
+    category: "Volatility",
+    description: "Price bands at N standard deviations",
+    parameters: ["period", "stdDev"],
+  },
+  {
+    id: "atr",
+    name: "ATR",
+    category: "Volatility",
+    description: "Average True Range",
+    parameters: ["period"],
+  },
+  {
+    id: "keltner",
+    name: "Keltner Channels",
+    category: "Volatility",
+    description: "EMA-based volatility channels",
+    parameters: ["period", "multiplier"],
+  },
+  {
+    id: "donchian",
+    name: "Donchian Channels",
+    category: "Volatility",
+    description: "Highest high / lowest low channels",
+    parameters: ["period"],
+  },
+  {
+    id: "stddev",
+    name: "Std Deviation",
+    category: "Volatility",
+    description: "Rolling standard deviation of price",
+    parameters: ["period"],
+  },
 
   // Volume (5)
   { id: "obv", name: "OBV", category: "Volume", description: "On-Balance Volume", parameters: [] },
-  { id: "vwap", name: "VWAP", category: "Volume", description: "Volume-Weighted Average Price", parameters: [] },
-  { id: "ad", name: "A/D Line", category: "Volume", description: "Accumulation/Distribution Line", parameters: [] },
-  { id: "mfi", name: "MFI", category: "Volume", description: "Money Flow Index", parameters: ["period"] },
-  { id: "cmf", name: "CMF", category: "Volume", description: "Chaikin Money Flow", parameters: ["period"] },
+  {
+    id: "vwap",
+    name: "VWAP",
+    category: "Volume",
+    description: "Volume-Weighted Average Price",
+    parameters: [],
+  },
+  {
+    id: "ad",
+    name: "A/D Line",
+    category: "Volume",
+    description: "Accumulation/Distribution Line",
+    parameters: [],
+  },
+  {
+    id: "mfi",
+    name: "MFI",
+    category: "Volume",
+    description: "Money Flow Index",
+    parameters: ["period"],
+  },
+  {
+    id: "cmf",
+    name: "CMF",
+    category: "Volume",
+    description: "Chaikin Money Flow",
+    parameters: ["period"],
+  },
 
   // Structure (5)
-  { id: "pivot", name: "Pivot Points", category: "Structure", description: "Support/resistance pivot levels", parameters: ["type"] },
-  { id: "fib", name: "Fibonacci Levels", category: "Structure", description: "Fibonacci retracement levels", parameters: ["swingHigh", "swingLow"] },
-  { id: "sr", name: "Support/Resistance", category: "Structure", description: "Auto-detected S/R zones", parameters: ["lookback", "threshold"] },
-  { id: "trendline", name: "Trendlines", category: "Structure", description: "Auto-drawn trend lines", parameters: ["lookback"] },
-  { id: "patterns", name: "Chart Patterns", category: "Structure", description: "Detected chart patterns (H&S, triangles, etc.)", parameters: ["lookback"] },
+  {
+    id: "pivot",
+    name: "Pivot Points",
+    category: "Structure",
+    description: "Support/resistance pivot levels",
+    parameters: ["type"],
+  },
+  {
+    id: "fib",
+    name: "Fibonacci Levels",
+    category: "Structure",
+    description: "Fibonacci retracement levels",
+    parameters: ["swingHigh", "swingLow"],
+  },
+  {
+    id: "sr",
+    name: "Support/Resistance",
+    category: "Structure",
+    description: "Auto-detected S/R zones",
+    parameters: ["lookback", "threshold"],
+  },
+  {
+    id: "trendline",
+    name: "Trendlines",
+    category: "Structure",
+    description: "Auto-drawn trend lines",
+    parameters: ["lookback"],
+  },
+  {
+    id: "patterns",
+    name: "Chart Patterns",
+    category: "Structure",
+    description: "Detected chart patterns (H&S, triangles, etc.)",
+    parameters: ["lookback"],
+  },
 
   // Advanced (5)
-  { id: "hurst", name: "Hurst Exponent", category: "Advanced", description: "Mean-reversion vs trend persistence measure", parameters: ["maxLag"] },
-  { id: "entropy", name: "Shannon Entropy", category: "Advanced", description: "Market uncertainty / information measure", parameters: ["period"] },
-  { id: "correlation", name: "Correlation Matrix", category: "Advanced", description: "Cross-asset rolling correlation", parameters: ["period", "assets"] },
-  { id: "regime", name: "Regime Detector", category: "Advanced", description: "HMM-based market regime classification", parameters: ["states"] },
-  { id: "fractal", name: "Fractal Dimension", category: "Advanced", description: "Price series complexity measure", parameters: ["period"] },
+  {
+    id: "hurst",
+    name: "Hurst Exponent",
+    category: "Advanced",
+    description: "Mean-reversion vs trend persistence measure",
+    parameters: ["maxLag"],
+  },
+  {
+    id: "entropy",
+    name: "Shannon Entropy",
+    category: "Advanced",
+    description: "Market uncertainty / information measure",
+    parameters: ["period"],
+  },
+  {
+    id: "correlation",
+    name: "Correlation Matrix",
+    category: "Advanced",
+    description: "Cross-asset rolling correlation",
+    parameters: ["period", "assets"],
+  },
+  {
+    id: "regime",
+    name: "Regime Detector",
+    category: "Advanced",
+    description: "HMM-based market regime classification",
+    parameters: ["states"],
+  },
+  {
+    id: "fractal",
+    name: "Fractal Dimension",
+    category: "Advanced",
+    description: "Price series complexity measure",
+    parameters: ["period"],
+  },
 ];
 
 const CATEGORIES = ["Trend", "Momentum", "Volatility", "Volume", "Structure", "Advanced"];
@@ -131,26 +317,29 @@ export function IndicatorBrowser({ onSelect, onClose }: Props) {
   const selectable = useMemo(() => selectableIndices(flatList), [flatList]);
   const [cursor, setCursor] = useState(0);
 
-  useRoutedInput((input, key) => {
-    if (key.escape) {
-      onClose();
-      return;
-    }
-    if (key.upArrow) {
-      setCursor((c) => Math.max(0, c - 1));
-      return;
-    }
-    if (key.downArrow) {
-      setCursor((c) => Math.min(selectable.length - 1, c + 1));
-      return;
-    }
-    if (key.return) {
-      const idx = selectable[cursor];
-      if (idx === undefined) return;
-      const entry = flatList[idx];
-      if (entry?.indicator && onSelect) onSelect(entry.indicator);
-    }
-  }, { id: "indicatorBrowser", priority: FOCUS_PRIORITY.DIALOG });
+  useRoutedInput(
+    (_input, key) => {
+      if (key.escape) {
+        onClose();
+        return;
+      }
+      if (key.upArrow) {
+        setCursor((c) => Math.max(0, c - 1));
+        return;
+      }
+      if (key.downArrow) {
+        setCursor((c) => Math.min(selectable.length - 1, c + 1));
+        return;
+      }
+      if (key.return) {
+        const idx = selectable[cursor];
+        if (idx === undefined) return;
+        const entry = flatList[idx];
+        if (entry?.indicator && onSelect) onSelect(entry.indicator);
+      }
+    },
+    { id: "indicatorBrowser", priority: FOCUS_PRIORITY.DIALOG },
+  );
 
   const selectedFlatIdx = selectable[cursor] ?? -1;
   const focusedIndicator = selectedFlatIdx >= 0 ? flatList[selectedFlatIdx]?.indicator : undefined;

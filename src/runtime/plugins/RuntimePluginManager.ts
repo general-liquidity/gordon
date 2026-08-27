@@ -116,13 +116,12 @@ function buildDefaultInventory(state: {
 
     const routing = routingByPlugin.get(plugin.id);
     const routed = Boolean(
-      routing
-      && (
-        routing.routingManifest.defaultAgent !== "Gordon"
-        || (routing.routingManifest.toolAgentMap?.length ?? 0) > 0
-      ),
+      routing &&
+        (routing.routingManifest.defaultAgent !== "Gordon" ||
+          (routing.routingManifest.toolAgentMap?.length ?? 0) > 0),
     );
-    const toolCount = serverToolIds.length > 0 ? serverToolIds.length : plugin.manifest.tools.length;
+    const toolCount =
+      serverToolIds.length > 0 ? serverToolIds.length : plugin.manifest.tools.length;
     const attentionReasons: string[] = [];
     if (!plugin.enabled) {
       attentionReasons.push("disabled");
@@ -136,16 +135,13 @@ function buildDefaultInventory(state: {
     if (routed && !routing?.routingManifest.alsoOnGordon) {
       attentionReasons.push("agent-routed only");
     }
-    const status = !plugin.enabled
-      ? "disabled"
-      : toolCount > 0
-        ? "ready"
-        : "degraded";
-    const attentionLevel = status === "degraded" || attentionReasons.includes("no commands surfaced")
-      ? "warning"
-      : attentionReasons.length > 0
-        ? "info"
-        : "none";
+    const status = !plugin.enabled ? "disabled" : toolCount > 0 ? "ready" : "degraded";
+    const attentionLevel =
+      status === "degraded" || attentionReasons.includes("no commands surfaced")
+        ? "warning"
+        : attentionReasons.length > 0
+          ? "info"
+          : "none";
     return {
       id: plugin.id,
       name: plugin.manifest.name ?? plugin.id,
@@ -177,12 +173,16 @@ function buildDefaultInventory(state: {
     tools: Object.entries(toolsByServer).flatMap(([serverId, toolIds]) => {
       const routing = routingByPlugin.get(serverId);
       const toolAgentMap = new Map(
-        (routing?.routingManifest.toolAgentMap ?? []).map((mapping) => [mapping.toolName, mapping.agent]),
+        (routing?.routingManifest.toolAgentMap ?? []).map((mapping) => [
+          mapping.toolName,
+          mapping.agent,
+        ]),
       );
       return toolIds.map((toolId) => {
         const underscoreIndex = toolId.indexOf("_");
         const bareToolName = underscoreIndex > 0 ? toolId.slice(underscoreIndex + 1) : toolId;
-        const routedToAgent = toolAgentMap.get(bareToolName) ?? routing?.routingManifest.defaultAgent;
+        const routedToAgent =
+          toolAgentMap.get(bareToolName) ?? routing?.routingManifest.defaultAgent;
         return {
           id: toolId,
           origin: "mcp" as const,
@@ -190,7 +190,9 @@ function buildDefaultInventory(state: {
           serverId,
           displayName: toolId,
           routedToAgent,
-          exposedOnGordon: Boolean(routing?.routingManifest.alsoOnGordon && routedToAgent && routedToAgent !== "Gordon"),
+          exposedOnGordon: Boolean(
+            routing?.routingManifest.alsoOnGordon && routedToAgent && routedToAgent !== "Gordon",
+          ),
         } satisfies RuntimeToolSummary;
       });
     }),
@@ -206,36 +208,56 @@ export class RuntimePluginManager {
 
   constructor(deps: RuntimePluginManagerDeps = {}) {
     this.deps = {
-      initializePlugins: deps.initializePlugins ?? (async () => {
-        await pluginInstaller.initialize();
-        await initMCPTools();
-        await initRouting();
-      }),
-      listPlugins: deps.listPlugins ?? (() => buildDefaultInventory({
-        hotReloadEnabled: this.hotReloadEnabled,
-        lastReloadAt: this.lastReloadAt,
-      }).plugins),
-      listMcpServers: deps.listMcpServers ?? (() => buildDefaultInventory({
-        hotReloadEnabled: this.hotReloadEnabled,
-        lastReloadAt: this.lastReloadAt,
-      }).mcpServers),
-      listTools: deps.listTools ?? (() => buildDefaultInventory({
-        hotReloadEnabled: this.hotReloadEnabled,
-        lastReloadAt: this.lastReloadAt,
-      }).tools),
-      listCommands: deps.listCommands ?? (() => buildDefaultInventory({
-        hotReloadEnabled: this.hotReloadEnabled,
-        lastReloadAt: this.lastReloadAt,
-      }).commands),
-      reloadPlugins: deps.reloadPlugins ?? (async () => {
-        await reloadRouting();
-      }),
-      enableHotReload: deps.enableHotReload ?? ((intervalMs?: number) => enableMCPHotReload(intervalMs)),
+      initializePlugins:
+        deps.initializePlugins ??
+        (async () => {
+          await pluginInstaller.initialize();
+          await initMCPTools();
+          await initRouting();
+        }),
+      listPlugins:
+        deps.listPlugins ??
+        (() =>
+          buildDefaultInventory({
+            hotReloadEnabled: this.hotReloadEnabled,
+            lastReloadAt: this.lastReloadAt,
+          }).plugins),
+      listMcpServers:
+        deps.listMcpServers ??
+        (() =>
+          buildDefaultInventory({
+            hotReloadEnabled: this.hotReloadEnabled,
+            lastReloadAt: this.lastReloadAt,
+          }).mcpServers),
+      listTools:
+        deps.listTools ??
+        (() =>
+          buildDefaultInventory({
+            hotReloadEnabled: this.hotReloadEnabled,
+            lastReloadAt: this.lastReloadAt,
+          }).tools),
+      listCommands:
+        deps.listCommands ??
+        (() =>
+          buildDefaultInventory({
+            hotReloadEnabled: this.hotReloadEnabled,
+            lastReloadAt: this.lastReloadAt,
+          }).commands),
+      reloadPlugins:
+        deps.reloadPlugins ??
+        (async () => {
+          await reloadRouting();
+        }),
+      enableHotReload:
+        deps.enableHotReload ?? ((intervalMs?: number) => enableMCPHotReload(intervalMs)),
       disableHotReload: deps.disableHotReload ?? (() => disableMCPHotReload()),
     };
   }
 
-  async initialize(runtime: SessionRuntime, options: { intervalMs?: number; enableHotReload?: boolean } = {}): Promise<RuntimePluginInventory> {
+  async initialize(
+    runtime: SessionRuntime,
+    options: { intervalMs?: number; enableHotReload?: boolean } = {},
+  ): Promise<RuntimePluginInventory> {
     await this.deps.initializePlugins();
     const inventory = await this.sync(runtime);
     if (options.enableHotReload) {

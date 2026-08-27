@@ -26,7 +26,9 @@ describe("computeVZO", () => {
   });
 
   it("is neutral on insufficient data or mismatched lengths", () => {
-    expect(computeVZO({ closes: [1, 2, 3], volumes: [1, 1, 1], period: 14 }).zone).toBe("insufficient");
+    expect(computeVZO({ closes: [1, 2, 3], volumes: [1, 1, 1], period: 14 }).zone).toBe(
+      "insufficient",
+    );
     expect(computeVZO({ closes: up, volumes: [1, 2] }).zone).toBe("insufficient");
   });
 });

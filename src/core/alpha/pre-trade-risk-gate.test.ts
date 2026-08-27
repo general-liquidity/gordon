@@ -11,7 +11,7 @@ function genSeries(seed: number, n = 30): number[] {
   let x = seed;
   for (let i = 0; i < n; i++) {
     x = (x * 1103515245 + 12345) & 0x7fffffff;
-    out.push(((x / 0x7fffffff) - 0.5) * 0.04);
+    out.push((x / 0x7fffffff - 0.5) * 0.04);
   }
   return out;
 }
@@ -30,7 +30,13 @@ describe("checkPreTradeRiskGate", () => {
       returnSeries: genSeries(1),
     };
     const existing: ExistingPosition[] = [
-      { symbol: "BBB", sector: "energy", exposurePct: 0.003, side: "LONG", returnSeries: genSeries(2) },
+      {
+        symbol: "BBB",
+        sector: "energy",
+        exposurePct: 0.003,
+        side: "LONG",
+        returnSeries: genSeries(2),
+      },
     ];
     const pnl = [0.002, -0.001, 0.001, -0.002, 0.001];
     const r = checkPreTradeRiskGate(proposal, existing, pnl);
@@ -62,7 +68,13 @@ describe("checkPreTradeRiskGate", () => {
       returnSeries: clone(sharedSeries), // identical → corr = 1
     };
     const existing: ExistingPosition[] = [
-      { symbol: "BBB", sector: "energy", exposurePct: 0.005, side: "LONG", returnSeries: clone(sharedSeries) },
+      {
+        symbol: "BBB",
+        sector: "energy",
+        exposurePct: 0.005,
+        side: "LONG",
+        returnSeries: clone(sharedSeries),
+      },
     ];
     const r = checkPreTradeRiskGate(proposal, existing, [0]);
     expect(r.verdict).toBe("block_correlation");
@@ -137,7 +149,13 @@ describe("checkPreTradeRiskGate", () => {
       // no returnSeries
     };
     const existing: ExistingPosition[] = [
-      { symbol: "BBB", sector: "energy", exposurePct: 0.003, side: "LONG", returnSeries: genSeries(2) },
+      {
+        symbol: "BBB",
+        sector: "energy",
+        exposurePct: 0.003,
+        side: "LONG",
+        returnSeries: genSeries(2),
+      },
     ];
     const r = checkPreTradeRiskGate(proposal, existing, [0]);
     expect(r.verdict).toBe("data_gap");
@@ -205,7 +223,13 @@ describe("checkPreTradeRiskGate", () => {
       // missing returnSeries
     };
     const existing: ExistingPosition[] = [
-      { symbol: "BBB", sector: "energy", exposurePct: 0.003, side: "LONG", returnSeries: genSeries(2) },
+      {
+        symbol: "BBB",
+        sector: "energy",
+        exposurePct: 0.003,
+        side: "LONG",
+        returnSeries: genSeries(2),
+      },
     ];
     const r = checkPreTradeRiskGate(proposal, existing, []);
     expect(r.verdict).toBe("data_gap");
@@ -253,7 +277,13 @@ describe("checkPreTradeRiskGate", () => {
       returnSeries: genSeries(1),
     };
     const existing: ExistingPosition[] = [
-      { symbol: "T1", sector: "tech", exposurePct: 0.038, side: "LONG", returnSeries: genSeries(99) },
+      {
+        symbol: "T1",
+        sector: "tech",
+        exposurePct: 0.038,
+        side: "LONG",
+        returnSeries: genSeries(99),
+      },
     ];
     const r = checkPreTradeRiskGate(proposal, existing, [0, 0, 0]);
     expect(r.verdict).toBe("block_sector");

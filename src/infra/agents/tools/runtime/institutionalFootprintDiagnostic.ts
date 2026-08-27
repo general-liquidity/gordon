@@ -79,12 +79,7 @@ export const institutionalFootprintDiagnosticTool = createTool({
       .min(5)
       .optional()
       .describe("SMA length for the holding-EMA check. Default 21."),
-    minBars: z
-      .number()
-      .int()
-      .min(10)
-      .optional()
-      .describe("Minimum bars in the input. Default 30."),
+    minBars: z.number().int().min(10).optional().describe("Minimum bars in the input. Default 30."),
     minBaseLength: z
       .number()
       .int()

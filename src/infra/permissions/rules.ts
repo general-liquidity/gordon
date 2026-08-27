@@ -19,7 +19,18 @@ export interface ContentCondition {
   /** Dot-path into the args object (e.g., "notionalUsd" or "order.side"). */
   path: string;
   /** Comparison operator. */
-  op: "eq" | "ne" | "lt" | "lte" | "gt" | "gte" | "in" | "nin" | "matches" | "starts_with" | "contains";
+  op:
+    | "eq"
+    | "ne"
+    | "lt"
+    | "lte"
+    | "gt"
+    | "gte"
+    | "in"
+    | "nin"
+    | "matches"
+    | "starts_with"
+    | "contains";
   /** Value to compare against. */
   value: string | number | boolean | string[] | number[];
 }
@@ -48,7 +59,7 @@ function toolMatches(pattern: string, toolName: string): boolean {
   if (pattern === "*" || pattern === toolName) return true;
   if (!pattern.includes("*")) return false;
   const regex = new RegExp(
-    "^" + pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$",
+    `^${pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`,
   );
   return regex.test(toolName);
 }
@@ -77,8 +88,10 @@ function conditionMatches(cond: ContentCondition, args: unknown): boolean {
   const actual = resolvePath(args, cond.path);
 
   switch (cond.op) {
-    case "eq": return actual === cond.value;
-    case "ne": return actual !== cond.value;
+    case "eq":
+      return actual === cond.value;
+    case "ne":
+      return actual !== cond.value;
     case "lt": {
       const a = toNumber(actual);
       const b = toNumber(cond.value);
@@ -111,9 +124,15 @@ function conditionMatches(cond: ContentCondition, args: unknown): boolean {
         return false;
       }
     case "starts_with":
-      return typeof actual === "string" && typeof cond.value === "string" && actual.startsWith(cond.value);
+      return (
+        typeof actual === "string" &&
+        typeof cond.value === "string" &&
+        actual.startsWith(cond.value)
+      );
     case "contains":
-      return typeof actual === "string" && typeof cond.value === "string" && actual.includes(cond.value);
+      return (
+        typeof actual === "string" && typeof cond.value === "string" && actual.includes(cond.value)
+      );
     default:
       return false;
   }
@@ -139,10 +158,7 @@ export interface EvaluateInput {
  * Evaluate rules against a tool call. Returns the first matching rule's
  * behavior, or the default (defaults to "ask") if nothing matches.
  */
-export function evaluateRules(
-  rules: PermissionRule[],
-  input: EvaluateInput,
-): PermissionDecision {
+export function evaluateRules(rules: PermissionRule[], input: EvaluateInput): PermissionDecision {
   const sorted = [...rules].sort((a, b) => (a.priority ?? 100) - (b.priority ?? 100));
 
   for (const rule of sorted) {
@@ -191,7 +207,10 @@ export const PRESET_BLOCK_SHORTING: PermissionRule = {
   id: "no-shorting",
   source: "policy",
   toolPattern: "place_*order*",
-  conditions: [{ path: "side", op: "eq", value: "sell" }, { path: "isShort", op: "eq", value: true }],
+  conditions: [
+    { path: "side", op: "eq", value: "sell" },
+    { path: "isShort", op: "eq", value: true },
+  ],
   behavior: "deny",
   priority: 5,
   reason: "Short selling is disabled by policy",

@@ -27,7 +27,11 @@ beforeEach(() => {
 afterEach(() => {
   if (originalEnv === undefined) delete process.env[ACP_SESSIONS_PATH_ENV];
   else process.env[ACP_SESSIONS_PATH_ENV] = originalEnv;
-  try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* */ }
+  try {
+    rmSync(tempDir, { recursive: true, force: true });
+  } catch {
+    /* */
+  }
 });
 
 describe("getAcpSessionsDir", () => {
@@ -80,15 +84,15 @@ describe("appendSessionTurn + loadSessionTurns", () => {
     const { appendFileSync } = require("node:fs");
     appendFileSync(
       join(tempDir, "s4.jsonl"),
-      JSON.stringify({ role: "system", content: "x", ts: 1 }) + "\n",
+      `${JSON.stringify({ role: "system", content: "x", ts: 1 })}\n`,
     );
     appendFileSync(
       join(tempDir, "s4.jsonl"),
-      JSON.stringify({ role: "user", content: 42, ts: 2 }) + "\n",
+      `${JSON.stringify({ role: "user", content: 42, ts: 2 })}\n`,
     );
     appendFileSync(
       join(tempDir, "s4.jsonl"),
-      JSON.stringify({ role: "user", content: "valid", ts: 3 }) + "\n",
+      `${JSON.stringify({ role: "user", content: "valid", ts: 3 })}\n`,
     );
     const turns = loadSessionTurns("s4");
     expect(turns).toHaveLength(1);

@@ -15,7 +15,7 @@ export interface ExportStatus {
 
 export async function exportResultsJson(
   results: BacktestResult[],
-  filepath: string
+  filepath: string,
 ): Promise<ExportStatus> {
   try {
     await mkdir(dirname(filepath), { recursive: true });
@@ -35,7 +35,7 @@ export async function exportResultsJson(
 
 export async function exportResultsCsv(
   results: BacktestResult[],
-  filepath: string
+  filepath: string,
 ): Promise<ExportStatus> {
   try {
     await mkdir(dirname(filepath), { recursive: true });
@@ -90,20 +90,19 @@ export async function exportResultsCsv(
 
 export async function generateHtmlReport(
   results: BacktestResult[],
-  filepath: string
+  filepath: string,
 ): Promise<ExportStatus> {
   try {
     await mkdir(dirname(filepath), { recursive: true });
 
-    const bestReturn = results.length > 0
-      ? Math.max(...results.map((r) => r.metrics.totalReturn))
-      : 0;
+    const bestReturn =
+      results.length > 0 ? Math.max(...results.map((r) => r.metrics.totalReturn)) : 0;
 
     const rows = results
       .map((result) => {
         const metrics = result.metrics;
         const isBest = metrics.totalReturn === bestReturn;
-        const rowClass = isBest ? " class=\"best\"" : "";
+        const rowClass = isBest ? ' class="best"' : "";
         return `      <tr${rowClass}>
         <td>${result.strategyName}</td>
         <td>${metrics.totalReturn.toFixed(2)}%</td>

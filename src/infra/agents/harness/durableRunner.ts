@@ -68,9 +68,7 @@ export const DURABLE_AGENTS_FLAG_ENV = "GORDON_DURABLE_AGENTS";
  * Gate flag. Off (default) keeps the hand-rolled autonomous loop; on activates
  * the durable-agent + native-goal + background-task path. Accepts `1`/`true`/`yes`.
  */
-export function isDurableAgentsEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function isDurableAgentsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   const raw = env[DURABLE_AGENTS_FLAG_ENV];
   if (typeof raw !== "string") return false;
   const normalized = raw.trim().toLowerCase();
@@ -84,10 +82,7 @@ export function isDurableAgentsEnabled(
  * without constructing a full Mastra instance.
  */
 export interface DurableAgentLike {
-  stream(
-    messages: unknown,
-    options?: Record<string, unknown>,
-  ): Promise<DurableStreamResultLike>;
+  stream(messages: unknown, options?: Record<string, unknown>): Promise<DurableStreamResultLike>;
   setObjective?(
     objective: string,
     options: {
@@ -99,10 +94,7 @@ export interface DurableAgentLike {
       id?: string;
     },
   ): Promise<unknown>;
-  observe?(
-    runId: string,
-    options?: Record<string, unknown>,
-  ): Promise<DurableStreamResultLike>;
+  observe?(runId: string, options?: Record<string, unknown>): Promise<DurableStreamResultLike>;
   resume?(
     runId: string,
     resumeData: unknown,
@@ -249,9 +241,7 @@ function mandateExecutionContext(mandate: SwingMandate): ExecutionContext {
  * side effects until `start()` / `recover()` is called. `createDurable` defaults
  * to the real `createDurableAgent`; tests inject a fake.
  */
-export function buildDurableAutonomousRunner(
-  config: DurableRunnerConfig,
-): DurableAutonomousRunner {
+export function buildDurableAutonomousRunner(config: DurableRunnerConfig): DurableAutonomousRunner {
   const createDurable = config.createDurable ?? defaultCreateDurable;
 
   let durable: DurableAgentLike | null = null;
@@ -348,7 +338,7 @@ export function buildDurableAutonomousRunner(
     const untilIdle =
       typeof config.untilIdle === "number"
         ? { maxIdleMs: config.untilIdle }
-        : config.untilIdle ?? true;
+        : (config.untilIdle ?? true);
 
     const result = await agent.stream(objective, {
       untilIdle,
@@ -381,10 +371,7 @@ export function buildDurableAutonomousRunner(
     return agent.observe(runId);
   }
 
-  async function resume(
-    runId: string,
-    resumeData: unknown,
-  ): Promise<DurableStreamResultLike> {
+  async function resume(runId: string, resumeData: unknown): Promise<DurableStreamResultLike> {
     const agent = ensureDurable();
     if (!agent.resume) {
       throw new Error("Durable agent does not support resume()");

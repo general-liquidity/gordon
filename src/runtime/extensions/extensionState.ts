@@ -71,7 +71,11 @@ export function saveExtensionState(state: Omit<ExtensionState, "lastUpdatedAt" |
   } catch {
     // Some Windows configs reject rename if target exists — fall back to overwrite.
     writeFileSync(file, JSON.stringify(payload, null, 2), { encoding: "utf-8", mode: 0o600 });
-    try { unlinkSync(tmp); } catch {/* ignore */}
+    try {
+      unlinkSync(tmp);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -85,7 +89,8 @@ export function loadExtensionState(sessionId: string): ExtensionState | null {
   try {
     const raw = readFileSync(file, "utf-8");
     const parsed = JSON.parse(raw) as ExtensionState;
-    if (typeof parsed.sessionId !== "string" || !Array.isArray(parsed.enabledExtensionIds)) return null;
+    if (typeof parsed.sessionId !== "string" || !Array.isArray(parsed.enabledExtensionIds))
+      return null;
     if (parsed.version !== 1) return null;
     // Defensive: drop non-string entries the file may have collected via
     // older versions or tampering.
@@ -93,7 +98,8 @@ export function loadExtensionState(sessionId: string): ExtensionState | null {
     return {
       sessionId: parsed.sessionId,
       enabledExtensionIds: cleanIds,
-      lastUpdatedAt: typeof parsed.lastUpdatedAt === "string" ? parsed.lastUpdatedAt : new Date().toISOString(),
+      lastUpdatedAt:
+        typeof parsed.lastUpdatedAt === "string" ? parsed.lastUpdatedAt : new Date().toISOString(),
       version: 1,
     };
   } catch {
@@ -128,10 +134,7 @@ export interface DriftReport {
   totalDrift: number;
 }
 
-export function computeDrift(
-  saved: ExtensionState | null,
-  currentEnabled: string[],
-): DriftReport {
+export function computeDrift(saved: ExtensionState | null, currentEnabled: string[]): DriftReport {
   const savedSet = new Set(saved?.enabledExtensionIds ?? []);
   const currentSet = new Set(currentEnabled);
   const missingFromCurrent = [...savedSet].filter((id) => !currentSet.has(id));

@@ -227,8 +227,13 @@ export function computeDampedCycleDecomposition(input: {
       // Real root (DC/trend or Nyquist): single r^n column.
       used[i] = true;
       const col: number[] = [];
-      for (let m = 0; m < n; m++) col.push(Math.pow(r, m) * (theta === 0 ? 1 : Math.cos(theta * m)));
-      groups.push({ r, theta: Math.abs(theta) < 1e-6 ? 0 : Math.PI, isPair: false, colStart: columns.length });
+      for (let m = 0; m < n; m++) col.push(r ** m * (theta === 0 ? 1 : Math.cos(theta * m)));
+      groups.push({
+        r,
+        theta: Math.abs(theta) < 1e-6 ? 0 : Math.PI,
+        isPair: false,
+        colStart: columns.length,
+      });
       columns.push(col);
     } else {
       // Find the conjugate partner.
@@ -236,7 +241,10 @@ export function computeDampedCycleDecomposition(input: {
       for (let j = i + 1; j < roots.length; j++) {
         if (used[j]) continue;
         const zj = roots[j]!;
-        if (Math.abs(cAbs(zj) - r) < 1e-3 * (1 + r) && Math.abs(Math.atan2(zj.im, zj.re) + theta) < 1e-3) {
+        if (
+          Math.abs(cAbs(zj) - r) < 1e-3 * (1 + r) &&
+          Math.abs(Math.atan2(zj.im, zj.re) + theta) < 1e-3
+        ) {
           partner = j;
           break;
         }
@@ -247,7 +255,7 @@ export function computeDampedCycleDecomposition(input: {
       const cosCol: number[] = [];
       const sinCol: number[] = [];
       for (let m = 0; m < n; m++) {
-        const rn = Math.pow(r, m);
+        const rn = r ** m;
         cosCol.push(rn * Math.cos(w * m));
         sinCol.push(rn * Math.sin(w * m));
       }

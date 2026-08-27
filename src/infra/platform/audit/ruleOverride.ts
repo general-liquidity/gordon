@@ -35,10 +35,7 @@ import { auditLog, getAuditHistory, type AuditEntry } from "./audit-log.ts";
  * Severity of the rule-override, mirroring riskClassifier's recommendation
  * vocabulary so the audit trail stays operator-readable.
  */
-export type RuleOverrideSeverity =
-  | "prompt_user"
-  | "require_confirmation"
-  | "block";
+export type RuleOverrideSeverity = "prompt_user" | "require_confirmation" | "block";
 
 export interface RuleOverrideParameters {
   /** What the operator did (e.g. "approve_plan", "place_market_order"). */
@@ -109,11 +106,7 @@ export function recordRuleOverride(
  * "trades that could have been overridden." Pulled from AuditAction's
  * enum subset that represents real trade execution / position changes.
  */
-const TRADE_EXECUTION_ACTIONS = [
-  "EXECUTE_PLAN",
-  "CLOSE_TRADE",
-  "PLACE_OCO_ORDER",
-] as const;
+const TRADE_EXECUTION_ACTIONS = ["EXECUTE_PLAN", "CLOSE_TRADE", "PLACE_OCO_ORDER"] as const;
 
 export interface AdherenceWindow {
   /** ISO timestamp. Defaults: 7 days ago. */
@@ -205,9 +198,7 @@ function toOverrideRecord(entry: AuditEntry): AdherenceOverrideRecord | undefine
  * query volume is bounded by retention (~7y default) and the window
  * (~7d default) so the unjoined approach is fine.
  */
-export function getAdherenceReport(
-  window: AdherenceWindow = {},
-): AdherenceReport {
+export function getAdherenceReport(window: AdherenceWindow = {}): AdherenceReport {
   const startTime = window.startTime ?? defaultStartIso();
   const endTime = window.endTime ?? defaultEndIso();
 
@@ -246,8 +237,7 @@ export function getAdherenceReport(
     bySeverity[r.originalRecommendation]++;
   }
 
-  const deviationRate =
-    tradesExecuted > 0 ? overrideList.length / tradesExecuted : null;
+  const deviationRate = tradesExecuted > 0 ? overrideList.length / tradesExecuted : null;
 
   return {
     windowStart: startTime,

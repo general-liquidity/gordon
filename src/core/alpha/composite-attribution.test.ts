@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  explainCompositeAttribution,
-  formatAttributionTable,
-} from "./composite-attribution.ts";
+import { explainCompositeAttribution, formatAttributionTable } from "./composite-attribution.ts";
 import type { RiskAssessment } from "../../infra/trading/risk/riskClassifier.ts";
 
 function makeAssessment(
@@ -11,9 +8,7 @@ function makeAssessment(
 ): RiskAssessment {
   const totalWeight = dims.reduce((sum, d) => sum + d.weight, 0);
   const composite =
-    totalWeight > 0
-      ? dims.reduce((sum, d) => sum + d.score * d.weight, 0) / totalWeight
-      : 0;
+    totalWeight > 0 ? dims.reduce((sum, d) => sum + d.score * d.weight, 0) / totalWeight : 0;
   return {
     compositeScore: composite,
     tier: composite < 25 ? "low" : composite < 50 ? "medium" : composite < 75 ? "high" : "critical",
@@ -24,7 +19,14 @@ function makeAssessment(
       reason: d.reason ?? `score ${d.score}`,
     })),
     topFactors: [],
-    recommendation: composite < 25 ? "auto_approve" : composite < 50 ? "prompt_user" : composite < 75 ? "require_confirmation" : "block",
+    recommendation:
+      composite < 25
+        ? "auto_approve"
+        : composite < 50
+          ? "prompt_user"
+          : composite < 75
+            ? "require_confirmation"
+            : "block",
     summary: "test",
     ...override,
   };
@@ -46,10 +48,7 @@ describe("explainCompositeAttribution — basic structure", () => {
         { name: "B", score: 30, weight: 2 },
       ]),
     );
-    const totalPct = attr.dimensionsByContribution.reduce(
-      (s, d) => s + d.contributionPct,
-      0,
-    );
+    const totalPct = attr.dimensionsByContribution.reduce((s, d) => s + d.contributionPct, 0);
     expect(totalPct).toBeCloseTo(100, 4);
   });
 

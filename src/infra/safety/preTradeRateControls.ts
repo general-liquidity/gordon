@@ -16,8 +16,7 @@
 import { flagEnv } from "../config/flagResolver.ts";
 
 export const PRETRADE_RATE_CONTROLS_FLAG_ENV = "GORDON_PRETRADE_RATE_CONTROLS";
-export const PRETRADE_RATE_CONTROLS_DISABLE_ENV =
-  "GORDON_PRETRADE_RATE_CONTROLS_DISABLE";
+export const PRETRADE_RATE_CONTROLS_DISABLE_ENV = "GORDON_PRETRADE_RATE_CONTROLS_DISABLE";
 
 /**
  * Pre-trade rate controls are DEFAULT-ON. They stay enabled unless the
@@ -108,8 +107,7 @@ export function checkPreTradeRate(input: RateCheckInput): RateCheckResult {
     ...(input.limits ?? {}),
   };
   const events = input.events;
-  const nowMs =
-    input.nowMs ?? (events.length > 0 ? events[events.length - 1]!.t : Date.now());
+  const nowMs = input.nowMs ?? (events.length > 0 ? events[events.length - 1]!.t : Date.now());
   const windowStart = nowMs - lims.windowMs;
 
   let submit = 0;
@@ -133,18 +131,17 @@ export function checkPreTradeRate(input: RateCheckInput): RateCheckResult {
 
   const openForProposed =
     input.proposedInstrument && input.openOrdersPerInstrument
-      ? input.openOrdersPerInstrument[input.proposedInstrument] ?? 0
+      ? (input.openOrdersPerInstrument[input.proposedInstrument] ?? 0)
       : 0;
 
   const breaches: RateBreach[] = [];
   if (messagesPerSecond > lims.maxMessagesPerSecond) breaches.push("messages_per_second");
-  if (modificationsPerSecond > lims.maxModificationsPerSecond) breaches.push("modifications_per_second");
-  if (cancellationsPerSecond > lims.maxCancellationsPerSecond) breaches.push("cancellations_per_second");
+  if (modificationsPerSecond > lims.maxModificationsPerSecond)
+    breaches.push("modifications_per_second");
+  if (cancellationsPerSecond > lims.maxCancellationsPerSecond)
+    breaches.push("cancellations_per_second");
   if (orderToTradeRatio > lims.maxOrderToTradeRatio) breaches.push("order_to_trade_ratio");
-  if (
-    input.proposedKind === "submit" &&
-    openForProposed >= lims.maxOpenOrdersPerInstrument
-  ) {
+  if (input.proposedKind === "submit" && openForProposed >= lims.maxOpenOrdersPerInstrument) {
     breaches.push("open_orders_per_instrument");
   }
 
@@ -206,8 +203,7 @@ export function recordRateEvent(
 
   if (instrument) {
     if (kind === "submit") {
-      OPEN_ORDERS_PER_INSTRUMENT[instrument] =
-        (OPEN_ORDERS_PER_INSTRUMENT[instrument] ?? 0) + 1;
+      OPEN_ORDERS_PER_INSTRUMENT[instrument] = (OPEN_ORDERS_PER_INSTRUMENT[instrument] ?? 0) + 1;
     } else if (kind === "fill" || kind === "cancel") {
       const next = (OPEN_ORDERS_PER_INSTRUMENT[instrument] ?? 0) - 1;
       OPEN_ORDERS_PER_INSTRUMENT[instrument] = next > 0 ? next : 0;

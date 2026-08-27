@@ -92,14 +92,10 @@ const NATIVE_VENUE_TIERS: Record<NativeExchangeId, VenueMevTier> = {
 
 const TIER_REASONS: Record<VenueMevTier, string> = {
   low: "CEX with no public mempool — standard CLOB spread covers MEV exposure",
-  protected:
-    "MEV-protected venue (batch auction / private RPC) — minimal residual overhead",
-  medium:
-    "Partial pre-trade leakage — operator should monitor sandwich/frontrun exposure",
-  high:
-    "Public mempool — sandwich and frontrun attacks are documented; consider an MEV-protected venue for size",
-  unknown:
-    "Venue not classified — treating as moderate exposure (operator should classify)",
+  protected: "MEV-protected venue (batch auction / private RPC) — minimal residual overhead",
+  medium: "Partial pre-trade leakage — operator should monitor sandwich/frontrun exposure",
+  high: "Public mempool — sandwich and frontrun attacks are documented; consider an MEV-protected venue for size",
+  unknown: "Venue not classified — treating as moderate exposure (operator should classify)",
 };
 
 /**

@@ -2,7 +2,11 @@ import { exchangeStatus } from "../../app/commands/exchange.ts";
 import { verifyStoredAuditChain } from "../../core/audit/store.ts";
 import type { AuditChainVerification } from "../../core/audit/signing.ts";
 import { BrokerFactory } from "../../infra/broker/factory.ts";
-import { resolveBrokerCredentials, type BrokerAdapter, type BrokerQuote } from "../../infra/broker/types.ts";
+import {
+  resolveBrokerCredentials,
+  type BrokerAdapter,
+  type BrokerQuote,
+} from "../../infra/broker/types.ts";
 import { getStockQuote } from "../../infra/data/providers/finnhub.ts";
 import { MultiSourceQuoteService } from "../../infra/data/providers/multiSourceQuote.ts";
 import { DataSourceManager, registerOnchainDataSources } from "../../infra/data/sources/index.ts";
@@ -66,7 +70,10 @@ export interface BootLiveDeps {
   testVenue: () => Promise<{ connected: boolean }>;
   fetchEquity: () => Promise<number>;
   verifyAudit: () => AuditChainVerification;
-  fetchTicker: (symbols: TickerSymbol[], config?: GordonConfig | null) => Promise<TickerQuote[] | null>;
+  fetchTicker: (
+    symbols: TickerSymbol[],
+    config?: GordonConfig | null,
+  ) => Promise<TickerQuote[] | null>;
   timeoutMs?: number;
 }
 
@@ -76,23 +83,28 @@ const BOOT_TICKER_QUOTE_CACHE_TTL_MS = 10_000;
 const BOOT_QUOTE_EXCHANGE_LIMIT = 2;
 const HOUR_MS = 60 * 60_000;
 const DAY_MS = 24 * HOUR_MS;
-const CRYPTO_NO_SOURCE_NOTE = "crypto quotes unavailable from exchange, CoinGecko, DefiLlama, and DexScreener";
+const CRYPTO_NO_SOURCE_NOTE =
+  "crypto quotes unavailable from exchange, CoinGecko, DefiLlama, and DexScreener";
 const EQUITY_NO_SOURCE_NOTE = "stock quotes need a connected broker or FINNHUB_API_KEY";
 
 function activeExchange(config: GordonConfig): MultiExchangeConfig | null {
   const exchanges = config.exchanges ?? [];
-  return exchanges.find((exchange) => exchange.id === config.activeExchangeId)
-    ?? exchanges.find((exchange) => exchange.isDefault)
-    ?? exchanges[0]
-    ?? null;
+  return (
+    exchanges.find((exchange) => exchange.id === config.activeExchangeId) ??
+    exchanges.find((exchange) => exchange.isDefault) ??
+    exchanges[0] ??
+    null
+  );
 }
 
 function activeBroker(config: GordonConfig): MultiBrokerConfig | null {
   const brokers = config.brokers ?? [];
-  return brokers.find((broker) => broker.id === config.activeBrokerId)
-    ?? brokers.find((broker) => broker.isDefault)
-    ?? brokers[0]
-    ?? null;
+  return (
+    brokers.find((broker) => broker.id === config.activeBrokerId) ??
+    brokers.find((broker) => broker.isDefault) ??
+    brokers[0] ??
+    null
+  );
 }
 
 function venueLabel(config: GordonConfig, active: MultiExchangeConfig | null): string | null {
@@ -145,7 +157,10 @@ function inferTickerKind(symbol: string): TickerKind {
 }
 
 function parseOnchainTickerSymbol(value: string): TickerSymbol | null {
-  const parts = value.split(":").map((part) => part.trim()).filter(Boolean);
+  const parts = value
+    .split(":")
+    .map((part) => part.trim())
+    .filter(Boolean);
   const chain = parts[0]?.toLowerCase();
   if (!chain) return null;
 
@@ -179,7 +194,8 @@ export function parseTickerSymbol(symbol: string): TickerSymbol | null {
     const value = prefixed[2]!.trim();
     if (!value) return null;
     if (prefix === "crypto") return { symbol: normalizeTickerSymbol(value), kind: "crypto" };
-    if (prefix === "equity" || prefix === "stock") return { symbol: normalizeTickerSymbol(value), kind: "equity" };
+    if (prefix === "equity" || prefix === "stock")
+      return { symbol: normalizeTickerSymbol(value), kind: "equity" };
     if (prefix === "onchain") return parseOnchainTickerSymbol(value);
   }
 
@@ -194,15 +210,16 @@ export function buildTickerSymbolPlan(config: GordonConfig | null): TickerSymbol
 
   const active = config ? activeExchange(config) : null;
   const broker = config ? activeBroker(config) : null;
-  const defaults = configured && configured.length > 0
-    ? configured
-    : active && broker
-      ? ["BTC", "ETH", "SPY"].map((symbol) => parseTickerSymbol(symbol)!)
-      : active
-        ? ["BTC", "ETH"].map((symbol) => parseTickerSymbol(symbol)!)
-        : broker
-          ? ["SPY", "QQQ"].map((symbol) => parseTickerSymbol(symbol)!)
-          : ["BTC", "ETH"].map((symbol) => parseTickerSymbol(symbol)!);
+  const defaults =
+    configured && configured.length > 0
+      ? configured
+      : active && broker
+        ? ["BTC", "ETH", "SPY"].map((symbol) => parseTickerSymbol(symbol)!)
+        : active
+          ? ["BTC", "ETH"].map((symbol) => parseTickerSymbol(symbol)!)
+          : broker
+            ? ["SPY", "QQQ"].map((symbol) => parseTickerSymbol(symbol)!)
+            : ["BTC", "ETH"].map((symbol) => parseTickerSymbol(symbol)!);
 
   const display = defaults.slice(0, MAX_TICKER_SYMBOLS);
   return {
@@ -229,7 +246,10 @@ function withTimeout<T>(run: () => Promise<T> | T, fallback: T, timeoutMs: numbe
   });
 }
 
-async function deferredAuditVerify(deps: BootLiveDeps, timeoutMs: number): Promise<BootLiveData["audit"]> {
+async function deferredAuditVerify(
+  deps: BootLiveDeps,
+  timeoutMs: number,
+): Promise<BootLiveData["audit"]> {
   const verification = await withTimeout(
     async () => {
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -345,9 +365,10 @@ async function fetchOnchainTickerQuote(entry: TickerSymbol): Promise<TickerQuote
       });
       const latest = result.candles[result.candles.length - 1];
       if (!latest || !finitePositive(latest.close)) continue;
-      const changePercent24h = window.timeframe === "1d" && finitePositive(latest.open)
-        ? ((latest.close - latest.open) / latest.open) * 100
-        : null;
+      const changePercent24h =
+        window.timeframe === "1d" && finitePositive(latest.open)
+          ? ((latest.close - latest.open) / latest.open) * 100
+          : null;
       return {
         symbol: entry.symbol,
         kind: entry.kind,
@@ -394,7 +415,8 @@ async function fetchCryptoTickerQuote(
     kind: entry.kind,
     priceUsd: shadowPrice,
     changePercent24h: null,
-    note: shadowPrice === null ? CRYPTO_NO_SOURCE_NOTE : "source: ccxt/defillama/dexscreener fallback",
+    note:
+      shadowPrice === null ? CRYPTO_NO_SOURCE_NOTE : "source: ccxt/defillama/dexscreener fallback",
   };
 }
 
@@ -451,11 +473,13 @@ export async function fetchBootTickerQuotes(
   if (symbols.length === 0) return null;
   const quoteService = createBootQuoteService(config);
   const broker = createActiveBrokerAdapter(config);
-  const ticker = await Promise.all(symbols.map((entry) => (
-    entry.kind === "crypto"
-      ? fetchCryptoTickerQuote(entry, quoteService)
-      : fetchEquityTickerQuote(entry, broker)
-  )));
+  const ticker = await Promise.all(
+    symbols.map((entry) =>
+      entry.kind === "crypto"
+        ? fetchCryptoTickerQuote(entry, quoteService)
+        : fetchEquityTickerQuote(entry, broker),
+    ),
+  );
   return ticker.length > 0 ? ticker : null;
 }
 
@@ -465,7 +489,8 @@ export function defaultBootLiveDeps(): BootLiveDeps {
     testVenue: async () => {
       const result = await exchangeStatus();
       if (!result.success || !isExchangeStatusPayload(result.data)) return { connected: false };
-      const active = result.data.statuses.find((status) => status.isActive) ?? result.data.statuses[0];
+      const active =
+        result.data.statuses.find((status) => status.isActive) ?? result.data.statuses[0];
       return { connected: Boolean(active?.connected) };
     },
     fetchEquity: async () => {
@@ -476,12 +501,15 @@ export function defaultBootLiveDeps(): BootLiveDeps {
       return (await exchange.getFullAccountDetails()).totalUsdtValue;
     },
     verifyAudit: verifyStoredAuditChain,
-    fetchTicker: async (symbols, config) => fetchBootTickerQuotes(symbols, config ?? await loadConfig()),
+    fetchTicker: async (symbols, config) =>
+      fetchBootTickerQuotes(symbols, config ?? (await loadConfig())),
   };
 }
 
 /** Resolves every field independently; a failed/timed-out probe degrades that field only. Never rejects. */
-export async function loadBootLiveData(deps: BootLiveDeps = defaultBootLiveDeps()): Promise<BootLiveData> {
+export async function loadBootLiveData(
+  deps: BootLiveDeps = defaultBootLiveDeps(),
+): Promise<BootLiveData> {
   const timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const config = await withTimeout<GordonConfig | null>(() => deps.loadConfig(), null, timeoutMs);
   const active = config ? activeExchange(config) : null;
@@ -492,14 +520,21 @@ export async function loadBootLiveData(deps: BootLiveDeps = defaultBootLiveDeps(
   const [connectivity, equityUsd, audit, ticker] = await Promise.all([
     active
       ? withTimeout(
-          async () => (await deps.testVenue()).connected ? "connected" as const : "offline" as const,
+          async () =>
+            (await deps.testVenue()).connected ? ("connected" as const) : ("offline" as const),
           "offline" as const,
           timeoutMs,
         )
       : Promise.resolve("none" as const),
-    active ? withTimeout<number | null>(() => deps.fetchEquity(), null, timeoutMs) : Promise.resolve(null),
+    active
+      ? withTimeout<number | null>(() => deps.fetchEquity(), null, timeoutMs)
+      : Promise.resolve(null),
     deferredAuditVerify(deps, timeoutMs),
-    withTimeout<BootLiveData["ticker"]>(() => deps.fetchTicker(tickerPlan.display, config), null, timeoutMs),
+    withTimeout<BootLiveData["ticker"]>(
+      () => deps.fetchTicker(tickerPlan.display, config),
+      null,
+      timeoutMs,
+    ),
   ]);
 
   return {

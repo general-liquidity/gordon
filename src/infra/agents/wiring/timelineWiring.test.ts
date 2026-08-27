@@ -5,10 +5,7 @@ import {
   reportTimelineProgress,
   estimateTokensFromMessages,
 } from "./timelineWiring.ts";
-import {
-  captureContextTimeline,
-  resetContextTimeline,
-} from "../contextTimeline.ts";
+import { captureContextTimeline, resetContextTimeline } from "../contextTimeline.ts";
 
 beforeEach(() => {
   resetContextTimeline();
@@ -44,18 +41,16 @@ describe("withTimelineEntry", () => {
   });
 
   it("threads parentAgentId through", async () => {
-    await withTimelineEntry(
-      { agentId: "p", agentName: "parent", agentType: "main" },
-      async () =>
-        withTimelineEntry(
-          {
-            agentId: "c",
-            agentName: "child",
-            agentType: "investigation",
-            parentAgentId: "p",
-          },
-          async () => "x",
-        ),
+    await withTimelineEntry({ agentId: "p", agentName: "parent", agentType: "main" }, async () =>
+      withTimelineEntry(
+        {
+          agentId: "c",
+          agentName: "child",
+          agentType: "investigation",
+          parentAgentId: "p",
+        },
+        async () => "x",
+      ),
     );
     const snap = captureContextTimeline();
     const child = snap.agents.find((a) => a.agentId === "c")!;

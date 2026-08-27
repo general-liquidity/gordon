@@ -51,13 +51,7 @@ export const pspDetectorDiagnosticTool = createTool({
     dissenters: z.array(z.string()),
     pspAsset: z.string().nullable(),
     recommendedDirection: z.enum(["long", "short"]).nullable(),
-    verdict: z.enum([
-      "psp_detected",
-      "all_bullish",
-      "all_bearish",
-      "split",
-      "insufficient_data",
-    ]),
+    verdict: z.enum(["psp_detected", "all_bullish", "all_bearish", "split", "insufficient_data"]),
     assetStatuses: z.array(
       z.object({
         symbol: z.string(),

@@ -58,7 +58,13 @@ export interface StopRules {
 }
 
 /** Compatibility hint — which trading playbooks this execution shape fits. */
-export type CompatibilityHint = "trend_continuation" | "mean_reversion" | "range_extremity" | "breakout" | "scalp" | "any";
+export type CompatibilityHint =
+  | "trend_continuation"
+  | "mean_reversion"
+  | "range_extremity"
+  | "breakout"
+  | "scalp"
+  | "any";
 
 export interface ExecutionPlaybook {
   /** Stable identifier (e.g. "scaled-3-clip-mean-rev"). */
@@ -122,7 +128,12 @@ const SCALED_THIRDS: ExecutionPlaybook = {
     { sizeFraction: 0.5, atRMultiple: 1.0, description: "half off at +1R" },
     { sizeFraction: 0.5, atRMultiple: 2.0, description: "remainder at +2R or trail" },
   ],
-  stops: { initialStopAtR: 1.0, moveToBreakEvenAtR: 1.0, trailActivateAtR: 1.5, trailDistanceAtr: 1.0 },
+  stops: {
+    initialStopAtR: 1.0,
+    moveToBreakEvenAtR: 1.0,
+    trailActivateAtR: 1.5,
+    trailDistanceAtr: 1.0,
+  },
   notes: ["Reduces average entry cost on pullbacks; uses break-even stop once first target hit."],
 };
 
@@ -140,7 +151,12 @@ const BREAKOUT_CONFIRM: ExecutionPlaybook = {
     { sizeFraction: 0.33, atRMultiple: 2.0 },
     { sizeFraction: 0.34, atRMultiple: 3.0, description: "runner with trail" },
   ],
-  stops: { initialStopAtR: 1.0, moveToBreakEvenAtR: 1.5, trailActivateAtR: 2.0, trailDistanceAtr: 1.5 },
+  stops: {
+    initialStopAtR: 1.0,
+    moveToBreakEvenAtR: 1.5,
+    trailActivateAtR: 2.0,
+    trailDistanceAtr: 1.5,
+  },
 };
 
 const RANGE_EXTREMITY_FADE: ExecutionPlaybook = {
@@ -200,12 +216,16 @@ export function registerPlaybook(playbook: ExecutionPlaybook): void {
   // Validate fractions sum to ~1
   const entrySum = playbook.entry.reduce((s, c) => s + c.sizeFraction, 0);
   if (Math.abs(entrySum - 1) > 0.01) {
-    throw new Error(`Execution playbook "${playbook.id}" entry fractions must sum to 1 (got ${entrySum})`);
+    throw new Error(
+      `Execution playbook "${playbook.id}" entry fractions must sum to 1 (got ${entrySum})`,
+    );
   }
   if (playbook.exits.length > 0) {
     const exitSum = playbook.exits.reduce((s, c) => s + c.sizeFraction, 0);
     if (Math.abs(exitSum - 1) > 0.01) {
-      throw new Error(`Execution playbook "${playbook.id}" exit fractions must sum to 1 (got ${exitSum})`);
+      throw new Error(
+        `Execution playbook "${playbook.id}" exit fractions must sum to 1 (got ${exitSum})`,
+      );
     }
   }
   _registry.set(playbook.id, playbook);
@@ -251,9 +271,7 @@ export function attachExecution(input: AttachInput): ExecutionPlan {
 
   const directionSign = input.direction === "long" ? 1 : -1;
   const rDistance =
-    input.stopPrice !== undefined
-      ? Math.abs(input.entryPrice - input.stopPrice)
-      : undefined;
+    input.stopPrice !== undefined ? Math.abs(input.entryPrice - input.stopPrice) : undefined;
 
   const scheduledEntries = playbook.entry.map((clip) => {
     let resolvedPrice: number | undefined;
@@ -306,7 +324,9 @@ export function formatPlaybook(playbook: ExecutionPlaybook): string {
       lines.push(`    - ${pct}%${at}${c.description ? ` — ${c.description}` : ""}`);
     }
   }
-  lines.push(`  Stops: initial ${playbook.stops.initialStopAtR}R${playbook.stops.moveToBreakEvenAtR ? `, BE at +${playbook.stops.moveToBreakEvenAtR}R` : ""}${playbook.stops.trailActivateAtR ? `, trail at +${playbook.stops.trailActivateAtR}R` : ""}`);
+  lines.push(
+    `  Stops: initial ${playbook.stops.initialStopAtR}R${playbook.stops.moveToBreakEvenAtR ? `, BE at +${playbook.stops.moveToBreakEvenAtR}R` : ""}${playbook.stops.trailActivateAtR ? `, trail at +${playbook.stops.trailActivateAtR}R` : ""}`,
+  );
   return lines.join("\n");
 }
 

@@ -11,10 +11,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import {
-  computeBrierScore,
-  brierScoreToPayload,
-} from "../../../trading/quant/brierScore.ts";
+import { computeBrierScore, brierScoreToPayload } from "../../../trading/quant/brierScore.ts";
 import { recordStructuredObservation } from "../../../platform/observability/structured.ts";
 
 export const brierScoreDiagnosticTool = createTool({

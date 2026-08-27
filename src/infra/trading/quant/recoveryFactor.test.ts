@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeRecoveryFactor,
-  recoveryFactorToPayload,
-} from "./recoveryFactor.ts";
+import { computeRecoveryFactor, recoveryFactorToPayload } from "./recoveryFactor.ts";
 
 describe("computeRecoveryFactor — basic formulae", () => {
   it("monotonically rising equity → recovery factor = ∞ (drawdown = 0)", () => {
@@ -82,7 +79,7 @@ describe("computeRecoveryFactor — peak/trough indices", () => {
     // equity: 1, 1.05, 1.10, 1.08, 1.20, 0.80, 1.00
     // Two drawdowns:  1.10 → 1.08 = 0.02, and 1.20 → 0.80 = 0.40 (largest)
     const r = computeRecoveryFactor({
-      returns: [0.05, 0.05 / 1.05, -0.02 / 1.10, 0.12 / 1.08, -0.4 / 1.20, 0.20 / 0.80],
+      returns: [0.05, 0.05 / 1.05, -0.02 / 1.1, 0.12 / 1.08, -0.4 / 1.2, 0.2 / 0.8],
       compoundMode: "compound",
     });
     // Verify the large drawdown captured (peak ≈ 1.20)
@@ -100,9 +97,7 @@ describe("computeRecoveryFactor — boundary", () => {
   });
 
   it("throws on non-positive initial equity", () => {
-    expect(() =>
-      computeRecoveryFactor({ returns: [0.01], initialEquity: 0 }),
-    ).toThrow();
+    expect(() => computeRecoveryFactor({ returns: [0.01], initialEquity: 0 })).toThrow();
   });
 
   it("net loss + drawdown: RF positive (uses |net profit|)", () => {

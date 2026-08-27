@@ -186,9 +186,7 @@ export function computeHedgeFundReplication(input: ReplicationInput): Replicatio
   }
 
   // X is T × k.
-  const X: number[][] = Array.from({ length: T }, (_, i) =>
-    factors.map((f) => f.returns[i]!),
-  );
+  const X: number[][] = Array.from({ length: T }, (_, i) => factors.map((f) => f.returns[i]!));
   const Xt = transpose(X);
   const XtX = matMul(Xt, X);
   const Xty = matMul(

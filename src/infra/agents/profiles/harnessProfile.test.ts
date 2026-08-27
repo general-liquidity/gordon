@@ -11,7 +11,10 @@ import {
 describe("FW3 — harness profile registry", () => {
   describe("resolveHarnessProfile", () => {
     test("matches anthropic by provider string", () => {
-      const profile = resolveHarnessProfile({ provider: "anthropic", model: "claude-sonnet-4-6" } as any);
+      const profile = resolveHarnessProfile({
+        provider: "anthropic",
+        model: "claude-sonnet-4-6",
+      } as any);
       expect(profile?.provider).toBe("anthropic");
     });
 
@@ -36,7 +39,10 @@ describe("FW3 — harness profile registry", () => {
     });
 
     test("matches openai for openai-routed traffic", () => {
-      const profile = resolveHarnessProfile({ provider: "openai", model: "anthropic/claude-sonnet" } as any);
+      const profile = resolveHarnessProfile({
+        provider: "openai",
+        model: "anthropic/claude-sonnet",
+      } as any);
       expect(profile?.provider).toBe("openai");
     });
 
@@ -46,7 +52,9 @@ describe("FW3 — harness profile registry", () => {
     });
 
     test("returns undefined for unknown provider", () => {
-      expect(resolveHarnessProfile({ provider: "cohere", model: "command" } as any)).toBeUndefined();
+      expect(
+        resolveHarnessProfile({ provider: "cohere", model: "command" } as any),
+      ).toBeUndefined();
     });
 
     test("accepts string model config", () => {
@@ -66,10 +74,9 @@ describe("FW3 — harness profile registry", () => {
         suffix: "test",
         envOverride: "X_CUSTOM",
       };
-      const profile = resolveHarnessProfile(
-        { provider: "x-custom", model: "any" } as any,
-        [customProfile],
-      );
+      const profile = resolveHarnessProfile({ provider: "x-custom", model: "any" } as any, [
+        customProfile,
+      ]);
       expect(profile?.provider).toBe("anthropic");
     });
   });
@@ -85,7 +92,9 @@ describe("FW3 — harness profile registry", () => {
     });
 
     test("reads env override at call time", () => {
-      const env = { GORDON_HARNESS_ANTHROPIC_SUFFIX: "## Claude-specific tuning\nthink step-by-step" };
+      const env = {
+        GORDON_HARNESS_ANTHROPIC_SUFFIX: "## Claude-specific tuning\nthink step-by-step",
+      };
       const result = getHarnessSuffixForModel({ provider: "anthropic" } as any, env);
       expect(result).toBe("## Claude-specific tuning\nthink step-by-step");
     });

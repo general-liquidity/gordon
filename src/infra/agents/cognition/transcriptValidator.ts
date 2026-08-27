@@ -44,12 +44,12 @@ function normalizeForDeduplication(message: string): string {
   return normalizeWhitespace(message).toLowerCase();
 }
 
-type GroundedProviderOptions = SystemModelMessage["providerOptions"] | UserModelMessage["providerOptions"];
+type GroundedProviderOptions =
+  | SystemModelMessage["providerOptions"]
+  | UserModelMessage["providerOptions"];
 
 function getProviderOptions(message: GroundedPromptMessage): GroundedProviderOptions | undefined {
-  return "providerOptions" in message
-    ? message.providerOptions
-    : undefined;
+  return "providerOptions" in message ? message.providerOptions : undefined;
 }
 
 function isMeaningfulUserContent(message: string): boolean {
@@ -64,10 +64,9 @@ export function formatTranscriptRepairBlock(validation: TranscriptValidationResu
   if (validation.repairNotes.length === 0) {
     return "";
   }
-  return [
-    "[GORDON_TRANSCRIPT_REPAIR]",
-    ...validation.repairNotes.map((note) => `- ${note}`),
-  ].join("\n");
+  return ["[GORDON_TRANSCRIPT_REPAIR]", ...validation.repairNotes.map((note) => `- ${note}`)].join(
+    "\n",
+  );
 }
 
 export function validateAndRepairTranscript(
@@ -79,18 +78,24 @@ export function validateAndRepairTranscript(
 
   if (!sanitized) {
     sanitized = "Help with the current thread request.";
-    repairNotes.push("The incoming request was empty after normalization, so Gordon inserted a minimal fallback instruction.");
+    repairNotes.push(
+      "The incoming request was empty after normalization, so Gordon inserted a minimal fallback instruction.",
+    );
   }
 
   const markerSanitized = sanitizeReservedMarkers(sanitized);
   if (markerSanitized !== sanitized) {
     sanitized = markerSanitized;
-    repairNotes.push("Reserved Gordon runtime markers were escaped so user text cannot override grounded system context.");
+    repairNotes.push(
+      "Reserved Gordon runtime markers were escaped so user text cannot override grounded system context.",
+    );
   }
 
   if (!isMeaningfulUserContent(sanitized)) {
     sanitized = "Help with the current thread request.";
-    repairNotes.push("The incoming request only contained reserved runtime markers, so Gordon replaced it with a minimal fallback instruction.");
+    repairNotes.push(
+      "The incoming request only contained reserved runtime markers, so Gordon replaced it with a minimal fallback instruction.",
+    );
   }
 
   const threadId = context.threadId;
@@ -111,13 +116,21 @@ export function validateAndRepairTranscript(
 
       if (entry.entryType === "tool_result") {
         const hasParent = Boolean(entry.parentEntryId);
-        const hasLinkedCall = entries.some((candidate) => candidate.id === entry.parentEntryId || candidate.correlationId === entry.correlationId && candidate.entryType === "tool_call");
+        const hasLinkedCall = entries.some(
+          (candidate) =>
+            candidate.id === entry.parentEntryId ||
+            (candidate.correlationId === entry.correlationId &&
+              candidate.entryType === "tool_call"),
+        );
         if (!hasParent && !hasLinkedCall) {
           toolResultWithoutCall += 1;
         }
       }
 
-      if (entry.entryType === "run_status" && /failed|blocked|rate.?limit/i.test(`${entry.title} ${entry.content}`)) {
+      if (
+        entry.entryType === "run_status" &&
+        /failed|blocked|rate.?limit/i.test(`${entry.title} ${entry.content}`)
+      ) {
         const signature = `${entry.title}:${entry.content}`;
         if (signature === lastFailureSignature) {
           repeatedFailures += 1;
@@ -129,15 +142,21 @@ export function validateAndRepairTranscript(
     }
 
     if (consecutiveAssistant >= 4) {
-      repairNotes.push("Recent thread history has several assistant-side turns without a fresh user turn. Favor the latest user intent over stale assistant momentum.");
+      repairNotes.push(
+        "Recent thread history has several assistant-side turns without a fresh user turn. Favor the latest user intent over stale assistant momentum.",
+      );
     }
 
     if (toolResultWithoutCall > 0) {
-      repairNotes.push("Recent action-log history contains tool results without an obvious originating tool-call entry. Treat recent runtime history cautiously and prefer current grounded state.");
+      repairNotes.push(
+        "Recent action-log history contains tool results without an obvious originating tool-call entry. Treat recent runtime history cautiously and prefer current grounded state.",
+      );
     }
 
     if (repeatedFailures >= 2) {
-      repairNotes.push("Recent thread history shows repeated identical failures. Avoid looping on the same failing path without changing venue, provider, or scope.");
+      repairNotes.push(
+        "Recent thread history shows repeated identical failures. Avoid looping on the same failing path without changing venue, provider, or scope.",
+      );
     }
   }
 
@@ -171,7 +190,9 @@ export function validateAndRepairModelMessages(
     const normalizedForDedup = normalizeForDeduplication(sanitizedContent);
 
     if (role === "system" && normalizedForDedup.includes("[gordon_runtime_reminders_note]")) {
-      repairNotes.push("Converted a misplaced runtime reminder block into user-side guidance semantics.");
+      repairNotes.push(
+        "Converted a misplaced runtime reminder block into user-side guidance semantics.",
+      );
     }
 
     if (role === "system" && !providerOptions) {
@@ -234,7 +255,9 @@ export function validateAndRepairModelMessages(
       role: "user",
       content: "Help with the current thread request.",
     });
-    repairNotes.push("Inserted a fallback user message because the model-facing transcript did not end with user intent.");
+    repairNotes.push(
+      "Inserted a fallback user message because the model-facing transcript did not end with user intent.",
+    );
   }
 
   return {

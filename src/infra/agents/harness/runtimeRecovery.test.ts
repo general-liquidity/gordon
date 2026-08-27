@@ -15,7 +15,7 @@ describe("decideRecovery", () => {
   });
 
   it("second detection of the same fingerprint → redirect with reminder", () => {
-    let s = decideRecovery({
+    const s = decideRecovery({
       state: newRecoveryState(),
       fingerprint: "fp",
       toolName: "get_chart",
@@ -67,7 +67,11 @@ describe("decideRecovery", () => {
   });
 
   it("safety-critical fast-track applies regardless of prior history", () => {
-    let s = decideRecovery({ state: newRecoveryState(), fingerprint: "x", toolName: "get_chart" }).state;
+    const s = decideRecovery({
+      state: newRecoveryState(),
+      fingerprint: "x",
+      toolName: "get_chart",
+    }).state;
     // Switch to a critical tool — should halt immediately even though state
     // counter shows only 1 prior detection.
     const r = decideRecovery({

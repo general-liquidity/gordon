@@ -62,7 +62,11 @@ export function calculateOpenPivot(
       : parseFloat((((currentClose - sessionOpen) / sessionOpen) * 100).toFixed(4));
 
   const openBias: OpenPivotResult["openBias"] =
-    currentClose > sessionOpen ? "above_open" : currentClose < sessionOpen ? "below_open" : "at_open";
+    currentClose > sessionOpen
+      ? "above_open"
+      : currentClose < sessionOpen
+        ? "below_open"
+        : "at_open";
 
   // Reclaim/lost: latest bar's close crossing the session open relative to
   // the prior bar's close.

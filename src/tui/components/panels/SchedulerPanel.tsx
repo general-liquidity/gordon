@@ -13,7 +13,7 @@
  *   Funding arb        0 * /8 * * *   6h ago       1h 12m       ○ paused
  */
 
-import React, { useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 
 // ============================================================================
@@ -149,7 +149,9 @@ export function SchedulerPanel({ jobs, onPause, onResume, onDelete, onClose }: P
   if (jobs.length === 0) {
     return (
       <Box flexDirection="column" paddingLeft={2}>
-        <Text bold color="cyanBright">SCHEDULED JOBS</Text>
+        <Text bold color="cyanBright">
+          SCHEDULED JOBS
+        </Text>
         <Text> </Text>
         <Text dimColor>No scheduled jobs configured.</Text>
         <Text> </Text>
@@ -165,9 +167,12 @@ export function SchedulerPanel({ jobs, onPause, onResume, onDelete, onClose }: P
     <Box flexDirection="column" paddingLeft={2}>
       {/* Header */}
       <Box>
-        <Text bold color="cyanBright">SCHEDULED JOBS</Text>
+        <Text bold color="cyanBright">
+          SCHEDULED JOBS
+        </Text>
         <Text dimColor>
-          {" "}({jobs.length} {"\u00b7"}{" "}
+          {" "}
+          ({jobs.length} {"\u00b7"}{" "}
         </Text>
         <Text color="green">{activeCount} active</Text>
         {pausedCount > 0 && (
@@ -183,11 +188,31 @@ export function SchedulerPanel({ jobs, onPause, onResume, onDelete, onClose }: P
       {/* Column headers */}
       <Box>
         <Text>{"  "}</Text>
-        <Box width={COL_NAME}><Text bold dimColor>NAME</Text></Box>
-        <Box width={COL_SCHED}><Text bold dimColor>SCHEDULE</Text></Box>
-        <Box width={COL_LAST}><Text bold dimColor>LAST RUN</Text></Box>
-        <Box width={COL_NEXT}><Text bold dimColor>NEXT RUN</Text></Box>
-        <Box width={COL_STATUS}><Text bold dimColor>STATUS</Text></Box>
+        <Box width={COL_NAME}>
+          <Text bold dimColor>
+            NAME
+          </Text>
+        </Box>
+        <Box width={COL_SCHED}>
+          <Text bold dimColor>
+            SCHEDULE
+          </Text>
+        </Box>
+        <Box width={COL_LAST}>
+          <Text bold dimColor>
+            LAST RUN
+          </Text>
+        </Box>
+        <Box width={COL_NEXT}>
+          <Text bold dimColor>
+            NEXT RUN
+          </Text>
+        </Box>
+        <Box width={COL_STATUS}>
+          <Text bold dimColor>
+            STATUS
+          </Text>
+        </Box>
       </Box>
 
       {/* Job rows */}
@@ -201,13 +226,9 @@ export function SchedulerPanel({ jobs, onPause, onResume, onDelete, onClose }: P
         return (
           <Box key={job.id} flexDirection="column">
             <Box>
-              <Text color={isSelected ? "yellow" : undefined}>
-                {isSelected ? "\u25B8 " : "  "}
-              </Text>
+              <Text color={isSelected ? "yellow" : undefined}>{isSelected ? "\u25B8 " : "  "}</Text>
               <Box width={COL_NAME}>
-                <Text bold={isSelected}>
-                  {padRight(job.name, COL_NAME)}
-                </Text>
+                <Text bold={isSelected}>{padRight(job.name, COL_NAME)}</Text>
               </Box>
               <Box width={COL_SCHED}>
                 <Text dimColor>{padRight(job.schedule, COL_SCHED)}</Text>
@@ -217,10 +238,7 @@ export function SchedulerPanel({ jobs, onPause, onResume, onDelete, onClose }: P
               </Box>
               <Box width={COL_NEXT}>
                 <Text>
-                  {padRight(
-                    job.status === "paused" ? "\u2014" : timeUntil(job.nextRun),
-                    COL_NEXT,
-                  )}
+                  {padRight(job.status === "paused" ? "\u2014" : timeUntil(job.nextRun), COL_NEXT)}
                 </Text>
               </Box>
               <Box width={COL_STATUS}>

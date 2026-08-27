@@ -9,15 +9,9 @@ import {
 describe("isRevengeTradeGuardEnabled", () => {
   it("respects the flag (default-on, explicit opt-out)", () => {
     expect(isRevengeTradeGuardEnabled({})).toBe(true);
-    expect(
-      isRevengeTradeGuardEnabled({ [REVENGE_TRADE_GUARD_FLAG_ENV]: "1" }),
-    ).toBe(true);
-    expect(
-      isRevengeTradeGuardEnabled({ [REVENGE_TRADE_GUARD_FLAG_ENV]: "0" }),
-    ).toBe(false);
-    expect(
-      isRevengeTradeGuardEnabled({ [REVENGE_TRADE_GUARD_FLAG_ENV]: "false" }),
-    ).toBe(false);
+    expect(isRevengeTradeGuardEnabled({ [REVENGE_TRADE_GUARD_FLAG_ENV]: "1" })).toBe(true);
+    expect(isRevengeTradeGuardEnabled({ [REVENGE_TRADE_GUARD_FLAG_ENV]: "0" })).toBe(false);
+    expect(isRevengeTradeGuardEnabled({ [REVENGE_TRADE_GUARD_FLAG_ENV]: "false" })).toBe(false);
   });
 });
 
@@ -29,30 +23,20 @@ describe("evaluateRevengeTradeGuard — validation", () => {
   };
 
   it("rejects negative proposedPlanSize", () => {
-    expect(() =>
-      evaluateRevengeTradeGuard({ ...base, proposedPlanSize: -1 }),
-    ).toThrow();
+    expect(() => evaluateRevengeTradeGuard({ ...base, proposedPlanSize: -1 })).toThrow();
   });
 
   it("rejects non-positive baselineSize", () => {
-    expect(() =>
-      evaluateRevengeTradeGuard({ ...base, baselineSize: 0 }),
-    ).toThrow();
+    expect(() => evaluateRevengeTradeGuard({ ...base, baselineSize: 0 })).toThrow();
   });
 
   it("rejects non-finite priorTradePnL", () => {
-    expect(() =>
-      evaluateRevengeTradeGuard({ ...base, priorTradePnL: NaN }),
-    ).toThrow();
+    expect(() => evaluateRevengeTradeGuard({ ...base, priorTradePnL: NaN })).toThrow();
   });
 
   it("rejects sizeIncreaseThreshold ≤ 1", () => {
-    expect(() =>
-      evaluateRevengeTradeGuard({ ...base, sizeIncreaseThreshold: 1 }),
-    ).toThrow();
-    expect(() =>
-      evaluateRevengeTradeGuard({ ...base, sizeIncreaseThreshold: 0.5 }),
-    ).toThrow();
+    expect(() => evaluateRevengeTradeGuard({ ...base, sizeIncreaseThreshold: 1 })).toThrow();
+    expect(() => evaluateRevengeTradeGuard({ ...base, sizeIncreaseThreshold: 0.5 })).toThrow();
   });
 });
 
@@ -150,9 +134,9 @@ describe("evaluateRevengeTradeGuard — mode behavior", () => {
       priorTradePnL: -50,
     };
     expect(evaluateRevengeTradeGuard(noRevenge).recommendedAction).toBe("proceed");
-    expect(
-      evaluateRevengeTradeGuard({ ...noRevenge, mode: "active" }).recommendedAction,
-    ).toBe("proceed");
+    expect(evaluateRevengeTradeGuard({ ...noRevenge, mode: "active" }).recommendedAction).toBe(
+      "proceed",
+    );
   });
 });
 

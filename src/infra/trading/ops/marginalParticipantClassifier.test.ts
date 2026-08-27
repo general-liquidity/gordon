@@ -1,9 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  classifyMarginalParticipant,
-  marginalToPayload,
-} from "./marginalParticipantClassifier.ts";
+import { classifyMarginalParticipant, marginalToPayload } from "./marginalParticipantClassifier.ts";
 
 describe("classifyMarginalParticipant — typical state (default)", () => {
   it("no drivers → typical with default confidence", () => {
@@ -41,12 +38,7 @@ describe("classifyMarginalParticipant — opportunity state", () => {
 
   it("Bill Ackman March 2020 scenario (multiple stress drivers)", () => {
     const r = classifyMarginalParticipant({
-      drivers: [
-        "margin_call_cascade",
-        "correlation_spike",
-        "bid_evaporation",
-        "vix_spike",
-      ],
+      drivers: ["margin_call_cascade", "correlation_spike", "bid_evaporation", "vix_spike"],
       vixZScore: 4,
       correlationZScore: 3,
     });

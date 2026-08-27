@@ -147,8 +147,7 @@ describe("createPostToolOutputSchemaHook", () => {
       id: "plan-validator",
       schema: planSchema,
       toolFilter: "build_plan",
-      extract: (r: unknown) =>
-        (r as { plan: unknown } | undefined)?.plan,
+      extract: (r: unknown) => (r as { plan: unknown } | undefined)?.plan,
     });
     registerHook(hook);
     const result = await runHooks("PostToolUse", {

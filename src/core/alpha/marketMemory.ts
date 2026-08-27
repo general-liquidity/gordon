@@ -155,7 +155,10 @@ function linearSlope(xs: number[], ys: number[]): number {
 // Hurst (R/S, with Anis-Lloyd correction)
 // ============================================================================
 
-function hurstRS(returns: number[], minWindow: number): { hurst: number; sizes: number[]; rs: number[] } {
+function hurstRS(
+  returns: number[],
+  minWindow: number,
+): { hurst: number; sizes: number[]; rs: number[] } {
   const maxWindow = Math.max(minWindow, Math.floor(returns.length / 2));
   const sizes = logspaceInts(minWindow, maxWindow, 14);
   const rs: number[] = [];
@@ -197,7 +200,7 @@ function expectedRS(n: number): number {
   return front * middle * back;
 }
 
-function anisLloydHurst(returns: number[], rawRs: number[], sizes: number[]): number {
+function anisLloydHurst(_returns: number[], rawRs: number[], sizes: number[]): number {
   if (sizes.length < 2) return 0.5;
   const expectedSeries = sizes.map(expectedRS);
   const slopeEmp = linearSlope(sizes.map(Math.log), rawRs.map(Math.log));
@@ -333,7 +336,10 @@ export function computeMarketMemory(input: MarketMemoryInput): MarketMemoryResul
     nReturns < 100 ? "low" : nReturns < 500 ? "medium" : "high";
 
   const vrStr = vrProfile
-    .map((v) => `q${v.horizon}=${v.ratio.toFixed(2)}(z${v.zScore >= 0 ? "+" : ""}${v.zScore.toFixed(1)})`)
+    .map(
+      (v) =>
+        `q${v.horizon}=${v.ratio.toFixed(2)}(z${v.zScore >= 0 ? "+" : ""}${v.zScore.toFixed(1)})`,
+    )
     .join("  ");
 
   const summary = [

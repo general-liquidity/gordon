@@ -37,7 +37,9 @@ function sellFill(
 
 describe("scoreDarkPoolAdverseSelection", () => {
   test("insufficient_data with too few fills", () => {
-    const fills = Array(10).fill(0).map(() => buyFill(100, 100.01, 100, 0.02));
+    const fills = Array(10)
+      .fill(0)
+      .map(() => buyFill(100, 100.01, 100, 0.02));
     const r = scoreDarkPoolAdverseSelection(fills);
     expect(r.verdict).toBe("insufficient_data");
   });
@@ -101,7 +103,7 @@ describe("scoreDarkPoolAdverseSelection", () => {
     const fills: DarkPoolFill[] = [];
     // 25 large benefit fills
     for (let i = 0; i < 25; i++) {
-      fills.push(buyFill(100, 100.10, 100, 0.02));
+      fills.push(buyFill(100, 100.1, 100, 0.02));
     }
     // 5 small fills (low qty); price barely changes
     for (let i = 0; i < 5; i++) {
@@ -114,7 +116,9 @@ describe("scoreDarkPoolAdverseSelection", () => {
   });
 
   test("respects custom minFills threshold", () => {
-    const fills = Array(15).fill(0).map(() => buyFill(100, 99.95, 100, 0.02));
+    const fills = Array(15)
+      .fill(0)
+      .map(() => buyFill(100, 99.95, 100, 0.02));
     const strict = scoreDarkPoolAdverseSelection(fills, { minFills: 20 });
     const lax = scoreDarkPoolAdverseSelection(fills, { minFills: 10 });
     expect(strict.verdict).toBe("insufficient_data");
@@ -149,7 +153,13 @@ describe("scoreDarkPoolAdverseSelection", () => {
     const fills: DarkPoolFill[] = Array(25)
       .fill(0)
       .map(() => buyFill(100, 100.05, 100, 0.02));
-    fills.push({ side: "buy", fillPrice: 100, quantity: 0, midPriceAfterWindow: 50, litMarketSpread: 0.02 });
+    fills.push({
+      side: "buy",
+      fillPrice: 100,
+      quantity: 0,
+      midPriceAfterWindow: 50,
+      litMarketSpread: 0.02,
+    });
     const r = scoreDarkPoolAdverseSelection(fills);
     expect(r.totalQuantity).toBe(25 * 100);
   });

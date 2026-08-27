@@ -100,8 +100,15 @@ export class ArkhamWalletSource implements WalletIntelSource {
       tokenHolders: false,
       smartMoneyFlow: false,
       chains: [
-        "ethereum", "bitcoin", "solana", "base", "arbitrum",
-        "polygon", "optimism", "avalanche", "bsc",
+        "ethereum",
+        "bitcoin",
+        "solana",
+        "base",
+        "arbitrum",
+        "polygon",
+        "optimism",
+        "avalanche",
+        "bsc",
       ],
     };
   }

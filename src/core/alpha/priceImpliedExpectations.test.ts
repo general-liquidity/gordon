@@ -15,7 +15,7 @@ function dcfEvForRoundtrip(
   // shares=1 / netCash=0 convention so EV == equityValue == priceShare.
   const fcfProjections: number[] = [];
   for (let t = 1; t <= horizonYears; t++) {
-    fcfProjections.push(baseFcf * Math.pow(1 + growthRate, t));
+    fcfProjections.push(baseFcf * (1 + growthRate) ** t);
   }
   const r = computeDcf({
     fcfProjections,
@@ -55,12 +55,18 @@ describe("PIE — solve for growth rate", () => {
 
     const low = computePriceImpliedExpectations({
       enterpriseValue: 2000,
-      baseFcf, wacc, terminalGrowthPct, horizonYears,
+      baseFcf,
+      wacc,
+      terminalGrowthPct,
+      horizonYears,
       solveFor: "growth_rate",
     });
     const high = computePriceImpliedExpectations({
       enterpriseValue: 3500,
-      baseFcf, wacc, terminalGrowthPct, horizonYears,
+      baseFcf,
+      wacc,
+      terminalGrowthPct,
+      horizonYears,
       solveFor: "growth_rate",
     });
     expect(high.solvedValue).toBeGreaterThan(low.solvedValue);
@@ -88,7 +94,10 @@ describe("PIE — solve for growth rate", () => {
     const ev = dcfEvForRoundtrip(baseFcf, 0, horizonYears, wacc, terminalGrowthPct);
     const r = computePriceImpliedExpectations({
       enterpriseValue: ev,
-      baseFcf, wacc, terminalGrowthPct, horizonYears,
+      baseFcf,
+      wacc,
+      terminalGrowthPct,
+      horizonYears,
       solveFor: "growth_rate",
     });
     expect(r.converged).toBe(true);
@@ -109,12 +118,20 @@ describe("PIE — solve for competitive advantage period (CAP)", () => {
     expect(ev15).toBeGreaterThan(ev5);
 
     const pie5 = computePriceImpliedExpectations({
-      enterpriseValue: ev5, baseFcf, wacc, terminalGrowthPct,
-      growthRate, solveFor: "competitive_advantage",
+      enterpriseValue: ev5,
+      baseFcf,
+      wacc,
+      terminalGrowthPct,
+      growthRate,
+      solveFor: "competitive_advantage",
     });
     const pie15 = computePriceImpliedExpectations({
-      enterpriseValue: ev15, baseFcf, wacc, terminalGrowthPct,
-      growthRate, solveFor: "competitive_advantage",
+      enterpriseValue: ev15,
+      baseFcf,
+      wacc,
+      terminalGrowthPct,
+      growthRate,
+      solveFor: "competitive_advantage",
     });
     expect(pie5.converged).toBe(true);
     expect(pie15.converged).toBe(true);
@@ -143,16 +160,28 @@ describe("PIE — solve for WACC", () => {
     const growthRate = 0.1;
 
     const evLowWacc = dcfEvForRoundtrip(baseFcf, growthRate, horizonYears, 0.08, terminalGrowthPct);
-    const evHighWacc = dcfEvForRoundtrip(baseFcf, growthRate, horizonYears, 0.12, terminalGrowthPct);
+    const evHighWacc = dcfEvForRoundtrip(
+      baseFcf,
+      growthRate,
+      horizonYears,
+      0.12,
+      terminalGrowthPct,
+    );
 
     const pieLowEv = computePriceImpliedExpectations({
       enterpriseValue: evHighWacc, // lower EV
-      baseFcf, terminalGrowthPct, horizonYears, growthRate,
+      baseFcf,
+      terminalGrowthPct,
+      horizonYears,
+      growthRate,
       solveFor: "wacc",
     });
     const pieHighEv = computePriceImpliedExpectations({
       enterpriseValue: evLowWacc, // higher EV
-      baseFcf, terminalGrowthPct, horizonYears, growthRate,
+      baseFcf,
+      terminalGrowthPct,
+      horizonYears,
+      growthRate,
       solveFor: "wacc",
     });
     expect(pieLowEv.converged).toBe(true);
@@ -170,7 +199,10 @@ describe("PIE — solve for WACC", () => {
 
     const r = computePriceImpliedExpectations({
       enterpriseValue: ev,
-      baseFcf, terminalGrowthPct, horizonYears, growthRate,
+      baseFcf,
+      terminalGrowthPct,
+      horizonYears,
+      growthRate,
       solveFor: "wacc",
     });
     expect(r.converged).toBe(true);
@@ -253,7 +285,10 @@ describe("PIE — residual error reporting", () => {
     const ev = dcfEvForRoundtrip(baseFcf, growthRate, horizonYears, wacc, terminalGrowthPct);
     const r = computePriceImpliedExpectations({
       enterpriseValue: ev,
-      baseFcf, wacc, terminalGrowthPct, horizonYears,
+      baseFcf,
+      wacc,
+      terminalGrowthPct,
+      horizonYears,
       solveFor: "growth_rate",
     });
     expect(r.residualError).toBeLessThan(1);

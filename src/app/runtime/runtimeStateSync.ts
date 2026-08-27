@@ -28,7 +28,7 @@ export function buildRuntimeActivityStatus(
   if (nextIsStreaming) {
     return runtimeState.stream.activeAgent
       ? `Working via ${runtimeState.stream.activeAgent}...`
-      : previousActivityStatus ?? "Preparing response...";
+      : (previousActivityStatus ?? "Preparing response...");
   }
 
   return wasStreaming ? null : previousActivityStatus;
@@ -39,19 +39,19 @@ export function shouldRefreshRuntimeInspector(
   next: RuntimeInspectorViewModel,
 ): boolean {
   return (
-    previous?.lastUpdatedAt !== next.lastUpdatedAt
-    || previous?.transcriptEntryCount !== next.transcriptEntryCount
-    || previous?.recentHandoffs.length !== next.recentHandoffs.length
-    || previous?.recentScratchpad.length !== next.recentScratchpad.length
-    || previous?.streamStatus !== next.streamStatus
-    || previous?.pluginCount !== next.pluginCount
-    || previous?.mcpServerCount !== next.mcpServerCount
-    || previous?.registeredToolCount !== next.registeredToolCount
-    || previous?.remoteConnectionStatus !== next.remoteConnectionStatus
-    || previous?.pendingApprovalCount !== next.pendingApprovalCount
-    || previous?.recentApprovalCount !== next.recentApprovalCount
-    || previous?.approvalRuleCount !== next.approvalRuleCount
-    || previous?.pluginAttentionCount !== next.pluginAttentionCount
-    || previous?.activeBridgeSessions !== next.activeBridgeSessions
+    previous?.lastUpdatedAt !== next.lastUpdatedAt ||
+    previous?.transcriptEntryCount !== next.transcriptEntryCount ||
+    previous?.recentHandoffs.length !== next.recentHandoffs.length ||
+    previous?.recentScratchpad.length !== next.recentScratchpad.length ||
+    previous?.streamStatus !== next.streamStatus ||
+    previous?.pluginCount !== next.pluginCount ||
+    previous?.mcpServerCount !== next.mcpServerCount ||
+    previous?.registeredToolCount !== next.registeredToolCount ||
+    previous?.remoteConnectionStatus !== next.remoteConnectionStatus ||
+    previous?.pendingApprovalCount !== next.pendingApprovalCount ||
+    previous?.recentApprovalCount !== next.recentApprovalCount ||
+    previous?.approvalRuleCount !== next.approvalRuleCount ||
+    previous?.pluginAttentionCount !== next.pluginAttentionCount ||
+    previous?.activeBridgeSessions !== next.activeBridgeSessions
   );
 }

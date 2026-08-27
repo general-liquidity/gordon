@@ -20,7 +20,7 @@ describe("detectMev — sandwich", () => {
 
   it("no sandwich when round-trip impact below threshold", () => {
     const trades: MevTrade[] = [
-      { timestamp: 1_000, side: "buy", price: 100.00, size: 0.1 },
+      { timestamp: 1_000, side: "buy", price: 100.0, size: 0.1 },
       { timestamp: 1_500, side: "buy", price: 100.001, size: 10.0 },
       { timestamp: 2_000, side: "sell", price: 100.001, size: 0.1 },
     ];

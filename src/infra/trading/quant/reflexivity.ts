@@ -95,7 +95,7 @@ function detectPriceFundamentals(inputs: ReflexivityInputs): FeedbackSignal | nu
   }
 
   // Large price rises create virtuous cycle
-  if (priceChangePct > 0.20) {
+  if (priceChangePct > 0.2) {
     return {
       loop: "price_fundamentals",
       direction: "reinforcing",
@@ -112,7 +112,7 @@ function detectPnlBehaviour(inputs: ReflexivityInputs): FeedbackSignal | null {
   const { portfolioPnlPct } = inputs;
 
   // Portfolio drawdown causes forced selling
-  if (portfolioPnlPct < -0.10) {
+  if (portfolioPnlPct < -0.1) {
     return {
       loop: "pnl_behaviour",
       direction: "reinforcing",
@@ -228,16 +228,28 @@ export function assessReflexivity(inputs: ReflexivityInputs): ReflexivityAssessm
 
   // Determine dominant direction
   const bullishStrength = activeLoops
-    .filter((l) => l.description.includes("rise") || l.description.includes("up") || l.description.includes("bullish"))
+    .filter(
+      (l) =>
+        l.description.includes("rise") ||
+        l.description.includes("up") ||
+        l.description.includes("bullish"),
+    )
     .reduce((s, l) => s + l.strength, 0);
   const bearishStrength = activeLoops
-    .filter((l) => l.description.includes("drop") || l.description.includes("down") || l.description.includes("bearish"))
+    .filter(
+      (l) =>
+        l.description.includes("drop") ||
+        l.description.includes("down") ||
+        l.description.includes("bearish"),
+    )
     .reduce((s, l) => s + l.strength, 0);
 
   const dominantDirection: ReflexivityAssessment["dominantDirection"] =
-    bullishStrength > bearishStrength * 1.3 ? "bullish" :
-    bearishStrength > bullishStrength * 1.3 ? "bearish" :
-    "mixed";
+    bullishStrength > bearishStrength * 1.3
+      ? "bullish"
+      : bearishStrength > bullishStrength * 1.3
+        ? "bearish"
+        : "mixed";
 
   // Reflexive extreme detection
   const reflexiveExtreme = rr !== null;
@@ -251,8 +263,10 @@ export function assessReflexivity(inputs: ReflexivityInputs): ReflexivityAssessm
   }
 
   // Overall score
-  const reflexivityScore = Math.min(100,
-    activeLoops.reduce((s, l) => s + l.strength * (l.direction === "reinforcing" ? 1.2 : 0.8), 0) / Math.max(1, activeLoops.length),
+  const reflexivityScore = Math.min(
+    100,
+    activeLoops.reduce((s, l) => s + l.strength * (l.direction === "reinforcing" ? 1.2 : 0.8), 0) /
+      Math.max(1, activeLoops.length),
   );
 
   // Summary
@@ -262,9 +276,13 @@ export function assessReflexivity(inputs: ReflexivityInputs): ReflexivityAssessm
   } else {
     parts.push(`${activeLoops.length} feedback loop(s) active, ${reinforcingCount} reinforcing.`);
     if (reflexiveExtreme) {
-      parts.push(`REFLEXIVE EXTREME: ${(reversalProbability * 100).toFixed(0)}% reversal probability.`);
+      parts.push(
+        `REFLEXIVE EXTREME: ${(reversalProbability * 100).toFixed(0)}% reversal probability.`,
+      );
     }
-    parts.push(`Dominant direction: ${dominantDirection}. Reflexivity score: ${reflexivityScore.toFixed(0)}/100.`);
+    parts.push(
+      `Dominant direction: ${dominantDirection}. Reflexivity score: ${reflexivityScore.toFixed(0)}/100.`,
+    );
   }
 
   return {

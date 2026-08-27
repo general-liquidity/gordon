@@ -39,10 +39,7 @@ describe("approvalRulesToQuickCheckRules + quickPermissionCheck", () => {
   });
 
   test("exact toolName deny rule short-circuits to deny", () => {
-    const result = quickCheck(
-      [rule({ toolName: "place_order", decision: "deny" })],
-      "place_order",
-    );
+    const result = quickCheck([rule({ toolName: "place_order", decision: "deny" })], "place_order");
     expect(result?.decision).toBe("deny");
   });
 

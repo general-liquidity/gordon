@@ -43,9 +43,17 @@ const ERROR_CODE_REGISTRY: Record<string, ErrorCodeEntry> = {
   TRADING_MODE: { code: "G3006", category: "trading", description: "Trading mode conflict" },
   PLAN_NOT_FOUND: { code: "G3007", category: "trading", description: "Trade plan not found" },
   TRADE_NOT_FOUND: { code: "G3008", category: "trading", description: "Trade not found" },
-  TRADE_NOT_MODIFIABLE: { code: "G3009", category: "trading", description: "Trade cannot be modified" },
+  TRADE_NOT_MODIFIABLE: {
+    code: "G3009",
+    category: "trading",
+    description: "Trade cannot be modified",
+  },
   RISK_LIMIT: { code: "G3010", category: "trading", description: "Risk limit exceeded" },
-  ORDER_TRIGGER: { code: "G3011", category: "trading", description: "Order would trigger immediately" },
+  ORDER_TRIGGER: {
+    code: "G3011",
+    category: "trading",
+    description: "Order would trigger immediately",
+  },
   ANALYSIS_ERROR: { code: "G3012", category: "trading", description: "Analysis failed" },
 
   // G4xxx — Network
@@ -53,13 +61,33 @@ const ERROR_CODE_REGISTRY: Record<string, ErrorCodeEntry> = {
   BINANCE_RATE_LIMIT: { code: "G4010", category: "network", description: "Binance rate limit" },
   COINBASE_RATE_LIMIT: { code: "G4011", category: "network", description: "Coinbase rate limit" },
   KRAKEN_RATE_LIMIT: { code: "G4012", category: "network", description: "Kraken rate limit" },
-  HYPERLIQUID_RATE_LIMIT: { code: "G4013", category: "network", description: "Hyperliquid rate limit" },
+  HYPERLIQUID_RATE_LIMIT: {
+    code: "G4013",
+    category: "network",
+    description: "Hyperliquid rate limit",
+  },
   BITFINEX_RATE_LIMIT: { code: "G4014", category: "network", description: "Bitfinex rate limit" },
-  BINANCE_CONNECTION: { code: "G4020", category: "network", description: "Binance connection error" },
-  COINBASE_CONNECTION: { code: "G4021", category: "network", description: "Coinbase connection error" },
+  BINANCE_CONNECTION: {
+    code: "G4020",
+    category: "network",
+    description: "Binance connection error",
+  },
+  COINBASE_CONNECTION: {
+    code: "G4021",
+    category: "network",
+    description: "Coinbase connection error",
+  },
   KRAKEN_CONNECTION: { code: "G4022", category: "network", description: "Kraken connection error" },
-  HYPERLIQUID_CONNECTION: { code: "G4023", category: "network", description: "Hyperliquid connection error" },
-  BITFINEX_CONNECTION: { code: "G4024", category: "network", description: "Bitfinex connection error" },
+  HYPERLIQUID_CONNECTION: {
+    code: "G4023",
+    category: "network",
+    description: "Hyperliquid connection error",
+  },
+  BITFINEX_CONNECTION: {
+    code: "G4024",
+    category: "network",
+    description: "Bitfinex connection error",
+  },
 
   // G5xxx — System
   UNKNOWN_ERROR: { code: "G5001", category: "system", description: "Unknown error" },

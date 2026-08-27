@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 
@@ -30,7 +29,8 @@ function depthBar(ratio: number, width: number, char = "\u2588"): string {
 }
 
 function fmtPrice(n: number): string {
-  if (n >= 10000) return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  if (n >= 10000)
+    return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   if (n >= 1) return n.toFixed(2);
   return n.toPrecision(4);
 }
@@ -55,13 +55,39 @@ export function OrderbookView({ symbol, bids, asks, spread, spreadPercent, onClo
     <Pane title={`ORDERBOOK ${symbol}`}>
       {/* Header */}
       <Box>
-        <Box width={12}><Text bold dimColor>QTY</Text></Box>
-        <Box width={barWidth + 2}><Text bold dimColor>BIDS</Text></Box>
-        <Box width={12} justifyContent="flex-end"><Text bold dimColor>PRICE</Text></Box>
-        <Box width={4}><Text> </Text></Box>
-        <Box width={12}><Text bold dimColor>PRICE</Text></Box>
-        <Box width={barWidth + 2}><Text bold dimColor>ASKS</Text></Box>
-        <Box width={12} justifyContent="flex-end"><Text bold dimColor>QTY</Text></Box>
+        <Box width={12}>
+          <Text bold dimColor>
+            QTY
+          </Text>
+        </Box>
+        <Box width={barWidth + 2}>
+          <Text bold dimColor>
+            BIDS
+          </Text>
+        </Box>
+        <Box width={12} justifyContent="flex-end">
+          <Text bold dimColor>
+            PRICE
+          </Text>
+        </Box>
+        <Box width={4}>
+          <Text> </Text>
+        </Box>
+        <Box width={12}>
+          <Text bold dimColor>
+            PRICE
+          </Text>
+        </Box>
+        <Box width={barWidth + 2}>
+          <Text bold dimColor>
+            ASKS
+          </Text>
+        </Box>
+        <Box width={12} justifyContent="flex-end">
+          <Text bold dimColor>
+            QTY
+          </Text>
+        </Box>
       </Box>
 
       {/* Depth rows */}
@@ -75,9 +101,7 @@ export function OrderbookView({ symbol, bids, asks, spread, spreadPercent, onClo
               <Text dimColor>{bid ? fmtQty(bid.quantity) : ""}</Text>
             </Box>
             <Box width={barWidth + 2} justifyContent="flex-end">
-              <Text color="green">
-                {bid ? depthBar(bid.cumulative / maxCumBid, barWidth) : ""}
-              </Text>
+              <Text color="green">{bid ? depthBar(bid.cumulative / maxCumBid, barWidth) : ""}</Text>
             </Box>
             <Box width={12} justifyContent="flex-end">
               <Text color="green">{bid ? fmtPrice(bid.price) : ""}</Text>
@@ -93,9 +117,7 @@ export function OrderbookView({ symbol, bids, asks, spread, spreadPercent, onClo
               <Text color="red">{ask ? fmtPrice(ask.price) : ""}</Text>
             </Box>
             <Box width={barWidth + 2}>
-              <Text color="red">
-                {ask ? depthBar(ask.cumulative / maxCumAsk, barWidth) : ""}
-              </Text>
+              <Text color="red">{ask ? depthBar(ask.cumulative / maxCumAsk, barWidth) : ""}</Text>
             </Box>
             <Box width={12} justifyContent="flex-end">
               <Text dimColor>{ask ? fmtQty(ask.quantity) : ""}</Text>

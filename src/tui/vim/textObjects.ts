@@ -4,10 +4,14 @@
 
 const WORD_CHAR = /[a-zA-Z0-9_]/;
 const PAIRS: Record<string, [string, string]> = {
-  "(": ["(", ")"], ")": ["(", ")"],
-  "[": ["[", "]"], "]": ["[", "]"],
-  "{": ["{", "}"], "}": ["{", "}"],
-  "<": ["<", ">"], ">": ["<", ">"],
+  "(": ["(", ")"],
+  ")": ["(", ")"],
+  "[": ["[", "]"],
+  "]": ["[", "]"],
+  "{": ["{", "}"],
+  "}": ["{", "}"],
+  "<": ["<", ">"],
+  ">": ["<", ">"],
   '"': ['"', '"'],
   "'": ["'", "'"],
   "`": ["`", "`"],
@@ -33,7 +37,11 @@ export function selectTextObject(
   return null;
 }
 
-function selectWord(text: string, cursor: number, inner: boolean): { start: number; end: number } | null {
+function selectWord(
+  text: string,
+  cursor: number,
+  inner: boolean,
+): { start: number; end: number } | null {
   if (cursor >= text.length) return null;
 
   let start = cursor;
@@ -69,22 +77,29 @@ function selectPair(
     let openPos = -1;
     let closePos = -1;
     for (let i = cursor; i >= 0; i--) {
-      if (text[i] === open) { openPos = i; break; }
+      if (text[i] === open) {
+        openPos = i;
+        break;
+      }
     }
     for (let i = cursor + 1; i < text.length; i++) {
-      if (text[i] === close) { closePos = i; break; }
+      if (text[i] === close) {
+        closePos = i;
+        break;
+      }
     }
     if (openPos === -1 || closePos === -1) return null;
-    return inner
-      ? { start: openPos + 1, end: closePos }
-      : { start: openPos, end: closePos + 1 };
+    return inner ? { start: openPos + 1, end: closePos } : { start: openPos, end: closePos + 1 };
   }
 
   // For different open/close, use depth counting
   for (let i = cursor; i >= 0; i--) {
     if (text[i] === close) depth++;
     if (text[i] === open) {
-      if (depth === 0) { start = i; break; }
+      if (depth === 0) {
+        start = i;
+        break;
+      }
       depth--;
     }
   }
@@ -94,14 +109,15 @@ function selectPair(
   for (let i = cursor; i < text.length; i++) {
     if (text[i] === open && i !== start) depth++;
     if (text[i] === close) {
-      if (depth === 0) { end = i; break; }
+      if (depth === 0) {
+        end = i;
+        break;
+      }
       depth--;
     }
   }
 
   if (text[start] !== open || text[end] !== close) return null;
 
-  return inner
-    ? { start: start + 1, end }
-    : { start, end: end + 1 };
+  return inner ? { start: start + 1, end } : { start, end: end + 1 };
 }

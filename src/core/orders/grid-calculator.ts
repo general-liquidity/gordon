@@ -65,24 +65,23 @@ export function calculateGridLevels(input: GridCalculationInput): GridCalculatio
   const levels = Math.max(MIN_LEVELS, Math.min(MAX_LEVELS, numLevels));
 
   const sortedSupports = [...supports]
-    .filter(s => s.price < currentPrice)
+    .filter((s) => s.price < currentPrice)
     .sort((a, b) => b.price - a.price);
 
   const highPrice = sortedSupports[0]?.price ?? currentPrice * 0.98;
-  const lowPrice = sortedSupports[2]?.price ?? sortedSupports[1]?.price ?? currentPrice * 0.90;
+  const lowPrice = sortedSupports[2]?.price ?? sortedSupports[1]?.price ?? currentPrice * 0.9;
   const priceStep = (highPrice - lowPrice) / (levels - 1);
 
-  const weights = distribution === "pyramid"
-    ? calculatePyramidWeights(levels)
-    : calculateEqualWeights(levels);
+  const weights =
+    distribution === "pyramid" ? calculatePyramidWeights(levels) : calculateEqualWeights(levels);
 
   const gridLevels: GridCalculationResult["levels"] = [];
 
   for (let i = 0; i < levels; i++) {
-    let price = highPrice - (priceStep * i);
+    let price = highPrice - priceStep * i;
 
-    const nearbySupport = sortedSupports.find(s =>
-      Math.abs(s.price - price) / price < SUPPORT_SNAP_THRESHOLD
+    const nearbySupport = sortedSupports.find(
+      (s) => Math.abs(s.price - price) / price < SUPPORT_SNAP_THRESHOLD,
     );
     if (nearbySupport) price = nearbySupport.price;
 
@@ -90,8 +89,8 @@ export function calculateGridLevels(input: GridCalculationInput): GridCalculatio
     const amount = allocation * percent;
 
     let nearSupport: string | null = null;
-    const supportIndex = sortedSupports.findIndex(s =>
-      Math.abs(s.price - price) / price < SUPPORT_SNAP_THRESHOLD
+    const supportIndex = sortedSupports.findIndex(
+      (s) => Math.abs(s.price - price) / price < SUPPORT_SNAP_THRESHOLD,
     );
     if (supportIndex !== -1) nearSupport = `S${supportIndex + 1}`;
 
@@ -104,14 +103,15 @@ export function calculateGridLevels(input: GridCalculationInput): GridCalculatio
   }
 
   const weightedEntry = gridLevels.reduce(
-    (sum, level) => sum + level.price * level.percentOfAllocation, 0
+    (sum, level) => sum + level.price * level.percentOfAllocation,
+    0,
   );
 
   const lowestPrice = gridLevels[gridLevels.length - 1]!.price;
   const stopLossPrice = roundPrice(lowestPrice * (1 - STOP_LOSS_BUFFER_PERCENT));
 
   const config: GridConfig = {
-    levels: gridLevels.map(l => ({
+    levels: gridLevels.map((l) => ({
       price: l.price,
       percentOfAllocation: l.percentOfAllocation,
     })),
@@ -122,7 +122,12 @@ export function calculateGridLevels(input: GridCalculationInput): GridCalculatio
     },
   };
 
-  return { config, levels: gridLevels, weightedEntryIfAllFill: roundPrice(weightedEntry), stopLossPrice };
+  return {
+    config,
+    levels: gridLevels,
+    weightedEntryIfAllFill: roundPrice(weightedEntry),
+    stopLossPrice,
+  };
 }
 
 function roundPrice(price: number): number {

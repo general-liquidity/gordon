@@ -3,7 +3,7 @@
  * Type definitions for the MCP plugin marketplace system
  */
 
-import type { MCPServerManifest, MCPCategory } from '../types';
+import type { MCPServerManifest, MCPCategory } from "../types.ts";
 
 // ============================================================================
 // Marketplace Listing
@@ -14,7 +14,7 @@ import type { MCPServerManifest, MCPCategory } from '../types';
  */
 export interface PluginPricing {
   /** Pricing type */
-  type: 'free' | 'freemium' | 'paid';
+  type: "free" | "freemium" | "paid";
   /** Description of free tier limits (for freemium) */
   freeUsage?: string;
   /** URL to pricing page (for paid/freemium) */
@@ -29,6 +29,8 @@ export interface MarketplaceListing {
   id: string;
   /** The plugin's manifest defining its capabilities */
   manifest: MCPServerManifest;
+  /** SHA-256 of the exact manifest.json bytes Gordon will install. */
+  manifestSha256?: string;
   /** Repository URL (e.g., GitHub) */
   repository: string;
   /** GitHub stars count */
@@ -44,7 +46,7 @@ export interface MarketplaceListing {
   /** Pricing information */
   pricing: PluginPricing;
   /** Optional routing manifest for agent routing (auto-written as routing.json on install) */
-  routingManifest?: import('../../../runtime/routing/types').RoutingManifest;
+  routingManifest?: import("../../../runtime/routing/types").RoutingManifest;
 }
 
 // ============================================================================
@@ -75,6 +77,8 @@ export interface InstalledPlugin {
   id: string;
   /** The plugin's manifest */
   manifest: MCPServerManifest;
+  /** SHA-256 of the installed manifest.json, verified before loading. */
+  manifestSha256: string;
   /** ISO date string when the plugin was installed */
   installedAt: string;
   /** Source of installation (marketplace URL, local path, etc.) */
@@ -98,15 +102,15 @@ export interface MarketplaceSearchOptions {
   /** Filter by category */
   category?: MCPCategory;
   /** Filter by pricing type */
-  pricingType?: 'free' | 'freemium' | 'paid';
+  pricingType?: "free" | "freemium" | "paid";
   /** Only show verified plugins */
   verifiedOnly?: boolean;
   /** Only show official provider plugins */
   officialOnly?: boolean;
   /** Sort field */
-  sortBy?: 'name' | 'stars' | 'downloads' | 'lastUpdated';
+  sortBy?: "name" | "stars" | "downloads" | "lastUpdated";
   /** Sort direction */
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: "asc" | "desc";
   /** Maximum results to return */
   limit?: number;
 }
@@ -147,13 +151,13 @@ export interface PluginValidationResult {
  * Status of a plugin installation operation
  */
 export type InstallationStatus =
-  | 'pending'
-  | 'downloading'
-  | 'validating'
-  | 'installing'
-  | 'configuring'
-  | 'complete'
-  | 'failed';
+  | "pending"
+  | "downloading"
+  | "validating"
+  | "installing"
+  | "configuring"
+  | "complete"
+  | "failed";
 
 /**
  * Progress update during plugin installation

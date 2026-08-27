@@ -4,7 +4,6 @@
  */
 
 import {
-  GordonError,
   RateLimitError,
   BinanceAuthError,
   InsufficientBalanceError,
@@ -141,14 +140,9 @@ export function detectErrorType(error: Error): ErrorType {
 /**
  * Generate recovery steps for rate limit errors
  */
-function getRateLimitRecovery(
-  error: Error,
-  context?: Record<string, unknown>
-): RecoveryStep[] {
+function getRateLimitRecovery(error: Error, context?: Record<string, unknown>): RecoveryStep[] {
   const waitTime =
-    error instanceof RateLimitError && error.retryAfter
-      ? Math.ceil(error.retryAfter / 1000)
-      : 30;
+    error instanceof RateLimitError && error.retryAfter ? Math.ceil(error.retryAfter / 1000) : 30;
 
   const steps: RecoveryStep[] = [
     {
@@ -184,7 +178,8 @@ function getAuthRecovery(): RecoveryStep[] {
       command: "/setup",
     },
     {
-      description: "Check that your API key has the correct permissions (Enable Reading, Enable Spot Trading)",
+      description:
+        "Check that your API key has the correct permissions (Enable Reading, Enable Spot Trading)",
     },
     {
       description: "Verify your system clock is synchronized (NTP)",
@@ -200,7 +195,7 @@ function getAuthRecovery(): RecoveryStep[] {
  */
 function getInsufficientBalanceRecovery(
   error: Error,
-  context?: Record<string, unknown>
+  _context?: Record<string, unknown>,
 ): RecoveryStep[] {
   const steps: RecoveryStep[] = [
     {
@@ -258,7 +253,7 @@ function getNetworkRecovery(): RecoveryStep[] {
  */
 function getInvalidSymbolRecovery(
   error: Error,
-  context?: Record<string, unknown>
+  _context?: Record<string, unknown>,
 ): RecoveryStep[] {
   const steps: RecoveryStep[] = [];
 
@@ -475,7 +470,7 @@ function levenshteinDistance(a: string, b: string): number {
         matrix[i]![j] = Math.min(
           matrix[i - 1]![j - 1]! + 1, // substitution
           matrix[i]![j - 1]! + 1, // insertion
-          matrix[i - 1]![j]! + 1 // deletion
+          matrix[i - 1]![j]! + 1, // deletion
         );
       }
     }
@@ -513,7 +508,7 @@ function levenshteinDistance(a: string, b: string): number {
 export function createErrorContext(
   error: Error,
   operation: string,
-  context?: Record<string, unknown>
+  context?: Record<string, unknown>,
 ): ErrorContext {
   const errorType = detectErrorType(error);
   const errorCode = isGordonError(error) ? error.code : undefined;
@@ -578,7 +573,7 @@ export function createErrorContext(
 function getRecoverySteps(
   errorType: ErrorType,
   error: Error,
-  context?: Record<string, unknown>
+  context?: Record<string, unknown>,
 ): RecoveryStep[] {
   let steps: RecoveryStep[];
 

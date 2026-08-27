@@ -26,9 +26,7 @@ import { flagEnv } from "../config/flagResolver.ts";
 
 export const ABSORBING_BARRIER_FLAG_ENV = "GORDON_ABSORBING_BARRIER";
 
-export function isAbsorbingBarrierEnabled(
-  env: NodeJS.ProcessEnv = flagEnv(),
-): boolean {
+export function isAbsorbingBarrierEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   // Default-on protective gate: absence = enabled. Explicit "0"/"false" opts out.
   // Dormant unless the operator supplies barrier inputs (equity/limits), so it
   // never fires spuriously with no configuration.
@@ -163,16 +161,12 @@ export function distanceToBarriers(input: BarrierInput): BarriersResult {
     brokerTrigger = input.maintenanceMarginEquity;
   }
   if (input.dailyLoss !== undefined) {
-    const dailyTrigger =
-      input.dailyLoss.windowStartEquityUsd - input.dailyLoss.budgetUsd;
+    const dailyTrigger = input.dailyLoss.windowStartEquityUsd - input.dailyLoss.budgetUsd;
     brokerTrigger = brokerTrigger === null ? dailyTrigger : Math.max(brokerTrigger, dailyTrigger);
   }
 
   let propFirmTrigger: number | null = null;
-  if (
-    input.propFirmTrailingDdUsd !== undefined &&
-    input.equityHighWaterMark !== undefined
-  ) {
+  if (input.propFirmTrailingDdUsd !== undefined && input.equityHighWaterMark !== undefined) {
     propFirmTrigger = input.equityHighWaterMark - input.propFirmTrailingDdUsd;
   }
 
@@ -191,9 +185,7 @@ export function distanceToBarriers(input: BarrierInput): BarriersResult {
   if (active.length === 0) {
     return { barriers, nearest: null, nearestRUnits: Number.POSITIVE_INFINITY };
   }
-  const nearest = active.reduce((min, b) =>
-    b.rUnitsToBarrier < min.rUnitsToBarrier ? b : min,
-  );
+  const nearest = active.reduce((min, b) => (b.rUnitsToBarrier < min.rUnitsToBarrier ? b : min));
   return { barriers, nearest: nearest.kind, nearestRUnits: nearest.rUnitsToBarrier };
 }
 
@@ -203,7 +195,9 @@ export function distanceToBarriers(input: BarrierInput): BarriersResult {
  */
 export function shouldBlockNewTrades(result: BarriersResult): boolean {
   return result.barriers.some(
-    (b) => b.active && (b.alertLevel === "warn" || b.alertLevel === "critical" || b.alertLevel === "breached"),
+    (b) =>
+      b.active &&
+      (b.alertLevel === "warn" || b.alertLevel === "critical" || b.alertLevel === "breached"),
   );
 }
 
@@ -307,9 +301,7 @@ export interface AbsorbingBarrierEvaluation {
   inceptionPointInTimeLossFraction: number;
 }
 
-export function createAbsorbingBarrierState(
-  inceptionEquityUsd: number,
-): AbsorbingBarrierState {
+export function createAbsorbingBarrierState(inceptionEquityUsd: number): AbsorbingBarrierState {
   return {
     referenceCapitalUsd: inceptionEquityUsd,
     highWaterMarkUsd: inceptionEquityUsd,
@@ -390,8 +382,7 @@ export function evaluateAbsorbingBarrier(
   const next: AbsorbingBarrierState = { ...state, lastEquityUsd: currentEquityUsd };
 
   if (currentEquityUsd > next.highWaterMarkUsd) {
-    next.closedEpisodeLossUsd +=
-      next.highWaterMarkUsd - next.troughSinceHighWaterUsd;
+    next.closedEpisodeLossUsd += next.highWaterMarkUsd - next.troughSinceHighWaterUsd;
     next.highWaterMarkUsd = currentEquityUsd;
     next.troughSinceHighWaterUsd = currentEquityUsd;
   } else if (currentEquityUsd < next.troughSinceHighWaterUsd) {
@@ -403,15 +394,13 @@ export function evaluateAbsorbingBarrier(
 
   const inceptionLoss = cumulativeLossUsd / next.referenceCapitalUsd;
   const trailingLoss = openDeclineUsd / next.highWaterMarkUsd;
-  const pointInTimeLoss =
-    (next.referenceCapitalUsd - currentEquityUsd) / next.referenceCapitalUsd;
+  const pointInTimeLoss = (next.referenceCapitalUsd - currentEquityUsd) / next.referenceCapitalUsd;
 
   const inceptionTrigger =
     config.inceptionLossFraction === undefined
       ? null
       : next.highWaterMarkUsd -
-        (config.inceptionLossFraction * next.referenceCapitalUsd -
-          next.closedEpisodeLossUsd);
+        (config.inceptionLossFraction * next.referenceCapitalUsd - next.closedEpisodeLossUsd);
   const trailingTrigger =
     config.trailingDrawdownFraction === undefined
       ? null
@@ -431,9 +420,7 @@ export function evaluateAbsorbingBarrier(
   );
 
   if (!next.tripped) {
-    const breached = [trailing, inception].filter(
-      (r) => r.active && r.headroomFraction <= 0,
-    );
+    const breached = [trailing, inception].filter((r) => r.active && r.headroomFraction <= 0);
     if (breached.length > 0) {
       // The deepest breach governs: on this equity path it is the limit that
       // would have stopped the operator earliest.
@@ -474,9 +461,7 @@ export function absorbingBarrierToPayload(
     boundBy: evaluation.boundBy,
     trippedAtEquityUsd: evaluation.state.trippedAtEquityUsd,
     referenceCapitalUsd: evaluation.state.referenceCapitalUsd,
-    pointInTimeLossFraction: Number(
-      evaluation.inceptionPointInTimeLossFraction.toFixed(4),
-    ),
+    pointInTimeLossFraction: Number(evaluation.inceptionPointInTimeLossFraction.toFixed(4)),
     barriers: readings,
   };
 }

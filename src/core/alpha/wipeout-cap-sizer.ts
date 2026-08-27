@@ -56,10 +56,7 @@ export interface WipeoutCapInput {
   maxPositionFraction?: number;
 }
 
-export type SizingVerdict =
-  | "sized"
-  | "below_minimum"
-  | "invalid_inputs";
+export type SizingVerdict = "sized" | "below_minimum" | "invalid_inputs";
 
 export interface WipeoutCapResult {
   /** Position size as fraction of book. */
@@ -126,8 +123,7 @@ export function sizeWithWipeoutCap(input: WipeoutCapInput): WipeoutCapResult {
   //
   // Concretely: position = min(maxBookLoss / max(p, ε), maxPositionFraction)
   const EPSILON = 1e-6;
-  const wipeoutCapPosition =
-    maxBookLoss / Math.max(input.wipeoutProbability, EPSILON);
+  const wipeoutCapPosition = maxBookLoss / Math.max(input.wipeoutProbability, EPSILON);
   const positionFraction = Math.min(wipeoutCapPosition, maxPos);
 
   if (positionFraction < minPos) {
@@ -138,8 +134,7 @@ export function sizeWithWipeoutCap(input: WipeoutCapInput): WipeoutCapResult {
       expectedYieldOnPosition: 0,
       netEv: 0,
       verdict: "below_minimum",
-      summary:
-        `Computed size ${(positionFraction * 100).toFixed(2)}% below minimum ${(minPos * 100).toFixed(2)}% — skip.`,
+      summary: `Computed size ${(positionFraction * 100).toFixed(2)}% below minimum ${(minPos * 100).toFixed(2)}% — skip.`,
     };
   }
 

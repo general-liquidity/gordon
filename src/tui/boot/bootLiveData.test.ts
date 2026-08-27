@@ -59,11 +59,13 @@ describe("loadBootLiveData", () => {
   });
 
   test("degrades connectivity independently when the venue probe rejects", async () => {
-    const data = await loadBootLiveData(deps({
-      testVenue: async () => {
-        throw new Error("network down");
-      },
-    }));
+    const data = await loadBootLiveData(
+      deps({
+        testVenue: async () => {
+          throw new Error("network down");
+        },
+      }),
+    );
     expect(data.venue.connectivity).toBe("offline");
     expect(data.equityUsd).toBe(12_408.32);
     expect(data.audit.state).toBe("ok");
@@ -71,55 +73,66 @@ describe("loadBootLiveData", () => {
   });
 
   test("times out a hanging venue probe", async () => {
-    const data = await loadBootLiveData(deps({
-      testVenue: () => new Promise(() => {}),
-      timeoutMs: 20,
-    }));
+    const data = await loadBootLiveData(
+      deps({
+        testVenue: () => new Promise(() => {}),
+        timeoutMs: 20,
+      }),
+    );
     expect(data.venue.connectivity).toBe("offline");
   });
 
   test("reports none when no exchange is configured", async () => {
     let equityCalled = false;
-    const data = await loadBootLiveData(deps({
-      loadConfig: async () => ({ ...baseConfig, exchanges: [], activeExchangeId: undefined }) as GordonConfig,
-      fetchEquity: async () => {
-        equityCalled = true;
-        return 1;
-      },
-    }));
+    const data = await loadBootLiveData(
+      deps({
+        loadConfig: async () =>
+          ({ ...baseConfig, exchanges: [], activeExchangeId: undefined }) as GordonConfig,
+        fetchEquity: async () => {
+          equityCalled = true;
+          return 1;
+        },
+      }),
+    );
     expect(data.venue).toEqual({ label: null, paper: false, connectivity: "none" });
     expect(data.equityUsd).toBeNull();
     expect(equityCalled).toBe(false);
   });
 
   test("marks audit unavailable when verification throws", async () => {
-    const data = await loadBootLiveData(deps({
-      verifyAudit: () => {
-        throw new Error("sqlite unavailable");
-      },
-    }));
+    const data = await loadBootLiveData(
+      deps({
+        verifyAudit: () => {
+          throw new Error("sqlite unavailable");
+        },
+      }),
+    );
     expect(data.audit).toEqual({ state: "unavailable", checked: 0 });
   });
 
   test("never rejects when every probe fails", async () => {
-    await expect(loadBootLiveData(deps({
-      loadConfig: async () => {
-        throw new Error("config failed");
-      },
-      testVenue: async () => {
-        throw new Error("venue failed");
-      },
-      fetchEquity: async () => {
-        throw new Error("equity failed");
-      },
-      verifyAudit: () => {
-        throw new Error("audit failed");
-      },
-      fetchTicker: async () => {
-        throw new Error("ticker failed");
-      },
-      timeoutMs: 20,
-    }))).resolves.toEqual({
+    await expect(
+      loadBootLiveData(
+        deps({
+          loadConfig: async () => {
+            throw new Error("config failed");
+          },
+          testVenue: async () => {
+            throw new Error("venue failed");
+          },
+          fetchEquity: async () => {
+            throw new Error("equity failed");
+          },
+          verifyAudit: () => {
+            throw new Error("audit failed");
+          },
+          fetchTicker: async () => {
+            throw new Error("ticker failed");
+          },
+          timeoutMs: 20,
+        }),
+      ),
+    ).resolves.toEqual({
       venue: { label: null, paper: false, connectivity: "none" },
       equityUsd: null,
       audit: { state: "unavailable", checked: 0 },
@@ -134,12 +147,14 @@ describe("loadBootLiveData", () => {
 
   test("passes the loaded config into the ticker fetcher", async () => {
     let seenConfig: GordonConfig | null | undefined;
-    await loadBootLiveData(deps({
-      fetchTicker: async (_symbols, config) => {
-        seenConfig = config;
-        return [];
-      },
-    }));
+    await loadBootLiveData(
+      deps({
+        fetchTicker: async (_symbols, config) => {
+          seenConfig = config;
+          return [];
+        },
+      }),
+    );
     expect(seenConfig?.activeExchangeId).toBe("binance");
   });
 });
@@ -201,12 +216,14 @@ describe("refreshBootTicker", () => {
   });
 
   test("times out a hanging ticker refresh", async () => {
-    await expect(refreshBootTicker(
-      [{ symbol: "BTC", kind: "crypto" }],
-      deps({
-        fetchTicker: () => new Promise(() => {}),
-        timeoutMs: 20,
-      }),
-    )).resolves.toBeNull();
+    await expect(
+      refreshBootTicker(
+        [{ symbol: "BTC", kind: "crypto" }],
+        deps({
+          fetchTicker: () => new Promise(() => {}),
+          timeoutMs: 20,
+        }),
+      ),
+    ).resolves.toBeNull();
   });
 });

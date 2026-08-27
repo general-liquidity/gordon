@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import {
-  loadSubagentProfiles,
-  summarizeLoadedSubagentProfiles,
-} from "./subagentProfileLoader.ts";
+import { loadSubagentProfiles, summarizeLoadedSubagentProfiles } from "./subagentProfileLoader.ts";
 
 function makeFileMap(entries: Record<string, string>): {
   fileContent: Map<string, string>;
@@ -200,7 +197,9 @@ describe("summarizeLoadedSubagentProfiles", () => {
     const summary = summarizeLoadedSubagentProfiles({
       profiles: new Map(),
       warnings: [],
-      sources: [{ path: "x", origin: "project", found: false, fileCount: 0, accepted: 0, rejected: 0 }],
+      sources: [
+        { path: "x", origin: "project", found: false, fileCount: 0, accepted: 0, rejected: 0 },
+      ],
       totalAccepted: 0,
       totalRejected: 0,
     });
@@ -211,7 +210,9 @@ describe("summarizeLoadedSubagentProfiles", () => {
     const summary = summarizeLoadedSubagentProfiles({
       profiles: new Map(),
       warnings: [],
-      sources: [{ path: "x", origin: "project", found: true, fileCount: 1, accepted: 1, rejected: 0 }],
+      sources: [
+        { path: "x", origin: "project", found: true, fileCount: 1, accepted: 1, rejected: 0 },
+      ],
       totalAccepted: 1,
       totalRejected: 0,
     });
@@ -222,7 +223,9 @@ describe("summarizeLoadedSubagentProfiles", () => {
     const summary = summarizeLoadedSubagentProfiles({
       profiles: new Map(),
       warnings: ["x", "y"],
-      sources: [{ path: "x", origin: "project", found: true, fileCount: 5, accepted: 3, rejected: 2 }],
+      sources: [
+        { path: "x", origin: "project", found: true, fileCount: 5, accepted: 3, rejected: 2 },
+      ],
       totalAccepted: 3,
       totalRejected: 2,
     });

@@ -29,10 +29,7 @@
 import { TRADING_CONSTITUTION } from "../../../safety/defense/tradingConstitution.ts";
 import { SAFETY_CRITICAL_PATTERNS } from "../../../../runtime/permissions/trustTrajectory.ts";
 import { CATEGORY_RUBRIC_DATA } from "./categoryRubrics.ts";
-import {
-  constitutionScenarios,
-  riskDimensionScenarios,
-} from "./generator/index.ts";
+import { constitutionScenarios, riskDimensionScenarios } from "./generator/index.ts";
 import { ALL_SCENARIOS } from "./scenarios/index.ts";
 import type { EvalScenario } from "./types.ts";
 
@@ -73,10 +70,7 @@ function constitutionOrphans(suiteProvenance: Set<string>): OrphanRule[] {
     }
   }
   for (const ruleKey of declared) {
-    const isRealRule = Object.prototype.hasOwnProperty.call(
-      TRADING_CONSTITUTION,
-      ruleKey,
-    );
+    const isRealRule = Object.hasOwn(TRADING_CONSTITUTION, ruleKey);
     const covered = suiteProvenance.has(`constitution:${ruleKey}`);
     if (!isRealRule || !covered) {
       orphans.push({ source: "constitution", id: ruleKey });
@@ -123,9 +117,7 @@ function denylistOrphans(suiteProvenance: Set<string>): OrphanRule[] {
   for (const prov of suiteProvenance) {
     if (!prov.startsWith("denylist:")) continue;
     const pattern = prov.slice("denylist:".length);
-    const onList = SAFETY_CRITICAL_PATTERNS.some(
-      (p) => pattern.includes(p) || p.includes(pattern),
-    );
+    const onList = SAFETY_CRITICAL_PATTERNS.some((p) => pattern.includes(p) || p.includes(pattern));
     if (!onList) orphans.push({ source: "denylist", id: pattern });
   }
   return orphans;

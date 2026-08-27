@@ -111,9 +111,7 @@ export function computeBrierScore(input: BrierScoreInput): BrierScoreResult {
   //   = baseline² − 2·baseline·baseRate + baseRate
   // When baseline = baseRate, this collapses to baseRate·(1 − baseRate) (variance of Bernoulli).
   const baselineBrier =
-    baselineProbability * baselineProbability -
-    2 * baselineProbability * baseRate +
-    baseRate;
+    baselineProbability * baselineProbability - 2 * baselineProbability * baseRate + baseRate;
 
   const skillScore = baselineBrier > 0 ? 1 - brierScore / baselineBrier : 0;
 

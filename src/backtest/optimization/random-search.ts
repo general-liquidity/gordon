@@ -15,15 +15,11 @@ import type {
   ParameterSet,
   ConstraintFn,
   ProgressCallback,
-  ProgressInfo,
   OptimizationResult,
   RobustSample,
   RobustSelectionOptions,
 } from "./grid-search.ts";
-import {
-  buildRobustSelectionReport,
-  collectRobustSample,
-} from "./grid-search.ts";
+import { buildRobustSelectionReport, collectRobustSample } from "./grid-search.ts";
 
 // ============================================================================
 // Random Search Type Definitions
@@ -107,7 +103,8 @@ class SeededRandom {
    * Generate next random number between 0 and 1.
    */
   next(): number {
-    let t = (this.state += 0x6d2b79f5);
+    this.state += 0x6d2b79f5;
+    let t = this.state;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
@@ -208,7 +205,7 @@ export class RandomSearchOptimizer {
     paramDistributions: ParameterDistributions,
     nIterations: number,
     metric: keyof BacktestMetrics,
-    options: RandomSearchOptions = {}
+    options: RandomSearchOptions = {},
   ): OptimizationResult {
     const startTime = Date.now();
     const {
@@ -224,8 +221,7 @@ export class RandomSearchOptimizer {
     // Initialize RNG with seed if provided
     this.rng = new SeededRandom(seed);
 
-    const allResults: Array<{ params: ParameterSet; metrics: BacktestMetrics }> =
-      [];
+    const allResults: Array<{ params: ParameterSet; metrics: BacktestMetrics }> = [];
     let bestParams: ParameterSet | null = null;
     let bestMetrics: BacktestMetrics | null = null;
     let bestMetricValue = -Infinity;
@@ -283,8 +279,7 @@ export class RandomSearchOptimizer {
       // Call progress callback
       const completedCount = i + 1;
       if (onProgress && completedCount % progressInterval === 0) {
-        const avgIterationTime =
-          timings.reduce((a, b) => a + b, 0) / timings.length;
+        const avgIterationTime = timings.reduce((a, b) => a + b, 0) / timings.length;
         const remainingIterations = nIterations - completedCount;
         const estimatedRemainingMs = avgIterationTime * remainingIterations;
 
@@ -294,9 +289,7 @@ export class RandomSearchOptimizer {
           progressPercent: (completedCount / nIterations) * 100,
           estimatedRemainingMs,
           currentBest:
-            bestParams && bestMetrics
-              ? { params: bestParams, metrics: bestMetrics }
-              : undefined,
+            bestParams && bestMetrics ? { params: bestParams, metrics: bestMetrics } : undefined,
         });
       }
     }
@@ -313,8 +306,7 @@ export class RandomSearchOptimizer {
     // Ensure we have a valid result
     if (!bestParams || !bestMetrics) {
       throw new Error(
-        "No valid results found during optimization. " +
-          "Constraints may be too restrictive."
+        "No valid results found during optimization. " + "Constraints may be too restrictive.",
       );
     }
 
@@ -329,7 +321,7 @@ export class RandomSearchOptimizer {
             robustSelection: buildRobustSelectionReport(
               robustSamples,
               String(metric),
-              robustSelection
+              robustSelection,
             ),
           }
         : {}),
@@ -342,9 +334,7 @@ export class RandomSearchOptimizer {
    * @param distributions - Parameter distributions
    * @returns Sampled parameter set
    */
-  private sampleParameters(
-    distributions: ParameterDistributions
-  ): ParameterSet {
+  private sampleParameters(distributions: ParameterDistributions): ParameterSet {
     const params: ParameterSet = {};
 
     for (const [name, dist] of Object.entries(distributions)) {
@@ -374,12 +364,13 @@ export class RandomSearchOptimizer {
         value = this.rng.range(dist.min, dist.max);
         break;
 
-      case "log-uniform":
+      case "log-uniform": {
         // Sample uniformly in log space
         const logMin = Math.log(dist.min);
         const logMax = Math.log(dist.max);
         value = Math.exp(this.rng.range(logMin, logMax));
         break;
+      }
 
       case "normal": {
         // Box-Muller transform for normal distribution

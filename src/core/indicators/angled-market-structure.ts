@@ -116,7 +116,7 @@ export function calculateAMS(
   pivotLen: number = 5,
   angleFactor: number = 0.01,
   atrPeriod: number = 14,
-  maxPivots: number = 5
+  maxPivots: number = 5,
 ): AMSResult {
   if (candles.length < pivotLen * 2 + atrPeriod + 2) {
     return {
@@ -190,8 +190,8 @@ export function calculateAMS(
   }
 
   // Filter to active (unbroken) lines, keep most recent
-  const activeResistance = resistanceLines.filter(l => !l.broken).slice(-maxPivots);
-  const activeSupport = supportLines.filter(l => !l.broken).slice(-maxPivots);
+  const activeResistance = resistanceLines.filter((l) => !l.broken).slice(-maxPivots);
+  const activeSupport = supportLines.filter((l) => !l.broken).slice(-maxPivots);
 
   // Find nearest levels
   let nearestResistance: number | null = null;
@@ -267,7 +267,7 @@ export function calculateAMS(
     bias,
     atr,
     activeSupport.length,
-    activeResistance.length
+    activeResistance.length,
   );
 
   return {
@@ -292,7 +292,7 @@ function buildAMSInterpretation(
   bias: string,
   atr: number,
   supportCount: number,
-  resistCount: number
+  resistCount: number,
 ): string {
   let msg = `AMS: ${supportCount} support, ${resistCount} resistance lines active. `;
 
@@ -305,9 +305,10 @@ function buildAMSInterpretation(
 
   if (structBreak) {
     msg += `STRUCTURE BREAK ${breakDir.toUpperCase()} — `;
-    msg += breakDir === "bullish"
-      ? "price broke above angled resistance. "
-      : "price broke below angled support. ";
+    msg +=
+      breakDir === "bullish"
+        ? "price broke above angled resistance. "
+        : "price broke below angled support. ";
   }
 
   msg += `Bias: ${bias.toUpperCase()}.`;

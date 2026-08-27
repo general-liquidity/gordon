@@ -21,25 +21,25 @@
  * window, default confidence threshold, and suppression behavior.
  */
 export type ProactiveCategory =
-  | "regime_flip"          // Market regime changed — suggest matching playbook
-  | "chart_pattern"        // Geometric chart pattern (LMW) completed on a watched symbol
-  | "whale_alert"          // Whale transfer/accumulation on a held or watched token
-  | "volatility_spike"     // Sudden volatility increase — suggest stop tightening
-  | "stop_loss_tighten"    // Price pushed — suggest trailing stop
-  | "portfolio_drift"      // Position weights drifted from target
-  | "missed_entry"         // Watchlist level hit while user was away
-  | "position_review"      // Long-held position worth re-evaluating
-  | "journal_prompt"       // End of session — suggest journal entry
-  | "session_review"       // End of day/week — suggest review
-  | "risk_warning"         // Drawdown, correlation, cascade risk
-  | "playbook_suggest"     // New regime-matched playbook available
-  | "funding_alert"        // Perp funding rate anomaly
-  | "news_event"           // News triggering position review
+  | "regime_flip" // Market regime changed — suggest matching playbook
+  | "chart_pattern" // Geometric chart pattern (LMW) completed on a watched symbol
+  | "whale_alert" // Whale transfer/accumulation on a held or watched token
+  | "volatility_spike" // Sudden volatility increase — suggest stop tightening
+  | "stop_loss_tighten" // Price pushed — suggest trailing stop
+  | "portfolio_drift" // Position weights drifted from target
+  | "missed_entry" // Watchlist level hit while user was away
+  | "position_review" // Long-held position worth re-evaluating
+  | "journal_prompt" // End of session — suggest journal entry
+  | "session_review" // End of day/week — suggest review
+  | "risk_warning" // Drawdown, correlation, cascade risk
+  | "playbook_suggest" // New regime-matched playbook available
+  | "funding_alert" // Perp funding rate anomaly
+  | "news_event" // News triggering position review
   | "earnings_approaching" // Upcoming earnings on held or watched symbol
-  | "insider_flow_alert"   // Cluster of insider buys/sells on watchlist
-  | "analyst_upgrade"      // Analyst consensus rating shift
-  | "congressional_trade"  // STOCK Act disclosure on held or watched symbol
-  | "edge_health";         // A live EDGE.md edge degraded (invariant broke) or should retire (kill fired)
+  | "insider_flow_alert" // Cluster of insider buys/sells on watchlist
+  | "analyst_upgrade" // Analyst consensus rating shift
+  | "congressional_trade" // STOCK Act disclosure on held or watched symbol
+  | "edge_health"; // A live EDGE.md edge degraded (invariant broke) or should retire (kill fired)
 
 /** Categories in schema/UI but with no producer wired yet. */
 export const INACTIVE_PROACTIVE_CATEGORIES: ReadonlySet<ProactiveCategory> = new Set();
@@ -105,11 +105,11 @@ export const SUMMARY_ROLLUP_CATEGORY: ProactiveCategory = "session_review";
 // ============================================================================
 
 export type ProactiveStatus =
-  | "pending"    // Surfaced, awaiting user action
-  | "accepted"   // User accepted — action taken
-  | "dismissed"  // User explicitly dismissed
+  | "pending" // Surfaced, awaiting user action
+  | "accepted" // User accepted — action taken
+  | "dismissed" // User explicitly dismissed
   | "suppressed" // Auto-suppressed (category rule or cooldown)
-  | "expired";   // Timed out without user action
+  | "expired"; // Timed out without user action
 
 // ============================================================================
 // Outcome taxonomy (from ProactiveAgent's ProactiveBench)

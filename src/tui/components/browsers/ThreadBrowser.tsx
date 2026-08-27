@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text } from "../../ink-custom";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 
@@ -30,44 +30,72 @@ export function ThreadBrowser({ threads, activeThreadId, onSwitch, onDelete, onC
   const [query, setQuery] = useState("");
 
   const filtered = query
-    ? threads.filter((t) =>
-        t.id.toLowerCase().includes(query.toLowerCase()) ||
-        (t.name ?? "").toLowerCase().includes(query.toLowerCase())
+    ? threads.filter(
+        (t) =>
+          t.id.toLowerCase().includes(query.toLowerCase()) ||
+          (t.name ?? "").toLowerCase().includes(query.toLowerCase()),
       )
     : threads;
 
-  useRoutedInput((input, key) => {
-    if (key.escape) {
-      if (query) { setQuery(""); setSelectedIdx(0); }
-      else onCancel();
-      return;
-    }
-    if (key.return) {
-      const thread = filtered[selectedIdx];
-      if (thread && thread.id !== activeThreadId) onSwitch(thread.id);
-      return;
-    }
-    if (key.upArrow) { setSelectedIdx((i) => Math.max(0, i - 1)); return; }
-    if (key.downArrow) { setSelectedIdx((i) => Math.min(filtered.length - 1, i + 1)); return; }
-    if (key.delete && key.ctrl) {
-      const thread = filtered[selectedIdx];
-      if (thread && thread.id !== activeThreadId) onDelete(thread.id);
-      return;
-    }
-    if (key.backspace) { setQuery((q) => q.slice(0, -1)); setSelectedIdx(0); return; }
-    if (input && !key.ctrl && !key.meta) { setQuery((q) => q + input); setSelectedIdx(0); }
-  }, { id: "threadBrowser", priority: FOCUS_PRIORITY.DIALOG });
+  useRoutedInput(
+    (input, key) => {
+      if (key.escape) {
+        if (query) {
+          setQuery("");
+          setSelectedIdx(0);
+        } else onCancel();
+        return;
+      }
+      if (key.return) {
+        const thread = filtered[selectedIdx];
+        if (thread && thread.id !== activeThreadId) onSwitch(thread.id);
+        return;
+      }
+      if (key.upArrow) {
+        setSelectedIdx((i) => Math.max(0, i - 1));
+        return;
+      }
+      if (key.downArrow) {
+        setSelectedIdx((i) => Math.min(filtered.length - 1, i + 1));
+        return;
+      }
+      if (key.delete && key.ctrl) {
+        const thread = filtered[selectedIdx];
+        if (thread && thread.id !== activeThreadId) onDelete(thread.id);
+        return;
+      }
+      if (key.backspace) {
+        setQuery((q) => q.slice(0, -1));
+        setSelectedIdx(0);
+        return;
+      }
+      if (input && !key.ctrl && !key.meta) {
+        setQuery((q) => q + input);
+        setSelectedIdx(0);
+      }
+    },
+    { id: "threadBrowser", priority: FOCUS_PRIORITY.DIALOG },
+  );
 
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">SESSIONS</Text>
-        <Text dimColor>  ({filtered.length} threads)</Text>
+        <Text bold color="cyanBright">
+          SESSIONS
+        </Text>
+        <Text dimColor> ({filtered.length} threads)</Text>
       </Box>
 
       <Box>
         <Text color="cyanBright">{"\uD83D\uDD0D"} </Text>
-        {query ? <Text>{query}<Text color="cyanBright">{"\u2588"}</Text></Text> : <Text dimColor>Type to search...</Text>}
+        {query ? (
+          <Text>
+            {query}
+            <Text color="cyanBright">{"\u2588"}</Text>
+          </Text>
+        ) : (
+          <Text dimColor>Type to search...</Text>
+        )}
       </Box>
 
       <Box flexDirection="column" marginTop={1}>
@@ -80,8 +108,12 @@ export function ThreadBrowser({ threads, activeThreadId, onSwitch, onDelete, onC
               <Text color={isFocused ? "cyanBright" : undefined}>
                 {isFocused ? " \u25B8" : "  "}
               </Text>
-              <Text color={isActive ? "green" : isFocused ? "cyanBright" : undefined} bold={isFocused || isActive}>
-                {" "}{(thread.name ?? thread.id.slice(0, 24)).padEnd(26)}
+              <Text
+                color={isActive ? "green" : isFocused ? "cyanBright" : undefined}
+                bold={isFocused || isActive}
+              >
+                {" "}
+                {(thread.name ?? thread.id.slice(0, 24)).padEnd(26)}
               </Text>
               <Text dimColor={!isFocused}>
                 {String(thread.messageCount).padStart(3)} msgs {"\u00B7"} {age}
@@ -93,7 +125,10 @@ export function ThreadBrowser({ threads, activeThreadId, onSwitch, onDelete, onC
       </Box>
 
       <Box marginTop={1}>
-        <Text dimColor>{"\u2191\u2193"} navigate {"\u00B7"} Enter switch {"\u00B7"} Ctrl+Del delete {"\u00B7"} Esc close</Text>
+        <Text dimColor>
+          {"\u2191\u2193"} navigate {"\u00B7"} Enter switch {"\u00B7"} Ctrl+Del delete {"\u00B7"}{" "}
+          Esc close
+        </Text>
       </Box>
     </Box>
   );

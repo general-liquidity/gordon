@@ -12,7 +12,7 @@
 
 import { createModuleLogger } from "../infra/logger/index.ts";
 import { recordStructuredObservation } from "../infra/platform/observability/structured.ts";
-import { EventBus, getEventBus } from "./bus.ts";
+import { type EventBus, getEventBus } from "./bus.ts";
 import type { MarketEventType, MarketEvent } from "./market-events.ts";
 import type { EventType } from "./types.ts";
 
@@ -70,7 +70,7 @@ interface ActiveSubscription {
 export type AgentInvoker = (
   agentId: AgentId,
   prompt: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ) => Promise<void>;
 
 // ============================================================================
@@ -142,7 +142,7 @@ export class AgentSubscriptionRegistry {
       } catch (error) {
         logger.error(
           `Agent subscription handler failed: ${subscription.agentId} on ${subscription.eventType}`,
-          error instanceof Error ? error : new Error(String(error))
+          error instanceof Error ? error : new Error(String(error)),
         );
       }
     };
@@ -153,7 +153,7 @@ export class AgentSubscriptionRegistry {
     const unsubscribe = this.bus.on(
       subscription.eventType as unknown as EventType,
       wrappedHandler as (event: unknown) => Promise<void>,
-      { priority: subscription.priority ?? 0 }
+      { priority: subscription.priority ?? 0 },
     );
 
     // Track the active subscription
@@ -174,7 +174,7 @@ export class AgentSubscriptionRegistry {
       const subs = this.activeSubscriptions.get(key) ?? [];
       this.activeSubscriptions.set(
         key,
-        subs.filter((s) => s.subscription !== subscription)
+        subs.filter((s) => s.subscription !== subscription),
       );
       logger.debug("Subscription unregistered", { key });
     };
@@ -274,8 +274,14 @@ export class AgentSubscriptionRegistry {
   /**
    * Get a summary of all active subscriptions grouped by agent
    */
-  getSummary(): Record<AgentId, { eventType: MarketEventType; priority: number; description?: string }[]> {
-    const summary: Record<string, { eventType: MarketEventType; priority: number; description?: string }[]> = {};
+  getSummary(): Record<
+    AgentId,
+    { eventType: MarketEventType; priority: number; description?: string }[]
+  > {
+    const summary: Record<
+      string,
+      { eventType: MarketEventType; priority: number; description?: string }[]
+    > = {};
 
     const allSubs = Array.from(this.activeSubscriptions.values());
     for (const subs of allSubs) {
@@ -291,7 +297,10 @@ export class AgentSubscriptionRegistry {
       }
     }
 
-    return summary as Record<AgentId, { eventType: MarketEventType; priority: number; description?: string }[]>;
+    return summary as Record<
+      AgentId,
+      { eventType: MarketEventType; priority: number; description?: string }[]
+    >;
   }
 
   /**
@@ -344,7 +353,7 @@ function shadowVerdict(
 }
 
 export function createDefaultSubscriptions(
-  registry: AgentSubscriptionRegistry
+  registry: AgentSubscriptionRegistry,
 ): AgentSubscription[] {
   /**
    * Helper to invoke an agent via the registry's invoker
@@ -352,7 +361,7 @@ export function createDefaultSubscriptions(
   const invoke = async (
     agentId: AgentId,
     prompt: string,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): Promise<void> => {
     const invoker = registry.getInvoker();
     if (!invoker) {
@@ -378,7 +387,7 @@ export function createDefaultSubscriptions(
           `A ${e.timeframe} candle just closed on ${e.symbol}. ` +
             `OHLCV: O=${e.open} H=${e.high} L=${e.low} C=${e.close} V=${e.volume}. ` +
             `Check for trading setups on this pair.`,
-          { symbol: e.symbol, timeframe: e.timeframe, trigger: "candle_close" }
+          { symbol: e.symbol, timeframe: e.timeframe, trigger: "candle_close" },
         );
       },
     },
@@ -394,7 +403,7 @@ export function createDefaultSubscriptions(
           `Volume spike detected on ${e.symbol}: ${e.spikeMultiple.toFixed(1)}x ` +
             `normal volume on the ${e.timeframe} timeframe. Current price: ${e.price}. ` +
             `Analyze this for potential trading opportunities.`,
-          { symbol: e.symbol, spikeMultiple: e.spikeMultiple, trigger: "volume_spike" }
+          { symbol: e.symbol, spikeMultiple: e.spikeMultiple, trigger: "volume_spike" },
         );
       },
     },
@@ -411,7 +420,7 @@ export function createDefaultSubscriptions(
           `Funding rate on ${e.symbol} ${direction} significantly from ` +
             `${(e.previousRate * 100).toFixed(4)}% to ${(e.currentRate * 100).toFixed(4)}%. ` +
             `Check if this signals a sentiment shift or trading opportunity.`,
-          { symbol: e.symbol, delta: e.delta, trigger: "funding_rate_change" }
+          { symbol: e.symbol, delta: e.delta, trigger: "funding_rate_change" },
         );
       },
     },
@@ -432,7 +441,7 @@ export function createDefaultSubscriptions(
             `${Math.round(e.confidence * 100)}% confidence, ${e.bias} bias on ${e.timeframe}. ` +
             `${e.ensembleAgreement ? `Ensemble agreement: ${Math.round(e.ensembleAgreement * 100)}%. ` : ""}` +
             `Run a deep analysis to validate this setup and determine entry/exit levels.`,
-          { symbol: e.symbol, strategy: e.strategy, trigger: "setup_detected" }
+          { symbol: e.symbol, strategy: e.strategy, trigger: "setup_detected" },
         );
       },
     },
@@ -460,7 +469,7 @@ export function createDefaultSubscriptions(
             `Resistance levels: ${e.resistanceLevels.join(", ")}. ` +
             `Current price: ${e.currentPrice}. ` +
             `Create a trading plan for this opportunity.`,
-          { symbol: e.symbol, bias: e.overallBias, trigger: "analysis_complete" }
+          { symbol: e.symbol, bias: e.overallBias, trigger: "analysis_complete" },
         );
       },
     },
@@ -559,29 +568,33 @@ export function createDefaultSubscriptions(
               // R-units are undefined without an R, so the distance barriers
               // are skipped rather than defaulted. The terminal fold below is
               // measured in fractions of capital and runs regardless.
-              const barriers = baseR > 0 ? distanceToBarriers({
-                currentEquity,
-                equityHighWaterMark: equityHwm > 0 ? equityHwm : undefined,
-                dailyLoss:
-                  dailyLossBudget > 0 && dayStartEquity > 0
-                    ? { windowStartEquityUsd: dayStartEquity, budgetUsd: dailyLossBudget }
-                    : undefined,
-                propFirmTrailingDdUsd: propFirmTrailingDd > 0 ? propFirmTrailingDd : undefined,
-                psychologicalTilt:
-                  psychTilt > 0 && dayStartEquity > 0
-                    ? { windowStartEquityUsd: dayStartEquity, budgetUsd: psychTilt }
-                    : undefined,
-                baseRiskPerTradeUsd: baseR,
-              }) : null;
+              const barriers =
+                baseR > 0
+                  ? distanceToBarriers({
+                      currentEquity,
+                      equityHighWaterMark: equityHwm > 0 ? equityHwm : undefined,
+                      dailyLoss:
+                        dailyLossBudget > 0 && dayStartEquity > 0
+                          ? { windowStartEquityUsd: dayStartEquity, budgetUsd: dailyLossBudget }
+                          : undefined,
+                      propFirmTrailingDdUsd:
+                        propFirmTrailingDd > 0 ? propFirmTrailingDd : undefined,
+                      psychologicalTilt:
+                        psychTilt > 0 && dayStartEquity > 0
+                          ? { windowStartEquityUsd: dayStartEquity, budgetUsd: psychTilt }
+                          : undefined,
+                      baseRiskPerTradeUsd: baseR,
+                    })
+                  : null;
               const trailingWouldBlock = barriers !== null && shouldBlockNewTrades(barriers);
               // The trailing barrier forgives a recover-and-lose-again path, so
               // the inception-referenced fold is evaluated alongside it and the
               // gate is the union: either one blocking blocks.
               // Isolated: a failure in the newer barrier must not swallow the
               // trailing verdict this block already emits.
-              let terminal: import(
-                "../infra/safety/absorbingBarrier.ts"
-              ).AbsorbingBarrierEvaluation | null = null;
+              let terminal:
+                | import("../infra/safety/absorbingBarrier.ts").AbsorbingBarrierEvaluation
+                | null = null;
               try {
                 const { observeSessionEquity } = await import(
                   "../infra/safety/absorbingBarrierState.ts"
@@ -620,8 +633,9 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { sizePosition, classifyPerformanceState } =
-            await import("../infra/trading/ops/pathDependentSizer.ts");
+          const { sizePosition, classifyPerformanceState } = await import(
+            "../infra/trading/ops/pathDependentSizer.ts"
+          );
           {
             const initialRC = Number(process.env.GORDON_INITIAL_RISK_CAPITAL_USD ?? 0);
             const ytdPnL = Number(process.env.GORDON_YTD_PNL_USD ?? 0);
@@ -774,9 +788,7 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { auditRiskBundle } = await import(
-            "../infra/trading/ops/riskBundleAuditor.ts"
-          );
+          const { auditRiskBundle } = await import("../infra/trading/ops/riskBundleAuditor.ts");
           {
             const stopDistance = Math.abs(e.entry - e.stopLoss);
             const result = auditRiskBundle({
@@ -815,8 +827,8 @@ export function createDefaultSubscriptions(
               .split(",")
               .map((s) => s.trim())
               .filter(Boolean) as Array<
-                "index_reconstitution" | "month_end_rebalance" | "vix_spike" | "margin_call_cascade"
-              >;
+              "index_reconstitution" | "month_end_rebalance" | "vix_spike" | "margin_call_cascade"
+            >;
             const vixZ = Number(process.env.GORDON_VIX_ZSCORE ?? "NaN");
             const corrZ = Number(process.env.GORDON_CORRELATION_ZSCORE ?? "NaN");
             const result = classifyMarginalParticipant({
@@ -836,16 +848,18 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { attributeEdge } = await import(
-            "../infra/trading/ops/edgeAttribution.ts"
-          );
+          const { attributeEdge } = await import("../infra/trading/ops/edgeAttribution.ts");
           {
             const edgeType = (process.env.GORDON_EDGE_TYPE ?? "structural") as
-              | "behavioral" | "analytical" | "informational" | "structural";
+              | "behavioral"
+              | "analytical"
+              | "informational"
+              | "structural";
             const result = attributeEdge({
               edgeType,
               counterparty: process.env.GORDON_EDGE_COUNTERPARTY ?? `consensus on ${e.symbol}`,
-              constraint: process.env.GORDON_EDGE_CONSTRAINT ?? "uniformed flow taking the other side",
+              constraint:
+                process.env.GORDON_EDGE_CONSTRAINT ?? "uniformed flow taking the other side",
               edgeArticulation:
                 process.env.GORDON_EDGE_ARTICULATION ??
                 `${e.strategy} setup on ${e.symbol} ${e.direction} entry ${e.entry} stop ${e.stopLoss} target ladder ${e.takeProfits.join("/")} with risk-reward ${e.riskRewardRatio.toFixed(2)}`,
@@ -862,18 +876,21 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { isStreakCircuitBreakerEnabled, evaluateCircuit, shouldBlockTrade } =
-            await import("../infra/trading/ops/streakCircuitBreaker.ts");
+          const { isStreakCircuitBreakerEnabled, evaluateCircuit, shouldBlockTrade } = await import(
+            "../infra/trading/ops/streakCircuitBreaker.ts"
+          );
           if (isStreakCircuitBreakerEnabled()) {
             const fs = await import("node:fs");
-            const { defaultDebriefPath } = await import(
-              "../infra/trading/ops/debriefMatrix.ts"
-            );
+            const { defaultDebriefPath } = await import("../infra/trading/ops/debriefMatrix.ts");
             const path = defaultDebriefPath();
             const recent: Array<"win" | "loss" | "scratch"> = [];
             if (fs.existsSync(path)) {
               const raw = fs.readFileSync(path, "utf8");
-              const lines = raw.split("\n").filter((l) => l.trim()).slice(-10).reverse();
+              const lines = raw
+                .split("\n")
+                .filter((l) => l.trim())
+                .slice(-10)
+                .reverse();
               for (const line of lines) {
                 try {
                   const row = JSON.parse(line) as { pnlUsd?: number };
@@ -930,11 +947,17 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { evaluateRegimeCheck, classifyVolatilityLevel } =
-            await import("../infra/trading/ops/weeklyRegimeCheck.ts");
+          const { evaluateRegimeCheck, classifyVolatilityLevel } = await import(
+            "../infra/trading/ops/weeklyRegimeCheck.ts"
+          );
           {
             const regime = (process.env.GORDON_CURRENT_REGIME ?? "ranging") as
-              | "trending_up" | "trending_down" | "ranging" | "volatile" | "quiet" | "breakout";
+              | "trending_up"
+              | "trending_down"
+              | "ranging"
+              | "volatile"
+              | "quiet"
+              | "breakout";
             const volIndex = Number(process.env.GORDON_VOLATILITY_INDEX ?? 20);
             const volLevel = classifyVolatilityLevel(volIndex);
             const result = evaluateRegimeCheck({ regime, volatility: volLevel });
@@ -951,9 +974,7 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { classifyTrader } = await import(
-            "../infra/trading/ops/traderArchetype.ts"
-          );
+          const { classifyTrader } = await import("../infra/trading/ops/traderArchetype.ts");
           {
             const result = classifyTrader({
               hesitatesAtEntry: process.env.GORDON_TRADER_HESITATES === "1",
@@ -978,9 +999,7 @@ export function createDefaultSubscriptions(
         }
 
         try {
-          const { mapLiquidity } = await import(
-            "../infra/trading/ops/liquidityMapper.ts"
-          );
+          const { mapLiquidity } = await import("../infra/trading/ops/liquidityMapper.ts");
           {
             const stopBuffer = Math.abs(e.entry - e.stopLoss) * 0.1;
             const result = mapLiquidity({
@@ -996,7 +1015,8 @@ export function createDefaultSubscriptions(
                 ...e.takeProfits.map((tp, i) => ({
                   price: tp,
                   kind: (e.direction === "long" ? "resistance" : "support") as
-                    | "support" | "resistance",
+                    | "support"
+                    | "resistance",
                   testCount: 1,
                   label: `target ${i + 1}`,
                 })),
@@ -1060,7 +1080,7 @@ export function createDefaultSubscriptions(
             `Risk/reward: ${e.riskRewardRatio.toFixed(2)}, Position size: ${e.positionSizePct}%. ` +
             `Strategy: ${e.strategy}. Plan ID: ${e.planId}. ` +
             `Review and prepare for execution (requires user approval via ApprovalDialog).`,
-          { planId: e.planId, symbol: e.symbol, trigger: "plan_ready" }
+          { planId: e.planId, symbol: e.symbol, trigger: "plan_ready" },
         );
       },
     },
@@ -1077,7 +1097,7 @@ export function createDefaultSubscriptions(
             `Risk score: ${e.riskScore}, Approved size: ${e.approvedSize}. ` +
             `${e.conditions ? `Conditions: ${e.conditions.join(", ")}. ` : ""}` +
             `The plan is cleared for execution pending user confirmation.`,
-          { planId: e.planId, symbol: e.symbol, trigger: "risk_approved" }
+          { planId: e.planId, symbol: e.symbol, trigger: "risk_approved" },
         );
       },
     },
@@ -1102,7 +1122,7 @@ export function createDefaultSubscriptions(
           "monitor",
           `Price update on ${e.symbol}: ${e.price}. ` +
             `Check if any open positions need attention (stop approaching, target hit, etc.).`,
-          { symbol: e.symbol, price: e.price, trigger: "price_tick" }
+          { symbol: e.symbol, price: e.price, trigger: "price_tick" },
         );
       },
     },
@@ -1119,7 +1139,7 @@ export function createDefaultSubscriptions(
             `Entry: ${e.entryPrice}, Stop: ${e.stopPrice}, Trigger price: ${e.triggerPrice}. ` +
             `PnL: ${e.pnl >= 0 ? "+" : ""}${e.pnl.toFixed(2)} (${e.pnlPercent.toFixed(2)}%). ` +
             `Record this outcome and update portfolio status.`,
-          { symbol: e.symbol, pnl: e.pnl, trigger: "stop_triggered" }
+          { symbol: e.symbol, pnl: e.pnl, trigger: "stop_triggered" },
         );
       },
     },
@@ -1136,7 +1156,7 @@ export function createDefaultSubscriptions(
             `Entry: ${e.entryPrice}, Target: ${e.targetPrice}, Trigger: ${e.triggerPrice}. ` +
             `PnL: +${e.pnl.toFixed(2)} (${e.pnlPercent.toFixed(2)}%). ` +
             `Record this outcome and update portfolio status.`,
-          { symbol: e.symbol, pnl: e.pnl, trigger: "target_reached" }
+          { symbol: e.symbol, pnl: e.pnl, trigger: "target_reached" },
         );
       },
     },
@@ -1153,7 +1173,7 @@ export function createDefaultSubscriptions(
             `totaling $${e.totalLiquidated.toFixed(0)} on the ${e.side} side ` +
             `in ${e.windowSeconds}s. Price impact: ${e.priceImpactPercent.toFixed(2)}%. ` +
             `Check our portfolio exposure and any positions on this pair.`,
-          { symbol: e.symbol, side: e.side, trigger: "liquidation_wave" }
+          { symbol: e.symbol, side: e.side, trigger: "liquidation_wave" },
         );
       },
     },
@@ -1178,13 +1198,11 @@ export function createDefaultSubscriptions(
             `${e.strategy ? `Strategy: ${e.strategy}. ` : ""}` +
             `Held for ${(e.holdDurationMs / 3600000).toFixed(1)} hours. ` +
             `Provide a brief post-trade review with lessons learned.`,
-          { symbol: e.symbol, pnl: e.realizedPnl, reason: e.reason, trigger: "position_closed" }
+          { symbol: e.symbol, pnl: e.realizedPnl, reason: e.reason, trigger: "position_closed" },
         );
 
         try {
-          const { recordDebrief } = await import(
-            "../infra/trading/ops/debriefMatrix.ts"
-          );
+          const { recordDebrief } = await import("../infra/trading/ops/debriefMatrix.ts");
           {
             // Auto-debrief: process_score is high when the close reason is
             // a plan-defined exit (stop_loss, take_profit), low when the
@@ -1249,7 +1267,7 @@ export function createDefaultSubscriptions(
           `Scheduled backtest triggered (job: ${e.jobName}). ` +
             `Run a backtest on ${symbol} using ${strategy} strategy. ` +
             `Compare results with previous runs and flag any degradation.`,
-          { jobId: e.jobId, jobName: e.jobName, trigger: "cron_tick" }
+          { jobId: e.jobId, jobName: e.jobName, trigger: "cron_tick" },
         );
       },
     },
@@ -1264,15 +1282,9 @@ export function createDefaultSubscriptions(
       description: "Aggregate last 24h decisionLog + debriefMatrix + frictionTracker into rollup",
       handler: async () => {
         try {
-          const { buildRollup, formatRollup } = await import(
-            "../infra/trading/ops/dailyRollup.ts"
-          );
-          const { defaultDecisionsLogPath } = await import(
-            "../infra/agents/memory/decisionLog.ts"
-          );
-          const { defaultDebriefPath } = await import(
-            "../infra/trading/ops/debriefMatrix.ts"
-          );
+          const { buildRollup, formatRollup } = await import("../infra/trading/ops/dailyRollup.ts");
+          const { defaultDecisionsLogPath } = await import("../infra/agents/memory/decisionLog.ts");
+          const { defaultDebriefPath } = await import("../infra/trading/ops/debriefMatrix.ts");
           const { defaultFrictionLogPath } = await import(
             "../infra/trading/ops/frictionTracker.ts"
           );
@@ -1325,11 +1337,9 @@ export function getSubscriptionRegistry(): AgentSubscriptionRegistry {
  */
 export function initializeSubscriptions(
   invoker: AgentInvoker,
-  bus?: EventBus
+  bus?: EventBus,
 ): AgentSubscriptionRegistry {
-  const registry = bus
-    ? new AgentSubscriptionRegistry(bus)
-    : getSubscriptionRegistry();
+  const registry = bus ? new AgentSubscriptionRegistry(bus) : getSubscriptionRegistry();
 
   // Set the invoker
   registry.setInvoker(invoker);

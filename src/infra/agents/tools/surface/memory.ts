@@ -51,7 +51,12 @@ interface FlattenedRecord {
   id: string | undefined;
 }
 
-function flatten(results: Array<{ entry: { id?: string; content: string; type: string; createdAt?: string; symbols?: string[] }; score: number }>): FlattenedRecord[] {
+function flatten(
+  results: Array<{
+    entry: { id?: string; content: string; type: string; createdAt?: string; symbols?: string[] };
+    score: number;
+  }>,
+): FlattenedRecord[] {
   return results.map((r) => ({
     id: r.entry.id,
     content: r.entry.content,
@@ -118,7 +123,13 @@ export const memorySearchTool = createTool({
     error: z.string().optional(),
   }),
   execute: async (
-    args: { query: string; scope?: string; limit?: number; asOf?: string; mode?: "standard" | "deep" | "auto" },
+    args: {
+      query: string;
+      scope?: string;
+      limit?: number;
+      asOf?: string;
+      mode?: "standard" | "deep" | "auto";
+    },
     _execContext?: MastraExecutionContext,
   ) => {
     const baseLimit = args.limit ?? 10;
@@ -131,7 +142,12 @@ export const memorySearchTool = createTool({
       // First pass — standard limit unless caller asked for deep upfront.
       const firstLimit = mode === "deep" ? deepLimit : baseLimit;
       const firstRaw = await manager.journal.search(args.query, { limit: firstLimit });
-      const firstFiltered = filterByAsOf(flatten(firstRaw), args.asOf, (r) => r.createdAt, "permissive");
+      const firstFiltered = filterByAsOf(
+        flatten(firstRaw),
+        args.asOf,
+        (r) => r.createdAt,
+        "permissive",
+      );
 
       let merged: FlattenedRecord[] = firstFiltered;
       let expanded = false;
@@ -141,8 +157,16 @@ export const memorySearchTool = createTool({
       // for "deep" (one pass is the contract) or "standard" (no fallback).
       if (mode === "auto" && isThinEvidence(firstFiltered)) {
         const secondRaw = await manager.journal.search(args.query, { limit: deepLimit });
-        const secondFiltered = filterByAsOf(flatten(secondRaw), args.asOf, (r) => r.createdAt, "permissive");
-        merged = mergeAndDedupe(firstFiltered as unknown as Array<Record<string, unknown>>, secondFiltered as unknown as Array<Record<string, unknown>>) as unknown as FlattenedRecord[];
+        const secondFiltered = filterByAsOf(
+          flatten(secondRaw),
+          args.asOf,
+          (r) => r.createdAt,
+          "permissive",
+        );
+        merged = mergeAndDedupe(
+          firstFiltered as unknown as Array<Record<string, unknown>>,
+          secondFiltered as unknown as Array<Record<string, unknown>>,
+        ) as unknown as FlattenedRecord[];
         expanded = merged.length > firstFiltered.length;
       }
 
@@ -276,10 +300,7 @@ export const auditEventTool = createTool({
   inputSchema: z.object({
     action: z.string().min(1).describe("AuditAction — e.g. 'CREATE_PLAN', 'OBSERVATION'."),
     summary: z.string().min(1).describe("One-line operator-readable summary."),
-    parameters: z
-      .record(z.string(), z.unknown())
-      .optional()
-      .describe("Structured event payload."),
+    parameters: z.record(z.string(), z.unknown()).optional().describe("Structured event payload."),
     tradeId: z.string().optional(),
     planId: z.string().optional(),
   }),

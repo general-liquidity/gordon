@@ -68,7 +68,7 @@ export class OrderBlocksStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, 100);
     if (candles.length < 30) {
@@ -100,7 +100,7 @@ export class OrderBlocksStrategy extends BaseStrategy {
 
     if (nearbyOBs.length === 0) {
       return this.notDetected(
-        `Found ${orderBlocks.length} order blocks but none near current price (within ${proximityThreshold.toFixed(2)})`
+        `Found ${orderBlocks.length} order blocks but none near current price (within ${proximityThreshold.toFixed(2)})`,
       );
     }
 
@@ -108,8 +108,10 @@ export class OrderBlocksStrategy extends BaseStrategy {
     const bestOB = nearbyOBs.sort((a, b) => b.impulseStrength - a.impulseStrength)[0]!;
 
     // Check if price is approaching from the right direction
-    const isBullishSetup = bestOB.type === "bullish" && currentPrice >= bestOB.low && currentPrice <= bestOB.high * 1.01;
-    const isBearishSetup = bestOB.type === "bearish" && currentPrice <= bestOB.high && currentPrice >= bestOB.low * 0.99;
+    const isBullishSetup =
+      bestOB.type === "bullish" && currentPrice >= bestOB.low && currentPrice <= bestOB.high * 1.01;
+    const isBearishSetup =
+      bestOB.type === "bearish" && currentPrice <= bestOB.high && currentPrice >= bestOB.low * 0.99;
 
     if (!isBullishSetup && !isBearishSetup) {
       return this.notDetected("Price not approaching order block from correct direction");
@@ -162,7 +164,9 @@ export class OrderBlocksStrategy extends BaseStrategy {
     };
 
     const reasons: string[] = [];
-    reasons.push(`${bestOB.type} order block at ${bestOB.low.toFixed(2)}-${bestOB.high.toFixed(2)}`);
+    reasons.push(
+      `${bestOB.type} order block at ${bestOB.low.toFixed(2)}-${bestOB.high.toFixed(2)}`,
+    );
     reasons.push(`Price in OB zone (impulse strength: ${bestOB.impulseStrength.toFixed(1)}x ATR)`);
     if (nearbyOBs.length >= 2) {
       reasons.push(`${nearbyOBs.length} order blocks clustering at this level`);
@@ -254,10 +258,7 @@ export class OrderBlocksStrategy extends BaseStrategy {
     return slice.reduce((sum, c) => sum + c.volume, 0) / slice.length;
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", 100);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const atr = this.calculateATR(candles);
@@ -270,8 +271,10 @@ export class OrderBlocksStrategy extends BaseStrategy {
 
     const entryPrice = nearbyOB ? (nearbyOB.high + nearbyOB.low) / 2 : currentPrice;
     const stopLoss = nearbyOB
-      ? (nearbyOB.type === "bullish" ? nearbyOB.low - atrVal * 1.5 : nearbyOB.high + atrVal * 1.5)
-      : (currentPrice - atrVal * 2);
+      ? nearbyOB.type === "bullish"
+        ? nearbyOB.low - atrVal * 1.5
+        : nearbyOB.high + atrVal * 1.5
+      : currentPrice - atrVal * 2;
 
     const risk = Math.abs(entryPrice - stopLoss);
     const takeProfits = [
@@ -347,7 +350,7 @@ When creating a plan using the Order Blocks strategy:
     bar: OHLC,
     _index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     const price = bar.close;
     const { rsi14, ema50, atr14, volumeRatio } = indicators;
@@ -441,13 +444,7 @@ When creating a plan using the Order Blocks strategy:
    * Get required indicators for backtesting.
    */
   override getRequiredIndicators(): string[] {
-    return [
-      "ema50",
-      "rsi14",
-      "atr14",
-      "volumeRatio",
-      "volumeAvg20",
-    ];
+    return ["ema50", "rsi14", "atr14", "volumeRatio", "volumeAvg20"];
   }
 }
 

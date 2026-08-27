@@ -67,11 +67,7 @@ export interface NewBeliefOptions {
 }
 
 /** Construct an active belief. */
-export function makeBelief(
-  id: string,
-  statement: string,
-  opts: NewBeliefOptions = {},
-): Belief {
+export function makeBelief(id: string, statement: string, opts: NewBeliefOptions = {}): Belief {
   const belief: Belief = { id, statement, status: "active" };
   if (opts.symbol !== undefined) belief.symbol = opts.symbol;
   if (opts.provenance !== undefined) belief.provenance = opts.provenance;

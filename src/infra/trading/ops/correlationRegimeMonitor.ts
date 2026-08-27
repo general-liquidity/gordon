@@ -105,8 +105,7 @@ export function computeCorrelationMatrix(returns: number[][]): number[][] {
     const series = returns[i]!;
     const mean = series.reduce((s, x) => s + x, 0) / series.length;
     means.push(mean);
-    const variance =
-      series.reduce((s, x) => s + (x - mean) * (x - mean), 0) / series.length;
+    const variance = series.reduce((s, x) => s + (x - mean) * (x - mean), 0) / series.length;
     stds.push(Math.sqrt(variance));
   }
   for (let i = 0; i < n; i++) {

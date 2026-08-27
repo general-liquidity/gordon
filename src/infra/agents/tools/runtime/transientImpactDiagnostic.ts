@@ -30,9 +30,7 @@ export const transientImpactDiagnosticTool = createTool({
       .array(
         z.object({
           time: z.number().describe("Time of the fill (same units as `now`)."),
-          signedSize: z
-            .number()
-            .describe("Signed size: positive = BUY, negative = SELL."),
+          signedSize: z.number().describe("Signed size: positive = BUY, negative = SELL."),
         }),
       )
       .describe("Fill history."),

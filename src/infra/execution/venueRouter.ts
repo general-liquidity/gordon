@@ -76,7 +76,7 @@ export const DEFAULT_TAKER_FEE_BPS: Partial<Record<ExchangeId, number>> = {
   coinbase: 60,
   kraken: 26,
   bitfinex: 20,
-  hyperliquid: 3,   // perps — maker 1 / taker 3.5 default
+  hyperliquid: 3, // perps — maker 1 / taker 3.5 default
   robinhood: 0,
   okx: 10,
   gemini: 40,
@@ -123,13 +123,11 @@ async function quoteForVenue(
   feeOverrides?: Partial<Record<ExchangeId, number>>,
 ): Promise<VenueQuote> {
   const price = await venue.getPrice(intent.symbol);
-  const feeBps = feeOverrides?.[venue.exchangeId]
-    ?? DEFAULT_TAKER_FEE_BPS[venue.exchangeId]
-    ?? FALLBACK_FEE_BPS;
+  const feeBps =
+    feeOverrides?.[venue.exchangeId] ?? DEFAULT_TAKER_FEE_BPS[venue.exchangeId] ?? FALLBACK_FEE_BPS;
   const feeFraction = feeBps / 10_000;
-  const effectivePrice = intent.side === "buy"
-    ? price * (1 + feeFraction)
-    : price * (1 - feeFraction);
+  const effectivePrice =
+    intent.side === "buy" ? price * (1 + feeFraction) : price * (1 - feeFraction);
   const notional = price * intent.quantity;
   const feeCost = notional * feeFraction;
 
@@ -176,9 +174,10 @@ export async function routeOrder(
   if (ranked.length >= 2) {
     const best = ranked[0]!;
     const worst = ranked[ranked.length - 1]!;
-    estimatedSavings = intent.side === "buy"
-      ? (worst.effectivePrice - best.effectivePrice) * intent.quantity
-      : (best.effectivePrice - worst.effectivePrice) * intent.quantity;
+    estimatedSavings =
+      intent.side === "buy"
+        ? (worst.effectivePrice - best.effectivePrice) * intent.quantity
+        : (best.effectivePrice - worst.effectivePrice) * intent.quantity;
   }
 
   return {
@@ -212,7 +211,9 @@ export function formatRecommendation(rec: ExecutionRecommendation): string {
     lines.push(`  Failed: ${rec.failed.map((f) => `${f.venueId} (${f.error})`).join(", ")}`);
   }
   if (rec.estimatedSavings > 0) {
-    lines.push(`  Est. savings routing here vs worst: ${rec.estimatedSavings.toFixed(4)} quote-units`);
+    lines.push(
+      `  Est. savings routing here vs worst: ${rec.estimatedSavings.toFixed(4)} quote-units`,
+    );
   }
   return lines.join("\n");
 }

@@ -100,7 +100,9 @@ function formatBinding(action: BindableAction | undefined): string | undefined {
   if (!binding) return undefined;
   return binding.key
     .split("+")
-    .map((part) => part.length === 1 ? part.toUpperCase() : part[0]!.toUpperCase() + part.slice(1))
+    .map((part) =>
+      part.length === 1 ? part.toUpperCase() : part[0]!.toUpperCase() + part.slice(1),
+    )
     .join("+");
 }
 

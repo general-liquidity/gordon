@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import {
-  HandoffCoordinator,
-  type FilterableMessage,
-} from "./HandoffCoordinator.ts";
+import { HandoffCoordinator, type FilterableMessage } from "./HandoffCoordinator.ts";
 import {
   isNativeSupervisorEnabled,
   shouldBlockDelegation,

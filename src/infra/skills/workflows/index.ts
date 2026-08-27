@@ -34,19 +34,25 @@ const DAILY_OPERATING_LOOP: SkillWorkflowManifest = {
       consumes: [field("watchlist", "array")],
       produces: [
         field("market_regime", "string", { description: "Current top-down regime read" }),
-        field("overnight_events", "array", { description: "Material news / gaps since last close" }),
+        field("overnight_events", "array", {
+          description: "Material news / gaps since last close",
+        }),
       ],
     },
     {
       skillId: "quick-scan",
       consumes: [field("watchlist", "array"), field("market_regime", "string")],
-      produces: [field("scan_candidates", "array", { description: "Symbols passing the scan filters" })],
+      produces: [
+        field("scan_candidates", "array", { description: "Symbols passing the scan filters" }),
+      ],
     },
     {
       skillId: "risk-check",
       consumes: [field("scan_candidates", "array"), field("market_regime", "string")],
       produces: [
-        field("net_exposure_ceiling", "number", { description: "Deployable-capital ceiling for the session" }),
+        field("net_exposure_ceiling", "number", {
+          description: "Deployable-capital ceiling for the session",
+        }),
         field("risk_flags", "array"),
       ],
     },
@@ -77,21 +83,30 @@ const WEEKLY_REVIEW_LOOP: SkillWorkflowManifest = {
     {
       skillId: "exit-review",
       consumes: [field("open_positions", "array")],
-      produces: [field("position_actions", "array", { description: "Hold/trim/close/tighten per position" })],
+      produces: [
+        field("position_actions", "array", { description: "Hold/trim/close/tighten per position" }),
+      ],
     },
     {
       skillId: "trade-performance-coach",
       consumes: [field("closed_trades", "array")],
       produces: [
         field("behavioral_tags", "array", { description: "Recurring behavioral pattern tags" }),
-        field("next_session_operating_rules", "array", { description: "Prescriptive rules for the next session" }),
+        field("next_session_operating_rules", "array", {
+          description: "Prescriptive rules for the next session",
+        }),
       ],
     },
     {
       skillId: "setup-model-book",
-      consumes: [field("closed_trades", "array"), field("behavioral_tags", "array", { required: false })],
+      consumes: [
+        field("closed_trades", "array"),
+        field("behavioral_tags", "array", { required: false }),
+      ],
       produces: [
-        field("cohort_stats", "object", { description: "Per-setup-tag forward-outcome statistics" }),
+        field("cohort_stats", "object", {
+          description: "Per-setup-tag forward-outcome statistics",
+        }),
         field("rule_candidates", "array", { description: "Minted setup rule candidates" }),
       ],
     },

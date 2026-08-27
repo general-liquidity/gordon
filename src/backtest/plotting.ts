@@ -4,7 +4,10 @@
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const asciichart = require("asciichart") as {
-  plot: (series: number[] | number[][], options?: { height?: number; format?: (x: number) => string }) => string;
+  plot: (
+    series: number[] | number[][],
+    options?: { height?: number; format?: (x: number) => string },
+  ) => string;
 };
 import type { OHLC } from "./types.ts";
 
@@ -24,14 +27,17 @@ function downsample(values: number[], maxPoints: number): number[] {
 export function generateBacktestChart(
   ohlcData: OHLC[],
   stats: { equityCurve?: number[] } = {},
-  title: string = "Backtest Result"
+  title: string = "Backtest Result",
 ): { status: "success" | "error"; chart?: string; title?: string; error?: string } {
   try {
     if (ohlcData.length === 0) {
       return { status: "error", error: "No OHLC data provided" };
     }
 
-    const prices = downsample(ohlcData.map((bar) => bar.close), 120);
+    const prices = downsample(
+      ohlcData.map((bar) => bar.close),
+      120,
+    );
     const equity = stats.equityCurve ? downsample(stats.equityCurve, 120) : null;
 
     const series = equity ? [prices, equity] : [prices];

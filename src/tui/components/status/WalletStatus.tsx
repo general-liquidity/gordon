@@ -7,7 +7,6 @@
  * Pattern: Claude Code context panel with grouped key-value data.
  */
 
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 
@@ -59,7 +58,7 @@ function fmtUSD(n: number): string {
 }
 
 function fmtAmount(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
   if (n >= 1) return n.toFixed(4);
   return n.toFixed(6);
@@ -83,7 +82,11 @@ export function WalletStatus({ wallets }: Props) {
   return (
     <Pane title="WALLETS">
       {wallets.map((wallet, i) => (
-        <Box key={`${wallet.chain}-${wallet.address}`} flexDirection="column" marginTop={i > 0 ? 1 : 0}>
+        <Box
+          key={`${wallet.chain}-${wallet.address}`}
+          flexDirection="column"
+          marginTop={i > 0 ? 1 : 0}
+        >
           {/* Wallet header */}
           <Box>
             <Text bold color={chainColor(wallet.chain)}>

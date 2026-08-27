@@ -30,10 +30,7 @@ export type ExpectedReturnRegime =
   | "recovery"
   | "unknown";
 
-export type ValuationMetricType =
-  | "shiller_pe"
-  | "yield_to_maturity"
-  | "operator_supplied";
+export type ValuationMetricType = "shiller_pe" | "yield_to_maturity" | "operator_supplied";
 
 export interface ValuationInput {
   /**
@@ -66,10 +63,10 @@ export interface RegimeAdjustment {
  * (bonds rally in recession, etc.).
  */
 export const DEFAULT_EQUITY_REGIME_ADJUSTMENTS: RegimeAdjustment = {
-  expansion: 1.10,
+  expansion: 1.1,
   late_cycle: 0.85,
-  recession: 0.50,
-  recovery: 1.30,
+  recession: 0.5,
+  recovery: 1.3,
   unknown: 1.0,
 };
 
@@ -117,7 +114,7 @@ export interface ExpectedReturnResult {
 // Internals
 // ============================================================================
 
-const DEFAULT_WEIGHTS = { historical: 0.25, valuation: 0.50, regime: 0.25 };
+const DEFAULT_WEIGHTS = { historical: 0.25, valuation: 0.5, regime: 0.25 };
 const DEFAULT_DIVERGENCE_THRESHOLD = 0.05;
 const DEFAULT_LONG_RUN_CAPE = 17;
 const DEFAULT_EXPECTED_INFLATION = 0.025;
@@ -130,11 +127,11 @@ function mean(values: number[]): number {
   return s / values.length;
 }
 
-function normalizeWeights(w: {
+function normalizeWeights(w: { historical: number; valuation: number; regime: number }): {
   historical: number;
   valuation: number;
   regime: number;
-}): { historical: number; valuation: number; regime: number } {
+} {
   const sum = w.historical + w.valuation + w.regime;
   if (sum <= 0) return DEFAULT_WEIGHTS;
   return {
@@ -178,7 +175,7 @@ function valuationImpliedEstimate(v: ValuationInput): {
 
   // Real return = earnings yield + valuation-change contribution
   const earningsYield = 1 / cape;
-  const valuationChange = Math.pow(longRunMean / cape, 1 / years) - 1;
+  const valuationChange = (longRunMean / cape) ** (1 / years) - 1;
   const realReturn = earningsYield + valuationChange;
   const nominalReturn = realReturn + inflation;
 
@@ -195,9 +192,7 @@ function valuationImpliedEstimate(v: ValuationInput): {
 // Public API
 // ============================================================================
 
-export function estimateExpectedReturn(
-  input: ExpectedReturnInput,
-): ExpectedReturnResult {
+export function estimateExpectedReturn(input: ExpectedReturnInput): ExpectedReturnResult {
   const flags: string[] = [];
 
   // Method 1: historical
@@ -231,8 +226,7 @@ export function estimateExpectedReturn(
   const regimeResult: ExpectedReturnMethodResult = {
     name: "regime_adjusted",
     estimate: regimeEstimate,
-    reasoning:
-      `Historical ${(historicalEstimate * 100).toFixed(2)}% × ${multiplier.toFixed(2)} (${input.regime}) = ${(regimeEstimate * 100).toFixed(2)}%`,
+    reasoning: `Historical ${(historicalEstimate * 100).toFixed(2)}% × ${multiplier.toFixed(2)} (${input.regime}) = ${(regimeEstimate * 100).toFixed(2)}%`,
   };
 
   if (input.regime === "unknown") {

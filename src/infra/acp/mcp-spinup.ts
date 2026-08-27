@@ -104,16 +104,17 @@ export function isPublicNetworkAddress(address: string): boolean {
  * the check-then-connect race of a separate DNS preflight, and mixed
  * public/private responses are refused in full.
  */
-export function createPublicOnlyLookup(
-  resolver: typeof dnsLookup = dnsLookup,
-): LookupFunction {
+export function createPublicOnlyLookup(resolver: typeof dnsLookup = dnsLookup): LookupFunction {
   return ((hostname, options, callback) => {
     resolver(hostname, { ...options, all: true }, (error, addresses) => {
       if (error) {
         callback(error, "", 4);
         return;
       }
-      if (addresses.length === 0 || addresses.some(({ address }) => !isPublicNetworkAddress(address))) {
+      if (
+        addresses.length === 0 ||
+        addresses.some(({ address }) => !isPublicNetworkAddress(address))
+      ) {
         const refusal = Object.assign(
           new Error(`ACP-forwarded MCP hostname ${hostname} resolved to a non-public address`),
           { code: "EACCES" },
@@ -148,7 +149,10 @@ function createGuardedForwardedFetch(headers: Record<string, string>): GuardedTr
     agent ??= new Agent({ connect: { lookup: createPublicOnlyLookup() } });
     return agent;
   };
-  const guardedFetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+  const guardedFetch = async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ): Promise<Response> => {
     const url = new URL(input instanceof Request ? input.url : input.toString());
     if (!isSafeForwardedUrl(url.href)) {
       throw new Error(`ACP-forwarded MCP request refused unsafe URL: ${url.href}`);
@@ -203,7 +207,8 @@ export function acpServerToMastraDefinition(
     headers?: Array<{ name: string; value: string }>;
   };
   const identity = `${peek.type ?? "stdio"}:${peek.url ?? peek.command ?? "server"}`;
-  const name = peek.name ?? `acp-fwd-${createHash("sha256").update(identity).digest("hex").slice(0, 8)}`;
+  const name =
+    peek.name ?? `acp-fwd-${createHash("sha256").update(identity).digest("hex").slice(0, 8)}`;
   const transport = peek.type;
 
   // HTTP / SSE — URL-based remote MCP servers
@@ -245,9 +250,7 @@ export function acpServerToMastraDefinition(
     }
     const cmdError = validatePluginCommand(peek.command, peek.args);
     if (cmdError) {
-      console.warn(
-        `[acp-mcp-spinup] Skipping ACP-forwarded MCP server "${name}": ${cmdError}`,
-      );
+      console.warn(`[acp-mcp-spinup] Skipping ACP-forwarded MCP server "${name}": ${cmdError}`);
       return null;
     }
     const childEnv: Record<string, string> = {};

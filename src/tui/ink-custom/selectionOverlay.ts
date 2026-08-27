@@ -116,8 +116,7 @@ export function createSelectionOverlay(): SelectionOverlay {
           const cell = frame.get(x, y);
           const visualWidth = cell.width === 1 ? 2 : cell.width === 2 ? 0 : 1;
           const selected =
-            cellInRange(x, y, range) ||
-            (visualWidth === 2 && cellInRange(x + 1, y, range));
+            cellInRange(x, y, range) || (visualWidth === 2 && cellInRange(x + 1, y, range));
           if (selected && visualWidth > 0) {
             patches.push({
               x,

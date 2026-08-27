@@ -1,7 +1,4 @@
-import {
-  getPerformanceMonitor,
-  type AttributedFrameKind,
-} from "./performanceMonitor.ts";
+import { getPerformanceMonitor, type AttributedFrameKind } from "./performanceMonitor.ts";
 
 export interface RenderBudget {
   keystrokeMs: number;
@@ -66,28 +63,29 @@ export class BudgetEvaluator {
 
 let activeEvaluator: BudgetEvaluator | null = null;
 
-export function installRenderBudget(opts: {
-  budget?: Partial<RenderBudget>;
-  sink?: BreachSink;
-} = {}): () => void {
+export function installRenderBudget(
+  opts: { budget?: Partial<RenderBudget>; sink?: BreachSink } = {},
+): () => void {
   if (!isRenderBudgetEnabled()) return () => {};
 
   const budget = { ...DEFAULT_RENDER_BUDGET, ...opts.budget };
   let inSink = false;
-  const sink = opts.sink ?? ((breach: BudgetBreach) => {
-    if (inSink) return;
-    inSink = true;
-    try {
-      console.error(
-        `[render-budget] ${breach.kind} frame ${breach.observedMs.toFixed(1)}ms > ${breach.budgetMs}ms budget (${breach.consecutive} consecutive)`,
-      );
-      if (isRenderBudgetStrict()) {
-        throw new Error(`render budget breached: ${breach.kind}`);
+  const sink =
+    opts.sink ??
+    ((breach: BudgetBreach) => {
+      if (inSink) return;
+      inSink = true;
+      try {
+        console.error(
+          `[render-budget] ${breach.kind} frame ${breach.observedMs.toFixed(1)}ms > ${breach.budgetMs}ms budget (${breach.consecutive} consecutive)`,
+        );
+        if (isRenderBudgetStrict()) {
+          throw new Error(`render budget breached: ${breach.kind}`);
+        }
+      } finally {
+        inSink = false;
       }
-    } finally {
-      inSink = false;
-    }
-  });
+    });
   const evaluator = new BudgetEvaluator(budget, sink);
   activeEvaluator = evaluator;
   const unsubscribe = getPerformanceMonitor().onAttributedFrame((kind, durationMs) => {

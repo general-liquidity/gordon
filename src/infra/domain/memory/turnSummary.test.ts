@@ -60,12 +60,8 @@ describe("buildTurnSummary", () => {
   });
 
   it("counts tool calls and picks the dominant tool", () => {
-    const content =
-      'Calling [tool:get_price]; then [tool:get_price]; then [tool:get_chart]';
-    const s = buildTurnSummary(
-      { role: "user", content: "x" },
-      { role: "assistant", content },
-    );
+    const content = "Calling [tool:get_price]; then [tool:get_price]; then [tool:get_chart]";
+    const s = buildTurnSummary({ role: "user", content: "x" }, { role: "assistant", content });
     expect(s.toolCallCount).toBe(3);
     expect(s.dominantTool).toBe("get_price");
   });

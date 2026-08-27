@@ -46,7 +46,10 @@ export class RuntimeStore {
     return this.state;
   }
 
-  setSession(session: RuntimeSessionContext, snapshot?: RuntimeSessionState["session"]["snapshot"]): RuntimeSessionState {
+  setSession(
+    session: RuntimeSessionContext,
+    snapshot?: RuntimeSessionState["session"]["snapshot"],
+  ): RuntimeSessionState {
     return this.patch({
       session: {
         ...session,

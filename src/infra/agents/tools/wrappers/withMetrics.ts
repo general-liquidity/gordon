@@ -18,9 +18,9 @@ import { toStandardSchema, type PublicSchema } from "@mastra/core/schema";
 function getMastraExecutionContext(args: unknown[]): MastraExecutionContext | undefined {
   for (const arg of args) {
     if (
-      arg
-      && typeof arg === "object"
-      && ("requestContext" in arg || "abortSignal" in arg || "tracingContext" in arg)
+      arg &&
+      typeof arg === "object" &&
+      ("requestContext" in arg || "abortSignal" in arg || "tracingContext" in arg)
     ) {
       return arg as MastraExecutionContext;
     }
@@ -87,7 +87,12 @@ export async function evaluateGordonToolAccess(
   if (!policy.allowed) {
     return { status: "blocked", reason: policy.reason };
   }
-  const permission = await getDefaultPermissionEngine().evaluate(toolId, gordonContext, policy, args);
+  const permission = await getDefaultPermissionEngine().evaluate(
+    toolId,
+    gordonContext,
+    policy,
+    args,
+  );
   if (permission.status === "allowed") {
     return { status: "allowed", reason: permission.reason };
   }
@@ -111,7 +116,9 @@ export async function evaluateGordonToolAccess(
  * @param tool - The Mastra tool to wrap
  * @returns A new tool with metrics recording
  */
-export function withToolMetrics<T extends { id: string; execute?: unknown; inputSchema?: unknown }>(tool: T): T {
+export function withToolMetrics<T extends { id: string; execute?: unknown; inputSchema?: unknown }>(
+  tool: T,
+): T {
   // If no execute function, return as-is
   if (typeof tool.execute !== "function") {
     return tool;
@@ -126,150 +133,141 @@ export function withToolMetrics<T extends { id: string; execute?: unknown; input
     const threadId = gordonContext?.threadId ?? "unknown";
     const toolCallId = randomUUID();
 
-    return withSpan(
-      `tool.${tool.id}`,
-      { toolName: tool.id, threadId },
-      async (span) => {
-        try {
-          const prePayload: PreToolUsePayload = {
-            toolName: tool.id,
-            toolCallId,
-            args: args[0],
-          };
-          const preHook = await runHooks("PreToolUse", prePayload);
-          if (preHook.action === "block") {
-            recordToolCall(tool.id, false);
-            span.setStatus("error", preHook.reason ?? "PreToolUse hook blocked execution");
-            return createRuntimeAccessError(
-              tool.id,
-              "blocked",
-              preHook.reason ?? "PreToolUse hook blocked execution.",
-            );
-          }
-          const hookedPrePayload = finalHookPayload(preHook, prePayload);
-          const invocationArgs = [...args];
-          if (invocationArgs.length > 0) {
-            if (tool.inputSchema) {
-              try {
-                const schema = toStandardSchema(tool.inputSchema as PublicSchema<unknown>);
-                const validation = await schema["~standard"].validate(hookedPrePayload.args);
-                if (validation.issues) {
-                  const reason = validation.issues.map((issue) => issue.message).join("; ");
-                  recordToolCall(tool.id, false);
-                  span.setStatus("error", reason);
-                  return createRuntimeAccessError(
-                    tool.id,
-                    "blocked",
-                    `PreToolUse replacement failed input validation: ${reason}`,
-                  );
-                }
-                invocationArgs[0] = validation.value;
-              } catch (error) {
-                const reason = error instanceof Error ? error.message : String(error);
+    return withSpan(`tool.${tool.id}`, { toolName: tool.id, threadId }, async (span) => {
+      try {
+        const prePayload: PreToolUsePayload = {
+          toolName: tool.id,
+          toolCallId,
+          args: args[0],
+        };
+        const preHook = await runHooks("PreToolUse", prePayload);
+        if (preHook.action === "block") {
+          recordToolCall(tool.id, false);
+          span.setStatus("error", preHook.reason ?? "PreToolUse hook blocked execution");
+          return createRuntimeAccessError(
+            tool.id,
+            "blocked",
+            preHook.reason ?? "PreToolUse hook blocked execution.",
+          );
+        }
+        const hookedPrePayload = finalHookPayload(preHook, prePayload);
+        const invocationArgs = [...args];
+        if (invocationArgs.length > 0) {
+          if (tool.inputSchema) {
+            try {
+              const schema = toStandardSchema(tool.inputSchema as PublicSchema<unknown>);
+              const validation = await schema["~standard"].validate(hookedPrePayload.args);
+              if (validation.issues) {
+                const reason = validation.issues.map((issue) => issue.message).join("; ");
                 recordToolCall(tool.id, false);
                 span.setStatus("error", reason);
                 return createRuntimeAccessError(
                   tool.id,
                   "blocked",
-                  `PreToolUse replacement could not be validated: ${reason}`,
+                  `PreToolUse replacement failed input validation: ${reason}`,
                 );
               }
-            } else {
-              invocationArgs[0] = hookedPrePayload.args;
-            }
-          }
-
-          const access = await evaluateGordonToolAccess(
-            tool.id,
-            gordonContext,
-            hookedPrePayload.args,
-          );
-          span.setAttribute("permissionStatus", access.status);
-          if (access.status !== "allowed") {
-            recordToolCall(tool.id, false);
-            span.setStatus("error", access.reason ?? access.status);
-            return createRuntimeAccessError(
-              tool.id,
-              access.status,
-              access.reason,
-              access.requestId,
-            );
-          }
-
-          const startedAt = Date.now();
-          let result: unknown;
-          try {
-            result = await originalExecute.apply(tool, invocationArgs);
-          } catch (error) {
-            // PostToolUse is a lifecycle observation, not merely a successful-
-            // result transformer. Emit it for thrown tool bodies as well so an
-            // audit/compliance hook never loses the failed calls it is meant to
-            // observe. Preserve the original exception after hooks finish.
-            const failedPostHook = await runHooks("PostToolUse", {
-              toolName: tool.id,
-              toolCallId,
-              args: hookedPrePayload.args,
-              result: {
-                error: error instanceof Error ? error.message : String(error),
-              },
-              durationMs: Date.now() - startedAt,
-              success: false,
-            });
-            if (failedPostHook.action === "block") {
-              console.error(
-                `[hooks] PostToolUse blocked after ${tool.id} failed: ${failedPostHook.reason ?? "blocked"}`,
+              invocationArgs[0] = validation.value;
+            } catch (error) {
+              const reason = error instanceof Error ? error.message : String(error);
+              recordToolCall(tool.id, false);
+              span.setStatus("error", reason);
+              return createRuntimeAccessError(
+                tool.id,
+                "blocked",
+                `PreToolUse replacement could not be validated: ${reason}`,
               );
             }
-            throw error;
+          } else {
+            invocationArgs[0] = hookedPrePayload.args;
           }
+        }
 
-          let isError =
-            result &&
-            typeof result === "object" &&
-            result !== null &&
-            "error" in result &&
-            typeof (result as Record<string, unknown>).error === "string";
+        const access = await evaluateGordonToolAccess(
+          tool.id,
+          gordonContext,
+          hookedPrePayload.args,
+        );
+        span.setAttribute("permissionStatus", access.status);
+        if (access.status !== "allowed") {
+          recordToolCall(tool.id, false);
+          span.setStatus("error", access.reason ?? access.status);
+          return createRuntimeAccessError(tool.id, access.status, access.reason, access.requestId);
+        }
 
-          const postPayload: PostToolUsePayload = {
+        const startedAt = Date.now();
+        let result: unknown;
+        try {
+          result = await originalExecute.apply(tool, invocationArgs);
+        } catch (error) {
+          // PostToolUse is a lifecycle observation, not merely a successful-
+          // result transformer. Emit it for thrown tool bodies as well so an
+          // audit/compliance hook never loses the failed calls it is meant to
+          // observe. Preserve the original exception after hooks finish.
+          const failedPostHook = await runHooks("PostToolUse", {
             toolName: tool.id,
             toolCallId,
             args: hookedPrePayload.args,
-            result,
+            result: {
+              error: error instanceof Error ? error.message : String(error),
+            },
             durationMs: Date.now() - startedAt,
-            success: !isError,
-          };
-          const postHook = await runHooks("PostToolUse", postPayload);
-          if (postHook.action === "block") {
-            result = createRuntimeAccessError(
-              tool.id,
-              "blocked",
-              postHook.reason ?? "PostToolUse hook withheld the result.",
-            );
-            isError = true;
-          } else {
-            result = finalHookPayload(postHook, postPayload).result;
-            isError = Boolean(
-              result
-              && typeof result === "object"
-              && "error" in result
-              && typeof (result as Record<string, unknown>).error === "string"
+            success: false,
+          });
+          if (failedPostHook.action === "block") {
+            console.error(
+              `[hooks] PostToolUse blocked after ${tool.id} failed: ${failedPostHook.reason ?? "blocked"}`,
             );
           }
-
-          recordToolCall(tool.id, !isError);
-          span.setAttribute("success", !isError);
-          if (isError) {
-            span.setStatus("error", String((result as Record<string, unknown>).error));
-          }
-
-          return result;
-        } catch (err) {
-          recordToolCall(tool.id, false);
-          span.recordError(err);
-          throw err;
+          throw error;
         }
-      },
-    );
+
+        let isError =
+          result &&
+          typeof result === "object" &&
+          result !== null &&
+          "error" in result &&
+          typeof (result as Record<string, unknown>).error === "string";
+
+        const postPayload: PostToolUsePayload = {
+          toolName: tool.id,
+          toolCallId,
+          args: hookedPrePayload.args,
+          result,
+          durationMs: Date.now() - startedAt,
+          success: !isError,
+        };
+        const postHook = await runHooks("PostToolUse", postPayload);
+        if (postHook.action === "block") {
+          result = createRuntimeAccessError(
+            tool.id,
+            "blocked",
+            postHook.reason ?? "PostToolUse hook withheld the result.",
+          );
+          isError = true;
+        } else {
+          result = finalHookPayload(postHook, postPayload).result;
+          isError = Boolean(
+            result &&
+              typeof result === "object" &&
+              "error" in result &&
+              typeof (result as Record<string, unknown>).error === "string",
+          );
+        }
+
+        recordToolCall(tool.id, !isError);
+        span.setAttribute("success", !isError);
+        if (isError) {
+          span.setStatus("error", String((result as Record<string, unknown>).error));
+        }
+
+        return result;
+      } catch (err) {
+        recordToolCall(tool.id, false);
+        span.recordError(err);
+        throw err;
+      }
+    });
   };
 
   // Return a new tool with the wrapped execute function
@@ -296,9 +294,9 @@ export function withToolMetrics<T extends { id: string; execute?: unknown; input
  * const instrumentedMarketTools = withToolsMetrics(marketTools);
  * ```
  */
-export function withToolsMetrics<T extends Record<string, { id: string; execute?: unknown; inputSchema?: unknown }>>(
-  tools: T
-): T {
+export function withToolsMetrics<
+  T extends Record<string, { id: string; execute?: unknown; inputSchema?: unknown }>,
+>(tools: T): T {
   const wrapped = {} as Record<string, unknown>;
 
   for (const [key, tool] of Object.entries(tools)) {

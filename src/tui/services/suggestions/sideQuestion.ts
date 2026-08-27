@@ -72,9 +72,8 @@ export class SideQuestionManager {
     void emitEvent("agent:elicitation_requested", {
       requestId: id,
       prompt: question,
-      options: options && options.length > 0
-        ? options.map((o) => ({ value: o, label: o }))
-        : undefined,
+      options:
+        options && options.length > 0 ? options.map((o) => ({ value: o, label: o })) : undefined,
       kind: resolvedKind,
     });
 
@@ -129,10 +128,6 @@ export const sideQuestionManager = {
   get instance() {
     return getSideQuestionManager();
   },
-  ask: (
-    question: string,
-    options?: string[],
-    context?: string,
-    kind?: SideQuestionKind,
-  ) => getSideQuestionManager().ask(question, options, context, kind),
+  ask: (question: string, options?: string[], context?: string, kind?: SideQuestionKind) =>
+    getSideQuestionManager().ask(question, options, context, kind),
 };

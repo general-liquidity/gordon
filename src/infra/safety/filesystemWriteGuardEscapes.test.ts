@@ -71,7 +71,10 @@ describe("symlink traversal", () => {
     expect(existsSync(link)).toBe(true);
 
     const throughLink = join(link, "stolen.txt");
-    const result = checkWrite({ path: throughLink }, { mode: "warn", rules: [{ prefix: sandbox }] });
+    const result = checkWrite(
+      { path: throughLink },
+      { mode: "warn", rules: [{ prefix: sandbox }] },
+    );
     expect(result.allowed).toBe(false);
     expect(result.reason).toContain("symlink");
   });

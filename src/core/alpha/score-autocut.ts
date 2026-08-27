@@ -65,8 +65,7 @@ export function selectByScoreDiscontinuity(
   const jumpRatio = options.jumpRatio ?? 0.2;
   const dominanceRatio = options.dominanceRatio ?? 1.5;
   const minKeep = Math.max(1, Math.floor(options.minKeep ?? 1));
-  const maxKeep =
-    options.maxKeep != null ? Math.max(minKeep, Math.floor(options.maxKeep)) : null;
+  const maxKeep = options.maxKeep != null ? Math.max(minKeep, Math.floor(options.maxKeep)) : null;
 
   const sorted = [...items].sort((a, b) => b.score - a.score);
   const n = sorted.length;
@@ -142,6 +141,6 @@ export function selectByScoreDiscontinuity(
     interpretation:
       `cut after rank ${keptCount} — leading cluster of ${keptCount} ` +
       `(gap ${(normalizedGap * 100).toFixed(1)}% of spread, ` +
-      `${Number.isFinite(dominanceX) ? dominanceX.toFixed(1) + "×" : "∞×"} the next gap)`,
+      `${Number.isFinite(dominanceX) ? `${dominanceX.toFixed(1)}×` : "∞×"} the next gap)`,
   };
 }

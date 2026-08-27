@@ -24,13 +24,36 @@ import {
 } from "../../infra/safety/defense/injectionDefense.ts";
 import { isSkillInjectionGuardEnabled } from "../../infra/skills/skillSecurity.ts";
 
-export interface OutputStyle { id: string; name: string; description: string; promptAddendum: string; }
+export interface OutputStyle {
+  id: string;
+  name: string;
+  description: string;
+  promptAddendum: string;
+}
 
 const BUILTIN_STYLES: OutputStyle[] = [
   { id: "default", name: "Default", description: "Standard response format", promptAddendum: "" },
-  { id: "brief", name: "Brief", description: "Just fills, P&L, and key numbers. No prose.", promptAddendum: "Be extremely concise. Only output numbers, prices, and key metrics. No explanations." },
-  { id: "detailed", name: "Detailed", description: "Full reasoning, indicator values, confidence scores", promptAddendum: "Provide detailed analysis with all indicator values, reasoning chain, and confidence scores." },
-  { id: "risk-focused", name: "Risk-Focused", description: "Emphasizes risk metrics in every response", promptAddendum: "Always lead with risk assessment. Show position sizing, stop distances, max loss, drawdown, and correlation exposure." },
+  {
+    id: "brief",
+    name: "Brief",
+    description: "Just fills, P&L, and key numbers. No prose.",
+    promptAddendum:
+      "Be extremely concise. Only output numbers, prices, and key metrics. No explanations.",
+  },
+  {
+    id: "detailed",
+    name: "Detailed",
+    description: "Full reasoning, indicator values, confidence scores",
+    promptAddendum:
+      "Provide detailed analysis with all indicator values, reasoning chain, and confidence scores.",
+  },
+  {
+    id: "risk-focused",
+    name: "Risk-Focused",
+    description: "Emphasizes risk metrics in every response",
+    promptAddendum:
+      "Always lead with risk assessment. Show position sizing, stop distances, max loss, drawdown, and correlation exposure.",
+  },
 ];
 
 /** Same cap the skill loader applies — bounds memory + token cost per file. */
@@ -49,22 +72,29 @@ function userStylesDir(): string {
 function loadStyleFromFile(filePath: string): OutputStyle | null {
   try {
     let size: number | undefined;
-    try { size = statSync(filePath).size; } catch { /* fall through */ }
+    try {
+      size = statSync(filePath).size;
+    } catch {
+      /* fall through */
+    }
     if (size !== undefined && size > MAX_STYLE_FILE_SIZE) return null;
 
     const raw = readFileSync(filePath, "utf-8");
     const { frontmatter, body } = parseFrontmatter(raw);
 
     const fileBase = basename(filePath).replace(/\.md$/i, "");
-    const name = typeof frontmatter.name === "string" && frontmatter.name.trim()
-      ? frontmatter.name.trim()
-      : fileBase;
-    const id = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const name =
+      typeof frontmatter.name === "string" && frontmatter.name.trim()
+        ? frontmatter.name.trim()
+        : fileBase;
+    const id = name
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
     if (!id || !ID_PATTERN.test(id)) return null;
 
-    const rawDescription = typeof frontmatter.description === "string"
-      ? frontmatter.description.trim()
-      : "";
+    const rawDescription =
+      typeof frontmatter.description === "string" ? frontmatter.description.trim() : "";
     const addendum = body.trim();
     if (!addendum) return null; // a persona with no style instruction is useless
 
@@ -93,7 +123,11 @@ function loadUserStyles(): OutputStyle[] {
     for (const entry of readdirSync(dir)) {
       if (!/\.md$/i.test(entry)) continue;
       const filePath = join(dir, entry);
-      try { if (!statSync(filePath).isFile()) continue; } catch { continue; }
+      try {
+        if (!statSync(filePath).isFile()) continue;
+      } catch {
+        continue;
+      }
       const style = loadStyleFromFile(filePath);
       if (style) styles.push(style);
     }
@@ -132,7 +166,13 @@ export class OutputStyleManager {
     this.styles = loadAllStyles();
   }
 
-  listStyles(): OutputStyle[] { return this.styles; }
-  getActive(): OutputStyle { return this.styles.find((s) => s.id === activeId) ?? this.styles[0]!; }
-  setActive(styleId: string): void { if (this.styles.some((s) => s.id === styleId)) activeId = styleId; }
+  listStyles(): OutputStyle[] {
+    return this.styles;
+  }
+  getActive(): OutputStyle {
+    return this.styles.find((s) => s.id === activeId) ?? this.styles[0]!;
+  }
+  setActive(styleId: string): void {
+    if (this.styles.some((s) => s.id === styleId)) activeId = styleId;
+  }
 }

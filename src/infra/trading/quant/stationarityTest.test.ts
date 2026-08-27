@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  runAdfTest,
-  adfToPayload,
-} from "./stationarityTest.ts";
+import { runAdfTest, adfToPayload } from "./stationarityTest.ts";
 
 function lcg(seed: number) {
   let s = seed;

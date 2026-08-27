@@ -8,7 +8,9 @@ export interface ActiveSessionContextInput {
   resourceId?: string;
 }
 
-export function createRuntimeSessionContext(input: ActiveSessionContextInput): RuntimeSessionContext {
+export function createRuntimeSessionContext(
+  input: ActiveSessionContextInput,
+): RuntimeSessionContext {
   return {
     runtimeId: input.runtimeId,
     sessionId: input.sessionId,

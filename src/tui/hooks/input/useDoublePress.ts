@@ -25,9 +25,7 @@ export interface DoublePressResult {
   reset: () => void;
 }
 
-export function useDoublePress(
-  timeoutMs: number = DEFAULT_TIMEOUT_MS,
-): DoublePressResult {
+export function useDoublePress(timeoutMs: number = DEFAULT_TIMEOUT_MS): DoublePressResult {
   const [isPending, setIsPending] = useState(false);
   const [isDoublePressed, setIsDoublePressed] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

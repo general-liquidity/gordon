@@ -7,7 +7,6 @@
  * Pattern: Claude Code task progress panel with real-time metrics.
  */
 
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 import { ProgressBar } from "../../design-system/ProgressBar.js";
@@ -80,9 +79,13 @@ export function AlgoExecutionProgress({
     <Pane title={`${algo} EXECUTION`} color={color}>
       {/* Status line */}
       <Box>
-        <Text color={color}>{statusIcon(status)} {status.toUpperCase()}</Text>
+        <Text color={color}>
+          {statusIcon(status)} {status.toUpperCase()}
+        </Text>
         <Text dimColor> {"\u00b7"} </Text>
-        <Text bold color={color}>{algo}</Text>
+        <Text bold color={color}>
+          {algo}
+        </Text>
         <Text dimColor> {"\u00b7"} </Text>
         <Text dimColor>{elapsed}</Text>
       </Box>

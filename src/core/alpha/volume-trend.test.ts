@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  analyzeVolumeTrend,
-  formatVolumeTrend,
-  type VolumeTrendCandle,
-} from "./volume-trend.ts";
+import { analyzeVolumeTrend, formatVolumeTrend, type VolumeTrendCandle } from "./volume-trend.ts";
 
 function makeCandles(volumes: number[], price = 100): VolumeTrendCandle[] {
   return volumes.map((v) => ({ close: price, volume: v }));
@@ -54,7 +50,7 @@ describe("analyzeVolumeTrend", () => {
     let v = 10000;
     for (let i = 0; i < 20; i++) {
       vols.push(v);
-      v *= 0.80;
+      v *= 0.8;
     }
     const r = analyzeVolumeTrend(makeCandles(vols));
     expect(r.direction).toBe("decreasing");

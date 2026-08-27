@@ -1,7 +1,14 @@
 import type { SessionRuntime } from "../../runtime/index.ts";
-import type { RuntimeApprovalRequest, RuntimeBridgeSession, RuntimeTranscriptEntry } from "../../runtime/contracts/types.ts";
+import type {
+  RuntimeApprovalRequest,
+  RuntimeBridgeSession,
+  RuntimeTranscriptEntry,
+} from "../../runtime/contracts/types.ts";
 import type { RuntimeSessionState } from "../../runtime/state/SessionState.ts";
-import type { HandoffArtifact, WorkerScratchpadEntry } from "../../runtime/workers/HandoffArtifact.ts";
+import type {
+  HandoffArtifact,
+  WorkerScratchpadEntry,
+} from "../../runtime/workers/HandoffArtifact.ts";
 import { getRuntimeApprovalShortId } from "../runtime/runtimeApprovalId.ts";
 
 export interface RuntimeInspectorViewModel {
@@ -55,10 +62,12 @@ export function createRuntimeInspectorViewModel(
   const handoffs = runtime.getHandoffArtifacts();
 
   const hasActionableRail =
-    state.approvals.pending.length > 0
-    || state.background.tasks.length > 0
-    || state.bridge.active.length > 0
-    || state.tooling.plugins.some((plugin) => plugin.attentionLevel && plugin.attentionLevel !== "none");
+    state.approvals.pending.length > 0 ||
+    state.background.tasks.length > 0 ||
+    state.bridge.active.length > 0 ||
+    state.tooling.plugins.some(
+      (plugin) => plugin.attentionLevel && plugin.attentionLevel !== "none",
+    );
 
   return {
     sessionId: state.session.sessionId,
@@ -73,10 +82,15 @@ export function createRuntimeInspectorViewModel(
     approvalRuleCount: state.approvals.rules.length,
     pendingApprovals: state.approvals.pending.slice(0, maxItems),
     pluginCount: state.tooling.plugins.length,
-    degradedPluginCount: state.tooling.plugins.filter((plugin) => plugin.status === "degraded").length,
-    reloadRecommendedCount: state.tooling.plugins.filter((plugin) => plugin.reloadRecommended).length,
-    routedPluginCount: state.tooling.plugins.filter((plugin) => plugin.lifecycle === "routed").length,
-    pluginAttentionCount: state.tooling.plugins.filter((plugin) => plugin.attentionLevel && plugin.attentionLevel !== "none").length,
+    degradedPluginCount: state.tooling.plugins.filter((plugin) => plugin.status === "degraded")
+      .length,
+    reloadRecommendedCount: state.tooling.plugins.filter((plugin) => plugin.reloadRecommended)
+      .length,
+    routedPluginCount: state.tooling.plugins.filter((plugin) => plugin.lifecycle === "routed")
+      .length,
+    pluginAttentionCount: state.tooling.plugins.filter(
+      (plugin) => plugin.attentionLevel && plugin.attentionLevel !== "none",
+    ).length,
     mcpServerCount: state.tooling.mcpServers.length,
     registeredToolCount: runtime.getRegisteredTools().length,
     commandCount: state.tooling.commands.length,
@@ -140,7 +154,9 @@ export function formatRuntimeInspectorSummary(viewModel: RuntimeInspectorViewMod
   if (viewModel.recentApprovals.length > 0) {
     lines.push("", "**Recent approvals**");
     for (const approval of viewModel.recentApprovals) {
-      lines.push(`- ${approval.status} · ${approval.toolName}${approval.actor ? ` · ${approval.actor}` : ""}`);
+      lines.push(
+        `- ${approval.status} · ${approval.toolName}${approval.actor ? ` · ${approval.actor}` : ""}`,
+      );
     }
   }
 

@@ -19,11 +19,7 @@
  */
 
 import type { z, ZodType } from "zod";
-import type {
-  HookDefinition,
-  HookResult,
-  PostToolUsePayload,
-} from "./types.ts";
+import type { HookDefinition, HookResult, PostToolUsePayload } from "./types.ts";
 
 export interface StructuredValidationOk<T> {
   ok: true;
@@ -37,9 +33,7 @@ export interface StructuredValidationFail {
   reprompt: string;
 }
 
-export type StructuredValidationResult<T> =
-  | StructuredValidationOk<T>
-  | StructuredValidationFail;
+export type StructuredValidationResult<T> = StructuredValidationOk<T> | StructuredValidationFail;
 
 function formatIssues(error: z.ZodError): string[] {
   return error.issues.map((i) => {
@@ -95,10 +89,7 @@ export interface CreatePostToolOutputHookOptions<T> {
    */
   repromptInsteadOfBlock?: boolean;
   /** Optional observer for structured failures (for telemetry). */
-  onFailure?: (
-    payload: PostToolUsePayload,
-    result: StructuredValidationFail,
-  ) => void;
+  onFailure?: (payload: PostToolUsePayload, result: StructuredValidationFail) => void;
 }
 
 export function createPostToolOutputSchemaHook<T>(
@@ -155,10 +146,7 @@ export interface CreatePreToolInputHookOptions<T> {
   extract?: (args: unknown) => unknown;
   priority?: number;
   source?: HookDefinition["source"];
-  onFailure?: (
-    args: unknown,
-    result: StructuredValidationFail,
-  ) => void;
+  onFailure?: (args: unknown, result: StructuredValidationFail) => void;
 }
 
 /**

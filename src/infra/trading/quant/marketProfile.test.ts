@@ -1,9 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeMarketProfile,
-  marketProfileToPayload,
-  type ProfileBar,
-} from "./marketProfile.ts";
+import { computeMarketProfile, marketProfileToPayload, type ProfileBar } from "./marketProfile.ts";
 
 function bars(samples: Array<[number, number, number]>): ProfileBar[] {
   return samples.map(([t, low, high]) => ({ timestamp: t, low, high }));

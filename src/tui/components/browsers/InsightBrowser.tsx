@@ -7,7 +7,7 @@
  * Pattern: Claude Code knowledge browser with category filtering.
  */
 
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Box, Text } from "../../ink-custom";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { Pane } from "../../design-system/Pane.js";
@@ -76,23 +76,33 @@ export function InsightBrowser({ insights, onClose }: Props) {
     return insights.filter((ins) => ins.category.toLowerCase() === activeTab);
   }, [insights, activeTab]);
 
-  useRoutedInput((_input, key) => {
-    if (key.escape) {
-      onClose();
-      return;
-    }
-    if (key.upArrow) {
-      setCursor((c) => Math.max(0, c - 1));
-      return;
-    }
-    if (key.downArrow) {
-      setCursor((c) => Math.min(filtered.length - 1, c + 1));
-    }
-  }, { id: "insightBrowser", priority: FOCUS_PRIORITY.DIALOG });
+  useRoutedInput(
+    (_input, key) => {
+      if (key.escape) {
+        onClose();
+        return;
+      }
+      if (key.upArrow) {
+        setCursor((c) => Math.max(0, c - 1));
+        return;
+      }
+      if (key.downArrow) {
+        setCursor((c) => Math.min(filtered.length - 1, c + 1));
+      }
+    },
+    { id: "insightBrowser", priority: FOCUS_PRIORITY.DIALOG },
+  );
 
   return (
     <Pane title="TRADING INSIGHTS">
-      <Tabs tabs={CATEGORY_TABS} activeKey={activeTab} onChange={(key) => { setActiveTab(key); setCursor(0); }}>
+      <Tabs
+        tabs={CATEGORY_TABS}
+        activeKey={activeTab}
+        onChange={(key) => {
+          setActiveTab(key);
+          setCursor(0);
+        }}
+      >
         <Box>
           <Text dimColor>({filtered.length} insights)</Text>
         </Box>
@@ -122,11 +132,8 @@ export function InsightBrowser({ insights, onClose }: Props) {
                   </Box>
                   <Box paddingLeft={4}>
                     <Text dimColor>
-                      {ins.sourceTradeIds.length} source{ins.sourceTradeIds.length !== 1 ? "s" : ""}
-                      {" "}{"\u00b7"}{" "}
-                      {formatDate(ins.createdAt)}
-                      {" "}{"\u00b7"}{" "}
-                      {ins.category}
+                      {ins.sourceTradeIds.length} source{ins.sourceTradeIds.length !== 1 ? "s" : ""}{" "}
+                      {"\u00b7"} {formatDate(ins.createdAt)} {"\u00b7"} {ins.category}
                     </Text>
                   </Box>
                 </Box>

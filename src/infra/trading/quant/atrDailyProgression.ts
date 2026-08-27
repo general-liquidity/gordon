@@ -35,13 +35,13 @@ export interface AtrProgressionInput {
 }
 
 export type AtrProgressionZone =
-  | "low"        // <25%
-  | "moderate"   // 25–50%
-  | "active"     // 50–75%
-  | "high"       // 75–90%
-  | "warning"    // 90–100%
-  | "exceeded"   // 100–150%
-  | "extreme";   // >150%
+  | "low" // <25%
+  | "moderate" // 25–50%
+  | "active" // 50–75%
+  | "high" // 75–90%
+  | "warning" // 90–100%
+  | "exceeded" // 100–150%
+  | "extreme"; // >150%
 
 export type AtrProgressionAction = "continue" | "caution" | "avoid";
 
@@ -119,10 +119,7 @@ export function computeAtrProgression(input: AtrProgressionInput): AtrProgressio
   }
 
   // Group candles into days by boundary-shifted UTC day index.
-  const byDay = new Map<
-    number,
-    { high: number; low: number; close: number; lastTs: number }
-  >();
+  const byDay = new Map<number, { high: number; low: number; close: number; lastTs: number }>();
   for (const c of candles) {
     const k = dayKey(c.timestamp, boundary);
     const prior = byDay.get(k);
@@ -174,9 +171,7 @@ export function computeAtrProgression(input: AtrProgressionInput): AtrProgressio
   }
 
   const window = trs.slice(-lookback);
-  const dailyAtr = window.length > 0
-    ? window.reduce((a, b) => a + b, 0) / window.length
-    : 0;
+  const dailyAtr = window.length > 0 ? window.reduce((a, b) => a + b, 0) / window.length : 0;
 
   const todayHigh = todayEntry.high;
   const todayLow = todayEntry.low;

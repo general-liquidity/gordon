@@ -68,10 +68,7 @@ export function calculateEMA(data: number[], period: number): EMAResult {
 /**
  * Calculate multiple EMAs and determine alignment
  */
-export function calculateMultiEMA(
-  closes: number[],
-  currentPrice: number
-): MultiEMAResult {
+export function calculateMultiEMA(closes: number[], currentPrice: number): MultiEMAResult {
   const ema9 = calculateEMA(closes, 9);
   const ema20 = calculateEMA(closes, 20);
   const ema50 = calculateEMA(closes, 50);
@@ -97,11 +94,19 @@ export function calculateMultiEMA(
   let pricePosition: "above_all" | "below_all" | "mixed" = "mixed";
 
   if (ema9Val && ema20Val && ema50Val && ema200Val) {
-    if (currentPrice > ema9Val && currentPrice > ema20Val &&
-        currentPrice > ema50Val && currentPrice > ema200Val) {
+    if (
+      currentPrice > ema9Val &&
+      currentPrice > ema20Val &&
+      currentPrice > ema50Val &&
+      currentPrice > ema200Val
+    ) {
       pricePosition = "above_all";
-    } else if (currentPrice < ema9Val && currentPrice < ema20Val &&
-               currentPrice < ema50Val && currentPrice < ema200Val) {
+    } else if (
+      currentPrice < ema9Val &&
+      currentPrice < ema20Val &&
+      currentPrice < ema50Val &&
+      currentPrice < ema200Val
+    ) {
       pricePosition = "below_all";
     }
   }

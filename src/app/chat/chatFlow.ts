@@ -70,8 +70,7 @@ export function shouldShowInlineQuickActions(input: {
   value: string;
   hasConversationMomentum: boolean;
 }): boolean {
-  return !input.disabled
-    && !input.busy
-    && input.value.trim() === ""
-    && !input.hasConversationMomentum;
+  return (
+    !input.disabled && !input.busy && input.value.trim() === "" && !input.hasConversationMomentum
+  );
 }

@@ -22,13 +22,25 @@ const ALL_FRAMES = [...FRAMES, ...[...FRAMES].reverse()];
 // row read at the same brightness.
 const MUTED = "rgb(150,150,150)";
 
-const TRADING_VERBS = [
-  "Scanning markets", "Analyzing charts", "Computing risk",
-  "Building position", "Checking correlation", "Running backtest",
-  "Evaluating setup", "Sizing position", "Checking constitution",
-  "Classifying risk", "Querying orderbook", "Evaluating momentum",
-  "Assessing volatility", "Computing exposure", "Modeling scenarios",
-  "Reviewing signals", "Processing data", "Synthesizing analysis",
+const _TRADING_VERBS = [
+  "Scanning markets",
+  "Analyzing charts",
+  "Computing risk",
+  "Building position",
+  "Checking correlation",
+  "Running backtest",
+  "Evaluating setup",
+  "Sizing position",
+  "Checking constitution",
+  "Classifying risk",
+  "Querying orderbook",
+  "Evaluating momentum",
+  "Assessing volatility",
+  "Computing exposure",
+  "Modeling scenarios",
+  "Reviewing signals",
+  "Processing data",
+  "Synthesizing analysis",
 ];
 
 // Rotating hint shown under the spinner (Claude Code's `⎿ Tip:` line, adapted
@@ -101,7 +113,8 @@ function inferVerbFromInput(input?: string): string | null {
 // Map tool name patterns to contextual verbs — covers all ~300 tools
 function getToolVerb(toolName: string): string | null {
   // Price & market data
-  if (/get_price|fetch_price|pyth.*price|chainlink.*price|book_ticker/i.test(toolName)) return "Fetching price";
+  if (/get_price|fetch_price|pyth.*price|chainlink.*price|book_ticker/i.test(toolName))
+    return "Fetching price";
   if (/get_candles|candlestick/i.test(toolName)) return "Loading charts";
   if (/order_book|tick_liquidity/i.test(toolName)) return "Checking liquidity";
   if (/get_spread/i.test(toolName)) return "Checking spread";
@@ -115,19 +128,23 @@ function getToolVerb(toolName: string): string | null {
   if (/ichimoku/i.test(toolName)) return "Computing Ichimoku";
   if (/supertrend/i.test(toolName)) return "Computing Supertrend";
   if (/vwap/i.test(toolName)) return "Computing VWAP";
-  if (/atr|adx|parabolic|bollinger|squeeze|linear_regression/i.test(toolName)) return "Computing indicators";
+  if (/atr|adx|parabolic|bollinger|squeeze|linear_regression/i.test(toolName))
+    return "Computing indicators";
   if (/technical_analysis|technical_signals/i.test(toolName)) return "Running technical analysis";
-  if (/divergence|fvg|supply_demand|camarilla|angled_market/i.test(toolName)) return "Analyzing structure";
+  if (/divergence|fvg|supply_demand|camarilla|angled_market/i.test(toolName))
+    return "Analyzing structure";
 
   // Scanning & discovery
-  if (/scan_market|scan_breakout|scan_for_strategy|scan_with_ensemble/i.test(toolName)) return "Scanning markets";
+  if (/scan_market|scan_breakout|scan_for_strategy|scan_with_ensemble/i.test(toolName))
+    return "Scanning markets";
   if (/scan_base|scan_.*volume|scan_.*whale/i.test(toolName)) return "Scanning on-chain";
   if (/parallel_scan|parallel_multi/i.test(toolName)) return "Running parallel scan";
   if (/score_market|detect_consolidation/i.test(toolName)) return "Scoring market";
 
   // Risk & sizing
   if (/classify.*risk|assess.*risk|check_risk|get_risk/i.test(toolName)) return "Assessing risk";
-  if (/position_size|kelly_size|volatility_adjusted/i.test(toolName)) return "Computing position size";
+  if (/position_size|kelly_size|volatility_adjusted/i.test(toolName))
+    return "Computing position size";
   if (/drawdown|cascade_risk|crowding/i.test(toolName)) return "Checking drawdown risk";
   if (/check_daily_limit|check_exit/i.test(toolName)) return "Checking limits";
   if (/portfolio_health|portfolio_drift/i.test(toolName)) return "Checking portfolio health";
@@ -153,7 +170,8 @@ function getToolVerb(toolName: string): string | null {
   if (/get_portfolio|portfolio_state/i.test(toolName)) return "Loading portfolio";
   if (/get_balance|get_user_assets/i.test(toolName)) return "Checking balance";
   if (/get_account|account_details|account_snapshot/i.test(toolName)) return "Loading account";
-  if (/get_positions|list_active_positions|check_positions/i.test(toolName)) return "Loading positions";
+  if (/get_positions|list_active_positions|check_positions/i.test(toolName))
+    return "Loading positions";
   if (/trade_history|order_history/i.test(toolName)) return "Loading history";
   if (/trade_fees|trade_statistics/i.test(toolName)) return "Loading trade stats";
   if (/wallet_balance|token_balance/i.test(toolName)) return "Checking wallet";
@@ -165,10 +183,13 @@ function getToolVerb(toolName: string): string | null {
   if (/compare_backtest|compare_live/i.test(toolName)) return "Comparing results";
   if (/monte_carlo/i.test(toolName)) return "Running Monte Carlo";
   if (/optimize_strategy|grid_search|random_search/i.test(toolName)) return "Optimizing strategy";
-  if (/strategy_generate|suggest_strategy|suggest_mutation/i.test(toolName)) return "Generating strategy";
+  if (/strategy_generate|suggest_strategy|suggest_mutation/i.test(toolName))
+    return "Generating strategy";
   if (/strategy_iterate|strategy_explain/i.test(toolName)) return "Refining strategy";
-  if (/find_best_strategy|get_best_strategy|rank_strategies/i.test(toolName)) return "Ranking strategies";
-  if (/deploy_strategy|start_.*strategy|resume_strategy/i.test(toolName)) return "Deploying strategy";
+  if (/find_best_strategy|get_best_strategy|rank_strategies/i.test(toolName))
+    return "Ranking strategies";
+  if (/deploy_strategy|start_.*strategy|resume_strategy/i.test(toolName))
+    return "Deploying strategy";
   if (/stop_strategy|pause_strategy/i.test(toolName)) return "Stopping strategy";
   if (/sandbox|create_sandbox|compare_sandbox/i.test(toolName)) return "Testing in sandbox";
   if (/playbook|fork_playbook|rank_playbook/i.test(toolName)) return "Loading playbook";
@@ -200,7 +221,8 @@ function getToolVerb(toolName: string): string | null {
   if (/list_proactive_suggestions/i.test(toolName)) return "Loading suggestions";
   if (/accept_proactive_suggestion/i.test(toolName)) return "Accepting suggestion";
   if (/dismiss_proactive_suggestion/i.test(toolName)) return "Dismissing suggestion";
-  if (/suppress_proactive_category|unsuppress_proactive_category/i.test(toolName)) return "Updating suppression";
+  if (/suppress_proactive_category|unsuppress_proactive_category/i.test(toolName))
+    return "Updating suppression";
   if (/get_proactive_stats/i.test(toolName)) return "Computing proactive stats";
   if (/fire_proactive_suggestion/i.test(toolName)) return "Firing suggestion";
   if (/configure_proactive_category/i.test(toolName)) return "Tuning proactive policy";
@@ -307,13 +329,13 @@ function getToolVerb(toolName: string): string | null {
   if (/debank/i.test(toolName)) return "Querying DeBank";
   if (/token_holder|wallet_intel|smart_money/i.test(toolName)) return "Fetching wallet intel";
 
-
-
   // Memory & system
-  if (/memory|record_insight|record_observation|search_memory/i.test(toolName)) return "Searching memory";
+  if (/memory|record_insight|record_observation|search_memory/i.test(toolName))
+    return "Searching memory";
   if (/audit|decision_path|agent_activity/i.test(toolName)) return "Querying audit trail";
   if (/explain/i.test(toolName)) return "Explaining";
-  if (/autonomous|start_autonomous|stop_autonomous/i.test(toolName)) return "Managing autonomous mode";
+  if (/autonomous|start_autonomous|stop_autonomous/i.test(toolName))
+    return "Managing autonomous mode";
   if (/background_scanning/i.test(toolName)) return "Managing scanner";
   if (/circuit_breaker/i.test(toolName)) return "Checking circuit breaker";
   if (/permission_mode/i.test(toolName)) return "Changing permissions";
@@ -333,13 +355,23 @@ function getToolVerb(toolName: string): string | null {
 
   // Plans & approvals
   if (/create_plan|list_plans/i.test(toolName)) return "Managing plan";
-  if (/approve_plan|approve_position|approve_strategy/i.test(toolName)) return "Processing approval";
+  if (/approve_plan|approve_position|approve_strategy/i.test(toolName))
+    return "Processing approval";
   if (/reject_position|review_position/i.test(toolName)) return "Reviewing position";
 
   return null;
 }
 
-export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInput, activeToolName, contextBudgetRatio, agents, showHint = true }: Props) {
+export function TradingSpinner({
+  agentName,
+  elapsedMs,
+  streamLength = 0,
+  userInput,
+  activeToolName,
+  contextBudgetRatio,
+  agents,
+  showHint = true,
+}: Props) {
   // Progressive width gating: hide elements that don't fit
   const cols = process.stdout.columns ?? 80;
   // Token counter (smooth animation via ref)
@@ -347,14 +379,16 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
   const estimatedTokens = Math.floor(streamLength / 4); // ~4 chars per token
   // Verb priority: active tool > user input inference > agent name > generic
   // Memoized — regex runs only when inputs change, not every 50ms render
-  const verb = useMemo(() =>
-    (activeToolName && getToolVerb(activeToolName))
-    ?? inferVerbFromInput(userInput)
-    ?? (agentName && AGENT_VERBS[agentName] ? AGENT_VERBS[agentName]! : "Thinking"),
+  const verb = useMemo(
+    () =>
+      (activeToolName && getToolVerb(activeToolName)) ??
+      inferVerbFromInput(userInput) ??
+      (agentName && AGENT_VERBS[agentName] ? AGENT_VERBS[agentName]! : "Thinking"),
     [activeToolName, userInput, agentName],
   );
 
-  const reducedMotion = typeof process !== "undefined" && process.env.GORDON_REDUCED_MOTION === "true";
+  const reducedMotion =
+    typeof process !== "undefined" && process.env.GORDON_REDUCED_MOTION === "true";
 
   // Stall detection — refs only, no state (no extra render needed)
   const lastLengthRef = useRef(streamLength);
@@ -373,9 +407,7 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
   const clockFrame = useAnimationClock(reducedMotion ? 1000 : 16);
 
   // Derive all animation state directly from clockFrame — no useEffect, no double-render
-  const frame = reducedMotion
-    ? clockFrame % 2
-    : Math.floor(clockFrame / 9) % ALL_FRAMES.length;
+  const frame = reducedMotion ? clockFrame % 2 : Math.floor(clockFrame / 9) % ALL_FRAMES.length;
   const verbLen = verb.length + 4;
   const glimmerIndex = Math.floor(clockFrame / 9) % verbLen;
   const timeSinceGrowth = Date.now() - lastGrowthRef.current;
@@ -388,15 +420,15 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
   const stallIntensity = stallRef.current;
 
   const char = reducedMotion
-    ? (frame % 2 === 0 ? "\u25CF" : " ")
+    ? frame % 2 === 0
+      ? "\u25CF"
+      : " "
     : (ALL_FRAMES[Math.floor(frame / 2.4) % ALL_FRAMES.length] ?? "\u00B7");
   const isStalled = stallIntensity > 0.3;
   // Match Claude Code's formatDuration: "5s" / "1m 23s" / "2h 15m" so
   // long-running operations don't keep climbing as a four-digit-second
   // count. Falls back to empty string under the 1-second threshold.
-  const elapsedStr = elapsedMs != null && elapsedMs >= 1000
-    ? formatElapsed(elapsedMs / 1000)
-    : "";
+  const elapsedStr = elapsedMs != null && elapsedMs >= 1000 ? formatElapsed(elapsedMs / 1000) : "";
 
   // Smooth token counter (Claude Code pattern: +3 small, +50 large)
   const tokenGap = estimatedTokens - displayedTokensRef.current;
@@ -405,9 +437,12 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
     displayedTokensRef.current = Math.min(estimatedTokens, displayedTokensRef.current + increment);
   }
   const displayedTokens = displayedTokensRef.current;
-  const tokenStr = displayedTokens > 0
-    ? displayedTokens >= 1000 ? `${(displayedTokens / 1000).toFixed(1)}k tok` : `${displayedTokens} tok`
-    : "";
+  const tokenStr =
+    displayedTokens > 0
+      ? displayedTokens >= 1000
+        ? `${(displayedTokens / 1000).toFixed(1)}k tok`
+        : `${displayedTokens} tok`
+      : "";
 
   // Status phrase (Claude Code's "…with high effort" slot, trading-native):
   // surface the tool actually running so the verb's friendly label is backed
@@ -450,24 +485,43 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
         ))}
         <SpinnerMeta
           items={[
-            showElapsed && elapsedStr ? <Text key="el" color={MUTED}>{elapsedStr}</Text> : null,
-            showTokens && tokenStr
-              ? <Text key="tok" color={MUTED}>{"\u2193 "}{tokenStr}</Text>
-              : null,
-            statusPhrase ? <Text key="st" color={MUTED}>{statusPhrase}</Text> : null,
-            showStall && isStalled ? <Text key="stall" color="red">slow response</Text> : null,
-            showContextBudget ? <Text key="ctx" color={ctxColor}>{ctxPct}% ctx</Text> : null,
+            showElapsed && elapsedStr ? (
+              <Text key="el" color={MUTED}>
+                {elapsedStr}
+              </Text>
+            ) : null,
+            showTokens && tokenStr ? (
+              <Text key="tok" color={MUTED}>
+                {"\u2193 "}
+                {tokenStr}
+              </Text>
+            ) : null,
+            statusPhrase ? (
+              <Text key="st" color={MUTED}>
+                {statusPhrase}
+              </Text>
+            ) : null,
+            showStall && isStalled ? (
+              <Text key="stall" color="red">
+                slow response
+              </Text>
+            ) : null,
+            showContextBudget ? (
+              <Text key="ctx" color={ctxColor}>
+                {ctxPct}% ctx
+              </Text>
+            ) : null,
           ]}
         />
       </Box>
       {showHint && (
         <Box paddingLeft={2}>
-          <Text color={MUTED}>{"\u23bf  "}Tip: {tip}</Text>
+          <Text color={MUTED}>
+            {"\u23bf  "}Tip: {tip}
+          </Text>
         </Box>
       )}
-      {showAgentTree && agents && (
-        <TeammateSpinnerTree agents={agents} />
-      )}
+      {showAgentTree && agents && <TeammateSpinnerTree agents={agents} />}
     </Box>
   );
 }

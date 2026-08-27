@@ -136,10 +136,10 @@ export interface Skill {
 }
 
 export type SkillSource =
-  | "builtin"  // Shipped with Gordon
-  | "user"     // ~/.gordon/skills/
-  | "project"  // .gordon/skills/
-  | "plugin";  // From MCP/plugin
+  | "builtin" // Shipped with Gordon
+  | "user" // ~/.gordon/skills/
+  | "project" // .gordon/skills/
+  | "plugin"; // From MCP/plugin
 
 export interface SkillInvocation {
   skillId: string;

@@ -3,7 +3,7 @@ import { existsSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Exchange, Order } from "../../infra/exchange/index.ts";
-import type { Plan } from "../../types/index.ts";
+import type { Plan, Trade } from "../../types/index.ts";
 import { setDatabasePathForTesting } from "../../infra/storage/database.ts";
 import { createPlan, updatePlan } from "../../infra/storage/entities/plans.ts";
 import {
@@ -15,6 +15,9 @@ import {
   waitForFill,
   repairProtectiveOrders,
   placeOCOOrders,
+  placeOrderIdempotent,
+  cancelTrade,
+  confirmedExecutedFill,
 } from "./executor.ts";
 
 const dbPath = join(tmpdir(), `gordon-money-path-${process.pid}-${Date.now()}.db`);
@@ -35,7 +38,9 @@ afterAll(() => {
   }
 });
 
-function basePlan(overrides: Partial<Omit<Plan, "id" | "createdAt">> = {}): Omit<Plan, "id" | "createdAt"> {
+function basePlan(
+  overrides: Partial<Omit<Plan, "id" | "createdAt">> = {},
+): Omit<Plan, "id" | "createdAt"> {
   return {
     symbol: "BTCUSDT",
     direction: "long",
@@ -100,6 +105,150 @@ describe("waitForFill", () => {
     expect(result.success).toBe(true);
     expect(result.fillStatus.filledQuantity).toBe(0.02);
     expect(polls).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("confirmedExecutedFill", () => {
+  it("uses the venue order price when a filled order omits cumulative quote value", async () => {
+    const order: Order = {
+      orderId: "filled-price-fallback",
+      symbol: "BTCUSDT",
+      side: "SELL",
+      type: "MARKET",
+      status: "FILLED",
+      price: 101,
+      quantity: 2,
+      executedQty: 2,
+      cummulativeQuoteQty: 0,
+    };
+
+    const fill = await confirmedExecutedFill({} as Exchange, order);
+    expect(fill.averagePrice).toBe(101);
+  });
+
+  it("refuses a filled acknowledgement with no finite positive execution price", async () => {
+    const order: Order = {
+      orderId: "filled-without-price",
+      symbol: "BTCUSDT",
+      side: "SELL",
+      type: "MARKET",
+      status: "FILLED",
+      price: 0,
+      quantity: 2,
+      executedQty: 2,
+      cummulativeQuoteQty: 0,
+    };
+
+    expect(confirmedExecutedFill({} as Exchange, order)).rejects.toThrow(/execution price/i);
+  });
+});
+
+describe("placeOrderIdempotent", () => {
+  it("advances the client-order generation after a zero-fill cancellation", async () => {
+    const baseId = "gordon_abc12345_close_0_deadbee";
+    const placedIds: string[] = [];
+    const cancelled: Order = {
+      orderId: "old-1",
+      clientOrderId: baseId,
+      symbol: "BTCUSDT",
+      side: "SELL",
+      type: "MARKET",
+      status: "CANCELED",
+      price: 0,
+      quantity: 1,
+      executedQty: 0,
+      cummulativeQuoteQty: 0,
+    };
+    const client = {
+      exchangeId: "binance",
+      isSandbox: true,
+      getOrderHistory: async () => [cancelled],
+      getOpenOrders: async () => [],
+      placeOrder: async (params: { newClientOrderId?: string }) => {
+        placedIds.push(params.newClientOrderId ?? "");
+        return {
+          ...cancelled,
+          orderId: "new-1",
+          clientOrderId: params.newClientOrderId,
+          status: "NEW",
+        };
+      },
+    } as unknown as Exchange;
+
+    await placeOrderIdempotent(client, {
+      symbol: "BTCUSDT",
+      side: "SELL",
+      type: "MARKET",
+      quantity: 1,
+      newClientOrderId: baseId,
+    });
+
+    expect(placedIds).toEqual([`${baseId}_r1`]);
+  });
+
+  it("recovers the venue order when dispatch throws after remote acceptance", async () => {
+    const clientOrderId = "gordon_abc12345_entry";
+    let remote: Order | null = null;
+    const client = {
+      exchangeId: "binance",
+      isSandbox: true,
+      getOrderHistory: async () => (remote ? [remote] : []),
+      getOpenOrders: async () => [],
+      placeOrder: async () => {
+        remote = {
+          orderId: "remote-1",
+          clientOrderId,
+          symbol: "BTCUSDT",
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          price: 50_000,
+          quantity: 0.01,
+          executedQty: 0.01,
+          cummulativeQuoteQty: 500,
+        };
+        throw new Error("connection reset after write");
+      },
+    } as unknown as Exchange;
+
+    const recovered = await placeOrderIdempotent(client, {
+      symbol: "BTCUSDT",
+      side: "BUY",
+      type: "MARKET",
+      quantity: 0.01,
+      newClientOrderId: clientOrderId,
+    });
+
+    expect(recovered.orderId).toBe("remote-1");
+    expect(recovered.status).toBe("FILLED");
+  });
+});
+
+describe("cancelTrade exposure semantics", () => {
+  it("refuses to turn an open position into a falsely closed trade", async () => {
+    let enumeratedOrders = false;
+    const client = {
+      getOpenOrders: async () => {
+        enumeratedOrders = true;
+        return [];
+      },
+    } as unknown as Exchange;
+    const trade = {
+      id: "trade-open-exposure",
+      planId: "plan-open-exposure",
+      symbol: "BTCUSDT",
+      status: "OPEN",
+      entries: [{ orderId: "entry", price: 100, quantity: 2, filledAt: "now" }],
+      exits: [{ orderId: "partial", price: 110, quantity: 0.5, filledAt: "now", reason: "TP1" }],
+      averageEntry: 100,
+      realizedPnl: 5,
+      realizedPnlPercent: 2.5,
+    } as Trade;
+
+    const result = await cancelTrade(client, trade);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("1.5 units of open exposure");
+    expect(enumeratedOrders).toBe(false);
   });
 });
 
@@ -169,7 +318,9 @@ describe("repairProtectiveOrders", () => {
     const result = await repairProtectiveOrders(plan.id, client);
     expect(result.repaired).toBe(true);
     expect(result.placed).toContain("stop");
-    expect(placed[0]?.newClientOrderId).toBe(generateDeterministicClientOrderId(plan.id, "stop"));
+    expect(placed[0]?.newClientOrderId).toBe(
+      generateDeterministicClientOrderId(plan.id, "stop_r0"),
+    );
     expect(placed[0]?.quantity).toBe(0.02);
   });
 
@@ -266,10 +417,94 @@ describe("repairProtectiveOrders", () => {
     expect(result.repaired).toBe(true);
     expect(placedQtys[0]).toBe(0.04);
   });
+
+  it("does not place a replacement stop when cancellation fails", async () => {
+    const plan = createPlan(basePlan());
+    updatePlan(plan.id, { status: "EXECUTING" });
+    const entryClientId = generateDeterministicClientOrderId(plan.id, "entry");
+    const stopClientId = generateDeterministicClientOrderId(plan.id, "stop");
+    let placements = 0;
+    const entry: Order = {
+      orderId: "entry-1",
+      clientOrderId: entryClientId,
+      symbol: plan.symbol,
+      side: "BUY",
+      type: "LIMIT",
+      status: "FILLED",
+      price: 50_000,
+      quantity: 0.04,
+      executedQty: 0.04,
+      cummulativeQuoteQty: 2000,
+    };
+    const stop: Order = {
+      orderId: "stop-old",
+      clientOrderId: stopClientId,
+      symbol: plan.symbol,
+      side: "SELL",
+      type: "STOP_LOSS_LIMIT",
+      status: "NEW",
+      price: 48_755,
+      quantity: 0.02,
+      executedQty: 0,
+      cummulativeQuoteQty: 0,
+    };
+    const client = {
+      exchangeId: "binance",
+      isSandbox: true,
+      getOrderHistory: async () => [entry, stop],
+      getOpenOrders: async () => [stop],
+      cancelOrder: async () => {
+        throw new Error("venue refused cancel");
+      },
+      placeOrder: async () => {
+        placements++;
+        throw new Error("must not place");
+      },
+    } as unknown as Exchange;
+
+    const result = await repairProtectiveOrders(plan.id, client);
+    expect(result.repaired).toBe(false);
+    expect(result.reason).toContain("stop_resize_cancel_failed");
+    expect(placements).toBe(0);
+  });
 });
 
-describe("placeOCOOrders fallback client IDs", () => {
-  it("uses deterministic oco_stop and oco_tp client IDs when planId is set", async () => {
+describe("placeOCOOrders atomicity", () => {
+  it("returns the venue's native list and leg identifiers without remapping them", async () => {
+    const client = {
+      exchangeId: "binance",
+      isSandbox: true,
+      placeOCOOrder: async () => ({
+        orderListId: 77,
+        contingencyType: "OCO",
+        listStatusType: "EXEC_STARTED",
+        listOrderStatus: "EXECUTING",
+        transactionTime: Date.now(),
+        symbol: "BTCUSDT",
+        orders: [
+          { symbol: "BTCUSDT", orderId: 101, clientOrderId: "stop-leg" },
+          { symbol: "BTCUSDT", orderId: 102, clientOrderId: "tp-leg" },
+        ],
+        orderReports: [],
+      }),
+    } as unknown as Exchange;
+
+    const result = await placeOCOOrders(
+      client,
+      "BTCUSDT",
+      "SELL",
+      0.01,
+      49_000,
+      48_755,
+      52_000,
+      "plan-abc12345",
+    );
+
+    expect(result).toMatchObject({ success: true, native: true, orderListId: 77 });
+    expect(result.orderIds).toEqual(["101", "102"]);
+  });
+
+  it("places no orders when the venue has no native OCO", async () => {
     const planId = "plan-abc12345";
     const captured: string[] = [];
 
@@ -316,10 +551,8 @@ describe("placeOCOOrders fallback client IDs", () => {
       planId,
     );
 
-    expect(result.success).toBe(true);
-    expect(captured).toEqual([
-      generateDeterministicClientOrderId(planId, "oco_stop"),
-      generateDeterministicClientOrderId(planId, "oco_tp"),
-    ]);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Native OCO is not supported/);
+    expect(captured).toEqual([]);
   });
 });

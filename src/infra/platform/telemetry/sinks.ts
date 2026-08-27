@@ -61,7 +61,7 @@ class LocalCrashSink implements TelemetrySink {
   send(event: RoutedEvent): void {
     try {
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
-      fs.appendFileSync(this.file, JSON.stringify(event.event) + "\n", "utf-8");
+      fs.appendFileSync(this.file, `${JSON.stringify(event.event)}\n`, "utf-8");
     } catch (err) {
       logger.warn("LocalCrashSink write failed", { err: String(err) });
     }
@@ -83,7 +83,7 @@ class LocalUsageSink implements TelemetrySink {
   send(event: RoutedEvent): void {
     try {
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
-      fs.appendFileSync(this.file, JSON.stringify(event.event) + "\n", "utf-8");
+      fs.appendFileSync(this.file, `${JSON.stringify(event.event)}\n`, "utf-8");
     } catch (err) {
       logger.warn("LocalUsageSink write failed", { err: String(err) });
     }
@@ -117,10 +117,20 @@ export function initSinks(): void {
  */
 export function categorize(event: TelemetryEvent): EventCategory {
   const name = event.event;
-  if (name === "uncaught_exception" || name === "unhandled_rejection" || name === "error_occurred") {
+  if (
+    name === "uncaught_exception" ||
+    name === "unhandled_rejection" ||
+    name === "error_occurred"
+  ) {
     return "crash";
   }
-  if (name === "session_start" || name === "session_end" || name === "command_invoked" || name === "agent_routed" || name === "feature_used") {
+  if (
+    name === "session_start" ||
+    name === "session_end" ||
+    name === "command_invoked" ||
+    name === "agent_routed" ||
+    name === "feature_used"
+  ) {
     return "usage";
   }
   return "metric";

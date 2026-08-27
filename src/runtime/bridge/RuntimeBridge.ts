@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { RuntimeBridgeSession } from "../contracts/types.ts";
-import { RuntimeStore } from "../state/RuntimeStore.ts";
+import type { RuntimeStore } from "../state/RuntimeStore.ts";
 
 export interface RuntimeBridgeStartInput {
   runtimeId: string;
@@ -39,7 +39,10 @@ export class RuntimeBridge {
     const state = this.runtimeStore.getState();
     this.runtimeStore.setBridgeState({
       active: [session, ...state.bridge.active].slice(0, 20),
-      recent: [session, ...state.bridge.recent.filter((entry) => entry.id !== session.id)].slice(0, 50),
+      recent: [session, ...state.bridge.recent.filter((entry) => entry.id !== session.id)].slice(
+        0,
+        50,
+      ),
     });
     this.runtimeStore.setRemoteState({
       connectionStatus: "connected",
@@ -64,8 +67,9 @@ export class RuntimeBridge {
     detail?: string,
   ): RuntimeBridgeSession | null {
     const state = this.runtimeStore.getState();
-    const current = state.bridge.active.find((entry) => entry.id === id)
-      ?? state.bridge.recent.find((entry) => entry.id === id);
+    const current =
+      state.bridge.active.find((entry) => entry.id === id) ??
+      state.bridge.recent.find((entry) => entry.id === id);
     if (!current) {
       return null;
     }

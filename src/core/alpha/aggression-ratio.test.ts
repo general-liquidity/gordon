@@ -80,7 +80,7 @@ describe("computeAggressionRatio", () => {
   test("custom thresholds respected", () => {
     const bars: TakerVolumeBar[] = [];
     for (let i = 0; i < 30; i++) bars.push(bar(115, 100)); // small bias
-    const strict = computeAggressionRatio(bars, { buyThreshold: 0.50 });
+    const strict = computeAggressionRatio(bars, { buyThreshold: 0.5 });
     const lax = computeAggressionRatio(bars, { buyThreshold: 0.05 });
     expect(strict.verdict).toBe("neutral");
     expect(["buy", "strong_buy"]).toContain(lax.verdict);

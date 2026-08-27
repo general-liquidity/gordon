@@ -24,8 +24,8 @@
  * Run automatically via postinstall, or manually: node scripts/patch-ink.cjs
  */
 
-const fs = require("fs");
-const path = require("path");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const verbose = process.argv.includes("--verbose") || process.env.PATCH_INK_VERBOSE === "1";
 
@@ -42,7 +42,7 @@ function warn(message) {
 const inkPath = path.resolve(__dirname, "..", "..", "node_modules", "ink", "build", "ink.js");
 
 if (!fs.existsSync(inkPath)) {
-  warn("[patch-ink] WARNING: ink.js not found at " + inkPath + " — skipping.");
+  warn(`[patch-ink] WARNING: ink.js not found at ${inkPath} — skipping.`);
   process.exit(0);
 }
 
@@ -62,30 +62,32 @@ if (content.includes("deferredRender")) {
 
   // Build needle and replacement using detected line endings
   const needle = [
-    indent8 + "this.rootNode.onRender = unthrottled",
-    indent12 + "? this.onRender",
-    indent12 + ": throttle(this.onRender, renderThrottleMs, {",
-    indent16 + "leading: true,",
-    indent16 + "trailing: true,",
-    indent12 + "});",
+    `${indent8}this.rootNode.onRender = unthrottled`,
+    `${indent12}? this.onRender`,
+    `${indent12}: throttle(this.onRender, renderThrottleMs, {`,
+    `${indent16}leading: true,`,
+    `${indent16}trailing: true,`,
+    `${indent12}});`,
   ].join(eol);
 
   const replacement = [
-    indent8 + "// queueMicrotask defers the paint to after React's layout phase",
-    indent8 + "// (useLayoutEffect / ref attach) so cursor declarations commit before",
-    indent8 + "// the terminal write. Same pattern as Claude Code's Ink fork.",
-    indent8 + "const deferredRender = () => queueMicrotask(this.onRender.bind(this));",
-    indent8 + "this.rootNode.onRender = unthrottled",
-    indent12 + "? this.onRender",
-    indent12 + ": throttle(deferredRender, renderThrottleMs, {",
-    indent16 + "leading: true,",
-    indent16 + "trailing: true,",
-    indent12 + "});",
+    `${indent8}// queueMicrotask defers the paint to after React's layout phase`,
+    `${indent8}// (useLayoutEffect / ref attach) so cursor declarations commit before`,
+    `${indent8}// the terminal write. Same pattern as Claude Code's Ink fork.`,
+    `${indent8}const deferredRender = () => queueMicrotask(this.onRender.bind(this));`,
+    `${indent8}this.rootNode.onRender = unthrottled`,
+    `${indent12}? this.onRender`,
+    `${indent12}: throttle(deferredRender, renderThrottleMs, {`,
+    `${indent16}leading: true,`,
+    `${indent16}trailing: true,`,
+    `${indent12}});`,
   ].join(eol);
 
   if (!content.includes(needle)) {
     warn("[patch-ink] WARNING: Could not find the target onRender pattern in ink.js.");
-    warn("[patch-ink] The file may have been updated — inspect node_modules/ink/build/ink.js manually.");
+    warn(
+      "[patch-ink] The file may have been updated — inspect node_modules/ink/build/ink.js manually.",
+    );
   } else {
     const patched = content.replace(needle, replacement);
     fs.writeFileSync(inkPath, patched, "utf8");
@@ -111,10 +113,22 @@ if (content.includes("deferredRender")) {
 // has two frame-writing stream.write() calls. We wrap both.
 // ============================================================================
 
-const logUpdatePath = path.resolve(__dirname, "..", "..", "node_modules", "ink", "build", "log-update.js");
+const logUpdatePath = path.resolve(
+  __dirname,
+  "..",
+  "..",
+  "node_modules",
+  "ink",
+  "build",
+  "log-update.js",
+);
 
 if (!fs.existsSync(logUpdatePath)) {
-  warn("[patch-ink] WARNING: log-update.js not found at " + logUpdatePath + " — skipping BSU/ESU patch.");
+  warn(
+    "[patch-ink] WARNING: log-update.js not found at " +
+      logUpdatePath +
+      " — skipping BSU/ESU patch.",
+  );
 } else {
   let logUpdateContent = fs.readFileSync(logUpdatePath, "utf8");
 
@@ -141,11 +155,13 @@ if (!fs.existsSync(logUpdatePath)) {
     // Insert the detection block right before the createStandard declaration.
     const createStandardDecl = "const createStandard = (stream, { showCursor = false } = {}) => {";
     if (!logUpdateContent.includes(createStandardDecl)) {
-      warn("[patch-ink] WARNING: Could not find createStandard declaration in log-update.js — skipping BSU/ESU patch.");
+      warn(
+        "[patch-ink] WARNING: Could not find createStandard declaration in log-update.js — skipping BSU/ESU patch.",
+      );
     } else {
       logUpdateContent = logUpdateContent.replace(
         createStandardDecl,
-        syncDetectBlock + "\n" + createStandardDecl,
+        `${syncDetectBlock}\n${createStandardDecl}`,
       );
 
       // Wrap the two frame-writing stream.write() calls in createIncremental.
@@ -182,7 +198,9 @@ if (!fs.existsSync(logUpdatePath)) {
       }
 
       if (!logUpdateContent.includes("__syncSupported")) {
-        warn("[patch-ink] WARNING: BSU/ESU patch may have failed — __syncSupported not found after replacement.");
+        warn(
+          "[patch-ink] WARNING: BSU/ESU patch may have failed — __syncSupported not found after replacement.",
+        );
       } else {
         fs.writeFileSync(logUpdatePath, logUpdateContent, "utf8");
         console.log("[patch-ink] Patched log-update.js — BSU/ESU synchronized output applied.");
@@ -211,12 +229,20 @@ if (!fs.existsSync(logUpdatePath)) {
 // line that calls styledCharsFromTokens(tokenize(line)).
 // ============================================================================
 
-const outputJsPath = path.resolve(__dirname, "..", "..", "node_modules", "ink", "build", "output.js");
+const outputJsPath = path.resolve(
+  __dirname,
+  "..",
+  "..",
+  "node_modules",
+  "ink",
+  "build",
+  "output.js",
+);
 
 if (!fs.existsSync(outputJsPath)) {
-  warn("[patch-ink] WARNING: output.js not found at " + outputJsPath + " — skipping charCache patch.");
+  warn(`[patch-ink] WARNING: output.js not found at ${outputJsPath} — skipping charCache patch.`);
 } else {
-  let outputContent = fs.readFileSync(outputJsPath, "utf8");
+  const outputContent = fs.readFileSync(outputJsPath, "utf8");
 
   // Idempotency check
   if (outputContent.includes("charCache")) {
@@ -229,22 +255,24 @@ if (!fs.existsSync(outputJsPath)) {
 
     if (!outputContent.includes(needle)) {
       warn("[patch-ink] WARNING: Could not find tokenize/styledCharsFromTokens line in output.js.");
-      warn("[patch-ink] The file may have been updated — inspect node_modules/ink/build/output.js manually.");
+      warn(
+        "[patch-ink] The file may have been updated — inspect node_modules/ink/build/output.js manually.",
+      );
     } else {
       // Replacement: wrap the expensive call in a static charCache lookup.
       // We preserve the same variable name `characters` so the rest of the
       // loop body is untouched.
       const indent = "                    ";
       const replacement = [
-        indent + "// charCache: persist tokenized+styled chars across frames (patch-ink.cjs)",
-        indent + "// Cap at 16 384 entries to prevent unbounded growth — same as Claude Code.",
-        indent + "if (!Output._charCache) Output._charCache = new Map();",
-        indent + "let characters = Output._charCache.get(line);",
-        indent + "if (!characters) {",
-        indent + "    characters = styledCharsFromTokens(tokenize(line));",
-        indent + "    Output._charCache.set(line, characters);",
-        indent + "    if (Output._charCache.size > 16384) Output._charCache.clear();",
-        indent + "}",
+        `${indent}// charCache: persist tokenized+styled chars across frames (patch-ink.cjs)`,
+        `${indent}// Cap at 16 384 entries to prevent unbounded growth — same as Claude Code.`,
+        `${indent}if (!Output._charCache) Output._charCache = new Map();`,
+        `${indent}let characters = Output._charCache.get(line);`,
+        `${indent}if (!characters) {`,
+        `${indent}    characters = styledCharsFromTokens(tokenize(line));`,
+        `${indent}    Output._charCache.set(line, characters);`,
+        `${indent}    if (Output._charCache.size > 16384) Output._charCache.clear();`,
+        `${indent}}`,
       ].join("\n");
 
       const crlf3 = outputContent.includes("\r\n");
@@ -254,7 +282,9 @@ if (!fs.existsSync(outputJsPath)) {
       );
 
       if (!patchedOutput.includes("charCache")) {
-        warn("[patch-ink] WARNING: charCache patch may have failed — charCache not found after replacement.");
+        warn(
+          "[patch-ink] WARNING: charCache patch may have failed — charCache not found after replacement.",
+        );
       } else {
         fs.writeFileSync(outputJsPath, patchedOutput, "utf8");
         console.log("[patch-ink] Patched output.js — charCache tokenization memoization applied.");
@@ -286,7 +316,15 @@ if (!fs.existsSync(outputJsPath)) {
 // clean ink-text nodes.
 // ============================================================================
 
-const reconcilerPath = require("path").resolve(__dirname, "..", "..", "node_modules", "ink", "build", "reconciler.js");
+const reconcilerPath = require("node:path").resolve(
+  __dirname,
+  "..",
+  "..",
+  "node_modules",
+  "ink",
+  "build",
+  "reconciler.js",
+);
 
 // ============================================================================
 // Patch 4a: strip the dev-only top-level await so the standalone binary builds
@@ -299,14 +337,16 @@ const reconcilerPath = require("path").resolve(__dirname, "..", "..", "node_modu
 // whole build. Rewriting the await to a floating promise keeps the dev-only
 // behaviour and removes the top-level await.
 // ============================================================================
-if (require("fs").existsSync(reconcilerPath)) {
-  const tlaSource = require("fs").readFileSync(reconcilerPath, "utf8");
+if (require("node:fs").existsSync(reconcilerPath)) {
+  const tlaSource = require("node:fs").readFileSync(reconcilerPath, "utf8");
   if (tlaSource.includes("void import('./devtools.js')")) {
     log("[patch-ink] reconciler.js top-level await already stripped — skipping.");
   } else if (!tlaSource.includes("await import('./devtools.js')")) {
-    warn("[patch-ink] WARNING: reconciler.js devtools top-level await not found — ink may have changed.");
+    warn(
+      "[patch-ink] WARNING: reconciler.js devtools top-level await not found — ink may have changed.",
+    );
   } else {
-    require("fs").writeFileSync(
+    require("node:fs").writeFileSync(
       reconcilerPath,
       tlaSource.replace("await import('./devtools.js')", "void import('./devtools.js')"),
       "utf8",
@@ -315,10 +355,14 @@ if (require("fs").existsSync(reconcilerPath)) {
   }
 }
 
-if (!require("fs").existsSync(reconcilerPath)) {
-  warn("[patch-ink] WARNING: reconciler.js not found at " + reconcilerPath + " — skipping dirty-tracking patch.");
+if (!require("node:fs").existsSync(reconcilerPath)) {
+  warn(
+    "[patch-ink] WARNING: reconciler.js not found at " +
+      reconcilerPath +
+      " — skipping dirty-tracking patch.",
+  );
 } else {
-  let reconcilerContent = require("fs").readFileSync(reconcilerPath, "utf8");
+  const reconcilerContent = require("node:fs").readFileSync(reconcilerPath, "utf8");
 
   if (reconcilerContent.includes("DIRTY_TRACKING")) {
     log("[patch-ink] reconciler.js already has dirty-tracking patch — skipping.");
@@ -388,31 +432,43 @@ if (!require("fs").existsSync(reconcilerPath)) {
     let patchCount = 0;
 
     if (!patched.includes(createInstanceNeedle)) {
-      warn("[patch-ink] WARNING: Could not find createNode(type) line in reconciler.js — createInstance dirty patch skipped.");
+      warn(
+        "[patch-ink] WARNING: Could not find createNode(type) line in reconciler.js — createInstance dirty patch skipped.",
+      );
     } else {
       patched = patched.replace(createInstanceNeedle, createInstanceReplacement);
       patchCount++;
     }
 
     if (!patched.includes(commitUpdateNeedle.split(crlf4 ? "\r\n" : "\n")[0])) {
-      warn("[patch-ink] WARNING: Could not find commitUpdate closing block in reconciler.js — commitUpdate dirty patch skipped.");
+      warn(
+        "[patch-ink] WARNING: Could not find commitUpdate closing block in reconciler.js — commitUpdate dirty patch skipped.",
+      );
     } else {
       patched = patched.replace(commitUpdateNeedle, commitUpdateReplacement);
       patchCount++;
     }
 
     if (!patched.includes(commitTextNeedle.split(crlf4 ? "\r\n" : "\n")[0])) {
-      warn("[patch-ink] WARNING: Could not find commitTextUpdate block in reconciler.js — commitTextUpdate dirty patch skipped.");
+      warn(
+        "[patch-ink] WARNING: Could not find commitTextUpdate block in reconciler.js — commitTextUpdate dirty patch skipped.",
+      );
     } else {
       patched = patched.replace(commitTextNeedle, commitTextReplacement);
       patchCount++;
     }
 
     if (patchCount > 0) {
-      require("fs").writeFileSync(reconcilerPath, patched, "utf8");
-      console.log("[patch-ink] Patched reconciler.js — DOM dirty tracking applied (" + patchCount + "/3 hooks).");
+      require("node:fs").writeFileSync(reconcilerPath, patched, "utf8");
+      console.log(
+        "[patch-ink] Patched reconciler.js — DOM dirty tracking applied (" +
+          patchCount +
+          "/3 hooks).",
+      );
     } else {
-      warn("[patch-ink] WARNING: No dirty-tracking patches applied to reconciler.js — check the file manually.");
+      warn(
+        "[patch-ink] WARNING: No dirty-tracking patches applied to reconciler.js — check the file manually.",
+      );
     }
   }
 }
@@ -452,12 +508,20 @@ if (!require("fs").existsSync(reconcilerPath)) {
 // that Claude Code's fork also applies.
 // ============================================================================
 
-const renderNodePath = require("path").resolve(__dirname, "..", "..", "node_modules", "ink", "build", "render-node-to-output.js");
+const renderNodePath = require("node:path").resolve(
+  __dirname,
+  "..",
+  "..",
+  "node_modules",
+  "ink",
+  "build",
+  "render-node-to-output.js",
+);
 
-if (!require("fs").existsSync(renderNodePath)) {
+if (!require("node:fs").existsSync(renderNodePath)) {
   warn("[patch-ink] WARNING: render-node-to-output.js not found — skipping blit patch.");
 } else {
-  let renderContent = require("fs").readFileSync(renderNodePath, "utf8");
+  const renderContent = require("node:fs").readFileSync(renderNodePath, "utf8");
 
   if (renderContent.includes("BLIT_OPT")) {
     log("[patch-ink] render-node-to-output.js already has blit patch — skipping.");
@@ -590,24 +654,34 @@ if (!require("fs").existsSync(renderNodePath)) {
     let renderPatchCount = 0;
 
     if (!renderPatched.includes(inkTextNeedle.split(eol5)[0])) {
-      warn("[patch-ink] WARNING: Could not find ink-text block in render-node-to-output.js — ink-text blit patch skipped.");
+      warn(
+        "[patch-ink] WARNING: Could not find ink-text block in render-node-to-output.js — ink-text blit patch skipped.",
+      );
     } else {
       renderPatched = renderPatched.replace(inkTextNeedle, inkTextReplacement);
       renderPatchCount++;
     }
 
     if (!renderPatched.includes(boxRootNeedle.split(eol5)[0])) {
-      warn("[patch-ink] WARNING: Could not find ink-root/ink-box block in render-node-to-output.js — box dirty-clear patch skipped.");
+      warn(
+        "[patch-ink] WARNING: Could not find ink-root/ink-box block in render-node-to-output.js — box dirty-clear patch skipped.",
+      );
     } else {
       renderPatched = renderPatched.replace(boxRootNeedle, boxRootReplacement);
       renderPatchCount++;
     }
 
     if (renderPatchCount > 0) {
-      require("fs").writeFileSync(renderNodePath, renderPatched, "utf8");
-      console.log("[patch-ink] Patched render-node-to-output.js — blit optimization applied (" + renderPatchCount + "/2 sites).");
+      require("node:fs").writeFileSync(renderNodePath, renderPatched, "utf8");
+      console.log(
+        "[patch-ink] Patched render-node-to-output.js — blit optimization applied (" +
+          renderPatchCount +
+          "/2 sites).",
+      );
     } else {
-      warn("[patch-ink] WARNING: No blit patches applied to render-node-to-output.js — check the file manually.");
+      warn(
+        "[patch-ink] WARNING: No blit patches applied to render-node-to-output.js — check the file manually.",
+      );
     }
   }
 }
@@ -633,12 +707,24 @@ if (!require("fs").existsSync(renderNodePath)) {
 //         and previousOutput to their initial empty values.
 // ============================================================================
 
-const logUpdatePath6 = require("path").resolve(__dirname, "..", "..", "node_modules", "ink", "build", "log-update.js");
+const logUpdatePath6 = require("node:path").resolve(
+  __dirname,
+  "..",
+  "..",
+  "node_modules",
+  "ink",
+  "build",
+  "log-update.js",
+);
 
-if (!require("fs").existsSync(logUpdatePath6)) {
-  warn("[patch-ink] WARNING: log-update.js not found at " + logUpdatePath6 + " — skipping CLEAR_INCREMENTAL_CACHE patch.");
+if (!require("node:fs").existsSync(logUpdatePath6)) {
+  warn(
+    "[patch-ink] WARNING: log-update.js not found at " +
+      logUpdatePath6 +
+      " — skipping CLEAR_INCREMENTAL_CACHE patch.",
+  );
 } else {
-  let logUpdate6Content = require("fs").readFileSync(logUpdatePath6, "utf8");
+  const logUpdate6Content = require("node:fs").readFileSync(logUpdatePath6, "utf8");
 
   // Idempotency check
   if (logUpdate6Content.includes("CLEAR_INCREMENTAL_CACHE")) {
@@ -666,12 +752,18 @@ if (!require("fs").existsSync(logUpdatePath6)) {
     ].join(eol6);
 
     if (!logUpdate6Content.includes(needle6)) {
-      warn("[patch-ink] WARNING: Could not find previousLines/previousOutput/hasHiddenCursor declarations in createIncremental (log-update.js).");
-      warn("[patch-ink] The file may have been updated — inspect node_modules/ink/build/log-update.js manually.");
+      warn(
+        "[patch-ink] WARNING: Could not find previousLines/previousOutput/hasHiddenCursor declarations in createIncremental (log-update.js).",
+      );
+      warn(
+        "[patch-ink] The file may have been updated — inspect node_modules/ink/build/log-update.js manually.",
+      );
     } else {
       const patched6 = logUpdate6Content.replace(needle6, replacement6);
-      require("fs").writeFileSync(logUpdatePath6, patched6, "utf8");
-      console.log("[patch-ink] Patched log-update.js — CLEAR_INCREMENTAL_CACHE global hook applied.");
+      require("node:fs").writeFileSync(logUpdatePath6, patched6, "utf8");
+      console.log(
+        "[patch-ink] Patched log-update.js — CLEAR_INCREMENTAL_CACHE global hook applied.",
+      );
     }
   }
 }
@@ -705,12 +797,20 @@ if (!require("fs").existsSync(logUpdatePath6)) {
 // Idempotency sentinel: YOGA_MEASURE_REGISTRY
 // ============================================================================
 
-const reconcilerPath7 = require("path").resolve(__dirname, "..", "..", "node_modules", "ink", "build", "reconciler.js");
+const reconcilerPath7 = require("node:path").resolve(
+  __dirname,
+  "..",
+  "..",
+  "node_modules",
+  "ink",
+  "build",
+  "reconciler.js",
+);
 
-if (!require("fs").existsSync(reconcilerPath7)) {
+if (!require("node:fs").existsSync(reconcilerPath7)) {
   warn("[patch-ink] WARNING: reconciler.js not found — skipping YOGA_MEASURE_REGISTRY patch.");
 } else {
-  let rec7Content = require("fs").readFileSync(reconcilerPath7, "utf8");
+  let rec7Content = require("node:fs").readFileSync(reconcilerPath7, "utf8");
 
   if (rec7Content.includes("YOGA_MEASURE_REGISTRY")) {
     log("[patch-ink] reconciler.js already has YOGA_MEASURE_REGISTRY patch — skipping.");
@@ -734,12 +834,11 @@ if (!require("fs").existsSync(reconcilerPath7)) {
 
     const importLine = "import process from 'node:process';";
     if (!rec7Content.includes(importLine)) {
-      warn("[patch-ink] WARNING: Could not find 'import process' in reconciler.js — YOGA_MEASURE_REGISTRY global block skipped.");
-    } else {
-      rec7Content = rec7Content.replace(
-        importLine,
-        importLine + eol7 + globalRegistryBlock,
+      warn(
+        "[patch-ink] WARNING: Could not find 'import process' in reconciler.js — YOGA_MEASURE_REGISTRY global block skipped.",
       );
+    } else {
+      rec7Content = rec7Content.replace(importLine, importLine + eol7 + globalRegistryBlock);
     }
 
     // ── createInstance: register node when data-measure-id prop is present ───
@@ -774,9 +873,14 @@ if (!require("fs").existsSync(reconcilerPath7)) {
     ].join(eol7);
 
     if (!rec7Content.includes(createInstanceReturnNeedle)) {
-      warn("[patch-ink] WARNING: Could not find createInstance return in reconciler.js — createInstance registry patch skipped.");
+      warn(
+        "[patch-ink] WARNING: Could not find createInstance return in reconciler.js — createInstance registry patch skipped.",
+      );
     } else {
-      rec7Content = rec7Content.replace(createInstanceReturnNeedle, createInstanceReturnReplacement);
+      rec7Content = rec7Content.replace(
+        createInstanceReturnNeedle,
+        createInstanceReturnReplacement,
+      );
     }
 
     // ── commitUpdate: update registry when data-measure-id changes ───────────
@@ -814,7 +918,9 @@ if (!require("fs").existsSync(reconcilerPath7)) {
     ].join(eol7);
 
     if (!rec7Content.includes(commitUpdateDirtyNeedle)) {
-      warn("[patch-ink] WARNING: Could not find DIRTY_TRACKING block in commitUpdate (reconciler.js) — commitUpdate registry patch skipped.");
+      warn(
+        "[patch-ink] WARNING: Could not find DIRTY_TRACKING block in commitUpdate (reconciler.js) — commitUpdate registry patch skipped.",
+      );
     } else {
       rec7Content = rec7Content.replace(commitUpdateDirtyNeedle, commitUpdateDirtyReplacement);
     }
@@ -844,7 +950,9 @@ if (!require("fs").existsSync(reconcilerPath7)) {
     ].join(eol7);
 
     if (!rec7Content.includes(removeChildNeedle)) {
-      warn("[patch-ink] WARNING: Could not find removeChild block in reconciler.js — removeChild registry patch skipped.");
+      warn(
+        "[patch-ink] WARNING: Could not find removeChild block in reconciler.js — removeChild registry patch skipped.",
+      );
     } else {
       rec7Content = rec7Content.replace(removeChildNeedle, removeChildReplacement);
     }
@@ -873,12 +981,16 @@ if (!require("fs").existsSync(reconcilerPath7)) {
     ].join(eol7);
 
     if (!rec7Content.includes(removeFromContainerNeedle)) {
-      warn("[patch-ink] WARNING: Could not find removeChildFromContainer block in reconciler.js — removeChildFromContainer registry patch skipped.");
+      warn(
+        "[patch-ink] WARNING: Could not find removeChildFromContainer block in reconciler.js — removeChildFromContainer registry patch skipped.",
+      );
     } else {
       rec7Content = rec7Content.replace(removeFromContainerNeedle, removeFromContainerReplacement);
     }
 
-    require("fs").writeFileSync(reconcilerPath7, rec7Content, "utf8");
-    console.log("[patch-ink] Patched reconciler.js — YOGA_MEASURE_REGISTRY global node registry applied.");
+    require("node:fs").writeFileSync(reconcilerPath7, rec7Content, "utf8");
+    console.log(
+      "[patch-ink] Patched reconciler.js — YOGA_MEASURE_REGISTRY global node registry applied.",
+    );
   }
 }

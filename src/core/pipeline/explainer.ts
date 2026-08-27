@@ -5,7 +5,12 @@
  * decisions, and plans in plain language.
  */
 
-import { LLMClient, loadPrompt, buildMessages, executeWithFailover } from "../../infra/ai/llm/index.ts";
+import {
+  type LLMClient,
+  loadPrompt,
+  buildMessages,
+  executeWithFailover,
+} from "../../infra/ai/llm/index.ts";
 import type { Plan, Trade, CoinAnalysis } from "../../types/index.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import {
@@ -194,11 +199,11 @@ const TOPIC_ALIASES: Record<string, string> = {
   "support levels": "support",
   "resistance level": "resistance",
   "resistance levels": "resistance",
-  "stop": "stop_loss",
-  "stoploss": "stop_loss",
+  stop: "stop_loss",
+  stoploss: "stop_loss",
   "stop-loss": "stop_loss",
-  "stops": "stop_loss",
-  "tp": "take_profit",
+  stops: "stop_loss",
+  tp: "take_profit",
   "take profits": "take_profit",
   "profit target": "take_profit",
   "profit targets": "take_profit",
@@ -207,7 +212,7 @@ const TOPIC_ALIASES: Record<string, string> = {
   "risk reward": "risk_reward",
   "risk-reward": "risk_reward",
   "r:r": "risk_reward",
-  "rr": "risk_reward",
+  rr: "risk_reward",
   // Strategy aliases
   "support bounce": "support_bounce",
   "support bounce strategy": "support_bounce",
@@ -287,14 +292,16 @@ export function formatPlanExplanation(plan: Plan): string {
 
   // Entry
   if (plan.entry.type === "market") {
-    lines.push("Entry: Market order (buy at current price)");
+    lines.push(
+      `Entry: Market order (${plan.direction === "short" ? "sell short" : "buy"} at current price)`,
+    );
   } else {
     lines.push(`Entry: Limit order at $${formatPrice(plan.entry.price!)}`);
   }
 
   // Position size
   lines.push(
-    `Position Size: $${plan.allocation.amount.toFixed(2)} (${(plan.allocation.percentOfPortfolio * 100).toFixed(1)}% of portfolio)`
+    `Position Size: $${plan.allocation.amount.toFixed(2)} (${(plan.allocation.percentOfPortfolio * 100).toFixed(1)}% of portfolio)`,
   );
   lines.push("");
 
@@ -303,9 +310,10 @@ export function formatPlanExplanation(plan: Plan): string {
   lines.push(`  Stop Loss: $${formatPrice(plan.stopLoss.price)}`);
 
   if (plan.entry.price) {
-    const stopPercent =
-      ((plan.entry.price - plan.stopLoss.price) / plan.entry.price) * 100;
-    lines.push(`    (${stopPercent.toFixed(1)}% below entry)`);
+    const stopPercent = (Math.abs(plan.entry.price - plan.stopLoss.price) / plan.entry.price) * 100;
+    lines.push(
+      `    (${stopPercent.toFixed(1)}% ${plan.direction === "short" ? "above" : "below"} entry)`,
+    );
   }
   lines.push("");
 
@@ -314,10 +322,11 @@ export function formatPlanExplanation(plan: Plan): string {
   plan.takeProfit.forEach((tp, index) => {
     const tpLabel = `TP${index + 1}`;
     const percentToSell = (tp.percentToSell * 100).toFixed(0);
-    let tpLine = `  ${tpLabel}: $${formatPrice(tp.price)} (sell ${percentToSell}%)`;
+    let tpLine = `  ${tpLabel}: $${formatPrice(tp.price)} (close ${percentToSell}%)`;
 
     if (plan.entry.price) {
-      const gainPercent = ((tp.price - plan.entry.price) / plan.entry.price) * 100;
+      const multiplier = plan.direction === "short" ? -1 : 1;
+      const gainPercent = multiplier * ((tp.price - plan.entry.price) / plan.entry.price) * 100;
       tpLine += ` - +${gainPercent.toFixed(1)}% gain`;
     }
 
@@ -327,13 +336,13 @@ export function formatPlanExplanation(plan: Plan): string {
 
   // DCA levels if present
   if (plan.dca && plan.dca.length > 0) {
-    lines.push("DCA Levels (buy more if price drops):");
+    lines.push(
+      `DCA Levels (${plan.direction === "short" ? "sell more if price rises" : "buy more if price drops"}):`,
+    );
     plan.dca.forEach((dca, index) => {
       const dcaLabel = `DCA${index + 1}`;
       const percentAlloc = (dca.percentOfAllocation * 100).toFixed(0);
-      lines.push(
-        `  ${dcaLabel}: $${formatPrice(dca.price)} (add ${percentAlloc}% of allocation)`
-      );
+      lines.push(`  ${dcaLabel}: $${formatPrice(dca.price)} (add ${percentAlloc}% of allocation)`);
     });
     lines.push("");
   }
@@ -410,14 +419,14 @@ function buildContextString(context: ExplainContext): string {
 
     if (plan.entry.price) {
       const stopPercent =
-        ((plan.entry.price - plan.stopLoss.price) / plan.entry.price) * 100;
+        (Math.abs(plan.entry.price - plan.stopLoss.price) / plan.entry.price) * 100;
       parts.push(`Stop Distance: ${stopPercent.toFixed(1)}%`);
     }
 
     parts.push("Take Profits:");
     plan.takeProfit.forEach((tp, i) => {
       parts.push(
-        `  TP${i + 1}: $${formatPrice(tp.price)} (${(tp.percentToSell * 100).toFixed(0)}%)`
+        `  TP${i + 1}: $${formatPrice(tp.price)} (${(tp.percentToSell * 100).toFixed(0)}%)`,
       );
     });
 
@@ -425,7 +434,7 @@ function buildContextString(context: ExplainContext): string {
       parts.push("DCA Levels:");
       plan.dca.forEach((dca, i) => {
         parts.push(
-          `  DCA${i + 1}: $${formatPrice(dca.price)} (${(dca.percentOfAllocation * 100).toFixed(0)}%)`
+          `  DCA${i + 1}: $${formatPrice(dca.price)} (${(dca.percentOfAllocation * 100).toFixed(0)}%)`,
         );
       });
     }
@@ -447,14 +456,14 @@ function buildContextString(context: ExplainContext): string {
       parts.push(`Average Entry: $${formatPrice(trade.averageEntry)}`);
     }
 
-    parts.push(`Realized PnL: $${trade.realizedPnl.toFixed(2)} (${trade.realizedPnlPercent.toFixed(2)}%)`);
+    parts.push(
+      `Realized PnL: $${trade.realizedPnl.toFixed(2)} (${trade.realizedPnlPercent.toFixed(2)}%)`,
+    );
 
     if (trade.entries.length > 0) {
       parts.push("Entry Fills:");
       trade.entries.forEach((entry) => {
-        parts.push(
-          `  ${entry.quantity} @ $${formatPrice(entry.price)} (${entry.filledAt})`
-        );
+        parts.push(`  ${entry.quantity} @ $${formatPrice(entry.price)} (${entry.filledAt})`);
       });
     }
 
@@ -462,7 +471,7 @@ function buildContextString(context: ExplainContext): string {
       parts.push("Exit Fills:");
       trade.exits.forEach((exit) => {
         parts.push(
-          `  ${exit.quantity} @ $${formatPrice(exit.price)} - ${exit.reason} (${exit.filledAt})`
+          `  ${exit.quantity} @ $${formatPrice(exit.price)} - ${exit.reason} (${exit.filledAt})`,
         );
       });
     }
@@ -503,7 +512,7 @@ function buildContextString(context: ExplainContext): string {
         parts.push("Support Levels:");
         supports.slice(0, 3).forEach((level, i) => {
           parts.push(
-            `  S${i + 1}: $${formatPrice(level.price)} (strength: ${(level.strength * 100).toFixed(0)}%, touches: ${level.touches})`
+            `  S${i + 1}: $${formatPrice(level.price)} (strength: ${(level.strength * 100).toFixed(0)}%, touches: ${level.touches})`,
           );
         });
       }
@@ -512,14 +521,16 @@ function buildContextString(context: ExplainContext): string {
         parts.push("Resistance Levels:");
         resistances.slice(0, 3).forEach((level, i) => {
           parts.push(
-            `  R${i + 1}: $${formatPrice(level.price)} (strength: ${(level.strength * 100).toFixed(0)}%, touches: ${level.touches})`
+            `  R${i + 1}: $${formatPrice(level.price)} (strength: ${(level.strength * 100).toFixed(0)}%, touches: ${level.touches})`,
           );
         });
       }
     }
 
     if (analysis.setupDetected) {
-      parts.push(`Setup Detected: Yes (confidence: ${(analysis.setupConfidence * 100).toFixed(0)}%)`);
+      parts.push(
+        `Setup Detected: Yes (confidence: ${(analysis.setupConfidence * 100).toFixed(0)}%)`,
+      );
     }
     parts.push("");
   }
@@ -547,11 +558,11 @@ function buildContextString(context: ExplainContext): string {
 export async function explain(
   client: LLMClient,
   question: string,
-  context: ExplainContext
+  context: ExplainContext,
 ): Promise<string> {
   logger.debug("Processing explanation request", {
     question: question.substring(0, 50),
-    hasContext: !!context.plan || !!context.trade || !!context.analysis
+    hasContext: !!context.plan || !!context.trade || !!context.analysis,
   });
 
   // Check if this is a question about a preset topic
@@ -583,7 +594,9 @@ export async function explain(
   });
 
   if (!failover.ok || !failover.result) {
-    throw new Error(`Explanation failed across all LLM providers: ${formatFailoverErrors(failover.errors)}`);
+    throw new Error(
+      `Explanation failed across all LLM providers: ${formatFailoverErrors(failover.errors)}`,
+    );
   }
 
   if (failover.degraded) {
@@ -601,10 +614,7 @@ export async function explain(
 /**
  * Detect if the question is about a preset topic and return the preset if so
  */
-function detectAndGetPreset(
-  question: string,
-  context: ExplainContext
-): string | null {
+function detectAndGetPreset(question: string, context: ExplainContext): string | null {
   const lowerQuestion = question.toLowerCase();
 
   // Check if context has a specific topic
@@ -620,23 +630,86 @@ function detectAndGetPreset(
     // Indicator keywords
     { keywords: ["what is rsi", "what's rsi", "explain rsi", "rsi mean"], topic: "rsi" },
     { keywords: ["what is macd", "what's macd", "explain macd", "macd mean"], topic: "macd" },
-    { keywords: ["what is support", "what's support", "explain support", "support mean", "support level"], topic: "support" },
-    { keywords: ["what is resistance", "what's resistance", "explain resistance", "resistance mean", "resistance level"], topic: "resistance" },
-    { keywords: ["what is stop loss", "what's a stop", "explain stop", "stop loss mean", "why stop loss"], topic: "stop_loss" },
-    { keywords: ["what is take profit", "what's take profit", "explain take profit", "tp mean"], topic: "take_profit" },
-    { keywords: ["what is dca", "what's dca", "explain dca", "dca mean", "dollar cost"], topic: "dca" },
-    { keywords: ["what is risk reward", "what's risk reward", "explain risk reward", "r:r mean", "risk/reward"], topic: "risk_reward" },
+    {
+      keywords: [
+        "what is support",
+        "what's support",
+        "explain support",
+        "support mean",
+        "support level",
+      ],
+      topic: "support",
+    },
+    {
+      keywords: [
+        "what is resistance",
+        "what's resistance",
+        "explain resistance",
+        "resistance mean",
+        "resistance level",
+      ],
+      topic: "resistance",
+    },
+    {
+      keywords: [
+        "what is stop loss",
+        "what's a stop",
+        "explain stop",
+        "stop loss mean",
+        "why stop loss",
+      ],
+      topic: "stop_loss",
+    },
+    {
+      keywords: ["what is take profit", "what's take profit", "explain take profit", "tp mean"],
+      topic: "take_profit",
+    },
+    {
+      keywords: ["what is dca", "what's dca", "explain dca", "dca mean", "dollar cost"],
+      topic: "dca",
+    },
+    {
+      keywords: [
+        "what is risk reward",
+        "what's risk reward",
+        "explain risk reward",
+        "r:r mean",
+        "risk/reward",
+      ],
+      topic: "risk_reward",
+    },
     // Strategy keywords
-    { keywords: ["support bounce", "support_bounce", "tell me about support bounce"], topic: "support_bounce" },
-    { keywords: ["bollinger bounce", "bollinger_bounce", "bollinger bands strategy"], topic: "bollinger_bounce" },
-    { keywords: ["sma crossover", "sma_crossover", "golden cross strategy"], topic: "sma_crossover" },
+    {
+      keywords: ["support bounce", "support_bounce", "tell me about support bounce"],
+      topic: "support_bounce",
+    },
+    {
+      keywords: ["bollinger bounce", "bollinger_bounce", "bollinger bands strategy"],
+      topic: "bollinger_bounce",
+    },
+    {
+      keywords: ["sma crossover", "sma_crossover", "golden cross strategy"],
+      topic: "sma_crossover",
+    },
     { keywords: ["volume surge", "volume_surge", "volume strategy"], topic: "volume_surge" },
     { keywords: ["vwap bounce", "vwap_bounce", "vwap strategy"], topic: "vwap_bounce" },
-    { keywords: ["ema rsi crossover", "ema_rsi_crossover", "ema crossover strategy"], topic: "ema_rsi_crossover" },
-    { keywords: ["engulfing pattern", "engulfing_pattern", "bullish engulfing strategy"], topic: "engulfing_pattern" },
+    {
+      keywords: ["ema rsi crossover", "ema_rsi_crossover", "ema crossover strategy"],
+      topic: "ema_rsi_crossover",
+    },
+    {
+      keywords: ["engulfing pattern", "engulfing_pattern", "bullish engulfing strategy"],
+      topic: "engulfing_pattern",
+    },
     { keywords: ["adx trend", "adx_trend", "adx strategy"], topic: "adx_trend" },
-    { keywords: ["consolidation pop", "consolidation_pop", "breakout strategy"], topic: "consolidation_pop" },
-    { keywords: ["relative strength", "relative_strength", "rs strategy"], topic: "relative_strength" },
+    {
+      keywords: ["consolidation pop", "consolidation_pop", "breakout strategy"],
+      topic: "consolidation_pop",
+    },
+    {
+      keywords: ["relative strength", "relative_strength", "rs strategy"],
+      topic: "relative_strength",
+    },
   ];
 
   for (const { keywords, topic } of topicKeywords) {

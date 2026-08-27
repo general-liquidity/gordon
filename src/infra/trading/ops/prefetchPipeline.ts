@@ -19,11 +19,11 @@
 // ============================================================================
 
 export type PrefetchTrigger =
-  | "post_analysis"    // User just saw analysis → likely wants to trade
-  | "post_plan"        // Plan created → likely wants to execute
-  | "post_scan"        // Scan results shown → likely wants to drill into top hits
-  | "post_execution"   // Order placed → likely wants to check fills/positions
-  | "post_login"       // Just connected → likely wants portfolio overview
+  | "post_analysis" // User just saw analysis → likely wants to trade
+  | "post_plan" // Plan created → likely wants to execute
+  | "post_scan" // Scan results shown → likely wants to drill into top hits
+  | "post_execution" // Order placed → likely wants to check fills/positions
+  | "post_login" // Just connected → likely wants portfolio overview
   | "symbol_mentioned" // Symbol referenced in chat → fetch context
   | "custom";
 
@@ -77,7 +77,8 @@ export class PrefetchPipeline {
       if (this.inflight.has(task.cacheKey)) continue;
 
       // Launch fetch (fire-and-forget)
-      const promise = task.fetch()
+      const promise = task
+        .fetch()
         .then((data) => {
           this.cache.set(task.cacheKey, {
             data,

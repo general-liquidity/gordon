@@ -30,7 +30,10 @@ describe("outbound fetch guard integration", () => {
   });
 
   test("enforceOutbound allows canonical host", () => {
-    const result = enforceOutbound({ url: "https://api.anthropic.com/v1/messages", caller: "test" });
+    const result = enforceOutbound({
+      url: "https://api.anthropic.com/v1/messages",
+      caller: "test",
+    });
     expect(result.allowed).toBe(true);
   });
 });

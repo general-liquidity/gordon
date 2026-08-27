@@ -63,7 +63,10 @@ describe("conditionalDistributionTest", () => {
   test("decile bookkeeping is consistent", () => {
     const uncond = ramp(200, -3, 3);
     const cond = ramp(100, -1, 4);
-    const r = conditionalDistributionTest({ conditionalReturns: cond, unconditionalReturns: uncond });
+    const r = conditionalDistributionTest({
+      conditionalReturns: cond,
+      unconditionalReturns: uncond,
+    });
     const totalCounts = r.chiSquare.decileCounts.reduce((s, c) => s + c, 0);
     expect(totalCounts).toBe(100);
     const totalFrac = r.chiSquare.decileFractions.reduce((s, f) => s + f, 0);

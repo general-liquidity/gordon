@@ -159,7 +159,7 @@ let sequenceCounter = 0;
 export function createChunk<T>(
   type: StreamChunkType,
   data: T,
-  metadata?: StreamChunk<T>["metadata"]
+  metadata?: StreamChunk<T>["metadata"],
 ): StreamChunk<T> {
   return {
     type,
@@ -175,7 +175,10 @@ export function createChunk<T>(
 /**
  * Create a progress chunk
  */
-export function createProgressChunk(progress: ProgressData, source?: string): StreamChunk<ProgressData> {
+export function createProgressChunk(
+  progress: ProgressData,
+  source?: string,
+): StreamChunk<ProgressData> {
   return createChunk("progress", progress, {
     source,
     progressPercent: progress.percent,
@@ -185,17 +188,24 @@ export function createProgressChunk(progress: ProgressData, source?: string): St
 /**
  * Create a result chunk
  */
-export function createResultChunk<T>(result: ResultData<T>, source?: string): StreamChunk<ResultData<T>> {
+export function createResultChunk<T>(
+  result: ResultData<T>,
+  source?: string,
+): StreamChunk<ResultData<T>> {
   return createChunk("result", result, { source });
 }
 
 /**
  * Create an error chunk
  */
-export function createErrorChunk(error: Error | string, source?: string): StreamChunk<{ message: string; name?: string; stack?: string }> {
-  const errorData = error instanceof Error
-    ? { message: error.message, name: error.name, stack: error.stack }
-    : { message: error };
+export function createErrorChunk(
+  error: Error | string,
+  source?: string,
+): StreamChunk<{ message: string; name?: string; stack?: string }> {
+  const errorData =
+    error instanceof Error
+      ? { message: error.message, name: error.name, stack: error.stack }
+      : { message: error };
 
   return createChunk("error", errorData, { source });
 }
@@ -203,21 +213,35 @@ export function createErrorChunk(error: Error | string, source?: string): Stream
 /**
  * Create a start chunk
  */
-export function createStartChunk(operationName: string, totalExpected?: number): StreamChunk<{ operation: string }> {
-  return createChunk("start", { operation: operationName }, {
-    source: operationName,
-    totalExpected,
-  });
+export function createStartChunk(
+  operationName: string,
+  totalExpected?: number,
+): StreamChunk<{ operation: string }> {
+  return createChunk(
+    "start",
+    { operation: operationName },
+    {
+      source: operationName,
+      totalExpected,
+    },
+  );
 }
 
 /**
  * Create an end chunk
  */
-export function createEndChunk(operationName: string, summary?: Record<string, unknown>): StreamChunk<{ operation: string; summary?: Record<string, unknown> }> {
-  return createChunk("end", { operation: operationName, summary }, {
-    source: operationName,
-    progressPercent: 100,
-  });
+export function createEndChunk(
+  operationName: string,
+  summary?: Record<string, unknown>,
+): StreamChunk<{ operation: string; summary?: Record<string, unknown> }> {
+  return createChunk(
+    "end",
+    { operation: operationName, summary },
+    {
+      source: operationName,
+      progressPercent: 100,
+    },
+  );
 }
 
 /**
@@ -252,18 +276,25 @@ export class ConsoleStreamWriter implements StreamWriter {
     const source = chunk.metadata?.source || "unknown";
 
     switch (chunk.type) {
-      case "progress":
+      case "progress": {
         const progress = chunk.data as ProgressData;
-        console.log(`${prefix} [${timestamp}] Progress (${source}): ${progress.step} - ${progress.current}/${progress.total} (${progress.percent}%)`);
+        console.log(
+          `${prefix} [${timestamp}] Progress (${source}): ${progress.step} - ${progress.current}/${progress.total} (${progress.percent}%)`,
+        );
         break;
-      case "result":
+      }
+      case "result": {
         const result = chunk.data as ResultData;
-        console.log(`${prefix} [${timestamp}] Result (${source}): ${result.success ? "SUCCESS" : "FAILED"} - ${result.operationId} (${result.duration}ms)`);
+        console.log(
+          `${prefix} [${timestamp}] Result (${source}): ${result.success ? "SUCCESS" : "FAILED"} - ${result.operationId} (${result.duration}ms)`,
+        );
         break;
-      case "error":
+      }
+      case "error": {
         const error = chunk.data as { message: string };
         console.error(`${prefix} [${timestamp}] Error (${source}): ${error.message}`);
         break;
+      }
       case "start":
         console.log(`${prefix} [${timestamp}] Started: ${source}`);
         break;
@@ -329,14 +360,14 @@ export class ArrayStreamWriter<T = unknown> implements StreamWriter<T> {
    * Get only result chunks
    */
   getResults(): StreamChunk<T>[] {
-    return this.chunks.filter(c => c.type === "result");
+    return this.chunks.filter((c) => c.type === "result");
   }
 
   /**
    * Get only error chunks
    */
   getErrors(): StreamChunk<T>[] {
-    return this.chunks.filter(c => c.type === "error");
+    return this.chunks.filter((c) => c.type === "error");
   }
 
   /**
@@ -361,7 +392,7 @@ export class CallbackStreamWriter<T = unknown> implements StreamWriter<T> {
     options?: {
       onClose?: () => void | Promise<void>;
       onAbort?: (reason: Error) => void | Promise<void>;
-    }
+    },
   ) {
     this.callback = callback;
     this.onClose = options?.onClose;
@@ -409,21 +440,21 @@ export class MultiplexStreamWriter<T = unknown> implements StreamWriter<T> {
     if (this.closed) {
       throw new Error("Writer is closed");
     }
-    await Promise.all(this.writers.map(w => w.write(chunk)));
+    await Promise.all(this.writers.map((w) => w.write(chunk)));
   }
 
   async close(): Promise<void> {
     this.closed = true;
-    await Promise.all(this.writers.map(w => w.close()));
+    await Promise.all(this.writers.map((w) => w.close()));
   }
 
   isReady(): boolean {
-    return !this.closed && this.writers.every(w => !w.isReady || w.isReady());
+    return !this.closed && this.writers.every((w) => !w.isReady || w.isReady());
   }
 
   async abort(reason: Error): Promise<void> {
     this.closed = true;
-    await Promise.all(this.writers.map(w => w.abort?.(reason)));
+    await Promise.all(this.writers.map((w) => w.abort?.(reason)));
   }
 }
 
@@ -433,11 +464,15 @@ export class MultiplexStreamWriter<T = unknown> implements StreamWriter<T> {
 export class TransformStreamWriter<TIn = unknown, TOut = unknown> implements StreamWriter<TIn> {
   private closed = false;
   private target: StreamWriter<TOut>;
-  private transform: (chunk: StreamChunk<TIn>) => StreamChunk<TOut> | null | Promise<StreamChunk<TOut> | null>;
+  private transform: (
+    chunk: StreamChunk<TIn>,
+  ) => StreamChunk<TOut> | null | Promise<StreamChunk<TOut> | null>;
 
   constructor(
     target: StreamWriter<TOut>,
-    transform: (chunk: StreamChunk<TIn>) => StreamChunk<TOut> | null | Promise<StreamChunk<TOut> | null>
+    transform: (
+      chunk: StreamChunk<TIn>,
+    ) => StreamChunk<TOut> | null | Promise<StreamChunk<TOut> | null>,
   ) {
     this.target = target;
     this.transform = transform;
@@ -492,7 +527,7 @@ export interface StreamingResult<T> {
  */
 export function createStreamingPipeline<T>(
   source: AsyncIterable<T>,
-  options?: StreamingWorkflowOptions
+  options?: StreamingWorkflowOptions,
 ): {
   pipeTo: (writer: StreamWriter<T>) => Promise<StreamingResult<T>>;
   [Symbol.asyncIterator]: () => AsyncIterator<T>;
@@ -512,8 +547,10 @@ export function createStreamingPipeline<T>(
           const interval = options.heartbeatInterval || 5000;
           heartbeatInterval = setInterval(async () => {
             try {
-              await writer.write(createHeartbeatChunk(options.metadata?.source as string) as StreamChunk<T>);
-            } catch (e) {
+              await writer.write(
+                createHeartbeatChunk(options.metadata?.source as string) as StreamChunk<T>,
+              );
+            } catch (_e) {
               // Ignore heartbeat errors
             }
           }, interval);
@@ -528,7 +565,7 @@ export function createStreamingPipeline<T>(
           // Check backpressure
           if (writer.isReady && !writer.isReady()) {
             logger.warn("Writer not ready, waiting...");
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise((resolve) => setTimeout(resolve, 100));
           }
 
           const chunk = createChunk("result", item, options?.metadata);
@@ -540,7 +577,6 @@ export function createStreamingPipeline<T>(
         // Write end chunk
         await writer.write(createEndChunk("pipeline", { chunksWritten, errors }) as StreamChunk<T>);
         chunksWritten++;
-
       } catch (err) {
         errors++;
         const error = err instanceof Error ? err : new Error(String(err));
@@ -596,7 +632,7 @@ export function createCallbackWriter<T = unknown>(
   options?: {
     onClose?: () => void | Promise<void>;
     onAbort?: (reason: Error) => void | Promise<void>;
-  }
+  },
 ): CallbackStreamWriter<T> {
   return new CallbackStreamWriter<T>(callback, options);
 }
@@ -604,7 +640,9 @@ export function createCallbackWriter<T = unknown>(
 /**
  * Create a multiplexer writer that writes to multiple destinations
  */
-export function createMultiplexWriter<T = unknown>(writers: StreamWriter<T>[]): MultiplexStreamWriter<T> {
+export function createMultiplexWriter<T = unknown>(
+  writers: StreamWriter<T>[],
+): MultiplexStreamWriter<T> {
   return new MultiplexStreamWriter<T>(writers);
 }
 
@@ -613,7 +651,9 @@ export function createMultiplexWriter<T = unknown>(writers: StreamWriter<T>[]): 
  */
 export function createTransformWriter<TIn = unknown, TOut = unknown>(
   target: StreamWriter<TOut>,
-  transform: (chunk: StreamChunk<TIn>) => StreamChunk<TOut> | null | Promise<StreamChunk<TOut> | null>
+  transform: (
+    chunk: StreamChunk<TIn>,
+  ) => StreamChunk<TOut> | null | Promise<StreamChunk<TOut> | null>,
 ): TransformStreamWriter<TIn, TOut> {
   return new TransformStreamWriter<TIn, TOut>(target, transform);
 }

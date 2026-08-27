@@ -79,5 +79,14 @@ export function analyzeContext(
     });
   }
 
-  return { systemPrompt, toolDefinitions, conversation, memory, totalUsed, maxTokens, usagePercent, suggestions };
+  return {
+    systemPrompt,
+    toolDefinitions,
+    conversation,
+    memory,
+    totalUsed,
+    maxTokens,
+    usagePercent,
+    suggestions,
+  };
 }

@@ -38,11 +38,7 @@
  * ```
  */
 
-import {
-  getDefaultIpcPath,
-  isIpcDaemonReachable,
-  sendIpcCommand,
-} from "../gateway/daemon/ipc.ts";
+import { getDefaultIpcPath, isIpcDaemonReachable, sendIpcCommand } from "../gateway/daemon/ipc.ts";
 import type { GatewayIPCResponse } from "../gateway/daemon/ipc.ts";
 import type { GatewayCommandEnvelope } from "../gateway/protocol/commands.ts";
 import {
@@ -212,9 +208,7 @@ export class GordonSDKClient {
 
     while (this.reconnectAttempt < this.config.maxReconnectAttempts) {
       this.reconnectAttempt++;
-      const delay =
-        this.config.reconnectIntervalMs *
-        Math.pow(2, this.reconnectAttempt - 1);
+      const delay = this.config.reconnectIntervalMs * 2 ** (this.reconnectAttempt - 1);
 
       this.emit("reconnecting", {
         attempt: this.reconnectAttempt,
@@ -261,10 +255,7 @@ export class GordonSDKClient {
    */
   private async ensureConnected(): Promise<void> {
     if (this._connectionState === "connected") return;
-    if (
-      this._connectionState === "disconnected" ||
-      this._connectionState === "reconnecting"
-    ) {
+    if (this._connectionState === "disconnected" || this._connectionState === "reconnecting") {
       await this.connect();
     }
   }
@@ -325,10 +316,10 @@ export class GordonSDKClient {
         }
       }
 
-      throw new ConnectionError(
-        `Failed to reach Gordon daemon: ${message}`,
-        { socketPath: this.socketPath, commandType: command.type },
-      );
+      throw new ConnectionError(`Failed to reach Gordon daemon: ${message}`, {
+        socketPath: this.socketPath,
+        commandType: command.type,
+      });
     }
 
     this.emit("command_response", {
@@ -371,10 +362,7 @@ export class GordonSDKClient {
    * await client.sendMessage("Show me ETH analysis", { threadId: "t-123" });
    * ```
    */
-  async sendMessage(
-    text: string,
-    options: SendMessageOptions = {},
-  ): Promise<SDKCommandResponse> {
+  async sendMessage(text: string, options: SendMessageOptions = {}): Promise<SDKCommandResponse> {
     const parsed = ChatSendMessagePayloadSchema.safeParse({
       text,
       threadId: options.threadId,
@@ -414,9 +402,7 @@ export class GordonSDKClient {
       throw new ValidationError("sendStructuredMessage requires non-empty text");
     }
     if (options.schemaName == null && options.jsonSchema == null) {
-      throw new ValidationError(
-        "sendStructuredMessage requires either schemaName or jsonSchema",
-      );
+      throw new ValidationError("sendStructuredMessage requires either schemaName or jsonSchema");
     }
     return this.send({
       type: "chat.structured_message",
@@ -523,9 +509,7 @@ export class GordonSDKClient {
    * });
    * ```
    */
-  async scheduleTask(
-    options: ScheduleTaskOptions,
-  ): Promise<SDKCommandResponse> {
+  async scheduleTask(options: ScheduleTaskOptions): Promise<SDKCommandResponse> {
     const parsed = SchedulerCreateTaskPayloadSchema.safeParse({
       taskId: options.taskId,
       cron: options.cron,
@@ -601,9 +585,7 @@ export class GordonSDKClient {
    * console.log(result.data);
    * ```
    */
-  async healthCheck(
-    options: HealthCheckOptions = {},
-  ): Promise<SDKCommandResponse> {
+  async healthCheck(options: HealthCheckOptions = {}): Promise<SDKCommandResponse> {
     const parsed = RuntimeHealthCheckPayloadSchema.safeParse(options);
     if (!parsed.success) {
       throw new ValidationError(
@@ -631,9 +613,7 @@ export class GordonSDKClient {
    * await client.reconcile({ force: true });
    * ```
    */
-  async reconcile(
-    options: ReconcileOptions = {},
-  ): Promise<SDKCommandResponse> {
+  async reconcile(options: ReconcileOptions = {}): Promise<SDKCommandResponse> {
     const parsed = ReconcileRunPayloadSchema.safeParse(options);
     if (!parsed.success) {
       throw new ValidationError(
@@ -662,9 +642,7 @@ export class GordonSDKClient {
    * await client.reloadPlugins({ pluginId: "my-custom-plugin" });
    * ```
    */
-  async reloadPlugins(
-    options: PluginReloadOptions = {},
-  ): Promise<SDKCommandResponse> {
+  async reloadPlugins(options: PluginReloadOptions = {}): Promise<SDKCommandResponse> {
     const parsed = PluginReloadPayloadSchema.safeParse(options);
     if (!parsed.success) {
       throw new ValidationError(
@@ -767,10 +745,7 @@ export class GordonSDKClient {
    * allSub.unsubscribe();
    * ```
    */
-  onEvent(
-    eventType: SDKEventType | "*",
-    callback: SDKEventHandler,
-  ): EventSubscription {
+  onEvent(eventType: SDKEventType | "*", callback: SDKEventHandler): EventSubscription {
     let handlers = this.listeners.get(eventType);
     if (!handlers) {
       handlers = new Set();

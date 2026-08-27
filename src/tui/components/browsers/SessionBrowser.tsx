@@ -8,7 +8,7 @@
  * Phase 17 of the TUI rebuild.
  */
 
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Box, Text } from "../../ink-custom";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { SessionPreview } from "../editors/SessionPreview.tsx";
@@ -77,41 +77,39 @@ export function SessionBrowser({ sessions, onSelect, onClose }: Props) {
   const sorted = useMemo(
     () =>
       [...sessions].sort(
-        (a, b) =>
-          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+        (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
       ),
     [sessions],
   );
 
-  useRoutedInput((_, key) => {
-    if (key.escape) {
-      onClose();
-      return;
-    }
-    if (key.upArrow) {
-      setSelectedIndex((i) => Math.max(0, i - 1));
-      return;
-    }
-    if (key.downArrow) {
-      setSelectedIndex((i) => Math.min(sorted.length - 1, i + 1));
-      return;
-    }
-    if (key.return) {
-      const session = sorted[selectedIndex];
-      if (session) onSelect(session.sessionId);
-    }
-  }, { id: "sessionBrowser", priority: FOCUS_PRIORITY.DIALOG });
+  useRoutedInput(
+    (_, key) => {
+      if (key.escape) {
+        onClose();
+        return;
+      }
+      if (key.upArrow) {
+        setSelectedIndex((i) => Math.max(0, i - 1));
+        return;
+      }
+      if (key.downArrow) {
+        setSelectedIndex((i) => Math.min(sorted.length - 1, i + 1));
+        return;
+      }
+      if (key.return) {
+        const session = sorted[selectedIndex];
+        if (session) onSelect(session.sessionId);
+      }
+    },
+    { id: "sessionBrowser", priority: FOCUS_PRIORITY.DIALOG },
+  );
 
   if (sorted.length === 0) {
     return (
-      <Box
-        flexDirection="column"
-        borderStyle="round"
-        borderColor="cyan"
-        paddingX={2}
-        paddingY={1}
-      >
-        <Text bold color="cyan">SESSION HISTORY</Text>
+      <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+        <Text bold color="cyan">
+          SESSION HISTORY
+        </Text>
         <Text> </Text>
         <Text dimColor>No past sessions found.</Text>
         <Text> </Text>
@@ -131,89 +129,90 @@ export function SessionBrowser({ sessions, onSelect, onClose }: Props) {
 
   return (
     <Box flexDirection="row">
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
-      paddingX={2}
-      paddingY={1}
-    >
-      <Box>
-        <Text bold color="cyan">SESSION HISTORY</Text>
-        <Text dimColor> ({sorted.length} sessions)</Text>
-      </Box>
-      <Text> </Text>
+      <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+        <Box>
+          <Text bold color="cyan">
+            SESSION HISTORY
+          </Text>
+          <Text dimColor> ({sorted.length} sessions)</Text>
+        </Box>
+        <Text> </Text>
 
-      {/* Header row */}
-      <Box paddingLeft={3}>
-        <Box width={COL_DATE}>
-          <Text bold dimColor>DATE</Text>
-        </Box>
-        <Box width={COL_MSGS}>
-          <Text bold dimColor>MSGS</Text>
-        </Box>
-        <Box width={COL_PNL}>
-          <Text bold dimColor>P&L</Text>
-        </Box>
-        <Box width={COL_DUR}>
-          <Text bold dimColor>DURATION</Text>
-        </Box>
-      </Box>
-
-      {/* Session rows */}
-      {sorted.slice(0, 20).map((session, i) => {
-        const isSelected = i === selectedIndex;
-        const dur =
-          session.duration ?? formatDuration(session.startedAt, session.endedAt);
-
-        return (
-          <Box key={session.sessionId} paddingLeft={1}>
-            <Text color={isSelected ? "yellow" : undefined}>
-              {isSelected ? "\u25B8 " : "  "}
+        {/* Header row */}
+        <Box paddingLeft={3}>
+          <Box width={COL_DATE}>
+            <Text bold dimColor>
+              DATE
             </Text>
-            <Box width={COL_DATE}>
-              <Text bold={isSelected}>{formatDate(session.startedAt)}</Text>
-            </Box>
-            <Box width={COL_MSGS}>
-              <Text>{session.messageCount}</Text>
-            </Box>
-            <Box width={COL_PNL}>
-              {session.pnl != null ? (
-                <Text color={session.pnl >= 0 ? "green" : "red"}>
-                  {session.pnl >= 0 ? "+" : ""}
-                  {session.pnl.toFixed(2)}
-                </Text>
-              ) : (
-                <Text dimColor>{"\u2014"}</Text>
-              )}
-            </Box>
-            <Box width={COL_DUR}>
-              <Text dimColor>{dur}</Text>
-            </Box>
           </Box>
-        );
-      })}
+          <Box width={COL_MSGS}>
+            <Text bold dimColor>
+              MSGS
+            </Text>
+          </Box>
+          <Box width={COL_PNL}>
+            <Text bold dimColor>
+              P&L
+            </Text>
+          </Box>
+          <Box width={COL_DUR}>
+            <Text bold dimColor>
+              DURATION
+            </Text>
+          </Box>
+        </Box>
 
-      <Text> </Text>
-      <Text dimColor>
-        {"\u2191\u2193"} navigate {"\u00b7"} Enter resume {"\u00b7"} Esc close
-      </Text>
-    </Box>
-    {focused && (
-      <Box marginLeft={1}>
-        <SessionPreview
-          preview={{
-            openPositions: 0,
-            pnlUsd: focused.pnl,
-            lastActivity: focused.endedAt ?? focused.startedAt,
-            messageCount: focused.messageCount,
-          }}
-          onResume={() => onSelect(focused.sessionId)}
-          onClose={onClose}
-          embedded
-        />
+        {/* Session rows */}
+        {sorted.slice(0, 20).map((session, i) => {
+          const isSelected = i === selectedIndex;
+          const dur = session.duration ?? formatDuration(session.startedAt, session.endedAt);
+
+          return (
+            <Box key={session.sessionId} paddingLeft={1}>
+              <Text color={isSelected ? "yellow" : undefined}>{isSelected ? "\u25B8 " : "  "}</Text>
+              <Box width={COL_DATE}>
+                <Text bold={isSelected}>{formatDate(session.startedAt)}</Text>
+              </Box>
+              <Box width={COL_MSGS}>
+                <Text>{session.messageCount}</Text>
+              </Box>
+              <Box width={COL_PNL}>
+                {session.pnl != null ? (
+                  <Text color={session.pnl >= 0 ? "green" : "red"}>
+                    {session.pnl >= 0 ? "+" : ""}
+                    {session.pnl.toFixed(2)}
+                  </Text>
+                ) : (
+                  <Text dimColor>{"\u2014"}</Text>
+                )}
+              </Box>
+              <Box width={COL_DUR}>
+                <Text dimColor>{dur}</Text>
+              </Box>
+            </Box>
+          );
+        })}
+
+        <Text> </Text>
+        <Text dimColor>
+          {"\u2191\u2193"} navigate {"\u00b7"} Enter resume {"\u00b7"} Esc close
+        </Text>
       </Box>
-    )}
+      {focused && (
+        <Box marginLeft={1}>
+          <SessionPreview
+            preview={{
+              openPositions: 0,
+              pnlUsd: focused.pnl,
+              lastActivity: focused.endedAt ?? focused.startedAt,
+              messageCount: focused.messageCount,
+            }}
+            onResume={() => onSelect(focused.sessionId)}
+            onClose={onClose}
+            embedded
+          />
+        </Box>
+      )}
     </Box>
   );
 }

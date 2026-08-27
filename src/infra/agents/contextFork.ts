@@ -43,7 +43,6 @@ import {
   type InvestigationDependencies,
   type InvestigationMessage,
   type InvestigationResult,
-  type InvestigationToolCall,
 } from "./investigation.ts";
 
 export interface ContextForkRequest {

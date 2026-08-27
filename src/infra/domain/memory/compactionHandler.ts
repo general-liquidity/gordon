@@ -55,7 +55,11 @@ export async function applyCompactionIfNeeded<T extends { role: string; content:
       messageCount: messages.length,
     });
     if (preCompact.action === "block") {
-      return { applied: false, messages, detail: `microcompact blocked: ${preCompact.reason ?? "hook policy"}` };
+      return {
+        applied: false,
+        messages,
+        detail: `microcompact blocked: ${preCompact.reason ?? "hook policy"}`,
+      };
     }
     const result = microcompactMessages(messages);
     if (result.cleared === 0) {
@@ -70,7 +74,11 @@ export async function applyCompactionIfNeeded<T extends { role: string; content:
       clearedCount: result.cleared,
     });
     if (postCompact.action === "block") {
-      return { applied: false, messages, detail: `microcompact withheld: ${postCompact.reason ?? "hook policy"}` };
+      return {
+        applied: false,
+        messages,
+        detail: `microcompact withheld: ${postCompact.reason ?? "hook policy"}`,
+      };
     }
     logger.info("microcompact applied", {
       cleared: result.cleared,

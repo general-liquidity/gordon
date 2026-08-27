@@ -47,7 +47,10 @@ export function reserveIdempotencyKey(input: {
   });
 
   const row = executeWithLogging(
-    () => db.query("SELECT * FROM gateway_idempotency WHERE idempotencyKey = ?").get(key) as RawIdempotencyRow | null,
+    () =>
+      db
+        .query("SELECT * FROM gateway_idempotency WHERE idempotencyKey = ?")
+        .get(key) as RawIdempotencyRow | null,
     "SELECT gateway_idempotency",
   );
 
@@ -110,10 +113,7 @@ export function completeIdempotencyKey(input: {
   );
 }
 
-export function failIdempotencyKey(input: {
-  idempotencyKey?: string;
-  error: unknown;
-}): void {
+export function failIdempotencyKey(input: { idempotencyKey?: string; error: unknown }): void {
   const idempotencyKey = input.idempotencyKey;
   if (!idempotencyKey) return;
   const db = getDatabase();
@@ -125,11 +125,7 @@ export function failIdempotencyKey(input: {
           SET status = ?, responseJson = ?
           WHERE idempotencyKey = ?`,
         )
-        .run(
-          "failed",
-          JSON.stringify({ error: String(input.error) }),
-          idempotencyKey,
-        ),
+        .run("failed", JSON.stringify({ error: String(input.error) }), idempotencyKey),
     "UPDATE gateway_idempotency failed",
   );
 }
@@ -138,7 +134,10 @@ export function pruneExpiredIdempotencyKeys(): number {
   const db = getDatabase();
   const now = new Date().toISOString();
   const result = executeWithLogging(
-    () => db.query("DELETE FROM gateway_idempotency WHERE expiresAt IS NOT NULL AND expiresAt < ?").run(now),
+    () =>
+      db
+        .query("DELETE FROM gateway_idempotency WHERE expiresAt IS NOT NULL AND expiresAt < ?")
+        .run(now),
     "DELETE gateway_idempotency expired",
   );
   return Number(result.changes ?? 0);

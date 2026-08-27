@@ -1,9 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Box, Text } from "../ink-custom";
-import {
-  PALETTE_WORKFLOW_CONFIG,
-  type PaletteWorkflowId,
-} from "../../app/slash/commandUx.ts";
+import { PALETTE_WORKFLOW_CONFIG, type PaletteWorkflowId } from "../../app/slash/commandUx.ts";
 import type { GordonTheme } from "../themes/themes.ts";
 import { useTheme } from "../themes/ThemeProvider.tsx";
 import { fuzzyMatch } from "../utils/fuzzy.ts";
@@ -48,7 +45,12 @@ export function groupPaletteItems(
         const config = PALETTE_WORKFLOW_CONFIG[group];
         // Frecency nudges recently/frequently used commands up within their
         // group; the config.order * 10 term keeps group ordering dominant.
-        return { item, index, group, score: 1_000 - config.order * 10 - index / 1000 + frec(item.id) };
+        return {
+          item,
+          index,
+          group,
+          score: 1_000 - config.order * 10 - index / 1000 + frec(item.id),
+        };
       }
       const match =
         fuzzyMatch(trimmed, item.label) ??
@@ -83,8 +85,12 @@ export function CommandPalette({ items, onSelect, onClose, workspaceSection, fre
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const grouped = useMemo(() => groupPaletteItems(items, query, frecency), [items, query, frecency]);
-  const showWorkspace = query.trim() === "" && workspaceSection && workspaceSection.items.length > 0;
+  const grouped = useMemo(
+    () => groupPaletteItems(items, query, frecency),
+    [items, query, frecency],
+  );
+  const showWorkspace =
+    query.trim() === "" && workspaceSection && workspaceSection.items.length > 0;
   const flat = useMemo(
     () => [
       ...(showWorkspace ? workspaceSection!.items : []),
@@ -94,36 +100,39 @@ export function CommandPalette({ items, onSelect, onClose, workspaceSection, fre
   );
   const totalShown = flat.length;
 
-  useRoutedInput((input, key) => {
-    if (key.escape) {
-      onClose();
-      return;
-    }
-    if (key.upArrow) {
-      setSelectedIndex((i) => Math.max(0, i - 1));
-      return;
-    }
-    if (key.downArrow) {
-      setSelectedIndex((i) => Math.min(Math.max(0, totalShown - 1), i + 1));
-      return;
-    }
-    if (key.return) {
-      const item = flat[selectedIndex];
-      if (item) onSelect(item);
-      return;
-    }
-    if (key.backspace || key.delete) {
-      setQuery((q) => q.slice(0, -1));
-      setSelectedIndex(0);
-      return;
-    }
-    if (input && !key.ctrl && !key.meta) {
-      setQuery((q) => q + input);
-      setSelectedIndex(0);
-      return;
-    }
-    return false;
-  }, { id: "command-palette", priority: FOCUS_PRIORITY.OVERLAY });
+  useRoutedInput(
+    (input, key) => {
+      if (key.escape) {
+        onClose();
+        return;
+      }
+      if (key.upArrow) {
+        setSelectedIndex((i) => Math.max(0, i - 1));
+        return;
+      }
+      if (key.downArrow) {
+        setSelectedIndex((i) => Math.min(Math.max(0, totalShown - 1), i + 1));
+        return;
+      }
+      if (key.return) {
+        const item = flat[selectedIndex];
+        if (item) onSelect(item);
+        return;
+      }
+      if (key.backspace || key.delete) {
+        setQuery((q) => q.slice(0, -1));
+        setSelectedIndex(0);
+        return;
+      }
+      if (input && !key.ctrl && !key.meta) {
+        setQuery((q) => q + input);
+        setSelectedIndex(0);
+        return;
+      }
+      return false;
+    },
+    { id: "command-palette", priority: FOCUS_PRIORITY.OVERLAY },
+  );
 
   let cursor = 0;
   const renderRow = (item: PaletteItem, color: string): React.ReactElement => {
@@ -167,9 +176,13 @@ export function CommandPalette({ items, onSelect, onClose, workspaceSection, fre
       {showWorkspace && (
         <>
           <Box marginTop={1}>
-            <Text color={theme[workspaceSection!.colorToken ?? "uiBrand"]} bold>{workspaceSection!.label}</Text>
+            <Text color={theme[workspaceSection!.colorToken ?? "uiBrand"]} bold>
+              {workspaceSection!.label}
+            </Text>
           </Box>
-          {workspaceSection!.items.map((item) => renderRow(item, theme[workspaceSection!.colorToken ?? "uiBrand"]))}
+          {workspaceSection!.items.map((item) =>
+            renderRow(item, theme[workspaceSection!.colorToken ?? "uiBrand"]),
+          )}
         </>
       )}
 
@@ -179,7 +192,9 @@ export function CommandPalette({ items, onSelect, onClose, workspaceSection, fre
         return (
           <React.Fragment key={group}>
             <Box marginTop={1}>
-              <Text color={color} bold>{config.icon} {config.label}</Text>
+              <Text color={color} bold>
+                {config.icon} {config.label}
+              </Text>
             </Box>
             {groupItems.map((item) => renderRow(item, color))}
           </React.Fragment>
@@ -193,7 +208,9 @@ export function CommandPalette({ items, onSelect, onClose, workspaceSection, fre
       )}
 
       <Box marginTop={1}>
-        <Text dimColor>{totalShown} of {items.length} · ↑↓ navigate · Enter run · Esc close</Text>
+        <Text dimColor>
+          {totalShown} of {items.length} · ↑↓ navigate · Enter run · Esc close
+        </Text>
       </Box>
     </Box>
   );

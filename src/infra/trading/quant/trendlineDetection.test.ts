@@ -19,20 +19,35 @@ function risingLinear(n: number, h0: number, l0: number, dh: number, dl: number)
 describe("detectTrendlines — validation", () => {
   it("rejects fewer than 3 bars", () => {
     expect(() =>
-      detectTrendlines({ bars: [{ high: 10, low: 9 }, { high: 11, low: 10 }] }),
+      detectTrendlines({
+        bars: [
+          { high: 10, low: 9 },
+          { high: 11, low: 10 },
+        ],
+      }),
     ).toThrow(/at least 3/);
   });
 
   it("rejects non-finite values", () => {
     expect(() =>
-      detectTrendlines({ bars: [{ high: NaN, low: 1 }, { high: 2, low: 1 }, { high: 3, low: 2 }] }),
+      detectTrendlines({
+        bars: [
+          { high: NaN, low: 1 },
+          { high: 2, low: 1 },
+          { high: 3, low: 2 },
+        ],
+      }),
     ).toThrow(/non-finite/);
   });
 
   it("rejects low > high", () => {
     expect(() =>
       detectTrendlines({
-        bars: [{ high: 5, low: 6 }, { high: 7, low: 6 }, { high: 8, low: 7 }],
+        bars: [
+          { high: 5, low: 6 },
+          { high: 7, low: 6 },
+          { high: 8, low: 7 },
+        ],
       }),
     ).toThrow(/low.*>.*high/);
   });

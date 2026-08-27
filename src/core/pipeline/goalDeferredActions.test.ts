@@ -13,9 +13,7 @@ import {
 describe("isGoalDeferredActionsEnabled", () => {
   it("respects the flag", () => {
     expect(isGoalDeferredActionsEnabled({})).toBe(false);
-    expect(
-      isGoalDeferredActionsEnabled({ [GOAL_DEFERRED_ACTIONS_FLAG_ENV]: "1" }),
-    ).toBe(true);
+    expect(isGoalDeferredActionsEnabled({ [GOAL_DEFERRED_ACTIONS_FLAG_ENV]: "1" })).toBe(true);
   });
 });
 

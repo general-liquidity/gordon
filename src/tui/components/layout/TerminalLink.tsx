@@ -1,4 +1,3 @@
-import React from "react";
 import { Text } from "../../ink-custom";
 
 // ============================================================================
@@ -32,7 +31,11 @@ function supportsHyperlinks(): boolean {
 export function TerminalLink({ url, children, color = "cyan" }: Props) {
   if (!supportsHyperlinks()) {
     // Fallback: show text with URL in parentheses
-    return <Text color={color} underline>{children}</Text>;
+    return (
+      <Text color={color} underline>
+        {children}
+      </Text>
+    );
   }
 
   // OSC 8 hyperlink: \x1b]8;;URL\x07TEXT\x1b]8;;\x07

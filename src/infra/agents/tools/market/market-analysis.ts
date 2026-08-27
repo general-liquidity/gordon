@@ -16,6 +16,7 @@ import {
   BreakoutDetector,
   ConsolidationDetector,
   MarketScorer,
+  type FlowFeatures,
   type OrderBookEntry,
 } from "../../../../core/market-analysis/index.ts";
 import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "../types.ts";
@@ -43,10 +44,7 @@ export const analyzeWhaleOrdersTool = createTool({
       .number()
       .default(50000)
       .describe("Minimum USD value to consider a whale order (default: $50,000)"),
-    depthLimit: z
-      .number()
-      .default(100)
-      .describe("Number of orderbook levels to analyze"),
+    depthLimit: z.number().default(100).describe("Number of orderbook levels to analyze"),
   }),
   outputSchema: z.object({
     symbol: z.string().optional(),
@@ -57,26 +55,37 @@ export const analyzeWhaleOrdersTool = createTool({
     whaleBidsCount: z.number().optional(),
     whaleAsksCount: z.number().optional(),
     totalWhaleValue: z.number().optional(),
-    largestBid: z.object({
-      price: z.number(),
-      quantity: z.number(),
-      value: z.number(),
-    }).nullable().optional(),
-    largestAsk: z.object({
-      price: z.number(),
-      quantity: z.number(),
-      value: z.number(),
-    }).nullable().optional(),
-    depthAnalysis: z.object({
-      bidDepth: z.number(),
-      askDepth: z.number(),
-      depthImbalance: z.number(),
-      bidAskRatio: z.number(),
-    }).optional(),
+    largestBid: z
+      .object({
+        price: z.number(),
+        quantity: z.number(),
+        value: z.number(),
+      })
+      .nullable()
+      .optional(),
+    largestAsk: z
+      .object({
+        price: z.number(),
+        quantity: z.number(),
+        value: z.number(),
+      })
+      .nullable()
+      .optional(),
+    depthAnalysis: z
+      .object({
+        bidDepth: z.number(),
+        askDepth: z.number(),
+        depthImbalance: z.number(),
+        bidAskRatio: z.number(),
+      })
+      .optional(),
     interpretation: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, whaleThresholdUsd, depthLimit }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, whaleThresholdUsd, depthLimit },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -117,7 +126,7 @@ export const analyzeWhaleOrdersTool = createTool({
       if (depthAnalysis.depthImbalance > 0.3) {
         interpretation += ` Order book depth favors buyers (${(depthAnalysis.bidAskRatio).toFixed(2)}:1 ratio).`;
       } else if (depthAnalysis.depthImbalance < -0.3) {
-        interpretation += ` Order book depth favors sellers (1:${(1/depthAnalysis.bidAskRatio).toFixed(2)} ratio).`;
+        interpretation += ` Order book depth favors sellers (1:${(1 / depthAnalysis.bidAskRatio).toFixed(2)} ratio).`;
       }
 
       return {
@@ -146,18 +155,20 @@ export const estimateMarketImpactTool = createTool({
     orderSizeUsd: z.number().positive().describe("Size of order in USD"),
     side: z.enum(["BUY", "SELL"]).default("BUY").describe("Order side"),
   }),
-  outputSchema: z.object({
-    symbol: z.string(),
-    orderSizeUsd: z.number(),
-    side: z.enum(["BUY", "SELL"]),
-    bestPrice: z.number(),
-    impactPrice: z.number(),
-    slippagePercent: z.number(),
-    levelsConsumed: z.number(),
-    fillPercentage: z.number(),
-    interpretation: z.string(),
-    error: z.string().optional(),
-  }).partial(),
+  outputSchema: z
+    .object({
+      symbol: z.string(),
+      orderSizeUsd: z.number(),
+      side: z.enum(["BUY", "SELL"]),
+      bestPrice: z.number(),
+      impactPrice: z.number(),
+      slippagePercent: z.number(),
+      levelsConsumed: z.number(),
+      fillPercentage: z.number(),
+      interpretation: z.string(),
+      error: z.string().optional(),
+    })
+    .partial(),
   execute: async ({ symbol, orderSizeUsd, side }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
@@ -224,20 +235,22 @@ export const scanBreakoutsTool = createTool({
     timeframe: z.enum(["15m", "1h", "4h", "1d"]).default("1h").describe("Timeframe for analysis"),
     lookbackBars: z.number().default(289).describe("Number of bars for S/R calculation"),
   }),
-  outputSchema: z.object({
-    symbol: z.string(),
-    breakout: z.boolean(),
-    breakdown: z.boolean(),
-    support: z.number(),
-    resistance: z.number(),
-    currentPrice: z.number(),
-    breakoutPrice: z.number().nullable(),
-    breakdownPrice: z.number().nullable(),
-    distanceToResistance: z.number(),
-    distanceToSupport: z.number(),
-    interpretation: z.string(),
-    error: z.string().optional(),
-  }).partial(),
+  outputSchema: z
+    .object({
+      symbol: z.string(),
+      breakout: z.boolean(),
+      breakdown: z.boolean(),
+      support: z.number(),
+      resistance: z.number(),
+      currentPrice: z.number(),
+      breakoutPrice: z.number().nullable(),
+      breakdownPrice: z.number().nullable(),
+      distanceToResistance: z.number(),
+      distanceToSupport: z.number(),
+      interpretation: z.string(),
+      error: z.string().optional(),
+    })
+    .partial(),
   execute: async ({ symbol, timeframe, lookbackBars }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
@@ -255,7 +268,7 @@ export const scanBreakoutsTool = createTool({
         normalizedSymbol,
         candles,
         spread.bidPrice,
-        spread.askPrice
+        spread.askPrice,
       );
 
       let interpretation = "";
@@ -300,21 +313,26 @@ export const detectConsolidationTool = createTool({
       .default(0.7)
       .describe("True Range % threshold for consolidation (default 0.7%)"),
   }),
-  outputSchema: z.object({
-    symbol: z.string(),
-    isConsolidating: z.boolean(),
-    consolidationLow: z.number(),
-    consolidationHigh: z.number(),
-    rangeSize: z.number(),
-    rangePercent: z.number(),
-    trueRangePercent: z.number(),
-    barsInConsolidation: z.number(),
-    currentPrice: z.number(),
-    positionInRange: z.string(),
-    interpretation: z.string(),
-    error: z.string().optional(),
-  }).partial(),
-  execute: async ({ symbol, timeframe, consolidationThreshold }, execContext: MastraExecutionContext) => {
+  outputSchema: z
+    .object({
+      symbol: z.string(),
+      isConsolidating: z.boolean(),
+      consolidationLow: z.number(),
+      consolidationHigh: z.number(),
+      rangeSize: z.number(),
+      rangePercent: z.number(),
+      trueRangePercent: z.number(),
+      barsInConsolidation: z.number(),
+      currentPrice: z.number(),
+      positionInRange: z.string(),
+      interpretation: z.string(),
+      error: z.string().optional(),
+    })
+    .partial(),
+  execute: async (
+    { symbol, timeframe, consolidationThreshold },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -382,26 +400,31 @@ export const scoreMarketTool = createTool({
     "Use when user asks to 'rank coins', 'score opportunities', 'which coin is best', 'compare symbols'.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
-    includeWhaleAnalysis: z.boolean().default(true).describe("Include whale order analysis in scoring"),
+    includeWhaleAnalysis: z
+      .boolean()
+      .default(true)
+      .describe("Include whale order analysis in scoring"),
   }),
-  outputSchema: z.object({
-    symbol: z.string(),
-    technicalScore: z.number(),
-    flowScore: z.number(),
-    combinedScore: z.number(),
-    consensus: z.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
-    confidence: z.number(),
-    narrative: z.string(),
-    factors: z.object({
-      trendScore: z.number(),
-      volatilityScore: z.number(),
-      momentumScore: z.number(),
-      whaleScore: z.number(),
-      pressureScore: z.number(),
-    }),
-    interpretation: z.string(),
-    error: z.string().optional(),
-  }).partial(),
+  outputSchema: z
+    .object({
+      symbol: z.string(),
+      technicalScore: z.number(),
+      flowScore: z.number(),
+      combinedScore: z.number(),
+      consensus: z.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
+      confidence: z.number(),
+      narrative: z.string(),
+      factors: z.object({
+        trendScore: z.number(),
+        volatilityScore: z.number(),
+        momentumScore: z.number(),
+        whaleScore: z.number(),
+        pressureScore: z.number(),
+      }),
+      interpretation: z.string(),
+      error: z.string().optional(),
+    })
+    .partial(),
   execute: async ({ symbol, includeWhaleAnalysis }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
@@ -431,7 +454,7 @@ export const scoreMarketTool = createTool({
         const tr = Math.max(
           candle.high - candle.low,
           Math.abs(candle.high - prevClose),
-          Math.abs(candle.low - prevClose)
+          Math.abs(candle.low - prevClose),
         );
         trSum += tr;
       }
@@ -453,7 +476,7 @@ export const scoreMarketTool = createTool({
       const avgGain = gains / 14;
       const avgLoss = losses / 14;
       const rs = avgLoss > 0 ? avgGain / avgLoss : 100;
-      const rsi = 100 - (100 / (1 + rs));
+      const rsi = 100 - 100 / (1 + rs);
 
       const marketData = {
         volatility,
@@ -463,7 +486,7 @@ export const scoreMarketTool = createTool({
       };
 
       // Optionally include whale analysis
-      let flowFeatures = undefined;
+      let flowFeatures: FlowFeatures | undefined;
       if (includeWhaleAnalysis) {
         try {
           const orderBook = await ctx.exchange.getOrderBook(normalizedSymbol, 100);

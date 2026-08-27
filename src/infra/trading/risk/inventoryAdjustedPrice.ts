@@ -88,10 +88,7 @@ export interface InventoryAdjustmentResult {
    * "Bias direction" of the adjustment, plain-English label so audit
    * lines stay operator-readable.
    */
-  bias:
-    | "long_inventory_sell_bias"
-    | "short_inventory_buy_bias"
-    | "neutral";
+  bias: "long_inventory_sell_bias" | "short_inventory_buy_bias" | "neutral";
   /** Echo of inputs for audit trail. */
   inputs: {
     mid: number;
@@ -152,9 +149,7 @@ export function computeInventoryAdjustedPrice(
 }
 
 /** One-line operator summary suitable for audit / tool output. */
-export function summarizeInventoryAdjustment(
-  r: InventoryAdjustmentResult,
-): string {
+export function summarizeInventoryAdjustment(r: InventoryAdjustmentResult): string {
   const direction =
     r.bias === "long_inventory_sell_bias"
       ? "long inventory → bias toward selling (r below mid)"

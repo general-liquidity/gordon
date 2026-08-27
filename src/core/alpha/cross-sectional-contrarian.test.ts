@@ -8,7 +8,7 @@ import {
 function genPrices(start: number, totalReturn: number, steps: number, noise = 0.005): number[] {
   // Smooth geometric trajectory with mild noise so σ is non-degenerate.
   const out: number[] = [start];
-  const r = Math.pow(1 + totalReturn, 1 / steps);
+  const r = (1 + totalReturn) ** (1 / steps);
   let p = start;
   for (let i = 1; i <= steps; i++) {
     const wobble = 1 + (Math.sin(i * 1.7) - 0.3) * noise;
@@ -39,7 +39,7 @@ describe("sizeCrossSectionalContrarian", () => {
 
   test("winners get short weight, losers get long weight", () => {
     const assets: ContrarianAsset[] = [
-      { symbol: "WINNER", prices: genPrices(100, 0.20, 30) },
+      { symbol: "WINNER", prices: genPrices(100, 0.2, 30) },
       { symbol: "FLAT_A", prices: genPrices(100, 0.0, 30) },
       { symbol: "FLAT_B", prices: genPrices(100, 0.0, 30) },
       { symbol: "FLAT_C", prices: genPrices(100, 0.0, 30) },
@@ -54,11 +54,11 @@ describe("sizeCrossSectionalContrarian", () => {
 
   test("dollar-neutrality: net exposure ≈ 0", () => {
     const assets: ContrarianAsset[] = [
-      { symbol: "A", prices: genPrices(100, 0.10, 30) },
+      { symbol: "A", prices: genPrices(100, 0.1, 30) },
       { symbol: "B", prices: genPrices(100, 0.05, 30) },
       { symbol: "C", prices: genPrices(100, 0.0, 30) },
       { symbol: "D", prices: genPrices(100, -0.05, 30) },
-      { symbol: "E", prices: genPrices(100, -0.10, 30) },
+      { symbol: "E", prices: genPrices(100, -0.1, 30) },
     ];
     const r = sizeCrossSectionalContrarian(assets);
     expect(Math.abs(r.netExposure)).toBeLessThan(1e-4);
@@ -66,11 +66,11 @@ describe("sizeCrossSectionalContrarian", () => {
 
   test("gross exposure normalizes to 1.0", () => {
     const assets: ContrarianAsset[] = [
-      { symbol: "A", prices: genPrices(100, 0.10, 30) },
+      { symbol: "A", prices: genPrices(100, 0.1, 30) },
       { symbol: "B", prices: genPrices(100, 0.05, 30) },
       { symbol: "C", prices: genPrices(100, 0.0, 30) },
       { symbol: "D", prices: genPrices(100, -0.05, 30) },
-      { symbol: "E", prices: genPrices(100, -0.10, 30) },
+      { symbol: "E", prices: genPrices(100, -0.1, 30) },
     ];
     const r = sizeCrossSectionalContrarian(assets);
     expect(r.grossExposure).toBeCloseTo(1.0, 2);
@@ -79,7 +79,7 @@ describe("sizeCrossSectionalContrarian", () => {
   test("inverse-sigma weighting reduces volatile names vs none", () => {
     const calmReturns = genPrices(100, 0.05, 30, 0.001);
     const wildReturns = genPrices(100, 0.05, 30, 0.05);
-    const fillerLoser = genPrices(100, -0.10, 30, 0.01);
+    const fillerLoser = genPrices(100, -0.1, 30, 0.01);
     const fillerFlat = genPrices(100, 0.0, 30, 0.01);
     const assets: ContrarianAsset[] = [
       { symbol: "CALM", prices: calmReturns },
@@ -100,7 +100,7 @@ describe("sizeCrossSectionalContrarian", () => {
 
   test("maxAbsoluteWeight caps single-name concentration", () => {
     const assets: ContrarianAsset[] = [
-      { symbol: "EXTREME", prices: genPrices(100, 1.50, 30) },
+      { symbol: "EXTREME", prices: genPrices(100, 1.5, 30) },
       { symbol: "MILD_A", prices: genPrices(100, 0.01, 30) },
       { symbol: "MILD_B", prices: genPrices(100, 0.01, 30) },
       { symbol: "MILD_C", prices: genPrices(100, 0.01, 30) },
@@ -115,11 +115,11 @@ describe("sizeCrossSectionalContrarian", () => {
 
   test("demeaned returns sum to ≈ 0", () => {
     const assets: ContrarianAsset[] = [
-      { symbol: "A", prices: genPrices(100, 0.10, 30) },
+      { symbol: "A", prices: genPrices(100, 0.1, 30) },
       { symbol: "B", prices: genPrices(100, 0.05, 30) },
       { symbol: "C", prices: genPrices(100, 0.0, 30) },
       { symbol: "D", prices: genPrices(100, -0.05, 30) },
-      { symbol: "E", prices: genPrices(100, -0.10, 30) },
+      { symbol: "E", prices: genPrices(100, -0.1, 30) },
     ];
     const r = sizeCrossSectionalContrarian(assets);
     const sumDemeaned = r.weights.reduce((s, w) => s + w.demeanedReturn, 0);
@@ -128,11 +128,11 @@ describe("sizeCrossSectionalContrarian", () => {
 
   test("contrarian sign: largest winner has most-negative weight", () => {
     const assets: ContrarianAsset[] = [
-      { symbol: "BIG_WIN", prices: genPrices(100, 0.30, 30) },
+      { symbol: "BIG_WIN", prices: genPrices(100, 0.3, 30) },
       { symbol: "SMALL_WIN", prices: genPrices(100, 0.05, 30) },
       { symbol: "FLAT", prices: genPrices(100, 0.0, 30) },
       { symbol: "SMALL_LOSS", prices: genPrices(100, -0.05, 30) },
-      { symbol: "BIG_LOSS", prices: genPrices(100, -0.20, 30) },
+      { symbol: "BIG_LOSS", prices: genPrices(100, -0.2, 30) },
     ];
     const r = sizeCrossSectionalContrarian(assets, { volatilityWeighting: "none" });
     const sorted = [...r.weights].sort((a, b) => a.weight - b.weight);
@@ -142,11 +142,11 @@ describe("sizeCrossSectionalContrarian", () => {
 
   test("inverse_sigma_squared weighting is valid", () => {
     const assets: ContrarianAsset[] = [
-      { symbol: "A", prices: genPrices(100, 0.10, 30) },
+      { symbol: "A", prices: genPrices(100, 0.1, 30) },
       { symbol: "B", prices: genPrices(100, 0.05, 30) },
       { symbol: "C", prices: genPrices(100, 0.0, 30) },
       { symbol: "D", prices: genPrices(100, -0.05, 30) },
-      { symbol: "E", prices: genPrices(100, -0.10, 30) },
+      { symbol: "E", prices: genPrices(100, -0.1, 30) },
     ];
     const r = sizeCrossSectionalContrarian(assets, {
       volatilityWeighting: "inverse_sigma_squared",
@@ -159,11 +159,11 @@ describe("sizeCrossSectionalContrarian", () => {
 describe("formatCrossSectionalContrarian", () => {
   test("renders weighted result with LONG/SHORT lists", () => {
     const assets: ContrarianAsset[] = [
-      { symbol: "A", prices: genPrices(100, 0.10, 30) },
+      { symbol: "A", prices: genPrices(100, 0.1, 30) },
       { symbol: "B", prices: genPrices(100, 0.05, 30) },
       { symbol: "C", prices: genPrices(100, 0.0, 30) },
       { symbol: "D", prices: genPrices(100, -0.05, 30) },
-      { symbol: "E", prices: genPrices(100, -0.10, 30) },
+      { symbol: "E", prices: genPrices(100, -0.1, 30) },
     ];
     const r = sizeCrossSectionalContrarian(assets);
     const text = formatCrossSectionalContrarian(r);

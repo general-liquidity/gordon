@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  DARK_THEME,
-  DARK_DALTONIZED_THEME,
-  type GordonTheme,
-} from "../themes/themes.ts";
+import { DARK_THEME, DARK_DALTONIZED_THEME, type GordonTheme } from "../themes/themes.ts";
 import {
   buildTopBorder,
   embedTitleInBorder,

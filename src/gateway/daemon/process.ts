@@ -8,7 +8,11 @@ import { startGatewayIpcServer } from "./ipc.ts";
 import { LocalCronScheduler, computeNextRunAt } from "../scheduler/index.ts";
 import { ReconciliationLoop } from "../reconciliation/index.ts";
 import { getOrCreateDaemonToken } from "../security/index.ts";
-import { initMCPTools, enableMCPHotReload, disableMCPHotReload } from "../../infra/ai/mcp/client.ts";
+import {
+  initMCPTools,
+  enableMCPHotReload,
+  disableMCPHotReload,
+} from "../../infra/ai/mcp/client.ts";
 import { StrategyRuntime } from "../../core/runtime/engine.ts";
 import { upsertSchedulerTask } from "../store/scheduler-store.ts";
 import { resetOrphanedRunningCommands } from "../store/command-queue-store.ts";
@@ -22,9 +26,7 @@ import { resetSubscriptionRegistry } from "../../events/index.ts";
 
 const logger = createModuleLogger("gateway-daemon");
 
-function safeAppendActionLog(
-  input: Parameters<typeof appendActionLogEntry>[0],
-): void {
+function safeAppendActionLog(input: Parameters<typeof appendActionLogEntry>[0]): void {
   try {
     appendActionLogEntry(input);
   } catch (error) {
@@ -108,12 +110,15 @@ export async function startGatewayDaemonProcess(
       if (initCtx.exchange) {
         const details = await initCtx.exchange.getFullAccountDetails();
         // Support multiple quote currencies (USDT, USDC, EUR, etc.)
-        const totalCapital = details.totalUsdtValue
-          ?? (details as any).totalUsdcValue
-          ?? (details as any).totalValue
-          ?? 0;
+        const totalCapital =
+          details.totalUsdtValue ??
+          (details as any).totalUsdcValue ??
+          (details as any).totalValue ??
+          0;
         if (totalCapital === 0) {
-          logger.warn("Could not determine total capital — no supported quote currency found in account details");
+          logger.warn(
+            "Could not determine total capital — no supported quote currency found in account details",
+          );
         }
         strategyRuntime.setTotalCapital(totalCapital);
         logger.info("StrategyRuntime initialized with exchange equity", {
@@ -177,7 +182,10 @@ export async function startGatewayDaemonProcess(
         logger.warn("Startup reconciliation skipped — no exchange configured");
       }
     } catch (error) {
-      logger.error("Startup reconciliation failed — local state may be stale until the next reconciliation cycle", error as Error);
+      logger.error(
+        "Startup reconciliation failed — local state may be stale until the next reconciliation cycle",
+        error as Error,
+      );
       safeAppendAudit({
         eventType: "daemon.startup_reconciliation_failed",
         actor: "daemon",
@@ -198,7 +206,11 @@ export async function startGatewayDaemonProcess(
     cleanedUp = true;
     const failures: unknown[] = [];
     const attempt = (operation: () => void): void => {
-      try { operation(); } catch (error) { failures.push(error); }
+      try {
+        operation();
+      } catch (error) {
+        failures.push(error);
+      }
     };
     if (reconciler) attempt(() => reconciler?.stop());
     if (scheduler) attempt(() => scheduler?.stop());
@@ -207,7 +219,11 @@ export async function startGatewayDaemonProcess(
       mcpHotReloadEnabled = false;
     }
     if (ipc) {
-      try { await ipc.close(); } catch (error) { failures.push(error); }
+      try {
+        await ipc.close();
+      } catch (error) {
+        failures.push(error);
+      }
     }
     if (announceStop && ipc) {
       safeAppendAudit({
@@ -224,7 +240,11 @@ export async function startGatewayDaemonProcess(
         payload: { socketPath: ipc.socketPath },
       });
     }
-    try { await runtime.disposeAsync(); } catch (error) { failures.push(error); }
+    try {
+      await runtime.disposeAsync();
+    } catch (error) {
+      failures.push(error);
+    }
     attempt(() => resetSubscriptionRegistry());
     attempt(() => resetMemoryManager());
     attempt(() => closeDatabase());

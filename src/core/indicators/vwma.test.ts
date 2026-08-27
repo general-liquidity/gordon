@@ -25,10 +25,7 @@ describe("VWMA", () => {
   test("rolls forward over the window", () => {
     // window bars 1..3: closes [20,30,40] vol [1,1,2]
     // pv = 20+30+80 = 130; vol = 4 → 32.5
-    const r = calculateVWMA(
-      [bar(10, 1), bar(20, 1), bar(30, 1), bar(40, 2)],
-      3,
-    );
+    const r = calculateVWMA([bar(10, 1), bar(20, 1), bar(30, 1), bar(40, 2)], 3);
     expect(r[3]).toBeCloseTo(32.5, 6);
   });
 

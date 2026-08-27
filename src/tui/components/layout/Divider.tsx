@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text, useStdout } from "../../ink-custom";
 
 // ============================================================================
@@ -28,7 +27,9 @@ export function Divider({ title, color, style = "solid" }: Props) {
     return (
       <Box>
         <Text dimColor={!color} color={color}>
-          {ch.repeat(left)}{titleWithPad}{ch.repeat(right)}
+          {ch.repeat(left)}
+          {titleWithPad}
+          {ch.repeat(right)}
         </Text>
       </Box>
     );
@@ -37,7 +38,9 @@ export function Divider({ title, color, style = "solid" }: Props) {
   const ch = CHARS[style];
   return (
     <Box>
-      <Text dimColor={!color} color={color}>{ch.repeat(width - 2)}</Text>
+      <Text dimColor={!color} color={color}>
+        {ch.repeat(width - 2)}
+      </Text>
     </Box>
   );
 }

@@ -56,7 +56,7 @@ export class BollingerBounceStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, 100);
     if (candles.length < 30) {
@@ -79,7 +79,7 @@ export class BollingerBounceStrategy extends BaseStrategy {
 
     if (distanceToLower > BAND_TOUCH_THRESHOLD) {
       return this.notDetected(
-        `Price too far from lower band (${(distanceToLower * 100).toFixed(1)}% above)`
+        `Price too far from lower band (${(distanceToLower * 100).toFixed(1)}% above)`,
       );
     }
 
@@ -90,19 +90,13 @@ export class BollingerBounceStrategy extends BaseStrategy {
     }
 
     if (rsi.current > RSI_THRESHOLD) {
-      return this.notDetected(
-        `RSI not oversold (${rsi.current.toFixed(1)} > ${RSI_THRESHOLD})`
-      );
+      return this.notDetected(`RSI not oversold (${rsi.current.toFixed(1)} > ${RSI_THRESHOLD})`);
     }
 
     // Check for strong downtrend (disqualifier)
     const ema50 = this.calculateEMA(candles, 50);
     const ema200 = this.calculateEMA(candles, 200);
-    if (
-      ema50.current &&
-      ema200.current &&
-      ema50.current < ema200.current * 0.95
-    ) {
+    if (ema50.current && ema200.current && ema50.current < ema200.current * 0.95) {
       // EMA50 more than 5% below EMA200 = strong downtrend
       return this.notDetected("Strong downtrend detected (avoid catching knives)");
     }
@@ -158,10 +152,7 @@ export class BollingerBounceStrategy extends BaseStrategy {
     return this.detected(confidence, signals, reasons.join(". "));
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", 100);
     const currentPrice = this.getCurrentPrice(candles, ctx);
 
@@ -191,7 +182,8 @@ export class BollingerBounceStrategy extends BaseStrategy {
       stopLoss,
       takeProfits,
       riskRewardRatio,
-      notes: `Bollinger Bounce setup. Target middle band at $${(bb.current.middle ?? 0).toFixed(2)}. ` +
+      notes:
+        `Bollinger Bounce setup. Target middle band at $${(bb.current.middle ?? 0).toFixed(2)}. ` +
         `R:R ${riskRewardRatio.toFixed(1)}:1`,
     };
   }
@@ -215,15 +207,10 @@ export class BollingerBounceStrategy extends BaseStrategy {
     bar: OHLC,
     _index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     const price = bar.close;
-    const {
-      rsi14,
-      bbUpper,
-      bbMiddle,
-      bbLower,
-    } = indicators;
+    const { rsi14, bbUpper, bbMiddle, bbLower } = indicators;
 
     // Need Bollinger Bands to generate signals
     if (
@@ -277,16 +264,7 @@ export class BollingerBounceStrategy extends BaseStrategy {
    * Get required indicators for backtesting.
    */
   override getRequiredIndicators(): string[] {
-    return [
-      "rsi14",
-      "atr14",
-      "bbUpper",
-      "bbMiddle",
-      "bbLower",
-      "bbWidth",
-      "ema50",
-      "volumeRatio",
-    ];
+    return ["rsi14", "atr14", "bbUpper", "bbMiddle", "bbLower", "bbWidth", "ema50", "volumeRatio"];
   }
 
   getPromptFragment(): string {

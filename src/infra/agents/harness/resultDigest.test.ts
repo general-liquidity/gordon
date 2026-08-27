@@ -11,7 +11,11 @@ describe("digestLargeResult", () => {
   });
 
   test("digests a large array of objects with row count, column aggregates, sample, and tally", () => {
-    const scan = Array.from({ length: 50 }, (_, i) => ({ symbol: `S${i}`, rsi: 30 + (i % 40), score: i / 50 }));
+    const scan = Array.from({ length: 50 }, (_, i) => ({
+      symbol: `S${i}`,
+      rsi: 30 + (i % 40),
+      score: i / 50,
+    }));
     const d = digestLargeResult(scan)!;
     expect(d).toContain("50 rows");
     expect(d).toContain("rsi: min"); // numeric column aggregated
@@ -48,7 +52,12 @@ describe("digestLargeResult", () => {
   });
 
   test("honors maxChars by dropping sample rows but keeping the aggregates", () => {
-    const wide = Array.from({ length: 20 }, (_, i) => ({ id: i, a: i, b: i * 2, note: "x".repeat(200) }));
+    const wide = Array.from({ length: 20 }, (_, i) => ({
+      id: i,
+      a: i,
+      b: i * 2,
+      note: "x".repeat(200),
+    }));
     const d = digestLargeResult(wide, { maxChars: 300 })!;
     expect(d.length).toBeLessThanOrEqual(301); // maxChars (+1 for the ellipsis)
     expect(d).toContain("20 rows"); // the count/aggregates survive

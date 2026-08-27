@@ -32,7 +32,8 @@ function samplePlan(overrides: Partial<Plan> = {}): Plan {
     grid: null,
     stopLoss: { price: 95 },
     takeProfit: [{ price: 110, percentToSell: 1 }],
-    reasoning: "Price held the 95 support twice and the regime is trending up, so a bounce entry at 100 with a stop under support is favourable.",
+    reasoning:
+      "Price held the 95 support twice and the regime is trending up, so a bounce entry at 100 with a stop under support is favourable.",
     status: "DRAFT",
     synthesisManifest: {
       capturedAt: 1_754_000_000_000,
@@ -196,7 +197,11 @@ describe("rationale consistency findings", () => {
       legs: {
         factuality: { leg: "factuality", score: MIN_PLAN_RATIONALE_CONSISTENCY, justification: "" },
         deduction: { leg: "deduction", score: MIN_PLAN_RATIONALE_CONSISTENCY, justification: "" },
-        consistency: { leg: "consistency", score: MIN_PLAN_RATIONALE_CONSISTENCY, justification: "" },
+        consistency: {
+          leg: "consistency",
+          score: MIN_PLAN_RATIONALE_CONSISTENCY,
+          justification: "",
+        },
       },
       factuality: MIN_PLAN_RATIONALE_CONSISTENCY,
       deduction: MIN_PLAN_RATIONALE_CONSISTENCY,

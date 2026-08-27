@@ -420,9 +420,6 @@ describe("inception loss barrier", () => {
     expect(payload.tripped).toBe(true);
     expect(payload.boundBy).toBe("inception");
     expect(payload.referenceCapitalUsd).toBe(100_000);
-    expect(payload.barriers.map((b) => b.kind)).toEqual([
-      "trailing_high_water",
-      "inception",
-    ]);
+    expect(payload.barriers.map((b) => b.kind)).toEqual(["trailing_high_water", "inception"]);
   });
 });

@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 
 // ============================================================================
@@ -78,7 +77,7 @@ export function ToolExecutionDetailDialog({ execution, onClose }: Props) {
 
   const truncatedResult =
     execution.result && execution.result.length > RESULT_MAX_CHARS
-      ? execution.result.slice(0, RESULT_MAX_CHARS) + "..."
+      ? `${execution.result.slice(0, RESULT_MAX_CHARS)}...`
       : execution.result;
 
   return (
@@ -91,7 +90,9 @@ export function ToolExecutionDetailDialog({ execution, onClose }: Props) {
     >
       {/* Title */}
       <Box marginBottom={0}>
-        <Text bold color="cyanBright">TOOL EXECUTION: </Text>
+        <Text bold color="cyanBright">
+          TOOL EXECUTION:{" "}
+        </Text>
         <Text bold>{execution.toolName}</Text>
       </Box>
       <Text dimColor>{DIVIDER}</Text>
@@ -116,10 +117,10 @@ export function ToolExecutionDetailDialog({ execution, onClose }: Props) {
       {/* Status */}
       <Box marginTop={1}>
         <Text bold>Status: </Text>
-        <Text color={color}>{icon} {execution.status}</Text>
-        {duration && (
-          <Text dimColor>  ({duration})</Text>
-        )}
+        <Text color={color}>
+          {icon} {execution.status}
+        </Text>
+        {duration && <Text dimColor> ({duration})</Text>}
       </Box>
 
       {/* Result */}
@@ -135,7 +136,9 @@ export function ToolExecutionDetailDialog({ execution, onClose }: Props) {
       {/* Error */}
       {execution.error && (
         <Box flexDirection="column" marginTop={1}>
-          <Text bold color="red">Error:</Text>
+          <Text bold color="red">
+            Error:
+          </Text>
           <Box paddingLeft={2}>
             <Text color="red">{execution.error}</Text>
           </Box>

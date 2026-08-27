@@ -108,8 +108,7 @@ export const convictionFilteredExpectancyDiagnosticTool = createTool({
       source: "agent_tool",
       component: "simulate_conviction_filtered_expectancy",
       toolName: "simulate_conviction_filtered_expectancy",
-      outcome:
-        result.verdict === "filtered_edge_found" ? "failure" : "info",
+      outcome: result.verdict === "filtered_edge_found" ? "failure" : "info",
       details: {
         verdict: result.verdict,
         totalTrades: result.totalTrades,
@@ -130,6 +129,5 @@ export const convictionFilteredExpectancyDiagnosticTool = createTool({
 });
 
 export const convictionFilteredExpectancyTools = {
-  simulate_conviction_filtered_expectancy:
-    convictionFilteredExpectancyDiagnosticTool,
+  simulate_conviction_filtered_expectancy: convictionFilteredExpectancyDiagnosticTool,
 };

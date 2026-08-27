@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 
 // ============================================================================
 // Overlay Context — Tracks active overlays for Escape key routing
@@ -64,9 +64,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
 
   return (
     <OverlayStateContext.Provider value={state}>
-      <OverlayActionsContext.Provider value={actions}>
-        {children}
-      </OverlayActionsContext.Provider>
+      <OverlayActionsContext.Provider value={actions}>{children}</OverlayActionsContext.Provider>
     </OverlayStateContext.Provider>
   );
 }

@@ -86,14 +86,17 @@ export interface SwitchResult {
  * Thread registry stored alongside session state
  */
 interface ThreadRegistry {
-  threads: Record<string, {
-    threadId: string;
-    resourceId: string;
-    createdAt: string;
-    clonedFrom: string | null;
-    label: string;
-    lastActiveAt: string;
-  }>;
+  threads: Record<
+    string,
+    {
+      threadId: string;
+      resourceId: string;
+      createdAt: string;
+      clonedFrom: string | null;
+      label: string;
+      lastActiveAt: string;
+    }
+  >;
 }
 
 // In-memory cache of thread registry
@@ -224,7 +227,7 @@ async function touchThread(threadId: string): Promise<void> {
 export async function cloneThread(
   sourceThreadId: string,
   newThreadId?: string,
-  label?: string
+  label?: string,
 ): Promise<CloneResult> {
   const startTime = Date.now();
   logger.info("Starting thread clone", { sourceThreadId, newThreadId });
@@ -248,12 +251,18 @@ export async function cloneThread(
     try {
       // Get thread context including messages and working memory
       // Using type assertion as getContextWindow may not be in public types
-      const context = await (memory as unknown as {
-        getContextWindow(params: { threadId: string; resourceId: string; format: string }): Promise<{
-          messages?: Array<{ role: string; content: string; id?: string; createdAt?: Date }>;
-          workingMemory?: string;
-        }>;
-      }).getContextWindow({
+      const context = await (
+        memory as unknown as {
+          getContextWindow(params: {
+            threadId: string;
+            resourceId: string;
+            format: string;
+          }): Promise<{
+            messages?: Array<{ role: string; content: string; id?: string; createdAt?: Date }>;
+            workingMemory?: string;
+          }>;
+        }
+      ).getContextWindow({
         threadId: sourceThreadId,
         resourceId,
         format: "raw",
@@ -287,19 +296,24 @@ export async function cloneThread(
     for (const message of messages) {
       try {
         // Cast to bypass strict type checking - runtime structure matches expected format
-        await (memory.saveMessages as (params: {
-          messages: Array<{ role: string; content: unknown; id?: string; createdAt?: Date }>;
-          threadId: string;
-          resourceId: string;
-        }) => Promise<unknown>)({
-          messages: [{
-            role: message.role,
-            content: typeof message.content === "string"
-              ? message.content
-              : JSON.stringify(message.content),
-            id: message.id || randomUUID(),
-            createdAt: message.createdAt || new Date(),
-          }],
+        await (
+          memory.saveMessages as (params: {
+            messages: Array<{ role: string; content: unknown; id?: string; createdAt?: Date }>;
+            threadId: string;
+            resourceId: string;
+          }) => Promise<unknown>
+        )({
+          messages: [
+            {
+              role: message.role,
+              content:
+                typeof message.content === "string"
+                  ? message.content
+                  : JSON.stringify(message.content),
+              id: message.id || randomUUID(),
+              createdAt: message.createdAt || new Date(),
+            },
+          ],
           threadId: targetThreadId,
           resourceId,
         });
@@ -389,11 +403,17 @@ export async function listThreads(resourceId?: string): Promise<ThreadInfo[]> {
         try {
           const memory = createMemoryInstance();
           // Using type assertion as getContextWindow may not be in public types
-          const context = await (memory as unknown as {
-            getContextWindow(params: { threadId: string; resourceId: string; format: string }): Promise<{
-              messages?: Array<{ role: string; content: string }>;
-            }>;
-          }).getContextWindow({
+          const context = await (
+            memory as unknown as {
+              getContextWindow(params: {
+                threadId: string;
+                resourceId: string;
+                format: string;
+              }): Promise<{
+                messages?: Array<{ role: string; content: string }>;
+              }>;
+            }
+          ).getContextWindow({
             threadId,
             resourceId: effectiveResourceId,
             format: "raw",
@@ -419,8 +439,8 @@ export async function listThreads(resourceId?: string): Promise<ThreadInfo[]> {
     }
 
     // Sort by last active time (most recent first)
-    threadInfos.sort((a, b) =>
-      new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime()
+    threadInfos.sort(
+      (a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime(),
     );
 
     logger.debug("Listed threads", {
@@ -456,8 +476,9 @@ export function buildThreadTree(threads: ThreadInfo[]): ThreadTreeNode[] {
   }
 
   for (const siblings of childrenByParent.values()) {
-    siblings.sort((left, right) =>
-      new Date(right.lastActiveAt).getTime() - new Date(left.lastActiveAt).getTime()
+    siblings.sort(
+      (left, right) =>
+        new Date(right.lastActiveAt).getTime() - new Date(left.lastActiveAt).getTime(),
     );
   }
 
@@ -482,9 +503,12 @@ export function buildThreadTree(threads: ThreadInfo[]): ThreadTreeNode[] {
     }
   };
 
-  const roots = threads.filter((thread) => !thread.clonedFrom || !threads.some((candidate) => candidate.threadId === thread.clonedFrom));
-  const sortedRoots = [...roots].sort((left, right) =>
-    new Date(right.lastActiveAt).getTime() - new Date(left.lastActiveAt).getTime()
+  const roots = threads.filter(
+    (thread) =>
+      !thread.clonedFrom || !threads.some((candidate) => candidate.threadId === thread.clonedFrom),
+  );
+  const sortedRoots = [...roots].sort(
+    (left, right) => new Date(right.lastActiveAt).getTime() - new Date(left.lastActiveAt).getTime(),
   );
 
   for (const root of sortedRoots) {
@@ -504,7 +528,9 @@ export function buildThreadTree(threads: ThreadInfo[]): ThreadTreeNode[] {
  * @param threadId - The thread ID to delete
  * @returns Success status
  */
-export async function deleteThread(threadId: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteThread(
+  threadId: string,
+): Promise<{ success: boolean; error?: string }> {
   try {
     const sessionState = await loadSessionState();
 
@@ -565,11 +591,17 @@ export async function getThreadInfo(threadId: string): Promise<ThreadInfo | null
     try {
       const memory = createMemoryInstance();
       // Using type assertion as getContextWindow may not be in public types
-      const context = await (memory as unknown as {
-        getContextWindow(params: { threadId: string; resourceId: string; format: string }): Promise<{
-          messages?: Array<{ role: string; content: string }>;
-        }>;
-      }).getContextWindow({
+      const context = await (
+        memory as unknown as {
+          getContextWindow(params: {
+            threadId: string;
+            resourceId: string;
+            format: string;
+          }): Promise<{
+            messages?: Array<{ role: string; content: string }>;
+          }>;
+        }
+      ).getContextWindow({
         threadId,
         resourceId: thread.resourceId,
         format: "raw",
@@ -659,7 +691,7 @@ export async function switchThread(threadId: string): Promise<SwitchResult> {
  */
 export async function updateThreadLabel(
   threadId: string,
-  label: string
+  label: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const registry = await loadThreadRegistry();

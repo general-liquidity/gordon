@@ -44,7 +44,11 @@ export function Tabs({ tabs, activeKey, onChange, children }: Props) {
           return (
             <React.Fragment key={tab.key}>
               {i > 0 ? <Text dimColor>{"\u2502"}</Text> : null}
-              <Text bold={isActive} color={isActive ? "cyanBright" : undefined} dimColor={!isActive}>
+              <Text
+                bold={isActive}
+                color={isActive ? "cyanBright" : undefined}
+                dimColor={!isActive}
+              >
                 {tab.label}
               </Text>
             </React.Fragment>

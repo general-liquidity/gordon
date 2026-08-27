@@ -13,10 +13,7 @@ export interface SelectState<T> {
   reset: () => void;
 }
 
-export function useSelectState<T>(
-  options: Array<{ value: T }>,
-  initialIndex = 0,
-): SelectState<T> {
+export function useSelectState<T>(options: Array<{ value: T }>, initialIndex = 0): SelectState<T> {
   const clamp = (i: number) => Math.max(0, Math.min(options.length - 1, i));
 
   const [selectedIndex, setSelectedIndexRaw] = useState<number>(() =>

@@ -32,8 +32,14 @@ describe("computeDealerGreeksExposure", () => {
 
   it("flipping the dealer-position assumption flips the gamma sign", () => {
     const longBook = computeDealerGreeksExposure(callHeavy, params);
-    const shortBook = computeDealerGreeksExposure(callHeavy, { ...params, callSign: -1, putSign: 1 });
-    expect(Math.sign(shortBook.atSpot.gammaExposure)).toBe(-Math.sign(longBook.atSpot.gammaExposure));
+    const shortBook = computeDealerGreeksExposure(callHeavy, {
+      ...params,
+      callSign: -1,
+      putSign: 1,
+    });
+    expect(Math.sign(shortBook.atSpot.gammaExposure)).toBe(
+      -Math.sign(longBook.atSpot.gammaExposure),
+    );
   });
 
   it("finds a gamma flip when puts cluster low and calls cluster high", () => {

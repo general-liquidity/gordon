@@ -249,9 +249,7 @@ describe("a judge that fails to answer yields no score rather than a passing one
 
   it("reports an unscored result when a single leg returns a malformed score", async () => {
     const result = await scoreTriangularConsistency(GROUNDED_NON_SEQUITUR, ({ leg }) =>
-      leg === "consistency"
-        ? ({ score: "high" } as unknown as { score: number })
-        : { score: 0.95 },
+      leg === "consistency" ? ({ score: "high" } as unknown as { score: number }) : { score: 0.95 },
     );
     expect(result.scored).toBe(false);
     if (result.scored) throw new Error("unreachable");
@@ -262,7 +260,9 @@ describe("a judge that fails to answer yields no score rather than a passing one
 
   it("rejects out-of-range and non-finite scores", async () => {
     for (const bad of [1.4, -0.2, Number.NaN, Number.POSITIVE_INFINITY]) {
-      const result = await scoreTriangularConsistency(GROUNDED_NON_SEQUITUR, () => ({ score: bad }));
+      const result = await scoreTriangularConsistency(GROUNDED_NON_SEQUITUR, () => ({
+        score: bad,
+      }));
       expect(result.scored).toBe(false);
     }
   });

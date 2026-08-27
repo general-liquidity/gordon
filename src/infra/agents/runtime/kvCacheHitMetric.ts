@@ -87,7 +87,7 @@ export function recordCacheCall(input: RecordCallInput, path?: string): CacheCal
   };
   const target = path ?? defaultKvCacheMetricPath();
   ensureParentDir(target);
-  appendFileSync(target, JSON.stringify(record) + "\n", "utf8");
+  appendFileSync(target, `${JSON.stringify(record)}\n`, "utf8");
   return record;
 }
 
@@ -97,7 +97,9 @@ export function readCacheCalls(
 ): CacheCallRecord[] {
   const target = path ?? defaultKvCacheMetricPath();
   if (!existsSync(target)) return [];
-  const lines = readFileSync(target, "utf8").split("\n").filter((l) => l.trim().length > 0);
+  const lines = readFileSync(target, "utf8")
+    .split("\n")
+    .filter((l) => l.trim().length > 0);
   const out: CacheCallRecord[] = [];
   for (const line of lines) {
     try {

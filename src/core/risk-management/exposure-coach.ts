@@ -150,8 +150,7 @@ export function computeExposureCeiling(
   const maxCeiling = options.maxCeiling ?? DEFAULT_MAX_CEILING;
   const entriesFloor = options.entriesFloor ?? DEFAULT_ENTRIES_FLOOR;
   const breadthWeight = options.breadthWeight ?? DEFAULT_BREADTH_WEIGHT;
-  const participationWeight =
-    options.participationWeight ?? DEFAULT_PARTICIPATION_WEIGHT;
+  const participationWeight = options.participationWeight ?? DEFAULT_PARTICIPATION_WEIGHT;
   const maxParticipationDeviation =
     options.maxParticipationDeviation ?? DEFAULT_MAX_PARTICIPATION_DEVIATION;
 
@@ -162,11 +161,7 @@ export function computeExposureCeiling(
   const breadthAdjustment = breadth * breadthWeight;
 
   const participation = input.participation ?? 1;
-  const deviation = clamp(
-    participation - 1,
-    -maxParticipationDeviation,
-    maxParticipationDeviation,
-  );
+  const deviation = clamp(participation - 1, -maxParticipationDeviation, maxParticipationDeviation);
   const participationAdjustment = riskDirection * deviation * participationWeight;
 
   const netExposureCeiling = clamp(

@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import type { PermissionMode } from "../../state/types.js";
 import type { GordonTheme } from "../../themes/themes.ts";
@@ -34,12 +33,12 @@ interface Props {
 }
 
 const MODE_COLOR: Record<PermissionMode, string> = {
-  auto:    "red",
-  ask:     "rgb(52,238,176)",
-  strict:  "green",
-  paper:   "white",
+  auto: "red",
+  ask: "rgb(52,238,176)",
+  strict: "green",
+  paper: "white",
   observe: "magenta",
-  plan:    "blue",
+  plan: "blue",
 };
 
 export function GordonHeader({
@@ -66,31 +65,41 @@ export function GordonHeader({
   const sessionDisplay = threadId
     ? threadId.slice(0, 24)
     : sessionId
-    ? sessionId.slice(0, 24)
-    : "initializing...";
+      ? sessionId.slice(0, 24)
+      : "initializing...";
 
   // Compact mode: single status line that doesn't eat viewport space.
   // Shown once conversation starts so the full card doesn't crowd messages.
   if (compact) {
     const model = process.env.GORDON_MODEL ?? "auto";
-    const modelShort = model.length > 30 ? model.slice(0, 28) + "…" : model;
+    const modelShort = model.length > 30 ? `${model.slice(0, 28)}…` : model;
     return (
       <Box paddingX={1} marginBottom={1}>
-        <Text color="rgb(52,238,176)" bold>{"≫"} </Text>
+        <Text color="rgb(52,238,176)" bold>
+          {"≫"}{" "}
+        </Text>
         <Text dimColor>Gordon</Text>
         {workspace && workspaceTint && (
-          <Text color={workspaceTint} bold> [{workspace}]</Text>
+          <Text color={workspaceTint} bold>
+            {" "}
+            [{workspace}]
+          </Text>
         )}
-        <Text dimColor>  ·  </Text>
+        <Text dimColor> · </Text>
         <Text color={modeColor}>{permissionMode}</Text>
-        {isPaper && <Text color="yellow" bold> [PAPER]</Text>}
-        <Text dimColor>  ·  </Text>
+        {isPaper && (
+          <Text color="yellow" bold>
+            {" "}
+            [PAPER]
+          </Text>
+        )}
+        <Text dimColor> · </Text>
         <Text dimColor>{modelShort}</Text>
-        <Text dimColor>  ·  </Text>
+        <Text dimColor> · </Text>
         <Text dimColor>{sessionDisplay}</Text>
         {exchangeStatus && (
           <>
-            <Text dimColor>  ·  </Text>
+            <Text dimColor> · </Text>
             <Text dimColor>{exchangeStatus}</Text>
           </>
         )}
@@ -104,51 +113,57 @@ export function GordonHeader({
       {/* Paper mode's yellow border outranks workspace decoration (PAPER visibility wins). */}
       <Box
         borderStyle="round"
-        borderColor={isPaper ? "yellow" : workspaceTint ?? "gray"}
+        borderColor={isPaper ? "yellow" : (workspaceTint ?? "gray")}
         paddingX={2}
         paddingY={0}
         flexDirection="column"
         width={56}
       >
         <Box>
-          <Text color="rgb(52,238,176)" bold>{"≫"}  Gordon CLI</Text>
+          <Text color="rgb(52,238,176)" bold>
+            {"≫"} Gordon CLI
+          </Text>
           <Text dimColor> (v{version})</Text>
         </Box>
-        <Text>   The Frontier Trading Agent</Text>
-        <Text dimColor>   General Liquidity, Inc.</Text>
+        <Text> The Frontier Trading Agent</Text>
+        <Text dimColor> General Liquidity, Inc.</Text>
         <Text> </Text>
         <Box>
-          <Text dimColor>   model:     </Text>
+          <Text dimColor> model: </Text>
           <Text>{process.env.GORDON_MODEL ?? "auto"}</Text>
           {process.env.GORDON_EFFORT && <Text dimColor> {process.env.GORDON_EFFORT}</Text>}
-          <Text dimColor>   /model to change</Text>
+          <Text dimColor> /model to change</Text>
         </Box>
         <Box>
-          <Text dimColor>   mode:      </Text>
+          <Text dimColor> mode: </Text>
           <Text color={modeColor}>{permissionMode}</Text>
-          <Text dimColor>      {isPaper ? "/live to exit" : "/auto to change"}</Text>
+          <Text dimColor> {isPaper ? "/live to exit" : "/auto to change"}</Text>
         </Box>
         <Box>
-          <Text dimColor>   session:   </Text>
+          <Text dimColor> session: </Text>
           <Text>{sessionDisplay}</Text>
         </Box>
         {exchangeStatus && (
           <Box>
-            <Text dimColor>   exchange:  </Text>
+            <Text dimColor> exchange: </Text>
             <Text>{isPaper ? `${exchangeStatus} (sandbox)` : exchangeStatus}</Text>
           </Box>
         )}
         <Box>
-          <Text dimColor>   tools:     </Text>
+          <Text dimColor> tools: </Text>
           <Text>{toolCount} loaded</Text>
         </Box>
       </Box>
 
-      {mcpWarnings && mcpWarnings.length > 0 && mcpWarnings.map((w, i) => (
-        <Box key={i} paddingX={1}>
-          <Text color="yellow">{"⚠"} {w}</Text>
-        </Box>
-      ))}
+      {mcpWarnings &&
+        mcpWarnings.length > 0 &&
+        mcpWarnings.map((w, i) => (
+          <Box key={i} paddingX={1}>
+            <Text color="yellow">
+              {"⚠"} {w}
+            </Text>
+          </Box>
+        ))}
 
       {/* The rotating "Tip:" line above the header is printed by
           src/tui/index.tsx:245 BEFORE React mounts (one tip per
@@ -157,7 +172,9 @@ export function GordonHeader({
 
       {isResumedSession && resumeMessageCount != null && (
         <Box paddingX={1}>
-          <Text dimColor>{"↻"} Resumed {"·"} {resumeMessageCount} messages restored</Text>
+          <Text dimColor>
+            {"↻"} Resumed {"·"} {resumeMessageCount} messages restored
+          </Text>
         </Box>
       )}
     </Box>

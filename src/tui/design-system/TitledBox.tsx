@@ -1,4 +1,4 @@
-import React, { type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Box, Text, useStdout, type BoxProps } from "../ink-custom";
 import type { GordonTheme } from "../themes/themes.ts";
 import { useTheme } from "../themes/ThemeProvider.tsx";

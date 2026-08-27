@@ -1,9 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  classifyTrader,
-  archetypeToPayload,
-} from "./traderArchetype.ts";
+import { classifyTrader, archetypeToPayload } from "./traderArchetype.ts";
 
 describe("classifyTrader — pure archetypes", () => {
   it("all anxious signals → anxious_overthinker", () => {

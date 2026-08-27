@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Select, TextInput, PasswordInput } from "@inkjs/ui";
 import type { SetupWizardSection } from "../../../app/setup/setup-flow.ts";
@@ -130,9 +130,10 @@ const EXCHANGE_STEP: StepConfig = {
     const liveHeader = [
       { label: "─── Live venues — real money. I understand, go live ───", value: "skip" },
     ];
-    const prefix = p.exchanges.length > 0
-      ? [{ label: "Keep existing — don't touch exchanges", value: "skip" }]
-      : [];
+    const prefix =
+      p.exchanges.length > 0
+        ? [{ label: "Keep existing — don't touch exchanges", value: "skip" }]
+        : [];
     const suffix = p.exchanges.length === 0 ? [{ label: "Skip", value: "skip" }] : [];
     return [...prefix, ...sandbox, ...liveHeader, ...live, ...suffix];
   },
@@ -215,7 +216,8 @@ const EXCHANGE_API_SECRET_STEP: StepConfig = {
   id: "exchange-api-secret",
   section: "exchange",
   title: "Exchange API Secret",
-  description: "Paste the exchange API secret (for Coinbase CDP keys: paste the full EC private key):",
+  description:
+    "Paste the exchange API secret (for Coinbase CDP keys: paste the full EC private key):",
   inputType: "password",
   key: "exchangeApiSecret",
   placeholder: "",
@@ -273,10 +275,13 @@ const BROKER_STEP: StepConfig = {
       ...opt,
       label: p.brokers.includes(opt.value) ? `${opt.label} (configured)` : opt.label,
     }));
-    const prefix = p.brokers.length > 0
-      ? [{ label: "Keep existing — don't touch brokers", value: "skip" }]
-      : [];
-    return [...prefix, ...base, ...(p.brokers.length === 0 ? [{ label: "Skip", value: "skip" }] : [])];
+    const prefix =
+      p.brokers.length > 0 ? [{ label: "Keep existing — don't touch brokers", value: "skip" }] : [];
+    return [
+      ...prefix,
+      ...base,
+      ...(p.brokers.length === 0 ? [{ label: "Skip", value: "skip" }] : []),
+    ];
   },
 };
 
@@ -361,9 +366,15 @@ const PERMISSION_MODE_STEP: StepConfig = {
   inputType: "select",
   key: "permissionMode",
   options: [
-    { label: "Paper — simulated orders only, no real money (recommended to start)", value: "paper" },
+    {
+      label: "Paper — simulated orders only, no real money (recommended to start)",
+      value: "paper",
+    },
     { label: "Ask — approve each trade via dialog", value: "ask" },
-    { label: "Auto — execute trades without asking (real money moves — I understand, go live)", value: "auto" },
+    {
+      label: "Auto — execute trades without asking (real money moves — I understand, go live)",
+      value: "auto",
+    },
     { label: "Strict — read-only, never trade", value: "strict" },
   ],
   // Skip if the user already has a non-default permissionMode set.
@@ -449,17 +460,13 @@ export function SetupWizard({ onComplete, onSkip, preflight }: Props) {
   );
 
   const step = activeSteps[stepIndex];
-  if (!step) {
-    // All steps done
-    onComplete(data);
-    return null;
-  }
-
-  // Resolve current step's options (dynamic or static).
-  const stepOptions = step.dynamicOptions ? step.dynamicOptions(data, pre) : step.options;
+  useEffect(() => {
+    if (!step) onComplete(data);
+  }, [data, onComplete, step]);
 
   const handleValue = useCallback(
     (value: string) => {
+      if (!step) return;
       if (step.id === "exchange-live-confirm" && value === "back") {
         const { exchangeLiveConfirmed: _dropped, ...rest } = data;
         const resetData = { ...rest, exchange: "skip" };
@@ -488,6 +495,10 @@ export function SetupWizard({ onComplete, onSkip, preflight }: Props) {
     [data, step, onComplete, pre],
   );
 
+  if (!step) return null;
+
+  const stepOptions = step.dynamicOptions ? step.dynamicOptions(data, pre) : step.options;
+
   const progress = `${stepIndex + 1}/${activeSteps.length}`;
 
   return (
@@ -504,10 +515,7 @@ export function SetupWizard({ onComplete, onSkip, preflight }: Props) {
       {/* Progress indicators */}
       <Box>
         {activeSteps.map((s, i) => (
-          <Text
-            key={s.id}
-            color={i < stepIndex ? "green" : i === stepIndex ? "yellow" : "gray"}
-          >
+          <Text key={s.id} color={i < stepIndex ? "green" : i === stepIndex ? "yellow" : "gray"}>
             {i < stepIndex ? " \u2713 " : i === stepIndex ? " \u25CF " : " \u25CB "}
           </Text>
         ))}
@@ -522,15 +530,9 @@ export function SetupWizard({ onComplete, onSkip, preflight }: Props) {
       {step.inputType === "select" && stepOptions ? (
         <Select options={stepOptions} onChange={handleValue} />
       ) : step.inputType === "password" ? (
-        <PasswordInput
-          placeholder={step.placeholder ?? ""}
-          onSubmit={handleValue}
-        />
+        <PasswordInput placeholder={step.placeholder ?? ""} onSubmit={handleValue} />
       ) : (
-        <TextInput
-          placeholder={step.placeholder ?? ""}
-          onSubmit={handleValue}
-        />
+        <TextInput placeholder={step.placeholder ?? ""} onSubmit={handleValue} />
       )}
 
       <Text> </Text>

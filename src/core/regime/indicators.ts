@@ -284,11 +284,7 @@ export function calculateEMAAlignment(candles: Candle[]): {
  * Bollinger Band width as a percentage of the middle band (SMA).
  * BB Width = (Upper - Lower) / Middle * 100
  */
-export function calculateBBWidth(
-  candles: Candle[],
-  period = 20,
-  stddev = 2,
-): number {
+export function calculateBBWidth(candles: Candle[], period = 20, stddev = 2): number {
   const c = closes(candles);
   if (c.length < period) return 0;
 
@@ -297,8 +293,7 @@ export function calculateBBWidth(
 
   if (middle === 0) return 0;
 
-  const variance =
-    slice.reduce((sum, v) => sum + (v - middle) ** 2, 0) / period;
+  const variance = slice.reduce((sum, v) => sum + (v - middle) ** 2, 0) / period;
   const sd = Math.sqrt(variance);
 
   const upper = middle + stddev * sd;
@@ -417,9 +412,7 @@ export function calculateMACD(candles: Candle[]): {
  * Determine if volume is increasing, decreasing, or stable.
  * Compares the recent 5-period volume average to the prior 5-period average.
  */
-export function calculateVolumeTrend(
-  candles: Candle[],
-): "increasing" | "decreasing" | "stable" {
+export function calculateVolumeTrend(candles: Candle[]): "increasing" | "decreasing" | "stable" {
   if (candles.length < 10) return "stable";
 
   const volumes = candles.map((c) => c.volume);

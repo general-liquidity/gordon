@@ -57,7 +57,10 @@ function jaccard(a: Set<string>, b: Set<string>): number {
   return union === 0 ? 0 : inter / union;
 }
 
-export function dedupeParallelTasks(tasks: ParallelTask[], opts: DedupeOptions = {}): ParallelDedupeResult {
+export function dedupeParallelTasks(
+  tasks: ParallelTask[],
+  opts: DedupeOptions = {},
+): ParallelDedupeResult {
   const threshold = opts.overlapThreshold ?? 0.6;
   const n = tasks.length;
   const sets = tasks.map((t) => normalize(t.surface));
@@ -84,7 +87,12 @@ export function dedupeParallelTasks(tasks: ParallelTask[], opts: DedupeOptions =
       const jac = jaccard(sets[i]!, sets[j]!);
       if (jac >= threshold) {
         const shared = [...sets[i]!].filter((x) => sets[j]!.has(x)).sort();
-        redundantPairs.push({ a: tasks[i]!.id, b: tasks[j]!.id, jaccard: parseFloat(jac.toFixed(3)), shared });
+        redundantPairs.push({
+          a: tasks[i]!.id,
+          b: tasks[j]!.id,
+          jaccard: parseFloat(jac.toFixed(3)),
+          shared,
+        });
         unite(i, j);
       }
     }
@@ -123,7 +131,11 @@ export function dedupeParallelTasks(tasks: ParallelTask[], opts: DedupeOptions =
 }
 
 /** Build a task surface from a trading sub-task's decision identity (symbol + action [+ venue]). */
-export function tradingTaskSurface(fields: { symbol?: string; action?: string; venue?: string }): string[] {
+export function tradingTaskSurface(fields: {
+  symbol?: string;
+  action?: string;
+  venue?: string;
+}): string[] {
   const s: string[] = [];
   if (fields.symbol) s.push(`sym:${fields.symbol.trim().toLowerCase()}`);
   if (fields.action) s.push(`act:${fields.action.trim().toLowerCase()}`);

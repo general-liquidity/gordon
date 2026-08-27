@@ -22,6 +22,7 @@ import { cleanupExpiredPlans, repairProtectiveOrders } from "../core/pipeline/ex
 import { listPlans } from "../infra/storage/entities/plans.ts";
 import { StrategyRuntime } from "../core/runtime/engine.ts";
 import { FeedbackLoop } from "../core/learning/feedback-loop.ts";
+import { requireLiveConsent } from "../infra/safety/consent.ts";
 const logger = createModuleLogger("reconciliation-exchange");
 
 export interface ReconciliationResult {
@@ -68,9 +69,7 @@ function buildKnownOrderOwnerKeys(activeTrades: Trade[]): Set<string> {
  * 4. Feeds trade closures back to StrategyRuntime
  * 5. Detects orphaned orders
  */
-export async function reconcileWithExchange(
-  exchange: Exchange,
-): Promise<ReconciliationResult> {
+export async function reconcileWithExchange(exchange: Exchange): Promise<ReconciliationResult> {
   const result: ReconciliationResult = {
     success: true,
     tradesReconciled: 0,
@@ -167,11 +166,8 @@ export async function reconcileWithExchange(
           );
         }
       } catch (repairError) {
-        const repairMessage =
-          repairError instanceof Error ? repairError.message : "Unknown error";
-        result.warnings.push(
-          `Protective repair failed for plan ${plan.id}: ${repairMessage}`,
-        );
+        const repairMessage = repairError instanceof Error ? repairError.message : "Unknown error";
+        result.warnings.push(`Protective repair failed for plan ${plan.id}: ${repairMessage}`);
       }
     }
 
@@ -255,9 +251,7 @@ async function reconcileTrade(
     if (clientOrderId.includes("entry") || clientOrderId.includes("grid")) {
       if (orderStatus === "FILLED" || orderStatus === "PARTIALLY_FILLED") {
         const fillPrice =
-          order.executedQty > 0
-            ? order.cummulativeQuoteQty / order.executedQty
-            : order.price;
+          order.executedQty > 0 ? order.cummulativeQuoteQty / order.executedQty : order.price;
         const fillQuantity = order.executedQty;
         const existingFill = trade.entries.find((e) => e.orderId === orderId);
 
@@ -288,9 +282,7 @@ async function reconcileTrade(
           orderStatus === "PARTIALLY_FILLED"
         ) {
           updatedTrade.entries = updatedTrade.entries.map((e) =>
-            e.orderId === orderId
-              ? { ...e, quantity: fillQuantity, price: fillPrice }
-              : e,
+            e.orderId === orderId ? { ...e, quantity: fillQuantity, price: fillPrice } : e,
           );
           needsUpdate = true;
           result.ordersUpdated++;
@@ -303,9 +295,7 @@ async function reconcileTrade(
       if (orderStatus === "FILLED" || orderStatus === "PARTIALLY_FILLED") {
         const existingExit = trade.exits.find((e) => e.orderId === orderId);
         const exitPrice =
-          order.executedQty > 0
-            ? order.cummulativeQuoteQty / order.executedQty
-            : order.price;
+          order.executedQty > 0 ? order.cummulativeQuoteQty / order.executedQty : order.price;
 
         if (!existingExit && order.executedQty > 0) {
           let reason: "STOP" | "TP1" | "TP2" | "TP3" | "MANUAL" = "MANUAL";
@@ -349,9 +339,7 @@ async function reconcileTrade(
           orderStatus === "PARTIALLY_FILLED"
         ) {
           updatedTrade.exits = updatedTrade.exits.map((e) =>
-            e.orderId === orderId
-              ? { ...e, quantity: order.executedQty, price: exitPrice }
-              : e,
+            e.orderId === orderId ? { ...e, quantity: order.executedQty, price: exitPrice } : e,
           );
           needsUpdate = true;
           result.ordersUpdated++;
@@ -472,10 +460,7 @@ function feedbackToStrategyRuntime(trade: Trade): void {
   }
 }
 
-async function triggerCounterfactualAnalysis(
-  trade: Trade,
-  exchange: Exchange,
-): Promise<void> {
+async function triggerCounterfactualAnalysis(trade: Trade, exchange: Exchange): Promise<void> {
   try {
     const feedbackLoop = FeedbackLoop.getInstance();
     await feedbackLoop.onTradeClosed(trade, exchange);
@@ -507,7 +492,26 @@ async function checkOrphanedOrders(
           const matchingTrade = ownerKey ? knownOrderOwnerKeys.has(ownerKey) : false;
 
           if (!matchingTrade) {
-            // Auto-cancel orphaned Gordon orders
+            // An orphan can be an abandoned entry, but it can also be the only
+            // protective order for a real venue position whose local owner was
+            // lost. Reconciliation cannot prove which. Keep generic live
+            // cancellation under the same explicit-consent policy as every
+            // public cancel surface; sandbox cleanup remains automatic.
+            const consent = requireLiveConsent({ sandboxActive: exchange.isSandbox ?? false });
+            if (!consent.ok) {
+              result.warnings.push(
+                `Orphaned order left open pending live consent: ${order.orderId} for ${symbol} (clientOrderId: ${clientOrderId})`,
+              );
+              logger.warn("Orphaned order requires live consent before cancellation", {
+                symbol,
+                exchange: exchange.exchangeId,
+                orderId: order.orderId,
+                clientOrderId,
+              });
+              continue;
+            }
+
+            // Auto-cancel orphaned Gordon orders after the policy gate.
             try {
               await exchange.cancelOrder(symbol, order.orderId.toString());
               result.warnings.push(

@@ -28,22 +28,18 @@ export type {
   IndicatorState,
   EquityPoint,
   ClosedTrade,
-
   // Backtest types
   BacktestMetrics,
   BacktestConfig,
   BacktestTrade,
   BacktestResult,
-
   // Optimization types
   ParameterRange,
   ParameterSet,
   OptimizationResult,
-
   // Comparison types
   ComparisonResult,
   StrategyRanking,
-
   // Engine types
   PositionSizingMode,
   KellyParams,
@@ -66,14 +62,12 @@ export {
   calculateTotalReturn,
   calculateAnnualizedReturn,
   calculateCAGR,
-
   // Risk metrics
   calculateMaxDrawdown,
   calculateVolatility,
   calculateSharpeRatio,
   calculateSortinoRatio,
   calculateCalmarRatio,
-
   // Trade metrics
   calculateWinRate,
   calculateProfitFactor,
@@ -83,7 +77,6 @@ export {
   calculateExpectancy,
   calculateMaxConsecutiveWins,
   calculateMaxConsecutiveLosses,
-
   // Aggregate
   calculateAllMetrics,
   calculateMetricsFromTrades,

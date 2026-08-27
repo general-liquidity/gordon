@@ -7,7 +7,8 @@ import { buildTerminationPreTradeFromPlan } from "../../../trading/ops/terminati
 import type { GordonContext } from "../../../agents/types.ts";
 import type { Plan } from "../../../../types/plan.ts";
 
-const ctx: GordonContext = {  exchange: null,
+const ctx: GordonContext = {
+  exchange: null,
   broker: null,
   llm: {} as GordonContext["llm"],
   config: { permissionMode: "ask" } as GordonContext["config"],

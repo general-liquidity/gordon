@@ -76,7 +76,7 @@ describe("recordObservation — accrual", () => {
 
 describe("adjustable bar", () => {
   it("a higher bar demands more evidence to flip", () => {
-    let low = openTension(belief, against(2), { bar: 2 });
+    const low = openTension(belief, against(2), { bar: 2 });
     expect(low.verdict).toBe("flipped");
 
     let high = openTension(belief, against(2), { bar: 5 });
@@ -88,7 +88,7 @@ describe("adjustable bar", () => {
 
 describe("terminal resolution", () => {
   it("ignores further observations once resolved", () => {
-    let t = openTension(belief, against(5), { bar: 3 });
+    const t = openTension(belief, against(5), { bar: 3 });
     expect(t.verdict).toBe("flipped");
     const obsBefore = t.observations.length;
     const after = recordObservation(t, forObs(10), { bar: 3 });

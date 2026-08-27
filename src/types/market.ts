@@ -12,11 +12,13 @@ export const CandleSchema = z.object({
 
 export const IndicatorsSchema = z.object({
   rsi: z.number().nullable(),
-  macd: z.object({
-    macd: z.number(),
-    signal: z.number(),
-    histogram: z.number(),
-  }).nullable(),
+  macd: z
+    .object({
+      macd: z.number(),
+      signal: z.number(),
+      histogram: z.number(),
+    })
+    .nullable(),
   volumeMA: z.number().nullable(),
   volumeRatio: z.number().nullable(), // current volume / MA
 });

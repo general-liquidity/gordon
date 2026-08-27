@@ -93,9 +93,7 @@ async function main(): Promise<void> {
   );
   if (summary.denied.length > 0) {
     console.error(
-      `[gordon-mcp] denied tools: ${summary.denied
-        .map((d) => `${d.id} (${d.reason})`)
-        .join(", ")}`,
+      `[gordon-mcp] denied tools: ${summary.denied.map((d) => `${d.id} (${d.reason})`).join(", ")}`,
     );
   }
   if (allowList) {

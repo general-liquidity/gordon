@@ -36,7 +36,7 @@ export interface ToolCacheOptions {
  */
 export type ToolExecutor<TInput, TOutput> = (
   input: TInput,
-  context?: MastraExecutionContext
+  context?: MastraExecutionContext,
 ) => Promise<TOutput>;
 
 // ============================================================================
@@ -80,7 +80,7 @@ function stableStringify(value: unknown): string {
   }
 
   if (Array.isArray(value)) {
-    return "[" + value.map(stableStringify).join(",") + "]";
+    return `[${value.map(stableStringify).join(",")}]`;
   }
 
   // Sort object keys for consistent ordering
@@ -90,7 +90,7 @@ function stableStringify(value: unknown): string {
     return `${JSON.stringify(key)}:${stableStringify(v)}`;
   });
 
-  return "{" + pairs.join(",") + "}";
+  return `{${pairs.join(",")}}`;
 }
 
 // ============================================================================
@@ -115,11 +115,11 @@ function stableStringify(value: unknown): string {
 export function withCache<TInput, TOutput>(
   toolName: string,
   executor: ToolExecutor<TInput, TOutput>,
-  options: ToolCacheOptions
+  options: ToolCacheOptions,
 ): ToolExecutor<TInput, TOutput> {
   return async function cachedExecutor(
     input: TInput,
-    context?: MastraExecutionContext
+    context?: MastraExecutionContext,
   ): Promise<TOutput> {
     const key = options.keyGenerator
       ? `tool:${toolName}:${options.keyGenerator(input)}`
@@ -166,11 +166,11 @@ const inFlightRequests = new Map<string, Promise<unknown>>();
  */
 export function withDeduplication<TInput, TOutput>(
   toolName: string,
-  executor: ToolExecutor<TInput, TOutput>
+  executor: ToolExecutor<TInput, TOutput>,
 ): ToolExecutor<TInput, TOutput> {
   return async function dedupedExecutor(
     input: TInput,
-    context?: MastraExecutionContext
+    context?: MastraExecutionContext,
   ): Promise<TOutput> {
     const key = generateCacheKey(toolName, input);
 
@@ -220,11 +220,11 @@ export function withDeduplication<TInput, TOutput>(
 export function withCacheAndDeduplication<TInput, TOutput>(
   toolName: string,
   executor: ToolExecutor<TInput, TOutput>,
-  options: ToolCacheOptions
+  options: ToolCacheOptions,
 ): ToolExecutor<TInput, TOutput> {
   return async function cachedDedupedExecutor(
     input: TInput,
-    context?: MastraExecutionContext
+    context?: MastraExecutionContext,
   ): Promise<TOutput> {
     const key = options.keyGenerator
       ? `tool:${toolName}:${options.keyGenerator(input)}`
@@ -282,10 +282,10 @@ export function createCachedTool<
   TSuspend,
   TResume,
   TContext extends ToolExecutionContext<TSuspend, TResume>,
-  TId extends string
+  TId extends string,
 >(
   tool: Tool<TSchemaIn, TSchemaOut, TSuspend, TResume, TContext, TId>,
-  ttl: number
+  ttl: number,
 ): Tool<TSchemaIn, TSchemaOut, TSuspend, TResume, TContext, TId> {
   const originalExecute = tool.execute;
 
@@ -294,10 +294,7 @@ export function createCachedTool<
   }
 
   // Create cached execute function
-  const cachedExecute = async function (
-    input: TSchemaIn,
-    context?: TContext
-  ): Promise<TSchemaOut> {
+  const cachedExecute = async (input: TSchemaIn, context?: TContext): Promise<TSchemaOut> => {
     const key = generateCacheKey(tool.id, input);
 
     // Check cache first

@@ -38,7 +38,7 @@ export type {
   MCPServerConfig,
   MCPServerEvent,
   MCPServerEventHandler,
-} from './types';
+} from "./types";
 
 // ============================================================================
 // MCP Client (@mastra/mcp integration)
@@ -54,12 +54,10 @@ export {
   disableMCPHotReload,
   isMCPInitialized,
   getMCPStats,
-} from './client';
+} from "./client";
 
 // ============================================================================
 // Credential Management
 // ============================================================================
 
-export { MCPCredentialManager, credentialManager } from './credentials';
-
-
+export { MCPCredentialManager, credentialManager } from "./credentials";

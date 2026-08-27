@@ -1,10 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { ensureDataset } from "./service.ts";
-import {
-  upsertCandles,
-  _resetCacheForTests,
-  type CachedCandle,
-} from "../../data/ohlcvCache.ts";
+import { upsertCandles, _resetCacheForTests, type CachedCandle } from "../../data/ohlcvCache.ts";
 import { setDatabasePathForTesting, closeDatabase } from "../../storage/database.ts";
 import { _resetSystematicTablesForTests } from "./store.ts";
 import type { Exchange } from "../../exchange/types.ts";
@@ -18,7 +14,11 @@ let currentDbPath = "";
 const cleanupPaths = new Set<string>();
 
 function safeUnlink(path: string): void {
-  try { if (existsSync(path)) unlinkSync(path); } catch { /* Windows-busy */ }
+  try {
+    if (existsSync(path)) unlinkSync(path);
+  } catch {
+    /* Windows-busy */
+  }
 }
 
 const TF_MS = 60 * 60 * 1000; // 1h
@@ -39,7 +39,10 @@ function cached(openTime: number, base = 100): CachedCandle {
 /** Mock exchange serving a contiguous 1h series from rangeStart. Records the
  *  `since` of every getCandles call so the test can assert which sub-range
  *  was actually fetched. */
-function makeMockExchange(rangeStart: number, totalBars: number): {
+function makeMockExchange(
+  rangeStart: number,
+  totalBars: number,
+): {
   exchange: Exchange;
   fetchedSince: number[];
 } {

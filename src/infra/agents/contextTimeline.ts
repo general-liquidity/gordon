@@ -88,9 +88,7 @@ export function estimateTokensFromChars(charCount: number): number {
 /**
  * Estimate tokens from an array of message contents.
  */
-export function estimateTokensFromMessages(
-  messages: Array<{ content: string }>,
-): number {
+export function estimateTokensFromMessages(messages: Array<{ content: string }>): number {
   let total = 0;
   for (const m of messages) total += m.content.length;
   return estimateTokensFromChars(total);
@@ -152,10 +150,7 @@ export function recordAgentProgress(
  * Mark an agent as completed. Idempotent — calling on an already-
  * ended agent is a no-op. Calling on an unknown id is also a no-op.
  */
-export function recordAgentEnd(
-  agentId: string,
-  now: () => Date = () => new Date(),
-): void {
+export function recordAgentEnd(agentId: string, now: () => Date = () => new Date()): void {
   const agent = STATE.agents.get(agentId);
   if (!agent) return;
   if (!agent.isActive) return;

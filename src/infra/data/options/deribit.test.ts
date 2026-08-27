@@ -25,11 +25,31 @@ function makeFetch(now: number): typeof fetch {
   const expiredAt = now - 7 * DAY_MS;
 
   const instruments = [
-    { instrument_name: "BTC-CALL", strike: 70000, option_type: "call", expiration_timestamp: in30d },
+    {
+      instrument_name: "BTC-CALL",
+      strike: 70000,
+      option_type: "call",
+      expiration_timestamp: in30d,
+    },
     { instrument_name: "BTC-PUT", strike: 60000, option_type: "put", expiration_timestamp: in30d },
-    { instrument_name: "BTC-EXPIRED", strike: 65000, option_type: "call", expiration_timestamp: expiredAt },
-    { instrument_name: "BTC-ZERO", strike: 80000, option_type: "call", expiration_timestamp: in30d },
-    { instrument_name: "BTC-NOSUMMARY", strike: 90000, option_type: "put", expiration_timestamp: in30d },
+    {
+      instrument_name: "BTC-EXPIRED",
+      strike: 65000,
+      option_type: "call",
+      expiration_timestamp: expiredAt,
+    },
+    {
+      instrument_name: "BTC-ZERO",
+      strike: 80000,
+      option_type: "call",
+      expiration_timestamp: in30d,
+    },
+    {
+      instrument_name: "BTC-NOSUMMARY",
+      strike: 90000,
+      option_type: "put",
+      expiration_timestamp: in30d,
+    },
   ];
 
   const summaries = [

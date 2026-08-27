@@ -80,8 +80,7 @@ export class ExternalHandlerMissingError extends Error {
 
 export function isExternalHookRunnerEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   return (
-    env[EXTERNAL_HOOK_RUNNER_FLAG_ENV] === "1" ||
-    env[EXTERNAL_HOOK_RUNNER_FLAG_ENV] === "true"
+    env[EXTERNAL_HOOK_RUNNER_FLAG_ENV] === "1" || env[EXTERNAL_HOOK_RUNNER_FLAG_ENV] === "true"
   );
 }
 
@@ -162,7 +161,10 @@ function runHandlerProcess(
       if (terminationRequested) return;
       terminationRequested = true;
       terminateHandler(child, "SIGTERM");
-      forceKillHandle = setTimeout(() => terminateHandler(child, "SIGKILL"), EXTERNAL_HOOK_KILL_GRACE_MS);
+      forceKillHandle = setTimeout(
+        () => terminateHandler(child, "SIGKILL"),
+        EXTERNAL_HOOK_KILL_GRACE_MS,
+      );
       forceKillHandle.unref?.();
     };
 
@@ -239,9 +241,7 @@ function tryParseHookResultJson(stdout: string): HookResult | null {
     if (
       parsed &&
       typeof parsed === "object" &&
-      (parsed.action === "allow" ||
-        parsed.action === "block" ||
-        parsed.action === "modify")
+      (parsed.action === "allow" || parsed.action === "block" || parsed.action === "modify")
     ) {
       return {
         action: parsed.action,
@@ -357,9 +357,10 @@ export async function runExternalHook<P extends HookPoint>(
   // A structured allow/modify cannot override a transport failure. In
   // particular, a handler that prints {action:"allow"} and then hangs must
   // still fail closed when its deadline expires.
-  const jsonResult = outcome.timedOut || outcome.outputLimitExceeded || outcome.spawnError
-    ? null
-    : tryParseHookResultJson(outcome.stdout);
+  const jsonResult =
+    outcome.timedOut || outcome.outputLimitExceeded || outcome.spawnError
+      ? null
+      : tryParseHookResultJson(outcome.stdout);
   const stdoutJsonParsed = jsonResult !== null;
   const result =
     jsonResult ??

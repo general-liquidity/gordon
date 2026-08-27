@@ -52,12 +52,18 @@ describe("validateOrderLeg", () => {
 
   it("requires price on LIMIT and STOP_LIMIT", () => {
     expect(validateOrderLeg(leg({ type: "LIMIT", price: undefined })).length).toBeGreaterThan(0);
-    expect(validateOrderLeg(leg({ type: "STOP_LIMIT", price: undefined, stopPrice: 49_000 })).length).toBeGreaterThan(0);
+    expect(
+      validateOrderLeg(leg({ type: "STOP_LIMIT", price: undefined, stopPrice: 49_000 })).length,
+    ).toBeGreaterThan(0);
   });
 
   it("requires stopPrice on STOP and STOP_LIMIT", () => {
-    expect(validateOrderLeg(leg({ type: "STOP", price: undefined, stopPrice: undefined })).length).toBeGreaterThan(0);
-    expect(validateOrderLeg(leg({ type: "STOP", price: undefined, stopPrice: 49_000 })) ).toEqual([]);
+    expect(
+      validateOrderLeg(leg({ type: "STOP", price: undefined, stopPrice: undefined })).length,
+    ).toBeGreaterThan(0);
+    expect(validateOrderLeg(leg({ type: "STOP", price: undefined, stopPrice: 49_000 }))).toEqual(
+      [],
+    );
   });
 
   it("allows MARKET legs without price", () => {
@@ -133,10 +139,7 @@ describe("executeAtomicGroup — happy path", () => {
   it("skips a leg whose dependency is not filled", async () => {
     const { submit, calls } = okSubmitter();
     const { cancel } = okCanceller();
-    const legs = [
-      leg({ legId: "a" }),
-      leg({ legId: "b", dependsOn: "missing" }),
-    ];
+    const legs = [leg({ legId: "a" }), leg({ legId: "b", dependsOn: "missing" })];
 
     const group = await executeAtomicGroup(legs, submit, cancel);
 
@@ -158,7 +161,12 @@ describe("executeAtomicGroup — rollback semantics", () => {
       return { orderId: `ord_${l.legId}` };
     };
     const { cancel, calls: cancelCalls } = okCanceller();
-    const legs = [leg({ legId: "a" }), leg({ legId: "b" }), leg({ legId: "c" }), leg({ legId: "d" })];
+    const legs = [
+      leg({ legId: "a" }),
+      leg({ legId: "b" }),
+      leg({ legId: "c" }),
+      leg({ legId: "d" }),
+    ];
 
     const group = await executeAtomicGroup(legs, submit, cancel);
 

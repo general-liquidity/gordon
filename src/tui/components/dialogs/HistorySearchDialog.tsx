@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 
 // ============================================================================
@@ -34,16 +34,26 @@ export function HistorySearchDialog({ entries, onClose, onSelect }: Props) {
     else if (key.return && filtered[selectedIndex]) onSelect(filtered[selectedIndex]!.command);
     else if (key.upArrow) setSelectedIndex((p) => Math.max(0, p - 1));
     else if (key.downArrow) setSelectedIndex((p) => Math.min(filtered.length - 1, p + 1));
-    else if (key.backspace) { setQuery((p) => p.slice(0, -1)); setSelectedIndex(0); }
-    else if (input && !key.ctrl && !key.meta) { setQuery((p) => p + input); setSelectedIndex(0); }
+    else if (key.backspace) {
+      setQuery((p) => p.slice(0, -1));
+      setSelectedIndex(0);
+    } else if (input && !key.ctrl && !key.meta) {
+      setQuery((p) => p + input);
+      setSelectedIndex(0);
+    }
   });
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
-      <Text bold color="cyanBright">HISTORY SEARCH</Text>
+      <Text bold color="cyanBright">
+        HISTORY SEARCH
+      </Text>
       <Box>
         <Text dimColor>bck-i-search: </Text>
-        <Text color="cyanBright">{query}{"\u2588"}</Text>
+        <Text color="cyanBright">
+          {query}
+          {"\u2588"}
+        </Text>
       </Box>
       {filtered.map((entry, i) => (
         <Box key={i}>
@@ -54,7 +64,9 @@ export function HistorySearchDialog({ entries, onClose, onSelect }: Props) {
           <Text bold={i === selectedIndex}>{entry.command}</Text>
         </Box>
       ))}
-      <Text dimColor>{filtered.length} matches {"\u00B7"} Enter to select {"\u00B7"} Esc to close</Text>
+      <Text dimColor>
+        {filtered.length} matches {"\u00B7"} Enter to select {"\u00B7"} Esc to close
+      </Text>
     </Box>
   );
 }

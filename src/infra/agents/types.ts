@@ -29,7 +29,10 @@ export interface GordonRuntimeAccess {
   reloadPlugins?: () => Promise<void>;
   listRuntimeCommands?: () => string[];
   listRegisteredTools?: () => string[];
-  searchHistory?: (query: string, options?: { limit?: number }) => Array<{
+  searchHistory?: (
+    query: string,
+    options?: { limit?: number },
+  ) => Array<{
     timestamp: string;
     source: string;
     content: string;

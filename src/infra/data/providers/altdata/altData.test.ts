@@ -27,9 +27,7 @@ describe("normalizeAltSeries", () => {
 
   test("returns [] for empty / all-non-finite input", () => {
     expect(normalizeAltSeries([])).toEqual([]);
-    expect(
-      normalizeAltSeries([{ time: Number.NaN, value: Number.NaN }]),
-    ).toEqual([]);
+    expect(normalizeAltSeries([{ time: Number.NaN, value: Number.NaN }])).toEqual([]);
   });
 
   test("expanding z-score matches sample-stdev computation", () => {
@@ -166,7 +164,10 @@ describe("network adapters (guarded, NOT live)", () => {
         },
       }),
     });
-    const series = await fetchGoogleTrends("bitcoin", { url: "https://op-proxy/trends", fetchImpl });
+    const series = await fetchGoogleTrends("bitcoin", {
+      url: "https://op-proxy/trends",
+      fetchImpl,
+    });
     expect(series.points).toEqual([
       { time: 1700000000, value: 50 },
       { time: 1700086400, value: 75 },

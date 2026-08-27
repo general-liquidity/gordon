@@ -15,7 +15,10 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { getGordonContext, type MastraExecutionContext } from "../types.ts";
-import { createPlan as dbCreatePlan, getPlan as dbGetPlan } from "../../../storage/entities/plans.ts";
+import {
+  createPlan as dbCreatePlan,
+  getPlan as dbGetPlan,
+} from "../../../storage/entities/plans.ts";
 import {
   approvePlanTool as implApprovePlan,
   executePlanTool as implExecutePlan,
@@ -28,21 +31,14 @@ import { runBacktestTool as implRunBacktest } from "../strategy/backtest/backtes
 import type { BacktestResult } from "../../../../backtest/types.ts";
 import { analyzeBacktestResult } from "../../../../backtest/analysis/analysis.ts";
 import { computeVerdict } from "../../../../backtest/analysis/verdict.ts";
-import {
-  recordBacktestRun,
-  getBacktestRun,
-  detectDrift,
-} from "../../../data/backtestSnapshots.ts";
+import { recordBacktestRun, getBacktestRun, detectDrift } from "../../../data/backtestSnapshots.ts";
 import { auditLog } from "../../../platform/audit/index.ts";
 import { getMemoryManager } from "../../../../core/memory/index.ts";
 import { hasRecentSymbolObservation } from "../../observation/symbolObservationTracker.ts";
 import { buildSynthesisManifest, summarizeManifest } from "../../observation/synthesisManifest.ts";
 import { withPortfolioOverride } from "./portfolioOverride.ts";
 import { recordStructuredObservation } from "../../../platform/observability/index.ts";
-import {
-  scoreConfluences,
-  scoreToPayload,
-} from "../../../trading/ops/confluenceScorer.ts";
+import { scoreConfluences, scoreToPayload } from "../../../trading/ops/confluenceScorer.ts";
 import {
   selectPlaybookForStrategy,
   attachExecution,
@@ -54,6 +50,7 @@ import {
   monthsUntilBelowCostFloor,
   PAPER_CALIBRATION_2026,
 } from "../../../../core/alpha/signal-half-life.ts";
+import { requireLiveConsent } from "../../../safety/consent.ts";
 
 // ============================================================================
 // signal decay (shared by backtest + verify_plan)
@@ -97,7 +94,9 @@ export function assessBacktestWindowDecay(input: {
   readonly halfLifeMonths?: number;
 }): BacktestDecayReport {
   const operatorSupplied = typeof input.halfLifeMonths === "number" && input.halfLifeMonths > 0;
-  const halfLifeMonths = operatorSupplied ? (input.halfLifeMonths as number) : DEFAULT_HALF_LIFE_MONTHS;
+  const halfLifeMonths = operatorSupplied
+    ? (input.halfLifeMonths as number)
+    : DEFAULT_HALF_LIFE_MONTHS;
   const calibration = operatorSupplied ? OPERATOR_CALIBRATION_LABEL : DEFAULT_CALIBRATION_LABEL;
   const windowMonths = Math.max(0, input.backtestWindowMonths);
   const liveHorizonMonths = Math.max(0, input.liveHorizonMonths ?? 0);
@@ -153,7 +152,9 @@ export function assessPlanDecay(input: {
   readonly halfLifeMonths?: number;
 }): PlanDecayAssessment {
   const operatorSupplied = typeof input.halfLifeMonths === "number" && input.halfLifeMonths > 0;
-  const halfLifeMonths = operatorSupplied ? (input.halfLifeMonths as number) : DEFAULT_HALF_LIFE_MONTHS;
+  const halfLifeMonths = operatorSupplied
+    ? (input.halfLifeMonths as number)
+    : DEFAULT_HALF_LIFE_MONTHS;
   const calibration = operatorSupplied ? OPERATOR_CALIBRATION_LABEL : DEFAULT_CALIBRATION_LABEL;
 
   const missingInputs: string[] = [];
@@ -233,7 +234,10 @@ export function resolveVerifyVerdict(input: {
   readonly hasError: boolean;
   readonly approved: boolean;
   readonly reasonCount: number;
-}): { verdict: "approve" | "conditional" | "reject"; riskTier: "low" | "medium" | "high" | "critical" } {
+}): {
+  verdict: "approve" | "conditional" | "reject";
+  riskTier: "low" | "medium" | "high" | "critical";
+} {
   if (input.hasError) {
     return { verdict: "reject", riskTier: "critical" };
   }
@@ -284,7 +288,9 @@ export const createPlanTool = createTool({
         "grid_entry",
       ])
       .optional()
-      .describe("Strategy taxonomy for audit + adherence. Defaults to 'support_bounce' when unset; pick the closest match."),
+      .describe(
+        "Strategy taxonomy for audit + adherence. Defaults to 'support_bounce' when unset; pick the closest match.",
+      ),
     timeHorizonHours: z.number().positive().optional(),
     routingPolicy: z
       .enum(["maker_first", "any"])
@@ -294,10 +300,18 @@ export const createPlanTool = createTool({
       ),
     mentalState: z
       .object({
-        confidence: z.number().min(1).max(10).optional().describe("Subjective confidence in the setup. 1=hopeful, 10=screaming-edge."),
+        confidence: z
+          .number()
+          .min(1)
+          .max(10)
+          .optional()
+          .describe("Subjective confidence in the setup. 1=hopeful, 10=screaming-edge."),
         focus: z.number().min(1).max(10).optional().describe("Operator's current focus level."),
         mood: z.enum(["calm", "anxious", "frustrated", "neutral", "overconfident"]).optional(),
-        note: z.string().optional().describe("Free-form context — recent loss, fatigue, external pressure."),
+        note: z
+          .string()
+          .optional()
+          .describe("Free-form context — recent loss, fatigue, external pressure."),
       })
       .optional()
       .describe(
@@ -376,9 +390,7 @@ export const createPlanTool = createTool({
         dca: null,
         grid: null,
         stopLoss: { price: args.stopLossPrice },
-        takeProfit: args.takeProfitPrice
-          ? [{ price: args.takeProfitPrice, percentToSell: 1 }]
-          : [],
+        takeProfit: args.takeProfitPrice ? [{ price: args.takeProfitPrice, percentToSell: 1 }] : [],
         reasoning: args.rationale,
         // Default maker_first so operators get the +1.12% maker edge by
         // default. Explicit "any" lets the LLM signal that the operator
@@ -589,7 +601,10 @@ export const verifyPlanTool = createTool({
     const ctx = getGordonContext(execContext);
     const quantity =
       plan.allocation.amount /
-      Math.max(plan.entry.price ?? (await ctx?.exchange?.getPrice(plan.symbol).catch(() => 1)) ?? 1, 1e-9);
+      Math.max(
+        plan.entry.price ?? (await ctx?.exchange?.getPrice(plan.symbol).catch(() => 1)) ?? 1,
+        1e-9,
+      );
     // When the operator asked for a hypothetical-portfolio evaluation,
     // shadow the live ctx.portfolioValue / availableCash via the same
     // proxy compute_risk uses.
@@ -620,9 +635,9 @@ export const verifyPlanTool = createTool({
     // Maker-first routing check: surface a violation when policy is
     // maker_first AND entry.type is market. Operator must approve_plan
     // with overrideVerifyVerdict=true to accept the taker tax.
-    const planRoutingPolicy = (plan as { routingPolicy?: "maker_first" | "any" }).routingPolicy ?? "maker_first";
-    const routingConflict =
-      planRoutingPolicy === "maker_first" && plan.entry.type === "market";
+    const planRoutingPolicy =
+      (plan as { routingPolicy?: "maker_first" | "any" }).routingPolicy ?? "maker_first";
+    const routingConflict = planRoutingPolicy === "maker_first" && plan.entry.type === "market";
     if (routingConflict) {
       warnings.push(
         "ROUTING_VIOLATION: plan has routingPolicy='maker_first' but entry.type='market' — crossing the spread surrenders the +1.12% maker edge (Becker 2026, 72.1M trades). Convert to a limit entry, or approve with overrideVerifyVerdict=true to accept the taker tax.",
@@ -667,7 +682,9 @@ export const verifyPlanTool = createTool({
     });
 
     const baseSummary =
-      result.reason ?? result.error ?? (routingConflict ? "Routing-policy conflict — see warnings." : "Verify complete.");
+      result.reason ??
+      result.error ??
+      (routingConflict ? "Routing-policy conflict — see warnings." : "Verify complete.");
 
     return {
       planId: args.planId,
@@ -675,7 +692,11 @@ export const verifyPlanTool = createTool({
       riskTier,
       constitutionViolations: warnings as unknown[],
       recommendation:
-        verdict === "approve" ? "auto_approve" : verdict === "conditional" ? "prompt_user" : "block",
+        verdict === "approve"
+          ? "auto_approve"
+          : verdict === "conditional"
+            ? "prompt_user"
+            : "block",
       summary: decay.ran ? baseSummary : `${baseSummary} ${decay.note}`,
       decay: {
         ran: decay.ran,
@@ -854,13 +875,18 @@ export const cancelTool = createTool({
       target: z.enum(["order", "all_orders", "position", "partial"]),
       id: z.string().optional().describe("Order or trade ID for single-target operations."),
       symbol: z.string().optional().describe("Required for 'order' and 'all_orders' targets."),
-      percentPct: z.number().min(1).max(99).optional().describe("Percent to close for 'partial' target."),
+      percentPct: z
+        .number()
+        .min(1)
+        .max(99)
+        .optional()
+        .describe("Percent to close for 'partial' target."),
       reason: z.string().min(10),
     })
-    .refine(
-      (v) => v.target !== "all_orders" || typeof v.symbol === "string",
-      { message: "`symbol` is required when target='all_orders'.", path: ["symbol"] },
-    )
+    .refine((v) => v.target !== "all_orders" || typeof v.symbol === "string", {
+      message: "`symbol` is required when target='all_orders'.",
+      path: ["symbol"],
+    })
     .refine(
       (v) => v.target !== "order" || (typeof v.id === "string" && typeof v.symbol === "string"),
       { message: "`id` and `symbol` are both required when target='order'.", path: ["id"] },
@@ -869,10 +895,10 @@ export const cancelTool = createTool({
       (v) => (v.target !== "position" && v.target !== "partial") || typeof v.id === "string",
       { message: "`id` (tradeId) is required when target='position' or 'partial'.", path: ["id"] },
     )
-    .refine(
-      (v) => v.target !== "partial" || typeof v.percentPct === "number",
-      { message: "`percentPct` is required when target='partial'.", path: ["percentPct"] },
-    ),
+    .refine((v) => v.target !== "partial" || typeof v.percentPct === "number", {
+      message: "`percentPct` is required when target='partial'.",
+      path: ["percentPct"],
+    }),
   outputSchema: z.object({
     success: z.boolean(),
     target: z.string(),
@@ -890,18 +916,21 @@ export const cancelTool = createTool({
     execContext?: MastraExecutionContext,
   ) => {
     const ctx = getGordonContext(execContext);
-    // No live-consent gate on any target here, deliberately. Consent gates
-    // exposure-INCREASING operations; every target of this tool is
-    // exposure-reducing (cancel a resting order, or close all/part of an open
-    // position). Gating the exit behind the same acknowledgement that permits
-    // the entry would strand the operator once consent expires. Do not add a
-    // gate here thinking it was an oversight.
     try {
       switch (args.target) {
         case "order": {
-          if (!ctx?.exchange) return { success: false, target: args.target, error: "No exchange connected." };
+          if (!ctx?.exchange)
+            return { success: false, target: args.target, error: "No exchange connected." };
           if (!args.id || !args.symbol) {
-            return { success: false, target: args.target, error: "Both `id` and `symbol` are required for target='order'." };
+            return {
+              success: false,
+              target: args.target,
+              error: "Both `id` and `symbol` are required for target='order'.",
+            };
+          }
+          const consent = requireLiveConsent({ sandboxActive: ctx.exchange.isSandbox ?? false });
+          if (!consent.ok) {
+            return { success: false, target: args.target, error: consent.reason };
           }
           await ctx.exchange.cancelOrder(args.symbol, args.id);
           auditLog.record(
@@ -911,12 +940,25 @@ export const cancelTool = createTool({
             "SUCCESS",
             { resultDetails: args.reason },
           );
-          return { success: true, target: "order", cancelled: [{ orderId: args.id, symbol: args.symbol }] };
+          return {
+            success: true,
+            target: "order",
+            cancelled: [{ orderId: args.id, symbol: args.symbol }],
+          };
         }
         case "all_orders": {
-          if (!ctx?.exchange) return { success: false, target: args.target, error: "No exchange connected." };
+          if (!ctx?.exchange)
+            return { success: false, target: args.target, error: "No exchange connected." };
           if (!args.symbol) {
-            return { success: false, target: args.target, error: "`symbol` is required for target='all_orders'." };
+            return {
+              success: false,
+              target: args.target,
+              error: "`symbol` is required for target='all_orders'.",
+            };
+          }
+          const consent = requireLiveConsent({ sandboxActive: ctx.exchange.isSandbox ?? false });
+          if (!consent.ok) {
+            return { success: false, target: args.target, error: consent.reason };
           }
           const cancelled = await ctx.exchange.cancelAllOrders(args.symbol);
           auditLog.record(
@@ -929,7 +971,8 @@ export const cancelTool = createTool({
           return { success: true, target: "all_orders", cancelled };
         }
         case "position": {
-          if (!args.id) return { success: false, target: args.target, error: "`id` (tradeId) required." };
+          if (!args.id)
+            return { success: false, target: args.target, error: "`id` (tradeId) required." };
           const r = (await (implCloseTrade.execute as any)(
             { tradeId: args.id, reason: "MANUAL" },
             execContext,
@@ -942,9 +985,14 @@ export const cancelTool = createTool({
           };
         }
         case "partial": {
-          if (!args.id) return { success: false, target: args.target, error: "`id` (tradeId) required." };
+          if (!args.id)
+            return { success: false, target: args.target, error: "`id` (tradeId) required." };
           if (!args.percentPct)
-            return { success: false, target: args.target, error: "`percentPct` required for partial close." };
+            return {
+              success: false,
+              target: args.target,
+              error: "`percentPct` required for partial close.",
+            };
           const r = (await (implClosePartial.execute as any)(
             { tradeId: args.id, percentage: args.percentPct / 100, reason: "MANUAL" },
             execContext,
@@ -1017,7 +1065,12 @@ export const backtestTool = createTool({
     timeframe: z.enum(["15m", "30m", "1h", "4h", "1d"]).optional(),
     startDate: z.string().optional().describe("ISO date — supersedes `days` when provided."),
     endDate: z.string().optional(),
-    days: z.number().int().positive().optional().describe("Lookback days when start/end omitted. Default 90."),
+    days: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Lookback days when start/end omitted. Default 90."),
     initialCapitalUsd: z.number().positive().optional().describe("Default 10000."),
     market: z.enum(["auto", "crypto", "stocks"]).optional().describe("Default 'auto'."),
     replayRunId: z
@@ -1043,7 +1096,9 @@ export const backtestTool = createTool({
       .number()
       .positive()
       .optional()
-      .describe("How long the strategy is intended to be traded live, for the decay-validity check. Default 0."),
+      .describe(
+        "How long the strategy is intended to be traded live, for the decay-validity check. Default 0.",
+      ),
   }),
   outputSchema: z.object({
     runId: z.string(),
@@ -1148,7 +1203,7 @@ export const backtestTool = createTool({
         strategyId,
         market: args.market ?? "auto",
         timeframe,
-        days: hasCalendarRange ? undefined : days ?? 90,
+        days: hasCalendarRange ? undefined : (days ?? 90),
         ...(hasCalendarRange && {
           startTime: new Date(startDate as string).getTime(),
           endTime: new Date(endDate as string).getTime(),
@@ -1200,7 +1255,8 @@ export const backtestTool = createTool({
       liveHorizonMonths: args.liveHorizonMonths,
       halfLifeMonths: args.signalHalfLifeMonths,
     });
-    const baseSummary = result.summary ?? result.formattedSummary ?? result.error ?? "Backtest complete.";
+    const baseSummary =
+      result.summary ?? result.formattedSummary ?? result.error ?? "Backtest complete.";
 
     const out: {
       runId: string;
@@ -1247,16 +1303,18 @@ export const backtestTool = createTool({
 
     if (backtestResult) {
       out.analysis = analyzeBacktestResult(backtestResult);
-      out.verdict = computeVerdict(backtestResult.metrics, undefined, hasCalendarRange ? undefined : days ?? 90);
+      out.verdict = computeVerdict(
+        backtestResult.metrics,
+        undefined,
+        hasCalendarRange ? undefined : (days ?? 90),
+      );
     }
 
     if (storedSnapshotResult !== null) {
       const drift = detectDrift(storedSnapshotResult, result.result ?? {});
       out.drift = {
         hasDrift: drift.hasDrift,
-        deltas: Object.fromEntries(
-          Object.entries(drift.deltas).map(([k, v]) => [k, v ?? null]),
-        ),
+        deltas: Object.fromEntries(Object.entries(drift.deltas).map(([k, v]) => [k, v ?? null])),
         interpretation: drift.interpretation,
       };
     }
@@ -1269,9 +1327,7 @@ function isBacktestResult(value: unknown): value is BacktestResult {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<BacktestResult>;
   return Boolean(
-    candidate.metrics &&
-      typeof candidate.metrics === "object" &&
-      Array.isArray(candidate.trades),
+    candidate.metrics && typeof candidate.metrics === "object" && Array.isArray(candidate.trades),
   );
 }
 

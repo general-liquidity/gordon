@@ -47,12 +47,7 @@ export interface OrderBookSnapshot {
   symbol?: string;
 }
 
-export type ObiVerdict =
-  | "strong_bid"
-  | "moderate_bid"
-  | "balanced"
-  | "moderate_ask"
-  | "strong_ask";
+export type ObiVerdict = "strong_bid" | "moderate_bid" | "balanced" | "moderate_ask" | "strong_ask";
 
 export interface ObiResult {
   symbol?: string;
@@ -132,7 +127,7 @@ export function computeOrderBookImbalance(
 
   const topBid = bids[0]?.price ?? 0;
   const topAsk = asks[0]?.price ?? 0;
-  const midPrice = topBid && topAsk ? (topBid + topAsk) / 2 : (topBid || topAsk);
+  const midPrice = topBid && topAsk ? (topBid + topAsk) / 2 : topBid || topAsk;
 
   return {
     symbol: snapshot.symbol,
@@ -163,7 +158,7 @@ export function standardizeOrderBookImbalance(
     windowSize: options.windowSize ?? DEFAULT_WINDOW,
     moderateThreshold: options.moderateThreshold ?? DEFAULT_MODERATE_THRESHOLD,
     strongThreshold: options.strongThreshold ?? DEFAULT_STRONG_THRESHOLD,
-    scalingCoefficient: options.scalingCoefficient ?? (current.midPrice * 0.005), // 50 bps default
+    scalingCoefficient: options.scalingCoefficient ?? current.midPrice * 0.005, // 50 bps default
   };
 
   const windowed = history.slice(-opts.windowSize);

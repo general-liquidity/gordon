@@ -51,7 +51,9 @@ export const volTargetSizerDiagnosticTool = createTool({
       .min(0)
       .max(1)
       .optional()
-      .describe("Drift threshold (fraction) below which no rebalance is recommended. Default 0.10."),
+      .describe(
+        "Drift threshold (fraction) below which no rebalance is recommended. Default 0.10.",
+      ),
     minCurrentVol: z
       .number()
       .min(0)

@@ -108,7 +108,10 @@ function displayedHalfLifeScore(lifecycles: ReadonlyArray<LevelLifecycle> | unde
   return { score, halfLifeMs: median };
 }
 
-function depthTurnoverScore(addedCancelled: number | undefined, executed: number | undefined): {
+function depthTurnoverScore(
+  addedCancelled: number | undefined,
+  executed: number | undefined,
+): {
   score: number;
   ratio: number;
 } {
@@ -132,12 +135,7 @@ export function scoreMicrostructureToxicity(input: ToxicityInput): ToxicityResul
   const dt = depthTurnoverScore(input.addedPlusCancelledSize, input.executedVolume);
 
   // Weights sum to 1.0
-  const score =
-    mi * 0.25 +
-    td * 0.2 +
-    cv * 0.2 +
-    hl.score * 0.2 +
-    dt.score * 0.15;
+  const score = mi * 0.25 + td * 0.2 + cv * 0.2 + hl.score * 0.2 + dt.score * 0.15;
 
   const activeT = input.activeThreshold ?? DEFAULT_ACTIVE;
   const elevatedT = input.elevatedThreshold ?? DEFAULT_ELEVATED;

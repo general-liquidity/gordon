@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import type React from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { FullscreenLayout } from "../layout/FullscreenLayout.tsx";
 import type { ApprovalDecision, ApprovalRequest } from "../dialogs/ApprovalDialog.tsx";
@@ -23,7 +24,8 @@ type Section = "approvals" | "positions" | "radar";
 
 export function sortApprovalsByRisk(approvals: ApprovalRequest[]): ApprovalRequest[] {
   const rank = { critical: 0, high: 1, medium: 2, low: 3 } as const;
-  return approvals.map((approval, index) => ({ approval, index }))
+  return approvals
+    .map((approval, index) => ({ approval, index }))
     .sort((a, b) => rank[a.approval.riskClass] - rank[b.approval.riskClass] || a.index - b.index)
     .map((entry) => entry.approval);
 }
@@ -67,7 +69,9 @@ export function TradeQueueView({
       return;
     }
     if (key.tab) {
-      setSection((current) => current === "approvals" ? "positions" : current === "positions" ? "radar" : "approvals");
+      setSection((current) =>
+        current === "approvals" ? "positions" : current === "positions" ? "radar" : "approvals",
+      );
       setCursor(0);
       return;
     }
@@ -96,24 +100,69 @@ export function TradeQueueView({
       header={<Header title="TRADE QUEUE" mode={permissionMode} />}
       content={
         <Box flexDirection="column">
-          <SectionTitle active={section === "approvals"} label={`APPROVALS (${approvals.length})`} focusColor={theme.uiFocus} />
-          {approvals.length === 0 ? <Text dimColor>   none pending</Text> : approvals.map((approval, index) => (
-            <ApprovalRow key={approval.id} approval={approval} focused={section === "approvals" && index === cursor} focusColor={theme.uiFocus} />
-          ))}
+          <SectionTitle
+            active={section === "approvals"}
+            label={`APPROVALS (${approvals.length})`}
+            focusColor={theme.uiFocus}
+          />
+          {approvals.length === 0 ? (
+            <Text dimColor> none pending</Text>
+          ) : (
+            approvals.map((approval, index) => (
+              <ApprovalRow
+                key={approval.id}
+                approval={approval}
+                focused={section === "approvals" && index === cursor}
+                focusColor={theme.uiFocus}
+              />
+            ))
+          )}
           <Divider />
-          <SectionTitle active={section === "positions"} label={`POSITIONS (${positions.length})`} suffix={`P&L ${totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)}`} focusColor={theme.uiFocus} />
-          {positions.length === 0 ? <Text dimColor>   no open positions</Text> : positions.map((position, index) => (
-            <PositionRow key={position.id} position={position} focused={section === "positions" && index === cursor} focusColor={theme.uiFocus} />
-          ))}
+          <SectionTitle
+            active={section === "positions"}
+            label={`POSITIONS (${positions.length})`}
+            suffix={`P&L ${totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)}`}
+            focusColor={theme.uiFocus}
+          />
+          {positions.length === 0 ? (
+            <Text dimColor> no open positions</Text>
+          ) : (
+            positions.map((position, index) => (
+              <PositionRow
+                key={position.id}
+                position={position}
+                focused={section === "positions" && index === cursor}
+                focusColor={theme.uiFocus}
+              />
+            ))
+          )}
           <Divider />
-          <SectionTitle active={section === "radar"} label={`RADAR (${radar.length} pending)`} focusColor={theme.uiFocus} />
-          {radar.length === 0 ? <Text dimColor>   no pending radar cards</Text> : radar.map((suggestion, index) => (
-            <RadarRow key={suggestion.id} suggestion={suggestion} focused={section === "radar" && index === cursor} focusColor={theme.uiFocus} />
-          ))}
+          <SectionTitle
+            active={section === "radar"}
+            label={`RADAR (${radar.length} pending)`}
+            focusColor={theme.uiFocus}
+          />
+          {radar.length === 0 ? (
+            <Text dimColor> no pending radar cards</Text>
+          ) : (
+            radar.map((suggestion, index) => (
+              <RadarRow
+                key={suggestion.id}
+                suggestion={suggestion}
+                focused={section === "radar" && index === cursor}
+                focusColor={theme.uiFocus}
+              />
+            ))
+          )}
         </Box>
       }
       statusBar={<Text dimColor>Tab section · ↑↓ select · q / Esc back to chat</Text>}
-      input={<Text dimColor>Approvals: y approve once · n deny · m modify when offered. Radar: a ack · p pass · d mute 60m.</Text>}
+      input={
+        <Text dimColor>
+          Approvals: y approve once · n deny · m modify when offered. Radar: a ack · p pass · d mute
+          60m.
+        </Text>
+      }
     />
   );
 }
@@ -123,53 +172,109 @@ function Header({ title, mode }: { title: string; mode: PermissionMode }): React
     <Box flexDirection="column">
       <Box>
         <Text bold>{title}</Text>
-        <Text dimColor>                                      {mode} · {new Date().toLocaleTimeString()}</Text>
+        <Text dimColor>
+          {" "}
+          {mode} · {new Date().toLocaleTimeString()}
+        </Text>
       </Box>
       <Text dimColor>{"─".repeat(72)}</Text>
     </Box>
   );
 }
 
-function SectionTitle({ label, active, suffix, focusColor }: { label: string; active: boolean; suffix?: string; focusColor: string }): React.JSX.Element {
+function SectionTitle({
+  label,
+  active,
+  suffix,
+  focusColor,
+}: {
+  label: string;
+  active: boolean;
+  suffix?: string;
+  focusColor: string;
+}): React.JSX.Element {
   return (
     <Box>
-      <Text color={active ? focusColor : undefined} bold>{active ? "▸ " : "  "}{label}</Text>
-      {suffix && <Text dimColor>                                     {suffix}</Text>}
+      <Text color={active ? focusColor : undefined} bold>
+        {active ? "▸ " : "  "}
+        {label}
+      </Text>
+      {suffix && <Text dimColor> {suffix}</Text>}
     </Box>
   );
 }
 
-function ApprovalRow({ approval, focused, focusColor }: { approval: ApprovalRequest; focused: boolean; focusColor: string }): React.JSX.Element {
+function ApprovalRow({
+  approval,
+  focused,
+  focusColor,
+}: {
+  approval: ApprovalRequest;
+  focused: boolean;
+  focusColor: string;
+}): React.JSX.Element {
   return (
     <Box flexDirection="column">
       <Text color={focused ? focusColor : undefined}>
-        {focused ? " ▸ " : "   "}{approval.riskClass.toUpperCase()}  {approval.toolName} - {approval.permissionScope}
+        {focused ? " ▸ " : "   "}
+        {approval.riskClass.toUpperCase()} {approval.toolName} - {approval.permissionScope}
       </Text>
       {(approval.riskReasons ?? []).slice(0, 1).map((reason) => (
-        <Text key={reason} dimColor>      Why: {reason}</Text>
+        <Text key={reason} dimColor>
+          {" "}
+          Why: {reason}
+        </Text>
       ))}
-      <Text dimColor>      y approve once · n deny{approval.counterOffer ? ` · m reduce to ${approval.counterOffer.adjustedQuantity} ${approval.counterOffer.symbol}` : ""}</Text>
+      <Text dimColor>
+        {" "}
+        y approve once · n deny
+        {approval.counterOffer
+          ? ` · m reduce to ${approval.counterOffer.adjustedQuantity} ${approval.counterOffer.symbol}`
+          : ""}
+      </Text>
     </Box>
   );
 }
 
-function PositionRow({ position, focused, focusColor }: { position: Position; focused: boolean; focusColor: string }): React.JSX.Element {
+function PositionRow({
+  position,
+  focused,
+  focusColor,
+}: {
+  position: Position;
+  focused: boolean;
+  focusColor: string;
+}): React.JSX.Element {
   const risk = stopDistancePct(position);
   const acct = accountPctAtRisk(position, null);
   return (
     <Text color={focused ? focusColor : undefined}>
-      {focused ? " ▸ " : "   "}{position.symbol.padEnd(6)} {position.side.toUpperCase().padEnd(5)} {position.quantity.toFixed(4).padStart(8)} entry {position.entryPrice.toFixed(2).padStart(10)} last {position.lastPrice.toFixed(2).padStart(10)} pnl {position.pnl.toFixed(2).padStart(10)} risk {risk == null ? "NO STOP" : `${(risk * 100).toFixed(1)}%`} acct {acct == null ? "—" : `${(acct * 100).toFixed(1)}%`}
+      {focused ? " ▸ " : "   "}
+      {position.symbol.padEnd(6)} {position.side.toUpperCase().padEnd(5)}{" "}
+      {position.quantity.toFixed(4).padStart(8)} entry {position.entryPrice.toFixed(2).padStart(10)}{" "}
+      last {position.lastPrice.toFixed(2).padStart(10)} pnl {position.pnl.toFixed(2).padStart(10)}{" "}
+      risk {risk == null ? "NO STOP" : `${(risk * 100).toFixed(1)}%`} acct{" "}
+      {acct == null ? "—" : `${(acct * 100).toFixed(1)}%`}
     </Text>
   );
 }
 
-function RadarRow({ suggestion, focused, focusColor }: { suggestion: ProactiveSuggestion; focused: boolean; focusColor: string }): React.JSX.Element {
+function RadarRow({
+  suggestion,
+  focused,
+  focusColor,
+}: {
+  suggestion: ProactiveSuggestion;
+  focused: boolean;
+  focusColor: string;
+}): React.JSX.Element {
   return (
     <Box flexDirection="column">
       <Text color={focused ? focusColor : undefined}>
-        {focused ? " ▸ " : "   "}{suggestion.category.toUpperCase()}  {suggestion.title}
+        {focused ? " ▸ " : "   "}
+        {suggestion.category.toUpperCase()} {suggestion.title}
       </Text>
-      <Text dimColor>      a ack · p pass · d mute category 60m</Text>
+      <Text dimColor> a ack · p pass · d mute category 60m</Text>
     </Box>
   );
 }

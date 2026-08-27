@@ -22,17 +22,13 @@ const validInput: EdgeThesisInput = {
 describe("isStrategyEdgeThesisEnabled", () => {
   it("respects the flag", () => {
     expect(isStrategyEdgeThesisEnabled({})).toBe(false);
-    expect(
-      isStrategyEdgeThesisEnabled({ [STRATEGY_EDGE_THESIS_FLAG_ENV]: "1" }),
-    ).toBe(true);
+    expect(isStrategyEdgeThesisEnabled({ [STRATEGY_EDGE_THESIS_FLAG_ENV]: "1" })).toBe(true);
   });
 });
 
 describe("captureEdgeThesis — validation", () => {
   it("rejects empty strategyId", () => {
-    expect(() =>
-      captureEdgeThesis({ ...validInput, strategyId: "" }),
-    ).toThrow();
+    expect(() => captureEdgeThesis({ ...validInput, strategyId: "" })).toThrow();
   });
 
   it("rejects too-short inefficiencyDescription", () => {
@@ -48,15 +44,11 @@ describe("captureEdgeThesis — validation", () => {
   });
 
   it("rejects too-short counterpartyConstraint", () => {
-    expect(() =>
-      captureEdgeThesis({ ...validInput, counterpartyConstraint: "short" }),
-    ).toThrow();
+    expect(() => captureEdgeThesis({ ...validInput, counterpartyConstraint: "short" })).toThrow();
   });
 
   it("rejects too-short persistenceRationale", () => {
-    expect(() =>
-      captureEdgeThesis({ ...validInput, persistenceRationale: "short" }),
-    ).toThrow();
+    expect(() => captureEdgeThesis({ ...validInput, persistenceRationale: "short" })).toThrow();
   });
 
   it("error messages reference the article's framing", () => {
@@ -214,8 +206,7 @@ describe("captureEdgeThesis — reasoning text quality", () => {
   it("invalid reasoning includes guidance to rewrite", () => {
     const r = captureEdgeThesis({
       ...validInput,
-      inefficiencyDescription:
-        "found this signal through trial and error during the 2023 selloff",
+      inefficiencyDescription: "found this signal through trial and error during the 2023 selloff",
       mode: "active",
     });
     expect(r.reasoning.toLowerCase()).toContain("rewrite");
@@ -250,8 +241,7 @@ describe("edgeThesisToPayload", () => {
   it("emits null hash on invalid result", () => {
     const r = captureEdgeThesis({
       ...validInput,
-      inefficiencyDescription:
-        "the backtest showed a clear pattern across windows",
+      inefficiencyDescription: "the backtest showed a clear pattern across windows",
       mode: "active",
     });
     const p = edgeThesisToPayload(r) as { thesisHash: string | null };

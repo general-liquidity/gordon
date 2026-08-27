@@ -16,7 +16,7 @@ export {
   mcpUpdate,
   mcpInfo,
   type MCPCommandResult,
-} from './mcp.ts';
+} from "./mcp.ts";
 
 // Routing Management Commands
 export {
@@ -26,7 +26,7 @@ export {
   routingUninstall,
   routingRoute,
   type RoutingCommandResult,
-} from './routing.ts';
+} from "./routing.ts";
 
 // Config Commands
 export {
@@ -35,7 +35,7 @@ export {
   configSet,
   configReset,
   type ConfigCommandResult,
-} from './config.ts';
+} from "./config.ts";
 
 // Exchange Management Commands
 export {
@@ -47,7 +47,7 @@ export {
   exchangeStatus,
   exchangeCompare,
   type ExchangeCommandResult,
-} from './exchange.ts';
+} from "./exchange.ts";
 
 // Broker Management Commands
 export {
@@ -58,12 +58,10 @@ export {
   brokerRemove,
   brokerStatus,
   type BrokerCommandResult,
-} from './broker.ts';
+} from "./broker.ts";
 
 // Stocks Commands
-export {
-  handleStocksCommand,
-} from './stocks.ts';
+export { handleStocksCommand } from "./stocks.ts";
 
 // Strategy Management Commands
 export {
@@ -75,7 +73,7 @@ export {
   strategyBacktest,
   strategyCompare,
   type StrategyCommandResult,
-} from './strategy.ts';
+} from "./strategy.ts";
 
 // Workflow Commands
 export {
@@ -85,13 +83,13 @@ export {
   type WorkflowContext,
   type WorkflowResult,
   type WorkflowStep,
-} from './workflow.ts';
+} from "./workflow.ts";
 
 // Export Commands
 export {
   handleExportCommand,
   type ExportCommandResult,
-} from './export.ts';
+} from "./export.ts";
 
 // Keyring Commands
 export {
@@ -102,7 +100,7 @@ export {
   keyringStore,
   keyringClear,
   type KeyringCommandResult,
-} from './keyring.ts';
+} from "./keyring.ts";
 
 // OAuth Commands
 export {
@@ -113,28 +111,28 @@ export {
   oauthPasteToken,
   oauthRemove,
   type OAuthCommandResult,
-} from './oauth.ts';
+} from "./oauth.ts";
 
 // Telemetry Commands
 export {
   handleTelemetryCommand,
   type TelemetryCommandResult,
-} from './telemetry.ts';
+} from "./telemetry.ts";
 
 // Kill-switch commands
 export {
   handleKillSwitchCommand,
   type KillSwitchCommandResult,
-} from './killswitch.ts';
+} from "./killswitch.ts";
 
 // Context / cost diagnostics commands
 export {
   handleContextCommand,
   type ContextCommandResult,
-} from './context.ts';
+} from "./context.ts";
 
 // Cache audit diagnostic command
 export {
   handleCacheAuditCommand,
   type CacheAuditCommandResult,
-} from './cacheAudit.ts';
+} from "./cacheAudit.ts";

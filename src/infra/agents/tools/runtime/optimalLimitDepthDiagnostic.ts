@@ -24,10 +24,7 @@ export const optimalLimitDepthDiagnosticTool = createTool({
     "Returns the depth that balances fill probability against per-fill profit. " +
     "Use when the agent needs to choose limit-order depth analytically instead of heuristically.",
   inputSchema: z.object({
-    timeRemaining: z
-      .number()
-      .positive()
-      .describe("Time remaining in the execution horizon."),
+    timeRemaining: z.number().positive().describe("Time remaining in the execution horizon."),
     inventoryRemaining: z
       .number()
       .int()

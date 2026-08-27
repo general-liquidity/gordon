@@ -78,7 +78,11 @@ describe("TrustTrajectory.scoreFor", () => {
   it("ignores events outside the window", () => {
     // Trust window default = 30 days
     for (let i = 0; i < 5; i++) {
-      t.record({ toolName: "get_chart", decision: "approved", timestamp: NOW - 90 * DAY - i * DAY });
+      t.record({
+        toolName: "get_chart",
+        decision: "approved",
+        timestamp: NOW - 90 * DAY - i * DAY,
+      });
     }
     const s = t.scoreFor("get_chart", undefined, NOW);
     expect(s.approvals).toBe(0);
@@ -178,21 +182,29 @@ describe("TrustTrajectory persistence", () => {
       });
     }
 
-    expect(hook({
-      toolName: "rebalance_portfolio",
-      policy: { tool: { permissionScope: "livetrade.execute" } },
-    }).decision).toBe("abstain");
-    expect(hook({
-      toolName: "rebalance_portfolio",
-      policy: { tool: { permissionScope: "papertrade.execute" } },
-    }).decision).toBe("allow");
+    expect(
+      hook({
+        toolName: "rebalance_portfolio",
+        policy: { tool: { permissionScope: "livetrade.execute" } },
+      }).decision,
+    ).toBe("abstain");
+    expect(
+      hook({
+        toolName: "rebalance_portfolio",
+        policy: { tool: { permissionScope: "papertrade.execute" } },
+      }).decision,
+    ).toBe("allow");
   });
 
   it("hook refuses to auto-approve when policy says always_require_human", () => {
     const t = new TrustTrajectory({ minApprovals: 1, scoreThreshold: 0.5 });
-    for (let i = 0; i < 10; i++) t.record({ toolName: "get_chart", decision: "approved", timestamp: NOW - i });
+    for (let i = 0; i < 10; i++)
+      t.record({ toolName: "get_chart", decision: "approved", timestamp: NOW - i });
     const hook = buildTrustTrajectoryHook(t, { now: () => NOW });
-    const result = hook({ toolName: "get_chart", policy: { approvalClass: "always_require_human" } });
+    const result = hook({
+      toolName: "get_chart",
+      policy: { approvalClass: "always_require_human" },
+    });
     expect(result.decision).toBe("abstain");
   });
 
@@ -214,7 +226,7 @@ describe("TrustTrajectory persistence", () => {
     writer.record({ toolName: "get_chart", decision: "approved", timestamp: NOW });
     // Append junk by hand to simulate corruption
     const raw = readFileSync(path, "utf8");
-    writeFileSync(path, raw + "not-json\n{}\n");
+    writeFileSync(path, `${raw}not-json\n{}\n`);
     const reader = new TrustTrajectory({ persistPath: path });
     expect(reader.listEvents().length).toBe(1);
     rmSync(dir, { recursive: true, force: true });
@@ -238,10 +250,12 @@ describe("authority-granting scopes are never trust-auto-approved", () => {
       });
     }
     const hook = buildTrustTrajectoryHook(t, { now: () => NOW });
-    expect(hook({
-      toolName: "some_future_tool",
-      policy: { tool: { permissionScope: "system.mode.write" } },
-    }).decision).toBe("abstain");
+    expect(
+      hook({
+        toolName: "some_future_tool",
+        policy: { tool: { permissionScope: "system.mode.write" } },
+      }).decision,
+    ).toBe("abstain");
   });
 
   it("still auto-approves a read scope with the same approval history", () => {
@@ -255,9 +269,11 @@ describe("authority-granting scopes are never trust-auto-approved", () => {
       });
     }
     const hook = buildTrustTrajectoryHook(t, { now: () => NOW });
-    expect(hook({
-      toolName: "some_future_tool",
-      policy: { tool: { permissionScope: "market.read" } },
-    }).decision).toBe("allow");
+    expect(
+      hook({
+        toolName: "some_future_tool",
+        policy: { tool: { permissionScope: "market.read" } },
+      }).decision,
+    ).toBe("allow");
   });
 });

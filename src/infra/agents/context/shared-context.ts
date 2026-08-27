@@ -264,7 +264,7 @@ function isExpired(entry: VersionedEntry<unknown>): boolean {
 export function cleanupExpiredContexts(): void {
   if (!_sharedMemory) return;
 
-  const now = Date.now();
+  const _now = Date.now();
 
   // Clean up expired analyses
   for (const [symbol, history] of _sharedMemory.analyses.entries()) {
@@ -317,9 +317,7 @@ export function cleanupExpiredContexts(): void {
  * Enforce maximum entries limit for a context map
  * Removes oldest entries when limit is exceeded
  */
-function enforceMaxEntriesLimit<T>(
-  contextMap: Map<string, ContextHistory<T>>
-): void {
+function enforceMaxEntriesLimit<T>(contextMap: Map<string, ContextHistory<T>>): void {
   if (contextMap.size <= MAX_ENTRIES_PER_TYPE) return;
 
   // Get entries sorted by most recent activity (current entry timestamp)
@@ -344,7 +342,7 @@ function createVersionedEntry<T>(
   data: T,
   author: string,
   version: number,
-  ttlMs: number = DEFAULT_CONTEXT_TTL_MS
+  ttlMs: number = DEFAULT_CONTEXT_TTL_MS,
 ): VersionedEntry<T> {
   const now = Date.now();
   return {
@@ -362,16 +360,13 @@ function createVersionedEntry<T>(
 function getNextVersion(
   memory: SharedAgentMemory,
   type: "analyses" | "backtests",
-  symbol: string
+  symbol: string,
 ): number;
-function getNextVersion(
-  memory: SharedAgentMemory,
-  type: "scanner" | "planner" | "monitor"
-): number;
+function getNextVersion(memory: SharedAgentMemory, type: "scanner" | "planner" | "monitor"): number;
 function getNextVersion(
   memory: SharedAgentMemory,
   type: "analyses" | "backtests" | "scanner" | "planner" | "monitor",
-  symbol?: string
+  symbol?: string,
 ): number {
   if (type === "analyses" || type === "backtests") {
     const counter = memory.versionCounters[type];
@@ -392,10 +387,7 @@ function getNextVersion(
  * Store analysis context from Analyst agent
  * Creates a versioned entry and maintains history
  */
-export function storeAnalysisContext(
-  context: AnalysisContext,
-  author: string = "Analyst"
-): void {
+export function storeAnalysisContext(context: AnalysisContext, author: string = "Analyst"): void {
   const memory = getSharedMemory();
   const symbol = context.symbol;
 
@@ -441,7 +433,7 @@ export function getAnalysisContext(symbol: string): AnalysisContext | null {
  * Get the versioned entry for analysis context (includes metadata)
  */
 export function getAnalysisContextVersioned(
-  symbol: string
+  symbol: string,
 ): VersionedEntry<AnalysisContext> | null {
   const memory = getSharedMemory();
   const history = memory.analyses.get(symbol);
@@ -456,7 +448,7 @@ export function getAnalysisContextVersioned(
  */
 export function getContextHistory<T extends "analysis" | "backtest">(
   type: T,
-  symbol: string
+  symbol: string,
 ): ContextHistory<T extends "analysis" ? AnalysisContext : BacktestContext> | null {
   const memory = getSharedMemory();
 
@@ -474,10 +466,7 @@ export function getContextHistory<T extends "analysis" | "backtest">(
 /**
  * Check if we have recent analysis (within TTL)
  */
-export function hasRecentAnalysis(
-  symbol: string,
-  maxAgeMs: number = 5 * 60 * 1000
-): boolean {
+export function hasRecentAnalysis(symbol: string, maxAgeMs: number = 5 * 60 * 1000): boolean {
   const context = getAnalysisContext(symbol);
   if (!context) return false;
   return Date.now() - context.timestamp < maxAgeMs;
@@ -486,10 +475,7 @@ export function hasRecentAnalysis(
 /**
  * Store scanner context
  */
-export function storeScannerContext(
-  context: ScannerContext,
-  author: string = "Scanner"
-): void {
+export function storeScannerContext(context: ScannerContext, author: string = "Scanner"): void {
   const memory = getSharedMemory();
   const version = getNextVersion(memory, "scanner");
   memory.scanner = createVersionedEntry(context, author, version);
@@ -529,7 +515,7 @@ export function getScannerContextVersioned(): VersionedEntry<ScannerContext> | n
 export function storeBacktestContext(
   symbol: string,
   context: BacktestContext,
-  author: string = "Backtester"
+  author: string = "Backtester",
 ): void {
   const memory = getSharedMemory();
 
@@ -574,7 +560,7 @@ export function getBacktestContext(symbol: string): BacktestContext | null {
  * Get versioned backtest context (includes metadata)
  */
 export function getBacktestContextVersioned(
-  symbol: string
+  symbol: string,
 ): VersionedEntry<BacktestContext> | null {
   const memory = getSharedMemory();
   const history = memory.backtests.get(symbol);
@@ -587,10 +573,7 @@ export function getBacktestContextVersioned(
 /**
  * Store planner context
  */
-export function storePlannerContext(
-  context: PlannerContext,
-  author: string = "Planner"
-): void {
+export function storePlannerContext(context: PlannerContext, author: string = "Planner"): void {
   const memory = getSharedMemory();
   const version = getNextVersion(memory, "planner");
   memory.planner = createVersionedEntry(context, author, version);
@@ -627,10 +610,7 @@ export function getPlannerContextVersioned(): VersionedEntry<PlannerContext> | n
 /**
  * Store monitor context (portfolio ground truth)
  */
-export function storeMonitorContext(
-  context: MonitorContext,
-  author: string = "Monitor"
-): void {
+export function storeMonitorContext(context: MonitorContext, author: string = "Monitor"): void {
   const memory = getSharedMemory();
   const version = getNextVersion(memory, "monitor");
   memory.monitor = createVersionedEntry(context, author, version);
@@ -742,14 +722,12 @@ export function getSessionSummary(): string {
     const totalPnl = ctx.openPositions.reduce((sum, p) => sum + p.unrealizedPnl, 0);
     parts.push(
       `Portfolio: $${ctx.portfolioValue.toFixed(0)} | ${posCount} positions | ` +
-      `${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(2)} unrealized | ` +
-      `${ctx.totalExposurePercent.toFixed(1)}% exposure (v${memory.monitor.version})`
+        `${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(2)} unrealized | ` +
+        `${ctx.totalExposurePercent.toFixed(1)}% exposure (v${memory.monitor.version})`,
     );
   }
 
-  return parts.length > 0
-    ? `\n## Cross-Agent Context\n${parts.join("\n")}`
-    : "";
+  return parts.length > 0 ? `\n## Cross-Agent Context\n${parts.join("\n")}` : "";
 }
 
 /**
@@ -849,7 +827,9 @@ export const readSharedContextTool = createTool({
   inputSchema: z.object({
     contextType: z
       .enum(["analysis", "scanner", "backtest", "planner", "monitor", "all", "history"])
-      .describe("contextType: which agent's context to read — 'analysis', 'scanner', 'backtest', 'planner', 'monitor', 'all', or 'history'. Use 'monitor' for portfolio ground truth."),
+      .describe(
+        "contextType: which agent's context to read — 'analysis', 'scanner', 'backtest', 'planner', 'monitor', 'all', or 'history'. Use 'monitor' for portfolio ground truth.",
+      ),
     symbol: z
       .string()
       .optional()
@@ -926,7 +906,7 @@ export const readSharedContextTool = createTool({
           return { found: false, summary: "Symbol required for backtest context" };
         }
         const versioned = getBacktestContextVersioned(input.symbol);
-        if (!versioned || !versioned.data.lastBacktest) {
+        if (!versioned?.data.lastBacktest) {
           return { found: false, summary: `No backtest results for ${input.symbol}` };
         }
         const ctx = versioned.data;

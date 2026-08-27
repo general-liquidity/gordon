@@ -85,7 +85,7 @@ function parseBackupFilename(filename: string): { date: Date; type: "manual" | "
   // Try to parse the date
   try {
     const date = new Date(timestampStr);
-    if (isNaN(date.getTime())) {
+    if (Number.isNaN(date.getTime())) {
       // Fallback: use file stats
       return { date: new Date(), type };
     }
@@ -101,7 +101,9 @@ function parseBackupFilename(filename: string): { date: Date; type: "manual" | "
  * @param type - Backup type (manual or auto)
  * @returns Backup info or null if backup failed
  */
-export async function backupDatabase(type: "manual" | "auto" = "manual"): Promise<BackupInfo | null> {
+export async function backupDatabase(
+  type: "manual" | "auto" = "manual",
+): Promise<BackupInfo | null> {
   try {
     // Check if database exists
     const dbFile = Bun.file(DB_PATH);
@@ -139,10 +141,7 @@ export async function backupDatabase(type: "manual" | "auto" = "manual"): Promis
 
     return backupInfo;
   } catch (error) {
-    logger.error(
-      "Failed to create database backup",
-      error instanceof Error ? error : undefined
-    );
+    logger.error("Failed to create database backup", error instanceof Error ? error : undefined);
     return null;
   }
 }
@@ -177,19 +176,13 @@ export async function listBackups(): Promise<BackupInfo[]> {
           sizeBytes: stats.size,
           type: parsed?.type || "manual",
         });
-      } catch {
-        // Skip files we can't stat
-        continue;
-      }
+      } catch {}
     }
 
     // Sort by date, newest first
     return backups.sort((a, b) => b.date.getTime() - a.date.getTime());
   } catch (error) {
-    logger.error(
-      "Failed to list backups",
-      error instanceof Error ? error : undefined
-    );
+    logger.error("Failed to list backups", error instanceof Error ? error : undefined);
     return [];
   }
 }
@@ -210,7 +203,7 @@ export async function getLatestBackup(): Promise<BackupInfo | null> {
  */
 export async function restoreDatabase(
   backupPath: string,
-  createBackupFirst: boolean = true
+  createBackupFirst: boolean = true,
 ): Promise<void> {
   // Verify backup exists
   const backupFile = Bun.file(backupPath);
@@ -233,7 +226,7 @@ export async function restoreDatabase(
     if (dbExists) {
       const preRestoreBackup = join(
         BACKUPS_DIR,
-        `gordon-pre-restore-${new Date().toISOString().replace(/[:.]/g, "-")}.db`
+        `gordon-pre-restore-${new Date().toISOString().replace(/[:.]/g, "-")}.db`,
       );
       await ensureBackupsDir();
       await copyFile(DB_PATH, preRestoreBackup);
@@ -273,11 +266,9 @@ export async function deleteBackup(backupPath: string): Promise<void> {
     await unlink(backupPath);
     logger.info("Backup deleted", { path: basename(backupPath) });
   } catch (error) {
-    logger.error(
-      "Failed to delete backup",
-      error instanceof Error ? error : undefined,
-      { path: backupPath }
-    );
+    logger.error("Failed to delete backup", error instanceof Error ? error : undefined, {
+      path: backupPath,
+    });
     throw error;
   }
 }
@@ -288,9 +279,7 @@ export async function deleteBackup(backupPath: string): Promise<void> {
  * @param policy - Retention policy configuration
  * @returns Number of backups deleted
  */
-export async function pruneOldBackups(
-  policy: Partial<RetentionPolicy> = {}
-): Promise<number> {
+export async function pruneOldBackups(policy: Partial<RetentionPolicy> = {}): Promise<number> {
   const config = { ...DEFAULT_RETENTION_POLICY, ...policy };
   const backups = await listBackups();
 
@@ -379,7 +368,7 @@ export async function needsDailyBackup(): Promise<boolean> {
     const backupDate = new Date(
       backup.date.getFullYear(),
       backup.date.getMonth(),
-      backup.date.getDate()
+      backup.date.getDate(),
     );
 
     if (backupDate.getTime() === today.getTime()) {
@@ -488,11 +477,9 @@ export async function verifyBackup(backupPath: string): Promise<boolean> {
 
     return true;
   } catch (error) {
-    logger.error(
-      "Backup verification failed",
-      error instanceof Error ? error : undefined,
-      { path: backupPath }
-    );
+    logger.error("Backup verification failed", error instanceof Error ? error : undefined, {
+      path: backupPath,
+    });
     return false;
   }
 }

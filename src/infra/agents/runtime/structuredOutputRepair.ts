@@ -43,7 +43,8 @@ export async function repairStructuredOutput<T>(opts: RepairOptions<T>): Promise
   const maxAttempts = Math.max(1, Math.floor(opts.maxAttempts ?? 3));
   const buildHint =
     opts.buildHint ??
-    ((error: string) => `Your previous output was invalid: ${error}. Return ONLY a corrected output that fixes this — no prose, no code fences.`);
+    ((error: string) =>
+      `Your previous output was invalid: ${error}. Return ONLY a corrected output that fixes this — no prose, no code fences.`);
 
   const history: string[] = [];
   let hint: string | null = null;
@@ -93,7 +94,9 @@ export function parseJsonLenient<T = unknown>(raw: string): Validation<T> {
 }
 
 /** Build a validator that JSON-parses then runs `check` (returns an error string or null). */
-export function jsonValidator<T = unknown>(check?: (obj: T) => string | null): (raw: string) => Validation<T> {
+export function jsonValidator<T = unknown>(
+  check?: (obj: T) => string | null,
+): (raw: string) => Validation<T> {
   return (raw: string) => {
     const parsed = parseJsonLenient<T>(raw);
     if (!parsed.ok) return parsed;

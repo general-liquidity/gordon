@@ -66,8 +66,7 @@ export const DEFAULT_GATES: readonly GateDescriptor[] = [
     flag: "GORDON_EXTERNAL_HOOK_RUNNER",
     enabled: () => isExternalHookRunnerEnabled(),
     enforced: () => getExternalHookInstallerState().installed,
-    remedy:
-      "Set GORDON_EXTERNAL_HOOKS_PATH to a valid hooks JSON file and restart Gordon.",
+    remedy: "Set GORDON_EXTERNAL_HOOKS_PATH to a valid hooks JSON file and restart Gordon.",
   },
 ];
 

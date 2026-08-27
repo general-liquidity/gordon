@@ -37,7 +37,7 @@ export function computeCounterfactual(input: CounterfactualInput): Counterfactua
   const targetPnl = ((input.takeProfit - input.entry) / input.entry) * input.sizeUsd * direction;
 
   const loseProb = 1 - input.expectedWinRate;
-  const expectedValue = (input.expectedWinRate * targetPnl) + (loseProb * stopPnl);
+  const expectedValue = input.expectedWinRate * targetPnl + loseProb * stopPnl;
 
   const rr = Math.abs(stopPnl) > 0 ? Math.abs(targetPnl / stopPnl) : 0;
 

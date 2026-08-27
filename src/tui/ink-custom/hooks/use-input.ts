@@ -44,7 +44,8 @@ interface UseInputOptions {
 
 const useInput = (inputHandler: InputHandler, options: UseInputOptions = {}): void => {
   // eslint-disable-next-line @typescript-eslint/naming-convention
-  const { stdin, setRawMode, isRawModeSupported, internal_exitOnCtrlC, internal_eventEmitter } = useStdin();
+  const { setRawMode, isRawModeSupported, internal_exitOnCtrlC, internal_eventEmitter } =
+    useStdin();
 
   useEffect(() => {
     // Guard on raw-mode support: with a non-TTY stdin (piped/redirected
@@ -142,7 +143,7 @@ const useInput = (inputHandler: InputHandler, options: UseInputOptions = {}): vo
       internal_eventEmitter?.removeListener("input", handleData);
       internal_eventEmitter?.removeListener("paste", handlePaste);
     };
-  }, [options.isActive, stdin, internal_exitOnCtrlC, inputHandler, internal_eventEmitter]);
+  }, [options.isActive, internal_exitOnCtrlC, inputHandler, internal_eventEmitter]);
 };
 
 export default useInput;

@@ -130,7 +130,18 @@ describe("aggregateFills", () => {
 
   it("respects custom alarm threshold", () => {
     const r = aggregateFills(
-      ["adversely_selected", "clean", "clean", "clean", "clean", "clean", "clean", "clean", "clean", "clean"],
+      [
+        "adversely_selected",
+        "clean",
+        "clean",
+        "clean",
+        "clean",
+        "clean",
+        "clean",
+        "clean",
+        "clean",
+        "clean",
+      ],
       0.05,
     );
     expect(r.alarm).toBe(true);

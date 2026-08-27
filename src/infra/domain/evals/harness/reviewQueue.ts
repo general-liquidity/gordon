@@ -68,10 +68,7 @@ export function appendToReviewQueue(
     const dir = dirname(path);
     mkdirSync(dir, { recursive: true });
     const now = new Date().toISOString();
-    const lines =
-      entries
-        .map((e) => JSON.stringify({ ...e, appendedAt: now }))
-        .join("\n") + "\n";
+    const lines = `${entries.map((e) => JSON.stringify({ ...e, appendedAt: now })).join("\n")}\n`;
     appendFileSync(path, lines, { encoding: "utf-8" });
     return { written: entries.length, path };
   } catch (err) {

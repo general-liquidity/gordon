@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { Box, Text } from "../../ink-custom";
 
 // ============================================================================
@@ -42,35 +42,56 @@ export function MarketDataStatus({ feeds }: Props) {
       ? "yellow"
       : "green";
 
-  const icon = overallColor === "green"
-    ? "\u25CF"  // ●
-    : overallColor === "yellow"
-      ? "\u25C8"  // ◈
-      : "\u2717";  // ✗
+  const icon =
+    overallColor === "green"
+      ? "\u25CF" // ●
+      : overallColor === "yellow"
+        ? "\u25C8" // ◈
+        : "\u2717"; // ✗
 
   // Build summary segments
   const parts: React.ReactNode[] = [];
 
   if (allDisconnected) {
     parts.push(
-      <Text key="disc" color="red">disconnected</Text>
+      <Text key="disc" color="red">
+        disconnected
+      </Text>,
     );
   } else {
     if (liveCt > 0) {
       parts.push(
-        <Text key="live" color="green">{liveCt} live</Text>
+        <Text key="live" color="green">
+          {liveCt} live
+        </Text>,
       );
     }
     if (degradedCt > 0) {
-      if (parts.length > 0) parts.push(<Text key="sep1" dimColor> {"\u00b7"} </Text>);
+      if (parts.length > 0)
+        parts.push(
+          <Text key="sep1" dimColor>
+            {" "}
+            {"\u00b7"}{" "}
+          </Text>,
+        );
       parts.push(
-        <Text key="degraded" color="yellow">{degradedCt} degraded</Text>
+        <Text key="degraded" color="yellow">
+          {degradedCt} degraded
+        </Text>,
       );
     }
     if (disconnectedCt > 0) {
-      if (parts.length > 0) parts.push(<Text key="sep2" dimColor> {"\u00b7"} </Text>);
+      if (parts.length > 0)
+        parts.push(
+          <Text key="sep2" dimColor>
+            {" "}
+            {"\u00b7"}{" "}
+          </Text>,
+        );
       parts.push(
-        <Text key="disconn" color="red">{disconnectedCt} down</Text>
+        <Text key="disconn" color="red">
+          {disconnectedCt} down
+        </Text>,
       );
     }
   }

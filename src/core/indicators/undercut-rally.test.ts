@@ -2,7 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { calculateUndercutRally } from "./undercut-rally.ts";
 import type { Candle } from "./types.ts";
 
-function bar(open: number, high: number, low: number, close: number, volume: number, ts: number): Candle {
+function bar(
+  open: number,
+  high: number,
+  low: number,
+  close: number,
+  volume: number,
+  ts: number,
+): Candle {
   return {
     openTime: ts,
     open,

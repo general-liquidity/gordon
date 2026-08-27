@@ -6,7 +6,11 @@ describe("computeHolderConcentration", () => {
     const holders: Holder[] = [
       { address: "0xteam", balance: 40, label: "team" },
       { address: "0xvc", balance: 30, label: "investor" },
-      ...Array.from({ length: 6 }, (_, i) => ({ address: `0xp${i}`, balance: 5, label: "community" as const })),
+      ...Array.from({ length: 6 }, (_, i) => ({
+        address: `0xp${i}`,
+        balance: 5,
+        label: "community" as const,
+      })),
     ];
     const r = computeHolderConcentration({ holders, totalSupply: 100 });
     expect(r.top1Pct).toBeCloseTo(40, 4);
@@ -44,7 +48,10 @@ describe("computeHolderConcentration", () => {
   });
 
   test("invalid supply is reported, not crashed", () => {
-    const r = computeHolderConcentration({ holders: [{ address: "0x", balance: 1 }], totalSupply: 0 });
+    const r = computeHolderConcentration({
+      holders: [{ address: "0x", balance: 1 }],
+      totalSupply: 0,
+    });
     expect(r.summary).toContain("Invalid");
   });
 });

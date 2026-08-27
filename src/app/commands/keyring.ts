@@ -4,11 +4,7 @@
  */
 
 import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
-import {
-  createKeyringProvider,
-  KEYRING_SUPPORTED_KEYS,
-  type KeyringProvider,
-} from "../../infra/storage/keyring.ts";
+import { createKeyringProvider, KEYRING_SUPPORTED_KEYS } from "../../infra/storage/keyring.ts";
 
 export interface KeyringCommandResult {
   success: boolean;
@@ -19,9 +15,7 @@ export interface KeyringCommandResult {
 /**
  * Main command handler for /keyring
  */
-export async function handleKeyringCommand(
-  args: string
-): Promise<KeyringCommandResult> {
+export async function handleKeyringCommand(args: string): Promise<KeyringCommandResult> {
   const parts = args.trim().split(/\s+/);
   const subcommand = parts[0]?.toLowerCase() || "status";
   const subArgs = parts.slice(1).join(" ");
@@ -70,16 +64,9 @@ export async function keyringStatus(): Promise<KeyringCommandResult> {
       lines.push(``, `No keys stored in keyring yet.`);
     }
   } else if (!available) {
-    lines.push(
-      ``,
-      `Keyring is not available on this system.`,
-      platformGuidance(provider.platform)
-    );
+    lines.push(``, `Keyring is not available on this system.`, platformGuidance(provider.platform));
   } else {
-    lines.push(
-      ``,
-      `Use \`/keyring enable\` to start using the OS keyring for API keys.`
-    );
+    lines.push(``, `Use \`/keyring enable\` to start using the OS keyring for API keys.`);
   }
 
   return { success: true, message: lines.join("\n") };
@@ -123,7 +110,7 @@ export async function keyringEnable(): Promise<KeyringCommandResult> {
       `Migrated ${migrated.length} key(s) to ${provider.platform}:`,
       ...migrated.map((k) => `  - ${k}`),
       ``,
-      `Your .env file is unchanged — keys are now loaded from keyring first.`
+      `Your .env file is unchanged — keys are now loaded from keyring first.`,
     );
   } else {
     lines.push(`No existing keys found to migrate.`);
@@ -150,9 +137,7 @@ export async function keyringDisable(): Promise<KeyringCommandResult> {
 /**
  * Store a specific key in the keyring
  */
-export async function keyringStore(
-  keyName: string
-): Promise<KeyringCommandResult> {
+export async function keyringStore(keyName: string): Promise<KeyringCommandResult> {
   if (!keyName) {
     return {
       success: false,

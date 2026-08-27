@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Text } from "../ink-custom";
 
 // ============================================================================
@@ -14,7 +14,10 @@ interface Props {
   type: StatusType;
 }
 
-const staticIcons: Record<Exclude<StatusType, "loading">, { char: string; color?: string; dimColor?: boolean }> = {
+const staticIcons: Record<
+  Exclude<StatusType, "loading">,
+  { char: string; color?: string; dimColor?: boolean }
+> = {
   success: { char: "\u2713", color: "green" },
   error: { char: "\u2717", color: "red" },
   warning: { char: "\u26A0", color: "yellow" },
@@ -34,9 +37,7 @@ export function StatusIcon({ type }: Props) {
   }, [type]);
 
   if (type === "loading") {
-    return (
-      <Text color="cyanBright">{pulse ? "\u25CF" : "\u25CB"}</Text>
-    );
+    return <Text color="cyanBright">{pulse ? "\u25CF" : "\u25CB"}</Text>;
   }
 
   const icon = staticIcons[type];

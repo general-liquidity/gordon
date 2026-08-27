@@ -6,7 +6,6 @@
  * 'S' or Escape skips.
  */
 
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 
 // ============================================================================
@@ -30,21 +29,30 @@ export function PostTradeFeedback({ tradeDescription, onRate, onSkip }: Props) {
       onSkip();
       return;
     }
-    if (input === "1") { onRate(1); return; }
-    if (input === "2") { onRate(2); return; }
-    if (input === "3") { onRate(3); return; }
-    if (input === "4") { onRate(4); return; }
-    if (input === "5") { onRate(5); return; }
+    if (input === "1") {
+      onRate(1);
+      return;
+    }
+    if (input === "2") {
+      onRate(2);
+      return;
+    }
+    if (input === "3") {
+      onRate(3);
+      return;
+    }
+    if (input === "4") {
+      onRate(4);
+      return;
+    }
+    if (input === "5") {
+      onRate(5);
+      return;
+    }
   });
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="yellow"
-      paddingX={2}
-      paddingY={1}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={2} paddingY={1}>
       {/* Header */}
       <Text dimColor>Was this trade recommendation helpful?</Text>
       <Box paddingLeft={1}>
@@ -55,15 +63,17 @@ export function PostTradeFeedback({ tradeDescription, onRate, onSkip }: Props) {
       {/* Rating row */}
       <Box>
         <Text color="red">{"[1]"}</Text>
-        <Text> Poor  </Text>
+        <Text> Poor </Text>
         <Text color="yellow">{"[2]"}</Text>
-        <Text> Fair  </Text>
+        <Text> Fair </Text>
         <Text color="cyan">{"[3]"}</Text>
-        <Text> Good  </Text>
+        <Text> Good </Text>
         <Text color="green">{"[4]"}</Text>
-        <Text> Great  </Text>
-        <Text color="green" bold>{"[5]"}</Text>
-        <Text> Excellent  </Text>
+        <Text> Great </Text>
+        <Text color="green" bold>
+          {"[5]"}
+        </Text>
+        <Text> Excellent </Text>
         <Text dimColor>{"[S]"}</Text>
         <Text dimColor> Skip</Text>
       </Box>

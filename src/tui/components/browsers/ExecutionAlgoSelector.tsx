@@ -16,7 +16,6 @@
  * Pattern: Claude Code Select in approval dialog.
  */
 
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 
@@ -94,20 +93,18 @@ export function ExecutionAlgoSelector({ onSelect, symbol, size, currentPrice }: 
   }));
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
-      paddingX={1}
-      paddingY={0}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1} paddingY={0}>
       {/* Header */}
       <Box>
-        <Text bold color="cyan">EXECUTION</Text>
+        <Text bold color="cyan">
+          EXECUTION
+        </Text>
         <Text dimColor> {"\u00b7"} </Text>
         <Text bold>{symbol}</Text>
         <Text dimColor> {"\u00b7"} </Text>
-        <Text>{size.toLocaleString()} shares @ ${currentPrice.toFixed(2)}</Text>
+        <Text>
+          {size.toLocaleString()} shares @ ${currentPrice.toFixed(2)}
+        </Text>
       </Box>
 
       {/* Algo details table */}
@@ -128,10 +125,7 @@ export function ExecutionAlgoSelector({ onSelect, symbol, size, currentPrice }: 
       {/* Select */}
       <Box paddingLeft={2} marginTop={1} flexDirection="column">
         <Text dimColor>Select algorithm:</Text>
-        <Select
-          options={selectOptions}
-          onChange={(value) => onSelect(value as AlgoType)}
-        />
+        <Select options={selectOptions} onChange={(value) => onSelect(value as AlgoType)} />
       </Box>
     </Box>
   );

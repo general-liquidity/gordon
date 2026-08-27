@@ -109,10 +109,10 @@ describe("validateAgainstBaseline — kill-switch", () => {
   });
 
   it("allows kill-switch to remain true even if baseline is true", () => {
-    const r = validateAgainstBaseline(
-      GORDON_DEFAULT_BASELINE,
-      { ...GORDON_DEFAULT_BASELINE, killSwitchEnabled: true },
-    );
+    const r = validateAgainstBaseline(GORDON_DEFAULT_BASELINE, {
+      ...GORDON_DEFAULT_BASELINE,
+      killSwitchEnabled: true,
+    });
     expect(r.passes).toBe(true);
   });
 });

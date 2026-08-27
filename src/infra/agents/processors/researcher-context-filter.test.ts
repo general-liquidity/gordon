@@ -1,5 +1,8 @@
 import { describe, test, expect } from "bun:test";
-import { ResearcherContextFilter, isResearcherLeastContextEnabled } from "./researcher-context-filter.ts";
+import {
+  ResearcherContextFilter,
+  isResearcherLeastContextEnabled,
+} from "./researcher-context-filter.ts";
 
 // Proves the tested HandoffCoordinator redaction works through the Mastra
 // InputProcessor seam — i.e. when the researcher's model is about to see the
@@ -22,7 +25,7 @@ describe("ResearcherContextFilter (researcher inputProcessor)", () => {
   });
 
   test("redacts API-key-shaped secrets", async () => {
-    const key = "sk_live_" + "a".repeat(40);
+    const key = `sk_live_${"a".repeat(40)}`;
     const out = await run([{ role: "user", content: `api key ${key}` }]);
     const text = JSON.stringify(out);
     expect(text).not.toContain(key);
@@ -43,12 +46,12 @@ describe("ResearcherContextFilter (researcher inputProcessor)", () => {
   });
 
   test("default-on, opt-out via GORDON_LEAST_CONTEXT_RESEARCHER=0", () => {
-    const prev = process.env["GORDON_LEAST_CONTEXT_RESEARCHER"];
-    delete process.env["GORDON_LEAST_CONTEXT_RESEARCHER"];
+    const prev = process.env.GORDON_LEAST_CONTEXT_RESEARCHER;
+    delete process.env.GORDON_LEAST_CONTEXT_RESEARCHER;
     expect(isResearcherLeastContextEnabled()).toBe(true);
-    process.env["GORDON_LEAST_CONTEXT_RESEARCHER"] = "0";
+    process.env.GORDON_LEAST_CONTEXT_RESEARCHER = "0";
     expect(isResearcherLeastContextEnabled()).toBe(false);
-    if (prev === undefined) delete process.env["GORDON_LEAST_CONTEXT_RESEARCHER"];
-    else process.env["GORDON_LEAST_CONTEXT_RESEARCHER"] = prev;
+    if (prev === undefined) delete process.env.GORDON_LEAST_CONTEXT_RESEARCHER;
+    else process.env.GORDON_LEAST_CONTEXT_RESEARCHER = prev;
   });
 });

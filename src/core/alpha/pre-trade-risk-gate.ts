@@ -107,11 +107,7 @@ export interface PreTradeRiskGateOptions {
   minReturnSeriesForCorrelation?: number;
 }
 
-export type LayerName =
-  | "position_size"
-  | "correlation"
-  | "sector"
-  | "drawdown_window";
+export type LayerName = "position_size" | "correlation" | "sector" | "drawdown_window";
 
 export type LayerStatus = "passed" | "blocked" | "data_gap";
 
@@ -188,8 +184,7 @@ export function checkPreTradeRiskGate(
   const layers: LayerCheck[] = [];
 
   // === Layer 1: position size ===
-  const posStatus: LayerStatus =
-    proposal.exposurePct <= maxPerTrade ? "passed" : "blocked";
+  const posStatus: LayerStatus = proposal.exposurePct <= maxPerTrade ? "passed" : "blocked";
   layers.push({
     layer: "position_size",
     status: posStatus,
@@ -221,10 +216,7 @@ export function checkPreTradeRiskGate(
           dataGapDetail = `existing ${existing.symbol} returnSeries length ${existing.returnSeries?.length ?? 0} < ${minReturns}`;
           break;
         }
-        const corr = pearsonCorrelation(
-          [...proposal.returnSeries],
-          [...existing.returnSeries],
-        );
+        const corr = pearsonCorrelation([...proposal.returnSeries], [...existing.returnSeries]);
         if (Math.abs(corr) >= corrThreshold) {
           const cluster = proposal.exposurePct + existing.exposurePct;
           if (cluster > maxClusterExposure) {
@@ -269,8 +261,7 @@ export function checkPreTradeRiskGate(
       sectorExposure += existing.exposurePct;
     }
   }
-  const sectorStatus: LayerStatus =
-    sectorExposure <= maxSector ? "passed" : "blocked";
+  const sectorStatus: LayerStatus = sectorExposure <= maxSector ? "passed" : "blocked";
   layers.push({
     layer: "sector",
     status: sectorStatus,
@@ -416,8 +407,7 @@ export function formatPreTradeRiskGate(result: PreTradeRiskGateResult): string {
     `  Layers:`,
   ];
   for (const l of result.layers) {
-    const tag =
-      l.status === "passed" ? "[PASS]" : l.status === "blocked" ? "[BLOCK]" : "[GAP] ";
+    const tag = l.status === "passed" ? "[PASS]" : l.status === "blocked" ? "[BLOCK]" : "[GAP] ";
     lines.push(`    ${tag} ${l.description}`);
   }
   lines.push("");

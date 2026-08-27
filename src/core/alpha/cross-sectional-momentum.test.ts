@@ -46,8 +46,8 @@ describe("rankCrossSectionalMomentum", () => {
       assets.push(series(`S${i}`, 100, 100 + i));
     }
     const r = rankCrossSectionalMomentum(assets, {
-      topFraction: 0.10,
-      bottomFraction: 0.10,
+      topFraction: 0.1,
+      bottomFraction: 0.1,
     });
     expect(r.longBasket.length).toBe(2); // 10% of 20
     expect(r.shortBasket.length).toBe(2);

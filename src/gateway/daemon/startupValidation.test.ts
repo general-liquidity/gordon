@@ -2,10 +2,11 @@ import { describe, expect, it } from "bun:test";
 
 describe("gateway daemon startup validation", () => {
   it("boots, serves authenticated health over IPC, and stops without a model or venue", async () => {
-    const child = Bun.spawn(
-      [process.execPath, "scripts/dev/checks/validate-daemon-startup.ts"],
-      { cwd: process.cwd(), stdout: "pipe", stderr: "pipe" },
-    );
+    const child = Bun.spawn([process.execPath, "scripts/dev/checks/validate-daemon-startup.ts"], {
+      cwd: process.cwd(),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
     const timeout = setTimeout(() => child.kill(), 30_000);
     const [exitCode, stdout, stderr] = await Promise.all([
       child.exited,

@@ -27,18 +27,28 @@ export const implementationShortfallDiagnosticTool = createTool({
     "Use when reviewing a closed trade to identify where the edge leaked. " +
     "Inputs are price checkpoints; outputs are bucket costs in both account currency and bps, plus dominant-bucket classification.",
   inputSchema: z.object({
-    decisionPrice: z.number().positive().describe("Price at the moment the trading decision was made."),
+    decisionPrice: z
+      .number()
+      .positive()
+      .describe("Price at the moment the trading decision was made."),
     arrivalPrice: z
       .number()
       .positive()
-      .describe("Price when the order first hit the market (set equal to decisionPrice if you don't track this separately — collapses the delay bucket)."),
+      .describe(
+        "Price when the order first hit the market (set equal to decisionPrice if you don't track this separately — collapses the delay bucket).",
+      ),
     avgFillPrice: z.number().positive().describe("Volume-weighted average price across all fills."),
     closePrice: z
       .number()
       .positive()
-      .describe("Reference price for the unexecuted residual — typically the close of the active day or the cancellation price."),
+      .describe(
+        "Reference price for the unexecuted residual — typically the close of the active day or the cancellation price.",
+      ),
     decisionQuantity: z.number().positive().describe("Quantity the operator decided to trade."),
-    filledQuantity: z.number().min(0).describe("Quantity actually filled. Must satisfy 0 ≤ filledQty ≤ decisionQty."),
+    filledQuantity: z
+      .number()
+      .min(0)
+      .describe("Quantity actually filled. Must satisfy 0 ≤ filledQty ≤ decisionQty."),
     side: z.enum(["BUY", "SELL"]).describe("Order side."),
     fees: z.number().min(0).optional().describe("Explicit fees in account currency. Default 0."),
   }),

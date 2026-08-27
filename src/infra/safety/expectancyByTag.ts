@@ -160,7 +160,8 @@ function computeTagExpectancy(
   const winRate = sampleSize > 0 ? wins.length / sampleSize : 0;
   const lossRate = sampleSize > 0 ? losses.length / sampleSize : 0;
   const avgWin = wins.length > 0 ? wins.reduce((s, v) => s + v, 0) / wins.length : 0;
-  const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, v) => s + v, 0) / losses.length) : 0;
+  const avgLoss =
+    losses.length > 0 ? Math.abs(losses.reduce((s, v) => s + v, 0) / losses.length) : 0;
   const expectancy = winRate * avgWin - lossRate * avgLoss;
   const totalPnl = pnls.reduce((s, v) => s + v, 0);
 
@@ -217,9 +218,7 @@ export function computeExpectancyReport(
 
   const byTag: TagExpectancy[] = [];
   for (const [tag, pnls] of groups) {
-    byTag.push(
-      computeTagExpectancy(tag, pnls, opts.robustThreshold, opts.preliminaryThreshold),
-    );
+    byTag.push(computeTagExpectancy(tag, pnls, opts.robustThreshold, opts.preliminaryThreshold));
   }
   byTag.sort((a, b) => b.expectancy - a.expectancy);
 
@@ -237,8 +236,7 @@ export function computeExpectancyReport(
 
   const robustTags = byTag.filter((t) => t.significance !== "insufficient");
   const bestTag = robustTags.length > 0 ? robustTags[0]! : null;
-  const worstTag =
-    robustTags.length > 0 ? robustTags[robustTags.length - 1]! : null;
+  const worstTag = robustTags.length > 0 ? robustTags[robustTags.length - 1]! : null;
 
   const summary =
     `${rowsWithPnl} trades across ${byTag.length} tags ` +

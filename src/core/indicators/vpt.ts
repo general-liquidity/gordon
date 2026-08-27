@@ -37,7 +37,7 @@ export interface VPTResult {
 export function calculateVPT(
   candles: Candle[],
   maPeriod: number = 14,
-  slopeLookback: number = 5
+  slopeLookback: number = 5,
 ): VPTResult {
   if (candles.length < maPeriod + 5) {
     return {
@@ -78,7 +78,10 @@ export function calculateVPT(
   let slope: number | null = null;
   if (vptValues.length >= slopeLookback) {
     const recent = vptValues.slice(-slopeLookback);
-    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    let sumX = 0,
+      sumY = 0,
+      sumXY = 0,
+      sumX2 = 0;
     const n = recent.length;
     for (let i = 0; i < n; i++) {
       sumX += i;
@@ -104,10 +107,14 @@ export function calculateVPT(
   // Divergence: compare price direction vs VPT direction over lookback
   let divergence: "bullish_divergence" | "bearish_divergence" | "none" = "none";
   if (candles.length >= slopeLookback * 2 && vptValues.length >= slopeLookback * 2) {
-    const recentPriceHigh = Math.max(...candles.slice(-slopeLookback).map(c => c.high));
-    const prevPriceHigh = Math.max(...candles.slice(-slopeLookback * 2, -slopeLookback).map(c => c.high));
-    const recentPriceLow = Math.min(...candles.slice(-slopeLookback).map(c => c.low));
-    const prevPriceLow = Math.min(...candles.slice(-slopeLookback * 2, -slopeLookback).map(c => c.low));
+    const recentPriceHigh = Math.max(...candles.slice(-slopeLookback).map((c) => c.high));
+    const prevPriceHigh = Math.max(
+      ...candles.slice(-slopeLookback * 2, -slopeLookback).map((c) => c.high),
+    );
+    const recentPriceLow = Math.min(...candles.slice(-slopeLookback).map((c) => c.low));
+    const prevPriceLow = Math.min(
+      ...candles.slice(-slopeLookback * 2, -slopeLookback).map((c) => c.low),
+    );
 
     const recentVPTMax = Math.max(...vptValues.slice(-slopeLookback));
     const prevVPTMax = Math.max(...vptValues.slice(-slopeLookback * 2, -slopeLookback));
@@ -129,7 +136,7 @@ export function calculateVPT(
   return {
     current: parseFloat(current.toFixed(2)),
     currentMA: currentMA !== null ? parseFloat(currentMA.toFixed(2)) : null,
-    values: vptValues.map(v => parseFloat(v.toFixed(2))),
+    values: vptValues.map((v) => parseFloat(v.toFixed(2))),
     slope: slope !== null ? parseFloat(slope.toFixed(4)) : null,
     trend,
     divergence,
@@ -138,21 +145,26 @@ export function calculateVPT(
 }
 
 function buildVPTInterpretation(
-  current: number, slope: number | null, trend: string, divergence: string
+  current: number,
+  slope: number | null,
+  trend: string,
+  divergence: string,
 ): string {
   let msg = `VPT: ${current.toFixed(0)} (slope: ${slope?.toFixed(4) ?? "N/A"}). `;
   msg += `Trend: ${trend.toUpperCase()}. `;
 
   if (divergence !== "none") {
-    msg += divergence === "bullish_divergence"
-      ? "BULLISH DIVERGENCE — price lower low but VPT higher low. Potential reversal up."
-      : "BEARISH DIVERGENCE — price higher high but VPT lower high. Potential reversal down.";
+    msg +=
+      divergence === "bullish_divergence"
+        ? "BULLISH DIVERGENCE — price lower low but VPT higher low. Potential reversal up."
+        : "BEARISH DIVERGENCE — price higher high but VPT lower high. Potential reversal down.";
   } else {
-    msg += trend === "bullish"
-      ? "Volume confirming upward price movement."
-      : trend === "bearish"
-      ? "Volume confirming downward price movement."
-      : "No clear volume-price confirmation.";
+    msg +=
+      trend === "bullish"
+        ? "Volume confirming upward price movement."
+        : trend === "bearish"
+          ? "Volume confirming downward price movement."
+          : "No clear volume-price confirmation.";
   }
 
   return msg;

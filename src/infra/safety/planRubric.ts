@@ -52,9 +52,7 @@ export const RUBRIC_DIMENSIONS = [
 
 export type RubricDimension = (typeof RUBRIC_DIMENSIONS)[number];
 
-export function isPlanRubricEnabled(
-  env: NodeJS.ProcessEnv = flagEnv(),
-): boolean {
+export function isPlanRubricEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   return env.GORDON_PLAN_RUBRIC === "1" || env.GORDON_PLAN_RUBRIC === "true";
 }
 
@@ -154,12 +152,18 @@ export function formatRubric(rubric: PlanRubric): string {
 
 function shortName(dim: RubricDimension): string {
   switch (dim) {
-    case "correctness": return "corr";
-    case "verification": return "verif";
-    case "scopeDiscipline": return "scope";
-    case "reliability": return "rel";
-    case "maintainability": return "maint";
-    case "handoffReadiness": return "hand";
+    case "correctness":
+      return "corr";
+    case "verification":
+      return "verif";
+    case "scopeDiscipline":
+      return "scope";
+    case "reliability":
+      return "rel";
+    case "maintainability":
+      return "maint";
+    case "handoffReadiness":
+      return "hand";
   }
 }
 
@@ -207,15 +211,12 @@ export function scorePlanRubric(input: ScorePlanRubricInput): PlanRubric {
   rubric.scopeDiscipline =
     input.plan.stopLoss.price > 0 && input.plan.takeProfit.length > 0 ? 2 : 1;
 
-  rubric.reliability =
-    input.plan.id && input.plan.entry.type ? 2 : input.plan.id ? 1 : 0;
+  rubric.reliability = input.plan.id && input.plan.entry.type ? 2 : input.plan.id ? 1 : 0;
 
   const reasoningLen = input.plan.reasoning?.length ?? 0;
-  rubric.maintainability =
-    reasoningLen > 100 ? 2 : reasoningLen > 20 ? 1 : 0;
+  rubric.maintainability = reasoningLen > 100 ? 2 : reasoningLen > 20 ? 1 : 0;
 
-  rubric.handoffReadiness =
-    input.plan.id && input.plan.reasoning ? 2 : input.plan.id ? 1 : 0;
+  rubric.handoffReadiness = input.plan.id && input.plan.reasoning ? 2 : input.plan.id ? 1 : 0;
 
   return rubric;
 }

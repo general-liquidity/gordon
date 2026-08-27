@@ -3,8 +3,12 @@ import { computeDupont } from "./dupont.ts";
 
 describe("computeDupont", () => {
   it("returns neutral on zero equity / assets / revenue", () => {
-    expect(computeDupont({ revenue: 0, netIncome: 5, totalAssets: 100, equity: 50 }).threeWay).toBeNull();
-    expect(computeDupont({ revenue: 100, netIncome: 5, totalAssets: 100, equity: 0 }).reportedRoe).toBeNull();
+    expect(
+      computeDupont({ revenue: 0, netIncome: 5, totalAssets: 100, equity: 50 }).threeWay,
+    ).toBeNull();
+    expect(
+      computeDupont({ revenue: 100, netIncome: 5, totalAssets: 100, equity: 0 }).reportedRoe,
+    ).toBeNull();
   });
 
   it("3-way factors multiply back to reported ROE", () => {
@@ -72,6 +76,10 @@ describe("computeDupont", () => {
   it("falls back to 3-way attribution when 5-way inputs are absent", () => {
     const r = computeDupont({ revenue: 200, netIncome: 20, totalAssets: 400, equity: 100 });
     expect(r.fiveWay).toBeNull();
-    expect(r.drivers.map((d) => d.name)).toEqual(["netMargin", "assetTurnover", "equityMultiplier"]);
+    expect(r.drivers.map((d) => d.name)).toEqual([
+      "netMargin",
+      "assetTurnover",
+      "equityMultiplier",
+    ]);
   });
 });

@@ -163,7 +163,8 @@ function checkFile(relativePath: string): Violation[] {
           file: relativePath,
           line: i + 1,
           toolFamily: family,
-          reason: "untiered hot-tier addition (not in allow-list, not wrapped with isHotTierOnly())",
+          reason:
+            "untiered hot-tier addition (not in allow-list, not wrapped with isHotTierOnly())",
         });
       }
     }
@@ -192,8 +193,12 @@ function main(): number {
   }
   console.error(`\n${totalViolations} tier-convention violation(s).`);
   console.error("Options to fix each violation:");
-  console.error("  1. Wrap with `...(isHotTierOnly() ? {} : instrumentedXTools)` to demote to cold tier");
-  console.error("  2. Add the family to KNOWN_HOT_TIER_TOOL_FAMILIES with a justifying comment in the diff");
+  console.error(
+    "  1. Wrap with `...(isHotTierOnly() ? {} : instrumentedXTools)` to demote to cold tier",
+  );
+  console.error(
+    "  2. Add the family to KNOWN_HOT_TIER_TOOL_FAMILIES with a justifying comment in the diff",
+  );
   console.error("  3. Move the tools to a SKILL.md (loaded on demand) and remove the spread");
   console.error("See CLAUDE.md § 'Tool tier convention'.");
   return 1;

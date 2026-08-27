@@ -12,11 +12,7 @@
  */
 
 import { createModuleLogger } from "../../infra/logger/index.ts";
-import {
-  getDatabase,
-  executeWithLogging,
-  withTransaction,
-} from "../../infra/storage/database.ts";
+import { getDatabase, executeWithLogging, withTransaction } from "../../infra/storage/database.ts";
 import {
   GENESIS_SIGNATURE,
   resolveAuditHmacKey,
@@ -78,7 +74,7 @@ export function initAuditTables(): void {
           signature TEXT
         )
       `),
-    "CREATE TABLE audit_traces"
+    "CREATE TABLE audit_traces",
   );
 
   // Migration for databases created before signing shipped.
@@ -88,38 +84,36 @@ export function initAuditTables(): void {
 
   executeWithLogging(
     () =>
-      db.run(
-        "CREATE INDEX IF NOT EXISTS idx_audit_traces_started_at ON audit_traces(started_at)"
-      ),
-    "CREATE INDEX idx_audit_traces_started_at"
+      db.run("CREATE INDEX IF NOT EXISTS idx_audit_traces_started_at ON audit_traces(started_at)"),
+    "CREATE INDEX idx_audit_traces_started_at",
   );
   executeWithLogging(
     () =>
       db.run(
-        "CREATE INDEX IF NOT EXISTS idx_audit_traces_outcome_type ON audit_traces(outcome_type)"
+        "CREATE INDEX IF NOT EXISTS idx_audit_traces_outcome_type ON audit_traces(outcome_type)",
       ),
-    "CREATE INDEX idx_audit_traces_outcome_type"
+    "CREATE INDEX idx_audit_traces_outcome_type",
   );
   executeWithLogging(
     () =>
       db.run(
-        "CREATE INDEX IF NOT EXISTS idx_audit_traces_outcome_position_id ON audit_traces(outcome_position_id)"
+        "CREATE INDEX IF NOT EXISTS idx_audit_traces_outcome_position_id ON audit_traces(outcome_position_id)",
       ),
-    "CREATE INDEX idx_audit_traces_outcome_position_id"
+    "CREATE INDEX idx_audit_traces_outcome_position_id",
   );
   executeWithLogging(
     () =>
       db.run(
-        "CREATE INDEX IF NOT EXISTS idx_audit_traces_trigger_type ON audit_traces(trigger_type)"
+        "CREATE INDEX IF NOT EXISTS idx_audit_traces_trigger_type ON audit_traces(trigger_type)",
       ),
-    "CREATE INDEX idx_audit_traces_trigger_type"
+    "CREATE INDEX idx_audit_traces_trigger_type",
   );
   executeWithLogging(
     () =>
       db.run(
-        "CREATE INDEX IF NOT EXISTS idx_audit_traces_parent_trace_id ON audit_traces(parent_trace_id)"
+        "CREATE INDEX IF NOT EXISTS idx_audit_traces_parent_trace_id ON audit_traces(parent_trace_id)",
       ),
-    "CREATE INDEX idx_audit_traces_parent_trace_id"
+    "CREATE INDEX idx_audit_traces_parent_trace_id",
   );
 
   // --- audit_agent_steps ---
@@ -140,22 +134,18 @@ export function initAuditTables(): void {
           FOREIGN KEY (trace_id) REFERENCES audit_traces(trace_id)
         )
       `),
-    "CREATE TABLE audit_agent_steps"
+    "CREATE TABLE audit_agent_steps",
   );
 
   executeWithLogging(
     () =>
-      db.run(
-        "CREATE INDEX IF NOT EXISTS idx_audit_steps_trace_id ON audit_agent_steps(trace_id)"
-      ),
-    "CREATE INDEX idx_audit_steps_trace_id"
+      db.run("CREATE INDEX IF NOT EXISTS idx_audit_steps_trace_id ON audit_agent_steps(trace_id)"),
+    "CREATE INDEX idx_audit_steps_trace_id",
   );
   executeWithLogging(
     () =>
-      db.run(
-        "CREATE INDEX IF NOT EXISTS idx_audit_steps_agent_id ON audit_agent_steps(agent_id)"
-      ),
-    "CREATE INDEX idx_audit_steps_agent_id"
+      db.run("CREATE INDEX IF NOT EXISTS idx_audit_steps_agent_id ON audit_agent_steps(agent_id)"),
+    "CREATE INDEX idx_audit_steps_agent_id",
   );
 
   // --- audit_tool_calls ---
@@ -176,22 +166,17 @@ export function initAuditTables(): void {
           FOREIGN KEY (step_id) REFERENCES audit_agent_steps(step_id)
         )
       `),
-    "CREATE TABLE audit_tool_calls"
+    "CREATE TABLE audit_tool_calls",
   );
 
   executeWithLogging(
-    () =>
-      db.run(
-        "CREATE INDEX IF NOT EXISTS idx_audit_tools_step_id ON audit_tool_calls(step_id)"
-      ),
-    "CREATE INDEX idx_audit_tools_step_id"
+    () => db.run("CREATE INDEX IF NOT EXISTS idx_audit_tools_step_id ON audit_tool_calls(step_id)"),
+    "CREATE INDEX idx_audit_tools_step_id",
   );
   executeWithLogging(
     () =>
-      db.run(
-        "CREATE INDEX IF NOT EXISTS idx_audit_tools_tool_name ON audit_tool_calls(tool_name)"
-      ),
-    "CREATE INDEX idx_audit_tools_tool_name"
+      db.run("CREATE INDEX IF NOT EXISTS idx_audit_tools_tool_name ON audit_tool_calls(tool_name)"),
+    "CREATE INDEX idx_audit_tools_tool_name",
   );
 
   // Migration for databases created before durability tiering shipped.
@@ -205,7 +190,7 @@ export function initAuditTables(): void {
 function addTraceColumnIfMissing(
   db: ReturnType<typeof getDatabase>,
   column: string,
-  columnDef: string
+  columnDef: string,
 ): void {
   addColumnIfMissing(db, "audit_traces", column, columnDef);
 }
@@ -214,15 +199,13 @@ function addColumnIfMissing(
   db: ReturnType<typeof getDatabase>,
   table: string,
   column: string,
-  columnDef: string
+  columnDef: string,
 ): void {
-  const cols = db
-    .prepare(`PRAGMA table_info(${table})`)
-    .all() as { name: string }[];
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
   if (cols.some((c) => c.name === column)) return;
   executeWithLogging(
     () => db.run(`ALTER TABLE ${table} ADD COLUMN ${columnDef}`),
-    `ALTER TABLE ${table} ADD ${column}`
+    `ALTER TABLE ${table} ADD ${column}`,
   );
 }
 
@@ -305,10 +288,7 @@ function rowToStep(row: RawStepRow, toolCalls: AuditToolCall[]): AuditAgentStep 
   };
 }
 
-function rowToTrace(
-  row: RawTraceRow,
-  steps: AuditAgentStep[]
-): AuditTrace {
+function rowToTrace(row: RawTraceRow, steps: AuditAgentStep[]): AuditTrace {
   return {
     trace_id: row.trace_id,
     parent_trace_id: row.parent_trace_id ?? undefined,
@@ -363,13 +343,14 @@ export function saveTrace(inputTrace: AuditTrace): AuditTrace {
     const key = trace0.signature ? null : resolveAuditHmacKey();
     let trace = trace0;
 
-    withTransaction(() => {
-      if (!trace.signature) {
-        trace = signTrace(trace, getLastChainSignature(db) ?? GENESIS_SIGNATURE, key!);
-      }
+    withTransaction(
+      () => {
+        if (!trace.signature) {
+          trace = signTrace(trace, getLastChainSignature(db) ?? GENESIS_SIGNATURE, key!);
+        }
 
-      // Insert the trace row
-      const traceStmt = db.prepare(`
+        // Insert the trace row
+        const traceStmt = db.prepare(`
         INSERT OR REPLACE INTO audit_traces
           (trace_id, parent_trace_id, trigger_type, trigger_event_type, trigger_source,
            trigger_payload_summary, outcome_type, outcome_position_id, outcome_details,
@@ -378,84 +359,86 @@ export function saveTrace(inputTrace: AuditTrace): AuditTrace {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
-      executeWithLogging(
-        () =>
-          traceStmt.run(
-            trace.trace_id,
-            trace.parent_trace_id ?? null,
-            trace.trigger.type,
-            trace.trigger.event_type ?? null,
-            trace.trigger.source,
-            trace.trigger.payload_summary,
-            trace.outcome.type,
-            trace.outcome.position_id ?? null,
-            trace.outcome.details,
-            trace.started_at,
-            trace.ended_at ?? null,
-            trace.duration_ms ?? null,
-            trace.risk_check_id ?? null,
-            trace.content_hash ?? null,
-            trace.prev_signature ?? null,
-            trace.signature ?? null
-          ),
-        "INSERT audit_trace"
-      );
+        executeWithLogging(
+          () =>
+            traceStmt.run(
+              trace.trace_id,
+              trace.parent_trace_id ?? null,
+              trace.trigger.type,
+              trace.trigger.event_type ?? null,
+              trace.trigger.source,
+              trace.trigger.payload_summary,
+              trace.outcome.type,
+              trace.outcome.position_id ?? null,
+              trace.outcome.details,
+              trace.started_at,
+              trace.ended_at ?? null,
+              trace.duration_ms ?? null,
+              trace.risk_check_id ?? null,
+              trace.content_hash ?? null,
+              trace.prev_signature ?? null,
+              trace.signature ?? null,
+            ),
+          "INSERT audit_trace",
+        );
 
-      // Insert agent steps
-      const stepStmt = db.prepare(`
+        // Insert agent steps
+        const stepStmt = db.prepare(`
         INSERT OR REPLACE INTO audit_agent_steps
           (step_id, trace_id, agent_id, started_at, ended_at,
            reasoning_summary, handed_off_to, handoff_reason, durability_class, step_order)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
-      const toolStmt = db.prepare(`
+        const toolStmt = db.prepare(`
         INSERT INTO audit_tool_calls
           (step_id, tool_name, input_summary, output_summary,
            duration_ms, success, error, durability_class, call_order)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
-      for (let si = 0; si < trace.agent_steps.length; si++) {
-        const step = trace.agent_steps[si]!;
+        for (let si = 0; si < trace.agent_steps.length; si++) {
+          const step = trace.agent_steps[si]!;
 
-        executeWithLogging(
-          () =>
-            stepStmt.run(
-              step.step_id,
-              trace.trace_id,
-              step.agent_id,
-              step.started_at,
-              step.ended_at ?? null,
-              step.reasoning_summary,
-              step.handed_off_to ?? null,
-              step.handoff_reason ?? null,
-              step.durability_class ?? null,
-              si
-            ),
-          "INSERT audit_agent_step"
-        );
-
-        for (let ti = 0; ti < step.tool_calls.length; ti++) {
-          const tc = step.tool_calls[ti]!;
           executeWithLogging(
             () =>
-              toolStmt.run(
+              stepStmt.run(
                 step.step_id,
-                tc.tool_name,
-                tc.input_summary,
-                tc.output_summary,
-                tc.duration_ms,
-                tc.success ? 1 : 0,
-                tc.error ?? null,
-                tc.durability_class ?? null,
-                ti
+                trace.trace_id,
+                step.agent_id,
+                step.started_at,
+                step.ended_at ?? null,
+                step.reasoning_summary,
+                step.handed_off_to ?? null,
+                step.handoff_reason ?? null,
+                step.durability_class ?? null,
+                si,
               ),
-            "INSERT audit_tool_call"
+            "INSERT audit_agent_step",
           );
+
+          for (let ti = 0; ti < step.tool_calls.length; ti++) {
+            const tc = step.tool_calls[ti]!;
+            executeWithLogging(
+              () =>
+                toolStmt.run(
+                  step.step_id,
+                  tc.tool_name,
+                  tc.input_summary,
+                  tc.output_summary,
+                  tc.duration_ms,
+                  tc.success ? 1 : 0,
+                  tc.error ?? null,
+                  tc.durability_class ?? null,
+                  ti,
+                ),
+              "INSERT audit_tool_call",
+            );
+          }
         }
-      }
-    }, { mode: "IMMEDIATE" });
+      },
+      { mode: "IMMEDIATE" },
+    );
 
     logger.debug("Audit trace saved", { trace_id: trace.trace_id });
     return trace;
@@ -475,10 +458,10 @@ function getLastChainSignature(db: ReturnType<typeof getDatabase>): string | nul
     () =>
       db
         .prepare(
-          "SELECT signature FROM audit_traces WHERE signature IS NOT NULL ORDER BY rowid DESC LIMIT 1"
+          "SELECT signature FROM audit_traces WHERE signature IS NOT NULL ORDER BY rowid DESC LIMIT 1",
         )
         .get() as { signature: string } | null,
-    "SELECT last audit chain signature"
+    "SELECT last audit chain signature",
   );
   return row?.signature ?? null;
 }
@@ -492,11 +475,8 @@ export function verifyStoredAuditChain(): AuditChainVerification {
   const db = getDatabase();
 
   const rows = executeWithLogging(
-    () =>
-      db
-        .prepare("SELECT * FROM audit_traces ORDER BY rowid ASC")
-        .all() as RawTraceRow[],
-    "SELECT audit_traces in chain order"
+    () => db.prepare("SELECT * FROM audit_traces ORDER BY rowid ASC").all() as RawTraceRow[],
+    "SELECT audit_traces in chain order",
   );
 
   const traces = rows.map((row) => rowToTrace(row, loadStepsForTrace(db, row.trace_id)));
@@ -513,8 +493,10 @@ export function getTrace(traceId: string): AuditTrace | null {
 
     const traceRow = executeWithLogging(
       () =>
-        db.prepare("SELECT * FROM audit_traces WHERE trace_id = ?").get(traceId) as RawTraceRow | null,
-      "SELECT audit_trace by id"
+        db
+          .prepare("SELECT * FROM audit_traces WHERE trace_id = ?")
+          .get(traceId) as RawTraceRow | null,
+      "SELECT audit_trace by id",
     );
     if (!traceRow) return null;
 
@@ -538,10 +520,10 @@ export function getTracesByPosition(positionId: string): AuditTrace[] {
       () =>
         db
           .prepare(
-            "SELECT * FROM audit_traces WHERE outcome_position_id = ? ORDER BY started_at DESC"
+            "SELECT * FROM audit_traces WHERE outcome_position_id = ? ORDER BY started_at DESC",
           )
           .all(positionId) as RawTraceRow[],
-      "SELECT audit_traces by position"
+      "SELECT audit_traces by position",
     );
 
     return rows.map((row) => {
@@ -557,10 +539,7 @@ export function getTracesByPosition(positionId: string): AuditTrace[] {
 /**
  * Get traces that involved a specific agent (by agent_id in steps).
  */
-export function getTracesByAgent(
-  agentId: string,
-  limit: number = 50
-): AuditTrace[] {
+export function getTracesByAgent(agentId: string, limit: number = 50): AuditTrace[] {
   try {
     ensureTable();
     const db = getDatabase();
@@ -572,15 +551,13 @@ export function getTracesByAgent(
             `SELECT DISTINCT trace_id FROM audit_agent_steps
              WHERE agent_id = ?
              ORDER BY started_at DESC
-             LIMIT ?`
+             LIMIT ?`,
           )
           .all(agentId, limit) as { trace_id: string }[],
-      "SELECT trace_ids by agent"
+      "SELECT trace_ids by agent",
     );
 
-    return traceIds
-      .map((r) => getTrace(r.trace_id))
-      .filter((t): t is AuditTrace => t !== null);
+    return traceIds.map((r) => getTrace(r.trace_id)).filter((t): t is AuditTrace => t !== null);
   } catch (error) {
     logger.error("Failed to get traces by agent", error as Error);
     return [];
@@ -599,10 +576,10 @@ export function getTracesByTimeRange(from: Date, to: Date): AuditTrace[] {
       () =>
         db
           .prepare(
-            "SELECT * FROM audit_traces WHERE started_at >= ? AND started_at <= ? ORDER BY started_at DESC"
+            "SELECT * FROM audit_traces WHERE started_at >= ? AND started_at <= ? ORDER BY started_at DESC",
           )
           .all(from.toISOString(), to.toISOString()) as RawTraceRow[],
-      "SELECT audit_traces by time range"
+      "SELECT audit_traces by time range",
     );
 
     return rows.map((row) => {
@@ -626,11 +603,9 @@ export function getTracesByOutcomeType(outcomeType: string): AuditTrace[] {
     const rows = executeWithLogging(
       () =>
         db
-          .prepare(
-            "SELECT * FROM audit_traces WHERE outcome_type = ? ORDER BY started_at DESC"
-          )
+          .prepare("SELECT * FROM audit_traces WHERE outcome_type = ? ORDER BY started_at DESC")
           .all(outcomeType) as RawTraceRow[],
-      "SELECT audit_traces by outcome type"
+      "SELECT audit_traces by outcome type",
     );
 
     return rows.map((row) => {
@@ -654,11 +629,9 @@ export function getRecentTraces(limit: number = 20): AuditTrace[] {
     const rows = executeWithLogging(
       () =>
         db
-          .prepare(
-            "SELECT * FROM audit_traces ORDER BY started_at DESC LIMIT ?"
-          )
+          .prepare("SELECT * FROM audit_traces ORDER BY started_at DESC LIMIT ?")
           .all(limit) as RawTraceRow[],
-      "SELECT recent audit_traces"
+      "SELECT recent audit_traces",
     );
 
     return rows.map((row) => {
@@ -683,11 +656,9 @@ export function getTraceStats(): AuditStats {
     const summaryRow = executeWithLogging(
       () =>
         db
-          .prepare(
-            "SELECT COUNT(*) as total, AVG(duration_ms) as avg_dur FROM audit_traces"
-          )
+          .prepare("SELECT COUNT(*) as total, AVG(duration_ms) as avg_dur FROM audit_traces")
           .get() as { total: number; avg_dur: number | null } | null,
-      "SELECT audit trace summary stats"
+      "SELECT audit trace summary stats",
     );
 
     const total = summaryRow?.total ?? 0;
@@ -701,11 +672,9 @@ export function getTraceStats(): AuditStats {
     const outcomeRows = executeWithLogging(
       () =>
         db
-          .prepare(
-            "SELECT outcome_type, COUNT(*) as cnt FROM audit_traces GROUP BY outcome_type"
-          )
+          .prepare("SELECT outcome_type, COUNT(*) as cnt FROM audit_traces GROUP BY outcome_type")
           .all() as { outcome_type: string; cnt: number }[],
-      "SELECT audit outcome stats"
+      "SELECT audit outcome stats",
     );
     const byOutcome: Record<string, number> = {};
     for (const row of outcomeRows) {
@@ -716,11 +685,9 @@ export function getTraceStats(): AuditStats {
     const triggerRows = executeWithLogging(
       () =>
         db
-          .prepare(
-            "SELECT trigger_type, COUNT(*) as cnt FROM audit_traces GROUP BY trigger_type"
-          )
+          .prepare("SELECT trigger_type, COUNT(*) as cnt FROM audit_traces GROUP BY trigger_type")
           .all() as { trigger_type: string; cnt: number }[],
-      "SELECT audit trigger stats"
+      "SELECT audit trigger stats",
     );
     const byTrigger: Record<string, number> = {};
     for (const row of triggerRows) {
@@ -732,10 +699,10 @@ export function getTraceStats(): AuditStats {
       () =>
         db
           .prepare(
-            "SELECT agent_id, COUNT(DISTINCT trace_id) as cnt FROM audit_agent_steps GROUP BY agent_id"
+            "SELECT agent_id, COUNT(DISTINCT trace_id) as cnt FROM audit_agent_steps GROUP BY agent_id",
           )
           .all() as { agent_id: string; cnt: number }[],
-      "SELECT audit agent stats"
+      "SELECT audit agent stats",
     );
     const byAgent: Record<string, number> = {};
     for (const row of agentRows) {
@@ -758,65 +725,60 @@ export function pruneOldTraces(olderThanDays: number): number {
     ensureTable();
     const db = getDatabase();
 
-    const cutoff = new Date(
-      Date.now() - olderThanDays * 24 * 60 * 60 * 1000
-    ).toISOString();
+    const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000).toISOString();
 
     let pruned = 0;
 
-    withTransaction(() => {
-      // Get trace IDs to prune
-      const traceIds = executeWithLogging(
-        () =>
-          db
-            .prepare(
-              "SELECT trace_id FROM audit_traces WHERE started_at < ?"
-            )
-            .all(cutoff) as { trace_id: string }[],
-        "SELECT old audit trace ids"
-      );
+    withTransaction(
+      () => {
+        // Get trace IDs to prune
+        const traceIds = executeWithLogging(
+          () =>
+            db.prepare("SELECT trace_id FROM audit_traces WHERE started_at < ?").all(cutoff) as {
+              trace_id: string;
+            }[],
+          "SELECT old audit trace ids",
+        );
 
-      if (traceIds.length === 0) return;
+        if (traceIds.length === 0) return;
 
-      const idList = traceIds.map((r) => r.trace_id);
-      const placeholders = idList.map(() => "?").join(",");
+        const idList = traceIds.map((r) => r.trace_id);
+        const placeholders = idList.map(() => "?").join(",");
 
-      // Delete tool calls for those steps
-      executeWithLogging(
-        () =>
-          db
-            .prepare(
-              `DELETE FROM audit_tool_calls WHERE step_id IN
-                (SELECT step_id FROM audit_agent_steps WHERE trace_id IN (${placeholders}))`
-            )
-            .run(...idList),
-        "DELETE old audit_tool_calls"
-      );
+        // Delete tool calls for those steps
+        executeWithLogging(
+          () =>
+            db
+              .prepare(
+                `DELETE FROM audit_tool_calls WHERE step_id IN
+                (SELECT step_id FROM audit_agent_steps WHERE trace_id IN (${placeholders}))`,
+              )
+              .run(...idList),
+          "DELETE old audit_tool_calls",
+        );
 
-      // Delete steps
-      executeWithLogging(
-        () =>
-          db
-            .prepare(
-              `DELETE FROM audit_agent_steps WHERE trace_id IN (${placeholders})`
-            )
-            .run(...idList),
-        "DELETE old audit_agent_steps"
-      );
+        // Delete steps
+        executeWithLogging(
+          () =>
+            db
+              .prepare(`DELETE FROM audit_agent_steps WHERE trace_id IN (${placeholders})`)
+              .run(...idList),
+          "DELETE old audit_agent_steps",
+        );
 
-      // Delete traces
-      const result = executeWithLogging(
-        () =>
-          db
-            .prepare(
-              `DELETE FROM audit_traces WHERE trace_id IN (${placeholders})`
-            )
-            .run(...idList),
-        "DELETE old audit_traces"
-      );
+        // Delete traces
+        const result = executeWithLogging(
+          () =>
+            db
+              .prepare(`DELETE FROM audit_traces WHERE trace_id IN (${placeholders})`)
+              .run(...idList),
+          "DELETE old audit_traces",
+        );
 
-      pruned = result.changes;
-    }, { mode: "IMMEDIATE" });
+        pruned = result.changes;
+      },
+      { mode: "IMMEDIATE" },
+    );
 
     if (pruned > 0) {
       logger.info("Audit traces pruned", {
@@ -872,29 +834,22 @@ function redactTraceContent(trace: AuditTrace): AuditTrace {
 /**
  * Load all steps (with their tool calls) for a given trace_id.
  */
-function loadStepsForTrace(
-  db: ReturnType<typeof getDatabase>,
-  traceId: string
-): AuditAgentStep[] {
+function loadStepsForTrace(db: ReturnType<typeof getDatabase>, traceId: string): AuditAgentStep[] {
   const stepRows = executeWithLogging(
     () =>
       db
-        .prepare(
-          "SELECT * FROM audit_agent_steps WHERE trace_id = ? ORDER BY step_order ASC"
-        )
+        .prepare("SELECT * FROM audit_agent_steps WHERE trace_id = ? ORDER BY step_order ASC")
         .all(traceId) as RawStepRow[],
-    "SELECT audit_agent_steps for trace"
+    "SELECT audit_agent_steps for trace",
   );
 
   return stepRows.map((stepRow) => {
     const toolRows = executeWithLogging(
       () =>
         db
-          .prepare(
-            "SELECT * FROM audit_tool_calls WHERE step_id = ? ORDER BY call_order ASC"
-          )
+          .prepare("SELECT * FROM audit_tool_calls WHERE step_id = ? ORDER BY call_order ASC")
           .all(stepRow.step_id) as RawToolCallRow[],
-      "SELECT audit_tool_calls for step"
+      "SELECT audit_tool_calls for step",
     );
     const toolCalls = toolRows.map(rowToToolCall);
     return rowToStep(stepRow, toolCalls);

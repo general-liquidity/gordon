@@ -1,4 +1,3 @@
-import React from "react";
 import { render } from "./ink-custom";
 import { App } from "./App.js";
 import { loadLabsFlagsIntoEnv } from "./ink-custom/loadLabsFlags.js";
@@ -41,8 +40,8 @@ function acquireTuiLockOrExit(): ReturnType<typeof acquireInstanceLock> {
     if (error instanceof InstanceLockCollisionError) {
       process.stderr.write(
         `Gordon is already running${error.pid ? ` (pid ${error.pid})` : ""}.\n` +
-        `Lock: ${error.path}\n` +
-        "Set GORDON_ALLOW_MULTI_INSTANCE=1 to override.\n",
+          `Lock: ${error.path}\n` +
+          "Set GORDON_ALLOW_MULTI_INSTANCE=1 to override.\n",
       );
       process.exit(1);
     }

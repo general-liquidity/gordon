@@ -94,7 +94,7 @@ export function calculateRSI(candles: Candle[], period: number = 14): number | n
   }
 
   const rs = avgGain / avgLoss;
-  const rsi = 100 - (100 / (1 + rs));
+  const rsi = 100 - 100 / (1 + rs);
 
   return rsi;
 }
@@ -155,7 +155,7 @@ export function calculateMACD(
   candles: Candle[],
   fastPeriod: number = 12,
   slowPeriod: number = 26,
-  signalPeriod: number = 9
+  signalPeriod: number = 9,
 ): ScannerMACDResult | null {
   const minRequired = slowPeriod + signalPeriod - 1;
   if (candles.length < minRequired) {
@@ -333,10 +333,7 @@ export interface FullAnalysis {
 /**
  * Calculate all indicators and detect support/resistance levels
  */
-export function analyzeCandles(
-  candles: Candle[],
-  levelSensitivity: number = 3
-): FullAnalysis {
+export function analyzeCandles(candles: Candle[], levelSensitivity: number = 3): FullAnalysis {
   return {
     indicators: calculateIndicators(candles),
     levels: detectLevels(candles, levelSensitivity),

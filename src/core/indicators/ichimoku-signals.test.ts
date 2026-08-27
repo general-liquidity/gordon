@@ -172,7 +172,9 @@ describe("calculateIchimokuSignals — opts overrides and rounding", () => {
       expect(r.kijun).toBe(parseFloat(r.kijun.toFixed(2)));
     }
     expect(r.tkDisequilibrium.gap).toBe(parseFloat(r.tkDisequilibrium.gap.toFixed(2)));
-    expect(r.tkDisequilibrium.stretchPct).toBe(parseFloat(r.tkDisequilibrium.stretchPct.toFixed(2)));
+    expect(r.tkDisequilibrium.stretchPct).toBe(
+      parseFloat(r.tkDisequilibrium.stretchPct.toFixed(2)),
+    );
   });
 });
 

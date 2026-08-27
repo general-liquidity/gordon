@@ -1,4 +1,3 @@
-import React from "react";
 import { Box } from "../ink-custom";
 import { DataTable, fmtPct, type Column } from "../components/charts/DataTable.tsx";
 import { InlineChart } from "../components/charts/InlineChart.tsx";

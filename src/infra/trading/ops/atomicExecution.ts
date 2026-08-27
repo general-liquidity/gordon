@@ -60,7 +60,9 @@ export interface AtomicGroup {
   completedAt?: string;
 }
 
-export type OrderSubmitter = (leg: OrderLeg) => Promise<{ orderId: string; fillPrice?: number; fillQuantity?: number }>;
+export type OrderSubmitter = (
+  leg: OrderLeg,
+) => Promise<{ orderId: string; fillPrice?: number; fillQuantity?: number }>;
 export type OrderCanceller = (orderId: string, venue: string) => Promise<boolean>;
 
 // ============================================================================
@@ -147,10 +149,12 @@ export async function executeAtomicGroup(
     }
     group.status = "rejected";
     group.completedAt = new Date().toISOString();
-    emitAgentEvent(createEvent("error", 0, {
-      message: `Atomic group rejected before submission: ${legErrors.size} invalid leg(s)`,
-      recoverable: true,
-    }));
+    emitAgentEvent(
+      createEvent("error", 0, {
+        message: `Atomic group rejected before submission: ${legErrors.size} invalid leg(s)`,
+        recoverable: true,
+      }),
+    );
     return group;
   }
 
@@ -163,7 +167,7 @@ export async function executeAtomicGroup(
     // Check if this leg depends on a previous leg
     if (leg.dependsOn) {
       const depResult = group.results.find((r) => r.legId === leg.dependsOn);
-      if (!depResult || depResult.status !== "filled") {
+      if (depResult?.status !== "filled") {
         result.status = "cancelled";
         result.error = `Dependency ${leg.dependsOn} not filled`;
         continue;
@@ -174,11 +178,13 @@ export async function executeAtomicGroup(
       result.submittedAt = new Date().toISOString();
       result.status = "submitted";
 
-      emitAgentEvent(createEvent("tool_start", 0, {
-        toolName: `atomic_leg_${leg.label}`,
-        toolCallId: leg.legId,
-        args: { symbol: leg.symbol, side: leg.side, type: leg.type, quantity: leg.quantity },
-      }));
+      emitAgentEvent(
+        createEvent("tool_start", 0, {
+          toolName: `atomic_leg_${leg.label}`,
+          toolCallId: leg.legId,
+          args: { symbol: leg.symbol, side: leg.side, type: leg.type, quantity: leg.quantity },
+        }),
+      );
 
       const { orderId, fillPrice, fillQuantity } = await submit(leg);
 
@@ -189,24 +195,27 @@ export async function executeAtomicGroup(
       result.completedAt = new Date().toISOString();
       submittedOrderIds.push({ orderId, venue: leg.venue, legId: leg.legId });
 
-      emitAgentEvent(createEvent("tool_end", 0, {
-        toolName: `atomic_leg_${leg.label}`,
-        toolCallId: leg.legId,
-        success: true,
-        durationMs: Date.now() - new Date(result.submittedAt).getTime(),
-        resultPreview: `Filled: ${fillQuantity ?? leg.quantity} @ ${fillPrice ?? "market"}`,
-      }));
-
+      emitAgentEvent(
+        createEvent("tool_end", 0, {
+          toolName: `atomic_leg_${leg.label}`,
+          toolCallId: leg.legId,
+          success: true,
+          durationMs: Date.now() - new Date(result.submittedAt).getTime(),
+          resultPreview: `Filled: ${fillQuantity ?? leg.quantity} @ ${fillPrice ?? "market"}`,
+        }),
+      );
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       result.status = "failed";
       result.error = errorMsg;
       result.completedAt = new Date().toISOString();
 
-      emitAgentEvent(createEvent("error", 0, {
-        message: `Leg ${leg.label} failed: ${errorMsg}. Rolling back ${submittedOrderIds.length} legs.`,
-        recoverable: true,
-      }));
+      emitAgentEvent(
+        createEvent("error", 0, {
+          message: `Leg ${leg.label} failed: ${errorMsg}. Rolling back ${submittedOrderIds.length} legs.`,
+          recoverable: true,
+        }),
+      );
 
       // ── ROLLBACK ──
       await rollback(submittedOrderIds, cancel, group);
@@ -269,14 +278,21 @@ async function rollback(
  */
 export function formatAtomicGroup(group: AtomicGroup): string {
   const lines: string[] = [];
-  const statusIcon = group.status === "completed" ? "✓" : group.status === "rolled_back" ? "✗" : "⚠";
+  const statusIcon =
+    group.status === "completed" ? "✓" : group.status === "rolled_back" ? "✗" : "⚠";
   lines.push(`${statusIcon} ${group.label} [${group.status}]`);
 
   for (const result of group.results) {
-    const icon = result.status === "filled" ? "✓" :
-      result.status === "cancelled" ? "○" :
-      result.status === "orphaned" ? "⚠" :
-      result.status === "failed" ? "✗" : "·";
+    const icon =
+      result.status === "filled"
+        ? "✓"
+        : result.status === "cancelled"
+          ? "○"
+          : result.status === "orphaned"
+            ? "⚠"
+            : result.status === "failed"
+              ? "✗"
+              : "·";
     const fill = result.fillPrice ? ` @ $${result.fillPrice}` : "";
     const err = result.error ? ` — ${result.error}` : "";
     lines.push(`  ${icon} ${result.label}: ${result.status}${fill}${err}`);

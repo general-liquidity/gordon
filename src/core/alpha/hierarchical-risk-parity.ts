@@ -292,9 +292,10 @@ export function hierarchicalRiskParity(input: HrpInput): HrpResult | null {
   if (cov === null || cov.length < 2 || !isSquare(cov)) return null;
 
   const n = cov.length;
-  const corr = isSquare(input.correlation) && input.correlation.length === n
-    ? input.correlation
-    : covarianceToCorrelation(cov);
+  const corr =
+    isSquare(input.correlation) && input.correlation.length === n
+      ? input.correlation
+      : covarianceToCorrelation(cov);
 
   const dist = correlationDistance(corr);
   const linkage = singleLinkage(dist);
@@ -302,8 +303,8 @@ export function hierarchicalRiskParity(input: HrpInput): HrpResult | null {
   const rawWeights = recursiveBisection(cov, seriatedOrder);
 
   const sum = rawWeights.reduce((s, x) => s + x, 0);
-  const weights = (sum > 0 ? rawWeights.map((w) => w / sum) : new Array(n).fill(1 / n)).map(
-    (w) => parseFloat(w.toFixed(6)),
+  const weights = (sum > 0 ? rawWeights.map((w) => w / sum) : new Array(n).fill(1 / n)).map((w) =>
+    parseFloat(w.toFixed(6)),
   );
 
   const label = (i: number) => input.labels?.[i] ?? `asset${i}`;

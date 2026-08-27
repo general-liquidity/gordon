@@ -1,10 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  FULL_LOGO_MIN_COLUMNS,
-  GORDON_LOGO,
-  LOGO_WIDTH,
-  renderBanner,
-} from "./banner.ts";
+import { FULL_LOGO_MIN_COLUMNS, GORDON_LOGO, LOGO_WIDTH, renderBanner } from "./banner.ts";
 
 const ANSI = /\x1b\[[0-9;]*m/g;
 const stripAnsi = (value: string) => value.replace(ANSI, "");

@@ -13,7 +13,10 @@ const DEFAULT_AUDIT_DIRS = [
 
 const DIRECT_TRANSPORT_PATTERNS: Array<{ id: string; pattern: RegExp }> = [
   { id: "node_http_import", pattern: /\bfrom\s+["']node:http["']|\brequire\(["']node:http["']\)/ },
-  { id: "node_https_import", pattern: /\bfrom\s+["']node:https["']|\brequire\(["']node:https["']\)/ },
+  {
+    id: "node_https_import",
+    pattern: /\bfrom\s+["']node:https["']|\brequire\(["']node:https["']\)/,
+  },
   { id: "node_net_import", pattern: /\bfrom\s+["']node:net["']|\brequire\(["']node:net["']\)/ },
   { id: "node_tls_import", pattern: /\bfrom\s+["']node:tls["']|\brequire\(["']node:tls["']\)/ },
   { id: "bare_http_import", pattern: /\bfrom\s+["']http["']|\brequire\(["']http["']\)/ },

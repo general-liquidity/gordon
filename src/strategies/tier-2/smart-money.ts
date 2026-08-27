@@ -71,7 +71,7 @@ export class SmartMoneyStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, 100);
     if (candles.length < 30) {
@@ -144,8 +144,10 @@ export class SmartMoneyStrategy extends BaseStrategy {
     }
 
     // Multiple sweeps at same level
-    const sameLevelSweeps = sweeps.filter((s) =>
-      Math.abs(s.sweptLevel - bestSweep.sweptLevel) < (candles[candles.length - 1]!.high - candles[candles.length - 1]!.low) * 0.5
+    const sameLevelSweeps = sweeps.filter(
+      (s) =>
+        Math.abs(s.sweptLevel - bestSweep.sweptLevel) <
+        (candles[candles.length - 1]!.high - candles[candles.length - 1]!.low) * 0.5,
     );
     if (sameLevelSweeps.length >= 2) {
       confidence += 0.1;
@@ -162,11 +164,9 @@ export class SmartMoneyStrategy extends BaseStrategy {
     };
 
     const reasons: string[] = [];
+    reasons.push(`${bestSweep.type} liquidity sweep past ${bestSweep.sweptLevel.toFixed(2)}`);
     reasons.push(
-      `${bestSweep.type} liquidity sweep past ${bestSweep.sweptLevel.toFixed(2)}`
-    );
-    reasons.push(
-      `Swept to ${bestSweep.sweepExtreme.toFixed(2)} then reversed (vol: ${bestSweep.volumeRatio.toFixed(1)}x avg)`
+      `Swept to ${bestSweep.sweepExtreme.toFixed(2)} then reversed (vol: ${bestSweep.volumeRatio.toFixed(1)}x avg)`,
     );
     if (sameLevelSweeps.length >= 2) {
       reasons.push(`${sameLevelSweeps.length} sweeps at this level`);
@@ -224,7 +224,7 @@ export class SmartMoneyStrategy extends BaseStrategy {
     candles: Candle[],
     swingPoints: SwingPoint[],
     avgVolume: number,
-    recentWindow: number
+    recentWindow: number,
   ): LiquiditySweep[] {
     const sweeps: LiquiditySweep[] = [];
     const startIdx = Math.max(0, candles.length - recentWindow);
@@ -276,10 +276,7 @@ export class SmartMoneyStrategy extends BaseStrategy {
     return slice.reduce((sum, c) => sum + c.volume, 0) / slice.length;
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", 100);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const atr = this.calculateATR(candles);
@@ -370,7 +367,7 @@ When creating a plan using the Smart Money strategy:
     bar: OHLC,
     _index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     const price = bar.close;
     const { rsi14, volumeRatio } = indicators;
@@ -386,9 +383,15 @@ When creating a plan using the Smart Money strategy:
       const candidate = _data[i]!;
 
       for (let j = i - swingLookback; j <= i + swingLookback; j++) {
-        if (j === i || j < 0 || j >= _index) { continue; }
-        if (_data[j]!.low <= candidate.low) { isSwingLow = false; }
-        if (_data[j]!.high >= candidate.high) { isSwingHigh = false; }
+        if (j === i || j < 0 || j >= _index) {
+          continue;
+        }
+        if (_data[j]!.low <= candidate.low) {
+          isSwingLow = false;
+        }
+        if (_data[j]!.high >= candidate.high) {
+          isSwingHigh = false;
+        }
       }
 
       // Bullish sweep: bar wicks below swing low but closes above it
@@ -439,14 +442,7 @@ When creating a plan using the Smart Money strategy:
    * Get required indicators for backtesting.
    */
   override getRequiredIndicators(): string[] {
-    return [
-      "rsi14",
-      "atr14",
-      "volumeRatio",
-      "volumeAvg20",
-      "nearestSupport",
-      "nearestResistance",
-    ];
+    return ["rsi14", "atr14", "volumeRatio", "volumeAvg20", "nearestSupport", "nearestResistance"];
   }
 }
 

@@ -178,9 +178,7 @@ const logger = createModuleLogger("permission-profiles");
  *
  * `override` exists for deterministic testing; production passes nothing.
  */
-export function resolveSelectedProfile(
-  override?: string,
-): PermissionProfileName | undefined {
+export function resolveSelectedProfile(override?: string): PermissionProfileName | undefined {
   const raw = override ?? process.env.GORDON_PERMISSION_PROFILE;
   const trimmed = raw?.trim();
   if (!trimmed) return undefined; // unset/empty → no profile → today's behavior
@@ -216,12 +214,14 @@ export function resolveSelectedProfile(
  * The hook abstains for everything not explicitly auto-allowed, leaving
  * downstream hooks (default classifier, trust trajectory) to decide.
  */
-export function buildPermissionProfileHook(
-  options: { profileOverride?: string } = {},
-): (input: {
+export function buildPermissionProfileHook(options: { profileOverride?: string } = {}): (input: {
   toolName: string;
   policy: { approvalClass?: string };
-}) => { decision: "allow" | "abstain"; actor?: string; reason?: string } {
+}) => {
+  decision: "allow" | "abstain";
+  actor?: string;
+  reason?: string;
+} {
   const profileName = resolveSelectedProfile(options.profileOverride);
   // No profile → a hook that abstains for everything. Behavior is unchanged.
   if (!profileName) {

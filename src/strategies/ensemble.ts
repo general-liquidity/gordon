@@ -120,7 +120,7 @@ export async function runEnsemble(
   symbol: string,
   timeframe: string,
   ctx: StrategyContext,
-  options?: EnsembleOptions
+  options?: EnsembleOptions,
 ): Promise<EnsembleResult> {
   const minAgreement = options?.minAgreement ?? 0.5;
   const minStrategyConfidence = options?.minStrategyConfidence ?? 0.4;
@@ -134,13 +134,11 @@ export async function runEnsemble(
 
   // Run all strategies in parallel
   const results = await Promise.all(
-    strategies.map((strategy) => runSingleStrategy(strategy, symbol, timeframe, ctx))
+    strategies.map((strategy) => runSingleStrategy(strategy, symbol, timeframe, ctx)),
   );
 
   // Filter to only strategies that detected with sufficient confidence
-  const detected = results.filter(
-    (r) => r.detected && r.confidence >= minStrategyConfidence
-  );
+  const detected = results.filter((r) => r.detected && r.confidence >= minStrategyConfidence);
 
   // Calculate ensemble metrics
   const agreementPercent = results.length > 0 ? detected.length / results.length : 0;
@@ -181,7 +179,7 @@ export async function runEnsemble(
 export async function runQuickEnsemble(
   symbol: string,
   timeframe: string,
-  ctx: StrategyContext
+  ctx: StrategyContext,
 ): Promise<EnsembleResult> {
   return runEnsemble(symbol, timeframe, ctx, {
     strategies: DEFAULT_QUICK_STRATEGIES,
@@ -202,16 +200,14 @@ export async function scanWithEnsemble(
   symbols: string[],
   timeframe: string,
   ctx: StrategyContext,
-  options?: EnsembleOptions
+  options?: EnsembleOptions,
 ): Promise<EnsembleResult[]> {
   const results = await Promise.all(
-    symbols.map((symbol) => runEnsemble(symbol, timeframe, ctx, options))
+    symbols.map((symbol) => runEnsemble(symbol, timeframe, ctx, options)),
   );
 
   // Return only detected setups, sorted by confidence
-  return results
-    .filter((r) => r.detected)
-    .sort((a, b) => b.confidence - a.confidence);
+  return results.filter((r) => r.detected).sort((a, b) => b.confidence - a.confidence);
 }
 
 // ============================================================================
@@ -245,7 +241,7 @@ async function runSingleStrategy(
   strategy: Strategy,
   symbol: string,
   timeframe: string,
-  ctx: StrategyContext
+  ctx: StrategyContext,
 ): Promise<EnsembleStrategyResult> {
   try {
     const result = await strategy.detect(symbol, timeframe, ctx);
@@ -280,7 +276,7 @@ function calculateAverageConfidence(detected: EnsembleStrategyResult[]): number 
  */
 function generateCombinedReasoning(
   all: EnsembleStrategyResult[],
-  detected: EnsembleStrategyResult[]
+  detected: EnsembleStrategyResult[],
 ): string {
   const notDetected = all.filter((r) => !r.detected || r.confidence < 0.4);
 
@@ -305,11 +301,7 @@ function generateCombinedReasoning(
 /**
  * Create an empty result when no strategies are available.
  */
-function createEmptyResult(
-  symbol: string,
-  timeframe: string,
-  reasoning: string
-): EnsembleResult {
+function createEmptyResult(symbol: string, timeframe: string, reasoning: string): EnsembleResult {
   return {
     symbol,
     timeframe,

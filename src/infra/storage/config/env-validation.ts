@@ -23,7 +23,7 @@ const HYPERLIQUID_KEY_PATTERN = /^(0x)?[a-fA-F0-9]{64}$/;
 const BITFINEX_KEY_PATTERN = /^[a-zA-Z0-9_-]{10,}$/;
 const BITFINEX_SECRET_PATTERN = /^[a-zA-Z0-9_-]{10,}$/;
 const ALPACA_KEY_PATTERN = /^(PK|AK|CK)[a-zA-Z0-9]{14,30}$/;
-const BEARER_TOKEN_PATTERN = /^[a-zA-Z0-9._\-+/=]{8,}$/;
+const _BEARER_TOKEN_PATTERN = /^[a-zA-Z0-9._\-+/=]{8,}$/;
 
 // Validation schemas
 export const OpenAIKeySchema = z
@@ -32,7 +32,7 @@ export const OpenAIKeySchema = z
   .min(1, "OpenAI API key cannot be empty")
   .refine(
     (val) => OPENAI_KEY_PATTERN.test(val),
-    "OpenAI API key must start with 'sk-' followed by at least 32 characters"
+    "OpenAI API key must start with 'sk-' followed by at least 32 characters",
   );
 
 export const AnthropicKeySchema = z
@@ -41,7 +41,7 @@ export const AnthropicKeySchema = z
   .min(1, "Anthropic API key cannot be empty")
   .refine(
     (val) => ANTHROPIC_KEY_PATTERN.test(val),
-    "Anthropic API key must start with 'sk-ant-' followed by at least 16 characters"
+    "Anthropic API key must start with 'sk-ant-' followed by at least 16 characters",
   );
 
 export const BinanceKeySchema = z
@@ -50,7 +50,7 @@ export const BinanceKeySchema = z
   .min(1, "Binance API key cannot be empty")
   .refine(
     (val) => BINANCE_KEY_PATTERN.test(val),
-    "Binance API key must be exactly 64 alphanumeric characters"
+    "Binance API key must be exactly 64 alphanumeric characters",
   );
 
 export const BinanceSecretSchema = z
@@ -59,7 +59,7 @@ export const BinanceSecretSchema = z
   .min(1, "Binance API secret cannot be empty")
   .refine(
     (val) => BINANCE_SECRET_PATTERN.test(val),
-    "Binance API secret must be exactly 64 alphanumeric characters"
+    "Binance API secret must be exactly 64 alphanumeric characters",
   );
 
 export const CoinbaseKeySchema = z
@@ -68,7 +68,7 @@ export const CoinbaseKeySchema = z
   .min(1, "Coinbase API key cannot be empty")
   .refine(
     (val) => COINBASE_KEY_PATTERN.test(val),
-    "Coinbase API key must be 16-64 alphanumeric characters"
+    "Coinbase API key must be 16-64 alphanumeric characters",
   );
 
 export const CoinbaseSecretSchema = z
@@ -77,7 +77,7 @@ export const CoinbaseSecretSchema = z
   .min(1, "Coinbase API secret cannot be empty")
   .refine(
     (val) => COINBASE_SECRET_PATTERN.test(val),
-    "Coinbase API secret must be at least 16 base64-compatible characters"
+    "Coinbase API secret must be at least 16 base64-compatible characters",
   );
 
 export const CoinbasePassphraseSchema = z
@@ -86,7 +86,7 @@ export const CoinbasePassphraseSchema = z
   .min(1, "Coinbase passphrase cannot be empty")
   .refine(
     (val) => COINBASE_PASSPHRASE_PATTERN.test(val),
-    "Coinbase passphrase must be at least 4 alphanumeric characters"
+    "Coinbase passphrase must be at least 4 alphanumeric characters",
   );
 
 export const KrakenKeySchema = z
@@ -95,7 +95,7 @@ export const KrakenKeySchema = z
   .min(1, "Kraken API key cannot be empty")
   .refine(
     (val) => KRAKEN_KEY_PATTERN.test(val),
-    "Kraken API key must be at least 10 base64-compatible characters"
+    "Kraken API key must be at least 10 base64-compatible characters",
   );
 
 export const KrakenSecretSchema = z
@@ -104,7 +104,7 @@ export const KrakenSecretSchema = z
   .min(1, "Kraken API secret cannot be empty")
   .refine(
     (val) => KRAKEN_SECRET_PATTERN.test(val),
-    "Kraken API secret must be at least 10 base64-compatible characters"
+    "Kraken API secret must be at least 10 base64-compatible characters",
   );
 
 export const HyperliquidKeySchema = z
@@ -113,7 +113,7 @@ export const HyperliquidKeySchema = z
   .min(1, "Hyperliquid private key cannot be empty")
   .refine(
     (val) => HYPERLIQUID_KEY_PATTERN.test(val),
-    "Hyperliquid private key must be 64 hex characters (with optional 0x prefix)"
+    "Hyperliquid private key must be 64 hex characters (with optional 0x prefix)",
   );
 
 export const BitfinexKeySchema = z
@@ -122,7 +122,7 @@ export const BitfinexKeySchema = z
   .min(1, "Bitfinex API key cannot be empty")
   .refine(
     (val) => BITFINEX_KEY_PATTERN.test(val),
-    "Bitfinex API key must be at least 10 alphanumeric/dash/underscore characters"
+    "Bitfinex API key must be at least 10 alphanumeric/dash/underscore characters",
   );
 
 export const BitfinexSecretSchema = z
@@ -131,7 +131,7 @@ export const BitfinexSecretSchema = z
   .min(1, "Bitfinex API secret cannot be empty")
   .refine(
     (val) => BITFINEX_SECRET_PATTERN.test(val),
-    "Bitfinex API secret must be at least 10 alphanumeric/dash/underscore characters"
+    "Bitfinex API secret must be at least 10 alphanumeric/dash/underscore characters",
   );
 
 export const AlpacaKeySchema = z
@@ -140,7 +140,7 @@ export const AlpacaKeySchema = z
   .min(1, "Alpaca API key cannot be empty")
   .refine(
     (val) => ALPACA_KEY_PATTERN.test(val),
-    "Alpaca API key must start with 'PK', 'AK', or 'CK' followed by 14-30 alphanumeric characters"
+    "Alpaca API key must start with 'PK', 'AK', or 'CK' followed by 14-30 alphanumeric characters",
   );
 
 export const AlpacaSecretSchema = z
@@ -159,20 +159,11 @@ export const TastytradeSecretSchema = z
   .trim()
   .min(1, "tastytrade password cannot be empty");
 
-export const IbkrKeySchema = z
-  .string()
-  .trim()
-  .min(1, "IBKR gateway host/port cannot be empty");
+export const IbkrKeySchema = z.string().trim().min(1, "IBKR gateway host/port cannot be empty");
 
-export const IbkrSecretSchema = z
-  .string()
-  .trim()
-  .min(1, "IBKR session token cannot be empty");
+export const IbkrSecretSchema = z.string().trim().min(1, "IBKR session token cannot be empty");
 
-export const RobinhoodKeySchema = z
-  .string()
-  .trim()
-  .min(1, "Robinhood API key cannot be empty");
+export const RobinhoodKeySchema = z.string().trim().min(1, "Robinhood API key cannot be empty");
 
 export const RobinhoodSecretSchema = z
   .string()
@@ -228,7 +219,7 @@ export interface ValidationWarning {
 export function validateApiKey(
   key: string,
   value: string | undefined,
-  schema: z.ZodType<string>
+  schema: z.ZodType<string>,
 ): { valid: boolean; error?: string } {
   if (!value) {
     return { valid: true }; // Optional keys are valid when missing
@@ -308,9 +299,16 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
 
   // Pass-through validation for other provider / gateway / local keys.
   for (const providerKey of [
-    "GOOGLE_GENERATIVE_AI_API_KEY", "XAI_API_KEY", "OPENROUTER_API_KEY", "HF_TOKEN",
-    "TOGETHER_API_KEY", "FIREWORKS_API_KEY", "SILICONFLOW_API_KEY", "DEEPINFRA_API_KEY",
-    "GORDON_LOCAL_MODEL_URL", "GORDON_LOCAL_MODEL_API_KEY",
+    "GOOGLE_GENERATIVE_AI_API_KEY",
+    "XAI_API_KEY",
+    "OPENROUTER_API_KEY",
+    "HF_TOKEN",
+    "TOGETHER_API_KEY",
+    "FIREWORKS_API_KEY",
+    "SILICONFLOW_API_KEY",
+    "DEEPINFRA_API_KEY",
+    "GORDON_LOCAL_MODEL_URL",
+    "GORDON_LOCAL_MODEL_API_KEY",
   ] as const) {
     const value = keys[providerKey];
     if (value && value.trim().length > 0) {
@@ -328,7 +326,13 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
     });
   } else if (hasAlpacaKey && hasAlpacaSecret) {
     validateApiKeyWarn("ALPACA_API_KEY", keys.ALPACA_API_KEY, AlpacaKeySchema, warnings, validated);
-    validateApiKeyWarn("ALPACA_API_SECRET", keys.ALPACA_API_SECRET, AlpacaSecretSchema, warnings, validated);
+    validateApiKeyWarn(
+      "ALPACA_API_SECRET",
+      keys.ALPACA_API_SECRET,
+      AlpacaSecretSchema,
+      warnings,
+      validated,
+    );
   }
 
   // Validate tastytrade keys (must be paired)
@@ -340,14 +344,22 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
       message: "tastytrade login/email and password must both be provided",
     });
   } else if (hasTastytradeKey && hasTastytradeSecret) {
-    const keyResult = validateApiKey("TASTYTRADE_API_KEY", keys.TASTYTRADE_API_KEY, TastytradeKeySchema);
+    const keyResult = validateApiKey(
+      "TASTYTRADE_API_KEY",
+      keys.TASTYTRADE_API_KEY,
+      TastytradeKeySchema,
+    );
     if (!keyResult.valid) {
       errors.push({ key: "TASTYTRADE_API_KEY", message: keyResult.error! });
     } else {
       validated.TASTYTRADE_API_KEY = keys.TASTYTRADE_API_KEY!.trim();
     }
 
-    const secretResult = validateApiKey("TASTYTRADE_API_SECRET", keys.TASTYTRADE_API_SECRET, TastytradeSecretSchema);
+    const secretResult = validateApiKey(
+      "TASTYTRADE_API_SECRET",
+      keys.TASTYTRADE_API_SECRET,
+      TastytradeSecretSchema,
+    );
     if (!secretResult.valid) {
       errors.push({ key: "TASTYTRADE_API_SECRET", message: secretResult.error! });
     } else {
@@ -388,14 +400,22 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
       message: "Robinhood API key and secret must both be provided",
     });
   } else if (hasRobinhoodKey && hasRobinhoodSecret) {
-    const keyResult = validateApiKey("ROBINHOOD_API_KEY", keys.ROBINHOOD_API_KEY, RobinhoodKeySchema);
+    const keyResult = validateApiKey(
+      "ROBINHOOD_API_KEY",
+      keys.ROBINHOOD_API_KEY,
+      RobinhoodKeySchema,
+    );
     if (!keyResult.valid) {
       errors.push({ key: "ROBINHOOD_API_KEY", message: keyResult.error! });
     } else {
       validated.ROBINHOOD_API_KEY = keys.ROBINHOOD_API_KEY!.trim();
     }
 
-    const secretResult = validateApiKey("ROBINHOOD_API_SECRET", keys.ROBINHOOD_API_SECRET, RobinhoodSecretSchema);
+    const secretResult = validateApiKey(
+      "ROBINHOOD_API_SECRET",
+      keys.ROBINHOOD_API_SECRET,
+      RobinhoodSecretSchema,
+    );
     if (!secretResult.valid) {
       errors.push({ key: "ROBINHOOD_API_SECRET", message: secretResult.error! });
     } else {
@@ -420,7 +440,11 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
       validated.BINANCE_API_KEY = keys.BINANCE_API_KEY!.trim();
     }
 
-    const secretResult = validateApiKey("BINANCE_API_SECRET", keys.BINANCE_API_SECRET, BinanceSecretSchema);
+    const secretResult = validateApiKey(
+      "BINANCE_API_SECRET",
+      keys.BINANCE_API_SECRET,
+      BinanceSecretSchema,
+    );
     if (!secretResult.valid) {
       errors.push({ key: "BINANCE_API_SECRET", message: secretResult.error! });
     } else {
@@ -432,7 +456,9 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
   const hasCoinbaseKey = !!keys.COINBASE_API_KEY;
   const hasCoinbaseSecret = !!keys.COINBASE_API_SECRET;
   const hasCoinbasePassphrase = !!keys.COINBASE_PASSPHRASE;
-  const coinbaseCount = [hasCoinbaseKey, hasCoinbaseSecret, hasCoinbasePassphrase].filter(Boolean).length;
+  const coinbaseCount = [hasCoinbaseKey, hasCoinbaseSecret, hasCoinbasePassphrase].filter(
+    Boolean,
+  ).length;
 
   if (coinbaseCount > 0 && coinbaseCount < 3) {
     const missing: string[] = [];
@@ -444,9 +470,27 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
       message: `Coinbase requires API key, secret, and passphrase. Missing: ${missing.join(", ")}`,
     });
   } else if (coinbaseCount === 3) {
-    validateApiKeyWarn("COINBASE_API_KEY", keys.COINBASE_API_KEY, CoinbaseKeySchema, warnings, validated);
-    validateApiKeyWarn("COINBASE_API_SECRET", keys.COINBASE_API_SECRET, CoinbaseSecretSchema, warnings, validated);
-    validateApiKeyWarn("COINBASE_PASSPHRASE", keys.COINBASE_PASSPHRASE, CoinbasePassphraseSchema, warnings, validated);
+    validateApiKeyWarn(
+      "COINBASE_API_KEY",
+      keys.COINBASE_API_KEY,
+      CoinbaseKeySchema,
+      warnings,
+      validated,
+    );
+    validateApiKeyWarn(
+      "COINBASE_API_SECRET",
+      keys.COINBASE_API_SECRET,
+      CoinbaseSecretSchema,
+      warnings,
+      validated,
+    );
+    validateApiKeyWarn(
+      "COINBASE_PASSPHRASE",
+      keys.COINBASE_PASSPHRASE,
+      CoinbasePassphraseSchema,
+      warnings,
+      validated,
+    );
   }
 
   // Validate Kraken keys (must be paired) — base64 format
@@ -459,7 +503,13 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
     });
   } else if (hasKrakenKey && hasKrakenSecret) {
     validateApiKeyWarn("KRAKEN_API_KEY", keys.KRAKEN_API_KEY, KrakenKeySchema, warnings, validated);
-    validateApiKeyWarn("KRAKEN_API_SECRET", keys.KRAKEN_API_SECRET, KrakenSecretSchema, warnings, validated);
+    validateApiKeyWarn(
+      "KRAKEN_API_SECRET",
+      keys.KRAKEN_API_SECRET,
+      KrakenSecretSchema,
+      warnings,
+      validated,
+    );
   }
 
   // Validate Bitfinex keys (must be paired)
@@ -471,26 +521,52 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
       message: "Bitfinex API key and secret must both be provided",
     });
   } else if (hasBitfinexKey && hasBitfinexSecret) {
-    validateApiKeyWarn("BITFINEX_API_KEY", keys.BITFINEX_API_KEY, BitfinexKeySchema, warnings, validated);
-    validateApiKeyWarn("BITFINEX_API_SECRET", keys.BITFINEX_API_SECRET, BitfinexSecretSchema, warnings, validated);
+    validateApiKeyWarn(
+      "BITFINEX_API_KEY",
+      keys.BITFINEX_API_KEY,
+      BitfinexKeySchema,
+      warnings,
+      validated,
+    );
+    validateApiKeyWarn(
+      "BITFINEX_API_SECRET",
+      keys.BITFINEX_API_SECRET,
+      BitfinexSecretSchema,
+      warnings,
+      validated,
+    );
   }
 
   // Validate Hyperliquid private key (single key, hex format)
   if (keys.HYPERLIQUID_PRIVATE_KEY) {
-    validateApiKeyWarn("HYPERLIQUID_PRIVATE_KEY", keys.HYPERLIQUID_PRIVATE_KEY, HyperliquidKeySchema, warnings, validated);
+    validateApiKeyWarn(
+      "HYPERLIQUID_PRIVATE_KEY",
+      keys.HYPERLIQUID_PRIVATE_KEY,
+      HyperliquidKeySchema,
+      warnings,
+      validated,
+    );
   }
 
   // Check if at least one LLM key is present
   const llmKeyValues = [
-    keys.ANTHROPIC_API_KEY, keys.OPENAI_API_KEY, keys.GOOGLE_GENERATIVE_AI_API_KEY,
-    keys.XAI_API_KEY, keys.OPENROUTER_API_KEY, keys.HF_TOKEN, keys.TOGETHER_API_KEY,
-    keys.FIREWORKS_API_KEY, keys.SILICONFLOW_API_KEY, keys.DEEPINFRA_API_KEY,
+    keys.ANTHROPIC_API_KEY,
+    keys.OPENAI_API_KEY,
+    keys.GOOGLE_GENERATIVE_AI_API_KEY,
+    keys.XAI_API_KEY,
+    keys.OPENROUTER_API_KEY,
+    keys.HF_TOKEN,
+    keys.TOGETHER_API_KEY,
+    keys.FIREWORKS_API_KEY,
+    keys.SILICONFLOW_API_KEY,
+    keys.DEEPINFRA_API_KEY,
     keys.GORDON_LOCAL_MODEL_URL,
   ];
   if (!llmKeyValues.some(Boolean)) {
     warnings.push({
       key: "LLM",
-      message: "No LLM API key configured. Set ANTHROPIC_API_KEY (or OPENAI_API_KEY / another provider key).",
+      message:
+        "No LLM API key configured. Set ANTHROPIC_API_KEY (or OPENAI_API_KEY / another provider key).",
     });
   }
 
@@ -498,7 +574,8 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
   if (configuredLLMKeys > 1) {
     warnings.push({
       key: "LLM",
-      message: "Multiple LLM API keys are configured. Gordon will use the provider selected in model settings.",
+      message:
+        "Multiple LLM API keys are configured. Gordon will use the provider selected in model settings.",
     });
   }
 

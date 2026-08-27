@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  evaluateUsdVolumeGate,
-  usdVolumeGateToPayload,
-} from "./usdVolumeGate.ts";
+import { evaluateUsdVolumeGate, usdVolumeGateToPayload } from "./usdVolumeGate.ts";
 
 function mkCandle(close: number, volume: number) {
   return { close, volume };
@@ -14,27 +11,19 @@ describe("evaluateUsdVolumeGate — validation", () => {
   });
 
   it("rejects maPeriod < 1", () => {
-    expect(() =>
-      evaluateUsdVolumeGate({ candles: [mkCandle(100, 1)], maPeriod: 0 }),
-    ).toThrow();
+    expect(() => evaluateUsdVolumeGate({ candles: [mkCandle(100, 1)], maPeriod: 0 })).toThrow();
   });
 
   it("rejects non-positive threshold", () => {
-    expect(() =>
-      evaluateUsdVolumeGate({ candles: [mkCandle(100, 1)], thresholdUSD: 0 }),
-    ).toThrow();
+    expect(() => evaluateUsdVolumeGate({ candles: [mkCandle(100, 1)], thresholdUSD: 0 })).toThrow();
   });
 
   it("rejects non-positive close", () => {
-    expect(() =>
-      evaluateUsdVolumeGate({ candles: [mkCandle(0, 1)] }),
-    ).toThrow();
+    expect(() => evaluateUsdVolumeGate({ candles: [mkCandle(0, 1)] })).toThrow();
   });
 
   it("rejects negative volume", () => {
-    expect(() =>
-      evaluateUsdVolumeGate({ candles: [mkCandle(100, -1)] }),
-    ).toThrow();
+    expect(() => evaluateUsdVolumeGate({ candles: [mkCandle(100, -1)] })).toThrow();
   });
 });
 

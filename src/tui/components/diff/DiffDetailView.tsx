@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import type { DiffLine } from "./colorDiff.js";
 
@@ -19,48 +18,54 @@ export function DiffDetailView({ lines, startLine = 0, pageSize = 30 }: Props) {
     <Box flexDirection="column">
       {page.map((line, idx) => {
         const absIdx = startLine + idx;
-        return <LineRow key={absIdx} line={line} absIdx={absIdx} />;
+        return <LineRow key={absIdx} line={line} />;
       })}
     </Box>
   );
 }
 
-function LineRow({ line, absIdx }: { line: DiffLine; absIdx: number }) {
-  const lineNumStr = line.lineNum != null
-    ? String(line.lineNum).padStart(4)
-    : "    ";
+function LineRow({ line }: { line: DiffLine }) {
+  const lineNumStr = line.lineNum != null ? String(line.lineNum).padStart(4) : "    ";
 
   switch (line.type) {
     case "added":
       return (
         <Box>
           <Text dimColor>{lineNumStr} </Text>
-          <Text color="green">{"+"} {line.content}</Text>
+          <Text color="green">
+            {"+"} {line.content}
+          </Text>
         </Box>
       );
     case "removed":
       return (
         <Box>
           <Text dimColor>{lineNumStr} </Text>
-          <Text color="red">{"-"} {line.content}</Text>
+          <Text color="red">
+            {"-"} {line.content}
+          </Text>
         </Box>
       );
     case "header":
       return (
         <Box>
           <Text dimColor>{"    "} </Text>
-          <Text color="gray">{"── "}{line.content}{" ──"}</Text>
+          <Text color="gray">
+            {"── "}
+            {line.content}
+            {" ──"}
+          </Text>
         </Box>
       );
-    case "unchanged":
     default:
       return (
         <Box>
           <Text dimColor>{lineNumStr} </Text>
-          <Text dimColor>{"  "}{line.content}</Text>
+          <Text dimColor>
+            {"  "}
+            {line.content}
+          </Text>
         </Box>
       );
   }
-
-  void absIdx; // lineNum from DiffLine is used; absIdx kept for key
 }

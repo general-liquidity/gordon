@@ -97,42 +97,16 @@ const keyName: Record<string, string> = {
   "[Z": "tab",
 };
 
-export const nonAlphanumericKeys: string[] = [
-  ...Object.values(keyName),
-  "backspace",
-];
+export const nonAlphanumericKeys: string[] = [...Object.values(keyName), "backspace"];
 
 const isShiftKey = (code: string): boolean => {
-  return [
-    "[a",
-    "[b",
-    "[c",
-    "[d",
-    "[e",
-    "[2$",
-    "[3$",
-    "[5$",
-    "[6$",
-    "[7$",
-    "[8$",
-    "[Z",
-  ].includes(code);
+  return ["[a", "[b", "[c", "[d", "[e", "[2$", "[3$", "[5$", "[6$", "[7$", "[8$", "[Z"].includes(
+    code,
+  );
 };
 
 const isCtrlKey = (code: string): boolean => {
-  return [
-    "Oa",
-    "Ob",
-    "Oc",
-    "Od",
-    "Oe",
-    "[2^",
-    "[3^",
-    "[5^",
-    "[6^",
-    "[7^",
-    "[8^",
-  ].includes(code);
+  return ["Oa", "Ob", "Oc", "Od", "Oe", "[2^", "[3^", "[5^", "[6^", "[7^", "[8^"].includes(code);
 };
 
 export type ParsedKey = {
@@ -153,7 +127,7 @@ const parseKeypress = (input: Buffer | string = ""): ParsedKey => {
     // to surface meta-prefixed sequences from a single byte read.
     if (input[0]! > 127 && input[1] === undefined) {
       input[0] = input[0]! - 128;
-      s = "\x1b" + String(input);
+      s = `\x1b${String(input)}`;
     } else {
       s = String(input);
     }
@@ -177,7 +151,8 @@ const parseKeypress = (input: Buffer | string = ""): ParsedKey => {
 
   key.sequence = key.sequence || s || key.name;
 
-  let parts: RegExpExecArray | null;
+  const metaParts = metaKeyCodeRe.exec(s);
+  const functionParts = metaParts ? null : fnKeyRe.exec(s);
   if (s === "\r") {
     // carriage return
     key.raw = undefined;
@@ -205,9 +180,7 @@ const parseKeypress = (input: Buffer | string = ""): ParsedKey => {
     key.meta = s.length === 2;
   } else if (s.length === 1 && s <= "\x1a") {
     // ctrl+letter
-    key.name = String.fromCharCode(
-      s.charCodeAt(0) + "a".charCodeAt(0) - 1,
-    );
+    key.name = String.fromCharCode(s.charCodeAt(0) + "a".charCodeAt(0) - 1);
     key.ctrl = true;
   } else if (s.length === 1 && s >= "0" && s <= "9") {
     // number
@@ -219,11 +192,11 @@ const parseKeypress = (input: Buffer | string = ""): ParsedKey => {
     // shift+letter
     key.name = s.toLowerCase();
     key.shift = true;
-  } else if ((parts = metaKeyCodeRe.exec(s))) {
+  } else if (metaParts) {
     // meta+character key
     key.meta = true;
-    key.shift = /^[A-Z]$/.test(parts[1]!);
-  } else if ((parts = fnKeyRe.exec(s))) {
+    key.shift = /^[A-Z]$/.test(metaParts[1]!);
+  } else if (functionParts) {
     const segs = [...s];
     if (segs[0] === "" && segs[1] === "") {
       key.option = true;
@@ -231,10 +204,10 @@ const parseKeypress = (input: Buffer | string = ""): ParsedKey => {
     // ansi escape sequence
     // reassemble the key code leaving out leading \x1b's,
     // the modifier key bitflag and any meaningless "1;" sequence
-    const code = [parts[1], parts[2], parts[4], parts[6]]
+    const code = [functionParts[1], functionParts[2], functionParts[4], functionParts[6]]
       .filter(Boolean)
       .join("");
-    const modifier = (Number(parts[3] || parts[5] || 1)) - 1;
+    const modifier = Number(functionParts[3] || functionParts[5] || 1) - 1;
     // Parse the key modifier
     key.ctrl = !!(modifier & 4);
     key.meta = !!(modifier & 10);

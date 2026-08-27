@@ -40,13 +40,8 @@ export interface StrategyMandate {
 
 let cachedMandates: StrategyMandate[] | null = null;
 
-export function isStrategyMandatesEnabled(
-  env: NodeJS.ProcessEnv = flagEnv(),
-): boolean {
-  return (
-    env.GORDON_STRATEGY_MANDATES === "1" ||
-    env.GORDON_STRATEGY_MANDATES === "true"
-  );
+export function isStrategyMandatesEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
+  return env.GORDON_STRATEGY_MANDATES === "1" || env.GORDON_STRATEGY_MANDATES === "true";
 }
 
 export function defaultMandatesPath(): string {
@@ -55,9 +50,7 @@ export function defaultMandatesPath(): string {
   return join(homedir(), ".gordon", "strategy-mandates.json");
 }
 
-export function loadMandates(
-  path: string = defaultMandatesPath(),
-): StrategyMandate[] {
+export function loadMandates(path: string = defaultMandatesPath()): StrategyMandate[] {
   if (cachedMandates) return cachedMandates;
   if (!existsSync(path)) return [];
   try {

@@ -36,9 +36,7 @@ export const revengeTradeGuardDiagnosticTool = createTool({
       .number()
       .positive()
       .describe("Baseline / average size for this strategy in the same unit."),
-    priorTradePnL: z
-      .number()
-      .describe("P&L of the prior closed trade (negative = loss)."),
+    priorTradePnL: z.number().describe("P&L of the prior closed trade (negative = loss)."),
     sizeIncreaseThreshold: z
       .number()
       .gt(1)

@@ -198,10 +198,7 @@ export interface RobustSelectionOptions {
    * Extract the per-period return series for one candidate. Defaults to the result's
    * `periodReturns`, else a series derived from its `equityCurve`.
    */
-  returns?: (
-    result: BacktestResult,
-    params: ParameterSet
-  ) => readonly number[] | undefined;
+  returns?: (result: BacktestResult, params: ParameterSet) => readonly number[] | undefined;
 
   /**
    * Utility of one resampled return series. Defaults to a function of the search metric. Supply
@@ -283,9 +280,7 @@ export interface RobustSample {
  * no series. Deriving beats re-running: `selectByBootstrapPercentile` evaluates every candidate
  * once per resample, and a backtest per resample would be thousands of full runs.
  */
-export function periodReturnsFromResult(
-  result: BacktestResult
-): readonly number[] | undefined {
+export function periodReturnsFromResult(result: BacktestResult): readonly number[] | undefined {
   if (result.periodReturns && result.periodReturns.length > 0) {
     return result.periodReturns;
   }
@@ -345,7 +340,7 @@ function calmarOfReturns(returns: readonly number[]): number {
 
 function resolveUtility(
   metric: string,
-  override: ((returns: readonly number[]) => number) | undefined
+  override: ((returns: readonly number[]) => number) | undefined,
 ): {
   fn: (returns: readonly number[]) => number;
   name: string;
@@ -376,7 +371,7 @@ function resolveUtility(
 export function buildRobustSelectionReport(
   samples: readonly RobustSample[],
   metric: string,
-  options: RobustSelectionOptions
+  options: RobustSelectionOptions,
 ): RobustSelectionReport {
   const warnings: string[] = [];
 
@@ -399,12 +394,12 @@ export function buildRobustSelectionReport(
 
   const withSeries = samples.filter(
     (s): s is { params: ParameterSet; returns: readonly number[] } =>
-      s.returns !== undefined && s.returns.length >= 2
+      s.returns !== undefined && s.returns.length >= 2,
   );
 
   if (withSeries.length === 0) {
     return unavailable(
-      "no candidate backtest carried a per-period return series (periodReturns or equityCurve), and robust selection resamples that series rather than re-running backtests"
+      "no candidate backtest carried a per-period return series (periodReturns or equityCurve), and robust selection resamples that series rather than re-running backtests",
     );
   }
 
@@ -417,12 +412,12 @@ export function buildRobustSelectionReport(
   const usable = withSeries.filter((s) => s.returns.length === sampleSize);
   if (usable.length < withSeries.length) {
     warnings.push(
-      `${withSeries.length - usable.length} candidate(s) had a return series of a different length than ${sampleSize} and were excluded from robust selection`
+      `${withSeries.length - usable.length} candidate(s) had a return series of a different length than ${sampleSize} and were excluded from robust selection`,
     );
   }
   if (samples.length > withSeries.length) {
     warnings.push(
-      `${samples.length - withSeries.length} candidate(s) produced no usable per-period return series and were excluded from robust selection`
+      `${samples.length - withSeries.length} candidate(s) produced no usable per-period return series and were excluded from robust selection`,
     );
   }
 
@@ -485,13 +480,11 @@ export function buildRobustSelectionReport(
 export function collectRobustSample(
   result: BacktestResult,
   params: ParameterSet,
-  options: RobustSelectionOptions
+  options: RobustSelectionOptions,
 ): RobustSample {
   return {
     params,
-    returns: options.returns
-      ? options.returns(result, params)
-      : periodReturnsFromResult(result),
+    returns: options.returns ? options.returns(result, params) : periodReturnsFromResult(result),
   };
 }
 
@@ -599,7 +592,7 @@ export class GridSearchOptimizer {
   optimize(
     paramRanges: ParameterRanges,
     metric: keyof BacktestMetrics,
-    options: GridSearchOptions = {}
+    options: GridSearchOptions = {},
   ): OptimizationResult {
     const startTime = Date.now();
     const { constraint, onProgress, progressInterval = 1, robustSelection } = options;
@@ -609,20 +602,15 @@ export class GridSearchOptimizer {
     const allCombinations = this.generateCombinations(paramRanges);
 
     // Filter by constraint if provided
-    const validCombinations = constraint
-      ? allCombinations.filter(constraint)
-      : allCombinations;
+    const validCombinations = constraint ? allCombinations.filter(constraint) : allCombinations;
 
     const totalCombinations = validCombinations.length;
 
     if (totalCombinations === 0) {
-      throw new Error(
-        "No valid parameter combinations after applying constraints"
-      );
+      throw new Error("No valid parameter combinations after applying constraints");
     }
 
-    const allResults: Array<{ params: ParameterSet; metrics: BacktestMetrics }> =
-      [];
+    const allResults: Array<{ params: ParameterSet; metrics: BacktestMetrics }> = [];
     let bestParams: ParameterSet | null = null;
     let bestMetrics: BacktestMetrics | null = null;
     let bestMetricValue = -Infinity;
@@ -665,8 +653,7 @@ export class GridSearchOptimizer {
 
       // Call progress callback
       if (onProgress && completedCount % progressInterval === 0) {
-        const avgIterationTime =
-          timings.reduce((a, b) => a + b, 0) / timings.length;
+        const avgIterationTime = timings.reduce((a, b) => a + b, 0) / timings.length;
         const remainingIterations = totalCombinations - completedCount;
         const estimatedRemainingMs = avgIterationTime * remainingIterations;
 
@@ -676,9 +663,7 @@ export class GridSearchOptimizer {
           progressPercent: (completedCount / totalCombinations) * 100,
           estimatedRemainingMs,
           currentBest:
-            bestParams && bestMetrics
-              ? { params: bestParams, metrics: bestMetrics }
-              : undefined,
+            bestParams && bestMetrics ? { params: bestParams, metrics: bestMetrics } : undefined,
         });
       }
     }
@@ -708,7 +693,7 @@ export class GridSearchOptimizer {
             robustSelection: buildRobustSelectionReport(
               robustSamples,
               String(metric),
-              robustSelection
+              robustSelection,
             ),
           }
         : {}),
@@ -759,7 +744,7 @@ export class GridSearchOptimizer {
    */
   private cartesianProduct(
     paramNames: string[],
-    paramValues: Map<string, number[]>
+    paramValues: Map<string, number[]>,
   ): ParameterSet[] {
     if (paramNames.length === 0) {
       return [{}];

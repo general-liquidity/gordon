@@ -30,9 +30,7 @@ export const deltaPriceDivergenceDiagnosticTool = createTool({
           close: z.number().positive(),
           delta: z
             .number()
-            .describe(
-              "Per-bar delta = aggressive-buy volume − aggressive-sell volume (signed).",
-            ),
+            .describe("Per-bar delta = aggressive-buy volume − aggressive-sell volume (signed)."),
         }),
       )
       .min(1)
@@ -53,12 +51,7 @@ export const deltaPriceDivergenceDiagnosticTool = createTool({
       .min(0)
       .optional()
       .describe("Min |cumulative delta| for delta to register. Default 0."),
-    minBars: z
-      .number()
-      .int()
-      .min(2)
-      .optional()
-      .describe("Min input bars. Default 5."),
+    minBars: z.number().int().min(2).optional().describe("Min input bars. Default 5."),
   }),
   outputSchema: z.object({
     totalBars: z.number(),

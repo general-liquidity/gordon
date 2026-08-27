@@ -73,13 +73,16 @@ function sortEntries(entries: RegistryEntry[]): void {
   entries.sort((a, b) => (a.definition.priority ?? 100) - (b.definition.priority ?? 100));
 }
 
-function matchesToolFilter(filter: string | RegExp | undefined, toolName: string | undefined): boolean {
+function matchesToolFilter(
+  filter: string | RegExp | undefined,
+  toolName: string | undefined,
+): boolean {
   if (!filter) return true;
   if (!toolName) return true;
   if (filter instanceof RegExp) return filter.test(toolName);
   // Glob support: "*" wildcards. Fall back to substring match for safety.
   if (filter.includes("*")) {
-    const re = new RegExp("^" + filter.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$");
+    const re = new RegExp(`^${filter.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`);
     return re.test(toolName);
   }
   return filter === toolName;
@@ -149,7 +152,10 @@ export async function runHooks<P extends HookPoint>(
   for (const entry of entries) {
     const def = entry.definition;
     if (!def.asyncRewake) continue;
-    if ((def.point === "PreToolUse" || def.point === "PostToolUse") && !matchesToolFilter(def.toolFilter, toolName)) {
+    if (
+      (def.point === "PreToolUse" || def.point === "PostToolUse") &&
+      !matchesToolFilter(def.toolFilter, toolName)
+    ) {
       continue;
     }
     emitStatus(point, def, "start");
@@ -176,7 +182,10 @@ export async function runHooks<P extends HookPoint>(
   for (const entry of entries) {
     const def = entry.definition;
     if (def.asyncRewake) continue;
-    if ((def.point === "PreToolUse" || def.point === "PostToolUse") && !matchesToolFilter(def.toolFilter, toolName)) {
+    if (
+      (def.point === "PreToolUse" || def.point === "PostToolUse") &&
+      !matchesToolFilter(def.toolFilter, toolName)
+    ) {
       continue;
     }
 
@@ -200,7 +209,10 @@ export async function runHooks<P extends HookPoint>(
 
       if (result.action === "modify" && result.replacement !== undefined) {
         // Shallow merge — each hook can modify any field.
-        currentPayload = { ...currentPayload, ...(result.replacement as object) } as HookPayloadMap[P];
+        currentPayload = {
+          ...currentPayload,
+          ...(result.replacement as object),
+        } as HookPayloadMap[P];
       }
     } catch (err) {
       // A registered hook is part of the active policy plane. Treating a crash

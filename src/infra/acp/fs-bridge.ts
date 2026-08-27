@@ -41,10 +41,7 @@ export interface AcpFsOptions {
  * a connection is present AND the editor advertised the capability.
  * Falls back to Node's fs.readFileSync on failure or when out of ACP mode.
  */
-export async function readTextFileViaAcp(
-  path: string,
-  opts: AcpFsOptions = {},
-): Promise<string> {
+export async function readTextFileViaAcp(path: string, opts: AcpFsOptions = {}): Promise<string> {
   if (opts.connection && opts.sessionId && opts.clientReadCapable) {
     try {
       const response = await opts.connection.readTextFile({

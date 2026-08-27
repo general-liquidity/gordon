@@ -119,7 +119,7 @@ export function chunkText(text: string, maxChars: number): string[] {
   // Split on blank lines first (paragraphs), then fall back to single newlines.
   const paragraphs = text.split(/\n\s*\n/);
   for (const para of paragraphs) {
-    const block = para + "\n\n";
+    const block = `${para}\n\n`;
     if (block.length > maxChars) {
       // Oversized paragraph — flush what we have, then hard-split the paragraph.
       flush();
@@ -147,9 +147,7 @@ async function mapBounded<T, R>(
   const results: R[] = new Array(items.length);
   for (let start = 0; start < items.length; start += limit) {
     const batch = items.slice(start, start + limit);
-    const settled = await Promise.all(
-      batch.map((item, i) => fn(item, start + i)),
-    );
+    const settled = await Promise.all(batch.map((item, i) => fn(item, start + i)));
     for (let i = 0; i < settled.length; i++) results[start + i] = settled[i]!;
   }
   return results;
@@ -196,9 +194,7 @@ export async function recursiveDecompose(
 
   const synthesize = async (partials: string[]): Promise<string> => {
     synthesisCount += 1;
-    const combined = partials
-      .map((a, i) => `[Part ${i + 1}]\n${a}`)
-      .join("\n\n");
+    const combined = partials.map((a, i) => `[Part ${i + 1}]\n${a}`).join("\n\n");
     return deps.llm([
       { role: "system", content: synthesisSystem },
       {

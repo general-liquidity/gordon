@@ -171,7 +171,7 @@ export class TrustTrajectory {
     if (this.persistPath) {
       try {
         mkdirSync(dirname(this.persistPath), { recursive: true });
-        appendFileSync(this.persistPath, JSON.stringify(event) + "\n");
+        appendFileSync(this.persistPath, `${JSON.stringify(event)}\n`);
       } catch {
         // Best-effort persist; never block the runtime on disk failures.
       }
@@ -265,7 +265,11 @@ export class TrustTrajectory {
         if (!trimmed) continue;
         try {
           const ev = JSON.parse(trimmed) as TrustEvent;
-          if (ev.toolName && (ev.decision === "approved" || ev.decision === "rejected") && typeof ev.timestamp === "number") {
+          if (
+            ev.toolName &&
+            (ev.decision === "approved" || ev.decision === "rejected") &&
+            typeof ev.timestamp === "number"
+          ) {
             this.events.push(ev);
           } else {
             this.warnMalformedRow(path, lineNumber, "invalid trust event shape");

@@ -14,8 +14,17 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getGordonContext, type MastraExecutionContext } from "../../types.ts";
-import { providerRegistry, getActiveRoute, DIRECT_MODELS, type DirectProviderName } from "../../../../runtime/providers/registry.ts";
-import { loadConfig, loadConfigBundle, saveResolvedConfig } from "../../../../storage/config/config.ts";
+import {
+  providerRegistry,
+  getActiveRoute,
+  DIRECT_MODELS,
+  type DirectProviderName,
+} from "../../../../runtime/providers/registry.ts";
+import {
+  loadConfig,
+  loadConfigBundle,
+  saveResolvedConfig,
+} from "../../../../storage/config/config.ts";
 import { ExchangeFactory } from "../../../../exchange/index.ts";
 import { BrokerFactory } from "../../../../broker/factory.ts";
 import { getToolCacheStats, clearToolCache, pruneToolCache } from "../cache.ts";
@@ -24,8 +33,6 @@ import {
   getAgentHealthReport,
   getAgentMetrics,
   formatAgentHealthReport,
-  type PerAgentMetrics,
-  type AgentHealthReport,
 } from "../../../../platform/observability/index.ts";
 
 // NOTE: getHandoffHistory is dynamically imported to break circular dependency
@@ -46,21 +53,28 @@ export const testConnectionTool = createTool({
     canTradeNow: z.boolean(),
     llmConnected: z.boolean(),
     binanceConnected: z.boolean(),
-    binancePermissions: z.object({
-      read: z.boolean(),
-      spotTrade: z.boolean(),
-      withdraw: z.boolean(),
-    }).nullable().optional(),
+    binancePermissions: z
+      .object({
+        read: z.boolean(),
+        spotTrade: z.boolean(),
+        withdraw: z.boolean(),
+      })
+      .nullable()
+      .optional(),
     accountType: z.string().nullable(),
     canTrade: z.boolean().optional(),
     canWithdraw: z.boolean().optional(),
     canDeposit: z.boolean().optional(),
     assetsWithBalance: z.number().optional(),
-    assetList: z.array(z.object({
-      asset: z.string(),
-      free: z.number(),
-      locked: z.number(),
-    })).optional(),
+    assetList: z
+      .array(
+        z.object({
+          asset: z.string(),
+          free: z.number(),
+          locked: z.number(),
+        }),
+      )
+      .optional(),
     error: z.string().nullable(),
   }),
   execute: async (_input, execContext: MastraExecutionContext) => {
@@ -111,9 +125,7 @@ export const testConnectionTool = createTool({
         results.canWithdraw = accountInfo.canWithdraw;
         results.canDeposit = accountInfo.canDeposit;
 
-        const nonZeroBalances = accountInfo.balances.filter(
-          (b) => b.free > 0 || b.locked > 0
-        );
+        const nonZeroBalances = accountInfo.balances.filter((b) => b.free > 0 || b.locked > 0);
         results.assetsWithBalance = nonZeroBalances.length;
         results.assetList = nonZeroBalances.map((b) => ({
           asset: b.asset,
@@ -133,7 +145,10 @@ export const testConnectionTool = createTool({
 // Model Info Tool
 // ============================================================================
 
-const DIRECT_MODEL_TIERS: Record<DirectProviderName, { flagship: string; balanced: string; fast: string }> = DIRECT_MODELS;
+const DIRECT_MODEL_TIERS: Record<
+  DirectProviderName,
+  { flagship: string; balanced: string; fast: string }
+> = DIRECT_MODELS;
 
 export const getModelInfoTool = createTool({
   id: "get_model_info",
@@ -144,20 +159,24 @@ export const getModelInfoTool = createTool({
   outputSchema: z.object({
     currentProvider: z.string(),
     currentModel: z.string(),
-    directProviders: z.array(z.object({
-      name: z.string(),
-      configured: z.boolean(),
-      models: z.object({
-        flagship: z.string(),
-        balanced: z.string(),
-        fast: z.string(),
+    directProviders: z.array(
+      z.object({
+        name: z.string(),
+        configured: z.boolean(),
+        models: z.object({
+          flagship: z.string(),
+          balanced: z.string(),
+          fast: z.string(),
+        }),
       }),
-    })),
-    availableModels: z.array(z.object({
-      id: z.string(),
-      name: z.string(),
-      provider: z.string(),
-    })),
+    ),
+    availableModels: z.array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        provider: z.string(),
+      }),
+    ),
     tip: z.string(),
   }),
   execute: async () => {
@@ -167,11 +186,13 @@ export const getModelInfoTool = createTool({
     const currentModel = config?.modelConfig?.model || activeRoute.modelString;
     const availableProviders = providerRegistry.getAvailableProviders();
 
-    const directProviders = (["anthropic", "openai", "google", "xai"] as DirectProviderName[]).map((name) => ({
-      name,
-      configured: availableProviders.includes(name),
-      models: DIRECT_MODEL_TIERS[name],
-    }));
+    const directProviders = (["anthropic", "openai", "google", "xai"] as DirectProviderName[]).map(
+      (name) => ({
+        name,
+        configured: availableProviders.includes(name),
+        models: DIRECT_MODEL_TIERS[name],
+      }),
+    );
 
     const availableModels = providerRegistry.getAllAvailableModels();
 
@@ -195,17 +216,23 @@ export const getCacheStatsTool = createTool({
     "Get tool cache statistics including hit rate, misses, and in-flight requests. " +
     "Use when user asks '/cache', 'cache stats', 'show cache', or wants to debug performance.",
   inputSchema: z.object({
-    action: z.enum(["stats", "clear", "prune"]).default("stats")
-      .describe("Action to perform: stats (show statistics), clear (reset cache), prune (remove expired)"),
+    action: z
+      .enum(["stats", "clear", "prune"])
+      .default("stats")
+      .describe(
+        "Action to perform: stats (show statistics), clear (reset cache), prune (remove expired)",
+      ),
   }),
   outputSchema: z.object({
     action: z.string(),
-    stats: z.object({
-      hits: z.number(),
-      misses: z.number(),
-      hitRate: z.number(),
-      inFlightRequests: z.number(),
-    }).optional(),
+    stats: z
+      .object({
+        hits: z.number(),
+        misses: z.number(),
+        hitRate: z.number(),
+        inFlightRequests: z.number(),
+      })
+      .optional(),
     message: z.string(),
   }),
   execute: async ({ action }) => {
@@ -257,11 +284,13 @@ const perAgentMetricsSchema = z.object({
   totalTokens: z.number(),
   avgTokensPerCall: z.number(),
   errorTypes: z.record(z.string(), z.number()),
-  recentErrors: z.array(z.object({
-    timestamp: z.number(),
-    errorType: z.string(),
-    message: z.string(),
-  })),
+  recentErrors: z.array(
+    z.object({
+      timestamp: z.number(),
+      errorType: z.string(),
+      message: z.string(),
+    }),
+  ),
   lastCallTimestamp: z.number().nullable(),
 });
 
@@ -298,11 +327,19 @@ export const getAgentHealthTool = createTool({
     "Get agent health status showing success rates, average latency, token usage, and recent errors per agent. " +
     "Use when user asks '/health', 'agent health', 'show agent status', 'which agents are failing?', or 'agent diagnostics'.",
   inputSchema: z.object({
-    agentName: z.string().optional()
-      .describe("Optional specific agent name to get detailed metrics for (e.g., 'Analyst', 'Scanner')"),
-    includeHandoffs: z.boolean().default(false)
+    agentName: z
+      .string()
+      .optional()
+      .describe(
+        "Optional specific agent name to get detailed metrics for (e.g., 'Analyst', 'Scanner')",
+      ),
+    includeHandoffs: z
+      .boolean()
+      .default(false)
       .describe("Include recent handoff history in the response"),
-    format: z.enum(["json", "text"]).default("json")
+    format: z
+      .enum(["json", "text"])
+      .default("json")
       .describe("Output format: 'json' for structured data, 'text' for human-readable"),
   }),
   outputSchema: z.object({
@@ -315,13 +352,15 @@ export const getAgentHealthTool = createTool({
     // Formatted text output (when format is 'text')
     formattedReport: z.string().optional(),
     // Summary info
-    summary: z.object({
-      overallHealth: z.enum(["healthy", "degraded", "unhealthy"]),
-      healthScore: z.number(),
-      totalAgents: z.number(),
-      unhealthyCount: z.number(),
-      topRecommendation: z.string().optional(),
-    }).optional(),
+    summary: z
+      .object({
+        overallHealth: z.enum(["healthy", "degraded", "unhealthy"]),
+        healthScore: z.number(),
+        totalAgents: z.number(),
+        unhealthyCount: z.number(),
+        topRecommendation: z.string().optional(),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async ({ agentName, includeHandoffs, format }) => {
@@ -332,9 +371,11 @@ export const getAgentHealthTool = createTool({
       // If specific agent requested, return just that agent's metrics
       if (agentName) {
         const metrics = getAgentMetrics(agentName);
-        const handoffs = includeHandoffs ? getHandoffHistory(10).filter(
-          (h) => h.fromAgent === agentName || h.toAgent === agentName
-        ) : undefined;
+        const handoffs = includeHandoffs
+          ? getHandoffHistory(10).filter(
+              (h) => h.fromAgent === agentName || h.toAgent === agentName,
+            )
+          : undefined;
 
         if (format === "text") {
           const lines = [
@@ -427,22 +468,30 @@ export const switchExchangeTool = createTool({
     exchangeId: z
       .string()
       .optional()
-      .describe("Exchange config ID to switch to (e.g. 'binance-live', 'coinbase-sandbox'). Omit to list available exchanges."),
+      .describe(
+        "Exchange config ID to switch to (e.g. 'binance-live', 'coinbase-sandbox'). Omit to list available exchanges.",
+      ),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
-    activeExchange: z.object({
-      id: z.string(),
-      type: z.string(),
-      sandbox: z.boolean().optional(),
-    }).optional(),
-    available: z.array(z.object({
-      id: z.string(),
-      type: z.string(),
-      sandbox: z.boolean().optional(),
-      isDefault: z.boolean().optional(),
-      active: z.boolean().optional(),
-    })).optional(),
+    activeExchange: z
+      .object({
+        id: z.string(),
+        type: z.string(),
+        sandbox: z.boolean().optional(),
+      })
+      .optional(),
+    available: z
+      .array(
+        z.object({
+          id: z.string(),
+          type: z.string(),
+          sandbox: z.boolean().optional(),
+          isDefault: z.boolean().optional(),
+          active: z.boolean().optional(),
+        }),
+      )
+      .optional(),
     message: z.string().optional(),
     error: z.string().optional(),
   }),
@@ -452,9 +501,8 @@ export const switchExchangeTool = createTool({
     const exchanges = config.exchanges ?? [];
 
     if (!exchangeId) {
-      const currentId = config.activeExchangeId
-        ?? exchanges.find((e) => e.isDefault)?.id
-        ?? exchanges[0]?.id;
+      const currentId =
+        config.activeExchangeId ?? exchanges.find((e) => e.isDefault)?.id ?? exchanges[0]?.id;
       return {
         success: true,
         available: exchanges.map((e) => ({
@@ -471,7 +519,9 @@ export const switchExchangeTool = createTool({
     const target = exchanges.find((e) => e.id === exchangeId);
     if (!target) {
       const ids = exchanges.map((e) => e.id).join(", ");
-      return { error: `Exchange '${exchangeId}' not found. Available: ${ids || "none configured"}` };
+      return {
+        error: `Exchange '${exchangeId}' not found. Available: ${ids || "none configured"}`,
+      };
     }
 
     await saveResolvedConfig({ ...config, activeExchangeId: exchangeId }, resolved.layers);
@@ -480,7 +530,9 @@ export const switchExchangeTool = createTool({
     ExchangeFactory.clearCache();
     BrokerFactory.clearCache();
     try {
-      const { getGatewayContextResolver } = await import("../../../../../gateway/runtime/context.ts");
+      const { getGatewayContextResolver } = await import(
+        "../../../../../gateway/runtime/context.ts"
+      );
       getGatewayContextResolver().invalidate();
     } catch {
       // Not running inside the gateway daemon.
@@ -624,7 +676,8 @@ const KEEPER_FLAGS = [
   // --- Safety flags ---
   {
     name: "GORDON_ALLOW_LIVE",
-    description: "Opt into LIVE trading on a venue with no sandbox/testnet. Money-path — leave off unless deliberate.",
+    description:
+      "Opt into LIVE trading on a venue with no sandbox/testnet. Money-path — leave off unless deliberate.",
     truthy: ["1", "true"],
     defaultOn: false,
   },
@@ -636,7 +689,8 @@ const KEEPER_FLAGS = [
   },
   {
     name: "GORDON_MEMORY_WRITE_GUARD",
-    description: "Enforce (not just log) the working-memory sensitive-field guard on untrusted writes.",
+    description:
+      "Enforce (not just log) the working-memory sensitive-field guard on untrusted writes.",
     truthy: ["1", "true"],
     defaultOn: false,
   },
@@ -655,11 +709,7 @@ const KEEPER_FLAGS = [
   },
 ] as const;
 
-function flagIsOn(
-  name: string,
-  truthy: ReadonlyArray<string>,
-  defaultOn: boolean,
-): boolean {
+function flagIsOn(name: string, truthy: ReadonlyArray<string>, defaultOn: boolean): boolean {
   const raw = resolveFlag(name);
   if (raw === undefined || raw === "") return defaultOn;
   if (truthy.length === 0) return true; // value-flags: any set value is "on"

@@ -34,12 +34,31 @@ export const highestVolumeEverDiagnosticTool = createTool({
       )
       .min(2)
       .describe("OHLCV bars ordered oldest → newest. Latest bar is the one being tested."),
-    hv1WindowBars: z.number().int().min(2).optional().describe("HV1 lookback in bars. Default 252."),
-    shortWindowBars: z.number().int().min(2).optional().describe("Short-window lookback. Default 60."),
-    minClosingRange: z.number().min(0).max(1).optional().describe("Min closing-range fraction. Default 0.75."),
+    hv1WindowBars: z
+      .number()
+      .int()
+      .min(2)
+      .optional()
+      .describe("HV1 lookback in bars. Default 252."),
+    shortWindowBars: z
+      .number()
+      .int()
+      .min(2)
+      .optional()
+      .describe("Short-window lookback. Default 60."),
+    minClosingRange: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe("Min closing-range fraction. Default 0.75."),
     floatShares: z.number().positive().optional().describe("Optional float for fast-mover gate."),
     maxFloat: z.number().positive().optional().describe("Float gate max. Default 150,000,000."),
-    minGapFraction: z.number().min(0).optional().describe("Min gap-up size vs prior close. Default 0.02."),
+    minGapFraction: z
+      .number()
+      .min(0)
+      .optional()
+      .describe("Min gap-up size vs prior close. Default 0.02."),
   }),
   outputSchema: z.object({
     latestVolume: z.number(),
@@ -74,8 +93,7 @@ export const highestVolumeEverDiagnosticTool = createTool({
       source: "agent_tool",
       component: "detect_highest_volume",
       toolName: "detect_highest_volume",
-      outcome:
-        result.verdict === "hve" && result.conviction === "high" ? "failure" : "info",
+      outcome: result.verdict === "hve" && result.conviction === "high" ? "failure" : "info",
       details: {
         verdict: result.verdict,
         conviction: result.conviction,

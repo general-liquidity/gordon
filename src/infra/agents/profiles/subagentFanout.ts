@@ -78,7 +78,10 @@ export interface FanoutReport {
   digest: string;
 }
 
-function refusedUnknownRole(role: string, profiles: ReadonlyMap<string, SubagentProfile>): DispatchResult {
+function refusedUnknownRole(
+  role: string,
+  profiles: ReadonlyMap<string, SubagentProfile>,
+): DispatchResult {
   const available = [...profiles.keys()].join(", ");
   const summary = `Unknown role '${role}'. Available: ${available || "(none)"}`;
   return {
@@ -106,7 +109,9 @@ function buildDigest(items: FanoutItem[], dropped: number): string {
   const completed = items.filter((it) => it.result.status === "completed").length;
   let header = `Parallel research gather — ${items.length} task(s), ${completed} completed`;
   if (dropped > 0) header += `, ${dropped} dropped by the ${MAX_FANOUT_TASKS}-task cap`;
-  lines.push(`${header}. (Read-only gather — synthesize/decide yourself; the subagents could not.)`);
+  lines.push(
+    `${header}. (Read-only gather — synthesize/decide yourself; the subagents could not.)`,
+  );
   for (const it of items) {
     const tag = it.label ? `${it.role}/${it.label}` : it.role;
     const r = it.result;
@@ -134,7 +139,11 @@ export async function fanoutSubagentTasks(
   const dropped = tasks.length - capped.length;
   const concurrency = Math.max(
     1,
-    Math.min(options.concurrency ?? DEFAULT_FANOUT_CONCURRENCY, MAX_FANOUT_CONCURRENCY, capped.length || 1),
+    Math.min(
+      options.concurrency ?? DEFAULT_FANOUT_CONCURRENCY,
+      MAX_FANOUT_CONCURRENCY,
+      capped.length || 1,
+    ),
   );
 
   const items = new Array<FanoutItem>(capped.length);

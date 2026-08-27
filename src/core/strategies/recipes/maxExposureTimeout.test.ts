@@ -17,7 +17,7 @@ describe("applyMaxExposure", () => {
   });
 
   it("holds open position with no signal", () => {
-    let s = applyMaxExposure({
+    const s = applyMaxExposure({
       state: newMaxExposureState(),
       externalSignal: "long",
       currentPrice: 100,
@@ -41,9 +41,24 @@ describe("applyMaxExposure", () => {
       currentPrice: 100,
       maxCandles: 3,
     }).state;
-    s = applyMaxExposure({ state: s, externalSignal: "none", currentPrice: 101, maxCandles: 3 }).state;
-    s = applyMaxExposure({ state: s, externalSignal: "none", currentPrice: 102, maxCandles: 3 }).state;
-    const r = applyMaxExposure({ state: s, externalSignal: "none", currentPrice: 103, maxCandles: 3 });
+    s = applyMaxExposure({
+      state: s,
+      externalSignal: "none",
+      currentPrice: 101,
+      maxCandles: 3,
+    }).state;
+    s = applyMaxExposure({
+      state: s,
+      externalSignal: "none",
+      currentPrice: 102,
+      maxCandles: 3,
+    }).state;
+    const r = applyMaxExposure({
+      state: s,
+      externalSignal: "none",
+      currentPrice: 103,
+      maxCandles: 3,
+    });
     expect(r.forceExit).toBe(true);
     expect(r.action).toBe("short"); // exit long → short side
     expect(r.state.side).toBe("none");
@@ -57,7 +72,12 @@ describe("applyMaxExposure", () => {
       currentPrice: 100,
       maxCandles: 10,
     }).state;
-    s = applyMaxExposure({ state: s, externalSignal: "none", currentPrice: 101, maxCandles: 10 }).state;
+    s = applyMaxExposure({
+      state: s,
+      externalSignal: "none",
+      currentPrice: 101,
+      maxCandles: 10,
+    }).state;
     const r = applyMaxExposure({
       state: s,
       externalSignal: "short",
@@ -76,8 +96,18 @@ describe("applyMaxExposure", () => {
       currentPrice: 100,
       maxCandles: 2,
     }).state;
-    s = applyMaxExposure({ state: s, externalSignal: "none", currentPrice: 99, maxCandles: 2 }).state;
-    const r = applyMaxExposure({ state: s, externalSignal: "none", currentPrice: 98, maxCandles: 2 });
+    s = applyMaxExposure({
+      state: s,
+      externalSignal: "none",
+      currentPrice: 99,
+      maxCandles: 2,
+    }).state;
+    const r = applyMaxExposure({
+      state: s,
+      externalSignal: "none",
+      currentPrice: 98,
+      maxCandles: 2,
+    });
     expect(r.forceExit).toBe(true);
     expect(r.action).toBe("long"); // exit short → long side
     expect(r.state.side).toBe("none");

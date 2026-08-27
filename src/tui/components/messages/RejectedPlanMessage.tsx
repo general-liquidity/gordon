@@ -8,15 +8,11 @@ import type { Message } from "./MessageBubble.tsx";
 //     {content}
 function RejectedPlanMessageInner({ message }: { message: Message }) {
   return (
-    <Box
-      flexDirection="column"
-      marginTop={1}
-      borderStyle="round"
-      borderColor="red"
-      paddingX={1}
-    >
+    <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor="red" paddingX={1}>
       <Box>
-        <Text color="red" bold>{"⊘ PLAN REJECTED"}</Text>
+        <Text color="red" bold>
+          {"⊘ PLAN REJECTED"}
+        </Text>
       </Box>
       {message.content ? (
         <Box paddingLeft={2}>

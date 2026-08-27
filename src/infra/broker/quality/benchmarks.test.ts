@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { getBenchmarkableBrokers, runBrokerBenchmarks, validateBenchmarkReport } from "./benchmarks.ts";
+import {
+  getBenchmarkableBrokers,
+  runBrokerBenchmarks,
+  validateBenchmarkReport,
+} from "./benchmarks.ts";
 
 describe("broker latency benchmarks and reliability scorecard", () => {
   test("produces benchmark + scorecard for every REST-benchmarkable broker", async () => {
@@ -29,4 +33,3 @@ describe("broker latency benchmarks and reliability scorecard", () => {
     expect(validation.failures).toHaveLength(0);
   });
 });
-

@@ -34,10 +34,7 @@
  */
 
 import { createModuleLogger } from "../../logger/index.ts";
-import {
-  getDefaultAgentRegistry,
-  type AgentRegistry,
-} from "./subagentCoordination.ts";
+import { getDefaultAgentRegistry, type AgentRegistry } from "./subagentCoordination.ts";
 
 const logger = createModuleLogger("subagent-steer");
 
@@ -93,11 +90,7 @@ class SubagentSteerStore {
       logger.debug("Steer dropped — unknown subagent", { subagentId });
       return { queued: false, reason: "unknown", depth: 0 };
     }
-    if (
-      entry.state === "completed" ||
-      entry.state === "failed" ||
-      entry.state === "aborted"
-    ) {
+    if (entry.state === "completed" || entry.state === "failed" || entry.state === "aborted") {
       logger.debug("Steer dropped — subagent terminal", {
         subagentId,
         state: entry.state,
@@ -247,10 +240,7 @@ export function applyQueuedSteers(
  * Dispatch cleanup. Drop any lingering steer queue for a now-terminal subagent
  * so a late steer for a finished id doesn't linger. Idempotent / safe no-op.
  */
-export function finalizeSteers(
-  subagentId: string,
-  store?: SubagentSteerStore,
-): void {
+export function finalizeSteers(subagentId: string, store?: SubagentSteerStore): void {
   if (store) store.clear(subagentId);
   else clearSteers(subagentId);
 }

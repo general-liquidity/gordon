@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { Box, Text } from "../../ink-custom";
 import { WorkerBadge } from "./WorkerBadge.js";
 import { HandoffArrow } from "./HandoffArrow.js";
@@ -51,10 +51,10 @@ interface Props {
 }
 
 const STATUS_ICONS: Record<string, string> = {
-  pending: "\u25CB",   // ○
-  running: "\u25CF",   // ●
-  done: "\u2713",      // ✓
-  error: "\u2717",     // ✗
+  pending: "\u25CB", // ○
+  running: "\u25CF", // ●
+  done: "\u2713", // ✓
+  error: "\u2717", // ✗
   cancelled: "\u2012", // ‒
 };
 
@@ -78,56 +78,57 @@ export function AgentProgress({ chains, handoffs, tokenCount }: Props) {
     if (i > 0) {
       const prevChain = chains[i - 1]!;
       const handoff = handoffs.find(
-        (h) => h.from === prevChain.agentName && h.to === chain.agentName
+        (h) => h.from === prevChain.agentName && h.to === chain.agentName,
       );
       if (handoff) {
         elements.push(
-          <HandoffArrow key={`handoff-${i}`} from={prevChain.agentName} to={chain.agentName} />
+          <HandoffArrow key={`handoff-${i}`} from={prevChain.agentName} to={chain.agentName} />,
         );
       }
     }
 
     // Agent chain header
-    const durationStr = chain.duration ? formatMs(chain.duration) : chain.status === "running" ? "" : undefined;
+    const durationStr = chain.duration
+      ? formatMs(chain.duration)
+      : chain.status === "running"
+        ? ""
+        : undefined;
     elements.push(
       <Box key={`chain-${chain.id}`} flexDirection="column" marginTop={i > 0 ? 0 : 1}>
         <Box>
-          <Text bold color="cyanBright">GORDON</Text>
+          <Text bold color="cyanBright">
+            GORDON
+          </Text>
           <Text dimColor> {"\u00b7"} </Text>
           <WorkerBadge agent={chain.agentName} showBullet={false} />
           {chain.symbol && <Text dimColor> ({chain.symbol})</Text>}
           {durationStr && (
             <>
               <Text> </Text>
-              <Byline parts={[
-                chain.status === "done" ? `done \u00b7 ${durationStr}` : durationStr,
-                ...(tokenCount != null && i === chains.length - 1 ? [`${formatTokens(tokenCount)}`] : []),
-              ]} />
+              <Byline
+                parts={[
+                  chain.status === "done" ? `done \u00b7 ${durationStr}` : durationStr,
+                  ...(tokenCount != null && i === chains.length - 1
+                    ? [`${formatTokens(tokenCount)}`]
+                    : []),
+                ]}
+              />
             </>
           )}
         </Box>
 
         {/* Task nodes */}
         {chain.nodes.map((node, j) => (
-          <NodeView
-            key={node.id}
-            node={node}
-            isLast={j === chain.nodes.length - 1}
-            depth={1}
-          />
+          <NodeView key={node.id} node={node} isLast={j === chain.nodes.length - 1} depth={1} />
         ))}
-      </Box>
+      </Box>,
     );
   }
 
   return <>{elements}</>;
 }
 
-function NodeView({ node, isLast, depth }: {
-  node: ProgressNode;
-  isLast: boolean;
-  depth: number;
-}) {
+function NodeView({ node, isLast, depth }: { node: ProgressNode; isLast: boolean; depth: number }) {
   const connector = isLast ? "\u2514\u2500" : "\u251C\u2500";
   const icon = STATUS_ICONS[node.status] ?? "\u25CB";
   const iconColor = STATUS_COLORS[node.status] ?? "gray";
@@ -137,10 +138,14 @@ function NodeView({ node, isLast, depth }: {
   return (
     <>
       <Box>
-        <Text dimColor>{indent}{connector} </Text>
+        <Text dimColor>
+          {indent}
+          {connector}{" "}
+        </Text>
         <Text color={iconColor}>{icon} </Text>
         <Text dimColor={node.status === "pending"}>
-          {node.label}{durationStr}
+          {node.label}
+          {durationStr}
         </Text>
       </Box>
       {node.children?.map((child, i) => (

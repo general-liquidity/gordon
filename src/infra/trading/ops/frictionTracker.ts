@@ -27,9 +27,7 @@ import { dirname, join } from "node:path";
 
 export const FRICTION_TRACKER_PATH_ENV = "GORDON_FRICTION_TRACKER_PATH";
 
-export function defaultFrictionLogPath(
-  env: NodeJS.ProcessEnv = process.env,
-): string {
+export function defaultFrictionLogPath(env: NodeJS.ProcessEnv = process.env): string {
   return env[FRICTION_TRACKER_PATH_ENV] || join(homedir(), ".gordon", "friction.jsonl");
 }
 
@@ -97,7 +95,7 @@ export function recordFriction(
   };
   try {
     mkdirSync(dirname(path), { recursive: true });
-    appendFileSync(path, JSON.stringify(event) + "\n", "utf8");
+    appendFileSync(path, `${JSON.stringify(event)}\n`, "utf8");
   } catch {
     /* best-effort */
   }
@@ -147,7 +145,7 @@ export interface AuditInput {
   failRatio?: number;
 }
 
-const DEFAULT_FAIL_RATIO = 0.20;
+const DEFAULT_FAIL_RATIO = 0.2;
 
 export function auditFriction(input: AuditInput): FrictionAudit {
   const failRatio = input.failRatio ?? DEFAULT_FAIL_RATIO;
@@ -211,9 +209,7 @@ export function formatAudit(audit: FrictionAudit): string {
   lines.push(
     `  Total: ${$(audit.total)} (${pct(audit.frictionRatio)} of gross ${$(audit.grossProfitUsd)})`,
   );
-  lines.push(
-    `  Net:   ${$(audit.netProfitUsd)} | events: ${audit.eventCount}`,
-  );
+  lines.push(`  Net:   ${$(audit.netProfitUsd)} | events: ${audit.eventCount}`);
   lines.push(
     `  By component:  explicit ${$(audit.byComponent.explicit)} | implicit ${$(audit.byComponent.implicit)} | psychological ${$(audit.byComponent.psychological)}`,
   );

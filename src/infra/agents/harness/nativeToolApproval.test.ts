@@ -30,7 +30,14 @@ describe("flag gating", () => {
 
 describe("tool membership", () => {
   test("money-path ids are covered", () => {
-    for (const id of ["execute_plan", "cancel", "cancel_order", "cancel_all_orders", "cancel_replace_order", "cancel_order_list"]) {
+    for (const id of [
+      "execute_plan",
+      "cancel",
+      "cancel_order",
+      "cancel_all_orders",
+      "cancel_replace_order",
+      "cancel_order_list",
+    ]) {
       expect(isNativeApprovalTool(id)).toBe(true);
       expect(NATIVE_APPROVAL_TOOL_IDS).toContain(id as any);
     }
@@ -53,12 +60,15 @@ describe("buildRequireApproval — flag off is inert", () => {
 });
 
 describe("buildRequireApproval — cancel family always fires when on", () => {
-  test.each(["cancel", "cancel_order", "cancel_all_orders", "cancel_replace_order", "cancel_order_list"])(
-    "%s requires approval",
-    async (id) => {
-      expect(await buildRequireApproval(id, ON)({})).toBe(true);
-    },
-  );
+  test.each([
+    "cancel",
+    "cancel_order",
+    "cancel_all_orders",
+    "cancel_replace_order",
+    "cancel_order_list",
+  ])("%s requires approval", async (id) => {
+    expect(await buildRequireApproval(id, ON)({})).toBe(true);
+  });
 });
 
 describe("buildRequireApproval — execute_plan tier gating", () => {

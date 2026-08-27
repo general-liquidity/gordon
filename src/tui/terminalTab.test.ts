@@ -10,7 +10,7 @@ describe("stripTitleAnsi", () => {
   });
 
   it("strips an embedded OSC title-injection sequence", () => {
-    const injected = "BTC " + ESC + "]0;pwned" + BEL + "USD";
+    const injected = `BTC ${ESC}]0;pwned${BEL}USD`;
     const clean = stripTitleAnsi(injected);
     expect(clean.includes(ESC)).toBe(false);
     expect(clean.includes(BEL)).toBe(false);
@@ -18,7 +18,7 @@ describe("stripTitleAnsi", () => {
   });
 
   it("strips CSI/SGR color codes", () => {
-    const colored = ESC + "[31mred" + ESC + "[0m";
+    const colored = `${ESC}[31mred${ESC}[0m`;
     expect(stripTitleAnsi(colored)).toBe("red");
   });
 });

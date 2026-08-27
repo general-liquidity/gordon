@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeBrierScore,
-  brierScoreToPayload,
-} from "./brierScore.ts";
+import { computeBrierScore, brierScoreToPayload } from "./brierScore.ts";
 
 describe("computeBrierScore — validation", () => {
   it("rejects empty predictions", () => {
@@ -10,27 +7,17 @@ describe("computeBrierScore — validation", () => {
   });
 
   it("rejects length mismatch", () => {
-    expect(() =>
-      computeBrierScore({ predictions: [0.5, 0.6], outcomes: [1] }),
-    ).toThrow();
+    expect(() => computeBrierScore({ predictions: [0.5, 0.6], outcomes: [1] })).toThrow();
   });
 
   it("rejects predictions outside [0,1]", () => {
-    expect(() =>
-      computeBrierScore({ predictions: [0.5, 1.5], outcomes: [0, 1] }),
-    ).toThrow();
-    expect(() =>
-      computeBrierScore({ predictions: [-0.1, 0.5], outcomes: [0, 1] }),
-    ).toThrow();
-    expect(() =>
-      computeBrierScore({ predictions: [NaN, 0.5], outcomes: [0, 1] }),
-    ).toThrow();
+    expect(() => computeBrierScore({ predictions: [0.5, 1.5], outcomes: [0, 1] })).toThrow();
+    expect(() => computeBrierScore({ predictions: [-0.1, 0.5], outcomes: [0, 1] })).toThrow();
+    expect(() => computeBrierScore({ predictions: [NaN, 0.5], outcomes: [0, 1] })).toThrow();
   });
 
   it("rejects outcomes not in {0, 1, boolean}", () => {
-    expect(() =>
-      computeBrierScore({ predictions: [0.5], outcomes: [0.5] }),
-    ).toThrow();
+    expect(() => computeBrierScore({ predictions: [0.5], outcomes: [0.5] })).toThrow();
   });
 
   it("rejects baselineProbability outside [0,1]", () => {

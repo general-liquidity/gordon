@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 import { Divider } from "../layout/Divider.tsx";
@@ -16,7 +15,9 @@ export function ExitAutonomousPermissionRequest({ onDecision }: Props) {
     <Box flexDirection="column" marginTop={1}>
       <Divider />
       <Box paddingX={2} flexDirection="column">
-        <Text color="cyanBright" bold>{"→"} EXIT AUTONOMOUS MODE</Text>
+        <Text color="cyanBright" bold>
+          {"→"} EXIT AUTONOMOUS MODE
+        </Text>
         <Text> </Text>
         <Text>{"  "}Exit autonomous mode? Gordon will resume asking for approval.</Text>
         <Text> </Text>

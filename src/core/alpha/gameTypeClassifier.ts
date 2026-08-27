@@ -148,8 +148,7 @@ export function classifyGameType(
   // A derivative or a non-yielding store creates no aggregate wealth, and
   // a claim wrapped by a house/venue is not funded by production.
   const generation =
-    inputs.instrumentClass === "productive_asset" &&
-    inputs.counterparty === "issuer_or_production"
+    inputs.instrumentClass === "productive_asset" && inputs.counterparty === "issuer_or_production"
       ? realYield
       : 0;
 
@@ -213,8 +212,8 @@ function buildReasoning(
     gameType === "positive_sum"
       ? "POSITIVE-SUM"
       : gameType === "negative_sum"
-      ? "NEGATIVE-SUM"
-      : "ZERO-SUM";
+        ? "NEGATIVE-SUM"
+        : "ZERO-SUM";
   return `${label}: net edge pool ${(netEdgePerYear * 100).toFixed(2)}%/yr (generation ${(generation * 100).toFixed(2)}% - drag ${(totalDrag * 100).toFixed(2)}%). ${whoFundsEdge}`;
 }
 

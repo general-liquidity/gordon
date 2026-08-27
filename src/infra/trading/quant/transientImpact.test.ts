@@ -1,17 +1,10 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeTransientImpact,
-  transientImpactToPayload,
-} from "./transientImpact.ts";
+import { computeTransientImpact, transientImpactToPayload } from "./transientImpact.ts";
 
 describe("computeTransientImpact — validation", () => {
   it("rejects non-positive half-life", () => {
-    expect(() =>
-      computeTransientImpact({ now: 10, fills: [], halfLife: 0 }),
-    ).toThrow();
-    expect(() =>
-      computeTransientImpact({ now: 10, fills: [], halfLife: -1 }),
-    ).toThrow();
+    expect(() => computeTransientImpact({ now: 10, fills: [], halfLife: 0 })).toThrow();
+    expect(() => computeTransientImpact({ now: 10, fills: [], halfLife: -1 })).toThrow();
   });
 
   it("rejects negative coefficients", () => {

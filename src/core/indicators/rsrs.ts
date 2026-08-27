@@ -76,7 +76,12 @@ function round(x: number, n = 6): number {
   return Number(x.toFixed(n));
 }
 
-function neutral(slopeWindow: number, zWindow: number, sampleSize: number, why: string): RsrsResult {
+function neutral(
+  slopeWindow: number,
+  zWindow: number,
+  sampleSize: number,
+  why: string,
+): RsrsResult {
   return {
     beta: null,
     rSquared: null,
@@ -109,7 +114,10 @@ function olsSlopeR2(x: number[], y: number[]): { beta: number; r2: number } | nu
   return { beta, r2 };
 }
 
-export function calculateRsrs(candles: ReadonlyArray<Candle>, options: RsrsOptions = {}): RsrsResult {
+export function calculateRsrs(
+  candles: ReadonlyArray<Candle>,
+  options: RsrsOptions = {},
+): RsrsResult {
   const slopeWindow = options.slopeWindow ?? DEFAULT_SLOPE_WINDOW;
   const zWindow = options.zWindow ?? DEFAULT_Z_WINDOW;
   const buy = options.buyThreshold ?? DEFAULT_BUY;

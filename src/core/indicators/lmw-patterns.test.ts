@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  nadarayaWatsonSmooth,
-  findAlternatingExtrema,
-  detectLmwPatterns,
-} from "./lmw-patterns.ts";
+import { nadarayaWatsonSmooth, findAlternatingExtrema, detectLmwPatterns } from "./lmw-patterns.ts";
 
 /** Piecewise-linear ramp helper: appends a segment from `from` to `to`. */
 function segment(out: number[], from: number, to: number, steps: number): void {

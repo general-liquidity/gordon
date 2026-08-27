@@ -41,9 +41,21 @@ const MAX_CANDLES_PER_REQUEST = 1000;
 
 /** Default supported timeframes for exchanges */
 const DEFAULT_TIMEFRAMES = [
-  "1m", "3m", "5m", "15m", "30m",
-  "1h", "2h", "4h", "6h", "8h", "12h",
-  "1d", "3d", "1w", "1M",
+  "1m",
+  "3m",
+  "5m",
+  "15m",
+  "30m",
+  "1h",
+  "2h",
+  "4h",
+  "6h",
+  "8h",
+  "12h",
+  "1d",
+  "3d",
+  "1w",
+  "1M",
 ] as const satisfies readonly Timeframe[];
 
 // ============================================================================
@@ -95,7 +107,7 @@ export class ExchangeDataSource implements DataSource {
       supportedTimeframes?: string[];
       /** Maximum historical days available (default: 365) */
       maxHistoricalDays?: number;
-    } = {}
+    } = {},
   ) {
     this.exchange = exchange;
     this.id = `exchange-${exchange.exchangeId}`;
@@ -131,7 +143,7 @@ export class ExchangeDataSource implements DataSource {
     } catch (error) {
       logger.error(
         "Exchange availability check failed",
-        error instanceof Error ? error : new Error(String(error))
+        error instanceof Error ? error : new Error(String(error)),
       );
       return false;
     }
@@ -157,7 +169,7 @@ export class ExchangeDataSource implements DataSource {
     // Validate timeframe
     if (!this.capabilities.supportedTimeframes.includes(timeframe)) {
       throw new Error(
-        `Timeframe '${timeframe}' not supported. Supported: ${this.capabilities.supportedTimeframes.join(", ")}`
+        `Timeframe '${timeframe}' not supported. Supported: ${this.capabilities.supportedTimeframes.join(", ")}`,
       );
     }
 
@@ -187,7 +199,7 @@ export class ExchangeDataSource implements DataSource {
 
       // Filter candles to only include those in our range
       const filteredCandles = candles.filter(
-        (c) => c.openTime >= currentStart && c.openTime <= endTime
+        (c) => c.openTime >= currentStart && c.openTime <= endTime,
       );
       allCandles.push(...filteredCandles);
 
@@ -225,7 +237,7 @@ export class ExchangeDataSource implements DataSource {
     interval: string,
     startTime: number,
     endTime: number,
-    limit: number
+    limit: number,
   ): Promise<Candle[]> {
     const candles = await this.exchange.getCandles(
       symbol,

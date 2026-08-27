@@ -36,7 +36,9 @@ export function initSystematicTables(): void {
       updated_at TEXT NOT NULL
     )
   `);
-  db.run("CREATE INDEX IF NOT EXISTS idx_systematic_datasets_symbol_tf ON systematic_datasets(symbol, timeframe)");
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_systematic_datasets_symbol_tf ON systematic_datasets(symbol, timeframe)",
+  );
 
   db.run(`
     CREATE TABLE IF NOT EXISTS systematic_dataset_snapshots (
@@ -50,7 +52,9 @@ export function initSystematicTables(): void {
       created_at TEXT NOT NULL
     )
   `);
-  db.run("CREATE INDEX IF NOT EXISTS idx_systematic_snapshot_dataset ON systematic_dataset_snapshots(dataset_id)");
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_systematic_snapshot_dataset ON systematic_dataset_snapshots(dataset_id)",
+  );
 
   db.run(`
     CREATE TABLE IF NOT EXISTS systematic_validation_runs (
@@ -72,7 +76,9 @@ export function initSystematicTables(): void {
       created_at TEXT NOT NULL
     )
   `);
-  db.run("CREATE INDEX IF NOT EXISTS idx_systematic_validation_strategy ON systematic_validation_runs(strategy_id, created_at)");
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_systematic_validation_strategy ON systematic_validation_runs(strategy_id, created_at)",
+  );
 
   db.run(`
     CREATE TABLE IF NOT EXISTS systematic_experiments (
@@ -91,7 +97,9 @@ export function initSystematicTables(): void {
       updated_at TEXT NOT NULL
     )
   `);
-  db.run("CREATE INDEX IF NOT EXISTS idx_systematic_experiments_strategy ON systematic_experiments(strategy_id, updated_at)");
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_systematic_experiments_strategy ON systematic_experiments(strategy_id, updated_at)",
+  );
 
   db.run(`
     CREATE TABLE IF NOT EXISTS systematic_strategy_profiles (
@@ -116,7 +124,9 @@ export function initSystematicTables(): void {
       updated_at TEXT NOT NULL
     )
   `);
-  db.run("CREATE INDEX IF NOT EXISTS idx_systematic_profiles_status ON systematic_strategy_profiles(status, market_family)");
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_systematic_profiles_status ON systematic_strategy_profiles(status, market_family)",
+  );
 
   db.run(`
     CREATE TABLE IF NOT EXISTS systematic_lifecycle_events (
@@ -127,7 +137,9 @@ export function initSystematicTables(): void {
       created_at TEXT NOT NULL
     )
   `);
-  db.run("CREATE INDEX IF NOT EXISTS idx_systematic_lifecycle_strategy ON systematic_lifecycle_events(strategy_id, created_at)");
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_systematic_lifecycle_strategy ON systematic_lifecycle_events(strategy_id, created_at)",
+  );
 
   initialized = true;
   try {
@@ -173,7 +185,9 @@ export function saveDatasetRecord(record: DatasetRecord): void {
 export function getDatasetRecord(datasetId: string): DatasetRecord | null {
   initSystematicTables();
   const row = getDatabase()
-    .prepare<Record<string, unknown>, [string]>("SELECT * FROM systematic_datasets WHERE dataset_id = ?")
+    .prepare<Record<string, unknown>, [string]>(
+      "SELECT * FROM systematic_datasets WHERE dataset_id = ?",
+    )
     .get(datasetId);
 
   if (!row) return null;
@@ -195,12 +209,14 @@ export function getDatasetRecord(datasetId: string): DatasetRecord | null {
   };
 }
 
-export function listDatasetRecords(options: {
-  marketFamily?: DatasetRecord["marketFamily"];
-  symbol?: string;
-  timeframe?: string;
-  limit?: number;
-} = {}): DatasetRecord[] {
+export function listDatasetRecords(
+  options: {
+    marketFamily?: DatasetRecord["marketFamily"];
+    symbol?: string;
+    timeframe?: string;
+    limit?: number;
+  } = {},
+): DatasetRecord[] {
   initSystematicTables();
 
   const conditions: string[] = [];
@@ -270,7 +286,9 @@ export function saveDatasetSnapshot(record: DatasetSnapshotRecord, candles: unkn
   );
 }
 
-export function getDatasetSnapshot(snapshotId: string): (DatasetSnapshotRecord & { candles: OHLC[] }) | null {
+export function getDatasetSnapshot(
+  snapshotId: string,
+): (DatasetSnapshotRecord & { candles: OHLC[] }) | null {
   initSystematicTables();
   const row = getDatabase()
     .prepare<Record<string, unknown>, [string]>(
@@ -292,12 +310,14 @@ export function getDatasetSnapshot(snapshotId: string): (DatasetSnapshotRecord &
   };
 }
 
-export function saveValidationRun(record: SystematicValidationSummary & {
-  datasetId?: string;
-  datasetSnapshotId?: string;
-  backtestResultId?: string;
-  marketFamily: string;
-}): void {
+export function saveValidationRun(
+  record: SystematicValidationSummary & {
+    datasetId?: string;
+    datasetSnapshotId?: string;
+    backtestResultId?: string;
+    marketFamily: string;
+  },
+): void {
   initSystematicTables();
   const db = getDatabase();
   db.prepare(`
@@ -330,18 +350,18 @@ export function listDatasetSnapshots(datasetId?: string): DatasetSnapshotRecord[
   initSystematicTables();
   const rows = datasetId
     ? getDatabase()
-      .prepare<Record<string, unknown>, [string]>(`
+        .prepare<Record<string, unknown>, [string]>(`
         SELECT * FROM systematic_dataset_snapshots
         WHERE dataset_id = ?
         ORDER BY created_at DESC
       `)
-      .all(datasetId)
+        .all(datasetId)
     : getDatabase()
-      .prepare<Record<string, unknown>, []>(`
+        .prepare<Record<string, unknown>, []>(`
         SELECT * FROM systematic_dataset_snapshots
         ORDER BY created_at DESC
       `)
-      .all();
+        .all();
 
   return rows.map((row) => ({
     snapshotId: String(row.snapshot_id),
@@ -442,8 +462,12 @@ function parseProfile(row: Record<string, unknown>): SystematicStrategyProfile {
     capitalWeight: Number(row.capital_weight),
     maxAllocation: Number(row.max_allocation),
     latestDatasetId: row.latest_dataset_id ? String(row.latest_dataset_id) : undefined,
-    latestDatasetSnapshotId: row.latest_dataset_snapshot_id ? String(row.latest_dataset_snapshot_id) : undefined,
-    latestBacktestResultId: row.latest_backtest_result_id ? String(row.latest_backtest_result_id) : undefined,
+    latestDatasetSnapshotId: row.latest_dataset_snapshot_id
+      ? String(row.latest_dataset_snapshot_id)
+      : undefined,
+    latestBacktestResultId: row.latest_backtest_result_id
+      ? String(row.latest_backtest_result_id)
+      : undefined,
     latestValidationId: row.latest_validation_id ? String(row.latest_validation_id) : undefined,
     liveEligible: Number(row.live_eligible) === 1,
     lastMetrics: row.last_metrics_json ? JSON.parse(String(row.last_metrics_json)) : undefined,
@@ -456,7 +480,9 @@ function parseProfile(row: Record<string, unknown>): SystematicStrategyProfile {
 export function getStrategyProfile(strategyId: string): SystematicStrategyProfile | null {
   initSystematicTables();
   const row = getDatabase()
-    .prepare<Record<string, unknown>, [string]>("SELECT * FROM systematic_strategy_profiles WHERE strategy_id = ?")
+    .prepare<Record<string, unknown>, [string]>(
+      "SELECT * FROM systematic_strategy_profiles WHERE strategy_id = ?",
+    )
     .get(strategyId);
   return row ? parseProfile(row) : null;
 }
@@ -464,12 +490,16 @@ export function getStrategyProfile(strategyId: string): SystematicStrategyProfil
 export function listStrategyProfiles(): SystematicStrategyProfile[] {
   initSystematicTables();
   return getDatabase()
-    .prepare<Record<string, unknown>, []>("SELECT * FROM systematic_strategy_profiles ORDER BY updated_at DESC")
+    .prepare<Record<string, unknown>, []>(
+      "SELECT * FROM systematic_strategy_profiles ORDER BY updated_at DESC",
+    )
     .all()
     .map(parseProfile);
 }
 
-export function getLatestValidationForStrategy(strategyId: string): SystematicValidationSummary | null {
+export function getLatestValidationForStrategy(
+  strategyId: string,
+): SystematicValidationSummary | null {
   initSystematicTables();
   const row = getDatabase()
     .prepare<Record<string, unknown>, [string]>(`
@@ -490,7 +520,9 @@ export function getLatestValidationForStrategy(strategyId: string): SystematicVa
     score: Number(row.score),
     liveEligible: Number(row.live_eligible) === 1,
     gates: JSON.parse(String(row.gates_json)),
-    walkForwardSummary: row.walk_forward_json ? JSON.parse(String(row.walk_forward_json)) : undefined,
+    walkForwardSummary: row.walk_forward_json
+      ? JSON.parse(String(row.walk_forward_json))
+      : undefined,
     monteCarloSummary: row.monte_carlo_json ? JSON.parse(String(row.monte_carlo_json)) : undefined,
     overfittingSummary: row.overfitting_json ? JSON.parse(String(row.overfitting_json)) : undefined,
     biasDiagnostics: row.bias_json ? JSON.parse(String(row.bias_json)) : undefined,
@@ -501,7 +533,9 @@ export function getLatestValidationForStrategy(strategyId: string): SystematicVa
 export function getValidationRun(validationId: string): SystematicValidationSummary | null {
   initSystematicTables();
   const row = getDatabase()
-    .prepare<Record<string, unknown>, [string]>("SELECT * FROM systematic_validation_runs WHERE validation_id = ?")
+    .prepare<Record<string, unknown>, [string]>(
+      "SELECT * FROM systematic_validation_runs WHERE validation_id = ?",
+    )
     .get(validationId);
 
   if (!row) return null;
@@ -514,7 +548,9 @@ export function getValidationRun(validationId: string): SystematicValidationSumm
     score: Number(row.score),
     liveEligible: Number(row.live_eligible) === 1,
     gates: JSON.parse(String(row.gates_json)),
-    walkForwardSummary: row.walk_forward_json ? JSON.parse(String(row.walk_forward_json)) : undefined,
+    walkForwardSummary: row.walk_forward_json
+      ? JSON.parse(String(row.walk_forward_json))
+      : undefined,
     monteCarloSummary: row.monte_carlo_json ? JSON.parse(String(row.monte_carlo_json)) : undefined,
     overfittingSummary: row.overfitting_json ? JSON.parse(String(row.overfitting_json)) : undefined,
     biasDiagnostics: row.bias_json ? JSON.parse(String(row.bias_json)) : undefined,
@@ -526,15 +562,17 @@ export function listResearchExperiments(strategyId?: string): ResearchExperiment
   initSystematicTables();
   const rows = strategyId
     ? getDatabase()
-      .prepare<Record<string, unknown>, [string]>(`
+        .prepare<Record<string, unknown>, [string]>(`
         SELECT * FROM systematic_experiments
         WHERE strategy_id = ?
         ORDER BY updated_at DESC
       `)
-      .all(strategyId)
+        .all(strategyId)
     : getDatabase()
-      .prepare<Record<string, unknown>, []>("SELECT * FROM systematic_experiments ORDER BY updated_at DESC")
-      .all();
+        .prepare<Record<string, unknown>, []>(
+          "SELECT * FROM systematic_experiments ORDER BY updated_at DESC",
+        )
+        .all();
 
   return rows.map((row) => ({
     experimentId: String(row.experiment_id),

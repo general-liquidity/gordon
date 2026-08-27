@@ -164,7 +164,10 @@ export function recordSleepTimeActivity(now: number = Date.now()): void {
   lastActivityAt = now;
 }
 
-export function isIdle(now: number = Date.now(), idleThresholdMs = DEFAULT_IDLE_THRESHOLD_MS): boolean {
+export function isIdle(
+  now: number = Date.now(),
+  idleThresholdMs = DEFAULT_IDLE_THRESHOLD_MS,
+): boolean {
   return now - lastActivityAt >= idleThresholdMs;
 }
 
@@ -179,12 +182,14 @@ export function isIdle(now: number = Date.now(), idleThresholdMs = DEFAULT_IDLE_
  * Each analysis runs independently; a failure in one does not abort the pass.
  * Bounded by `maxAnalyses`.
  */
-export async function runSleepTimePrecompute(options: {
-  analyses?: SleepAnalysis[];
-  cache?: SleepTimeCache;
-  now?: number;
-  maxAnalyses?: number;
-} = {}): Promise<PrecomputeResult> {
+export async function runSleepTimePrecompute(
+  options: {
+    analyses?: SleepAnalysis[];
+    cache?: SleepTimeCache;
+    now?: number;
+    maxAnalyses?: number;
+  } = {},
+): Promise<PrecomputeResult> {
   const analyses = (options.analyses ?? registeredAnalyses).slice(
     0,
     options.maxAnalyses ?? DEFAULT_MAX_ANALYSES,
@@ -228,13 +233,18 @@ export async function runSleepTimePrecompute(options: {
  * is enabled, the session is idle, and analyses are registered. Then it runs a
  * bounded precompute pass over the registered analyses.
  */
-export async function tickSleepTimePrecompute(options: {
-  now?: number;
-  idleThresholdMs?: number;
-} = {}): Promise<PrecomputeResult> {
+export async function tickSleepTimePrecompute(
+  options: { now?: number; idleThresholdMs?: number } = {},
+): Promise<PrecomputeResult> {
   const now = options.now ?? Date.now();
   if (!isSleepTimeEnabled()) {
-    return { ran: false, reason: "GORDON_SLEEP_TIME not enabled", computed: 0, failed: 0, keys: [] };
+    return {
+      ran: false,
+      reason: "GORDON_SLEEP_TIME not enabled",
+      computed: 0,
+      failed: 0,
+      keys: [],
+    };
   }
   if (registeredAnalyses.length === 0) {
     return { ran: false, reason: "no analyses registered", computed: 0, failed: 0, keys: [] };

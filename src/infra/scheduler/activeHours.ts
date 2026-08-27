@@ -59,7 +59,10 @@ function parseHHMM(s: string): { hour: number; minute: number } | null {
 }
 
 /** Returns the local-to-timezone time-of-day components for a given instant. */
-function localTimeParts(ms: number, timezone: string): { year: number; month: number; day: number; hour: number; minute: number; dayOfWeek: number } {
+function localTimeParts(
+  ms: number,
+  timezone: string,
+): { year: number; month: number; day: number; hour: number; minute: number; dayOfWeek: number } {
   const date = new Date(ms);
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
@@ -88,10 +91,7 @@ function localTimeParts(ms: number, timezone: string): { year: number; month: nu
  * Check whether a given instant falls within the active-hours window.
  * Handles overnight windows (start > end) by treating them as spanning midnight.
  */
-export function isWithinActiveHours(
-  nowMs: number,
-  hours: ActiveHours,
-): boolean {
+export function isWithinActiveHours(nowMs: number, hours: ActiveHours): boolean {
   const timezone = hours.timezone ?? "America/New_York";
   const allowedDays = hours.daysOfWeek ?? [1, 2, 3, 4, 5];
 
@@ -129,10 +129,7 @@ export function isWithinActiveHours(
  * Given a target time, compute the next instant at which an active-hours
  * window starts. Returns null if something is misconfigured.
  */
-export function nextActiveHoursStart(
-  nowMs: number,
-  hours: ActiveHours,
-): number | null {
+export function nextActiveHoursStart(nowMs: number, hours: ActiveHours): number | null {
   const timezone = hours.timezone ?? "America/New_York";
   const allowedDays = hours.daysOfWeek ?? [1, 2, 3, 4, 5];
   const start = parseHHMM(hours.start);
@@ -154,11 +151,12 @@ export function nextActiveHoursStart(
     // adjusting from UTC until the local time matches.
     const targetIso = `${local.year}-${String(local.month).padStart(2, "0")}-${String(local.day).padStart(2, "0")}T${hours.start}:00`;
     // Parse as if it were UTC, then adjust for timezone offset.
-    const asUtc = Date.parse(targetIso + "Z");
+    const asUtc = Date.parse(`${targetIso}Z`);
     // Find the actual UTC ms by iterating: compute what Intl says this is in tz, adjust.
     // Good-enough approximation: compute the offset of midnight at that date in tz.
     const midnightLocal = localTimeParts(asUtc, timezone);
-    const diffMinutes = midnightLocal.hour * 60 + midnightLocal.minute - (start.hour * 60 + start.minute);
+    const diffMinutes =
+      midnightLocal.hour * 60 + midnightLocal.minute - (start.hour * 60 + start.minute);
     const corrected = asUtc - diffMinutes * 60 * 1000;
     return corrected;
   }

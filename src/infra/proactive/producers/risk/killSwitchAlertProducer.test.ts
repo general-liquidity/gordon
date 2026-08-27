@@ -4,10 +4,7 @@ import {
   resetKillSwitchAlertProducerState,
 } from "./killSwitchAlertProducer.ts";
 import type { ProactiveObservation } from "../../engine/proactiveEngine.ts";
-import {
-  resetAllKillSwitches,
-  tripKillSwitch,
-} from "../../../safety/killSwitches.ts";
+import { resetAllKillSwitches, tripKillSwitch } from "../../../safety/killSwitches.ts";
 
 const TICK_OBS: ProactiveObservation = {
   source: "monitor_loop",

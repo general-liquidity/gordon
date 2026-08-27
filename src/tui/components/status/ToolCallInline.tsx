@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState } from "react";
 import { Box, Text } from "../../ink-custom";
 import { useAnimationClock } from "../../hooks/animation/useAnimationClock.js";
 import { ToolExecutionDetailDialog } from "../dialogs/ToolExecutionDetailDialog.tsx";
@@ -96,7 +96,8 @@ function getToolLabel(toolName: string): string {
   if (/backtest|walk_forward/i.test(toolName)) return "Backtest";
   if (/monte_carlo/i.test(toolName)) return "Monte Carlo";
   if (/optimize/i.test(toolName)) return "Optimize";
-  if (/strategy_generate|suggest_strategy|suggest_mutation/i.test(toolName)) return "Generate Strategy";
+  if (/strategy_generate|suggest_strategy|suggest_mutation/i.test(toolName))
+    return "Generate Strategy";
   if (/strategy_iterate/i.test(toolName)) return "Iterate Strategy";
   if (/find_best|get_best|rank_strategies/i.test(toolName)) return "Rank";
   if (/deploy_strategy/i.test(toolName)) return "Deploy";
@@ -124,14 +125,17 @@ function getToolLabel(toolName: string): string {
   if (/list_x_trading_entities/i.test(toolName)) return "X Entities";
 
   // Proactive mode
-  if (/start_proactive_mode|stop_proactive_mode|get_proactive_status/i.test(toolName)) return "Proactive Mode";
+  if (/start_proactive_mode|stop_proactive_mode|get_proactive_status/i.test(toolName))
+    return "Proactive Mode";
   if (/list_proactive_suggestions/i.test(toolName)) return "Suggestions";
   if (/accept_proactive_suggestion/i.test(toolName)) return "Accept";
   if (/dismiss_proactive_suggestion/i.test(toolName)) return "Dismiss";
-  if (/suppress_proactive_category|unsuppress_proactive_category/i.test(toolName)) return "Suppression";
+  if (/suppress_proactive_category|unsuppress_proactive_category/i.test(toolName))
+    return "Suppression";
   if (/get_proactive_stats/i.test(toolName)) return "Proactive Stats";
   if (/fire_proactive_suggestion/i.test(toolName)) return "Fire Suggestion";
-  if (/configure_proactive_category|list_proactive_categories/i.test(toolName)) return "Proactive Policy";
+  if (/configure_proactive_category|list_proactive_categories/i.test(toolName))
+    return "Proactive Policy";
   if (/record_proactive_outcome/i.test(toolName)) return "Outcome";
 
   // Backtest verdict screening
@@ -232,8 +236,6 @@ function getToolLabel(toolName: string): string {
   if (/debank/i.test(toolName)) return "DeBank";
   if (/token_holder|wallet_intel|smart_money/i.test(toolName)) return "Wallet Intel";
 
-
-
   // SynthData
   if (/synthdata/i.test(toolName)) return "SynthData";
 
@@ -257,7 +259,10 @@ function getToolLabel(toolName: string): string {
   if (/approve_plan|approve_position/i.test(toolName)) return "Approval";
 
   // Fallback: clean snake_case to Title Case
-  return toolName.replace(/^(get_|set_|list_|check_|create_|update_)/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return toolName
+    .replace(/^(get_|set_|list_|check_|create_|update_)/, "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 // Secondary text — medium gray, brighter than faint dimColor (matches the
@@ -311,7 +316,7 @@ function getCachedToolLabel(toolName: string): string {
 const ToolCallRow = React.memo(function ToolCallRow({ call }: { call: ToolCallState }) {
   const result = call.status !== "running" ? call.result : undefined;
   const firstLine = result ? (result.split("\n")[0] ?? "") : "";
-  const preview = firstLine.length > 100 ? firstLine.slice(0, 100) + "\u2026" : firstLine;
+  const preview = firstLine.length > 100 ? `${firstLine.slice(0, 100)}\u2026` : firstLine;
   // Truncated if we dropped chars on the first line or there are more lines.
   const hasMore = result ? result.length > preview.length : false;
   return (
@@ -325,18 +330,23 @@ const ToolCallRow = React.memo(function ToolCallRow({ call }: { call: ToolCallSt
           <Text color="red">{"\u25CF"}</Text>
         )}
         {/* `Label(args)` \u2014 the trading equivalent of `Bash(command)`. */}
-        <Text bold>{" "}{getCachedToolLabel(call.toolName)}</Text>
+        <Text bold> {getCachedToolLabel(call.toolName)}</Text>
         <Text color={MUTED}>{formatToolArgs(call.args)}</Text>
         {call.status === "running" && <RunningElapsed startedAt={call.startedAt} />}
         {call.duration != null && (
-          <Text color={MUTED}> {"\u00B7"} {call.duration < 1000 ? `${call.duration}ms` : `${(call.duration / 1000).toFixed(1)}s`}</Text>
+          <Text color={MUTED}>
+            {" "}
+            {"\u00B7"}{" "}
+            {call.duration < 1000 ? `${call.duration}ms` : `${(call.duration / 1000).toFixed(1)}s`}
+          </Text>
         )}
       </Box>
       {result && (
         <Box paddingLeft={2}>
           <Text color={MUTED}>{"\u23BF  "}</Text>
           <Text color={call.status === "error" ? "red" : MUTED}>
-            {call.status === "error" ? "\u2717 " : ""}{preview || "done"}
+            {call.status === "error" ? "\u2717 " : ""}
+            {preview || "done"}
           </Text>
           {hasMore && <Text color={MUTED}> {"\u00B7"} d for details</Text>}
         </Box>
@@ -355,17 +365,20 @@ export const ToolCallInline = React.memo(function ToolCallInline({ calls }: Prop
   const shouldCollapse = completed.length >= 4 && !expanded;
   const latest = calls[calls.length - 1];
 
-  useRoutedInput((input, key) => {
-    if (key.ctrl && input === "o" && completed.length >= 4) {
-      setExpanded((e) => !e);
-      return;
-    }
-    if ((input === "d" || input === "D") && latest && !showDetail) {
-      setShowDetail(true);
-      return;
-    }
-    return false;
-  }, { id: "tool-call-inline", priority: FOCUS_PRIORITY.OVERLAY, isActive: calls.length > 0 });
+  useRoutedInput(
+    (input, key) => {
+      if (key.ctrl && input === "o" && completed.length >= 4) {
+        setExpanded((e) => !e);
+        return;
+      }
+      if ((input === "d" || input === "D") && latest && !showDetail) {
+        setShowDetail(true);
+        return;
+      }
+      return false;
+    },
+    { id: "tool-call-inline", priority: FOCUS_PRIORITY.OVERLAY, isActive: calls.length > 0 },
+  );
 
   if (calls.length === 0) return null;
 
@@ -396,7 +409,11 @@ export const ToolCallInline = React.memo(function ToolCallInline({ calls }: Prop
           <Text color={errors > 0 ? "yellow" : "green"}>●</Text>
           <Text color={MUTED}> {completed.length} tools completed</Text>
           {errors > 0 && <Text color="red"> ({errors} failed)</Text>}
-          <Text color={MUTED}> · {totalDuration < 1000 ? `${totalDuration}ms` : `${(totalDuration / 1000).toFixed(1)}s`}</Text>
+          <Text color={MUTED}>
+            {" "}
+            ·{" "}
+            {totalDuration < 1000 ? `${totalDuration}ms` : `${(totalDuration / 1000).toFixed(1)}s`}
+          </Text>
           <Text color={MUTED}> · Ctrl+O expand · d details</Text>
         </Box>
         {running.map((call) => (

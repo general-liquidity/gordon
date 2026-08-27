@@ -103,10 +103,7 @@ export function jsonSchemaToZod(node: JsonSchema): z.ZodTypeAny {
 
   // `const` — exact value match.
   if ("const" in node && node.const !== undefined) {
-    return applyNullable(
-      z.literal(node.const as Parameters<typeof z.literal>[0]),
-      node,
-    );
+    return applyNullable(z.literal(node.const as Parameters<typeof z.literal>[0]), node);
   }
 
   // `enum` — closed set. z.enum needs string literals; fall back to a refine
@@ -115,10 +112,7 @@ export function jsonSchemaToZod(node: JsonSchema): z.ZodTypeAny {
     const values = node.enum;
     const allStrings = values.every((v) => typeof v === "string");
     if (allStrings) {
-      return applyNullable(
-        z.enum(values as [string, ...string[]]),
-        node,
-      );
+      return applyNullable(z.enum(values as [string, ...string[]]), node);
     }
     return applyNullable(
       z.unknown().refine((v) => values.some((e) => Object.is(e, v) || e === v), {

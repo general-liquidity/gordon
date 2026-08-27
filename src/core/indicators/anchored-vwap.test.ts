@@ -26,7 +26,10 @@ describe("calculateAnchoredVWAP", () => {
 
   it("rising AVWAP off the low with price above reads as dynamic support", () => {
     const prices = [100, 101, 102, 103, 104, 105, 106, 107];
-    const r = calculateAnchoredVWAP(prices.map((p) => bar(p)), "low");
+    const r = calculateAnchoredVWAP(
+      prices.map((p) => bar(p)),
+      "low",
+    );
     expect(r.anchorIndex).toBe(0);
     expect(r.pricePosition).toBe("above");
     expect(r.slope).toBe("rising");
@@ -36,13 +39,20 @@ describe("calculateAnchoredVWAP", () => {
   it("flags a reclaim when price crosses back above the AVWAP", () => {
     // Below the running AVWAP, then a sharp close back above it on the last bar.
     const prices = [100, 99, 98, 97, 96, 95, 103];
-    const r = calculateAnchoredVWAP(prices.map((p) => bar(p)), "first");
+    const r = calculateAnchoredVWAP(
+      prices.map((p) => bar(p)),
+      "first",
+    );
     expect(r.signal).toBe("reclaim");
   });
 
   it("explicit numeric anchor + volume-weighted bands bracket the AVWAP", () => {
     const prices = [50, 52, 48, 53, 47, 54, 46, 55];
-    const r = calculateAnchoredVWAP(prices.map((p) => bar(p)), 2, 1);
+    const r = calculateAnchoredVWAP(
+      prices.map((p) => bar(p)),
+      2,
+      1,
+    );
     expect(r.anchorIndex).toBe(2);
     expect(r.values[1]).toBeNull();
     expect(r.upperBand!).toBeGreaterThan(r.current!);

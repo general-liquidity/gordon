@@ -59,7 +59,7 @@ export function calculateSupplyDemandZones(
   lookback: number = 20,
   minZoneWidth: number = 0.001,
   zoneMergeTolerance: number = 0.005,
-  maxZones: number = 5
+  maxZones: number = 5,
 ): SDZResult {
   if (candles.length < lookback + 5) {
     return {
@@ -159,25 +159,26 @@ export function calculateSupplyDemandZones(
 
   // Filter to intact zones and sort by proximity
   const activeDemand = demandZones
-    .filter(z => z.intact || z.tests >= 2)
+    .filter((z) => z.intact || z.tests >= 2)
     .sort((a, b) => Math.abs(currentPrice - a.mid) - Math.abs(currentPrice - b.mid))
     .slice(0, maxZones);
 
   const activeSupply = supplyZones
-    .filter(z => z.intact || z.tests >= 2)
+    .filter((z) => z.intact || z.tests >= 2)
     .sort((a, b) => Math.abs(currentPrice - a.mid) - Math.abs(currentPrice - b.mid))
     .slice(0, maxZones);
 
   // Check current price position
-  const inDemandZone = activeDemand.some(z => currentPrice >= z.lower && currentPrice <= z.upper);
-  const inSupplyZone = activeSupply.some(z => currentPrice >= z.lower && currentPrice <= z.upper);
+  const inDemandZone = activeDemand.some((z) => currentPrice >= z.lower && currentPrice <= z.upper);
+  const inSupplyZone = activeSupply.some((z) => currentPrice >= z.lower && currentPrice <= z.upper);
 
   // Nearest zones
-  const nearestDemand = activeDemand.find(z => z.upper < currentPrice) ?? null;
-  const nearestSupply = activeSupply.find(z => z.lower > currentPrice) ?? null;
+  const nearestDemand = activeDemand.find((z) => z.upper < currentPrice) ?? null;
+  const nearestSupply = activeSupply.find((z) => z.lower > currentPrice) ?? null;
 
   // Signal
-  let signal: "demand_bounce" | "supply_rejection" | "breakout_up" | "breakout_down" | "none" = "none";
+  let signal: "demand_bounce" | "supply_rejection" | "breakout_up" | "breakout_down" | "none" =
+    "none";
 
   if (inDemandZone) {
     // Check if price is bouncing (close > open on last candle)
@@ -227,7 +228,7 @@ export function calculateSupplyDemandZones(
     inSupplyZone,
     nearestDemand,
     nearestSupply,
-    signal
+    signal,
   );
 
   return {
@@ -261,7 +262,7 @@ function mergeZones(zones: SDZone[], tolerance: number, maxCount: number): SDZon
       last.lower = Math.min(last.lower, current.lower);
       last.upper = Math.max(last.upper, current.upper);
       last.mid = (last.upper + last.lower) / 2;
-      last.widthPct = parseFloat(((last.upper - last.lower) / last.mid * 100).toFixed(3));
+      last.widthPct = parseFloat((((last.upper - last.lower) / last.mid) * 100).toFixed(3));
       last.tests += current.tests;
     } else {
       merged.push({ ...current });
@@ -279,7 +280,7 @@ function buildSDZInterpretation(
   inSupply: boolean,
   nearestDemand: SDZone | null,
   nearestSupply: SDZone | null,
-  signal: string
+  signal: string,
 ): string {
   let msg = `${demandCount} demand zones, ${supplyCount} supply zones active. `;
 
@@ -290,11 +291,11 @@ function buildSDZInterpretation(
   }
 
   if (nearestDemand) {
-    const dist = ((price - nearestDemand.upper) / price * 100).toFixed(1);
+    const dist = (((price - nearestDemand.upper) / price) * 100).toFixed(1);
     msg += `Nearest demand: ${nearestDemand.lower.toFixed(2)}-${nearestDemand.upper.toFixed(2)} (${dist}% below). `;
   }
   if (nearestSupply) {
-    const dist = ((nearestSupply.lower - price) / price * 100).toFixed(1);
+    const dist = (((nearestSupply.lower - price) / price) * 100).toFixed(1);
     msg += `Nearest supply: ${nearestSupply.lower.toFixed(2)}-${nearestSupply.upper.toFixed(2)} (${dist}% above). `;
   }
 

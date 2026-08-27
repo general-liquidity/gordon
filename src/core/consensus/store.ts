@@ -9,7 +9,7 @@ import { getDatabase } from "../../infra/storage/database.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import type { ConsensusResult } from "./protocol.ts";
 
-const logger = createModuleLogger("consensus-store");
+const _logger = createModuleLogger("consensus-store");
 
 let initialized = false;
 
@@ -32,12 +32,8 @@ function ensureTable(): void {
       created_at TEXT NOT NULL
     )
   `);
-  db.run(
-    "CREATE INDEX IF NOT EXISTS idx_consensus_symbol ON consensus_votes(symbol)",
-  );
-  db.run(
-    "CREATE INDEX IF NOT EXISTS idx_consensus_created_at ON consensus_votes(created_at)",
-  );
+  db.run("CREATE INDEX IF NOT EXISTS idx_consensus_symbol ON consensus_votes(symbol)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_consensus_created_at ON consensus_votes(created_at)");
 
   initialized = true;
 }
@@ -102,29 +98,41 @@ export function queryConsensusResults(query: ConsensusQuery): ConsensusResult[] 
 
   // Use separate query paths to keep type signatures concrete
   if (query.symbol && query.playbookName && query.decision) {
-    return db.query<ConsensusRow, [string, string, string, number]>(
-      `SELECT decision, score, quorum_met, votes_json, dissenting_agents, proposal_json, created_at
+    return db
+      .query<ConsensusRow, [string, string, string, number]>(
+        `SELECT decision, score, quorum_met, votes_json, dissenting_agents, proposal_json, created_at
        FROM consensus_votes WHERE symbol = ? AND playbook_name = ? AND decision = ?
        ORDER BY created_at DESC LIMIT ?`,
-    ).all(query.symbol, query.playbookName, query.decision, limit).map(mapRow);
+      )
+      .all(query.symbol, query.playbookName, query.decision, limit)
+      .map(mapRow);
   }
   if (query.symbol) {
-    return db.query<ConsensusRow, [string, number]>(
-      `SELECT decision, score, quorum_met, votes_json, dissenting_agents, proposal_json, created_at
+    return db
+      .query<ConsensusRow, [string, number]>(
+        `SELECT decision, score, quorum_met, votes_json, dissenting_agents, proposal_json, created_at
        FROM consensus_votes WHERE symbol = ? ORDER BY created_at DESC LIMIT ?`,
-    ).all(query.symbol, limit).map(mapRow);
+      )
+      .all(query.symbol, limit)
+      .map(mapRow);
   }
   if (query.playbookName) {
-    return db.query<ConsensusRow, [string, number]>(
-      `SELECT decision, score, quorum_met, votes_json, dissenting_agents, proposal_json, created_at
+    return db
+      .query<ConsensusRow, [string, number]>(
+        `SELECT decision, score, quorum_met, votes_json, dissenting_agents, proposal_json, created_at
        FROM consensus_votes WHERE playbook_name = ? ORDER BY created_at DESC LIMIT ?`,
-    ).all(query.playbookName, limit).map(mapRow);
+      )
+      .all(query.playbookName, limit)
+      .map(mapRow);
   }
 
-  return db.query<ConsensusRow, [number]>(
-    `SELECT decision, score, quorum_met, votes_json, dissenting_agents, proposal_json, created_at
+  return db
+    .query<ConsensusRow, [number]>(
+      `SELECT decision, score, quorum_met, votes_json, dissenting_agents, proposal_json, created_at
      FROM consensus_votes ORDER BY created_at DESC LIMIT ?`,
-  ).all(limit).map(mapRow);
+    )
+    .all(limit)
+    .map(mapRow);
 }
 
 export function getConsensusStats(playbookName: string): {
@@ -137,10 +145,7 @@ export function getConsensusStats(playbookName: string): {
 
   const db = getDatabase();
   const row = db
-    .query<
-      { total: number; approved: number; avg_score: number },
-      [string]
-    >(
+    .query<{ total: number; approved: number; avg_score: number }, [string]>(
       `SELECT
          COUNT(*) as total,
          SUM(CASE WHEN decision = 'APPROVED' THEN 1 ELSE 0 END) as approved,

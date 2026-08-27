@@ -240,10 +240,7 @@ describe("computeMultiInstrumentHedgeRatio — output structure", () => {
   it("residualVariance ≤ positionVariance always", () => {
     const r = computeMultiInstrumentHedgeRatio({
       positionReturns: gaussianSeries(200, 0.02, 101),
-      candidateReturns: [
-        gaussianSeries(200, 0.02, 103),
-        gaussianSeries(200, 0.02, 107),
-      ],
+      candidateReturns: [gaussianSeries(200, 0.02, 103), gaussianSeries(200, 0.02, 107)],
     });
     expect(r.residualVariance).toBeLessThanOrEqual(r.positionVariance + 1e-9);
   });
@@ -251,10 +248,7 @@ describe("computeMultiInstrumentHedgeRatio — output structure", () => {
   it("residualVariance non-negative", () => {
     const r = computeMultiInstrumentHedgeRatio({
       positionReturns: gaussianSeries(200, 0.02, 111),
-      candidateReturns: [
-        gaussianSeries(200, 0.02, 113),
-        gaussianSeries(200, 0.02, 117),
-      ],
+      candidateReturns: [gaussianSeries(200, 0.02, 113), gaussianSeries(200, 0.02, 117)],
     });
     expect(r.residualVariance).toBeGreaterThanOrEqual(0);
   });
@@ -264,10 +258,7 @@ describe("multiInstrumentHedgeRatioToPayload", () => {
   it("emits stable shape", () => {
     const r = computeMultiInstrumentHedgeRatio({
       positionReturns: gaussianSeries(100, 0.02, 121),
-      candidateReturns: [
-        gaussianSeries(100, 0.02, 123),
-        gaussianSeries(100, 0.02, 125),
-      ],
+      candidateReturns: [gaussianSeries(100, 0.02, 123), gaussianSeries(100, 0.02, 125)],
       candidateNames: ["A", "B"],
     });
     const p = multiInstrumentHedgeRatioToPayload(r) as {

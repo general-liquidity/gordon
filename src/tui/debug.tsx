@@ -8,7 +8,7 @@ async function main() {
     console.log("   OK");
 
     console.log("2. Importing Ink...");
-    const { render, Box, Text } = await import("ink");
+    const { render } = await import("ink");
     console.log("   OK");
 
     console.log("3. Importing AppStateProvider...");

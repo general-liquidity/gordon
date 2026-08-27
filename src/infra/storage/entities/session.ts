@@ -166,9 +166,7 @@ function upsertThreadRecord(state: SessionState, record: ThreadRecord): void {
     state.threads.push(record);
   }
   // Keep newest-first ordering — cheap for the small N we expect.
-  state.threads.sort(
-    (a, b) => Date.parse(b.lastActiveAt) - Date.parse(a.lastActiveAt),
-  );
+  state.threads.sort((a, b) => Date.parse(b.lastActiveAt) - Date.parse(a.lastActiveAt));
 }
 
 /**
@@ -180,10 +178,9 @@ function upsertThreadRecord(state: SessionState, record: ThreadRecord): void {
  * @param options - Session initialization options
  * @returns Session info with threadId and resourceId
  */
-export async function initializeSession(options: {
-  autoResume?: boolean;
-  forceNewThread?: boolean;
-} = {}): Promise<SessionInfo> {
+export async function initializeSession(
+  options: { autoResume?: boolean; forceNewThread?: boolean } = {},
+): Promise<SessionInfo> {
   const { autoResume = false, forceNewThread = false } = options;
 
   const state = await loadSessionState();

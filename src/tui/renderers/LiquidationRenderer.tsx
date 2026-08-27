@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../ink-custom";
 import { fmtNum } from "../components/charts/DataTable.tsx";
 
@@ -43,7 +42,9 @@ export function LiquidationRenderer({ data }: Props) {
     <Box flexDirection="column" paddingLeft={2} marginTop={1}>
       {/* Header */}
       <Box>
-        <Text bold color="cyanBright">{data.symbol}</Text>
+        <Text bold color="cyanBright">
+          {data.symbol}
+        </Text>
         <Text dimColor> {"\u00b7"} LIQUIDATION MAP</Text>
       </Box>
 
@@ -55,7 +56,9 @@ export function LiquidationRenderer({ data }: Props) {
       {/* Current price marker */}
       <Box marginY={0}>
         <Box width={12} justifyContent="flex-end">
-          <Text bold color="yellow">{fmtNum(data.currentPrice)}</Text>
+          <Text bold color="yellow">
+            {fmtNum(data.currentPrice)}
+          </Text>
         </Box>
         <Text> </Text>
         <Text dimColor>{"\u2500".repeat(barWidth + 12)} CURRENT</Text>
@@ -95,9 +98,7 @@ function LevelRow({
       <Text> </Text>
       <Text color={color}>{"\u2588".repeat(filled)}</Text>
       <Text dimColor> {sideLabel}</Text>
-      {level.cumulative != null && (
-        <Text dimColor> ({fmtNum(level.cumulative)} cum)</Text>
-      )}
+      {level.cumulative != null && <Text dimColor> ({fmtNum(level.cumulative)} cum)</Text>}
     </Box>
   );
 }

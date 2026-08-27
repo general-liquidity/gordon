@@ -184,7 +184,10 @@ export function enforceWrite(
   return result;
 }
 
-export function resultToPayload(result: CheckWriteResult, caller?: string): Record<string, unknown> {
+export function resultToPayload(
+  result: CheckWriteResult,
+  caller?: string,
+): Record<string, unknown> {
   return {
     kind: "filesystem_write_guard.check_recorded",
     allowed: result.allowed,

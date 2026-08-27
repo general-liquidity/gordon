@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 
@@ -53,14 +53,16 @@ export function DoctorDialog({ checks, onRunFix, onCancel }: Props) {
   if (selectedCheck) {
     return (
       <Box flexDirection="column" paddingX={1} paddingY={1}>
-        <Text bold color="cyanBright">FIX: {selectedCheck.label}</Text>
+        <Text bold color="cyanBright">
+          FIX: {selectedCheck.label}
+        </Text>
         <Box marginTop={1}>
           <Text>{selectedCheck.message}</Text>
         </Box>
         {selectedCheck.fixCommand && (
           <Box marginTop={1} flexDirection="column">
             <Text bold>Suggested fix:</Text>
-            <Text color="green">  {selectedCheck.fixCommand}</Text>
+            <Text color="green"> {selectedCheck.fixCommand}</Text>
             <Box marginTop={1}>
               <Select
                 options={[
@@ -85,17 +87,20 @@ export function DoctorDialog({ checks, onRunFix, onCancel }: Props) {
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">DOCTOR</Text>
-        <Text dimColor>  ({checks.filter((c) => c.status === "pass").length}/{checks.length} passing)</Text>
+        <Text bold color="cyanBright">
+          DOCTOR
+        </Text>
+        <Text dimColor>
+          {" "}
+          ({checks.filter((c) => c.status === "pass").length}/{checks.length} passing)
+        </Text>
       </Box>
 
       {checks.map((check) => (
         <Box key={check.id}>
-          <Text color={STATUS_COLORS[check.status] as any}>
-            {" "}{STATUS_ICONS[check.status]}{" "}
-          </Text>
+          <Text color={STATUS_COLORS[check.status] as any}> {STATUS_ICONS[check.status]} </Text>
           <Text bold={check.status !== "pass"}>{check.label}</Text>
-          <Text dimColor>  {check.message}</Text>
+          <Text dimColor> {check.message}</Text>
         </Box>
       ))}
 

@@ -6,8 +6,8 @@
 import { calculateRSI } from "./rsi.ts";
 
 export interface StochasticRSIResult {
-  k: (number | null)[];  // %K line (fast)
-  d: (number | null)[];  // %D line (slow, signal)
+  k: (number | null)[]; // %K line (fast)
+  d: (number | null)[]; // %D line (slow, signal)
   currentK: number | null;
   currentD: number | null;
   signal: "oversold" | "neutral" | "overbought";
@@ -45,7 +45,7 @@ export function calculateStochasticRSI(
   rsiPeriod: number = 14,
   stochPeriod: number = 14,
   smoothK: number = 3,
-  smoothD: number = 3
+  smoothD: number = 3,
 ): StochasticRSIResult {
   const minRequired = rsiPeriod + stochPeriod + smoothK + smoothD;
 

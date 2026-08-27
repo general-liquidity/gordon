@@ -24,12 +24,21 @@ export function usePromptSuggestions(
     const suggestions: Suggestion[] = [];
 
     // After a scan result → suggest deep dive
-    if (lastMsg.variant === "scan_result" || content.includes("opportunit") || content.includes("trending")) {
+    if (
+      lastMsg.variant === "scan_result" ||
+      content.includes("opportunit") ||
+      content.includes("trending")
+    ) {
       suggestions.push({ command: "/dd", label: "Deep dive on a symbol" });
     }
 
     // After analysis → suggest risk check or trade
-    if (content.includes("support") || content.includes("resistance") || content.includes("bullish") || content.includes("bearish")) {
+    if (
+      content.includes("support") ||
+      content.includes("resistance") ||
+      content.includes("bullish") ||
+      content.includes("bearish")
+    ) {
       suggestions.push({ command: "/risk-check", label: "Check risk before trading" });
       if (hasExchange) {
         suggestions.push({ command: "/swing-entry", label: "Set up a swing trade" });

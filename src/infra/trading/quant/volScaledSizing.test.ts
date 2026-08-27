@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeVolScaledSizing,
-  volScaledSizingToPayload,
-} from "./volScaledSizing.ts";
+import { computeVolScaledSizing, volScaledSizingToPayload } from "./volScaledSizing.ts";
 
 describe("computeVolScaledSizing — scale_down (default)", () => {
   it("calm vol → 1×, normal size", () => {

@@ -19,7 +19,7 @@ function genTrendingUp(n: number, startPrice = 100, perBar = 0.5): MaCrossoverBa
   const out: MaCrossoverBar[] = [];
   let p = startPrice;
   for (let i = 0; i < n; i++) {
-    const next = p + perBar + (Math.sin(i * 0.7) * perBar) * 0.2;
+    const next = p + perBar + Math.sin(i * 0.7) * perBar * 0.2;
     out.push(bar(next, p));
     p = next;
   }

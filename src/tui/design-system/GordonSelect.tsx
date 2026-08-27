@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../ink-custom";
 import { useTheme } from "../themes/ThemeProvider.tsx";
 

@@ -11,7 +11,10 @@ import {
   unrejectLesson,
 } from "./RejectedBuffer.ts";
 
-const TMP_PATH = join(tmpdir(), `gordon-ace-rejected-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`);
+const TMP_PATH = join(
+  tmpdir(),
+  `gordon-ace-rejected-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`,
+);
 
 beforeEach(() => {
   process.env.GORDON_ACE_REJECTED_PATH = TMP_PATH;

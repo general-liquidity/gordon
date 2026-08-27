@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { z } from "zod";
 import {
   processMessage,
   processMessageStream,
@@ -8,21 +8,22 @@ import {
   type StreamEvent,
 } from "../../infra/agents/orchestrator.ts";
 import type { GordonContext } from "../../infra/agents/types.ts";
-import type { RuntimeQueryExecutionOptions, RuntimeResolveContextOptions, RuntimeSessionContext } from "../contracts/types.ts";
-import { RuntimeStore } from "../state/RuntimeStore.ts";
+import type {
+  RuntimeQueryExecutionOptions,
+  RuntimeResolveContextOptions,
+  RuntimeSessionContext,
+} from "../contracts/types.ts";
+import type { RuntimeStore } from "../state/RuntimeStore.ts";
 import { ToolInvoker } from "../tools/ToolInvoker.ts";
-import { TranscriptStore } from "../transcript/TranscriptStore.ts";
-import { ToolRegistry } from "../tools/ToolRegistry.ts";
-import { ScratchpadStore } from "../workers/ScratchpadStore.ts";
-import { WorkerRegistry } from "../workers/WorkerRegistry.ts";
-import { PermissionEngine } from "../permissions/PermissionEngine.ts";
+import type { TranscriptStore } from "../transcript/TranscriptStore.ts";
+import type { ToolRegistry } from "../tools/ToolRegistry.ts";
+import type { ScratchpadStore } from "../workers/ScratchpadStore.ts";
+import type { WorkerRegistry } from "../workers/WorkerRegistry.ts";
+import type { PermissionEngine } from "../permissions/PermissionEngine.ts";
 
 export interface QueryRuntimeDeps {
   resolveContext: (options: RuntimeResolveContextOptions) => Promise<GordonContext>;
-  enrichContext?: (
-    context: GordonContext,
-    session: RuntimeSessionContext,
-  ) => GordonContext;
+  enrichContext?: (context: GordonContext, session: RuntimeSessionContext) => GordonContext;
   runtimeStore: RuntimeStore;
   transcriptStore: TranscriptStore;
   toolRegistry: ToolRegistry;
@@ -143,7 +144,8 @@ export class QueryRuntime {
         {
           ...this.buildInvocationInput(session, options),
           args: { userMessage },
-          executor: async () => processMessage(userMessage, context, session.threadId, session.resourceId),
+          executor: async () =>
+            processMessage(userMessage, context, session.threadId, session.resourceId),
         },
       );
       const result = invocation.result;
@@ -200,15 +202,18 @@ export class QueryRuntime {
           completionTokens: number;
           totalTokens: number;
         };
-      }>(
-        "runtime_query_structured",
-        context,
-        {
-          ...this.buildInvocationInput(session, options),
-          args: { userMessage, structured: true },
-          executor: async () => processStructuredMessage(userMessage, schema, context, session.threadId, session.resourceId),
-        },
-      );
+      }>("runtime_query_structured", context, {
+        ...this.buildInvocationInput(session, options),
+        args: { userMessage, structured: true },
+        executor: async () =>
+          processStructuredMessage(
+            userMessage,
+            schema,
+            context,
+            session.threadId,
+            session.resourceId,
+          ),
+      });
       const result = invocation.result;
       this.deps.transcriptStore.append({
         role: "assistant",
@@ -238,9 +243,13 @@ export class QueryRuntime {
       ...this.deps.runtimeStore.getState().permissionScopes,
       tool.permissionScope,
     ]);
-    const invocation = await this.toolInvoker.invoke<Awaited<ReturnType<typeof quickScan>>>("quick_scan", context, {
-      ...this.buildInvocationInput(session, options),
-    });
+    const invocation = await this.toolInvoker.invoke<Awaited<ReturnType<typeof quickScan>>>(
+      "quick_scan",
+      context,
+      {
+        ...this.buildInvocationInput(session, options),
+      },
+    );
     return invocation.result;
   }
 
@@ -254,7 +263,9 @@ export class QueryRuntime {
       ...this.deps.runtimeStore.getState().permissionScopes,
       tool.permissionScope,
     ]);
-    const invocation = await this.toolInvoker.invoke<Awaited<ReturnType<typeof quickCheckPositions>>>("quick_check_positions", context, {
+    const invocation = await this.toolInvoker.invoke<
+      Awaited<ReturnType<typeof quickCheckPositions>>
+    >("quick_check_positions", context, {
       ...this.buildInvocationInput(session, options),
     });
     return invocation.result;
@@ -304,8 +315,12 @@ export class QueryRuntime {
           const previousAgent = this.deps.runtimeStore.getState().stream.activeAgent || "Gordon";
           this.deps.runtimeStore.markAgentSwitch(event.agentName);
           this.deps.scratchpadStore.recordHandoff({
-            fromWorker: previousAgent as Parameters<ScratchpadStore["recordHandoff"]>[0]["fromWorker"],
-            toWorker: event.agentName as Parameters<ScratchpadStore["recordHandoff"]>[0]["toWorker"],
+            fromWorker: previousAgent as Parameters<
+              ScratchpadStore["recordHandoff"]
+            >[0]["fromWorker"],
+            toWorker: event.agentName as Parameters<
+              ScratchpadStore["recordHandoff"]
+            >[0]["toWorker"],
             reason: "Agent switch during query execution",
           });
           this.deps.transcriptStore.append({
@@ -323,7 +338,8 @@ export class QueryRuntime {
       case "tool_call_end":
         if (event.toolName) {
           const tool = this.deps.toolRegistry.ensure(event.toolName);
-          const activeAgent = this.deps.runtimeStore.getState().stream.activeAgent || tool.workerRole;
+          const activeAgent =
+            this.deps.runtimeStore.getState().stream.activeAgent || tool.workerRole;
           this.deps.runtimeStore.setPermissionScopes([
             ...this.deps.runtimeStore.getState().permissionScopes,
             tool.permissionScope,
@@ -365,7 +381,11 @@ export class QueryRuntime {
   }
 
   private registerBuiltInRuntimeTools(): void {
-    for (const toolId of ["runtime_query_stream", "runtime_query_message", "runtime_query_structured"] as const) {
+    for (const toolId of [
+      "runtime_query_stream",
+      "runtime_query_message",
+      "runtime_query_structured",
+    ] as const) {
       const spec = this.deps.toolRegistry.ensure(toolId);
       this.deps.toolRegistry.registerDefinition({
         spec: {

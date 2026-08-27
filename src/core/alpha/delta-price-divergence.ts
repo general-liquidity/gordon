@@ -226,10 +226,7 @@ export function detectDeltaPriceDivergence(
 
   // Magnitude: geometric mean of normalized price-move and delta magnitudes,
   // each capped at 1. Operator-tunable normalizers.
-  const priceMagNorm = Math.min(
-    1,
-    Math.abs(priceChangePct) / (minPriceMovePct * 4),
-  );
+  const priceMagNorm = Math.min(1, Math.abs(priceChangePct) / (minPriceMovePct * 4));
   const deltaMagNorm =
     minAbsDelta > 0
       ? Math.min(1, absoluteDelta / (minAbsDelta * 4))
@@ -272,9 +269,7 @@ export function detectDeltaPriceDivergence(
   };
 }
 
-export function formatDeltaPriceDivergence(
-  result: DeltaPriceDivergenceResult,
-): string {
+export function formatDeltaPriceDivergence(result: DeltaPriceDivergenceResult): string {
   const lines = [
     `Delta-Price Divergence — ${result.verdict.toUpperCase()}`,
     "",

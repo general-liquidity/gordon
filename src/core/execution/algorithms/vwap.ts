@@ -8,12 +8,7 @@
 
 import type { Exchange } from "../../../infra/exchange/types.ts";
 import { createModuleLogger } from "../../../infra/logger/index.ts";
-import type {
-  VWAPConfig,
-  ExecutionSession,
-  ExecutionSlice,
-  OrderSubmitter,
-} from "./types.ts";
+import type { VWAPConfig, ExecutionSession, ExecutionSlice, OrderSubmitter } from "./types.ts";
 
 const logger = createModuleLogger("vwap-executor");
 
@@ -180,9 +175,7 @@ export class VWAPExecutor {
       slice.status = "filled";
       slice.filledQuantity = result.executedQty ?? effectiveQty;
       slice.avgFillPrice =
-        result.executedQty > 0
-          ? result.cummulativeQuoteQty / result.executedQty
-          : result.price;
+        result.executedQty > 0 ? result.cummulativeQuoteQty / result.executedQty : result.price;
       slice.placedAt = new Date().toISOString();
       slice.filledAt = new Date().toISOString();
 

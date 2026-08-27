@@ -12,7 +12,14 @@
  * abandoned and forcibly removed.
  */
 
-import { existsSync, readFileSync, writeFileSync, unlinkSync, appendFileSync, mkdirSync } from "node:fs";
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  unlinkSync,
+  appendFileSync,
+  mkdirSync,
+} from "node:fs";
 import { dirname, resolve } from "node:path";
 
 // ============================================================================
@@ -75,7 +82,11 @@ function tryAcquireLock(filePath: string, staleMs: number): boolean {
       unlinkSync(lock);
     } catch {
       // Corrupt lock file — remove it
-      try { unlinkSync(lock); } catch { /* ignore */ }
+      try {
+        unlinkSync(lock);
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -144,11 +155,15 @@ export async function atomicWriteFile(
   content: string,
   options?: LockOptions,
 ): Promise<boolean> {
-  return withFileLock(filePath, (path) => {
-    const dir = dirname(path);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(path, content, { encoding: "utf-8", mode: 0o600 });
-  }, options);
+  return withFileLock(
+    filePath,
+    (path) => {
+      const dir = dirname(path);
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      writeFileSync(path, content, { encoding: "utf-8", mode: 0o600 });
+    },
+    options,
+  );
 }
 
 /**
@@ -159,11 +174,15 @@ export async function atomicAppendFile(
   content: string,
   options?: LockOptions,
 ): Promise<boolean> {
-  return withFileLock(filePath, (path) => {
-    const dir = dirname(path);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    appendFileSync(path, content, { encoding: "utf-8", mode: 0o600 });
-  }, options);
+  return withFileLock(
+    filePath,
+    (path) => {
+      const dir = dirname(path);
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      appendFileSync(path, content, { encoding: "utf-8", mode: 0o600 });
+    },
+    options,
+  );
 }
 
 /**
@@ -174,18 +193,22 @@ export async function atomicJsonUpdate<T>(
   updater: (current: T | null) => T,
   options?: LockOptions,
 ): Promise<boolean> {
-  return withFileLock(filePath, (path) => {
-    let current: T | null = null;
-    if (existsSync(path)) {
-      try {
-        current = JSON.parse(readFileSync(path, "utf-8")) as T;
-      } catch {
-        current = null;
+  return withFileLock(
+    filePath,
+    (path) => {
+      let current: T | null = null;
+      if (existsSync(path)) {
+        try {
+          current = JSON.parse(readFileSync(path, "utf-8")) as T;
+        } catch {
+          current = null;
+        }
       }
-    }
-    const updated = updater(current);
-    const dir = dirname(path);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(path, JSON.stringify(updated, null, 2), { encoding: "utf-8", mode: 0o600 });
-  }, options);
+      const updated = updater(current);
+      const dir = dirname(path);
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      writeFileSync(path, JSON.stringify(updated, null, 2), { encoding: "utf-8", mode: 0o600 });
+    },
+    options,
+  );
 }

@@ -100,10 +100,14 @@ export function appReducer(state: AppState, action: Action): AppState {
       return { ...state, streamBuffer: action.buffer };
 
     case "SET_ACTIVE_THINKING":
-      return state.activeThinking === action.thinking ? state : { ...state, activeThinking: action.thinking };
+      return state.activeThinking === action.thinking
+        ? state
+        : { ...state, activeThinking: action.thinking };
 
     case "SET_ACTIVE_TOOL_CALLS":
-      return state.activeToolCalls === action.calls ? state : { ...state, activeToolCalls: action.calls };
+      return state.activeToolCalls === action.calls
+        ? state
+        : { ...state, activeToolCalls: action.calls };
 
     case "UPDATE_STREAMING_MESSAGE": {
       const index = state.messages.findIndex((message) => message.id === action.id);
@@ -132,7 +136,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         activeAgents: state.activeAgents.map((chain) =>
           chain.status === "running"
             ? { ...chain, status: "done" as const, duration: Date.now() - chain.startedAt }
-            : chain
+            : chain,
         ),
       };
 
@@ -239,7 +243,9 @@ export function appReducer(state: AppState, action: Action): AppState {
       return { ...state, modeBanner: action.banner };
 
     case "DISMISS_MODE_BANNER":
-      return state.modeBanner ? { ...state, modeBanner: { ...state.modeBanner, dismissed: true } } : state;
+      return state.modeBanner
+        ? { ...state, modeBanner: { ...state.modeBanner, dismissed: true } }
+        : state;
 
     case "SET_KILL_SWITCH_STATUS":
       return state.killSwitches?.signature === action.status.signature
@@ -288,7 +294,7 @@ export function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         notifications: state.notifications.map((n) =>
-          n.id === action.id ? { ...n, dismissed: true } : n
+          n.id === action.id ? { ...n, dismissed: true } : n,
         ),
       };
 

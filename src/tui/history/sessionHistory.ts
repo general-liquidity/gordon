@@ -77,10 +77,7 @@ export function recordInput(text: string, sessionId: string): void {
  * Current session entries come first (newest first), then other sessions.
  * Deduped by display text.
  */
-export function getFilteredHistory(
-  currentSessionId: string,
-  filter?: string,
-): HistoryEntry[] {
+export function getFilteredHistory(currentSessionId: string, filter?: string): HistoryEntry[] {
   const all = loadHistory();
 
   // Split into current session vs others

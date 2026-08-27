@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import { mkdtempSync, existsSync, readFileSync, appendFileSync } from "node:fs";
+import { mkdtempSync, existsSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -40,9 +40,9 @@ function ex(
 
 describe("defaultEvaluatorCalibrationPath", () => {
   it("honors env override", () => {
-    expect(
-      defaultEvaluatorCalibrationPath({ [EVALUATOR_CALIBRATION_PATH_ENV]: "/x.jsonl" }),
-    ).toBe("/x.jsonl");
+    expect(defaultEvaluatorCalibrationPath({ [EVALUATOR_CALIBRATION_PATH_ENV]: "/x.jsonl" })).toBe(
+      "/x.jsonl",
+    );
   });
   it("falls back to home-dir default", () => {
     expect(defaultEvaluatorCalibrationPath({})).toContain("evaluator-calibration.jsonl");
@@ -90,7 +90,10 @@ describe("selectRelevantExamples", () => {
 
   it("ranks by overlapping tags (+2 each)", () => {
     const pool = [
-      { ...ex("matchy", { tags: ["venue:binance", "asset:btc"] }), registeredAt: "2026-01-01T00:00:00Z" },
+      {
+        ...ex("matchy", { tags: ["venue:binance", "asset:btc"] }),
+        registeredAt: "2026-01-01T00:00:00Z",
+      },
       { ...ex("other"), registeredAt: "2026-02-01T00:00:00Z" },
     ];
     const out = selectRelevantExamples(pool, {
@@ -101,7 +104,10 @@ describe("selectRelevantExamples", () => {
 
   it("ranks by keyword overlap (+1 each)", () => {
     const pool = [
-      { ...ex("desc-match", { description: "momentum strategy on ETH" }), registeredAt: "2026-01-01T00:00:00Z" },
+      {
+        ...ex("desc-match", { description: "momentum strategy on ETH" }),
+        registeredAt: "2026-01-01T00:00:00Z",
+      },
       { ...ex("nope"), registeredAt: "2026-02-01T00:00:00Z" },
     ];
     const out = selectRelevantExamples(pool, { keywords: ["momentum"] });
@@ -133,9 +139,7 @@ describe("buildCalibrationBlock", () => {
   });
 
   it("formats each example with dimensions inline", () => {
-    const block = buildCalibrationBlock([
-      { ...ex("a"), registeredAt: "2026-01-01T00:00:00Z" },
-    ]);
+    const block = buildCalibrationBlock([{ ...ex("a"), registeredAt: "2026-01-01T00:00:00Z" }]);
     expect(block).toContain("CALIBRATION EXAMPLES");
     expect(block).toContain("Example a");
     expect(block).toContain("correctness=2");
@@ -157,21 +161,13 @@ describe("detectDrift", () => {
   });
 
   it("no drift when all dimensions are within tolerance", () => {
-    const report = detectDrift(
-      { correctness: 2.2, safety: 1.8, scope: 1 },
-      example,
-      0.5,
-    );
+    const report = detectDrift({ correctness: 2.2, safety: 1.8, scope: 1 }, example, 0.5);
     expect(report.hasDrift).toBe(false);
     expect(report.maxDrift).toBeCloseTo(0.2);
   });
 
   it("computes total drift across dimensions", () => {
-    const report = detectDrift(
-      { correctness: 1, safety: 1, scope: 0 },
-      example,
-      0.5,
-    );
+    const report = detectDrift({ correctness: 1, safety: 1, scope: 0 }, example, 0.5);
     expect(report.totalDrift).toBe(3);
   });
 

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "bun:test";
-import { ROLE_PROMPT_SECTIONS, type PromptAgentRole } from "../../../../agents/prompt-sections/roles.ts";
+import {
+  ROLE_PROMPT_SECTIONS,
+  type PromptAgentRole,
+} from "../../../../agents/prompt-sections/roles.ts";
 import {
   GORDON_SYSTEM_PROMPT,
   EXECUTOR_SYSTEM_PROMPT,
@@ -14,14 +17,21 @@ import {
  * (until the Phase-4 live runner makes the restatement unnecessary).
  */
 function liveRoleText(role: PromptAgentRole): string {
-  return ROLE_PROMPT_SECTIONS[role].map((s) => s.content).join("\n").toLowerCase();
+  return ROLE_PROMPT_SECTIONS[role]
+    .map((s) => s.content)
+    .join("\n")
+    .toLowerCase();
 }
 
 const CASES: Array<{ role: PromptAgentRole; evalPrompt: string; invariants: string[] }> = [
   {
     role: "gordon",
     evalPrompt: GORDON_SYSTEM_PROMPT,
-    invariants: ["classify_trade_risk", "constitution", "never execute trades without explicit approval"],
+    invariants: [
+      "classify_trade_risk",
+      "constitution",
+      "never execute trades without explicit approval",
+    ],
   },
   {
     role: "executor",

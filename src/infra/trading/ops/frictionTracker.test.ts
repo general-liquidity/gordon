@@ -22,22 +22,18 @@ beforeEach(() => {
 });
 
 function cleanup() {
-  try { rmSync(workDir, { recursive: true, force: true }); } catch { /* ignore */ }
+  try {
+    rmSync(workDir, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
 }
 
 describe("recordFriction", () => {
   it("writes JSONL", () => {
     const env = {};
-    recordFriction(
-      { tradeId: "t1", kind: "commission", costUsd: 2.5 },
-      env,
-      logPath,
-    );
-    recordFriction(
-      { tradeId: "t1", kind: "slippage", costUsd: 12 },
-      env,
-      logPath,
-    );
+    recordFriction({ tradeId: "t1", kind: "commission", costUsd: 2.5 }, env, logPath);
+    recordFriction({ tradeId: "t1", kind: "slippage", costUsd: 12 }, env, logPath);
     const lines = readFileSync(logPath, "utf8").trim().split("\n");
     expect(lines.length).toBe(2);
     const first = JSON.parse(lines[0]!) as FrictionEvent;

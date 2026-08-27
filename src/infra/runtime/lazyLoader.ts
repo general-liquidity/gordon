@@ -47,14 +47,16 @@ export function lazy<T>(importer: () => Promise<T>): LazyModule<T> {
       if (cached) return cached;
       if (loading) return loading;
 
-      loading = importer().then((mod) => {
-        cached = mod;
-        loading = null;
-        return mod;
-      }).catch((err) => {
-        loading = null;
-        throw err;
-      });
+      loading = importer()
+        .then((mod) => {
+          cached = mod;
+          loading = null;
+          return mod;
+        })
+        .catch((err) => {
+          loading = null;
+          throw err;
+        });
 
       return loading;
     },
@@ -87,14 +89,21 @@ function initFlags(): void {
   flagsInitialized = true;
 
   // From environment
-  const envFlags = process.env.GORDON_FEATURES?.split(",").map((f) => f.trim()).filter(Boolean) ?? [];
+  const envFlags =
+    process.env.GORDON_FEATURES?.split(",")
+      .map((f) => f.trim())
+      .filter(Boolean) ?? [];
   for (const flag of envFlags) activeFlags.add(flag);
 
   // From config file
   try {
     const { existsSync, readFileSync } = require("node:fs") as typeof import("node:fs");
     const { join } = require("node:path") as typeof import("node:path");
-    const flagFile = join(process.env.HOME ?? process.env.USERPROFILE ?? ".", ".gordon", "features.json");
+    const flagFile = join(
+      process.env.HOME ?? process.env.USERPROFILE ?? ".",
+      ".gordon",
+      "features.json",
+    );
     if (existsSync(flagFile)) {
       const parsed = JSON.parse(readFileSync(flagFile, "utf-8")) as Record<string, boolean>;
       for (const [flag, enabled] of Object.entries(parsed)) {

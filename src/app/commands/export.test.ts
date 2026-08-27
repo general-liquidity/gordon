@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import path from "path";
+import path from "node:path";
 
 import { resolveOutputPath } from "./export.ts";
 

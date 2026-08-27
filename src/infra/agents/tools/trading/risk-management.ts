@@ -18,7 +18,6 @@ import {
   ExitConditionChecker,
   DrawdownTracker,
 } from "../../../../core/risk-management/index.ts";
-import { getGordonContext, type MastraExecutionContext } from "../types.ts";
 
 // ============================================================================
 // Kelly Criterion Position Sizing Tool
@@ -52,7 +51,8 @@ export const calculateKellySizeTool = createTool({
 
     let interpretation: string;
     if (result.kellyPercent <= 0) {
-      interpretation = "Negative edge detected. Either improve win rate or risk/reward ratio before trading.";
+      interpretation =
+        "Negative edge detected. Either improve win rate or risk/reward ratio before trading.";
     } else if (result.kellyPercent > 25) {
       interpretation = `Full Kelly suggests ${result.kellyPercent.toFixed(1)}% which is aggressive. Using capped 25% for safety. Consider half-Kelly (${(result.kellyPercent / 2).toFixed(1)}%) for more conservative sizing.`;
     } else if (result.kellyPercent < 5) {
@@ -84,9 +84,23 @@ export const calculateVolatilityAdjustedSizeTool = createTool({
     "Use when entering volatile markets or during high-volatility periods.",
   inputSchema: z.object({
     balance: z.number().positive().describe("Current account balance in USD"),
-    stopLossPercent: z.number().positive().describe("Stop loss distance as percentage (e.g., 5 = 5%)"),
-    volatility: z.number().min(0).max(2).describe("Volatility measure (0-1 scale, e.g., 0.3 = 30% volatility, can exceed 1 for extreme volatility)"),
-    riskPercent: z.number().min(0.1).max(10).default(2).describe("Risk per trade as percentage of balance (default 2%)"),
+    stopLossPercent: z
+      .number()
+      .positive()
+      .describe("Stop loss distance as percentage (e.g., 5 = 5%)"),
+    volatility: z
+      .number()
+      .min(0)
+      .max(2)
+      .describe(
+        "Volatility measure (0-1 scale, e.g., 0.3 = 30% volatility, can exceed 1 for extreme volatility)",
+      ),
+    riskPercent: z
+      .number()
+      .min(0.1)
+      .max(10)
+      .default(2)
+      .describe("Risk per trade as percentage of balance (default 2%)"),
   }),
   outputSchema: z.object({
     baseSize: z.number(),
@@ -135,10 +149,18 @@ export const checkDailyLimitTool = createTool({
     "Tracks realized P&L and determines if trading should continue. " +
     "Use before opening new positions to ensure daily limits aren't exceeded.",
   inputSchema: z.object({
-    startingBalance: z.number().positive().optional().describe("Starting balance for percentage calculations"),
+    startingBalance: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Starting balance for percentage calculations"),
     unrealizedPnL: z.number().default(0).describe("Current unrealized P&L across all positions"),
     dailyLossLimitUsd: z.number().positive().default(500).describe("Maximum daily loss in USD"),
-    dailyLossLimitPercent: z.number().positive().default(5).describe("Maximum daily loss as percentage of balance"),
+    dailyLossLimitPercent: z
+      .number()
+      .positive()
+      .default(5)
+      .describe("Maximum daily loss as percentage of balance"),
   }),
   outputSchema: z.object({
     date: z.string(),
@@ -190,7 +212,11 @@ export const checkExitConditionsTool = createTool({
     currentPrice: z.number().positive().describe("Current market price"),
     side: z.enum(["buy", "sell"]).describe("Position side"),
     entryTime: z.string().describe("Entry time (ISO format or timestamp)"),
-    quantity: z.number().positive().optional().describe("Position quantity for USD P&L calculation"),
+    quantity: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Position quantity for USD P&L calculation"),
     targetPercent: z.number().default(8).describe("Take profit target percentage"),
     stopLossPercent: z.number().default(-5).describe("Stop loss percentage (negative)"),
     maxMinutesInPosition: z.number().default(240).describe("Maximum minutes to hold position"),
@@ -202,12 +228,14 @@ export const checkExitConditionsTool = createTool({
     pnlPercent: z.number(),
     pnlUsd: z.number().nullable(),
     minutesHeld: z.number(),
-    signals: z.array(z.object({
-      type: z.string(),
-      shouldExit: z.boolean(),
-      reason: z.string().nullable(),
-      urgency: z.string(),
-    })),
+    signals: z.array(
+      z.object({
+        type: z.string(),
+        shouldExit: z.boolean(),
+        reason: z.string().nullable(),
+        urgency: z.string(),
+      }),
+    ),
     interpretation: z.string(),
   }),
   execute: async ({
@@ -364,7 +392,14 @@ export const assessTradeRiskTool = createTool({
     }),
     recommendation: z.string(),
   }),
-  execute: async ({ balance, peakBalance, proposedSize, stopLossPercent, dailyPnL, dailyLossLimit }) => {
+  execute: async ({
+    balance,
+    peakBalance,
+    proposedSize,
+    stopLossPercent,
+    dailyPnL,
+    dailyLossLimit,
+  }) => {
     const reasons: string[] = [];
     let tradeAllowed = true;
     let adjustedSize = proposedSize;
@@ -388,7 +423,9 @@ export const assessTradeRiskTool = createTool({
     if (potentialLoss > dailyStatus.remainingAllowance) {
       const maxSize = (dailyStatus.remainingAllowance / stopLossPercent) * 100;
       adjustedSize = Math.min(adjustedSize, maxSize);
-      reasons.push(`Size reduced to stay within daily limit. Max loss: $${dailyStatus.remainingAllowance.toFixed(2)}`);
+      reasons.push(
+        `Size reduced to stay within daily limit. Max loss: $${dailyStatus.remainingAllowance.toFixed(2)}`,
+      );
     }
 
     // Check drawdown
@@ -420,14 +457,12 @@ export const assessTradeRiskTool = createTool({
     riskScore = Math.min(100, Math.max(0, riskScore));
 
     const riskLevel: "low" | "medium" | "high" | "extreme" =
-      riskScore < 25 ? "low" :
-      riskScore < 50 ? "medium" :
-      riskScore < 75 ? "high" : "extreme";
+      riskScore < 25 ? "low" : riskScore < 50 ? "medium" : riskScore < 75 ? "high" : "extreme";
 
     // Generate recommendation
     let recommendation: string;
     if (!tradeAllowed) {
-      recommendation = "Trade NOT allowed. " + reasons.join(" ");
+      recommendation = `Trade NOT allowed. ${reasons.join(" ")}`;
     } else if (adjustedSize < proposedSize) {
       recommendation = `Trade allowed with reduced size: $${adjustedSize.toFixed(2)} (originally $${proposedSize.toFixed(2)}).`;
     } else if (riskLevel === "high") {

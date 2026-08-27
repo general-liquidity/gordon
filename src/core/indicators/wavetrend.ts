@@ -85,7 +85,7 @@ function calculateCMF(candles: Candle[], period: number = 21): number | null {
 
   for (const c of window) {
     const range = c.high - c.low;
-    const mfm = range > 0 ? ((c.close - c.low) - (c.high - c.close)) / range : 0;
+    const mfm = range > 0 ? (c.close - c.low - (c.high - c.close)) / range : 0;
     mfvSum += mfm * c.volume;
     volSum += c.volume;
   }
@@ -110,7 +110,7 @@ export function calculateWaveTrend(
   averageLen: number = 21,
   maLen: number = 4,
   overboughtLevel: number = 60,
-  oversoldLevel: number = -60
+  oversoldLevel: number = -60,
 ): WaveTrendResult {
   if (candles.length < Math.max(channelLen, averageLen) + 5) {
     return {
@@ -184,7 +184,7 @@ export function calculateWaveTrend(
     crossover,
     momentum,
     cmfBias,
-    cmf
+    cmf,
   );
 
   return {
@@ -206,9 +206,9 @@ function buildWaveTrendInterpretation(
   wt2: number,
   zone: string,
   crossover: string,
-  momentum: string,
+  _momentum: string,
   cmfBias: string,
-  cmf: number | null
+  cmf: number | null,
 ): string {
   let msg = `WaveTrend: WT1=${wt1.toFixed(1)}, WT2=${wt2.toFixed(1)}. `;
 

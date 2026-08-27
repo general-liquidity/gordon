@@ -33,12 +33,53 @@ const MAX_RESULTS = 5;
 
 /** Words too common to be useful for matching */
 const STOP_WORDS: ReadonlySet<string> = new Set([
-  "the", "a", "an", "is", "are", "was", "were", "be", "been",
-  "being", "have", "has", "had", "do", "does", "did", "will",
-  "would", "could", "should", "may", "might", "shall", "can",
-  "of", "in", "to", "for", "with", "on", "at", "from", "by",
-  "as", "it", "its", "this", "that", "and", "or", "but", "not",
-  "no", "if", "so", "up", "out",
+  "the",
+  "a",
+  "an",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "being",
+  "have",
+  "has",
+  "had",
+  "do",
+  "does",
+  "did",
+  "will",
+  "would",
+  "could",
+  "should",
+  "may",
+  "might",
+  "shall",
+  "can",
+  "of",
+  "in",
+  "to",
+  "for",
+  "with",
+  "on",
+  "at",
+  "from",
+  "by",
+  "as",
+  "it",
+  "its",
+  "this",
+  "that",
+  "and",
+  "or",
+  "but",
+  "not",
+  "no",
+  "if",
+  "so",
+  "up",
+  "out",
 ]);
 
 // ============================================================================
@@ -60,10 +101,8 @@ function tokenize(query: string): string[] {
  * Build a searchable text blob from a memory entry.
  * Includes name, description, type, and content for comprehensive matching.
  */
-function buildSearchText(entry: MemoryEntry): string {
-  return [entry.name, entry.description, entry.type, entry.content]
-    .join(" ")
-    .toLowerCase();
+function _buildSearchText(entry: MemoryEntry): string {
+  return [entry.name, entry.description, entry.type, entry.content].join(" ").toLowerCase();
 }
 
 /**
@@ -75,7 +114,10 @@ function buildSearchText(entry: MemoryEntry): string {
  * - +1 for each term found in the content body
  * - Bonus: +1 for each additional occurrence in content (up to 3 extra per term)
  */
-function scoreEntry(entry: MemoryEntry, terms: string[]): { score: number; matchedTerms: string[] } {
+function scoreEntry(
+  entry: MemoryEntry,
+  terms: string[],
+): { score: number; matchedTerms: string[] } {
   if (terms.length === 0) return { score: 0, matchedTerms: [] };
 
   const nameLower = entry.name.toLowerCase();
@@ -163,10 +205,7 @@ export function useMemoryRelevance(query: string): RelevanceResult[] {
     // Sort by score descending, then by last modified descending for ties
     scored.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
-      return (
-        new Date(b.entry.lastModified).getTime() -
-        new Date(a.entry.lastModified).getTime()
-      );
+      return new Date(b.entry.lastModified).getTime() - new Date(a.entry.lastModified).getTime();
     });
 
     return scored.slice(0, MAX_RESULTS);

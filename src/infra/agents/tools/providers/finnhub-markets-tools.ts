@@ -17,10 +17,16 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { finnhub, isFinnhubConfigured, FINNHUB_NOT_CONFIGURED_MSG } from "../../../data/providers/finnhub.ts";
+import {
+  finnhub,
+  isFinnhubConfigured,
+  FINNHUB_NOT_CONFIGURED_MSG,
+} from "../../../data/providers/finnhub.ts";
 import { registerSymbols } from "../../../../tui/components/messages/markdownPalette.ts";
 
-function unconfigured<T extends Record<string, unknown>>(extra: T): T & { configured: false; error: string } {
+function unconfigured<T extends Record<string, unknown>>(
+  extra: T,
+): T & { configured: false; error: string } {
   return { ...extra, configured: false as const, error: FINNHUB_NOT_CONFIGURED_MSG };
 }
 
@@ -84,7 +90,7 @@ export const getStockCandlesTool = createTool({
     const to = Math.floor(Date.now() / 1000);
     const from = to - (daysBack ?? 90) * 86_400;
     const candles = await finnhub.getStockCandles(symbol, resolution ?? "D", from, to);
-    if (!candles || candles.s !== "ok")
+    if (candles?.s !== "ok")
       return {
         configured: true,
         symbol,
@@ -500,7 +506,8 @@ export const getMutualFundHoldingsTool = createTool({
 
 export const getMutualFundCountryExposureTool = createTool({
   id: "get_mutual_fund_country_exposure",
-  description: "Country exposure breakdown for a mutual fund — same structure as the ETF equivalent.",
+  description:
+    "Country exposure breakdown for a mutual fund — same structure as the ETF equivalent.",
   inputSchema: z.object({ symbol: z.string() }),
   outputSchema: z.object({
     configured: z.boolean(),
@@ -521,7 +528,8 @@ export const getMutualFundCountryExposureTool = createTool({
 
 export const getMutualFundSectorExposureTool = createTool({
   id: "get_mutual_fund_sector_exposure",
-  description: "Sector exposure breakdown for a mutual fund — same structure as the ETF equivalent.",
+  description:
+    "Sector exposure breakdown for a mutual fund — same structure as the ETF equivalent.",
   inputSchema: z.object({ symbol: z.string() }),
   outputSchema: z.object({
     configured: z.boolean(),
@@ -576,7 +584,11 @@ export const getBondYieldCurveTool = createTool({
     "regime classification, curve-shape analysis, and rates-driven risk " +
     "management.",
   inputSchema: z.object({
-    code: z.string().optional().default("10y").describe("Tenor code, e.g. '3m', '2y', '10y', '30y'"),
+    code: z
+      .string()
+      .optional()
+      .default("10y")
+      .describe("Tenor code, e.g. '3m', '2y', '10y', '30y'"),
   }),
   outputSchema: z.object({
     configured: z.boolean(),
@@ -679,7 +691,9 @@ export const getFinnhubCryptoCandlesTool = createTool({
     "cross-exchange sanity checks and for exchanges Gordon doesn't " +
     "natively wrap.",
   inputSchema: z.object({
-    symbol: z.string().describe("Finnhub-formatted symbol, e.g. 'BINANCE:BTCUSDT', 'COINBASE:BTC-USD'"),
+    symbol: z
+      .string()
+      .describe("Finnhub-formatted symbol, e.g. 'BINANCE:BTCUSDT', 'COINBASE:BTC-USD'"),
     resolution: resolutionEnum.optional().default("D"),
     daysBack: z.number().int().min(1).max(3650).optional().default(30),
   }),
@@ -697,7 +711,7 @@ export const getFinnhubCryptoCandlesTool = createTool({
     const to = Math.floor(Date.now() / 1000);
     const from = to - (daysBack ?? 30) * 86_400;
     const candles = await finnhub.getCryptoCandles(symbol, resolution ?? "D", from, to);
-    if (!candles || candles.s !== "ok")
+    if (candles?.s !== "ok")
       return {
         configured: true,
         symbol,

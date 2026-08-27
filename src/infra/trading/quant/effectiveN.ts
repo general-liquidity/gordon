@@ -159,9 +159,7 @@ export function computeEffectiveN(input: EffectiveNInput): EffectiveNResult {
 
   if (input.correlationMatrix && input.correlationMatrix.length > 0) {
     matrix = input.correlationMatrix.map((row) => [...row]);
-    labels = input.labels
-      ? [...input.labels]
-      : matrix.map((_, i) => `signal_${i}`);
+    labels = input.labels ? [...input.labels] : matrix.map((_, i) => `signal_${i}`);
   } else if (input.signals && input.signals.length > 0) {
     matrix = buildCorrelationMatrix(input.signals);
     labels = input.signals.map((s) => s.signalId);

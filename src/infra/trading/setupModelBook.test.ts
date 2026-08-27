@@ -127,23 +127,31 @@ describe("model-book persistence", () => {
   it("round-trips candidates and outcomes, last-write-wins per horizon", () => {
     recordCandidate(cand("c1"), path);
     recordCandidate(cand("c2", { symbol: "ETH" }), path);
-    recordOutcome("c1", {
-      horizon: "3d",
-      computedAt: "2026-07-04T00:00:00.000Z",
-      mfePct: 0.05,
-      maePct: -0.01,
-      closePct: 0.03,
-      outcomeTag: "win",
-    }, path);
+    recordOutcome(
+      "c1",
+      {
+        horizon: "3d",
+        computedAt: "2026-07-04T00:00:00.000Z",
+        mfePct: 0.05,
+        maePct: -0.01,
+        closePct: 0.03,
+        outcomeTag: "win",
+      },
+      path,
+    );
     // superseding 3d outcome for c1
-    recordOutcome("c1", {
-      horizon: "3d",
-      computedAt: "2026-07-04T12:00:00.000Z",
-      mfePct: 0.07,
-      maePct: -0.01,
-      closePct: 0.06,
-      outcomeTag: "win",
-    }, path);
+    recordOutcome(
+      "c1",
+      {
+        horizon: "3d",
+        computedAt: "2026-07-04T12:00:00.000Z",
+        mfePct: 0.07,
+        maePct: -0.01,
+        closePct: 0.06,
+        outcomeTag: "win",
+      },
+      path,
+    );
 
     const book = readModelBook(path);
     expect(book).toHaveLength(2);
@@ -153,14 +161,18 @@ describe("model-book persistence", () => {
   });
 
   it("skips orphan outcomes with no candidate", () => {
-    recordOutcome("ghost", {
-      horizon: "5d",
-      computedAt: "2026-07-06T00:00:00.000Z",
-      mfePct: 0.1,
-      maePct: 0,
-      closePct: 0.1,
-      outcomeTag: "win",
-    }, path);
+    recordOutcome(
+      "ghost",
+      {
+        horizon: "5d",
+        computedAt: "2026-07-06T00:00:00.000Z",
+        mfePct: 0.1,
+        maePct: 0,
+        closePct: 0.1,
+        outcomeTag: "win",
+      },
+      path,
+    );
     expect(readModelBook(path)).toHaveLength(0);
   });
 
@@ -175,7 +187,11 @@ function makeEntry(
   id: string,
   tags: string[],
   closePct: number,
-  extra: Partial<{ mfePct: number; maePct: number; tag: "win" | "loss" | "target_hit" | "stopped_out" | "scratch" }> = {},
+  extra: Partial<{
+    mfePct: number;
+    maePct: number;
+    tag: "win" | "loss" | "target_hit" | "stopped_out" | "scratch";
+  }> = {},
 ): SetupModelBookEntry {
   return {
     candidate: cand(id, { setupTags: tags }),

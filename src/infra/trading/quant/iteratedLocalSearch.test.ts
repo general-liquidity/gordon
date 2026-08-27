@@ -55,7 +55,7 @@ describe("computeIteratedLocalSearch — improvement", () => {
       seed: 13,
     });
     expect(Math.abs(r.bestState[0]! - 3)).toBeLessThan(1);
-    expect(Math.abs(r.bestState[1]! - (-2))).toBeLessThan(1);
+    expect(Math.abs(r.bestState[1]! - -2)).toBeLessThan(1);
   });
 });
 

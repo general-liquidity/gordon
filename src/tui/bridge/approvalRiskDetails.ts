@@ -10,7 +10,10 @@
  */
 
 import type { RiskAuditEntry, RiskCheck } from "../../core/risk-kernel/audit.ts";
-import type { ApprovalCounterOffer, ApprovalRiskDetails } from "../components/dialogs/ApprovalDialog.tsx";
+import type {
+  ApprovalCounterOffer,
+  ApprovalRiskDetails,
+} from "../components/dialogs/ApprovalDialog.tsx";
 
 export const MAX_RISK_REASONS = 3;
 export const MAX_REASON_CHARS = 120;
@@ -62,7 +65,9 @@ export function buildApprovalRiskDetails(
   const failed = entry.decision.checks
     .filter((check) => !check.passed)
     .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
-  const riskReasons = failed.slice(0, MAX_RISK_REASONS).map((check) => truncateReason(check.details));
+  const riskReasons = failed
+    .slice(0, MAX_RISK_REASONS)
+    .map((check) => truncateReason(check.details));
 
   const counterOffer: ApprovalCounterOffer | undefined =
     entry.decision.action === "modify" && entry.decision.modifiedOrder
@@ -83,9 +88,10 @@ export function buildApprovalRiskDetails(
  * (DB unavailable, no audit table yet) yields undefined and the dialog
  * renders without enrichment.
  */
-export async function fetchApprovalRiskDetails(
-  approval: { toolName: string; requestedAt: string },
-): Promise<ApprovalRiskDetails | undefined> {
+export async function fetchApprovalRiskDetails(approval: {
+  toolName: string;
+  requestedAt: string;
+}): Promise<ApprovalRiskDetails | undefined> {
   if (!isOrderExecutionTool(approval.toolName)) return undefined;
   try {
     // Lazy import: keeps the SQLite/audit dependency out of module load

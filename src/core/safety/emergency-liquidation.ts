@@ -15,6 +15,12 @@ import { createModuleLogger } from "../../infra/logger/index.ts";
 import { StrategyRuntime } from "../runtime/engine.ts";
 import type { CircuitBreakerTrigger } from "../../gateway/circuit-breakers/baseline.ts";
 import { assertConsentForExposure } from "../../infra/trading/execution/preflight.ts";
+import {
+  generateDeterministicClientOrderId,
+  placeOrderIdempotent,
+  repairProtectiveOrders,
+  waitForFill,
+} from "../pipeline/executor.ts";
 
 const logger = createModuleLogger("emergency-liquidation");
 
@@ -245,14 +251,20 @@ async function closeAllOpenPositions(
 
       // Determine exit side from the plan's direction
       const plan = getPlan(trade.planId);
-      const exitSide: "BUY" | "SELL" = plan?.direction === "short" ? "BUY" : "SELL";
+      if (!plan) {
+        throw new Error("cannot derive an exit side because the trade's plan is missing");
+      }
+      const exitSide: "BUY" | "SELL" = plan.direction === "short" ? "BUY" : "SELL";
 
       const closeOrder = {
         symbol: trade.symbol,
         side: exitSide,
         type: "MARKET" as const,
         quantity: remainingQty,
-        newClientOrderId: `gordon_emergency_${trade.id.slice(0, 8)}_${Date.now()}`,
+        newClientOrderId: generateDeterministicClientOrderId(
+          trade.planId,
+          `em_${trade.exits.length.toString(36)}_${Math.round(remainingQty * 1e8).toString(36)}`,
+        ),
       };
 
       // Exposure-reducing: not gated on live consent, but the reduction is
@@ -268,38 +280,70 @@ async function closeAllOpenPositions(
         },
       });
 
-      const orderResult = await exchange.placeOrder(closeOrder);
+      const orderResult = await placeOrderIdempotent(exchange, closeOrder, {
+        direction: "REDUCES_EXPOSURE",
+        reduction: {
+          side: closeOrder.side,
+          quantity: closeOrder.quantity,
+          exitSide,
+          remainingQuantity: remainingQty,
+        },
+      });
+
+      let executedQty = orderResult.executedQty;
+      let exitPrice =
+        executedQty > 0 && orderResult.cummulativeQuoteQty > 0
+          ? orderResult.cummulativeQuoteQty / executedQty
+          : orderResult.price;
+      if (orderResult.status !== "FILLED") {
+        const fill = await waitForFill(exchange, trade.symbol, orderResult.orderId.toString(), {
+          onPartialFill: "cancel",
+        });
+        executedQty = Math.min(remainingQty, fill.fillStatus.filledQuantity);
+        exitPrice = fill.fillStatus.averagePrice;
+      }
+      if (executedQty <= 0) {
+        throw new Error(
+          `emergency close ${orderResult.orderId} was acknowledged but no execution was confirmed`,
+        );
+      }
 
       // Update trade record
-      const exitPrice =
-        orderResult.executedQty > 0
-          ? orderResult.cummulativeQuoteQty / orderResult.executedQty
-          : orderResult.price;
-
       const updatedTrade = { ...trade };
       updatedTrade.exits = [
         ...updatedTrade.exits,
         {
           orderId: orderResult.orderId.toString(),
           price: exitPrice,
-          quantity: orderResult.executedQty ?? remainingQty,
+          quantity: executedQty,
           filledAt: new Date().toISOString(),
           reason: "STOP" as const,
         },
       ];
-      updatedTrade.status = "CLOSED";
-      updatedTrade.closedAt = new Date().toISOString();
+      const fullyClosed = executedQty >= remainingQty - 1e-8;
+      updatedTrade.status = fullyClosed ? "CLOSED" : "PARTIAL";
+      updatedTrade.closedAt = fullyClosed ? new Date().toISOString() : null;
 
       // Recalculate PnL (invert for shorts: short profits when price drops)
       const avgEntry = trade.averageEntry || 0;
       const pnlMultiplier = plan?.direction === "short" ? -1 : 1;
       updatedTrade.realizedPnl =
-        (trade.realizedPnl ?? 0) +
-        pnlMultiplier * (exitPrice - avgEntry) * (orderResult.executedQty ?? remainingQty);
+        (trade.realizedPnl ?? 0) + pnlMultiplier * (exitPrice - avgEntry) * executedQty;
 
       updateTrade(trade.id, updatedTrade);
-      result.positionsClosed++;
-      closedBySymbol.set(trade.symbol, (closedBySymbol.get(trade.symbol) ?? 0) + 1);
+      if (fullyClosed) {
+        result.positionsClosed++;
+        closedBySymbol.set(trade.symbol, (closedBySymbol.get(trade.symbol) ?? 0) + 1);
+      } else {
+        const repair = await repairProtectiveOrders(trade.planId, exchange);
+        const protectionState =
+          repair.repaired || repair.reason === "protective_orders_intact"
+            ? "protection restored"
+            : `protection not restored (${repair.reason})`;
+        result.errors.push(
+          `Close position ${trade.id} (${trade.symbol}) only filled ${executedQty} of ${remainingQty}; remainder stays open and ${protectionState}`,
+        );
+      }
 
       logger.info("Emergency closed position", {
         tradeId: trade.id,

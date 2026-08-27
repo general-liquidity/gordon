@@ -247,14 +247,14 @@ function fitOnce(
 
     // xi[t][i][j] = posterior P(q_t=i, q_{t+1}=j | O). Aggregate sum
     // over t for the M-step transition update.
-    const xiSum: number[][] = Array.from({ length: nStates }, () => new Array<number>(nStates).fill(0));
+    const xiSum: number[][] = Array.from({ length: nStates }, () =>
+      new Array<number>(nStates).fill(0),
+    );
     for (let t = 0; t < T - 1; t++) {
       const denomTerms: number[] = [];
       for (let i = 0; i < nStates; i++) {
         for (let j = 0; j < nStates; j++) {
-          denomTerms.push(
-            logAlpha[t]![i]! + logA[i]![j]! + logB[t + 1]![j]! + logBeta[t + 1]![j]!,
-          );
+          denomTerms.push(logAlpha[t]![i]! + logA[i]![j]! + logB[t + 1]![j]! + logBeta[t + 1]![j]!);
         }
       }
       const denom = logSumExp(denomTerms);
@@ -394,9 +394,7 @@ function permuteHmm(
   const newPi = perm.map((p) => pi[p]!);
   const newMu = perm.map((p) => mu[p]!);
   const newSigma2 = perm.map((p) => sigma2[p]!);
-  const newA: number[][] = perm.map((iSrc) =>
-    perm.map((jSrc) => A[iSrc]![jSrc]!),
-  );
+  const newA: number[][] = perm.map((iSrc) => perm.map((jSrc) => A[iSrc]![jSrc]!));
   const newStates = states.map((s) => invPerm[s]!);
   return { pi: newPi, A: newA, mu: newMu, sigma2: newSigma2, states: newStates };
 }

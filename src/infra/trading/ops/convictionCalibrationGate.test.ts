@@ -33,9 +33,7 @@ describe("evaluateCalibration — sample size gate", () => {
   });
 
   it("default min is 100 per Wright Ch 9", () => {
-    expect(evaluateCalibration({ trades: makeTrades(99, true) }).status).toBe(
-      "insufficient_data",
-    );
+    expect(evaluateCalibration({ trades: makeTrades(99, true) }).status).toBe("insufficient_data");
     expect(evaluateCalibration({ trades: makeTrades(100, true) }).status).not.toBe(
       "insufficient_data",
     );

@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  verifyHiddenBeta,
-  formatHiddenBetaVerifier,
-} from "./hidden-beta-verifier.ts";
-import type { FactorSeries } from "../../infra/trading/quant/hedgeFundReplication.ts";
+import { verifyHiddenBeta, formatHiddenBetaVerifier } from "./hidden-beta-verifier.ts";
 
 function genReturns(seed: number, n: number, mean = 0, vol = 0.01): number[] {
   let x = seed;
@@ -82,11 +78,7 @@ describe("verifyHiddenBeta", () => {
     const btc = genReturns(101, 200);
     const alts = genReturns(102, 200);
     const noise = genReturns(999, 200, 0, 0.003);
-    const portfolio = addSeries(
-      addSeries(noise, btc, 0.4),
-      alts,
-      0.3,
-    );
+    const portfolio = addSeries(addSeries(noise, btc, 0.4), alts, 0.3);
     const r = verifyHiddenBeta({
       portfolioReturns: portfolio,
       factors: [
@@ -159,10 +151,7 @@ describe("verifyHiddenBeta", () => {
     });
     expect(r.factorExplainedRSquared).toBeGreaterThanOrEqual(0);
     expect(r.factorExplainedRSquared).toBeLessThanOrEqual(1);
-    expect(r.residualVarianceFraction).toBeCloseTo(
-      1 - r.factorExplainedRSquared,
-      6,
-    );
+    expect(r.residualVarianceFraction).toBeCloseTo(1 - r.factorExplainedRSquared, 6);
   });
 
   test("perFactor preserves factor ordering from input", () => {

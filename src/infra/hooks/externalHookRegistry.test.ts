@@ -31,33 +31,45 @@ afterEach(() => {
 
 describe("loadExternalHookConfig", () => {
   test("accepts the documented object form", () => {
-    const path = tempFile("hooks.json", JSON.stringify({
-      hooks: [{ id: "audit", point: "PostToolUse", handlerPath: process.execPath }],
-    }));
+    const path = tempFile(
+      "hooks.json",
+      JSON.stringify({
+        hooks: [{ id: "audit", point: "PostToolUse", handlerPath: process.execPath }],
+      }),
+    );
     expect(loadExternalHookConfig(path)).toHaveLength(1);
   });
 
   test("rejects duplicate ids and unknown points", () => {
-    const duplicate = tempFile("duplicate.json", JSON.stringify([
-      { id: "x", point: "Stop", handlerPath: process.execPath },
-      { id: "x", point: "Stop", handlerPath: process.execPath },
-    ]));
+    const duplicate = tempFile(
+      "duplicate.json",
+      JSON.stringify([
+        { id: "x", point: "Stop", handlerPath: process.execPath },
+        { id: "x", point: "Stop", handlerPath: process.execPath },
+      ]),
+    );
     expect(() => loadExternalHookConfig(duplicate)).toThrow("Duplicate");
-    const unknown = tempFile("unknown.json", JSON.stringify([
-      { id: "x", point: "Imaginary", handlerPath: process.execPath },
-    ]));
+    const unknown = tempFile(
+      "unknown.json",
+      JSON.stringify([{ id: "x", point: "Imaginary", handlerPath: process.execPath }]),
+    );
     expect(() => loadExternalHookConfig(unknown)).toThrow("supported lifecycle");
   });
 
   test("rejects a non-positive timeout before any handler is registered", () => {
-    const path = tempFile("timeout.json", JSON.stringify({
-      hooks: [{
-        id: "no-deadline",
-        point: "PreToolUse",
-        handlerPath: process.execPath,
-        timeoutMs: 0,
-      }],
-    }));
+    const path = tempFile(
+      "timeout.json",
+      JSON.stringify({
+        hooks: [
+          {
+            id: "no-deadline",
+            point: "PreToolUse",
+            handlerPath: process.execPath,
+            timeoutMs: 0,
+          },
+        ],
+      }),
+    );
     expect(() => loadExternalHookConfig(path)).toThrow("timeoutMs must be greater than zero");
   });
 
@@ -69,13 +81,23 @@ describe("loadExternalHookConfig", () => {
 
 describe("installExternalHooks", () => {
   test("enabled runner installs and dispatches configured hooks", async () => {
-    const handler = tempFile("handler.mjs", "process.stdout.write(JSON.stringify({action:'block',reason:'operator policy'}));");
-    const config = tempFile("hooks.json", JSON.stringify({ hooks: [{
-      id: "operator-stop",
-      point: "Stop",
-      handlerPath: process.execPath,
-      args: [handler],
-    }] }));
+    const handler = tempFile(
+      "handler.mjs",
+      "process.stdout.write(JSON.stringify({action:'block',reason:'operator policy'}));",
+    );
+    const config = tempFile(
+      "hooks.json",
+      JSON.stringify({
+        hooks: [
+          {
+            id: "operator-stop",
+            point: "Stop",
+            handlerPath: process.execPath,
+            args: [handler],
+          },
+        ],
+      }),
+    );
     const env = {
       [EXTERNAL_HOOK_RUNNER_FLAG_ENV]: "1",
       [EXTERNAL_HOOKS_PATH_ENV]: config,
@@ -90,23 +112,34 @@ describe("installExternalHooks", () => {
 
   test("enabled runner fails closed when config is missing", () => {
     const missing = join(tmpdir(), `missing-hooks-${crypto.randomUUID()}.json`);
-    expect(() => installExternalHooks({
-      [EXTERNAL_HOOK_RUNNER_FLAG_ENV]: "1",
-      [EXTERNAL_HOOKS_PATH_ENV]: missing,
-    })).toThrow("were not installed");
+    expect(() =>
+      installExternalHooks({
+        [EXTERNAL_HOOK_RUNNER_FLAG_ENV]: "1",
+        [EXTERNAL_HOOKS_PATH_ENV]: missing,
+      }),
+    ).toThrow("were not installed");
     expect(getExternalHookInstallerState().installed).toBe(false);
   });
 
   test("enabled runner fails closed at startup when a handler is missing", () => {
-    const config = tempFile("hooks.json", JSON.stringify({ hooks: [{
-      id: "missing-handler",
-      point: "PreToolUse",
-      handlerPath: "./does-not-exist",
-    }] }));
-    expect(() => installExternalHooks({
-      [EXTERNAL_HOOK_RUNNER_FLAG_ENV]: "1",
-      [EXTERNAL_HOOKS_PATH_ENV]: config,
-    })).toThrow(/handler not found/);
+    const config = tempFile(
+      "hooks.json",
+      JSON.stringify({
+        hooks: [
+          {
+            id: "missing-handler",
+            point: "PreToolUse",
+            handlerPath: "./does-not-exist",
+          },
+        ],
+      }),
+    );
+    expect(() =>
+      installExternalHooks({
+        [EXTERNAL_HOOK_RUNNER_FLAG_ENV]: "1",
+        [EXTERNAL_HOOKS_PATH_ENV]: config,
+      }),
+    ).toThrow(/handler not found/);
     expect(getExternalHookInstallerState().installed).toBe(false);
     expect(listHooks()).toHaveLength(0);
   });

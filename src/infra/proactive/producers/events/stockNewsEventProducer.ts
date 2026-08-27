@@ -111,7 +111,9 @@ async function pullRssHeadlines(tickers: string[]): Promise<Map<string, Candidat
   return out;
 }
 
-export const stockNewsEventProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
+export const stockNewsEventProducer: CandidateProducer = async (
+  obs,
+): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop" || obs.eventType !== "tick_stock_news_event") return [];
 
   const watchlist = getStockWatchlist();
@@ -141,7 +143,11 @@ export const stockNewsEventProducer: CandidateProducer = async (obs): Promise<Pr
         if (e.score.confidence < STRONG_SIGNAL_CONFIDENCE) continue;
       }
       const conf = isFiling ? Math.max(0.7, e.score.confidence) : e.score.confidence;
-      if (!best || conf > (best.source === "edgar" ? Math.max(0.7, best.score.confidence) : best.score.confidence)) {
+      if (
+        !best ||
+        conf >
+          (best.source === "edgar" ? Math.max(0.7, best.score.confidence) : best.score.confidence)
+      ) {
         best = e;
       }
     }
@@ -150,11 +156,7 @@ export const stockNewsEventProducer: CandidateProducer = async (obs): Promise<Pr
     fired.add(best.link);
 
     const isFiling = best.source === "edgar";
-    const tone = isFiling
-      ? "Filing"
-      : best.score.sentiment === "bullish"
-        ? "Bullish"
-        : "Bearish";
+    const tone = isFiling ? "Filing" : best.score.sentiment === "bullish" ? "Bullish" : "Bearish";
     const action = isFiling
       ? `Read the 8-K — material events on ${ticker} (M&A, guidance, exec changes) move the stock fast.`
       : best.score.sentiment === "bullish"

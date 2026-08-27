@@ -8,7 +8,11 @@
 // vim state machine, adapted to Gordon's grapheme-index cursor model.
 // ============================================================================
 
-export enum VimMode { Insert = "INSERT", Normal = "NORMAL", Visual = "VISUAL" }
+export enum VimMode {
+  Insert = "INSERT",
+  Normal = "NORMAL",
+  Visual = "VISUAL",
+}
 
 export type Operator = "delete" | "change" | "yank";
 export type FindType = "f" | "F" | "t" | "T";
@@ -108,12 +112,19 @@ export function isTextObjScopeKey(key: string): key is keyof typeof TEXT_OBJ_SCO
 }
 
 export const TEXT_OBJ_TYPES = new Set([
-  "w", "W",
-  '"', "'", "`",
-  "(", ")",
-  "[", "]",
-  "{", "}",
-  "<", ">",
+  "w",
+  "W",
+  '"',
+  "'",
+  "`",
+  "(",
+  ")",
+  "[",
+  "]",
+  "{",
+  "}",
+  "<",
+  ">",
 ]);
 
 export const MAX_VIM_COUNT = 10000;

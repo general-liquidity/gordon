@@ -125,7 +125,9 @@ export class CoinGeckoOnchainDataSource implements DataSource {
       url.searchParams.set("limit", "1000");
 
       const json = await this.get<{
-        data?: { attributes?: { ohlcv_list?: Array<[number, number, number, number, number, number]> } };
+        data?: {
+          attributes?: { ohlcv_list?: Array<[number, number, number, number, number, number]> };
+        };
       }>(url.toString());
 
       const list = json?.data?.attributes?.ohlcv_list ?? [];

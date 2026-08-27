@@ -33,32 +33,15 @@ const listGeneratedStrategiesTool = createTool({
     "Use when the user asks to 'show my strategies', 'list generated strategies', " +
     "or 'what strategies have I created'.",
   inputSchema: z.object({
-    riskLevel: z
-      .enum(["low", "medium", "high"])
-      .optional()
-      .describe("Filter by risk level"),
-    minReturn: z
-      .number()
-      .optional()
-      .describe("Filter by minimum backtest return percentage"),
-    minSharpe: z
-      .number()
-      .optional()
-      .describe("Filter by minimum Sharpe ratio"),
+    riskLevel: z.enum(["low", "medium", "high"]).optional().describe("Filter by risk level"),
+    minReturn: z.number().optional().describe("Filter by minimum backtest return percentage"),
+    minSharpe: z.number().optional().describe("Filter by minimum Sharpe ratio"),
     orderBy: z
       .enum(["createdAt", "backtestReturn", "backtestSharpe", "name"])
       .default("createdAt")
       .describe("Field to order results by"),
-    orderDirection: z
-      .enum(["asc", "desc"])
-      .default("desc")
-      .describe("Sort direction"),
-    limit: z
-      .number()
-      .min(1)
-      .max(50)
-      .default(10)
-      .describe("Maximum number of results"),
+    orderDirection: z.enum(["asc", "desc"]).default("desc").describe("Sort direction"),
+    limit: z.number().min(1).max(50).default(10).describe("Maximum number of results"),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -74,7 +57,7 @@ const listGeneratedStrategiesTool = createTool({
           backtestReturn: z.number().optional(),
           backtestSharpe: z.number().optional(),
           backtestWinRate: z.number().optional(),
-        })
+        }),
       )
       .optional(),
     totalCount: z.number().optional(),
@@ -123,13 +106,8 @@ const deleteGeneratedStrategyTool = createTool({
     "Use when the user asks to 'delete strategy X', 'remove strategy', " +
     "or 'clean up old strategies'.",
   inputSchema: z.object({
-    strategyId: z
-      .string()
-      .describe("ID of the strategy to delete"),
-    confirm: z
-      .boolean()
-      .default(false)
-      .describe("Confirmation flag - must be true to proceed"),
+    strategyId: z.string().describe("ID of the strategy to delete"),
+    confirm: z.boolean().default(false).describe("Confirmation flag - must be true to proceed"),
   }),
   outputSchema: z.object({
     success: z.boolean(),

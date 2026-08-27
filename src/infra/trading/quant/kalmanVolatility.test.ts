@@ -1,12 +1,9 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  kalmanVolatility,
-  kalmanVolatilityToPayload,
-} from "./kalmanVolatility.ts";
+import { kalmanVolatility, kalmanVolatilityToPayload } from "./kalmanVolatility.ts";
 
 function makeRng(seed: number): () => number {
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   return () => {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return s / 0x100000000;
@@ -30,7 +27,7 @@ function simulateReturns(n: number, sigma: number, seed = 1): number[] {
 
 describe("kalmanVolatility — constant-vol recovery", () => {
   it("converges to ~10% annualized for σ_daily = 10%/sqrt(252)", () => {
-    const dailySigma = 0.10 / Math.sqrt(252);
+    const dailySigma = 0.1 / Math.sqrt(252);
     const returns = simulateReturns(2000, dailySigma, 42);
     const r = kalmanVolatility({ returns, q: 0.01, r: 1.0 });
     expect(r.currentAnnualVol).toBeGreaterThan(0.05);
@@ -38,7 +35,7 @@ describe("kalmanVolatility — constant-vol recovery", () => {
   });
 
   it("converges materially above the 10% scenario for σ_daily = 30%/sqrt(252)", () => {
-    const dailySigma = 0.30 / Math.sqrt(252);
+    const dailySigma = 0.3 / Math.sqrt(252);
     const returns = simulateReturns(2000, dailySigma, 7);
     const r = kalmanVolatility({ returns, q: 0.01, r: 1.0 });
     // Finite-sample chi-squared variance estimation has natural downward pull;
@@ -50,8 +47,8 @@ describe("kalmanVolatility — constant-vol recovery", () => {
 
 describe("kalmanVolatility — regime shift", () => {
   it("tracks a step change from low to high vol", () => {
-    const lowSigma = 0.10 / Math.sqrt(252);
-    const highSigma = 0.40 / Math.sqrt(252);
+    const lowSigma = 0.1 / Math.sqrt(252);
+    const highSigma = 0.4 / Math.sqrt(252);
     const lowReturns = simulateReturns(400, lowSigma, 11);
     const highReturns = simulateReturns(400, highSigma, 12);
     const returns = [...lowReturns, ...highReturns];
@@ -66,7 +63,7 @@ describe("kalmanVolatility — regime shift", () => {
 
 describe("kalmanVolatility — q controls responsiveness", () => {
   it("higher q produces wider min-to-max range than lower q on same series", () => {
-    const dailySigma = 0.20 / Math.sqrt(252);
+    const dailySigma = 0.2 / Math.sqrt(252);
     const returns = simulateReturns(1000, dailySigma, 99);
     const slow = kalmanVolatility({ returns, q: 0.001, r: 1.0 });
     const fast = kalmanVolatility({ returns, q: 0.5, r: 1.0 });

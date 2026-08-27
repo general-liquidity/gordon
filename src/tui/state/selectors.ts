@@ -124,8 +124,7 @@ export const selectUserMessages = createMemoSelector(
 /** Only gordon/assistant messages */
 export const selectGordonMessages = createMemoSelector(
   (state: AppState) => state.messages,
-  (messages): Message[] =>
-    messages.filter((m) => m.role === "gordon" || m.role === "assistant"),
+  (messages): Message[] => messages.filter((m) => m.role === "gordon" || m.role === "assistant"),
 );
 
 // ============================================================================
@@ -254,8 +253,7 @@ export function selectBackgroundTasks(state: AppState): BackgroundTask[] {
 /** Number of active (non-completed) background tasks */
 export const selectActiveBackgroundTaskCount = createMemoSelector(
   (state: AppState) => state.backgroundTasks,
-  (tasks): number =>
-    tasks.filter((t) => t.status !== "completed" && t.status !== "failed").length,
+  (tasks): number => tasks.filter((t) => t.status !== "completed" && t.status !== "failed").length,
 );
 
 // ============================================================================
@@ -270,15 +268,13 @@ export function selectNotifications(state: AppState): TuiNotification[] {
 /** Active (non-dismissed) notifications */
 export const selectActiveNotifications = createMemoSelector(
   (state: AppState) => state.notifications,
-  (notifications): TuiNotification[] =>
-    notifications.filter((n) => !n.dismissed),
+  (notifications): TuiNotification[] => notifications.filter((n) => !n.dismissed),
 );
 
 /** Count of active notifications */
 export const selectActiveNotificationCount = createMemoSelector(
   (state: AppState) => state.notifications,
-  (notifications): number =>
-    notifications.filter((n) => !n.dismissed).length,
+  (notifications): number => notifications.filter((n) => !n.dismissed).length,
 );
 
 // ============================================================================
@@ -376,7 +372,14 @@ export function selectDialogPayload<T>(state: AppState, id: DialogId): T | undef
 
 /** Whether any modal overlay is active (palette, setup, help) */
 export function selectHasActiveOverlay(state: AppState): boolean {
-  return state.showPalette || state.showSetup || state.showHelp || state.showResetConfirm || state.pager !== null || state.activeOverlayView !== null;
+  return (
+    state.showPalette ||
+    state.showSetup ||
+    state.showHelp ||
+    state.showResetConfirm ||
+    state.pager !== null ||
+    state.activeOverlayView !== null
+  );
 }
 
 /** Summary object for the footer/status bar */

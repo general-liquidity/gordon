@@ -32,20 +32,30 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-function installMockFetch(requests: CapturedRequest[], route: (request: CapturedRequest) => Response): void {
+function installMockFetch(
+  requests: CapturedRequest[],
+  route: (request: CapturedRequest) => Response,
+): void {
   globalThis.fetch = (async (input: FetchInput, init?: FetchInit): Promise<Response> => {
-    const url = typeof input === "string"
-      ? new URL(input)
-      : input instanceof URL
-        ? input
-        : new URL(input.url);
-    const method = (init?.method || (typeof input === "object" && "method" in input ? input.method : "GET")).toUpperCase();
-    const headers = new Headers(init?.headers || (typeof input === "object" && "headers" in input ? input.headers : undefined));
-    const bodyText = typeof init?.body === "string"
-      ? init.body
-      : init?.body instanceof URLSearchParams
-        ? init.body.toString()
-        : "";
+    const url =
+      typeof input === "string"
+        ? new URL(input)
+        : input instanceof URL
+          ? input
+          : new URL(input.url);
+    const method = (
+      init?.method || (typeof input === "object" && "method" in input ? input.method : "GET")
+    ).toUpperCase();
+    const headers = new Headers(
+      init?.headers ||
+        (typeof input === "object" && "headers" in input ? input.headers : undefined),
+    );
+    const bodyText =
+      typeof init?.body === "string"
+        ? init.body
+        : init?.body instanceof URLSearchParams
+          ? init.body.toString()
+          : "";
 
     const request: CapturedRequest = {
       url,
@@ -126,19 +136,23 @@ function runBrokerConformanceSuite(scenario: BrokerScenario): void {
     });
 
     test("rejects order placement without qty/notional", async () => {
-      await expect(adapter.placeOrder({
-        symbol: "AAPL",
-        side: "buy",
-        type: "market",
-        timeInForce: "day",
-      })).rejects.toThrow("qty or notional");
+      await expect(
+        adapter.placeOrder({
+          symbol: "AAPL",
+          side: "buy",
+          type: "market",
+          timeInForce: "day",
+        }),
+      ).rejects.toThrow("qty or notional");
     });
 
     test("uses authenticated headers", async () => {
       await adapter.getAccount();
       const authRequest = requests.find((request) => request.url.pathname.includes("/account"));
       expect(authRequest).toBeDefined();
-      expect((authRequest?.headers.get("accept") || "").toLowerCase()).toContain("application/json");
+      expect((authRequest?.headers.get("accept") || "").toLowerCase()).toContain(
+        "application/json",
+      );
     });
   });
 }
@@ -181,32 +195,36 @@ runBrokerConformanceSuite({
     }
 
     if (pathname === "/v2/positions" && request.method === "GET") {
-      return json([{
-        symbol: "AAPL",
-        qty: "2",
-        side: "long",
-        market_value: "410.52",
-        avg_entry_price: "200.00",
-        unrealized_pl: "10.52",
-        unrealized_plpc: "0.0263",
-      }]);
+      return json([
+        {
+          symbol: "AAPL",
+          qty: "2",
+          side: "long",
+          market_value: "410.52",
+          avg_entry_price: "200.00",
+          unrealized_pl: "10.52",
+          unrealized_plpc: "0.0263",
+        },
+      ]);
     }
 
     if (pathname === "/v2/orders" && request.method === "GET") {
       expect(searchParams.get("status")).toBe("open");
       expect(searchParams.get("limit")).toBe("2");
-      return json([{
-        id: "order-1",
-        client_order_id: "client-1",
-        symbol: "AAPL",
-        side: "buy",
-        type: "market",
-        time_in_force: "day",
-        status: "new",
-        qty: "2",
-        filled_qty: "0",
-        extended_hours: false,
-      }]);
+      return json([
+        {
+          id: "order-1",
+          client_order_id: "client-1",
+          symbol: "AAPL",
+          side: "buy",
+          type: "market",
+          time_in_force: "day",
+          status: "new",
+          qty: "2",
+          filled_qty: "0",
+          extended_hours: false,
+        },
+      ]);
     }
 
     if (pathname === "/v2/orders/order-1" && request.method === "GET") {
@@ -262,6 +280,8 @@ runBrokerConformanceSuite({
       });
     }
 
-    return new Response(`Unhandled route: ${request.method} ${request.url.toString()}`, { status: 500 });
+    return new Response(`Unhandled route: ${request.method} ${request.url.toString()}`, {
+      status: 500,
+    });
   },
 });

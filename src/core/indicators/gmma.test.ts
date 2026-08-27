@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { calculateGMMA } from "./gmma.ts";
 
-const rising = Array.from({ length: 140 }, (_, i) => 100 * Math.pow(1.005, i));
-const falling = Array.from({ length: 140 }, (_, i) => 100 * Math.pow(0.995, i));
+const rising = Array.from({ length: 140 }, (_, i) => 100 * 1.005 ** i);
+const falling = Array.from({ length: 140 }, (_, i) => 100 * 0.995 ** i);
 const flat = Array.from({ length: 140 }, (_, i) => 100 + 0.5 * Math.sin(i * 0.3));
 
 describe("calculateGMMA", () => {
@@ -29,8 +29,10 @@ describe("calculateGMMA", () => {
   });
 
   it("flat-then-rally flips to an uptrend signal without NaN", () => {
-    const series = [...Array.from({ length: 80 }, () => 100 + 0.3 * Math.sin(Math.random())),
-      ...Array.from({ length: 40 }, (_, i) => 100 * Math.pow(1.01, i + 1))];
+    const series = [
+      ...Array.from({ length: 80 }, () => 100 + 0.3 * Math.sin(Math.random())),
+      ...Array.from({ length: 40 }, (_, i) => 100 * 1.01 ** (i + 1)),
+    ];
     const r = calculateGMMA(series);
     expect(Number.isFinite(r.separationPct)).toBe(true);
     expect(r.trend).toBe("up");

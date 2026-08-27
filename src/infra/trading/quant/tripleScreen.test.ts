@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  evaluateTripleScreen,
-  tripleScreenToPayload,
-} from "./tripleScreen.ts";
+import { evaluateTripleScreen, tripleScreenToPayload } from "./tripleScreen.ts";
 
 describe("evaluateTripleScreen — gating", () => {
   it("flat major trend → no_trade", () => {

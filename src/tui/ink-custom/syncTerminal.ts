@@ -54,17 +54,14 @@ function parseLeadingInt(version: string | undefined): number {
  * blocking I/O — purely a function of the provided env bag. Pass a mock
  * env object from tests instead of mutating `process.env`.
  */
-export function detectTerminalCapability(
-  env: NodeJS.ProcessEnv = process.env,
-): TerminalCapability {
+export function detectTerminalCapability(env: NodeJS.ProcessEnv = process.env): TerminalCapability {
   const term = (env.TERM ?? "").toLowerCase();
   const termProgram = env.TERM_PROGRAM ?? "";
   const termProgramVersion = env.TERM_PROGRAM_VERSION ?? "";
   const isDumb = term === "dumb";
   const inTmux = typeof env.TMUX === "string" && env.TMUX.length > 0;
   const inScreen = typeof env.STY === "string" && env.STY.length > 0;
-  const inWindowsTerminal =
-    typeof env.WT_SESSION === "string" && env.WT_SESSION.length > 0;
+  const inWindowsTerminal = typeof env.WT_SESSION === "string" && env.WT_SESSION.length > 0;
 
   // --- supportsSyncUpdate -------------------------------------------------
   let supportsSyncUpdate = false;
@@ -129,9 +126,7 @@ export function detectTerminalCapability(
  * supported; otherwise returns the payload unchanged so callers can use a
  * single code path regardless of the host.
  */
-export function createSyncTerminal(
-  env: NodeJS.ProcessEnv = process.env,
-): SyncTerminal {
+export function createSyncTerminal(env: NodeJS.ProcessEnv = process.env): SyncTerminal {
   const capability = detectTerminalCapability(env);
   return {
     capability,

@@ -20,7 +20,13 @@ export interface VZOInput {
   period?: number;
 }
 
-export type VZOZone = "overbought" | "bullish" | "neutral" | "bearish" | "oversold" | "insufficient";
+export type VZOZone =
+  | "overbought"
+  | "bullish"
+  | "neutral"
+  | "bearish"
+  | "oversold"
+  | "insufficient";
 
 export interface VZOResult {
   values: (number | null)[];

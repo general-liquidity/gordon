@@ -12,30 +12,21 @@ describe("Stochastic Oscillator (%K/%D)", () => {
 
   test("close at period high → %K = 100", () => {
     // window highs/lows over 3 bars: HH=30, LL=10; last close=30 → 100*(30-10)/(30-10)=100
-    const r = calculateStochastic(
-      [bar(20, 10, 15), bar(25, 12, 20), bar(30, 18, 30)],
-      fast,
-    );
+    const r = calculateStochastic([bar(20, 10, 15), bar(25, 12, 20), bar(30, 18, 30)], fast);
     expect(r.current.k).toBeCloseTo(100, 6);
     expect(r.signal).toBe("overbought");
   });
 
   test("close at period low → %K = 0", () => {
     // HH=30, LL=10; last close=10 → 100*(10-10)/20 = 0
-    const r = calculateStochastic(
-      [bar(20, 10, 15), bar(25, 12, 20), bar(30, 18, 10)],
-      fast,
-    );
+    const r = calculateStochastic([bar(20, 10, 15), bar(25, 12, 20), bar(30, 18, 10)], fast);
     expect(r.current.k).toBeCloseTo(0, 6);
     expect(r.signal).toBe("oversold");
   });
 
   test("close at midpoint → %K = 50", () => {
     // HH=30, LL=10; last close=20 → 100*(20-10)/20 = 50
-    const r = calculateStochastic(
-      [bar(20, 10, 15), bar(25, 12, 18), bar(30, 18, 20)],
-      fast,
-    );
+    const r = calculateStochastic([bar(20, 10, 15), bar(25, 12, 18), bar(30, 18, 20)], fast);
     expect(r.current.k).toBeCloseTo(50, 6);
     expect(r.signal).toBe("neutral");
   });
@@ -50,10 +41,11 @@ describe("Stochastic Oscillator (%K/%D)", () => {
     // smoothed %K (SMA period 2):
     //   at b2: (100+40)/2 = 70
     //   at b3: (40+100)/2 = 70
-    const r = calculateStochastic(
-      [bar(10, 2, 5), bar(12, 4, 12), bar(14, 6, 8), bar(16, 8, 16)],
-      { kPeriod: 2, kSmooth: 2, dPeriod: 1 },
-    );
+    const r = calculateStochastic([bar(10, 2, 5), bar(12, 4, 12), bar(14, 6, 8), bar(16, 8, 16)], {
+      kPeriod: 2,
+      kSmooth: 2,
+      dPeriod: 1,
+    });
     expect(r.k[2]).toBeCloseTo(70, 6);
     expect(r.k[3]).toBeCloseTo(70, 6);
     expect(r.current.k).toBeCloseTo(70, 6);
@@ -62,20 +54,14 @@ describe("Stochastic Oscillator (%K/%D)", () => {
 
   test("flat-range bar (HH == LL) → null", () => {
     // All bars identical h/l → range 0 over the window → rawK null → k null
-    const r = calculateStochastic(
-      [bar(10, 10, 10), bar(10, 10, 10), bar(10, 10, 10)],
-      fast,
-    );
+    const r = calculateStochastic([bar(10, 10, 10), bar(10, 10, 10), bar(10, 10, 10)], fast);
     expect(r.k[r.k.length - 1]).toBeNull();
     expect(r.current.k).toBeNull();
     expect(r.signal).toBe("neutral");
   });
 
   test("null warmup prefix before kPeriod", () => {
-    const r = calculateStochastic(
-      [bar(20, 10, 15), bar(25, 12, 20), bar(30, 18, 30)],
-      fast,
-    );
+    const r = calculateStochastic([bar(20, 10, 15), bar(25, 12, 20), bar(30, 18, 30)], fast);
     expect(r.k[0]).toBeNull();
     expect(r.k[1]).toBeNull();
     expect(r.k[2]).not.toBeNull();

@@ -90,7 +90,7 @@ function firstMeaningfulLine(content: string, cap: number): string {
  */
 function looksToolResultish(content: string): boolean {
   if (content.length < 1500) return false;
-  if (/^\s*[\[{]/.test(content)) return true; // starts JSON-ish
+  if (/^\s*[[{]/.test(content)) return true; // starts JSON-ish
   if (/```(json|csv|tsv|xml|yaml)/i.test(content)) return true;
   if (/Tool result:|tool_result|\[GORDON_TOOL_CONTEXT\]/.test(content)) return true;
   return false;

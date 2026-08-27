@@ -204,10 +204,7 @@ export interface RemappingTable {
 
 export interface PoolMigrator {
   /** Walk the front frame + live hyperlinks, collect used IDs. */
-  captureSnapshot(
-    frontFrame: CellBuffer,
-    hyperlinkPool: HyperlinkPool,
-  ): PoolSnapshot;
+  captureSnapshot(frontFrame: CellBuffer, hyperlinkPool: HyperlinkPool): PoolSnapshot;
 
   /**
    * Build fresh pools containing only live items from the snapshot,

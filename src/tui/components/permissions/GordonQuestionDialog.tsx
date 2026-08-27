@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 
@@ -58,9 +58,14 @@ export function GordonQuestionDialog({ question, options, timeoutMs, onAnswer, o
         paddingX={2}
         paddingY={1}
       >
-        <Text color="cyanBright" bold>{"?"} Gordon needs clarification</Text>
+        <Text color="cyanBright" bold>
+          {"?"} Gordon needs clarification
+        </Text>
         <Text> </Text>
-        <Text>{"  "}{question}</Text>
+        <Text>
+          {"  "}
+          {question}
+        </Text>
         <Text> </Text>
         {options && options.length > 0 ? (
           <Box paddingLeft={2}>
@@ -73,7 +78,9 @@ export function GordonQuestionDialog({ question, options, timeoutMs, onAnswer, o
           </Box>
         )}
         {timeoutMs != null && timeoutMs > 0 && (
-          <Text dimColor>{"  "}Auto-skip in {countdownSecs}s...</Text>
+          <Text dimColor>
+            {"  "}Auto-skip in {countdownSecs}s...
+          </Text>
         )}
       </Box>
     </Box>
@@ -100,7 +107,9 @@ function TextInput({ onSubmit, onSkip }: { onSubmit: (v: string) => void; onSkip
     <Box>
       <Text color="cyanBright">{">"} </Text>
       <Text>{value}</Text>
-      <Text color="cyanBright" inverse>{" "}</Text>
+      <Text color="cyanBright" inverse>
+        {" "}
+      </Text>
     </Box>
   );
 }

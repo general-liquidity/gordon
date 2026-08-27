@@ -108,7 +108,7 @@ function validatePriceLevels(plan: Plan): string[] {
     // Stop loss must be below entry
     if (entryPrice !== null && plan.stopLoss.price >= entryPrice) {
       issues.push(
-        `Stop-loss ($${plan.stopLoss.price.toFixed(2)}) must be below entry ($${entryPrice.toFixed(2)}) for long positions`
+        `Stop-loss ($${plan.stopLoss.price.toFixed(2)}) must be below entry ($${entryPrice.toFixed(2)}) for long positions`,
       );
     }
 
@@ -116,7 +116,7 @@ function validatePriceLevels(plan: Plan): string[] {
     for (const tp of plan.takeProfit) {
       if (entryPrice !== null && tp.price <= entryPrice) {
         issues.push(
-          `Take profit ($${tp.price.toFixed(2)}) must be above entry ($${entryPrice.toFixed(2)}) for long positions`
+          `Take profit ($${tp.price.toFixed(2)}) must be above entry ($${entryPrice.toFixed(2)}) for long positions`,
         );
       }
     }
@@ -126,7 +126,7 @@ function validatePriceLevels(plan: Plan): string[] {
       for (const dca of plan.dca) {
         if (entryPrice !== null && dca.price >= entryPrice) {
           issues.push(
-            `DCA level ($${dca.price.toFixed(2)}) must be below entry ($${entryPrice.toFixed(2)}) for long positions`
+            `DCA level ($${dca.price.toFixed(2)}) must be below entry ($${entryPrice.toFixed(2)}) for long positions`,
           );
         }
       }
@@ -137,7 +137,7 @@ function validatePriceLevels(plan: Plan): string[] {
       const lowestGridLevel = plan.grid.levels[plan.grid.levels.length - 1];
       if (lowestGridLevel && plan.stopLoss.price >= lowestGridLevel.price) {
         issues.push(
-          `Stop-loss ($${plan.stopLoss.price.toFixed(2)}) must be below lowest grid level ($${lowestGridLevel.price.toFixed(2)})`
+          `Stop-loss ($${plan.stopLoss.price.toFixed(2)}) must be below lowest grid level ($${lowestGridLevel.price.toFixed(2)})`,
         );
       }
     }
@@ -154,7 +154,10 @@ function validateRiskRewardRatio(plan: Plan): { issues: string[]; ratio: number 
   const entryPrice = plan.entry.price;
 
   if (entryPrice === null || plan.takeProfit.length === 0) {
-    return { issues: ["Cannot calculate R:R ratio without entry price and take profit levels"], ratio: 0 };
+    return {
+      issues: ["Cannot calculate R:R ratio without entry price and take profit levels"],
+      ratio: 0,
+    };
   }
 
   // Calculate risk (distance from entry to stop)
@@ -174,7 +177,7 @@ function validateRiskRewardRatio(plan: Plan): { issues: string[]; ratio: number 
 
   if (ratio < MIN_RISK_REWARD_RATIO) {
     issues.push(
-      `Risk/reward ratio (${ratio.toFixed(2)}:1) is below minimum acceptable (${MIN_RISK_REWARD_RATIO}:1)`
+      `Risk/reward ratio (${ratio.toFixed(2)}:1) is below minimum acceptable (${MIN_RISK_REWARD_RATIO}:1)`,
     );
   }
 
@@ -192,14 +195,14 @@ function validateAllocation(plan: Plan, context: GordonContext): string[] {
   // Check allocation doesn't exceed max percent
   if (allocation.percentOfPortfolio > MAX_ALLOCATION_PERCENT) {
     issues.push(
-      `Allocation (${(allocation.percentOfPortfolio * 100).toFixed(1)}%) exceeds maximum allowed (${MAX_ALLOCATION_PERCENT * 100}%)`
+      `Allocation (${(allocation.percentOfPortfolio * 100).toFixed(1)}%) exceeds maximum allowed (${MAX_ALLOCATION_PERCENT * 100}%)`,
     );
   }
 
   // Check allocation doesn't exceed available cash
   if (allocation.amount > availableCash * 0.95) {
     issues.push(
-      `Allocation ($${allocation.amount.toFixed(2)}) exceeds 95% of available cash ($${availableCash.toFixed(2)})`
+      `Allocation ($${allocation.amount.toFixed(2)}) exceeds 95% of available cash ($${availableCash.toFixed(2)})`,
     );
   }
 
@@ -207,7 +210,7 @@ function validateAllocation(plan: Plan, context: GordonContext): string[] {
   const expectedPercent = allocation.amount / portfolioValue;
   if (Math.abs(expectedPercent - allocation.percentOfPortfolio) > 0.01) {
     issues.push(
-      `Allocation percentage (${(allocation.percentOfPortfolio * 100).toFixed(1)}%) doesn't match amount relative to portfolio value`
+      `Allocation percentage (${(allocation.percentOfPortfolio * 100).toFixed(1)}%) doesn't match amount relative to portfolio value`,
     );
   }
 
@@ -229,13 +232,13 @@ function validateStopLossDistance(plan: Plan): string[] {
 
   if (stopDistance > MAX_STOP_LOSS_DISTANCE_PERCENT) {
     issues.push(
-      `Stop loss distance (${(stopDistance * 100).toFixed(1)}%) exceeds maximum (${MAX_STOP_LOSS_DISTANCE_PERCENT * 100}%)`
+      `Stop loss distance (${(stopDistance * 100).toFixed(1)}%) exceeds maximum (${MAX_STOP_LOSS_DISTANCE_PERCENT * 100}%)`,
     );
   }
 
   if (stopDistance < MIN_STOP_LOSS_DISTANCE_PERCENT) {
     issues.push(
-      `Stop loss distance (${(stopDistance * 100).toFixed(1)}%) is below minimum (${MIN_STOP_LOSS_DISTANCE_PERCENT * 100}%)`
+      `Stop loss distance (${(stopDistance * 100).toFixed(1)}%) is below minimum (${MIN_STOP_LOSS_DISTANCE_PERCENT * 100}%)`,
     );
   }
 
@@ -258,7 +261,7 @@ function validateTakeProfitStructure(plan: Plan): string[] {
   const totalPercent = takeProfit.reduce((sum, tp) => sum + tp.percentToSell, 0);
   if (Math.abs(totalPercent - 1.0) > 0.01) {
     issues.push(
-      `Take profit percentages sum to ${(totalPercent * 100).toFixed(1)}% instead of 100%`
+      `Take profit percentages sum to ${(totalPercent * 100).toFixed(1)}% instead of 100%`,
     );
   }
 
@@ -302,7 +305,7 @@ function validateGridConfig(plan: Plan): string[] {
   const totalPercent = grid.levels.reduce((sum, level) => sum + level.percentOfAllocation, 0);
   if (Math.abs(totalPercent - 1.0) > 0.01) {
     issues.push(
-      `Grid level percentages sum to ${(totalPercent * 100).toFixed(1)}% instead of 100%`
+      `Grid level percentages sum to ${(totalPercent * 100).toFixed(1)}% instead of 100%`,
     );
   }
 
@@ -359,7 +362,7 @@ export function reflectOnPlanRules(plan: Plan, context: GordonContext): Reflecti
     ...allocationIssues,
     ...stopLossIssues,
     ...tpIssues,
-    ...gridIssues
+    ...gridIssues,
   );
 
   // Generate suggestions for each issue
@@ -438,7 +441,7 @@ function generateSuggestion(issue: string, plan: Plan): string {
 export async function reflectOnPlanWithLLM(
   plan: Plan,
   context: GordonContext,
-  options: ReflectionOptions = {}
+  options: ReflectionOptions = {},
 ): Promise<ReflectionResult> {
   const startTime = Date.now();
   const { llm } = context;
@@ -491,7 +494,7 @@ Analyze this plan and identify any issues.`;
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ],
-      LLMReflectionResultSchema
+      LLMReflectionResultSchema,
     );
 
     const result: ReflectionResult = {
@@ -665,7 +668,8 @@ export async function scorePlanRationaleConsistency(
   options: ReflectionOptions = {},
 ): Promise<TriangularConsistencyResult | null> {
   if (!isRationaleConsistencyEnabled()) return null;
-  const judge = options.rationaleJudge ?? (context.llm ? createLLMTriangularJudge(context.llm) : null);
+  const judge =
+    options.rationaleJudge ?? (context.llm ? createLLMTriangularJudge(context.llm) : null);
   if (!judge) return null;
 
   const result = await scoreTriangularConsistency(buildPlanRationaleTriple(plan), judge);
@@ -683,9 +687,10 @@ export async function scorePlanRationaleConsistency(
  * a judge outage is not evidence against the plan: it degrades the pass to a
  * note. A result that WAS scored and came back low is a real finding.
  */
-export function rationaleConsistencyFindings(
-  result: TriangularConsistencyResult,
-): { issues: string[]; suggestions: string[] } {
+export function rationaleConsistencyFindings(result: TriangularConsistencyResult): {
+  issues: string[];
+  suggestions: string[];
+} {
   if (!result.scored) {
     return {
       issues: [],
@@ -716,7 +721,7 @@ export function rationaleConsistencyFindings(
 export async function reflectOnPlan(
   plan: Plan,
   context: GordonContext,
-  options: ReflectionOptions = {}
+  options: ReflectionOptions = {},
 ): Promise<ReflectionResult> {
   const startTime = Date.now();
 
@@ -780,7 +785,7 @@ export async function reflectOnPlan(
 export async function reflectOnAnalysis(
   analysisContent: string,
   context: GordonContext,
-  options: ReflectionOptions = {}
+  options: ReflectionOptions = {},
 ): Promise<ReflectionResult> {
   const startTime = Date.now();
   const { llm } = context;
@@ -830,7 +835,7 @@ Identify any contradictions, unsupported claims, or logical issues.`;
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ],
-      LLMReflectionResultSchema
+      LLMReflectionResultSchema,
     );
 
     return {
@@ -867,7 +872,7 @@ export async function reflectWithLLM(
   content: string,
   contentType: "plan" | "analysis" | "strategy" | "custom",
   context: GordonContext,
-  customPrompt?: string
+  customPrompt?: string,
 ): Promise<ReflectionResult> {
   const startTime = Date.now();
   const { llm } = context;
@@ -910,7 +915,7 @@ Respond with JSON:
         { role: "system", content: systemPrompt },
         { role: "user", content: `Review this content:\n\n${content}` },
       ],
-      LLMReflectionResultSchema
+      LLMReflectionResultSchema,
     );
 
     return {
@@ -950,7 +955,7 @@ Respond with JSON:
 async function emitReflectionEvent(
   plan: Plan,
   result: ReflectionResult,
-  method: "rules" | "llm" | "combined"
+  method: "rules" | "llm" | "combined",
 ): Promise<void> {
   const analysis = result.isValid
     ? `Plan ${plan.id} passed reflection (confidence: ${(result.confidence * 100).toFixed(0)}%)`

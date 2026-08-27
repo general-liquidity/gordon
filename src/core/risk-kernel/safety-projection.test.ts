@@ -278,8 +278,9 @@ describe("safety projection", () => {
 
     expect(result.verdict).toBe("infeasible");
     expect(result.action).toBeNull();
-    expect(result.telemetry.constraints.find((c) => c.name === "drawdown")!.slackProjected)
-      .toBeLessThan(0);
+    expect(
+      result.telemetry.constraints.find((c) => c.name === "drawdown")!.slackProjected,
+    ).toBeLessThan(0);
   });
 
   test("soft, hard and infeasible outcomes do not collapse into one blocked verdict", () => {

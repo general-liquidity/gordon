@@ -1,4 +1,3 @@
-import React from "react";
 import { Text } from "../../ink-custom";
 import { useAnimationClock } from "../../hooks/animation/useAnimationClock.js";
 
@@ -21,7 +20,12 @@ interface Props {
   bold?: boolean;
 }
 
-export function FlashingChar({ char = "!", color = "yellow", intervalMs = 400, bold = false }: Props) {
+export function FlashingChar({
+  char = "!",
+  color = "yellow",
+  intervalMs = 400,
+  bold = false,
+}: Props) {
   const frame = useAnimationClock(intervalMs);
   const visible = frame % 2 === 1;
 

@@ -22,7 +22,7 @@ function splitByQuery(text: string, query: string): Segment[] {
   let remaining = text;
   const lowerRemaining = text.toLowerCase();
   const lowerQuery = query.toLowerCase();
-  let offset = 0;
+  let _offset = 0;
 
   let idx = lowerRemaining.indexOf(lowerQuery);
   while (idx !== -1) {
@@ -31,7 +31,7 @@ function splitByQuery(text: string, query: string): Segment[] {
     }
     segments.push({ text: remaining.slice(idx, idx + query.length), match: true });
     remaining = remaining.slice(idx + query.length);
-    offset += idx + query.length;
+    _offset += idx + query.length;
     idx = remaining.toLowerCase().indexOf(lowerQuery);
   }
 
@@ -42,7 +42,10 @@ function splitByQuery(text: string, query: string): Segment[] {
   return segments;
 }
 
-export const HighlightedThinkingText = React.memo(function HighlightedThinkingText({ text, query }: Props) {
+export const HighlightedThinkingText = React.memo(function HighlightedThinkingText({
+  text,
+  query,
+}: Props) {
   if (!query) {
     return (
       <Box>
@@ -57,9 +60,13 @@ export const HighlightedThinkingText = React.memo(function HighlightedThinkingTe
     <Box flexWrap="wrap">
       {segments.map((seg, i) =>
         seg.match ? (
-          <Text key={i} bold color="yellow" inverse>{seg.text}</Text>
+          <Text key={i} bold color="yellow" inverse>
+            {seg.text}
+          </Text>
         ) : (
-          <Text key={i} dimColor>{seg.text}</Text>
+          <Text key={i} dimColor>
+            {seg.text}
+          </Text>
         ),
       )}
     </Box>

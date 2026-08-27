@@ -27,7 +27,14 @@
  *   - Pool saturation (N/A until reconciler lands) is intentionally omitted.
  */
 
-import { writeFileSync, renameSync, existsSync, mkdirSync, readFileSync, appendFileSync } from "node:fs";
+import {
+  writeFileSync,
+  renameSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  appendFileSync,
+} from "node:fs";
 import { dirname } from "node:path";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,9 +42,9 @@ import { dirname } from "node:path";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type MetricEventKind =
-  | "frame"      // a stdout write happened — the "frame" boundary for Ink
-  | "render"    // React re-render (ADD_MESSAGE or equivalent dispatch)
-  | "memory";   // sampled process.memoryUsage()
+  | "frame" // a stdout write happened — the "frame" boundary for Ink
+  | "render" // React re-render (ADD_MESSAGE or equivalent dispatch)
+  | "memory"; // sampled process.memoryUsage()
 
 export interface FrameEvent {
   kind: "frame";
@@ -162,8 +169,8 @@ export interface StartOptions {
 export class RingBuffer<T> {
   private readonly capacity: number;
   private buf: Array<T | undefined>;
-  private head = 0;   // next write index
-  private size = 0;   // current count
+  private head = 0; // next write index
+  private size = 0; // current count
   private totalWrites = 0;
 
   constructor(capacity: number) {
@@ -536,7 +543,7 @@ function toSample(e: MemoryEvent): MemorySample {
  * opt out by rotating the file periodically.
  */
 export function atomicAppendJsonl(path: string, record: unknown): void {
-  const line = JSON.stringify(record) + "\n";
+  const line = `${JSON.stringify(record)}\n`;
   const tmp = `${path}.tmp`;
 
   let prior = "";
@@ -617,7 +624,9 @@ let originalWrite: WriteFn | null = null;
  * which is cheaper (and more accurate) in the custom reconciler. Until then
  * this is the best we can do without touching Ink's internals.
  */
-export function installStdoutTap(monitor: PerformanceMonitor = getPerformanceMonitor()): () => void {
+export function installStdoutTap(
+  monitor: PerformanceMonitor = getPerformanceMonitor(),
+): () => void {
   if (originalWrite !== null) {
     return uninstallStdoutTap; // already installed; return the uninstall hook
   }

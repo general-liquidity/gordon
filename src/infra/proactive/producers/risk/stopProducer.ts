@@ -21,8 +21,8 @@ export const stopProducer: CandidateProducer = (obs): ProactiveSuggestion[] => {
   if (obs.eventType === "alert:stop_approaching") {
     const symbol = obs.symbol ?? (obs.metadata?.symbol as string | undefined) ?? "a position";
     const distance = (obs.metadata?.distance as number | undefined) ?? 0;
-    const currentPrice = (obs.metadata?.currentPrice as number | undefined);
-    const stopPrice = (obs.metadata?.stopPrice as number | undefined);
+    const currentPrice = obs.metadata?.currentPrice as number | undefined;
+    const stopPrice = obs.metadata?.stopPrice as number | undefined;
 
     const confidence = distance < 1 ? 0.9 : distance < 2 ? 0.8 : 0.72;
 

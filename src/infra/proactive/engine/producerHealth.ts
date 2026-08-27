@@ -48,9 +48,9 @@ export interface ProducerHealthReport {
 }
 
 // Age thresholds for status classification
-const ACTIVE_THRESHOLD_MS = 2 * 60 * 1000;   // 2 min
-const STALE_THRESHOLD_MS = 15 * 60 * 1000;   // 15 min
-const SILENT_THRESHOLD_MS = 60 * 60 * 1000;  // 1 hour
+const ACTIVE_THRESHOLD_MS = 2 * 60 * 1000; // 2 min
+const STALE_THRESHOLD_MS = 15 * 60 * 1000; // 15 min
+const _SILENT_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 
 // ============================================================================
 // Tracker (singleton)
@@ -58,15 +58,14 @@ const SILENT_THRESHOLD_MS = 60 * 60 * 1000;  // 1 hour
 
 class ProducerHealthTracker {
   private heartbeats = new Map<string, ProducerHeartbeat>();
-  private startedAt: number | null = null;
   private expectedProducers = new Set<string>();
 
   start(): void {
-    this.startedAt = Date.now();
+    // Lifecycle marker retained as an explicit hook even though health is
+    // derived entirely from producer heartbeats.
   }
 
   stop(): void {
-    this.startedAt = null;
     this.heartbeats.clear();
   }
 
@@ -108,10 +107,7 @@ class ProducerHealthTracker {
   /** Build a health report including producers registered but never run yet. */
   report(): ProducerHealthReport {
     const now = Date.now();
-    const producerNames = new Set([
-      ...this.heartbeats.keys(),
-      ...this.expectedProducers,
-    ]);
+    const producerNames = new Set([...this.heartbeats.keys(), ...this.expectedProducers]);
     const producers: ProducerHealthReport["producers"] = [];
     let staleCount = 0;
     let erroredCount = 0;
@@ -168,7 +164,10 @@ class ProducerHealthTracker {
     if (erroredCount > 0 || staleCount > producers.length / 2) {
       overall = "degraded";
     }
-    if (producers.length === 0 || producers.every((p) => p.status === "never_run" || p.status === "silent")) {
+    if (
+      producers.length === 0 ||
+      producers.every((p) => p.status === "never_run" || p.status === "silent")
+    ) {
       overall = "down";
     }
 

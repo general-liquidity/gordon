@@ -10,7 +10,6 @@ import { z } from "zod";
 
 import {
   strategyRegistry,
-  STRATEGY_IDS,
   runEnsemble,
   runQuickEnsemble,
   type StrategyId,
@@ -46,28 +45,36 @@ export const listStrategiesTool = createTool({
       .describe("Filter by tier (1 = beginner, 2 = intermediate). Omit for all."),
   }),
   outputSchema: z.object({
-    tier1: z.object({
-      label: z.string(),
-      strategies: z.array(z.object({
-        id: z.string(),
-        name: z.string(),
-        description: z.string(),
-        indicators: z.string(),
-        timeframes: z.string(),
-        risk: z.string(),
-      })),
-    }).optional(),
-    tier2: z.object({
-      label: z.string(),
-      strategies: z.array(z.object({
-        id: z.string(),
-        name: z.string(),
-        description: z.string(),
-        indicators: z.string(),
-        timeframes: z.string(),
-        risk: z.string(),
-      })),
-    }).optional(),
+    tier1: z
+      .object({
+        label: z.string(),
+        strategies: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            description: z.string(),
+            indicators: z.string(),
+            timeframes: z.string(),
+            risk: z.string(),
+          }),
+        ),
+      })
+      .optional(),
+    tier2: z
+      .object({
+        label: z.string(),
+        strategies: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            description: z.string(),
+            indicators: z.string(),
+            timeframes: z.string(),
+            risk: z.string(),
+          }),
+        ),
+      })
+      .optional(),
     total: z.number(),
   }),
   execute: async ({ tier }) => {
@@ -101,9 +108,7 @@ export const getStrategyDetailsTool = createTool({
     "Get detailed information about a specific strategy including rules and indicators. " +
     "Use when the user asks 'tell me about X strategy' or 'how does X work?'.",
   inputSchema: z.object({
-    strategyId: z
-      .string()
-      .describe("Strategy ID (e.g., 'support_bounce', 'bollinger_bounce')"),
+    strategyId: z.string().describe("Strategy ID (e.g., 'support_bounce', 'bollinger_bounce')"),
   }),
   outputSchema: z.object({
     id: z.string().optional(),
@@ -146,16 +151,9 @@ export const detectStrategyTool = createTool({
     "Detect if a specific strategy's conditions are met for a symbol. " +
     "Use when the user asks 'is X strategy good for BTC?' or 'check bollinger bounce on ETH'.",
   inputSchema: z.object({
-    symbol: z
-      .string()
-      .describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETH')"),
-    strategyId: z
-      .string()
-      .describe("Strategy ID to check (e.g., 'support_bounce')"),
-    timeframe: z
-      .string()
-      .default("4h")
-      .describe("Timeframe to analyze"),
+    symbol: z.string().describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETH')"),
+    strategyId: z.string().describe("Strategy ID to check (e.g., 'support_bounce')"),
+    timeframe: z.string().default("4h").describe("Timeframe to analyze"),
   }),
   outputSchema: z.object({
     symbol: z.string().optional(),
@@ -212,17 +210,23 @@ export const scanForStrategyTool = createTool({
     "Scan multiple coins for a specific strategy. " +
     "Use when the user asks 'find coins good for bollinger bounce' or 'scan for support bounce setups'.",
   inputSchema: z.object({
-    strategyId: z
-      .string()
-      .describe("Strategy ID to scan for (e.g., 'support_bounce')"),
+    strategyId: z.string().describe("Strategy ID to scan for (e.g., 'support_bounce')"),
     symbols: z
       .array(z.string())
-      .default(["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT"])
+      .default([
+        "BTCUSDT",
+        "ETHUSDT",
+        "BNBUSDT",
+        "SOLUSDT",
+        "XRPUSDT",
+        "ADAUSDT",
+        "DOGEUSDT",
+        "AVAXUSDT",
+        "DOTUSDT",
+        "LINKUSDT",
+      ])
       .describe("Symbols to scan (defaults to top 10)"),
-    timeframe: z
-      .string()
-      .default("4h")
-      .describe("Timeframe to analyze"),
+    timeframe: z.string().default("4h").describe("Timeframe to analyze"),
     minConfidence: z
       .number()
       .min(0)
@@ -234,17 +238,21 @@ export const scanForStrategyTool = createTool({
     strategy: z.string().optional(),
     scanned: z.number().optional(),
     detected: z.number().optional(),
-    opportunities: z.array(z.object({
-      symbol: z.string(),
-      confidence: z.string(),
-      reasoning: z.string(),
-    })).optional(),
+    opportunities: z
+      .array(
+        z.object({
+          symbol: z.string(),
+          confidence: z.string(),
+          reasoning: z.string(),
+        }),
+      )
+      .optional(),
     noSetups: z.array(z.string()).optional(),
     error: z.string().optional(),
   }),
   execute: async (
     { strategyId, symbols, timeframe, minConfidence },
-    execContext: MastraExecutionContext
+    execContext: MastraExecutionContext,
   ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
@@ -283,8 +291,8 @@ export const scanForStrategyTool = createTool({
 
     // Sort by confidence descending
     opportunities.sort((a, b) => {
-      const confA = parseInt(a.confidence);
-      const confB = parseInt(b.confidence);
+      const confA = parseInt(a.confidence, 10);
+      const confB = parseInt(b.confidence, 10);
       return confB - confA;
     });
 
@@ -308,22 +316,21 @@ export const suggestStrategyTool = createTool({
     "Suggest the best strategy for a specific coin based on current market conditions. " +
     "Use when the user asks 'what strategy is best for BTC?' or 'which strategy should I use?'.",
   inputSchema: z.object({
-    symbol: z
-      .string()
-      .describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETH')"),
-    timeframe: z
-      .string()
-      .default("4h")
-      .describe("Timeframe to analyze"),
+    symbol: z.string().describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETH')"),
+    timeframe: z.string().default("4h").describe("Timeframe to analyze"),
   }),
   outputSchema: z.object({
     symbol: z.string().optional(),
-    recommendations: z.array(z.object({
-      strategy: z.string(),
-      strategyId: z.string(),
-      confidence: z.string(),
-      reasoning: z.string(),
-    })).optional(),
+    recommendations: z
+      .array(
+        z.object({
+          strategy: z.string(),
+          strategyId: z.string(),
+          confidence: z.string(),
+          reasoning: z.string(),
+        }),
+      )
+      .optional(),
     noSetups: z.boolean().optional(),
     message: z.string().optional(),
     error: z.string().optional(),
@@ -337,7 +344,12 @@ export const suggestStrategyTool = createTool({
     const normalizedSymbol = normalizeSymbol(symbol);
     const allStrategies = strategyRegistry.getAll();
 
-    const results: { strategy: string; strategyId: StrategyId; confidence: number; reasoning: string }[] = [];
+    const results: {
+      strategy: string;
+      strategyId: StrategyId;
+      confidence: number;
+      reasoning: string;
+    }[] = [];
 
     for (const strategy of allStrategies) {
       // Skip grid_entry as it's a special strategy
@@ -395,13 +407,8 @@ export const runStrategyEnsembleTool = createTool({
     "Returns confidence weighted by how many strategies agree. " +
     "Use when you want higher confidence signals or to validate a single strategy's detection.",
   inputSchema: z.object({
-    symbol: z
-      .string()
-      .describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETH')"),
-    timeframe: z
-      .string()
-      .default("4h")
-      .describe("Timeframe to analyze"),
+    symbol: z.string().describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETH')"),
+    timeframe: z.string().default("4h").describe("Timeframe to analyze"),
     strategies: z
       .array(z.string())
       .optional()
@@ -434,17 +441,21 @@ export const runStrategyEnsembleTool = createTool({
     totalCount: z.number().optional(),
     recommendedStrategy: z.string().nullable().optional(),
     combinedReasoning: z.string().optional(),
-    strategies: z.array(z.object({
-      id: z.string(),
-      detected: z.boolean(),
-      confidence: z.string(),
-      reasoning: z.string(),
-    })).optional(),
+    strategies: z
+      .array(
+        z.object({
+          id: z.string(),
+          detected: z.boolean(),
+          confidence: z.string(),
+          reasoning: z.string(),
+        }),
+      )
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async (
     { symbol, timeframe, strategies, minAgreement, tierFilter, quickMode },
-    execContext: MastraExecutionContext
+    execContext: MastraExecutionContext,
   ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
@@ -456,11 +467,16 @@ export const runStrategyEnsembleTool = createTool({
     try {
       const result = quickMode
         ? await runQuickEnsemble(normalizedSymbol, timeframe, { exchange: ctx.exchange })
-        : await runEnsemble(normalizedSymbol, timeframe, { exchange: ctx.exchange }, {
-            strategies,
-            minAgreement,
-            tierFilter: tierFilter as 1 | 2 | undefined,
-          });
+        : await runEnsemble(
+            normalizedSymbol,
+            timeframe,
+            { exchange: ctx.exchange },
+            {
+              strategies,
+              minAgreement,
+              tierFilter: tierFilter as 1 | 2 | undefined,
+            },
+          );
 
       return {
         symbol: result.symbol,
@@ -502,14 +518,19 @@ export const scanWithEnsembleTool = createTool({
     symbols: z
       .array(z.string())
       .default([
-        "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-        "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT",
+        "BTCUSDT",
+        "ETHUSDT",
+        "BNBUSDT",
+        "SOLUSDT",
+        "XRPUSDT",
+        "ADAUSDT",
+        "DOGEUSDT",
+        "AVAXUSDT",
+        "DOTUSDT",
+        "LINKUSDT",
       ])
       .describe("Symbols to scan (defaults to top 10)"),
-    timeframe: z
-      .string()
-      .default("4h")
-      .describe("Timeframe to analyze"),
+    timeframe: z.string().default("4h").describe("Timeframe to analyze"),
     minAgreement: z
       .number()
       .min(0)
@@ -532,21 +553,25 @@ export const scanWithEnsembleTool = createTool({
   outputSchema: z.object({
     scanned: z.number().optional(),
     detected: z.number().optional(),
-    opportunities: z.array(z.object({
-      symbol: z.string(),
-      confidence: z.string(),
-      agreementPercent: z.string(),
-      bullishCount: z.number(),
-      totalCount: z.number(),
-      recommendedStrategy: z.string().nullable(),
-      combinedReasoning: z.string(),
-    })).optional(),
+    opportunities: z
+      .array(
+        z.object({
+          symbol: z.string(),
+          confidence: z.string(),
+          agreementPercent: z.string(),
+          bullishCount: z.number(),
+          totalCount: z.number(),
+          recommendedStrategy: z.string().nullable(),
+          combinedReasoning: z.string(),
+        }),
+      )
+      .optional(),
     noSetups: z.array(z.string()).optional(),
     error: z.string().optional(),
   }),
   execute: async (
     { symbols, timeframe, minAgreement, tierFilter, maxResults },
-    execContext: MastraExecutionContext
+    execContext: MastraExecutionContext,
   ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
@@ -575,7 +600,7 @@ export const scanWithEnsembleTool = createTool({
           {
             minAgreement,
             tierFilter: tierFilter as 1 | 2 | undefined,
-          }
+          },
         );
 
         if (result.detected) {
@@ -598,8 +623,8 @@ export const scanWithEnsembleTool = createTool({
 
     // Sort by confidence descending
     opportunities.sort((a, b) => {
-      const confA = parseInt(a.confidence);
-      const confB = parseInt(b.confidence);
+      const confA = parseInt(a.confidence, 10);
+      const confB = parseInt(b.confidence, 10);
       return confB - confA;
     });
 

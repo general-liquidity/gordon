@@ -19,23 +19,23 @@
 export type ConcurrencySafety = "read_safe" | "write_serial";
 
 export type ToolFamily =
-  | "market_data"     // Prices, candles, tickers, orderbook reads
-  | "analysis"        // Indicators, charts, scoring, SMC patterns
-  | "finnhub"         // All Finnhub endpoints (stocks, crypto, macro)
-  | "portfolio_read"  // Account, positions, balances, history (read-only)
-  | "risk_read"       // Risk classification, check_risk (non-mutating)
-  | "memory_read"     // Search memory, get lessons, shared context reads
-  | "discovery"       // Trending, volume movers, DEX search
-  | "defi_read"       // DeFi Llama yields and on-chain reads
-  | "social"          // X social, news sentiment, social sentiment
-  | "regime"          // Regime detection, Hurst, efficiency
-  | "backtest"        // Backtests, walk-forward, Monte Carlo
-  | "planning"        // Create plans, preview orders (non-executing)
-  | "skill"           // Skill listing/loading, calibration reads
-  | "audit"           // Audit trail, decision path, metrics
+  | "market_data" // Prices, candles, tickers, orderbook reads
+  | "analysis" // Indicators, charts, scoring, SMC patterns
+  | "finnhub" // All Finnhub endpoints (stocks, crypto, macro)
+  | "portfolio_read" // Account, positions, balances, history (read-only)
+  | "risk_read" // Risk classification, check_risk (non-mutating)
+  | "memory_read" // Search memory, get lessons, shared context reads
+  | "discovery" // Trending, volume movers, DEX search
+  | "defi_read" // DeFi Llama yields and on-chain reads
+  | "social" // X social, news sentiment, social sentiment
+  | "regime" // Regime detection, Hurst, efficiency
+  | "backtest" // Backtests, walk-forward, Monte Carlo
+  | "planning" // Create plans, preview orders (non-executing)
+  | "skill" // Skill listing/loading, calibration reads
+  | "audit" // Audit trail, decision path, metrics
   | "trade_execution" // Place orders, execute plans, approve strategies
-  | "transfer"        // Fund transfers, withdrawals
-  | "system"          // Arm/disarm, mode changes, scheduler mutations
+  | "transfer" // Fund transfers, withdrawals
+  | "system" // Arm/disarm, mode changes, scheduler mutations
   | "unknown";
 
 export interface ToolClassification {
@@ -54,24 +54,24 @@ export interface ToolClassification {
  * prefix matching or fall through to "unknown" (read_safe, 30K limit).
  */
 const FAMILY_DEFAULTS: Record<ToolFamily, Omit<ToolClassification, "family">> = {
-  market_data:     { safety: "read_safe",     maxResultChars: 80_000 },
-  analysis:        { safety: "read_safe",     maxResultChars: 60_000 },
-  finnhub:         { safety: "read_safe",     maxResultChars: 80_000 },
-  portfolio_read:  { safety: "read_safe",     maxResultChars: 50_000 },
-  risk_read:       { safety: "read_safe",     maxResultChars: 30_000 },
-  memory_read:     { safety: "read_safe",     maxResultChars: 30_000 },
-  discovery:       { safety: "read_safe",     maxResultChars: 60_000 },
-  defi_read:       { safety: "read_safe",     maxResultChars: 60_000 },
-  social:          { safety: "read_safe",     maxResultChars: 40_000 },
-  regime:          { safety: "read_safe",     maxResultChars: 20_000 },
-  backtest:        { safety: "read_safe",     maxResultChars: 100_000 },
-  planning:        { safety: "read_safe",     maxResultChars: 40_000 },
-  skill:           { safety: "read_safe",     maxResultChars: 20_000 },
-  audit:           { safety: "read_safe",     maxResultChars: 40_000 },
-  trade_execution: { safety: "write_serial",  maxResultChars: 20_000 },
-  transfer:        { safety: "write_serial",  maxResultChars: 10_000 },
-  system:          { safety: "write_serial",  maxResultChars: 10_000 },
-  unknown:         { safety: "read_safe",     maxResultChars: 30_000 },
+  market_data: { safety: "read_safe", maxResultChars: 80_000 },
+  analysis: { safety: "read_safe", maxResultChars: 60_000 },
+  finnhub: { safety: "read_safe", maxResultChars: 80_000 },
+  portfolio_read: { safety: "read_safe", maxResultChars: 50_000 },
+  risk_read: { safety: "read_safe", maxResultChars: 30_000 },
+  memory_read: { safety: "read_safe", maxResultChars: 30_000 },
+  discovery: { safety: "read_safe", maxResultChars: 60_000 },
+  defi_read: { safety: "read_safe", maxResultChars: 60_000 },
+  social: { safety: "read_safe", maxResultChars: 40_000 },
+  regime: { safety: "read_safe", maxResultChars: 20_000 },
+  backtest: { safety: "read_safe", maxResultChars: 100_000 },
+  planning: { safety: "read_safe", maxResultChars: 40_000 },
+  skill: { safety: "read_safe", maxResultChars: 20_000 },
+  audit: { safety: "read_safe", maxResultChars: 40_000 },
+  trade_execution: { safety: "write_serial", maxResultChars: 20_000 },
+  transfer: { safety: "write_serial", maxResultChars: 10_000 },
+  system: { safety: "write_serial", maxResultChars: 10_000 },
+  unknown: { safety: "read_safe", maxResultChars: 30_000 },
 };
 
 /**
@@ -84,13 +84,22 @@ const PREFIX_FAMILY_MAP: Array<[string | RegExp, ToolFamily]> = [
   [/^(arm_|disarm_|start_autonomous|stop_autonomous|pause_autonomous|resume_autonomous)/, "system"],
 
   // Finnhub (all read-safe)
-  [/^(get_(?:upcoming_earnings|earnings_|revenue_|economic_|ipo_|insider_|congressional_|analyst_|price_target|upgrade_|sec_|news_|social_|company_(?:profile|news)|basic_financials|financials_reported|peer_|dividends|stock_(?:quote|candles|symbols|splits)|market_(?:status|news)|pattern_|support_|aggregate_|etf_|mutual_fund_|index_|bond_|finnhub_crypto_|forex_|esg_|fund_ownership|institutional_|lobbying|usa_spending|uspto_|visa_|supply_chain)|symbol_lookup|list_(?:earnings_transcripts|economic_codes)|get_economic_data)/, "finnhub"],
+  [
+    /^(get_(?:upcoming_earnings|earnings_|revenue_|economic_|ipo_|insider_|congressional_|analyst_|price_target|upgrade_|sec_|news_|social_|company_(?:profile|news)|basic_financials|financials_reported|peer_|dividends|stock_(?:quote|candles|symbols|splits)|market_(?:status|news)|pattern_|support_|aggregate_|etf_|mutual_fund_|index_|bond_|finnhub_crypto_|forex_|esg_|fund_ownership|institutional_|lobbying|usa_spending|uspto_|visa_|supply_chain)|symbol_lookup|list_(?:earnings_transcripts|economic_codes)|get_economic_data)/,
+    "finnhub",
+  ],
 
   // Market data
-  [/^(get_price|get_ticker|get_candles|get_order_book|get_spread|get_market_trades|get_funding_rate)/, "market_data"],
+  [
+    /^(get_price|get_ticker|get_candles|get_order_book|get_spread|get_market_trades|get_funding_rate)/,
+    "market_data",
+  ],
 
   // Analysis
-  [/^(get_(?:rsi|macd|bollinger|ichimoku|vwap|supertrend|atr|adx|obv|stochastic)|calculate_|detect_smc|analyze_)/, "analysis"],
+  [
+    /^(get_(?:rsi|macd|bollinger|ichimoku|vwap|supertrend|atr|adx|obv|stochastic)|calculate_|detect_smc|analyze_)/,
+    "analysis",
+  ],
   [/^(get_chart|render_|generate_chart)/, "analysis"],
 
   // Discovery
@@ -124,10 +133,16 @@ const PREFIX_FAMILY_MAP: Array<[string | RegExp, ToolFamily]> = [
   [/^(create_plan|create_grid_plan|list_plans|preview_|generate_strategy)/, "planning"],
 
   // Skills
-  [/^(list_skills|load_skill|record_confident|record_decision_outcome|get_producer_health)/, "skill"],
+  [
+    /^(list_skills|load_skill|record_confident|record_decision_outcome|get_producer_health)/,
+    "skill",
+  ],
 
   // Audit
-  [/^(query_audit|get_decision_path|get_agent_activity|get_audit_stats|get_runtime_metrics)/, "audit"],
+  [
+    /^(query_audit|get_decision_path|get_agent_activity|get_audit_stats|get_runtime_metrics)/,
+    "audit",
+  ],
 
   // Memory writes (read_safe because they don't affect trading state)
   [/^(record_observation|record_insight|write_shared_context|record_trade)/, "memory_read"],
@@ -148,7 +163,8 @@ export function classifyTool(toolName: string): ToolClassification {
 
   let family: ToolFamily = "unknown";
   for (const [pattern, fam] of PREFIX_FAMILY_MAP) {
-    const matches = pattern instanceof RegExp ? pattern.test(toolName) : toolName.startsWith(pattern);
+    const matches =
+      pattern instanceof RegExp ? pattern.test(toolName) : toolName.startsWith(pattern);
     if (matches) {
       family = fam;
       break;
@@ -156,7 +172,11 @@ export function classifyTool(toolName: string): ToolClassification {
   }
 
   const defaults = FAMILY_DEFAULTS[family];
-  const result: ToolClassification = { safety: defaults.safety, family, maxResultChars: defaults.maxResultChars };
+  const result: ToolClassification = {
+    safety: defaults.safety,
+    family,
+    maxResultChars: defaults.maxResultChars,
+  };
   classificationCache.set(toolName, result);
   return result;
 }

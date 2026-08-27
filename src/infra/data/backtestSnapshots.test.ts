@@ -9,10 +9,7 @@ import {
   detectDrift,
   _resetBacktestSnapshotsForTests,
 } from "./backtestSnapshots.ts";
-import {
-  setDatabasePathForTesting,
-  closeDatabase,
-} from "../storage/database.ts";
+import { setDatabasePathForTesting, closeDatabase } from "../storage/database.ts";
 import { unlinkSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -22,7 +19,11 @@ let currentDbPath = "";
 const cleanupPaths = new Set<string>();
 
 function safeUnlink(path: string): void {
-  try { if (existsSync(path)) unlinkSync(path); } catch { /* Windows-busy */ }
+  try {
+    if (existsSync(path)) unlinkSync(path);
+  } catch {
+    /* Windows-busy */
+  }
 }
 
 beforeEach(() => {
@@ -98,12 +99,22 @@ describe("recordBacktestRun + getBacktestRun", () => {
 
   test("two records with identical inputs are allowed (each is its own audit row)", () => {
     const a = recordBacktestRun({
-      strategyId: "x", symbol: "BTC", timeframe: "1h",
-      fromTs: 0, toTs: 1, params: {}, result: { sharpe: 1.0 },
+      strategyId: "x",
+      symbol: "BTC",
+      timeframe: "1h",
+      fromTs: 0,
+      toTs: 1,
+      params: {},
+      result: { sharpe: 1.0 },
     });
     const b = recordBacktestRun({
-      strategyId: "x", symbol: "BTC", timeframe: "1h",
-      fromTs: 0, toTs: 1, params: {}, result: { sharpe: 1.5 },
+      strategyId: "x",
+      symbol: "BTC",
+      timeframe: "1h",
+      fromTs: 0,
+      toTs: 1,
+      params: {},
+      result: { sharpe: 1.5 },
     });
     expect(a.runId).not.toBe(b.runId);
     expect(a.inputsHash).toBe(b.inputsHash);
@@ -112,11 +123,35 @@ describe("recordBacktestRun + getBacktestRun", () => {
 
 describe("listBacktestRuns", () => {
   test("filters by strategyId + symbol, sorted by recordedAt desc", async () => {
-    recordBacktestRun({ strategyId: "x", symbol: "BTC", timeframe: "1h", fromTs: 0, toTs: 1, params: {}, result: {} });
+    recordBacktestRun({
+      strategyId: "x",
+      symbol: "BTC",
+      timeframe: "1h",
+      fromTs: 0,
+      toTs: 1,
+      params: {},
+      result: {},
+    });
     await new Promise((r) => setTimeout(r, 2));
-    recordBacktestRun({ strategyId: "x", symbol: "ETH", timeframe: "1h", fromTs: 0, toTs: 1, params: {}, result: {} });
+    recordBacktestRun({
+      strategyId: "x",
+      symbol: "ETH",
+      timeframe: "1h",
+      fromTs: 0,
+      toTs: 1,
+      params: {},
+      result: {},
+    });
     await new Promise((r) => setTimeout(r, 2));
-    recordBacktestRun({ strategyId: "y", symbol: "BTC", timeframe: "1h", fromTs: 0, toTs: 1, params: {}, result: {} });
+    recordBacktestRun({
+      strategyId: "y",
+      symbol: "BTC",
+      timeframe: "1h",
+      fromTs: 0,
+      toTs: 1,
+      params: {},
+      result: {},
+    });
 
     const x = listBacktestRuns({ strategyId: "x" });
     expect(x).toHaveLength(2);
@@ -128,7 +163,15 @@ describe("listBacktestRuns", () => {
 
   test("respects limit", () => {
     for (let i = 0; i < 5; i++) {
-      recordBacktestRun({ strategyId: "x", symbol: "BTC", timeframe: "1h", fromTs: i, toTs: i + 1, params: {}, result: {} });
+      recordBacktestRun({
+        strategyId: "x",
+        symbol: "BTC",
+        timeframe: "1h",
+        fromTs: i,
+        toTs: i + 1,
+        params: {},
+        result: {},
+      });
     }
     expect(listBacktestRuns({ limit: 3 })).toHaveLength(3);
   });
@@ -136,11 +179,27 @@ describe("listBacktestRuns", () => {
 
 describe("pruneRunsBefore", () => {
   test("drops snapshots recorded before the threshold", async () => {
-    const a = recordBacktestRun({ strategyId: "x", symbol: "BTC", timeframe: "1h", fromTs: 0, toTs: 1, params: {}, result: {} });
+    const a = recordBacktestRun({
+      strategyId: "x",
+      symbol: "BTC",
+      timeframe: "1h",
+      fromTs: 0,
+      toTs: 1,
+      params: {},
+      result: {},
+    });
     await new Promise((r) => setTimeout(r, 5));
     const cutoff = Date.now();
     await new Promise((r) => setTimeout(r, 5));
-    const b = recordBacktestRun({ strategyId: "x", symbol: "BTC", timeframe: "1h", fromTs: 0, toTs: 1, params: {}, result: {} });
+    const b = recordBacktestRun({
+      strategyId: "x",
+      symbol: "BTC",
+      timeframe: "1h",
+      fromTs: 0,
+      toTs: 1,
+      params: {},
+      result: {},
+    });
 
     const removed = pruneRunsBefore(cutoff);
     expect(removed).toBe(1);
@@ -178,7 +237,10 @@ describe("extractComparableMetrics", () => {
 
 describe("detectDrift", () => {
   test("no drift when identical results", () => {
-    const r = detectDrift({ sharpe: 1.0, winRate: 0.5, tradeCount: 10 }, { sharpe: 1.0, winRate: 0.5, tradeCount: 10 });
+    const r = detectDrift(
+      { sharpe: 1.0, winRate: 0.5, tradeCount: 10 },
+      { sharpe: 1.0, winRate: 0.5, tradeCount: 10 },
+    );
     expect(r.hasDrift).toBe(false);
     expect(r.interpretation).toContain("No drift");
   });

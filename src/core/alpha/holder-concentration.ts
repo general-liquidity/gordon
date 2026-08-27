@@ -84,15 +84,23 @@ export function computeHolderConcentration(
   const effectiveHolders = hhi > 0 ? parseFloat((1 / hhi).toFixed(2)) : 0;
 
   const insiderControlledPct = parseFloat(
-    pct(sorted.filter((h) => INSIDER.has(h.label ?? "unknown")).reduce((s, h) => s + h.balance, 0)).toFixed(4),
+    pct(
+      sorted.filter((h) => INSIDER.has(h.label ?? "unknown")).reduce((s, h) => s + h.balance, 0),
+    ).toFixed(4),
   );
   const exchangePct = parseFloat(
-    pct(sorted.filter((h) => (h.label ?? "unknown") === "exchange").reduce((s, h) => s + h.balance, 0)).toFixed(4),
+    pct(
+      sorted
+        .filter((h) => (h.label ?? "unknown") === "exchange")
+        .reduce((s, h) => s + h.balance, 0),
+    ).toFixed(4),
   );
 
   const flags: string[] = [];
   if (insiderControlledPct >= insiderFlagPct) {
-    flags.push(`insiders (team/investor/foundation) control ${insiderControlledPct.toFixed(1)}% — exit-liquidity risk`);
+    flags.push(
+      `insiders (team/investor/foundation) control ${insiderControlledPct.toFixed(1)}% — exit-liquidity risk`,
+    );
   }
   if (top1Pct >= 20) flags.push(`single wallet holds ${top1Pct.toFixed(1)}% of supply`);
   if (topNPct >= 60) flags.push(`top ${topN} wallets hold ${topNPct.toFixed(1)}% of supply`);

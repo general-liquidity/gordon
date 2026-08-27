@@ -16,9 +16,9 @@ import { useSyncExternalStore, useCallback, useMemo, useRef } from "react";
 // Constants (match Claude Code exactly)
 // ---------------------------------------------------------------------------
 
-const OVERSCAN_ROWS = 80;        // was: overscan=3 items (~9 rows)
-const SCROLL_QUANTUM = 40;       // quantize scrollTop to reduce re-renders
-const MAX_MOUNTED_ITEMS = 300;   // cap on rendered items
+const OVERSCAN_ROWS = 80; // was: overscan=3 items (~9 rows)
+const SCROLL_QUANTUM = 40; // quantize scrollTop to reduce re-renders
+const MAX_MOUNTED_ITEMS = 300; // cap on rendered items
 // const SLIDE_STEP = 25;        // max new items per commit (reserved for future sliding window)
 // const COLD_START_COUNT = 30;  // items rendered before heights known (reserved)
 
@@ -116,11 +116,7 @@ function findFirstVisible(offsets: number[], scrollTop: number): number {
 /**
  * Returns the index of the last item whose top edge is within the viewport bottom.
  */
-function findLastVisible(
-  offsets: number[],
-  scrollTop: number,
-  viewportHeight: number,
-): number {
+function findLastVisible(offsets: number[], scrollTop: number, viewportHeight: number): number {
   const bottom = scrollTop + viewportHeight;
   let lo = 0;
   let hi = offsets.length - 1;
@@ -178,7 +174,7 @@ export interface VirtualScrollResult {
 
 interface ScrollStore {
   subscribe: (cb: () => void) => () => void;
-  getSnapshot: () => number;           // returns quantized bucket
+  getSnapshot: () => number; // returns quantized bucket
   setScrollTop: (top: number, max: number) => void;
   getRaw: () => number;
 }
@@ -188,14 +184,26 @@ function createScrollStore(initialRaw: number): ScrollStore {
   let bucket = Math.floor(initialRaw / SCROLL_QUANTUM);
   const subs = new Set<() => void>();
   return {
-    subscribe(cb) { subs.add(cb); return () => subs.delete(cb); },
-    getSnapshot() { return bucket; },
+    subscribe(cb) {
+      subs.add(cb);
+      return () => subs.delete(cb);
+    },
+    getSnapshot() {
+      return bucket;
+    },
     setScrollTop(top, max) {
       raw = Math.max(0, Math.min(top, max));
       const b = Math.floor(raw / SCROLL_QUANTUM);
-      if (b !== bucket) { bucket = b; subs.forEach(fn => fn()); }
+      if (b !== bucket) {
+        bucket = b;
+        subs.forEach((fn) => {
+          fn();
+        });
+      }
     },
-    getRaw() { return raw; },
+    getRaw() {
+      return raw;
+    },
   };
 }
 
@@ -235,12 +243,8 @@ export function useVirtualScroll({
   const clampedTop = Math.max(0, Math.min(store.current.getRaw(), maxScrollTop));
 
   // Compute visible range with row-based overscan
-  let startIndex = findFirstVisible(
-    offsets,
-    Math.max(0, clampedTop - OVERSCAN_ROWS),
-  );
-  let endIndex =
-    findLastVisible(offsets, clampedTop, viewportHeight + OVERSCAN_ROWS) + 1;
+  let startIndex = findFirstVisible(offsets, Math.max(0, clampedTop - OVERSCAN_ROWS));
+  let endIndex = findLastVisible(offsets, clampedTop, viewportHeight + OVERSCAN_ROWS) + 1;
 
   // Cap to MAX_MOUNTED_ITEMS to prevent excessive DOM nodes
   if (endIndex - startIndex > MAX_MOUNTED_ITEMS) {
@@ -272,10 +276,7 @@ export function useVirtualScroll({
     [offsets, maxScrollTop],
   );
 
-  const getItemTop = useCallback(
-    (index: number) => offsets[index] ?? 0,
-    [offsets],
-  );
+  const getItemTop = useCallback((index: number) => offsets[index] ?? 0, [offsets]);
 
   const getItemHeight = useCallback(
     (index: number) => {

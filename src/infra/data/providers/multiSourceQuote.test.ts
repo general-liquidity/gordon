@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import {
-  MultiSourceQuoteService,
-  QuoteUnavailableError,
-} from "./multiSourceQuote.ts";
+import { MultiSourceQuoteService, QuoteUnavailableError } from "./multiSourceQuote.ts";
 import type { Exchange, Ticker24hr } from "../../exchange/types.ts";
 import type { LLMClient } from "../../ai/llm/client.ts";
 
@@ -69,8 +66,7 @@ function makeService(
     enableLLMEnrichment: llmClient != null,
   });
   // Keep tests offline: replace the real CoinGecko client.
-  (svc as unknown as { coinGecko: typeof deadCoinGecko }).coinGecko =
-    deadCoinGecko;
+  (svc as unknown as { coinGecko: typeof deadCoinGecko }).coinGecko = deadCoinGecko;
   svc.clearCache();
   return svc;
 }
@@ -88,9 +84,7 @@ beforeEach(() => {
 describe("MultiSourceQuoteService failure contract", () => {
   it("throws QuoteUnavailableError when all sources fail (never price=0)", async () => {
     const svc = makeService([downExchange("VenueA"), downExchange("VenueB")]);
-    expect(svc.getQuote("AAA1USDT")).rejects.toBeInstanceOf(
-      QuoteUnavailableError,
-    );
+    expect(svc.getQuote("AAA1USDT")).rejects.toBeInstanceOf(QuoteUnavailableError);
     try {
       await svc.getQuote("AAA1USDT");
       throw new Error("expected QuoteUnavailableError");
@@ -106,9 +100,7 @@ describe("MultiSourceQuoteService failure contract", () => {
 
   it("treats a zero-price source as failed, not as a usable quote", async () => {
     const svc = makeService([zeroPriceExchange("ZeroVenue", "AAA2USDT")]);
-    expect(svc.getQuote("AAA2USDT")).rejects.toBeInstanceOf(
-      QuoteUnavailableError,
-    );
+    expect(svc.getQuote("AAA2USDT")).rejects.toBeInstanceOf(QuoteUnavailableError);
   });
 
   it("omits unavailable symbols from getQuotes instead of returning sentinels", async () => {
@@ -134,10 +126,7 @@ describe("MultiSourceQuoteService failure contract", () => {
 describe("MultiSourceQuoteService degradation metadata", () => {
   it("stamps fetchedAt and a clean degraded state on agreeing sources", async () => {
     const before = Date.now();
-    const svc = makeService([
-      fakeExchange("VenueA", 100),
-      fakeExchange("VenueB", 101),
-    ]);
+    const svc = makeService([fakeExchange("VenueA", 100), fakeExchange("VenueB", 101)]);
     const quote = await svc.getQuote("AAA3USDT");
     expect(quote.price).toBe(100.5);
     expect(quote.fetchedAt).toBeGreaterThanOrEqual(before);
@@ -148,20 +137,14 @@ describe("MultiSourceQuoteService degradation metadata", () => {
   });
 
   it("flags source disagreement beyond the threshold as degraded", async () => {
-    const svc = makeService([
-      fakeExchange("VenueA", 100),
-      fakeExchange("VenueB", 110),
-    ]);
+    const svc = makeService([fakeExchange("VenueA", 100), fakeExchange("VenueB", 110)]);
     const quote = await svc.getQuote("AAA4USDT");
     expect(quote.degraded).toBe(true);
     expect(quote.degradedReasons).toContain("source disagreement");
   });
 
   it("does not flag disagreement for a single surviving source", async () => {
-    const svc = makeService([
-      fakeExchange("VenueA", 100),
-      downExchange("VenueB"),
-    ]);
+    const svc = makeService([fakeExchange("VenueA", 100), downExchange("VenueB")]);
     const quote = await svc.getQuote("AAA5USDT");
     expect(quote.degraded).toBe(false);
     expect(quote.sourcesFailed).toContain("VenueB");

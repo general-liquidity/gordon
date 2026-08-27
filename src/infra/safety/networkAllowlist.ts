@@ -260,7 +260,10 @@ export function enforceOutbound(
   return result;
 }
 
-export function resultToPayload(result: CheckOutboundResult, caller?: string): Record<string, unknown> {
+export function resultToPayload(
+  result: CheckOutboundResult,
+  caller?: string,
+): Record<string, unknown> {
   return {
     kind: "network_allowlist.check_recorded",
     allowed: result.allowed,

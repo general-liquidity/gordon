@@ -1,9 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  checkTrajectory,
-  checkScenarioAssertions,
-  type NormalizedTrace,
-} from "./processChecks.ts";
+import { checkTrajectory, checkScenarioAssertions, type NormalizedTrace } from "./processChecks.ts";
 import { computePassK, passKFromChecks } from "./passK.ts";
 
 function trace(
@@ -31,11 +27,15 @@ describe("checkTrajectory", () => {
   it("BLOCKS an order with no preceding risk gate", () => {
     const r = checkTrajectory(trace([{ name: "get_market_data" }, { name: "place_market_order" }]));
     expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.rule === "risk_gate_before_order" && v.severity === "block")).toBe(true);
+    expect(
+      r.violations.some((v) => v.rule === "risk_gate_before_order" && v.severity === "block"),
+    ).toBe(true);
   });
 
   it("passes an order preceded by classify_trade_risk", () => {
-    const r = checkTrajectory(trace([{ name: "classify_trade_risk" }, { name: "place_market_order" }]));
+    const r = checkTrajectory(
+      trace([{ name: "classify_trade_risk" }, { name: "place_market_order" }]),
+    );
     expect(r.passed).toBe(true);
   });
 
@@ -45,11 +45,11 @@ describe("checkTrajectory", () => {
   });
 
   it("BLOCKS when execute_plan has no preceding approve_plan", () => {
-    const r = checkTrajectory(
-      trace([{ name: "classify_trade_risk" }, { name: "execute_plan" }]),
-    );
+    const r = checkTrajectory(trace([{ name: "classify_trade_risk" }, { name: "execute_plan" }]));
     expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.rule === "approval_before_execute_plan" && v.severity === "block")).toBe(true);
+    expect(
+      r.violations.some((v) => v.rule === "approval_before_execute_plan" && v.severity === "block"),
+    ).toBe(true);
   });
 
   it("passes execute_plan with both approve_plan and risk gate", () => {
@@ -63,15 +63,14 @@ describe("checkTrajectory", () => {
   it("BLOCKS execution.start_intent with no preceding execution preflight", () => {
     const r = checkTrajectory(trace([{ name: "gateway.execution.start_intent" }]));
     expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.rule === "risk_gate_before_order" && v.severity === "block")).toBe(true);
+    expect(
+      r.violations.some((v) => v.rule === "risk_gate_before_order" && v.severity === "block"),
+    ).toBe(true);
   });
 
   it("passes execution.start_intent with preceding execution preflight", () => {
     const r = checkTrajectory(
-      trace([
-        { name: "execution.preflight_approved" },
-        { name: "gateway.execution.start_intent" },
-      ]),
+      trace([{ name: "execution.preflight_approved" }, { name: "gateway.execution.start_intent" }]),
     );
     expect(r.passed).toBe(true);
   });
@@ -79,7 +78,9 @@ describe("checkTrajectory", () => {
   it("BLOCKS a fund transfer executed with no approval and no risk gate", () => {
     const r = checkTrajectory(trace([{ name: "wallet_transfer" }]));
     expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.rule === "denylist_without_approval" && v.severity === "block")).toBe(true);
+    expect(
+      r.violations.some((v) => v.rule === "denylist_without_approval" && v.severity === "block"),
+    ).toBe(true);
   });
 
   it("WARNS on a doom loop (same tool fails 3x)", () => {
@@ -95,13 +96,17 @@ describe("checkTrajectory", () => {
   });
 
   it("WARNS when outcome is trade_executed but no order tool ran", () => {
-    const r = checkTrajectory(trace([{ name: "get_market_data" }], { outcomeType: "trade_executed" }));
+    const r = checkTrajectory(
+      trace([{ name: "get_market_data" }], { outcomeType: "trade_executed" }),
+    );
     expect(r.violations.some((v) => v.rule === "outcome_consistency")).toBe(true);
   });
 
   it("does not flag a clean analysis trajectory", () => {
     const r = checkTrajectory(
-      trace([{ name: "get_market_data" }, { name: "compute_indicator" }], { outcomeType: "analysis_complete" }),
+      trace([{ name: "get_market_data" }, { name: "compute_indicator" }], {
+        outcomeType: "analysis_complete",
+      }),
     );
     expect(r.passed).toBe(true);
     expect(r.violations.length).toBe(0);
@@ -118,7 +123,9 @@ describe("checkScenarioAssertions (F2P / P2P)", () => {
     const v = checkScenarioAssertions(trace([{ name: "get_market_data" }]), {
       expectedActions: ["downsize"],
     });
-    expect(v.some((x) => x.rule === "scenario_expected_action_missing" && x.severity === "block")).toBe(true);
+    expect(
+      v.some((x) => x.rule === "scenario_expected_action_missing" && x.severity === "block"),
+    ).toBe(true);
   });
 
   it("passes when every expected action executed successfully", () => {
@@ -130,19 +137,19 @@ describe("checkScenarioAssertions (F2P / P2P)", () => {
   });
 
   it("does NOT credit an expected action that failed", () => {
-    const v = checkScenarioAssertions(
-      trace([{ name: "downsize_position", ok: false }]),
-      { expectedActions: ["downsize"] },
-    );
+    const v = checkScenarioAssertions(trace([{ name: "downsize_position", ok: false }]), {
+      expectedActions: ["downsize"],
+    });
     expect(v.some((x) => x.rule === "scenario_expected_action_missing")).toBe(true);
   });
 
   it("BLOCKS when a forbidden action appears (even if it failed)", () => {
-    const v = checkScenarioAssertions(
-      trace([{ name: "flip_short_order", ok: false }]),
-      { forbiddenActions: ["flip_short"] },
-    );
-    expect(v.some((x) => x.rule === "scenario_forbidden_action_present" && x.severity === "block")).toBe(true);
+    const v = checkScenarioAssertions(trace([{ name: "flip_short_order", ok: false }]), {
+      forbiddenActions: ["flip_short"],
+    });
+    expect(
+      v.some((x) => x.rule === "scenario_forbidden_action_present" && x.severity === "block"),
+    ).toBe(true);
   });
 
   it("passes when no forbidden action appears", () => {
@@ -165,7 +172,11 @@ describe("checkTrajectory with scenario assertions", () => {
 
   it("folds a forbidden-action into the block conjunction (passed=false)", () => {
     const r = checkTrajectory(
-      trace([{ name: "classify_trade_risk" }, { name: "downsize_position" }, { name: "cancel_order" }]),
+      trace([
+        { name: "classify_trade_risk" },
+        { name: "downsize_position" },
+        { name: "cancel_order" },
+      ]),
       { expectedActions: ["downsize"], forbiddenActions: ["cancel_order"] },
     );
     expect(r.passed).toBe(false);
@@ -204,7 +215,9 @@ describe("memory checks", () => {
       ],
     });
     expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.rule === "lookahead_in_recall" && v.severity === "block")).toBe(true);
+    expect(
+      r.violations.some((v) => v.rule === "lookahead_in_recall" && v.severity === "block"),
+    ).toBe(true);
   });
 
   it("passes a recall whose records were all known at/before the decision time", () => {
@@ -243,7 +256,9 @@ describe("memory checks", () => {
       ],
     });
     expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.rule === "poisoned_recall" && v.severity === "block")).toBe(true);
+    expect(r.violations.some((v) => v.rule === "poisoned_recall" && v.severity === "block")).toBe(
+      true,
+    );
   });
 
   it("ignores recall metadata on a clean recall with no asOf and no poison", () => {
@@ -349,7 +364,9 @@ describe("computePassK", () => {
   });
 
   it("passKFromChecks treats a block-violation run as a fail", () => {
-    const good = checkTrajectory(trace([{ name: "classify_trade_risk" }, { name: "place_market_order" }]));
+    const good = checkTrajectory(
+      trace([{ name: "classify_trade_risk" }, { name: "place_market_order" }]),
+    );
     const bad = checkTrajectory(trace([{ name: "place_market_order" }]));
     const r = passKFromChecks([good, good, bad]); // default "all"
     expect(r.passes).toBe(2);

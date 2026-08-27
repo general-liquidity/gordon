@@ -12,10 +12,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import {
-  playbookRegistry,
-  PlaybookPromptGenerator,
-} from "../../../../../core/playbooks/index.ts";
+import { playbookRegistry, PlaybookPromptGenerator } from "../../../../../core/playbooks/index.ts";
 import { createModuleLogger } from "../../../../logger/index.ts";
 
 const logger = createModuleLogger("playbook-tools");
@@ -45,9 +42,9 @@ export const listPlaybooksTool = createTool({
             timeframes: z.string(),
             tags: z.string(),
             description: z.string(),
-          })
+          }),
         ),
-      })
+      }),
     ),
     total: z.number(),
     error: z.string().optional(),
@@ -110,9 +107,7 @@ export const searchPlaybooksTool = createTool({
     "Search playbooks by a free-text query. Matches against names, descriptions, tags, markets, and symbols. " +
     "Use when looking for a strategy that fits specific criteria.",
   inputSchema: z.object({
-    query: z
-      .string()
-      .describe("Search query (e.g., 'momentum', 'low risk', 'BTC')"),
+    query: z.string().describe("Search query (e.g., 'momentum', 'low risk', 'BTC')"),
   }),
   outputSchema: z.object({
     results: z.array(
@@ -123,7 +118,7 @@ export const searchPlaybooksTool = createTool({
         riskLevel: z.string(),
         description: z.string(),
         tags: z.array(z.string()),
-      })
+      }),
     ),
     count: z.number(),
     error: z.string().optional(),
@@ -139,9 +134,7 @@ export const searchPlaybooksTool = createTool({
           tier: pb.tier,
           riskLevel: pb.riskLevel,
           description:
-            pb.description.length > 150
-              ? pb.description.slice(0, 147) + "..."
-              : pb.description,
+            pb.description.length > 150 ? `${pb.description.slice(0, 147)}...` : pb.description,
           tags: pb.tags,
         })),
         count: matches.length,
@@ -164,9 +157,7 @@ export const getPlaybookForAgentTool = createTool({
     "Get the playbook prompt fragment tailored for a specific agent role. " +
     "Returns only the information relevant to that agent (e.g., trigger conditions for Scanner, management rules for Monitor).",
   inputSchema: z.object({
-    playbookId: z
-      .string()
-      .describe("Playbook ID (kebab-case)"),
+    playbookId: z.string().describe("Playbook ID (kebab-case)"),
     agentRole: z
       .enum(["scanner", "analyst", "planner", "monitor", "teacher"])
       .describe("The agent role to generate the prompt fragment for"),

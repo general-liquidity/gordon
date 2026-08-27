@@ -20,7 +20,7 @@ function makeMetrics(overrides: Partial<ReplayMetrics> = {}): ReplayMetrics {
 describe("evaluateReplay — drawdown check", () => {
   it("passes when DD ≤ baseline", () => {
     const v = evaluateReplay(makeMetrics({ maxIntradayDrawdown: 0.05 }), {
-      baseline99thPctDrawdown: 0.10,
+      baseline99thPctDrawdown: 0.1,
     });
     expect(v.passed).toBe(true);
     expect(v.reasons.some((r) => r.includes("within"))).toBe(true);
@@ -28,14 +28,14 @@ describe("evaluateReplay — drawdown check", () => {
 
   it("fails when DD > baseline", () => {
     const v = evaluateReplay(makeMetrics({ maxIntradayDrawdown: 0.15 }), {
-      baseline99thPctDrawdown: 0.10,
+      baseline99thPctDrawdown: 0.1,
     });
     expect(v.passed).toBe(false);
     expect(v.reasons.some((r) => r.includes("exceeded 99th-pct baseline"))).toBe(true);
   });
 
   it("skips DD check when threshold omitted", () => {
-    const v = evaluateReplay(makeMetrics({ maxIntradayDrawdown: 0.50 }), {});
+    const v = evaluateReplay(makeMetrics({ maxIntradayDrawdown: 0.5 }), {});
     expect(v.comparedTo.baseline99thPctDrawdown).toBeUndefined();
     expect(v.reasons.some((r) => r.includes("baseline"))).toBe(false);
   });
@@ -90,12 +90,12 @@ describe("evaluateReplay — combined fails", () => {
   it("accumulates multiple failure reasons", () => {
     const v = evaluateReplay(
       makeMetrics({
-        maxIntradayDrawdown: 0.20,
+        maxIntradayDrawdown: 0.2,
         riskResponseTimeSeconds: 999,
         maxSingleTradeSlippage: 999,
       }),
       {
-        baseline99thPctDrawdown: 0.10,
+        baseline99thPctDrawdown: 0.1,
         responseTimeBudgetSeconds: 300,
         maxAcceptableSlippageBps: 100,
       },
@@ -115,7 +115,7 @@ describe("evaluateReplay — no thresholds supplied", () => {
 
 describe("formatVerdict", () => {
   it("renders PASS status with metrics", () => {
-    const v = evaluateReplay(makeMetrics(), { baseline99thPctDrawdown: 0.10 });
+    const v = evaluateReplay(makeMetrics(), { baseline99thPctDrawdown: 0.1 });
     const text = formatVerdict(v);
     expect(text).toContain("PASS");
     expect(text).toContain("Max DD");
@@ -124,8 +124,8 @@ describe("formatVerdict", () => {
   });
 
   it("renders FAIL status when verdict failed", () => {
-    const v = evaluateReplay(makeMetrics({ maxIntradayDrawdown: 0.50 }), {
-      baseline99thPctDrawdown: 0.10,
+    const v = evaluateReplay(makeMetrics({ maxIntradayDrawdown: 0.5 }), {
+      baseline99thPctDrawdown: 0.1,
     });
     const text = formatVerdict(v);
     expect(text).toContain("FAIL");

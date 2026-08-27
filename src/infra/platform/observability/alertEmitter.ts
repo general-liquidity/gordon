@@ -64,7 +64,10 @@ function isRecentDuplicate(key: string, windowMs: number): boolean {
  * Emit an alert to the event bus. Returns true if the alert was emitted,
  * false if it was suppressed by dedup.
  */
-export async function emitAlert(input: AlertInput, options: { dedupWindowMs?: number } = {}): Promise<boolean> {
+export async function emitAlert(
+  input: AlertInput,
+  options: { dedupWindowMs?: number } = {},
+): Promise<boolean> {
   if (input.dedupeKey) {
     const windowMs = options.dedupWindowMs ?? DEFAULT_DEDUP_WINDOW_MS;
     if (isRecentDuplicate(input.dedupeKey, windowMs)) {
@@ -86,12 +89,24 @@ export async function emitAlert(input: AlertInput, options: { dedupWindowMs?: nu
  * Convenience helpers for common alert levels.
  */
 export const alert = {
-  info: (category: string, message: string, context?: Record<string, unknown>, dedupeKey?: string) =>
-    emitAlert({ level: "info", category, message, context, dedupeKey }),
-  warn: (category: string, message: string, context?: Record<string, unknown>, dedupeKey?: string) =>
-    emitAlert({ level: "warning", category, message, context, dedupeKey }),
-  critical: (category: string, message: string, context?: Record<string, unknown>, dedupeKey?: string) =>
-    emitAlert({ level: "critical", category, message, context, dedupeKey }),
+  info: (
+    category: string,
+    message: string,
+    context?: Record<string, unknown>,
+    dedupeKey?: string,
+  ) => emitAlert({ level: "info", category, message, context, dedupeKey }),
+  warn: (
+    category: string,
+    message: string,
+    context?: Record<string, unknown>,
+    dedupeKey?: string,
+  ) => emitAlert({ level: "warning", category, message, context, dedupeKey }),
+  critical: (
+    category: string,
+    message: string,
+    context?: Record<string, unknown>,
+    dedupeKey?: string,
+  ) => emitAlert({ level: "critical", category, message, context, dedupeKey }),
 };
 
 /**

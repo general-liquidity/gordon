@@ -60,22 +60,12 @@ import { getGordonContext, type MastraExecutionContext } from "../../agents/tool
 export const MCP_EXPOSE_FLAG_ENV = "GORDON_MCP_EXPOSE_SERVER";
 export const MCP_ALLOW_EXECUTION_ENV = "GORDON_MCP_ALLOW_EXECUTION";
 
-export function isMcpExposeEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[MCP_EXPOSE_FLAG_ENV] === "1" ||
-    env[MCP_EXPOSE_FLAG_ENV] === "true"
-  );
+export function isMcpExposeEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env[MCP_EXPOSE_FLAG_ENV] === "1" || env[MCP_EXPOSE_FLAG_ENV] === "true";
 }
 
-export function isMcpExecutionAllowed(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[MCP_ALLOW_EXECUTION_ENV] === "1" ||
-    env[MCP_ALLOW_EXECUTION_ENV] === "true"
-  );
+export function isMcpExecutionAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env[MCP_ALLOW_EXECUTION_ENV] === "1" || env[MCP_ALLOW_EXECUTION_ENV] === "true";
 }
 
 /**
@@ -198,28 +188,29 @@ async function invokeAndAdapt(
     const gordonContext = getGordonContext(execContext as MastraExecutionContext) ?? undefined;
     const access = await evaluateGordonToolAccess(tool.id, gordonContext);
     if (access.status !== "allowed") {
-      const suffix = access.requestId
-        ? ` Approval id: ${access.requestId}.`
-        : "";
+      const suffix = access.requestId ? ` Approval id: ${access.requestId}.` : "";
       return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            error: `${access.reason ?? `Tool ${tool.id} ${access.status}.`}${suffix}`,
-            runtimeStatus: access.status,
-            toolId: tool.id,
-            approvalRequestId: access.requestId,
-          }, null, 2),
-        }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                error: `${access.reason ?? `Tool ${tool.id} ${access.status}.`}${suffix}`,
+                runtimeStatus: access.status,
+                toolId: tool.id,
+                approvalRequestId: access.requestId,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
         isError: true,
       };
     }
 
     const result = await tool.execute(input, execContext);
-    const text =
-      typeof result === "string"
-        ? result
-        : JSON.stringify(result, null, 2);
+    const text = typeof result === "string" ? result : JSON.stringify(result, null, 2);
     return { content: [{ type: "text", text }] };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -319,14 +310,16 @@ export function buildGordonMcpServer(
     server.registerTool(
       tool.id,
       config as Parameters<typeof server.registerTool>[1],
-      async (input: Record<string, unknown>) =>
-        invokeAndAdapt(tool, input, options.execContext),
+      async (input: Record<string, unknown>) => invokeAndAdapt(tool, input, options.execContext),
     );
   }
 
   // v2: resources + prompts + task annotation accounting
   let resourceSummary: { count: number; resources: string[] } = { count: 0, resources: [] };
-  let promptSummary: { count: number; prompts: Array<{ name: string }> } = { count: 0, prompts: [] };
+  let promptSummary: { count: number; prompts: Array<{ name: string }> } = {
+    count: 0,
+    prompts: [],
+  };
   if (options.includeResources !== false) {
     resourceSummary = registerGordonResources(server);
   }

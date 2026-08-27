@@ -47,8 +47,8 @@ export class PublicExchangeNotSupportedError extends Error {
   constructor(exchangeId: ExchangeId) {
     super(
       `Public-only mode for "${exchangeId}" is not supported. ` +
-      `The adapter requires authentication even for read-only operations. ` +
-      `Connect the venue normally to enable quote fetching.`,
+        `The adapter requires authentication even for read-only operations. ` +
+        `Connect the venue normally to enable quote fetching.`,
     );
     this.name = "PublicExchangeNotSupportedError";
     this.exchangeId = exchangeId;

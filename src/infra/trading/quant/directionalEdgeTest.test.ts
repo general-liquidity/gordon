@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  runDirectionalEdgeTest,
-  directionalEdgeTestToPayload,
-} from "./directionalEdgeTest.ts";
+import { runDirectionalEdgeTest, directionalEdgeTestToPayload } from "./directionalEdgeTest.ts";
 
 function lcg(seed: number) {
   let s = seed;

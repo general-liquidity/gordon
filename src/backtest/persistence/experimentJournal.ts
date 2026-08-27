@@ -106,7 +106,7 @@ export function recordExperiment(
 
   try {
     ensureJournalDir();
-    appendFileSync(getJournalPath(), JSON.stringify(experiment) + "\n", "utf8");
+    appendFileSync(getJournalPath(), `${JSON.stringify(experiment)}\n`, "utf8");
   } catch (err) {
     logger.warn("Failed to write backtest experiment journal entry", {
       err: String(err),
@@ -132,9 +132,7 @@ export interface ListExperimentsOptions {
  * Read recent experiments from the journal. Returns newest-first. Streams the
  * file line by line to keep memory bounded even for large journals.
  */
-export function listExperiments(
-  options: ListExperimentsOptions = {},
-): BacktestExperiment[] {
+export function listExperiments(options: ListExperimentsOptions = {}): BacktestExperiment[] {
   const path = getJournalPath();
   if (!existsSync(path)) return [];
 

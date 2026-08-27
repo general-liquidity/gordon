@@ -194,7 +194,9 @@ export function formatPairRegime(r: PairRegime, symbolX: string, symbolY: string
   lines.push(`  ADF Statistic: ${Number.isNaN(r.adfStat) ? "N/A" : r.adfStat.toFixed(3)}`);
   lines.push(
     `  Half-Life: ${
-      Number.isNaN(r.halfLife) || r.halfLife === Infinity ? "N/A" : `${r.halfLife.toFixed(1)} periods`
+      Number.isNaN(r.halfLife) || r.halfLife === Infinity
+        ? "N/A"
+        : `${r.halfLife.toFixed(1)} periods`
     }`,
   );
   return lines.join("\n");

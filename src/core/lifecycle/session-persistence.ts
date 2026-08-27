@@ -105,7 +105,10 @@ export function updateHeartbeat(sessionId: string): void {
   }
 }
 
-export function isStaleSession(state: PersistedSessionState, maxAgeMs: number = 30 * 60 * 1000): boolean {
+export function isStaleSession(
+  state: PersistedSessionState,
+  maxAgeMs: number = 30 * 60 * 1000,
+): boolean {
   const lastBeat = new Date(state.lastHeartbeat).getTime();
   return Date.now() - lastBeat > maxAgeMs;
 }

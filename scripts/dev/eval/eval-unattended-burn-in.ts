@@ -24,7 +24,8 @@ for (let i = 2; i < process.argv.length; i++) {
   else if (arg === "--interval-ms") intervalMs = Number(process.argv[++i]);
   else if (arg === "--output") evidencePath = process.argv[++i];
   else if (arg === "--scenario") scenarioId = process.argv[++i];
-  else if (arg === "--live") throw new Error("This burn-in is permanently dry-run; --live is not supported");
+  else if (arg === "--live")
+    throw new Error("This burn-in is permanently dry-run; --live is not supported");
 }
 
 const selected = scenarioId ? getScenarioById(scenarioId) : undefined;
@@ -38,11 +39,13 @@ const result = await runUnattendedBurnIn({
   ...(evidencePath ? { evidencePath } : {}),
 });
 
-console.log(JSON.stringify({
-  status: "pass",
-  runId: result.runId,
-  cyclesCompleted: result.cyclesCompleted,
-  evidencePath: result.evidencePath,
-  modelInference: false,
-  orderDispatch: false,
-}));
+console.log(
+  JSON.stringify({
+    status: "pass",
+    runId: result.runId,
+    cyclesCompleted: result.cyclesCompleted,
+    evidencePath: result.evidencePath,
+    modelInference: false,
+    orderDispatch: false,
+  }),
+);

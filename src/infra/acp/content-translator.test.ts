@@ -41,9 +41,7 @@ describe("extractMultimodalPrompt", () => {
   it("extracts audio attachments + surfaces placeholder", () => {
     const result = extractMultimodalPrompt({
       sessionId: "s",
-      prompt: [
-        { type: "audio", data: "RIFF...", mimeType: "audio/wav" },
-      ],
+      prompt: [{ type: "audio", data: "RIFF...", mimeType: "audio/wav" }],
     } as unknown as PromptRequest);
     expect(result.attachments).toHaveLength(1);
     expect(result.attachments[0]?.kind).toBe("audio");

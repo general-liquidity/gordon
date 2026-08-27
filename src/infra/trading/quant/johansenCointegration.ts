@@ -44,7 +44,11 @@
 
 import { invert, transpose, multiply, eigenDecomposition } from "../../../core/alpha/matrix.ts";
 
-export type JohansenVerdict = "cointegrated" | "no_cointegration" | "stationary_system" | "insufficient_data";
+export type JohansenVerdict =
+  | "cointegrated"
+  | "no_cointegration"
+  | "stationary_system"
+  | "insufficient_data";
 export type JohansenAlpha = 0.1 | 0.05 | 0.01;
 
 export interface JohansenInput {
@@ -98,7 +102,12 @@ const TRACE_CRITICAL_VALUES: Record<number, Record<JohansenAlpha, number>> = {
 const DEFAULT_LAG = 1;
 const DEFAULT_ALPHA: JohansenAlpha = 0.05;
 
-function insufficient(numSeries: number, lagOrder: number, n: number, reason: string): JohansenResult {
+function insufficient(
+  numSeries: number,
+  lagOrder: number,
+  n: number,
+  reason: string,
+): JohansenResult {
   return {
     verdict: "insufficient_data",
     cointegrationRank: 0,
@@ -156,7 +165,8 @@ function regressOut(Y: number[][], Z: number[][]): number[][] | null {
 /** A'B / T for two T×* matrices. */
 function crossMoment(A: number[][], B: number[][], T: number): number[][] {
   const m = multiply(transpose(A), B);
-  for (let i = 0; i < m.length; i++) for (let j = 0; j < m[i]!.length; j++) m[i]![j] = m[i]![j]! / T;
+  for (let i = 0; i < m.length; i++)
+    for (let j = 0; j < m[i]!.length; j++) m[i]![j] = m[i]![j]! / T;
   return m;
 }
 
@@ -212,7 +222,9 @@ export function runJohansenTest(input: JohansenInput): JohansenResult {
   const len = cols[0]!.length;
   for (const c of cols) {
     if (c.length !== len) return insufficient(k, lagOrder, len, "series have unequal lengths");
-    for (const v of c) if (!Number.isFinite(v)) return insufficient(k, lagOrder, len, "series contain non-finite values");
+    for (const v of c)
+      if (!Number.isFinite(v))
+        return insufficient(k, lagOrder, len, "series contain non-finite values");
   }
 
   // Build level matrix Y (len×k) from column-major input.
@@ -238,7 +250,12 @@ export function runJohansenTest(input: JohansenInput): JohansenResult {
   const T = dY.length - startD;
   const minRequired = k * (lagOrder + 2) + 5;
   if (T < minRequired) {
-    return insufficient(k, lagOrder, len, `need at least ${minRequired} aligned observations, got ${T}`);
+    return insufficient(
+      k,
+      lagOrder,
+      len,
+      `need at least ${minRequired} aligned observations, got ${T}`,
+    );
   }
 
   // R0 source = ΔY_t (rows startD..end); R1 source = Y_{t-1} (level at same t).
@@ -267,7 +284,8 @@ export function runJohansenTest(input: JohansenInput): JohansenResult {
     R0 = demean(dY0);
     R1 = demean(Ylag);
   }
-  if (!R0 || !R1) return insufficient(k, lagOrder, len, "singular regressor matrix in concentration step");
+  if (!R0 || !R1)
+    return insufficient(k, lagOrder, len, "singular regressor matrix in concentration step");
 
   const S00 = crossMoment(R0, R0, T);
   const S01 = crossMoment(R0, R1, T);
@@ -275,7 +293,8 @@ export function runJohansenTest(input: JohansenInput): JohansenResult {
   const S10 = transpose(S01);
 
   const S00inv = invert(S00);
-  if (!S00inv) return insufficient(k, lagOrder, len, "S00 singular — degenerate differenced series");
+  if (!S00inv)
+    return insufficient(k, lagOrder, len, "S00 singular — degenerate differenced series");
 
   // M = S10 S00⁻¹ S01  (k×k, symmetric PSD).
   const M = multiply(multiply(S10, S00inv), S01);

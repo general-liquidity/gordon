@@ -135,10 +135,7 @@ export function computeInternalBatch(
   const requireDiffStrategy = options.requireDifferentStrategy ?? false;
 
   // Bucket by symbol
-  const bySymbol = new Map<
-    string,
-    { buys: BatchOrderInput[]; sells: BatchOrderInput[] }
-  >();
+  const bySymbol = new Map<string, { buys: BatchOrderInput[]; sells: BatchOrderInput[] }>();
   for (const order of orders) {
     let bucket = bySymbol.get(order.symbol);
     if (!bucket) {

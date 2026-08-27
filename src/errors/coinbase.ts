@@ -15,7 +15,7 @@ export class CoinbaseError extends GordonError {
     message: string,
     coinbaseCode?: string,
     endpoint?: string,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, "COINBASE_ERROR", { ...context, coinbaseCode, endpoint });
     this.name = "CoinbaseError";
@@ -48,16 +48,12 @@ export class CoinbaseError extends GordonError {
 export class CoinbaseRateLimitError extends CoinbaseError {
   public readonly retryAfter?: number;
 
-  constructor(
-    retryAfter?: number,
-    endpoint?: string,
-    context?: Record<string, unknown>
-  ) {
+  constructor(retryAfter?: number, endpoint?: string, context?: Record<string, unknown>) {
     super(
       `Rate limit exceeded${retryAfter ? `. Retry after ${retryAfter}ms` : ""}`,
       "RATE_LIMIT_EXCEEDED",
       endpoint,
-      { ...context, retryAfter }
+      { ...context, retryAfter },
     );
     this.name = "CoinbaseRateLimitError";
     this.retryAfter = retryAfter;
@@ -71,7 +67,7 @@ export class CoinbaseAuthError extends CoinbaseError {
   constructor(
     message: string = "Invalid API key, signature, or passphrase",
     coinbaseCode: string = "INVALID_API_KEY",
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, coinbaseCode, undefined, context);
     this.name = "CoinbaseAuthError";
@@ -90,13 +86,13 @@ export class CoinbaseInsufficientBalanceError extends CoinbaseError {
     asset: string,
     required: number,
     available: number,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(
       `Insufficient ${asset} balance. Required: ${required}, Available: ${available}`,
       "INSUFFICIENT_FUNDS",
       "/api/v3/brokerage/orders",
-      { ...context, asset, required, available }
+      { ...context, asset, required, available },
     );
     this.name = "CoinbaseInsufficientBalanceError";
     this.asset = asset;
@@ -127,7 +123,7 @@ export class CoinbaseInvalidProductError extends CoinbaseError {
 export class CoinbaseConnectionError extends GordonError {
   constructor(
     message: string = "Failed to connect to Coinbase API",
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, "COINBASE_CONNECTION_ERROR", context);
     this.name = "CoinbaseConnectionError";
@@ -140,7 +136,7 @@ export class CoinbaseConnectionError extends GordonError {
 export function createCoinbaseError(
   code: string,
   message: string,
-  endpoint?: string
+  endpoint?: string,
 ): CoinbaseError {
   switch (code) {
     case "RATE_LIMIT_EXCEEDED":

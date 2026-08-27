@@ -8,16 +8,10 @@
  * Phase 16 of the TUI rebuild.
  */
 
-import React, { useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Select, TextInput } from "@inkjs/ui";
-import {
-  useSettings,
-  type GordonSettings,
-  type PermissionModeSetting,
-  type RiskLevel,
-  type ThemeSetting,
-} from "../../state/SettingsProvider.js";
+import { useSettings, type GordonSettings } from "../../state/SettingsProvider.js";
 
 // ============================================================================
 // Tab definitions
@@ -149,7 +143,7 @@ export function SettingsDialog({ onClose }: Props) {
   const { settings, update } = useSettings();
   const [activeTab, setActiveTab] = useState<Tab>("General");
   const [editingField, setEditingField] = useState<string | null>(null);
-  const [textValue, setTextValue] = useState("");
+  const [_textValue, _setTextValue] = useState("");
 
   // Tab navigation
   useInput((input, key) => {
@@ -179,7 +173,11 @@ export function SettingsDialog({ onClose }: Props) {
     (field: Field, value: string) => {
       const key = field.key;
       // Convert numeric string values back to numbers
-      if (key === "maxConcurrentTrades" || key === "maxPositionSizePct" || key === "cashReservePercent") {
+      if (
+        key === "maxConcurrentTrades" ||
+        key === "maxPositionSizePct" ||
+        key === "cashReservePercent"
+      ) {
         update(key, Number(value));
       } else {
         update(key, value as any);
@@ -191,7 +189,11 @@ export function SettingsDialog({ onClose }: Props) {
   const handleTextSubmit = useCallback(
     (field: Field, value: string) => {
       const key = field.key;
-      if (key === "maxPositionSizePct" || key === "cashReservePercent" || key === "maxConcurrentTrades") {
+      if (
+        key === "maxPositionSizePct" ||
+        key === "cashReservePercent" ||
+        key === "maxConcurrentTrades"
+      ) {
         const num = Number(value);
         if (!Number.isNaN(num) && num >= 0) {
           update(key, num);
@@ -205,16 +207,12 @@ export function SettingsDialog({ onClose }: Props) {
   );
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="yellow"
-      paddingX={2}
-      paddingY={1}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={2} paddingY={1}>
       {/* Header */}
       <Box justifyContent="center">
-        <Text bold color="yellow">GORDON SETTINGS</Text>
+        <Text bold color="yellow">
+          GORDON SETTINGS
+        </Text>
       </Box>
       <Text> </Text>
 
@@ -223,7 +221,9 @@ export function SettingsDialog({ onClose }: Props) {
         {TABS.map((tab) => (
           <Box key={tab} paddingX={1}>
             {tab === activeTab ? (
-              <Text bold color="yellow" underline>{tab}</Text>
+              <Text bold color="yellow" underline>
+                {tab}
+              </Text>
             ) : (
               <Text dimColor>{tab}</Text>
             )}
@@ -240,14 +240,11 @@ export function SettingsDialog({ onClose }: Props) {
           return (
             <Box key={field.key} flexDirection="column" marginBottom={1}>
               <Text bold>{field.label}</Text>
-              <Text dimColor>  Current: {currentValue || "(not set)"}</Text>
+              <Text dimColor> Current: {currentValue || "(not set)"}</Text>
 
               {field.kind === "select" ? (
                 <Box paddingLeft={2}>
-                  <Select
-                    options={field.options}
-                    onChange={(v) => handleSelectChange(field, v)}
-                  />
+                  <Select options={field.options} onChange={(v) => handleSelectChange(field, v)} />
                 </Box>
               ) : editingField === field.key ? (
                 <Box paddingLeft={2}>
@@ -260,10 +257,7 @@ export function SettingsDialog({ onClose }: Props) {
                 </Box>
               ) : (
                 <Box paddingLeft={2}>
-                  <Text
-                    dimColor
-                    color="cyan"
-                  >
+                  <Text dimColor color="cyan">
                     Press Enter to edit
                   </Text>
                 </Box>

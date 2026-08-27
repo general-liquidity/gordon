@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, type BoxProps } from "../ink-custom";
 import type { GordonTheme } from "../themes/themes.ts";
 import { useTheme } from "../themes/ThemeProvider.tsx";
@@ -36,7 +35,18 @@ export function ThemedBox({ colorToken, borderTone, borderStyle, borderColor, ..
   const tokenProps: Partial<BoxProps> =
     colorToken === "overlay" ? { borderStyle: "round", borderColor: theme.uiBorder } : {};
   const toneProps: Partial<BoxProps> = borderTone
-    ? { borderStyle: borderStyle ?? "round", borderColor: borderColor ?? borderToneColor(borderTone, theme) }
+    ? {
+        borderStyle: borderStyle ?? "round",
+        borderColor: borderColor ?? borderToneColor(borderTone, theme),
+      }
     : {};
-  return <Box {...tokenProps} {...toneProps} borderStyle={borderStyle ?? toneProps.borderStyle ?? tokenProps.borderStyle} borderColor={borderColor ?? toneProps.borderColor ?? tokenProps.borderColor} {...rest} />;
+  return (
+    <Box
+      {...tokenProps}
+      {...toneProps}
+      borderStyle={borderStyle ?? toneProps.borderStyle ?? tokenProps.borderStyle}
+      borderColor={borderColor ?? toneProps.borderColor ?? tokenProps.borderColor}
+      {...rest}
+    />
+  );
 }

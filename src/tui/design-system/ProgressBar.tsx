@@ -1,4 +1,3 @@
-import React from "react";
 import { Text } from "../ink-custom";
 
 // ============================================================================
@@ -55,8 +54,13 @@ export function ProgressBar({
 
   return (
     <Text>
-      <Text color={fillColor}>{filled}{partial}</Text>
-      <Text dimColor={!!emptyColor} color={emptyColor}>{empty}</Text>
+      <Text color={fillColor}>
+        {filled}
+        {partial}
+      </Text>
+      <Text dimColor={!!emptyColor} color={emptyColor}>
+        {empty}
+      </Text>
     </Text>
   );
 }

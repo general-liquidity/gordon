@@ -51,7 +51,9 @@ export interface FundamentalQualityResult {
   interpretation: string;
 }
 
-export function computeFundamentalQuality(input: FundamentalQualityInput): FundamentalQualityResult {
+export function computeFundamentalQuality(
+  input: FundamentalQualityInput,
+): FundamentalQualityResult {
   const days = input.daysInPeriod && input.daysInPeriod > 0 ? input.daysInPeriod : 365;
   const rev = input.revenue;
 
@@ -62,28 +64,53 @@ export function computeFundamentalQuality(input: FundamentalQualityInput): Funda
         ? ((rev - input.priorRevenue) / Math.abs(input.priorRevenue)) * 100
         : null;
 
-  const fcfMarginPct = typeof input.freeCashFlow === "number" && rev > 0 ? (input.freeCashFlow / rev) * 100 : null;
+  const fcfMarginPct =
+    typeof input.freeCashFlow === "number" && rev > 0 ? (input.freeCashFlow / rev) * 100 : null;
   const ruleOf40 = growthPct !== null && fcfMarginPct !== null ? growthPct + fcfMarginPct : null;
 
   const fcfConversion =
-    typeof input.freeCashFlow === "number" && typeof input.netIncome === "number" && input.netIncome !== 0
+    typeof input.freeCashFlow === "number" &&
+    typeof input.netIncome === "number" &&
+    input.netIncome !== 0
       ? input.freeCashFlow / input.netIncome
       : null;
   const fcfToOcf =
-    typeof input.freeCashFlow === "number" && typeof input.operatingCashFlow === "number" && input.operatingCashFlow !== 0
+    typeof input.freeCashFlow === "number" &&
+    typeof input.operatingCashFlow === "number" &&
+    input.operatingCashFlow !== 0
       ? input.freeCashFlow / input.operatingCashFlow
       : null;
 
-  const dso = typeof input.accountsReceivable === "number" && rev > 0 ? (input.accountsReceivable / rev) * days : null;
-  const dio = typeof input.inventory === "number" && input.cogs && input.cogs > 0 ? (input.inventory / input.cogs) * days : null;
-  const dpo = typeof input.accountsPayable === "number" && input.cogs && input.cogs > 0 ? (input.accountsPayable / input.cogs) * days : null;
+  const dso =
+    typeof input.accountsReceivable === "number" && rev > 0
+      ? (input.accountsReceivable / rev) * days
+      : null;
+  const dio =
+    typeof input.inventory === "number" && input.cogs && input.cogs > 0
+      ? (input.inventory / input.cogs) * days
+      : null;
+  const dpo =
+    typeof input.accountsPayable === "number" && input.cogs && input.cogs > 0
+      ? (input.accountsPayable / input.cogs) * days
+      : null;
   const ccc = dso !== null && dio !== null && dpo !== null ? dso + dio - dpo : null;
 
   const parts: string[] = [];
-  if (ruleOf40 !== null) parts.push(`Rule-of-40 ${round(ruleOf40, 1)} (${ruleOf40 >= 40 ? "PASS" : "fail"}: ${round(growthPct!, 1)}% growth + ${round(fcfMarginPct!, 1)}% FCF margin)`);
-  if (fcfConversion !== null) parts.push(`FCF/NI ${round(fcfConversion, 2)}${fcfConversion < 0.8 ? " (low — accrual-heavy earnings)" : ""}`);
-  if (ccc !== null) parts.push(`CCC ${round(ccc, 0)}d${ccc < 0 ? " (negative — collects before paying, strong)" : ""}`);
-  const interpretation = parts.length ? parts.join("; ") : "insufficient statement inputs for any quality ratio";
+  if (ruleOf40 !== null)
+    parts.push(
+      `Rule-of-40 ${round(ruleOf40, 1)} (${ruleOf40 >= 40 ? "PASS" : "fail"}: ${round(growthPct!, 1)}% growth + ${round(fcfMarginPct!, 1)}% FCF margin)`,
+    );
+  if (fcfConversion !== null)
+    parts.push(
+      `FCF/NI ${round(fcfConversion, 2)}${fcfConversion < 0.8 ? " (low — accrual-heavy earnings)" : ""}`,
+    );
+  if (ccc !== null)
+    parts.push(
+      `CCC ${round(ccc, 0)}d${ccc < 0 ? " (negative — collects before paying, strong)" : ""}`,
+    );
+  const interpretation = parts.length
+    ? parts.join("; ")
+    : "insufficient statement inputs for any quality ratio";
 
   return {
     ruleOf40: ruleOf40 !== null ? round(ruleOf40, 2) : null,
@@ -129,11 +156,26 @@ export interface WACCResult {
 }
 
 export function computeWACC(input: WACCInput): WACCResult {
-  const { riskFreeRate: rf, beta, equityRiskPremium: erp, marketCapEquity: E, marketValueDebt: D, costOfDebt: kd, taxRate: t } = input;
+  const {
+    riskFreeRate: rf,
+    beta,
+    equityRiskPremium: erp,
+    marketCapEquity: E,
+    marketValueDebt: D,
+    costOfDebt: kd,
+    taxRate: t,
+  } = input;
   const invalid = (reason: string): WACCResult => ({
-    costOfEquity: 0, afterTaxCostOfDebt: 0, weightEquity: 0, weightDebt: 0, wacc: 0, valid: false, interpretation: reason,
+    costOfEquity: 0,
+    afterTaxCostOfDebt: 0,
+    weightEquity: 0,
+    weightDebt: 0,
+    wacc: 0,
+    valid: false,
+    interpretation: reason,
   });
-  if (!(E >= 0) || !(D >= 0) || E + D <= 0) return invalid("need marketCapEquity, marketValueDebt ≥ 0 with E+D > 0");
+  if (!(E >= 0) || !(D >= 0) || E + D <= 0)
+    return invalid("need marketCapEquity, marketValueDebt ≥ 0 with E+D > 0");
 
   const costOfEquity = rf + beta * erp + (input.additionalPremium ?? 0);
   const afterTaxKd = kd * (1 - t);

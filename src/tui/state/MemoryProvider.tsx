@@ -8,7 +8,7 @@
  * Phase 18 of the TUI rebuild plan.
  */
 
-import React, {
+import {
   createContext,
   useContext,
   useState,
@@ -52,7 +52,12 @@ export interface MemoryContextValue {
   /** Reload all memory files from disk */
   loadMemories: () => Promise<void>;
   /** Save (create or overwrite) a memory file */
-  saveMemory: (type: MemoryType, name: string, content: string, description?: string) => Promise<void>;
+  saveMemory: (
+    type: MemoryType,
+    name: string,
+    content: string,
+    description?: string,
+  ) => Promise<void>;
   /** List memories, optionally filtered by type */
   listMemories: (type?: MemoryType) => MemoryEntry[];
   /** Get a single memory by name */
@@ -106,7 +111,10 @@ function parseFrontmatter(raw: string): { meta: Frontmatter; body: string } {
     const colonIdx = line.indexOf(":");
     if (colonIdx === -1) continue;
     const key = line.slice(0, colonIdx).trim().toLowerCase();
-    const value = line.slice(colonIdx + 1).trim().replace(/^["']|["']$/g, "");
+    const value = line
+      .slice(colonIdx + 1)
+      .trim()
+      .replace(/^["']|["']$/g, "");
     if (key === "name") meta.name = value;
     else if (key === "description") meta.description = value;
     else if (key === "type" && VALID_TYPES.has(value)) meta.type = value as MemoryType;
@@ -232,12 +240,7 @@ export function MemoryProvider({ children }: Props) {
         await ensureDir();
         const slug = slugify(name);
         const filePath = path.join(MEMORY_DIR, `${slug}.md`);
-        const markdown = serializeFrontmatter(
-          name,
-          description ?? "",
-          type,
-          content,
-        );
+        const markdown = serializeFrontmatter(name, description ?? "", type, content);
         await fs.writeFile(filePath, markdown, "utf-8");
 
         // Reload to pick up changes
@@ -263,9 +266,7 @@ export function MemoryProvider({ children }: Props) {
     (name: string): MemoryEntry | undefined => {
       const lower = name.toLowerCase();
       return memories.find(
-        (m) =>
-          m.name.toLowerCase() === lower ||
-          slugify(m.name) === slugify(name),
+        (m) => m.name.toLowerCase() === lower || slugify(m.name) === slugify(name),
       );
     },
     [memories],
@@ -290,11 +291,7 @@ export function MemoryProvider({ children }: Props) {
     [memories, loading, error, loadMemories, saveMemory, listMemories, getMemory],
   );
 
-  return (
-    <MemoryContext.Provider value={value}>
-      {children}
-    </MemoryContext.Provider>
-  );
+  return <MemoryContext.Provider value={value}>{children}</MemoryContext.Provider>;
 }
 
 // ============================================================================

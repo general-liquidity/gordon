@@ -15,14 +15,16 @@ const scanInputSchema = z.object({
 const scanOutputSchema = z.object({
   timestamp: z.string(),
   coinsScanned: z.number(),
-  opportunities: z.array(z.object({
-    symbol: z.string(),
-    price: z.number(),
-    change24h: z.number(),
-    setupConfidence: z.number(),
-    bias: z.string(),
-    risk: z.string(),
-  })),
+  opportunities: z.array(
+    z.object({
+      symbol: z.string(),
+      price: z.number(),
+      change24h: z.number(),
+      setupConfidence: z.number(),
+      bias: z.string(),
+      risk: z.string(),
+    }),
+  ),
 });
 
 const analyzeInputSchema = z.object({
@@ -134,7 +136,8 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
         description: "Canonical market scan tool",
       },
     ),
-    prompt: () => "Scan crypto markets for trading opportunities across multiple symbols (~10-30s depending on market size)",
+    prompt: () =>
+      "Scan crypto markets for trading opportunities across multiple symbols (~10-30s depending on market size)",
     tags: ["market", "scan", "discovery"],
   },
   {
@@ -147,7 +150,10 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
     sideEffectLevel: "none",
     approvalPolicy: "none",
     dryRunSupported: false,
-    providerRequirements: [{ kind: "exchange", optional: true }, { kind: "broker", optional: true }],
+    providerRequirements: [
+      { kind: "exchange", optional: true },
+      { kind: "broker", optional: true },
+    ],
     rateLimitBudget: "analysis",
     visibility: ["interactive", "json", "agent"],
     inputSchema: analyzeInputSchema,
@@ -173,9 +179,10 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
         description: "Canonical single-symbol analysis tool",
       },
     ),
-    prompt: ({ args }) => args
-      ? `Run a quick single analysis on ${args} - get price action, key levels, and trading signal`
-      : "What symbol should I analyze? (Crypto pair or stock ticker)",
+    prompt: ({ args }) =>
+      args
+        ? `Run a quick single analysis on ${args} - get price action, key levels, and trading signal`
+        : "What symbol should I analyze? (Crypto pair or stock ticker)",
     tags: ["market", "analysis"],
   },
   {
@@ -213,7 +220,8 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
         description: "Canonical plan creation tool",
       },
     ),
-    prompt: ({ args }) => args ? `Create a trade plan for ${args}` : "What coin should I plan a trade for?",
+    prompt: ({ args }) =>
+      args ? `Create a trade plan for ${args}` : "What coin should I plan a trade for?",
     tags: ["trading", "planning"],
   },
   {
@@ -226,7 +234,10 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
     sideEffectLevel: "preview",
     approvalPolicy: "confirm",
     dryRunSupported: true,
-    providerRequirements: [{ kind: "exchange", optional: true }, { kind: "broker", optional: true }],
+    providerRequirements: [
+      { kind: "exchange", optional: true },
+      { kind: "broker", optional: true },
+    ],
     rateLimitBudget: "execution",
     visibility: ["interactive", "json", "agent"],
     inputSchema: previewOrderInputSchema,
@@ -244,7 +255,8 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
         action: "agent",
         target: "planner",
         executionTime: "~1-2s",
-        whenToUse: "See readiness, estimated fills, policy blockers, and side effects before placing a market order",
+        whenToUse:
+          "See readiness, estimated fills, policy blockers, and side effects before placing a market order",
       },
       {
         toolName: "preview_market_order",
@@ -252,9 +264,10 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
         description: "Canonical market-order preview tool",
       },
     ),
-    prompt: ({ args }) => args
-      ? `Preview a market order before execution: ${args}. Show readiness, estimated fills, fees, and policy blockers.`
-      : "What market order should I preview? Example: /preview-order BTC buy 100 quote or /preview-order AAPL buy 5",
+    prompt: ({ args }) =>
+      args
+        ? `Preview a market order before execution: ${args}. Show readiness, estimated fills, fees, and policy blockers.`
+        : "What market order should I preview? Example: /preview-order BTC buy 100 quote or /preview-order AAPL buy 5",
     tags: ["trading", "preview", "dry-run"],
   },
   {
@@ -267,7 +280,10 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
     sideEffectLevel: "funds",
     approvalPolicy: "trade_permission",
     dryRunSupported: true,
-    providerRequirements: [{ kind: "exchange", optional: true }, { kind: "broker", optional: true }],
+    providerRequirements: [
+      { kind: "exchange", optional: true },
+      { kind: "broker", optional: true },
+    ],
     rateLimitBudget: "execution",
     visibility: ["agent"],
     inputSchema: marketOrderInputSchema,
@@ -277,7 +293,8 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
       agentTarget: "Executor",
       description: "Canonical live market-order tool",
     },
-    prompt: ({ args }) => args ? `Place a live market order: ${args}` : "What market order should I place?",
+    prompt: ({ args }) =>
+      args ? `Place a live market order: ${args}` : "What market order should I place?",
     tags: ["trading", "execution", "armed"],
   },
   {
@@ -290,7 +307,10 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
     sideEffectLevel: "none",
     approvalPolicy: "none",
     dryRunSupported: false,
-    providerRequirements: [{ kind: "exchange", optional: true }, { kind: "broker", optional: true }],
+    providerRequirements: [
+      { kind: "exchange", optional: true },
+      { kind: "broker", optional: true },
+    ],
     rateLimitBudget: "minimal",
     visibility: ["interactive", "json", "agent"],
     inputSchema: portfolioInputSchema,
@@ -308,9 +328,10 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
       target: "portfolio",
       whenToUse: "Inspect current balances and holdings",
     }),
-    prompt: ({ args }) => args.toLowerCase().includes("stock")
-      ? "Show my stock broker account summary"
-      : "Show my portfolio",
+    prompt: ({ args }) =>
+      args.toLowerCase().includes("stock")
+        ? "Show my stock broker account summary"
+        : "Show my portfolio",
     tags: ["portfolio", "account"],
   },
   {

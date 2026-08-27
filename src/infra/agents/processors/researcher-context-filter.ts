@@ -42,7 +42,7 @@ export class ResearcherContextFilter implements Processor<"researcher-context-fi
 
 /** Opt-out kill switch — the filter is on by default (safety filter). */
 export function isResearcherLeastContextEnabled(): boolean {
-  return process.env["GORDON_LEAST_CONTEXT_RESEARCHER"] !== "0";
+  return process.env.GORDON_LEAST_CONTEXT_RESEARCHER !== "0";
 }
 
 export const researcherContextFilter = new ResearcherContextFilter();

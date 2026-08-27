@@ -109,10 +109,7 @@ function resolveDefaultThreshold(): number {
  * counter and captures the user message so future friction events can
  * be attributed to a specific question.
  */
-export function recordUserTurnStart(
-  context: GordonContext,
-  userMessage?: string,
-): void {
+export function recordUserTurnStart(context: GordonContext, userMessage?: string): void {
   const key = getThreadKey(context);
   const now = Date.now();
   turnStateByThread.set(key, {
@@ -214,7 +211,7 @@ export function appendToolFrictionEvent(
 ): { written: boolean; path: string; error?: string } {
   try {
     mkdirSync(dirname(path), { recursive: true });
-    appendFileSync(path, JSON.stringify(entry) + "\n", { encoding: "utf-8" });
+    appendFileSync(path, `${JSON.stringify(entry)}\n`, { encoding: "utf-8" });
     return { written: true, path };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -98,7 +98,8 @@ export function classifySurvivorshipRisk(input: SurvivorshipRiskInput): Survivor
       returnHaircut: 1.0,
       reasons,
       checklist: CHECKLIST,
-      interpretation: "No survivorship-bias risk: the strategy does not pick winners from a historical universe.",
+      interpretation:
+        "No survivorship-bias risk: the strategy does not pick winners from a historical universe.",
     };
   }
 
@@ -111,7 +112,8 @@ export function classifySurvivorshipRisk(input: SurvivorshipRiskInput): Survivor
       returnHaircut: 1.0,
       reasons,
       checklist: CHECKLIST,
-      interpretation: "No survivorship-bias risk: the universe is reconstructed point-in-time with failed names included.",
+      interpretation:
+        "No survivorship-bias risk: the universe is reconstructed point-in-time with failed names included.",
     };
   }
 
@@ -124,7 +126,8 @@ export function classifySurvivorshipRisk(input: SurvivorshipRiskInput): Survivor
       returnHaircut: HAIRCUT_BY_TIER.low,
       reasons,
       checklist: CHECKLIST,
-      interpretation: "Low survivorship-bias risk: broad-liquid exposure is largely immune, but confirm the proxy itself isn't reconstituted survivor-only.",
+      interpretation:
+        "Low survivorship-bias risk: broad-liquid exposure is largely immune, but confirm the proxy itself isn't reconstituted survivor-only.",
     };
   }
 
@@ -136,26 +139,38 @@ export function classifySurvivorshipRisk(input: SurvivorshipRiskInput): Survivor
   let score = 0;
   if (windowDays > 3 * YEAR) {
     score += 2;
-    reasons.push(`Long window (${(windowDays / YEAR).toFixed(1)}y) — many names had time to delist and be excluded.`);
+    reasons.push(
+      `Long window (${(windowDays / YEAR).toFixed(1)}y) — many names had time to delist and be excluded.`,
+    );
   } else if (windowDays > YEAR) {
     score += 1;
-    reasons.push(`Multi-year window (${(windowDays / YEAR).toFixed(1)}y) — some delisting exclusion likely.`);
+    reasons.push(
+      `Multi-year window (${(windowDays / YEAR).toFixed(1)}y) — some delisting exclusion likely.`,
+    );
   }
 
   if (assetClass === "crypto") {
     score += 2;
-    reasons.push("Crypto universe — tokens delist/die far more aggressively than large-cap equity, amplifying the bias.");
+    reasons.push(
+      "Crypto universe — tokens delist/die far more aggressively than large-cap equity, amplifying the bias.",
+    );
   } else if (assetClass === "equity") {
     score += 1;
-    reasons.push("Equity universe — historical index members are routinely removed; bankrupt/merged names drop out.");
+    reasons.push(
+      "Equity universe — historical index members are routinely removed; bankrupt/merged names drop out.",
+    );
   }
 
   if (universeSize >= 50) {
     score += 2;
-    reasons.push(`Broad universe (${universeSize} names) selecting a small basket — many failed candidates excluded from the pool.`);
+    reasons.push(
+      `Broad universe (${universeSize} names) selecting a small basket — many failed candidates excluded from the pool.`,
+    );
   } else if (universeSize >= 10) {
     score += 1;
-    reasons.push(`Mid-size universe (${universeSize} names) — a meaningful pool of potential failures excluded.`);
+    reasons.push(
+      `Mid-size universe (${universeSize} names) — a meaningful pool of potential failures excluded.`,
+    );
   }
 
   // Any current-snapshot cross-sectional test is at least low-risk by nature.

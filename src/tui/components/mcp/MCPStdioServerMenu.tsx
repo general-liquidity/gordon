@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Divider } from "../layout/Divider.tsx";
 
@@ -102,8 +102,10 @@ export function MCPStdioServerMenu({ onAdd, onClose }: Props) {
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">ADD LOCAL MCP SERVER</Text>
-        <Text dimColor>  (stdio)</Text>
+        <Text bold color="cyanBright">
+          ADD LOCAL MCP SERVER
+        </Text>
+        <Text dimColor> (stdio)</Text>
       </Box>
 
       <Divider />
@@ -114,7 +116,7 @@ export function MCPStdioServerMenu({ onAdd, onClose }: Props) {
           if (s === "confirm") return null;
           return (
             <Box key={s}>
-              <Text dimColor>  {STEP_LABEL[s].padEnd(16)}</Text>
+              <Text dimColor> {STEP_LABEL[s].padEnd(16)}</Text>
               <Text color="green">{values[s] || "(blank)"}</Text>
             </Box>
           );
@@ -133,9 +135,7 @@ export function MCPStdioServerMenu({ onAdd, onClose }: Props) {
           <Box marginTop={1}>
             <Text dimColor>{STEP_PLACEHOLDER[step]}</Text>
           </Box>
-          {input.trim() === "" && (
-            <Text color="yellow">  (required)</Text>
-          )}
+          {input.trim() === "" && <Text color="yellow"> (required)</Text>}
         </Box>
       )}
 
@@ -144,16 +144,16 @@ export function MCPStdioServerMenu({ onAdd, onClose }: Props) {
         <Box flexDirection="column" marginTop={1}>
           <Text bold>Ready to add:</Text>
           <Box>
-            <Text dimColor>  {"Name".padEnd(16)}</Text>
+            <Text dimColor> {"Name".padEnd(16)}</Text>
             <Text>{values.name}</Text>
           </Box>
           <Box>
-            <Text dimColor>  {"Command".padEnd(16)}</Text>
+            <Text dimColor> {"Command".padEnd(16)}</Text>
             <Text>{parsed.command}</Text>
           </Box>
           {parsed.args && parsed.args.length > 0 && (
             <Box>
-              <Text dimColor>  {"Args".padEnd(16)}</Text>
+              <Text dimColor> {"Args".padEnd(16)}</Text>
               <Text dimColor>{parsed.args.join(" ")}</Text>
             </Box>
           )}

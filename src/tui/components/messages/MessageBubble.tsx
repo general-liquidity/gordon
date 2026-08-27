@@ -1,7 +1,6 @@
 import React from "react";
-import { Box, Text } from "../../ink-custom";
+import { Box } from "../../ink-custom";
 import { RichContent } from "./RichContent.js";
-import { Byline } from "../layout/Byline.tsx";
 import { NoSelect } from "../layout/NoSelect.tsx";
 
 // Specialized renderers (Claude Code pattern: one component per message type)
@@ -44,15 +43,41 @@ import { AdvisorMessage } from "./AdvisorMessage.js";
 // ============================================================================
 
 export type MessageVariant =
-  | "default" | "approval" | "system" | "tool" | "handoff"
-  | "fill" | "stop" | "alert" | "strategy"
-  | "error" | "compact" | "resume" | "welcome"
-  | "position" | "order" | "risk_check" | "backtest" | "scan_result"
-  | "hook_progress" | "rate_limit" | "shutdown" | "paste"
+  | "default"
+  | "approval"
+  | "system"
+  | "tool"
+  | "handoff"
+  | "fill"
+  | "stop"
+  | "alert"
+  | "strategy"
+  | "error"
+  | "compact"
+  | "resume"
+  | "welcome"
+  | "position"
+  | "order"
+  | "risk_check"
+  | "backtest"
+  | "scan_result"
+  | "hook_progress"
+  | "rate_limit"
+  | "shutdown"
+  | "paste"
   | "proactive_suggestion"
-  | "thinking" | "redacted_thinking" | "interrupted" | "compact_boundary"
-  | "tool_success" | "tool_error" | "tool_canceled" | "tool_reject"
-  | "rejected_plan" | "task_assignment" | "plan_approval" | "advisor";
+  | "thinking"
+  | "redacted_thinking"
+  | "interrupted"
+  | "compact_boundary"
+  | "tool_success"
+  | "tool_error"
+  | "tool_canceled"
+  | "tool_reject"
+  | "rejected_plan"
+  | "task_assignment"
+  | "plan_approval"
+  | "advisor";
 
 export interface PlanRubricPayload {
   rubric: import("../../../infra/safety/planRubric.ts").PlanRubric;
@@ -82,13 +107,16 @@ interface Props {
 // Badge and color configuration per variant
 // Trading badges (FILLED, STOP, ALERT) stay prominent — they're money events.
 // Generic labels (gordon, you, system) use lowercase for clean hierarchy.
-const VARIANT_CONFIG: Record<string, {
-  getBadge: (msg: Message) => string;
-  badgeColor: string;
-  contentDim?: boolean;
-  icon?: string;
-  useHook?: boolean; // Show ⎿ left hook (Claude Code style)
-}> = {
+const _VARIANT_CONFIG: Record<
+  string,
+  {
+    getBadge: (msg: Message) => string;
+    badgeColor: string;
+    contentDim?: boolean;
+    icon?: string;
+    useHook?: boolean; // Show ⎿ left hook (Claude Code style)
+  }
+> = {
   default_user: {
     getBadge: () => "",
     badgeColor: "white",
@@ -258,7 +286,8 @@ export const MessageBubble = React.memo(function MessageBubble({ message }: Prop
 
   // Extended thinking variants
   if (variant === "thinking") return <AssistantThinkingMessage message={message} />;
-  if (variant === "redacted_thinking") return <AssistantRedactedThinkingMessage message={message} />;
+  if (variant === "redacted_thinking")
+    return <AssistantRedactedThinkingMessage message={message} />;
 
   // Interrupt
   if (variant === "interrupted") return <InterruptedMessage message={message} />;
@@ -293,7 +322,7 @@ export const MessageBubble = React.memo(function MessageBubble({ message }: Prop
   );
 }, areMessagePropsEqual);
 
-function timeAgo(ts: string): string {
+function _timeAgo(ts: string): string {
   try {
     const diff = Date.now() - new Date(ts).getTime();
     if (diff < 60_000) return "just now";

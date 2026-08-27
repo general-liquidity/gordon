@@ -83,10 +83,7 @@ export async function computeCorrelationShock(
  * spread in basis points. Gracefully skips symbols where spread data
  * is unavailable.
  */
-export async function computeLiquidityGap(
-  exchange: Exchange,
-  symbols: string[],
-): Promise<number> {
+export async function computeLiquidityGap(exchange: Exchange, symbols: string[]): Promise<number> {
   if (symbols.length === 0) return 0;
 
   let totalBps = 0;

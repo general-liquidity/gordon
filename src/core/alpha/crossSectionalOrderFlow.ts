@@ -150,8 +150,7 @@ export function crossSectionalOrderFlowSignal(
   // Dollar-neutral long-short weights: weight ∝ z-score (already mean-zero,
   // so Σ weight ≈ 0), normalized so Σ|weight| = 1 (gross exposure of 1).
   const grossZ = zScores.reduce((acc, z) => acc + Math.abs(z), 0);
-  const weights =
-    grossZ <= EPS ? zScores.map(() => 0) : zScores.map((z) => z / grossZ);
+  const weights = grossZ <= EPS ? zScores.map(() => 0) : zScores.map((z) => z / grossZ);
 
   return flows.map((f, i) => ({
     symbol: f.symbol,

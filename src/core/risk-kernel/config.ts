@@ -101,14 +101,23 @@ export function loadConfigFromEnv(overrides?: Partial<RiskKernelConfig>): RiskKe
   const env = flagEnv();
 
   const raw: Record<string, unknown> = {
-    maxPositionSizeUsd: parseEnvNumber(env.GORDON_RISK_MAX_POSITION_USD) ?? overrides?.maxPositionSizeUsd,
-    maxPositionSizePercent: parseEnvNumber(env.GORDON_RISK_MAX_POSITION_PERCENT) ?? overrides?.maxPositionSizePercent,
-    maxOpenPositions: parseEnvInt(env.GORDON_RISK_MAX_OPEN_POSITIONS) ?? overrides?.maxOpenPositions,
-    dailyLossLimitUsd: parseEnvNumber(env.GORDON_RISK_DAILY_LOSS_USD) ?? overrides?.dailyLossLimitUsd,
-    dailyLossLimitPercent: parseEnvNumber(env.GORDON_RISK_DAILY_LOSS_PERCENT) ?? overrides?.dailyLossLimitPercent,
-    maxDrawdownPercent: parseEnvNumber(env.GORDON_RISK_MAX_DRAWDOWN_PERCENT) ?? overrides?.maxDrawdownPercent,
-    maxSingleAssetExposure: parseEnvNumber(env.GORDON_RISK_MAX_SINGLE_ASSET_EXPOSURE) ?? overrides?.maxSingleAssetExposure,
-    maxCorrelatedExposure: parseEnvNumber(env.GORDON_RISK_MAX_CORRELATED_EXPOSURE) ?? overrides?.maxCorrelatedExposure,
+    maxPositionSizeUsd:
+      parseEnvNumber(env.GORDON_RISK_MAX_POSITION_USD) ?? overrides?.maxPositionSizeUsd,
+    maxPositionSizePercent:
+      parseEnvNumber(env.GORDON_RISK_MAX_POSITION_PERCENT) ?? overrides?.maxPositionSizePercent,
+    maxOpenPositions:
+      parseEnvInt(env.GORDON_RISK_MAX_OPEN_POSITIONS) ?? overrides?.maxOpenPositions,
+    dailyLossLimitUsd:
+      parseEnvNumber(env.GORDON_RISK_DAILY_LOSS_USD) ?? overrides?.dailyLossLimitUsd,
+    dailyLossLimitPercent:
+      parseEnvNumber(env.GORDON_RISK_DAILY_LOSS_PERCENT) ?? overrides?.dailyLossLimitPercent,
+    maxDrawdownPercent:
+      parseEnvNumber(env.GORDON_RISK_MAX_DRAWDOWN_PERCENT) ?? overrides?.maxDrawdownPercent,
+    maxSingleAssetExposure:
+      parseEnvNumber(env.GORDON_RISK_MAX_SINGLE_ASSET_EXPOSURE) ??
+      overrides?.maxSingleAssetExposure,
+    maxCorrelatedExposure:
+      parseEnvNumber(env.GORDON_RISK_MAX_CORRELATED_EXPOSURE) ?? overrides?.maxCorrelatedExposure,
     maxLeverage: parseEnvNumber(env.GORDON_RISK_MAX_LEVERAGE) ?? overrides?.maxLeverage,
     mode: env.GORDON_RISK_MODE ?? overrides?.mode,
     autoAdjustSize: parseEnvBool(env.GORDON_RISK_AUTO_ADJUST) ?? overrides?.autoAdjustSize,
@@ -116,9 +125,7 @@ export function loadConfigFromEnv(overrides?: Partial<RiskKernelConfig>): RiskKe
   };
 
   // Strip undefined values so Zod defaults apply
-  const cleaned = Object.fromEntries(
-    Object.entries(raw).filter(([, v]) => v !== undefined)
-  );
+  const cleaned = Object.fromEntries(Object.entries(raw).filter(([, v]) => v !== undefined));
 
   const result = RiskKernelConfigSchema.safeParse(cleaned);
 

@@ -56,10 +56,7 @@ function binIndex(v: number, lo: number, width: number, bins: number): number {
 }
 
 // 2D-histogram mutual information (natural log) + normalized MI via marginal entropies.
-function mutualInformation(
-  xs: number[],
-  ys: number[],
-): { mi: number; nmi: number } {
+function mutualInformation(xs: number[], ys: number[]): { mi: number; nmi: number } {
   const n = xs.length;
   const bins = Math.max(2, Math.round(Math.sqrt(n / 3)));
 
@@ -185,11 +182,7 @@ function distanceCorrelation(xs: number[], ys: number[]): number {
   return dCor;
 }
 
-function interpret(
-  pearsonV: number,
-  nmi: number,
-  dCor: number,
-): string {
+function interpret(pearsonV: number, nmi: number, dCor: number): string {
   const linear = Math.abs(pearsonV);
   if (dCor < 0.1 && nmi < 0.05) {
     return "Independent — no detectable linear or non-linear codependence.";
@@ -239,9 +232,7 @@ export function computeCodependence(input: {
   };
 }
 
-export function codependenceMatrix(
-  seriesBySymbol: Record<string, ReadonlyArray<number>>,
-): Array<{
+export function codependenceMatrix(seriesBySymbol: Record<string, ReadonlyArray<number>>): Array<{
   a: string;
   b: string;
   pearson: number;

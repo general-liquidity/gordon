@@ -62,14 +62,19 @@ async function fetchWithRetry(url: string, label: string, maxAttempts = 5): Prom
     if (res.ok) return res;
     if ((res.status === 429 || res.status >= 500) && attempt < maxAttempts) {
       const retryAfter = Number(res.headers.get("retry-after"));
-      const backoffMs = Number.isFinite(retryAfter) && retryAfter > 0
-        ? retryAfter * 1000
-        : Math.min(60_000, 2_000 * 2 ** (attempt - 1)); // 2s,4s,8s,16s,…
-      console.warn(`  ${label}: HTTP ${res.status} — backoff ${(backoffMs / 1000).toFixed(0)}s (attempt ${attempt}/${maxAttempts})`);
+      const backoffMs =
+        Number.isFinite(retryAfter) && retryAfter > 0
+          ? retryAfter * 1000
+          : Math.min(60_000, 2_000 * 2 ** (attempt - 1)); // 2s,4s,8s,16s,…
+      console.warn(
+        `  ${label}: HTTP ${res.status} — backoff ${(backoffMs / 1000).toFixed(0)}s (attempt ${attempt}/${maxAttempts})`,
+      );
       await sleep(backoffMs);
       continue;
     }
-    throw new Error(`${label}: HTTP ${res.status} ${res.statusText} — ${(await res.text()).slice(0, 300)}`);
+    throw new Error(
+      `${label}: HTTP ${res.status} ${res.statusText} — ${(await res.text()).slice(0, 300)}`,
+    );
   }
 }
 
@@ -95,7 +100,9 @@ async function main(): Promise<void> {
   await mkdir(outDir, { recursive: true });
 
   console.log(`Fetching CoinGecko free historical daily market data (${COINS.length} coins)`);
-  console.log(`Window: ${new Date(FROM_SEC * 1000).toISOString()} … ${new Date(TO_SEC * 1000).toISOString()}\n`);
+  console.log(
+    `Window: ${new Date(FROM_SEC * 1000).toISOString()} … ${new Date(TO_SEC * 1000).toISOString()}\n`,
+  );
 
   let anyFailed = false;
   for (let i = 0; i < COINS.length; i++) {
@@ -106,10 +113,13 @@ async function main(): Promise<void> {
       await writeFile(file, JSON.stringify(points, null, 2));
       const first = points[0];
       const last = points[points.length - 1];
-      const span = first && last
-        ? `${new Date(first.time * 1000).toISOString().slice(0, 10)} … ${new Date(last.time * 1000).toISOString().slice(0, 10)}`
-        : "(empty)";
-      console.log(`  ${id.padEnd(17)} → ${sym.padEnd(7)} ${String(points.length).padStart(3)} daily points  ${span}`);
+      const span =
+        first && last
+          ? `${new Date(first.time * 1000).toISOString().slice(0, 10)} … ${new Date(last.time * 1000).toISOString().slice(0, 10)}`
+          : "(empty)";
+      console.log(
+        `  ${id.padEnd(17)} → ${sym.padEnd(7)} ${String(points.length).padStart(3)} daily points  ${span}`,
+      );
     } catch (err) {
       anyFailed = true;
       console.error(`  ${id.padEnd(17)} → ${sym.padEnd(7)} FAILED: ${(err as Error).message}`);
@@ -120,7 +130,9 @@ async function main(): Promise<void> {
 
   if (anyFailed) {
     console.error("\nSome coins failed (rate-limit / region block). The full-validate script");
-    console.error("falls back to its existing behaviour for any symbol whose marketdata is missing.");
+    console.error(
+      "falls back to its existing behaviour for any symbol whose marketdata is missing.",
+    );
     process.exit(1);
   }
   console.log("\nDone. Market-data JSONs written to data/momq/marketdata/");

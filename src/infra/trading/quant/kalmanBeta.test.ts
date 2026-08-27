@@ -1,12 +1,9 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  kalmanBeta,
-  kalmanBetaToPayload,
-} from "./kalmanBeta.ts";
+import { kalmanBeta, kalmanBetaToPayload } from "./kalmanBeta.ts";
 
 function makeRng(seed: number): () => number {
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   return () => {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return s / 0x100000000;
@@ -22,7 +19,11 @@ function gaussianRng(rng: () => number): () => number {
   };
 }
 
-function simulateBeta(n: number, betaSeries: number[], seed = 1): {
+function simulateBeta(
+  n: number,
+  betaSeries: number[],
+  seed = 1,
+): {
   market: number[];
   asset: number[];
 } {

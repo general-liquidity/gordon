@@ -51,7 +51,7 @@ export const BULLETS = Object.freeze(["\u2022", "\u25E6", "\u25AB"] as const);
 /** Task list ballot characters. */
 export const BALLOTS = Object.freeze({
   unchecked: "\u2610", // ☐
-  checked: "\u2611",   // ☑
+  checked: "\u2611", // ☑
 });
 
 /** Thinking / progress indicator glyphs. */

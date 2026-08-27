@@ -3,11 +3,7 @@ import { BrokerFactory } from "../factory.ts";
 import type { BrokerAdapter, BrokerCredentials, BrokerId } from "../types.ts";
 import { installMockBrokerApi } from "../testing/mock-api.ts";
 
-const BROKER_CASES: BrokerId[] = [
-  "alpaca",
-  "tastytrade",
-  "ibkr",
-];
+const BROKER_CASES: BrokerId[] = ["alpaca", "tastytrade", "ibkr"];
 
 function createCredentials(brokerId: BrokerId): BrokerCredentials {
   return {
@@ -64,12 +60,14 @@ describe("broker conformance matrix", () => {
         expect(quote.askPrice).toBeGreaterThan(0);
         expect(quote.bidPrice).toBeGreaterThan(0);
 
-        await expect(adapter.placeOrder({
-          symbol: "AAPL",
-          side: "buy",
-          type: "market",
-          timeInForce: "day",
-        })).rejects.toThrow("qty or notional");
+        await expect(
+          adapter.placeOrder({
+            symbol: "AAPL",
+            side: "buy",
+            type: "market",
+            timeInForce: "day",
+          }),
+        ).rejects.toThrow("qty or notional");
 
         await expect(adapter.getLatestQuote("UNKNOWN")).rejects.toThrow();
 

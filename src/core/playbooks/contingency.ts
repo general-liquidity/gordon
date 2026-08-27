@@ -138,8 +138,8 @@ function evaluateTrigger(
   trigger: ContingencyTrigger,
   metrics: Record<string, number>,
 ): TriggerEvaluation {
-  const has = Object.prototype.hasOwnProperty.call(metrics, trigger.metric);
-  const actual = has ? metrics[trigger.metric] ?? null : null;
+  const has = Object.hasOwn(metrics, trigger.metric);
+  const actual = has ? (metrics[trigger.metric] ?? null) : null;
   let met = false;
   if (actual !== null && Number.isFinite(actual)) {
     const t = trigger.threshold;
@@ -227,22 +227,17 @@ export function resolveContingency(
   let fellThrough: boolean;
   if (matched.length > 0) {
     // Highest priority wins; stable tie-break by declaration order.
-    const winner = matched.reduce((best, cur) =>
-      cur.priority > best.priority ? cur : best,
-    );
+    const winner = matched.reduce((best, cur) => (cur.priority > best.priority ? cur : best));
     activeBranch = plan.branches.find((b) => b.name === winner.name)!;
     fellThrough = false;
   } else {
     const fallbackName = plan.defaultBranch ?? "base";
-    activeBranch =
-      plan.branches.find((b) => b.name === fallbackName) ?? plan.branches[0]!;
+    activeBranch = plan.branches.find((b) => b.name === fallbackName) ?? plan.branches[0]!;
     fellThrough = true;
   }
 
   const missingMetrics = Array.from(
-    new Set(
-      evaluations.flatMap((e) => e.triggers.filter((t) => t.missing).map((t) => t.metric)),
-    ),
+    new Set(evaluations.flatMap((e) => e.triggers.filter((t) => t.missing).map((t) => t.metric))),
   );
 
   const allocSummary = activeBranch.targetAllocation
@@ -279,9 +274,7 @@ export interface ContingencyValidationResult {
  * Errors are disqualifying; warnings are advisory (e.g. allocation legs
  * that do not sum to ~100%).
  */
-export function validateContingencyPlan(
-  plan: ContingencyPlan,
-): ContingencyValidationResult {
+export function validateContingencyPlan(plan: ContingencyPlan): ContingencyValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -298,9 +291,7 @@ export function validateContingencyPlan(
     }
     const total = branch.targetAllocation.reduce((s, a) => s + a.targetPercent, 0);
     if (branch.targetAllocation.length > 0 && Math.abs(total - 100) > 0.5) {
-      warnings.push(
-        `Branch ${branch.name} allocation sums to ${total.toFixed(1)}%, not 100%.`,
-      );
+      warnings.push(`Branch ${branch.name} allocation sums to ${total.toFixed(1)}%, not 100%.`);
     }
     for (const t of branch.triggers) {
       const isPair = t.operator === "between" || t.operator === "outside";
@@ -318,9 +309,7 @@ export function validateContingencyPlan(
       if (isPair && pairShape) {
         const [lo, hi] = t.threshold as [number, number];
         if (lo > hi) {
-          errors.push(
-            `Branch ${branch.name} trigger on ${t.metric} has low ${lo} > high ${hi}.`,
-          );
+          errors.push(`Branch ${branch.name} trigger on ${t.metric} has low ${lo} > high ${hi}.`);
         }
       }
     }

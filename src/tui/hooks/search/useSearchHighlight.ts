@@ -5,7 +5,11 @@ import { TranscriptSearchEngine } from "../../utils/transcriptSearch.js";
 // useSearchHighlight — Manages search state for transcript highlighting
 // ============================================================================
 
-interface Message { id?: string; content?: string; role?: string; }
+interface Message {
+  id?: string;
+  content?: string;
+  role?: string;
+}
 
 export function useSearchHighlight(messages: Message[]) {
   const [query, setQuery] = useState("");
@@ -37,8 +41,13 @@ export function useSearchHighlight(messages: Message[]) {
   }, []);
 
   return {
-    query, setQuery, currentMatchIndex, totalMatches,
-    nextMatch, prevMatch, clearSearch,
+    query,
+    setQuery,
+    currentMatchIndex,
+    totalMatches,
+    nextMatch,
+    prevMatch,
+    clearSearch,
     isSearchActive: query.length > 0,
   };
 }

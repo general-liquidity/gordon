@@ -32,7 +32,7 @@
  * to the pre-FW6 code path.
  */
 
-import { Agent } from "@mastra/core/agent";
+import type { Agent } from "@mastra/core/agent";
 import { providerRegistry, type MastraModelConfig } from "../runtime/providers/registry.ts";
 import { getMastraInstance } from "../platform/observability/tracing.ts";
 import { determineWorkflowPhase, resolveModelForWorkflowPhase } from "./cognition/workflowPhase.ts";
@@ -83,9 +83,8 @@ const FIRST_PARTY_FALLBACK: Record<ModelTier, ModelOverride> = {
 function roleDefaultModel(role: AgentRole): ModelOverride {
   const tier = ROLE_TIER[role];
   try {
-    const spec = tier === "fast"
-      ? providerRegistry.getFastModel()
-      : providerRegistry.getDefaultModel();
+    const spec =
+      tier === "fast" ? providerRegistry.getFastModel() : providerRegistry.getDefaultModel();
     const slash = spec.indexOf("/");
     if (slash > 0) {
       return { provider: spec.slice(0, slash), model: spec.slice(slash + 1) };
@@ -156,8 +155,12 @@ export function resolveRuntimeModel(
   agentRole?: AgentRole,
 ): MastraModelConfig {
   const requestConfig = args?.requestContext?.get?.("config") as GordonConfig | undefined;
-  const requestedActionId = args?.requestContext?.get?.("requestedActionId") as GordonContext["requestedActionId"];
-  const requestedTaskScope = args?.requestContext?.get?.("requestedTaskScope") as GordonContext["requestedTaskScope"];
+  const requestedActionId = args?.requestContext?.get?.(
+    "requestedActionId",
+  ) as GordonContext["requestedActionId"];
+  const requestedTaskScope = args?.requestContext?.get?.(
+    "requestedTaskScope",
+  ) as GordonContext["requestedTaskScope"];
   const workflowPhase = determineWorkflowPhase({
     requestedActionId,
     requestedTaskScope,
@@ -219,8 +222,7 @@ export function formatModelLabel(model: MastraModelConfig): string {
   }
 
   if (typeof model.id === "string" && model.id.length > 0) {
-    const url =
-      typeof model.url === "string" && model.url.length > 0 ? model.url : undefined;
+    const url = typeof model.url === "string" && model.url.length > 0 ? model.url : undefined;
     return url ? `${model.id} @ ${url}` : model.id;
   }
 

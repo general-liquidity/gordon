@@ -58,12 +58,7 @@ describe("filterExposableTools — deny list", () => {
     });
     expect(exposable.map((t) => t.id).sort()).toEqual(["get_data", "scan_market"]);
     const deniedIds = summary.denied.map((d) => d.id).sort();
-    expect(deniedIds).toEqual([
-      "cancel_order",
-      "execute_plan",
-      "place_order",
-      "wallet_transfer",
-    ]);
+    expect(deniedIds).toEqual(["cancel_order", "execute_plan", "place_order", "wallet_transfer"]);
     for (const d of summary.denied) {
       expect(d.reason).toContain("execution-deny-list");
     }

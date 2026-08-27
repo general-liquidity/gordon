@@ -56,14 +56,19 @@ describe("audit — script_health", () => {
           lastRunAtMs: FIXED_NOW - 10_000,
           expectedIntervalMs: 5_000,
         },
-        { name: "healthy", lastExitCode: 0, lastRunAtMs: FIXED_NOW - 100, expectedIntervalMs: 5_000 },
+        {
+          name: "healthy",
+          lastExitCode: 0,
+          lastRunAtMs: FIXED_NOW - 100,
+          expectedIntervalMs: 5_000,
+        },
       ],
     };
     const f = audit("script_health", inputs, { now: nowFn });
     const bySubject = Object.fromEntries(f.map((x) => [x.subject, x]));
     expect(bySubject["fetch-cron"]!.severity).toBe("critical");
-    expect(bySubject["reconcile"]!.severity).toBe("warn");
-    expect(bySubject["healthy"]).toBeUndefined();
+    expect(bySubject.reconcile!.severity).toBe("warn");
+    expect(bySubject.healthy).toBeUndefined();
   });
 
   it("flags a never-run script as info", () => {
@@ -100,7 +105,12 @@ describe("audit — unused_assets", () => {
       assets: [
         { id: "a", kind: "skill", referenced: false },
         { id: "b", kind: "tool" },
-        { id: "c", kind: "playbook", lastUsedAtMs: FIXED_NOW - 40 * 24 * 60 * 60 * 1000, referenced: true },
+        {
+          id: "c",
+          kind: "playbook",
+          lastUsedAtMs: FIXED_NOW - 40 * 24 * 60 * 60 * 1000,
+          referenced: true,
+        },
         { id: "d", kind: "recipe", lastUsedAtMs: FIXED_NOW - 1000, referenced: true },
       ],
     };
@@ -136,15 +146,20 @@ describe("audit — data_api_tokens", () => {
         { provider: "expired", expiresAtMs: FIXED_NOW - 1 },
         { provider: "soon", expiresAtMs: FIXED_NOW + 60_000 },
         { provider: "low", remaining: 5, limit: 100 },
-        { provider: "fine", remaining: 90, limit: 100, expiresAtMs: FIXED_NOW + 10 * 24 * 60 * 60 * 1000 },
+        {
+          provider: "fine",
+          remaining: 90,
+          limit: 100,
+          expiresAtMs: FIXED_NOW + 10 * 24 * 60 * 60 * 1000,
+        },
       ],
     };
     const f = audit("data_api_tokens", inputs, { now: nowFn });
     const bySubject = Object.fromEntries(f.map((x) => [x.subject, x]));
-    expect(bySubject["expired"]!.severity).toBe("critical");
-    expect(bySubject["soon"]!.severity).toBe("warn");
-    expect(bySubject["low"]!.severity).toBe("warn");
-    expect(bySubject["fine"]).toBeUndefined();
+    expect(bySubject.expired!.severity).toBe("critical");
+    expect(bySubject.soon!.severity).toBe("warn");
+    expect(bySubject.low!.severity).toBe("warn");
+    expect(bySubject.fine).toBeUndefined();
   });
 });
 

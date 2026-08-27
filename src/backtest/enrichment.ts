@@ -50,10 +50,7 @@ export async function enrichBacktestResult(
   engineResult: BacktestEngineResult,
   options: EnrichBacktestOptions = {},
 ): Promise<BacktestEnrichment> {
-  const windowDays = Math.max(
-    1,
-    (engineResult.endDate - engineResult.startDate) / 86_400_000,
-  );
+  const windowDays = Math.max(1, (engineResult.endDate - engineResult.startDate) / 86_400_000);
 
   const verdict = computeVerdict(
     engineResult.metrics,
@@ -77,10 +74,7 @@ export async function enrichBacktestResult(
 
   let overfitting: OverfittingResult | undefined;
   if (options.optimizationEntries && options.optimizationEntries.length > 0) {
-    overfitting = detectOverfitting(
-      options.optimizationEntries,
-      options.overfittingOptions,
-    );
+    overfitting = detectOverfitting(options.optimizationEntries, options.overfittingOptions);
     summaryLines.push(
       `[OVERFITTING] ${overfitting.severity} — score ${overfitting.overfitScore.toFixed(2)}, ` +
         `${overfitting.analysis.combinationsTested} combinations, ` +
@@ -90,10 +84,7 @@ export async function enrichBacktestResult(
 
   let alphaDecay: AlphaDecayResult | { error: string } | undefined;
   if (options.delayedResults && Object.keys(options.delayedResults).length > 0) {
-    alphaDecay = analyzeAlphaDecay(
-      options.delayedResults,
-      options.alphaDecayMetric,
-    );
+    alphaDecay = analyzeAlphaDecay(options.delayedResults, options.alphaDecayMetric);
     summaryLines.push(
       "error" in alphaDecay
         ? `[ALPHA_DECAY] error — ${alphaDecay.error}`

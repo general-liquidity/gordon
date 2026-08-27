@@ -86,9 +86,7 @@ describe("twoSamplePnlTest", () => {
   });
 
   test("null on non-finite inputs", () => {
-    expect(
-      twoSamplePnlTest({ baseline: [1, 2, 3, 4, NaN], scenario: [1, 2, 3, 4, 5] }),
-    ).toBeNull();
+    expect(twoSamplePnlTest({ baseline: [1, 2, 3, 4, NaN], scenario: [1, 2, 3, 4, 5] })).toBeNull();
   });
 
   test("custom alpha respected", () => {

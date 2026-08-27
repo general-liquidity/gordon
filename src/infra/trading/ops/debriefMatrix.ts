@@ -34,11 +34,7 @@ export function defaultDebriefPath(env: NodeJS.ProcessEnv = process.env): string
   return env[DEBRIEF_MATRIX_PATH_ENV] || join(homedir(), ".gordon", "debriefs.jsonl");
 }
 
-export type Quadrant =
-  | "deserved_success"
-  | "bad_luck"
-  | "dumb_luck"
-  | "poetic_justice";
+export type Quadrant = "deserved_success" | "bad_luck" | "dumb_luck" | "poetic_justice";
 
 export type QuadrantAction = "reinforce" | "resilience" | "treat_as_failure" | "learn";
 
@@ -143,7 +139,7 @@ export function recordDebrief(
   };
   try {
     mkdirSync(dirname(path), { recursive: true });
-    appendFileSync(path, JSON.stringify(entry) + "\n", "utf8");
+    appendFileSync(path, `${JSON.stringify(entry)}\n`, "utf8");
   } catch {
     /* best-effort */
   }

@@ -171,7 +171,11 @@ export function computeBoxTiaoHedgeRatio(input: {
     if (len < minLen) minLen = len;
   }
   if (!Number.isFinite(minLen) || minLen < 10) {
-    return neutral(symbols, Number.isFinite(minLen) ? minLen : 0, "need at least 10 aligned points");
+    return neutral(
+      symbols,
+      Number.isFinite(minLen) ? minLen : 0,
+      "need at least 10 aligned points",
+    );
   }
 
   // Build level matrix: rows = time, cols = asset (last minLen points).
@@ -234,7 +238,10 @@ export function computeBoxTiaoHedgeRatio(input: {
   const halfLife = spreadHalfLife(spread);
   const predictability = eig.eigenvalue;
 
-  const hlText = halfLife == null ? "no finite mean-reversion half-life" : `half-life ≈ ${round6(halfLife)} bars`;
+  const hlText =
+    halfLife == null
+      ? "no finite mean-reversion half-life"
+      : `half-life ≈ ${round6(halfLife)} bars`;
   const interpretation =
     `Box-Tiao most-mean-reverting portfolio over ${symbols.length} symbols. ` +
     `Predictability λ=${round6(predictability)} (smaller = more stationary); ${hlText}.`;

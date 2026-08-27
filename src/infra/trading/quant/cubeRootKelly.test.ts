@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeCubeRootKelly,
-  cubeRootKellyToPayload,
-} from "./cubeRootKelly.ts";
+import { computeCubeRootKelly, cubeRootKellyToPayload } from "./cubeRootKelly.ts";
 
 /** Full-size holding for the fixtures below. h₀ is required, so name it once. */
 const SCALE = 0.25;

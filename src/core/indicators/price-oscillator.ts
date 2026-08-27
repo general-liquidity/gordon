@@ -58,7 +58,7 @@ function classify(current: number | null): "bullish" | "bearish" | "neutral" {
 export function calculateAPO(
   closes: number[],
   fast: number = 12,
-  slow: number = 26
+  slow: number = 26,
 ): PriceOscResult {
   const periods: [number, number] = [fast, slow];
   if (closes.length < slow) {
@@ -100,7 +100,7 @@ export function calculateAPO(
 export function calculatePPO(
   closes: number[],
   fast: number = 12,
-  slow: number = 26
+  slow: number = 26,
 ): PriceOscResult {
   const periods: [number, number] = [fast, slow];
   if (closes.length < slow) {

@@ -5,11 +5,7 @@ import {
   type ReturnSeries,
 } from "./correlationBreakdown.ts";
 
-function syntheticSeries(
-  symbol: string,
-  length: number,
-  noise: () => number,
-): ReturnSeries {
+function _syntheticSeries(symbol: string, length: number, noise: () => number): ReturnSeries {
   return {
     symbol,
     returns: Array.from({ length }, () => noise()),
@@ -52,9 +48,7 @@ function correlatedSeries(
 
 describe("detectCorrelationBreakdown — edge cases", () => {
   test("single series returns empty pairs", () => {
-    const report = detectCorrelationBreakdown([
-      { symbol: "BTC", returns: [0.01, -0.01, 0.02] },
-    ]);
+    const report = detectCorrelationBreakdown([{ symbol: "BTC", returns: [0.01, -0.01, 0.02] }]);
     expect(report.pairs).toEqual([]);
     expect(report.flaggedCount).toBe(0);
   });
@@ -120,11 +114,7 @@ describe("detectCorrelationBreakdown — three-symbol basket", () => {
       symbol: s,
       returns: Array.from({ length: 200 }, () => Math.random() - 0.5),
     });
-    const report = detectCorrelationBreakdown([
-      seed1[0],
-      seed1[1],
-      noise("SOL"),
-    ]);
+    const report = detectCorrelationBreakdown([seed1[0], seed1[1], noise("SOL")]);
     // pairs = (BTC,ETH), (BTC,SOL), (ETH,SOL) = 3
     expect(report.pairs).toHaveLength(3);
   });

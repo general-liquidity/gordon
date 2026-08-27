@@ -44,6 +44,7 @@ import {
   RequestNotPendingError,
 } from "../../infra/agents/runtime/humanInputTool.ts";
 import { handleTelemetryCommand, handleContextCommand } from "../../app/commands/index.ts";
+import { compactRuntimeTranscript } from "../../app/commands/runtime.ts";
 import { getRuntimeApprovalShortId } from "../../app/runtime/runtimeApprovalId.ts";
 import type { Message } from "../components/messages/MessageBubble.tsx";
 import type { StateUpdater } from "./runtime.js";
@@ -96,7 +97,7 @@ function applyPermissionModeChange(
       role: "system",
       content: verdict.allowed
         ? successText
-        : verdict.reason ?? `Cannot switch permission mode to ${mode}.`,
+        : (verdict.reason ?? `Cannot switch permission mode to ${mode}.`),
       timestamp: new Date().toISOString(),
     };
     return {
@@ -124,7 +125,11 @@ function addMessageOrPager(
     ...prev,
     pager: { title, content },
   }));
-  addMessage(setState, "system", `${title} opened in pager. Use Ctrl+O later to reopen the latest long message.`);
+  addMessage(
+    setState,
+    "system",
+    `${title} opened in pager. Use Ctrl+O later to reopen the latest long message.`,
+  );
 }
 
 // ============================================================================
@@ -145,7 +150,7 @@ export async function handleSessionMenuCommand(
         const transcript = runtime.getTranscript();
         const messages: Message[] = transcript.map((entry, i) => ({
           id: `resumed-${i}`,
-          role: entry.role === "user" ? "user" as const : "gordon" as const,
+          role: entry.role === "user" ? ("user" as const) : ("gordon" as const),
           content: entry.content,
           timestamp: entry.timestamp,
         }));
@@ -166,16 +171,21 @@ export async function handleSessionMenuCommand(
     case "session":
     case "session-info": {
       const snapshot = await runtime.getCurrentSession();
-      addMessage(setState, "gordon",
+      addMessage(
+        setState,
+        "gordon",
         `Session: ${snapshot.resourceId}\n` +
-        `Thread: ${snapshot.threadId ?? "none"}\n` +
-        `Started: ${snapshot.threadStartedAt ?? "unknown"}\n` +
-        `Sessions: ${snapshot.sessionCount}`
+          `Thread: ${snapshot.threadId ?? "none"}\n` +
+          `Started: ${snapshot.threadStartedAt ?? "unknown"}\n` +
+          `Sessions: ${snapshot.sessionCount}`,
       );
       return true;
     }
     case "name": {
-      if (!args) { addMessage(setState, "system", "Usage: /name <session-name>"); return true; }
+      if (!args) {
+        addMessage(setState, "system", "Usage: /name <session-name>");
+        return true;
+      }
       addMessage(setState, "system", `Session named: ${args.trim()}`);
       return true;
     }
@@ -198,8 +208,9 @@ export async function handleThreadMenuCommand(
     case "threads":
     case "list-threads": {
       const threads = runtime.listRecentHistory(10);
-      const lines = threads.map((t) =>
-        `${t.runtimeId}  ${t.threadId ?? "\u2014"}  ${t.transcriptEntryCount} msgs  ${t.savedAt}`
+      const lines = threads.map(
+        (t) =>
+          `${t.runtimeId}  ${t.threadId ?? "\u2014"}  ${t.transcriptEntryCount} msgs  ${t.savedAt}`,
       );
       addMessage(setState, "gordon", lines.length > 0 ? lines.join("\n") : "No saved threads.");
       return true;
@@ -209,9 +220,11 @@ export async function handleThreadMenuCommand(
         const session = await runtime.getCurrentSession();
         await runtime.startNewSession();
         const transcript = runtime.getTranscript();
-        addMessage(setState, "system",
+        addMessage(
+          setState,
+          "system",
           `Thread cloned from ${session.threadId ?? "current"}. ` +
-          `${transcript.length} messages carried over to new thread.`
+            `${transcript.length} messages carried over to new thread.`,
         );
       } catch {
         addMessage(setState, "system", "Failed to clone thread.", "system");
@@ -219,10 +232,15 @@ export async function handleThreadMenuCommand(
       return true;
     }
     case "switch-thread": {
-      if (!args) { addMessage(setState, "system", "Usage: /switch-thread <thread-id>"); return true; }
+      if (!args) {
+        addMessage(setState, "system", "Usage: /switch-thread <thread-id>");
+        return true;
+      }
       try {
         const threads = runtime.listRecentHistory(50);
-        const match = threads.find((t) => t.threadId === args.trim() || t.runtimeId === args.trim());
+        const match = threads.find(
+          (t) => t.threadId === args.trim() || t.runtimeId === args.trim(),
+        );
         if (!match) {
           addMessage(setState, "system", `Thread not found: ${args.trim()}`, "system");
           return true;
@@ -235,12 +253,18 @@ export async function handleThreadMenuCommand(
       return true;
     }
     case "rename-thread": {
-      if (!args) { addMessage(setState, "system", "Usage: /rename-thread <new-name>"); return true; }
+      if (!args) {
+        addMessage(setState, "system", "Usage: /rename-thread <new-name>");
+        return true;
+      }
       addMessage(setState, "system", `Thread renamed to: ${args.trim()}`);
       return true;
     }
     case "delete-thread": {
-      if (!args) { addMessage(setState, "system", "Usage: /delete-thread <thread-id>"); return true; }
+      if (!args) {
+        addMessage(setState, "system", "Usage: /delete-thread <thread-id>");
+        return true;
+      }
       addMessage(setState, "system", `Thread deleted: ${args.trim()}`);
       return true;
     }
@@ -248,12 +272,14 @@ export async function handleThreadMenuCommand(
       try {
         const session = await runtime.getCurrentSession();
         const transcript = runtime.getTranscript();
-        addMessage(setState, "gordon",
+        addMessage(
+          setState,
+          "gordon",
           `Thread: ${session.threadId ?? "none"}\n` +
-          `Resource: ${session.resourceId}\n` +
-          `Messages: ${transcript.length}\n` +
-          `Started: ${session.threadStartedAt ?? "unknown"}\n` +
-          `Sessions: ${session.sessionCount}`
+            `Resource: ${session.resourceId}\n` +
+            `Messages: ${transcript.length}\n` +
+            `Started: ${session.threadStartedAt ?? "unknown"}\n` +
+            `Sessions: ${session.sessionCount}`,
         );
       } catch {
         addMessage(setState, "system", "No active thread.", "system");
@@ -265,27 +291,42 @@ export async function handleThreadMenuCommand(
       const transcript = runtime.getTranscript();
       const userMsgs = transcript.filter((e) => e.role === "user").length;
       const assistantMsgs = transcript.filter((e) => e.role === "assistant").length;
-      addMessage(setState, "gordon",
+      addMessage(
+        setState,
+        "gordon",
         `SESSION SUMMARY:\n` +
-        `Total messages: ${transcript.length}\n` +
-        `User messages: ${userMsgs}\n` +
-        `Assistant messages: ${assistantMsgs}\n` +
-        `Topics discussed: ${transcript.filter((e) => e.role === "user").slice(-5).map((e) => e.content.slice(0, 40)).join(", ") || "none"}`
+          `Total messages: ${transcript.length}\n` +
+          `User messages: ${userMsgs}\n` +
+          `Assistant messages: ${assistantMsgs}\n` +
+          `Topics discussed: ${
+            transcript
+              .filter((e) => e.role === "user")
+              .slice(-5)
+              .map((e) => e.content.slice(0, 40))
+              .join(", ") || "none"
+          }`,
       );
       return true;
     }
-    case "compact": {
-      runtime.compactTranscript();
-      addMessage(setState, "system", "Conversation compacted.");
-      return true;
-    }
+    case "compact":
     case "compact-thread": {
-      runtime.compactTranscript();
-      addMessage(setState, "system", "Thread compacted. Older messages summarized.");
+      const result = compactRuntimeTranscript(runtime, args);
+      const messages: Message[] = runtime.getTranscript().map((entry) => ({
+        id: entry.id,
+        role: entry.role === "user" ? "user" : entry.role === "assistant" ? "gordon" : "system",
+        content: entry.content,
+        timestamp: entry.timestamp,
+      }));
+      setState((prev: any) => ({ ...prev, messages }));
+      addMessage(setState, "gordon", result);
       return true;
     }
     case "bookmark-entry": {
-      addMessage(setState, "system", args ? `Bookmarked: ${args.trim()}` : "Current message bookmarked.");
+      addMessage(
+        setState,
+        "system",
+        args ? `Bookmarked: ${args.trim()}` : "Current message bookmarked.",
+      );
       return true;
     }
     case "list-bookmarks": {
@@ -312,20 +353,22 @@ export async function handleRuntimeMenuCommand(
     case "rstate":
     case "rs": {
       const state = runtime.getState();
-      addMessage(setState, "gordon",
+      addMessage(
+        setState,
+        "gordon",
         `Stream: ${state.stream.status}\n` +
-        `Agent: ${state.stream.activeAgent ?? "none"}\n` +
-        `Tooling: ${state.tooling.tools.length} tools, ${state.tooling.plugins.length} plugins\n` +
-        `Approvals: ${state.approvals.pending.length} pending\n` +
-        `Scopes: ${state.permissionScopes.join(", ") || "none"}`
+          `Agent: ${state.stream.activeAgent ?? "none"}\n` +
+          `Tooling: ${state.tooling.tools.length} tools, ${state.tooling.plugins.length} plugins\n` +
+          `Approvals: ${state.approvals.pending.length} pending\n` +
+          `Scopes: ${state.permissionScopes.join(", ") || "none"}`,
       );
       return true;
     }
     case "runtime-plugins":
     case "rplugins": {
       const state = runtime.getState();
-      const lines = state.tooling.plugins.map((p) =>
-        `${p.enabled ? "\u2713" : "\u2717"} ${p.name} (${p.toolCount ?? 0} tools)`
+      const lines = state.tooling.plugins.map(
+        (p) => `${p.enabled ? "\u2713" : "\u2717"} ${p.name} (${p.toolCount ?? 0} tools)`,
       );
       addMessage(setState, "gordon", lines.length > 0 ? lines.join("\n") : "No plugins installed.");
       return true;
@@ -338,23 +381,37 @@ export async function handleRuntimeMenuCommand(
         lines.push("PENDING:");
         for (const a of pending) {
           const shortId = getRuntimeApprovalShortId(a.id);
-          lines.push(`  [${shortId}] ${a.toolName} (${a.riskClass}) \u2014 approve ${shortId} / deny ${shortId}`);
+          lines.push(
+            `  [${shortId}] ${a.toolName} (${a.riskClass}) \u2014 approve ${shortId} / deny ${shortId}`,
+          );
         }
       }
       if (recent.length > 0) {
         lines.push("RECENT:");
         for (const a of recent) {
-          lines.push(`  ${a.status === "approved" ? "\u2713" : "\u2717"} ${a.toolName} (${a.status})`);
+          lines.push(
+            `  ${a.status === "approved" ? "\u2713" : "\u2717"} ${a.toolName} (${a.status})`,
+          );
         }
       }
       addMessage(setState, "gordon", lines.length > 0 ? lines.join("\n") : "No approvals.");
       return true;
     }
     case "runtime-approve": {
-      if (!args) { addMessage(setState, "system", "Usage: /runtime-approve <id> [persist]"); return true; }
+      if (!args) {
+        addMessage(setState, "system", "Usage: /runtime-approve <id> [persist]");
+        return true;
+      }
       const parts = args.split(/\s+/);
-      const result = runtime.approvePendingRequest(parts[0]!, { persist: parts.includes("persist"), actor: "user" });
-      addMessage(setState, "gordon", result ? `Approved: ${result.toolName}` : `No pending approval: ${parts[0]}`);
+      const result = runtime.approvePendingRequest(parts[0]!, {
+        persist: parts.includes("persist"),
+        actor: "user",
+      });
+      addMessage(
+        setState,
+        "gordon",
+        result ? `Approved: ${result.toolName}` : `No pending approval: ${parts[0]}`,
+      );
       return true;
     }
     case "runtime-deny-all": {
@@ -362,10 +419,17 @@ export async function handleRuntimeMenuCommand(
       // Validate scope against known RuntimePermissionScope values; otherwise
       // treat as unscoped so a typo just denies everything (safe default).
       const validScopes = new Set([
-        "market.read", "analysis.run", "portfolio.read",
-        "papertrade.execute", "livetrade.execute", "transfer.execute",
-        "wallet.write", "system.mode.write", "runtime.background.write",
-        "plugin.install", "mcp.connect",
+        "market.read",
+        "analysis.run",
+        "portfolio.read",
+        "papertrade.execute",
+        "livetrade.execute",
+        "transfer.execute",
+        "wallet.write",
+        "system.mode.write",
+        "runtime.background.write",
+        "plugin.install",
+        "mcp.connect",
       ]);
       const resolvedScope = scope && validScopes.has(scope) ? scope : undefined;
       const denied = runtime.denyAllPending({
@@ -377,9 +441,13 @@ export async function handleRuntimeMenuCommand(
         : scope
           ? ` (scope "${scope}" unknown — denied all)`
           : "";
-      addMessage(setState, "gordon", denied > 0
-        ? `Denied ${denied} pending request${denied === 1 ? "" : "s"}${scopeHint}.`
-        : `No pending approvals to deny${scopeHint}.`);
+      addMessage(
+        setState,
+        "gordon",
+        denied > 0
+          ? `Denied ${denied} pending request${denied === 1 ? "" : "s"}${scopeHint}.`
+          : `No pending approvals to deny${scopeHint}.`,
+      );
       return true;
     }
     case "runtime-rules": {
@@ -398,24 +466,38 @@ export async function handleRuntimeMenuCommand(
               ? `scope=${r.permissionScope}`
               : "*";
         const expires = r.expiresAt ? ` expires=${r.expiresAt.slice(0, 10)}` : "";
-        lines.push(`  ${r.decision === "allow" ? "✓" : "✗"} ${target} [${r.scope}]${expires} (by ${r.createdBy})`);
+        lines.push(
+          `  ${r.decision === "allow" ? "✓" : "✗"} ${target} [${r.scope}]${expires} (by ${r.createdBy})`,
+        );
       }
       addMessage(setState, "gordon", lines.join("\n"));
       return true;
     }
     case "runtime-deny": {
-      if (!args) { addMessage(setState, "system", "Usage: /runtime-deny <id> [reason]"); return true; }
+      if (!args) {
+        addMessage(setState, "system", "Usage: /runtime-deny <id> [reason]");
+        return true;
+      }
       const parts = args.split(/\s+/);
       const reason = parts.slice(1).join(" ") || undefined;
       const result = runtime.denyPendingRequest(parts[0]!, { reason, actor: "user" });
-      addMessage(setState, "gordon", result ? `Denied: ${result.toolName}` : `No pending approval: ${parts[0]}`);
+      addMessage(
+        setState,
+        "gordon",
+        result ? `Denied: ${result.toolName}` : `No pending approval: ${parts[0]}`,
+      );
       return true;
     }
     case "runtime-transcript": {
-      const limit = parseInt(args) || 10;
+      const limit = parseInt(args, 10) || 10;
       const transcript = runtime.getTranscript().slice(-limit);
       const lines = transcript.map((e) => `[${e.role}] ${e.content.slice(0, 100)}`);
-      addMessageOrPager(setState, "gordon", "Runtime Transcript", lines.join("\n") || "Empty transcript.");
+      addMessageOrPager(
+        setState,
+        "gordon",
+        "Runtime Transcript",
+        lines.join("\n") || "Empty transcript.",
+      );
       return true;
     }
     case "runtime-scratchpad": {
@@ -427,7 +509,9 @@ export async function handleRuntimeMenuCommand(
     case "runtime-handoffs":
     case "delegations": {
       const handoffs = runtime.getHandoffArtifacts();
-      const lines = handoffs.map((h: any) => `${h.fromWorker} \u2192 ${h.toWorker}: ${h.reason ?? ""}`);
+      const lines = handoffs.map(
+        (h: any) => `${h.fromWorker} \u2192 ${h.toWorker}: ${h.reason ?? ""}`,
+      );
       addMessage(setState, "gordon", lines.length > 0 ? lines.join("\n") : "No handoffs recorded.");
       return true;
     }
@@ -455,14 +539,17 @@ export async function handleRuntimeMenuCommand(
     case "runtime-history": {
       if (args.trim()) {
         const results = runtime.searchHistory(args.trim(), { limit: 10 });
-        const lines = results.map((r) =>
-          `[${r.timestamp}] ${r.source}: ${r.content.slice(0, 80)}`
+        const lines = results.map((r) => `[${r.timestamp}] ${r.source}: ${r.content.slice(0, 80)}`);
+        addMessage(
+          setState,
+          "gordon",
+          lines.length > 0 ? lines.join("\n") : `No history matches for: ${args.trim()}`,
         );
-        addMessage(setState, "gordon", lines.length > 0 ? lines.join("\n") : `No history matches for: ${args.trim()}`);
       } else {
         const recent = runtime.listRecentHistory(10);
-        const lines = recent.map((r) =>
-          `${r.runtimeId}  ${r.threadId ?? "\u2014"}  ${r.transcriptEntryCount} msgs  ${r.savedAt}`
+        const lines = recent.map(
+          (r) =>
+            `${r.runtimeId}  ${r.threadId ?? "\u2014"}  ${r.transcriptEntryCount} msgs  ${r.savedAt}`,
         );
         addMessage(setState, "gordon", lines.length > 0 ? lines.join("\n") : "No history.");
       }
@@ -470,14 +557,16 @@ export async function handleRuntimeMenuCommand(
     }
     case "cache-stats": {
       const state = runtime.getState();
-      addMessage(setState, "gordon",
+      addMessage(
+        setState,
+        "gordon",
         `CACHE STATS:\n` +
-        `Tools: ${state.tooling.tools.length} registered\n` +
-        `Plugins: ${state.tooling.plugins.length} loaded\n` +
-        `MCP servers: ${state.tooling.mcpServers.length}\n` +
-        `Last sync: ${state.tooling.lastSyncedAt ?? "never"}\n` +
-        `Last reload: ${state.tooling.lastReloadAt ?? "never"}\n` +
-        `Hot reload: ${state.tooling.hotReloadEnabled ? "enabled" : "disabled"}`
+          `Tools: ${state.tooling.tools.length} registered\n` +
+          `Plugins: ${state.tooling.plugins.length} loaded\n` +
+          `MCP servers: ${state.tooling.mcpServers.length}\n` +
+          `Last sync: ${state.tooling.lastSyncedAt ?? "never"}\n` +
+          `Last reload: ${state.tooling.lastReloadAt ?? "never"}\n` +
+          `Hot reload: ${state.tooling.hotReloadEnabled ? "enabled" : "disabled"}`,
       );
       return true;
     }
@@ -489,20 +578,27 @@ export async function handleRuntimeMenuCommand(
       for (const a of [...bridgeRecent, ...bridgeActive].slice(-10)) {
         lines.push(`  [${a.status}] ${a.source} \u2192 ${a.commandType}`);
       }
-      addMessageOrPager(setState, "gordon", "Action Log", lines.length > 1 ? lines.join("\n") : "No actions recorded.");
+      addMessageOrPager(
+        setState,
+        "gordon",
+        "Action Log",
+        lines.length > 1 ? lines.join("\n") : "No actions recorded.",
+      );
       return true;
     }
     case "bugreport": {
       const state = runtime.getState();
-      addMessage(setState, "gordon",
+      addMessage(
+        setState,
+        "gordon",
         `BUG REPORT TEMPLATE:\n` +
-        `Runtime: ${state.runtimeId}\n` +
-        `Session: ${state.sessionId ?? "none"}\n` +
-        `Stream: ${state.stream.status}\n` +
-        `Tools: ${state.tooling.tools.length}\n` +
-        `Plugins: ${state.tooling.plugins.length}\n` +
-        `Last error: ${state.lastError ?? "none"}\n\n` +
-        `Paste this with your bug description at: https://github.com/general-liquidity/gordon/issues`
+          `Runtime: ${state.runtimeId}\n` +
+          `Session: ${state.sessionId ?? "none"}\n` +
+          `Stream: ${state.stream.status}\n` +
+          `Tools: ${state.tooling.tools.length}\n` +
+          `Plugins: ${state.tooling.plugins.length}\n` +
+          `Last error: ${state.lastError ?? "none"}\n\n` +
+          `Paste this with your bug description at: https://github.com/general-liquidity/gordon/issues`,
       );
       return true;
     }
@@ -517,7 +613,12 @@ export async function handleRuntimeMenuCommand(
           addMessage(setState, "gordon", `VALIDATION:\n${formatted}`);
         }
       } catch (err) {
-        addMessage(setState, "system", `Validation error: ${err instanceof Error ? err.message : String(err)}`, "system");
+        addMessage(
+          setState,
+          "system",
+          `Validation error: ${err instanceof Error ? err.message : String(err)}`,
+          "system",
+        );
       }
       return true;
     }
@@ -527,7 +628,12 @@ export async function handleRuntimeMenuCommand(
         const content = typeof result === "string" ? result : JSON.stringify(result, null, 2);
         addMessage(setState, "gordon", content);
       } catch (err) {
-        addMessage(setState, "system", `Telemetry error: ${err instanceof Error ? err.message : String(err)}`, "system");
+        addMessage(
+          setState,
+          "system",
+          `Telemetry error: ${err instanceof Error ? err.message : String(err)}`,
+          "system",
+        );
       }
       return true;
     }
@@ -537,7 +643,12 @@ export async function handleRuntimeMenuCommand(
         const content = typeof result === "string" ? result : JSON.stringify(result, null, 2);
         addMessage(setState, "gordon", content);
       } catch (err) {
-        addMessage(setState, "system", `Context error: ${err instanceof Error ? err.message : String(err)}`, "system");
+        addMessage(
+          setState,
+          "system",
+          `Context error: ${err instanceof Error ? err.message : String(err)}`,
+          "system",
+        );
       }
       return true;
     }
@@ -552,7 +663,7 @@ export async function handleRuntimeMenuCommand(
 
 export function handleWorkspaceMenuCommand(
   target: string,
-  args: string,
+  _args: string,
   setState: StateUpdater,
 ): boolean {
   switch (target) {
@@ -562,7 +673,11 @@ export function handleWorkspaceMenuCommand(
     case "workspace-monitor": {
       const workspace = target.replace("workspace-", "");
       setState((prev: any) => ({ ...prev, activeWorkspace: workspace }));
-      addMessage(setState, "system", `Workspace: ${workspace}. Context adjusted for ${workspace} workflows.`);
+      addMessage(
+        setState,
+        "system",
+        `Workspace: ${workspace}. Context adjusted for ${workspace} workflows.`,
+      );
       return true;
     }
     case "chat": {
@@ -581,7 +696,7 @@ export function handleWorkspaceMenuCommand(
 
 export function handleUIMenuCommand(
   target: string,
-  args: string,
+  _args: string,
   setState: StateUpdater,
 ): boolean {
   switch (target) {
@@ -595,7 +710,11 @@ export function handleUIMenuCommand(
     }
     case "emergency": {
       setState((prev: any) => ({ ...prev, showEmergency: true }));
-      addMessage(setState, "system", "EMERGENCY PANEL OPENED \u2014 confirm actions to halt all operations.");
+      addMessage(
+        setState,
+        "system",
+        "EMERGENCY PANEL OPENED \u2014 confirm actions to halt all operations.",
+      );
       return true;
     }
     case "context-viz": {
@@ -616,7 +735,11 @@ export function handleUIMenuCommand(
         toggled = !prev.privacyMode;
         return { ...prev, privacyMode: toggled };
       });
-      addMessage(setState, "system", `Privacy mode: ${toggled ? "ON \u2014 sensitive data redacted" : "OFF \u2014 full display"}`);
+      addMessage(
+        setState,
+        "system",
+        `Privacy mode: ${toggled ? "ON \u2014 sensitive data redacted" : "OFF \u2014 full display"}`,
+      );
       return true;
     }
     case "menu": {
@@ -632,16 +755,28 @@ export function handleUIMenuCommand(
       return true;
     }
     case "auto": {
-      applyPermissionModeChange(setState, "auto", "Permission mode: auto \u2014 trades execute without per-action approval. Use /ask to return to default.");
+      applyPermissionModeChange(
+        setState,
+        "auto",
+        "Permission mode: auto \u2014 trades execute without per-action approval. Use /ask to return to default.",
+      );
       return true;
     }
     case "ask": {
-      applyPermissionModeChange(setState, "ask", "Permission mode: ask \u2014 each trade requires approval via dialog (default).");
+      applyPermissionModeChange(
+        setState,
+        "ask",
+        "Permission mode: ask \u2014 each trade requires approval via dialog (default).",
+      );
       return true;
     }
     case "strict":
     case "readonly": {
-      applyPermissionModeChange(setState, "strict", "Permission mode: strict \u2014 read-only, all trades blocked.");
+      applyPermissionModeChange(
+        setState,
+        "strict",
+        "Permission mode: strict \u2014 read-only, all trades blocked.",
+      );
       return true;
     }
     case "setup":
@@ -703,29 +838,38 @@ export async function handleSystemMenuCommand(
         const formatted = formatDoctorReport(report);
         addMessage(setState, "gordon", formatted);
       } catch (err) {
-        addMessage(setState, "system", `Doctor error: ${err instanceof Error ? err.message : String(err)}`, "system");
+        addMessage(
+          setState,
+          "system",
+          `Doctor error: ${err instanceof Error ? err.message : String(err)}`,
+          "system",
+        );
       }
       return true;
     }
     case "theme": {
-      addMessage(setState, "gordon",
+      addMessage(
+        setState,
+        "gordon",
         `THEME: Gordon Dark (default)\n` +
-        `Primary: cyanBright\n` +
-        `Accent: greenBright\n` +
-        `Warning: yellow\n` +
-        `Error: red\n` +
-        `Dimmed: gray`
+          `Primary: cyanBright\n` +
+          `Accent: greenBright\n` +
+          `Warning: yellow\n` +
+          `Error: red\n` +
+          `Dimmed: gray`,
       );
       return true;
     }
     case "shortcuts": {
-      addMessage(setState, "gordon",
+      addMessage(
+        setState,
+        "gordon",
         `KEYBOARD SHORTCUTS:\n` +
-        `Ctrl+C      \u2014 Cancel / exit (double-press)\n` +
-        `Ctrl+P      \u2014 Command palette\n` +
-        `?           \u2014 Toggle inline help\n` +
-        `Up/Down     \u2014 Input history\n` +
-        `Tab         \u2014 Autocomplete command`
+          `Ctrl+C      \u2014 Cancel / exit (double-press)\n` +
+          `Ctrl+P      \u2014 Command palette\n` +
+          `?           \u2014 Toggle inline help\n` +
+          `Up/Down     \u2014 Input history\n` +
+          `Tab         \u2014 Autocomplete command`,
       );
       return true;
     }
@@ -736,8 +880,10 @@ export async function handleSystemMenuCommand(
 
       // No args → App.tsx intercepts and opens interactive ModelPicker
       if (!args || args.trim() === "") {
-        addMessage(setState, "gordon",
-          `Current: ${currentProvider} / ${currentModel}\nUse /model to open the interactive picker.`
+        addMessage(
+          setState,
+          "gordon",
+          `Current: ${currentProvider} / ${currentModel}\nUse /model to open the interactive picker.`,
         );
         return true;
       }
@@ -755,10 +901,12 @@ export async function handleSystemMenuCommand(
           },
         };
         await saveConfig(updated);
-        addMessage(setState, "gordon",
+        addMessage(
+          setState,
+          "gordon",
           `\u2713 Switched to ${aliasResult.displayName}\n` +
-          `  Provider: ${currentProvider} \u2192 ${aliasResult.provider}\n` +
-          `  Model: ${currentModel} \u2192 ${aliasResult.model}`
+            `  Provider: ${currentProvider} \u2192 ${aliasResult.provider}\n` +
+            `  Model: ${currentModel} \u2192 ${aliasResult.model}`,
         );
         return true;
       }
@@ -775,8 +923,10 @@ export async function handleSystemMenuCommand(
       if (!newProvider || (!KNOWN_PROVIDER_IDS.includes(newProvider) && !isPassThroughSpec)) {
         // Not a known alias or integrated provider — show help
         const { formatAliasHelp } = await import("../../app/models/modelAliases.ts");
-        addMessage(setState, "gordon",
-          `Unknown model or provider: ${args.trim()}\n\n` + formatAliasHelp()
+        addMessage(
+          setState,
+          "gordon",
+          `Unknown model or provider: ${args.trim()}\n\n${formatAliasHelp()}`,
         );
         return true;
       }
@@ -792,33 +942,16 @@ export async function handleSystemMenuCommand(
       await saveConfig(updated);
 
       const displayModel = newModel ?? `${newProvider} default`;
-      addMessage(setState, "gordon",
+      addMessage(
+        setState,
+        "gordon",
         `\u2713 Model updated:\n` +
-        `  Provider: ${currentProvider} \u2192 ${newProvider}\n` +
-        `  Model: ${currentModel} \u2192 ${displayModel}`
+          `  Provider: ${currentProvider} \u2192 ${newProvider}\n` +
+          `  Model: ${currentModel} \u2192 ${displayModel}`,
       );
       return true;
     }
     // ── Commands ported from Claude Code ──
-
-    case "compact": {
-      // Manually trigger context compaction
-      try {
-        const { getCompactionTrigger } = await import("../../infra/context/compaction/compactionTrigger.ts");
-        const { microcompactMessages } = await import("../../infra/context/compaction/microcompact.ts");
-        const trigger = getCompactionTrigger();
-        const projection = trigger.current();
-        addMessage(setState, "gordon",
-          `Context compaction triggered manually.\n` +
-          `Current usage: ${Math.round(projection.currentFraction * 100)}% of ${projection.contextWindow.toLocaleString()} tokens\n` +
-          `Stage: ${projection.stage}\n` +
-          `Recommendation: ${projection.recommendation}`
-        );
-      } catch {
-        addMessage(setState, "gordon", "Context compaction triggered. Old tool results will be cleared on next turn.");
-      }
-      return true;
-    }
 
     case "clear": {
       setState((prev: any) => ({ ...prev, showResetConfirm: true }));
@@ -842,23 +975,31 @@ export async function handleSystemMenuCommand(
       const level = args.trim().toLowerCase();
       const validLevels = ["low", "medium", "high", "max", "auto"];
       if (!level || !validLevels.includes(level)) {
-        addMessage(setState, "gordon",
+        addMessage(
+          setState,
+          "gordon",
           `Effort level controls how much reasoning the model does.\n\n` +
-          `Usage: /effort <level>\n` +
-          `Levels:\n` +
-          `  low    — fast, minimal reasoning\n` +
-          `  medium — balanced (default)\n` +
-          `  high   — deep reasoning, slower\n` +
-          `  max    — maximum reasoning depth\n` +
-          `  auto   — adapt based on query complexity`
+            `Usage: /effort <level>\n` +
+            `Levels:\n` +
+            `  low    — fast, minimal reasoning\n` +
+            `  medium — balanced (default)\n` +
+            `  high   — deep reasoning, slower\n` +
+            `  max    — maximum reasoning depth\n` +
+            `  auto   — adapt based on query complexity`,
         );
       } else {
         // Store as session override (effort isn't a persistent config — it's per-session)
         try {
           const { setSessionOverride } = await import("../../infra/config/settingsLayers.ts");
           setSessionOverride("effortLevel", level);
-        } catch { /* best-effort */ }
-        addMessage(setState, "gordon", `Effort level set to: ${level}. Takes effect on next message.`);
+        } catch {
+          /* best-effort */
+        }
+        addMessage(
+          setState,
+          "gordon",
+          `Effort level set to: ${level}. Takes effect on next message.`,
+        );
       }
       return true;
     }
@@ -869,20 +1010,24 @@ export async function handleSystemMenuCommand(
         const { discoverSkills } = await import("../../infra/skills/index.ts");
         const skills = discoverSkills();
         if (skills.length === 0) {
-          addMessage(setState, "gordon",
+          addMessage(
+            setState,
+            "gordon",
             `No skills installed.\n\n` +
-            `Create skills in:\n` +
-            `  ~/.gordon/skills/<name>/SKILL.md  (user-wide)\n` +
-            `  .gordon/skills/<name>/SKILL.md    (project)\n\n` +
-            `5 builtin skills available: /quick-scan, /dd, /risk-check, /morning-brief, /close-losers`
+              `Create skills in:\n` +
+              `  ~/.gordon/skills/<name>/SKILL.md  (user-wide)\n` +
+              `  .gordon/skills/<name>/SKILL.md    (project)\n\n` +
+              `5 builtin skills available: /quick-scan, /dd, /risk-check, /morning-brief, /close-losers`,
           );
         } else {
-          const lines = skills.map((s) =>
-            `  /${s.id.padEnd(20)} ${s.description || s.name} [${s.source}]`
+          const lines = skills.map(
+            (s) => `  /${s.id.padEnd(20)} ${s.description || s.name} [${s.source}]`,
           );
-          addMessage(setState, "gordon",
+          addMessage(
+            setState,
+            "gordon",
             `Available skills (${skills.length}):\n\n${lines.join("\n")}\n\n` +
-            `Invoke with /<skill-name> [args]`
+              `Invoke with /<skill-name> [args]`,
           );
         }
       } catch {
@@ -897,20 +1042,24 @@ export async function handleSystemMenuCommand(
         const { listHooks } = await import("../../infra/hooks/engine.ts");
         const hooks = listHooks();
         if (hooks.length === 0) {
-          addMessage(setState, "gordon",
+          addMessage(
+            setState,
+            "gordon",
             `No hooks registered.\n\n` +
-            `Hooks run at lifecycle points (PreToolUse, PostToolUse, PreApproval, etc.).\n` +
-            `Register via the hooks engine or GORDON.md configuration.`
+              `Hooks run at lifecycle points (PreToolUse, PostToolUse, PreApproval, etc.).\n` +
+              `Register via the hooks engine or GORDON.md configuration.`,
           );
         } else {
-          const lines = hooks.map((h) =>
-            `  ${h.id.padEnd(25)} ${h.point.padEnd(18)} priority: ${h.priority ?? 100}`
+          const lines = hooks.map(
+            (h) => `  ${h.id.padEnd(25)} ${h.point.padEnd(18)} priority: ${h.priority ?? 100}`,
           );
-          addMessage(setState, "gordon",
+          addMessage(
+            setState,
+            "gordon",
             `Registered hooks (${hooks.length}):\n\n` +
-            `  ${"ID".padEnd(25)} ${"Hook Point".padEnd(18)} Priority\n` +
-            `  ${"-".repeat(25)} ${"-".repeat(18)} --------\n` +
-            `${lines.join("\n")}`
+              `  ${"ID".padEnd(25)} ${"Hook Point".padEnd(18)} Priority\n` +
+              `  ${"-".repeat(25)} ${"-".repeat(18)} --------\n` +
+              `${lines.join("\n")}`,
           );
         }
       } catch {
@@ -920,17 +1069,19 @@ export async function handleSystemMenuCommand(
     }
 
     case "whatsnew": {
-      addMessage(setState, "gordon",
+      addMessage(
+        setState,
+        "gordon",
         `WHAT'S NEW in Gordon v0.9:\n` +
-        `- Full TUI rebuild with Ink/React\n` +
-        `- Runtime session management\n` +
-        `- Agent handoff visualization\n` +
-        `- Approval workflow with persist\n` +
-        `- Background task monitoring\n` +
-        `- Command palette (Ctrl+P)\n` +
-        `- 119 slash commands\n` +
-        `- Plugin hot reload\n` +
-        `- MCP server support`
+          `- Full TUI rebuild with Ink/React\n` +
+          `- Runtime session management\n` +
+          `- Agent handoff visualization\n` +
+          `- Approval workflow with persist\n` +
+          `- Background task monitoring\n` +
+          `- Command palette (Ctrl+P)\n` +
+          `- 119 slash commands\n` +
+          `- Plugin hot reload\n` +
+          `- MCP server support`,
       );
       return true;
     }
@@ -940,33 +1091,52 @@ export async function handleSystemMenuCommand(
         if (["debug", "info", "warn", "error", "silent"].includes(level)) {
           addMessage(setState, "system", `Log level set to: ${level}`);
         } else {
-          addMessage(setState, "system", `Invalid log level: ${level}. Use: debug, info, warn, error, silent`);
+          addMessage(
+            setState,
+            "system",
+            `Invalid log level: ${level}. Use: debug, info, warn, error, silent`,
+          );
         }
       } else {
-        addMessage(setState, "gordon", "Current log level: info\nAvailable: debug, info, warn, error, silent");
+        addMessage(
+          setState,
+          "gordon",
+          "Current log level: info\nAvailable: debug, info, warn, error, silent",
+        );
       }
       return true;
     }
     case "journal": {
-      const limit = parseInt(args) || 10;
+      const limit = parseInt(args, 10) || 10;
       try {
         const transcript = runtime.getTranscript();
         const tradeEntries = transcript
-          .filter((e) =>
-            e.content.toLowerCase().includes("trade") ||
-            e.content.toLowerCase().includes("position") ||
-            e.content.toLowerCase().includes("p&l") ||
-            e.content.toLowerCase().includes("entry") ||
-            e.content.toLowerCase().includes("exit")
+          .filter(
+            (e) =>
+              e.content.toLowerCase().includes("trade") ||
+              e.content.toLowerCase().includes("position") ||
+              e.content.toLowerCase().includes("p&l") ||
+              e.content.toLowerCase().includes("entry") ||
+              e.content.toLowerCase().includes("exit"),
           )
           .slice(-limit);
         if (tradeEntries.length === 0) {
-          addMessage(setState, "gordon", "No trade journal entries found. Trades will appear here as you execute them.");
-        } else {
-          const lines = tradeEntries.map((e, i) =>
-            `${i + 1}. [${e.role}] ${e.content.slice(0, 120)}${e.content.length > 120 ? "..." : ""}`
+          addMessage(
+            setState,
+            "gordon",
+            "No trade journal entries found. Trades will appear here as you execute them.",
           );
-          addMessageOrPager(setState, "gordon", "Trade Journal", `TRADE JOURNAL (last ${tradeEntries.length}):\n${lines.join("\n")}`);
+        } else {
+          const lines = tradeEntries.map(
+            (e, i) =>
+              `${i + 1}. [${e.role}] ${e.content.slice(0, 120)}${e.content.length > 120 ? "..." : ""}`,
+          );
+          addMessageOrPager(
+            setState,
+            "gordon",
+            "Trade Journal",
+            `TRADE JOURNAL (last ${tradeEntries.length}):\n${lines.join("\n")}`,
+          );
         }
       } catch {
         addMessage(setState, "gordon", "No trade journal entries found.");
@@ -998,7 +1168,11 @@ export async function handleAutonomousMenuCommand(
     case "start": {
       const status = getAutonomousLoopStatus();
       if (status.isRunning) {
-        addMessage(setState, "system", "Autonomous loop is already running. Use /autonomous stop first.");
+        addMessage(
+          setState,
+          "system",
+          "Autonomous loop is already running. Use /autonomous stop first.",
+        );
         return true;
       }
       const prompt = commandToPrompt(command, args);
@@ -1048,11 +1222,14 @@ export async function handleAutonomousMenuCommand(
       addMessage(setState, "gordon", "\u25C8 Autonomous loop resumed.");
       return true;
     }
-    case "status":
     default: {
       const status = getAutonomousLoopStatus();
       if (!status.isRunning) {
-        addMessage(setState, "gordon", "\u25C8 Autonomous loop: inactive\nUse /autonomous start to begin.");
+        addMessage(
+          setState,
+          "gordon",
+          "\u25C8 Autonomous loop: inactive\nUse /autonomous start to begin.",
+        );
         return true;
       }
       const stateLabel = status.isPaused ? "paused" : "running";
@@ -1061,13 +1238,15 @@ export async function handleAutonomousMenuCommand(
           `Direction: ${status.mandate.direction}\n` +
           `Timeframe: ${status.mandate.timeframe}`
         : "";
-      addMessage(setState, "gordon",
+      addMessage(
+        setState,
+        "gordon",
         `\u25C8 Autonomous loop: ${stateLabel}\n` +
-        `Cycles: ${status.cycleCount}\n` +
-        `Opportunities: ${status.totalOpportunities}` +
-        mandateInfo +
-        (status.lastCycleTime ? `\nLast cycle: ${status.lastCycleTime}` : "") +
-        (status.nextCycleTime ? `\nNext cycle: ${status.nextCycleTime}` : "")
+          `Cycles: ${status.cycleCount}\n` +
+          `Opportunities: ${status.totalOpportunities}` +
+          mandateInfo +
+          (status.lastCycleTime ? `\nLast cycle: ${status.lastCycleTime}` : "") +
+          (status.nextCycleTime ? `\nNext cycle: ${status.nextCycleTime}` : ""),
       );
       return true;
     }
@@ -1208,11 +1387,7 @@ export async function handleGoalMenuCommand(
   }
 
   if (!isGoalModeEnabled()) {
-    addMessage(
-      setState,
-      "system",
-      "Goal mode is disabled. Set GORDON_GOAL_MODE=1 to enable.",
-    );
+    addMessage(setState, "system", "Goal mode is disabled. Set GORDON_GOAL_MODE=1 to enable.");
     return true;
   }
 
@@ -1240,7 +1415,7 @@ export async function handleGoalMenuCommand(
       }
       const state = createGoalState(text);
       persistGoalState(state);
-      addMessage(setState, "gordon", "◈ Goal set.\n\n" + formatGoalState(state));
+      addMessage(setState, "gordon", `◈ Goal set.\n\n${formatGoalState(state)}`);
       return true;
     }
     case "goal-status": {
@@ -1265,11 +1440,7 @@ export async function handleGoalMenuCommand(
         persistGoalState(resumeGoal(state));
         addMessage(setState, "gordon", "◈ Goal resumed.");
       } else {
-        addMessage(
-          setState,
-          "system",
-          `Goal is ${state.status}; nothing to pause/resume.`,
-        );
+        addMessage(setState, "system", `Goal is ${state.status}; nothing to pause/resume.`);
       }
       return true;
     }
@@ -1401,4 +1572,3 @@ export async function handleHumanInputMenuCommand(
   }
   return true;
 }
-

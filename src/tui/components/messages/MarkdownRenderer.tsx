@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { Box, Text } from "../../ink-custom";
 import { marked, type Tokens, type Token } from "marked";
 import { CodeBlock } from "../display/CodeBlock.tsx";
@@ -36,7 +36,7 @@ const _TOKEN_CACHE_MAX = 500;
 
 // Fast-path regex — if the first 500 chars contain none of these, skip
 // marked entirely and emit a single paragraph token.
-const MD_SYNTAX_RE = /[#*`|\[\]>~_\\]|\n\n|^\d+\. |\n\d+\. |---|___|\*\*\*/;
+const MD_SYNTAX_RE = /[#*`|[\]>~_\\]|\n\n|^\d+\. |\n\d+\. |---|___|\*\*\*/;
 
 function hashContent(content: string): string {
   let h = 0;
@@ -184,10 +184,18 @@ function TokenRenderer({ token }: { token: Token }) {
       // in bold+cyan, and embedded ANSI resets inside would terminate that
       // wrapper mid-cell. Data rows: ANSI-formatted so codespans/bold/em
       // keep their per-word color.
-      lines.push("| " + t.header.map((h: Tokens.TableCell) => tokensToPlainText(h.tokens ?? [])).join(" | ") + " |");
-      lines.push("| " + t.align.map((a: string | null) => alignMarker(a)).join(" | ") + " |");
+      lines.push(
+        "| " +
+          t.header.map((h: Tokens.TableCell) => tokensToPlainText(h.tokens ?? [])).join(" | ") +
+          " |",
+      );
+      lines.push(`| ${t.align.map((a: string | null) => alignMarker(a)).join(" | ")} |`);
       for (const row of t.rows) {
-        lines.push("| " + row.map((cell: Tokens.TableCell) => tokensToAnsiText(cell.tokens ?? [])).join(" | ") + " |");
+        lines.push(
+          "| " +
+            row.map((cell: Tokens.TableCell) => tokensToAnsiText(cell.tokens ?? [])).join(" | ") +
+            " |",
+        );
       }
       return <InlineTable lines={lines} />;
     }
@@ -285,15 +293,22 @@ function tokensToAnsiText(tokens: Token[]): string {
     .map((t) => {
       if (t.type === "text") return colorSignedNumbersAnsi((t as Tokens.Text).text);
       if (t.type === "codespan") return ANSI.tan + (t as Tokens.Codespan).text + ANSI_RESET;
-      if (t.type === "strong") return ANSI_BOLD + tokensToAnsiText((t as Tokens.Strong).tokens ?? []) + ANSI_RESET;
-      if (t.type === "em") return ANSI_ITALIC + tokensToAnsiText((t as Tokens.Em).tokens ?? []) + ANSI_RESET;
-      if (t.type === "del") return ANSI_STRIKE + tokensToAnsiText((t as Tokens.Del).tokens ?? []) + ANSI_RESET;
+      if (t.type === "strong")
+        return ANSI_BOLD + tokensToAnsiText((t as Tokens.Strong).tokens ?? []) + ANSI_RESET;
+      if (t.type === "em")
+        return ANSI_ITALIC + tokensToAnsiText((t as Tokens.Em).tokens ?? []) + ANSI_RESET;
+      if (t.type === "del")
+        return ANSI_STRIKE + tokensToAnsiText((t as Tokens.Del).tokens ?? []) + ANSI_RESET;
       if (t.type === "link") {
         const link = t as Tokens.Link;
         return `\x1b]8;;${link.href}\x1b\\${ANSI_PLATINUM}${link.text}${ANSI_RESET}\x1b]8;;\x1b\\`;
       }
       if (t.type === "br") return " ";
-      return (t as Token & { text?: string; raw?: string }).text ?? (t as Token & { raw?: string }).raw ?? "";
+      return (
+        (t as Token & { text?: string; raw?: string }).text ??
+        (t as Token & { raw?: string }).raw ??
+        ""
+      );
     })
     .join("");
 }
@@ -309,7 +324,11 @@ function tokensToPlainText(tokens: Token[]): string {
       if (t.type === "em") return tokensToPlainText((t as Tokens.Em).tokens ?? []);
       if (t.type === "del") return tokensToPlainText((t as Tokens.Del).tokens ?? []);
       if (t.type === "br") return " ";
-      return (t as Token & { text?: string; raw?: string }).text ?? (t as Token & { raw?: string }).raw ?? "";
+      return (
+        (t as Token & { text?: string; raw?: string }).text ??
+        (t as Token & { raw?: string }).raw ??
+        ""
+      );
     })
     .join("");
 }
@@ -330,11 +349,7 @@ function ListRenderer({ token, level }: { token: Tokens.List; level: number }) {
             : level === 1
               ? "\u25E6"
               : "\u25AB";
-        const task = item.task
-          ? item.checked
-            ? "\u2611 "
-            : "\u2610 "
-          : "";
+        const task = item.task ? (item.checked ? "\u2611 " : "\u2610 ") : "";
 
         // Each item can have multiple child tokens (paragraph + nested list etc.)
         const childTokens = item.tokens ?? [];
@@ -345,13 +360,22 @@ function ListRenderer({ token, level }: { token: Tokens.List; level: number }) {
           <Box key={i} flexDirection="column">
             <Box>
               <Text>
-                {indent}{"  "}{bullet} {task}
-                {firstParagraph && (firstParagraph.type === "paragraph" || firstParagraph.type === "text") ? (
+                {indent}
+                {"  "}
+                {bullet} {task}
+                {firstParagraph &&
+                (firstParagraph.type === "paragraph" || firstParagraph.type === "text") ? (
                   <InlineTokens
                     tokens={
                       "tokens" in firstParagraph && firstParagraph.tokens
                         ? firstParagraph.tokens
-                        : [{ type: "text", text: (firstParagraph as Tokens.Text).text, raw: "" } as Tokens.Text]
+                        : [
+                            {
+                              type: "text",
+                              text: (firstParagraph as Tokens.Text).text,
+                              raw: "",
+                            } as Tokens.Text,
+                          ]
                     }
                   />
                 ) : null}
@@ -395,7 +419,11 @@ function renderTextWithDeltas(text: string): React.ReactElement {
   let key = 0;
   for (const h of hits) {
     if (h.start > last) parts.push(<Text key={key++}>{text.slice(last, h.start)}</Text>);
-    parts.push(<Text key={key++} color={h.color}>{text.slice(h.start, h.end)}</Text>);
+    parts.push(
+      <Text key={key++} color={h.color}>
+        {text.slice(h.start, h.end)}
+      </Text>,
+    );
     last = h.end;
   }
   if (last < text.length) parts.push(<Text key={key++}>{text.slice(last)}</Text>);
@@ -417,7 +445,9 @@ function InlineToken({ token }: { token: Token }): React.ReactElement | null {
       const t = token as Tokens.Strong;
       return (
         <Text bold>
-          <InlineTokens tokens={t.tokens ?? [{ type: "text", text: t.text, raw: "" } as Tokens.Text]} />
+          <InlineTokens
+            tokens={t.tokens ?? [{ type: "text", text: t.text, raw: "" } as Tokens.Text]}
+          />
         </Text>
       );
     }
@@ -426,7 +456,9 @@ function InlineToken({ token }: { token: Token }): React.ReactElement | null {
       const t = token as Tokens.Em;
       return (
         <Text italic>
-          <InlineTokens tokens={t.tokens ?? [{ type: "text", text: t.text, raw: "" } as Tokens.Text]} />
+          <InlineTokens
+            tokens={t.tokens ?? [{ type: "text", text: t.text, raw: "" } as Tokens.Text]}
+          />
         </Text>
       );
     }
@@ -436,7 +468,9 @@ function InlineToken({ token }: { token: Token }): React.ReactElement | null {
       const t = token as Tokens.Del;
       return (
         <Text strikethrough>
-          <InlineTokens tokens={t.tokens ?? [{ type: "text", text: t.text, raw: "" } as Tokens.Text]} />
+          <InlineTokens
+            tokens={t.tokens ?? [{ type: "text", text: t.text, raw: "" } as Tokens.Text]}
+          />
         </Text>
       );
     }
@@ -455,7 +489,11 @@ function InlineToken({ token }: { token: Token }): React.ReactElement | null {
       // OSC 8 hyperlink — modern terminals render as clickable
       const displayText = t.text;
       const wrapped = `\u001b]8;;${t.href}\u001b\\${displayText}\u001b]8;;\u001b\\`;
-      return <Text color={PALETTE.platinum} underline>{wrapped}</Text>;
+      return (
+        <Text color={PALETTE.platinum} underline>
+          {wrapped}
+        </Text>
+      );
     }
 
     case "image": {

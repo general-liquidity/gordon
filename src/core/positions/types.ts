@@ -20,18 +20,18 @@ import { z } from "zod";
  * Terminal states: reviewed, cancelled, rejected.
  */
 export const PositionStateSchema = z.enum([
-  "idea",        // Scanner detected a potential setup
-  "analyzed",    // Analyst evaluated the setup
-  "planned",     // Planner created execution plan with sizing
-  "approved",    // User approved the trade (human-in-the-loop)
-  "ordering",    // Order is being placed on exchange
-  "filled",      // Order filled, position is live
-  "monitoring",  // Position is being actively tracked
-  "closing",     // Close order is being placed
-  "closed",      // Position fully closed
-  "reviewed",    // Teacher completed post-trade review
-  "cancelled",   // Trade cancelled at any pre-fill stage
-  "rejected",    // Risk kernel rejected the trade
+  "idea", // Scanner detected a potential setup
+  "analyzed", // Analyst evaluated the setup
+  "planned", // Planner created execution plan with sizing
+  "approved", // User approved the trade (human-in-the-loop)
+  "ordering", // Order is being placed on exchange
+  "filled", // Order filled, position is live
+  "monitoring", // Position is being actively tracked
+  "closing", // Close order is being placed
+  "closed", // Position fully closed
+  "reviewed", // Teacher completed post-trade review
+  "cancelled", // Trade cancelled at any pre-fill stage
+  "rejected", // Risk kernel rejected the trade
 ]);
 
 export type PositionState = z.infer<typeof PositionStateSchema>;
@@ -44,18 +44,18 @@ export type PositionState = z.infer<typeof PositionStateSchema>;
  * Legal state transitions. Each key maps to the set of states reachable from it.
  */
 export const VALID_TRANSITIONS: Record<PositionState, PositionState[]> = {
-  idea:       ["analyzed", "cancelled"],
-  analyzed:   ["planned", "cancelled"],
-  planned:    ["approved", "rejected", "cancelled"],
-  approved:   ["ordering", "cancelled"],
-  ordering:   ["filled", "cancelled"],        // cancelled if order rejected by exchange
-  filled:     ["monitoring"],
-  monitoring: ["closing", "closed"],           // closed for instant market close
-  closing:    ["closed"],
-  closed:     ["reviewed"],
-  reviewed:   [],                              // terminal state
-  cancelled:  [],                              // terminal state
-  rejected:   [],                              // terminal state
+  idea: ["analyzed", "cancelled"],
+  analyzed: ["planned", "cancelled"],
+  planned: ["approved", "rejected", "cancelled"],
+  approved: ["ordering", "cancelled"],
+  ordering: ["filled", "cancelled"], // cancelled if order rejected by exchange
+  filled: ["monitoring"],
+  monitoring: ["closing", "closed"], // closed for instant market close
+  closing: ["closed"],
+  closed: ["reviewed"],
+  reviewed: [], // terminal state
+  cancelled: [], // terminal state
+  rejected: [], // terminal state
 };
 
 /**
@@ -206,12 +206,15 @@ export const PositionRecordSchema = z.object({
   trailingStop: TrailingStopSchema.optional(),
   currentPrice: z.number().optional(),
   unrealizedPnL: z.number().optional(),
+  unrealizedPnLPercent: z.number().optional(),
   highWaterMark: z.number().optional(),
 
   // Close phase
   exitOrder: OrderRecordSchema.optional(),
   exitPrice: z.number().optional(),
   realizedPnL: z.number().optional(),
+  realizedPnLPercent: z.number().optional(),
+  fees: z.number().nonnegative().optional(),
 
   // Review phase
   review: TradeReviewSchema.optional(),
@@ -255,6 +258,7 @@ export interface FillData {
 export interface LivePositionData {
   currentPrice: number;
   unrealizedPnL: number;
+  unrealizedPnLPercent?: number;
   highWaterMark?: number;
   trailingStop?: TrailingStop;
   stopLoss?: number;
@@ -264,6 +268,9 @@ export interface LivePositionData {
 export interface CloseData {
   exitPrice: number;
   realizedPnL: number;
+  realizedPnLPercent?: number;
+  fees?: number;
+  reason?: string;
   exitOrder?: OrderRecord;
 }
 

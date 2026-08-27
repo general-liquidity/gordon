@@ -88,7 +88,7 @@ function makeRng(seed: number | undefined): () => number {
   if (seed === undefined) return Math.random;
   let state = (seed | 0) >>> 0;
   return () => {
-    state = (state + 0x6D2B79F5) | 0;
+    state = (state + 0x6d2b79f5) | 0;
     let t = state;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
@@ -128,8 +128,8 @@ export function analyticGamblersRuin(
   // where r = q/p. Returns ruin probability ∈ [0, 1]. When r > 1 the
   // gambler is at a disadvantage (q > p); when r < 1 the gambler has
   // the edge and ruin probability approaches 0 as N → ∞.
-  const rN = Math.pow(r, targetUnits);
-  const rI = Math.pow(r, startUnits);
+  const rN = r ** targetUnits;
+  const rI = r ** startUnits;
   const num = rN - rI;
   const den = rN - 1;
   if (!Number.isFinite(num) || !Number.isFinite(den) || den === 0) return null;
@@ -200,7 +200,7 @@ export function computeRuinDiagnostic(input: RuinDiagnosticInput): RuinDiagnosti
   const analyticRuin = analyticGamblersRuin(p, 10, 20); // arbitrary reference scale
 
   let verdict: RuinDiagnostic["verdict"];
-  if (ruinTo50 > 0.30 || ruinTo10 > 0.10) verdict = "dangerous";
+  if (ruinTo50 > 0.3 || ruinTo10 > 0.1) verdict = "dangerous";
   else if (ruinTo50 > 0.15 || ruinTo10 > 0.05) verdict = "risky";
   else if (ruinTo50 > 0.05) verdict = "moderate";
   else verdict = "safe";

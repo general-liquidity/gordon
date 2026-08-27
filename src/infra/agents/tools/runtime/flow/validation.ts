@@ -49,7 +49,7 @@ export interface ValidationResult {
  */
 export type ToolExecutor<TInput, TOutput> = (
   input: TInput,
-  context?: MastraExecutionContext
+  context?: MastraExecutionContext,
 ) => Promise<TOutput>;
 
 /**
@@ -420,7 +420,7 @@ export const commonValidationRules: Record<string, ValidationRule> = {
 export function validateToolInput(
   input: Record<string, unknown>,
   rules: ValidationRule[],
-  options: { skipMissingFields?: boolean } = {}
+  options: { skipMissingFields?: boolean } = {},
 ): ValidationResult {
   const errors: string[] = [];
   const { skipMissingFields = true } = options;
@@ -480,7 +480,7 @@ export function createValidationRule(
   field: string,
   validate: (value: unknown) => boolean,
   message: string,
-  required = false
+  required = false,
 ): ValidationRule {
   return { field, validate, message, required };
 }
@@ -510,11 +510,11 @@ export function createValidationRule(
 export function withValidation<TInput extends Record<string, unknown>, TOutput>(
   executor: ToolExecutor<TInput, TOutput>,
   rules: ValidationRule[],
-  options: { skipMissingFields?: boolean } = {}
+  options: { skipMissingFields?: boolean } = {},
 ): ToolExecutor<TInput, TOutput | { error: string }> {
   return async function validatedExecutor(
     input: TInput,
-    context?: MastraExecutionContext
+    context?: MastraExecutionContext,
   ): Promise<TOutput | { error: string }> {
     const result = validateToolInput(input, rules, options);
 

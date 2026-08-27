@@ -35,12 +35,7 @@ describe("detectManufacturedImbalance — classic manufactured pattern", () => {
 
 describe("detectManufacturedImbalance — clean cases", () => {
   it("balanced book → clean", () => {
-    const snaps = [
-      snap(0, 100, 100),
-      snap(1, 110, 100),
-      snap(2, 100, 105),
-      snap(3, 95, 100),
-    ];
+    const snaps = [snap(0, 100, 100), snap(1, 110, 100), snap(2, 100, 105), snap(3, 95, 100)];
     const r = detectManufacturedImbalance({ snapshots: snaps });
     expect(r.verdict).toBe("clean");
   });
@@ -89,12 +84,7 @@ describe("detectManufacturedImbalance — boundary cases", () => {
   });
 
   it("respects custom thresholds", () => {
-    const snaps = [
-      snap(0, 100, 100),
-      snap(1, 200, 100),
-      snap(2, 300, 100),
-      snap(3, 100, 100),
-    ];
+    const snaps = [snap(0, 100, 100), snap(1, 200, 100), snap(2, 300, 100), snap(3, 100, 100)];
     const tight = detectManufacturedImbalance({
       snapshots: snaps,
       peakThreshold: 0.2,

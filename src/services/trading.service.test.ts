@@ -1,10 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { TradingService } from "./trading.service.ts";
 import { ServiceContainer, setContainer } from "./container.ts";
-import {
-  InvalidPlanError,
-  TradingModeError,
-} from "../errors/index.ts";
+import { InvalidPlanError, TradingModeError } from "../errors/index.ts";
 import type { GordonConfig, Plan } from "../types/index.ts";
 
 function makePlan(overrides: Partial<Plan> = {}): Plan {
@@ -84,7 +81,15 @@ describe("TradingService", () => {
     await expect(
       service.validatePlan(
         makePlan({ allocation: { currency: "USDT", amount: 2_000, percentOfPortfolio: 0.25 } }),
-        makeConfig({ preferences: { cashReservePercent: 0.2, maxAllocationPerTrade: 0.1, defaultTimeframes: ["1h"], topNCoins: 50, maxConcurrentTrades: 5 } }),
+        makeConfig({
+          preferences: {
+            cashReservePercent: 0.2,
+            maxAllocationPerTrade: 0.1,
+            defaultTimeframes: ["1h"],
+            topNCoins: 50,
+            maxConcurrentTrades: 5,
+          },
+        }),
         10_000,
       ),
     ).rejects.toThrow(/allocation/i);

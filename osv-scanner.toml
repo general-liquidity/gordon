@@ -1,0 +1,9 @@
+# Mastra 1.x still carries its legacy AI-SDK-v5 compatibility alias at
+# @ai-sdk/provider-utils 3.0.30. GHSA-866g-f22w-33x8 affects the entire 3.x
+# line and upstream has published no patched 3.x release. Gordon's active
+# providers use AI SDK 7; removing or cross-major-overriding this alias would
+# break Mastra's compatibility surface. Keep the exception narrow and expiring.
+[[IgnoredVulns]]
+id = "GHSA-866g-f22w-33x8"
+ignoreUntil = 2026-11-30
+reason = "No patched provider-utils 3.x exists; retained only by Mastra's legacy AI-SDK-v5 compatibility layer."

@@ -72,7 +72,11 @@ export function getCachedPrefix(key: string): CachedPrefix | null {
 /**
  * Store a stable prefix. Key should be agent-scoped (e.g., "gordon", "researcher").
  */
-export function setCachedPrefix(key: string, stableText: string, ttlMs: number = DEFAULT_TTL_MS): CachedPrefix {
+export function setCachedPrefix(
+  key: string,
+  stableText: string,
+  ttlMs: number = DEFAULT_TTL_MS,
+): CachedPrefix {
   const entry: CachedPrefix = {
     stableText,
     hash: simpleHash(stableText),

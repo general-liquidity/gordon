@@ -1,4 +1,3 @@
-import React from "react";
 import { Text } from "../../ink-custom";
 
 // ============================================================================
@@ -15,5 +14,11 @@ interface Props {
 
 export function NoSelect({ children }: Props) {
   // Zero-width space (U+200B) before and after breaks text selection
-  return <Text dimColor>{"\u200B"}{children}{"\u200B"}</Text>;
+  return (
+    <Text dimColor>
+      {"\u200B"}
+      {children}
+      {"\u200B"}
+    </Text>
+  );
 }

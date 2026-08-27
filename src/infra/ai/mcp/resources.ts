@@ -73,7 +73,7 @@ function isSameDay(tsMs: number, refMs: number = Date.now()): boolean {
 }
 
 function matchesSymbol(rowSymbol: string, querySymbol: string): boolean {
-  const norm = (s: string) => s.toLowerCase().replace(/[\/_\-:]/g, "");
+  const norm = (s: string) => s.toLowerCase().replace(/[/_\-:]/g, "");
   return norm(rowSymbol) === norm(querySymbol);
 }
 
@@ -223,7 +223,8 @@ export function registerGordonResources(server: McpServer): {
     new ResourceTemplate("gordon://trades/recent/{symbol}", { list: undefined }),
     {
       title: "Recent trades by symbol",
-      description: "Trade-ledger entries filtered by symbol (e.g., gordon://trades/recent/BTCUSDT or BTC/USDT)",
+      description:
+        "Trade-ledger entries filtered by symbol (e.g., gordon://trades/recent/BTCUSDT or BTC/USDT)",
       mimeType: "application/json",
     },
     async (uri, variables) => {

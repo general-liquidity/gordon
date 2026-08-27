@@ -78,11 +78,8 @@ export interface ValuationResult {
 /**
  * Run a single DCF scenario.
  */
-function runDCF(
-  inputs: DCFInputs,
-  scenario: ScenarioAssumptions,
-): ScenarioResult {
-  const wacc = inputs.wacc ?? 0.10;
+function runDCF(inputs: DCFInputs, scenario: ScenarioAssumptions): ScenarioResult {
+  const wacc = inputs.wacc ?? 0.1;
   const terminalGrowth = inputs.terminalGrowthRate ?? 0.03;
   const years = inputs.projectionYears ?? 10;
   const midpoint = Math.floor(years / 2);
@@ -93,14 +90,14 @@ function runDCF(
 
   for (let year = 1; year <= years; year++) {
     const growthRate = year <= midpoint ? scenario.nearTermGrowth : scenario.longTermGrowth;
-    fcf *= (1 + growthRate);
-    pvOfCashFlows += fcf / Math.pow(1 + wacc, year);
+    fcf *= 1 + growthRate;
+    pvOfCashFlows += fcf / (1 + wacc) ** year;
   }
 
   // Terminal value (Gordon Growth Model)
   const terminalFCF = fcf * (1 + terminalGrowth);
   const terminalValue = terminalFCF / (wacc - terminalGrowth);
-  const pvOfTerminal = terminalValue / Math.pow(1 + wacc, years);
+  const pvOfTerminal = terminalValue / (1 + wacc) ** years;
 
   // Enterprise value → equity value → per share
   const enterpriseValue = pvOfCashFlows + pvOfTerminal;
@@ -125,7 +122,11 @@ function runDCF(
 export function runScenarioValuation(
   symbol: string,
   inputs: DCFInputs,
-  customScenarios?: { bear?: Partial<ScenarioAssumptions>; base?: Partial<ScenarioAssumptions>; bull?: Partial<ScenarioAssumptions> },
+  customScenarios?: {
+    bear?: Partial<ScenarioAssumptions>;
+    base?: Partial<ScenarioAssumptions>;
+    bull?: Partial<ScenarioAssumptions>;
+  },
 ): ValuationResult {
   const bear: ScenarioAssumptions = {
     label: "Bear",

@@ -66,7 +66,7 @@ describe("formatSilent — failure path", () => {
 
 describe("formatSilent — truncation on failure", () => {
   it("truncates very long output and notes the drop", () => {
-    const long = "FAIL\n" + "x".repeat(10_000);
+    const long = `FAIL\n${"x".repeat(10_000)}`;
     const r = formatSilent({
       description: "tests",
       output: long,
@@ -170,7 +170,8 @@ describe("HumanLayer scenario — test suite with one failure", () => {
       { description: "typecheck", output: "✓ all clean".repeat(200), exitCode: 0 },
       {
         description: "unit tests",
-        output: "FAIL: orderRouting.test.ts > rejects on no-liquidity\n  expected status 'rejected', got 'pending'",
+        output:
+          "FAIL: orderRouting.test.ts > rejects on no-liquidity\n  expected status 'rejected', got 'pending'",
         exitCode: 1,
       },
       { description: "e2e", output: "skipped".repeat(50), exitCode: 0 },

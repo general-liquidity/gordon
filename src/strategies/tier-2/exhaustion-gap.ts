@@ -57,7 +57,7 @@ export class ExhaustionGapStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, CANDLE_LIMIT);
     if (candles.length < 30) {
@@ -82,7 +82,7 @@ export class ExhaustionGapStrategy extends BaseStrategy {
 
     if (volumeSpike < VOLUME_SPIKE_MULT) {
       return this.notDetected(
-        `Volume not extreme enough: ${volumeSpike.toFixed(1)}x avg (need > ${VOLUME_SPIKE_MULT}x)`
+        `Volume not extreme enough: ${volumeSpike.toFixed(1)}x avg (need > ${VOLUME_SPIKE_MULT}x)`,
       );
     }
 
@@ -93,13 +93,11 @@ export class ExhaustionGapStrategy extends BaseStrategy {
     }
 
     const isUpGap = gap.direction === "up";
-    const rsiExtreme = isUpGap
-      ? rsi.current > RSI_OVERBOUGHT
-      : rsi.current < RSI_OVERSOLD;
+    const rsiExtreme = isUpGap ? rsi.current > RSI_OVERBOUGHT : rsi.current < RSI_OVERSOLD;
 
     if (!rsiExtreme) {
       return this.notDetected(
-        `RSI ${rsi.current.toFixed(1)} not extreme enough for ${isUpGap ? "bearish" : "bullish"} exhaustion (need ${isUpGap ? "> " + RSI_OVERBOUGHT : "< " + RSI_OVERSOLD})`
+        `RSI ${rsi.current.toFixed(1)} not extreme enough for ${isUpGap ? "bearish" : "bullish"} exhaustion (need ${isUpGap ? `> ${RSI_OVERBOUGHT}` : `< ${RSI_OVERSOLD}`})`,
       );
     }
 
@@ -120,7 +118,7 @@ export class ExhaustionGapStrategy extends BaseStrategy {
     else if (rsiExtremity > 5) confidence += 0.05;
 
     // ATR expanding
-    const atr = this.calculateATR(candles);
+    const _atr = this.calculateATR(candles);
     const atrExpanding = this.isATRExpanding(candles);
     if (atrExpanding) confidence += 0.05;
 
@@ -128,7 +126,8 @@ export class ExhaustionGapStrategy extends BaseStrategy {
     const fvg = calculateFVG(candles);
     const allGaps = [...fvg.bullishGaps, ...fvg.bearishGaps];
     const recentFVG = allGaps.length > 0 ? allGaps[allGaps.length - 1] : null;
-    const fvgAligns = recentFVG != null &&
+    const fvgAligns =
+      recentFVG != null &&
       ((isUpGap && recentFVG.type === "bullish") || (!isUpGap && recentFVG.type === "bearish"));
     if (fvgAligns) confidence += 0.1;
 
@@ -160,7 +159,9 @@ export class ExhaustionGapStrategy extends BaseStrategy {
     if (fvgAligns) reasons.push("FVG confirms gap zone");
     if (gap.partiallyFilled) reasons.push("Gap starting to fill (exhaustion confirmed)");
     if (atrExpanding) reasons.push("ATR expanding (peak volatility)");
-    reasons.push(`Trade: ${tradeDirection === "long_fade" ? "BUY (fade bearish exhaustion)" : "SELL/avoid (fade bullish exhaustion)"}`);
+    reasons.push(
+      `Trade: ${tradeDirection === "long_fade" ? "BUY (fade bearish exhaustion)" : "SELL/avoid (fade bullish exhaustion)"}`,
+    );
 
     return this.detected(confidence, signals, reasons.join(". "));
   }
@@ -214,8 +215,8 @@ export class ExhaustionGapStrategy extends BaseStrategy {
     }
 
     // Also check for body gaps (less strict)
-    const bodyGapUp = (last.open - prev.close) / prev.close * 100;
-    const bodyGapDown = (prev.close - last.open) / prev.close * 100;
+    const bodyGapUp = ((last.open - prev.close) / prev.close) * 100;
+    const bodyGapDown = ((prev.close - last.open) / prev.close) * 100;
 
     if (bodyGapUp >= GAP_MIN_PCT) {
       return {
@@ -258,10 +259,7 @@ export class ExhaustionGapStrategy extends BaseStrategy {
     return recentAvgRange > olderAvgRange * 1.3;
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", CANDLE_LIMIT);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const atr = this.calculateATR(candles);
@@ -336,7 +334,7 @@ When creating a plan using the Exhaustion Gap strategy:
     bar: OHLC,
     index: number,
     data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     if (index < 20) return null;
 

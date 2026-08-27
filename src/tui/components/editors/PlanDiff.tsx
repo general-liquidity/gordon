@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 
@@ -38,7 +37,8 @@ export function PlanDiff({ previous, current }: Props) {
     { label: "Confidence", from: previous.confidence, to: current.confidence, isPrice: false },
   ].map((d) => ({
     ...d,
-    direction: d.to > d.from ? "up" as const : d.to < d.from ? "down" as const : "same" as const,
+    direction:
+      d.to > d.from ? ("up" as const) : d.to < d.from ? ("down" as const) : ("same" as const),
   }));
 
   const changed = diffs.filter((d) => d.direction !== "same");
@@ -46,7 +46,9 @@ export function PlanDiff({ previous, current }: Props) {
   if (changed.length === 0) {
     return (
       <Pane title={`PLAN v${previous.version} → v${current.version}`} tone="muted">
-        <Text dimColor italic>No changes from previous version</Text>
+        <Text dimColor italic>
+          No changes from previous version
+        </Text>
       </Pane>
     );
   }
@@ -63,10 +65,13 @@ export function PlanDiff({ previous, current }: Props) {
             <Box key={d.label}>
               <Text dimColor>{d.label.padEnd(14)}</Text>
               <Text>{formatValue(d.from, d.isPrice).padEnd(12)}</Text>
-              <Text color={color} bold>{arrow} </Text>
+              <Text color={color} bold>
+                {arrow}{" "}
+              </Text>
               <Text bold>{formatValue(d.to, d.isPrice).padEnd(12)}</Text>
               <Text color={color} dimColor>
-                ({delta >= 0 ? "+" : ""}{pctChange.toFixed(1)}%)
+                ({delta >= 0 ? "+" : ""}
+                {pctChange.toFixed(1)}%)
               </Text>
             </Box>
           );

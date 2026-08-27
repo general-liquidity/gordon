@@ -21,10 +21,7 @@
  * Pure; delegates the TPO build to computeMarketProfile and never throws.
  */
 
-import {
-  computeMarketProfile,
-  type MarketProfileInput,
-} from "./marketProfile.ts";
+import { computeMarketProfile, type MarketProfileInput } from "./marketProfile.ts";
 
 export interface SinglePrintsInput extends MarketProfileInput {
   /** TPO count at an extreme bin to call the high/low "poor" (unfinished). Default 2. */
@@ -105,7 +102,13 @@ export function computeSinglePrints(input: SinglePrintsInput): SinglePrintsResul
     const location: SinglePrintLocation =
       i === 0 ? "buying_tail" : j === n - 1 ? "selling_tail" : "mid_range";
     const midpoint = round((priceLow + priceHigh) / 2);
-    zones.push({ priceLow: round(priceLow), priceHigh: round(priceHigh), midpoint, length, location });
+    zones.push({
+      priceLow: round(priceLow),
+      priceHigh: round(priceHigh),
+      midpoint,
+      length,
+      location,
+    });
     // Per the canonical definition, only mid-range runs are "single prints";
     // extreme runs are tails (captured by buying/sellingTailLength).
     if (location === "mid_range") {
@@ -120,18 +123,23 @@ export function computeSinglePrints(input: SinglePrintsInput): SinglePrintsResul
   let buyingTailLength = 0;
   while (buyingTailLength < n && countsArr[buyingTailLength] === 1) buyingTailLength += 1;
   let sellingTailLength = 0;
-  while (sellingTailLength < n && countsArr[n - 1 - sellingTailLength] === 1) sellingTailLength += 1;
+  while (sellingTailLength < n && countsArr[n - 1 - sellingTailLength] === 1)
+    sellingTailLength += 1;
 
   const poorLow = countsArr[0]! >= poorThreshold;
   const poorHigh = countsArr[n - 1]! >= poorThreshold;
 
   const parts: string[] = [];
-  if (buyingTailLength > 0) parts.push(`buying tail ${buyingTailLength} print(s) at ${round(sortedPrices[0]!)}`);
-  if (sellingTailLength > 0) parts.push(`selling tail ${sellingTailLength} print(s) at ${round(sortedPrices[n - 1]!)}`);
+  if (buyingTailLength > 0)
+    parts.push(`buying tail ${buyingTailLength} print(s) at ${round(sortedPrices[0]!)}`);
+  if (sellingTailLength > 0)
+    parts.push(`selling tail ${sellingTailLength} print(s) at ${round(sortedPrices[n - 1]!)}`);
   if (poorLow) parts.push(`poor low (unfinished, ${countsArr[0]} TPOs at the extreme)`);
   if (poorHigh) parts.push(`poor high (unfinished, ${countsArr[n - 1]} TPOs at the extreme)`);
   if (midRangeTargets.length > 0) {
-    parts.push(`${midRangeTargets.length} mid-range single-print zone(s) as fill target(s): ${midRangeTargets.join(", ")}`);
+    parts.push(
+      `${midRangeTargets.length} mid-range single-print zone(s) as fill target(s): ${midRangeTargets.join(", ")}`,
+    );
   }
   const interpretation = parts.length > 0 ? parts.join("; ") : "no notable single-print structure";
 

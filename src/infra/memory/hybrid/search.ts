@@ -14,7 +14,11 @@
  * or any stored memory where "similar + recent + diverse" matters.
  */
 
-import { applyTemporalDecay, DEFAULT_TEMPORAL_DECAY, type TemporalDecayConfig } from "./temporalDecay.ts";
+import {
+  applyTemporalDecay,
+  DEFAULT_TEMPORAL_DECAY,
+  type TemporalDecayConfig,
+} from "./temporalDecay.ts";
 import { mmrRerank, DEFAULT_MMR_CONFIG, type MMRConfig } from "./mmr.ts";
 import { filterAsOf, type KnownAt } from "../../../core/memory/asOf.ts";
 
@@ -73,12 +77,63 @@ export const DEFAULT_HYBRID_CONFIG: HybridSearchConfig = {
 };
 
 const STOPWORDS = new Set([
-  "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-  "have", "has", "had", "do", "does", "did", "will", "would", "could",
-  "should", "may", "might", "must", "can", "this", "that", "these",
-  "those", "i", "you", "he", "she", "it", "we", "they", "what", "which",
-  "who", "when", "where", "why", "how", "and", "but", "or", "nor", "for",
-  "yet", "so", "at", "by", "in", "on", "to", "with", "of", "from",
+  "the",
+  "a",
+  "an",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "being",
+  "have",
+  "has",
+  "had",
+  "do",
+  "does",
+  "did",
+  "will",
+  "would",
+  "could",
+  "should",
+  "may",
+  "might",
+  "must",
+  "can",
+  "this",
+  "that",
+  "these",
+  "those",
+  "i",
+  "you",
+  "he",
+  "she",
+  "it",
+  "we",
+  "they",
+  "what",
+  "which",
+  "who",
+  "when",
+  "where",
+  "why",
+  "how",
+  "and",
+  "but",
+  "or",
+  "nor",
+  "for",
+  "yet",
+  "so",
+  "at",
+  "by",
+  "in",
+  "on",
+  "to",
+  "with",
+  "of",
+  "from",
 ]);
 
 function tokenize(text: string): string[] {
@@ -158,10 +213,8 @@ export function hybridSearch(
 
   // No-lookahead guard: drop entries learned after the as-of decision time.
   // Known-at falls back to the valid-time `timestamp` when unset.
-  const visible = filterAsOf(
-    entries,
-    cfg.asOf,
-    (e) => (e.knownAt !== undefined ? e.knownAt : e.timestamp),
+  const visible = filterAsOf(entries, cfg.asOf, (e) =>
+    e.knownAt !== undefined ? e.knownAt : e.timestamp,
   );
   if (visible.length === 0) return [];
   entries = visible;
@@ -190,9 +243,7 @@ export function hybridSearch(
   }
 
   // Filter by minScore and sort
-  const filtered = decayed
-    .filter((r) => r.score >= cfg.minScore)
-    .sort((a, b) => b.score - a.score);
+  const filtered = decayed.filter((r) => r.score >= cfg.minScore).sort((a, b) => b.score - a.score);
 
   // Over-fetch before MMR, then trim to limit
   const pool = filtered.slice(0, cfg.limit * 3);

@@ -39,7 +39,7 @@ import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 
 const GAP_UP_THRESHOLD = 1.01; // 1% gap up: open > prevClose * 1.01
 const GAP_DOWN_THRESHOLD = 0.99; // 1% gap down: open < prevClose * 0.99
-const GAP_SMALL_MIN = 1.0; // Small gap: 1-2%
+const _GAP_SMALL_MIN = 1.0; // Small gap: 1-2%
 const GAP_MEDIUM_MIN = 2.0; // Medium gap: 2-4%
 const GAP_LARGE_MIN = 4.0; // Large gap: 4%+
 const ATR_SIGNIFICANT_MULT = 1.5; // Gap > 1.5x ATR = significant
@@ -69,7 +69,7 @@ export class GapTradingStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, CANDLE_LIMIT);
     if (candles.length < 30) {
@@ -92,7 +92,7 @@ export class GapTradingStrategy extends BaseStrategy {
 
     if (!isGapUp && !isGapDown) {
       return this.notDetected(
-        `No significant gap detected (open/prevClose ratio: ${gapRatio.toFixed(4)}, need > ${GAP_UP_THRESHOLD} or < ${GAP_DOWN_THRESHOLD})`
+        `No significant gap detected (open/prevClose ratio: ${gapRatio.toFixed(4)}, need > ${GAP_UP_THRESHOLD} or < ${GAP_DOWN_THRESHOLD})`,
       );
     }
 
@@ -139,9 +139,7 @@ export class GapTradingStrategy extends BaseStrategy {
     if (smaValue !== null) {
       // Gap up aligns with uptrend (price above SMA)
       // Gap down aligns with downtrend (price below SMA)
-      trendAligns =
-        (isGapUp && currentPrice > smaValue) ||
-        (isGapDown && currentPrice < smaValue);
+      trendAligns = (isGapUp && currentPrice > smaValue) || (isGapDown && currentPrice < smaValue);
     }
 
     // ---------- Confidence Scoring ----------
@@ -149,22 +147,22 @@ export class GapTradingStrategy extends BaseStrategy {
 
     // Gap > 2% of price
     if (gapPercent > 2.0) {
-      confidence += 0.10;
+      confidence += 0.1;
     }
 
     // Gap > 1.5x ATR (significant)
     if (gapVsAtr > ATR_SIGNIFICANT_MULT) {
-      confidence += 0.10;
+      confidence += 0.1;
     }
 
     // Volume above 1.5x average
     if (volumeConfirmed) {
-      confidence += 0.10;
+      confidence += 0.1;
     }
 
     // Gap direction aligns with SMA 20 trend
     if (trendAligns) {
-      confidence += 0.10;
+      confidence += 0.1;
     }
 
     // Price holding gap (not filling back) — continuation is stronger
@@ -188,17 +186,25 @@ export class GapTradingStrategy extends BaseStrategy {
 
     // ---------- Reasoning ----------
     const reasons: string[] = [];
-    reasons.push(`${gapDirection.toUpperCase()} gap detected: ${gapPercent.toFixed(2)}% (${gapSize})`);
-    reasons.push(`Gap type: ${gapType} (price ${gapType === "filling" ? "reverting toward" : "extending away from"} previous close)`);
-    reasons.push(`Volume: ${volumeRatio.toFixed(1)}x average${volumeConfirmed ? " (confirmed)" : " (weak)"}`);
-    reasons.push(`Gap vs ATR: ${gapVsAtr.toFixed(2)}x${gapVsAtr > ATR_SIGNIFICANT_MULT ? " (significant)" : ""}`);
+    reasons.push(
+      `${gapDirection.toUpperCase()} gap detected: ${gapPercent.toFixed(2)}% (${gapSize})`,
+    );
+    reasons.push(
+      `Gap type: ${gapType} (price ${gapType === "filling" ? "reverting toward" : "extending away from"} previous close)`,
+    );
+    reasons.push(
+      `Volume: ${volumeRatio.toFixed(1)}x average${volumeConfirmed ? " (confirmed)" : " (weak)"}`,
+    );
+    reasons.push(
+      `Gap vs ATR: ${gapVsAtr.toFixed(2)}x${gapVsAtr > ATR_SIGNIFICANT_MULT ? " (significant)" : ""}`,
+    );
     if (trendAligns) {
       reasons.push("SMA 20 trend aligns with gap direction");
     }
     reasons.push(
       gapType === "continuation"
         ? `Trade: ${isGapUp ? "BUY" : "SELL"} gap continuation`
-        : `Trade: ${isGapUp ? "SELL" : "BUY"} gap fill toward $${prevClose.toFixed(2)}`
+        : `Trade: ${isGapUp ? "SELL" : "BUY"} gap fill toward $${prevClose.toFixed(2)}`,
     );
 
     return this.detected(confidence, signals, reasons.join(". "));
@@ -208,10 +214,7 @@ export class GapTradingStrategy extends BaseStrategy {
   // Plan Parameters
   // ==========================================================================
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", CANDLE_LIMIT);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const atr = this.calculateATR(candles);
@@ -269,20 +272,13 @@ export class GapTradingStrategy extends BaseStrategy {
     const direction = entryPrice > stopLoss ? 1 : -1; // 1 for long, -1 for short context
 
     const takeProfits: TakeProfitLevel[] = [
-      { price: entryPrice + risk * 1.0 * direction, percentToSell: 0.40 },
+      { price: entryPrice + risk * 1.0 * direction, percentToSell: 0.4 },
       { price: entryPrice + risk * 2.0 * direction, percentToSell: 0.35 },
       { price: entryPrice + risk * 3.0 * direction, percentToSell: 0.25 },
     ];
 
-    const avgTpPrice = takeProfits.reduce(
-      (sum, tp) => sum + tp.price * tp.percentToSell,
-      0
-    );
-    const riskRewardRatio = this.calculateRiskReward(
-      entryPrice,
-      stopLoss,
-      avgTpPrice
-    );
+    const avgTpPrice = takeProfits.reduce((sum, tp) => sum + tp.price * tp.percentToSell, 0);
+    const riskRewardRatio = this.calculateRiskReward(entryPrice, stopLoss, avgTpPrice);
 
     const tradeType = isFilling ? "gap fill" : "gap continuation";
     const gapDir = isGapUp ? "up" : isGapDown ? "down" : "neutral";
@@ -373,7 +369,7 @@ When creating a plan using the Gap Trading strategy:
     bar: OHLC,
     index: number,
     data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     if (index < 20) return null;
 

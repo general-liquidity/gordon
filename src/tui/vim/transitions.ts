@@ -89,11 +89,7 @@ export function transition(
 // Shared input handling
 // ============================================================================
 
-function handleNormalInput(
-  input: string,
-  count: number,
-  ctx: VimContext,
-): TransitionResult | null {
+function handleNormalInput(input: string, count: number, ctx: VimContext): TransitionResult | null {
   if (isOperatorKey(input)) {
     return { next: { type: "operator", op: OPERATORS[input], count } };
   }
@@ -134,11 +130,13 @@ function handleNormalInput(
   }
   if (input === "u") return { execute: () => ctx.onUndo?.() };
   if (input === "i") return { execute: () => ctx.enterInsert(ctx.cursor) };
-  if (input === "I") return { execute: () => ctx.enterInsert(firstNonBlankGrapheme(ctx.text, ctx.cursor)) };
+  if (input === "I")
+    return { execute: () => ctx.enterInsert(firstNonBlankGrapheme(ctx.text, ctx.cursor)) };
   if (input === "a") {
     return { execute: () => ctx.enterInsert(Math.min(graphemeCount(ctx.text), ctx.cursor + 1)) };
   }
-  if (input === "A") return { execute: () => ctx.enterInsert(endOfLineGrapheme(ctx.text, ctx.cursor)) };
+  if (input === "A")
+    return { execute: () => ctx.enterInsert(endOfLineGrapheme(ctx.text, ctx.cursor)) };
   if (input === "o") return { execute: () => executeOpenLine("below", ctx) };
   if (input === "O") return { execute: () => executeOpenLine("above", ctx) };
 
@@ -227,7 +225,9 @@ function fromOperatorFind(
   ctx: VimContext,
 ): TransitionResult {
   if (input === "") return { next: { type: "idle" } };
-  return { execute: () => executeOperatorFind(command.op, command.find, input, command.count, ctx) };
+  return {
+    execute: () => executeOperatorFind(command.op, command.find, input, command.count, ctx),
+  };
 }
 
 function fromOperatorTextObj(

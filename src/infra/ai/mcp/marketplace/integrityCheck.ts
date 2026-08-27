@@ -1,18 +1,13 @@
 /**
  * Extension integrity check — SHA-256 verification + denylist gate.
  *
- * Inspired by Goose's `extension_malware_check.rs`. Before an MCP
- * extension binary or tarball is allowed to load, we verify it matches
- * the catalog-published expected hash and isn't on a known-bad
- * denylist. Mismatch = block + structured reason.
+ * Before an MCP artifact is allowed to load, verify its bytes against an
+ * expected hash and an optional known-bad denylist. Mismatch = block.
  *
- * Threat model: Gordon is single-user and the marketplace catalog is
- * curated, so a full reputation system would be overkill. The hash
- * check protects against:
- *   - tampered downloads (mirror compromise, MitM during install)
- *   - accidental version drift (catalog says vX, file is vY)
- *   - retroactive denylist (after a confirmed bad version, ship the
- *     hash via marketplace update; future installs block)
+ * The marketplace installer applies this to its installed manifest. That
+ * detects local tampering and version drift after installation. It does not
+ * authenticate code fetched later by a package runner or make an unsigned
+ * remote catalog a trust anchor.
  *
  * No network calls — everything is local file IO + crypto.
  */
@@ -118,13 +113,12 @@ export async function verifyExtensionIntegrity(
     };
   }
 
-  if (request.denylist && request.denylist.has(computed)) {
+  if (request.denylist?.has(computed)) {
     return {
       ok: false,
       reason: "denylisted",
       computedSha256: computed,
-      message:
-        `Integrity check failed: SHA-256 ${computed} is on the denylist — refusing to load.`,
+      message: `Integrity check failed: SHA-256 ${computed} is on the denylist — refusing to load.`,
     };
   }
 

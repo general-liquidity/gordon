@@ -42,4 +42,3 @@ export function createEnvelopeMeta(input: {
     timestamp: now,
   };
 }
-

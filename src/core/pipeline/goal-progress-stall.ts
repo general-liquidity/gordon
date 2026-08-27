@@ -38,13 +38,20 @@ export interface GoalStallResult {
 
 const COMPLETE = 0.999;
 
-export function detectGoalStall(progressHistory: number[], opts: GoalStallOptions = {}): GoalStallResult {
+export function detectGoalStall(
+  progressHistory: number[],
+  opts: GoalStallOptions = {},
+): GoalStallResult {
   const minDelta = opts.minDelta && opts.minDelta > 0 ? opts.minDelta : 0.01;
   const patience = Math.max(2, Math.floor(opts.patience ?? 6));
   const h = (progressHistory ?? []).filter((x) => Number.isFinite(x));
   const n = h.length;
 
-  const base = (rec: GoalStallResult["recommendation"], interp: string, extra: Partial<GoalStallResult> = {}): GoalStallResult => ({
+  const base = (
+    rec: GoalStallResult["recommendation"],
+    interp: string,
+    extra: Partial<GoalStallResult> = {},
+  ): GoalStallResult => ({
     stalled: rec === "halt",
     cyclesSinceImprovement: 0,
     bestProgressPct: n > 0 ? Math.max(...h) : 0,
@@ -73,10 +80,18 @@ export function detectGoalStall(progressHistory: number[], opts: GoalStallOption
   const cyclesSinceImprovement = n - 1 - lastHighIdx;
 
   if (latest >= COMPLETE) {
-    return base("continue", `progress ${(latest * 100).toFixed(0)}% — effectively complete, not stalled`, { cyclesSinceImprovement });
+    return base(
+      "continue",
+      `progress ${(latest * 100).toFixed(0)}% — effectively complete, not stalled`,
+      { cyclesSinceImprovement },
+    );
   }
   if (n <= patience) {
-    return base("continue", `only ${n} cycle(s) of progress — too early to judge stall (patience ${patience})`, { cyclesSinceImprovement });
+    return base(
+      "continue",
+      `only ${n} cycle(s) of progress — too early to judge stall (patience ${patience})`,
+      { cyclesSinceImprovement },
+    );
   }
 
   const bestBefore = Math.max(...h.slice(0, n - patience));
@@ -84,7 +99,11 @@ export function detectGoalStall(progressHistory: number[], opts: GoalStallOption
   const stalled = windowGain < minDelta;
   const warn = !stalled && cyclesSinceImprovement >= Math.ceil(patience / 2);
 
-  const recommendation: GoalStallResult["recommendation"] = stalled ? "halt" : warn ? "stall_warning" : "continue";
+  const recommendation: GoalStallResult["recommendation"] = stalled
+    ? "halt"
+    : warn
+      ? "stall_warning"
+      : "continue";
   const interpretation = stalled
     ? `STALLED — best progress advanced only ${(windowGain * 100).toFixed(1)}pp over the last ${patience} cycles (< ${(minDelta * 100).toFixed(1)}pp); loop is spinning without advancing → halt`
     : warn

@@ -49,7 +49,9 @@ describe("fundamentalRatios — equity multiples", () => {
 
   test("FCF yield = FCF / market cap", () => {
     const r = computeFundamentalRatios({
-      fcf: 10_000_000, price: 100, sharesOutstanding: 1_000_000,
+      fcf: 10_000_000,
+      price: 100,
+      sharesOutstanding: 1_000_000,
     });
     // marketCap = 100M; 10M / 100M = 10%
     expect(r.fcfYield).toBeCloseTo(0.1, 5);
@@ -64,8 +66,10 @@ describe("fundamentalRatios — equity multiples", () => {
 describe("fundamentalRatios — enterprise value", () => {
   test("EV = marketCap + totalDebt - cash", () => {
     const r = computeFundamentalRatios({
-      price: 100, sharesOutstanding: 1_000_000,
-      totalDebt: 50_000_000, cashAndEquivalents: 30_000_000,
+      price: 100,
+      sharesOutstanding: 1_000_000,
+      totalDebt: 50_000_000,
+      cashAndEquivalents: 30_000_000,
     });
     // marketCap = 100M; EV = 100M + 50M - 30M = 120M
     expect(r.enterpriseValue).toBe(120_000_000);
@@ -73,15 +77,18 @@ describe("fundamentalRatios — enterprise value", () => {
 
   test("netCash = cash - debt", () => {
     const r = computeFundamentalRatios({
-      totalDebt: 50_000_000, cashAndEquivalents: 30_000_000,
+      totalDebt: 50_000_000,
+      cashAndEquivalents: 30_000_000,
     });
     expect(r.netCash).toBe(-20_000_000);
   });
 
   test("EV/EBITDA = EV / EBITDA", () => {
     const r = computeFundamentalRatios({
-      price: 100, sharesOutstanding: 1_000_000,
-      totalDebt: 50_000_000, cashAndEquivalents: 30_000_000,
+      price: 100,
+      sharesOutstanding: 1_000_000,
+      totalDebt: 50_000_000,
+      cashAndEquivalents: 30_000_000,
       ebitda: 20_000_000,
     });
     // EV = 120M; 120M / 20M = 6x
@@ -102,10 +109,18 @@ describe("fundamentalRatios — interpretation", () => {
 
   test("interpretation lists every computable ratio", () => {
     const r = computeFundamentalRatios({
-      ebit: 1000, taxRate: 0.21, investedCapital: 5000,
-      price: 100, eps: 5, ebitda: 200, fcf: 30,
-      sharesOutstanding: 1, totalDebt: 100, cashAndEquivalents: 50,
-      netIncome: 500, bookEquity: 2500,
+      ebit: 1000,
+      taxRate: 0.21,
+      investedCapital: 5000,
+      price: 100,
+      eps: 5,
+      ebitda: 200,
+      fcf: 30,
+      sharesOutstanding: 1,
+      totalDebt: 100,
+      cashAndEquivalents: 50,
+      netIncome: 500,
+      bookEquity: 2500,
     });
     expect(r.interpretation).toContain("ROIC");
     expect(r.interpretation).toContain("ROE");
@@ -118,7 +133,9 @@ describe("fundamentalRatios — interpretation", () => {
 describe("fundamentalRatios — defensiveness", () => {
   test("NaN inputs produce null, not NaN", () => {
     const r = computeFundamentalRatios({
-      ebit: NaN, taxRate: 0.21, investedCapital: 1000,
+      ebit: NaN,
+      taxRate: 0.21,
+      investedCapital: 1000,
     });
     expect(r.roic).toBeNull();
   });

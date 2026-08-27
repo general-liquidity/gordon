@@ -155,15 +155,18 @@ export function computeDealerGreeksExposure(
   const gammaFlipPrice = findGammaFlip(profile);
 
   const gammaSign = atSpot.gammaExposure >= 0 ? "long" : "short";
-  const gammaBehavior = atSpot.gammaExposure >= 0
-    ? "stabilizing (dealers sell rallies / buy dips)"
-    : "amplifying (dealers buy rallies / sell dips)";
-  const flipNote = gammaFlipPrice == null
-    ? "no gamma flip within ±grid"
-    : `gamma flip ~${gammaFlipPrice.toFixed(2)} (${gammaFlipPrice > params.spot ? "above" : "below"} spot)`;
-  const vannaNote = atSpot.vannaExposure >= 0
-    ? "vanna+: rising IV pushes dealer delta up (buy), falling IV down (sell)"
-    : "vanna−: rising IV pushes dealer delta down (sell), falling IV up (buy)";
+  const gammaBehavior =
+    atSpot.gammaExposure >= 0
+      ? "stabilizing (dealers sell rallies / buy dips)"
+      : "amplifying (dealers buy rallies / sell dips)";
+  const flipNote =
+    gammaFlipPrice == null
+      ? "no gamma flip within ±grid"
+      : `gamma flip ~${gammaFlipPrice.toFixed(2)} (${gammaFlipPrice > params.spot ? "above" : "below"} spot)`;
+  const vannaNote =
+    atSpot.vannaExposure >= 0
+      ? "vanna+: rising IV pushes dealer delta up (buy), falling IV down (sell)"
+      : "vanna−: rising IV pushes dealer delta down (sell), falling IV up (buy)";
 
   const interpretation =
     `Dealer ${gammaSign}-gamma at spot ${params.spot.toFixed(2)} — ${gammaBehavior}. ` +

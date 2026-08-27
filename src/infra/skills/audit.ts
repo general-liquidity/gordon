@@ -75,9 +75,9 @@ export interface AuditOptions extends SkillStalenessOptions, UsageReadOptions {
 }
 
 const DEFAULTS = {
-  needsAttentionStaleRatio: 0.30,
-  degradedStaleRatio: 0.50,
-  degradedUnusedRatio: 0.50,
+  needsAttentionStaleRatio: 0.3,
+  degradedStaleRatio: 0.5,
+  degradedUnusedRatio: 0.5,
 };
 
 /**
@@ -105,14 +105,18 @@ export function runSkillAudit(skills: Skill[], options: AuditOptions = {}): Skil
   // Verdict calculation
   const staleRatio = totalSkills === 0 ? 0 : stalenessByVerdict.stale / totalSkills;
   const unusedRatio = totalSkills === 0 ? 0 : neverInvoked.length / totalSkills;
-  const needsAttentionStaleRatio = options.needsAttentionStaleRatio ?? DEFAULTS.needsAttentionStaleRatio;
+  const needsAttentionStaleRatio =
+    options.needsAttentionStaleRatio ?? DEFAULTS.needsAttentionStaleRatio;
   const degradedStaleRatio = options.degradedStaleRatio ?? DEFAULTS.degradedStaleRatio;
   const degradedUnusedRatio = options.degradedUnusedRatio ?? DEFAULTS.degradedUnusedRatio;
 
   let verdict: AuditVerdict;
   if (staleRatio >= degradedStaleRatio && unusedRatio >= degradedUnusedRatio) {
     verdict = "degraded";
-  } else if (staleRatio >= needsAttentionStaleRatio || statusBreakdown.unspecified > totalSkills * 0.5) {
+  } else if (
+    staleRatio >= needsAttentionStaleRatio ||
+    statusBreakdown.unspecified > totalSkills * 0.5
+  ) {
     verdict = "needs_attention";
   } else {
     verdict = "clean";
@@ -170,7 +174,9 @@ export function formatAuditReport(report: SkillAuditReport): string {
   if (report.usage.length > 0) {
     lines.push("", "Most-used (last 30d):");
     for (const stats of report.usage.slice(0, 5)) {
-      lines.push(`  - ${stats.skillId}: ${stats.recentInvocations} recent / ${stats.totalInvocations} total`);
+      lines.push(
+        `  - ${stats.skillId}: ${stats.recentInvocations} recent / ${stats.totalInvocations} total`,
+      );
     }
   }
 

@@ -23,10 +23,7 @@
 import { Mastra } from "@mastra/core";
 import type { Agent } from "@mastra/core/agent";
 import { CostGuardProcessor } from "@mastra/core/processors";
-import {
-  getNativeInputProcessors,
-  getNativeOutputProcessors,
-} from "./processors/index.ts";
+import { getNativeInputProcessors, getNativeOutputProcessors } from "./processors/index.ts";
 import { isDurableAgentsEnabled } from "./harness/durableRunner.ts";
 import { getFastMastraModel, type MastraModelConfig } from "../runtime/providers/registry.ts";
 import { createMastraStorageConfig } from "./memory/mastraStorage.ts";
@@ -44,9 +41,7 @@ const logger = createModuleLogger("native-wiring");
  * (all warn-mode) survive.
  */
 export function nativeInputProcessorsForAgent() {
-  return getNativeInputProcessors().filter(
-    (p) => !(p instanceof CostGuardProcessor),
-  );
+  return getNativeInputProcessors().filter((p) => !(p instanceof CostGuardProcessor));
 }
 
 /**

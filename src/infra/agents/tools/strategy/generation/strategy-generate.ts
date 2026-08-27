@@ -8,10 +8,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import {
-  createStrategyGenerator,
-  describeAbsentBacktest,
-} from "../../../strategy-generator.ts";
+import { createStrategyGenerator, describeAbsentBacktest } from "../../../strategy-generator.ts";
 import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "../../types.ts";
 import { saveGeneratedStrategy } from "../../../../storage/entities/generated-strategies.ts";
 
@@ -39,16 +36,8 @@ const inputSchema = z.object({
     .max(365)
     .default(90)
     .describe("Days of historical data to use for backtesting"),
-  symbol: z
-    .string()
-    .default("BTCUSDT")
-    .describe("Trading symbol to use for backtesting"),
-  minSharpe: z
-    .number()
-    .min(0)
-    .max(5)
-    .default(0.5)
-    .describe("Minimum Sharpe ratio threshold"),
+  symbol: z.string().default("BTCUSDT").describe("Trading symbol to use for backtesting"),
+  minSharpe: z.number().min(0).max(5).default(0.5).describe("Minimum Sharpe ratio threshold"),
   maxIterations: z
     .number()
     .min(1)
@@ -76,9 +65,7 @@ const outputSchema = z.object({
   meetsThresholds: z.boolean().optional(),
   backtestPerformed: z.boolean().optional(),
   /** Recovery steps taken during generation: what the user did not get. */
-  degradations: z
-    .array(z.object({ kind: z.string(), detail: z.string() }))
-    .optional(),
+  degradations: z.array(z.object({ kind: z.string(), detail: z.string() })).optional(),
   warnings: z.array(z.string()).optional(),
   error: z.string().optional(),
 });

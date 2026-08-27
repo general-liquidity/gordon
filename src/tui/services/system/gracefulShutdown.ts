@@ -75,7 +75,7 @@ async function performShutdown(signal: string): Promise<void> {
         // without interfering with normal stdout output.
         process.stderr.write(
           `[clean-state-gate] verdict=${result.verdict} signal=${signal} override=${override} ` +
-          `failing=${(payload.failingIds as string[]).join(",") || "none"}\n`,
+            `failing=${(payload.failingIds as string[]).join(",") || "none"}\n`,
         );
         if (result.verdict === "block" && !override) {
           cleanStateBlocked = true;

@@ -180,7 +180,7 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
     // Erase the live frame, emit console output (becomes permanent
     // scrollback — nothing erases it next frame), then reprint the frame.
     const erase = ansiEscapes.eraseLines(lastPrintedHeight);
-    writeToStdout(syncTerm.wrapFrame(erase + writes + lastPaintedAnsi + "\n"));
+    writeToStdout(syncTerm.wrapFrame(`${erase + writes + lastPaintedAnsi}\n`));
   };
 
   if (options.patchConsole) {
@@ -209,8 +209,7 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
       // a full rewrite instead of attempting incremental patches — after a
       // resize the front/back buffers share no meaningful cell-level overlap
       // with what's already on screen.
-      const sizeChanged =
-        frameBuffer.width !== width || frameBuffer.height !== height;
+      const sizeChanged = frameBuffer.width !== width || frameBuffer.height !== height;
       if (sizeChanged) {
         frameBuffer.resize(width, height);
       }
@@ -248,18 +247,16 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
       // eraseLines only clears the live region, so newly-emitted static
       // content scrolls up into history behind the reprinted live frame.
       const hasStatic = staticAnsi.length > 0;
-      const staticEmit = hasStatic ? staticAnsi + "\n" : "";
+      const staticEmit = hasStatic ? `${staticAnsi}\n` : "";
 
       // First paint: cursor-hide + (optional static) + full frame, no erase.
       if (lastPaintedAnsi.length === 0) {
         lastPaintedAnsi = fullAnsi;
         lastPrintedHeight = Math.max(1, fullAnsi.split("\n").length);
         lastPrintedWidth = width;
-        if (hasStatic) emittedStaticAnsi += staticAnsi + "\n";
+        if (hasStatic) emittedStaticAnsi += `${staticAnsi}\n`;
         writeToStdout(
-          syncTerm.wrapFrame(
-            ansiEscapes.cursorHide + staticEmit + fullAnsi + "\n" + cursorAnsi,
-          ),
+          syncTerm.wrapFrame(`${ansiEscapes.cursorHide + staticEmit + fullAnsi}\n${cursorAnsi}`),
         );
         options.onRender?.({ renderTime: performance.now() - startTime });
         return;
@@ -267,12 +264,7 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
 
       // Subsequent frames: if nothing changed AND no new static tail,
       // skip. If only static changed, we still need to erase + emit.
-      if (
-        !hasStatic &&
-        !selectionChanged &&
-        fullAnsi === lastPaintedAnsi &&
-        patches.length === 0
-      ) {
+      if (!hasStatic && !selectionChanged && fullAnsi === lastPaintedAnsi && patches.length === 0) {
         options.onRender?.({ renderTime: performance.now() - startTime });
         return;
       }
@@ -302,12 +294,7 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
         width === lastPrintedWidth;
 
       if (canIncremental) {
-        const body = relativePatcher.write(
-          patches,
-          stylePool,
-          charPool,
-          lastPrintedHeight,
-        );
+        const body = relativePatcher.write(patches, stylePool, charPool, lastPrintedHeight);
         writeToStdout(syncTerm.wrapFrame(body + cursorAnsi));
         // Geometry unchanged — lastPrintedHeight and lastPrintedWidth stay
         // the same. Update lastPaintedAnsi so the next-tick skip check can
@@ -318,20 +305,13 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
       }
 
       const erase = lastPrintedHeight > 0 ? ansiEscapes.eraseLines(lastPrintedHeight) : "";
-      if (hasStatic) emittedStaticAnsi += staticAnsi + "\n";
+      if (hasStatic) emittedStaticAnsi += `${staticAnsi}\n`;
       const selectedPatches = selectionOverlay.applyTo(
         selectionOverlay.patchesFor(frameBuffer.front, charPool),
       );
-      const selectionAnsi = relativePatcher.write(
-        selectedPatches,
-        stylePool,
-        charPool,
-        nextHeight,
-      );
+      const selectionAnsi = relativePatcher.write(selectedPatches, stylePool, charPool, nextHeight);
       writeToStdout(
-        syncTerm.wrapFrame(
-          erase + staticEmit + fullAnsi + "\n" + selectionAnsi + cursorAnsi,
-        ),
+        syncTerm.wrapFrame(`${erase + staticEmit + fullAnsi}\n${selectionAnsi}${cursorAnsi}`),
       );
       lastPaintedAnsi = fullAnsi;
       lastPaintedSelectionRevision = selectionRevision;
@@ -395,7 +375,7 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
       restoreConsole = null;
     }
     // Show cursor + newline so shell prompt lands cleanly after us.
-    writeToStdout(ansiEscapes.cursorShow + "\n");
+    writeToStdout(`${ansiEscapes.cursorShow}\n`);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (reconciler as any).updateContainerSync(null, container, null, noop);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -481,11 +461,11 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
   // (useful for benchmarking a single cold pool vs. migrated pools), or
   // to "true" to force on. The callback is wrapped so a migration throw
   // only logs — the render loop keeps going on stale-but-valid pools.
-  const migrationFlag = process.env["GORDON_POOL_MIGRATION_ENABLED"];
-  const migrationEnabled = migrationFlag === "false" ? false : true;
+  const migrationFlag = process.env.GORDON_POOL_MIGRATION_ENABLED;
+  const migrationEnabled = migrationFlag !== "false";
   if (migrationEnabled) {
     try {
-      const intervalRaw = process.env["GORDON_POOL_MIGRATION_INTERVAL_MS"];
+      const intervalRaw = process.env.GORDON_POOL_MIGRATION_INTERVAL_MS;
       const parsed = intervalRaw ? Number(intervalRaw) : NaN;
       const intervalMs = Number.isFinite(parsed) && parsed > 0 ? parsed : 5 * 60 * 1000;
 

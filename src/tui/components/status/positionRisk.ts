@@ -8,8 +8,11 @@ function hasFiniteNumber(value: unknown): value is number {
  * Side-aware percentage distance from last price to the stop.
  * Negative values mean the stop level has already been breached.
  */
-export function stopDistancePct(p: Pick<Position, "side" | "lastPrice" | "stopPrice">): number | null {
-  if (!hasFiniteNumber(p.stopPrice) || !hasFiniteNumber(p.lastPrice) || p.lastPrice <= 0) return null;
+export function stopDistancePct(
+  p: Pick<Position, "side" | "lastPrice" | "stopPrice">,
+): number | null {
+  if (!hasFiniteNumber(p.stopPrice) || !hasFiniteNumber(p.lastPrice) || p.lastPrice <= 0)
+    return null;
   if (p.side === "long") return (p.lastPrice - p.stopPrice) / p.lastPrice;
   return (p.stopPrice - p.lastPrice) / p.lastPrice;
 }
@@ -23,13 +26,12 @@ export function accountPctAtRisk(
   p: Pick<Position, "side" | "entryPrice" | "quantity" | "stopPrice">,
   accountEquity: number | null | undefined,
 ): number | null {
-  if (!hasFiniteNumber(p.stopPrice) || !hasFiniteNumber(accountEquity) || accountEquity <= 0) return null;
+  if (!hasFiniteNumber(p.stopPrice) || !hasFiniteNumber(accountEquity) || accountEquity <= 0)
+    return null;
   if (!hasFiniteNumber(p.entryPrice) || !hasFiniteNumber(p.quantity)) return null;
 
   const quantity = Math.abs(p.quantity);
-  const perUnitLoss = p.side === "long"
-    ? p.entryPrice - p.stopPrice
-    : p.stopPrice - p.entryPrice;
+  const perUnitLoss = p.side === "long" ? p.entryPrice - p.stopPrice : p.stopPrice - p.entryPrice;
   const loss = Math.max(0, perUnitLoss * quantity);
   return loss / accountEquity;
 }

@@ -133,7 +133,7 @@ export function computeOptimalF(input: OptimalFInput): OptimalFResult {
       // Equity multiplier: 1 + f × (−t / biggestLoss)
       // Note: biggestLoss is negative, so dividing a positive (−t for loss) by
       // negative gives the correct negative factor → reduces equity.
-      const factor = 1 + f * ((-t) / biggestLoss);
+      const factor = 1 + f * (-t / biggestLoss);
       if (factor <= 0) {
         // Bankruptcy under this f — TWR = 0, abandon
         twr = 0;
@@ -151,7 +151,7 @@ export function computeOptimalF(input: OptimalFInput): OptimalFResult {
     }
   }
 
-  const geometricMean = Math.pow(Math.max(0, bestTWR), 1 / N);
+  const geometricMean = Math.max(0, bestTWR) ** (1 / N);
   const conservativeF = bestF / 2;
 
   const reasoning =
@@ -175,8 +175,7 @@ export function computeOptimalF(input: OptimalFInput): OptimalFResult {
 }
 
 export function optimalFToPayload(result: OptimalFResult): Record<string, unknown> {
-  const finite = (x: number): number | null =>
-    Number.isFinite(x) ? Number(x.toFixed(6)) : null;
+  const finite = (x: number): number | null => (Number.isFinite(x) ? Number(x.toFixed(6)) : null);
   return {
     kind: "optimal_f.computed",
     optimalF: finite(result.optimalF),

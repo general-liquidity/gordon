@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Divider } from "../layout/Divider.tsx";
 
@@ -55,15 +55,17 @@ export function MCPToolListView({ serverName, tools, onSelect, onClose }: Props)
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">TOOLS: {serverName}</Text>
-        <Text dimColor>  ({tools.length} tools)</Text>
+        <Text bold color="cyanBright">
+          TOOLS: {serverName}
+        </Text>
+        <Text dimColor> ({tools.length} tools)</Text>
       </Box>
 
       <Divider />
 
       {tools.length === 0 ? (
         <Box marginTop={1}>
-          <Text dimColor>  No tools available from this server.</Text>
+          <Text dimColor> No tools available from this server.</Text>
         </Box>
       ) : (
         <Box flexDirection="column" marginTop={1}>
@@ -71,16 +73,11 @@ export function MCPToolListView({ serverName, tools, onSelect, onClose }: Props)
             const absIdx = scrollOffset + i;
             const isFocused = absIdx === focusIdx;
             const desc = tool.description ?? "";
-            const truncatedDesc = desc.length > 45 ? desc.slice(0, 42) + "..." : desc;
+            const truncatedDesc = desc.length > 45 ? `${desc.slice(0, 42)}...` : desc;
             return (
               <Box key={tool.name}>
-                <Text color={isFocused ? "cyanBright" : undefined}>
-                  {isFocused ? "▸ " : "  "}
-                </Text>
-                <Text
-                  bold={isFocused}
-                  color={isFocused ? "cyanBright" : undefined}
-                >
+                <Text color={isFocused ? "cyanBright" : undefined}>{isFocused ? "▸ " : "  "}</Text>
+                <Text bold={isFocused} color={isFocused ? "cyanBright" : undefined}>
                   {tool.name.padEnd(28)}
                 </Text>
                 <Text dimColor>{truncatedDesc}</Text>
@@ -99,7 +96,7 @@ export function MCPToolListView({ serverName, tools, onSelect, onClose }: Props)
       )}
 
       <Box marginTop={1}>
-        <Text dimColor>↑↓ navigate  Enter view detail  Esc back</Text>
+        <Text dimColor>↑↓ navigate Enter view detail Esc back</Text>
       </Box>
     </Box>
   );

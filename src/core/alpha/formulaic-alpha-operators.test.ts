@@ -31,8 +31,7 @@ import {
 } from "./formulaic-alpha-operators.ts";
 
 // A 1-date panel with 3 tickers, used for cross-sectional ops.
-const xs1 = (vals: (number | null)[]): Panel =>
-  makePanel(["d0"], ["A", "B", "C"], [vals]);
+const xs1 = (vals: (number | null)[]): Panel => makePanel(["d0"], ["A", "B", "C"], [vals]);
 
 // A single-ticker time-series panel: one column, T dates.
 const tsPanel = (vals: (number | null)[]): Panel =>

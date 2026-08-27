@@ -33,12 +33,14 @@ function makeTrade(overrides: Partial<Trade> = {}): Trade {
     status: "OPEN",
     planId: "p1",
     averageEntry: 50_000,
-    entries: [{
-      orderId: "o1",
-      quantity: 0.002,
-      price: 50_000,
-      filledAt: new Date().toISOString(),
-    }],
+    entries: [
+      {
+        orderId: "o1",
+        quantity: 0.002,
+        price: 50_000,
+        filledAt: new Date().toISOString(),
+      },
+    ],
     exits: [],
     realizedPnl: 0,
     realizedPnlPercent: 0,

@@ -37,10 +37,7 @@
  * Pure function. Caller supplies the return + benchmark series.
  */
 import { mean, sampleStd, pearsonCorrelation } from "./helpers.ts";
-import {
-  skewness as ssSkewness,
-  kurtosis as ssKurtosis,
-} from "../stats/index.ts";
+import { skewness as ssSkewness, kurtosis as ssKurtosis } from "../stats/index.ts";
 
 export interface StrategyClaim {
   /** Optional claim: beta to benchmark. e.g. 0 = market-neutral. */
@@ -154,7 +151,7 @@ export interface StrategyClaimVerifierResult {
 }
 
 const DEFAULT_ANNUALIZATION = 252;
-const DEFAULT_BETA_TOL = 0.10;
+const DEFAULT_BETA_TOL = 0.1;
 const DEFAULT_SHARPE_TOL = 0.25;
 const DEFAULT_DD_TOL = 0.25;
 const DEFAULT_SKEW_LONG = 0.5;
@@ -372,8 +369,8 @@ export function verifyStrategyClaims(
     const consistent = relDiff <= ddTol;
     checks.push({
       claim: "maxDrawdown",
-      claimedValue: (input.claims.maxDrawdown * 100).toFixed(1) + "%",
-      realizedValue: (mdd * 100).toFixed(1) + "%",
+      claimedValue: `${(input.claims.maxDrawdown * 100).toFixed(1)}%`,
+      realizedValue: `${(mdd * 100).toFixed(1)}%`,
       verdict: consistent ? "consistent" : "inconsistent",
       reason: consistent
         ? `Realized max drawdown ${(mdd * 100).toFixed(1)}% within ${(ddTol * 100).toFixed(0)}% of claim.`
@@ -386,9 +383,7 @@ export function verifyStrategyClaims(
     const realized = Number.isFinite(holdImplied) ? holdImplied : 9999;
     const diff = Math.abs(realized - input.claims.holdingPeriodPeriods);
     const relDiff =
-      input.claims.holdingPeriodPeriods > 0
-        ? diff / input.claims.holdingPeriodPeriods
-        : diff;
+      input.claims.holdingPeriodPeriods > 0 ? diff / input.claims.holdingPeriodPeriods : diff;
     const consistent = relDiff <= 1.0; // holding period is noisy; ±100%
     checks.push({
       claim: "holdingPeriodPeriods",
@@ -451,9 +446,7 @@ export function verifyStrategyClaims(
   };
 }
 
-export function formatStrategyClaimVerification(
-  result: StrategyClaimVerifierResult,
-): string {
+export function formatStrategyClaimVerification(result: StrategyClaimVerifierResult): string {
   const lines = [
     `Strategy-Claim Verifier — ${result.verdict.toUpperCase()}`,
     "",
@@ -475,13 +468,10 @@ export function formatStrategyClaimVerification(
   if (result.checks.length > 0) {
     lines.push("Checks:");
     for (const c of result.checks) {
-      const mark =
-        c.verdict === "consistent"
-          ? "✓"
-          : c.verdict === "inconsistent"
-            ? "✗"
-            : "·";
-      lines.push(`  ${mark} ${c.claim.padEnd(20)} claimed: ${c.claimedValue.padEnd(10)} realized: ${c.realizedValue.padEnd(10)} → ${c.verdict}`);
+      const mark = c.verdict === "consistent" ? "✓" : c.verdict === "inconsistent" ? "✗" : "·";
+      lines.push(
+        `  ${mark} ${c.claim.padEnd(20)} claimed: ${c.claimedValue.padEnd(10)} realized: ${c.realizedValue.padEnd(10)} → ${c.verdict}`,
+      );
       lines.push(`     ${c.reason}`);
     }
   }

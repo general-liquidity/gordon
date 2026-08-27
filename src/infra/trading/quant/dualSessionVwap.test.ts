@@ -1,14 +1,15 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeDualVwap,
-  dualVwapToPayload,
-  type DualVwapCandle,
-} from "./dualSessionVwap.ts";
+import { computeDualVwap, dualVwapToPayload, type DualVwapCandle } from "./dualSessionVwap.ts";
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 
-function constantPriceDay(dayIndex: number, price: number, volume: number, bars = 24): DualVwapCandle[] {
+function constantPriceDay(
+  dayIndex: number,
+  price: number,
+  volume: number,
+  bars = 24,
+): DualVwapCandle[] {
   const base = dayIndex * DAY_MS;
   const out: DualVwapCandle[] = [];
   for (let h = 0; h < bars; h++) {

@@ -30,7 +30,7 @@
 import { createModuleLogger } from "../../logger/index.ts";
 import {
   defaultHandoffCoordinator,
-  HandoffCoordinator,
+  type HandoffCoordinator,
   type FilterableMessage,
 } from "./HandoffCoordinator.ts";
 import { collectSupervisorFeedback } from "./toolAgentMap.ts";
@@ -55,9 +55,7 @@ export interface SupervisorDelegationState {
  * Gate flag — `GORDON_NATIVE_SUPERVISOR=1` activates the native supervisor
  * delegation config. Off (default) keeps the hand-rolled handoff path.
  */
-export function isNativeSupervisorEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function isNativeSupervisorEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   const raw = env.GORDON_NATIVE_SUPERVISOR;
   if (typeof raw !== "string") return false;
   const normalized = raw.trim().toLowerCase();
@@ -184,9 +182,7 @@ export function buildNativeSupervisorDelegation(
     onDelegationComplete: async (ctx: any) => {
       const primitiveId: string = ctx?.primitiveId ?? "";
       await endSubagentHook({
-        key:
-          state.activeSubagentHookKey
-          ?? `stream:${scopeKey}:${ctx?.toolCallId ?? primitiveId}`,
+        key: state.activeSubagentHookKey ?? `stream:${scopeKey}:${ctx?.toolCallId ?? primitiveId}`,
         type: primitiveId,
         parent: SUPERVISOR_AGENT,
         status: ctx?.error ? "failed" : "completed",

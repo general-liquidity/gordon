@@ -90,7 +90,7 @@ function geometricMean(equity: number[]): number {
   const totalReturn = equity[equity.length - 1]! / equity[0]!;
   if (totalReturn <= 0) return -Infinity;
   // Per-bar geometric mean return.
-  return Math.pow(totalReturn, 1 / (equity.length - 1)) - 1;
+  return totalReturn ** (1 / (equity.length - 1)) - 1;
 }
 
 function arithmeticAndVol(equity: number[]): { mean: number; vol: number } {
@@ -100,8 +100,7 @@ function arithmeticAndVol(equity: number[]): { mean: number; vol: number } {
     returns.push(equity[i]! / equity[i - 1]! - 1);
   }
   const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
-  const variance =
-    returns.reduce((a, b) => a + (b - mean) * (b - mean), 0) / returns.length;
+  const variance = returns.reduce((a, b) => a + (b - mean) * (b - mean), 0) / returns.length;
   return { mean, vol: Math.sqrt(variance) };
 }
 
@@ -191,9 +190,7 @@ export function computePortfolioCombine(input: PortfolioCombineInput): Portfolio
     weightedFinal += weights[s]! * componentFinal;
   }
   const weightedGeometricComponent =
-    weightedFinal > 0
-      ? Math.pow(weightedFinal, 1 / (barCount - 1)) - 1
-      : -Infinity;
+    weightedFinal > 0 ? weightedFinal ** (1 / (barCount - 1)) - 1 : -Infinity;
 
   const rebalancingPremium = geometricMeanReturn - weightedGeometricComponent;
   const hasParrondo = geometricMeanReturn > weightedGeometricComponent;

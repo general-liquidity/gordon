@@ -61,7 +61,7 @@ export class EngulfingPatternStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, 100);
     if (candles.length < 30) {
@@ -103,14 +103,12 @@ export class EngulfingPatternStrategy extends BaseStrategy {
 
     if (!nearSupport && supportDistance > MAX_SUPPORT_DISTANCE) {
       return this.notDetected(
-        `Pattern not near support (${supportDistance.toFixed(1)}% from nearest)`
+        `Pattern not near support (${supportDistance.toFixed(1)}% from nearest)`,
       );
     }
 
     // Volume confirmation
-    const avgVolume = candles
-      .slice(-21, -1)
-      .reduce((sum, c) => sum + c.volume, 0) / 20;
+    const avgVolume = candles.slice(-21, -1).reduce((sum, c) => sum + c.volume, 0) / 20;
     const volumeRatio = engulfingCandle.volume / avgVolume;
 
     // Calculate RSI for context
@@ -183,7 +181,7 @@ export class EngulfingPatternStrategy extends BaseStrategy {
    */
   private detectBullishEngulfing(
     engulfed: Candle,
-    engulfing: Candle
+    engulfing: Candle,
   ): { isPattern: boolean; engulfRatio: number; reason?: string } {
     // Engulfed candle must be bearish (red)
     const engulfedBody = engulfed.close - engulfed.open;
@@ -223,10 +221,7 @@ export class EngulfingPatternStrategy extends BaseStrategy {
     return { isPattern: true, engulfRatio };
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", 100);
     const currentPrice = this.getCurrentPrice(candles, ctx);
 
@@ -258,7 +253,8 @@ export class EngulfingPatternStrategy extends BaseStrategy {
       stopLoss,
       takeProfits,
       riskRewardRatio,
-      notes: `Bullish engulfing reversal. Stop below pattern at $${stopLoss.toFixed(2)}. ` +
+      notes:
+        `Bullish engulfing reversal. Stop below pattern at $${stopLoss.toFixed(2)}. ` +
         `R:R ${riskRewardRatio.toFixed(1)}:1`,
     };
   }
@@ -319,15 +315,10 @@ When creating a plan using the Engulfing Pattern strategy:
     bar: OHLC,
     _index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     const price = bar.close;
-    const {
-      rsi14,
-      nearestSupport,
-      nearestResistance,
-      volumeRatio,
-    } = indicators;
+    const { rsi14, nearestSupport, nearestResistance, volumeRatio } = indicators;
 
     // Check SELL signal first (exit conditions)
     if (nearestResistance && price >= nearestResistance) {

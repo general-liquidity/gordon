@@ -53,10 +53,18 @@ function detectAlgorithm(text: string): AlgorithmHint {
   const lower = text.toLowerCase();
 
   // Explicit algorithm names (highest confidence)
-  if (lower.includes("twap") || lower.includes("time-weighted") || lower.includes("time weighted")) {
+  if (
+    lower.includes("twap") ||
+    lower.includes("time-weighted") ||
+    lower.includes("time weighted")
+  ) {
     return { algorithm: "TWAP", confidence: 1.0, keywords: ["twap"] };
   }
-  if (lower.includes("vwap") || lower.includes("volume-weighted") || lower.includes("volume weighted")) {
+  if (
+    lower.includes("vwap") ||
+    lower.includes("volume-weighted") ||
+    lower.includes("volume weighted")
+  ) {
     return { algorithm: "VWAP", confidence: 1.0, keywords: ["vwap"] };
   }
   if (lower.includes("iceberg") || lower.includes("ice berg")) {
@@ -72,19 +80,37 @@ function detectAlgorithm(text: string): AlgorithmHint {
   }
 
   // Behavioral keywords (lower confidence)
-  if (lower.includes("hide") || lower.includes("hidden") || lower.includes("stealth") || lower.includes("without moving")) {
+  if (
+    lower.includes("hide") ||
+    lower.includes("hidden") ||
+    lower.includes("stealth") ||
+    lower.includes("without moving")
+  ) {
     return { algorithm: "ICEBERG", confidence: 0.8, keywords: ["hide/stealth"] };
   }
-  if (lower.includes("match volume") || lower.includes("follow volume") || lower.includes("volume profile")) {
+  if (
+    lower.includes("match volume") ||
+    lower.includes("follow volume") ||
+    lower.includes("volume profile")
+  ) {
     return { algorithm: "VWAP", confidence: 0.8, keywords: ["volume matching"] };
   }
-  if (lower.includes("slowly") || lower.includes("gradually") || lower.includes("spread out") || lower.includes("over time")) {
+  if (
+    lower.includes("slowly") ||
+    lower.includes("gradually") ||
+    lower.includes("spread out") ||
+    lower.includes("over time")
+  ) {
     return { algorithm: "TWAP", confidence: 0.7, keywords: ["gradual execution"] };
   }
   if (lower.includes("accumulate") || lower.includes("dca") || lower.includes("dollar cost")) {
     return { algorithm: "TWAP", confidence: 0.7, keywords: ["accumulation/DCA"] };
   }
-  if (lower.includes("minimize impact") || lower.includes("low impact") || lower.includes("minimal slippage")) {
+  if (
+    lower.includes("minimize impact") ||
+    lower.includes("low impact") ||
+    lower.includes("minimal slippage")
+  ) {
     return { algorithm: "TWAP", confidence: 0.6, keywords: ["impact minimization"] };
   }
 

@@ -12,7 +12,7 @@ beforeEach(() => {
 });
 
 function abortStub(_reason?: string): never {
-  throw new Error("abort called: " + (_reason ?? ""));
+  throw new Error(`abort called: ${_reason ?? ""}`);
 }
 
 function makeArgs(messages: unknown[]): {
@@ -127,9 +127,7 @@ describe("GordonToolCallReconciler — interruption hint integration", () => {
       { role: "user", content: "place order" },
       {
         role: "assistant",
-        content: [
-          { type: "tool-call", toolCallId: "call_1", toolName: "place_order" },
-        ],
+        content: [{ type: "tool-call", toolCallId: "call_1", toolName: "place_order" }],
       },
     ];
     const result = (await reconciler.processInput(
@@ -172,9 +170,7 @@ describe("GordonToolCallReconciler — interruption hint integration", () => {
       { role: "user", content: "x" },
       {
         role: "assistant",
-        content: [
-          { type: "tool-call", toolCallId: "present_id", toolName: "t" },
-        ],
+        content: [{ type: "tool-call", toolCallId: "present_id", toolName: "t" }],
       },
     ];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

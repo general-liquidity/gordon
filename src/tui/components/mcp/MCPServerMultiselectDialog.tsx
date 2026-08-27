@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Divider } from "../layout/Divider.tsx";
 
@@ -90,15 +90,20 @@ export function MCPServerMultiselectDialog({ servers, enabled, onChange, onClose
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">ENABLE / DISABLE MCP SERVERS</Text>
-        <Text dimColor>  ({enabledCount}/{servers.length} enabled)</Text>
+        <Text bold color="cyanBright">
+          ENABLE / DISABLE MCP SERVERS
+        </Text>
+        <Text dimColor>
+          {" "}
+          ({enabledCount}/{servers.length} enabled)
+        </Text>
       </Box>
 
       <Divider />
 
       {servers.length === 0 ? (
         <Box marginTop={1}>
-          <Text dimColor>  No MCP servers configured.</Text>
+          <Text dimColor> No MCP servers configured.</Text>
         </Box>
       ) : (
         <Box flexDirection="column" marginTop={1}>
@@ -107,12 +112,8 @@ export function MCPServerMultiselectDialog({ servers, enabled, onChange, onClose
             const isEnabled = localEnabled.has(s.id);
             return (
               <Box key={s.id}>
-                <Text color={isFocused ? "cyanBright" : undefined}>
-                  {isFocused ? "▸ " : "  "}
-                </Text>
-                <Text color={isEnabled ? "green" : "gray"}>
-                  {isEnabled ? "[x]" : "[ ]"}
-                </Text>
+                <Text color={isFocused ? "cyanBright" : undefined}>{isFocused ? "▸ " : "  "}</Text>
+                <Text color={isEnabled ? "green" : "gray"}>{isEnabled ? "[x]" : "[ ]"}</Text>
                 <Text> </Text>
                 <Text
                   bold={isFocused}
@@ -121,10 +122,7 @@ export function MCPServerMultiselectDialog({ servers, enabled, onChange, onClose
                   {s.name.padEnd(24)}
                 </Text>
                 <Text dimColor>{s.transport.padEnd(6)}</Text>
-                <Text
-                  color={STATUS_COLOR[s.status] as any}
-                  dimColor={!isEnabled}
-                >
+                <Text color={STATUS_COLOR[s.status] as any} dimColor={!isEnabled}>
                   {s.status}
                 </Text>
               </Box>
@@ -134,7 +132,7 @@ export function MCPServerMultiselectDialog({ servers, enabled, onChange, onClose
       )}
 
       <Box marginTop={1}>
-        <Text dimColor>↑↓ navigate  Space toggle  Enter confirm  A all  N none  Esc cancel</Text>
+        <Text dimColor>↑↓ navigate Space toggle Enter confirm A all N none Esc cancel</Text>
       </Box>
     </Box>
   );

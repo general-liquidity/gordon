@@ -50,7 +50,9 @@ describe("interpretRiskRatioTriple — math honesty", () => {
     const sharpe = 3.0;
     const sortino = 1.08 * Math.SQRT2 * sharpe;
     expect(interpretRiskRatioTriple({ sharpe, sortino }).skew).toBe("symmetric");
-    expect(interpretRiskRatioTriple({ sharpe, sortino, symmetricTolerance: 0.05 }).skew).toBe("positive");
+    expect(interpretRiskRatioTriple({ sharpe, sortino, symmetricTolerance: 0.05 }).skew).toBe(
+      "positive",
+    );
   });
 });
 

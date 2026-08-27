@@ -57,7 +57,9 @@ describe("validateStrategyCode — missing shift", () => {
   });
 
   it("warns on signal[i] * returns[i] pattern", () => {
-    const r = validateStrategyCode("for (let i = 1; i < n; i++) { pnl += signal[i] * returns[i]; }");
+    const r = validateStrategyCode(
+      "for (let i = 1; i < n; i++) { pnl += signal[i] * returns[i]; }",
+    );
     expect(r.violations.some((v) => v.rule.id === "pnl_without_shift_ts")).toBe(true);
   });
 });
@@ -157,19 +159,15 @@ describe("validateStrategyCode — options", () => {
       description: "Hardcoded API key.",
       fixInstruction: "Use env var.",
     };
-    const r = validateStrategyCode(
-      "API_KEY = \"sk-real-secret\"",
-      { rules: [customRule] },
-    );
+    const r = validateStrategyCode('API_KEY = "sk-real-secret"', { rules: [customRule] });
     expect(r.passes).toBe(false);
     expect(r.violations[0]!.rule.id).toBe("gordon_hardcoded_creds");
   });
 
   it("suppresses specific rule ids", () => {
-    const r = validateStrategyCode(
-      "X_scaled = scaler.fit_transform(X)",
-      { suppressRuleIds: ["fit_transform_full"] },
-    );
+    const r = validateStrategyCode("X_scaled = scaler.fit_transform(X)", {
+      suppressRuleIds: ["fit_transform_full"],
+    });
     expect(r.violations.some((v) => v.rule.id === "fit_transform_full")).toBe(false);
   });
 });

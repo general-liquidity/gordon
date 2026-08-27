@@ -26,7 +26,13 @@ import type { ProactiveSuggestion } from "../../types.ts";
 import { createModuleLogger } from "../../../logger/index.ts";
 import { GORDON_DIR } from "../../../storage/paths.ts";
 import { fetchRecentCandles, type ProactiveCandle } from "../candleFetch.ts";
-import { composeHealth, loadLiveEdges, type EdgeHealth, type EdgeMetrics, type EdgeSpec } from "../../../../core/edge/index.ts";
+import {
+  composeHealth,
+  loadLiveEdges,
+  type EdgeHealth,
+  type EdgeMetrics,
+  type EdgeSpec,
+} from "../../../../core/edge/index.ts";
 import { assessEdge } from "../../../trading/ops/edgeStatus.ts";
 
 const logger = createModuleLogger("edge-assessment-producer");
@@ -39,14 +45,20 @@ const lastLevelByKey = new Map<string, EdgeHealth>();
 
 const SEVERITY: Record<EdgeHealth, number> = { stable: 0, degraded: 1, retire: 2 };
 
-interface RegimeSignal { regime: string; confidence: number; metrics?: Record<string, number> }
+interface RegimeSignal {
+  regime: string;
+  confidence: number;
+  metrics?: Record<string, number>;
+}
 interface RegimeDetectorClass {
-  getInstance: () => { detectRegime: (candles: unknown[], symbol: string, timeframe?: string) => RegimeSignal };
+  getInstance: () => {
+    detectRegime: (candles: unknown[], symbol: string, timeframe?: string) => RegimeSignal;
+  };
 }
 
-async function loadRegimeDetector(): Promise<
-  { detectRegime: (candles: unknown[], symbol: string, timeframe?: string) => RegimeSignal } | null
-> {
+async function loadRegimeDetector(): Promise<{
+  detectRegime: (candles: unknown[], symbol: string, timeframe?: string) => RegimeSignal;
+} | null> {
   try {
     const mod = (await import("../../../../core/regime/detector.ts" as string)) as {
       RegimeDetector?: RegimeDetectorClass;
@@ -90,7 +102,8 @@ export function tradeMetricsFromOutcomes(outcomes: LedgerOutcome[]): EdgeMetrics
   const losses = outcomes.filter((o) => o.outcome === "loss").length;
   if (wins + losses > 0) metrics.winRate = wins / (wins + losses);
   const pnlPcts = outcomes.map((o) => o.profitLossPercent).filter(isFinite_);
-  if (pnlPcts.length > 0) metrics.netEdgeBps = (pnlPcts.reduce((a, b) => a + b, 0) / pnlPcts.length) * 100;
+  if (pnlPcts.length > 0)
+    metrics.netEdgeBps = (pnlPcts.reduce((a, b) => a + b, 0) / pnlPcts.length) * 100;
   return metrics;
 }
 
@@ -125,7 +138,9 @@ export function normalizeInstrument(instrument: string): string {
 }
 
 /** Classify recent volume as increasing / decreasing / flat from OHLCV bars. */
-export function computeVolumePattern(candles: ProactiveCandle[]): "increasing" | "decreasing" | "flat" {
+export function computeVolumePattern(
+  candles: ProactiveCandle[],
+): "increasing" | "decreasing" | "flat" {
   if (candles.length < 24) return "flat";
   const recent = candles.slice(-6);
   const prior = candles.slice(-24, -6);
@@ -242,11 +257,15 @@ function buildEdgeCard(
     breakIds.push(c.invariant.id);
   }
   for (const c of measurableViolations) {
-    drivers.push(`invariant ${c.invariant.id} broke (${c.invariant.metric}=${String(c.value)} not ${c.invariant.comparator} ${formatThreshold(c.invariant.threshold)})`);
+    drivers.push(
+      `invariant ${c.invariant.id} broke (${c.invariant.metric}=${String(c.value)} not ${c.invariant.comparator} ${formatThreshold(c.invariant.threshold)})`,
+    );
     breakIds.push(c.invariant.id);
   }
   if (decay && decay.state !== "stable") {
-    drivers.push(`realized R decayed to ${(decay.ratio * 100).toFixed(0)}% of baseline (recent ${decay.recentExpectancy.toFixed(2)}R vs ${decay.baselineExpectancy.toFixed(2)}R)`);
+    drivers.push(
+      `realized R decayed to ${(decay.ratio * 100).toFixed(0)}% of baseline (recent ${decay.recentExpectancy.toFixed(2)}R vs ${decay.baselineExpectancy.toFixed(2)}R)`,
+    );
     breakIds.push("decay");
   }
   const driverText = drivers.join("; ");
@@ -302,7 +321,9 @@ function formatThreshold(t: number | string | string[]): string {
   return Array.isArray(t) ? t.join(",") : String(t);
 }
 
-export const edgeAssessmentProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
+export const edgeAssessmentProducer: CandidateProducer = async (
+  obs,
+): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop" || obs.eventType !== "tick_edge_assessment") return [];
 
   const edges = loadLiveEdges([join(GORDON_DIR, "edges")]);
@@ -332,7 +353,13 @@ export const edgeAssessmentProducer: CandidateProducer = async (obs): Promise<Pr
     }),
   ]);
 
-  return computeEdgeAlerts(edges, metricsBySymbol, lastLevelByKey, rMultiplesByStrategy, tradeMetricsByStrategy);
+  return computeEdgeAlerts(
+    edges,
+    metricsBySymbol,
+    lastLevelByKey,
+    rMultiplesByStrategy,
+    tradeMetricsByStrategy,
+  );
 };
 
 /** Reset the per-edge health memory. Called on producer unregister. */

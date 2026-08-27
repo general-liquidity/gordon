@@ -1,7 +1,10 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { Box, Text, useStdout } from "../../ink-custom";
 import { clearInkOutput } from "../../utils/inkInstance.ts";
-import { useSlashCommandTypeahead, type TypeaheadMatch } from "../../hooks/useSlashCommandTypeahead.js";
+import {
+  useSlashCommandTypeahead,
+  type TypeaheadMatch,
+} from "../../hooks/useSlashCommandTypeahead.js";
 import { useInputHistory } from "../../hooks/input/useInputHistory.js";
 import { useImagePaste } from "../../hooks/input/useImagePaste.js";
 import { useDeclaredCursor } from "../../hooks/useDeclaredCursor.js";
@@ -103,18 +106,12 @@ const CMD_COL_WIDTH = 18;
 export const PromptInput = React.memo(function PromptInput({
   onSubmit,
   placeholder = "",
-  permissionMode,
-  activeAgentCount,
-  activeAgentName,
   isStreaming,
-  autonomousActive = false,
-  autonomousStrategyCount = 0,
   vimMode = false,
   locked = false,
   onShowShortcuts,
   onStop,
   onVimModeChange,
-  effortLevel,
   tokenBudgetRatio,
   commandFrecency,
 }: Props) {
@@ -140,12 +137,17 @@ export const PromptInput = React.memo(function PromptInput({
   const lastSubmittedRef = useRef("");
 
   // Paste detection: rapid input within 10ms = paste
-  const lastInputTimeRef = useRef(0);
-  const pasteBufferRef = useRef("");
+  const _lastInputTimeRef = useRef(0);
+  const _pasteBufferRef = useRef("");
 
   // Image paste: swaps pasted image path/clipboard blob for a reference token
   const imagePaste = useImagePaste((imagePath: string) => {
-    const id = imagePath.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "").slice(-8) ?? "img";
+    const id =
+      imagePath
+        .split(/[\\/]/)
+        .pop()
+        ?.replace(/\.[^.]+$/, "")
+        .slice(-8) ?? "img";
     const token = `[image:${id}] `;
     setValue((prev) => prev + token);
     // Image-ref token is ASCII, so grapheme count === code-unit length, but
@@ -223,221 +225,254 @@ export const PromptInput = React.memo(function PromptInput({
     Math.max(6, termRows - 14),
   );
 
-  useRoutedInput((input, key) => {
-    if (locked) return;
-    markInteraction("keystroke");
-    if (value === "" && input === "?" && onShowShortcuts && !key.ctrl && !key.meta) {
-      onShowShortcuts();
-      return;
-    }
-
-    // Vim mode routing — intercept keys when vim is enabled and we're in Normal
-    // mode. Enter/Ctrl+C always pass through (REPL convention: Enter submits in
-    // any mode). Escape resets the pending command; a literal key drives the
-    // NORMAL-mode command parser, which owns the buffer via a VimContext.
-    if (vimMode && vimState.mode === VimMode.Normal && !key.return && !key.ctrl) {
-      if (key.escape) {
-        setVimState({ mode: VimMode.Normal, command: { type: "idle" } });
+  useRoutedInput(
+    (input, key) => {
+      if (locked) return;
+      markInteraction("keystroke");
+      if (value === "" && input === "?" && onShowShortcuts && !key.ctrl && !key.meta) {
+        onShowShortcuts();
         return;
       }
-      const vimKey = input || "";
-      if (!vimKey) return;
 
-      // Mutable draft seeded from live React state. Executors write through the
-      // VimContext callbacks; we flush the draft to setState after the parser
-      // runs so a single keystroke produces one coherent update.
-      const draft: { text: string; cursor: number; mode: VimMode } = {
-        text: value,
-        cursor: cursorPos,
-        mode: VimMode.Normal,
-      };
-      const ctx: VimContext = {
-        get text() { return draft.text; },
-        get cursor() { return draft.cursor; },
-        setText(t) { draft.text = t; },
-        setCursor(c) { draft.cursor = c; },
-        enterInsert(c) { draft.cursor = c; draft.mode = VimMode.Insert; vimInsertBuffer.current = ""; },
-        getRegister() { return vimPersistent.current.register; },
-        setRegister(content, linewise) { vimPersistent.current.register = { content, linewise }; },
-        getLastFind() { return vimPersistent.current.lastFind; },
-        setLastFind(type, char) { vimPersistent.current.lastFind = { type, char }; },
-        recordChange(change) { vimPersistent.current.lastChange = change; },
-        onDotRepeat() {
-          const last = vimPersistent.current.lastChange;
-          if (last) vimReplayChange(last, ctx);
-        },
-      };
+      // Vim mode routing — intercept keys when vim is enabled and we're in Normal
+      // mode. Enter/Ctrl+C always pass through (REPL convention: Enter submits in
+      // any mode). Escape resets the pending command; a literal key drives the
+      // NORMAL-mode command parser, which owns the buffer via a VimContext.
+      if (vimMode && vimState.mode === VimMode.Normal && !key.return && !key.ctrl) {
+        if (key.escape) {
+          setVimState({ mode: VimMode.Normal, command: { type: "idle" } });
+          return;
+        }
+        const vimKey = input || "";
+        if (!vimKey) return;
 
-      const result = vimTransition(vimState.command, vimKey, ctx);
-      result.execute?.();
-      const nextCommand = result.next ?? { type: "idle" };
+        // Mutable draft seeded from live React state. Executors write through the
+        // VimContext callbacks; we flush the draft to setState after the parser
+        // runs so a single keystroke produces one coherent update.
+        const draft: { text: string; cursor: number; mode: VimMode } = {
+          text: value,
+          cursor: cursorPos,
+          mode: VimMode.Normal,
+        };
+        const ctx: VimContext = {
+          get text() {
+            return draft.text;
+          },
+          get cursor() {
+            return draft.cursor;
+          },
+          setText(t) {
+            draft.text = t;
+          },
+          setCursor(c) {
+            draft.cursor = c;
+          },
+          enterInsert(c) {
+            draft.cursor = c;
+            draft.mode = VimMode.Insert;
+            vimInsertBuffer.current = "";
+          },
+          getRegister() {
+            return vimPersistent.current.register;
+          },
+          setRegister(content, linewise) {
+            vimPersistent.current.register = { content, linewise };
+          },
+          getLastFind() {
+            return vimPersistent.current.lastFind;
+          },
+          setLastFind(type, char) {
+            vimPersistent.current.lastFind = { type, char };
+          },
+          recordChange(change) {
+            vimPersistent.current.lastChange = change;
+          },
+          onDotRepeat() {
+            const last = vimPersistent.current.lastChange;
+            if (last) vimReplayChange(last, ctx);
+          },
+        };
 
-      if (draft.text !== value) setValue(draft.text);
-      const gLen = graphemeCount(draft.text);
-      let finalCursor = draft.cursor;
-      if (draft.mode === VimMode.Normal && finalCursor >= gLen && gLen > 0) finalCursor = gLen - 1;
-      finalCursor = Math.max(0, Math.min(finalCursor, gLen));
-      setCursorPos(finalCursor);
-      setVimState({ mode: draft.mode, command: draft.mode === VimMode.Insert ? { type: "idle" } : nextCommand });
-      if (draft.mode !== vimState.mode) onVimModeChange?.(vimModeName(draft.mode));
-      setSelectedIdx(0);
-      return;
-    }
+        const result = vimTransition(vimState.command, vimKey, ctx);
+        result.execute?.();
+        const nextCommand = result.next ?? { type: "idle" };
 
-    // Insert-mode Escape: transition to Normal without clearing the buffer.
-    if (vimMode && vimState.mode === VimMode.Insert && key.escape) {
-      // Capture the text typed this session for dot-repeat, then reset it.
-      if (vimInsertBuffer.current) {
-        vimPersistent.current.lastChange = { type: "insert", text: vimInsertBuffer.current };
-      }
-      vimInsertBuffer.current = "";
-      setVimState({ mode: VimMode.Normal, command: { type: "idle" } });
-      onVimModeChange?.("normal");
-      // Keep cursor inside the buffer in Normal mode (cursor lives on a
-      // grapheme, not past end). graphemeCount handles CJK / emoji correctly.
-      const gLen = graphemeCount(value);
-      if (cursorPos >= gLen && gLen > 0) setCursorPos(gLen - 1);
-      return;
-    }
-
-    // Shift+Enter: insert newline instead of submitting (newline is 1 grapheme)
-    if (key.return && key.shift) {
-      setValue((prev) => prev + "\n");
-      setCursorPos((p) => p + 1);
-      return;
-    }
-
-    if (key.return) {
-      if (showSuggestions && suggestions[selectedIdx]) {
-        const cmd = suggestions[selectedIdx]!;
-        history.push(`/${cmd.name}`);
-        onSubmit(`/${cmd.name}`);
-        setValue("");
-        setCursorPos(0);
+        if (draft.text !== value) setValue(draft.text);
+        const gLen = graphemeCount(draft.text);
+        let finalCursor = draft.cursor;
+        if (draft.mode === VimMode.Normal && finalCursor >= gLen && gLen > 0)
+          finalCursor = gLen - 1;
+        finalCursor = Math.max(0, Math.min(finalCursor, gLen));
+        setCursorPos(finalCursor);
+        setVimState({
+          mode: draft.mode,
+          command: draft.mode === VimMode.Insert ? { type: "idle" } : nextCommand,
+        });
+        if (draft.mode !== vimState.mode) onVimModeChange?.(vimModeName(draft.mode));
         setSelectedIdx(0);
-      } else {
-        const trimmed = value.trim();
-        if (trimmed) {
-          history.push(trimmed);
-          lastSubmittedRef.current = trimmed;
-          onSubmit(trimmed);
+        return;
+      }
+
+      // Insert-mode Escape: transition to Normal without clearing the buffer.
+      if (vimMode && vimState.mode === VimMode.Insert && key.escape) {
+        // Capture the text typed this session for dot-repeat, then reset it.
+        if (vimInsertBuffer.current) {
+          vimPersistent.current.lastChange = { type: "insert", text: vimInsertBuffer.current };
+        }
+        vimInsertBuffer.current = "";
+        setVimState({ mode: VimMode.Normal, command: { type: "idle" } });
+        onVimModeChange?.("normal");
+        // Keep cursor inside the buffer in Normal mode (cursor lives on a
+        // grapheme, not past end). graphemeCount handles CJK / emoji correctly.
+        const gLen = graphemeCount(value);
+        if (cursorPos >= gLen && gLen > 0) setCursorPos(gLen - 1);
+        return;
+      }
+
+      // Shift+Enter: insert newline instead of submitting (newline is 1 grapheme)
+      if (key.return && key.shift) {
+        setValue((prev) => `${prev}\n`);
+        setCursorPos((p) => p + 1);
+        return;
+      }
+
+      if (key.return) {
+        if (showSuggestions && suggestions[selectedIdx]) {
+          const cmd = suggestions[selectedIdx]!;
+          history.push(`/${cmd.name}`);
+          onSubmit(`/${cmd.name}`);
           setValue("");
           setCursorPos(0);
           setSelectedIdx(0);
-        }
-      }
-      return;
-    }
-
-    if (key.escape) {
-      // Esc while the agent is streaming → stop the turn and restore the last
-      // input for editing. Slash suggestions close first if they're open.
-      if (isStreaming && !showSuggestions) {
-        onStop?.();
-        if (lastSubmittedRef.current) {
-          setValue(lastSubmittedRef.current);
-          setCursorPos(graphemeCount(lastSubmittedRef.current));
+        } else {
+          const trimmed = value.trim();
+          if (trimmed) {
+            history.push(trimmed);
+            lastSubmittedRef.current = trimmed;
+            onSubmit(trimmed);
+            setValue("");
+            setCursorPos(0);
+            setSelectedIdx(0);
+          }
         }
         return;
       }
-      setValue("");
-      setCursorPos(0);
-      setSelectedIdx(0);
-      history.reset();
-      return;
-    }
 
-    // History navigation (up/down when not in slash mode)
-    if (!showSuggestions && key.upArrow) {
-      if (!history.current) stashedInputRef.current = value;
-      const prev = history.goUp();
-      if (prev != null) { setValue(prev); setCursorPos(graphemeCount(prev)); }
-      return;
-    }
-    if (!showSuggestions && key.downArrow) {
-      const next = history.goDown();
-      if (next != null) { setValue(next); setCursorPos(graphemeCount(next)); }
-      else {
-        setValue(stashedInputRef.current);
-        setCursorPos(graphemeCount(stashedInputRef.current));
-      }
-      return;
-    }
-
-    // Cursor movement (left/right) — grapheme-aware. One keystroke = one
-    // visible character, even if the char is an emoji or CJK glyph.
-    if (key.leftArrow) {
-      setCursorPos((p) => Math.max(0, p - 1));
-      return;
-    }
-    if (key.rightArrow) {
-      const gLen = graphemeCount(value);
-      setCursorPos((p) => Math.min(gLen, p + 1));
-      return;
-    }
-
-    if (key.backspace || key.delete) {
-      setValue((prev) => {
-        const gLen = graphemeCount(prev);
-        const pos = Math.min(cursorPos, gLen);
-        if (pos > 0) {
-          setCursorPos(pos - 1);
-          // Slice by code units at the grapheme boundaries so we remove the
-          // whole cluster (a single emoji / CJK char), not half a surrogate.
-          const leftCode = graphemeToCodeUnit(prev, pos - 1);
-          const rightCode = graphemeToCodeUnit(prev, pos);
-          return prev.slice(0, leftCode) + prev.slice(rightCode);
+      if (key.escape) {
+        // Esc while the agent is streaming → stop the turn and restore the last
+        // input for editing. Slash suggestions close first if they're open.
+        if (isStreaming && !showSuggestions) {
+          onStop?.();
+          if (lastSubmittedRef.current) {
+            setValue(lastSubmittedRef.current);
+            setCursorPos(graphemeCount(lastSubmittedRef.current));
+          }
+          return;
         }
-        return prev;
-      });
-      setSelectedIdx(0);
-      return;
-    }
+        setValue("");
+        setCursorPos(0);
+        setSelectedIdx(0);
+        history.reset();
+        return;
+      }
 
-    if (showSuggestions) {
-      if (key.upArrow) {
-        setSelectedIdx((i) => (i > 0 ? i - 1 : suggestions.length - 1));
-        return;
-      }
-      if (key.downArrow) {
-        setSelectedIdx((i) => (i < suggestions.length - 1 ? i + 1 : 0));
-        return;
-      }
-      if (key.tab) {
-        const selected = suggestions[selectedIdx];
-        if (selected) {
-          setValue(`/${selected.name} `);
-          setSelectedIdx(0);
+      // History navigation (up/down when not in slash mode)
+      if (!showSuggestions && key.upArrow) {
+        if (!history.current) stashedInputRef.current = value;
+        const prev = history.goUp();
+        if (prev != null) {
+          setValue(prev);
+          setCursorPos(graphemeCount(prev));
         }
         return;
       }
-    }
+      if (!showSuggestions && key.downArrow) {
+        const next = history.goDown();
+        if (next != null) {
+          setValue(next);
+          setCursorPos(graphemeCount(next));
+        } else {
+          setValue(stashedInputRef.current);
+          setCursorPos(graphemeCount(stashedInputRef.current));
+        }
+        return;
+      }
 
-    if (input && !key.ctrl && !key.meta && !key.upArrow && !key.downArrow) {
-      // Intercept pasted image paths/clipboard images before they land in the buffer
-      if (input.length > 4 && imagePaste.handlePastedText(input)) {
+      // Cursor movement (left/right) — grapheme-aware. One keystroke = one
+      // visible character, even if the char is an emoji or CJK glyph.
+      if (key.leftArrow) {
+        setCursorPos((p) => Math.max(0, p - 1));
+        return;
+      }
+      if (key.rightArrow) {
+        const gLen = graphemeCount(value);
+        setCursorPos((p) => Math.min(gLen, p + 1));
+        return;
+      }
+
+      if (key.backspace || key.delete) {
+        setValue((prev) => {
+          const gLen = graphemeCount(prev);
+          const pos = Math.min(cursorPos, gLen);
+          if (pos > 0) {
+            setCursorPos(pos - 1);
+            // Slice by code units at the grapheme boundaries so we remove the
+            // whole cluster (a single emoji / CJK char), not half a surrogate.
+            const leftCode = graphemeToCodeUnit(prev, pos - 1);
+            const rightCode = graphemeToCodeUnit(prev, pos);
+            return prev.slice(0, leftCode) + prev.slice(rightCode);
+          }
+          return prev;
+        });
         setSelectedIdx(0);
         return;
       }
-      const inputGraphemes = graphemeCount(input);
-      // Record text typed during a vim INSERT session so `.` can replay it.
-      if (vimMode && vimState.mode === VimMode.Insert) vimInsertBuffer.current += input;
-      // Always insert at cursor position. Left/right-arrow navigation must
-      // produce real edits at the caret, not append-to-end. Slice by code
-      // units at the grapheme boundary so we don't split surrogate pairs.
-      setValue((prev) => {
-        const insertAt = graphemeToCodeUnit(prev, Math.min(cursorPos, graphemeCount(prev)));
-        return prev.slice(0, insertAt) + input + prev.slice(insertAt);
-      });
-      setCursorPos((p) => p + inputGraphemes);
-      setSelectedIdx(0);
-    }
-  }, { id: "prompt-input", priority: FOCUS_PRIORITY.CHAT });
+
+      if (showSuggestions) {
+        if (key.upArrow) {
+          setSelectedIdx((i) => (i > 0 ? i - 1 : suggestions.length - 1));
+          return;
+        }
+        if (key.downArrow) {
+          setSelectedIdx((i) => (i < suggestions.length - 1 ? i + 1 : 0));
+          return;
+        }
+        if (key.tab) {
+          const selected = suggestions[selectedIdx];
+          if (selected) {
+            setValue(`/${selected.name} `);
+            setSelectedIdx(0);
+          }
+          return;
+        }
+      }
+
+      if (input && !key.ctrl && !key.meta && !key.upArrow && !key.downArrow) {
+        // Intercept pasted image paths/clipboard images before they land in the buffer
+        if (input.length > 4 && imagePaste.handlePastedText(input)) {
+          setSelectedIdx(0);
+          return;
+        }
+        const inputGraphemes = graphemeCount(input);
+        // Record text typed during a vim INSERT session so `.` can replay it.
+        if (vimMode && vimState.mode === VimMode.Insert) vimInsertBuffer.current += input;
+        // Always insert at cursor position. Left/right-arrow navigation must
+        // produce real edits at the caret, not append-to-end. Slice by code
+        // units at the grapheme boundary so we don't split surrogate pairs.
+        setValue((prev) => {
+          const insertAt = graphemeToCodeUnit(prev, Math.min(cursorPos, graphemeCount(prev)));
+          return prev.slice(0, insertAt) + input + prev.slice(insertAt);
+        });
+        setCursorPos((p) => p + inputGraphemes);
+        setSelectedIdx(0);
+      }
+    },
+    { id: "prompt-input", priority: FOCUS_PRIORITY.CHAT },
+  );
 
   // Build flat row list with headers interleaved
   const allRows: Array<
-    | { kind: "header"; text: string }
-    | { kind: "item"; cmd: TypeaheadMatch; globalIdx: number }
+    { kind: "header"; text: string } | { kind: "item"; cmd: TypeaheadMatch; globalIdx: number }
   > = [];
   if (showSuggestions) {
     for (const group of grouped) {
@@ -468,14 +503,16 @@ export const PromptInput = React.memo(function PromptInput({
   const isBashMode = value.startsWith("!");
   const isVimNormal = vimMode && vimState.mode === VimMode.Normal;
   const isVimVisual = vimMode && vimState.mode === VimMode.Visual;
-  const promptChar = isVimNormal ? "N"
-    : isVimVisual ? "V"
-    : isBashMode ? "$"
-    : isSlashMode ? "/"
-    : "\u276F";
-  const promptColor = isVimNormal ? "yellow"
-    : isVimVisual ? "magenta"
-    : "rgb(52,238,176)";
+  const promptChar = isVimNormal
+    ? "N"
+    : isVimVisual
+      ? "V"
+      : isBashMode
+        ? "$"
+        : isSlashMode
+          ? "/"
+          : "\u276F";
+  const promptColor = isVimNormal ? "yellow" : isVimVisual ? "magenta" : "rgb(52,238,176)";
 
   return (
     <Box flexDirection="column">
@@ -483,7 +520,10 @@ export const PromptInput = React.memo(function PromptInput({
       {showSuggestions && (
         <Box flexDirection="column">
           {hasMoreAbove && (
-            <Text dimColor> {"\u25B2"} {rowScrollStart} more</Text>
+            <Text dimColor>
+              {" "}
+              {"\u25B2"} {rowScrollStart} more
+            </Text>
           )}
 
           {visibleSlice.map((row, i) => {
@@ -491,7 +531,9 @@ export const PromptInput = React.memo(function PromptInput({
               return (
                 <Box key={`hdr-${row.text}-${i}`} marginTop={i > 0 ? 1 : 0}>
                   <Text dimColor>
-                    {"  ── "}{row.text.toLowerCase()}{" ──"}
+                    {"  ── "}
+                    {row.text.toLowerCase()}
+                    {" ──"}
                   </Text>
                 </Box>
               );
@@ -508,9 +550,14 @@ export const PromptInput = React.memo(function PromptInput({
                   {isFocused ? " \u25B8" : "  "}
                 </Text>
                 <Text color={isFocused ? "rgb(52,238,176)" : undefined} bold={isFocused}>
-                  {" "}{padded}
+                  {" "}
+                  {padded}
                 </Text>
-                <Text dimColor={!isFocused} color={isFocused ? "white" : undefined} wrap="truncate-end">
+                <Text
+                  dimColor={!isFocused}
+                  color={isFocused ? "white" : undefined}
+                  wrap="truncate-end"
+                >
                   {(cmd.description ?? "").slice(0, descWidth)}
                 </Text>
               </Box>
@@ -518,11 +565,16 @@ export const PromptInput = React.memo(function PromptInput({
           })}
 
           {hasMoreBelow && (
-            <Text dimColor> {"\u25BC"} {allRows.length - rowScrollStart - maxVisible} more</Text>
+            <Text dimColor>
+              {" "}
+              {"\u25BC"} {allRows.length - rowScrollStart - maxVisible} more
+            </Text>
           )}
 
           <Text dimColor>
-            {" "}{"\u2191\u2193"} select {"\u00B7"} Tab complete {"\u00B7"} Enter run {"\u00B7"} Esc cancel
+            {" "}
+            {"\u2191\u2193"} select {"\u00B7"} Tab complete {"\u00B7"} Enter run {"\u00B7"} Esc
+            cancel
           </Text>
         </Box>
       )}
@@ -538,7 +590,9 @@ export const PromptInput = React.memo(function PromptInput({
           the model is working (Claude Code pattern — cursor never
           disappears once the input is focused). */}
       <Box>
-        <Text color={promptColor} bold>{promptChar} </Text>
+        <Text color={promptColor} bold>
+          {promptChar}{" "}
+        </Text>
         <Box flexGrow={1}>
           {value ? (
             <PromptDisplay
@@ -557,15 +611,15 @@ export const PromptInput = React.memo(function PromptInput({
           {argHint && (
             <Text>
               <Text color={theme.uiMuted}>{argHint.active}</Text>
-              {argHint.rest.length > 0 && (
-                <Text dimColor>{" " + argHint.rest.join(" ")}</Text>
-              )}
+              {argHint.rest.length > 0 && <Text dimColor>{` ${argHint.rest.join(" ")}`}</Text>}
             </Text>
           )}
-      </Box>
+        </Box>
         {vimMode && (
           <Text
-            color={isVimNormal ? theme.riskWarning : isVimVisual ? theme.variantAdvisor : theme.uiMuted}
+            color={
+              isVimNormal ? theme.riskWarning : isVimVisual ? theme.variantAdvisor : theme.uiMuted
+            }
             bold={isVimNormal || isVimVisual}
           >
             {isVimNormal ? "[VIM NORMAL]" : isVimVisual ? "[VIM VISUAL]" : "[VIM]"}
@@ -575,9 +629,7 @@ export const PromptInput = React.memo(function PromptInput({
       </Box>
 
       {/* At-rest keyboard-affordance menu — shown on an empty, focused composer */}
-      {value === "" && !isStreaming && !showSuggestions && !locked && (
-        <PromptInputHelpMenu />
-      )}
+      {value === "" && !isStreaming && !showSuggestions && !locked && <PromptInputHelpMenu />}
     </Box>
   );
 });
@@ -588,7 +640,6 @@ function vimModeName(mode: VimMode): "insert" | "normal" | "visual" {
       return "normal";
     case VimMode.Visual:
       return "visual";
-    case VimMode.Insert:
     default:
       return "insert";
   }
@@ -627,10 +678,7 @@ function PromptDisplay({
   const displayText = prefixMode ? value.slice(1) : value;
   const adjCursor = prefixMode ? Math.max(0, cursorPos - 1) : cursorPos;
 
-  const { leftCodeUnit, rightCodeUnit, charAtCursor } = useDeclaredCursor(
-    displayText,
-    adjCursor,
-  );
+  const { leftCodeUnit, rightCodeUnit, charAtCursor } = useDeclaredCursor(displayText, adjCursor);
   const left = displayText.slice(0, leftCodeUnit);
   const right = displayText.slice(rightCodeUnit);
 
@@ -654,7 +702,9 @@ function PromptDisplay({
         </>
       ) : (
         <>
-          <Text color={textColor} inverse>{charAtCursor}</Text>
+          <Text color={textColor} inverse>
+            {charAtCursor}
+          </Text>
           <Text color={textColor}>{right}</Text>
         </>
       )}

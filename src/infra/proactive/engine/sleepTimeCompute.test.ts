@@ -48,7 +48,13 @@ describe("SleepTimeCache", () => {
 
   it("matches a query to a fresh entry by keyword overlap", () => {
     const cache = new SleepTimeCache(1000);
-    cache.put({ key: "regime", label: "R", keywords: ["regime", "eth"], value: "trending", computedAt: 0 });
+    cache.put({
+      key: "regime",
+      label: "R",
+      keywords: ["regime", "eth"],
+      value: "trending",
+      computedAt: 0,
+    });
 
     expect(cache.match("what's the regime on ETH?", 100)?.value).toBe("trending");
     expect(cache.match("tell me a joke", 100)).toBeNull();
@@ -82,9 +88,14 @@ describe("runSleepTimePrecompute", () => {
     const result = await runSleepTimePrecompute({
       analyses: [
         { key: "ok", label: "ok", keywords: ["ok"], compute: async () => "fine" },
-        { key: "bad", label: "bad", keywords: ["bad"], compute: async () => {
-          throw new Error("boom");
-        } },
+        {
+          key: "bad",
+          label: "bad",
+          keywords: ["bad"],
+          compute: async () => {
+            throw new Error("boom");
+          },
+        },
       ],
       cache,
       now: 0,
@@ -126,7 +137,10 @@ describe("tickSleepTimePrecompute (observer entry)", () => {
     process.env.GORDON_SLEEP_TIME = "1";
     registerSleepAnalyses(makeAnalyses({ n: 0 }));
     recordSleepTimeActivity(10_000_000); // just active
-    const result = await tickSleepTimePrecompute({ now: 10_000_000 + 1000, idleThresholdMs: 60_000 });
+    const result = await tickSleepTimePrecompute({
+      now: 10_000_000 + 1000,
+      idleThresholdMs: 60_000,
+    });
     expect(result.ran).toBe(false);
     expect(result.reason).toContain("idle");
   });

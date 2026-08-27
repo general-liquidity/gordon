@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 
 // ============================================================================
@@ -25,13 +24,7 @@ interface Props {
 
 const BAR_WIDTH = 24;
 
-export function TrailingStopDisplay({
-  symbol,
-  currentPrice,
-  stopLevel,
-  trailAmount,
-  side,
-}: Props) {
+export function TrailingStopDisplay({ symbol, currentPrice, stopLevel, trailAmount, side }: Props) {
   // Distance from current price to stop level
   const distanceDollar = Math.abs(currentPrice - stopLevel);
   const distancePct = (distanceDollar / currentPrice) * 100;
@@ -56,12 +49,7 @@ export function TrailingStopDisplay({
   const sideLabel = side.toUpperCase();
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={borderColor}
-      paddingX={1}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor={borderColor} paddingX={1}>
       {/* Header */}
       <Box>
         <Text bold color={accentColor}>
@@ -74,9 +62,11 @@ export function TrailingStopDisplay({
       <Box marginTop={1}>
         <Text>price: </Text>
         <Text bold>${currentPrice.toFixed(2)}</Text>
-        <Text dimColor>   stop: </Text>
-        <Text bold color={accentColor}>${stopLevel.toFixed(2)}</Text>
-        <Text dimColor>   trail: </Text>
+        <Text dimColor> stop: </Text>
+        <Text bold color={accentColor}>
+          ${stopLevel.toFixed(2)}
+        </Text>
+        <Text dimColor> trail: </Text>
         <Text>${trailAmount.toFixed(2)}</Text>
       </Box>
 

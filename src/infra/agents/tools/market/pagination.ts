@@ -198,7 +198,7 @@ export const TOOL_PAGINATION_CONFIG: Record<string, ToolPaginationConfig> = {
 export function paginateResults<T>(
   items: T[],
   params: PaginationParams = {},
-  config?: Partial<ToolPaginationConfig>
+  config?: Partial<ToolPaginationConfig>,
 ): PaginatedResult<T> {
   const defaultLimit = config?.defaultLimit ?? DEFAULT_LIMIT;
   const maxLimit = config?.maxLimit ?? MAX_LIMIT;
@@ -236,9 +236,7 @@ export function paginateResults<T>(
  * @param input - Tool input object
  * @returns Extracted pagination params
  */
-export function extractPaginationParams(
-  input: Record<string, unknown>
-): PaginationParams {
+export function extractPaginationParams(input: Record<string, unknown>): PaginationParams {
   return {
     limit: typeof input.limit === "number" ? input.limit : undefined,
     offset: typeof input.offset === "number" ? input.offset : undefined,
@@ -274,11 +272,7 @@ function getByPath(obj: unknown, path: string): unknown {
  * @param value - Value to set
  * @returns Modified object
  */
-function setByPath<T extends Record<string, unknown>>(
-  obj: T,
-  path: string,
-  value: unknown
-): T {
+function setByPath<T extends Record<string, unknown>>(obj: T, path: string, value: unknown): T {
   const parts = path.split(".");
   const result = { ...obj };
   let current: Record<string, unknown> = result;
@@ -311,7 +305,7 @@ export function applyPaginationToResult<T extends Record<string, unknown>>(
   result: T,
   arrayField: string,
   params: PaginationParams = {},
-  config?: Partial<ToolPaginationConfig>
+  config?: Partial<ToolPaginationConfig>,
 ): T & { pagination?: PaginationMetadata } {
   const array = getByPath(result, arrayField);
 
@@ -462,7 +456,7 @@ export function calculateTotalPages(total: number, limit: number): number {
  */
 export function validatePaginationParams(
   params: PaginationParams,
-  config?: Partial<ToolPaginationConfig>
+  config?: Partial<ToolPaginationConfig>,
 ): {
   valid: boolean;
   errors: string[];

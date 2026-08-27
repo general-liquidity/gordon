@@ -72,13 +72,13 @@ export interface ScrollBox {
  *  if the consumer has not set one. We also accept negative-or-zero as
  *  "no scroll possible" (clamp to 0). */
 function readScrollMax(node: DOMElement): number {
-  const raw = node.attributes["scrollMax"];
+  const raw = node.attributes.scrollMax;
   if (typeof raw === "number" && Number.isFinite(raw) && raw >= 0) return raw;
   return Number.POSITIVE_INFINITY;
 }
 
 function readScrollTop(node: DOMElement): number {
-  const raw = node.attributes["scrollTop"];
+  const raw = node.attributes.scrollTop;
   return typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
 }
 
@@ -110,13 +110,12 @@ export function createScrollBox(
       queueMicrotask(cb);
     });
 
-  const marker: DirtyMarker | undefined =
-    dirtyMarker ?? (node.yogaNode as DirtyMarker | undefined);
+  const marker: DirtyMarker | undefined = dirtyMarker ?? (node.yogaNode as DirtyMarker | undefined);
 
   // Initialize scrollTop on the node if missing — readers should always
   // see a number.
-  if (typeof node.attributes["scrollTop"] !== "number") {
-    node.attributes["scrollTop"] = 0;
+  if (typeof node.attributes.scrollTop !== "number") {
+    node.attributes.scrollTop = 0;
   }
 
   // Coalescing: a burst of scrollBy() calls schedules at most one
@@ -153,7 +152,7 @@ export function createScrollBox(
     const clamped = clamp(y);
     const current = readScrollTop(node);
     if (clamped === current) return;
-    node.attributes["scrollTop"] = clamped;
+    node.attributes.scrollTop = clamped;
     schedule();
   }
 

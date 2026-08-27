@@ -83,12 +83,7 @@ export const fipMomentumQualityDiagnosticTool = createTool({
         zeroDays: z.number(),
         sampleSize: z.number(),
         fip: z.number(),
-        fipQuality: z.enum([
-          "smooth_momentum",
-          "mixed_momentum",
-          "spiky_momentum",
-          "no_direction",
-        ]),
+        fipQuality: z.enum(["smooth_momentum", "mixed_momentum", "spiky_momentum", "no_direction"]),
         returnRank: z.number(),
         returnPercentile: z.number(),
         isHighQualityMomentum: z.boolean(),
@@ -120,8 +115,7 @@ export const fipMomentumQualityDiagnosticTool = createTool({
       component: "score_fip_momentum_quality",
       toolName: "score_fip_momentum_quality",
       outcome:
-        result.verdict === "weak_quality_momentum" ||
-        result.verdict === "insufficient_data"
+        result.verdict === "weak_quality_momentum" || result.verdict === "insufficient_data"
           ? "failure"
           : "info",
       details: {

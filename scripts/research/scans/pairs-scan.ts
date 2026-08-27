@@ -34,13 +34,22 @@ import { Worker, isMainThread, parentPort, workerData } from "node:worker_thread
 
 import { testCointegration } from "../../../src/infra/trading/quant/cointegration.ts";
 import { johansenTest } from "../../../src/infra/trading/quant/johansen.ts";
-import { calibrateOU, minimumEntryZScore, effectiveEntryZ } from "../../../src/infra/trading/quant/ouCalibration.ts";
+import {
+  calibrateOU,
+  minimumEntryZScore,
+  effectiveEntryZ,
+} from "../../../src/infra/trading/quant/ouCalibration.ts";
 
 const BARS_DIR = join(process.cwd(), process.env.ALPHA_BARS_DIR ?? join("data", "momq", "bars"));
 const TF = process.env.ALPHA_TF ?? "M15";
 // Optional comma-separated symbol filter (default: all in the dir). For the comp,
 // restrict to the 15 tradeable instruments via PAIRS_SYMBOLS.
-const WANTED = new Set((process.env.PAIRS_SYMBOLS ?? "").split(",").map((s) => s.trim()).filter(Boolean));
+const WANTED = new Set(
+  (process.env.PAIRS_SYMBOLS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
 
 const DESIRED_ENTRY_Z = 2.0;
 const EXIT_FRACTION = 0.5; // exit at half the (effective) entry z.
@@ -49,8 +58,17 @@ const IS_FRAC = 0.7;
 // sample but slower than a handful of bars (signal-to-noise floor).
 const HL_MIN = Number(process.env.PAIRS_HL_MIN ?? 3);
 
-interface RawBar { time: number; close: number; spread: number }
-interface Series { symbol: string; timeToClose: Map<number, number>; times: number[]; spreadBps: number }
+interface RawBar {
+  time: number;
+  close: number;
+  spread: number;
+}
+interface Series {
+  symbol: string;
+  timeToClose: Map<number, number>;
+  times: number[];
+  spreadBps: number;
+}
 
 const mean = (xs: number[]) => xs.reduce((s, v) => s + v, 0) / (xs.length || 1);
 const std = (xs: number[]) => {
@@ -74,7 +92,12 @@ function loadSeries(symbol: string): Series | null {
   const timeToClose = new Map<number, number>();
   for (const b of clean) timeToClose.set(b.time, b.close);
   const bps = clean.filter((b) => b.spread > 0).map((b) => (b.spread / b.close) * 10_000);
-  return { symbol, timeToClose, times: clean.map((b) => b.time), spreadBps: bps.length ? median(bps) : 1 };
+  return {
+    symbol,
+    timeToClose,
+    times: clean.map((b) => b.time),
+    spreadBps: bps.length ? median(bps) : 1,
+  };
 }
 
 /** Common-timestamp aligned close arrays for two series (chronological). */
@@ -164,7 +187,8 @@ function backtestSlice(
     const zi = z[i]!;
     if (!Number.isNaN(zi)) {
       if (pos === 0) {
-        if (zi > entryZ) pos = -1; // spread rich → short it
+        if (zi > entryZ)
+          pos = -1; // spread rich → short it
         else if (zi < -entryZ) pos = 1; // spread cheap → long it
       } else if (pos === -1 && zi < exitZ) pos = 0;
       else if (pos === 1 && zi > -exitZ) pos = 0;
@@ -223,9 +247,23 @@ function evaluatePair(a: Series, b: Series): PairResult | null {
   // Gate: must pass Johansen AND EG-both AND mean-reverting (Hurst<0.5) AND tradeable HL.
   if (!(joh.cointegrated && egBoth && hurst < 0.5 && tradeable)) {
     return {
-      a: a.symbol, b: b.symbol, n, beta, halfLife, hurst, ouStd: ou.ouStd,
-      egBoth, johansen: joh.cointegrated, entryZ: NaN, minZ: NaN,
-      isSharpe: NaN, oosSharpe: NaN, isRet: NaN, oosRet: NaN, oosMaxDd: NaN, oosTrades: 0,
+      a: a.symbol,
+      b: b.symbol,
+      n,
+      beta,
+      halfLife,
+      hurst,
+      ouStd: ou.ouStd,
+      egBoth,
+      johansen: joh.cointegrated,
+      entryZ: NaN,
+      minZ: NaN,
+      isSharpe: NaN,
+      oosSharpe: NaN,
+      isRet: NaN,
+      oosRet: NaN,
+      oosMaxDd: NaN,
+      oosTrades: 0,
     };
   }
 
@@ -240,11 +278,23 @@ function evaluatePair(a: Series, b: Series): PairResult | null {
   const oos = backtestSlice(spread.slice(cut), lookback, entryZ, exitZ, costFraction);
 
   return {
-    a: a.symbol, b: b.symbol, n, beta, halfLife, hurst, ouStd: ou.ouStd,
-    egBoth, johansen: joh.cointegrated, entryZ, minZ,
-    isSharpe: sharpe(is.rets), oosSharpe: sharpe(oos.rets),
-    isRet: is.rets.reduce((s, r) => s + r, 0), oosRet: oos.rets.reduce((s, r) => s + r, 0),
-    oosMaxDd: maxDrawdown(oos.rets), oosTrades: oos.trades,
+    a: a.symbol,
+    b: b.symbol,
+    n,
+    beta,
+    halfLife,
+    hurst,
+    ouStd: ou.ouStd,
+    egBoth,
+    johansen: joh.cointegrated,
+    entryZ,
+    minZ,
+    isSharpe: sharpe(is.rets),
+    oosSharpe: sharpe(oos.rets),
+    isRet: is.rets.reduce((s, r) => s + r, 0),
+    oosRet: oos.rets.reduce((s, r) => s + r, 0),
+    oosMaxDd: maxDrawdown(oos.rets),
+    oosTrades: oos.trades,
   };
 }
 
@@ -296,7 +346,9 @@ function runShardedPairs(units: PairUnit[]): Promise<PairResult[]> {
   // heaviest-first, and we round-robin them across workers (LPT). This spreads the
   // few expensive big-pair evaluations evenly instead of piling them into one worker.
   const chunks: PairUnit[][] = Array.from({ length: nWorkers }, () => []);
-  units.forEach((unit, i) => chunks[i % nWorkers]!.push(unit));
+  units.forEach((unit, i) => {
+    chunks[i % nWorkers]!.push(unit);
+  });
 
   return Promise.all(
     chunks.map(
@@ -318,14 +370,16 @@ function runShardedPairs(units: PairUnit[]): Promise<PairResult[]> {
 async function main(): Promise<void> {
   let symbols = readdirSync(BARS_DIR)
     .filter((f) => f.endsWith(`_${TF}.json`))
-    .map((f) => f.slice(0, -(`_${TF}.json`).length))
+    .map((f) => f.slice(0, -`_${TF}.json`.length))
     .sort();
   if (WANTED.size) symbols = symbols.filter((s) => WANTED.has(s));
 
   const series = symbols.map(loadSeries).filter((s): s is Series => s !== null);
 
   console.log("=".repeat(82));
-  console.log("COINTEGRATION PAIRS SCAN — Johansen + EG(both) + Hurst<0.5 + OU half-life, IS/OOS backtest");
+  console.log(
+    "COINTEGRATION PAIRS SCAN — Johansen + EG(both) + Hurst<0.5 + OU half-life, IS/OOS backtest",
+  );
   console.log("=".repeat(82));
   console.log(`Dir/TF        : ${process.env.ALPHA_BARS_DIR ?? "data/momq/bars"} / ${TF}`);
   console.log(`Symbols       : ${series.length} (${series.map((s) => s.symbol).join(", ")})`);
@@ -347,7 +401,9 @@ async function main(): Promise<void> {
 
   const serial = process.env.ALPHA_SERIAL === "1" || allUnits.length <= 1;
   const nWorkers = serial ? 1 : Math.min(availableParallelism(), allUnits.length);
-  console.log(`Parallelism   : ${serial ? "serial (1 core)" : `${nWorkers} workers / ${availableParallelism()} cores, ${allUnits.length} pairs`}`);
+  console.log(
+    `Parallelism   : ${serial ? "serial (1 core)" : `${nWorkers} workers / ${availableParallelism()} cores, ${allUnits.length} pairs`}`,
+  );
   console.log("");
 
   let results: PairResult[];
@@ -357,7 +413,7 @@ async function main(): Promise<void> {
     // Heaviest-first by combined bar-count so the round-robin shard is proper LPT.
     const ordered = [...allUnits].sort(
       (x, y) =>
-        (bars.get(y.unit.a)! + bars.get(y.unit.b)!) - (bars.get(x.unit.a)! + bars.get(x.unit.b)!),
+        bars.get(y.unit.a)! + bars.get(y.unit.b)! - (bars.get(x.unit.a)! + bars.get(x.unit.b)!),
     );
     results = await runShardedPairs(ordered.map((u) => u.unit));
     // Restore serial order so ranking ties resolve identically to the serial run.
@@ -373,15 +429,25 @@ async function main(): Promise<void> {
   // All cointegrated pairs (the relationship map), sorted by half-life.
   console.log("COINTEGRATED PAIRS (Johansen ∧ EG-both)");
   console.log("-".repeat(82));
-  console.log(["pair".padEnd(20), "beta".padStart(8), "halfLife".padStart(9), "hurst".padStart(7), "backtested".padStart(11)].join(" "));
+  console.log(
+    [
+      "pair".padEnd(20),
+      "beta".padStart(8),
+      "halfLife".padStart(9),
+      "hurst".padStart(7),
+      "backtested".padStart(11),
+    ].join(" "),
+  );
   for (const r of [...cointegrated].sort((x, y) => x.halfLife - y.halfLife)) {
-    console.log([
-      `${r.a}/${r.b}`.padEnd(20),
-      r.beta.toFixed(3).padStart(8),
-      (Number.isFinite(r.halfLife) ? r.halfLife.toFixed(1) : "inf").padStart(9),
-      r.hurst.toFixed(3).padStart(7),
-      (Number.isFinite(r.oosSharpe) ? "yes" : "no (HL/Hurst)").padStart(11),
-    ].join(" "));
+    console.log(
+      [
+        `${r.a}/${r.b}`.padEnd(20),
+        r.beta.toFixed(3).padStart(8),
+        (Number.isFinite(r.halfLife) ? r.halfLife.toFixed(1) : "inf").padStart(9),
+        r.hurst.toFixed(3).padStart(7),
+        (Number.isFinite(r.oosSharpe) ? "yes" : "no (HL/Hurst)").padStart(11),
+      ].join(" "),
+    );
   }
   console.log("");
 
@@ -390,37 +456,60 @@ async function main(): Promise<void> {
     console.log("BACKTESTED PAIRS — ranked by OOS spread Sharpe (per-bar, after both-leg costs)");
     console.log("-".repeat(82));
     console.log(
-      ["pair".padEnd(18), "HL".padStart(6), "entryZ".padStart(7), "isSh".padStart(7), "oosSh".padStart(7), "oosRet".padStart(8), "oosDD".padStart(7), "trd".padStart(4)].join(" "),
+      [
+        "pair".padEnd(18),
+        "HL".padStart(6),
+        "entryZ".padStart(7),
+        "isSh".padStart(7),
+        "oosSh".padStart(7),
+        "oosRet".padStart(8),
+        "oosDD".padStart(7),
+        "trd".padStart(4),
+      ].join(" "),
     );
     for (const r of tradeable) {
-      console.log([
-        `${r.a}/${r.b}`.padEnd(18),
-        r.halfLife.toFixed(0).padStart(6),
-        r.entryZ.toFixed(2).padStart(7),
-        r.isSharpe.toFixed(3).padStart(7),
-        r.oosSharpe.toFixed(3).padStart(7),
-        `${(r.oosRet * 100).toFixed(1)}%`.padStart(8),
-        `${(r.oosMaxDd * 100).toFixed(1)}%`.padStart(7),
-        String(r.oosTrades).padStart(4),
-      ].join(" "));
+      console.log(
+        [
+          `${r.a}/${r.b}`.padEnd(18),
+          r.halfLife.toFixed(0).padStart(6),
+          r.entryZ.toFixed(2).padStart(7),
+          r.isSharpe.toFixed(3).padStart(7),
+          r.oosSharpe.toFixed(3).padStart(7),
+          `${(r.oosRet * 100).toFixed(1)}%`.padStart(8),
+          `${(r.oosMaxDd * 100).toFixed(1)}%`.padStart(7),
+          String(r.oosTrades).padStart(4),
+        ].join(" "),
+      );
     }
     console.log("");
     const consistent = tradeable.filter((r) => r.isSharpe > 0 && r.oosSharpe > 0);
     console.log("=".repeat(82));
     console.log("VERDICT");
     console.log("=".repeat(82));
-    console.log(`${consistent.length}/${tradeable.length} backtested pairs have BOTH positive IS and positive OOS spread Sharpe.`);
+    console.log(
+      `${consistent.length}/${tradeable.length} backtested pairs have BOTH positive IS and positive OOS spread Sharpe.`,
+    );
     if (consistent.length) {
-      console.log("Leads (positive IS+OOS — re-test on more data, watch with the rolling-coint monitor):");
+      console.log(
+        "Leads (positive IS+OOS — re-test on more data, watch with the rolling-coint monitor):",
+      );
       for (const r of consistent.slice(0, 8)) {
-        console.log(`  • ${r.a}/${r.b} — OOS Sharpe ${r.oosSharpe.toFixed(3)}, OOS ret ${(r.oosRet * 100).toFixed(1)}%, HL ${r.halfLife.toFixed(0)} bars, ${r.oosTrades} trades`);
+        console.log(
+          `  • ${r.a}/${r.b} — OOS Sharpe ${r.oosSharpe.toFixed(3)}, OOS ret ${(r.oosRet * 100).toFixed(1)}%, HL ${r.halfLife.toFixed(0)} bars, ${r.oosTrades} trades`,
+        );
       }
     } else {
-      console.log("No pair held a positive spread Sharpe out of sample after costs — same honest null as");
-      console.log("the directional search. Cointegration over this window did not translate into OOS edge.");
+      console.log(
+        "No pair held a positive spread Sharpe out of sample after costs — same honest null as",
+      );
+      console.log(
+        "the directional search. Cointegration over this window did not translate into OOS edge.",
+      );
     }
   } else {
-    console.log("No pair cleared all gates (Johansen + EG-both + Hurst<0.5 + tradeable half-life).");
+    console.log(
+      "No pair cleared all gates (Johansen + EG-both + Hurst<0.5 + tradeable half-life).",
+    );
   }
   console.log("");
 }

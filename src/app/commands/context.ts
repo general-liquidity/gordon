@@ -13,7 +13,10 @@ export interface ContextCommandResult {
 // Last compaction details cache (populated by memory:compacted_details event)
 // ---------------------------------------------------------------------------
 
-type CompactedDetailsSnapshot = Omit<EventData<"memory:compacted_details">, "timestamp" | "type" | "id">;
+type CompactedDetailsSnapshot = Omit<
+  EventData<"memory:compacted_details">,
+  "timestamp" | "type" | "id"
+>;
 
 let _lastCompactionDetails: CompactedDetailsSnapshot | null = null;
 let _lastCompactionAt: number | null = null;
@@ -50,7 +53,9 @@ function formatCompactionDetails(details: CompactedDetailsSnapshot, at: number):
   const mins = Math.max(0, Math.round((Date.now() - at) / 60_000));
   const ago = mins === 0 ? "just now" : `${mins}m ago`;
   const line = (label: string, items: string[]): string | null =>
-    items.length > 0 ? `  ${label.padEnd(12)} ${items.slice(0, 8).join(", ")}${items.length > 8 ? ` (+${items.length - 8})` : ""}` : null;
+    items.length > 0
+      ? `  ${label.padEnd(12)} ${items.slice(0, 8).join(", ")}${items.length > 8 ? ` (+${items.length - 8})` : ""}`
+      : null;
 
   const lines: (string | null)[] = [
     "",
@@ -70,14 +75,18 @@ function formatCompactionDetails(details: CompactedDetailsSnapshot, at: number):
   return body.length > 2 ? body : "";
 }
 
-export async function handleContextCommand(args: string, currentThreadId?: string): Promise<ContextCommandResult> {
+export async function handleContextCommand(
+  args: string,
+  currentThreadId?: string,
+): Promise<ContextCommandResult> {
   subscribeIfNeeded();
   const threadId = args.trim() || currentThreadId;
   const report = getLatestPromptContextReport(threadId);
   const baseMessage = formatPromptContextReport(report);
-  const compactionBlock = _lastCompactionDetails && _lastCompactionAt
-    ? formatCompactionDetails(_lastCompactionDetails, _lastCompactionAt)
-    : "";
+  const compactionBlock =
+    _lastCompactionDetails && _lastCompactionAt
+      ? formatCompactionDetails(_lastCompactionDetails, _lastCompactionAt)
+      : "";
   return {
     success: report !== null || _lastCompactionDetails !== null,
     message: compactionBlock ? `${baseMessage}${compactionBlock}` : baseMessage,

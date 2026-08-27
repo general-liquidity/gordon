@@ -51,7 +51,11 @@ function readConsentFile(env: NodeJS.ProcessEnv = process.env): ConsentFile {
 
 export function hasAcceptedLiveConsent(env: NodeJS.ProcessEnv = process.env): boolean {
   const live = readConsentFile(env).live;
-  return live?.accepted === true && typeof live.version === "number" && live.version >= LIVE_CONSENT_VERSION;
+  return (
+    live?.accepted === true &&
+    typeof live.version === "number" &&
+    live.version >= LIVE_CONSENT_VERSION
+  );
 }
 
 export function recordLiveConsent(env: NodeJS.ProcessEnv = process.env): void {

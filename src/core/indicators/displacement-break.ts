@@ -51,7 +51,7 @@ function detectPivots(candles: Candle[], window: number): Pivot[] {
 
 export function calculateDisplacementBreak(
   candles: Candle[],
-  opts?: { pivotWindow?: number; minRatio?: number }
+  opts?: { pivotWindow?: number; minRatio?: number },
 ): DisplacementBreakResult {
   const pivotWindow = opts?.pivotWindow ?? 2;
   const minRatio = opts?.minRatio ?? 1.5;
@@ -131,12 +131,9 @@ export function calculateDisplacementBreak(
     }
   }
   const breakLeg =
-    extreme === Infinity || extreme === -Infinity
-      ? null
-      : Math.abs(brokenPivot.price - extreme);
+    extreme === Infinity || extreme === -Infinity ? null : Math.abs(brokenPivot.price - extreme);
 
-  const ratio =
-    priorLeg != null && priorLeg > 0 && breakLeg != null ? breakLeg / priorLeg : null;
+  const ratio = priorLeg != null && priorLeg > 0 && breakLeg != null ? breakLeg / priorLeg : null;
 
   const valid = ratio != null && ratio >= minRatio;
 
@@ -156,8 +153,7 @@ export function calculateDisplacementBreak(
       `Weak ${dirWord} break: close pierced the swing level but the breaking leg is only ${ratioRounded}x ` +
       `the prior swing (< ${minRatio}x) — likely a one-candle poke that often fails, not true displacement.`;
   } else {
-    interpretation =
-      `${dirWord} break detected but displacement ratio is undefined (prior swing leg has zero size).`;
+    interpretation = `${dirWord} break detected but displacement ratio is undefined (prior swing leg has zero size).`;
   }
 
   return {

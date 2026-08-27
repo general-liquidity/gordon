@@ -53,7 +53,11 @@ describe("computeRegimeFilterValue", () => {
       ["bear", -0.01, 20],
       ["bull", 0.01, 20],
     ]);
-    const r = computeRegimeFilterValue({ returns, regimeLabels, options: { detectionLagBars: 2, flipFraction: 0.15 } });
+    const r = computeRegimeFilterValue({
+      returns,
+      regimeLabels,
+      options: { detectionLagBars: 2, flipFraction: 0.15 },
+    });
     expect(r.cleanFilterValue).toBeGreaterThan(0);
     expect(r.filterValue).toBeGreaterThan(0);
     expect(r.verdict).toBe("build_filter");
@@ -69,7 +73,11 @@ describe("computeRegimeFilterValue", () => {
       blocks.push(["bear", -0.01, 2]);
     }
     const { returns, regimeLabels } = build(blocks);
-    const r = computeRegimeFilterValue({ returns, regimeLabels, options: { detectionLagBars: 2, flipFraction: 0.3 } });
+    const r = computeRegimeFilterValue({
+      returns,
+      regimeLabels,
+      options: { detectionLagBars: 2, flipFraction: 0.3 },
+    });
     expect(r.cleanFilterValue).toBeGreaterThan(0); // a perfect filter WOULD help
     expect(r.filterValue).toBeLessThanOrEqual(0); // but the realistic one doesn't
     expect(r.verdict).toBe("complexity_tax");

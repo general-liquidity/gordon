@@ -119,23 +119,41 @@ export const CapitalRefreshPayloadSchema = z.object({});
 
 export const GatewayCommandPayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("chat.send_message"), payload: ChatSendMessagePayloadSchema }),
-  z.object({ type: z.literal("chat.structured_message"), payload: ChatStructuredMessagePayloadSchema }),
+  z.object({
+    type: z.literal("chat.structured_message"),
+    payload: ChatStructuredMessagePayloadSchema,
+  }),
   z.object({ type: z.literal("scan.run"), payload: ScanRunPayloadSchema }),
   z.object({ type: z.literal("monitor.run_cycle"), payload: MonitorRunCyclePayloadSchema }),
-  z.object({ type: z.literal("system.set_permission_mode"), payload: SystemSetPermissionModePayloadSchema }),
+  z.object({
+    type: z.literal("system.set_permission_mode"),
+    payload: SystemSetPermissionModePayloadSchema,
+  }),
   z.object({ type: z.literal("scheduler.create_task"), payload: SchedulerCreateTaskPayloadSchema }),
   z.object({ type: z.literal("scheduler.delete_task"), payload: SchedulerDeleteTaskPayloadSchema }),
   z.object({ type: z.literal("scheduler.list_tasks"), payload: SchedulerListTasksPayloadSchema }),
-  z.object({ type: z.literal("runtime.background_status"), payload: RuntimeBackgroundStatusPayloadSchema }),
+  z.object({
+    type: z.literal("runtime.background_status"),
+    payload: RuntimeBackgroundStatusPayloadSchema,
+  }),
   z.object({ type: z.literal("runtime.health_check"), payload: RuntimeHealthCheckPayloadSchema }),
   z.object({ type: z.literal("reconcile.run"), payload: ReconcileRunPayloadSchema }),
   z.object({ type: z.literal("plugin.reload"), payload: PluginReloadPayloadSchema }),
   z.object({ type: z.literal("daemon.shutdown"), payload: DaemonShutdownPayloadSchema }),
-  z.object({ type: z.literal("circuit_breaker.evaluate"), payload: CircuitBreakerEvaluatePayloadSchema }),
+  z.object({
+    type: z.literal("circuit_breaker.evaluate"),
+    payload: CircuitBreakerEvaluatePayloadSchema,
+  }),
   z.object({ type: z.literal("regime.check"), payload: RegimeCheckPayloadSchema }),
   z.object({ type: z.literal("evolution.tick"), payload: EvolutionTickPayloadSchema }),
-  z.object({ type: z.literal("learning.analyze_trade"), payload: LearningAnalyzeTradePayloadSchema }),
-  z.object({ type: z.literal("execution.start_intent"), payload: ExecutionStartIntentPayloadSchema }),
+  z.object({
+    type: z.literal("learning.analyze_trade"),
+    payload: LearningAnalyzeTradePayloadSchema,
+  }),
+  z.object({
+    type: z.literal("execution.start_intent"),
+    payload: ExecutionStartIntentPayloadSchema,
+  }),
   z.object({ type: z.literal("autonomous.run_cycle"), payload: AutonomousRunCyclePayloadSchema }),
   z.object({ type: z.literal("capital.refresh"), payload: CapitalRefreshPayloadSchema }),
 ]);

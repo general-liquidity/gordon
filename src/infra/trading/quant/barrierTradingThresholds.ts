@@ -34,9 +34,7 @@ import { normalCdf } from "../../../core/numerics/index.ts";
 
 export const BARRIER_TRADING_THRESHOLDS_FLAG_ENV = "GORDON_BARRIER_TRADING_THRESHOLDS";
 
-export function isBarrierTradingThresholdsEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function isBarrierTradingThresholdsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return (
     env[BARRIER_TRADING_THRESHOLDS_FLAG_ENV] === "1" ||
     env[BARRIER_TRADING_THRESHOLDS_FLAG_ENV] === "true"

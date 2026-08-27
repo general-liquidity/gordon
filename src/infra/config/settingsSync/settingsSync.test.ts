@@ -122,11 +122,7 @@ describe("safety-relax guard", () => {
       { venue: "binance", accountType: "paper", baseCurrency: "USD" },
       { venue: "okx", accountType: "live", baseCurrency: "EUR" },
     );
-    expect(violations.map((v) => v.path).sort()).toEqual([
-      "accountType",
-      "baseCurrency",
-      "venue",
-    ]);
+    expect(violations.map((v) => v.path).sort()).toEqual(["accountType", "baseCurrency", "venue"]);
     expect(violations.every((v) => v.kind === "identity_changed")).toBe(true);
   });
 
@@ -140,7 +136,13 @@ describe("safety-relax guard", () => {
     });
     const current = { risk: { maxRiskPerTrade: 0.01 } };
 
-    const blocked = await pullSettings({ client: remote, key: KEY, current, blockOnRelax: true, warn: () => {} });
+    const blocked = await pullSettings({
+      client: remote,
+      key: KEY,
+      current,
+      blockOnRelax: true,
+      warn: () => {},
+    });
     expect(blocked.status).toBe("blocked");
 
     const surfaced = await pullSettings({ client: remote, key: KEY, current, warn: () => {} });

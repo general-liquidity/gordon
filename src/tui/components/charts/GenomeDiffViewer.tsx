@@ -10,7 +10,6 @@
  * Pattern: Claude Code StructuredDiff (side-by-side parameter comparison).
  */
 
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 
 // ============================================================================
@@ -78,13 +77,7 @@ export function GenomeDiffViewer({ mutation }: Props) {
   const changedCount = mutation.params.filter(hasChanged).length;
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
-      paddingX={2}
-      paddingY={1}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
       {/* Header */}
       <Box>
         <Text bold color="cyan">
@@ -150,9 +143,7 @@ export function GenomeDiffViewer({ mutation }: Props) {
 
       {/* Separator line */}
       <Box>
-        <Text dimColor>
-          {"\u2500".repeat(COL_KEY + COL_VAL + SEPARATOR.length + COL_VAL)}
-        </Text>
+        <Text dimColor>{"\u2500".repeat(COL_KEY + COL_VAL + SEPARATOR.length + COL_VAL)}</Text>
       </Box>
 
       {/* Parameter rows */}
@@ -175,25 +166,17 @@ export function GenomeDiffViewer({ mutation }: Props) {
               {changed ? SEPARATOR : "      "}
             </Text>
             <Box width={COL_VAL}>
-              <Text
-                color={changed ? "cyan" : undefined}
-                dimColor={!changed}
-                bold={changed}
-              >
+              <Text color={changed ? "cyan" : undefined} dimColor={!changed} bold={changed}>
                 {padRight(mutStr, COL_VAL)}
               </Text>
             </Box>
-            {changed && (
-              <Text color="cyan"> {"\u25C0"}</Text>
-            )}
+            {changed && <Text color="cyan"> {"\u25C0"}</Text>}
           </Box>
         );
       })}
 
       <Text> </Text>
-      <Text dimColor>
-        {"\u25C0"} marks mutated parameters
-      </Text>
+      <Text dimColor>{"\u25C0"} marks mutated parameters</Text>
     </Box>
   );
 }

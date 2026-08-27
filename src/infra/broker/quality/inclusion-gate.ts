@@ -58,7 +58,8 @@ export const BROKER_INCLUSION_GATE: Record<BrokerId, BrokerInclusionDecision> = 
       paperOrSafeDryRunPath: true,
       tsRuntimeAuthMaintainable: true,
     },
-    rationale: "Retail API with account/order workflows and maintainable auth lifecycle in TS runtime.",
+    rationale:
+      "Retail API with account/order workflows and maintainable auth lifecycle in TS runtime.",
   },
   ibkr: {
     brokerId: "ibkr",
@@ -83,18 +84,26 @@ export function getBrokerInclusionDecision(brokerId: BrokerId): BrokerInclusionD
   return BROKER_INCLUSION_GATE[brokerId];
 }
 
-export function getFailedCriteria(criteria: BrokerInclusionCriteria): Array<keyof BrokerInclusionCriteria> {
+export function getFailedCriteria(
+  criteria: BrokerInclusionCriteria,
+): Array<keyof BrokerInclusionCriteria> {
   const failed: Array<keyof BrokerInclusionCriteria> = [];
-  for (const [key, value] of Object.entries(criteria) as Array<[keyof BrokerInclusionCriteria, BrokerInclusionCriterion]>) {
+  for (const [key, value] of Object.entries(criteria) as Array<
+    [keyof BrokerInclusionCriteria, BrokerInclusionCriterion]
+  >) {
     if (value === false) failed.push(key);
   }
   return failed;
 }
 
 /** Criteria the integration cannot observe. Never a guarantee, never a failure. */
-export function getUnverifiableCriteria(criteria: BrokerInclusionCriteria): Array<keyof BrokerInclusionCriteria> {
+export function getUnverifiableCriteria(
+  criteria: BrokerInclusionCriteria,
+): Array<keyof BrokerInclusionCriteria> {
   const unverifiable: Array<keyof BrokerInclusionCriteria> = [];
-  for (const [key, value] of Object.entries(criteria) as Array<[keyof BrokerInclusionCriteria, BrokerInclusionCriterion]>) {
+  for (const [key, value] of Object.entries(criteria) as Array<
+    [keyof BrokerInclusionCriteria, BrokerInclusionCriterion]
+  >) {
     if (value === "unverifiable") unverifiable.push(key);
   }
   return unverifiable;

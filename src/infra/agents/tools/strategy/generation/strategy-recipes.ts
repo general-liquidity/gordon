@@ -97,9 +97,9 @@ export const evaluateStrategyRecipesTool = createTool({
     fastMa: z.number(),
     slowMa: z.number(),
     price: z.number(),
-    state: pipelineStateSchema.optional().describe(
-      "Pipeline state from a prior call. Omit on the first candle.",
-    ),
+    state: pipelineStateSchema
+      .optional()
+      .describe("Pipeline state from a prior call. Omit on the first candle."),
     regimeRsiSettings: regimeRsiSettingsSchema.optional(),
     bounceCounter: z
       .object({
@@ -219,17 +219,19 @@ export const bounceCounterTool = createTool({
     signal: sideSchema,
     state: bounceCounterStateSchema,
   }),
-  execute: async (params: z.infer<typeof bounceCounterStateSchema> extends infer _
-    ? {
-        state: z.infer<typeof bounceCounterStateSchema>;
-        rsi: number;
-        high: number;
-        low: number;
-        persistence: number;
-        requiredBounces: number;
-        resetAfterFlats?: number;
-      }
-    : never) => applyBounceCounter(params),
+  execute: async (
+    params: z.infer<typeof bounceCounterStateSchema> extends infer _
+      ? {
+          state: z.infer<typeof bounceCounterStateSchema>;
+          rsi: number;
+          high: number;
+          low: number;
+          persistence: number;
+          requiredBounces: number;
+          resetAfterFlats?: number;
+        }
+      : never,
+  ) => applyBounceCounter(params),
 });
 
 export const signalGateTool = createTool({

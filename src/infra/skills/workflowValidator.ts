@@ -100,9 +100,10 @@ export function validateWorkflowManifest(
   availableSkillIds: Iterable<string>,
 ): WorkflowValidationResult {
   const issues: WorkflowValidationIssue[] = [];
-  const skillSet = availableSkillIds instanceof Set
-    ? (availableSkillIds as Set<string>)
-    : new Set(availableSkillIds);
+  const skillSet =
+    availableSkillIds instanceof Set
+      ? (availableSkillIds as Set<string>)
+      : new Set(availableSkillIds);
 
   // ── Manifest-level shape ──────────────────────────────────────
   if (!manifest.id || !ID_PATTERN.test(manifest.id)) {
@@ -123,7 +124,11 @@ export function validateWorkflowManifest(
     });
   }
   if (!Array.isArray(manifest.steps) || manifest.steps.length === 0) {
-    issues.push({ severity: "error", field: "steps", message: "workflow must declare at least one step" });
+    issues.push({
+      severity: "error",
+      field: "steps",
+      message: "workflow must declare at least one step",
+    });
     return { workflowId: manifest.id, ok: false, issues };
   }
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 
 // ============================================================================
@@ -29,13 +29,15 @@ export function CollapsibleOutput({ content, maxLines = 10, label }: Props) {
   if (!needsCollapse || expanded) {
     return (
       <Box flexDirection="column">
-        {label && <Text bold dimColor>{label}</Text>}
-        {lines.map((line, i) => (
-          <Text key={i}>  {line}</Text>
-        ))}
-        {expanded && needsCollapse && (
-          <Text dimColor>  (Ctrl+E to collapse)</Text>
+        {label && (
+          <Text bold dimColor>
+            {label}
+          </Text>
         )}
+        {lines.map((line, i) => (
+          <Text key={i}> {line}</Text>
+        ))}
+        {expanded && needsCollapse && <Text dimColor> (Ctrl+E to collapse)</Text>}
       </Box>
     );
   }
@@ -45,11 +47,15 @@ export function CollapsibleOutput({ content, maxLines = 10, label }: Props) {
 
   return (
     <Box flexDirection="column">
-      {label && <Text bold dimColor>{label}</Text>}
+      {label && (
+        <Text bold dimColor>
+          {label}
+        </Text>
+      )}
       {visible.map((line, i) => (
-        <Text key={i}>  {line}</Text>
+        <Text key={i}> {line}</Text>
       ))}
-      <Text dimColor>  ... +{remaining} more lines (Ctrl+E to expand)</Text>
+      <Text dimColor> ... +{remaining} more lines (Ctrl+E to expand)</Text>
     </Box>
   );
 }

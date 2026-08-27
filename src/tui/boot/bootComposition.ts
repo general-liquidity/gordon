@@ -1,7 +1,13 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { isOutboundFetchGuardInstalled, type OutboundFetchGuardStatus } from "../../infra/safety/outboundFetchGuard.ts";
-import { isFilesystemWriteGuardInstalled, type FilesystemWriteGuardStatus } from "../../infra/safety/filesystemWriteGuardInstaller.ts";
+import {
+  isOutboundFetchGuardInstalled,
+  type OutboundFetchGuardStatus,
+} from "../../infra/safety/outboundFetchGuard.ts";
+import {
+  isFilesystemWriteGuardInstalled,
+  type FilesystemWriteGuardStatus,
+} from "../../infra/safety/filesystemWriteGuardInstaller.ts";
 import { listTrippedSwitches, type KillSwitchKey } from "../../infra/safety/killSwitches.ts";
 import { isObserverRunning } from "../../infra/proactive/engine/observer.ts";
 import { getProducerHealthTracker } from "../../infra/proactive/engine/producerHealth.ts";
@@ -53,12 +59,12 @@ function truncateAnsi(value: string, maxVisible: number): string {
 
   let out = "";
   let visible = 0;
-  for (let i = 0; i < value.length;) {
+  for (let i = 0; i < value.length; ) {
     const rest = value.slice(i);
-    const escape = rest.match(/^\x1b\[[0-9;]*m/);
-    if (escape) {
-      out += escape[0];
-      i += escape[0].length;
+    const escapeSequence = rest.match(/^\x1b\[[0-9;]*m/);
+    if (escapeSequence) {
+      out += escapeSequence[0];
+      i += escapeSequence[0].length;
       continue;
     }
 
@@ -85,7 +91,7 @@ function readJsonFile(pathname: string): Record<string, unknown> | null {
     if (!fs.existsSync(pathname)) return null;
     const parsed = JSON.parse(fs.readFileSync(pathname, "utf-8"));
     return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
+      ? (parsed as Record<string, unknown>)
       : null;
   } catch {
     return null;
@@ -141,11 +147,23 @@ function safeRead<T>(read: () => T, fallback: T): T {
 }
 
 function defaultFetchGuard(): OutboundFetchGuardStatus {
-  return { installed: false, enabled: false, mode: "warn", warnViolations: 0, recentViolations: [] };
+  return {
+    installed: false,
+    enabled: false,
+    mode: "warn",
+    warnViolations: 0,
+    recentViolations: [],
+  };
 }
 
 function defaultFsGuard(): FilesystemWriteGuardStatus {
-  return { installed: false, enabled: false, mode: "warn", warnViolations: 0, recentViolations: [] };
+  return {
+    installed: false,
+    enabled: false,
+    mode: "warn",
+    warnViolations: 0,
+    recentViolations: [],
+  };
 }
 
 function collectRadarSnapshot(): BootStaticInfo["radar"] {
@@ -193,7 +211,10 @@ export function formatAge(ms: number): string {
   return `${Math.floor(hours / 24)}d`;
 }
 
-function renderGuard(name: string, status: OutboundFetchGuardStatus | FilesystemWriteGuardStatus): string {
+function renderGuard(
+  name: string,
+  status: OutboundFetchGuardStatus | FilesystemWriteGuardStatus,
+): string {
   if (status.enabled && !status.installed) return `${name} ${RED}${BOLD}✗ NOT INSTALLED${RESET}`;
   if (!status.enabled) return `${name} ${YELLOW}✗ off${RESET}`;
   return `${name} ${TEAL}✓${RESET} ${DIM}${status.mode}${RESET}`;
@@ -228,7 +249,13 @@ function renderRadar(info: BootStaticInfo): string {
   return `${radar.producerCount} producers · last card ${formatAge(radar.lastCardAgeMs)} ago`;
 }
 
-function renderRow(label: string, value: string, budget: number, columns: number, hint?: string): string {
+function renderRow(
+  label: string,
+  value: string,
+  budget: number,
+  columns: number,
+  hint?: string,
+): string {
   const labelCell = `  ${DIM}${label.padEnd(LABEL_WIDTH)}${RESET}`;
   const valueBudget = budget - INDENT_WIDTH - LABEL_WIDTH;
   if (valueBudget <= 0) return truncateAnsi(labelCell, budget);
@@ -237,7 +264,8 @@ function renderRow(label: string, value: string, budget: number, columns: number
   const reservedForHint = visibleLength(hintSuffix);
   const valueMax = Math.max(0, valueBudget - reservedForHint);
   const shownValue = truncateAnsi(value, valueMax);
-  const maybeHint = hintSuffix && visibleLength(labelCell + shownValue + hintSuffix) <= budget ? hintSuffix : "";
+  const maybeHint =
+    hintSuffix && visibleLength(labelCell + shownValue + hintSuffix) <= budget ? hintSuffix : "";
   const row = `${labelCell}${shownValue}${maybeHint}`;
   return visibleLength(row) <= budget ? row : truncateAnsi(row, budget);
 }
@@ -279,10 +307,9 @@ export function renderBootStaticRows(info: BootStaticInfo, columns: number): str
   const modeValue = `${modeColor}${info.permissionMode}${RESET}${isPaper ? ` ${BOLD}${YELLOW}[PAPER]${RESET}` : ""}`;
   const bodyBudget = Math.max(0, rowBudget - INDENT_WIDTH - LABEL_WIDTH);
   const cwdValue = truncateStart(info.cwd, bodyBudget);
-  const guardValue = [
-    renderGuard("fetch", info.fetchGuard),
-    renderGuard("fs", info.fsGuard),
-  ].join(` ${DIM}·${RESET} `);
+  const guardValue = [renderGuard("fetch", info.fetchGuard), renderGuard("fs", info.fsGuard)].join(
+    ` ${DIM}·${RESET} `,
+  );
 
   const rows = [
     renderRow("model", modelValue, rowBudget, columns, "/model to change"),

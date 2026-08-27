@@ -3,10 +3,7 @@ import { argumentHintFor, extractUsageArgs } from "./argumentHint.ts";
 
 describe("extractUsageArgs", () => {
   test("splits required and optional tokens off the command name", () => {
-    expect(extractUsageArgs("/chart <symbol> [timeframe]")).toEqual([
-      "<symbol>",
-      "[timeframe]",
-    ]);
+    expect(extractUsageArgs("/chart <symbol> [timeframe]")).toEqual(["<symbol>", "[timeframe]"]);
   });
 
   test("no-argument usage yields an empty list", () => {
@@ -14,9 +11,7 @@ describe("extractUsageArgs", () => {
   });
 
   test("keeps a bracketed alternation as a single token", () => {
-    expect(extractUsageArgs("/trending [gainers|losers]")).toEqual([
-      "[gainers|losers]",
-    ]);
+    expect(extractUsageArgs("/trending [gainers|losers]")).toEqual(["[gainers|losers]"]);
   });
 
   test("uses the primary form of a piped usage", () => {

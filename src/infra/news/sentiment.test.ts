@@ -60,9 +60,7 @@ describe("aggregateSentiment", () => {
   });
 
   it("returns netScore=0 when there are no directional headlines", () => {
-    const agg = aggregateSentiment([
-      { title: "x", sentiment: "neutral", confidence: 0 },
-    ]);
+    const agg = aggregateSentiment([{ title: "x", sentiment: "neutral", confidence: 0 }]);
     expect(agg.netScore).toBe(0);
     expect(agg.topBullish).toBeUndefined();
     expect(agg.topBearish).toBeUndefined();

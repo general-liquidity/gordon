@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { ShimmerChar } from "./ShimmerChar.js";
 import { useAnimationClock } from "../../hooks/animation/useAnimationClock.js";
@@ -40,12 +39,7 @@ export function ShimmeredInput({ lastInput, visible }: Props) {
         <Text dimColor>{"…"}</Text>
       ) : (
         chars.map((char, i) => (
-          <ShimmerChar
-            key={i}
-            char={char}
-            charIndex={i}
-            glimmerIndex={glimmerIndex}
-          />
+          <ShimmerChar key={i} char={char} charIndex={i} glimmerIndex={glimmerIndex} />
         ))
       )}
     </Box>

@@ -168,9 +168,7 @@ export function computeDupont(input: DupontInput): DupontResult {
     name: f.name,
     value: round(f.value),
     contributionPct:
-      logComputable && Math.abs(lnRoe) > 1e-12
-        ? round((Math.log(f.value) / lnRoe) * 100, 2)
-        : null,
+      logComputable && Math.abs(lnRoe) > 1e-12 ? round((Math.log(f.value) / lnRoe) * 100, 2) : null,
   }));
 
   const reconstructionError =
@@ -186,9 +184,7 @@ export function computeDupont(input: DupontInput): DupontResult {
       `ROE ${(reportedRoe * 100).toFixed(1)}% (negative — loss or negative equity); ` +
       `factor attribution not meaningful. Leverage ${equityMultiplier.toFixed(2)}×.`;
   } else if (logComputable) {
-    const ranked = [...drivers].sort(
-      (a, b) => (b.contributionPct ?? 0) - (a.contributionPct ?? 0),
-    );
+    const ranked = [...drivers].sort((a, b) => (b.contributionPct ?? 0) - (a.contributionPct ?? 0));
     const top = ranked[0]!;
     const drag = ranked[ranked.length - 1]!;
     const leverageNote =

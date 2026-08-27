@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  checkTooGoodToBeTrue,
-  formatTooGoodCheck,
-} from "./too-good-check.ts";
+import { checkTooGoodToBeTrue, formatTooGoodCheck } from "./too-good-check.ts";
 
 describe("checkTooGoodToBeTrue — verdict cascade", () => {
   it("returns plausible when no inputs are supplied", () => {
@@ -143,17 +140,14 @@ describe("checkTooGoodToBeTrue — custom thresholds", () => {
   });
 
   it("respects custom IC thresholds", () => {
-    const result = checkTooGoodToBeTrue(
-      { ic: 0.08 },
-      { suspiciousIc: 0.05, catastrophicIc: 0.10 },
-    );
+    const result = checkTooGoodToBeTrue({ ic: 0.08 }, { suspiciousIc: 0.05, catastrophicIc: 0.1 });
     expect(result.verdict).toBe("suspicious");
   });
 
   it("respects custom maxDrawdown thresholds", () => {
     const result = checkTooGoodToBeTrue(
       { maxDrawdown: 0.05, observationPeriods: 500 },
-      { suspiciousMaxDD: 0.10, catastrophicMaxDD: 0.07 },
+      { suspiciousMaxDD: 0.1, catastrophicMaxDD: 0.07 },
     );
     expect(result.verdict).toBe("too_good_to_be_true");
   });
@@ -192,9 +186,7 @@ describe("formatTooGoodCheck", () => {
   });
 
   it("renders TOO GOOD TO BE TRUE with multiple checks", () => {
-    const text = formatTooGoodCheck(
-      checkTooGoodToBeTrue({ sharpe: 6, ic: 0.4, winRate: 0.99 }),
-    );
+    const text = formatTooGoodCheck(checkTooGoodToBeTrue({ sharpe: 6, ic: 0.4, winRate: 0.99 }));
     expect(text).toContain("TOO GOOD TO BE TRUE");
     expect(text).toContain("CATASTROPHIC");
   });

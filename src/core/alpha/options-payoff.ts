@@ -75,8 +75,7 @@ function isValidLeg(leg: OptionLeg): boolean {
 
 function legPayoff(leg: OptionLeg, S: number): number {
   const qty = leg.quantity ?? DEFAULT_QTY;
-  const intrinsic =
-    leg.type === "call" ? Math.max(S - leg.strike, 0) : Math.max(leg.strike - S, 0);
+  const intrinsic = leg.type === "call" ? Math.max(S - leg.strike, 0) : Math.max(leg.strike - S, 0);
   const longPnl = intrinsic - leg.premium;
   const perContract = leg.side === "long" ? longPnl : -longPnl;
   return perContract * qty;
@@ -149,9 +148,7 @@ function findBreakevens(curve: PayoffPoint[]): number[] {
   return dedup;
 }
 
-export function computeOptionsPayoff(
-  input: OptionsPayoffInput,
-): OptionsPayoffResult {
+export function computeOptionsPayoff(input: OptionsPayoffInput): OptionsPayoffResult {
   const invalid = (why: string): OptionsPayoffResult => ({
     valid: false,
     netPremium: null,
@@ -211,9 +208,7 @@ export function computeOptionsPayoff(
     })
     .join(", ");
   const netStr =
-    netKind === "even"
-      ? "net even"
-      : `net ${netKind} ${Math.abs(netRounded).toFixed(2)}`;
+    netKind === "even" ? "net even" : `net ${netKind} ${Math.abs(netRounded).toFixed(2)}`;
   const beStr =
     breakevens.length > 0
       ? `breakeven(s) ${breakevens.map((b) => b.toFixed(2)).join(", ")}`
@@ -238,11 +233,7 @@ export function computeOptionsPayoff(
   };
 }
 
-export function longStraddle(
-  strike: number,
-  callPremium: number,
-  putPremium: number,
-): OptionLeg[] {
+export function longStraddle(strike: number, callPremium: number, putPremium: number): OptionLeg[] {
   return [
     { type: "call", side: "long", strike, premium: callPremium },
     { type: "put", side: "long", strike, premium: putPremium },

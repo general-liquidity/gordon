@@ -37,7 +37,7 @@ function mockContext(onPlace?: (order: OrderParams) => void): GordonContext {
           updateTime: Date.now(),
         },
         totalUsdtValue: 100_000,
-        nonZeroBalances: [],
+        nonZeroBalances: [{ asset: "USDT", free: 100_000, locked: 0, total: 100_000 }],
       };
     },
     async getBalance(asset: string) {
@@ -255,7 +255,12 @@ describe("assertConsentForExposure", () => {
 describe("verifyExposureReduction", () => {
   it("accepts a partial reduction in the exit direction", () => {
     expect(
-      verifyExposureReduction({ side: "BUY", quantity: 0.5, exitSide: "BUY", remainingQuantity: 2 }),
+      verifyExposureReduction({
+        side: "BUY",
+        quantity: 0.5,
+        exitSide: "BUY",
+        remainingQuantity: 2,
+      }),
     ).toEqual({ ok: true });
   });
 

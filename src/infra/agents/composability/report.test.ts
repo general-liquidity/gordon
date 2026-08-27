@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  captureComposabilityReport,
-  formatComposabilityReport,
-} from "./report.ts";
+import { captureComposabilityReport, formatComposabilityReport } from "./report.ts";
 
 describe("captureComposabilityReport — shape", () => {
   it("returns ≥ 10 pluggability axes", () => {

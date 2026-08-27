@@ -170,9 +170,7 @@ export function clampTierToCalibration<T extends "I" | "II" | "III">(
   return "I";
 }
 
-export function calibrationToPayload(
-  result: CalibrationResult,
-): Record<string, unknown> {
+export function calibrationToPayload(result: CalibrationResult): Record<string, unknown> {
   return {
     kind: "conviction_calibration.evaluated",
     status: result.status,

@@ -89,7 +89,7 @@ export const DEFAULT_WATCHLIST: readonly string[] = ["BTCUSDT", "ETHUSDT", "SOLU
 export async function resolveMonitoredSymbols(): Promise<string[]> {
   const symbols = new Set<string>(DEFAULT_WATCHLIST);
   try {
-    const mod = await import("../../../core/positions/store.ts" as string) as {
+    const mod = (await import("../../../core/positions/store.ts" as string)) as {
       getPositionStore?: () => Promise<{ getActive: () => Promise<Array<{ symbol: string }>> }>;
     };
     if (typeof mod.getPositionStore === "function") {

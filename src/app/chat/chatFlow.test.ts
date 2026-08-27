@@ -40,25 +40,31 @@ describe("chat flow helpers", () => {
   it("treats an active back-and-forth as conversation momentum", () => {
     expect(hasConversationMomentum([])).toBe(false);
     expect(hasConversationMomentum([{ role: "user", content: "scan btc" }])).toBe(false);
-    expect(hasConversationMomentum([
-      { role: "user", content: "scan btc" },
-      { role: "gordon", content: "Scanning now." },
-    ])).toBe(true);
+    expect(
+      hasConversationMomentum([
+        { role: "user", content: "scan btc" },
+        { role: "gordon", content: "Scanning now." },
+      ]),
+    ).toBe(true);
   });
 
   it("only shows inline quick actions before the thread has momentum", () => {
-    expect(shouldShowInlineQuickActions({
-      disabled: false,
-      busy: false,
-      value: "",
-      hasConversationMomentum: false,
-    })).toBe(true);
+    expect(
+      shouldShowInlineQuickActions({
+        disabled: false,
+        busy: false,
+        value: "",
+        hasConversationMomentum: false,
+      }),
+    ).toBe(true);
 
-    expect(shouldShowInlineQuickActions({
-      disabled: false,
-      busy: false,
-      value: "",
-      hasConversationMomentum: true,
-    })).toBe(false);
+    expect(
+      shouldShowInlineQuickActions({
+        disabled: false,
+        busy: false,
+        value: "",
+        hasConversationMomentum: true,
+      }),
+    ).toBe(false);
   });
 });

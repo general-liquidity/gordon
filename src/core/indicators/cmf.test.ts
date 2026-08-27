@@ -30,11 +30,7 @@ describe("Chaikin Money Flow (CMF)", () => {
     //   Bar2 H10 L0 C0  V100 → MFM=((0-0)-(10-0))/10=-1     → MFV=-100
     //   Bar3 H10 L0 C8  V200 → MFM=((8-0)-(10-8))/10=+0.6   → MFV=+120
     //   ΣMFV = 100 - 100 + 120 = 120 ; ΣV = 400 ; CMF = 120/400 = 0.3
-    const candles: Candle[] = [
-      bar(10, 0, 10, 100),
-      bar(10, 0, 0, 100),
-      bar(10, 0, 8, 200),
-    ];
+    const candles: Candle[] = [bar(10, 0, 10, 100), bar(10, 0, 0, 100), bar(10, 0, 8, 200)];
     const r = calculateCMF(candles, 3);
     expect(r.current).toBeCloseTo(0.3, 6);
     expect(r.signal).toBe("accumulation");

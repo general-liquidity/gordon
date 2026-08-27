@@ -11,20 +11,16 @@
  *   bun scripts/build.ts --binary --target bun-linux-x64 --outfile gordon-linux-x64
  *                                    → cross-compile a named target (release matrix)
  *
- * Externals — native/runtime deps that must not be bundled. Moving these
- * out of the argv list into an array makes them easy to read and keeps
- * the build command short.
+ * Externals — native/runtime deps that must not be bundled. Gordon currently
+ * has none: the old list existed solely for Solana packages that were declared
+ * but never imported. Keeping the array makes that decision explicit and keeps
+ * the release and local build paths identical if a real native dependency is
+ * added later.
  */
 
 import { resolve } from "node:path";
 
-const EXTERNALS = [
-  "@lightprotocol/compressed-token",
-  "@lightprotocol/stateless.js",
-  "@solana-developers/helpers",
-  "@galacticcouncil/api-augment/hydradx",
-  "@galacticcouncil/api-augment/basilisk",
-];
+const EXTERNALS: string[] = [];
 
 const ROOT = resolve(import.meta.dirname, "..", "..");
 const ENTRY = resolve(ROOT, "src/entry.ts");
@@ -85,8 +81,11 @@ for (const output of result.outputs) {
   totalBytes += output.size;
 }
 
-const sizeStr = totalBytes >= 1_000_000
-  ? `${(totalBytes / 1_000_000).toFixed(2)} MB`
-  : `${(totalBytes / 1_000).toFixed(0)} KB`;
+const sizeStr =
+  totalBytes >= 1_000_000
+    ? `${(totalBytes / 1_000_000).toFixed(2)} MB`
+    : `${(totalBytes / 1_000).toFixed(0)} KB`;
 
-console.log(`Bundled ${result.outputs.length} output${result.outputs.length === 1 ? "" : "s"} (${sizeStr})`);
+console.log(
+  `Bundled ${result.outputs.length} output${result.outputs.length === 1 ? "" : "s"} (${sizeStr})`,
+);

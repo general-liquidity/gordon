@@ -22,12 +22,10 @@
  *   dim "+N more" overflow line so boot output stays bounded.
  */
 
-import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { Box, Text, useStdout } from "../../ink-custom";
 import { fmtNum } from "../charts/DataTable.tsx";
-import {
-  useEventBusSubscriptions,
-} from "../../hooks/useEventBusSubscription.js";
+import { useEventBusSubscriptions } from "../../hooks/useEventBusSubscription.js";
 import type { EventType, EventData } from "../../../events/index.ts";
 import { getMoneyColor, getSignalColor } from "../../design-system/colorMap.ts";
 import { useTheme } from "../../themes/ThemeProvider.tsx";
@@ -133,9 +131,7 @@ export function tableLineWidth(cols: ColumnSpec[]): number {
  */
 export function fitCell(text: string, width: number, align: "left" | "right" = "left"): string {
   if (width <= 0) return "";
-  const t = text.length > width
-    ? text.slice(0, width - 1) + ELLIPSIS
-    : text;
+  const t = text.length > width ? text.slice(0, width - 1) + ELLIPSIS : text;
   if (t.length >= width) return t;
   const pad = " ".repeat(width - t.length);
   return align === "right" ? pad + t : t + pad;
@@ -235,9 +231,7 @@ export function buildFooterLine(
   totalPnl: number,
 ): { label: string; pnl: string } {
   const pnlIdx = cols.findIndex((c) => c.key === "pnl");
-  const labelWidth = cols
-    .slice(0, pnlIdx)
-    .reduce((sum, c) => sum + c.width + COLUMN_GAP, 0);
+  const labelWidth = cols.slice(0, pnlIdx).reduce((sum, c) => sum + c.width + COLUMN_GAP, 0);
   const noun = count === 1 ? "position" : "positions";
   return {
     label: fitCell(`TOTAL (${count} ${noun})`, labelWidth, "left"),
@@ -287,16 +281,19 @@ export function LivePositions({ initialPositions = EMPTY_POSITIONS }: Props) {
   }, [stdout]);
 
   const columns = useMemo(() => selectVisibleColumns(terminalWidth), [terminalWidth]);
-  const { rows: visible, total, totalPnl, hiddenCount } = useMemo(
-    () => prepareDisplayRows(positions),
-    [positions],
-  );
+  const {
+    rows: visible,
+    total,
+    totalPnl,
+    hiddenCount,
+  } = useMemo(() => prepareDisplayRows(positions), [positions]);
   const visibleRows = useMemo<PositionRow[]>(
-    () => visible.map((position) => ({
-      ...position,
-      riskPct: stopDistancePct(position),
-      acctPct: accountPctAtRisk(position, accountEquity),
-    })),
+    () =>
+      visible.map((position) => ({
+        ...position,
+        riskPct: stopDistancePct(position),
+        acctPct: accountPctAtRisk(position, accountEquity),
+      })),
     [visible, accountEquity],
   );
 
@@ -326,27 +323,25 @@ export function LivePositions({ initialPositions = EMPTY_POSITIONS }: Props) {
   }, []);
 
   // Handle position:updated — upsert position in list
-  const handleEvent = useCallback(
-    (event: EventData<EventType>) => {
-      const eventType = event.type as string;
+  const handleEvent = useCallback((event: EventData<EventType>) => {
+    const eventType = event.type as string;
 
-      if (eventType === "position:updated") {
-        const ev = event as unknown as { positionId: string; updates: Partial<Position> };
-        coalescerRef.current?.push({ kind: "update", positionId: ev.positionId, updates: ev.updates ?? {} });
-      }
+    if (eventType === "position:updated") {
+      const ev = event as unknown as { positionId: string; updates: Partial<Position> };
+      coalescerRef.current?.push({
+        kind: "update",
+        positionId: ev.positionId,
+        updates: ev.updates ?? {},
+      });
+    }
 
-      if (eventType === "position:closed") {
-        const ev = event as unknown as { positionId: string };
-        coalescerRef.current?.push({ kind: "close", positionId: ev.positionId });
-      }
-    },
-    [],
-  );
+    if (eventType === "position:closed") {
+      const ev = event as unknown as { positionId: string };
+      coalescerRef.current?.push({ kind: "close", positionId: ev.positionId });
+    }
+  }, []);
 
-  useEventBusSubscriptions(
-    ["position:updated", "position:closed"],
-    handleEvent,
-  );
+  useEventBusSubscriptions(["position:updated", "position:closed"], handleEvent);
 
   if (total === 0) return null;
 
@@ -358,27 +353,32 @@ export function LivePositions({ initialPositions = EMPTY_POSITIONS }: Props) {
   return (
     <Box flexDirection="column">
       <Box paddingLeft={LEFT_PADDING}>
-        <Text bold color={theme.uiBrand}>OPEN POSITIONS</Text>
+        <Text bold color={theme.uiBrand}>
+          OPEN POSITIONS
+        </Text>
         <Text dimColor> ({total})</Text>
       </Box>
       <Box flexDirection="column" marginTop={1} paddingLeft={LEFT_PADDING}>
-        <Text bold dimColor>{headerCells.join(gap)}</Text>
+        <Text bold dimColor>
+          {headerCells.join(gap)}
+        </Text>
         {visibleRows.map((row) => (
           <Box key={row.id}>
             {buildRowCells(row, columns).map((cell, idx) => (
               <Text key={columns[idx]!.key} color={cellColor(columns[idx]!, row, theme)}>
-                {idx > 0 ? gap : ""}{cell}
+                {idx > 0 ? gap : ""}
+                {cell}
               </Text>
             ))}
           </Box>
         ))}
-        {hiddenCount > 0 && (
-          <Text dimColor>{`+${hiddenCount} more — /positions for all`}</Text>
-        )}
+        {hiddenCount > 0 && <Text dimColor>{`+${hiddenCount} more — /positions for all`}</Text>}
         <Text dimColor>{"─".repeat(lineWidth)}</Text>
         <Box>
           <Text bold>{footer.label}</Text>
-          <Text bold color={getMoneyColor(totalPnl, theme)}>{footer.pnl}</Text>
+          <Text bold color={getMoneyColor(totalPnl, theme)}>
+            {footer.pnl}
+          </Text>
         </Box>
       </Box>
     </Box>

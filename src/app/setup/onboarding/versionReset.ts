@@ -59,13 +59,16 @@ export function loadOnboardingState(): OnboardingState {
 export function saveOnboardingState(state: OnboardingState): void {
   const gordonDir = getGordonDir();
   if (!existsSync(gordonDir)) mkdirSync(gordonDir, { recursive: true });
-  writeFileSync(getOnboardingStateFile(), JSON.stringify(state, null, 2), { encoding: "utf-8", mode: 0o600 });
+  writeFileSync(getOnboardingStateFile(), JSON.stringify(state, null, 2), {
+    encoding: "utf-8",
+    mode: 0o600,
+  });
 }
 
 /**
  * Check if onboarding needs to be re-triggered due to a version bump.
  */
-export function needsVersionReset(currentVersion: string): boolean {
+export function needsVersionReset(_currentVersion: string): boolean {
   const state = loadOnboardingState();
   if (!state.completedOnce) return false; // First-time users get the full wizard, not reset
   if (!state.lastOnboardingVersion) return true;

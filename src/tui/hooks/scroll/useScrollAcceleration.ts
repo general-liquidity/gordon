@@ -1,8 +1,8 @@
 import { useRef, useCallback } from "react";
 
-const ACCEL_THRESHOLD_MS = 80;   // faster than this = accelerate
-const RESET_THRESHOLD_MS = 300;  // slower than this = reset
-const MAX_ACCEL = 8;             // cap multiplier at 8x
+const ACCEL_THRESHOLD_MS = 80; // faster than this = accelerate
+const RESET_THRESHOLD_MS = 300; // slower than this = reset
+const MAX_ACCEL = 8; // cap multiplier at 8x
 
 interface AccelState {
   lastPressMs: number;

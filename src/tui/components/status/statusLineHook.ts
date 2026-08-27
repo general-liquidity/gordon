@@ -36,18 +36,12 @@ export interface StatusLineRunResult {
 }
 
 /** Pluggable runner — real impl spawns a shell; tests inject a fake. */
-export type StatusLineRunner = (
-  command: string,
-  timeoutMs: number,
-) => Promise<StatusLineRunResult>;
+export type StatusLineRunner = (command: string, timeoutMs: number) => Promise<StatusLineRunResult>;
 
 // ESC (0x1B) followed by a CSI/OSC/other escape sequence.
-const ANSI_ESCAPE_RE = new RegExp(
-  "\\u001B(?:\\[[0-9;?]*[ -/]*[@-~]|\\][^\\u0007]*\\u0007|[@-Z\\\\-_])",
-  "g",
-);
+const ANSI_ESCAPE_RE = /\u001B(?:\[[0-9;?]*[ -/]*[@-~]|\][^\u0007]*\u0007|[@-Z\\-_])/g;
 // C0 (0x00-0x1F), DEL (0x7F), and C1 (0x80-0x9F) control characters.
-const CONTROL_CHAR_RE = new RegExp("[\\u0000-\\u001F\\u007F-\\u009F]", "g");
+const CONTROL_CHAR_RE = /[\u0000-\u001F\u007F-\u009F]/g;
 
 /**
  * Strip control characters and ANSI escapes, collapse all whitespace runs to a
@@ -65,7 +59,7 @@ export function sanitizeStatusLineOutput(raw: string): string | null {
     .trim();
   if (collapsed.length === 0) return null;
   return collapsed.length > STATUS_LINE_RENDER_CAP
-    ? collapsed.slice(0, STATUS_LINE_RENDER_CAP - 1) + "…"
+    ? `${collapsed.slice(0, STATUS_LINE_RENDER_CAP - 1)}…`
     : collapsed;
 }
 
@@ -88,12 +82,15 @@ export const defaultStatusLineRunner: StatusLineRunner = (command, timeoutMs) =>
       resolvePromise(r);
     };
 
-    let child;
+    let child: ReturnType<typeof spawn>;
     try {
       const isWin = process.platform === "win32";
       child = isWin
         ? spawn("cmd.exe", ["/d", "/s", "/c", command], { stdio: ["ignore", "pipe", "ignore"] })
-        : spawn("/bin/sh", ["-c", command], { stdio: ["ignore", "pipe", "ignore"], detached: true });
+        : spawn("/bin/sh", ["-c", command], {
+            stdio: ["ignore", "pipe", "ignore"],
+            detached: true,
+          });
     } catch {
       settle({ stdout: "", exitCode: null, timedOut: false, spawnFailed: true });
       return;

@@ -11,7 +11,10 @@ function seededRand(seed: number): () => number {
 
 describe("KPSS test", () => {
   test("MATH-ANCHOR: level critical values are KPSS (1992) Table 1", () => {
-    const r = runKpssTest({ series: Array.from({ length: 50 }, (_, i) => Math.sin(i)), regression: "c" });
+    const r = runKpssTest({
+      series: Array.from({ length: 50 }, (_, i) => Math.sin(i)),
+      regression: "c",
+    });
     expect(r.criticalValues[0.1]).toBe(0.347);
     expect(r.criticalValues[0.05]).toBe(0.463);
     expect(r.criticalValues[0.025]).toBe(0.574);
@@ -19,7 +22,10 @@ describe("KPSS test", () => {
   });
 
   test("trend critical values differ from level", () => {
-    const r = runKpssTest({ series: Array.from({ length: 50 }, (_, i) => i + Math.sin(i)), regression: "ct" });
+    const r = runKpssTest({
+      series: Array.from({ length: 50 }, (_, i) => i + Math.sin(i)),
+      regression: "ct",
+    });
     expect(r.criticalValues[0.05]).toBe(0.146);
   });
 

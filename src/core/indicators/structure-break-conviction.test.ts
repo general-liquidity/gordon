@@ -11,9 +11,7 @@ function bar(low: number, close: number): Candle {
 // Uptrend with two ascending HIGHER LOWS (90 @ idx2, 100 @ idx9) then a decline.
 // lastClose set per-test to break zero / one / two of them.
 function bearishScaffold(lastClose: number): Candle[] {
-  const lows = [
-    96, 94, 90, 92, 94, 95, 95, 104, 102, 100, 102, 104, 104, 104, 100, 95, 90, 88, 86,
-  ];
+  const lows = [96, 94, 90, 92, 94, 95, 95, 104, 102, 100, 102, 104, 104, 104, 100, 95, 90, 88, 86];
   const candles = lows.map((l) => bar(l, l + 0.5));
   candles.push({ open: 86, high: 101, low: 84, close: lastClose, volume: 1 });
   return candles;

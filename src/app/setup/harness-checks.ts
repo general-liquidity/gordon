@@ -16,10 +16,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import {
-  runInitProbes,
-  type Probe,
-} from "../../infra/diagnostics/initProbe.ts";
+import { runInitProbes, type Probe } from "../../infra/diagnostics/initProbe.ts";
 import {
   isSafetyConfigGuardEnabled,
   validateAgainstBaseline,
@@ -37,12 +34,7 @@ import {
   type FilesystemWriteGuardStatus,
 } from "../../infra/safety/filesystemWriteGuardInstaller.ts";
 import { buildTransportGuardCoverageReport } from "../../infra/safety/transportGuardCoverage.ts";
-import {
-  readCacheCalls,
-  summarizeHitRate,
-} from "../../infra/agents/runtime/kvCacheHitMetric.ts";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readCacheCalls, summarizeHitRate } from "../../infra/agents/runtime/kvCacheHitMetric.ts";
 import type { DoctorCheck } from "./setup-runtime.ts";
 import {
   checkAgentReadiness,
@@ -133,16 +125,16 @@ export function defaultGordonProbes(): Probe[] {
  * Run init probes and convert results into DoctorCheck entries so they
  * surface alongside the existing checks.
  */
-export async function collectInitProbeChecks(extraProbes: readonly Probe[] = []): Promise<DoctorCheck[]> {
+export async function collectInitProbeChecks(
+  extraProbes: readonly Probe[] = [],
+): Promise<DoctorCheck[]> {
   const probes: Probe[] = [...defaultGordonProbes(), ...extraProbes];
   const report = await runInitProbes(probes);
   return report.results.map((r) => ({
     id: `probe.${r.id}`,
     ok: r.status === "pass" || r.status === "skip",
     severity: r.status === "fail" ? "error" : "info",
-    message: r.fixInstruction
-      ? `${r.message} — fix: ${r.fixInstruction}`
-      : r.message,
+    message: r.fixInstruction ? `${r.message} — fix: ${r.fixInstruction}` : r.message,
   }));
 }
 
@@ -225,20 +217,23 @@ export function collectSandboxChecks(
       id: "sandbox.network_allowlist",
       ok: false,
       severity: "warn",
-      message: "Network allowlist disabled via GORDON_NETWORK_ALLOWLIST — outbound fetches are unguarded.",
+      message:
+        "Network allowlist disabled via GORDON_NETWORK_ALLOWLIST — outbound fetches are unguarded.",
     });
   } else if (!fetchGuard.installed) {
     checks.push({
       id: "sandbox.network_allowlist",
       ok: false,
       severity: "error",
-      message: "Network allowlist enabled but the outbound fetch guard is NOT installed — the policy is inert. installProductionGuards() should run at process entry.",
+      message:
+        "Network allowlist enabled but the outbound fetch guard is NOT installed — the policy is inert. installProductionGuards() should run at process entry.",
     });
   } else {
     const hosts = listAllowedHosts().length;
-    const violations = fetchGuard.warnViolations > 0
-      ? ` ${fetchGuard.warnViolations} warn-mode violation(s) this session; recent hosts: ${fetchGuard.recentViolations.slice(-3).join(", ")}.`
-      : "";
+    const violations =
+      fetchGuard.warnViolations > 0
+        ? ` ${fetchGuard.warnViolations} warn-mode violation(s) this session; recent hosts: ${fetchGuard.recentViolations.slice(-3).join(", ")}.`
+        : "";
     checks.push({
       id: "sandbox.network_allowlist",
       ok: true,
@@ -252,20 +247,23 @@ export function collectSandboxChecks(
       id: "sandbox.filesystem_write_guard",
       ok: false,
       severity: "warn",
-      message: "Filesystem write guard disabled via GORDON_FILESYSTEM_WRITE_GUARD — writes are unguarded.",
+      message:
+        "Filesystem write guard disabled via GORDON_FILESYSTEM_WRITE_GUARD — writes are unguarded.",
     });
   } else if (!fsGuard.installed) {
     checks.push({
       id: "sandbox.filesystem_write_guard",
       ok: false,
       severity: "error",
-      message: "Filesystem write guard enabled but NOT installed — the policy is inert. installProductionGuards() should run at process entry.",
+      message:
+        "Filesystem write guard enabled but NOT installed — the policy is inert. installProductionGuards() should run at process entry.",
     });
   } else {
     const paths = listAllowedPaths().length;
-    const violations = fsGuard.warnViolations > 0
-      ? ` ${fsGuard.warnViolations} warn-mode violation(s) this session; recent paths: ${fsGuard.recentViolations.slice(-3).join(", ")}.`
-      : "";
+    const violations =
+      fsGuard.warnViolations > 0
+        ? ` ${fsGuard.warnViolations} warn-mode violation(s) this session; recent paths: ${fsGuard.recentViolations.slice(-3).join(", ")}.`
+        : "";
     checks.push({
       id: "sandbox.filesystem_write_guard",
       ok: true,

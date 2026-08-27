@@ -21,7 +21,6 @@ import {
   getOutcomeTracker,
   autoRecordFromStore,
   buildCandidate,
-  ALL_CATEGORIES,
   OUTCOME_LABELS,
   getActiveJudge,
   setActiveJudge,
@@ -30,7 +29,11 @@ import {
   type ProactiveCategory,
   type SuggestionOutcome,
 } from "../../../../proactive/index.ts";
-import { startProactiveObserver, stopProactiveObserver, isObserverRunning } from "../../../../proactive/engine/observer.ts";
+import {
+  startProactiveObserver,
+  stopProactiveObserver,
+  isObserverRunning,
+} from "../../../../proactive/engine/observer.ts";
 
 const CATEGORY_SCHEMA = z.enum([
   "regime_flip",
@@ -48,9 +51,7 @@ const CATEGORY_SCHEMA = z.enum([
   "news_event",
 ]);
 
-const STATUS_SCHEMA = z.enum([
-  "pending", "accepted", "dismissed", "suppressed", "expired",
-]);
+const STATUS_SCHEMA = z.enum(["pending", "accepted", "dismissed", "suppressed", "expired"]);
 
 // ============================================================================
 // 1. start_proactive_mode
@@ -288,7 +289,12 @@ export const suppressProactiveCategoryTool = createTool({
     "scoped and automatically expires.",
   inputSchema: z.object({
     category: CATEGORY_SCHEMA,
-    durationMinutes: z.number().int().min(1).max(24 * 60).default(60),
+    durationMinutes: z
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 60)
+      .default(60),
   }),
   outputSchema: z.object({
     category: z.string(),
@@ -311,7 +317,8 @@ export const suppressProactiveCategoryTool = createTool({
 
 export const unsuppressProactiveCategoryTool = createTool({
   id: "unsuppress_proactive_category",
-  description: "Remove an explicit suppression on a proactive category, restoring normal cooldown behavior.",
+  description:
+    "Remove an explicit suppression on a proactive category, restoring normal cooldown behavior.",
   inputSchema: z.object({
     category: CATEGORY_SCHEMA,
   }),
@@ -417,20 +424,15 @@ export const fireProactiveSuggestionTool = createTool({
     judgeReasoning: z.string().optional(),
   }),
   execute: async ({ category, title, body, action, confidence, symbol, metadata }) => {
-    const candidate = buildCandidate(
-      category as ProactiveCategory,
-      title,
-      body,
-      {
-        action,
-        confidence,
-        triggers: {
-          source: "manual",
-          symbol,
-          metadata,
-        },
+    const candidate = buildCandidate(category as ProactiveCategory, title, body, {
+      action,
+      confidence,
+      triggers: {
+        source: "manual",
+        symbol,
+        metadata,
       },
-    );
+    });
     const result = await getProactiveEngine().fireCandidate({
       category: candidate.category,
       title: candidate.title,
@@ -464,7 +466,12 @@ export const configureProactiveCategoryTool = createTool({
     "alerts' or 'let me see more regime flips'. Changes apply immediately.",
   inputSchema: z.object({
     category: CATEGORY_SCHEMA,
-    cooldownMinutes: z.number().int().min(1).max(24 * 60).optional(),
+    cooldownMinutes: z
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 60)
+      .optional(),
     minConfidence: z.number().min(0).max(1).optional(),
     maxPerHour: z.number().int().min(0).max(100).optional(),
   }),

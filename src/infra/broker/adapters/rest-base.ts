@@ -71,7 +71,7 @@ export class MalformedBrokerOrderError extends Error {
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : null;
 }
 
@@ -170,7 +170,9 @@ function unwrapPayload(payload: unknown): unknown {
 }
 
 function normalizeOrderType(value: unknown): BrokerOrderType {
-  const normalized = String(value ?? "").trim().toLowerCase();
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
   switch (normalized) {
     case "market":
     case "mkt":
@@ -195,7 +197,9 @@ function normalizeOrderType(value: unknown): BrokerOrderType {
 }
 
 function normalizeTimeInForce(value: unknown): BrokerTimeInForce {
-  const normalized = String(value ?? "").trim().toLowerCase();
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
   switch (normalized) {
     case "day":
     case "gtc":
@@ -240,7 +244,9 @@ function normalizeOrderStatus(value: unknown): BrokerOrderStatus {
 }
 
 function normalizeSide(value: unknown): "buy" | "sell" {
-  const normalized = String(value ?? "").trim().toLowerCase();
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
   if (normalized === "sell" || normalized === "s") return "sell";
   return "buy";
 }
@@ -269,7 +275,10 @@ function fallbackClock(): BrokerClock {
   };
 }
 
-function buildDefaultOrderBody(params: BrokerOrderRequest, accountId: string): { body: BodyInit; contentType: string } {
+function buildDefaultOrderBody(
+  params: BrokerOrderRequest,
+  accountId: string,
+): { body: BodyInit; contentType: string } {
   const payload: Record<string, unknown> = {
     accountId,
     account_id: accountId,
@@ -328,14 +337,16 @@ export class RestBrokerAdapter implements BrokerAdapter {
 
     const paper = credentials.paper ?? true;
     this.isPaper = paper;
-    this.baseUrl = credentials.baseUrl
-      || (paper && config.defaultPaperBaseUrl ? config.defaultPaperBaseUrl : config.defaultLiveBaseUrl);
-    this.dataBaseUrl = credentials.dataBaseUrl
-      || (
-        paper && config.defaultPaperDataBaseUrl
-          ? config.defaultPaperDataBaseUrl
-          : config.defaultLiveDataBaseUrl || this.baseUrl
-      );
+    this.baseUrl =
+      credentials.baseUrl ||
+      (paper && config.defaultPaperBaseUrl
+        ? config.defaultPaperBaseUrl
+        : config.defaultLiveBaseUrl);
+    this.dataBaseUrl =
+      credentials.dataBaseUrl ||
+      (paper && config.defaultPaperDataBaseUrl
+        ? config.defaultPaperDataBaseUrl
+        : config.defaultLiveDataBaseUrl || this.baseUrl);
     this.accountIdCache = credentials.accountId;
 
     // Initialize token manager for bearer auth when OAuth2 credentials are available.
@@ -358,7 +369,10 @@ export class RestBrokerAdapter implements BrokerAdapter {
     }
   }
 
-  protected renderPath(template: string, vars: Record<string, string | number | undefined>): string {
+  protected renderPath(
+    template: string,
+    vars: Record<string, string | number | undefined>,
+  ): string {
     return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key) => {
       const value = vars[key];
       if (value === undefined || value === null) return "";
@@ -374,7 +388,9 @@ export class RestBrokerAdapter implements BrokerAdapter {
       const token = bearerToken ?? this.credentials.apiKey;
       headers.set("authorization", `Bearer ${token}`);
     } else if (this.config.authStyle === "basic") {
-      const token = Buffer.from(`${this.credentials.apiKey}:${this.credentials.apiSecret}`).toString("base64");
+      const token = Buffer.from(
+        `${this.credentials.apiKey}:${this.credentials.apiSecret}`,
+      ).toString("base64");
       headers.set("authorization", `Basic ${token}`);
     } else if (this.config.authStyle === "none" && this.credentials.apiKey) {
       headers.set("x-api-key", this.credentials.apiKey);
@@ -398,9 +414,7 @@ export class RestBrokerAdapter implements BrokerAdapter {
     const url = new URL(path, base).toString();
 
     // Ensure bearer token is fresh before sending the request.
-    const bearerToken = this.tokenManager
-      ? await this.tokenManager.ensureValidToken()
-      : undefined;
+    const bearerToken = this.tokenManager ? await this.tokenManager.ensureValidToken() : undefined;
     const headers = this.buildHeaders(init?.headers, bearerToken);
 
     if (init?.body && !headers.has("content-type")) {
@@ -412,7 +426,9 @@ export class RestBrokerAdapter implements BrokerAdapter {
       const body = await response.text();
       const safeBody = redactString(body).slice(0, 500);
       const details = safeBody.trim().length > 0 ? `: ${safeBody}` : "";
-      throw new Error(`${this.displayName} API ${response.status} ${response.statusText}${details}`);
+      throw new Error(
+        `${this.displayName} API ${response.status} ${response.statusText}${details}`,
+      );
     }
 
     if (response.status === 204) return undefined as T;
@@ -470,7 +486,9 @@ export class RestBrokerAdapter implements BrokerAdapter {
     const accountId = String(directId ?? "").trim();
 
     if (!accountId) {
-      throw new Error(`${this.displayName} account ID could not be resolved. Set accountId in broker config.`);
+      throw new Error(
+        `${this.displayName} account ID could not be resolved. Set accountId in broker config.`,
+      );
     }
 
     this.accountIdCache = accountId;
@@ -481,18 +499,24 @@ export class RestBrokerAdapter implements BrokerAdapter {
     const raw = asRecord(input) || {};
 
     const id = String(
-      raw.id
-        ?? raw.orderId
-        ?? raw.order_id
-        ?? raw.orderid
-        ?? raw.order_id_key
-        ?? raw.referenceNumber
-        ?? ""
+      raw.id ??
+        raw.orderId ??
+        raw.order_id ??
+        raw.orderid ??
+        raw.order_id_key ??
+        raw.referenceNumber ??
+        "",
     ).trim();
     if (id.length === 0) {
-      throw new MalformedBrokerOrderError(`${this.displayName} order response is missing an order id`);
+      throw new MalformedBrokerOrderError(
+        `${this.displayName} order response is missing an order id`,
+      );
     }
-    if (raw.status === undefined && raw.orderStatus === undefined && raw.order_status === undefined) {
+    if (
+      raw.status === undefined &&
+      raw.orderStatus === undefined &&
+      raw.order_status === undefined
+    ) {
       throw new MalformedBrokerOrderError(
         `${this.displayName} order response is missing status (order ${id})`,
       );
@@ -502,22 +526,38 @@ export class RestBrokerAdapter implements BrokerAdapter {
 
     return {
       id,
-      clientOrderId: String(raw.clientOrderId ?? raw.client_order_id ?? raw.clientOrderID ?? "").trim() || undefined,
+      clientOrderId:
+        String(raw.clientOrderId ?? raw.client_order_id ?? raw.clientOrderID ?? "").trim() ||
+        undefined,
       symbol: String(raw.symbol ?? raw.ticker ?? raw.security ?? raw.instrument ?? ""),
       side: normalizeSide(raw.side ?? raw.orderAction ?? raw.action),
       type: normalizeOrderType(raw.type ?? raw.orderType ?? raw.order_type),
-      timeInForce: normalizeTimeInForce(raw.timeInForce ?? raw.tif ?? raw.duration ?? raw.orderTerm),
+      timeInForce: normalizeTimeInForce(
+        raw.timeInForce ?? raw.tif ?? raw.duration ?? raw.orderTerm,
+      ),
       status: normalizeOrderStatus(raw.status ?? raw.orderStatus ?? raw.order_status),
-      qty: requireFiniteBrokerField(raw.qty ?? raw.quantity ?? raw.orderQty ?? raw.totalQuantity ?? 0, "qty", this.displayName),
-      filledQty: requireFiniteBrokerField(raw.filledQty ?? raw.filled_quantity ?? raw.executedQuantity ?? raw.filledQuantity ?? 0, "filledQty", this.displayName),
+      qty: requireFiniteBrokerField(
+        raw.qty ?? raw.quantity ?? raw.orderQty ?? raw.totalQuantity ?? 0,
+        "qty",
+        this.displayName,
+      ),
+      filledQty: requireFiniteBrokerField(
+        raw.filledQty ?? raw.filled_quantity ?? raw.executedQuantity ?? raw.filledQuantity ?? 0,
+        "filledQty",
+        this.displayName,
+      ),
       notional: raw.notional !== undefined ? parseNumber(raw.notional) : undefined,
-      limitPrice: limitPriceRaw !== undefined
-        ? requireFiniteBrokerField(limitPriceRaw, "limitPrice", this.displayName)
-        : undefined,
+      limitPrice:
+        limitPriceRaw !== undefined
+          ? requireFiniteBrokerField(limitPriceRaw, "limitPrice", this.displayName)
+          : undefined,
       stopPrice: raw.stopPrice !== undefined ? parseNumber(raw.stopPrice) : undefined,
       extendedHours: parseBoolean(raw.extendedHours ?? raw.outsideRth ?? raw.marketSession),
-      submittedAt: String(raw.submittedAt ?? raw.createdAt ?? raw.orderDate ?? raw.enteredTime ?? "").trim() || undefined,
-      filledAt: String(raw.filledAt ?? raw.closeTime ?? raw.executionTime ?? "").trim() || undefined,
+      submittedAt:
+        String(raw.submittedAt ?? raw.createdAt ?? raw.orderDate ?? raw.enteredTime ?? "").trim() ||
+        undefined,
+      filledAt:
+        String(raw.filledAt ?? raw.closeTime ?? raw.executionTime ?? "").trim() || undefined,
       canceledAt: String(raw.canceledAt ?? raw.cancelTime ?? "").trim() || undefined,
     };
   }
@@ -534,10 +574,19 @@ export class RestBrokerAdapter implements BrokerAdapter {
   async getClock(): Promise<BrokerClock> {
     try {
       const payload = await this.requestCandidates<unknown>(this.config.clockPaths, {});
-      const timestamp = String(findFirstValue(payload, ["timestamp", "time", "dateTime", "serverTime"]) || new Date().toISOString());
-      const isOpen = parseBoolean(findFirstValue(payload, ["isOpen", "is_open", "open", "marketOpen"]));
-      const nextOpen = String(findFirstValue(payload, ["nextOpen", "next_open", "nextOpeningTime"]) || timestamp);
-      const nextClose = String(findFirstValue(payload, ["nextClose", "next_close", "nextClosingTime"]) || timestamp);
+      const timestamp = String(
+        findFirstValue(payload, ["timestamp", "time", "dateTime", "serverTime"]) ||
+          new Date().toISOString(),
+      );
+      const isOpen = parseBoolean(
+        findFirstValue(payload, ["isOpen", "is_open", "open", "marketOpen"]),
+      );
+      const nextOpen = String(
+        findFirstValue(payload, ["nextOpen", "next_open", "nextOpeningTime"]) || timestamp,
+      );
+      const nextClose = String(
+        findFirstValue(payload, ["nextClose", "next_close", "nextClosingTime"]) || timestamp,
+      );
       return { timestamp, isOpen, nextOpen, nextClose };
     } catch {
       return fallbackClock();
@@ -546,20 +595,44 @@ export class RestBrokerAdapter implements BrokerAdapter {
 
   async getAccount(): Promise<BrokerAccount> {
     const accountId = await this.resolveAccountId();
-    const payload = await this.requestCandidates<unknown>(
-      this.config.accountPaths,
-      { accountId },
-    );
+    const payload = await this.requestCandidates<unknown>(this.config.accountPaths, { accountId });
 
-    const id = String(findFirstValue(payload, ["accountId", "account_id", "accountNumber", "account_number", "id"]) || accountId);
-    const status = String(findFirstValue(payload, ["status", "accountStatus", "state"]) || "active");
+    const id = String(
+      findFirstValue(payload, [
+        "accountId",
+        "account_id",
+        "accountNumber",
+        "account_number",
+        "id",
+      ]) || accountId,
+    );
+    const status = String(
+      findFirstValue(payload, ["status", "accountStatus", "state"]) || "active",
+    );
     const currency = String(findFirstValue(payload, ["currency", "baseCurrency"]) || "USD");
-    const cash = parseNumber(findFirstValue(payload, ["cash", "cashBalance", "cashAvailableForTrading", "cashAvailable"]));
-    const buyingPower = parseNumber(findFirstValue(payload, ["buyingPower", "buying_power", "dayTradingBuyingPower", "availableFunds"]));
-    const portfolioValue = parseNumber(findFirstValue(payload, ["portfolioValue", "netLiquidationValue", "totalValue", "equity"]));
-    const patternDayTrader = parseBoolean(findFirstValue(payload, ["patternDayTrader", "isDayTrader", "dayTrader"]));
-    const shortingEnabled = parseBoolean(findFirstValue(payload, ["shortingEnabled", "shortEnabled", "canShort"]));
-    const tradingBlocked = parseBoolean(findFirstValue(payload, ["tradingBlocked", "isBlocked", "tradeBlocked"]));
+    const cash = parseNumber(
+      findFirstValue(payload, ["cash", "cashBalance", "cashAvailableForTrading", "cashAvailable"]),
+    );
+    const buyingPower = parseNumber(
+      findFirstValue(payload, [
+        "buyingPower",
+        "buying_power",
+        "dayTradingBuyingPower",
+        "availableFunds",
+      ]),
+    );
+    const portfolioValue = parseNumber(
+      findFirstValue(payload, ["portfolioValue", "netLiquidationValue", "totalValue", "equity"]),
+    );
+    const patternDayTrader = parseBoolean(
+      findFirstValue(payload, ["patternDayTrader", "isDayTrader", "dayTrader"]),
+    );
+    const shortingEnabled = parseBoolean(
+      findFirstValue(payload, ["shortingEnabled", "shortEnabled", "canShort"]),
+    );
+    const tradingBlocked = parseBoolean(
+      findFirstValue(payload, ["tradingBlocked", "isBlocked", "tradeBlocked"]),
+    );
 
     return {
       id,
@@ -576,11 +649,15 @@ export class RestBrokerAdapter implements BrokerAdapter {
 
   async getPositions(): Promise<BrokerPosition[]> {
     const accountId = await this.resolveAccountId();
-    const payload = await this.requestCandidates<unknown>(this.config.positionsPaths, { accountId });
+    const payload = await this.requestCandidates<unknown>(this.config.positionsPaths, {
+      accountId,
+    });
     const positionsRaw =
-      (findFirstValue(payload, ["positions", "position", "securitiesAccountPositions"]) as unknown[] | undefined)
-      ?? findFirstArray(payload)
-      ?? [];
+      (findFirstValue(payload, ["positions", "position", "securitiesAccountPositions"]) as
+        | unknown[]
+        | undefined) ??
+      findFirstArray(payload) ??
+      [];
 
     return positionsRaw.map((entry) => {
       const row = asRecord(entry) || {};
@@ -592,8 +669,12 @@ export class RestBrokerAdapter implements BrokerAdapter {
         side,
         marketValue: parseNumber(row.marketValue ?? row.market_value ?? row.currentValue),
         avgEntryPrice: parseNumber(row.avgEntryPrice ?? row.averagePrice ?? row.costBasisPrice),
-        unrealizedPl: parseNumber(row.unrealizedPl ?? row.unrealizedPnl ?? row.unrealizedProfitLoss),
-        unrealizedPlPercent: parseNumber(row.unrealizedPlPercent ?? row.unrealizedPnlPercent ?? row.unrealizedProfitLossPercent),
+        unrealizedPl: parseNumber(
+          row.unrealizedPl ?? row.unrealizedPnl ?? row.unrealizedProfitLoss,
+        ),
+        unrealizedPlPercent: parseNumber(
+          row.unrealizedPlPercent ?? row.unrealizedPnlPercent ?? row.unrealizedProfitLossPercent,
+        ),
       };
     });
   }
@@ -601,7 +682,11 @@ export class RestBrokerAdapter implements BrokerAdapter {
   async getOpenOrders(limit = 50): Promise<BrokerOrder[]> {
     const accountId = await this.resolveAccountId();
     if (this.config.openOrdersPaths && this.config.openOrdersPaths.length > 0) {
-      const payload = await this.requestCandidates<unknown>(this.config.openOrdersPaths, { accountId, limit, status: "open" });
+      const payload = await this.requestCandidates<unknown>(this.config.openOrdersPaths, {
+        accountId,
+        limit,
+        status: "open",
+      });
       const rows = (findFirstArray(payload) ?? []) as unknown[];
       return rows.map((row) => this.toBrokerOrder(row));
     }
@@ -614,27 +699,31 @@ export class RestBrokerAdapter implements BrokerAdapter {
     const status = params?.status || "open";
     const mappedStatus = this.config.mapStatusParam ? this.config.mapStatusParam(status) : status;
     const limit = params?.limit || 50;
-    const payload = await this.requestCandidates<unknown>(
-      this.config.listOrdersPaths,
-      { accountId, status: mappedStatus, limit },
-    );
+    const payload = await this.requestCandidates<unknown>(this.config.listOrdersPaths, {
+      accountId,
+      status: mappedStatus,
+      limit,
+    });
 
-    const rows = (findFirstValue(payload, ["orders", "orderStrategies", "order"]) as unknown[] | undefined)
-      ?? findFirstArray(payload)
-      ?? [];
+    const rows =
+      (findFirstValue(payload, ["orders", "orderStrategies", "order"]) as unknown[] | undefined) ??
+      findFirstArray(payload) ??
+      [];
     return rows.map((row) => this.toBrokerOrder(row));
   }
 
   async getOrder(orderId: string): Promise<BrokerOrder> {
     const accountId = await this.resolveAccountId();
-    const payload = await this.requestCandidates<unknown>(
-      this.config.getOrderPaths,
-      { accountId, orderId },
-    );
+    const payload = await this.requestCandidates<unknown>(this.config.getOrderPaths, {
+      accountId,
+      orderId,
+    });
 
     const rows = findFirstArray(payload);
     if (rows && rows.length > 0) {
-      const exact = rows.find((row) => String(findFirstValue(row, ["id", "orderId", "order_id"])) === orderId);
+      const exact = rows.find(
+        (row) => String(findFirstValue(row, ["id", "orderId", "order_id"])) === orderId,
+      );
       return this.toBrokerOrder(exact ?? rows[0]);
     }
 
@@ -649,9 +738,14 @@ export class RestBrokerAdapter implements BrokerAdapter {
     // Kill-switch chokepoint — read-only, idempotent. Rejects orders that
     // reach the adapter while a venue/instrument/firm switch is tripped.
     if (isKillSwitchesEnabled()) {
-      const decision = isExecutionAllowed({ venue: this.config.brokerId, instrument: params.symbol.toUpperCase() });
+      const decision = isExecutionAllowed({
+        venue: this.config.brokerId,
+        instrument: params.symbol.toUpperCase(),
+      });
       if (!decision.allowed) {
-        throw new Error(`${decision.reason}. Reset the relevant kill switch before placing this order.`);
+        throw new Error(
+          `${decision.reason}. Reset the relevant kill switch before placing this order.`,
+        );
       }
     }
 
@@ -710,11 +804,11 @@ export class RestBrokerAdapter implements BrokerAdapter {
 
     const quotesValue = findFirstValue(payload, ["quotes", "quote", "data"]);
     const quoteRecord =
-      asRecord(quotesValue)
-      || asRecord(findFirstArray(quotesValue)?.[0])
-      || asRecord(findFirstArray(payload)?.[0])
-      || asRecord(payload)
-      || {};
+      asRecord(quotesValue) ||
+      asRecord(findFirstArray(quotesValue)?.[0]) ||
+      asRecord(findFirstArray(payload)?.[0]) ||
+      asRecord(payload) ||
+      {};
 
     return {
       symbol: String(quoteRecord.symbol ?? quoteRecord.ticker ?? upper),
@@ -722,11 +816,18 @@ export class RestBrokerAdapter implements BrokerAdapter {
       bidSize: parseNumber(quoteRecord.bidSize ?? quoteRecord.bid_size ?? quoteRecord.bs),
       askPrice: parseNumber(quoteRecord.askPrice ?? quoteRecord.ask ?? quoteRecord.ap),
       askSize: parseNumber(quoteRecord.askSize ?? quoteRecord.ask_size ?? quoteRecord.as),
-      timestamp: String(quoteRecord.timestamp ?? quoteRecord.time ?? quoteRecord.quoteTime ?? new Date().toISOString()),
+      timestamp: String(
+        quoteRecord.timestamp ??
+          quoteRecord.time ??
+          quoteRecord.quoteTime ??
+          new Date().toISOString(),
+      ),
     };
   }
 
   async getHistoricalBars(_params: BrokerHistoricalBarsParams): Promise<Candle[]> {
-    throw new Error(`${this.displayName} does not expose normalized historical bars in Gordon yet.`);
+    throw new Error(
+      `${this.displayName} does not expose normalized historical bars in Gordon yet.`,
+    );
   }
 }

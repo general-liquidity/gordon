@@ -12,7 +12,12 @@
 
 import { loadConfig } from "../../infra/storage/config/config.ts";
 import { BrokerFactory } from "../../infra/broker/factory.ts";
-import { resolveBrokerCredentials, type BrokerAdapter, type BrokerId, type BrokerTimeInForce } from "../../infra/broker/types.ts";
+import {
+  resolveBrokerCredentials,
+  type BrokerAdapter,
+  type BrokerId,
+  type BrokerTimeInForce,
+} from "../../infra/broker/types.ts";
 import { checkEnvStatus } from "../../infra/storage/config/env.ts";
 
 interface ActiveBrokerResolution {
@@ -36,7 +41,14 @@ function parsePositiveNumber(value: string): number | null {
 function parseTimeInForce(value: string | undefined): BrokerTimeInForce | null {
   if (!value) return "day";
   const normalized = value.toLowerCase();
-  if (normalized === "day" || normalized === "gtc" || normalized === "opg" || normalized === "cls" || normalized === "ioc" || normalized === "fok") {
+  if (
+    normalized === "day" ||
+    normalized === "gtc" ||
+    normalized === "opg" ||
+    normalized === "cls" ||
+    normalized === "ioc" ||
+    normalized === "fok"
+  ) {
     return normalized;
   }
   return null;
@@ -55,7 +67,9 @@ async function resolveActiveBroker(): Promise<ActiveBrokerResolution> {
 
     const creds = resolveBrokerCredentials(active);
     if (!creds.apiKey || !creds.apiSecret) {
-      throw new Error(`Missing credentials for broker "${active.id}". Run /setup to configure broker keys.`);
+      throw new Error(
+        `Missing credentials for broker "${active.id}". Run /setup to configure broker keys.`,
+      );
     }
 
     return {
@@ -124,16 +138,21 @@ async function resolveActiveBroker(): Promise<ActiveBrokerResolution> {
   throw new Error("No broker configured. Use /setup or /broker add first.");
 }
 
-function parseOrderArgs(args: string[]): {
-  symbol: string;
-  qty?: number;
-  notional?: number;
-  type: "market" | "limit";
-  limitPrice?: number;
-  timeInForce: BrokerTimeInForce;
-} | { error: string } {
+function _parseOrderArgs(args: string[]):
+  | {
+      symbol: string;
+      qty?: number;
+      notional?: number;
+      type: "market" | "limit";
+      limitPrice?: number;
+      timeInForce: BrokerTimeInForce;
+    }
+  | { error: string } {
   if (args.length < 2 || !args[0] || !args[1]) {
-    return { error: "Usage: /stocks buy|sell <symbol> <qty|$notional> [market|limit <price>] [day|gtc|ioc|fok]" };
+    return {
+      error:
+        "Usage: /stocks buy|sell <symbol> <qty|$notional> [market|limit <price>] [day|gtc|ioc|fok]",
+    };
   }
 
   const symbol = args[0].toUpperCase();
@@ -171,7 +190,9 @@ function parseOrderArgs(args: string[]): {
     const priceToken = args[index];
     const parsedPrice = parsePositiveNumber(priceToken || "");
     if (!parsedPrice) {
-      return { error: "Limit orders require a valid price: /stocks buy <symbol> <qty> limit <price>" };
+      return {
+        error: "Limit orders require a valid price: /stocks buy <symbol> <qty> limit <price>",
+      };
     }
     limitPrice = parsedPrice;
     index += 1;
@@ -262,8 +283,9 @@ async function stocksPositions(): Promise<StocksCommandResult> {
 
     const lines = [
       `Open stock positions (${brokerId}, ${paper ? "PAPER" : "LIVE"}):`,
-      ...positions.map((position) =>
-        `  ${position.symbol}: ${position.qty} ${position.side} | MV $${position.marketValue.toFixed(2)} | PnL $${position.unrealizedPl.toFixed(2)} (${(position.unrealizedPlPercent * 100).toFixed(2)}%)`
+      ...positions.map(
+        (position) =>
+          `  ${position.symbol}: ${position.qty} ${position.side} | MV $${position.marketValue.toFixed(2)} | PnL $${position.unrealizedPl.toFixed(2)} (${(position.unrealizedPlPercent * 100).toFixed(2)}%)`,
       ),
     ];
 
@@ -276,7 +298,10 @@ async function stocksPositions(): Promise<StocksCommandResult> {
   }
 }
 
-async function stocksOrders(statusArg: string | undefined, limitArg: string | undefined): Promise<StocksCommandResult> {
+async function stocksOrders(
+  statusArg: string | undefined,
+  limitArg: string | undefined,
+): Promise<StocksCommandResult> {
   try {
     const { broker, brokerId, paper } = await resolveActiveBroker();
     const status = (statusArg || "open").toLowerCase();
@@ -286,12 +311,13 @@ async function stocksOrders(statusArg: string | undefined, limitArg: string | un
       return { success: false, message: `Invalid limit: ${limitArg}` };
     }
 
-    const orders = status === "open"
-      ? await broker.getOpenOrders(limit)
-      : await broker.listOrders({
-          status: status === "all" || status === "closed" ? status : "open",
-          limit,
-        });
+    const orders =
+      status === "open"
+        ? await broker.getOpenOrders(limit)
+        : await broker.listOrders({
+            status: status === "all" || status === "closed" ? status : "open",
+            limit,
+          });
 
     if (orders.length === 0) {
       return {
@@ -302,8 +328,9 @@ async function stocksOrders(statusArg: string | undefined, limitArg: string | un
 
     const lines = [
       `${status.toUpperCase()} stock orders (${brokerId}, ${paper ? "PAPER" : "LIVE"}):`,
-      ...orders.map((order) =>
-        `  ${order.symbol}: ${order.side.toUpperCase()} ${order.qty || order.notional || 0} ${order.type.toUpperCase()} ${order.status}`
+      ...orders.map(
+        (order) =>
+          `  ${order.symbol}: ${order.side.toUpperCase()} ${order.qty || order.notional || 0} ${order.type.toUpperCase()} ${order.status}`,
       ),
     ];
     return { success: true, message: lines.join("\n") };

@@ -68,10 +68,7 @@ export const DEFAULT_MATCHER: Required<Omit<MatcherConfig, "ignoreQueryParams">>
  * query params and sort the remaining params so param ordering never
  * affects a match. Non-URL strings are returned untouched.
  */
-export function canonicalizeUrl(
-  rawUrl: string,
-  ignoreQueryParams: readonly string[],
-): string {
+export function canonicalizeUrl(rawUrl: string, ignoreQueryParams: readonly string[]): string {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);

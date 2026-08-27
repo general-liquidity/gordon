@@ -10,20 +10,10 @@
 // The custom pipeline bootstraps Yoga + reconciler + output painting, so
 // this is a genuine end-to-end smoke test.
 
-import {
-  describe,
-  expect,
-  test,
-  afterEach,
-  beforeEach,
-} from "bun:test";
+import { describe, expect, test, afterEach, beforeEach } from "bun:test";
 import React from "react";
 import { PassThrough } from "node:stream";
-import {
-  render,
-  shouldUseCustomRenderer,
-  _resetFallbackNoticeForTests,
-} from "./render.ts";
+import { render, shouldUseCustomRenderer, _resetFallbackNoticeForTests } from "./render.ts";
 import Box from "./components/Box.ts";
 import Text from "./components/Text.ts";
 import Static from "./components/Static.ts";
@@ -32,12 +22,12 @@ import useStdout from "./hooks/use-stdout.ts";
 import AppContext from "./contexts/AppContext.ts";
 import StdoutContext from "./contexts/StdoutContext.ts";
 
-const originalEnv = process.env["GORDON_CUSTOM_RENDER"];
-const originalMigrationEnabled = process.env["GORDON_POOL_MIGRATION_ENABLED"];
-const originalMigrationInterval = process.env["GORDON_POOL_MIGRATION_INTERVAL_MS"];
-const originalTerm = process.env["TERM"];
-const originalTmux = process.env["TMUX"];
-const originalSty = process.env["STY"];
+const originalEnv = process.env.GORDON_CUSTOM_RENDER;
+const originalMigrationEnabled = process.env.GORDON_POOL_MIGRATION_ENABLED;
+const originalMigrationInterval = process.env.GORDON_POOL_MIGRATION_INTERVAL_MS;
+const originalTerm = process.env.TERM;
+const originalTmux = process.env.TMUX;
+const originalSty = process.env.STY;
 const screenReaderVars = [
   "INK_SCREEN_READER",
   "ACCESSIBILITY_ENABLED",
@@ -67,20 +57,18 @@ function createMockStdout(): NodeJS.WriteStream & { captured: string } {
 }
 
 afterEach(() => {
-  if (originalEnv === undefined) delete process.env["GORDON_CUSTOM_RENDER"];
-  else process.env["GORDON_CUSTOM_RENDER"] = originalEnv;
-  if (originalMigrationEnabled === undefined)
-    delete process.env["GORDON_POOL_MIGRATION_ENABLED"];
-  else process.env["GORDON_POOL_MIGRATION_ENABLED"] = originalMigrationEnabled;
-  if (originalMigrationInterval === undefined)
-    delete process.env["GORDON_POOL_MIGRATION_INTERVAL_MS"];
-  else process.env["GORDON_POOL_MIGRATION_INTERVAL_MS"] = originalMigrationInterval;
-  if (originalTerm === undefined) delete process.env["TERM"];
-  else process.env["TERM"] = originalTerm;
-  if (originalTmux === undefined) delete process.env["TMUX"];
-  else process.env["TMUX"] = originalTmux;
-  if (originalSty === undefined) delete process.env["STY"];
-  else process.env["STY"] = originalSty;
+  if (originalEnv === undefined) delete process.env.GORDON_CUSTOM_RENDER;
+  else process.env.GORDON_CUSTOM_RENDER = originalEnv;
+  if (originalMigrationEnabled === undefined) delete process.env.GORDON_POOL_MIGRATION_ENABLED;
+  else process.env.GORDON_POOL_MIGRATION_ENABLED = originalMigrationEnabled;
+  if (originalMigrationInterval === undefined) delete process.env.GORDON_POOL_MIGRATION_INTERVAL_MS;
+  else process.env.GORDON_POOL_MIGRATION_INTERVAL_MS = originalMigrationInterval;
+  if (originalTerm === undefined) delete process.env.TERM;
+  else process.env.TERM = originalTerm;
+  if (originalTmux === undefined) delete process.env.TMUX;
+  else process.env.TMUX = originalTmux;
+  if (originalSty === undefined) delete process.env.STY;
+  else process.env.STY = originalSty;
   for (const key of screenReaderVars) {
     const original = originalScreenReaderEnv[key];
     if (original === undefined) delete process.env[key];
@@ -91,13 +79,9 @@ afterEach(() => {
 
 describe("render() integration", () => {
   test("opt-out (GORDON_CUSTOM_RENDER=0): returns vanilla Ink Instance", () => {
-    process.env["GORDON_CUSTOM_RENDER"] = "0";
+    process.env.GORDON_CUSTOM_RENDER = "0";
     const stdout = createMockStdout();
-    const tree = React.createElement(
-      Box,
-      null,
-      React.createElement(Text, null, "hello vanilla"),
-    );
+    const tree = React.createElement(Box, null, React.createElement(Text, null, "hello vanilla"));
     const instance = render(tree, { stdout, patchConsole: false, exitOnCtrlC: false });
     try {
       expect(typeof instance.rerender).toBe("function");
@@ -116,7 +100,7 @@ describe("render() integration", () => {
       // A2 default-on was rolled back after real-world rendering bugs (cell
       // interleaving / cursor desync visible on mount). Tests now set the
       // explicit opt-in flag.
-      process.env["GORDON_CUSTOM_RENDER"] = "1";
+      process.env.GORDON_CUSTOM_RENDER = "1";
     });
 
     test("mounts and writes expected text to stdout", () => {
@@ -284,9 +268,9 @@ describe("render() integration", () => {
     // jest/vitest do). We only assert that enabling the flag doesn't break
     // mount and that unmount cleanly stops the scheduler.
     test("GORDON_POOL_MIGRATION_ENABLED=true: mount + unmount is safe", () => {
-      process.env["GORDON_POOL_MIGRATION_ENABLED"] = "true";
+      process.env.GORDON_POOL_MIGRATION_ENABLED = "true";
       // 1h interval so the timer never fires inside the test window.
-      process.env["GORDON_POOL_MIGRATION_INTERVAL_MS"] = String(60 * 60 * 1000);
+      process.env.GORDON_POOL_MIGRATION_INTERVAL_MS = String(60 * 60 * 1000);
       const stdout = createMockStdout();
       const tree = React.createElement(Text, null, "mig");
       const instance = render(tree, { stdout, patchConsole: false, exitOnCtrlC: false });
@@ -300,7 +284,7 @@ describe("render() integration", () => {
     });
 
     test("GORDON_POOL_MIGRATION_ENABLED unset: default scheduler starts and unmount stops it", () => {
-      delete process.env["GORDON_POOL_MIGRATION_ENABLED"];
+      delete process.env.GORDON_POOL_MIGRATION_ENABLED;
       const stdout = createMockStdout();
       const tree = React.createElement(Text, null, "no-mig");
       const instance = render(tree, { stdout, patchConsole: false, exitOnCtrlC: false });
@@ -324,14 +308,11 @@ describe("render() integration", () => {
       const tree = React.createElement(
         Box,
         { flexDirection: "column" },
-        React.createElement(
-          Static<string>,
-          {
-            items,
-            // biome-ignore lint/correctness/noChildrenProp: Ink's Static type requires this render function in its props.
-            children: (item: string) => React.createElement(Text, { key: item }, item),
-          },
-        ) as React.ReactElement,
+        React.createElement(Static<string>, {
+          items,
+          // biome-ignore lint/correctness/noChildrenProp: Ink's Static type requires this render function in its props.
+          children: (item: string) => React.createElement(Text, { key: item }, item),
+        }) as React.ReactElement,
         React.createElement(Text, null, "live-region"),
       );
       const instance = render(tree, { stdout, patchConsole: false, exitOnCtrlC: false });
@@ -448,9 +429,7 @@ describe("render() integration", () => {
       const stream = new PassThrough() as PassThrough & { captured: string };
       stream.captured = "";
       const originalWrite = stream.write.bind(stream);
-      (stream as unknown as { write: (chunk: unknown) => boolean }).write = (
-        chunk: unknown,
-      ) => {
+      (stream as unknown as { write: (chunk: unknown) => boolean }).write = (chunk: unknown) => {
         stream.captured += String(chunk);
         return originalWrite(chunk as Buffer | string);
       };
@@ -464,10 +443,10 @@ describe("render() integration", () => {
     }
 
     beforeEach(() => {
-      delete process.env["GORDON_CUSTOM_RENDER"];
-      delete process.env["TERM"];
-      delete process.env["TMUX"];
-      delete process.env["STY"];
+      delete process.env.GORDON_CUSTOM_RENDER;
+      delete process.env.TERM;
+      delete process.env.TMUX;
+      delete process.env.STY;
       for (const key of screenReaderVars) delete process.env[key];
       _resetFallbackNoticeForTests();
     });
@@ -481,7 +460,7 @@ describe("render() integration", () => {
     });
 
     test("GORDON_CUSTOM_RENDER=0: returns false, no notice", () => {
-      process.env["GORDON_CUSTOM_RENDER"] = "0";
+      process.env.GORDON_CUSTOM_RENDER = "0";
       const stderr = fakeStderr();
       const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
       expect(result).toBe(false);
@@ -489,7 +468,7 @@ describe("render() integration", () => {
     });
 
     test("GORDON_CUSTOM_RENDER=false: returns false, no notice", () => {
-      process.env["GORDON_CUSTOM_RENDER"] = "false";
+      process.env.GORDON_CUSTOM_RENDER = "false";
       const stderr = fakeStderr();
       const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
       expect(result).toBe(false);
@@ -497,7 +476,7 @@ describe("render() integration", () => {
     });
 
     test("opt-in (=1) on TTY no-a11y: returns true, no notice", () => {
-      process.env["GORDON_CUSTOM_RENDER"] = "1";
+      process.env.GORDON_CUSTOM_RENDER = "1";
       const stderr = fakeStderr();
       const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
       expect(result).toBe(true);
@@ -505,7 +484,7 @@ describe("render() integration", () => {
     });
 
     test("opt-in + isScreenReaderEnabled: returns false, screen-reader notice", () => {
-      process.env["GORDON_CUSTOM_RENDER"] = "1";
+      process.env.GORDON_CUSTOM_RENDER = "1";
       const stderr = fakeStderr();
       const result = shouldUseCustomRenderer(ttyStdout(), stderr, true);
       expect(result).toBe(false);
@@ -521,7 +500,7 @@ describe("render() integration", () => {
       ["NARRATOR_RUNNING", "1"],
     ] as const) {
       test(`opt-in + ${key}: render falls back to vanilla`, () => {
-        process.env["GORDON_CUSTOM_RENDER"] = "1";
+        process.env.GORDON_CUSTOM_RENDER = "1";
         process.env[key] = value;
         const stdout = createMockStdout();
         const stderr = fakeStderr();
@@ -542,7 +521,7 @@ describe("render() integration", () => {
     }
 
     test("opt-in + non-TTY stdout: returns false, isTTY notice", () => {
-      process.env["GORDON_CUSTOM_RENDER"] = "1";
+      process.env.GORDON_CUSTOM_RENDER = "1";
       const stderr = fakeStderr();
       const stdout = new PassThrough() as unknown as NodeJS.WriteStream;
       (stdout as unknown as { isTTY: boolean }).isTTY = false;
@@ -552,7 +531,7 @@ describe("render() integration", () => {
     });
 
     test("opt-in + stdout with no isTTY capability also falls back", () => {
-      process.env["GORDON_CUSTOM_RENDER"] = "1";
+      process.env.GORDON_CUSTOM_RENDER = "1";
       const stdout = new PassThrough() as unknown as NodeJS.WriteStream;
       const stderr = fakeStderr();
       expect(shouldUseCustomRenderer(stdout, stderr, false)).toBe(false);
@@ -560,8 +539,8 @@ describe("render() integration", () => {
     });
 
     test("opt-in + TERM=dumb: returns false, TERM=dumb notice", () => {
-      process.env["GORDON_CUSTOM_RENDER"] = "1";
-      process.env["TERM"] = "dumb";
+      process.env.GORDON_CUSTOM_RENDER = "1";
+      process.env.TERM = "dumb";
       const stderr = fakeStderr();
       const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
       expect(result).toBe(false);
@@ -569,8 +548,8 @@ describe("render() integration", () => {
     });
 
     test("opt-in + TMUX: returns false, tmux notice", () => {
-      process.env["GORDON_CUSTOM_RENDER"] = "1";
-      process.env["TMUX"] = "/tmp/tmux-1000/default,12345,0";
+      process.env.GORDON_CUSTOM_RENDER = "1";
+      process.env.TMUX = "/tmp/tmux-1000/default,12345,0";
       const stderr = fakeStderr();
       const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
       expect(result).toBe(false);
@@ -578,8 +557,8 @@ describe("render() integration", () => {
     });
 
     test("opt-in + STY: returns false, screen notice", () => {
-      process.env["GORDON_CUSTOM_RENDER"] = "1";
-      process.env["STY"] = "12345.pts-0.host";
+      process.env.GORDON_CUSTOM_RENDER = "1";
+      process.env.STY = "12345.pts-0.host";
       const stderr = fakeStderr();
       const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
       expect(result).toBe(false);
@@ -587,8 +566,8 @@ describe("render() integration", () => {
     });
 
     test("opt-in fallback notice is process-once", () => {
-      process.env["GORDON_CUSTOM_RENDER"] = "1";
-      process.env["TERM"] = "dumb";
+      process.env.GORDON_CUSTOM_RENDER = "1";
+      process.env.TERM = "dumb";
       const stderr = fakeStderr();
       shouldUseCustomRenderer(ttyStdout(), stderr, false);
       const lengthAfterFirst = stderr.captured.length;
@@ -602,7 +581,7 @@ describe("render() integration", () => {
   // values through to ours so vanilla Ink path keeps working.
   describe("VanillaInkContextBridge: hooks see populated owned contexts under vanilla Ink", () => {
     beforeEach(() => {
-      delete process.env["GORDON_CUSTOM_RENDER"]; // default = vanilla Ink
+      delete process.env.GORDON_CUSTOM_RENDER; // default = vanilla Ink
     });
 
     test("useApp() returns Ink's exit (not the empty owned default)", () => {

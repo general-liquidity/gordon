@@ -128,9 +128,7 @@ export function computeRecoveryFactor(input: RecoveryFactorInput): RecoveryFacto
   };
 }
 
-export function recoveryFactorToPayload(
-  result: RecoveryFactorResult,
-): Record<string, unknown> {
+export function recoveryFactorToPayload(result: RecoveryFactorResult): Record<string, unknown> {
   return {
     kind: "recovery_factor.computed",
     netProfit: Number(result.netProfit.toFixed(8)),

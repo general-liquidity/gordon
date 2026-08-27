@@ -106,7 +106,8 @@ const PATTERN_RULES: Array<{
       // hit is generic "failed/error" AND the failure is transient infra/data
       // NOISE (network timeout, parse error, undefined, stale data), don't
       // poison the failure memory with a non-trading lesson.
-      const isTradingSignal = /(rejected|insufficient|denied|risk|blocked|margin|over.?size|policy)/.test(text);
+      const isTradingSignal =
+        /(rejected|insufficient|denied|risk|blocked|margin|over.?size|policy)/.test(text);
       if (!isTradingSignal && isInfraNoise(text)) return null;
       const venue = (e.payload?.venue ?? e.payload?.exchange ?? "venue") as string;
       return `Execution attempts on ${venue} have failed before — pre-validate balance and policy gates first.`;
@@ -171,7 +172,11 @@ const PATTERN_RULES: Array<{
   {
     category: "operational",
     match: (e) => {
-      if (e.entryType !== "venue_change" && e.entryType !== "profile_change" && e.entryType !== "model_change") {
+      if (
+        e.entryType !== "venue_change" &&
+        e.entryType !== "profile_change" &&
+        e.entryType !== "model_change"
+      ) {
         return null;
       }
       return `Operator-level change observed (${e.entryType}) — confirm the change is reflected in the active session.`;
@@ -256,7 +261,11 @@ const PATTERN_RULES: Array<{
 ];
 
 function dedupeKey(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 80);
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .slice(0, 80);
 }
 
 // ============================================================================
@@ -327,9 +336,7 @@ const BROAD_EXPLORATION_TOOLS = new Set([
 
 const MIN_SESSIONS_FOR_AGGREGATE = 3;
 
-function bucketBySession(
-  entries: ReadonlyArray<ActionLogEntry>,
-): Map<string, ActionLogEntry[]> {
+function bucketBySession(entries: ReadonlyArray<ActionLogEntry>): Map<string, ActionLogEntry[]> {
   const sessions = new Map<string, ActionLogEntry[]>();
   for (const e of entries) {
     const sid = e.sessionId ?? e.threadId ?? "default";
@@ -366,15 +373,11 @@ const AGGREGATE_PATTERN_RULES: ReadonlyArray<AggregatePatternRule> = [
       let lastTs = Number.NEGATIVE_INFINITY;
 
       for (const sessEntries of sessions.values()) {
-        const sorted = [...sessEntries].sort(
-          (a, b) => entryTimestamp(a) - entryTimestamp(b),
-        );
+        const sorted = [...sessEntries].sort((a, b) => entryTimestamp(a) - entryTimestamp(b));
         const firstTool = sorted.find((e) => e.entryType === "tool_call");
         if (!firstTool) continue;
         totalWithTool += 1;
-        const toolName = String(
-          firstTool.payload?.toolName ?? firstTool.title ?? "",
-        ).toLowerCase();
+        const toolName = String(firstTool.payload?.toolName ?? firstTool.title ?? "").toLowerCase();
         if (BROAD_EXPLORATION_TOOLS.has(toolName)) {
           broadFirst += 1;
           const ts = entryTimestamp(firstTool);
@@ -421,9 +424,7 @@ const AGGREGATE_PATTERN_RULES: ReadonlyArray<AggregatePatternRule> = [
       >();
 
       for (const e of cancels) {
-        const rationale = (e.payload?.rationale as string | undefined)
-          ?.trim()
-          .toLowerCase();
+        const rationale = (e.payload?.rationale as string | undefined)?.trim().toLowerCase();
         if (!rationale || rationale.length < 5) continue;
         // Coarse bucket by first 3 significant words — captures
         // recurring themes without overfitting to exact wording.
@@ -571,7 +572,8 @@ export function runReflector(input: ReflectorInput = {}): ReflectorOutput {
 export function _applyAggregatePatternRulesForTest(
   entries: ReadonlyArray<ActionLogEntry>,
 ): Array<{ category: ACELessonCandidate["category"]; candidates: AggregateCandidate[] }> {
-  const out: Array<{ category: ACELessonCandidate["category"]; candidates: AggregateCandidate[] }> = [];
+  const out: Array<{ category: ACELessonCandidate["category"]; candidates: AggregateCandidate[] }> =
+    [];
   for (const rule of AGGREGATE_PATTERN_RULES) {
     const candidates = rule.match(entries);
     if (candidates.length > 0) {
@@ -658,7 +660,10 @@ export function _synthesizeCategoryClustersForTest(
     if (group.length < clusterThreshold) continue;
     // Aggregate stats across the cluster.
     const totalEvidence = group.reduce((acc, c) => acc + c.evidenceCount, 0);
-    const firstSeenAt = group.reduce((acc, c) => Math.min(acc, c.firstSeenAt), Number.POSITIVE_INFINITY);
+    const firstSeenAt = group.reduce(
+      (acc, c) => Math.min(acc, c.firstSeenAt),
+      Number.POSITIVE_INFINITY,
+    );
     const lastSeenAt = group.reduce((acc, c) => Math.max(acc, c.lastSeenAt), 0);
     const ids = group.flatMap((c) => c.evidenceEntryIds);
     // De-dup ids while preserving order, then cap at MAX_EVIDENCE_IDS.

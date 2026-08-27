@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 import { Pane } from "../../design-system/Pane.js";
@@ -49,23 +48,28 @@ export function AutonomousControlDialog({
           { label: "Pause loop", value: "pause" },
           { label: "Stop loop", value: "stop" },
         ]
-    : [
-        { label: "Start autonomous loop", value: "start" },
-      ];
+    : [{ label: "Start autonomous loop", value: "start" }];
 
   return (
     <Pane title="AUTONOMOUS TRADING" color={statusColor}>
       {/* Status */}
       <Box>
-        <Text color={statusColor} bold>{statusIcon} {statusLabel}</Text>
-        {mandateId && <Text dimColor> {"\u00b7"} mandate {mandateId}</Text>}
+        <Text color={statusColor} bold>
+          {statusIcon} {statusLabel}
+        </Text>
+        {mandateId && (
+          <Text dimColor>
+            {" "}
+            {"\u00b7"} mandate {mandateId}
+          </Text>
+        )}
       </Box>
 
       {/* Stats */}
       {isActive && (
         <Box marginTop={1} flexDirection="column">
           <Box>
-            <Text dimColor>Cycles:        </Text>
+            <Text dimColor>Cycles: </Text>
             <Text>{cycleCount}</Text>
           </Box>
           <Box>
@@ -73,7 +77,7 @@ export function AutonomousControlDialog({
             <Text color={opportunitiesFound > 0 ? "green" : undefined}>{opportunitiesFound}</Text>
           </Box>
           <Box>
-            <Text dimColor>Interval:      </Text>
+            <Text dimColor>Interval: </Text>
             <Text>every {intervalMinutes}m</Text>
           </Box>
         </Box>

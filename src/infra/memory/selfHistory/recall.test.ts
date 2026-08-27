@@ -62,7 +62,12 @@ describe("searchSessionHistory", () => {
   test("recalls a past-session mention with a citation to the exact turn", () => {
     writeSession("s1.json", "2026-07-01_09-00-00", [
       { role: "user", content: "what do you think of BTC funding rates today", minutesAgo: 50 },
-      { role: "assistant", content: "BTC funding is neutral, nothing notable", agent: "gordon", minutesAgo: 49 },
+      {
+        role: "assistant",
+        content: "BTC funding is neutral, nothing notable",
+        agent: "gordon",
+        minutesAgo: 49,
+      },
     ]);
     writeSession("s2.json", "2026-07-02_14-00-00", [
       { role: "user", content: "analyze SOL microstructure and order book depth", minutesAgo: 40 },
@@ -91,7 +96,11 @@ describe("searchSessionHistory", () => {
 
   test("every hit carries why_matched reasons naming the matched terms", () => {
     writeSession("s1.json", "2026-07-02_14-00-00", [
-      { role: "user", content: "review the ETH breakout playbook and whether it fired", minutesAgo: 20 },
+      {
+        role: "user",
+        content: "review the ETH breakout playbook and whether it fired",
+        minutesAgo: 20,
+      },
       {
         role: "assistant",
         content: "the ETH breakout playbook fired at 3400 and hit target",
@@ -120,10 +129,18 @@ describe("searchSessionHistory", () => {
   test("respects the limit", () => {
     for (let i = 0; i < 5; i++) {
       writeSession(`s${i}.json`, `sess-${i}`, [
-        { role: "user", content: `session ${i} discussing momentum breakout signals`, minutesAgo: 10 + i },
+        {
+          role: "user",
+          content: `session ${i} discussing momentum breakout signals`,
+          minutesAgo: 10 + i,
+        },
       ]);
     }
-    const hits = searchSessionHistory("momentum breakout signals", { historyDir, indexDir, limit: 2 });
+    const hits = searchSessionHistory("momentum breakout signals", {
+      historyDir,
+      indexDir,
+      limit: 2,
+    });
     expect(hits.length).toBeLessThanOrEqual(2);
   });
 });

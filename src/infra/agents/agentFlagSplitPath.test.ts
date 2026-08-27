@@ -70,7 +70,12 @@ describe("settings-layer flags reach their agent-tree reader", () => {
     // default parameter alone left this second entry point on the split path.
     settingsLayerOnly({ GORDON_DYNAMIC_SUBAGENTS: "1" });
     const result = await dispatchSubagentTask(
-      { name: "split-path-probe", description: "probe", instructions: "probe.", tools: ["list_skills"] },
+      {
+        name: "split-path-probe",
+        description: "probe",
+        instructions: "probe.",
+        tools: ["list_skills"],
+      },
       "probe the flag path",
       { list_skills: { id: "list_skills" } },
       { agentFactory: () => ({ generate: async () => ({ text: "ok" }) }) },

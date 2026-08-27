@@ -56,7 +56,9 @@ interface HLAssetCtx {
 
 let _cache: { meta: HLMeta; assetCtxs: HLAssetCtx[]; timestamp: number } | null = null;
 
-async function fetchMarketData(): Promise<{ meta: HLMeta; assetCtxs: HLAssetCtx[]; error?: undefined } | { error: string }> {
+async function fetchMarketData(): Promise<
+  { meta: HLMeta; assetCtxs: HLAssetCtx[]; error?: undefined } | { error: string }
+> {
   const now = Date.now();
   if (_cache && now - _cache.timestamp < CACHE_TTL_MS) {
     return { meta: _cache.meta, assetCtxs: _cache.assetCtxs };
@@ -102,7 +104,7 @@ interface CascadeRiskFactors {
 
 function calculateCascadeRisk(
   ctx: HLAssetCtx,
-  asset: HLAssetInfo
+  asset: HLAssetInfo,
 ): { score: number; factors: CascadeRiskFactors; interpretation: string } {
   const fundingRate = parseFloat(ctx.funding);
   const annualizedFunding = Math.abs(fundingRate * 3 * 365);
@@ -119,14 +121,12 @@ function calculateCascadeRisk(
   const leverageScore = Math.min(asset.maxLeverage / 50, 1.0) * 100;
 
   const score = Math.round(
-    fundingScore * 0.3 +
-    oiVolumeScore * 0.25 +
-    premiumScore * 0.25 +
-    leverageScore * 0.2
+    fundingScore * 0.3 + oiVolumeScore * 0.25 + premiumScore * 0.25 + leverageScore * 0.2,
   );
 
   let interpretation: string;
-  if (score > 75) interpretation = "Critical cascade risk — extreme leverage and crowded positioning";
+  if (score > 75)
+    interpretation = "Critical cascade risk — extreme leverage and crowded positioning";
   else if (score > 50) interpretation = "High cascade risk — significant deleveraging potential";
   else if (score > 25) interpretation = "Moderate cascade risk — some pressure building";
   else interpretation = "Low cascade risk — stable conditions";
@@ -145,9 +145,11 @@ function calculateCascadeRisk(
 
 type PressureDirection = "long_squeeze" | "short_squeeze" | "neutral";
 
-function detectLiquidationPressure(
-  ctx: HLAssetCtx
-): { direction: PressureDirection; pressureScore: number; explanation: string } {
+function detectLiquidationPressure(ctx: HLAssetCtx): {
+  direction: PressureDirection;
+  pressureScore: number;
+  explanation: string;
+} {
   const fundingRate = parseFloat(ctx.funding);
   const annualizedFunding = fundingRate * 3 * 365;
   const premium = parseFloat(ctx.premium);
@@ -160,11 +162,11 @@ function detectLiquidationPressure(
   const reasons: string[] = [];
 
   // Extreme funding → crowded side being squeezed
-  if (fundingRate > 0.0001 || annualizedFunding > 0.10) {
+  if (fundingRate > 0.0001 || annualizedFunding > 0.1) {
     direction = "long_squeeze";
     pressureScore += 40;
     reasons.push(`Extreme positive funding (${(annualizedFunding * 100).toFixed(1)}% annualized)`);
-  } else if (fundingRate < -0.0001 || annualizedFunding < -0.10) {
+  } else if (fundingRate < -0.0001 || annualizedFunding < -0.1) {
     direction = "short_squeeze";
     pressureScore += 40;
     reasons.push(`Extreme negative funding (${(annualizedFunding * 100).toFixed(1)}% annualized)`);
@@ -191,9 +193,11 @@ function detectLiquidationPressure(
 
 type CrowdDirection = "crowded_long" | "crowded_short" | "balanced";
 
-function analyzeCrowding(
-  ctx: HLAssetCtx
-): { direction: CrowdDirection; crowdingScore: number; implication: string } {
+function analyzeCrowding(ctx: HLAssetCtx): {
+  direction: CrowdDirection;
+  crowdingScore: number;
+  implication: string;
+} {
   const fundingRate = parseFloat(ctx.funding);
   const annualizedFunding = fundingRate * 3 * 365;
   const premium = parseFloat(ctx.premium);
@@ -238,12 +242,7 @@ export const getCascadeRiskTool = createTool({
       .string()
       .optional()
       .describe("Filter by coin (e.g., 'BTC', 'ETH'). Omit for all coins."),
-    limit: z
-      .number()
-      .min(1)
-      .max(50)
-      .default(10)
-      .describe("Max results (default 10)"),
+    limit: z.number().min(1).max(50).default(10).describe("Max results (default 10)"),
   }),
   outputSchema: z.object({
     count: z.number().optional(),
@@ -262,7 +261,7 @@ export const getCascadeRiskTool = createTool({
           currentPrice: z.string(),
           openInterest: z.string(),
           dailyVolume: z.string(),
-        })
+        }),
       )
       .optional(),
     error: z.string().optional(),
@@ -330,7 +329,7 @@ export const getLiquidationPressureTool = createTool({
           currentFunding: z.string(),
           annualizedFunding: z.string(),
           premium: z.string(),
-        })
+        }),
       )
       .optional(),
     error: z.string().optional(),
@@ -384,12 +383,7 @@ export const getCrowdingAnalysisTool = createTool({
     "Combines funding rate direction/magnitude with premium to score crowding. " +
     "Use to find contrarian opportunities or anticipate squeezes.",
   inputSchema: z.object({
-    limit: z
-      .number()
-      .min(1)
-      .max(50)
-      .default(10)
-      .describe("Max results (default 10)"),
+    limit: z.number().min(1).max(50).default(10).describe("Max results (default 10)"),
   }),
   outputSchema: z.object({
     count: z.number().optional(),
@@ -402,7 +396,7 @@ export const getCrowdingAnalysisTool = createTool({
           implication: z.string(),
           currentFunding: z.string(),
           premium: z.string(),
-        })
+        }),
       )
       .optional(),
     error: z.string().optional(),
@@ -454,12 +448,7 @@ export const getSqueezeCandidatesTool = createTool({
     "Detects when price rises while shorts are crowded (short squeeze) or falls while longs are crowded (long squeeze). " +
     "Use to find momentum trades or avoid getting caught in squeezes.",
   inputSchema: z.object({
-    limit: z
-      .number()
-      .min(1)
-      .max(20)
-      .default(5)
-      .describe("Max results (default 5)"),
+    limit: z.number().min(1).max(20).default(5).describe("Max results (default 5)"),
   }),
   outputSchema: z.object({
     count: z.number().optional(),
@@ -473,7 +462,7 @@ export const getSqueezeCandidatesTool = createTool({
           priceChange24h: z.string(),
           currentFunding: z.string(),
           crowdingScore: z.number(),
-        })
+        }),
       )
       .optional(),
     error: z.string().optional(),
@@ -505,7 +494,9 @@ export const getSqueezeCandidatesTool = createTool({
           if (priceChange > 0.02 && fundingRate < -0.00005) {
             type = "short_squeeze";
             probability += 40;
-            triggerConditions.push(`Price up ${(priceChange * 100).toFixed(1)}% while shorts crowded`);
+            triggerConditions.push(
+              `Price up ${(priceChange * 100).toFixed(1)}% while shorts crowded`,
+            );
             if (crowding.crowdingScore > 50) {
               probability += 30;
               triggerConditions.push(`High short crowding (${crowding.crowdingScore})`);
@@ -519,7 +510,9 @@ export const getSqueezeCandidatesTool = createTool({
           else if (priceChange < -0.02 && fundingRate > 0.00005) {
             type = "long_squeeze";
             probability += 40;
-            triggerConditions.push(`Price down ${(Math.abs(priceChange) * 100).toFixed(1)}% while longs crowded`);
+            triggerConditions.push(
+              `Price down ${(Math.abs(priceChange) * 100).toFixed(1)}% while longs crowded`,
+            );
             if (crowding.crowdingScore > 50) {
               probability += 30;
               triggerConditions.push(`High long crowding (${crowding.crowdingScore})`);

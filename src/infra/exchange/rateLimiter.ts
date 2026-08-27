@@ -12,13 +12,13 @@ export interface RateLimiterConfig {
 }
 
 export const EXCHANGE_LIMITS: Record<string, RateLimiterConfig> = {
-  binance:      { maxRequests: 1200, windowMs: 60_000, burstLimit: 50 },
-  binance_us:   { maxRequests: 1200, windowMs: 60_000, burstLimit: 50 },
-  coinbase:     { maxRequests: 10,   windowMs: 1_000,  burstLimit: 10 },
-  kraken:       { maxRequests: 15,   windowMs: 1_000,  burstLimit: 15 },
-  hyperliquid:  { maxRequests: 1200, windowMs: 60_000, burstLimit: 50 },
-  bitfinex:     { maxRequests: 90,   windowMs: 60_000, burstLimit: 20 },
-  robinhood:    { maxRequests: 1,    windowMs: 1_000,  burstLimit: 1 },
+  binance: { maxRequests: 1200, windowMs: 60_000, burstLimit: 50 },
+  binance_us: { maxRequests: 1200, windowMs: 60_000, burstLimit: 50 },
+  coinbase: { maxRequests: 10, windowMs: 1_000, burstLimit: 10 },
+  kraken: { maxRequests: 15, windowMs: 1_000, burstLimit: 15 },
+  hyperliquid: { maxRequests: 1200, windowMs: 60_000, burstLimit: 50 },
+  bitfinex: { maxRequests: 90, windowMs: 60_000, burstLimit: 20 },
+  robinhood: { maxRequests: 1, windowMs: 1_000, burstLimit: 1 },
 };
 
 interface QueuedRequest {
@@ -117,7 +117,10 @@ export class RateLimiter {
       used: Math.round(this.maxTokens - this.tokens),
       limit: this.maxTokens,
       remaining: Math.round(this.tokens),
-      resetMs: this.tokens < this.maxTokens ? Math.ceil((this.maxTokens - this.tokens) / this.refillRate) : 0,
+      resetMs:
+        this.tokens < this.maxTokens
+          ? Math.ceil((this.maxTokens - this.tokens) / this.refillRate)
+          : 0,
     };
   }
 
@@ -161,7 +164,11 @@ export function createExchangeRateLimiter(exchangeId: string): RateLimiter {
   const existing = limiters.get(exchangeId);
   if (existing) return existing;
 
-  const config = EXCHANGE_LIMITS[exchangeId] ?? { maxRequests: 30, windowMs: 60_000, burstLimit: 10 };
+  const config = EXCHANGE_LIMITS[exchangeId] ?? {
+    maxRequests: 30,
+    windowMs: 60_000,
+    burstLimit: 10,
+  };
   const limiter = new RateLimiter(config);
   limiters.set(exchangeId, limiter);
   return limiter;

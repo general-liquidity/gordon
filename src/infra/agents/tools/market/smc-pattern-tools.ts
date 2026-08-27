@@ -33,7 +33,16 @@ import type { Timeframe } from "../../../../types/timeframes.ts";
 
 const TIMEFRAMES = ["5m", "15m", "30m", "1h", "4h", "1d"] as const satisfies readonly Timeframe[];
 
-function toOhlc(bars: Array<{ timestamp: number; open: number; high: number; low: number; close: number; volume: number }>): OHLC[] {
+function toOhlc(
+  bars: Array<{
+    timestamp: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+  }>,
+): OHLC[] {
   return bars as OHLC[];
 }
 
@@ -246,15 +255,33 @@ export const detectSmcSinglePatternTool = createTool({
     switch (pattern) {
       case "fair_value_gap": {
         const results = detectFairValueGaps(candles).slice(-10);
-        return { symbol, timeframe: timeframe ?? "1h", pattern, count: results.length, results: results as unknown as Array<Record<string, unknown>> };
+        return {
+          symbol,
+          timeframe: timeframe ?? "1h",
+          pattern,
+          count: results.length,
+          results: results as unknown as Array<Record<string, unknown>>,
+        };
       }
       case "order_block": {
         const results = detectOrderBlocks(candles, lookback).slice(-10);
-        return { symbol, timeframe: timeframe ?? "1h", pattern, count: results.length, results: results as unknown as Array<Record<string, unknown>> };
+        return {
+          symbol,
+          timeframe: timeframe ?? "1h",
+          pattern,
+          count: results.length,
+          results: results as unknown as Array<Record<string, unknown>>,
+        };
       }
       case "change_of_character": {
         const results = detectChangeOfCharacter(candles, lookback).slice(-10);
-        return { symbol, timeframe: timeframe ?? "1h", pattern, count: results.length, results: results as unknown as Array<Record<string, unknown>> };
+        return {
+          symbol,
+          timeframe: timeframe ?? "1h",
+          pattern,
+          count: results.length,
+          results: results as unknown as Array<Record<string, unknown>>,
+        };
       }
       case "premium_discount": {
         const zones = detectPremiumDiscountZones(candles, lookback);
@@ -268,7 +295,13 @@ export const detectSmcSinglePatternTool = createTool({
       }
       case "liquidity_sweep": {
         const results = detectLiquiditySweeps(candles, { swingLookback: lookback }).slice(-10);
-        return { symbol, timeframe: timeframe ?? "1h", pattern, count: results.length, results: results as unknown as Array<Record<string, unknown>> };
+        return {
+          symbol,
+          timeframe: timeframe ?? "1h",
+          pattern,
+          count: results.length,
+          results: results as unknown as Array<Record<string, unknown>>,
+        };
       }
     }
   },

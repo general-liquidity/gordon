@@ -71,23 +71,21 @@ export class PortfolioContextBuilder {
       const accountDetails = await adapter.getFullAccountDetails();
       const totalEquity = accountDetails.totalUsdtValue;
 
-      // Get available USDT balance
-      let availableBalance = 0;
-      const stableAssets = ["USDT", "BUSD", "USDC", "FDUSD"];
-      for (const asset of stableAssets) {
-        try {
-          availableBalance += await adapter.getBalance(asset);
-        } catch {
-          // Asset not found or no balance
-        }
-      }
+      const stableAssets = ["USD", "USDT", "USDC", "BUSD", "FDUSD", "DAI"];
+      // The account snapshot already carries free/locked totals. Re-querying
+      // each stable asset can mix timestamps and used to swallow an adapter
+      // failure as a fabricated zero cash balance.
+      const availableBalance = accountDetails.nonZeroBalances
+        .filter((balance) => stableAssets.includes(balance.asset))
+        .reduce((sum, balance) => sum + balance.free, 0);
 
       // Build open positions from non-stable balances
       const openPositions: OpenPosition[] = [];
       const nonStable = accountDetails.nonZeroBalances.filter(
-        (b) => !stableAssets.includes(b.asset) && b.total > 0
+        (b) => !stableAssets.includes(b.asset) && b.total > 0,
       );
 
+      const unpriced: Error[] = [];
       for (const balance of nonStable) {
         try {
           const symbol = `${balance.asset}USDT`;
@@ -106,9 +104,20 @@ export class PortfolioContextBuilder {
               exchangeId: adapter.exchangeId,
             });
           }
-        } catch {
-          // No USDT pair for this asset, skip
+        } catch (error) {
+          // Omitting a positive balance from the risk snapshot makes
+          // concentration and leverage look safer than they are. A missing
+          // mark therefore invalidates the whole live snapshot.
+          unpriced.push(
+            new Error(
+              `Could not price positive ${balance.asset} balance`,
+              error instanceof Error ? { cause: error } : undefined,
+            ),
+          );
         }
+      }
+      if (unpriced.length > 0) {
+        throw new AggregateError(unpriced, "Live portfolio contains unpriced positive balances");
       }
 
       // Get daily PnL and drawdown from local trackers
@@ -140,7 +149,7 @@ export class PortfolioContextBuilder {
         currentDrawdown: currentDrawdown.toFixed(2),
       });
 
-      return context;
+      return PortfolioContextSchema.parse(context);
     } catch (error) {
       logger.error("Failed to build portfolio context from exchange", error as Error);
       throw error;
@@ -161,7 +170,8 @@ export class PortfolioContextBuilder {
         side: position.side,
         size: position.qty,
         entryPrice: position.avgEntryPrice,
-        currentPrice: position.qty !== 0 ? position.marketValue / position.qty : position.avgEntryPrice,
+        currentPrice:
+          position.qty !== 0 ? position.marketValue / position.qty : position.avgEntryPrice,
         unrealizedPnL: position.unrealizedPl,
         exchangeId: adapter.brokerId,
       }));
@@ -175,7 +185,7 @@ export class PortfolioContextBuilder {
       const currentDrawdown = ddStatus.drawdownPercent;
       const peakEquity = ddStatus.peakBalance;
 
-      return {
+      return PortfolioContextSchema.parse({
         totalEquity,
         availableBalance,
         openPositions,
@@ -183,7 +193,7 @@ export class PortfolioContextBuilder {
         todayTradeCount,
         currentDrawdown,
         peakEquity: peakEquity > 0 ? peakEquity : totalEquity,
-      };
+      });
     } catch (error) {
       logger.error("Failed to build portfolio context from broker", error as Error);
       throw error;
@@ -204,9 +214,7 @@ export class PortfolioContextBuilder {
    */
   buildFromCache(state: CachedPortfolioState): PortfolioContext {
     const drawdownAmount = state.peakEquity - state.totalEquity;
-    const currentDrawdown = state.peakEquity > 0
-      ? (drawdownAmount / state.peakEquity) * 100
-      : 0;
+    const currentDrawdown = state.peakEquity > 0 ? (drawdownAmount / state.peakEquity) * 100 : 0;
 
     const context: PortfolioContext = {
       totalEquity: state.totalEquity,
@@ -223,7 +231,7 @@ export class PortfolioContextBuilder {
       openPositions: state.openPositions.length,
     });
 
-    return context;
+    return PortfolioContextSchema.parse(context);
   }
 }
 

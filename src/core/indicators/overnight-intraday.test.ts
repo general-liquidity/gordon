@@ -47,7 +47,8 @@ describe("calculateOvernightIntraday", () => {
   it("overnight + intraday legs compose to the total return", () => {
     const r = calculateOvernightIntraday(series(0.5, 0.3, 30));
     // (1+cumOn)(1+cumId) − 1 ≈ cumTotal
-    const composed = (1 + r.cumulativeOvernightReturnPct / 100) * (1 + r.cumulativeIntradayReturnPct / 100) - 1;
+    const composed =
+      (1 + r.cumulativeOvernightReturnPct / 100) * (1 + r.cumulativeIntradayReturnPct / 100) - 1;
     expect(composed * 100).toBeCloseTo(r.cumulativeTotalReturnPct, 1);
     expect(r.bars).toBe(29);
   });

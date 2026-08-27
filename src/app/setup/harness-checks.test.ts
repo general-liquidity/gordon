@@ -76,7 +76,10 @@ describe("collectSandboxChecks — guard status surfacing", () => {
   it("surfaces warn-mode violation counts and recent paths for the filesystem guard", () => {
     const checks = collectSandboxChecks(
       fetchStatus(),
-      fsStatus({ warnViolations: 2, recentViolations: ["C:/outside/one.txt", "C:/outside/two.txt"] }),
+      fsStatus({
+        warnViolations: 2,
+        recentViolations: ["C:/outside/one.txt", "C:/outside/two.txt"],
+      }),
     );
     const fs = checks.find((c) => c.id === "sandbox.filesystem_write_guard");
     expect(fs?.severity).toBe("warn");
@@ -103,7 +106,10 @@ describe("collectSandboxChecks — guard status surfacing", () => {
   });
 
   it("reflects block mode in the message", () => {
-    const checks = collectSandboxChecks(fetchStatus({ mode: "block" }), fsStatus({ mode: "block" }));
+    const checks = collectSandboxChecks(
+      fetchStatus({ mode: "block" }),
+      fsStatus({ mode: "block" }),
+    );
     expect(checks[0]?.message).toContain("block mode");
     expect(checks[1]?.message).toContain("block mode");
   });

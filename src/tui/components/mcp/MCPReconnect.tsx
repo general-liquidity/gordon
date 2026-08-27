@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { useAnimationClock } from "../../hooks/animation/useAnimationClock.ts";
 import { Divider } from "../layout/Divider.tsx";
@@ -37,13 +36,13 @@ const BAR_WIDTH = 36;
 
 function buildProgressBar(attempt: number, maxAttempts: number, frame: number): string {
   const filled = Math.round((attempt / maxAttempts) * (BAR_WIDTH - 2));
-  const empty = BAR_WIDTH - 2 - filled;
+  const _empty = BAR_WIDTH - 2 - filled;
 
   // Pulse the marker position slightly using the animation frame
   const markerOffset = Math.floor(filled + (frame % 4) * 0.5) % (BAR_WIDTH - 1);
   const left = "─".repeat(markerOffset);
   const right = "─".repeat(Math.max(0, BAR_WIDTH - 2 - markerOffset));
-  return left + "●" + right;
+  return `${left}●${right}`;
 }
 
 export function MCPReconnect({ server, attempt, maxAttempts, nextRetryMs, onCancel }: Props) {
@@ -57,20 +56,22 @@ export function MCPReconnect({ server, attempt, maxAttempts, nextRetryMs, onCanc
 
   const spinnerChar = SPINNER_FRAMES[frame % SPINNER_FRAMES.length] ?? "↻";
   const progressBar = buildProgressBar(attempt, maxAttempts, frame);
-  const nextRetrySec =
-    nextRetryMs !== undefined ? Math.ceil(nextRetryMs / 1000) : null;
+  const nextRetrySec = nextRetryMs !== undefined ? Math.ceil(nextRetryMs / 1000) : null;
 
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box marginBottom={1}>
-        <Text color="yellow" bold>{spinnerChar} Reconnecting: </Text>
-        <Text bold color="cyanBright">{server.name}</Text>
+        <Text color="yellow" bold>
+          {spinnerChar} Reconnecting:{" "}
+        </Text>
+        <Text bold color="cyanBright">
+          {server.name}
+        </Text>
       </Box>
 
       <Box marginBottom={1}>
         <Text dimColor>
-          Attempt{" "}
-          <Text color="yellow">{attempt}</Text>
+          Attempt <Text color="yellow">{attempt}</Text>
           {" of "}
           <Text color="yellow">{maxAttempts}</Text>
           {nextRetrySec !== null && (

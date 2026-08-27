@@ -203,7 +203,11 @@ export function sanitizeValue(value: unknown): {
 
 // -------------------- detection event --------------------
 
-function logDetection(toolId: string, outcome: SanitizationOutcome, kind: "result" | "error"): void {
+function logDetection(
+  toolId: string,
+  outcome: SanitizationOutcome,
+  kind: "result" | "error",
+): void {
   if (outcome.patternsTriggered === 0) return;
   try {
     logger.warn("Tool injection attempt redacted", {
@@ -229,9 +233,7 @@ function logDetection(toolId: string, outcome: SanitizationOutcome, kind: "resul
  *
  *   withToolsMetrics(withToolsResultSanitizer(rawTools))
  */
-export function withResultSanitizer<T extends { id: string; execute?: unknown }>(
-  tool: T,
-): T {
+export function withResultSanitizer<T extends { id: string; execute?: unknown }>(tool: T): T {
   const origExecute = tool.execute as
     | ((...args: unknown[]) => Promise<unknown> | unknown)
     | undefined;

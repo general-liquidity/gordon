@@ -163,15 +163,22 @@ function createNode(
   };
 }
 
-function replaceNode(nodes: TaskTreeNode[], nodeId: string, updater: (node: TaskTreeNode) => TaskTreeNode): TaskTreeNode[] {
+function replaceNode(
+  nodes: TaskTreeNode[],
+  nodeId: string,
+  updater: (node: TaskTreeNode) => TaskTreeNode,
+): TaskTreeNode[] {
   return nodes.map((node) => (node.id === nodeId ? updater(node) : node));
 }
 
-function getNode(nodes: TaskTreeNode[], nodeId: string): TaskTreeNode | undefined {
+function _getNode(nodes: TaskTreeNode[], nodeId: string): TaskTreeNode | undefined {
   return nodes.find((node) => node.id === nodeId);
 }
 
-function findNode(nodes: TaskTreeNode[], predicate: (node: TaskTreeNode) => boolean): TaskTreeNode | undefined {
+function findNode(
+  nodes: TaskTreeNode[],
+  predicate: (node: TaskTreeNode) => boolean,
+): TaskTreeNode | undefined {
   return nodes.find(predicate);
 }
 
@@ -187,14 +194,22 @@ function ensureNode(
   return [{ ...tree, nodes: [...tree.nodes, next] }, next];
 }
 
-function markNodeStatus(tree: TaskTreeState, nodeId: string, status: TaskTreeNodeStatus, detail?: string): TaskTreeState {
+function markNodeStatus(
+  tree: TaskTreeState,
+  nodeId: string,
+  status: TaskTreeNodeStatus,
+  detail?: string,
+): TaskTreeState {
   return {
     ...tree,
     nodes: replaceNode(tree.nodes, nodeId, (node) => ({
       ...node,
       status,
       detail: detail ?? node.detail,
-      endedAt: status === "running" || status === "pending" || status === "queued" ? node.endedAt : Date.now(),
+      endedAt:
+        status === "running" || status === "pending" || status === "queued"
+          ? node.endedAt
+          : Date.now(),
     })),
   };
 }
@@ -214,7 +229,17 @@ function humanizeIdentifier(value: string): string {
 function summarizeArgs(args?: Record<string, unknown>): string | undefined {
   if (!args) return undefined;
 
-  const preferredKeys = ["symbol", "symbols", "strategy", "timeframe", "side", "intent", "goal", "resource", "monitorId"];
+  const preferredKeys = [
+    "symbol",
+    "symbols",
+    "strategy",
+    "timeframe",
+    "side",
+    "intent",
+    "goal",
+    "resource",
+    "monitorId",
+  ];
   const parts: string[] = [];
 
   for (const key of preferredKeys) {
@@ -266,14 +291,24 @@ function ensureFamilyNode(tree: TaskTreeState, family: TaskFamily): [TaskTreeSta
   return ensureNode(
     tree,
     (node) => node.kind === "family" && node.meta?.familyKey === family.key,
-    () => createNode("family", family.label, "running", tree.rootId, undefined, { familyKey: family.key }),
+    () =>
+      createNode("family", family.label, "running", tree.rootId, undefined, {
+        familyKey: family.key,
+      }),
   );
 }
 
-function ensureAgentNode(tree: TaskTreeState, familyNode: TaskTreeNode, agentName: string): [TaskTreeState, TaskTreeNode] {
+function ensureAgentNode(
+  tree: TaskTreeState,
+  familyNode: TaskTreeNode,
+  agentName: string,
+): [TaskTreeState, TaskTreeNode] {
   return ensureNode(
     tree,
-    (node) => node.kind === "agent" && node.parentId === familyNode.id && node.meta?.agentName === agentName,
+    (node) =>
+      node.kind === "agent" &&
+      node.parentId === familyNode.id &&
+      node.meta?.agentName === agentName,
     () => createNode("agent", agentName, "running", familyNode.id, undefined, { agentName }),
   );
 }
@@ -281,11 +316,11 @@ function ensureAgentNode(tree: TaskTreeState, familyNode: TaskTreeNode, agentNam
 function completeActiveToolNodes(tree: TaskTreeState): TaskTreeState {
   return {
     ...tree,
-    nodes: tree.nodes.map((node) => (
+    nodes: tree.nodes.map((node) =>
       node.kind === "tool" && node.status === "running"
         ? { ...node, status: "completed" as const, endedAt: Date.now() }
-        : node
-    )),
+        : node,
+    ),
   };
 }
 
@@ -304,8 +339,12 @@ function settleFamilyAndAgentStatuses(tree: TaskTreeState): TaskTreeState {
       if (node.kind !== "family" && node.kind !== "agent") return node;
       const childNodes = children.get(node.id) ?? [];
       if (childNodes.length === 0) return node;
-      const hasRunning = childNodes.some((child) => child.status === "running" || child.status === "pending");
-      const hasFailed = childNodes.some((child) => child.status === "failed" || child.status === "blocked");
+      const hasRunning = childNodes.some(
+        (child) => child.status === "running" || child.status === "pending",
+      );
+      const hasFailed = childNodes.some(
+        (child) => child.status === "failed" || child.status === "blocked",
+      );
       const allCancelled = childNodes.every((child) => child.status === "cancelled");
       if (hasRunning) return { ...node, status: "running" as const };
       if (hasFailed) return { ...node, status: "failed" as const, endedAt: Date.now() };
@@ -321,13 +360,20 @@ export function createTaskTree(options: {
   commandName?: string;
 }): TaskTreeState {
   const action = options.actionId ? getActionById(options.actionId) : undefined;
-  const requestLabel = action?.title
-    ?? (options.commandName ? humanizeIdentifier(options.commandName) : "Handle request");
+  const requestLabel =
+    action?.title ??
+    (options.commandName ? humanizeIdentifier(options.commandName) : "Handle request");
   const requestDetail = shorten(options.input);
   const root = createNode("request", requestLabel, "running", null, requestDetail, {
     actionId: options.actionId ?? "",
   });
-  const routing = createNode("routing", "Route request", "running", root.id, "Selecting the right workflow and tools");
+  const routing = createNode(
+    "routing",
+    "Route request",
+    "running",
+    root.id,
+    "Selecting the right workflow and tools",
+  );
 
   return {
     runId: `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -347,12 +393,14 @@ export function markTaskTreeRoutingResolved(tree: TaskTreeState, detail?: string
 export function recordTaskTreeAgentSwitch(tree: TaskTreeState, agentName: string): TaskTreeState {
   let next = markTaskTreeRoutingResolved(tree);
   const family = getPrimaryFamily(tree.actionId);
-  let familyNode: TaskTreeNode;
-  [next, familyNode] = ensureFamilyNode(next, family);
+  const familyResult = ensureFamilyNode(next, family);
+  next = familyResult[0];
+  const familyNode = familyResult[1];
   next = markNodeStatus(next, familyNode.id, "running");
 
-  let agentNode: TaskTreeNode;
-  [next, agentNode] = ensureAgentNode(next, familyNode, agentName);
+  const agentResult = ensureAgentNode(next, familyNode, agentName);
+  next = agentResult[0];
+  const agentNode = agentResult[1];
   next = markNodeStatus(next, agentNode.id, "running");
 
   return {
@@ -369,8 +417,9 @@ export function recordTaskTreeToolStart(
 ): TaskTreeState {
   let next = markTaskTreeRoutingResolved(tree);
   const family = classifyToolFamily(toolName, tree.actionId);
-  let familyNode: TaskTreeNode;
-  [next, familyNode] = ensureFamilyNode(next, family);
+  const familyResult = ensureFamilyNode(next, family);
+  next = familyResult[0];
+  const familyNode = familyResult[1];
   next = markNodeStatus(next, familyNode.id, "running");
 
   const resolvedAgentName = agentName ?? tree.currentAgentName ?? "Gordon";
@@ -381,12 +430,13 @@ export function recordTaskTreeToolStart(
   const toolFingerprint = buildToolFingerprint(agentNode.id, toolName, toolDetail);
   const existingRunningTool = [...next.nodes]
     .reverse()
-    .find((node) => (
-      node.kind === "tool"
-      && node.parentId === agentNode.id
-      && node.status === "running"
-      && node.meta?.toolFingerprint === toolFingerprint
-    ));
+    .find(
+      (node) =>
+        node.kind === "tool" &&
+        node.parentId === agentNode.id &&
+        node.status === "running" &&
+        node.meta?.toolFingerprint === toolFingerprint,
+    );
 
   if (existingRunningTool) {
     return {
@@ -411,10 +461,19 @@ export function recordTaskTreeToolStart(
   };
 }
 
-export function recordTaskTreeToolEnd(tree: TaskTreeState, toolName?: string, succeeded: boolean = true): TaskTreeState {
+export function recordTaskTreeToolEnd(
+  tree: TaskTreeState,
+  toolName?: string,
+  succeeded: boolean = true,
+): TaskTreeState {
   const matchingNode = [...tree.nodes]
     .reverse()
-    .find((node) => node.kind === "tool" && node.status === "running" && (!toolName || node.meta?.toolName === toolName));
+    .find(
+      (node) =>
+        node.kind === "tool" &&
+        node.status === "running" &&
+        (!toolName || node.meta?.toolName === toolName),
+    );
 
   if (!matchingNode) return tree;
 
@@ -422,10 +481,17 @@ export function recordTaskTreeToolEnd(tree: TaskTreeState, toolName?: string, su
   return settleFamilyAndAgentStatuses(next);
 }
 
-export function queueTaskTreeSubmission(tree: TaskTreeState | null, preview: string, kind: "follow-up" | "steer"): TaskTreeState | null {
+export function queueTaskTreeSubmission(
+  tree: TaskTreeState | null,
+  preview: string,
+  kind: "follow-up" | "steer",
+): TaskTreeState | null {
   if (!tree) return tree;
   const label = kind === "steer" ? "Steering update queued" : "Follow-up queued";
-  const existing = findNode(tree.nodes, (node) => node.kind === "queue" && node.label === label && node.status === "queued");
+  const existing = findNode(
+    tree.nodes,
+    (node) => node.kind === "queue" && node.label === label && node.status === "queued",
+  );
   if (existing) {
     return markNodeStatus(tree, existing.id, "queued", shorten(preview, 64));
   }
@@ -438,12 +504,19 @@ export function queueTaskTreeSubmission(tree: TaskTreeState | null, preview: str
 
 export function dequeueTaskTreeSubmission(tree: TaskTreeState | null): TaskTreeState | null {
   if (!tree) return tree;
-  const queueNode = findNode(tree.nodes, (node) => node.kind === "queue" && node.status === "queued");
+  const queueNode = findNode(
+    tree.nodes,
+    (node) => node.kind === "queue" && node.status === "queued",
+  );
   if (!queueNode) return tree;
   return markNodeStatus(tree, queueNode.id, "completed", queueNode.detail);
 }
 
-function finalizeTree(tree: TaskTreeState, status: "completed" | "cancelled" | "failed", detail?: string): TaskTreeState {
+function finalizeTree(
+  tree: TaskTreeState,
+  status: "completed" | "cancelled" | "failed",
+  detail?: string,
+): TaskTreeState {
   let next = completeActiveToolNodes(tree);
   next = settleFamilyAndAgentStatuses(next);
   const routing = getRoutingNode(next);
@@ -468,7 +541,8 @@ function finalizeTree(tree: TaskTreeState, status: "completed" | "cancelled" | "
       if (node.status === "running" || node.status === "pending") {
         return {
           ...node,
-          status: status === "failed" ? "failed" : status === "cancelled" ? "cancelled" : "completed",
+          status:
+            status === "failed" ? "failed" : status === "cancelled" ? "cancelled" : "completed",
           endedAt: Date.now(),
         };
       }
@@ -479,7 +553,10 @@ function finalizeTree(tree: TaskTreeState, status: "completed" | "cancelled" | "
   return settleFamilyAndAgentStatuses(next);
 }
 
-export function completeTaskTree(tree: TaskTreeState | null, detail?: string): TaskTreeState | null {
+export function completeTaskTree(
+  tree: TaskTreeState | null,
+  detail?: string,
+): TaskTreeState | null {
   if (!tree) return null;
   return finalizeTree(tree, "completed", detail);
 }

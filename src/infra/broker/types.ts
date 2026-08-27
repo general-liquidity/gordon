@@ -13,19 +13,14 @@ import type { Candle } from "../../types/index.ts";
  * Supported broker identifiers.
  * Limited to brokers with a trustworthy native TS SDK: Alpaca, tastytrade, IBKR.
  */
-export type BrokerId =
-  | "alpaca"
-  | "tastytrade"
-  | "ibkr";
+export type BrokerId = "alpaca" | "tastytrade" | "ibkr";
 
 /**
  * Runtime array of all supported broker IDs. Kept in sync with BrokerId via
  * the `satisfies` constraint. The compiler errors if this drifts from the
  * type union.
  */
-export const BROKER_IDS = [
-  "alpaca", "tastytrade", "ibkr",
-] as const satisfies readonly BrokerId[];
+export const BROKER_IDS = ["alpaca", "tastytrade", "ibkr"] as const satisfies readonly BrokerId[];
 
 /**
  * Broker credentials for authentication.
@@ -59,7 +54,10 @@ export interface BrokerCredentials {
  * Maps broker type -> environment variable names for credential storage.
  * Used by config resolution to restore masked credentials from process.env.
  */
-export const BROKER_ENV_MAP: Record<BrokerId, { key: string; secret: string; paper?: string; accountId?: string }> = {
+export const BROKER_ENV_MAP: Record<
+  BrokerId,
+  { key: string; secret: string; paper?: string; accountId?: string }
+> = {
   alpaca: { key: "ALPACA_API_KEY", secret: "ALPACA_API_SECRET", paper: "ALPACA_PAPER" },
   tastytrade: {
     key: "TASTYTRADE_API_KEY",
@@ -87,20 +85,17 @@ function parseBooleanEnv(value: string | undefined): boolean | undefined {
  * Resolve broker credentials, preferring process.env over config values.
  * Config may store "***" placeholders; this resolves them from env.
  */
-export function resolveBrokerCredentials(
-  config: {
-    type: string;
-    apiKey: string;
-    apiSecret: string;
-    paper?: boolean;
-    baseUrl?: string;
-    dataBaseUrl?: string;
-    accountId?: string;
-  },
-): BrokerCredentials {
-  const envMap = config.type in BROKER_ENV_MAP
-    ? BROKER_ENV_MAP[config.type as BrokerId]
-    : undefined;
+export function resolveBrokerCredentials(config: {
+  type: string;
+  apiKey: string;
+  apiSecret: string;
+  paper?: boolean;
+  baseUrl?: string;
+  dataBaseUrl?: string;
+  accountId?: string;
+}): BrokerCredentials {
+  const envMap =
+    config.type in BROKER_ENV_MAP ? BROKER_ENV_MAP[config.type as BrokerId] : undefined;
   const isRedacted = (v: string | undefined) => !v || v === "***";
 
   let apiKey = config.apiKey;

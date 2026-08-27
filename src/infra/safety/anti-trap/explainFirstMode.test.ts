@@ -61,9 +61,7 @@ describe("explainFirstMode", () => {
 
     it("does not require once thesis is stored", () => {
       recordUserThesis("plan-1", "Liquidity flush completed, regime flipped bullish");
-      expect(
-        requiresUserThesis("plan-1", { GORDON_EXPLAIN_FIRST: "1" }).required,
-      ).toBe(false);
+      expect(requiresUserThesis("plan-1", { GORDON_EXPLAIN_FIRST: "1" }).required).toBe(false);
     });
   });
 

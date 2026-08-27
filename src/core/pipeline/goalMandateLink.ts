@@ -20,10 +20,7 @@ import { createHash } from "node:crypto";
 export const GOAL_MANDATE_LINK_FLAG_ENV = "GORDON_GOAL_MANDATE_LINK";
 
 export function isGoalMandateLinkEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[GOAL_MANDATE_LINK_FLAG_ENV] === "1" ||
-    env[GOAL_MANDATE_LINK_FLAG_ENV] === "true"
-  );
+  return env[GOAL_MANDATE_LINK_FLAG_ENV] === "1" || env[GOAL_MANDATE_LINK_FLAG_ENV] === "true";
 }
 
 export interface MandateLink {

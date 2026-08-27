@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeMtfRsi,
-  mtfRsiToPayload,
-} from "./multiTimeframeRsi.ts";
+import { computeMtfRsi, mtfRsiToPayload } from "./multiTimeframeRsi.ts";
 
 function rising(n: number, start = 100, step = 1): number[] {
   return Array.from({ length: n }, (_, i) => start + i * step);

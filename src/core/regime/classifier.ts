@@ -43,10 +43,9 @@ export class RegimeClassifier {
   classify(candles: Candle[], symbol: string, timeframe: string): RegimeSignal {
     // Compute all indicators
     const adx = calculateADX(candles);
-    const { score: emaAlignment, direction: emaDirection } =
-      calculateEMAAlignment(candles);
+    const { score: emaAlignment, direction: emaDirection } = calculateEMAAlignment(candles);
     const atrPercentile = calculateATRPercentile(candles);
-    const atr = calculateATR(candles);
+    const _atr = calculateATR(candles);
     const bbWidth = calculateBBWidth(candles);
     const rsi = calculateRSI(candles);
     const volumeRatio = calculateVolumeRatio(candles);
@@ -55,9 +54,10 @@ export class RegimeClassifier {
 
     // Hourly range (last candle)
     const lastCandle = candles[candles.length - 1];
-    const hourlyRangePercent = lastCandle && lastCandle.open !== 0
-      ? ((lastCandle.high - lastCandle.low) / lastCandle.open) * 100
-      : 0;
+    const hourlyRangePercent =
+      lastCandle && lastCandle.open !== 0
+        ? ((lastCandle.high - lastCandle.low) / lastCandle.open) * 100
+        : 0;
 
     const metrics: RegimeMetrics = {
       adx,
@@ -178,11 +178,7 @@ export class RegimeClassifier {
    * Confidence for breakout regime.
    * Factors: ATR jump magnitude (40%), volume spike (40%), ADX rising (20%).
    */
-  private calcBreakoutConfidence(
-    atrPct: number,
-    volumeRatio: number,
-    adx: number,
-  ): number {
+  private calcBreakoutConfidence(atrPct: number, volumeRatio: number, adx: number): number {
     const atrScore = Math.min(1, (atrPct - 60) / 40);
     const volScore = Math.min(1, (volumeRatio - 1.5) / 1.5);
     const adxBonus = adx > 20 ? 0.15 : 0;

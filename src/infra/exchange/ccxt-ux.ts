@@ -20,8 +20,8 @@ import { extractCcxtSubId, isCcxtExchangeId, type CcxtExchangeId } from "./types
  * audit.
  */
 const CCXT_PASSPHRASE_EXCHANGES = new Set<string>([
-  "coinbase",        // legacy REST
-  "coinbasepro",     // legacy alias
+  "coinbase", // legacy REST
+  "coinbasepro", // legacy alias
   "coinbaseinternational",
   "coinbaseadvanced",
   "okx",
@@ -29,7 +29,7 @@ const CCXT_PASSPHRASE_EXCHANGES = new Set<string>([
   "kucoinfutures",
   "bitget",
   "gate",
-  "gateio",          // alias
+  "gateio", // alias
   "bitmart",
   "phemex",
   "cryptocom",

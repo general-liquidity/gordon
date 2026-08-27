@@ -24,7 +24,12 @@ export const PLAYBOOK_PROTOCOL_VERSION = "1.0";
 export const TierEnum = z.enum(["1-conservative", "2-moderate", "3-aggressive"]);
 export const TimeframeEnum = z.enum(["scalp", "intraday", "swing", "position"]);
 export const RegimeEnum = z.enum(["trending", "ranging", "volatile", "quiet", "any"]);
-export const StopLossTypeEnum = z.enum(["fixed_percent", "atr_multiple", "support_level", "trailing"]);
+export const StopLossTypeEnum = z.enum([
+  "fixed_percent",
+  "atr_multiple",
+  "support_level",
+  "trailing",
+]);
 export const OrderTypeEnum = z.enum(["market", "limit", "bracket"]);
 export const EntryMethodEnum = z.enum(["immediate", "scaled", "dca"]);
 export const LicenseEnum = z.enum(["MIT", "proprietary", "CC-BY-4.0", "unlicensed"]);

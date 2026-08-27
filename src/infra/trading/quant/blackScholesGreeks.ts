@@ -147,10 +147,7 @@ export function computeBlackScholesGreeks(input: BSInput): BSResult {
 
   // Expired option: return intrinsic, NaN Greeks
   if (T === 0) {
-    const intrinsic =
-      input.optionType === "call"
-        ? Math.max(S - K, 0)
-        : Math.max(K - S, 0);
+    const intrinsic = input.optionType === "call" ? Math.max(S - K, 0) : Math.max(K - S, 0);
     return {
       price: intrinsic,
       d1: NaN,
@@ -189,18 +186,12 @@ export function computeBlackScholesGreeks(input: BSInput): BSResult {
   if (input.optionType === "call") {
     price = S * eqT * Nd1 - K * erT * Nd2;
     delta = eqT * Nd1;
-    theta =
-      -(S * eqT * phid1 * sigma) / (2 * sqrtT) -
-      r * K * erT * Nd2 +
-      q * S * eqT * Nd1;
+    theta = -(S * eqT * phid1 * sigma) / (2 * sqrtT) - r * K * erT * Nd2 + q * S * eqT * Nd1;
     rho = K * T * erT * Nd2;
   } else {
     price = K * erT * NmD2 - S * eqT * NmD1;
     delta = eqT * (Nd1 - 1); // = -eqT * NmD1
-    theta =
-      -(S * eqT * phid1 * sigma) / (2 * sqrtT) +
-      r * K * erT * NmD2 -
-      q * S * eqT * NmD1;
+    theta = -(S * eqT * phid1 * sigma) / (2 * sqrtT) + r * K * erT * NmD2 - q * S * eqT * NmD1;
     rho = -K * T * erT * NmD2;
   }
 
@@ -214,9 +205,7 @@ export function computeBlackScholesGreeks(input: BSInput): BSResult {
   // charm = ∂Δ/∂t (calendar time forward = −∂Δ/∂T), per year.
   const charmCommon = (eqT * phid1 * (2 * (r - q) * T - d2 * sigSqrtT)) / (2 * T * sigSqrtT);
   const charm =
-    input.optionType === "call"
-      ? q * eqT * Nd1 - charmCommon
-      : -q * eqT * NmD1 - charmCommon;
+    input.optionType === "call" ? q * eqT * Nd1 - charmCommon : -q * eqT * NmD1 - charmCommon;
 
   const reasoning =
     `BS ${input.optionType.toUpperCase()}: S=${S}, K=${K}, T=${T.toFixed(4)}, ` +
@@ -337,9 +326,7 @@ export function impliedVolatility(input: ImpliedVolInput): ImpliedVolResult {
   const eqT = Math.exp(-q * T);
   const erT = Math.exp(-r * T);
   const lowerBound =
-    optionType === "call"
-      ? Math.max(S * eqT - K * erT, 0)
-      : Math.max(K * erT - S * eqT, 0);
+    optionType === "call" ? Math.max(S * eqT - K * erT, 0) : Math.max(K * erT - S * eqT, 0);
   if (target < lowerBound - 1e-9) {
     return fail(
       `market price ${target.toFixed(6)} below intrinsic lower bound ${lowerBound.toFixed(6)}`,

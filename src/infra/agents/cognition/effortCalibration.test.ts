@@ -9,12 +9,8 @@ import {
 
 describe("classifyComplexity — explicit level", () => {
   it("honors explicit `level` hint over all heuristics", () => {
-    expect(
-      classifyComplexity({ level: "deep", isRouting: true }),
-    ).toBe("deep");
-    expect(
-      classifyComplexity({ level: "trivial", isLiveExecution: true }),
-    ).toBe("trivial");
+    expect(classifyComplexity({ level: "deep", isRouting: true })).toBe("deep");
+    expect(classifyComplexity({ level: "trivial", isLiveExecution: true })).toBe("trivial");
   });
 });
 
@@ -28,9 +24,7 @@ describe("classifyComplexity — precedence", () => {
   });
 
   it("deep keyword in task → deep", () => {
-    expect(classifyComplexity({ task: "analyze the regime over the last 6 months" })).toBe(
-      "deep",
-    );
+    expect(classifyComplexity({ task: "analyze the regime over the last 6 months" })).toBe("deep");
   });
 
   it("trivial keyword in task → trivial", () => {
@@ -38,9 +32,7 @@ describe("classifyComplexity — precedence", () => {
   });
 
   it("deep keyword wins over trivial keyword when both present", () => {
-    expect(
-      classifyComplexity({ task: "fetch and analyze the regime for BTC" }),
-    ).toBe("deep");
+    expect(classifyComplexity({ task: "fetch and analyze the regime for BTC" })).toBe("deep");
   });
 
   it("fanout > 5 → deep when no keyword match", () => {

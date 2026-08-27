@@ -104,7 +104,10 @@ export interface YahooNewsItem {
 const YAHOO_BASE = "https://query2.finance.yahoo.com";
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
-interface CacheEntry<T> { data: T; timestamp: number; }
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
 
 export class FundamentalsClient {
   private cache: Map<string, CacheEntry<any>> = new Map();
@@ -119,13 +122,13 @@ export class FundamentalsClient {
       const response = await fetch(url, {
         headers: {
           "User-Agent": "Mozilla/5.0 Gordon CLI Trading Terminal",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
         signal: AbortSignal.timeout(10000),
       });
 
       if (!response.ok) return null;
-      const data = await response.json() as T;
+      const data = (await response.json()) as T;
       this.cache.set(url, { data, timestamp: Date.now() });
       return data;
     } catch {
@@ -176,15 +179,20 @@ export class FundamentalsClient {
     };
   }
 
-  async getFinancialStatements(symbol: string, period: "annual" | "quarterly" = "annual"): Promise<FinancialStatement[]> {
+  async getFinancialStatements(
+    symbol: string,
+    period: "annual" | "quarterly" = "annual",
+  ): Promise<FinancialStatement[]> {
     const sym = symbol.toUpperCase();
-    const module = period === "annual" ? "incomeStatementHistory" : "incomeStatementHistoryQuarterly";
+    const module =
+      period === "annual" ? "incomeStatementHistory" : "incomeStatementHistoryQuarterly";
     const url = `${YAHOO_BASE}/v10/finance/quoteSummary/${sym}?modules=${module}`;
 
     const data = await this.fetch<any>(url);
-    const statements = period === "annual"
-      ? data?.quoteSummary?.result?.[0]?.incomeStatementHistory?.incomeStatementHistory
-      : data?.quoteSummary?.result?.[0]?.incomeStatementHistoryQuarterly?.incomeStatementHistory;
+    const statements =
+      period === "annual"
+        ? data?.quoteSummary?.result?.[0]?.incomeStatementHistory?.incomeStatementHistory
+        : data?.quoteSummary?.result?.[0]?.incomeStatementHistoryQuarterly?.incomeStatementHistory;
 
     if (!Array.isArray(statements)) return [];
 
@@ -202,15 +210,19 @@ export class FundamentalsClient {
     }));
   }
 
-  async getBalanceSheet(symbol: string, period: "annual" | "quarterly" = "annual"): Promise<BalanceSheet[]> {
+  async getBalanceSheet(
+    symbol: string,
+    period: "annual" | "quarterly" = "annual",
+  ): Promise<BalanceSheet[]> {
     const sym = symbol.toUpperCase();
     const module = period === "annual" ? "balanceSheetHistory" : "balanceSheetHistoryQuarterly";
     const url = `${YAHOO_BASE}/v10/finance/quoteSummary/${sym}?modules=${module}`;
 
     const data = await this.fetch<any>(url);
-    const sheets = period === "annual"
-      ? data?.quoteSummary?.result?.[0]?.balanceSheetHistory?.balanceSheetStatements
-      : data?.quoteSummary?.result?.[0]?.balanceSheetHistoryQuarterly?.balanceSheetStatements;
+    const sheets =
+      period === "annual"
+        ? data?.quoteSummary?.result?.[0]?.balanceSheetHistory?.balanceSheetStatements
+        : data?.quoteSummary?.result?.[0]?.balanceSheetHistoryQuarterly?.balanceSheetStatements;
 
     if (!Array.isArray(sheets)) return [];
 
@@ -228,15 +240,20 @@ export class FundamentalsClient {
     }));
   }
 
-  async getCashFlow(symbol: string, period: "annual" | "quarterly" = "annual"): Promise<CashFlowStatement[]> {
+  async getCashFlow(
+    symbol: string,
+    period: "annual" | "quarterly" = "annual",
+  ): Promise<CashFlowStatement[]> {
     const sym = symbol.toUpperCase();
-    const module = period === "annual" ? "cashflowStatementHistory" : "cashflowStatementHistoryQuarterly";
+    const module =
+      period === "annual" ? "cashflowStatementHistory" : "cashflowStatementHistoryQuarterly";
     const url = `${YAHOO_BASE}/v10/finance/quoteSummary/${sym}?modules=${module}`;
 
     const data = await this.fetch<any>(url);
-    const flows = period === "annual"
-      ? data?.quoteSummary?.result?.[0]?.cashflowStatementHistory?.cashflowStatements
-      : data?.quoteSummary?.result?.[0]?.cashflowStatementHistoryQuarterly?.cashflowStatements;
+    const flows =
+      period === "annual"
+        ? data?.quoteSummary?.result?.[0]?.cashflowStatementHistory?.cashflowStatements
+        : data?.quoteSummary?.result?.[0]?.cashflowStatementHistoryQuarterly?.cashflowStatements;
 
     if (!Array.isArray(flows)) return [];
 
@@ -247,7 +264,8 @@ export class FundamentalsClient {
       operatingCashFlow: s.totalCashFromOperatingActivities?.raw ?? 0,
       investingCashFlow: s.totalCashflowsFromInvestingActivities?.raw ?? 0,
       financingCashFlow: s.totalCashFromFinancingActivities?.raw ?? 0,
-      freeCashFlow: (s.totalCashFromOperatingActivities?.raw ?? 0) - (s.capitalExpenditures?.raw ?? 0),
+      freeCashFlow:
+        (s.totalCashFromOperatingActivities?.raw ?? 0) - (s.capitalExpenditures?.raw ?? 0),
       capex: Math.abs(s.capitalExpenditures?.raw ?? 0),
       dividendsPaid: Math.abs(s.dividendsPaid?.raw ?? 0),
     }));
@@ -308,8 +326,32 @@ export class FundamentalsClient {
       };
       // Simple keyword-based sentiment
       const title = item.title.toLowerCase();
-      const bullish = ["beat", "surge", "soar", "rally", "upgrade", "buy", "bullish", "growth", "record", "strong", "positive"];
-      const bearish = ["miss", "plunge", "crash", "fall", "downgrade", "sell", "bearish", "loss", "weak", "negative", "warn"];
+      const bullish = [
+        "beat",
+        "surge",
+        "soar",
+        "rally",
+        "upgrade",
+        "buy",
+        "bullish",
+        "growth",
+        "record",
+        "strong",
+        "positive",
+      ];
+      const bearish = [
+        "miss",
+        "plunge",
+        "crash",
+        "fall",
+        "downgrade",
+        "sell",
+        "bearish",
+        "loss",
+        "weak",
+        "negative",
+        "warn",
+      ];
       let score = 0;
       for (const w of bullish) if (title.includes(w)) score += 0.2;
       for (const w of bearish) if (title.includes(w)) score -= 0.2;
@@ -320,7 +362,9 @@ export class FundamentalsClient {
     });
   }
 
-  clearCache(): void { this.cache.clear(); }
+  clearCache(): void {
+    this.cache.clear();
+  }
 }
 
 let instance: FundamentalsClient | null = null;

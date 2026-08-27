@@ -80,7 +80,8 @@ export const DEFAULT_RULES: readonly ValidatorRule[] = [
     severity: "block",
     pattern: /\.rolling\([^)]*center\s*=\s*True/i,
     description: "Pandas rolling window with center=True peeks at future bars.",
-    fixInstruction: "Set center=False (default) and shift the output by lookback//2 if you need symmetry, but expect the symmetric smoother to leak.",
+    fixInstruction:
+      "Set center=False (default) and shift the output by lookback//2 if you need symmetry, but expect the symmetric smoother to leak.",
   },
   {
     id: "centered_window_align",
@@ -88,7 +89,8 @@ export const DEFAULT_RULES: readonly ValidatorRule[] = [
     severity: "block",
     pattern: /align\s*[:=]\s*["']?center["']?/i,
     description: "Window with align: 'center' includes future bars.",
-    fixInstruction: "Use align: 'right' (or trailing-only) for any feature used as input to a trading signal.",
+    fixInstruction:
+      "Use align: 'right' (or trailing-only) for any feature used as input to a trading signal.",
   },
 
   // --- 2. Missing shift before PnL ---
@@ -97,8 +99,10 @@ export const DEFAULT_RULES: readonly ValidatorRule[] = [
     family: "missing_shift",
     severity: "warn",
     pattern: /signal\s*\*\s*returns(?!\s*\.\s*shift)/,
-    description: "Pattern 'signal * returns' without an adjacent .shift(1) likely uses the current bar's signal for the current bar's PnL — look-ahead.",
-    fixInstruction: "Shift signal by one bar before computing PnL: (signal.shift(1) * returns) or equivalent.",
+    description:
+      "Pattern 'signal * returns' without an adjacent .shift(1) likely uses the current bar's signal for the current bar's PnL — look-ahead.",
+    fixInstruction:
+      "Shift signal by one bar before computing PnL: (signal.shift(1) * returns) or equivalent.",
   },
   {
     id: "pnl_without_shift_ts",
@@ -106,7 +110,8 @@ export const DEFAULT_RULES: readonly ValidatorRule[] = [
     severity: "warn",
     pattern: /(?:position|signal)\s*\[\s*i\s*\]\s*\*\s*(?:returns?|ret)\s*\[\s*i\s*\]/,
     description: "Same-index multiplication of signal[i] * returns[i] is look-ahead.",
-    fixInstruction: "Use signal[i-1] * returns[i] — the signal decided at bar i-1 applies to the bar i return.",
+    fixInstruction:
+      "Use signal[i-1] * returns[i] — the signal decided at bar i-1 applies to the bar i return.",
   },
 
   // --- 3. Full-sample normalization ---
@@ -115,14 +120,17 @@ export const DEFAULT_RULES: readonly ValidatorRule[] = [
     family: "full_sample_normalization",
     severity: "block",
     pattern: /\.fit_transform\s*\(\s*[A-Za-z_]\w*\s*\)/,
-    description: "fit_transform on the full dataset before train/test split causes test-set leakage into normalization parameters.",
-    fixInstruction: "Fit the scaler on train only, then .transform() test. Use a per-fold scaler inside walk-forward.",
+    description:
+      "fit_transform on the full dataset before train/test split causes test-set leakage into normalization parameters.",
+    fixInstruction:
+      "Fit the scaler on train only, then .transform() test. Use a per-fold scaler inside walk-forward.",
   },
   {
     id: "zscore_full_sample",
     family: "full_sample_normalization",
     severity: "warn",
-    pattern: /\(\s*[A-Za-z_]\w*\s*-\s*[A-Za-z_]\w*\.mean\(\s*\)\s*\)\s*\/\s*[A-Za-z_]\w*\.std\(\s*\)/,
+    pattern:
+      /\(\s*[A-Za-z_]\w*\s*-\s*[A-Za-z_]\w*\.mean\(\s*\)\s*\)\s*\/\s*[A-Za-z_]\w*\.std\(\s*\)/,
     description: "Z-score using full-series mean/std leaks test-set statistics into the feature.",
     fixInstruction: "Compute z-score in a rolling window (see FeaturePipeline) or refit per fold.",
   },
@@ -133,8 +141,10 @@ export const DEFAULT_RULES: readonly ValidatorRule[] = [
     family: "survivorship_bias",
     severity: "warn",
     pattern: /(?:sp500|spy|nasdaq|russell|index)_(?:current|today|now|members)/i,
-    description: "Using today's index membership as the historical universe introduces survivorship bias.",
-    fixInstruction: "Use point-in-time index constituents for each date. Most vendors offer 'as-of' membership tables.",
+    description:
+      "Using today's index membership as the historical universe introduces survivorship bias.",
+    fixInstruction:
+      "Use point-in-time index constituents for each date. Most vendors offer 'as-of' membership tables.",
   },
 
   // --- 5. Restated fundamentals ---
@@ -143,8 +153,10 @@ export const DEFAULT_RULES: readonly ValidatorRule[] = [
     family: "restated_fundamentals",
     severity: "warn",
     pattern: /\b(?:latest_|current_|as_of_now_)(?:earnings|revenue|eps|fundamentals)\b/i,
-    description: "Using latest/restated fundamentals for historical backtests is look-ahead; companies restate.",
-    fixInstruction: "Use point-in-time fundamentals (the value AS IT WAS REPORTED on the historical date, not the latest restatement).",
+    description:
+      "Using latest/restated fundamentals for historical backtests is look-ahead; companies restate.",
+    fixInstruction:
+      "Use point-in-time fundamentals (the value AS IT WAS REPORTED on the historical date, not the latest restatement).",
   },
 
   // --- 6. Future references ---
@@ -154,7 +166,8 @@ export const DEFAULT_RULES: readonly ValidatorRule[] = [
     severity: "block",
     pattern: /\b(?:future|next_bar|lookahead|peek)_(?:price|close|return|signal)\b/i,
     description: "Variable name suggests reading future data.",
-    fixInstruction: "Forward-looking variable names are usually look-ahead. If you need a future-aware label (e.g. triple-barrier), do it in a separate labeling step that the trading signal never sees.",
+    fixInstruction:
+      "Forward-looking variable names are usually look-ahead. If you need a future-aware label (e.g. triple-barrier), do it in a separate labeling step that the trading signal never sees.",
   },
   {
     id: "negative_shift_or_lead",
@@ -162,7 +175,8 @@ export const DEFAULT_RULES: readonly ValidatorRule[] = [
     severity: "block",
     pattern: /\.shift\(\s*-\d+\s*\)|\.lead\(/,
     description: "Negative shift or .lead() pulls future data into the current bar.",
-    fixInstruction: "Negative shift is leakage. Use only positive shifts (or labels computed in a separate label-only pipeline).",
+    fixInstruction:
+      "Negative shift is leakage. Use only positive shifts (or labels computed in a separate label-only pipeline).",
   },
   {
     id: "positive_offset_slice",
@@ -170,7 +184,8 @@ export const DEFAULT_RULES: readonly ValidatorRule[] = [
     severity: "warn",
     pattern: /\.iloc\[\s*i\s*\+\s*\d+\s*\]|\.slice\(\s*i\s*,\s*i\s*\+\s*\d+\s*\)/,
     description: "Indexing forward from the current bar (i+k) accesses the future.",
-    fixInstruction: "Replace with i-k indexing (past) or move forward-looking logic to a separate label-generation step.",
+    fixInstruction:
+      "Replace with i-k indexing (past) or move forward-looking logic to a separate label-generation step.",
   },
 ];
 
@@ -185,10 +200,7 @@ export interface ValidateOptions {
   suppressRuleIds?: readonly string[];
 }
 
-export function validateStrategyCode(
-  code: string,
-  opts: ValidateOptions = {},
-): ValidatorResult {
+export function validateStrategyCode(code: string, opts: ValidateOptions = {}): ValidatorResult {
   const rules = (opts.rules ?? DEFAULT_RULES).filter(
     (r) => !(opts.suppressRuleIds ?? []).includes(r.id),
   );

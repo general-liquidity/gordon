@@ -8,7 +8,6 @@
  * Enter or Escape closes the dialog.
  */
 
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 
 // ============================================================================
@@ -32,16 +31,12 @@ export function InvalidSettingsDialog({ errors, onClose }: Props) {
   });
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="yellow"
-      paddingX={2}
-      paddingY={1}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={2} paddingY={1}>
       {/* Title */}
       <Box justifyContent="center">
-        <Text bold color="yellow">{"⚠ INVALID SETTINGS"}</Text>
+        <Text bold color="yellow">
+          {"⚠ INVALID SETTINGS"}
+        </Text>
       </Box>
       <Text> </Text>
 

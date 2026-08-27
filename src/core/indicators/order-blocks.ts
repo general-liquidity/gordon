@@ -73,14 +73,14 @@ function rollingZScore(values: number[], window: number): number[] {
  * Simplified Kaplan-Meier survival probability
  */
 function kaplanMeierProbability(blocks: OrderBlock[]): number {
-  const mitigated = blocks.filter(b => b.mitigated);
+  const mitigated = blocks.filter((b) => b.mitigated);
   if (mitigated.length < 5) return 0.5;
 
-  const survivalTimes = mitigated.map(b => b.mitigationBar - b.bar);
+  const survivalTimes = mitigated.map((b) => b.mitigationBar - b.bar);
   survivalTimes.sort((a, b) => a - b);
 
   const medianTime = survivalTimes[Math.floor(survivalTimes.length / 2)]!;
-  const survivors = mitigated.filter(b => (b.mitigationBar - b.bar) >= medianTime).length;
+  const survivors = mitigated.filter((b) => b.mitigationBar - b.bar >= medianTime).length;
   const prob = survivors / mitigated.length;
 
   return Math.max(0.1, Math.min(0.9, prob));
@@ -101,7 +101,7 @@ export function calculateOrderBlocks(
   lookback: number = 50,
   zThresholdBull: number = 4.0,
   zThresholdBear: number = 4.0,
-  boxExpiration: number = 100
+  boxExpiration: number = 100,
 ): OrderBlockResult {
   if (candles.length < lookback + 5) {
     return {
@@ -118,8 +118,8 @@ export function calculateOrderBlocks(
     };
   }
 
-  const highs = candles.map(c => c.high);
-  const lows = candles.map(c => c.low);
+  const highs = candles.map((c) => c.high);
+  const lows = candles.map((c) => c.low);
   const lastBar = candles.length - 1;
   const currentPrice = candles[lastBar]!.close;
 
@@ -195,12 +195,10 @@ export function calculateOrderBlocks(
   }
 
   // Filter active blocks (unmitigated and not expired)
-  const activeBlocks = allBlocks.filter(
-    b => !b.mitigated && (lastBar - b.bar) < boxExpiration
-  );
+  const activeBlocks = allBlocks.filter((b) => !b.mitigated && lastBar - b.bar < boxExpiration);
 
-  const bullishBlocks = activeBlocks.filter(b => b.type === "bullish");
-  const bearishBlocks = activeBlocks.filter(b => b.type === "bearish");
+  const bullishBlocks = activeBlocks.filter((b) => b.type === "bullish");
+  const bearishBlocks = activeBlocks.filter((b) => b.type === "bearish");
 
   // Nearest blocks
   let nearestBullishOB: number | null = null;
@@ -224,13 +222,13 @@ export function calculateOrderBlocks(
   }
 
   // KM probabilities
-  const allBullish = allBlocks.filter(b => b.type === "bullish");
-  const allBearish = allBlocks.filter(b => b.type === "bearish");
+  const allBullish = allBlocks.filter((b) => b.type === "bullish");
+  const allBearish = allBlocks.filter((b) => b.type === "bearish");
   const bullishProbability = parseFloat(kaplanMeierProbability(allBullish).toFixed(2));
   const bearishProbability = parseFloat(kaplanMeierProbability(allBearish).toFixed(2));
 
   // New block detection
-  const recentBlocks = allBlocks.filter(b => b.bar >= lastBar - 1);
+  const recentBlocks = allBlocks.filter((b) => b.bar >= lastBar - 1);
   const newBlock = recentBlocks.length > 0;
   const newBlockType = newBlock ? recentBlocks[recentBlocks.length - 1]!.type : "none";
 
@@ -240,9 +238,16 @@ export function calculateOrderBlocks(
   else if (newBlock && newBlockType === "bearish" && bearishProbability >= 0.6) signal = "sell";
 
   const interpretation = buildOBInterpretation(
-    bullishBlocks.length, bearishBlocks.length,
-    nearestBullishOB, nearestBearishOB, currentPrice,
-    newBlock, newBlockType, bullishProbability, bearishProbability, signal
+    bullishBlocks.length,
+    bearishBlocks.length,
+    nearestBullishOB,
+    nearestBearishOB,
+    currentPrice,
+    newBlock,
+    newBlockType,
+    bullishProbability,
+    bearishProbability,
+    signal,
   );
 
   return {
@@ -260,18 +265,24 @@ export function calculateOrderBlocks(
 }
 
 function buildOBInterpretation(
-  bullCount: number, bearCount: number,
-  nearBull: number | null, nearBear: number | null, price: number,
-  newBlock: boolean, newType: string,
-  bullProb: number, bearProb: number, signal: string
+  bullCount: number,
+  bearCount: number,
+  nearBull: number | null,
+  nearBear: number | null,
+  price: number,
+  newBlock: boolean,
+  newType: string,
+  bullProb: number,
+  bearProb: number,
+  signal: string,
 ): string {
   let msg = `Order Blocks: ${bullCount} bullish, ${bearCount} bearish active. `;
 
   if (nearBull !== null) {
-    msg += `Nearest bullish OB: ${nearBull.toFixed(2)} (${((price - nearBull) / price * 100).toFixed(1)}% below). `;
+    msg += `Nearest bullish OB: ${nearBull.toFixed(2)} (${(((price - nearBull) / price) * 100).toFixed(1)}% below). `;
   }
   if (nearBear !== null) {
-    msg += `Nearest bearish OB: ${nearBear.toFixed(2)} (${((nearBear - price) / price * 100).toFixed(1)}% above). `;
+    msg += `Nearest bearish OB: ${nearBear.toFixed(2)} (${(((nearBear - price) / price) * 100).toFixed(1)}% above). `;
   }
 
   if (newBlock) {

@@ -7,7 +7,6 @@
 
 import { BaseStrategy } from "../base-strategy.ts";
 import type {
-  Strategy,
   StrategyId,
   StrategyContext,
   StrategyDetectionResult,
@@ -15,13 +14,9 @@ import type {
   TakeProfitLevel,
 } from "../types.ts";
 import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
-import type { StrategyDSL, SignalRule, Condition, StopLoss, TakeProfit } from "./schema.ts";
-import { StrategyDSLSchema, validateStrategyDSL } from "./schema.ts";
-import {
-  evaluateCondition,
-  evaluateSignalRule,
-  type EvaluationContext,
-} from "./conditions.ts";
+import type { StrategyDSL, Condition, StopLoss, TakeProfit } from "./schema.ts";
+import { validateStrategyDSL } from "./schema.ts";
+import { evaluateSignalRule, type EvaluationContext } from "./conditions.ts";
 
 // ============================================================================
 // DSL-Based Strategy Class
@@ -72,7 +67,7 @@ export class DSLBasedStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, 100);
     if (candles.length < 30) {
@@ -168,10 +163,7 @@ export class DSLBasedStrategy extends BaseStrategy {
     return this.detected(avgConfidence, signals, reasons.join(". "));
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", 100);
     const currentPrice = this.getCurrentPrice(candles, ctx);
 
@@ -187,7 +179,7 @@ export class DSLBasedStrategy extends BaseStrategy {
       this.dsl.exitRules.stopLoss,
       entryPrice,
       atr.current ?? entryPrice * 0.02,
-      supports[0]?.price
+      supports[0]?.price,
     );
 
     // Calculate take profits
@@ -197,14 +189,11 @@ export class DSLBasedStrategy extends BaseStrategy {
       entryPrice,
       risk,
       atr.current ?? entryPrice * 0.02,
-      resistances[0]?.price
+      resistances[0]?.price,
     );
 
     // Calculate average take profit for R:R
-    const avgTpPrice = takeProfits.reduce(
-      (sum, tp) => sum + tp.price * tp.percentToSell,
-      0
-    );
+    const avgTpPrice = takeProfits.reduce((sum, tp) => sum + tp.price * tp.percentToSell, 0);
     const riskRewardRatio = this.calculateRiskReward(entryPrice, stopLoss, avgTpPrice);
 
     const notes = [
@@ -215,7 +204,7 @@ export class DSLBasedStrategy extends BaseStrategy {
 
     if (this.dsl.exitRules.trailingStop?.enabled) {
       notes.push(
-        `Trailing stop activates at ${this.dsl.exitRules.trailingStop.activation ?? 2}% profit`
+        `Trailing stop activates at ${this.dsl.exitRules.trailingStop.activation ?? 2}% profit`,
       );
     }
 
@@ -232,7 +221,10 @@ export class DSLBasedStrategy extends BaseStrategy {
     const dsl = this.dsl;
 
     const entryRules = dsl.entryRules.long
-      .map((r) => `- ${r.name}: ${r.conditions.map(c => this.conditionToText(c)).join(` ${r.operator} `)}`)
+      .map(
+        (r) =>
+          `- ${r.name}: ${r.conditions.map((c) => this.conditionToText(c)).join(` ${r.operator} `)}`,
+      )
       .join("\n");
 
     const tpRules = dsl.exitRules.takeProfit
@@ -271,7 +263,7 @@ ${dsl.requiredIndicators.join(", ")}
     bar: OHLC,
     _index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     const evalCtx: EvaluationContext = {
       bar,
@@ -359,10 +351,7 @@ ${dsl.requiredIndicators.join(", ")}
     this.prevIndicators = { ...indicators };
   }
 
-  private checkFilters(
-    bar: OHLC,
-    indicators: IndicatorState
-  ): { passed: boolean; reason: string } {
+  private checkFilters(bar: OHLC, indicators: IndicatorState): { passed: boolean; reason: string } {
     const filters = this.dsl.filters;
     if (!filters) {
       return { passed: true, reason: "" };
@@ -420,7 +409,7 @@ ${dsl.requiredIndicators.join(", ")}
     config: StopLoss,
     entryPrice: number,
     atr: number,
-    support?: number
+    support?: number,
   ): number {
     switch (config.type) {
       case "atr":
@@ -431,7 +420,7 @@ ${dsl.requiredIndicators.join(", ")}
 
       case "support":
         if (support) {
-          return support * (1 - (config.value / 100));
+          return support * (1 - config.value / 100);
         }
         return entryPrice * (1 - config.value / 100);
 
@@ -448,7 +437,7 @@ ${dsl.requiredIndicators.join(", ")}
     entryPrice: number,
     risk: number,
     atr: number,
-    resistance?: number
+    resistance?: number,
   ): TakeProfitLevel[] {
     return configs.map((tp) => {
       let price: number;
@@ -473,8 +462,15 @@ ${dsl.requiredIndicators.join(", ")}
   }
 
   private buildIndicatorState(
-    candles: { open: number; high: number; low: number; close: number; volume: number; openTime?: number }[],
-    currentPrice: number
+    candles: {
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+      volume: number;
+      openTime?: number;
+    }[],
+    currentPrice: number,
   ): IndicatorState {
     const state: IndicatorState = {};
 
@@ -560,9 +556,8 @@ ${dsl.requiredIndicators.join(", ")}
       case "indicator": {
         const indicator = condition.indicator.toUpperCase();
         const op = condition.comparison.replace("_", " ");
-        const value = typeof condition.value === "number"
-          ? condition.value.toString()
-          : condition.value;
+        const value =
+          typeof condition.value === "number" ? condition.value.toString() : condition.value;
         return `${indicator} ${op} ${value}`;
       }
 
@@ -669,13 +664,31 @@ export class DSLStrategyInterpreter {
 
     // Check that required indicators are valid
     const validIndicators = new Set([
-      "rsi14", "sma20", "sma50", "sma200",
-      "ema9", "ema12", "ema21", "ema26", "ema50",
-      "bbUpper", "bbMiddle", "bbLower", "bbWidth",
-      "atr14", "macdLine", "macdSignal", "macdHistogram",
-      "vwap", "volumeRatio", "volumeAvg20",
-      "nearestSupport", "nearestResistance",
-      "adx", "stochK", "stochD",
+      "rsi14",
+      "sma20",
+      "sma50",
+      "sma200",
+      "ema9",
+      "ema12",
+      "ema21",
+      "ema26",
+      "ema50",
+      "bbUpper",
+      "bbMiddle",
+      "bbLower",
+      "bbWidth",
+      "atr14",
+      "macdLine",
+      "macdSignal",
+      "macdHistogram",
+      "vwap",
+      "volumeRatio",
+      "volumeAvg20",
+      "nearestSupport",
+      "nearestResistance",
+      "adx",
+      "stochK",
+      "stochD",
     ]);
 
     for (const ind of dsl.requiredIndicators) {

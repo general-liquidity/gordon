@@ -77,12 +77,7 @@ export const crossSectionalContrarianDiagnosticTool = createTool({
     shortBookGross: z.number(),
     netExposure: z.number(),
     grossExposure: z.number(),
-    verdict: z.enum([
-      "weighted",
-      "insufficient_data",
-      "no_dispersion",
-      "degenerate_volatility",
-    ]),
+    verdict: z.enum(["weighted", "insufficient_data", "no_dispersion", "degenerate_volatility"]),
     summary: z.string(),
   }),
   execute: async (input) => {

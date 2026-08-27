@@ -75,9 +75,7 @@ export interface RevengeTradeGuardResult {
 
 const DEFAULT_THRESHOLD = 1.5;
 
-export function evaluateRevengeTradeGuard(
-  input: RevengeTradeGuardInput,
-): RevengeTradeGuardResult {
+export function evaluateRevengeTradeGuard(input: RevengeTradeGuardInput): RevengeTradeGuardResult {
   if (input.proposedPlanSize < 0) {
     throw new Error("proposedPlanSize must be ≥ 0");
   }
@@ -89,7 +87,9 @@ export function evaluateRevengeTradeGuard(
   }
   const threshold = input.sizeIncreaseThreshold ?? DEFAULT_THRESHOLD;
   if (threshold <= 1) {
-    throw new Error("sizeIncreaseThreshold must be > 1 (this guards against UPsizing, not downsizing)");
+    throw new Error(
+      "sizeIncreaseThreshold must be > 1 (this guards against UPsizing, not downsizing)",
+    );
   }
   const mode: GuardMode = input.mode ?? "informational";
 

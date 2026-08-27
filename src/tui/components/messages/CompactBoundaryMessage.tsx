@@ -18,9 +18,9 @@ function CompactBoundaryMessageInner({ message }: { message: Message }) {
   return (
     <Box marginTop={1} flexDirection="row">
       <Text dimColor>{dash.repeat(left)}</Text>
-      <Text dimColor>{" "}</Text>
+      <Text dimColor> </Text>
       <Text color="cyanBright">{"✶"}</Text>
-      <Text dimColor>{" "}{message.content || "conversation compacted"}{" "}</Text>
+      <Text dimColor> {message.content || "conversation compacted"} </Text>
       <Text dimColor>{dash.repeat(right)}</Text>
     </Box>
   );

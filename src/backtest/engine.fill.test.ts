@@ -46,8 +46,10 @@ function entryExitStrategy() {
     name: "Fill Test",
     generateSignal(bar: OHLC, _indicators: unknown, _position: Position | null): Signal | null {
       const index = (bar.timestamp - 1_700_000_000_000) / 60_000;
-      if (index === 1) return { type: "BUY", price: 100, timestamp: bar.timestamp, reason: "entry" };
-      if (index === 3) return { type: "SELL", price: 100, timestamp: bar.timestamp, reason: "exit" };
+      if (index === 1)
+        return { type: "BUY", price: 100, timestamp: bar.timestamp, reason: "entry" };
+      if (index === 3)
+        return { type: "SELL", price: 100, timestamp: bar.timestamp, reason: "exit" };
       return null;
     },
   };
@@ -111,7 +113,7 @@ describe("book-aware fills price at realized depth", () => {
     expect(fill.price).toBeLessThan(100.4);
     expect(fill.price).toBeCloseTo(
       (100 * 100.0 + 50 * 100.05 + 25 * 100.1 + 12 * 100.2 + 53 * 100.4) / 240,
-      9
+      9,
     );
   });
 
@@ -184,7 +186,9 @@ describe("depth exhaustion is explicit", () => {
     const engine = new BacktestEngine({
       ...baseParams(20_000),
       // Only the exit side runs dry, so the entry stays book-priced.
-      fillModel: { depth: () => ({ asks: THINNING_BOOK.asks, bids: [{ price: 99.95, quantity: 5 }] }) },
+      fillModel: {
+        depth: () => ({ asks: THINNING_BOOK.asks, bids: [{ price: 99.95, quantity: 5 }] }),
+      },
     });
     const result = engine.run(entryExitStrategy(), bars(6));
 

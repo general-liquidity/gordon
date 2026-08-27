@@ -58,7 +58,7 @@ export class SMACrossoverStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, 250);
     if (candles.length < 210) {
@@ -81,7 +81,7 @@ export class SMACrossoverStrategy extends BaseStrategy {
     // Check for Golden Cross (SMA50 > SMA200)
     if (sma50.current <= sma200.current) {
       return this.notDetected(
-        `No Golden Cross (SMA50: $${sma50.current.toFixed(2)} <= SMA200: $${sma200.current.toFixed(2)})`
+        `No Golden Cross (SMA50: $${sma50.current.toFixed(2)} <= SMA200: $${sma200.current.toFixed(2)})`,
       );
     }
 
@@ -91,7 +91,7 @@ export class SMACrossoverStrategy extends BaseStrategy {
       const distanceToSMA50 = Math.abs(currentPrice - sma50.current) / sma50.current;
       if (distanceToSMA50 > PULLBACK_THRESHOLD) {
         return this.notDetected(
-          `Price too far below SMA50 (${(distanceToSMA50 * 100).toFixed(1)}%)`
+          `Price too far below SMA50 (${(distanceToSMA50 * 100).toFixed(1)}%)`,
         );
       }
     }
@@ -99,13 +99,14 @@ export class SMACrossoverStrategy extends BaseStrategy {
     // Check how recent the crossover is
     const crossoverCandles = this.findCrossoverAge(sma50.values, sma200.values);
     const isRecentCross = crossoverCandles <= CROSSOVER_LOOKBACK;
-    const isPullbackSetup = !isRecentCross &&
+    const isPullbackSetup =
+      !isRecentCross &&
       currentPrice >= sma50.current * (1 - PULLBACK_THRESHOLD) &&
       currentPrice <= sma50.current * (1 + PULLBACK_THRESHOLD);
 
     if (!isRecentCross && !isPullbackSetup) {
       return this.notDetected(
-        `Golden Cross too old (${crossoverCandles} candles ago) and no pullback setup`
+        `Golden Cross too old (${crossoverCandles} candles ago) and no pullback setup`,
       );
     }
 
@@ -153,7 +154,9 @@ export class SMACrossoverStrategy extends BaseStrategy {
     };
 
     const reasons: string[] = [];
-    reasons.push(`Golden Cross: SMA50 ($${sma50.current.toFixed(2)}) > SMA200 ($${sma200.current.toFixed(2)})`);
+    reasons.push(
+      `Golden Cross: SMA50 ($${sma50.current.toFixed(2)}) > SMA200 ($${sma200.current.toFixed(2)})`,
+    );
     if (isRecentCross) {
       reasons.push(`Recent crossover (${crossoverCandles} candles ago)`);
     } else if (isPullbackSetup) {
@@ -170,10 +173,7 @@ export class SMACrossoverStrategy extends BaseStrategy {
   /**
    * Find how many candles ago the crossover occurred
    */
-  private findCrossoverAge(
-    fastValues: (number | null)[],
-    slowValues: (number | null)[]
-  ): number {
+  private findCrossoverAge(fastValues: (number | null)[], slowValues: (number | null)[]): number {
     for (let i = fastValues.length - 1; i >= 1; i--) {
       const currentFast = fastValues[i];
       const currentSlow = slowValues[i];
@@ -199,14 +199,11 @@ export class SMACrossoverStrategy extends BaseStrategy {
     return 999; // No crossover found
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", 250);
     const currentPrice = this.getCurrentPrice(candles, ctx);
 
-    const sma50 = this.calculateSMA(candles, FAST_SMA);
+    const _sma50 = this.calculateSMA(candles, FAST_SMA);
     const sma200 = this.calculateSMA(candles, SLOW_SMA);
     const atr = this.calculateATR(candles);
 
@@ -233,7 +230,8 @@ export class SMACrossoverStrategy extends BaseStrategy {
       stopLoss,
       takeProfits,
       riskRewardRatio,
-      notes: `Golden Cross trend trade. Stop below SMA200 at $${stopLoss.toFixed(2)}. ` +
+      notes:
+        `Golden Cross trend trade. Stop below SMA200 at $${stopLoss.toFixed(2)}. ` +
         `Trailing stops recommended. R:R ${riskRewardRatio.toFixed(1)}:1`,
     };
   }
@@ -255,23 +253,13 @@ export class SMACrossoverStrategy extends BaseStrategy {
     bar: OHLC,
     _index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     const price = bar.close;
-    const {
-      rsi14,
-      rsi14Prev,
-      sma50,
-      sma200,
-    } = indicators;
+    const { rsi14, rsi14Prev, sma50, sma200 } = indicators;
 
     // Need RSI values for crossover detection
-    if (
-      rsi14 === null ||
-      rsi14 === undefined ||
-      rsi14Prev === null ||
-      rsi14Prev === undefined
-    ) {
+    if (rsi14 === null || rsi14 === undefined || rsi14Prev === null || rsi14Prev === undefined) {
       return null;
     }
 
@@ -314,15 +302,7 @@ export class SMACrossoverStrategy extends BaseStrategy {
    * Get required indicators for backtesting.
    */
   override getRequiredIndicators(): string[] {
-    return [
-      "sma50",
-      "sma200",
-      "rsi14",
-      "rsi14Prev",
-      "atr14",
-      "volumeRatio",
-      "volumeAvg20",
-    ];
+    return ["sma50", "sma200", "rsi14", "rsi14Prev", "atr14", "volumeRatio", "volumeAvg20"];
   }
 
   getPromptFragment(): string {

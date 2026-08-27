@@ -57,7 +57,7 @@ const CAMARILLA_FACTOR = 1.1;
 export function calculateCamarillaPivots(
   candles: Candle[],
   lookbackPeriod: number = 24,
-  currentPrice?: number
+  currentPrice?: number,
 ): CamarillaPivotResult {
   if (candles.length < lookbackPeriod + 1) {
     return {
@@ -144,7 +144,7 @@ export function calculateCamarillaPivots(
     priceZone,
     signal,
     nearestLevel,
-    range
+    range,
   );
 
   return {
@@ -168,7 +168,7 @@ function getPriceZone(
   s1: number,
   s2: number,
   s3: number,
-  s4: number
+  s4: number,
 ): string {
   if (price > r4) return "above_R4";
   if (price > r3) return "R3_R4";
@@ -187,7 +187,7 @@ function getSignal(
   r3: number,
   s3: number,
   s4: number,
-  candles: Candle[]
+  candles: Candle[],
 ): "long_reversal" | "short_reversal" | "long_breakout" | "short_breakout" | "neutral" {
   const lastCandle = candles[candles.length - 1]!;
 
@@ -208,11 +208,11 @@ function getSignal(
 
 function buildCamarillaInterpretation(
   price: number,
-  levels: CamarillaLevel[],
+  _levels: CamarillaLevel[],
   zone: string,
   signal: string,
   nearest: CamarillaLevel | null,
-  range: number
+  range: number,
 ): string {
   if (!nearest) return "Unable to determine Camarilla levels";
 

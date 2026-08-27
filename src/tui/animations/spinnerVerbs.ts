@@ -78,13 +78,7 @@ const VERB_POOLS: Record<SpinnerContext, string[]> = {
     "Designing entry",
     "Crafting strategy",
   ],
-  monitoring: [
-    "Monitoring",
-    "Watching positions",
-    "Tracking P&L",
-    "Checking levels",
-    "Observing",
-  ],
+  monitoring: ["Monitoring", "Watching positions", "Tracking P&L", "Checking levels", "Observing"],
   connecting: [
     "Connecting",
     "Authenticating",
@@ -98,12 +92,7 @@ const VERB_POOLS: Record<SpinnerContext, string[]> = {
     "Trimming memory",
     "Optimizing context",
   ],
-  idle: [
-    "Ready",
-    "Waiting",
-    "Standing by",
-    "Listening",
-  ],
+  idle: ["Ready", "Waiting", "Standing by", "Listening"],
 };
 
 // ── Custom verbs (user-provided) ──
@@ -151,12 +140,30 @@ export function getVerbPool(context: SpinnerContext): string[] {
  */
 export function toolToSpinnerContext(toolName: string): SpinnerContext {
   if (toolName.startsWith("scan_") || toolName.startsWith("detect_")) return "scanning";
-  if (toolName.startsWith("analyze_") || toolName.startsWith("compute_") || toolName.startsWith("explain_")) return "analyzing";
-  if (toolName.startsWith("place_") || toolName.startsWith("execute_") || toolName.startsWith("cancel_")) return "executing";
-  if (toolName.startsWith("get_") || toolName.startsWith("fetch_") || toolName.startsWith("load_")) return "fetching";
-  if (toolName.startsWith("backtest_") || toolName.startsWith("test_strategy")) return "backtesting";
+  if (
+    toolName.startsWith("analyze_") ||
+    toolName.startsWith("compute_") ||
+    toolName.startsWith("explain_")
+  )
+    return "analyzing";
+  if (
+    toolName.startsWith("place_") ||
+    toolName.startsWith("execute_") ||
+    toolName.startsWith("cancel_")
+  )
+    return "executing";
+  if (toolName.startsWith("get_") || toolName.startsWith("fetch_") || toolName.startsWith("load_"))
+    return "fetching";
+  if (toolName.startsWith("backtest_") || toolName.startsWith("test_strategy"))
+    return "backtesting";
   if (toolName.startsWith("create_") && toolName.includes("plan")) return "planning";
-  if (toolName.startsWith("monitor_") || toolName.startsWith("check_") || toolName.startsWith("watch_")) return "monitoring";
-  if (toolName.startsWith("connect_") || toolName.startsWith("test_connection")) return "connecting";
+  if (
+    toolName.startsWith("monitor_") ||
+    toolName.startsWith("check_") ||
+    toolName.startsWith("watch_")
+  )
+    return "monitoring";
+  if (toolName.startsWith("connect_") || toolName.startsWith("test_connection"))
+    return "connecting";
   return "thinking";
 }

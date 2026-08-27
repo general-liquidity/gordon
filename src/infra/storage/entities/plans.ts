@@ -85,9 +85,9 @@ export function setApprovedContentHash(id: string, hash: string): void {
 
 export function getApprovedContentHash(id: string): string | null {
   const db = getPlansDb();
-  const row = db.prepare("SELECT approvedContentHash FROM plans WHERE id = ?").get(id) as
-    | { approvedContentHash?: string | null }
-    | null;
+  const row = db.prepare("SELECT approvedContentHash FROM plans WHERE id = ?").get(id) as {
+    approvedContentHash?: string | null;
+  } | null;
   return row?.approvedContentHash ?? null;
 }
 
@@ -116,9 +116,7 @@ function rowToPlan(row: Record<string, unknown>): Plan {
 /**
  * Creates a new plan in the database
  */
-export function createPlan(
-  plan: Omit<Plan, "id" | "createdAt">
-): Plan {
+export function createPlan(plan: Omit<Plan, "id" | "createdAt">): Plan {
   const db = getPlansDb();
 
   const id = generatePlanId();
@@ -145,7 +143,7 @@ export function createPlan(
     JSON.stringify(plan.stopLoss),
     JSON.stringify(plan.takeProfit),
     plan.reasoning,
-    plan.status
+    plan.status,
   );
 
   return {
@@ -215,7 +213,7 @@ export function updatePlan(id: string, updates: Partial<Plan>): Plan {
     updated.reasoning,
     updated.status,
     updated.expiresAt ?? null,
-    id
+    id,
   );
 
   if (demoted) {

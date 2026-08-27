@@ -105,16 +105,14 @@ export function computeExposureEfficiency(
   if (mode === "compound") totalReturn -= 1;
 
   const timeInMarketFraction = exposurePeriods / N;
-  const returnPerExposureUnit =
-    exposurePeriods > 0 ? totalReturn / timeInMarketFraction : 0;
-  const leakingExposureFraction =
-    exposurePeriods > 0 ? leakingExposure / exposurePeriods : 0;
+  const returnPerExposureUnit = exposurePeriods > 0 ? totalReturn / timeInMarketFraction : 0;
+  const leakingExposureFraction = exposurePeriods > 0 ? leakingExposure / exposurePeriods : 0;
 
   let annualizedReturnPerExposure: number | null = null;
   if (input.periodsPerYear && input.periodsPerYear > 0 && exposurePeriods > 0) {
     annualizedReturnPerExposure =
       mode === "compound"
-        ? Math.pow(1 + totalReturn, input.periodsPerYear / exposurePeriods) - 1
+        ? (1 + totalReturn) ** (input.periodsPerYear / exposurePeriods) - 1
         : (totalReturn / exposurePeriods) * input.periodsPerYear;
   }
 

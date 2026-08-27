@@ -116,12 +116,14 @@ export function getExchangeCapabilities(id: string): ExchangeCapabilities {
   let hasWebsocket = false;
   if (proExchanges && typeof proExchanges[id] === "function") {
     const proHas = (new proExchanges[id]() as { has?: Record<string, unknown> }).has ?? {};
-    hasWebsocket = proHas.watchTicker === true || proHas.watchOHLCV === true || proHas.watchOrderBook === true;
+    hasWebsocket =
+      proHas.watchTicker === true || proHas.watchOHLCV === true || proHas.watchOrderBook === true;
   }
 
   const has = ex?.has ?? {};
   const hasOHLCV = has.fetchOHLCV === true;
-  const isDex = requiredCredentials.includes("privateKey") || requiredCredentials.includes("walletAddress");
+  const isDex =
+    requiredCredentials.includes("privateKey") || requiredCredentials.includes("walletAddress");
 
   const caps: ExchangeCapabilities = {
     requiredCredentials,

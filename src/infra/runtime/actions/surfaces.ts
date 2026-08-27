@@ -12,8 +12,7 @@ export interface DerivedToolMetadata {
 }
 
 export function getGeneratedSlashCommands(): SlashActionSurface[] {
-  return getCanonicalActions()
-    .flatMap((action) => (action.slash ? [action.slash] : []));
+  return getCanonicalActions().flatMap((action) => (action.slash ? [action.slash] : []));
 }
 
 export function mergeSlashCommands<T extends { name: string; aliases: string[] }>(
@@ -36,16 +35,21 @@ export function mergeSlashCommands<T extends { name: string; aliases: string[] }
 }
 
 export function getDerivedToolMetadata(): DerivedToolMetadata[] {
-  return getCanonicalActions()
-    .flatMap((action) => action.tool ? [{
-      actionId: action.id,
-      toolName: action.tool.toolName,
-      description: action.tool.description,
-      taskScope: action.taskScope,
-      approvalPolicy: action.approvalPolicy,
-      sideEffectLevel: action.sideEffectLevel,
-      agentTarget: action.tool.agentTarget,
-    }] : []);
+  return getCanonicalActions().flatMap((action) =>
+    action.tool
+      ? [
+          {
+            actionId: action.id,
+            toolName: action.tool.toolName,
+            description: action.tool.description,
+            taskScope: action.taskScope,
+            approvalPolicy: action.approvalPolicy,
+            sideEffectLevel: action.sideEffectLevel,
+            agentTarget: action.tool.agentTarget,
+          },
+        ]
+      : [],
+  );
 }
 
 export function getDerivedToolMetadataByName(toolName: string): DerivedToolMetadata | undefined {

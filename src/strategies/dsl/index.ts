@@ -44,26 +44,20 @@ export {
   PriceConditionSchema,
   PatternConditionSchema,
   ConditionSchema,
-
   // Rule schemas
   SignalRuleSchema,
-
   // Exit rule schemas
   StopLossSchema,
   TakeProfitSchema,
   TrailingStopSchema,
-
   // Filter and metadata schemas
   FiltersSchema,
   MetadataSchema,
-
   // Main strategy schema
   StrategyDSLSchema,
-
   // Validation helpers
   validateStrategyDSL,
   createStrategyDSL,
-
   // Example templates
   EXAMPLE_RSI_BOUNCE_DSL,
   EXAMPLE_MACD_CROSSOVER_DSL,
@@ -92,12 +86,10 @@ export {
   // Main evaluation functions
   evaluateCondition,
   evaluateConditionWithResult,
-
   // Specific evaluators
   evaluateIndicatorCondition,
   evaluatePriceCondition,
   evaluatePatternCondition,
-
   // Rule evaluation
   evaluateSignalRule,
 } from "./conditions.ts";
@@ -114,10 +106,8 @@ export type {
 export {
   // Strategy class
   DSLBasedStrategy,
-
   // Interpreter class
   DSLStrategyInterpreter,
-
   // Factory functions
   createInterpreter,
   interpretDSL,
@@ -143,33 +133,27 @@ export {
   getStrategiesDir,
   getGeneratedStrategiesDir,
   storageExists,
-
   // CRUD operations
   saveStrategy,
   loadStrategy,
   listStrategies,
   deleteStrategy,
   strategyExists,
-
   // Bulk operations
   saveStrategies,
   deleteStrategies,
   clearAllStrategies,
-
   // Search and filter
   listStrategiesFiltered,
   searchStrategies,
-
   // Import/Export
   exportStrategies,
   importStrategies,
-
   // Metadata operations
   updateStrategyMetadata,
   addBacktestResults,
   addTags,
   removeTags,
-
   // Statistics
   getStorageStats,
 } from "./storage.ts";
@@ -182,7 +166,7 @@ export {
  * Create and save a new DSL strategy
  */
 export async function createAndSaveStrategy(
-  dsl: import("./schema.ts").StrategyDSL
+  dsl: import("./schema.ts").StrategyDSL,
 ): Promise<import("./interpreter.ts").DSLBasedStrategy> {
   const { saveStrategy: save } = await import("./storage.ts");
   const { interpretDSL: interpret } = await import("./interpreter.ts");
@@ -198,7 +182,7 @@ export async function createAndSaveStrategy(
  * Load and interpret a strategy from storage
  */
 export async function loadAndInterpret(
-  id: string
+  id: string,
 ): Promise<import("./interpreter.ts").DSLBasedStrategy | null> {
   const { loadStrategy: load } = await import("./storage.ts");
   const { interpretDSL: interpret } = await import("./interpreter.ts");

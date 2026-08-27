@@ -66,12 +66,10 @@ function median(xs: number[]): number {
   return sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!;
 }
 
-const DEFAULT_BULL = 0.70;
-const DEFAULT_BEAR = 0.70;
+const DEFAULT_BULL = 0.7;
+const DEFAULT_BEAR = 0.7;
 
-export function computeMarketBreadthBias(
-  input: MarketBreadthBiasInput,
-): MarketBreadthBiasResult {
+export function computeMarketBreadthBias(input: MarketBreadthBiasInput): MarketBreadthBiasResult {
   if (input.returns.length === 0) {
     throw new Error("returns must not be empty");
   }

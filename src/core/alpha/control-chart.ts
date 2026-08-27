@@ -32,7 +32,11 @@
  *   4. 8 consecutive on the same side of the center line.
  */
 
-export type ControlRule = "beyond_3sigma" | "two_of_three_2sigma" | "four_of_five_1sigma" | "run_of_eight";
+export type ControlRule =
+  | "beyond_3sigma"
+  | "two_of_three_2sigma"
+  | "four_of_five_1sigma"
+  | "run_of_eight";
 
 export interface ControlSignal {
   index: number;

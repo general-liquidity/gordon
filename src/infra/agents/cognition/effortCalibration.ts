@@ -148,7 +148,6 @@ export function budgetFor(level: ComplexityLevel): EffortBudget {
       return TRIVIAL_BUDGET;
     case "deep":
       return DEEP_BUDGET;
-    case "normal":
     default:
       return NORMAL_BUDGET;
   }

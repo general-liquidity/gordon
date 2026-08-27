@@ -190,7 +190,12 @@ describe("shrinkToDiagonal", () => {
 
 describe("computeCovarianceMatrix", () => {
   it("returns null for length mismatch", () => {
-    expect(computeCovarianceMatrix([[1, 2, 3], [1, 2]])).toBeNull();
+    expect(
+      computeCovarianceMatrix([
+        [1, 2, 3],
+        [1, 2],
+      ]),
+    ).toBeNull();
   });
 
   it("returns null for insufficient samples", () => {

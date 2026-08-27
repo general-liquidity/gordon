@@ -23,11 +23,17 @@ afterAll(() => {
   setDatabasePathForTesting(null);
   for (const suffix of ["", "-wal", "-shm"]) {
     const p = `${dbPath}${suffix}`;
-    try { if (existsSync(p)) unlinkSync(p); } catch { /* ignore */ }
+    try {
+      if (existsSync(p)) unlinkSync(p);
+    } catch {
+      /* ignore */
+    }
   }
 });
 
-function planFixture(overrides: Partial<Omit<Plan, "id" | "createdAt">> = {}): Omit<Plan, "id" | "createdAt"> {
+function planFixture(
+  overrides: Partial<Omit<Plan, "id" | "createdAt">> = {},
+): Omit<Plan, "id" | "createdAt"> {
   return {
     symbol: "BTCUSDT",
     direction: "long",
@@ -59,10 +65,16 @@ describe("computePlanContentHash", () => {
   test("changes when any trade-relevant field changes", () => {
     const base = createPlan(planFixture());
     const hash = computePlanContentHash(base);
-    expect(computePlanContentHash({ ...base, entry: { type: "limit", price: 51_000 } })).not.toBe(hash);
+    expect(computePlanContentHash({ ...base, entry: { type: "limit", price: 51_000 } })).not.toBe(
+      hash,
+    );
     expect(computePlanContentHash({ ...base, stopLoss: { price: 48_000 } })).not.toBe(hash);
-    expect(computePlanContentHash({ ...base, allocation: { ...base.allocation, amount: 2000 } })).not.toBe(hash);
-    expect(computePlanContentHash({ ...base, takeProfit: [{ price: 55_000, percentToSell: 1 }] })).not.toBe(hash);
+    expect(
+      computePlanContentHash({ ...base, allocation: { ...base.allocation, amount: 2000 } }),
+    ).not.toBe(hash);
+    expect(
+      computePlanContentHash({ ...base, takeProfit: [{ price: 55_000, percentToSell: 1 }] }),
+    ).not.toBe(hash);
     expect(computePlanContentHash({ ...base, symbol: "ETHUSDT" })).not.toBe(hash);
     expect(computePlanContentHash({ ...base, direction: "short" })).not.toBe(hash);
   });

@@ -12,7 +12,6 @@
  *   AI: Bitcoin showing bullish continuation after breaking $48k resistance...
  */
 
-import React from "react";
 import { Box, Text } from "../ink-custom";
 import type { GordonTheme } from "../themes/themes.ts";
 import { useTheme } from "../themes/ThemeProvider.tsx";
@@ -99,9 +98,7 @@ export function EnrichedQuoteRenderer({ data }: Props) {
         <Text bold color={priceChangeTone}>
           {fmtPrice(data.price)}
         </Text>
-        <Text color={priceChangeTone}>
-          {fmtPct(data.changePercent24h)}
-        </Text>
+        <Text color={priceChangeTone}>{fmtPct(data.changePercent24h)}</Text>
         <Text dimColor>Vol: {fmtVol(data.volume24h)}</Text>
       </Box>
 
@@ -129,9 +126,7 @@ export function EnrichedQuoteRenderer({ data }: Props) {
             <Text color={trendColor(data.trendDirection, theme)}>
               {trendArrow(data.trendDirection)} {(data.trendDirection ?? "sideways").toUpperCase()}
             </Text>
-            {data.momentum && (
-              <Text dimColor> ({data.momentum} momentum)</Text>
-            )}
+            {data.momentum && <Text dimColor> ({data.momentum} momentum)</Text>}
           </Text>
           {data.volumeAssessment && (
             <Text>
@@ -146,7 +141,9 @@ export function EnrichedQuoteRenderer({ data }: Props) {
       {data.summary && (
         <Box>
           <Text>
-            <Text dimColor italic>AI: {data.summary}</Text>
+            <Text dimColor italic>
+              AI: {data.summary}
+            </Text>
           </Text>
         </Box>
       )}

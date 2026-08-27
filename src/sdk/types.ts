@@ -8,7 +8,6 @@
 
 import { z } from "zod";
 import type { GatewayCommandType } from "../gateway/protocol/commands.ts";
-import type { GatewayEventType } from "../gateway/protocol/events.ts";
 
 // ============================================================================
 // SDK Configuration
@@ -65,11 +64,7 @@ export type SDKConfigInput = z.input<typeof SDKConfigSchema>;
  *   disconnected -> connecting -> connected
  *   connected    -> reconnecting -> connected | disconnected
  */
-export type SDKConnectionState =
-  | "disconnected"
-  | "connecting"
-  | "connected"
-  | "reconnecting";
+export type SDKConnectionState = "disconnected" | "connecting" | "connected" | "reconnecting";
 
 // ============================================================================
 // Command Option Types

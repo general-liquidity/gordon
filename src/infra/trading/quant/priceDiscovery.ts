@@ -179,7 +179,7 @@ export function computePriceDiscovery(input: PriceDiscoveryInput): PriceDiscover
   let gis1 = 0.5;
   let gis2 = 0.5;
   if (D > 0) {
-    is1Upper = Math.pow(psi1 * s1 + psi2 * rho * s2, 2) / D; // market1 ordered first
+    is1Upper = (psi1 * s1 + psi2 * rho * s2) ** 2 / D; // market1 ordered first
     is1Lower = (psi1 * psi1 * s1 * s1 * (1 - rho * rho)) / D; // market1 ordered second
 
     const rc = Math.max(-1, Math.min(1, rho));

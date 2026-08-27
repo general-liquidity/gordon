@@ -1,4 +1,5 @@
-import React, { useMemo, useRef } from "react";
+import type React from "react";
+import { useMemo, useRef } from "react";
 import { Box, Text } from "../../ink-custom";
 import { CodeBlock } from "../display/CodeBlock.tsx";
 import { TerminalLink } from "../layout/TerminalLink.tsx";
@@ -46,7 +47,10 @@ interface ParsedBlock {
 
 // Strip internal prompt XML tags that shouldn't be visible
 function stripPromptXMLTags(text: string): string {
-  return text.replace(/<\/?(?:user_context|system|assistant|tool_result|thinking|artifact)[^>]*>/g, "");
+  return text.replace(
+    /<\/?(?:user_context|system|assistant|tool_result|thinking|artifact)[^>]*>/g,
+    "",
+  );
 }
 
 function parseBlocks(content: string): ParsedBlock[] {
@@ -92,32 +96,46 @@ function parseBlocks(content: string): ParsedBlock[] {
       continue;
     }
 
-    if (inCodeBlock) { codeLines.push(line); i++; continue; }
+    if (inCodeBlock) {
+      codeLines.push(line);
+      i++;
+      continue;
+    }
 
     if (/^[-*_]{3,}\s*$/.test(line)) {
       blocks.push({ type: "hr", content: "", raw: line });
-      i++; continue;
+      i++;
+      continue;
     }
 
     const headingMatch = line.match(/^(#{1,4})\s+(.+)/);
     if (headingMatch) {
-      blocks.push({ type: "heading", content: headingMatch[2]!, level: headingMatch[1]!.length, raw: line });
-      i++; continue;
+      blocks.push({
+        type: "heading",
+        content: headingMatch[2]!,
+        level: headingMatch[1]!.length,
+        raw: line,
+      });
+      i++;
+      continue;
     }
 
     if (line.startsWith("> ")) {
       blocks.push({ type: "blockquote", content: line.slice(2), raw: line });
-      i++; continue;
+      i++;
+      continue;
     }
 
     if (/^[\s]*[-*+]\s/.test(line)) {
       blocks.push({ type: "bullet", content: line.replace(/^[\s]*[-*+]\s/, ""), raw: line });
-      i++; continue;
+      i++;
+      continue;
     }
 
     if (/^[\s]*\d+\.\s/.test(line)) {
       blocks.push({ type: "bullet", content: line.replace(/^[\s]*\d+\.\s/, ""), raw: line });
-      i++; continue;
+      i++;
+      continue;
     }
 
     blocks.push({ type: "text", content: line, raw: line });
@@ -154,7 +172,11 @@ function pushPlain(parts: React.ReactNode[], keyStart: number, text: string): nu
   let last = 0;
   for (const h of hits) {
     if (h.start > last) parts.push(<Text key={key++}>{text.slice(last, h.start)}</Text>);
-    parts.push(<Text key={key++} color={h.color}>{text.slice(h.start, h.end)}</Text>);
+    parts.push(
+      <Text key={key++} color={h.color}>
+        {text.slice(h.start, h.end)}
+      </Text>,
+    );
     last = h.end;
   }
   if (last < text.length) parts.push(<Text key={key++}>{text.slice(last)}</Text>);
@@ -170,7 +192,11 @@ function renderInline(text: string): React.ReactNode {
     const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
     if (boldMatch && boldMatch.index != null) {
       if (boldMatch.index > 0) key = pushPlain(parts, key, remaining.slice(0, boldMatch.index));
-      parts.push(<Text key={key++} bold>{boldMatch[1]}</Text>);
+      parts.push(
+        <Text key={key++} bold>
+          {boldMatch[1]}
+        </Text>,
+      );
       remaining = remaining.slice(boldMatch.index + boldMatch[0].length);
       continue;
     }
@@ -179,7 +205,11 @@ function renderInline(text: string): React.ReactNode {
     const urlMatch = remaining.match(/https?:\/\/[^\s<>"')]+/);
     if (urlMatch && urlMatch.index != null) {
       if (urlMatch.index > 0) key = pushPlain(parts, key, remaining.slice(0, urlMatch.index));
-      parts.push(<TerminalLink key={key++} url={urlMatch[0]} color={PALETTE.platinum}>{urlMatch[0]}</TerminalLink>);
+      parts.push(
+        <TerminalLink key={key++} url={urlMatch[0]} color={PALETTE.platinum}>
+          {urlMatch[0]}
+        </TerminalLink>,
+      );
       remaining = remaining.slice(urlMatch.index + urlMatch[0].length);
       continue;
     }
@@ -190,7 +220,11 @@ function renderInline(text: string): React.ReactNode {
       // Tan for function / strategy / parameter IDs — distinct from the
       // amber used by table headers / H2 so backticked names don't blend
       // with section emphasis. Matches MarkdownRenderer codespan.
-      parts.push(<Text key={key++} color={PALETTE.tan}>{codeMatch[1]}</Text>);
+      parts.push(
+        <Text key={key++} color={PALETTE.tan}>
+          {codeMatch[1]}
+        </Text>,
+      );
       remaining = remaining.slice(codeMatch.index + codeMatch[0].length);
       continue;
     }
@@ -237,8 +271,8 @@ export function StreamingMarkdown({ content, isStreaming }: Props) {
 
   // Stable prefix blocks (memoized, never re-parsed)
   const stableBlocks = useMemo(
-    () => stablePrefixRef.current ? parseBlocks(stablePrefixRef.current) : [],
-    [stablePrefixRef.current],
+    () => (stablePrefixRef.current ? parseBlocks(stablePrefixRef.current) : []),
+    [],
   );
 
   const allBlocks = [...stableBlocks, ...tailBlocks];
@@ -252,7 +286,12 @@ export function StreamingMarkdown({ content, isStreaming }: Props) {
             // Mirrors MarkdownRenderer so streaming and completed paths
             // render identically.
             return (
-              <Text key={i} bold color={headingColor(block.level ?? 1)} underline={block.level === 1}>
+              <Text
+                key={i}
+                bold
+                color={headingColor(block.level ?? 1)}
+                underline={block.level === 1}
+              >
                 {block.content}
               </Text>
             );
@@ -262,7 +301,9 @@ export function StreamingMarkdown({ content, isStreaming }: Props) {
           case "blockquote":
             return (
               <Box key={i} paddingLeft={2}>
-                <Text dimColor italic>{"\u2502"} {block.content}</Text>
+                <Text dimColor italic>
+                  {"\u2502"} {block.content}
+                </Text>
               </Box>
             );
           case "bullet":
@@ -273,8 +314,11 @@ export function StreamingMarkdown({ content, isStreaming }: Props) {
               </Box>
             );
           case "hr":
-            return <Text key={i} dimColor>{"\u2500".repeat(40)}</Text>;
-          case "text":
+            return (
+              <Text key={i} dimColor>
+                {"\u2500".repeat(40)}
+              </Text>
+            );
           default:
             if (!block.content.trim()) return null;
             return <Box key={i}>{renderInline(block.content)}</Box>;

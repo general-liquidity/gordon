@@ -62,7 +62,7 @@ describe("createScrollBox state", () => {
     const node = makeNode();
     const sb = createScrollBox(node);
     expect(sb.scrollTop).toBe(0);
-    expect(node.attributes["scrollTop"]).toBe(0);
+    expect(node.attributes.scrollTop).toBe(0);
   });
 
   test("preserves an existing scrollTop attribute on the node", () => {
@@ -77,7 +77,7 @@ describe("createScrollBox state", () => {
     const sb = createScrollBox(node, q.scheduler);
     sb.scrollBy(3);
     expect(sb.scrollTop).toBe(3);
-    expect(node.attributes["scrollTop"]).toBe(3);
+    expect(node.attributes.scrollTop).toBe(3);
     sb.scrollBy(-1);
     expect(sb.scrollTop).toBe(2);
   });

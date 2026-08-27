@@ -17,7 +17,9 @@ describe("buildExtendedThinkingConfig", () => {
 
   it("uses depth-tier budget by default", () => {
     expect(buildExtendedThinkingConfig("low").budgetTokens).toBe(EXTENDED_THINKING_BUDGETS.low);
-    expect(buildExtendedThinkingConfig("medium").budgetTokens).toBe(EXTENDED_THINKING_BUDGETS.medium);
+    expect(buildExtendedThinkingConfig("medium").budgetTokens).toBe(
+      EXTENDED_THINKING_BUDGETS.medium,
+    );
     expect(buildExtendedThinkingConfig("high").budgetTokens).toBe(EXTENDED_THINKING_BUDGETS.high);
   });
 
@@ -65,8 +67,8 @@ describe("providerOptionsForDepth", () => {
     const r = providerOptionsForDepth("medium", { maxTokens: 16_384 });
     expect("anthropic" in r).toBe(true);
     expect(
-      (r as { anthropic: { thinking: { type: string; budgetTokens: number } } })
-        .anthropic.thinking.type,
+      (r as { anthropic: { thinking: { type: string; budgetTokens: number } } }).anthropic.thinking
+        .type,
     ).toBe("enabled");
   });
 });

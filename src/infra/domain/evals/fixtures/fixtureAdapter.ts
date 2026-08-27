@@ -37,10 +37,7 @@ export const FIXTURE_TIMESTAMP = "2026-01-01T00:00:00.000Z";
 const FIXTURES_DIR = dirname(fileURLToPath(import.meta.url));
 
 /** Committed baseline trajectory fixture (LLM-judge regression leg input). */
-export const BASELINE_TRAJECTORIES_FIXTURE_PATH = join(
-  FIXTURES_DIR,
-  "baseline-trajectories.json",
-);
+export const BASELINE_TRAJECTORIES_FIXTURE_PATH = join(FIXTURES_DIR, "baseline-trajectories.json");
 
 /** Committed gold-trace fixture (deterministic process-check leg input). */
 export const GOLD_TRACES_FIXTURE_PATH = join(FIXTURES_DIR, "gold-traces.json");

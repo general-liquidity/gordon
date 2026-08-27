@@ -7,7 +7,6 @@
  * Pattern: Claude Code long-running task monitor with live metrics.
  */
 
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 import { ProgressBar } from "../../design-system/ProgressBar.js";
@@ -64,7 +63,7 @@ export function GenomeEvolutionPanel({
   onStop,
   onClose,
 }: Props) {
-  useInput((input, key) => {
+  useInput((_input, key) => {
     if (key.escape) {
       onClose();
       return;
@@ -78,9 +77,7 @@ export function GenomeEvolutionPanel({
     }
   });
 
-  const top10 = [...variants]
-    .sort((a, b) => b.fitness - a.fitness)
-    .slice(0, 10);
+  const top10 = [...variants].sort((a, b) => b.fitness - a.fitness).slice(0, 10);
 
   return (
     <Pane title="GENOME EVOLUTION" color={isRunning ? "green" : "cyan"}>
@@ -104,19 +101,43 @@ export function GenomeEvolutionPanel({
         </Box>
         <ProgressBar value={bestFitness} width={20} fillColor={fitnessColor(bestFitness)} />
         <Text> </Text>
-        <Text bold color={fitnessColor(bestFitness)}>{(bestFitness * 100).toFixed(1)}%</Text>
+        <Text bold color={fitnessColor(bestFitness)}>
+          {(bestFitness * 100).toFixed(1)}%
+        </Text>
       </Box>
       <Text> </Text>
 
       {/* Top variants */}
-      <Text bold dimColor>TOP VARIANTS</Text>
+      <Text bold dimColor>
+        TOP VARIANTS
+      </Text>
       <Box paddingLeft={2} flexDirection="column">
         <Box>
-          <Box width={6}><Text bold dimColor>RANK</Text></Box>
-          <Box width={12}><Text bold dimColor>ID</Text></Box>
-          <Box width={10}><Text bold dimColor>FITNESS</Text></Box>
-          <Box width={8}><Text bold dimColor>GEN</Text></Box>
-          <Box width={24}><Text bold dimColor>PARAMS</Text></Box>
+          <Box width={6}>
+            <Text bold dimColor>
+              RANK
+            </Text>
+          </Box>
+          <Box width={12}>
+            <Text bold dimColor>
+              ID
+            </Text>
+          </Box>
+          <Box width={10}>
+            <Text bold dimColor>
+              FITNESS
+            </Text>
+          </Box>
+          <Box width={8}>
+            <Text bold dimColor>
+              GEN
+            </Text>
+          </Box>
+          <Box width={24}>
+            <Text bold dimColor>
+              PARAMS
+            </Text>
+          </Box>
         </Box>
 
         {top10.map((v, i) => {

@@ -26,8 +26,7 @@ export function computeTlsHedgeRatio(input: {
       intercept: 0,
       olsHedgeRatio: 0,
       sampleSize: n,
-      interpretation:
-        "Insufficient data: need at least 3 paired points to estimate a hedge ratio.",
+      interpretation: "Insufficient data: need at least 3 paired points to estimate a hedge ratio.",
     };
   }
 

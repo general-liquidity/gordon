@@ -116,26 +116,20 @@ describe("listAllowedHosts", () => {
 
 describe("enforceOutbound — block mode", () => {
   it("throws BlockedOutboundError on a miss", () => {
-    expect(() =>
-      enforceOutbound({ url: "https://evil.example.com" }, { mode: "block" }),
-    ).toThrow(BlockedOutboundError);
+    expect(() => enforceOutbound({ url: "https://evil.example.com" }, { mode: "block" })).toThrow(
+      BlockedOutboundError,
+    );
   });
 
   it("returns the result on an allowed URL", () => {
-    const r = enforceOutbound(
-      { url: "https://api.anthropic.com/v1/messages" },
-      { mode: "block" },
-    );
+    const r = enforceOutbound({ url: "https://api.anthropic.com/v1/messages" }, { mode: "block" });
     expect(r.allowed).toBe(true);
   });
 });
 
 describe("enforceOutbound — warn mode", () => {
   it("does NOT throw on a miss", () => {
-    const r = enforceOutbound(
-      { url: "https://evil.example.com" },
-      { mode: "warn" },
-    );
+    const r = enforceOutbound({ url: "https://evil.example.com" }, { mode: "warn" });
     expect(r.allowed).toBe(false);
     expect(r.mode).toBe("warn");
   });

@@ -7,7 +7,6 @@
  * Pattern: Claude Code health check panel with status indicators.
  */
 
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 
@@ -66,8 +65,9 @@ function formatTime(iso: string): string {
 }
 
 function fmtNum(n: number): string {
-  if (Math.abs(n) >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
-  if (Math.abs(n) >= 1_000) return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (Math.abs(n) >= 1_000)
+    return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return n.toFixed(4);
 }
 
@@ -116,16 +116,38 @@ export function ReconciliationStatus({
         </Box>
       ) : (
         <Box flexDirection="column" marginTop={1}>
-          <Text bold dimColor>DISCREPANCIES ({discrepancies.length})</Text>
+          <Text bold dimColor>
+            DISCREPANCIES ({discrepancies.length})
+          </Text>
           <Text> </Text>
 
           {/* Column headers */}
           <Box paddingLeft={2}>
-            <Box width={10}><Text bold dimColor>TYPE</Text></Box>
-            <Box width={10}><Text bold dimColor>SYMBOL</Text></Box>
-            <Box width={14}><Text bold dimColor>GORDON</Text></Box>
-            <Box width={14}><Text bold dimColor>EXCHANGE</Text></Box>
-            <Box width={12}><Text bold dimColor>DELTA</Text></Box>
+            <Box width={10}>
+              <Text bold dimColor>
+                TYPE
+              </Text>
+            </Box>
+            <Box width={10}>
+              <Text bold dimColor>
+                SYMBOL
+              </Text>
+            </Box>
+            <Box width={14}>
+              <Text bold dimColor>
+                GORDON
+              </Text>
+            </Box>
+            <Box width={14}>
+              <Text bold dimColor>
+                EXCHANGE
+              </Text>
+            </Box>
+            <Box width={12}>
+              <Text bold dimColor>
+                DELTA
+              </Text>
+            </Box>
           </Box>
 
           {discrepancies.map((d, i) => (
@@ -144,7 +166,8 @@ export function ReconciliationStatus({
               </Box>
               <Box width={12}>
                 <Text color={deltaColor(d.delta)}>
-                  {d.delta >= 0 ? "+" : ""}{fmtNum(d.delta)}
+                  {d.delta >= 0 ? "+" : ""}
+                  {fmtNum(d.delta)}
                 </Text>
               </Box>
             </Box>

@@ -1,9 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  validateWorkflowManifest,
-  validateWorkflowManifests,
-  field,
-} from "./workflowValidator.ts";
+import { validateWorkflowManifest, validateWorkflowManifests, field } from "./workflowValidator.ts";
 import { BUILTIN_WORKFLOWS } from "./workflows/index.ts";
 import { discoverSkills } from "./registry.ts";
 import type { SkillWorkflowManifest } from "./types.ts";
@@ -40,10 +36,7 @@ describe("validateWorkflowManifest — shape", () => {
   });
 
   it("rejects an unknown cadence", () => {
-    const r = validateWorkflowManifest(
-      base({ cadence: "hourly" as never }),
-      SKILLS,
-    );
+    const r = validateWorkflowManifest(base({ cadence: "hourly" as never }), SKILLS);
     expect(r.issues.some((i) => i.field === "cadence")).toBe(true);
   });
 

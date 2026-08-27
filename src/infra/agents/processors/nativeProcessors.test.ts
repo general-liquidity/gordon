@@ -60,11 +60,11 @@ describe("input processors", () => {
   test("flag on, no budget: injection + PII + moderation, no cost guard", () => {
     process.env[FLAG] = "1";
     const procs = getNativeInputProcessors();
-    const ids = procs.map((p) => p.id);
+    const ids: string[] = procs.map((p) => p.id);
     expect(ids).toContain("prompt-injection-detector");
     expect(ids).toContain("pii-detector");
     expect(ids).toContain("moderation");
-    expect(ids).not.toContain("cost-guard");
+    expect(ids).not.toContain("token-cost-control");
   });
 
   test("all detectors run in warn mode (non-destructive, compose not replace)", () => {
@@ -80,14 +80,16 @@ describe("input processors", () => {
     process.env[FLAG] = "1";
     setCostBudget({ sessionUsd: 12, action: "halt", warnThresholds: [0.9] });
     const procs = getNativeInputProcessors();
-    expect(procs.map((p) => p.id)).toContain("cost-guard");
+    const ids: string[] = procs.map((p) => p.id);
+    expect(ids).toContain("token-cost-control");
   });
 
   test("cost ceiling falls back to GORDON_COST_BUDGET_USD env", () => {
     process.env[FLAG] = "1";
     process.env[BUDGET_FLAG] = "7";
     const procs = getNativeInputProcessors();
-    expect(procs.map((p) => p.id)).toContain("cost-guard");
+    const ids: string[] = procs.map((p) => p.id);
+    expect(ids).toContain("token-cost-control");
   });
 
   test("zero / disabled budget omits the cost guard", () => {
@@ -95,7 +97,8 @@ describe("input processors", () => {
     process.env[BUDGET_FLAG] = "0";
     setCostBudget(null);
     const procs = getNativeInputProcessors();
-    expect(procs.map((p) => p.id)).not.toContain("cost-guard");
+    const ids: string[] = procs.map((p) => p.id);
+    expect(ids).not.toContain("token-cost-control");
   });
 });
 

@@ -34,7 +34,12 @@
 
 import { johansenTest } from "./johansen.ts";
 import { testCointegration } from "./cointegration.ts";
-import { calibrateOU, minimumEntryZScore, effectiveEntryZ, recommendedExitZ } from "./ouCalibration.ts";
+import {
+  calibrateOU,
+  minimumEntryZScore,
+  effectiveEntryZ,
+  recommendedExitZ,
+} from "./ouCalibration.ts";
 import { kalmanHedgeRatio } from "./kalmanHedgeRatio.ts";
 import {
   pairRegimeMonitor,
@@ -232,7 +237,11 @@ function quantileSorted(sorted: number[], q: number): number {
  * (fewer than `window` samples) are "healthy" — the regime monitor's own warmup
  * already HALTS those.
  */
-export function pTraceHealthSeries(pTrace: number[], window: number, pct: number): PairHealthSignal[] {
+export function pTraceHealthSeries(
+  pTrace: number[],
+  window: number,
+  pct: number,
+): PairHealthSignal[] {
   const n = pTrace.length;
   const out: PairHealthSignal[] = new Array(n).fill("healthy");
   for (let i = window - 1; i < n; i++) {
@@ -317,7 +326,8 @@ export function runPairsSystem(
   const hurst = hurstOfSpread(spread);
   const halfLife = ou.halfLife;
 
-  const tradeableHL = Number.isFinite(halfLife) && halfLife >= halfLifeMin && halfLife <= halfLifeMax;
+  const tradeableHL =
+    Number.isFinite(halfLife) && halfLife >= halfLifeMin && halfLife <= halfLifeMax;
   const hurstOk = hurst < 0.5;
 
   let rejectReason: string | null = null;
@@ -346,8 +356,7 @@ export function runPairsSystem(
   const exitZ = recommendedExitZ(entryZ);
 
   // ── Layer 4: rolling z + state machine + OU-proportional sizing ──
-  const lookback =
-    config.zLookback ?? Math.min(250, Math.max(20, Math.round(2.5 * halfLife)));
+  const lookback = config.zLookback ?? Math.min(250, Math.max(20, Math.round(2.5 * halfLife)));
   const z = rollingZ(spread, lookback);
   const maxFraction = config.maxFraction ?? 1.0;
 
@@ -399,7 +408,8 @@ export function runPairsSystem(
     } else if (!Number.isNaN(zi)) {
       if (state === "flat") {
         if (regime === "ACTIVE" && entryAllowed) {
-          if (zi > entryZ) state = "short"; // spread rich → short the spread
+          if (zi > entryZ)
+            state = "short"; // spread rich → short the spread
           else if (zi < -entryZ) state = "long"; // spread cheap → long the spread
         }
         // WARNING + flat, or gated by P_trace → stay flat (open nothing new).

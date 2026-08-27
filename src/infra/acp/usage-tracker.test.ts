@@ -57,8 +57,16 @@ describe("usage tracker — accumulation", () => {
 
   it("accumulates costUsd when provided", async () => {
     const { connection } = makeFakeConnection();
-    await emitUsageUpdate(connection, "s1", { promptTokens: 100, completionTokens: 50, costUsd: 0.05 });
-    await emitUsageUpdate(connection, "s1", { promptTokens: 100, completionTokens: 50, costUsd: 0.03 });
+    await emitUsageUpdate(connection, "s1", {
+      promptTokens: 100,
+      completionTokens: 50,
+      costUsd: 0.05,
+    });
+    await emitUsageUpdate(connection, "s1", {
+      promptTokens: 100,
+      completionTokens: 50,
+      costUsd: 0.03,
+    });
     expect(getSessionUsage("s1")!.costUsd).toBeCloseTo(0.08, 4);
   });
 
@@ -76,7 +84,11 @@ describe("usage tracker — accumulation", () => {
     await emitUsageUpdate(connection, "s1", { promptTokens: 30, completionTokens: 15 });
     expect(updates).toHaveLength(2);
     expect(updates[1]!.update.sessionUpdate).toBe("usage_update");
-    const usage = updates[1]!.update.usage as { promptTokens: number; completionTokens: number; totalTokens: number };
+    const usage = updates[1]!.update.usage as {
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+    };
     expect(usage.promptTokens).toBe(80);
     expect(usage.completionTokens).toBe(40);
     expect(usage.totalTokens).toBe(120);
@@ -91,7 +103,11 @@ describe("usage tracker — accumulation", () => {
 
   it("includes costUsd when accumulated > 0", async () => {
     const { connection, updates } = makeFakeConnection();
-    await emitUsageUpdate(connection, "s1", { promptTokens: 100, completionTokens: 50, costUsd: 0.01 });
+    await emitUsageUpdate(connection, "s1", {
+      promptTokens: 100,
+      completionTokens: 50,
+      costUsd: 0.01,
+    });
     const usage = updates[0]!.update.usage as { costUsd?: number };
     expect(usage.costUsd).toBeCloseTo(0.01, 4);
   });

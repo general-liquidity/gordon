@@ -134,9 +134,30 @@ function extractClaimFeatures(claim: string): ExtractedFeatures {
 }
 
 const STOP_WORDS = new Set([
-  "the", "and", "for", "with", "this", "that", "from", "into", "above",
-  "below", "over", "under", "into", "than", "then", "have", "will",
-  "should", "would", "could", "because", "since", "when", "what",
+  "the",
+  "and",
+  "for",
+  "with",
+  "this",
+  "that",
+  "from",
+  "into",
+  "above",
+  "below",
+  "over",
+  "under",
+  "into",
+  "than",
+  "then",
+  "have",
+  "will",
+  "should",
+  "would",
+  "could",
+  "because",
+  "since",
+  "when",
+  "what",
 ]);
 
 function extractEvidenceFeatures(ev: EvidenceRef): ExtractedFeatures {
@@ -237,7 +258,7 @@ export function detectUnsupportedClaims(manifest: CitationManifest): ClaimCitati
 export function persistCitationManifest(manifest: CitationManifest, path?: string): void {
   const target = path ?? defaultCitationManifestPath();
   ensureParentDir(target);
-  appendFileSync(target, JSON.stringify(manifest) + "\n", "utf8");
+  appendFileSync(target, `${JSON.stringify(manifest)}\n`, "utf8");
 }
 
 export function readCitationManifests(
@@ -246,7 +267,9 @@ export function readCitationManifests(
 ): CitationManifest[] {
   const target = path ?? defaultCitationManifestPath();
   if (!existsSync(target)) return [];
-  const lines = readFileSync(target, "utf8").split("\n").filter((l) => l.trim().length > 0);
+  const lines = readFileSync(target, "utf8")
+    .split("\n")
+    .filter((l) => l.trim().length > 0);
   const out: CitationManifest[] = [];
   for (const line of lines) {
     try {
@@ -273,7 +296,9 @@ export function formatCitationManifest(manifest: CitationManifest): string {
     `Citation manifest for ${manifest.recommendationId} — ${(manifest.supportRatio * 100).toFixed(0)}% supported (${manifest.unsupportedClaimCount} unsupported)`,
   );
   for (const c of manifest.citations) {
-    const tag = c.unsupported ? "UNSUPPORTED" : `${c.evidenceRefs.length} evidence (score ${c.matchScore.toFixed(2)})`;
+    const tag = c.unsupported
+      ? "UNSUPPORTED"
+      : `${c.evidenceRefs.length} evidence (score ${c.matchScore.toFixed(2)})`;
     lines.push(`  [${tag}] ${c.claim}`);
     for (const ref of c.evidenceRefs) {
       lines.push(`    → ${ref.toolName}@${ref.timestamp}: ${ref.summary}`);

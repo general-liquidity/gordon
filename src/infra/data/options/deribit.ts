@@ -150,7 +150,10 @@ export class DeribitOptionsProvider implements OptionsChainProvider {
 
       contracts.push({ strike, timeYears, openInterest, optionType, iv });
 
-      if (typeof summary.underlying_price === "number" && Number.isFinite(summary.underlying_price)) {
+      if (
+        typeof summary.underlying_price === "number" &&
+        Number.isFinite(summary.underlying_price)
+      ) {
         spotSamples.push(summary.underlying_price);
       }
     }

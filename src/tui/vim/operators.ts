@@ -369,12 +369,12 @@ export function executeOpenLine(direction: "above" | "below", ctx: VimContext): 
   let insertCode: number;
   if (direction === "below") {
     const end = lineEndCode(text, off);
-    const newText = text.slice(0, end) + "\n" + text.slice(end);
+    const newText = `${text.slice(0, end)}\n${text.slice(end)}`;
     ctx.setText(newText);
     insertCode = end + 1;
   } else {
     const start = lineStartCode(text, off);
-    const newText = text.slice(0, start) + "\n" + text.slice(start);
+    const newText = `${text.slice(0, start)}\n${text.slice(start)}`;
     ctx.setText(newText);
     insertCode = start;
   }
@@ -444,11 +444,17 @@ export function findChar(
     let found = -1;
     if (forward) {
       for (let k = idx + 1; k < graphemes.length; k++) {
-        if (graphemes[k] === char) { found = k; break; }
+        if (graphemes[k] === char) {
+          found = k;
+          break;
+        }
       }
     } else {
       for (let k = idx - 1; k >= 0; k--) {
-        if (graphemes[k] === char) { found = k; break; }
+        if (graphemes[k] === char) {
+          found = k;
+          break;
+        }
       }
     }
     if (found === -1) return null;

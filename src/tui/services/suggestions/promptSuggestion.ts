@@ -2,7 +2,11 @@
 // Prompt Suggestion — AI-generated next-action suggestions
 // ============================================================================
 
-interface Message { role?: string; content?: string; variant?: string; }
+interface Message {
+  role?: string;
+  content?: string;
+  variant?: string;
+}
 
 export function generateSuggestions(messages: Message[], positions: any[]): string[] {
   const suggestions: string[] = [];

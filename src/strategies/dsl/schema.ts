@@ -33,11 +33,11 @@ export const IndicatorConditionSchema = z.object({
   params: z.record(z.string(), z.number()).optional(),
   /** Comparison operator */
   comparison: z.enum([
-    "gt",        // Greater than
-    "lt",        // Less than
-    "gte",       // Greater than or equal
-    "lte",       // Less than or equal
-    "eq",        // Equal (with tolerance)
+    "gt", // Greater than
+    "lt", // Less than
+    "gte", // Greater than or equal
+    "lte", // Less than or equal
+    "eq", // Equal (with tolerance)
     "cross_above", // Crosses above
     "cross_below", // Crosses below
   ]),
@@ -57,11 +57,11 @@ export type IndicatorCondition = z.infer<typeof IndicatorConditionSchema>;
 export const PriceConditionSchema = z.object({
   type: z.literal("price"),
   condition: z.enum([
-    "near_support",     // Price close to support level
-    "near_resistance",  // Price close to resistance level
-    "breakout_above",   // Price breaks above level
-    "breakout_below",   // Price breaks below level
-    "in_range",         // Price within a range
+    "near_support", // Price close to support level
+    "near_resistance", // Price close to resistance level
+    "breakout_above", // Price breaks above level
+    "breakout_below", // Price breaks below level
+    "in_range", // Price within a range
   ]),
   /** Percentage threshold for condition (0-20%) */
   threshold: z.number().min(0).max(20).optional(),
@@ -79,14 +79,14 @@ export type PriceCondition = z.infer<typeof PriceConditionSchema>;
 export const PatternConditionSchema = z.object({
   type: z.literal("pattern"),
   pattern: z.enum([
-    "engulfing",       // Engulfing pattern
-    "doji",            // Doji (indecision)
-    "hammer",          // Hammer (bullish reversal)
-    "shooting_star",   // Shooting star (bearish reversal)
-    "morning_star",    // Morning star (bullish reversal)
-    "evening_star",    // Evening star (bearish reversal)
-    "three_soldiers",  // Three white soldiers (bullish)
-    "three_crows",     // Three black crows (bearish)
+    "engulfing", // Engulfing pattern
+    "doji", // Doji (indecision)
+    "hammer", // Hammer (bullish reversal)
+    "shooting_star", // Shooting star (bearish reversal)
+    "morning_star", // Morning star (bullish reversal)
+    "evening_star", // Evening star (bearish reversal)
+    "three_soldiers", // Three white soldiers (bullish)
+    "three_crows", // Three black crows (bearish)
   ]),
   /** Direction filter for the pattern */
   direction: z.enum(["bullish", "bearish", "any"]).optional(),
@@ -139,10 +139,10 @@ export type SignalRule = z.infer<typeof SignalRuleSchema>;
 export const StopLossSchema = z.object({
   /** Type of stop loss calculation */
   type: z.enum([
-    "atr",      // ATR-based stop
-    "percent",  // Fixed percentage
-    "support",  // Below support level
-    "fixed",    // Fixed price distance
+    "atr", // ATR-based stop
+    "percent", // Fixed percentage
+    "support", // Below support level
+    "fixed", // Fixed price distance
   ]),
   /** Value for calculation (ATR periods, percentage, or price) */
   value: z.number(),
@@ -161,10 +161,7 @@ export type StopLoss = z.infer<typeof StopLossSchema>;
  */
 export const TakeProfitSchema = z.object({
   /** Target type - number for R:R, or special targets */
-  target: z.union([
-    z.number(),
-    z.enum(["resistance", "atr_multiple"]),
-  ]),
+  target: z.union([z.number(), z.enum(["resistance", "atr_multiple"])]),
   /** Value for special targets (ATR multiple or fixed price) */
   targetValue: z.number().optional(),
   /** Percentage of position to close at this level (0-1) */
@@ -242,7 +239,12 @@ export type Metadata = z.infer<typeof MetadataSchema>;
  */
 export const StrategyDSLSchema = z.object({
   /** Unique identifier (lowercase, alphanumeric with underscores) */
-  id: z.string().regex(/^[a-z][a-z0-9_]*$/, "ID must start with a letter and contain only lowercase letters, numbers, and underscores"),
+  id: z
+    .string()
+    .regex(
+      /^[a-z][a-z0-9_]*$/,
+      "ID must start with a letter and contain only lowercase letters, numbers, and underscores",
+    ),
   /** Human-readable name */
   name: z.string().max(100),
   /** Strategy description */
@@ -311,16 +313,18 @@ export function validateStrategyDSL(data: unknown): {
 /**
  * Create a partial DSL with defaults applied
  */
-export function createStrategyDSL(partial: Partial<StrategyDSL> & {
-  id: string;
-  name: string;
-  description: string;
-  riskLevel: "low" | "medium" | "high";
-  timeframes: string[];
-  entryRules: StrategyDSL["entryRules"];
-  exitRules: StrategyDSL["exitRules"];
-  requiredIndicators: string[];
-}): StrategyDSL {
+export function createStrategyDSL(
+  partial: Partial<StrategyDSL> & {
+    id: string;
+    name: string;
+    description: string;
+    riskLevel: "low" | "medium" | "high";
+    timeframes: string[];
+    entryRules: StrategyDSL["entryRules"];
+    exitRules: StrategyDSL["exitRules"];
+    requiredIndicators: string[];
+  },
+): StrategyDSL {
   return {
     version: "1.0.0",
     tier: "1",

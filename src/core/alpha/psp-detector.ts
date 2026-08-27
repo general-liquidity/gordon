@@ -105,10 +105,7 @@ function classify(open: number, close: number, dojiTol: number): BarDirection {
   return change > 0 ? "bullish" : "bearish";
 }
 
-export function detectPsp(
-  bars: ReadonlyArray<PspBar>,
-  options: PspOptions = {},
-): PspResult {
+export function detectPsp(bars: ReadonlyArray<PspBar>, options: PspOptions = {}): PspResult {
   const dojiTol = options.dojiToleranceFraction ?? DEFAULT_DOJI_TOLERANCE;
   const dojiCountsAsMajority = options.dojiCountsTowardMajority ?? false;
 
@@ -223,7 +220,9 @@ export function formatPsp(result: PspResult): string {
     const tag =
       a.direction === "bullish" ? "▲ bull" : a.direction === "bearish" ? "▼ bear" : "· doji";
     const dissent = a.isDissenter ? " ← dissenter" : "";
-    lines.push(`    ${a.symbol.padEnd(8)} ${tag.padEnd(8)} ${(a.changeFraction * 100).toFixed(3)}%${dissent}`);
+    lines.push(
+      `    ${a.symbol.padEnd(8)} ${tag.padEnd(8)} ${(a.changeFraction * 100).toFixed(3)}%${dissent}`,
+    );
   }
   if (result.pspAsset) {
     lines.push("");

@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeMarketBreadthBias,
-  marketBreadthBiasToPayload,
-} from "./marketBreadthBias.ts";
+import { computeMarketBreadthBias, marketBreadthBiasToPayload } from "./marketBreadthBias.ts";
 
 describe("computeMarketBreadthBias — validation", () => {
   it("rejects empty returns", () => {
@@ -10,33 +7,21 @@ describe("computeMarketBreadthBias — validation", () => {
   });
 
   it("rejects bullishThreshold out of (0,1]", () => {
-    expect(() =>
-      computeMarketBreadthBias({ returns: [0.1], bullishThreshold: 0 }),
-    ).toThrow();
-    expect(() =>
-      computeMarketBreadthBias({ returns: [0.1], bullishThreshold: 1.5 }),
-    ).toThrow();
+    expect(() => computeMarketBreadthBias({ returns: [0.1], bullishThreshold: 0 })).toThrow();
+    expect(() => computeMarketBreadthBias({ returns: [0.1], bullishThreshold: 1.5 })).toThrow();
   });
 
   it("rejects bearishThreshold out of (0,1]", () => {
-    expect(() =>
-      computeMarketBreadthBias({ returns: [0.1], bearishThreshold: 0 }),
-    ).toThrow();
+    expect(() => computeMarketBreadthBias({ returns: [0.1], bearishThreshold: 0 })).toThrow();
   });
 
   it("rejects negative flatThreshold", () => {
-    expect(() =>
-      computeMarketBreadthBias({ returns: [0.1], flatThreshold: -0.01 }),
-    ).toThrow();
+    expect(() => computeMarketBreadthBias({ returns: [0.1], flatThreshold: -0.01 })).toThrow();
   });
 
   it("rejects non-finite returns", () => {
-    expect(() =>
-      computeMarketBreadthBias({ returns: [0.1, NaN, 0.2] }),
-    ).toThrow();
-    expect(() =>
-      computeMarketBreadthBias({ returns: [0.1, Infinity] }),
-    ).toThrow();
+    expect(() => computeMarketBreadthBias({ returns: [0.1, NaN, 0.2] })).toThrow();
+    expect(() => computeMarketBreadthBias({ returns: [0.1, Infinity] })).toThrow();
   });
 });
 

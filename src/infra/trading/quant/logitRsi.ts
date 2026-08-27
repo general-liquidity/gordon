@@ -152,7 +152,11 @@ export function computeLogitRsi(input: LogitRsiInput): LogitRsiResult {
   const zone = Number.isFinite(z) ? classifyZone(z) : "neutral";
 
   let squeeze = false;
-  if (n >= rsiPeriod + bbPeriod * 2 && Number.isFinite(currentUpper) && Number.isFinite(currentLower)) {
+  if (
+    n >= rsiPeriod + bbPeriod * 2 &&
+    Number.isFinite(currentUpper) &&
+    Number.isFinite(currentLower)
+  ) {
     const currentWidth = currentUpper - currentLower;
     let widthSum = 0;
     let widthCount = 0;
@@ -190,8 +194,12 @@ export function logitRsiToPayload(result: LogitRsiResult): Record<string, unknow
   return {
     kind: "logit_rsi.computed",
     currentRsi: Number.isFinite(result.currentRsi) ? Number(result.currentRsi.toFixed(2)) : null,
-    currentLogit: Number.isFinite(result.currentLogit) ? Number(result.currentLogit.toFixed(4)) : null,
-    currentZScore: Number.isFinite(result.currentZScore) ? Number(result.currentZScore.toFixed(3)) : null,
+    currentLogit: Number.isFinite(result.currentLogit)
+      ? Number(result.currentLogit.toFixed(4))
+      : null,
+    currentZScore: Number.isFinite(result.currentZScore)
+      ? Number(result.currentZScore.toFixed(3))
+      : null,
     currentZone: result.currentZone,
     squeeze: result.squeeze,
     sampleSize: result.sampleSize,

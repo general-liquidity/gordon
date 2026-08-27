@@ -1,12 +1,7 @@
 import type { ZodTypeAny } from "zod";
 import type { IntegrationSurfaceMetadata } from "../../domain/integrations/taxonomy.ts";
 
-export type ActionDomain =
-  | "market"
-  | "trading"
-  | "account"
-  | "system"
-  | "setup";
+export type ActionDomain = "market" | "trading" | "account" | "system" | "setup";
 
 export type ActionCapability = "read" | "plan" | "execute" | "configure";
 

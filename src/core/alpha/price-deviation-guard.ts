@@ -40,9 +40,7 @@ function isPositiveFinite(x: number): boolean {
   return typeof x === "number" && Number.isFinite(x) && x > 0;
 }
 
-export function checkPriceDeviation(
-  input: PriceDeviationInput,
-): PriceDeviationResult | null {
+export function checkPriceDeviation(input: PriceDeviationInput): PriceDeviationResult | null {
   if (input == null) return null;
   const { orderPrice, referencePrice, side } = input;
 

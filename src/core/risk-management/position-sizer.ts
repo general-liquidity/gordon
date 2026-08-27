@@ -77,10 +77,7 @@ export class PositionSizer {
   /**
    * Calculate position size based on risk percentage and stop loss
    */
-  calculateRiskBasedSize(
-    balance: number,
-    stopLossPercent: number
-  ): RiskBasedSizeResult {
+  calculateRiskBasedSize(balance: number, stopLossPercent: number): RiskBasedSizeResult {
     try {
       const riskAmount = balance * (this.config.riskPerTradePercent / 100);
       let positionSize = riskAmount / (stopLossPercent / 100);
@@ -89,7 +86,7 @@ export class PositionSizer {
       positionSize = Math.min(
         positionSize,
         this.config.maxPositionSize,
-        this.config.maxRiskPerPosition / (stopLossPercent / 100)
+        this.config.maxRiskPerPosition / (stopLossPercent / 100),
       );
 
       return {
@@ -222,7 +219,7 @@ export class PositionSizer {
   calculateVolatilityAdjusted(
     balance: number,
     stopLossPercent: number,
-    volatility: number // 0-1 scale, e.g., 0.3 = 30% volatility
+    volatility: number, // 0-1 scale, e.g., 0.3 = 30% volatility
   ): VolatilityAdjustedResult {
     try {
       const baseResult = this.calculateRiskBasedSize(balance, stopLossPercent);
@@ -238,7 +235,7 @@ export class PositionSizer {
       adjustedSize = Math.min(
         adjustedSize,
         this.config.maxPositionSize,
-        this.config.maxRiskPerPosition / (stopLossPercent / 100)
+        this.config.maxRiskPerPosition / (stopLossPercent / 100),
       );
 
       return {
@@ -266,7 +263,7 @@ export class PositionSizer {
     currentPrice: number,
     atrValue: number,
     riskPercent: number = 2.0,
-    atrMultiplier: number = 2.0
+    atrMultiplier: number = 2.0,
   ): {
     positionSize: number;
     stopLossPrice: number;

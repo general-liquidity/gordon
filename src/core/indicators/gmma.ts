@@ -68,9 +68,17 @@ export function calculateGMMA(closes: number[], input: { lookback?: number } = {
   const lookback = Math.max(5, Math.floor(input.lookback ?? 20));
   const n = closes.length;
   const empty: GmmaResult = {
-    trader: [], investor: [], traderMean: 0, investorMean: 0, separationPct: 0,
-    traderSpreadPct: 0, investorSpreadPct: 0, trend: "neutral", compression: "normal",
-    signal: "neutral", interpretation: `insufficient data — need ≥ ${MAXP} closes, got ${n}`,
+    trader: [],
+    investor: [],
+    traderMean: 0,
+    investorMean: 0,
+    separationPct: 0,
+    traderSpreadPct: 0,
+    investorSpreadPct: 0,
+    trend: "neutral",
+    compression: "normal",
+    signal: "neutral",
+    interpretation: `insufficient data — need ≥ ${MAXP} closes, got ${n}`,
   };
   if (n < MAXP) return empty;
 
@@ -97,7 +105,8 @@ export function calculateGMMA(closes: number[], input: { lookback?: number } = {
   const traderSpreadPct = round(((Math.max(...trader) - Math.min(...trader)) / px) * 100);
   const investorSpreadPct = round(((Math.max(...investor) - Math.min(...investor)) / px) * 100);
 
-  const trend: GmmaResult["trend"] = separationPct > 0.1 ? "up" : separationPct < -0.1 ? "down" : "neutral";
+  const trend: GmmaResult["trend"] =
+    separationPct > 0.1 ? "up" : separationPct < -0.1 ? "down" : "neutral";
 
   // Compression state from the investor-spread history.
   let compression: GmmaResult["compression"] = "normal";
@@ -108,7 +117,8 @@ export function calculateGMMA(closes: number[], input: { lookback?: number } = {
     const hi = Math.max(...win);
     const band = hi - lo;
     const compressedLevel = lo + 0.25 * band;
-    const back = invSpreadSeries[invSpreadSeries.length - 1 - Math.min(5, invSpreadSeries.length - 1)]!;
+    const back =
+      invSpreadSeries[invSpreadSeries.length - 1 - Math.min(5, invSpreadSeries.length - 1)]!;
     if (band > 0 && cur <= compressedLevel) compression = "compressed";
     else if (band > 0 && back <= compressedLevel && cur > back * 1.15) compression = "expanding";
   }
@@ -144,7 +154,16 @@ export function calculateGMMA(closes: number[], input: { lookback?: number } = {
             : `bundles intertwined (sep ${separationPct}%) — no clear trend${compression === "compressed" ? ", compressed (coiling)" : ""}`;
 
   return {
-    trader, investor, traderMean: round(traderMean), investorMean: round(investorMean),
-    separationPct, traderSpreadPct, investorSpreadPct, trend, compression, signal, interpretation,
+    trader,
+    investor,
+    traderMean: round(traderMean),
+    investorMean: round(investorMean),
+    separationPct,
+    traderSpreadPct,
+    investorSpreadPct,
+    trend,
+    compression,
+    signal,
+    interpretation,
   };
 }

@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  runStationaryBootstrap,
-  bootstrapToPayload,
-} from "./stationaryBootstrap.ts";
+import { runStationaryBootstrap, bootstrapToPayload } from "./stationaryBootstrap.ts";
 
 function lcg(seed: number) {
   let s = seed;

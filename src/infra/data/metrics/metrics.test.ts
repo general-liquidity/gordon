@@ -10,9 +10,13 @@ describe("onchain metrics adapter", () => {
   const sources = onchainMetricSources();
 
   it("registers the five providers with distinct ids + priorities", () => {
-    expect(sources.map((s) => s.id).sort()).toEqual(
-      ["cryptoquant", "glassnode", "intotheblock", "messari", "santiment"],
-    );
+    expect(sources.map((s) => s.id).sort()).toEqual([
+      "cryptoquant",
+      "glassnode",
+      "intotheblock",
+      "messari",
+      "santiment",
+    ]);
     expect(new Set(sources.map((s) => s.priority)).size).toBe(sources.length);
   });
 

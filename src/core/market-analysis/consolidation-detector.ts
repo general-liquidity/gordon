@@ -236,7 +236,7 @@ export class ConsolidationDetector {
   isNearBoundary(
     currentPrice: number,
     consolidationRange: ConsolidationRange,
-    thresholdPercent: number = 1.0
+    thresholdPercent: number = 1.0,
   ): { nearLow: boolean; nearHigh: boolean; position: "near_low" | "near_high" | "middle" } {
     const { low, high } = consolidationRange;
 

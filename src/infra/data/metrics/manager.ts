@@ -5,11 +5,7 @@
  */
 
 import { createModuleLogger } from "../../logger/index.ts";
-import type {
-  OnchainMetricSource,
-  MetricQuery,
-  MetricSeries,
-} from "./types.ts";
+import type { OnchainMetricSource, MetricQuery, MetricSeries } from "./types.ts";
 
 const logger = createModuleLogger("onchain-metrics-manager");
 
@@ -51,7 +47,11 @@ export class OnchainMetricsManager {
       const caps = source.getCapabilities();
       if (!caps.metrics.includes(query.metric)) continue;
       const assets = caps.assets;
-      if (!assets.includes("*") && !assets.includes(query.asset.toUpperCase()) && !assets.includes(query.asset)) {
+      if (
+        !assets.includes("*") &&
+        !assets.includes(query.asset.toUpperCase()) &&
+        !assets.includes(query.asset)
+      ) {
         continue;
       }
       try {

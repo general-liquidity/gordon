@@ -189,9 +189,7 @@ function evaluateDataHealth(input: DataHealthInput): SignalEval {
     );
   }
   if (input.inputDriftScore !== undefined && input.inputDriftScore > maxDrift) {
-    reasons.push(
-      `input drift ${input.inputDriftScore.toFixed(2)} exceeds ${maxDrift.toFixed(2)}`,
-    );
+    reasons.push(`input drift ${input.inputDriftScore.toFixed(2)} exceeds ${maxDrift.toFixed(2)}`);
   }
 
   return { healthy: reasons.length === 0, reasons };
@@ -239,9 +237,7 @@ export function evaluateLiveSharpe(input: LiveSharpeInput): LiveSharpeReport {
   const signalEval = input.signal
     ? evaluateSignalHealth(input.signal)
     : { healthy: true, reasons: [] };
-  const dataEval = input.data
-    ? evaluateDataHealth(input.data)
-    : { healthy: true, reasons: [] };
+  const dataEval = input.data ? evaluateDataHealth(input.data) : { healthy: true, reasons: [] };
 
   const reasons: string[] = [];
   if (sharpeDegraded) {

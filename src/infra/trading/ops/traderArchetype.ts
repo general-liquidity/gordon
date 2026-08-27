@@ -18,7 +18,11 @@
  * dominant archetype plus a confidence number.
  */
 
-export type Archetype = "anxious_overthinker" | "impulsive_action_taker" | "emotional_empath" | "balanced";
+export type Archetype =
+  | "anxious_overthinker"
+  | "impulsive_action_taker"
+  | "emotional_empath"
+  | "balanced";
 
 export interface BehaviorSignals {
   /** Hesitates / second-guesses at entry. */
@@ -121,11 +125,13 @@ export function classifyTrader(signals: BehaviorSignals): ArchetypeResult {
   let chosen: Exclude<Archetype, "balanced">[] = [];
   if (confidence < 0.5) {
     archetype = "balanced";
-    chosen = ([
-      ["anxious_overthinker", a],
-      ["impulsive_action_taker", i],
-      ["emotional_empath", e],
-    ] as Array<[Exclude<Archetype, "balanced">, number]>)
+    chosen = (
+      [
+        ["anxious_overthinker", a],
+        ["impulsive_action_taker", i],
+        ["emotional_empath", e],
+      ] as Array<[Exclude<Archetype, "balanced">, number]>
+    )
       .filter(([, s]) => s >= 1)
       .map(([n]) => n);
   } else {

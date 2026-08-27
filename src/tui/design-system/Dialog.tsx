@@ -1,4 +1,4 @@
-import React, { type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Box, Text, useInput, useStdout } from "../ink-custom";
 import type { GordonTheme } from "../themes/themes.ts";
 import { useTheme } from "../themes/ThemeProvider.tsx";
@@ -42,7 +42,7 @@ export function Dialog({ title, subtitle, tone = "warning", onClose, onConfirm, 
   const width = Math.min(stdout?.columns ?? 80, 60);
   const color = dialogToneColor(tone, theme);
 
-  useInput((input, key) => {
+  useInput((_input, key) => {
     if (key.escape) {
       onClose();
     } else if (key.return && onConfirm) {
@@ -51,13 +51,7 @@ export function Dialog({ title, subtitle, tone = "warning", onClose, onConfirm, 
   });
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={color}
-      width={width}
-      paddingX={1}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor={color} width={width} paddingX={1}>
       <Text color={color} bold>
         {title}
       </Text>

@@ -24,7 +24,6 @@ import {
   type SetupSignal,
   type AnalysisResult,
   type TradePlan,
-  type RiskDecision,
   type OrderRecord,
   type FillData,
   type LivePositionData,
@@ -33,7 +32,7 @@ import {
   type HistoryOptions,
   type PositionSummary,
 } from "./types.ts";
-import { PositionStore, getPositionStore } from "./store.ts";
+import { type PositionStore, getPositionStore } from "./store.ts";
 
 const logger = createModuleLogger("position-manager");
 
@@ -41,11 +40,7 @@ export class PositionManager {
   private sm: PositionStateMachine;
   private store: PositionStore;
 
-  constructor(
-    private stateMachine: PositionStateMachine,
-    private bus: EventBus,
-    store: PositionStore
-  ) {
+  constructor(stateMachine: PositionStateMachine, _bus: EventBus, store: PositionStore) {
     this.sm = stateMachine;
     this.store = store;
   }
@@ -64,7 +59,7 @@ export class PositionManager {
     const position = await this.sm.create({
       symbol: signal.symbol,
       exchangeId: "default", // Can be overridden later
-      side: "long",          // Default; will be refined by Analyst/Planner
+      side: "long", // Default; will be refined by Analyst/Planner
       setupSignal: signal,
       strategyId: signal.strategy,
     });
@@ -76,29 +71,17 @@ export class PositionManager {
    * Analyst calls this with analysis results.
    * Transitions: idea -> analyzed
    */
-  async reportAnalysis(
-    positionId: string,
-    analysis: AnalysisResult
-  ): Promise<PositionRecord> {
+  async reportAnalysis(positionId: string, analysis: AnalysisResult): Promise<PositionRecord> {
     logger.info("Analysis reported", { positionId, bias: analysis.bias });
 
-    return this.sm.transition(
-      positionId,
-      "analyzed",
-      { analysis },
-      undefined,
-      "Analyst"
-    );
+    return this.sm.transition(positionId, "analyzed", { analysis }, undefined, "Analyst");
   }
 
   /**
    * Planner calls this with the trade plan.
    * Transitions: analyzed -> planned
    */
-  async reportPlan(
-    positionId: string,
-    plan: TradePlan
-  ): Promise<PositionRecord> {
+  async reportPlan(positionId: string, plan: TradePlan): Promise<PositionRecord> {
     logger.info("Plan reported", {
       positionId,
       entry: plan.entry,
@@ -115,7 +98,7 @@ export class PositionManager {
         takeProfit: plan.takeProfits[0],
       },
       undefined,
-      "Planner"
+      "Planner",
     );
   }
 
@@ -137,7 +120,7 @@ export class PositionManager {
         },
       },
       "User approved",
-      "User"
+      "User",
     );
   }
 
@@ -160,7 +143,7 @@ export class PositionManager {
         },
       },
       reason,
-      "RiskKernel"
+      "RiskKernel",
     );
   }
 
@@ -168,29 +151,17 @@ export class PositionManager {
    * Executor reports order placed on exchange.
    * Transitions: approved -> ordering
    */
-  async reportOrdered(
-    positionId: string,
-    order: OrderRecord
-  ): Promise<PositionRecord> {
+  async reportOrdered(positionId: string, order: OrderRecord): Promise<PositionRecord> {
     logger.info("Order placed", { positionId, orderId: order.orderId });
 
-    return this.sm.transition(
-      positionId,
-      "ordering",
-      { entryOrder: order },
-      undefined,
-      "Executor"
-    );
+    return this.sm.transition(positionId, "ordering", { entryOrder: order }, undefined, "Executor");
   }
 
   /**
    * Executor reports order filled.
    * Transitions: ordering -> filled
    */
-  async reportFilled(
-    positionId: string,
-    fillData: FillData
-  ): Promise<PositionRecord> {
+  async reportFilled(positionId: string, fillData: FillData): Promise<PositionRecord> {
     logger.info("Order filled", {
       positionId,
       entryPrice: fillData.entryPrice,
@@ -211,7 +182,7 @@ export class PositionManager {
         currentPrice: fillData.entryPrice,
       },
       undefined,
-      "Executor"
+      "Executor",
     );
   }
 
@@ -222,26 +193,18 @@ export class PositionManager {
   async startMonitoring(positionId: string): Promise<PositionRecord> {
     logger.info("Monitoring started", { positionId });
 
-    return this.sm.transition(
-      positionId,
-      "monitoring",
-      undefined,
-      undefined,
-      "Monitor"
-    );
+    return this.sm.transition(positionId, "monitoring", undefined, undefined, "Monitor");
   }
 
   /**
    * Monitor updates live position data (price, PnL, trailing stop).
    * Does NOT change state — just updates data fields.
    */
-  async updateLive(
-    positionId: string,
-    liveData: LivePositionData
-  ): Promise<PositionRecord> {
+  async updateLive(positionId: string, liveData: LivePositionData): Promise<PositionRecord> {
     return this.sm.update(positionId, {
       currentPrice: liveData.currentPrice,
       unrealizedPnL: liveData.unrealizedPnL,
+      unrealizedPnLPercent: liveData.unrealizedPnLPercent,
       highWaterMark: liveData.highWaterMark,
       trailingStop: liveData.trailingStop,
       stopLoss: liveData.stopLoss,
@@ -253,19 +216,10 @@ export class PositionManager {
    * Monitor or Executor initiates a close.
    * Transitions: monitoring -> closing
    */
-  async initiateClose(
-    positionId: string,
-    reason: string
-  ): Promise<PositionRecord> {
+  async initiateClose(positionId: string, reason: string): Promise<PositionRecord> {
     logger.info("Close initiated", { positionId, reason });
 
-    return this.sm.transition(
-      positionId,
-      "closing",
-      { closeReason: reason },
-      reason,
-      "Monitor"
-    );
+    return this.sm.transition(positionId, "closing", { closeReason: reason }, reason, "Monitor");
   }
 
   /**
@@ -273,10 +227,7 @@ export class PositionManager {
    * or from closing (after close order fills).
    * Transitions: monitoring -> closed  OR  closing -> closed
    */
-  async reportClosed(
-    positionId: string,
-    closeData: CloseData
-  ): Promise<PositionRecord> {
+  async reportClosed(positionId: string, closeData: CloseData): Promise<PositionRecord> {
     logger.info("Position closed", {
       positionId,
       exitPrice: closeData.exitPrice,
@@ -289,10 +240,13 @@ export class PositionManager {
       {
         exitPrice: closeData.exitPrice,
         realizedPnL: closeData.realizedPnL,
+        realizedPnLPercent: closeData.realizedPnLPercent,
+        fees: closeData.fees,
+        closeReason: closeData.reason,
         exitOrder: closeData.exitOrder,
       },
-      undefined,
-      "Executor"
+      closeData.reason,
+      "Executor",
     );
   }
 
@@ -300,19 +254,10 @@ export class PositionManager {
    * Teacher submits a post-trade review.
    * Transitions: closed -> reviewed
    */
-  async reportReview(
-    positionId: string,
-    review: TradeReview
-  ): Promise<PositionRecord> {
+  async reportReview(positionId: string, review: TradeReview): Promise<PositionRecord> {
     logger.info("Review submitted", { positionId, grade: review.grade });
 
-    return this.sm.transition(
-      positionId,
-      "reviewed",
-      { review },
-      undefined,
-      "Teacher"
-    );
+    return this.sm.transition(positionId, "reviewed", { review }, undefined, "Teacher");
   }
 
   /**
@@ -322,13 +267,7 @@ export class PositionManager {
   async cancel(positionId: string, reason: string): Promise<PositionRecord> {
     logger.info("Position cancelled", { positionId, reason });
 
-    return this.sm.transition(
-      positionId,
-      "cancelled",
-      { cancelReason: reason },
-      reason,
-      "User"
-    );
+    return this.sm.transition(positionId, "cancelled", { cancelReason: reason }, reason, "User");
   }
 
   // ==========================================================================
@@ -376,17 +315,12 @@ export class PositionManager {
   async getPositionSummary(): Promise<PositionSummary> {
     const all = await this.store.getHistory({});
     const active = all.filter((p) => !TERMINAL_STATES.has(p.state));
-    const closedOrReviewed = all.filter(
-      (p) => p.state === "closed" || p.state === "reviewed"
-    );
+    const closedOrReviewed = all.filter((p) => p.state === "closed" || p.state === "reviewed");
     const wins = closedOrReviewed.filter((p) => (p.realizedPnL ?? 0) > 0);
     const losses = closedOrReviewed.filter((p) => (p.realizedPnL ?? 0) < 0);
 
     const openPnL = active.reduce((sum, p) => sum + (p.unrealizedPnL ?? 0), 0);
-    const closedPnL = closedOrReviewed.reduce(
-      (sum, p) => sum + (p.realizedPnL ?? 0),
-      0
-    );
+    const closedPnL = closedOrReviewed.reduce((sum, p) => sum + (p.realizedPnL ?? 0), 0);
 
     // Count by state
     const byState: Record<PositionState, number> = {
@@ -430,10 +364,7 @@ let _manager: PositionManager | null = null;
 /**
  * Create a PositionManager with the given dependencies.
  */
-export function createPositionManager(
-  bus: EventBus,
-  store: PositionStore
-): PositionManager {
+export function createPositionManager(bus: EventBus, store: PositionStore): PositionManager {
   const sm = new PositionStateMachine(bus, store);
   return new PositionManager(sm, bus, store);
 }

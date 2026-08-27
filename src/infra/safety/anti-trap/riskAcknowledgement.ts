@@ -13,16 +13,11 @@
 import type { RiskAssessment, RiskDimension } from "../../trading/risk/riskClassifier.ts";
 import { flagEnv } from "../../config/flagResolver.ts";
 
-export function isRiskAckEnabled(
-  env: NodeJS.ProcessEnv = flagEnv(),
-): boolean {
+export function isRiskAckEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   return env.GORDON_RISK_ACK === "1" || env.GORDON_RISK_ACK === "true";
 }
 
-export function topWeightedDimensions(
-  assessment: RiskAssessment,
-  n: number = 3,
-): RiskDimension[] {
+export function topWeightedDimensions(assessment: RiskAssessment, n: number = 3): RiskDimension[] {
   return [...assessment.dimensions]
     .map((d) => ({ d, weighted: d.score * d.weight }))
     .sort((a, b) => b.weighted - a.weighted)

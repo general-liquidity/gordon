@@ -151,8 +151,8 @@ describe("attachExecution — scaled-thirds with ATR", () => {
     });
     expect(plan.scheduledEntries.length).toBe(3);
     expect(plan.scheduledEntries[0]!.resolvedPrice).toBe(100); // at entry
-    expect(plan.scheduledEntries[1]!.resolvedPrice).toBe(99);  // -0.5 ATR for long
-    expect(plan.scheduledEntries[2]!.resolvedPrice).toBe(98);  // -1.0 ATR
+    expect(plan.scheduledEntries[1]!.resolvedPrice).toBe(99); // -0.5 ATR for long
+    expect(plan.scheduledEntries[2]!.resolvedPrice).toBe(98); // -1.0 ATR
   });
 
   it("flips offset direction for shorts", () => {
@@ -193,8 +193,8 @@ describe("attachExecution — R-multiple exits", () => {
       stopPrice: 105,
       direction: "short",
     });
-    expect(plan.scheduledExits[0]!.resolvedPrice).toBe(95);  // -1R
-    expect(plan.scheduledExits[1]!.resolvedPrice).toBe(90);  // -2R
+    expect(plan.scheduledExits[0]!.resolvedPrice).toBe(95); // -1R
+    expect(plan.scheduledExits[1]!.resolvedPrice).toBe(90); // -2R
   });
 
   it("leaves exit price undefined when no stop given", () => {

@@ -44,42 +44,46 @@ import type { BacktestMetrics } from "../../../../../backtest/types.ts";
 // Shared zod shapes
 // ============================================================================
 
-const metricsShape = z.object({
-  totalReturn: z.number(),
-  annualizedReturn: z.number(),
-  cagr: z.number(),
-  maxDrawdown: z.number(),
-  sharpeRatio: z.number(),
-  sortinoRatio: z.number(),
-  volatility: z.number(),
-  calmarRatio: z.number(),
-  totalTrades: z.number(),
-  winningTrades: z.number(),
-  losingTrades: z.number(),
-  winRate: z.number(),
-  profitFactor: z.number(),
-  averageTrade: z.number(),
-  averageWin: z.number(),
-  averageLoss: z.number(),
-  expectancy: z.number(),
-  maxConsecutiveWins: z.number(),
-  maxConsecutiveLosses: z.number(),
-  initialValue: z.number(),
-  finalValue: z.number(),
-  totalPnl: z.number(),
-  netProfit: z.number(),
-  totalFees: z.number(),
-  avgTradeDuration: z.number(),
-  maxDrawdownDuration: z.number(),
-}).passthrough();
+const metricsShape = z
+  .object({
+    totalReturn: z.number(),
+    annualizedReturn: z.number(),
+    cagr: z.number(),
+    maxDrawdown: z.number(),
+    sharpeRatio: z.number(),
+    sortinoRatio: z.number(),
+    volatility: z.number(),
+    calmarRatio: z.number(),
+    totalTrades: z.number(),
+    winningTrades: z.number(),
+    losingTrades: z.number(),
+    winRate: z.number(),
+    profitFactor: z.number(),
+    averageTrade: z.number(),
+    averageWin: z.number(),
+    averageLoss: z.number(),
+    expectancy: z.number(),
+    maxConsecutiveWins: z.number(),
+    maxConsecutiveLosses: z.number(),
+    initialValue: z.number(),
+    finalValue: z.number(),
+    totalPnl: z.number(),
+    netProfit: z.number(),
+    totalFees: z.number(),
+    avgTradeDuration: z.number(),
+    maxDrawdownDuration: z.number(),
+  })
+  .passthrough();
 
-const thresholdsSchema = z.object({
-  minTrades: z.number().int().min(1).optional(),
-  minExposurePct: z.number().min(0).max(100).optional(),
-  minSharpe: z.number().optional(),
-  minCalmar: z.number().optional(),
-  maxDrawdownPct: z.number().min(0).max(100).optional(),
-}).optional();
+const thresholdsSchema = z
+  .object({
+    minTrades: z.number().int().min(1).optional(),
+    minExposurePct: z.number().min(0).max(100).optional(),
+    minSharpe: z.number().optional(),
+    minCalmar: z.number().optional(),
+    maxDrawdownPct: z.number().min(0).max(100).optional(),
+  })
+  .optional();
 
 // ============================================================================
 // 1. check_backtest_preconditions — pre-run gate
@@ -125,7 +129,14 @@ export const checkBacktestPreconditionsTool = createTool({
       maxFeePct: z.number(),
     }),
   }),
-  execute: async ({ leverage, initialCapital, positionSizePercent, days, feePercent, limitsOverride }) => {
+  execute: async ({
+    leverage,
+    initialCapital,
+    positionSizePercent,
+    days,
+    feePercent,
+    limitsOverride,
+  }) => {
     const limits = limitsOverride ? mergeGateLimits(limitsOverride) : DEFAULT_GATE_LIMITS;
     const result = checkBacktestPreconditions(
       { leverage, initialCapital, positionSizePercent, days, feePercent },
@@ -156,13 +167,7 @@ export const screenBacktestResultTool = createTool({
     thresholdsOverride: thresholdsSchema,
   }),
   outputSchema: z.object({
-    verdict: z.enum([
-      "ELIGIBLE",
-      "DISCARD_SAMPLE_SIZE",
-      "DISCARD_RISK",
-      "DISCARD_PROFIT",
-      "CRASH",
-    ]),
+    verdict: z.enum(["ELIGIBLE", "DISCARD_SAMPLE_SIZE", "DISCARD_RISK", "DISCARD_PROFIT", "CRASH"]),
     verdictLine: z.string(),
     summary: z.string(),
     violations: z.array(z.string()),
@@ -183,9 +188,7 @@ export const screenBacktestResultTool = createTool({
   }),
   execute: async ({ metrics, windowDays, strict, thresholdsOverride }) => {
     const base = strict ? STRICT_VERDICT_THRESHOLDS : DEFAULT_VERDICT_THRESHOLDS;
-    const thresholds = thresholdsOverride
-      ? { ...base, ...thresholdsOverride }
-      : base;
+    const thresholds = thresholdsOverride ? { ...base, ...thresholdsOverride } : base;
     const result = computeVerdict(metrics as unknown as BacktestMetrics, thresholds, windowDays);
     return {
       verdict: result.verdict,
@@ -220,13 +223,7 @@ export const recordBacktestExperimentTool = createTool({
       .string()
       .min(1)
       .describe("Free-text reasoning for why you're running this experiment — what's the thesis?"),
-    verdict: z.enum([
-      "ELIGIBLE",
-      "DISCARD_SAMPLE_SIZE",
-      "DISCARD_RISK",
-      "DISCARD_PROFIT",
-      "CRASH",
-    ]),
+    verdict: z.enum(["ELIGIBLE", "DISCARD_SAMPLE_SIZE", "DISCARD_RISK", "DISCARD_PROFIT", "CRASH"]),
     verdictLine: z.string(),
     violations: z.array(z.string()).default([]),
     metrics: metricsShape,
@@ -238,7 +235,16 @@ export const recordBacktestExperimentTool = createTool({
     timestamp: z.string(),
   }),
   execute: async ({
-    strategyId, symbol, timeframe, days, hypothesis, verdict, verdictLine, violations, metrics, backtestResultId,
+    strategyId,
+    symbol,
+    timeframe,
+    days,
+    hypothesis,
+    verdict,
+    verdictLine,
+    violations,
+    metrics,
+    backtestResultId,
   }) => {
     const experiment = recordExperiment({
       strategyId,
@@ -273,13 +279,7 @@ export const listBacktestExperimentsTool = createTool({
   inputSchema: z.object({
     limit: z.number().int().min(1).max(200).optional().default(20),
     verdict: z
-      .enum([
-        "ELIGIBLE",
-        "DISCARD_SAMPLE_SIZE",
-        "DISCARD_RISK",
-        "DISCARD_PROFIT",
-        "CRASH",
-      ])
+      .enum(["ELIGIBLE", "DISCARD_SAMPLE_SIZE", "DISCARD_RISK", "DISCARD_PROFIT", "CRASH"])
       .optional(),
     strategyId: z.string().optional(),
     symbol: z.string().optional(),

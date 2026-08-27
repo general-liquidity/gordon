@@ -36,12 +36,7 @@
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, basename } from "node:path";
-import type {
-  Skill,
-  SkillFrontmatter,
-  SkillSource,
-  SkillValidationIssue,
-} from "./types.ts";
+import type { Skill, SkillFrontmatter, SkillSource, SkillValidationIssue } from "./types.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { scanSkillSecurity } from "./skillSecurity.ts";
 
@@ -97,8 +92,7 @@ export const MAX_SKILL_FILE_SIZE = 64 * 1024;
 
 function stripQuotes(s: string): string {
   if (s.length < 2) return s;
-  if ((s[0] === '"' && s[s.length - 1] === '"') ||
-      (s[0] === "'" && s[s.length - 1] === "'")) {
+  if ((s[0] === '"' && s[s.length - 1] === '"') || (s[0] === "'" && s[s.length - 1] === "'")) {
     return s.slice(1, -1);
   }
   return s;
@@ -113,12 +107,18 @@ function parseScalar(raw: string): unknown {
   if (raw === "false") return false;
   if (raw === "null" || raw === "~") return null;
   if (raw.startsWith("[") && raw.endsWith("]")) {
-    return raw.slice(1, -1).split(",").map((s) => stripQuotes(s.trim()));
+    return raw
+      .slice(1, -1)
+      .split(",")
+      .map((s) => stripQuotes(s.trim()));
   }
   return stripQuotes(raw);
 }
 
-export function parseFrontmatter(content: string): { frontmatter: Record<string, unknown>; body: string } {
+export function parseFrontmatter(content: string): {
+  frontmatter: Record<string, unknown>;
+  body: string;
+} {
   const match = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
   if (!match) return { frontmatter: {}, body: content };
 
@@ -130,11 +130,20 @@ export function parseFrontmatter(content: string): { frontmatter: Record<string,
 
   while (i < lines.length) {
     const line = lines[i]!;
-    if (!line.trim()) { i++; continue; }
-    if (isIndented(line)) { i++; continue; } // stray indented line — skip
+    if (!line.trim()) {
+      i++;
+      continue;
+    }
+    if (isIndented(line)) {
+      i++;
+      continue;
+    } // stray indented line — skip
 
     const colonIdx = line.indexOf(":");
-    if (colonIdx === -1) { i++; continue; }
+    if (colonIdx === -1) {
+      i++;
+      continue;
+    }
 
     const key = line.slice(0, colonIdx).trim();
     const rawValue = line.slice(colonIdx + 1).trim();
@@ -145,10 +154,16 @@ export function parseFrontmatter(content: string): { frontmatter: Record<string,
       let j = i + 1;
       while (j < lines.length) {
         const sub = lines[j]!;
-        if (!sub.trim()) { j++; continue; }
+        if (!sub.trim()) {
+          j++;
+          continue;
+        }
         if (!isIndented(sub)) break;
         const subColon = sub.indexOf(":");
-        if (subColon === -1) { j++; continue; }
+        if (subColon === -1) {
+          j++;
+          continue;
+        }
         const subKey = sub.slice(0, subColon).trim();
         const subVal = stripQuotes(sub.slice(subColon + 1).trim());
         nested[subKey] = subVal;
@@ -185,7 +200,9 @@ function toFrontmatter(raw: Record<string, unknown>): SkillFrontmatter {
     allowedTools: (raw["allowed-tools"] ?? raw.allowedTools) as string[] | undefined,
     model: raw.model as string | undefined,
     userInvocable: (raw["user-invocable"] ?? raw.userInvocable ?? true) as boolean,
-    disableModelInvocation: (raw["disable-model-invocation"] ?? raw.disableModelInvocation) as boolean | undefined,
+    disableModelInvocation: (raw["disable-model-invocation"] ?? raw.disableModelInvocation) as
+      | boolean
+      | undefined,
     context: raw.context as "inline" | "fork" | undefined,
     agent: raw.agent as string | undefined,
     tags: raw.tags as string[] | undefined,

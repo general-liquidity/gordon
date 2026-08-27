@@ -53,19 +53,10 @@ export interface JudgeScoreEntry {
  * trajectory sits on a genuine judgment boundary, which is a different signal
  * from judges being uniformly uncertain at the same spread.
  */
-export type DissentPattern =
-  | "consensus"
-  | "dispersed"
-  | "polarised"
-  | "split"
-  | "unverifiable";
+export type DissentPattern = "consensus" | "dispersed" | "polarised" | "split" | "unverifiable";
 
 /** Whether the consensus score is trustworthy enough to gate CI on. */
-export type PanelVerdict =
-  | "safe_to_gate"
-  | "caution"
-  | "unsafe_to_gate"
-  | "unverifiable";
+export type PanelVerdict = "safe_to_gate" | "caution" | "unsafe_to_gate" | "unverifiable";
 
 /**
  * Rank disagreement and magnitude disagreement are different failures and must
@@ -74,11 +65,7 @@ export type PanelVerdict =
  * hold), or agree on level while ordering differently (the comparison itself
  * is contested, which is worse for a ranking harness).
  */
-export type AgreementMode =
-  | "aligned"
-  | "level_disagreement"
-  | "rank_disagreement"
-  | "unverifiable";
+export type AgreementMode = "aligned" | "level_disagreement" | "rank_disagreement" | "unverifiable";
 
 export interface TrajectoryDissent {
   trajectoryId: string;
@@ -225,9 +212,7 @@ export function computePanelDissent(
     agreementMode = "aligned";
   }
 
-  const contested = perTrajectory.filter(
-    (d) => d.pattern === "polarised" || d.pattern === "split",
-  );
+  const contested = perTrajectory.filter((d) => d.pattern === "polarised" || d.pattern === "split");
   const dispersed = perTrajectory.filter((d) => d.pattern === "dispersed");
 
   let verdict: PanelVerdict;
@@ -326,16 +311,18 @@ function analyseTrajectory(
   // On an equal-size split the lower side is the minority by convention, so the
   // choice is deterministic rather than dependent on judge ordering.
   const minorityIsLower = lowerSide.length <= upperSide.length;
-  const minorityView = pattern === "consensus" || pattern === "unverifiable"
-    ? []
-    : minorityIsLower
-      ? lowerSide
-      : upperSide;
-  const majorityView = pattern === "consensus" || pattern === "unverifiable"
-    ? []
-    : minorityIsLower
-      ? upperSide
-      : lowerSide;
+  const minorityView =
+    pattern === "consensus" || pattern === "unverifiable"
+      ? []
+      : minorityIsLower
+        ? lowerSide
+        : upperSide;
+  const majorityView =
+    pattern === "consensus" || pattern === "unverifiable"
+      ? []
+      : minorityIsLower
+        ? upperSide
+        : lowerSide;
 
   let dissenter: TrajectoryDissent["dissenter"];
   if (perJudge.length >= 2 && spread > 0) {
@@ -411,9 +398,7 @@ function medianOf(scores: ReadonlyArray<number>): number {
  * members of the pair scored. Undefined when no pair has two shared
  * trajectories, or when every comparable pair is fully tied on one side.
  */
-function meanPairwiseKendallTau(
-  surviving: ReadonlyArray<PanelJudgeEntry>,
-): number | undefined {
+function meanPairwiseKendallTau(surviving: ReadonlyArray<PanelJudgeEntry>): number | undefined {
   if (surviving.length < 2) return undefined;
   const taus: number[] = [];
   for (let i = 0; i < surviving.length; i += 1) {

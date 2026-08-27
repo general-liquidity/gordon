@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { _internal } from "./resources.ts";
 import { TRADE_LEDGER_PATH_ENV } from "../../safety/tradeLedger.ts";
 
-const { readRecentTrades, readTodayLedger, readSkillsCatalog, matchesSymbol, isSameDay } = _internal;
+const { readRecentTrades, readTodayLedger, readSkillsCatalog, matchesSymbol, isSameDay } =
+  _internal;
 
 let tempDir: string;
 let originalLedgerPath: string | undefined;
@@ -19,12 +20,16 @@ beforeEach(() => {
 afterEach(() => {
   if (originalLedgerPath === undefined) delete process.env[TRADE_LEDGER_PATH_ENV];
   else process.env[TRADE_LEDGER_PATH_ENV] = originalLedgerPath;
-  try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* */ }
+  try {
+    rmSync(tempDir, { recursive: true, force: true });
+  } catch {
+    /* */
+  }
 });
 
 function writeLedger(rows: unknown[]): void {
   const path = process.env[TRADE_LEDGER_PATH_ENV]!;
-  writeFileSync(path, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  writeFileSync(path, `${rows.map((r) => JSON.stringify(r)).join("\n")}\n`);
 }
 
 // =================== helpers ===================
@@ -111,11 +116,28 @@ describe("readRecentTrades", () => {
 
   it("skips malformed JSONL lines silently", () => {
     const path = process.env[TRADE_LEDGER_PATH_ENV]!;
-    writeFileSync(path, [
-      JSON.stringify({ id: "1", symbol: "BTCUSDT", side: "BUY", qty: 0.1, price: 50000, ts: 1000 }),
-      "not json",
-      JSON.stringify({ id: "2", symbol: "BTCUSDT", side: "SELL", qty: 0.1, price: 51000, ts: 2000 }),
-    ].join("\n") + "\n");
+    writeFileSync(
+      path,
+      `${[
+        JSON.stringify({
+          id: "1",
+          symbol: "BTCUSDT",
+          side: "BUY",
+          qty: 0.1,
+          price: 50000,
+          ts: 1000,
+        }),
+        "not json",
+        JSON.stringify({
+          id: "2",
+          symbol: "BTCUSDT",
+          side: "SELL",
+          qty: 0.1,
+          price: 51000,
+          ts: 2000,
+        }),
+      ].join("\n")}\n`,
+    );
     const result = JSON.parse(readRecentTrades(50).text);
     expect(result.count).toBe(2);
   });

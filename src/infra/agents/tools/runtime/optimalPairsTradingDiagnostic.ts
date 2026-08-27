@@ -32,17 +32,11 @@ export const optimalPairsTradingDiagnosticTool = createTool({
       .number()
       .positive()
       .describe("OU mean-reversion rate θ. Faster reversion = larger θ."),
-    spreadVolatility: z
-      .number()
-      .positive()
-      .describe("OU volatility σ."),
+    spreadVolatility: z.number().positive().describe("OU volatility σ."),
     currentInventory: z
       .number()
       .describe("Current spread position q (signed; long spread = positive)."),
-    impactCoef: z
-      .number()
-      .positive()
-      .describe("Linear-impact coefficient k (>0)."),
+    impactCoef: z.number().positive().describe("Linear-impact coefficient k (>0)."),
     riskAversion: z
       .number()
       .min(0)

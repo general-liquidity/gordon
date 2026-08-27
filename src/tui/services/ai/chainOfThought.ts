@@ -49,9 +49,12 @@ export interface CoTStep {
 export function parseCoTResponse(response: string): { steps: CoTStep[]; signal: any } {
   const stepPattern = /STEP (\d+)[\s\-—]*([A-Z][A-Z\s]+)\n([\s\S]*?)(?=STEP \d+|After all|$)/g;
   const steps: CoTStep[] = [];
-  let match;
-  while ((match = stepPattern.exec(response)) !== null) {
-    steps.push({ step: parseInt(match[1]!), title: match[2]!.trim(), content: match[3]!.trim() });
+  for (const match of response.matchAll(stepPattern)) {
+    steps.push({
+      step: parseInt(match[1]!, 10),
+      title: match[2]!.trim(),
+      content: match[3]!.trim(),
+    });
   }
   const jsonMatch = response.match(/\{[\s\S]*\}/);
   const signal = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
@@ -59,5 +62,9 @@ export function parseCoTResponse(response: string): { steps: CoTStep[]; signal: 
 }
 
 let cotEnabled = false;
-export function isCoTEnabled(): boolean { return cotEnabled; }
-export function setCoTEnabled(enabled: boolean): void { cotEnabled = enabled; }
+export function isCoTEnabled(): boolean {
+  return cotEnabled;
+}
+export function setCoTEnabled(enabled: boolean): void {
+  cotEnabled = enabled;
+}

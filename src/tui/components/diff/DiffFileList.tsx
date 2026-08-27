@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 
 // ============================================================================
@@ -65,10 +65,10 @@ export function DiffFileList({ files, onSelect }: Props) {
 
         return (
           <Box key={file.name}>
-            <Text color={isFocused ? "cyanBright" : undefined}>
-              {isFocused ? "▸ " : "  "}
+            <Text color={isFocused ? "cyanBright" : undefined}>{isFocused ? "▸ " : "  "}</Text>
+            <Text color={col as string} bold>
+              {sym}
             </Text>
-            <Text color={col as string} bold>{sym}</Text>
             <Text> </Text>
             <Text bold={isFocused} color={isFocused ? "cyanBright" : undefined}>
               {file.name.padEnd(maxName + 2)}

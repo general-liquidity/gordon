@@ -91,7 +91,7 @@ export function computeKama(input: KamaInput): KamaResult {
   for (let i = erPeriod + 1; i < n; i++) {
     const window = prices.slice(i - erPeriod, i + 1);
     const er = computeEfficiencyRatio({ prices: window, period: erPeriod });
-    const sc = Math.pow(er.efficiencyRatio * (fastSC - slowSC) + slowSC, 2);
+    const sc = (er.efficiencyRatio * (fastSC - slowSC) + slowSC) ** 2;
     scs[i] = sc;
     kama[i] = kama[i - 1]! + sc * (prices[i]! - kama[i - 1]!);
   }
@@ -152,12 +152,8 @@ export function computeKama(input: KamaInput): KamaResult {
 export function kamaToPayload(result: KamaResult): Record<string, unknown> {
   return {
     kind: "kaufman_adaptive_ma.computed",
-    currentKama: Number.isFinite(result.currentKama)
-      ? Number(result.currentKama.toFixed(5))
-      : null,
-    currentSc: Number.isFinite(result.currentSc)
-      ? Number(result.currentSc.toFixed(5))
-      : null,
+    currentKama: Number.isFinite(result.currentKama) ? Number(result.currentKama.toFixed(5)) : null,
+    currentSc: Number.isFinite(result.currentSc) ? Number(result.currentSc.toFixed(5)) : null,
     trend: result.trend,
     sampleSize: result.sampleSize,
   };

@@ -92,14 +92,14 @@ describe("computeExposureEfficiency", () => {
   });
 
   it("throws when exposure length does not match returns", () => {
-    expect(() =>
-      computeExposureEfficiency({ returns: [0.1, 0.2], exposure: [1] }),
-    ).toThrow("exposure length must equal returns length");
+    expect(() => computeExposureEfficiency({ returns: [0.1, 0.2], exposure: [1] })).toThrow(
+      "exposure length must equal returns length",
+    );
   });
 
   it("throws when exposure is outside [0, 1]", () => {
-    expect(() =>
-      computeExposureEfficiency({ returns: [0.1], exposure: [1.5] }),
-    ).toThrow("exposure must be within [0, 1]");
+    expect(() => computeExposureEfficiency({ returns: [0.1], exposure: [1.5] })).toThrow(
+      "exposure must be within [0, 1]",
+    );
   });
 });

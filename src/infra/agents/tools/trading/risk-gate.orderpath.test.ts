@@ -36,7 +36,10 @@ function contextWith(options: { cashUsd: number; holdings?: StubBalance[] }): Go
     isSandbox: true,
     getFullAccountDetails: async () => ({
       totalUsdtValue: EQUITY_USD,
-      nonZeroBalances: [{ asset: "USDT", total: options.cashUsd }, ...holdings],
+      nonZeroBalances: [
+        { asset: "USDT", free: options.cashUsd, locked: 0, total: options.cashUsd },
+        ...holdings.map((holding) => ({ ...holding, free: holding.total, locked: 0 })),
+      ],
     }),
     getBalance: async (asset: string) => (asset === "USDT" ? options.cashUsd : 0),
     getPrice: async () => PRICE_USD,

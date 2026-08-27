@@ -1,10 +1,4 @@
-import React from "react";
-import {
-  DataTable,
-  fmtNum,
-  fmtPct,
-  type Column,
-} from "../components/charts/DataTable.tsx";
+import { DataTable, fmtNum, fmtPct, type Column } from "../components/charts/DataTable.tsx";
 import { getMoneyColor, getSignalColor } from "../design-system/colorMap.ts";
 import { useTheme } from "../themes/ThemeProvider.tsx";
 
@@ -38,8 +32,7 @@ export function PositionRenderer({ data }: Props) {
       align: "left",
       color: (v) =>
         getSignalColor(
-          String(v).toLowerCase().includes("long") ||
-          String(v).toLowerCase().includes("buy")
+          String(v).toLowerCase().includes("long") || String(v).toLowerCase().includes("buy")
             ? "long"
             : "short",
           theme,

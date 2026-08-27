@@ -72,9 +72,7 @@ export interface SessionProgressSignal {
   noOrphanPlans: boolean;
 }
 
-export function isCleanStateGateEnabled(
-  env: NodeJS.ProcessEnv = flagEnv(),
-): boolean {
+export function isCleanStateGateEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   return env.GORDON_CLEAN_STATE_GATE === "1" || env.GORDON_CLEAN_STATE_GATE === "true";
 }
 
@@ -120,7 +118,9 @@ export function runCleanStateGate(
   if (failingChecks.length > 0 || progressViolations.length > 0) {
     const parts: string[] = [];
     if (failingChecks.length > 0) {
-      parts.push(`${failingChecks.length} failing diagnostic(s): ${failingChecks.map((c) => c.id).join(", ")}`);
+      parts.push(
+        `${failingChecks.length} failing diagnostic(s): ${failingChecks.map((c) => c.id).join(", ")}`,
+      );
     }
     if (progressViolations.length > 0) {
       parts.push(`progress violations: ${progressViolations.join(", ")}`);
@@ -161,12 +161,9 @@ export function runCleanStateGate(
  * the action log as a "dirty exit acknowledged" event so the next
  * session knows the state was intentional, not an accident.
  */
-export function hasOverrideAcknowledgement(
-  env: NodeJS.ProcessEnv = flagEnv(),
-): boolean {
+export function hasOverrideAcknowledgement(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   return (
-    env.GORDON_CLEAN_STATE_GATE_OVERRIDE === "1" ||
-    env.GORDON_CLEAN_STATE_GATE_OVERRIDE === "true"
+    env.GORDON_CLEAN_STATE_GATE_OVERRIDE === "1" || env.GORDON_CLEAN_STATE_GATE_OVERRIDE === "true"
   );
 }
 

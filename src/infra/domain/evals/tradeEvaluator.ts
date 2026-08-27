@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { getDatabase, withTransaction } from "../../storage/database.ts";
+import { getDatabase } from "../../storage/database.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 
 const logger = createModuleLogger("trade-evaluator");
@@ -192,7 +192,9 @@ export function initTradeEvaluatorTables(): void {
   db.run("CREATE INDEX IF NOT EXISTS idx_trade_outcomes_strategy ON trade_outcomes(strategy)");
   db.run("CREATE INDEX IF NOT EXISTS idx_trade_outcomes_symbol ON trade_outcomes(symbol)");
   db.run("CREATE INDEX IF NOT EXISTS idx_trade_outcomes_outcome ON trade_outcomes(outcome)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_trade_outcomes_agent ON trade_outcomes(recommendedByAgent)");
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_trade_outcomes_agent ON trade_outcomes(recommendedByAgent)",
+  );
   db.run("CREATE INDEX IF NOT EXISTS idx_trade_outcomes_recorded ON trade_outcomes(recordedAt)");
   db.run("CREATE INDEX IF NOT EXISTS idx_recommendations_status ON trade_recommendations(status)");
   db.run("CREATE INDEX IF NOT EXISTS idx_recommendations_plan ON trade_recommendations(planId)");
@@ -224,7 +226,7 @@ function generateOutcomeId(): string {
  * Track a new trade recommendation
  */
 export function trackRecommendation(
-  recommendation: Omit<TradeRecommendation, "id" | "createdAt" | "status">
+  recommendation: Omit<TradeRecommendation, "id" | "createdAt" | "status">,
 ): TradeRecommendation {
   const db = getDatabase();
   const id = generateRecommendationId();
@@ -253,7 +255,7 @@ export function trackRecommendation(
     recommendation.recommendedByAgent ?? null,
     recommendation.confidenceAtEntry ?? null,
     createdAt,
-    "pending"
+    "pending",
   );
 
   const tracked: TradeRecommendation = {
@@ -266,7 +268,11 @@ export function trackRecommendation(
     timeframe: recommendation.timeframe ?? "4h",
   };
 
-  logger.info("Tracked recommendation", { id, symbol: recommendation.symbol, strategy: recommendation.strategy });
+  logger.info("Tracked recommendation", {
+    id,
+    symbol: recommendation.symbol,
+    strategy: recommendation.strategy,
+  });
   return tracked;
 }
 
@@ -275,7 +281,7 @@ export function trackRecommendation(
  */
 export function updateRecommendationStatus(
   recommendationId: string,
-  status: TradeRecommendation["status"]
+  status: TradeRecommendation["status"],
 ): void {
   const db = getDatabase();
   const stmt = db.prepare("UPDATE trade_recommendations SET status = ? WHERE id = ?");
@@ -317,7 +323,9 @@ export function getRecommendationByPlanId(planId: string): TradeRecommendation |
  */
 export function getActiveRecommendations(): TradeRecommendation[] {
   const db = getDatabase();
-  const stmt = db.prepare("SELECT * FROM trade_recommendations WHERE status IN ('pending', 'active') ORDER BY createdAt DESC");
+  const stmt = db.prepare(
+    "SELECT * FROM trade_recommendations WHERE status IN ('pending', 'active') ORDER BY createdAt DESC",
+  );
   const rows = stmt.all() as Record<string, unknown>[];
 
   return rows.map((row) => ({
@@ -346,9 +354,7 @@ export function getActiveRecommendations(): TradeRecommendation[] {
 /**
  * Record a trade outcome
  */
-export function recordTradeOutcome(
-  outcome: Omit<TradeOutcome, "id" | "recordedAt">
-): TradeOutcome {
+export function recordTradeOutcome(outcome: Omit<TradeOutcome, "id" | "recordedAt">): TradeOutcome {
   const db = getDatabase();
   const id = generateOutcomeId();
   const recordedAt = new Date().toISOString();
@@ -389,7 +395,7 @@ export function recordTradeOutcome(
     outcome.exitTimestamp,
     recordedAt,
     outcome.notes ?? null,
-    outcome.tags ? JSON.stringify(outcome.tags) : null
+    outcome.tags ? JSON.stringify(outcome.tags) : null,
   );
 
   // Update recommendation status if exists
@@ -466,7 +472,9 @@ export function getTradeOutcomes(filter?: {
   }
 
   const stmt = db.prepare(query);
-  const rows = (params.length > 0 ? stmt.all(...(params as (string | number)[])) : stmt.all()) as Record<string, unknown>[];
+  const rows = (
+    params.length > 0 ? stmt.all(...(params as (string | number)[])) : stmt.all()
+  ) as Record<string, unknown>[];
 
   return rows.map((row) => ({
     id: row.id as string,
@@ -687,9 +695,7 @@ export function getAllStrategyPerformances(): StrategyPerformance[] {
 /**
  * Get recent trade summary for context injection
  */
-export function getRecentTradeSummary(
-  limit: number = 20
-): {
+export function getRecentTradeSummary(limit: number = 20): {
   totalTrades: number;
   winRate: number;
   bestSetups: string[];
@@ -791,5 +797,8 @@ export function getRecentTradeSummary(
 try {
   initTradeEvaluatorTables();
 } catch (error) {
-  logger.error("Failed to initialize trade evaluator tables", error instanceof Error ? error : undefined);
+  logger.error(
+    "Failed to initialize trade evaluator tables",
+    error instanceof Error ? error : undefined,
+  );
 }

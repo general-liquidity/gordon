@@ -16,8 +16,7 @@ function minEigenvalue(M: Matrix): number {
   const A = M.map((r) => r.slice());
   for (let sweep = 0; sweep < 50; sweep++) {
     let off = 0;
-    for (let i = 0; i < n; i++)
-      for (let j = i + 1; j < n; j++) off += A[i]![j]! * A[i]![j]!;
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) off += A[i]![j]! * A[i]![j]!;
     if (Math.sqrt(off) < 1e-12) break;
     for (let p = 0; p < n - 1; p++) {
       for (let q = p + 1; q < n; q++) {
@@ -55,8 +54,7 @@ function minEigenvalue(M: Matrix): number {
 function isSymmetric(M: Matrix, tol = 1e-9): boolean {
   const n = M.length;
   for (let i = 0; i < n; i++)
-    for (let j = i + 1; j < n; j++)
-      if (Math.abs(M[i]![j]! - M[j]![i]!) > tol) return false;
+    for (let j = i + 1; j < n; j++) if (Math.abs(M[i]![j]! - M[j]![i]!) > tol) return false;
   return true;
 }
 
@@ -68,9 +66,7 @@ describe("computeNearestCorrelationMatrix — validation", () => {
   });
 
   it("throws on non-square matrix", () => {
-    expect(() =>
-      computeNearestCorrelationMatrix({ matrix: [[1, 0], [0]] }),
-    ).toThrow();
+    expect(() => computeNearestCorrelationMatrix({ matrix: [[1, 0], [0]] })).toThrow();
   });
 
   it("throws on asymmetric input", () => {

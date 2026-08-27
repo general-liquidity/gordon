@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  type ReactNode,
+} from "react";
 import { useInput } from "../ink-custom";
 import { FocusStack, type FocusOwner } from "./focusStack.ts";
 

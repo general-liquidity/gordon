@@ -8,7 +8,6 @@
  * Max 5 notices rendered at once (oldest hidden when exceeded).
  */
 
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 
 // ============================================================================
@@ -32,9 +31,9 @@ interface Props {
 // ============================================================================
 
 const VARIANT_CONFIG = {
-  error:   { icon: "✗", color: "red" },
+  error: { icon: "✗", color: "red" },
   warning: { icon: "⚠", color: "yellow" },
-  info:    { icon: "ℹ", color: "cyan" },
+  info: { icon: "ℹ", color: "cyan" },
   success: { icon: "✓", color: "green" },
 } as const;
 
@@ -64,9 +63,7 @@ export function StatusNotices({ notices, onDismiss }: Props) {
             <Text color={cfg.color}>
               {cfg.icon} {notice.message}
             </Text>
-            {notice.dismissible && (
-              <Text dimColor>{"  [D] dismiss"}</Text>
-            )}
+            {notice.dismissible && <Text dimColor>{"  [D] dismiss"}</Text>}
           </Box>
         );
       })}

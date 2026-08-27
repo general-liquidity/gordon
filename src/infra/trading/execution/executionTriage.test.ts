@@ -15,7 +15,9 @@ describe("triageExecution", () => {
   });
 
   test("a rejected order is MUST-FIX with its reason", () => {
-    const t = triageExecution([{ status: "risk_rejected", reason: "Risk kernel rejected this trade" }]);
+    const t = triageExecution([
+      { status: "risk_rejected", reason: "Risk kernel rejected this trade" },
+    ]);
     expect(t.mustFix).toHaveLength(1);
     expect(t.mustFix[0]!.reason).toContain("Risk kernel");
   });
@@ -38,13 +40,17 @@ describe("triageExecution", () => {
   });
 
   test("slippage beyond tolerance is needs-review", () => {
-    const t = triageExecution([{ status: "filled", filledQty: 1, requestedQty: 1, averageEntry: 101, expectedPrice: 100 }]);
+    const t = triageExecution([
+      { status: "filled", filledQty: 1, requestedQty: 1, averageEntry: 101, expectedPrice: 100 },
+    ]);
     expect(t.needsReview).toHaveLength(1);
     expect(t.needsReview[0]!.reason).toContain("slippage 100bps");
   });
 
   test("slippage within tolerance stays clean", () => {
-    const t = triageExecution([{ status: "filled", filledQty: 1, requestedQty: 1, averageEntry: 100.2, expectedPrice: 100 }]);
+    const t = triageExecution([
+      { status: "filled", filledQty: 1, requestedQty: 1, averageEntry: 100.2, expectedPrice: 100 },
+    ]);
     expect(t.clean).toHaveLength(1);
   });
 
@@ -68,7 +74,9 @@ describe("triageExecution", () => {
   });
 
   test("respects a custom slippage tolerance", () => {
-    const order = [{ status: "filled", filledQty: 1, requestedQty: 1, averageEntry: 100.3, expectedPrice: 100 }]; // 30bps
+    const order = [
+      { status: "filled", filledQty: 1, requestedQty: 1, averageEntry: 100.3, expectedPrice: 100 },
+    ]; // 30bps
     expect(triageExecution(order).clean).toHaveLength(1); // default 50bps → clean
     expect(triageExecution(order, { slippageReviewBps: 20 }).needsReview).toHaveLength(1); // 30 > 20 → review
   });

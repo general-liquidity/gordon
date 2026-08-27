@@ -114,7 +114,7 @@ export interface CrossSectionalContrarianResult {
 }
 
 const DEFAULT_MIN_SYMBOLS = 3;
-const DEFAULT_MAX_ABS_WEIGHT = 0.30;
+const DEFAULT_MAX_ABS_WEIGHT = 0.3;
 const DEFAULT_MIN_SIGMA = 1e-4;
 
 function pctReturn(prices: ReadonlyArray<number>): number {
@@ -259,15 +259,9 @@ export function sizeCrossSectionalContrarian(
     if (!newlyClipped) break;
 
     // Recompute target gross for the unclipped portion.
-    const clippedGross = weights.reduce(
-      (s, v, i) => s + (clipped[i] ? Math.abs(v) : 0),
-      0,
-    );
+    const clippedGross = weights.reduce((s, v, i) => s + (clipped[i] ? Math.abs(v) : 0), 0);
     const remainingTarget = Math.max(0, 1 - clippedGross);
-    const unclippedGross = weights.reduce(
-      (s, v, i) => s + (clipped[i] ? 0 : Math.abs(v)),
-      0,
-    );
+    const unclippedGross = weights.reduce((s, v, i) => s + (clipped[i] ? 0 : Math.abs(v)), 0);
     if (unclippedGross > 0 && remainingTarget > 0) {
       const scale = remainingTarget / unclippedGross;
       for (let i = 0; i < weights.length; i++) {
@@ -275,12 +269,9 @@ export function sizeCrossSectionalContrarian(
       }
     }
     // Re-mean-center only the unclipped subset
-    const unclippedIdx = clipped
-      .map((c, i) => (c ? -1 : i))
-      .filter((i) => i >= 0);
+    const unclippedIdx = clipped.map((c, i) => (c ? -1 : i)).filter((i) => i >= 0);
     if (unclippedIdx.length > 0) {
-      const meanU =
-        unclippedIdx.reduce((s, i) => s + weights[i]!, 0) / unclippedIdx.length;
+      const meanU = unclippedIdx.reduce((s, i) => s + weights[i]!, 0) / unclippedIdx.length;
       for (const i of unclippedIdx) weights[i] = weights[i]! - meanU;
     }
   }
@@ -325,9 +316,7 @@ export function sizeCrossSectionalContrarian(
   };
 }
 
-export function formatCrossSectionalContrarian(
-  result: CrossSectionalContrarianResult,
-): string {
+export function formatCrossSectionalContrarian(result: CrossSectionalContrarianResult): string {
   const lines = [
     `Cross-Sectional Contrarian — ${result.verdict.toUpperCase()}`,
     "",

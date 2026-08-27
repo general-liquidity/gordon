@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  detectStreak,
-  formatStreak,
-  type StreakBar,
-} from "./streak-detector.ts";
+import { detectStreak, formatStreak, type StreakBar } from "./streak-detector.ts";
 
 function makeBars(closes: number[]): StreakBar[] {
   return closes.map((c) => ({ close: c }));
@@ -114,7 +110,7 @@ describe("detectStreak", () => {
     const strict = detectStreak(bars, {
       extremePercentile: 0.99,
       strongPercentile: 0.95,
-      moderatePercentile: 0.90,
+      moderatePercentile: 0.9,
     });
     const lax = detectStreak(bars, {
       extremePercentile: 0.5,
@@ -122,7 +118,9 @@ describe("detectStreak", () => {
       moderatePercentile: 0.3,
     });
     expect(strict.verdict).toBe("weak_exhaustion");
-    expect(["moderate_exhaustion", "strong_exhaustion", "extreme_exhaustion"]).toContain(lax.verdict);
+    expect(["moderate_exhaustion", "strong_exhaustion", "extreme_exhaustion"]).toContain(
+      lax.verdict,
+    );
   });
 
   test("lookback option limits the historical window", () => {

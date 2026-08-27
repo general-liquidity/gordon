@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Text, useInput, useStdout } from "../../ink-custom";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -36,9 +36,7 @@ export function BootScreen({ onReady }: Props) {
       .then((content) => {
         const raw = content.split("\n");
         const nonEmpty = raw.filter((l) => l.trim().length > 0);
-        const minIndent = Math.min(
-          ...nonEmpty.map((l) => l.match(/^(\s*)/)?.[1]?.length ?? 0)
-        );
+        const minIndent = Math.min(...nonEmpty.map((l) => l.match(/^(\s*)/)?.[1]?.length ?? 0));
         const stripped = raw.map((l) => l.slice(minIndent));
         const blockW = Math.max(...stripped.map((l) => l.length));
         const blockPad = Math.max(0, Math.floor((termW - blockW) / 2));

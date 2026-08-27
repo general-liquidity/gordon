@@ -51,7 +51,7 @@ export class BacktestSimulator {
   run(
     config: PlaybookBacktestConfig,
     candles: Candle[],
-    playbook: Playbook
+    playbook: Playbook,
   ): PlaybookBacktestResult {
     const startMs = Date.now();
 
@@ -131,13 +131,7 @@ export class BacktestSimulator {
         });
 
         if (exitSignal.triggered) {
-          const trade = this.closeTrade(
-            position,
-            candle,
-            exitSignal.reason,
-            feeRate,
-            slippageRate
-          );
+          const trade = this.closeTrade(position, candle, exitSignal.reason, feeRate, slippageRate);
           capital += trade.pnl - trade.fees;
           trades.push(trade);
           position = null;
@@ -155,7 +149,7 @@ export class BacktestSimulator {
             riskPercent,
             stopPercent,
             feeRate,
-            slippageRate
+            slippageRate,
           );
         }
       }
@@ -164,13 +158,7 @@ export class BacktestSimulator {
     // Close open position at end of data
     if (position && candles.length > 0) {
       const lastCandle = candles[candles.length - 1]!;
-      const trade = this.closeTrade(
-        position,
-        lastCandle,
-        "end_of_data",
-        feeRate,
-        slippageRate
-      );
+      const trade = this.closeTrade(position, lastCandle, "end_of_data", feeRate, slippageRate);
       capital += trade.pnl - trade.fees;
       trades.push(trade);
     }
@@ -192,8 +180,8 @@ export class BacktestSimulator {
     capital: number,
     riskPercent: number,
     stopPercent: number,
-    feeRate: number,
-    slippageRate: number
+    _feeRate: number,
+    slippageRate: number,
   ): OpenPosition {
     // Risk-based position sizing: risk X% of capital
     const riskAmount = capital * (riskPercent / 100);
@@ -223,12 +211,11 @@ export class BacktestSimulator {
     candle: Candle,
     exitReason: PlaybookBacktestTrade["exit_reason"],
     feeRate: number,
-    slippageRate: number
+    slippageRate: number,
   ): PlaybookBacktestTrade {
     // Apply slippage to exit
     const slippage = candle.close * slippageRate;
-    const exitPrice =
-      position.side === "long" ? candle.close - slippage : candle.close + slippage;
+    const exitPrice = position.side === "long" ? candle.close - slippage : candle.close + slippage;
 
     // Calculate PnL
     let rawPnl: number;
@@ -244,8 +231,7 @@ export class BacktestSimulator {
     const totalFees = (entryNotional + exitNotional) * feeRate;
 
     const netPnl = rawPnl - totalFees;
-    const pnlPercent =
-      entryNotional > 0 ? (netPnl / entryNotional) * 100 : 0;
+    const pnlPercent = entryNotional > 0 ? (netPnl / entryNotional) * 100 : 0;
 
     const durationMs = candle.timestamp - position.entry_time;
     const durationHours = durationMs / (1000 * 60 * 60);
@@ -286,7 +272,7 @@ export class BacktestSimulator {
     finalCapital: number,
     trades: PlaybookBacktestTrade[],
     equityCurve: { timestamp: string; equity: number; drawdown_percent: number }[],
-    startMs: number
+    startMs: number,
   ): PlaybookBacktestResult {
     const initial = config.initial_capital;
     const totalReturn = initial > 0 ? ((finalCapital - initial) / initial) * 100 : 0;
@@ -299,9 +285,7 @@ export class BacktestSimulator {
 
     // Annualized return
     const annualized =
-      years > 0 && totalReturn > -100
-        ? (Math.pow(1 + totalReturn / 100, 1 / years) - 1) * 100
-        : 0;
+      years > 0 && totalReturn > -100 ? ((1 + totalReturn / 100) ** (1 / years) - 1) * 100 : 0;
 
     // Trade classification
     const winningTrades = trades.filter((t) => t.pnl > 0);
@@ -314,9 +298,8 @@ export class BacktestSimulator {
     const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0;
 
     // Max drawdown
-    const maxDrawdown = equityCurve.length > 0
-      ? Math.max(...equityCurve.map((p) => p.drawdown_percent))
-      : 0;
+    const maxDrawdown =
+      equityCurve.length > 0 ? Math.max(...equityCurve.map((p) => p.drawdown_percent)) : 0;
 
     // Daily returns for Sharpe/Sortino
     const dailyReturns = this.computeDailyReturns(equityCurve);
@@ -325,21 +308,20 @@ export class BacktestSimulator {
     const calmar = maxDrawdown > 0 ? annualized / maxDrawdown : 0;
 
     // Trade stats
-    const avgWin = winningTrades.length > 0
-      ? winningTrades.reduce((s, t) => s + t.pnl_percent, 0) / winningTrades.length
-      : 0;
-    const avgLoss = losingTrades.length > 0
-      ? losingTrades.reduce((s, t) => s + t.pnl_percent, 0) / losingTrades.length
-      : 0;
-    const avgHold = trades.length > 0
-      ? trades.reduce((s, t) => s + t.duration_hours, 0) / trades.length
-      : 0;
-    const largestWin = winningTrades.length > 0
-      ? Math.max(...winningTrades.map((t) => t.pnl_percent))
-      : 0;
-    const largestLoss = losingTrades.length > 0
-      ? Math.min(...losingTrades.map((t) => t.pnl_percent))
-      : 0;
+    const avgWin =
+      winningTrades.length > 0
+        ? winningTrades.reduce((s, t) => s + t.pnl_percent, 0) / winningTrades.length
+        : 0;
+    const avgLoss =
+      losingTrades.length > 0
+        ? losingTrades.reduce((s, t) => s + t.pnl_percent, 0) / losingTrades.length
+        : 0;
+    const avgHold =
+      trades.length > 0 ? trades.reduce((s, t) => s + t.duration_hours, 0) / trades.length : 0;
+    const largestWin =
+      winningTrades.length > 0 ? Math.max(...winningTrades.map((t) => t.pnl_percent)) : 0;
+    const largestLoss =
+      losingTrades.length > 0 ? Math.min(...losingTrades.map((t) => t.pnl_percent)) : 0;
 
     // Consecutive streaks
     const { maxWins, maxLosses } = this.computeStreaks(trades);
@@ -373,7 +355,7 @@ export class BacktestSimulator {
   }
 
   private computeDailyReturns(
-    equityCurve: { timestamp: string; equity: number; drawdown_percent: number }[]
+    equityCurve: { timestamp: string; equity: number; drawdown_percent: number }[],
   ): number[] {
     if (equityCurve.length < 2) return [];
     const returns: number[] = [];
@@ -391,7 +373,7 @@ export class BacktestSimulator {
     if (returns.length < 2) return 0;
     const mean = returns.reduce((s, r) => s + r, 0) / returns.length;
     const annMean = mean * 365;
-    const variance = returns.reduce((s, r) => s + Math.pow(r - mean, 2), 0) / (returns.length - 1);
+    const variance = returns.reduce((s, r) => s + (r - mean) ** 2, 0) / (returns.length - 1);
     const annVol = Math.sqrt(variance) * Math.sqrt(365);
     if (annVol === 0) return 0;
     return (annMean - riskFreeRate) / annVol;
@@ -431,7 +413,7 @@ export class BacktestSimulator {
   private emptyResult(
     config: PlaybookBacktestConfig,
     playbook: Playbook,
-    startMs: number
+    startMs: number,
   ): PlaybookBacktestResult {
     return {
       config,

@@ -33,7 +33,7 @@ describe("computeDampedCycleDecomposition", () => {
   it("recovers a decaying cycle: period, negative λ, and half-life", () => {
     // x[n] = 0.95^n · cos(2π n / 12): period 12, r=0.95 → λ=ln(0.95)≈-0.0513.
     const decay = 0.95;
-    const x = series((n) => Math.pow(decay, n) * Math.cos((2 * Math.PI * n) / 12), 120);
+    const x = series((n) => decay ** n * Math.cos((2 * Math.PI * n) / 12), 120);
     const r = computeDampedCycleDecomposition({ values: x, options: { order: 2 } });
     expect(r.dominantPeriodBars!).toBeCloseTo(12, 1);
     const expectedLambda = Math.log(decay); // ≈ -0.0513
@@ -46,7 +46,7 @@ describe("computeDampedCycleDecomposition", () => {
 
   it("flags a growing (unstable) cycle", () => {
     const grow = 1.02;
-    const x = series((n) => Math.pow(grow, n) * Math.cos((2 * Math.PI * n) / 9), 100);
+    const x = series((n) => grow ** n * Math.cos((2 * Math.PI * n) / 9), 100);
     const r = computeDampedCycleDecomposition({ values: x, options: { order: 2 } });
     expect(r.dominantDecayPerBar!).toBeGreaterThan(0);
     expect(r.components[0]!.persistence).toBe("growing");

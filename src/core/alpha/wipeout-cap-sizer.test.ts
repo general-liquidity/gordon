@@ -4,7 +4,7 @@ import { sizeWithWipeoutCap, formatWipeoutCap } from "./wipeout-cap-sizer.ts";
 describe("sizeWithWipeoutCap", () => {
   test("100% wipeout probability → position = maxBookLoss", () => {
     const r = sizeWithWipeoutCap({
-      expectedYield: 0.50,
+      expectedYield: 0.5,
       wipeoutProbability: 1.0,
     });
     expect(r.verdict).toBe("sized");
@@ -14,25 +14,25 @@ describe("sizeWithWipeoutCap", () => {
 
   test("10% wipeout probability → position = 10x maxBookLoss = 10% of book", () => {
     const r = sizeWithWipeoutCap({
-      expectedYield: 0.30,
-      wipeoutProbability: 0.10,
+      expectedYield: 0.3,
+      wipeoutProbability: 0.1,
     });
-    expect(r.positionFraction).toBeCloseTo(0.10, 5);
+    expect(r.positionFraction).toBeCloseTo(0.1, 5);
   });
 
   test("very low wipeout probability → clamped by maxPositionFraction", () => {
     const r = sizeWithWipeoutCap({
-      expectedYield: 0.10,
+      expectedYield: 0.1,
       wipeoutProbability: 0.001,
-      maxPositionFraction: 0.20,
+      maxPositionFraction: 0.2,
     });
-    expect(r.positionFraction).toBe(0.20);
+    expect(r.positionFraction).toBe(0.2);
   });
 
   test("custom maxBookLoss respected", () => {
     const r = sizeWithWipeoutCap({
-      expectedYield: 0.20,
-      wipeoutProbability: 0.50,
+      expectedYield: 0.2,
+      wipeoutProbability: 0.5,
       maxBookLossFraction: 0.02,
     });
     expect(r.positionFraction).toBeCloseTo(0.04, 5);
@@ -40,7 +40,7 @@ describe("sizeWithWipeoutCap", () => {
 
   test("invalid wipeout probability → invalid_inputs", () => {
     const r = sizeWithWipeoutCap({
-      expectedYield: 0.20,
+      expectedYield: 0.2,
       wipeoutProbability: 1.5,
     });
     expect(r.verdict).toBe("invalid_inputs");
@@ -48,8 +48,8 @@ describe("sizeWithWipeoutCap", () => {
 
   test("invalid maxBookLoss → invalid_inputs", () => {
     const r = sizeWithWipeoutCap({
-      expectedYield: 0.20,
-      wipeoutProbability: 0.10,
+      expectedYield: 0.2,
+      wipeoutProbability: 0.1,
       maxBookLossFraction: 0,
     });
     expect(r.verdict).toBe("invalid_inputs");
@@ -57,8 +57,8 @@ describe("sizeWithWipeoutCap", () => {
 
   test("expected book return computed correctly", () => {
     const r = sizeWithWipeoutCap({
-      expectedYield: 0.20,
-      wipeoutProbability: 0.10,
+      expectedYield: 0.2,
+      wipeoutProbability: 0.1,
     });
     // position = 0.10, expected yield on position = 0.9 * 0.20 - 0.10 * 1 = 0.08
     // expected book return = 0.10 * 0.08 = 0.008
@@ -69,7 +69,7 @@ describe("sizeWithWipeoutCap", () => {
   test("negative EV detected (high wipeout prob + low yield)", () => {
     const r = sizeWithWipeoutCap({
       expectedYield: 0.05,
-      wipeoutProbability: 0.50,
+      wipeoutProbability: 0.5,
     });
     // position = 0.02 (cap), expected yield on pos = 0.5 * 0.05 - 0.5 * 1 = -0.475
     // book return = 0.02 * -0.475 = -0.0095
@@ -78,7 +78,7 @@ describe("sizeWithWipeoutCap", () => {
 
   test("below_minimum verdict when computed size < minPositionFraction", () => {
     const r = sizeWithWipeoutCap({
-      expectedYield: 0.10,
+      expectedYield: 0.1,
       wipeoutProbability: 1.0, // forces position = 1%
       minPositionFraction: 0.05,
     });
@@ -110,11 +110,11 @@ describe("sizeWithWipeoutCap", () => {
 
   test("position size scales inversely with wipeout probability", () => {
     const halfRisk = sizeWithWipeoutCap({
-      expectedYield: 0.20,
-      wipeoutProbability: 0.20,
+      expectedYield: 0.2,
+      wipeoutProbability: 0.2,
     });
     const tenthRisk = sizeWithWipeoutCap({
-      expectedYield: 0.20,
+      expectedYield: 0.2,
       wipeoutProbability: 0.02,
     });
     expect(tenthRisk.positionFraction).toBeGreaterThan(halfRisk.positionFraction);
@@ -125,7 +125,7 @@ describe("formatWipeoutCap", () => {
   test("renders summary and warning on negative EV", () => {
     const r = sizeWithWipeoutCap({
       expectedYield: 0.05,
-      wipeoutProbability: 0.80,
+      wipeoutProbability: 0.8,
     });
     const text = formatWipeoutCap(r);
     expect(text).toContain("Wipeout-Cap Sizer");
@@ -136,8 +136,8 @@ describe("formatWipeoutCap", () => {
 
   test("clean output on standard case", () => {
     const r = sizeWithWipeoutCap({
-      expectedYield: 0.30,
-      wipeoutProbability: 0.10,
+      expectedYield: 0.3,
+      wipeoutProbability: 0.1,
     });
     const text = formatWipeoutCap(r);
     expect(text).toContain("SIZED");

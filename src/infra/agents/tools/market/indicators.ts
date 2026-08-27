@@ -34,7 +34,9 @@ import {
 
 const errors = {
   noExchange: { error: "Exchange client not connected. Please run setup first." },
-  insufficientData: (symbol: string) => ({ error: `Insufficient data for ${symbol}. Need at least 50 candles.` }),
+  insufficientData: (symbol: string) => ({
+    error: `Insufficient data for ${symbol}. Need at least 50 candles.`,
+  }),
 };
 
 // ============================================================================
@@ -59,9 +61,9 @@ function calculateZLMA(closes: number[], period: number): (number | null)[] {
   const ema1 = calculateEMAArray(closes, period);
   const adjusted = closes.map((c, i) => {
     const e = ema1[i];
-    return e !== undefined && !isNaN(e) ? c + (c - e) : c;
+    return e !== undefined && !Number.isNaN(e) ? c + (c - e) : c;
   });
-  return calculateEMAArray(adjusted, period).map(v => (isNaN(v) ? null : v));
+  return calculateEMAArray(adjusted, period).map((v) => (Number.isNaN(v) ? null : v));
 }
 
 // ============================================================================
@@ -76,10 +78,7 @@ export const getTechnicalAnalysisTool = createTool({
     "Returns actionable bias (bullish/bearish) with confidence level.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
-    interval: z
-      .enum(["1h", "4h", "1d"])
-      .default("4h")
-      .describe("Timeframe for analysis"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe for analysis"),
     atrMultiplier: z
       .number()
       .min(1)
@@ -91,57 +90,73 @@ export const getTechnicalAnalysisTool = createTool({
     symbol: z.string().optional(),
     interval: z.string().optional(),
     currentPrice: z.number().optional(),
-    bias: z.enum(["bullish", "bearish", "neutral", "strongly_bullish", "strongly_bearish"]).optional(),
+    bias: z
+      .enum(["bullish", "bearish", "neutral", "strongly_bullish", "strongly_bearish"])
+      .optional(),
     confidence: z.union([z.number().min(0).max(100), z.enum(["high", "medium", "low"])]).optional(),
     summary: z.string().optional(),
-    rsi: z.object({
-      value: z.string().optional(),
-      signal: z.string(),
-      action: z.string(),
-    }).optional(),
-    ema: z.object({
-      ema9: z.string().optional(),
-      ema20: z.string().optional(),
-      ema50: z.string().optional(),
-      ema200: z.string().optional(),
-      alignment: z.string(),
-      interpretation: z.string(),
-    }).optional(),
-    macd: z.object({
-      value: z.string().optional(),
-      signal: z.string().optional(),
-      histogram: z.string().optional(),
-      trend: z.string(),
-      crossover: z.string().optional(),
-      interpretation: z.string(),
-    }).optional(),
-    atr: z.object({
-      value: z.string().optional(),
-      stopLossLong: z.string(),
-      stopLossShort: z.string(),
-      stopDistance: z.string(),
-      interpretation: z.string(),
-    }).optional(),
-    bollinger: z.object({
-      upper: z.string().optional(),
-      middle: z.string().optional(),
-      lower: z.string().optional(),
-      position: z.string(),
-      squeeze: z.boolean(),
-      interpretation: z.string(),
-    }).optional(),
-    zlma: z.object({
-      zlma20: z.string().optional(),
-      zlmaSlope: z.string().optional(),
-      zlmaTrend: z.enum(["bullish", "bearish", "neutral"]).optional(),
-    }).optional(),
-    signals: z.object({
-      action: z.string(),
-      signals: z.object({
-        type: z.enum(["buy", "sell", "hold"]),
-        reasons: z.array(z.string()),
-      }),
-    }).optional(),
+    rsi: z
+      .object({
+        value: z.string().optional(),
+        signal: z.string(),
+        action: z.string(),
+      })
+      .optional(),
+    ema: z
+      .object({
+        ema9: z.string().optional(),
+        ema20: z.string().optional(),
+        ema50: z.string().optional(),
+        ema200: z.string().optional(),
+        alignment: z.string(),
+        interpretation: z.string(),
+      })
+      .optional(),
+    macd: z
+      .object({
+        value: z.string().optional(),
+        signal: z.string().optional(),
+        histogram: z.string().optional(),
+        trend: z.string(),
+        crossover: z.string().optional(),
+        interpretation: z.string(),
+      })
+      .optional(),
+    atr: z
+      .object({
+        value: z.string().optional(),
+        stopLossLong: z.string(),
+        stopLossShort: z.string(),
+        stopDistance: z.string(),
+        interpretation: z.string(),
+      })
+      .optional(),
+    bollinger: z
+      .object({
+        upper: z.string().optional(),
+        middle: z.string().optional(),
+        lower: z.string().optional(),
+        position: z.string(),
+        squeeze: z.boolean(),
+        interpretation: z.string(),
+      })
+      .optional(),
+    zlma: z
+      .object({
+        zlma20: z.string().optional(),
+        zlmaSlope: z.string().optional(),
+        zlmaTrend: z.enum(["bullish", "bearish", "neutral"]).optional(),
+      })
+      .optional(),
+    signals: z
+      .object({
+        action: z.string(),
+        signals: z.object({
+          type: z.enum(["buy", "sell", "hold"]),
+          reasons: z.array(z.string()),
+        }),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol, interval, atrMultiplier }, execContext: MastraExecutionContext) => {
@@ -162,16 +177,23 @@ export const getTechnicalAnalysisTool = createTool({
         return errors.insufficientData(normalizedSymbol);
       }
 
-      const analysis = calculateTechnicalAnalysis(candles, normalizedSymbol, interval, atrMultiplier);
+      const analysis = calculateTechnicalAnalysis(
+        candles,
+        normalizedSymbol,
+        interval,
+        atrMultiplier,
+      );
 
       // ZLMA(20)
-      const zlmaCloses = candles.map(c => c.close);
+      const zlmaCloses = candles.map((c) => c.close);
       const zlmaValues = calculateZLMA(zlmaCloses, 20);
       const zlmaCurrent = zlmaValues[zlmaValues.length - 1] ?? null;
       const zlma3ago = zlmaValues[zlmaValues.length - 4] ?? null;
       const zlmaPrice = candles[candles.length - 1]?.close;
-      const zlmaSlope = zlmaCurrent !== null && zlma3ago !== null && zlmaPrice
-        ? ((zlmaCurrent - zlma3ago) / zlmaPrice) * 100 : null;
+      const zlmaSlope =
+        zlmaCurrent !== null && zlma3ago !== null && zlmaPrice
+          ? ((zlmaCurrent - zlma3ago) / zlmaPrice) * 100
+          : null;
       let zlmaTrend: "bullish" | "bearish" | "neutral" = "neutral";
       if (zlmaPrice && zlmaCurrent !== null && zlmaSlope !== null) {
         if (zlmaPrice > zlmaCurrent && zlmaSlope > 0) zlmaTrend = "bullish";
@@ -244,7 +266,8 @@ export const getTechnicalAnalysisTool = createTool({
 
         // Actionable signals
         signals: {
-          action: analysis.bias === "bullish" ? "BUY" : analysis.bias === "bearish" ? "SELL" : "HOLD",
+          action:
+            analysis.bias === "bullish" ? "BUY" : analysis.bias === "bearish" ? "SELL" : "HOLD",
           signals: analysis.signals,
         },
       };
@@ -266,10 +289,7 @@ export const getTechnicalSignalsTool = createTool({
     "Returns score from -100 (bearish) to +100 (bullish).",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair"),
-    interval: z
-      .enum(["1h", "4h", "1d"])
-      .default("4h")
-      .describe("Timeframe"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
   }),
   outputSchema: z.object({
     symbol: z.string().optional(),
@@ -338,39 +358,49 @@ export const getRSITool = createTool({
     signal: z.enum(["oversold", "overbought", "neutral"]).optional(),
     action: z.string().optional(),
     interpretation: z.string().optional(),
-    stochRsi: z.object({
-      k: z.string().optional(),
-      d: z.string().optional(),
-      signal: z.string().optional(),
-      crossover: z.string().optional(),
-      action: z.string().optional(),
-      interpretation: z.string().optional(),
-    }).optional(),
-    mfi: z.object({
-      value: z.string().optional(),
-      signal: z.string().optional(),
-      action: z.string().optional(),
-      flowDirection: z.string().optional(),
-      interpretation: z.string().optional(),
-    }).optional(),
-    waveTrend: z.object({
-      wt1: z.string().optional(),
-      wt2: z.string().optional(),
-      zone: z.string().optional(),
-      crossover: z.string().optional(),
-      momentum: z.string().optional(),
-      cmf: z.string().optional(),
-      cmfBias: z.string().optional(),
-      interpretation: z.string().optional(),
-    }).optional(),
-    rsiVelocity: z.object({
-      velocity: z.number().optional().describe("RSI change over last 3 bars"),
-      acceleration: z.number().optional().describe("Velocity change over last 3 bars"),
-      rsiMin20: z.number().optional().describe("Min RSI over last 20 bars"),
-      rsiMax20: z.number().optional().describe("Max RSI over last 20 bars"),
-      momentumShift: z.enum(["accelerating_up", "accelerating_down", "decelerating", "steady"]).optional(),
-      interpretation: z.string().optional(),
-    }).optional(),
+    stochRsi: z
+      .object({
+        k: z.string().optional(),
+        d: z.string().optional(),
+        signal: z.string().optional(),
+        crossover: z.string().optional(),
+        action: z.string().optional(),
+        interpretation: z.string().optional(),
+      })
+      .optional(),
+    mfi: z
+      .object({
+        value: z.string().optional(),
+        signal: z.string().optional(),
+        action: z.string().optional(),
+        flowDirection: z.string().optional(),
+        interpretation: z.string().optional(),
+      })
+      .optional(),
+    waveTrend: z
+      .object({
+        wt1: z.string().optional(),
+        wt2: z.string().optional(),
+        zone: z.string().optional(),
+        crossover: z.string().optional(),
+        momentum: z.string().optional(),
+        cmf: z.string().optional(),
+        cmfBias: z.string().optional(),
+        interpretation: z.string().optional(),
+      })
+      .optional(),
+    rsiVelocity: z
+      .object({
+        velocity: z.number().optional().describe("RSI change over last 3 bars"),
+        acceleration: z.number().optional().describe("Velocity change over last 3 bars"),
+        rsiMin20: z.number().optional().describe("Min RSI over last 20 bars"),
+        rsiMax20: z.number().optional().describe("Max RSI over last 20 bars"),
+        momentumShift: z
+          .enum(["accelerating_up", "accelerating_down", "decelerating", "steady"])
+          .optional(),
+        interpretation: z.string().optional(),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol, interval, period }, execContext: MastraExecutionContext) => {
@@ -388,11 +418,13 @@ export const getRSITool = createTool({
         return { error: "Insufficient data for RSI" };
       }
 
-      const closes = candles.map(c => c.close);
+      const closes = candles.map((c) => c.close);
       const rsi = calculateRSI(closes, period);
 
       // Sub-indicators
-      const { calculateStochasticRSI, calculateMFI, calculateWaveTrend } = await import("../../../../core/indicators/index.ts");
+      const { calculateStochasticRSI, calculateMFI, calculateWaveTrend } = await import(
+        "../../../../core/indicators/index.ts"
+      );
       const stochRsi = calculateStochasticRSI(closes, period, period, 3, 3);
       const mfi = calculateMFI(candles, period);
       const wt = calculateWaveTrend(candles);
@@ -408,11 +440,13 @@ export const getRSITool = createTool({
       if (rsiLen >= 7 && rsiValues[rsiLen - 4] != null && rsiValues[rsiLen - 7] != null) {
         velocity3ago = rsiValues[rsiLen - 4]! - rsiValues[rsiLen - 7]!;
       }
-      const rsiAcceleration = rsiVelocity !== null && velocity3ago !== null ? rsiVelocity - velocity3ago : null;
+      const rsiAcceleration =
+        rsiVelocity !== null && velocity3ago !== null ? rsiVelocity - velocity3ago : null;
       const recentRsi = rsiValues.slice(-20).filter((v): v is number => v !== null);
       const rsiMin20 = recentRsi.length > 0 ? Math.min(...recentRsi) : null;
       const rsiMax20 = recentRsi.length > 0 ? Math.max(...recentRsi) : null;
-      let momentumShift: "accelerating_up" | "accelerating_down" | "decelerating" | "steady" = "steady";
+      let momentumShift: "accelerating_up" | "accelerating_down" | "decelerating" | "steady" =
+        "steady";
       if (rsiVelocity !== null) {
         if (rsiVelocity > 5) momentumShift = "accelerating_up";
         else if (rsiVelocity < -5) momentumShift = "accelerating_down";
@@ -428,12 +462,12 @@ export const getRSITool = createTool({
           rsi.current === null
             ? "Insufficient data"
             : rsi.current < 30
-            ? "Oversold - potential buying opportunity"
-            : rsi.current > 70
-            ? "Overbought - potential selling pressure"
-            : rsi.current < 50
-            ? "Below midline - slight bearish bias"
-            : "Above midline - slight bullish bias",
+              ? "Oversold - potential buying opportunity"
+              : rsi.current > 70
+                ? "Overbought - potential selling pressure"
+                : rsi.current < 50
+                  ? "Below midline - slight bearish bias"
+                  : "Above midline - slight bullish bias",
         stochRsi: {
           k: stochRsi.currentK?.toFixed(1),
           d: stochRsi.currentD?.toFixed(1),
@@ -461,13 +495,15 @@ export const getRSITool = createTool({
         },
         rsiVelocity: {
           velocity: rsiVelocity !== null ? Math.round(rsiVelocity * 100) / 100 : undefined,
-          acceleration: rsiAcceleration !== null ? Math.round(rsiAcceleration * 100) / 100 : undefined,
+          acceleration:
+            rsiAcceleration !== null ? Math.round(rsiAcceleration * 100) / 100 : undefined,
           rsiMin20: rsiMin20 !== null ? Math.round(rsiMin20 * 10) / 10 : undefined,
           rsiMax20: rsiMax20 !== null ? Math.round(rsiMax20 * 10) / 10 : undefined,
           momentumShift,
-          interpretation: rsiVelocity !== null
-            ? `RSI ${rsiVelocity > 0 ? "rising" : "falling"} at ${Math.abs(rsiVelocity).toFixed(1)} pts/3bars, ${momentumShift.replace("_", " ")}${rsiMin20 !== null ? ` | 20-bar range: ${rsiMin20.toFixed(1)}-${rsiMax20!.toFixed(1)}` : ""}`
-            : undefined,
+          interpretation:
+            rsiVelocity !== null
+              ? `RSI ${rsiVelocity > 0 ? "rising" : "falling"} at ${Math.abs(rsiVelocity).toFixed(1)} pts/3bars, ${momentumShift.replace("_", " ")}${rsiMin20 !== null ? ` | 20-bar range: ${rsiMin20.toFixed(1)}-${rsiMax20!.toFixed(1)}` : ""}`
+              : undefined,
         },
       };
     } catch (error) {
@@ -488,54 +524,52 @@ export const getStopLossLevelsTool = createTool({
     "Returns stop-loss price for both long and short positions.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair"),
-    interval: z
-      .enum(["1h", "4h", "1d"])
-      .default("4h")
-      .describe("Timeframe for ATR calculation"),
-    entryPrice: z
-      .number()
-      .optional()
-      .describe("Entry price (defaults to current price)"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe for ATR calculation"),
+    entryPrice: z.number().optional().describe("Entry price (defaults to current price)"),
     atrMultiplier: z
       .number()
       .min(1)
       .max(4)
       .default(1.5)
       .describe("ATR multiplier (1.5 = normal, 2 = wide, 3 = very wide)"),
-    atrPeriod: z
-      .number()
-      .min(7)
-      .max(21)
-      .default(14)
-      .describe("ATR period"),
+    atrPeriod: z.number().min(7).max(21).default(14).describe("ATR period"),
   }),
   outputSchema: z.object({
     symbol: z.string().optional(),
     interval: z.string().optional(),
     currentPrice: z.string().optional(),
-    atr: z.object({
-      value: z.string(),
-      period: z.number(),
-      multiplier: z.number(),
-      asPercent: z.string(),
-    }).optional(),
-    stopLoss: z.object({
-      long: z.string(),
-      short: z.string(),
-      distance: z.string(),
-      distancePercent: z.string(),
-    }).optional(),
-    takeProfit: z.object({
-      long: z.string(),
-      short: z.string(),
-      distance: z.string(),
-      riskReward: z.string(),
-    }).optional(),
+    atr: z
+      .object({
+        value: z.string(),
+        period: z.number(),
+        multiplier: z.number(),
+        asPercent: z.string(),
+      })
+      .optional(),
+    stopLoss: z
+      .object({
+        long: z.string(),
+        short: z.string(),
+        distance: z.string(),
+        distancePercent: z.string(),
+      })
+      .optional(),
+    takeProfit: z
+      .object({
+        long: z.string(),
+        short: z.string(),
+        distance: z.string(),
+        riskReward: z.string(),
+      })
+      .optional(),
     interpretation: z.string().optional(),
     recommendation: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, interval, entryPrice, atrMultiplier, atrPeriod }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, interval, entryPrice, atrMultiplier, atrPeriod },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -570,14 +604,14 @@ export const getStopLossLevelsTool = createTool({
           value: atr.current.toFixed(2),
           period: atrPeriod,
           multiplier: atrMultiplier,
-          asPercent: ((atr.current / currentPrice) * 100).toFixed(2) + "%",
+          asPercent: `${((atr.current / currentPrice) * 100).toFixed(2)}%`,
         },
 
         stopLoss: {
           long: atr.stopLoss.long.toFixed(2),
           short: atr.stopLoss.short.toFixed(2),
           distance: stopDistance.toFixed(2),
-          distancePercent: ((stopDistance / currentPrice) * 100).toFixed(2) + "%",
+          distancePercent: `${((stopDistance / currentPrice) * 100).toFixed(2)}%`,
         },
 
         takeProfit: {
@@ -593,8 +627,8 @@ export const getStopLossLevelsTool = createTool({
           atr.current / currentPrice > 0.05
             ? "High volatility - consider reducing position size or widening stops"
             : atr.current / currentPrice > 0.03
-            ? "Elevated volatility - use standard position sizing"
-            : "Normal volatility - standard risk parameters appropriate",
+              ? "Elevated volatility - use standard position sizing"
+              : "Normal volatility - standard risk parameters appropriate",
       };
     } catch (error) {
       return { error: `Failed to calculate stop-loss: ${(error as Error).message}` };
@@ -617,22 +651,27 @@ export const getPositionSizeTool = createTool({
     interval: z.enum(["1h", "4h", "1d"]).default("4h"),
     atrMultiplier: z.number().min(1).max(4).default(1.5),
   }),
-  outputSchema: z.object({
-    symbol: z.string(),
-    currentPrice: z.string(),
-    risk: z.object({
-      amount: z.string(),
-      stopDistance: z.string(),
-      riskPerUnit: z.string(),
-    }),
-    position: z.object({
-      units: z.string(),
-      value: z.string(),
-    }),
-    note: z.string(),
-    error: z.string().optional(),
-  }).partial(),
-  execute: async ({ symbol, riskAmount, interval, atrMultiplier }, execContext: MastraExecutionContext) => {
+  outputSchema: z
+    .object({
+      symbol: z.string(),
+      currentPrice: z.string(),
+      risk: z.object({
+        amount: z.string(),
+        stopDistance: z.string(),
+        riskPerUnit: z.string(),
+      }),
+      position: z.object({
+        units: z.string(),
+        value: z.string(),
+      }),
+      note: z.string(),
+      error: z.string().optional(),
+    })
+    .partial(),
+  execute: async (
+    { symbol, riskAmount, interval, atrMultiplier },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -695,12 +734,7 @@ export const getVWAPTool = createTool({
       .enum(VWAP_TIMEFRAMES)
       .default("1h")
       .describe("Timeframe (VWAP works best on shorter timeframes)"),
-    limit: z
-      .number()
-      .min(50)
-      .max(500)
-      .default(100)
-      .describe("Number of candles to include"),
+    limit: z.number().min(50).max(500).default(100).describe("Number of candles to include"),
   }),
   outputSchema: z.object({
     symbol: z.string().optional(),
@@ -741,22 +775,36 @@ export const getVWAPTool = createTool({
 
       // Swing-Anchored VWAP
       const pivotLen = 5;
-      let swHiIdx: number | null = null, swHiPrice: number | null = null;
-      let swLoIdx: number | null = null, swLoPrice: number | null = null;
+      let swHiIdx: number | null = null,
+        swHiPrice: number | null = null;
+      let swLoIdx: number | null = null,
+        swLoPrice: number | null = null;
       for (let i = candles.length - 1 - pivotLen; i >= pivotLen; i--) {
         if (swHiIdx === null) {
           let isHi = true;
           for (let j = i - pivotLen; j <= i + pivotLen; j++) {
-            if (j !== i && candles[j]!.high >= candles[i]!.high) { isHi = false; break; }
+            if (j !== i && candles[j]!.high >= candles[i]!.high) {
+              isHi = false;
+              break;
+            }
           }
-          if (isHi) { swHiIdx = i; swHiPrice = candles[i]!.high; }
+          if (isHi) {
+            swHiIdx = i;
+            swHiPrice = candles[i]!.high;
+          }
         }
         if (swLoIdx === null) {
           let isLo = true;
           for (let j = i - pivotLen; j <= i + pivotLen; j++) {
-            if (j !== i && candles[j]!.low <= candles[i]!.low) { isLo = false; break; }
+            if (j !== i && candles[j]!.low <= candles[i]!.low) {
+              isLo = false;
+              break;
+            }
           }
-          if (isLo) { swLoIdx = i; swLoPrice = candles[i]!.low; }
+          if (isLo) {
+            swLoIdx = i;
+            swLoPrice = candles[i]!.low;
+          }
         }
         if (swHiIdx !== null && swLoIdx !== null) break;
       }
@@ -773,20 +821,30 @@ export const getVWAPTool = createTool({
         anchorIdx = swHiIdx > swLoIdx ? swHiIdx : swLoIdx;
         swingAnchorType = swHiIdx > swLoIdx ? "swing_high" : "swing_low";
         swingAnchorPrice = swHiIdx > swLoIdx ? swHiPrice : swLoPrice;
-      } else if (swHiIdx !== null) { anchorIdx = swHiIdx; swingAnchorType = "swing_high"; swingAnchorPrice = swHiPrice; }
-      else if (swLoIdx !== null) { anchorIdx = swLoIdx; swingAnchorType = "swing_low"; swingAnchorPrice = swLoPrice; }
+      } else if (swHiIdx !== null) {
+        anchorIdx = swHiIdx;
+        swingAnchorType = "swing_high";
+        swingAnchorPrice = swHiPrice;
+      } else if (swLoIdx !== null) {
+        anchorIdx = swLoIdx;
+        swingAnchorType = "swing_low";
+        swingAnchorPrice = swLoPrice;
+      }
 
       if (anchorIdx !== null) {
         swingAnchorBar = candles.length - 1 - anchorIdx;
-        let cumVol = 0, cumVP = 0;
+        let cumVol = 0,
+          cumVP = 0;
         for (let i = anchorIdx; i < candles.length; i++) {
           const tp = (candles[i]!.high + candles[i]!.low + candles[i]!.close) / 3;
-          cumVP += tp * candles[i]!.volume; cumVol += candles[i]!.volume;
+          cumVP += tp * candles[i]!.volume;
+          cumVol += candles[i]!.volume;
         }
         if (cumVol > 0) {
           swingVwapVal = cumVP / cumVol;
           const dev = ((currentPrice - swingVwapVal) / swingVwapVal) * 100;
-          priceVsSwingVwap = Math.abs(dev) < 0.1 ? "at" : currentPrice > swingVwapVal ? "above" : "below";
+          priceVsSwingVwap =
+            Math.abs(dev) < 0.1 ? "at" : currentPrice > swingVwapVal ? "above" : "below";
           const anchor = swingAnchorType === "swing_low" ? "swing low" : "swing high";
           swingVwapInterpretation = `Price ${Math.abs(dev).toFixed(2)}% ${priceVsSwingVwap} swing VWAP anchored from ${anchor} ${swingAnchorBar} bars ago`;
         }
@@ -804,8 +862,8 @@ export const getVWAPTool = createTool({
           vwap.pricePosition === "above"
             ? "Bullish bias - consider buying dips to VWAP"
             : vwap.pricePosition === "below"
-            ? "Bearish bias - consider selling rallies to VWAP"
-            : "At fair value - wait for direction",
+              ? "Bearish bias - consider selling rallies to VWAP"
+              : "At fair value - wait for direction",
         swingVwap: swingVwapVal?.toFixed(2) ?? null,
         swingAnchorType,
         swingAnchorBar,
@@ -818,9 +876,6 @@ export const getVWAPTool = createTool({
     }
   },
 });
-
-
-
 
 // ============================================================================
 // Camarilla Pivot Points Tool
@@ -835,7 +890,10 @@ export const getCamarillaPivotsTool = createTool({
     "Best for intraday and swing trading entry/exit planning.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
-    interval: z.enum(["1h", "4h", "1d"]).default("1h").describe("Timeframe (1h works best with 24-bar daily pivots)"),
+    interval: z
+      .enum(["1h", "4h", "1d"])
+      .default("1h")
+      .describe("Timeframe (1h works best with 24-bar daily pivots)"),
     lookbackPeriod: z
       .number()
       .min(6)
@@ -847,18 +905,26 @@ export const getCamarillaPivotsTool = createTool({
     symbol: z.string().optional(),
     interval: z.string().optional(),
     currentPrice: z.string().optional(),
-    levels: z.array(z.object({
-      label: z.string(),
-      price: z.string(),
-      type: z.string(),
-      role: z.string(),
-    })).optional(),
+    levels: z
+      .array(
+        z.object({
+          label: z.string(),
+          price: z.string(),
+          type: z.string(),
+          role: z.string(),
+        }),
+      )
+      .optional(),
     priceZone: z.string().optional(),
-    nearestLevel: z.object({
-      label: z.string(),
-      price: z.string(),
-    }).optional(),
-    signal: z.enum(["long_reversal", "short_reversal", "long_breakout", "short_breakout", "neutral"]).optional(),
+    nearestLevel: z
+      .object({
+        label: z.string(),
+        price: z.string(),
+      })
+      .optional(),
+    signal: z
+      .enum(["long_reversal", "short_reversal", "long_breakout", "short_breakout", "neutral"])
+      .optional(),
     interpretation: z.string().optional(),
     error: z.string().optional(),
   }),
@@ -869,8 +935,13 @@ export const getCamarillaPivotsTool = createTool({
     const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
-      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, lookbackPeriod + 10);
-      if (!candles || candles.length < lookbackPeriod + 1) return errors.insufficientData(normalizedSymbol);
+      const candles = await ctx.exchange.getCandles(
+        normalizedSymbol,
+        interval,
+        lookbackPeriod + 10,
+      );
+      if (!candles || candles.length < lookbackPeriod + 1)
+        return errors.insufficientData(normalizedSymbol);
 
       const { calculateCamarillaPivots } = await import("../../../../core/indicators/index.ts");
       const result = calculateCamarillaPivots(candles, lookbackPeriod);
@@ -879,17 +950,19 @@ export const getCamarillaPivotsTool = createTool({
         symbol: normalizedSymbol,
         interval,
         currentPrice: candles[candles.length - 1]!.close.toFixed(2),
-        levels: result.levels.map(l => ({
+        levels: result.levels.map((l) => ({
           label: l.label,
           price: l.price.toFixed(2),
           type: l.type,
           role: l.role,
         })),
         priceZone: result.priceZone,
-        nearestLevel: result.nearestLevel ? {
-          label: result.nearestLevel.label,
-          price: result.nearestLevel.price.toFixed(2),
-        } : undefined,
+        nearestLevel: result.nearestLevel
+          ? {
+              label: result.nearestLevel.label,
+              price: result.nearestLevel.price.toFixed(2),
+            }
+          : undefined,
         signal: result.signal,
         interpretation: result.interpretation,
       };
@@ -943,7 +1016,8 @@ export const getMarkovRegimeTool = createTool({
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, lookback * 2 + 10);
-      if (!candles || candles.length < lookback * 2 + 2) return errors.insufficientData(normalizedSymbol);
+      if (!candles || candles.length < lookback * 2 + 2)
+        return errors.insufficientData(normalizedSymbol);
 
       const { calculateMarkovRegime } = await import("../../../../core/indicators/index.ts");
       const result = calculateMarkovRegime(candles, lookback);
@@ -997,7 +1071,10 @@ export const getSupertrendTool = createTool({
     interpretation: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, interval, atrPeriod, multiplier }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, interval, atrPeriod, multiplier },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
 
@@ -1005,7 +1082,8 @@ export const getSupertrendTool = createTool({
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
-      if (!candles || candles.length < atrPeriod + 5) return errors.insufficientData(normalizedSymbol);
+      if (!candles || candles.length < atrPeriod + 5)
+        return errors.insufficientData(normalizedSymbol);
 
       const { calculateSupertrend } = await import("../../../../core/indicators/index.ts");
       const result = calculateSupertrend(candles, atrPeriod, multiplier);
@@ -1026,7 +1104,6 @@ export const getSupertrendTool = createTool({
     }
   },
 });
-
 
 // ============================================================================
 // Ichimoku Cloud Tool
@@ -1129,27 +1206,34 @@ export const getFlowScopeTool = createTool({
     valueAreaHigh: z.string().optional(),
     valueAreaLow: z.string().optional(),
     interpretation: z.string().optional(),
-    deltaLadder: z.object({
-      currentDelta: z.string().optional(),
-      cumulativeDelta: z.string().optional(),
-      deltaRatio: z.string().optional(),
-      poc: z.string().optional(),
-      trend: z.string().optional(),
-      reversal: z.boolean().optional(),
-      signal: z.string().optional(),
-      interpretation: z.string().optional(),
-    }).optional(),
-    orderFlowProxy: z.object({
-      netFlow: z.number().optional(),
-      buyPressure: z.number().optional(),
-      sellPressure: z.number().optional(),
-      absorption: z.boolean().optional(),
-      flowBias: z.enum(["strong_buy", "buy", "neutral", "sell", "strong_sell"]).optional(),
-      interpretation: z.string().optional(),
-    }).optional(),
+    deltaLadder: z
+      .object({
+        currentDelta: z.string().optional(),
+        cumulativeDelta: z.string().optional(),
+        deltaRatio: z.string().optional(),
+        poc: z.string().optional(),
+        trend: z.string().optional(),
+        reversal: z.boolean().optional(),
+        signal: z.string().optional(),
+        interpretation: z.string().optional(),
+      })
+      .optional(),
+    orderFlowProxy: z
+      .object({
+        netFlow: z.number().optional(),
+        buyPressure: z.number().optional(),
+        sellPressure: z.number().optional(),
+        absorption: z.boolean().optional(),
+        flowBias: z.enum(["strong_buy", "buy", "neutral", "sell", "strong_sell"]).optional(),
+        interpretation: z.string().optional(),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, interval, numBins, imbalanceThreshold }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, interval, numBins, imbalanceThreshold },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
 
@@ -1159,7 +1243,9 @@ export const getFlowScopeTool = createTool({
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
       if (!candles || candles.length < 20) return errors.insufficientData(normalizedSymbol);
 
-      const { calculateFlowScope, calculateDeltaLadder } = await import("../../../../core/indicators/index.ts");
+      const { calculateFlowScope, calculateDeltaLadder } = await import(
+        "../../../../core/indicators/index.ts"
+      );
       const result = calculateFlowScope(candles, numBins, imbalanceThreshold);
       const delta = calculateDeltaLadder(candles);
 
@@ -1172,8 +1258,12 @@ export const getFlowScopeTool = createTool({
         const sellP = range < 1e-10 ? 0.5 : (c.high - c.close) / range;
         barDeltas.push({ buyP, sellP, delta: c.volume * buyP - c.volume * sellP });
       }
-      let cumDelta = 0, cumVol = 0;
-      for (const b of barDeltas) { cumDelta += b.delta; cumVol += Math.abs(b.delta) + (b.buyP + b.sellP > 0 ? 1 : 0); }
+      let cumDelta = 0,
+        cumVol = 0;
+      for (const b of barDeltas) {
+        cumDelta += b.delta;
+        cumVol += Math.abs(b.delta) + (b.buyP + b.sellP > 0 ? 1 : 0);
+      }
       cumVol = ofpSlice.reduce((s, c) => s + c.volume, 0);
       const netFlow = cumVol > 0 ? Math.max(-1, Math.min(1, cumDelta / cumVol)) : 0;
       const short5 = barDeltas.slice(-5);
@@ -1181,15 +1271,27 @@ export const getFlowScopeTool = createTool({
       const avgSellP = short5.reduce((s, b) => s + b.sellP, 0) / short5.length;
       let ofpAbsorption = false;
       if (barDeltas.length >= 2) {
-        const last = barDeltas[barDeltas.length - 1]!, prev = barDeltas[barDeltas.length - 2]!;
+        const last = barDeltas[barDeltas.length - 1]!,
+          prev = barDeltas[barDeltas.length - 2]!;
         const flipped = (prev.delta > 0 && last.delta < 0) || (prev.delta < 0 && last.delta > 0);
         if (flipped) {
-          const lc = ofpSlice[ofpSlice.length - 1]!, pc = ofpSlice[ofpSlice.length - 2]!;
-          ofpAbsorption = (pc.close > pc.open && lc.close > lc.open) || (pc.close < pc.open && lc.close < lc.open);
+          const lc = ofpSlice[ofpSlice.length - 1]!,
+            pc = ofpSlice[ofpSlice.length - 2]!;
+          ofpAbsorption =
+            (pc.close > pc.open && lc.close > lc.open) ||
+            (pc.close < pc.open && lc.close < lc.open);
         }
       }
       const flowBias: "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell" =
-        netFlow > 0.3 ? "strong_buy" : netFlow > 0.1 ? "buy" : netFlow < -0.3 ? "strong_sell" : netFlow < -0.1 ? "sell" : "neutral";
+        netFlow > 0.3
+          ? "strong_buy"
+          : netFlow > 0.1
+            ? "buy"
+            : netFlow < -0.3
+              ? "strong_sell"
+              : netFlow < -0.1
+                ? "sell"
+                : "neutral";
 
       return {
         symbol: normalizedSymbol,
@@ -1266,7 +1368,10 @@ export const getAngledMarketStructureTool = createTool({
     interpretation: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, interval, pivotLen, angleFactor }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, interval, pivotLen, angleFactor },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
 
@@ -1299,7 +1404,6 @@ export const getAngledMarketStructureTool = createTool({
   },
 });
 
-
 // ============================================================================
 // False Breakout Reversal Tool
 // ============================================================================
@@ -1314,7 +1418,12 @@ export const getFalseBreakoutTool = createTool({
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
-    srLookback: z.number().min(3).max(15).default(5).describe("S/R pivot detection window (default 5)"),
+    srLookback: z
+      .number()
+      .min(3)
+      .max(15)
+      .default(5)
+      .describe("S/R pivot detection window (default 5)"),
     wickThreshold: z
       .number()
       .min(0.3)
@@ -1337,7 +1446,10 @@ export const getFalseBreakoutTool = createTool({
     interpretation: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, interval, srLookback, wickThreshold }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, interval, srLookback, wickThreshold },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
 
@@ -1359,7 +1471,8 @@ export const getFalseBreakoutTool = createTool({
         falseBreakout: result.falseBreakout,
         signal: result.signal,
         brokenLevel: result.brokenLevel?.toFixed(2),
-        wickRatio: result.wickRatio !== null ? `${(result.wickRatio * 100).toFixed(0)}%` : undefined,
+        wickRatio:
+          result.wickRatio !== null ? `${(result.wickRatio * 100).toFixed(0)}%` : undefined,
         volumeConfirmed: result.volumeConfirmed,
         confidence: result.confidence,
         interpretation: result.interpretation,
@@ -1408,7 +1521,8 @@ export const getADXTool = createTool({
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
-      if (!candles || candles.length < period * 2 + 2) return errors.insufficientData(normalizedSymbol);
+      if (!candles || candles.length < period * 2 + 2)
+        return errors.insufficientData(normalizedSymbol);
 
       const { calculateADX } = await import("../../../../core/indicators/index.ts");
       const result = calculateADX(candles, period);
@@ -1432,7 +1546,6 @@ export const getADXTool = createTool({
   },
 });
 
-
 // ============================================================================
 // Divergence Detection Tool
 // ============================================================================
@@ -1448,7 +1561,12 @@ export const getDivergenceTool = createTool({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
     rsiPeriod: z.number().min(7).max(21).default(14).describe("RSI period (default 14)"),
-    lookback: z.number().min(5).max(30).default(10).describe("Lookback for extreme detection (default 10)"),
+    lookback: z
+      .number()
+      .min(5)
+      .max(30)
+      .default(10)
+      .describe("Lookback for extreme detection (default 10)"),
   }),
   outputSchema: z.object({
     symbol: z.string().optional(),
@@ -1460,17 +1578,22 @@ export const getDivergenceTool = createTool({
     strength: z.number().optional(),
     divergenceCount: z.number().optional(),
     interpretation: z.string().optional(),
-    vpt: z.object({
-      current: z.string().optional(),
-      currentMA: z.string().optional(),
-      slope: z.string().optional(),
-      trend: z.string().optional(),
-      divergence: z.string().optional(),
-      interpretation: z.string().optional(),
-    }).optional(),
+    vpt: z
+      .object({
+        current: z.string().optional(),
+        currentMA: z.string().optional(),
+        slope: z.string().optional(),
+        trend: z.string().optional(),
+        divergence: z.string().optional(),
+        interpretation: z.string().optional(),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, interval, rsiPeriod, lookback }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, interval, rsiPeriod, lookback },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
 
@@ -1478,9 +1601,12 @@ export const getDivergenceTool = createTool({
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
-      if (!candles || candles.length < rsiPeriod + lookback * 2 + 2) return errors.insufficientData(normalizedSymbol);
+      if (!candles || candles.length < rsiPeriod + lookback * 2 + 2)
+        return errors.insufficientData(normalizedSymbol);
 
-      const { calculateDivergence, calculateVPT } = await import("../../../../core/indicators/index.ts");
+      const { calculateDivergence, calculateVPT } = await import(
+        "../../../../core/indicators/index.ts"
+      );
       const result = calculateDivergence(candles, rsiPeriod, lookback);
       const vpt = calculateVPT(candles);
 
@@ -1524,7 +1650,12 @@ export const getSupplyDemandZonesTool = createTool({
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
-    lookback: z.number().min(10).max(50).default(20).describe("Rolling window for zone detection (default 20)"),
+    lookback: z
+      .number()
+      .min(10)
+      .max(50)
+      .default(20)
+      .describe("Rolling window for zone detection (default 20)"),
   }),
   outputSchema: z.object({
     symbol: z.string().optional(),
@@ -1534,30 +1665,38 @@ export const getSupplyDemandZonesTool = createTool({
     supplyZoneCount: z.number().optional(),
     inDemandZone: z.boolean().optional(),
     inSupplyZone: z.boolean().optional(),
-    nearestDemand: z.object({
-      lower: z.string(),
-      upper: z.string(),
-      tests: z.number(),
-    }).optional(),
-    nearestSupply: z.object({
-      lower: z.string(),
-      upper: z.string(),
-      tests: z.number(),
-    }).optional(),
-    signal: z.enum(["demand_bounce", "supply_rejection", "breakout_up", "breakout_down", "none"]).optional(),
+    nearestDemand: z
+      .object({
+        lower: z.string(),
+        upper: z.string(),
+        tests: z.number(),
+      })
+      .optional(),
+    nearestSupply: z
+      .object({
+        lower: z.string(),
+        upper: z.string(),
+        tests: z.number(),
+      })
+      .optional(),
+    signal: z
+      .enum(["demand_bounce", "supply_rejection", "breakout_up", "breakout_down", "none"])
+      .optional(),
     interpretation: z.string().optional(),
-    orderBlocks: z.object({
-      bullishCount: z.number().optional(),
-      bearishCount: z.number().optional(),
-      nearestBullishOB: z.string().optional(),
-      nearestBearishOB: z.string().optional(),
-      bullishProbability: z.string().optional(),
-      bearishProbability: z.string().optional(),
-      newBlock: z.boolean().optional(),
-      newBlockType: z.string().optional(),
-      signal: z.string().optional(),
-      interpretation: z.string().optional(),
-    }).optional(),
+    orderBlocks: z
+      .object({
+        bullishCount: z.number().optional(),
+        bearishCount: z.number().optional(),
+        nearestBullishOB: z.string().optional(),
+        nearestBearishOB: z.string().optional(),
+        bullishProbability: z.string().optional(),
+        bearishProbability: z.string().optional(),
+        newBlock: z.boolean().optional(),
+        newBlockType: z.string().optional(),
+        signal: z.string().optional(),
+        interpretation: z.string().optional(),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol, interval, lookback }, execContext: MastraExecutionContext) => {
@@ -1568,9 +1707,12 @@ export const getSupplyDemandZonesTool = createTool({
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
-      if (!candles || candles.length < lookback + 6) return errors.insufficientData(normalizedSymbol);
+      if (!candles || candles.length < lookback + 6)
+        return errors.insufficientData(normalizedSymbol);
 
-      const { calculateSupplyDemandZones, calculateOrderBlocks } = await import("../../../../core/indicators/index.ts");
+      const { calculateSupplyDemandZones, calculateOrderBlocks } = await import(
+        "../../../../core/indicators/index.ts"
+      );
       const result = calculateSupplyDemandZones(candles, lookback);
       const ob = calculateOrderBlocks(candles);
 
@@ -1582,16 +1724,20 @@ export const getSupplyDemandZonesTool = createTool({
         supplyZoneCount: result.supplyZones.length,
         inDemandZone: result.inDemandZone,
         inSupplyZone: result.inSupplyZone,
-        nearestDemand: result.nearestDemand ? {
-          lower: result.nearestDemand.lower.toFixed(2),
-          upper: result.nearestDemand.upper.toFixed(2),
-          tests: result.nearestDemand.tests,
-        } : undefined,
-        nearestSupply: result.nearestSupply ? {
-          lower: result.nearestSupply.lower.toFixed(2),
-          upper: result.nearestSupply.upper.toFixed(2),
-          tests: result.nearestSupply.tests,
-        } : undefined,
+        nearestDemand: result.nearestDemand
+          ? {
+              lower: result.nearestDemand.lower.toFixed(2),
+              upper: result.nearestDemand.upper.toFixed(2),
+              tests: result.nearestDemand.tests,
+            }
+          : undefined,
+        nearestSupply: result.nearestSupply
+          ? {
+              lower: result.nearestSupply.lower.toFixed(2),
+              upper: result.nearestSupply.upper.toFixed(2),
+              tests: result.nearestSupply.tests,
+            }
+          : undefined,
         signal: result.signal,
         interpretation: result.interpretation,
         orderBlocks: {
@@ -1650,16 +1796,21 @@ export const getSqueezeMomentumTool = createTool({
       const { calculateSqueezeMomentum } = await import("../../../../core/indicators/index.ts");
       const result = calculateSqueezeMomentum(candles);
       return {
-        symbol: normalizedSymbol, interval,
+        symbol: normalizedSymbol,
+        interval,
         currentPrice: candles[candles.length - 1]!.close.toFixed(2),
-        squeezeOn: result.squeezeOn, squeezeFired: result.squeezeFired,
-        momentum: result.momentum?.toFixed(4), momentumColor: result.momentumColor,
-        signal: result.signal, interpretation: result.interpretation,
+        squeezeOn: result.squeezeOn,
+        squeezeFired: result.squeezeFired,
+        momentum: result.momentum?.toFixed(4),
+        momentumColor: result.momentumColor,
+        signal: result.signal,
+        interpretation: result.interpretation,
       };
-    } catch (error) { return { error: `Failed to get Squeeze Momentum: ${(error as Error).message}` }; }
+    } catch (error) {
+      return { error: `Failed to get Squeeze Momentum: ${(error as Error).message}` };
+    }
   },
 });
-
 
 // ============================================================================
 // Fair Value Gap (FVG) Tool
@@ -1701,16 +1852,26 @@ export const getFVGTool = createTool({
       const { calculateFVG } = await import("../../../../core/indicators/index.ts");
       const result = calculateFVG(candles);
       return {
-        symbol: normalizedSymbol, interval,
+        symbol: normalizedSymbol,
+        interval,
         currentPrice: candles[candles.length - 1]!.close.toFixed(2),
-        bullishGapCount: result.bullishGaps.length, bearishGapCount: result.bearishGaps.length,
+        bullishGapCount: result.bullishGaps.length,
+        bearishGapCount: result.bearishGaps.length,
         unfilledCount: result.unfilledCount,
-        newGap: result.newGap, newGapType: result.newGapType,
-        nearestBullishFVG: result.nearestBullishFVG ? `${result.nearestBullishFVG.low.toFixed(2)}-${result.nearestBullishFVG.high.toFixed(2)}` : undefined,
-        nearestBearishFVG: result.nearestBearishFVG ? `${result.nearestBearishFVG.low.toFixed(2)}-${result.nearestBearishFVG.high.toFixed(2)}` : undefined,
-        signal: result.signal, interpretation: result.interpretation,
+        newGap: result.newGap,
+        newGapType: result.newGapType,
+        nearestBullishFVG: result.nearestBullishFVG
+          ? `${result.nearestBullishFVG.low.toFixed(2)}-${result.nearestBullishFVG.high.toFixed(2)}`
+          : undefined,
+        nearestBearishFVG: result.nearestBearishFVG
+          ? `${result.nearestBearishFVG.low.toFixed(2)}-${result.nearestBearishFVG.high.toFixed(2)}`
+          : undefined,
+        signal: result.signal,
+        interpretation: result.interpretation,
       };
-    } catch (error) { return { error: `Failed to get FVG: ${(error as Error).message}` }; }
+    } catch (error) {
+      return { error: `Failed to get FVG: ${(error as Error).message}` };
+    }
   },
 });
 
@@ -1728,8 +1889,18 @@ export const getParabolicSARTool = createTool({
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
-    afStart: z.number().min(0.01).max(0.05).default(0.02).describe("Initial acceleration factor (default 0.02)"),
-    afMax: z.number().min(0.1).max(0.5).default(0.2).describe("Max acceleration factor (default 0.2)"),
+    afStart: z
+      .number()
+      .min(0.01)
+      .max(0.05)
+      .default(0.02)
+      .describe("Initial acceleration factor (default 0.02)"),
+    afMax: z
+      .number()
+      .min(0.1)
+      .max(0.5)
+      .default(0.2)
+      .describe("Max acceleration factor (default 0.2)"),
   }),
   outputSchema: z.object({
     symbol: z.string().optional(),
@@ -1753,21 +1924,21 @@ export const getParabolicSARTool = createTool({
       const { calculateParabolicSAR } = await import("../../../../core/indicators/index.ts");
       const result = calculateParabolicSAR(candles, afStart, afStart, afMax);
       return {
-        symbol: normalizedSymbol, interval,
+        symbol: normalizedSymbol,
+        interval,
         currentPrice: candles[candles.length - 1]!.close.toFixed(2),
         sar: result.current?.toFixed(2),
         direction: result.currentDirection === 1 ? "UPTREND" : "DOWNTREND",
-        trendChange: result.trendChange, signal: result.signal,
+        trendChange: result.trendChange,
+        signal: result.signal,
         distance: result.distance !== null ? `${result.distance}%` : undefined,
         interpretation: result.interpretation,
       };
-    } catch (error) { return { error: `Failed to get Parabolic SAR: ${(error as Error).message}` }; }
+    } catch (error) {
+      return { error: `Failed to get Parabolic SAR: ${(error as Error).message}` };
+    }
   },
 });
-
-
-
-
 
 // ============================================================================
 // ATR Rope Smoothing Tool
@@ -1783,7 +1954,12 @@ export const getATRRopeTool = createTool({
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
-    threshold: z.number().min(0.1).max(5.0).default(1.0).describe("ATR multiplier threshold (default 1.0)"),
+    threshold: z
+      .number()
+      .min(0.1)
+      .max(5.0)
+      .default(1.0)
+      .describe("ATR multiplier threshold (default 1.0)"),
   }),
   outputSchema: z.object({
     symbol: z.string().optional(),
@@ -1812,7 +1988,10 @@ export const getATRRopeTool = createTool({
       const trs: number[] = [];
       for (let i = 0; i < candles.length; i++) {
         const c = candles[i]!;
-        if (i === 0) { trs.push(c.high - c.low); continue; }
+        if (i === 0) {
+          trs.push(c.high - c.low);
+          continue;
+        }
         const p = candles[i - 1]!;
         trs.push(Math.max(c.high - c.low, Math.abs(c.high - p.close), Math.abs(c.low - p.close)));
       }
@@ -1820,20 +1999,33 @@ export const getATRRopeTool = createTool({
       let atrSum = 0;
       for (let i = 0; i < atrP; i++) atrSum += trs[i]!;
       atrs[atrP - 1] = atrSum / atrP;
-      for (let i = atrP; i < candles.length; i++) atrs[i] = (atrs[i - 1]! * (atrP - 1) + trs[i]!) / atrP;
+      for (let i = atrP; i < candles.length; i++)
+        atrs[i] = (atrs[i - 1]! * (atrP - 1) + trs[i]!) / atrP;
 
       // Rope algorithm
       const rope: number[] = new Array(candles.length).fill(0);
       const dirs: number[] = new Array(candles.length).fill(0);
-      rope[0] = candles[0]!.close; dirs[0] = 0;
+      rope[0] = candles[0]!.close;
+      dirs[0] = 0;
       for (let i = 1; i < candles.length; i++) {
         const close = candles[i]!.close;
         const atr = atrs[i]!;
-        if (i < atrP || atr <= 0) { rope[i] = close; dirs[i] = close > candles[i-1]!.close ? 1 : -1; continue; }
+        if (i < atrP || atr <= 0) {
+          rope[i] = close;
+          dirs[i] = close > candles[i - 1]!.close ? 1 : -1;
+          continue;
+        }
         const band = atr * threshold;
-        if (close > rope[i-1]! + band) { rope[i] = close - band; dirs[i] = 1; }
-        else if (close < rope[i-1]! - band) { rope[i] = close + band; dirs[i] = -1; }
-        else { rope[i] = rope[i-1]!; dirs[i] = dirs[i-1]!; }
+        if (close > rope[i - 1]! + band) {
+          rope[i] = close - band;
+          dirs[i] = 1;
+        } else if (close < rope[i - 1]! - band) {
+          rope[i] = close + band;
+          dirs[i] = -1;
+        } else {
+          rope[i] = rope[i - 1]!;
+          dirs[i] = dirs[i - 1]!;
+        }
       }
 
       const last = candles.length - 1;
@@ -1841,17 +2033,39 @@ export const getATRRopeTool = createTool({
       const rv = rope[last]!;
       const ca = atrs[last]!;
       let barsFlat = 0;
-      for (let i = last; i >= 1; i--) { if (Math.abs(rope[i]! - rope[i-1]!) < 1e-10) barsFlat++; else break; }
+      for (let i = last; i >= 1; i--) {
+        if (Math.abs(rope[i]! - rope[i - 1]!) < 1e-10) barsFlat++;
+        else break;
+      }
       let lastFlip = last;
-      for (let i = last; i >= 1; i--) { if (dirs[i] !== dirs[i-1]) { lastFlip = last - i; break; } }
+      for (let i = last; i >= 1; i--) {
+        if (dirs[i] !== dirs[i - 1]) {
+          lastFlip = last - i;
+          break;
+        }
+      }
       const dist = ca > 0 ? (cp - rv) / ca : 0;
-      const dir: "bullish" | "bearish" | "flat" = dirs[last] === 1 ? "bullish" : dirs[last] === -1 ? "bearish" : "flat";
+      const dir: "bullish" | "bearish" | "flat" =
+        dirs[last] === 1 ? "bullish" : dirs[last] === -1 ? "bearish" : "flat";
       let interp = `${dir.charAt(0).toUpperCase() + dir.slice(1)} — price ${Math.abs(dist).toFixed(2)} ATR ${dist >= 0 ? "above" : "below"} rope at ${rv.toFixed(2)}.`;
       if (barsFlat >= 5) interp += ` Rope flat ${barsFlat} bars (consolidation).`;
       if (lastFlip <= 3 && lastFlip > 0) interp += ` Fresh flip ${lastFlip} bar(s) ago.`;
 
-      return { symbol: normalizedSymbol, interval, currentPrice: cp.toFixed(2), ropeValue: rv.toFixed(2), direction: dir, distanceFromRope: dist.toFixed(2), barsFlat, lastFlipBarsAgo: lastFlip, atr: ca.toFixed(2), interpretation: interp };
-    } catch (error) { return { error: `Failed to get ATR Rope: ${(error as Error).message}` }; }
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: cp.toFixed(2),
+        ropeValue: rv.toFixed(2),
+        direction: dir,
+        distanceFromRope: dist.toFixed(2),
+        barsFlat,
+        lastFlipBarsAgo: lastFlip,
+        atr: ca.toFixed(2),
+        interpretation: interp,
+      };
+    } catch (error) {
+      return { error: `Failed to get ATR Rope: ${(error as Error).message}` };
+    }
   },
 });
 
@@ -1894,13 +2108,24 @@ export const getLinearRegressionTool = createTool({
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 100);
       if (!candles || candles.length < 50) return errors.insufficientData(normalizedSymbol);
 
-      const LB = 50, BM = 1.5;
-      const closes = candles.slice(-LB).map(c => c.close);
+      const LB = 50,
+        BM = 1.5;
+      const closes = candles.slice(-LB).map((c) => c.close);
       const N = closes.length;
       const cp = candles[candles.length - 1]!.close;
 
-      let sX = 0, sY = 0, sXY = 0, sX2 = 0, sY2 = 0;
-      for (let i = 0; i < N; i++) { sX += i; sY += closes[i]!; sXY += i * closes[i]!; sX2 += i * i; sY2 += closes[i]! * closes[i]!; }
+      let sX = 0,
+        sY = 0,
+        sXY = 0,
+        sX2 = 0,
+        sY2 = 0;
+      for (let i = 0; i < N; i++) {
+        sX += i;
+        sY += closes[i]!;
+        sXY += i * closes[i]!;
+        sX2 += i * i;
+        sY2 += closes[i]! * closes[i]!;
+      }
 
       const denom = N * sX2 - sX * sX;
       if (denom === 0) return { error: "Degenerate data" };
@@ -1909,9 +2134,13 @@ export const getLinearRegressionTool = createTool({
       const regVal = intercept + slope * (N - 1);
 
       let sumR2 = 0;
-      for (let i = 0; i < N; i++) { const r = closes[i]! - (intercept + slope * i); sumR2 += r * r; }
+      for (let i = 0; i < N; i++) {
+        const r = closes[i]! - (intercept + slope * i);
+        sumR2 += r * r;
+      }
       const stdDev = Math.sqrt(sumR2 / N);
-      const upper = regVal + BM * stdDev, lower = regVal - BM * stdDev;
+      const upper = regVal + BM * stdDev,
+        lower = regVal - BM * stdDev;
 
       const rNum = N * sXY - sX * sY;
       const rDen = Math.sqrt((N * sX2 - sX * sX) * (N * sY2 - sY * sY));
@@ -1920,17 +2149,41 @@ export const getLinearRegressionTool = createTool({
       const slopePct = regVal !== 0 ? (slope / regVal) * 100 : 0;
 
       const pos: "above_upper" | "upper_half" | "lower_half" | "below_lower" =
-        cp > upper ? "above_upper" : cp >= regVal ? "upper_half" : cp >= lower ? "lower_half" : "below_lower";
-      const strength: "strong" | "moderate" | "weak" = r2 > 0.7 ? "strong" : r2 > 0.4 ? "moderate" : "weak";
-      const dir: "bullish" | "bearish" | "flat" = Math.abs(slopePct) < 0.01 ? "flat" : slope > 0 ? "bullish" : "bearish";
+        cp > upper
+          ? "above_upper"
+          : cp >= regVal
+            ? "upper_half"
+            : cp >= lower
+              ? "lower_half"
+              : "below_lower";
+      const strength: "strong" | "moderate" | "weak" =
+        r2 > 0.7 ? "strong" : r2 > 0.4 ? "moderate" : "weak";
+      const dir: "bullish" | "bearish" | "flat" =
+        Math.abs(slopePct) < 0.01 ? "flat" : slope > 0 ? "bullish" : "bearish";
 
       let interp = `${strength.toUpperCase()} ${dir} trend (R²=${r2.toFixed(2)}, slope=${slopePct.toFixed(3)}%/bar). `;
       if (pos === "above_upper") interp += `Price above upper band — overextended.`;
       else if (pos === "below_lower") interp += `Price below lower band — oversold vs trend.`;
       else interp += `Price in ${pos.replace("_", " ")} of channel.`;
 
-      return { symbol: normalizedSymbol, interval, currentPrice: cp.toFixed(2), regressionValue: regVal.toFixed(2), slope: slope.toFixed(6), slopePercent: slopePct.toFixed(4), upperBand: upper.toFixed(2), lowerBand: lower.toFixed(2), rSquared: r2.toFixed(4), pricePosition: pos, trendStrength: strength, trendDirection: dir, interpretation: interp };
-    } catch (error) { return { error: `Failed to get Linear Regression: ${(error as Error).message}` }; }
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: cp.toFixed(2),
+        regressionValue: regVal.toFixed(2),
+        slope: slope.toFixed(6),
+        slopePercent: slopePct.toFixed(4),
+        upperBand: upper.toFixed(2),
+        lowerBand: lower.toFixed(2),
+        rSquared: r2.toFixed(4),
+        pricePosition: pos,
+        trendStrength: strength,
+        trendDirection: dir,
+        interpretation: interp,
+      };
+    } catch (error) {
+      return { error: `Failed to get Linear Regression: ${(error as Error).message}` };
+    }
   },
 });
 
@@ -1948,8 +2201,18 @@ export const getWAETool = createTool({
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
-    sensitivity: z.number().min(50).max(300).default(150).describe("Sensitivity multiplier for MACD delta (default 150)"),
-    deadZoneMult: z.number().min(1.0).max(6.0).default(3.7).describe("Dead zone ATR multiplier (default 3.7)"),
+    sensitivity: z
+      .number()
+      .min(50)
+      .max(300)
+      .default(150)
+      .describe("Sensitivity multiplier for MACD delta (default 150)"),
+    deadZoneMult: z
+      .number()
+      .min(1.0)
+      .max(6.0)
+      .default(3.7)
+      .describe("Dead zone ATR multiplier (default 3.7)"),
   }),
   outputSchema: z.object({
     symbol: z.string().optional(),
@@ -1967,7 +2230,10 @@ export const getWAETool = createTool({
     interpretation: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, interval, sensitivity, deadZoneMult }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, interval, sensitivity, deadZoneMult },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
     const normalizedSymbol = normalizeSymbol(symbol);
@@ -1976,7 +2242,7 @@ export const getWAETool = createTool({
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 120);
       if (!candles || candles.length < 50) return errors.insufficientData(normalizedSymbol);
 
-      const closes = candles.map(c => c.close);
+      const closes = candles.map((c) => c.close);
 
       // EMA helper (reusing local scope)
       const ema = (data: number[], period: number): number[] => {
@@ -1999,7 +2265,7 @@ export const getWAETool = createTool({
       for (let i = 0; i < closes.length; i++) {
         const f = fastEMA[i]!;
         const s = slowEMA[i]!;
-        macd.push(isNaN(f) || isNaN(s) ? 0 : f - s);
+        macd.push(Number.isNaN(f) || Number.isNaN(s) ? 0 : f - s);
       }
 
       // t1 = (MACD[i] - MACD[i-1]) * sensitivity
@@ -2024,7 +2290,10 @@ export const getWAETool = createTool({
       const trs: number[] = [];
       for (let i = 0; i < candles.length; i++) {
         const c = candles[i]!;
-        if (i === 0) { trs.push(c.high - c.low); continue; }
+        if (i === 0) {
+          trs.push(c.high - c.low);
+          continue;
+        }
         const p = candles[i - 1]!;
         trs.push(Math.max(c.high - c.low, Math.abs(c.high - p.close), Math.abs(c.low - p.close)));
       }
@@ -2040,35 +2309,57 @@ export const getWAETool = createTool({
       const momentum = Math.max(trendUpVal, trendDownVal);
       const aboveDeadZone = momentum > deadZoneVal;
       const aboveExplosion = momentum > explosionLine;
-      const dir: "bullish" | "bearish" | "neutral" = trendUpVal > 0 ? "bullish" : trendDownVal > 0 ? "bearish" : "neutral";
+      const dir: "bullish" | "bearish" | "neutral" =
+        trendUpVal > 0 ? "bullish" : trendDownVal > 0 ? "bearish" : "neutral";
 
-      const weakening = dir === "bullish"
-        ? trendUpVal < prevTrendUp
-        : dir === "bearish"
-          ? trendDownVal < prevTrendDown
-          : false;
+      const weakening =
+        dir === "bullish"
+          ? trendUpVal < prevTrendUp
+          : dir === "bearish"
+            ? trendDownVal < prevTrendDown
+            : false;
 
       let signal: "strong_buy" | "strong_sell" | "weak_buy" | "weak_sell" | "none" = "none";
-      if (dir === "bullish" && aboveDeadZone && aboveExplosion) signal = weakening ? "weak_buy" : "strong_buy";
-      else if (dir === "bearish" && aboveDeadZone && aboveExplosion) signal = weakening ? "weak_sell" : "strong_sell";
+      if (dir === "bullish" && aboveDeadZone && aboveExplosion)
+        signal = weakening ? "weak_buy" : "strong_buy";
+      else if (dir === "bearish" && aboveDeadZone && aboveExplosion)
+        signal = weakening ? "weak_sell" : "strong_sell";
 
       const cp = closes[len - 1]!;
       const parts: string[] = [];
-      if (signal === "strong_buy") parts.push("Strong bullish explosion — momentum exceeds both dead zone and BB envelope");
-      else if (signal === "strong_sell") parts.push("Strong bearish explosion — momentum exceeds both dead zone and BB envelope");
-      else if (signal === "weak_buy") parts.push("Bullish explosion but momentum weakening — consider tightening stops");
-      else if (signal === "weak_sell") parts.push("Bearish explosion but momentum weakening — consider tightening stops");
-      else if (!aboveDeadZone) parts.push("Inside dead zone — no actionable signal, market is ranging");
-      else parts.push("Momentum above dead zone but below explosion line — building, not yet confirmed");
+      if (signal === "strong_buy")
+        parts.push("Strong bullish explosion — momentum exceeds both dead zone and BB envelope");
+      else if (signal === "strong_sell")
+        parts.push("Strong bearish explosion — momentum exceeds both dead zone and BB envelope");
+      else if (signal === "weak_buy")
+        parts.push("Bullish explosion but momentum weakening — consider tightening stops");
+      else if (signal === "weak_sell")
+        parts.push("Bearish explosion but momentum weakening — consider tightening stops");
+      else if (!aboveDeadZone)
+        parts.push("Inside dead zone — no actionable signal, market is ranging");
+      else
+        parts.push(
+          "Momentum above dead zone but below explosion line — building, not yet confirmed",
+        );
 
       return {
-        symbol: normalizedSymbol, interval, currentPrice: cp.toFixed(2),
-        trendUp: trendUpVal.toFixed(4), trendDown: trendDownVal.toFixed(4),
-        explosion: explosionLine.toFixed(4), deadZone: deadZoneVal.toFixed(4),
-        direction: dir, aboveDeadZone, aboveExplosion, signal, momentumWeakening: weakening,
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: cp.toFixed(2),
+        trendUp: trendUpVal.toFixed(4),
+        trendDown: trendDownVal.toFixed(4),
+        explosion: explosionLine.toFixed(4),
+        deadZone: deadZoneVal.toFixed(4),
+        direction: dir,
+        aboveDeadZone,
+        aboveExplosion,
+        signal,
+        momentumWeakening: weakening,
         interpretation: parts.join(". "),
       };
-    } catch (error) { return { error: `Failed to get WAE: ${(error as Error).message}` }; }
+    } catch (error) {
+      return { error: `Failed to get WAE: ${(error as Error).message}` };
+    }
   },
 });
 
@@ -2077,8 +2368,14 @@ export const getWAETool = createTool({
 // ============================================================================
 
 export const indicatorTools = {
-  get_technical_analysis: createCachedTool(getTechnicalAnalysisTool, TOOL_CACHE_CONFIG.indicators.ttl),
-  get_technical_signals: createCachedTool(getTechnicalSignalsTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_technical_analysis: createCachedTool(
+    getTechnicalAnalysisTool,
+    TOOL_CACHE_CONFIG.indicators.ttl,
+  ),
+  get_technical_signals: createCachedTool(
+    getTechnicalSignalsTool,
+    TOOL_CACHE_CONFIG.indicators.ttl,
+  ),
   get_rsi: createCachedTool(getRSITool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_stop_loss_levels: createCachedTool(getStopLossLevelsTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_position_size: createCachedTool(getPositionSizeTool, TOOL_CACHE_CONFIG.indicators.ttl),
@@ -2088,15 +2385,24 @@ export const indicatorTools = {
   get_supertrend: createCachedTool(getSupertrendTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_ichimoku: createCachedTool(getIchimokuTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_flowscope: createCachedTool(getFlowScopeTool, TOOL_CACHE_CONFIG.indicators.ttl),
-  get_angled_market_structure: createCachedTool(getAngledMarketStructureTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_angled_market_structure: createCachedTool(
+    getAngledMarketStructureTool,
+    TOOL_CACHE_CONFIG.indicators.ttl,
+  ),
   get_false_breakout: createCachedTool(getFalseBreakoutTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_adx: createCachedTool(getADXTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_divergence: createCachedTool(getDivergenceTool, TOOL_CACHE_CONFIG.indicators.ttl),
-  get_supply_demand_zones: createCachedTool(getSupplyDemandZonesTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_supply_demand_zones: createCachedTool(
+    getSupplyDemandZonesTool,
+    TOOL_CACHE_CONFIG.indicators.ttl,
+  ),
   get_squeeze_momentum: createCachedTool(getSqueezeMomentumTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_fvg: createCachedTool(getFVGTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_parabolic_sar: createCachedTool(getParabolicSARTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_atr_rope: createCachedTool(getATRRopeTool, TOOL_CACHE_CONFIG.indicators.ttl),
-  get_linear_regression: createCachedTool(getLinearRegressionTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_linear_regression: createCachedTool(
+    getLinearRegressionTool,
+    TOOL_CACHE_CONFIG.indicators.ttl,
+  ),
   get_wae: createCachedTool(getWAETool, TOOL_CACHE_CONFIG.indicators.ttl),
 };

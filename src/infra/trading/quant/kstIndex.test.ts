@@ -22,8 +22,8 @@ describe("computeKst", () => {
 
   it("captures a crossover on a trend flip", () => {
     // Multiplicative price moves keep the underlying ROC series symmetric.
-    const down = Array.from({ length: 80 }, (_, i) => 200 * Math.pow(0.985, i));
-    const up = Array.from({ length: 80 }, (_, i) => down[79]! * Math.pow(1.02, i + 1));
+    const down = Array.from({ length: 80 }, (_, i) => 200 * 0.985 ** i);
+    const up = Array.from({ length: 80 }, (_, i) => down[79]! * 1.02 ** (i + 1));
     const r = computeKst({ prices: [...down, ...up] });
     expect(["bullish", "bearish"]).toContain(r.lastCross);
   });

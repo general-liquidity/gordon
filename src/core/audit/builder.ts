@@ -139,9 +139,7 @@ class TraceBuilderImpl implements TraceBuilder {
       this.endedAt = new Date().toISOString();
     }
 
-    const endedMs = this.endedAt
-      ? new Date(this.endedAt).getTime()
-      : Date.now();
+    const endedMs = this.endedAt ? new Date(this.endedAt).getTime() : Date.now();
     const startedMs = new Date(this.startedAt).getTime();
     const durationMs = Math.max(0, endedMs - startedMs);
 

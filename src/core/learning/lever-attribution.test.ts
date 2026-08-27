@@ -1,9 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { EdgeSpec } from "../edge/types.ts";
-import {
-  analyzeLeverAttribution,
-  type LeverTaggedTrade,
-} from "./lever-attribution.ts";
+import { analyzeLeverAttribution, type LeverTaggedTrade } from "./lever-attribution.ts";
 
 function edgeWith(leverIds: string[]): EdgeSpec {
   return {
@@ -13,7 +10,13 @@ function edgeWith(leverIds: string[]): EdgeSpec {
     regime: [],
     instruments: [],
     hypothesis: "x",
-    invariants: leverIds.map((id) => ({ id, metric: id, comparator: ">" as const, threshold: 0, description: "" })),
+    invariants: leverIds.map((id) => ({
+      id,
+      metric: id,
+      comparator: ">" as const,
+      threshold: 0,
+      description: "",
+    })),
     killConditions: [],
   };
 }
@@ -23,13 +26,27 @@ function edgeWith(leverIds: string[]): EdgeSpec {
  * (margin 0); the median split is 1, so the buckets separate cleanly. Each
  * bucket's realized R is `mean ± noise` (alternating) so the t-test has variance.
  */
-function leverTrades(leverId: string, nPer: number, strongMean: number, marginalMean: number, noise: number): LeverTaggedTrade[] {
+function leverTrades(
+  leverId: string,
+  nPer: number,
+  strongMean: number,
+  marginalMean: number,
+  noise: number,
+): LeverTaggedTrade[] {
   const out: LeverTaggedTrade[] = [];
   for (let i = 0; i < nPer; i++) {
-    out.push({ tradeId: `s${i}`, realizedR: strongMean + (i % 2 === 0 ? noise : -noise), leverMargins: { [leverId]: 2 } });
+    out.push({
+      tradeId: `s${i}`,
+      realizedR: strongMean + (i % 2 === 0 ? noise : -noise),
+      leverMargins: { [leverId]: 2 },
+    });
   }
   for (let i = 0; i < nPer; i++) {
-    out.push({ tradeId: `m${i}`, realizedR: marginalMean + (i % 2 === 0 ? noise : -noise), leverMargins: { [leverId]: 0 } });
+    out.push({
+      tradeId: `m${i}`,
+      realizedR: marginalMean + (i % 2 === 0 ? noise : -noise),
+      leverMargins: { [leverId]: 0 },
+    });
   }
   return out;
 }
@@ -52,7 +69,10 @@ describe("analyzeLeverAttribution", () => {
   });
 
   it("recommends INVERT for a backwards lever (marginal entries beat strong)", () => {
-    const r = analyzeLeverAttribution(edgeWith(["backwards"]), leverTrades("backwards", 40, 0.0, 1.0, 0.1));
+    const r = analyzeLeverAttribution(
+      edgeWith(["backwards"]),
+      leverTrades("backwards", 40, 0.0, 1.0, 0.1),
+    );
     expect(r.levers[0]!.recommendation).toBe("invert");
     expect(r.levers[0]!.discriminationR).toBeLessThan(0);
   });
@@ -64,7 +84,10 @@ describe("analyzeLeverAttribution", () => {
   });
 
   it("defers a lever no trade carries margin for", () => {
-    const r = analyzeLeverAttribution(edgeWith(["absent"]), leverTrades("other", 40, 1.0, 0.0, 0.1));
+    const r = analyzeLeverAttribution(
+      edgeWith(["absent"]),
+      leverTrades("other", 40, 1.0, 0.0, 0.1),
+    );
     expect(r.levers[0]!.recommendation).toBe("defer");
   });
 

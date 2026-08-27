@@ -155,11 +155,6 @@ interface MemoryRow {
   updated_at: string;
 }
 
-interface FtsMatchRow {
-  id: string;
-  rank: number;
-}
-
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -172,11 +167,7 @@ function serializeEmbedding(embedding: number[]): Buffer {
 
 /** Deserialize a BLOB Buffer back to a number[] */
 function deserializeEmbedding(blob: Buffer): number[] {
-  const float32 = new Float32Array(
-    blob.buffer,
-    blob.byteOffset,
-    blob.byteLength / 4
-  );
+  const float32 = new Float32Array(blob.buffer, blob.byteOffset, blob.byteLength / 4);
   return Array.from(float32);
 }
 
@@ -206,19 +197,118 @@ function cosineSimilarity(a: number[], b: number[]): number {
 export function extractTokens(text: string): string[] {
   // Crypto-aware stop words
   const stopWords = new Set([
-    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "may", "might", "shall", "can", "need", "dare", "ought",
-    "used", "to", "of", "in", "for", "on", "with", "at", "by", "from",
-    "as", "into", "through", "during", "before", "after", "above", "below",
-    "between", "out", "off", "over", "under", "again", "further", "then",
-    "once", "here", "there", "when", "where", "why", "how", "all", "both",
-    "each", "few", "more", "most", "other", "some", "such", "no", "nor",
-    "not", "only", "own", "same", "so", "than", "too", "very", "just",
-    "because", "but", "and", "or", "if", "while", "about", "it", "its",
-    "this", "that", "these", "those", "i", "me", "my", "we", "our", "you",
-    "your", "he", "him", "his", "she", "her", "they", "them", "their",
-    "what", "which", "who", "whom",
+    "a",
+    "an",
+    "the",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "shall",
+    "can",
+    "need",
+    "dare",
+    "ought",
+    "used",
+    "to",
+    "of",
+    "in",
+    "for",
+    "on",
+    "with",
+    "at",
+    "by",
+    "from",
+    "as",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "above",
+    "below",
+    "between",
+    "out",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "then",
+    "once",
+    "here",
+    "there",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "both",
+    "each",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "no",
+    "nor",
+    "not",
+    "only",
+    "own",
+    "same",
+    "so",
+    "than",
+    "too",
+    "very",
+    "just",
+    "because",
+    "but",
+    "and",
+    "or",
+    "if",
+    "while",
+    "about",
+    "it",
+    "its",
+    "this",
+    "that",
+    "these",
+    "those",
+    "i",
+    "me",
+    "my",
+    "we",
+    "our",
+    "you",
+    "your",
+    "he",
+    "him",
+    "his",
+    "she",
+    "her",
+    "they",
+    "them",
+    "their",
+    "what",
+    "which",
+    "who",
+    "whom",
   ]);
 
   return text
@@ -364,9 +454,7 @@ export class MemoryStore {
   // CRUD Operations
   // --------------------------------------------------------------------------
 
-  async add(
-    entry: Omit<MemoryEntry, "id" | "createdAt" | "updatedAt">
-  ): Promise<string> {
+  async add(entry: Omit<MemoryEntry, "id" | "createdAt" | "updatedAt">): Promise<string> {
     const db = this.getDb();
     const id = `mem_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`;
     const now = new Date().toISOString();
@@ -389,7 +477,7 @@ export class MemoryStore {
       entry.symbols ? JSON.stringify(entry.symbols) : null,
       entry.importance,
       now,
-      now
+      now,
     );
 
     logger.debug("Memory added", { id, type: entry.type });
@@ -498,10 +586,7 @@ export class MemoryStore {
   // Full-Text Search (BM25)
   // --------------------------------------------------------------------------
 
-  async searchKeyword(
-    query: string,
-    options: SearchOptions = {}
-  ): Promise<MemorySearchResult[]> {
+  async searchKeyword(query: string, options: SearchOptions = {}): Promise<MemorySearchResult[]> {
     const db = this.getDb();
     const limit = options.limit ?? 20;
     const offset = options.offset ?? 0;
@@ -580,7 +665,7 @@ export class MemoryStore {
   /** Fallback LIKE-based search when FTS5 query fails */
   private async searchKeywordFallback(
     query: string,
-    options: SearchOptions = {}
+    options: SearchOptions = {},
   ): Promise<MemorySearchResult[]> {
     const db = this.getDb();
     const limit = options.limit ?? 20;
@@ -632,7 +717,7 @@ export class MemoryStore {
 
   async searchSemantic(
     embedding: number[],
-    options: SearchOptions = {}
+    options: SearchOptions = {},
   ): Promise<MemorySearchResult[]> {
     const db = this.getDb();
     const limit = options.limit ?? 20;
@@ -695,7 +780,7 @@ export class MemoryStore {
   async searchHybrid(
     query: string,
     embedding: number[],
-    options: SearchOptions = {}
+    options: SearchOptions = {},
   ): Promise<MemorySearchResult[]> {
     const limit = options.limit ?? 20;
 
@@ -713,14 +798,11 @@ export class MemoryStore {
     >();
 
     // Normalize keyword scores to 0-1 range
-    const maxKeywordScore = keywordResults.length > 0
-      ? Math.max(...keywordResults.map((r) => r.score))
-      : 1;
+    const maxKeywordScore =
+      keywordResults.length > 0 ? Math.max(...keywordResults.map((r) => r.score)) : 1;
 
     for (const result of keywordResults) {
-      const normalizedScore = maxKeywordScore > 0
-        ? result.score / maxKeywordScore
-        : 0;
+      const normalizedScore = maxKeywordScore > 0 ? result.score / maxKeywordScore : 0;
       merged.set(result.entry.id, {
         entry: result.entry,
         keywordScore: normalizedScore,
@@ -747,7 +829,7 @@ export class MemoryStore {
         entry,
         score: 0.3 * keywordScore + 0.7 * semanticScore,
         matchType: "hybrid" as const,
-      })
+      }),
     );
 
     // Sort by combined score descending
@@ -789,7 +871,7 @@ export class MemoryStore {
   private async queryEntries(
     whereClause: string,
     whereParams: SQLQueryBindings[],
-    options: QueryOptions
+    options: QueryOptions,
   ): Promise<MemoryEntry[]> {
     const db = this.getDb();
     const limit = options.limit ?? 50;
@@ -819,9 +901,9 @@ export class MemoryStore {
   async getStats(): Promise<MemoryStats> {
     const db = this.getDb();
 
-    const totalResult = db
-      .prepare("SELECT COUNT(*) as count FROM memories")
-      .get() as { count: number } | undefined;
+    const totalResult = db.prepare("SELECT COUNT(*) as count FROM memories").get() as
+      | { count: number }
+      | undefined;
     const totalEntries = totalResult?.count ?? 0;
 
     if (totalEntries === 0) {
@@ -848,7 +930,7 @@ export class MemoryStore {
     // Counts by agent
     const agentRows = db
       .prepare(
-        "SELECT agent_id, COUNT(*) as count FROM memories WHERE agent_id IS NOT NULL GROUP BY agent_id"
+        "SELECT agent_id, COUNT(*) as count FROM memories WHERE agent_id IS NOT NULL GROUP BY agent_id",
       )
       .all() as { agent_id: string; count: number }[];
     const byAgent: Record<string, number> = {};
@@ -858,21 +940,17 @@ export class MemoryStore {
 
     // Date range
     const dateResult = db
-      .prepare(
-        "SELECT MIN(created_at) as oldest, MAX(created_at) as newest FROM memories"
-      )
+      .prepare("SELECT MIN(created_at) as oldest, MAX(created_at) as newest FROM memories")
       .get() as { oldest: string | null; newest: string | null } | undefined;
 
     // Average importance
-    const avgResult = db
-      .prepare("SELECT AVG(importance) as avg FROM memories")
-      .get() as { avg: number | null } | undefined;
+    const avgResult = db.prepare("SELECT AVG(importance) as avg FROM memories").get() as
+      | { avg: number | null }
+      | undefined;
 
     // Embedding count
     const embResult = db
-      .prepare(
-        "SELECT COUNT(*) as count FROM memories WHERE embedding IS NOT NULL"
-      )
+      .prepare("SELECT COUNT(*) as count FROM memories WHERE embedding IS NOT NULL")
       .get() as { count: number } | undefined;
 
     return {
@@ -895,13 +973,10 @@ export class MemoryStore {
   async cleanup(olderThan?: string, maxImportance: number = 0.3): Promise<number> {
     const db = this.getDb();
 
-    const cutoff =
-      olderThan ?? new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(); // 90 days default
+    const cutoff = olderThan ?? new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(); // 90 days default
 
     const result = db
-      .prepare(
-        "DELETE FROM memories WHERE created_at < ? AND importance <= ?"
-      )
+      .prepare("DELETE FROM memories WHERE created_at < ? AND importance <= ?")
       .run(cutoff, maxImportance);
 
     const deleted = result.changes;

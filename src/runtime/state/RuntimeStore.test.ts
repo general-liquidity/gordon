@@ -27,7 +27,9 @@ describe("RuntimeStore", () => {
       commands: ["reload-plugins"],
       plugins: [{ id: "coingecko", name: "CoinGecko", enabled: true, category: "data" }],
       mcpServers: [{ id: "coingecko", name: "CoinGecko", category: "data", toolCount: 4 }],
-      tools: [{ id: "coingecko_prices", origin: "mcp", pluginId: "coingecko", serverId: "coingecko" }],
+      tools: [
+        { id: "coingecko_prices", origin: "mcp", pluginId: "coingecko", serverId: "coingecko" },
+      ],
     });
     store.setRemoteState({
       connectionStatus: "connected",

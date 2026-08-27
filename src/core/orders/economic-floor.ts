@@ -155,7 +155,10 @@ export function feeForNotional(schedule: FeeSchedule, notionalMinor: Minor): Min
  * costs the same fraction at every size, so no floor can amortise it away.
  */
 export function economicOrderFloor(schedule: FeeSchedule, policy: EconomicFloorPolicy): Minor {
-  const fixedComponent = Math.max(schedule.fixedPerTrancheMinor, schedule.minimumPerOrderMinor ?? 0);
+  const fixedComponent = Math.max(
+    schedule.fixedPerTrancheMinor,
+    schedule.minimumPerOrderMinor ?? 0,
+  );
   if (fixedComponent <= 0) return 0;
   return ceilDiv(fixedComponent * BPS_PER_UNIT, policy.feeToleranceBps);
 }

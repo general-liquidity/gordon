@@ -20,9 +20,11 @@ describe("applyCompactionIfNeeded", () => {
     });
 
     expect(result.applied).toBe(true);
-    expect(result.messages.some((message) =>
-      String(message.content).includes("## Conversation Summary")
-    )).toBe(true);
+    expect(
+      result.messages.some((message) =>
+        String(message.content).includes("## Conversation Summary"),
+      ),
+    ).toBe(true);
     expect(result.messages.at(-1)?.content).toBe("recent request");
     expect(result.messages).not.toEqual(messages.slice(0, 5));
   });

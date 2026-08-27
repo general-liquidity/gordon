@@ -23,10 +23,7 @@
 
 import { createHash } from "node:crypto";
 import { randomUUID } from "node:crypto";
-import {
-  getDatabase,
-  executeWithLogging,
-} from "../storage/database.ts";
+import { getDatabase, executeWithLogging } from "../storage/database.ts";
 
 let tableInitialized = false;
 
@@ -229,7 +226,7 @@ export function listBacktestRuns(opts: ListBacktestRunsOptions = {}): BacktestSn
     params.push(opts.sinceMs!);
   }
   let sql = "SELECT * FROM backtest_runs";
-  if (where.length > 0) sql += " WHERE " + where.join(" AND ");
+  if (where.length > 0) sql += ` WHERE ${where.join(" AND ")}`;
   sql += " ORDER BY recorded_at DESC";
   if (Number.isFinite(opts.limit)) {
     sql += " LIMIT ?";

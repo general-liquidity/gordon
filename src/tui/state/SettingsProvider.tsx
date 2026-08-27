@@ -125,12 +125,9 @@ export function SettingsProvider({ children, initialSettings }: Props) {
     persistSettings(settings);
   }, [settings]);
 
-  const update = useCallback(
-    <K extends keyof GordonSettings>(key: K, value: GordonSettings[K]) => {
-      setSettings((prev) => ({ ...prev, [key]: value }));
-    },
-    [],
-  );
+  const update = useCallback(<K extends keyof GordonSettings>(key: K, value: GordonSettings[K]) => {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+  }, []);
 
   const updateMany = useCallback((patch: Partial<GordonSettings>) => {
     setSettings((prev) => ({ ...prev, ...patch }));

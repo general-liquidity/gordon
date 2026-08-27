@@ -36,9 +36,7 @@ export function getSubagentProfileRegistry(): ReadonlyMap<string, SubagentProfil
  * startup if they want to inject a pre-loaded set (e.g. an alternative
  * config source). Tests use it freely.
  */
-export function setSubagentProfileRegistry(
-  registry: ReadonlyMap<string, SubagentProfile>,
-): void {
+export function setSubagentProfileRegistry(registry: ReadonlyMap<string, SubagentProfile>): void {
   cachedRegistry = registry;
 }
 

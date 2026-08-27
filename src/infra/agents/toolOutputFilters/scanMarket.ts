@@ -20,12 +20,7 @@
  *   - Error envelope
  */
 
-import {
-  passthrough,
-  safeStringifyLength,
-  looksLikeError,
-  type FilterResult,
-} from "./types.ts";
+import { passthrough, safeStringifyLength, looksLikeError, type FilterResult } from "./types.ts";
 
 interface ScanRow {
   symbol: string;
@@ -153,9 +148,7 @@ export function filterScanMarket(raw: unknown, options: ScanFilterOptions = {}):
       dropped: droppedRows.length,
       medianChangePctDropped: Number(median(droppedChanges).toFixed(4)),
       avgChangePctDropped: droppedRows.length
-        ? Number(
-            (droppedChanges.reduce((s, v) => s + v, 0) / droppedRows.length).toFixed(4),
-          )
+        ? Number((droppedChanges.reduce((s, v) => s + v, 0) / droppedRows.length).toFixed(4))
         : 0,
       totalVolumeDropped: droppedVols.reduce((s, v) => s + v, 0),
     },

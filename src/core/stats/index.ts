@@ -126,10 +126,7 @@ export function quantileSorted(sorted: number[], p: number): number {
  * Ordinary-least-squares simple linear regression over (x, y) pairs.
  * Returns slope `m` and intercept `b` (y = m·x + b), matching `ss.linearRegression`.
  */
-export function linearRegression(
-  x: number[],
-  y: number[],
-): { slope: number; intercept: number } {
+export function linearRegression(x: number[], y: number[]): { slope: number; intercept: number } {
   const n = Math.min(x.length, y.length);
   const pairs: number[][] = [];
   for (let i = 0; i < n; i++) pairs.push([x[i] as number, y[i] as number]);
@@ -261,10 +258,8 @@ export function sortino(
     return annualizedMeanReturn > riskFreeRate ? Infinity : 0;
   }
 
-  const downsideVariance =
-    negativeReturns.reduce((sum, r) => sum + r * r, 0) / returns.length;
-  const annualizedDownsideDeviation =
-    Math.sqrt(downsideVariance) * Math.sqrt(periodsPerYear);
+  const downsideVariance = negativeReturns.reduce((sum, r) => sum + r * r, 0) / returns.length;
+  const annualizedDownsideDeviation = Math.sqrt(downsideVariance) * Math.sqrt(periodsPerYear);
   if (annualizedDownsideDeviation === 0) return 0;
 
   return (annualizedMeanReturn - riskFreeRate) / annualizedDownsideDeviation;
@@ -298,15 +293,11 @@ export function maxDrawdown(equity: number[]): number {
  * Compound Annual Growth Rate (%), from initial/final capital over `years`.
  * Mirrors `metrics.ts` calculateCAGR including the negative/zero-final guard.
  */
-export function cagr(
-  initialCapital: number,
-  finalCapital: number,
-  years: number,
-): number {
+export function cagr(initialCapital: number, finalCapital: number, years: number): number {
   if (initialCapital <= 0 || years <= 0) return 0;
   const ratio = finalCapital / initialCapital;
   if (ratio <= 0) return -100;
-  return (Math.pow(ratio, 1 / years) - 1) * 100;
+  return (ratio ** (1 / years) - 1) * 100;
 }
 
 /**

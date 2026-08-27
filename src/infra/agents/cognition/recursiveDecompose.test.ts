@@ -1,9 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  chunkText,
-  recursiveDecompose,
-  type DecomposeMessage,
-} from "./recursiveDecompose.ts";
+import { chunkText, recursiveDecompose, type DecomposeMessage } from "./recursiveDecompose.ts";
 
 /**
  * Stub LLM: classifies each call by the marker in its user message.
@@ -106,7 +102,7 @@ describe("recursiveDecompose", () => {
       return "A".repeat(80);
     };
 
-    const input = Array.from({ length: 16 }, (_, i) => `p${i} ` + "z".repeat(40)).join("\n\n");
+    const input = Array.from({ length: 16 }, (_, i) => `p${i} ${"z".repeat(40)}`).join("\n\n");
     const result = await recursiveDecompose(
       { query: "q", input, maxChunkChars: 120, maxFanOut: 4, maxDepth: 2 },
       { llm: verbose },

@@ -13,7 +13,9 @@ import { getAcpPermissionEngine, resetAcpGordonContext } from "./context.ts";
 // Mock PermissionEngine that records prepended hooks
 class FakePermissionEngine {
   hooks: Array<(input: { toolName: string; policy: any; context: any }) => unknown> = [];
-  prependHook(hook: (input: { toolName: string; policy: any; context: any }) => unknown): () => void {
+  prependHook(
+    hook: (input: { toolName: string; policy: any; context: any }) => unknown,
+  ): () => void {
     this.hooks.unshift(hook);
     return () => {
       const idx = this.hooks.indexOf(hook);
@@ -21,7 +23,11 @@ class FakePermissionEngine {
     };
   }
   // Call the first hook for testing
-  async invokeHook(toolName: string, policy: any = defaultPolicy(), sessionId?: string): Promise<unknown> {
+  async invokeHook(
+    toolName: string,
+    policy: any = defaultPolicy(),
+    sessionId?: string,
+  ): Promise<unknown> {
     const hook = this.hooks[0];
     if (!hook) return null;
     return hook({
@@ -46,9 +52,10 @@ function defaultPolicy(overrides: any = {}): any {
   };
 }
 
-function fakeConnection(
-  responder: () => unknown,
-): { connection: AgentSideConnection; calls: Array<{ toolName?: string }> } {
+function fakeConnection(responder: () => unknown): {
+  connection: AgentSideConnection;
+  calls: Array<{ toolName?: string }>;
+} {
   const calls: Array<{ toolName?: string }> = [];
   const fake = {
     requestPermission: async (req: unknown) => {
@@ -67,12 +74,8 @@ describe("installAcpPermissionHook", () => {
   });
 
   it("keeps approval queues isolated between ACP sessions", () => {
-    expect(getAcpPermissionEngine("session-a")).not.toBe(
-      getAcpPermissionEngine("session-b"),
-    );
-    expect(getAcpPermissionEngine("session-a")).toBe(
-      getAcpPermissionEngine("session-a"),
-    );
+    expect(getAcpPermissionEngine("session-a")).not.toBe(getAcpPermissionEngine("session-b"));
+    expect(getAcpPermissionEngine("session-a")).toBe(getAcpPermissionEngine("session-a"));
   });
 
   it("safety-critical tools abstain (no editor prompt)", async () => {
@@ -98,10 +101,13 @@ describe("installAcpPermissionHook", () => {
       sessionId: "safe",
       connection,
     });
-    const result = await engine.invokeHook("get_market_data", defaultPolicy({
-      approvalClass: "none",
-      tool: { riskClass: "low", sideEffectLevel: "read" },
-    }));
+    const result = await engine.invokeHook(
+      "get_market_data",
+      defaultPolicy({
+        approvalClass: "none",
+        tool: { riskClass: "low", sideEffectLevel: "read" },
+      }),
+    );
     expect(result).toEqual({ decision: "abstain" });
     expect(calls).toHaveLength(0);
   });

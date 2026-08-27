@@ -97,8 +97,12 @@ export function computeVidya(input: VidyaInput): VidyaResult {
 export function vidyaToPayload(result: VidyaResult): Record<string, unknown> {
   return {
     kind: "vidya.computed",
-    currentVidya: Number.isFinite(result.currentVidya) ? Number(result.currentVidya.toFixed(5)) : null,
-    currentAlpha: Number.isFinite(result.currentAlpha) ? Number(result.currentAlpha.toFixed(5)) : null,
+    currentVidya: Number.isFinite(result.currentVidya)
+      ? Number(result.currentVidya.toFixed(5))
+      : null,
+    currentAlpha: Number.isFinite(result.currentAlpha)
+      ? Number(result.currentAlpha.toFixed(5))
+      : null,
     sampleSize: result.sampleSize,
   };
 }

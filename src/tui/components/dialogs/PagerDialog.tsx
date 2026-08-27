@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import type React from "react";
+import { useMemo, useState } from "react";
 import { Box, Text, useInput, useStdout } from "../../ink-custom";
 import type { Message } from "../messages/MessageBubble.tsx";
 
@@ -10,7 +11,10 @@ export interface PagerDialogProps {
   onClose: () => void;
 }
 
-export function paginate(lines: string[], pageSize: number): { pages: string[][]; pageCount: number } {
+export function paginate(
+  lines: string[],
+  pageSize: number,
+): { pages: string[][]; pageCount: number } {
   const size = Math.max(1, Math.floor(pageSize));
   if (lines.length === 0) return { pages: [[]], pageCount: 1 };
 
@@ -71,7 +75,9 @@ export function PagerDialog({ title, content, onClose }: PagerDialogProps): Reac
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="cyanBright" width={columns}>
-      <Text color="cyanBright" bold>{title}</Text>
+      <Text color="cyanBright" bold>
+        {title}
+      </Text>
       <Box flexDirection="column">
         {visibleLines.map((line, index) => (
           <Text key={`${offset}-${index}`}>{clipLine(line, bodyWidth)}</Text>

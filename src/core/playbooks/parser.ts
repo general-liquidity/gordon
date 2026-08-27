@@ -13,7 +13,7 @@
  *   - `## Review` section with evaluation criteria and scoring factors
  */
 
-import { readFile } from "fs/promises";
+import { readFile } from "node:fs/promises";
 import { createModuleLogger } from "../../infra/logger/logger.ts";
 import { playbookToProtocol } from "./converter.ts";
 import type { PlaybookProtocol } from "./protocol.ts";
@@ -32,7 +32,7 @@ import type {
   ValidationResult,
 } from "./types.ts";
 
-const log = createModuleLogger("playbook-parser");
+const _log = createModuleLogger("playbook-parser");
 
 // ============================================================================
 // Frontmatter Parser (lightweight, no external YAML dependency)
@@ -73,8 +73,14 @@ function parseFrontmatter(raw: string): Record<string, unknown> {
     }
 
     // Boolean
-    if (value === "true") { result[key] = true; continue; }
-    if (value === "false") { result[key] = false; continue; }
+    if (value === "true") {
+      result[key] = true;
+      continue;
+    }
+    if (value === "false") {
+      result[key] = false;
+      continue;
+    }
 
     // Strip surrounding quotes
     if (
@@ -107,14 +113,13 @@ function extractSections(markdown: string): Map<string, MarkdownSection> {
   const pattern = /^##\s+(.+)$/gm;
   const headings: { title: string; start: number }[] = [];
 
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(markdown)) !== null) {
+  for (const match of markdown.matchAll(pattern)) {
     headings.push({ title: match[1]!.trim(), start: match.index + match[0].length });
   }
 
   for (let i = 0; i < headings.length; i++) {
     const heading = headings[i]!;
-    const nextStart = headings[i + 1]?.start ?? markdown.length;
+    const _nextStart = headings[i + 1]?.start ?? markdown.length;
     // Go back to find the start of the next heading line
     const nextHeadingLineStart = headings[i + 1]
       ? markdown.lastIndexOf("\n", headings[i + 1]!.start - headings[i + 1]!.title.length - 4)
@@ -191,9 +196,24 @@ function extractDescription(markdown: string): string {
 
 /** Known indicator keywords for condition extraction */
 const INDICATOR_KEYWORDS = [
-  "rsi", "ema", "sma", "macd", "volume", "atr", "vwap", "adx",
-  "bollinger", "stochastic", "mfi", "obv", "supertrend", "ichimoku",
-  "fibonacci", "fib", "price", "funding rate",
+  "rsi",
+  "ema",
+  "sma",
+  "macd",
+  "volume",
+  "atr",
+  "vwap",
+  "adx",
+  "bollinger",
+  "stochastic",
+  "mfi",
+  "obv",
+  "supertrend",
+  "ichimoku",
+  "fibonacci",
+  "fib",
+  "price",
+  "funding rate",
 ] as const;
 
 /**
@@ -275,7 +295,12 @@ function parseTriggerSection(body: string): PlaybookTrigger {
   if (lower.includes("analyst")) agentSubscription = "analyst";
 
   return {
-    description: body.split("\n").filter((l) => !l.trim().startsWith("-") && !l.trim().startsWith("*")).join(" ").trim() || "Trigger conditions",
+    description:
+      body
+        .split("\n")
+        .filter((l) => !l.trim().startsWith("-") && !l.trim().startsWith("*"))
+        .join(" ")
+        .trim() || "Trigger conditions",
     conditions,
     agentSubscription,
   };
@@ -324,12 +349,15 @@ function parseAnalysisSection(body: string): PlaybookAnalysis {
     invalidationCriteria.push(bullet);
   }
 
-  const descLines = body
-    .split("\n")
-    .filter((l) => {
-      const t = l.trim();
-      return t && !t.startsWith("-") && !t.startsWith("*") && !t.toLowerCase().startsWith("trade is invalid");
-    });
+  const descLines = body.split("\n").filter((l) => {
+    const t = l.trim();
+    return (
+      t &&
+      !t.startsWith("-") &&
+      !t.startsWith("*") &&
+      !t.toLowerCase().startsWith("trade is invalid")
+    );
+  });
 
   return {
     description: descLines.join(" ").trim() || "Analysis criteria",
@@ -355,21 +383,37 @@ function parseExecutionSection(body: string): PlaybookExecution {
 
   // Entry type
   let entryType: "market" | "limit" | "stop_limit" = "market";
-  const entryDesc = boldItems.get("entry") ?? bullets.find((b) => b.toLowerCase().includes("entry")) ?? "";
+  const entryDesc =
+    boldItems.get("entry") ?? bullets.find((b) => b.toLowerCase().includes("entry")) ?? "";
   if (lower.includes("limit order")) entryType = "limit";
   if (lower.includes("stop limit") || lower.includes("stop-limit")) entryType = "stop_limit";
   if (lower.includes("market order")) entryType = "market";
 
   // Stop-loss
-  const stopDesc = boldItems.get("stop loss") ?? boldItems.get("stop") ?? bullets.find((b) => b.toLowerCase().includes("stop")) ?? "";
+  const stopDesc =
+    boldItems.get("stop loss") ??
+    boldItems.get("stop") ??
+    bullets.find((b) => b.toLowerCase().includes("stop")) ??
+    "";
   const stopLoss = parseStopLossRule(stopDesc);
 
   // Take-profit
-  const tpDesc = boldItems.get("take profit") ?? boldItems.get("target") ?? bullets.find((b) => b.toLowerCase().includes("take profit") || b.toLowerCase().includes("target")) ?? "";
+  const tpDesc =
+    boldItems.get("take profit") ??
+    boldItems.get("target") ??
+    bullets.find(
+      (b) => b.toLowerCase().includes("take profit") || b.toLowerCase().includes("target"),
+    ) ??
+    "";
   const takeProfit = parseTakeProfitRule(tpDesc);
 
   // Position sizing
-  const sizeDesc = boldItems.get("position size") ?? boldItems.get("size") ?? boldItems.get("sizing") ?? bullets.find((b) => b.toLowerCase().includes("position") || b.toLowerCase().includes("risk")) ?? "";
+  const sizeDesc =
+    boldItems.get("position size") ??
+    boldItems.get("size") ??
+    boldItems.get("sizing") ??
+    bullets.find((b) => b.toLowerCase().includes("position") || b.toLowerCase().includes("risk")) ??
+    "";
   const positionSizing = parsePositionSizingRule(sizeDesc);
 
   return {
@@ -513,10 +557,15 @@ function parseManagementSection(body: string): PlaybookManagement {
   }
 
   return {
-    description: body.split("\n").filter((l) => {
-      const t = l.trim();
-      return t && !t.match(/^[\d\-*]/) && !t.match(/^\d+[.)]/);
-    }).join(" ").trim() || "Trade management rules",
+    description:
+      body
+        .split("\n")
+        .filter((l) => {
+          const t = l.trim();
+          return t && !t.match(/^[\d\-*]/) && !t.match(/^\d+[.)]/);
+        })
+        .join(" ")
+        .trim() || "Trade management rules",
     rules,
   };
 }
@@ -597,7 +646,12 @@ export class PlaybookParser {
 
     const analysis = analysisSection
       ? parseAnalysisSection(analysisSection.body)
-      : { description: "", validationCriteria: [], requiredIndicators: [], invalidationCriteria: [] };
+      : {
+          description: "",
+          validationCriteria: [],
+          requiredIndicators: [],
+          invalidationCriteria: [],
+        };
 
     const execution = executionSection
       ? parseExecutionSection(executionSection.body)
@@ -620,9 +674,7 @@ export class PlaybookParser {
     // ---- Assemble the Playbook ----
     const now = new Date().toISOString();
 
-    const tier = typeof frontmatter.tier === "number"
-      ? (frontmatter.tier as 1 | 2 | 3)
-      : 1;
+    const tier = typeof frontmatter.tier === "number" ? (frontmatter.tier as 1 | 2 | 3) : 1;
 
     const riskLevel = (frontmatter.risk as string) ?? (frontmatter.riskLevel as string) ?? "medium";
 
@@ -658,7 +710,7 @@ export class PlaybookParser {
    */
   async parseFile(
     filePath: string,
-    source: "builtin" | "workspace" | "hub" = "builtin"
+    source: "builtin" | "workspace" | "hub" = "builtin",
   ): Promise<Playbook> {
     const content = await readFile(filePath, "utf-8");
     const playbook = this.parse(content, source);
@@ -735,7 +787,7 @@ export class PlaybookParser {
    */
   parseToProtocol(
     markdown: string,
-    source: "builtin" | "workspace" | "hub" = "builtin"
+    source: "builtin" | "workspace" | "hub" = "builtin",
   ): PlaybookProtocol {
     const playbook = this.parse(markdown, source);
     return playbookToProtocol(playbook);
@@ -750,7 +802,7 @@ export class PlaybookParser {
    */
   async parseFileToProtocol(
     filePath: string,
-    source: "builtin" | "workspace" | "hub" = "builtin"
+    source: "builtin" | "workspace" | "hub" = "builtin",
   ): Promise<PlaybookProtocol> {
     const content = await readFile(filePath, "utf-8");
     return this.parseToProtocol(content, source);

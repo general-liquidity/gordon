@@ -117,7 +117,7 @@ export function computeCubeRootKelly(input: CubeRootKellyInput): CubeRootKellyRe
   // argument of the power is dimensionless and the result carries position
   // units. Skipping the scale is the h₀ = 1 assumption that turns the
   // function into an amplifier for every holding below one unit.
-  let position = magnitude > 0 ? scale * Math.pow(magnitude / scale, beta) * Math.sign(alpha) : 0;
+  let position = magnitude > 0 ? scale * (magnitude / scale) ** beta * Math.sign(alpha) : 0;
   let clipped = false;
   if (Math.abs(position) > limit) {
     position = limit * Math.sign(position);

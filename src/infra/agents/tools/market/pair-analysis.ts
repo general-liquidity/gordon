@@ -99,7 +99,8 @@ function halfLife(spread: number[]): number {
 function interpretCorrelation(corr: number): string {
   const abs = Math.abs(corr);
   const dir = corr >= 0 ? "positive" : "negative";
-  if (abs >= 0.8) return `Strong ${dir} correlation (${corr.toFixed(3)}) — assets move closely together${corr < 0 ? " in opposite directions" : ""}`;
+  if (abs >= 0.8)
+    return `Strong ${dir} correlation (${corr.toFixed(3)}) — assets move closely together${corr < 0 ? " in opposite directions" : ""}`;
   if (abs >= 0.5) return `Moderate ${dir} correlation (${corr.toFixed(3)}) — some co-movement`;
   if (abs >= 0.3) return `Weak ${dir} correlation (${corr.toFixed(3)}) — limited relationship`;
   return `Very weak/no correlation (${corr.toFixed(3)}) — assets move independently`;
@@ -118,16 +119,8 @@ export const analyzePairCorrelationTool = createTool({
   inputSchema: z.object({
     symbolA: z.string().describe("First trading pair (e.g., 'BTCUSDT')"),
     symbolB: z.string().describe("Second trading pair (e.g., 'XRPUSDT')"),
-    interval: z
-      .enum(["1h", "4h", "1d"])
-      .default("4h")
-      .describe("Timeframe for analysis"),
-    period: z
-      .number()
-      .min(20)
-      .max(500)
-      .default(100)
-      .describe("Number of candles to analyze"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe for analysis"),
+    period: z.number().min(20).max(500).default(100).describe("Number of candles to analyze"),
   }),
   outputSchema: z.object({
     symbolA: z.string().optional(),
@@ -231,16 +224,8 @@ export const analyzePairSpreadTool = createTool({
   inputSchema: z.object({
     symbolA: z.string().describe("First trading pair (e.g., 'BTCUSDT')"),
     symbolB: z.string().describe("Second trading pair (e.g., 'XRPUSDT')"),
-    interval: z
-      .enum(["1h", "4h", "1d"])
-      .default("4h")
-      .describe("Timeframe for analysis"),
-    period: z
-      .number()
-      .min(20)
-      .max(500)
-      .default(100)
-      .describe("Number of candles to analyze"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe for analysis"),
+    period: z.number().min(20).max(500).default(100).describe("Number of candles to analyze"),
     zScoreThreshold: z
       .number()
       .min(1)
@@ -272,7 +257,10 @@ export const analyzePairSpreadTool = createTool({
     interpretation: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbolA, symbolB, interval, period, zScoreThreshold }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbolA, symbolB, interval, period, zScoreThreshold },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -378,16 +366,8 @@ export const comparePairPerformanceTool = createTool({
   inputSchema: z.object({
     symbolA: z.string().describe("First trading pair (e.g., 'BTCUSDT')"),
     symbolB: z.string().describe("Second trading pair (e.g., 'ETHUSDT')"),
-    interval: z
-      .enum(["1h", "4h", "1d"])
-      .default("1d")
-      .describe("Timeframe"),
-    period: z
-      .number()
-      .min(5)
-      .max(365)
-      .default(30)
-      .describe("Number of candles to compare"),
+    interval: z.enum(["1h", "4h", "1d"]).default("1d").describe("Timeframe"),
+    period: z.number().min(5).max(365).default(30).describe("Number of candles to compare"),
   }),
   outputSchema: z.object({
     symbolA: z.string().optional(),

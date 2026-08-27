@@ -1,15 +1,8 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { RestBrokerAdapter, MalformedBrokerOrderError } from "./rest-base.ts";
 import { AlpacaAdapter } from "./alpaca.ts";
-import {
-  tripKillSwitch,
-  resetAllKillSwitches,
-} from "../../safety/killSwitches.ts";
-import type {
-  BrokerCapabilities,
-  BrokerCredentials,
-  BrokerOrder,
-} from "../types.ts";
+import { tripKillSwitch, resetAllKillSwitches } from "../../safety/killSwitches.ts";
+import type { BrokerCapabilities, BrokerCredentials, BrokerOrder } from "../types.ts";
 
 type FetchInput = Parameters<typeof fetch>[0];
 type FetchInit = Parameters<typeof fetch>[1];
@@ -18,11 +11,12 @@ const realFetch = globalThis.fetch;
 
 function installFetch(handler: (url: URL, init?: FetchInit) => Response): void {
   globalThis.fetch = (async (input: FetchInput, init?: FetchInit): Promise<Response> => {
-    const url = typeof input === "string"
-      ? new URL(input)
-      : input instanceof URL
-        ? input
-        : new URL(input.url);
+    const url =
+      typeof input === "string"
+        ? new URL(input)
+        : input instanceof URL
+          ? input
+          : new URL(input.url);
     return handler(url, init);
   }) as unknown as typeof fetch;
 }
@@ -84,8 +78,12 @@ describe("RestBrokerAdapter — P1-6 error-body redaction", () => {
   it("redacts a credential-shaped error body and truncates to 500 chars", async () => {
     const leakedToken = "sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     const longTail = "x".repeat(2000);
-    installFetch(() =>
-      new Response(`unauthorized: ${leakedToken} ${longTail}`, { status: 401, statusText: "Unauthorized" }),
+    installFetch(
+      () =>
+        new Response(`unauthorized: ${leakedToken} ${longTail}`, {
+          status: 401,
+          statusText: "Unauthorized",
+        }),
     );
 
     const broker = new TestRestBroker(CREDS);
@@ -111,7 +109,9 @@ describe("RestBrokerAdapter — P1-6 error-body redaction", () => {
 describe("RestBrokerAdapter — P1-9 malformed order throws", () => {
   it("throws when the order id is missing", () => {
     const broker = new TestRestBroker(CREDS);
-    expect(() => broker.publicToBrokerOrder({ status: "filled", qty: 1 })).toThrow(MalformedBrokerOrderError);
+    expect(() => broker.publicToBrokerOrder({ status: "filled", qty: 1 })).toThrow(
+      MalformedBrokerOrderError,
+    );
   });
 
   it("throws when a numeric field is non-finite", () => {
@@ -156,7 +156,13 @@ describe("Broker placeOrder — P1-5 kill-switch chokepoint", () => {
     const alpaca = new AlpacaAdapter(CREDS);
     tripKillSwitch({ scope: "venue", id: "alpaca" }, "halt alpaca for test");
     await expect(
-      alpaca.placeOrder({ symbol: "aapl", side: "buy", type: "market", timeInForce: "day", qty: 1 }),
+      alpaca.placeOrder({
+        symbol: "aapl",
+        side: "buy",
+        type: "market",
+        timeInForce: "day",
+        qty: 1,
+      }),
     ).rejects.toThrow(/kill switch/i);
   });
 
@@ -165,7 +171,13 @@ describe("Broker placeOrder — P1-5 kill-switch chokepoint", () => {
     const broker = new TestRestBroker(CREDS);
     tripKillSwitch({ scope: "firm" }, "firm-wide halt for test");
     await expect(
-      broker.placeOrder({ symbol: "aapl", side: "buy", type: "market", timeInForce: "day", qty: 1 }),
+      broker.placeOrder({
+        symbol: "aapl",
+        side: "buy",
+        type: "market",
+        timeInForce: "day",
+        qty: 1,
+      }),
     ).rejects.toThrow();
   });
 });

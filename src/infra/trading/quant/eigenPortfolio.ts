@@ -94,9 +94,10 @@ function canonicalizeSign(vec: number[]): number[] {
  * eigenvector (sign-canonicalized). ml-matrix yields ascending order with
  * eigenvectors as matrix columns, so we reverse + transpose here.
  */
-function jacobiEigen(
-  src: ReadonlyArray<ReadonlyArray<number>>,
-): { eigenvalues: number[]; eigenvectors: number[][] } {
+function jacobiEigen(src: ReadonlyArray<ReadonlyArray<number>>): {
+  eigenvalues: number[];
+  eigenvectors: number[][];
+} {
   const n = src.length;
   const evd = eigenDecomposition(src.map((row) => [...row]));
   if (!evd) return { eigenvalues: [], eigenvectors: [] };

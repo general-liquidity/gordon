@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { GordonSelect } from "../../design-system/GordonSelect.js";
 import { MultiStepPicker, type PickerStep } from "../../design-system/MultiStepPicker.tsx";
@@ -40,10 +39,10 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 const GATEWAY_PROVIDERS = ["openrouter", "huggingface"] as const;
 
-const PROVIDERS: ModelOption[] = [
-  ...Object.keys(DIRECT_MODELS),
-  ...GATEWAY_PROVIDERS,
-].map((p) => ({ label: PROVIDER_LABELS[p] ?? p, value: p }));
+const PROVIDERS: ModelOption[] = [...Object.keys(DIRECT_MODELS), ...GATEWAY_PROVIDERS].map((p) => ({
+  label: PROVIDER_LABELS[p] ?? p,
+  value: p,
+}));
 
 // Build each first-party family's model options from the live tier catalog.
 // De-duplicate models shared across tiers (e.g. when flagship === balanced).
@@ -89,8 +88,12 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
             <Text dimColor>Provider: {providerLabel}</Text>
             <Box marginTop={1}>
               <GordonSelect
-                options={MODEL_OPTIONS[provider] ?? [{ label: "Provider default", value: "__default__" }]}
-                onChange={(value) => onSelect(provider, value === "__default__" ? undefined : value)}
+                options={
+                  MODEL_OPTIONS[provider] ?? [{ label: "Provider default", value: "__default__" }]
+                }
+                onChange={(value) =>
+                  onSelect(provider, value === "__default__" ? undefined : value)
+                }
               />
             </Box>
           </>

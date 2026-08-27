@@ -106,11 +106,7 @@ export interface ReconciliationResult {
   /** True iff the input was already well-formed. */
   wasWellFormed: boolean;
   /** Verdict for the caller to log / surface. */
-  verdict:
-    | "no_dangling_calls"
-    | "repaired"
-    | "non_message_input"
-    | "no_messages";
+  verdict: "no_dangling_calls" | "repaired" | "non_message_input" | "no_messages";
   summary: string;
 }
 
@@ -157,13 +153,7 @@ function extractToolUseId(part: ToolUsePart): string | undefined {
 }
 
 function extractToolResultId(part: ToolResultPart): string | undefined {
-  return (
-    part.toolCallId ??
-    part.tool_call_id ??
-    part.tool_use_id ??
-    part.toolUseId ??
-    part.id
-  );
+  return part.toolCallId ?? part.tool_call_id ?? part.tool_use_id ?? part.toolUseId ?? part.id;
 }
 
 function extractToolName(part: ToolUsePart): string | undefined {
@@ -215,9 +205,7 @@ function buildSynthesizedResultPart(
   };
 }
 
-export function reconcileToolCalls(
-  input: ReconciliationInput,
-): ReconciliationResult {
+export function reconcileToolCalls(input: ReconciliationInput): ReconciliationResult {
   const messages = input.messages;
   const known = input.knownInterruptions ?? new Map();
   const defaultReason: InterruptionReason = input.defaultReason ?? "unknown";
@@ -240,10 +228,7 @@ export function reconcileToolCalls(
 
   // First pass: collect every tool_use id with its source assistant
   // message index, then every tool_result id that was actually produced.
-  const toolUses = new Map<
-    string,
-    { messageIndex: number; toolName?: string }
-  >();
+  const toolUses = new Map<string, { messageIndex: number; toolName?: string }>();
   const resolvedResultIds = new Set<string>();
 
   for (let i = 0; i < messages.length; i++) {
@@ -338,9 +323,7 @@ export function reconcileToolCalls(
         insertAtIndex,
       });
 
-      resultParts.push(
-        buildSynthesizedResultPart(d.id, d.toolName, reason, partial),
-      );
+      resultParts.push(buildSynthesizedResultPart(d.id, d.toolName, reason, partial));
     }
 
     reconciled.push({
@@ -367,9 +350,7 @@ export function reconcileToolCalls(
   };
 }
 
-function summarizeReasons(
-  synthesized: ReadonlyArray<SynthesizedToolResult>,
-): string {
+function summarizeReasons(synthesized: ReadonlyArray<SynthesizedToolResult>): string {
   if (synthesized.length === 0) return "";
   const counts = new Map<InterruptionReason, number>();
   for (const s of synthesized) {
@@ -382,9 +363,7 @@ function summarizeReasons(
   return `Reasons: ${parts.join(", ")}.`;
 }
 
-export function formatReconciliationReport(
-  result: ReconciliationResult,
-): string {
+export function formatReconciliationReport(result: ReconciliationResult): string {
   const lines = [
     `Tool-Call Reconciler — ${result.verdict.toUpperCase()}`,
     "",

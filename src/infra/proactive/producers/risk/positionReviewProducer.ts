@@ -41,7 +41,9 @@ async function loadPositionStore(): Promise<MinimalPositionStore | null> {
     if (typeof mod.getPositionStore !== "function") return null;
     return await mod.getPositionStore();
   } catch (err) {
-    logger.debug("Position store not accessible for position review producer", { err: String(err) });
+    logger.debug("Position store not accessible for position review producer", {
+      err: String(err),
+    });
     return null;
   }
 }

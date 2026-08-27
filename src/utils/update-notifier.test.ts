@@ -3,7 +3,12 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { detectDistTag, detectInstallContext, formatUpdatePromptLines, getUpdateCommand } from "./update-notifier.ts";
+import {
+  detectDistTag,
+  detectInstallContext,
+  formatUpdatePromptLines,
+  getUpdateCommand,
+} from "./update-notifier.ts";
 
 const tempDirectories: string[] = [];
 

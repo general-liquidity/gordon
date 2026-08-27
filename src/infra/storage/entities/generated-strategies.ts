@@ -153,7 +153,7 @@ export function initGeneratedStrategiesTable(): void {
  */
 export async function saveGeneratedStrategy(
   strategy: StrategyDSL,
-  backtestResult?: BacktestResult
+  backtestResult?: BacktestResult,
 ): Promise<{ success: boolean; id?: string; error?: string }> {
   try {
     const db = getDatabase();
@@ -188,7 +188,7 @@ export async function saveGeneratedStrategy(
       backtestResult?.metrics.sharpeRatio ?? null,
       backtestResult?.metrics.winRate ?? null,
       backtestResult?.metrics.maxDrawdown ?? null,
-      backtestResult?.metrics.totalTrades ?? null
+      backtestResult?.metrics.totalTrades ?? null,
     );
 
     // Save backtest result if provided
@@ -210,7 +210,7 @@ export async function saveGeneratedStrategy(
         JSON.stringify(backtestResult.trades.slice(0, 100)), // Limit trades stored
         JSON.stringify(backtestResult.equityCurve.slice(0, 500)), // Limit curve points
         JSON.stringify(backtestResult),
-        now
+        now,
       );
     }
 
@@ -260,7 +260,7 @@ export async function loadGeneratedStrategy(id: string): Promise<StrategyDSL | n
  * Get backtest result for a generated strategy
  */
 export async function getGeneratedStrategyBacktest(
-  strategyId: string
+  strategyId: string,
 ): Promise<BacktestResult | null> {
   try {
     const db = getDatabase();
@@ -268,18 +268,21 @@ export async function getGeneratedStrategyBacktest(
     // Ensure tables exist
     initGeneratedStrategiesTable();
 
-    const query = db.prepare<{
-      id: string;
-      strategy_id: string;
-      symbol: string;
-      timeframe: string;
-      config_json: string;
-      metrics_json: string;
-      trades_json: string;
-      equity_curve_json: string;
-      result_json: string | null;
-      created_at: string;
-    }, [string]>(`
+    const query = db.prepare<
+      {
+        id: string;
+        strategy_id: string;
+        symbol: string;
+        timeframe: string;
+        config_json: string;
+        metrics_json: string;
+        trades_json: string;
+        equity_curve_json: string;
+        result_json: string | null;
+        created_at: string;
+      },
+      [string]
+    >(`
       SELECT * FROM generated_strategy_backtests
       WHERE strategy_id = ?
       ORDER BY created_at DESC
@@ -345,7 +348,7 @@ export async function getGeneratedStrategyBacktest(
  * List generated strategies with optional filtering
  */
 export function listGeneratedStrategies(
-  options: GeneratedStrategyQueryOptions = {}
+  options: GeneratedStrategyQueryOptions = {},
 ): GeneratedStrategySummary[] {
   try {
     const db = getDatabase();
@@ -441,7 +444,10 @@ export function listGeneratedStrategies(
  * Count generated strategies
  */
 export function countGeneratedStrategies(
-  options: Omit<GeneratedStrategyQueryOptions, "orderBy" | "orderDirection" | "limit" | "offset"> = {}
+  options: Omit<
+    GeneratedStrategyQueryOptions,
+    "orderBy" | "orderDirection" | "limit" | "offset"
+  > = {},
 ): number {
   try {
     const db = getDatabase();
@@ -520,9 +526,7 @@ export function deleteGeneratedStrategy(id: string): boolean {
 export function cleanupOldGeneratedStrategies(olderThanDays: number): number {
   try {
     const db = getDatabase();
-    const cutoff = new Date(
-      Date.now() - olderThanDays * 24 * 60 * 60 * 1000
-    ).toISOString();
+    const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000).toISOString();
 
     // Get IDs to delete
     const query = db.prepare<{ id: string }, [string]>(`
@@ -537,16 +541,10 @@ export function cleanupOldGeneratedStrategies(olderThanDays: number): number {
 
     // Delete backtests first
     const placeholders = ids.map(() => "?").join(",");
-    db.run(
-      `DELETE FROM generated_strategy_backtests WHERE strategy_id IN (${placeholders})`,
-      ids
-    );
+    db.run(`DELETE FROM generated_strategy_backtests WHERE strategy_id IN (${placeholders})`, ids);
 
     // Delete strategies
-    const result = db.run(
-      `DELETE FROM generated_strategies WHERE id IN (${placeholders})`,
-      ids
-    );
+    const result = db.run(`DELETE FROM generated_strategies WHERE id IN (${placeholders})`, ids);
 
     logger.info("Cleaned up old generated strategies", {
       deleted: result.changes,

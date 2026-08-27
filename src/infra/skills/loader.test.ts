@@ -120,10 +120,7 @@ metadata:
 
 describe("validateSkillFrontmatter — name rules", () => {
   it("accepts valid kebab-case names", () => {
-    const issues = validateSkillFrontmatter(
-      { name: "my-skill", description: "x" },
-      "my-skill",
-    );
+    const issues = validateSkillFrontmatter({ name: "my-skill", description: "x" }, "my-skill");
     expect(issues.length).toBe(0);
   });
 
@@ -137,18 +134,12 @@ describe("validateSkillFrontmatter — name rules", () => {
   });
 
   it("rejects names starting with hyphen", () => {
-    const issues = validateSkillFrontmatter(
-      { name: "-pdf", description: "x" },
-      "-pdf",
-    );
+    const issues = validateSkillFrontmatter({ name: "-pdf", description: "x" }, "-pdf");
     expect(issues.some((i) => i.severity === "error" && i.field === "name")).toBe(true);
   });
 
   it("rejects names ending with hyphen", () => {
-    const issues = validateSkillFrontmatter(
-      { name: "pdf-", description: "x" },
-      "pdf-",
-    );
+    const issues = validateSkillFrontmatter({ name: "pdf-", description: "x" }, "pdf-");
     expect(issues.some((i) => i.severity === "error" && i.field === "name")).toBe(true);
   });
 
@@ -162,10 +153,7 @@ describe("validateSkillFrontmatter — name rules", () => {
 
   it("rejects name > 64 chars", () => {
     const longName = "x".repeat(65);
-    const issues = validateSkillFrontmatter(
-      { name: longName, description: "x" },
-      longName,
-    );
+    const issues = validateSkillFrontmatter({ name: longName, description: "x" }, longName);
     expect(issues.some((i) => i.severity === "error" && i.message.includes("64"))).toBe(true);
   });
 
@@ -176,38 +164,31 @@ describe("validateSkillFrontmatter — name rules", () => {
     );
     expect(
       issues.some(
-        (i) =>
-          i.severity === "error" &&
-          i.field === "name" &&
-          i.message.includes("does not match"),
+        (i) => i.severity === "error" && i.field === "name" && i.message.includes("does not match"),
       ),
     ).toBe(true);
   });
 
   it("rejects missing name", () => {
-    const issues = validateSkillFrontmatter(
-      { description: "x" },
-      "some-dir",
-    );
-    expect(issues.some((i) => i.severity === "error" && i.field === "name" && i.message === "required field missing")).toBe(true);
+    const issues = validateSkillFrontmatter({ description: "x" }, "some-dir");
+    expect(
+      issues.some(
+        (i) =>
+          i.severity === "error" && i.field === "name" && i.message === "required field missing",
+      ),
+    ).toBe(true);
   });
 });
 
 describe("validateSkillFrontmatter — description rules", () => {
   it("rejects missing description", () => {
-    const issues = validateSkillFrontmatter(
-      { name: "ok-name" },
-      "ok-name",
-    );
+    const issues = validateSkillFrontmatter({ name: "ok-name" }, "ok-name");
     expect(issues.some((i) => i.severity === "error" && i.field === "description")).toBe(true);
   });
 
   it("warns on description > 1024 chars (but loads)", () => {
     const long = "x".repeat(1025);
-    const issues = validateSkillFrontmatter(
-      { name: "ok-name", description: long },
-      "ok-name",
-    );
+    const issues = validateSkillFrontmatter({ name: "ok-name", description: long }, "ok-name");
     const warn = issues.find((i) => i.field === "description");
     expect(warn?.severity).toBe("warning");
     expect(warn?.message).toContain("1024");
@@ -263,7 +244,11 @@ describe("loadSkillFromFile — compliant skill loads", () => {
   });
 
   afterEach(() => {
-    try { rmSync(dir, { recursive: true, force: true }); } catch { /* */ }
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      /* */
+    }
   });
 
   it("loads a valid skill + populates frontmatter fields", () => {
@@ -371,7 +356,11 @@ describe("Patch 3 — MAX_SKILL_FILE_SIZE rejects oversized skills", () => {
     dir = mkdtempSync(join(tmpdir(), "gordon-skill-size-test-"));
   });
   afterEach(() => {
-    try { rmSync(dir, { recursive: true, force: true }); } catch { /* */ }
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      /* */
+    }
   });
 
   it("constant is exported and reasonable", () => {
@@ -440,7 +429,11 @@ describe("discoverSkillsFromDir — mixed compliance", () => {
   });
 
   afterEach(() => {
-    try { rmSync(dir, { recursive: true, force: true }); } catch { /* */ }
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      /* */
+    }
   });
 
   it("loads only compliant skills + silently skips invalid ones", () => {

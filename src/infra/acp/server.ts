@@ -77,11 +77,7 @@ import {
 } from "@agentclientprotocol/sdk";
 import { Readable, Writable } from "node:stream";
 import { processMessageStream } from "../agents/orchestrator.ts";
-import {
-  getAcpGordonContext,
-  getAcpPermissionEngine,
-  resetAcpGordonContext,
-} from "./context.ts";
+import { getAcpGordonContext, getAcpPermissionEngine, resetAcpGordonContext } from "./context.ts";
 import { StreamTranslator } from "./stream-translator.ts";
 import {
   appendSessionTurns,
@@ -91,38 +87,32 @@ import {
   appendSessionMode,
   loadSessionMode,
 } from "./sessions.ts";
-import {
-  captureSessionMcpServers,
-  dropSessionMcpServers,
-} from "./mcp-bridge.ts";
-import {
-  resetSessionUsage,
-  dropSessionUsage,
-  emitUsageUpdate,
-} from "./usage-tracker.ts";
-import {
-  extractMultimodalPrompt,
-  type MultimodalAttachment,
-} from "./content-translator.ts";
+import { captureSessionMcpServers, dropSessionMcpServers } from "./mcp-bridge.ts";
+import { resetSessionUsage, dropSessionUsage, emitUsageUpdate } from "./usage-tracker.ts";
+import { extractMultimodalPrompt, type MultimodalAttachment } from "./content-translator.ts";
 import { installAcpPermissionHook } from "./permission-hook.ts";
 import { probeBudgetHalt, budgetSignalToStopReason } from "./token-budget.ts";
-import {
-  createAcpMcpClient,
-  closeAcpMcpClient,
-  listAcpMcpToolsets,
-} from "./mcp-spinup.ts";
+import { createAcpMcpClient, closeAcpMcpClient, listAcpMcpToolsets } from "./mcp-spinup.ts";
 import { getSessionMcpServers } from "./mcp-bridge.ts";
 import { renderInlineTextPrompt, resolveVisionPath } from "./llm-vision.ts";
 import { runHooks } from "../hooks/engine.ts";
 
 export const ACP_SESSION_MODES = [
   { id: "default", name: "Default", description: "Use Gordon's configured permission mode." },
-  { id: "observe", name: "Observe", description: "Read-only analysis; execution tools remain unavailable." },
-  { id: "plan", name: "Plan", description: "Build and review plans without dispatching live execution." },
+  {
+    id: "observe",
+    name: "Observe",
+    description: "Read-only analysis; execution tools remain unavailable.",
+  },
+  {
+    id: "plan",
+    name: "Plan",
+    description: "Build and review plans without dispatching live execution.",
+  },
   { id: "paper", name: "Paper", description: "Route trading workflows through paper mode only." },
 ] as const satisfies readonly SessionMode[];
 
-export type AcpSessionModeId = typeof ACP_SESSION_MODES[number]["id"];
+export type AcpSessionModeId = (typeof ACP_SESSION_MODES)[number]["id"];
 
 function isAcpSessionModeId(value: string): value is AcpSessionModeId {
   return ACP_SESSION_MODES.some((mode) => mode.id === value);
@@ -217,12 +207,13 @@ function defaultPromptHandler(): PromptHandler {
     modeId,
   }): Promise<PromptHandlerResult> {
     const baseContext = await getAcpGordonContext(false, sessionId);
-    const context = modeId === "default"
-      ? baseContext
-      : {
-          ...baseContext,
-          config: { ...baseContext.config, permissionMode: modeId },
-        };
+    const context =
+      modeId === "default"
+        ? baseContext
+        : {
+            ...baseContext,
+            config: { ...baseContext.config, permissionMode: modeId },
+          };
     // Use the ACP sessionId as the Mastra threadId so conversations
     // resume correctly when loadSession is honored.
     const threadId = `acp-${sessionId}`;
@@ -434,7 +425,8 @@ export class GordonAcpAgent implements Agent {
     const session = this.sessions.get(params.sessionId);
     if (!session) throw new Error(`Unknown sessionId: ${params.sessionId}`);
     if (session.closing) throw new Error(`ACP session ${params.sessionId} is closing`);
-    if (!isAcpSessionModeId(params.modeId)) throw new Error(`Unsupported ACP session mode: ${params.modeId}`);
+    if (!isAcpSessionModeId(params.modeId))
+      throw new Error(`Unsupported ACP session mode: ${params.modeId}`);
     if (!appendSessionMode(params.sessionId, params.modeId)) {
       throw new Error(`Failed to persist ACP session mode for ${params.sessionId}`);
     }
@@ -466,7 +458,9 @@ export class GordonAcpAgent implements Agent {
     const generation = ++session.promptGeneration;
     const predecessor = session.promptTail;
     let releaseSlot!: () => void;
-    const slot = new Promise<void>((resolve) => { releaseSlot = resolve; });
+    const slot = new Promise<void>((resolve) => {
+      releaseSlot = resolve;
+    });
     session.promptTail = predecessor.then(() => slot);
     session.pendingPrompt?.abort();
 
@@ -500,10 +494,10 @@ export class GordonAcpAgent implements Agent {
 
       // Hook installation is part of the ACP permission boundary. If it
       // cannot be installed, this turn must not run without that boundary.
-      uninstallPermissionHook = installAcpPermissionHook(
-        getAcpPermissionEngine(params.sessionId),
-        { sessionId: params.sessionId, connection: this.connection },
-      );
+      uninstallPermissionHook = installAcpPermissionHook(getAcpPermissionEngine(params.sessionId), {
+        sessionId: params.sessionId,
+        connection: this.connection,
+      });
 
       const result = await this.promptHandler({
         sessionId: params.sessionId,
@@ -526,10 +520,12 @@ export class GordonAcpAgent implements Agent {
       if (result.stopReason !== "cancelled") {
         const assistantTurn = { role: "assistant" as const, content: result.assistantText };
         const ts = Date.now();
-        if (!appendSessionTurns(params.sessionId, [
-          { ...userTurn, ts },
-          { ...assistantTurn, ts },
-        ])) {
+        if (
+          !appendSessionTurns(params.sessionId, [
+            { ...userTurn, ts },
+            { ...assistantTurn, ts },
+          ])
+        ) {
           throw new Error(`Failed to persist completed ACP turn for ${params.sessionId}`);
         }
         session.history.push(userTurn, assistantTurn);
@@ -557,7 +553,11 @@ export class GordonAcpAgent implements Agent {
         session.pendingPrompt = null;
       }
       if (uninstallPermissionHook) {
-        try { uninstallPermissionHook(); } catch { /* removal is idempotent */ }
+        try {
+          uninstallPermissionHook();
+        } catch {
+          /* removal is idempotent */
+        }
       }
       releaseSlot();
     }
@@ -599,7 +599,8 @@ export class GordonAcpAgent implements Agent {
     });
     if (sessionEnd.action === "block") {
       throw new Error(
-        sessionEnd.reason ?? `ACP session ${params.sessionId} closed, but its SessionEnd hook failed`,
+        sessionEnd.reason ??
+          `ACP session ${params.sessionId} closed, but its SessionEnd hook failed`,
       );
     }
     return {};

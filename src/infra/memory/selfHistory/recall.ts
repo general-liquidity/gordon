@@ -47,12 +47,63 @@ export interface RecallOptions extends RefreshOptions {
 }
 
 const STOPWORDS = new Set([
-  "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-  "have", "has", "had", "do", "does", "did", "will", "would", "could",
-  "should", "may", "might", "must", "can", "this", "that", "these",
-  "those", "i", "you", "he", "she", "it", "we", "they", "what", "which",
-  "who", "when", "where", "why", "how", "and", "but", "or", "nor", "for",
-  "yet", "so", "at", "by", "in", "on", "to", "with", "of", "from",
+  "the",
+  "a",
+  "an",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "being",
+  "have",
+  "has",
+  "had",
+  "do",
+  "does",
+  "did",
+  "will",
+  "would",
+  "could",
+  "should",
+  "may",
+  "might",
+  "must",
+  "can",
+  "this",
+  "that",
+  "these",
+  "those",
+  "i",
+  "you",
+  "he",
+  "she",
+  "it",
+  "we",
+  "they",
+  "what",
+  "which",
+  "who",
+  "when",
+  "where",
+  "why",
+  "how",
+  "and",
+  "but",
+  "or",
+  "nor",
+  "for",
+  "yet",
+  "so",
+  "at",
+  "by",
+  "in",
+  "on",
+  "to",
+  "with",
+  "of",
+  "from",
 ]);
 
 function tokenize(text: string): string[] {
@@ -101,7 +152,10 @@ function buildWhyMatched(query: string, record: SessionRecord): string[] {
  * recall. Incrementally refreshes the staleness catalog first (only changed
  * session files are re-parsed), then ranks with the existing hybrid stack.
  */
-export function searchSessionHistory(query: string, options: RecallOptions = {}): SessionRecallHit[] {
+export function searchSessionHistory(
+  query: string,
+  options: RecallOptions = {},
+): SessionRecallHit[] {
   const limit = options.limit ?? 5;
   const snippetChars = options.snippetChars ?? 400;
 

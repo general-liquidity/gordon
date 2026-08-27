@@ -6,7 +6,7 @@
  * emitter work on any connected exchange, not just Binance.
  */
 
-import { EventEmitter } from "events";
+import { EventEmitter } from "node:events";
 import {
   BinanceWebSocket,
   type KlineUpdate,

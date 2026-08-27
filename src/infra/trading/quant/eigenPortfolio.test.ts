@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeEigenPortfolio,
-  eigenPortfolioToPayload,
-} from "./eigenPortfolio.ts";
+import { computeEigenPortfolio, eigenPortfolioToPayload } from "./eigenPortfolio.ts";
 
 describe("computeEigenPortfolio — eigenvalue correctness", () => {
   it("diagonal covariance → eigenvalues = diagonal entries (sorted)", () => {
@@ -60,8 +57,7 @@ describe("computeEigenPortfolio — variance attribution", () => {
     const r = computeEigenPortfolio({ covarianceMatrix: cov, weights: w });
     // Direct portfolio variance
     let direct = 0;
-    for (let i = 0; i < 2; i++)
-      for (let j = 0; j < 2; j++) direct += w[i]! * w[j]! * cov[i]![j]!;
+    for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) direct += w[i]! * w[j]! * cov[i]![j]!;
     expect(r.totalVariance).toBeCloseTo(direct, 9);
   });
 
@@ -126,7 +122,13 @@ describe("computeEigenPortfolio — eigenvectors are orthonormal", () => {
 describe("computeEigenPortfolio — input validation", () => {
   it("throws when covariance dimensions mismatch weights", () => {
     expect(() =>
-      computeEigenPortfolio({ covarianceMatrix: [[1, 0], [0, 1]], weights: [1] }),
+      computeEigenPortfolio({
+        covarianceMatrix: [
+          [1, 0],
+          [0, 1],
+        ],
+        weights: [1],
+      }),
     ).toThrow();
   });
 

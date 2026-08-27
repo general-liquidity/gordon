@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Dialog } from "../../design-system/Dialog.js";
 import type { SideQuestion } from "../../services/suggestions/sideQuestion.js";
@@ -55,15 +55,21 @@ export function SideQuestionDialog({ question, onAnswer, onDismiss }: Props) {
       ) : null}
 
       <Box marginTop={1}>
-        <Text bold color="cyanBright">{question.question}</Text>
+        <Text bold color="cyanBright">
+          {question.question}
+        </Text>
       </Box>
 
       {hasOptions ? (
         <Box flexDirection="column" marginTop={1}>
           {question.options!.map((opt, i) => (
             <Box key={opt}>
-              <Text color={i === selectedIndex ? "cyanBright" : undefined} bold={i === selectedIndex}>
-                {i === selectedIndex ? "\u25B8 " : "  "}{i + 1}. {opt}
+              <Text
+                color={i === selectedIndex ? "cyanBright" : undefined}
+                bold={i === selectedIndex}
+              >
+                {i === selectedIndex ? "\u25B8 " : "  "}
+                {i + 1}. {opt}
               </Text>
             </Box>
           ))}
@@ -78,7 +84,9 @@ export function SideQuestionDialog({ question, onAnswer, onDismiss }: Props) {
 
       <Box marginTop={1}>
         <Text dimColor>
-          {hasOptions ? "\u2191\u2193 to select \u00B7 Enter to confirm" : "Type answer \u00B7 Enter to submit"}
+          {hasOptions
+            ? "\u2191\u2193 to select \u00B7 Enter to confirm"
+            : "Type answer \u00B7 Enter to submit"}
           {" \u00B7 Esc to dismiss"}
         </Text>
       </Box>

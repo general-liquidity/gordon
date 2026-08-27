@@ -14,7 +14,10 @@ export type { BrokerAdapter } from "../infra/broker/index.ts";
 // Gateway advanced features
 export { evaluateBaselineCircuitBreakers } from "../gateway/circuit-breakers/index.ts";
 export { simulateOrderBundle } from "../gateway/advanced/counterfactual.ts";
-export { generateCircuitBreakerProof, verifyCircuitBreakerProof } from "../gateway/advanced/circuit-breaker-proof.ts";
+export {
+  generateCircuitBreakerProof,
+  verifyCircuitBreakerProof,
+} from "../gateway/advanced/circuit-breaker-proof.ts";
 export { queryRegimeScopedMemory } from "../gateway/advanced/regime-memory.ts";
 
 // SDK client and factory

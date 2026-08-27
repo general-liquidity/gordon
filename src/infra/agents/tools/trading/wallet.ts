@@ -21,7 +21,7 @@ import { z } from "zod";
 
 import { getGordonContext, type MastraExecutionContext } from "../types.ts";
 import { checkTradingPermission } from "../runtime/permissionHelpers.ts";
-import type { ExchangeExtended } from "../../../exchange/types.ts";
+import type { ExchangeExtended, WithdrawalInfo } from "../../../exchange/types.ts";
 
 // ============================================================================
 // Error Messages
@@ -54,16 +54,19 @@ export const getDustableAssetsTool = createTool({
   outputSchema: z.object({
     message: z.string().optional(),
     totalBNB: z.string().optional(),
-    assets: z.array(
-      z.object({
-        asset: z.string(),
-        amount: z.string(),
-        bnbValue: z.string(),
-      })
-    ).optional(),
+    assets: z
+      .array(
+        z.object({
+          asset: z.string(),
+          amount: z.string(),
+          bnbValue: z.string(),
+        }),
+      )
+      .optional(),
     error: z.string().optional(),
   }),
-  execute: async (_input, execContext: MastraExecutionContext) => binanceSapiUnavailable(execContext),
+  execute: async (_input, execContext: MastraExecutionContext) =>
+    binanceSapiUnavailable(execContext),
 });
 
 export const convertDustTool = createTool({
@@ -73,9 +76,7 @@ export const convertDustTool = createTool({
     "Use when user says 'convert dust to BNB', 'clean up balances', or 'sweep small amounts'. " +
     "Requires permissionMode not 'strict' for actual conversion.",
   inputSchema: z.object({
-    assets: z
-      .array(z.string())
-      .describe("List of asset symbols to convert (e.g., ['ADA', 'DOT'])"),
+    assets: z.array(z.string()).describe("List of asset symbols to convert (e.g., ['ADA', 'DOT'])"),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
@@ -87,7 +88,7 @@ export const convertDustTool = createTool({
           from: z.string(),
           amount: z.string(),
           receivedBNB: z.string(),
-        })
+        }),
       )
       .optional(),
     error: z.string().optional(),
@@ -121,7 +122,7 @@ export const transferFundsTool = createTool({
         "MARGIN_MAIN",
       ])
       .describe(
-        "Transfer type: MAIN=Spot, FUNDING=Funding wallet, UMFUTURE=USD-M Futures, MARGIN=Cross Margin"
+        "Transfer type: MAIN=Spot, FUNDING=Funding wallet, UMFUTURE=USD-M Futures, MARGIN=Cross Margin",
       ),
     asset: z.string().describe("Asset to transfer (e.g., 'USDT', 'BTC')"),
     amount: z.number().positive().describe("Amount to transfer"),
@@ -168,7 +169,7 @@ export const getCoinInfoTool = createTool({
           withdrawMin: z.string(),
           withdrawMax: z.string().optional(),
           estimatedArrival: z.string(),
-        })
+        }),
       )
       .optional(),
     error: z.string().optional(),
@@ -202,7 +203,7 @@ export const getCoinInfoTool = createTool({
           withdrawFee: String(n.withdrawFee),
           withdrawMin: String(n.withdrawMin),
           withdrawMax: n.withdrawMax ? String(n.withdrawMax) : undefined,
-          estimatedArrival: n.estimatedArrivalMins + " mins",
+          estimatedArrival: `${n.estimatedArrivalMins} mins`,
         })),
       };
     } catch (error) {
@@ -233,12 +234,13 @@ export const getTradeFeesTool = createTool({
           symbol: z.string(),
           maker: z.string(),
           taker: z.string(),
-        })
+        }),
       )
       .optional(),
     error: z.string().optional(),
   }),
-  execute: async (_input, execContext: MastraExecutionContext) => binanceSapiUnavailable(execContext),
+  execute: async (_input, execContext: MastraExecutionContext) =>
+    binanceSapiUnavailable(execContext),
 });
 
 export const getAssetDividendsTool = createTool({
@@ -247,16 +249,8 @@ export const getAssetDividendsTool = createTool({
     "Get history of asset dividends, airdrops, and staking rewards. " +
     "Use when user asks 'did I receive any airdrops', 'staking rewards', 'dividend history'.",
   inputSchema: z.object({
-    asset: z
-      .string()
-      .default("")
-      .describe("Filter by asset (e.g., 'BNB'). Empty for all."),
-    limit: z
-      .number()
-      .min(1)
-      .max(500)
-      .default(20)
-      .describe("Number of records to return"),
+    asset: z.string().default("").describe("Filter by asset (e.g., 'BNB'). Empty for all."),
+    limit: z.number().min(1).max(500).default(20).describe("Number of records to return"),
   }),
   outputSchema: z.object({
     message: z.string().optional(),
@@ -268,12 +262,13 @@ export const getAssetDividendsTool = createTool({
           amount: z.string(),
           description: z.string(),
           time: z.string(),
-        })
+        }),
       )
       .optional(),
     error: z.string().optional(),
   }),
-  execute: async (_input, execContext: MastraExecutionContext) => binanceSapiUnavailable(execContext),
+  execute: async (_input, execContext: MastraExecutionContext) =>
+    binanceSapiUnavailable(execContext),
 });
 
 export const getDepositAddressTool = createTool({
@@ -296,7 +291,8 @@ export const getDepositAddressTool = createTool({
     warning: z.string().nullable().optional(),
     error: z.string().optional(),
   }),
-  execute: async (_input, execContext: MastraExecutionContext) => binanceSapiUnavailable(execContext),
+  execute: async (_input, execContext: MastraExecutionContext) =>
+    binanceSapiUnavailable(execContext),
 });
 
 // ============================================================================
@@ -324,7 +320,7 @@ export const getUserAssetsTool = createTool({
           free: z.string(),
           locked: z.string(),
           btcValuation: z.string(),
-        })
+        }),
       )
       .optional(),
     error: z.string().optional(),
@@ -337,9 +333,7 @@ export const getUserAssetsTool = createTool({
 
     try {
       const balances = await ctx.exchange.getAllBalances();
-      const filtered = showAll
-        ? balances
-        : balances.filter((b) => b.free > 0 || b.locked > 0);
+      const filtered = showAll ? balances : balances.filter((b) => b.free > 0 || b.locked > 0);
 
       return {
         count: filtered.length,
@@ -369,7 +363,7 @@ export const getWalletBalancesTool = createTool({
           walletName: z.string(),
           balance: z.string(),
           active: z.boolean(),
-        })
+        }),
       )
       .optional(),
     totalBalance: z.string().optional(),
@@ -383,16 +377,16 @@ export const getWalletBalancesTool = createTool({
 
     try {
       const balances = await ctx.exchange.getAllBalances();
-      const totalBalance = balances
-        .reduce((sum, b) => sum + b.total, 0)
-        .toFixed(8);
+      const totalBalance = balances.reduce((sum, b) => sum + b.total, 0).toFixed(8);
 
       return {
-        wallets: [{
-          walletName: "Spot",
-          balance: totalBalance,
-          active: true,
-        }],
+        wallets: [
+          {
+            walletName: "Spot",
+            balance: totalBalance,
+            active: true,
+          },
+        ],
         totalBalance,
       };
     } catch (error) {
@@ -427,14 +421,15 @@ export const getDustLogTool = createTool({
               fromAsset: z.string(),
               amount: z.string(),
               bnbReceived: z.string(),
-            })
+            }),
           ),
-        })
+        }),
       )
       .optional(),
     error: z.string().optional(),
   }),
-  execute: async (_input, execContext: MastraExecutionContext) => binanceSapiUnavailable(execContext),
+  execute: async (_input, execContext: MastraExecutionContext) =>
+    binanceSapiUnavailable(execContext),
 });
 
 // ============================================================================
@@ -453,7 +448,9 @@ export const previewWithdrawalTool = createTool({
     network: z
       .string()
       .default("")
-      .describe("Network to use (e.g., 'ETH', 'TRX', 'BTC', 'BSC'). Empty to show all available networks."),
+      .describe(
+        "Network to use (e.g., 'ETH', 'TRX', 'BTC', 'BSC'). Empty to show all available networks.",
+      ),
     amount: z
       .number()
       .positive()
@@ -484,7 +481,7 @@ export const previewWithdrawalTool = createTool({
           withdrawMin: z.number(),
           withdrawMax: z.number(),
           estimatedArrivalMins: z.number(),
-        })
+        }),
       )
       .optional(),
     amountPreview: z
@@ -529,12 +526,10 @@ export const previewWithdrawalTool = createTool({
         estimatedArrivalMins: n.estimatedArrivalMins,
       }));
 
-      let selectedNetwork = undefined;
+      let selectedNetwork: (typeof allNetworks)[number] | undefined;
       if (network) {
         const networkUpper = network.toUpperCase();
-        const found = info.networks.find(
-          (n) => n.network.toUpperCase() === networkUpper
-        );
+        const found = info.networks.find((n) => n.network.toUpperCase() === networkUpper);
         if (!found) {
           return {
             error: `Network ${network} not available for ${coinUpper} on ${ctx.exchange.displayName}. Available: ${allNetworks.map((n) => n.network).join(", ")}`,
@@ -552,7 +547,15 @@ export const previewWithdrawalTool = createTool({
         };
       }
 
-      let amountPreview = undefined;
+      let amountPreview:
+        | {
+            grossAmount: number;
+            fee: number;
+            netReceived: number;
+            meetsMinimum: boolean;
+            withinMaximum: boolean;
+          }
+        | undefined;
       if (amount !== undefined && selectedNetwork) {
         const fee = selectedNetwork.withdrawFee;
         const netReceived = amount - fee;
@@ -565,8 +568,8 @@ export const previewWithdrawalTool = createTool({
         };
       }
 
-      let availableBalance: number | undefined = undefined;
-      let sufficientBalance: boolean | undefined = undefined;
+      let availableBalance: number | undefined;
+      let sufficientBalance: boolean | undefined;
       try {
         availableBalance = await ctx.exchange.getBalance(coinUpper);
         if (amount !== undefined) {
@@ -576,7 +579,7 @@ export const previewWithdrawalTool = createTool({
         // Non-critical — balance check is best-effort
       }
 
-      let warning: string | undefined = undefined;
+      let warning: string | undefined;
       if (selectedNetwork && !selectedNetwork.withdrawEnabled) {
         warning = `Withdrawals are currently DISABLED for ${coinUpper} on the ${selectedNetwork.network} network.`;
       }
@@ -615,7 +618,9 @@ export const withdrawToExternalTool = createTool({
       .describe("Address tag/memo (required for some coins like XRP, BNB on certain networks)"),
     confirm: z
       .boolean()
-      .describe("Must be explicitly set to true to execute. If false, returns a final summary instead."),
+      .describe(
+        "Must be explicitly set to true to execute. If false, returns a final summary instead.",
+      ),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
@@ -645,7 +650,7 @@ export const withdrawToExternalTool = createTool({
   }),
   execute: async (
     { coin, network, address, amount, tag, confirm },
-    execContext: MastraExecutionContext
+    execContext: MastraExecutionContext,
   ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
@@ -660,20 +665,21 @@ export const withdrawToExternalTool = createTool({
     const coinUpper = coin.toUpperCase();
 
     // Fetch network info for fee calculation and validation
-    let networkInfo;
+    let networkInfo: WithdrawalInfo["networks"][number];
     try {
       const info = await ext.getWithdrawalInfo(coinUpper);
       if (!info) {
         return { error: `Coin ${coinUpper} not found on ${ctx.exchange.displayName}.` };
       }
-      networkInfo = info.networks.find(
-        (n) => n.network.toUpperCase() === network.toUpperCase()
+      const matchedNetwork = info.networks.find(
+        (n) => n.network.toUpperCase() === network.toUpperCase(),
       );
-      if (!networkInfo) {
+      if (!matchedNetwork) {
         return {
           error: `Network ${network} not available for ${coinUpper} on ${ctx.exchange.displayName}. Available: ${info.networks.map((n) => n.network).join(", ")}`,
         };
       }
+      networkInfo = matchedNetwork;
     } catch (error) {
       return { error: `Failed to fetch network info: ${(error as Error).message}` };
     }
@@ -683,16 +689,24 @@ export const withdrawToExternalTool = createTool({
 
     // Validate
     if (!networkInfo.withdrawEnabled) {
-      return { error: `Withdrawals are currently DISABLED for ${coinUpper} on ${networkInfo.network}.` };
+      return {
+        error: `Withdrawals are currently DISABLED for ${coinUpper} on ${networkInfo.network}.`,
+      };
     }
     if (amount < networkInfo.withdrawMin) {
-      return { error: `Amount ${amount} is below minimum withdrawal of ${networkInfo.withdrawMin} ${coinUpper} for ${networkInfo.network}.` };
+      return {
+        error: `Amount ${amount} is below minimum withdrawal of ${networkInfo.withdrawMin} ${coinUpper} for ${networkInfo.network}.`,
+      };
     }
     if (networkInfo.withdrawMax > 0 && amount > networkInfo.withdrawMax) {
-      return { error: `Amount ${amount} exceeds maximum withdrawal of ${networkInfo.withdrawMax} ${coinUpper} for ${networkInfo.network}.` };
+      return {
+        error: `Amount ${amount} exceeds maximum withdrawal of ${networkInfo.withdrawMax} ${coinUpper} for ${networkInfo.network}.`,
+      };
     }
     if (netReceived <= 0) {
-      return { error: `Amount ${amount} ${coinUpper} is less than or equal to the network fee (${fee}). Nothing would be received.` };
+      return {
+        error: `Amount ${amount} ${coinUpper} is less than or equal to the network fee (${fee}). Nothing would be received.`,
+      };
     }
 
     // If not confirmed, return summary for review
@@ -714,7 +728,9 @@ export const withdrawToExternalTool = createTool({
 
     // Gate withdrawal across all permission modes
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "transfer", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
+      const check = checkTradingPermission(ctx.config?.permissionMode, "transfer", {
+        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper,
+      });
       if (!check.allowed) {
         return {
           error: check.reason ?? "Withdrawal not permitted under current mode",
@@ -730,7 +746,9 @@ export const withdrawToExternalTool = createTool({
     try {
       const balance = await ctx.exchange.getBalance(coinUpper);
       if (balance < amount) {
-        return { error: `Insufficient balance. Available: ${balance} ${coinUpper}, requested: ${amount} ${coinUpper}.` };
+        return {
+          error: `Insufficient balance. Available: ${balance} ${coinUpper}, requested: ${amount} ${coinUpper}.`,
+        };
       }
     } catch (error) {
       return { error: `Failed to check balance: ${(error as Error).message}` };
@@ -738,7 +756,13 @@ export const withdrawToExternalTool = createTool({
 
     // Execute
     try {
-      const result = await ext.withdraw(coinUpper, networkInfo.network, address, amount, tag || undefined);
+      const result = await ext.withdraw(
+        coinUpper,
+        networkInfo.network,
+        address,
+        amount,
+        tag || undefined,
+      );
 
       return {
         success: true,
@@ -784,7 +808,7 @@ export const getWithdrawalStatusTool = createTool({
           txId: z.string().optional(),
           applyTime: z.string(),
           completeTime: z.string().optional(),
-        })
+        }),
       )
       .optional(),
     total: z.number().optional(),
@@ -818,7 +842,9 @@ export const getWithdrawalStatusTool = createTool({
       if (filtered.length === 0) {
         return {
           exchange: ctx.exchange.displayName,
-          message: coin ? `No recent withdrawals found for ${coin.toUpperCase()}.` : "No recent withdrawals found.",
+          message: coin
+            ? `No recent withdrawals found for ${coin.toUpperCase()}.`
+            : "No recent withdrawals found.",
           total: 0,
         };
       }

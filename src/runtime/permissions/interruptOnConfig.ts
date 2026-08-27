@@ -47,10 +47,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type {
-  RuntimeApprovalRule,
-  RuntimePermissionScope,
-} from "../contracts/types.ts";
+import type { RuntimeApprovalRule, RuntimePermissionScope } from "../contracts/types.ts";
 
 export type InterruptOnDecision = "allow" | "deny";
 
@@ -120,11 +117,7 @@ function validateRule(value: unknown): string | null {
   if (rule.decision !== "allow" && rule.decision !== "deny") {
     return `decision must be 'allow' or 'deny' (got ${JSON.stringify(rule.decision)})`;
   }
-  if (
-    rule.scope !== undefined &&
-    rule.scope !== "session" &&
-    rule.scope !== "persistent"
-  ) {
+  if (rule.scope !== undefined && rule.scope !== "session" && rule.scope !== "persistent") {
     return `scope must be 'session' or 'persistent' (got ${JSON.stringify(rule.scope)})`;
   }
   if (
@@ -140,10 +133,7 @@ function validateRule(value: unknown): string | null {
       return `expiresAt is not a parseable ISO timestamp: ${rule.expiresAt}`;
     }
   }
-  if (
-    rule.permissionScope !== undefined &&
-    typeof rule.permissionScope !== "string"
-  ) {
+  if (rule.permissionScope !== undefined && typeof rule.permissionScope !== "string") {
     return "permissionScope must be a string";
   }
   return null;
@@ -216,9 +206,7 @@ export function parseInterruptOnConfig(
 
   if (!config || typeof config !== "object") {
     if (strict && config !== undefined && config !== null) {
-      throw new Error(
-        `interruptOn config must be an object, got ${typeof config}`,
-      );
+      throw new Error(`interruptOn config must be an object, got ${typeof config}`);
     }
     return {
       rules,

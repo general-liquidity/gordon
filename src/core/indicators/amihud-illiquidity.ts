@@ -31,10 +31,7 @@ function neutral(window: number): AmihudResult {
   };
 }
 
-export function calculateAmihud(
-  candles: Candle[],
-  opts?: { window?: number },
-): AmihudResult {
+export function calculateAmihud(candles: Candle[], opts?: { window?: number }): AmihudResult {
   if (candles == null || candles.length < 2) {
     return neutral(opts?.window ?? 0);
   }
@@ -42,9 +39,7 @@ export function calculateAmihud(
   // Window counts bars used to derive returns (each return consumes a prior close).
   const maxReturns = candles.length - 1;
   const window =
-    opts?.window != null && opts.window > 0
-      ? Math.min(opts.window, maxReturns)
-      : maxReturns;
+    opts?.window != null && opts.window > 0 ? Math.min(opts.window, maxReturns) : maxReturns;
 
   // Take the most recent `window` returns.
   const startIdx = candles.length - window;

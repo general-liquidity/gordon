@@ -29,7 +29,9 @@ export const hotStreakSizerDiagnosticTool = createTool({
   inputSchema: z.object({
     recentRealizedPnLPct: z
       .number()
-      .describe("Recent realized P&L as a fraction (e.g., 0.20 = +20%) over a caller-defined window."),
+      .describe(
+        "Recent realized P&L as a fraction (e.g., 0.20 = +20%) over a caller-defined window.",
+      ),
     hotThresholdPct: z
       .number()
       .positive()
@@ -53,7 +55,9 @@ export const hotStreakSizerDiagnosticTool = createTool({
     mode: z
       .enum(["informational", "active"])
       .optional()
-      .describe("informational (default) → observation only; active → apply the suggested multiplier."),
+      .describe(
+        "informational (default) → observation only; active → apply the suggested multiplier.",
+      ),
   }),
   outputSchema: z.object({
     classification: z.enum(["hot", "neutral_positive", "neutral_negative", "cold"]),

@@ -8,8 +8,10 @@ function UserToolCanceledMessageInner({ message }: { message: Message }) {
   return (
     <Box flexDirection="row" marginTop={0}>
       <Text dimColor>{"⎿ "}</Text>
-      <Text color="yellow" dimColor>{"⊘"}</Text>
-      <Text>{" "}</Text>
+      <Text color="yellow" dimColor>
+        {"⊘"}
+      </Text>
+      <Text> </Text>
       <Text dimColor>{message.content}</Text>
     </Box>
   );

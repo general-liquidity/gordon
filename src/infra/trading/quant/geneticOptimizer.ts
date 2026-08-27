@@ -65,7 +65,7 @@ export interface GeneticOptimizerResult {
 }
 
 function makeLCG(seed: number): () => number {
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   return () => {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return s / 0x100000000;
@@ -80,9 +80,7 @@ function clamp(x: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, x));
 }
 
-export function computeGeneticOptimizer(
-  input: GeneticOptimizerInput,
-): GeneticOptimizerResult {
+export function computeGeneticOptimizer(input: GeneticOptimizerInput): GeneticOptimizerResult {
   const G = input.bounds.length;
   if (G === 0) throw new Error("bounds must be non-empty");
   for (let i = 0; i < G; i++) {
@@ -218,9 +216,7 @@ export function computeGeneticOptimizer(
   };
 }
 
-export function geneticOptimizerToPayload(
-  result: GeneticOptimizerResult,
-): Record<string, unknown> {
+export function geneticOptimizerToPayload(result: GeneticOptimizerResult): Record<string, unknown> {
   return {
     kind: "genetic_optimizer.computed",
     bestFitness: Number(result.bestFitness.toFixed(8)),
@@ -229,13 +225,10 @@ export function geneticOptimizerToPayload(
     bestGenome: result.bestGenome.map((x) => Number(x.toFixed(6))),
     fitnessTrajectory: {
       first: Number(result.fitnessHistory[0]!.toFixed(6)),
-      last: Number(
-        result.fitnessHistory[result.fitnessHistory.length - 1]!.toFixed(6),
-      ),
+      last: Number(result.fitnessHistory[result.fitnessHistory.length - 1]!.toFixed(6)),
       improvement: Number(
         (
-          result.fitnessHistory[result.fitnessHistory.length - 1]! -
-          result.fitnessHistory[0]!
+          result.fitnessHistory[result.fitnessHistory.length - 1]! - result.fitnessHistory[0]!
         ).toFixed(6),
       ),
     },

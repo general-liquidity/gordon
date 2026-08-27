@@ -284,9 +284,7 @@ describe("efficientTradingFrontier", () => {
   });
 
   it("rejects non-positive horizon entries", () => {
-    expect(() =>
-      efficientTradingFrontier({ ...base, horizonDays: [0.1, 0, 1] }),
-    ).toThrow();
+    expect(() => efficientTradingFrontier({ ...base, horizonDays: [0.1, 0, 1] })).toThrow();
   });
 });
 

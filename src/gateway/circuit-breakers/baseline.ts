@@ -1,7 +1,4 @@
-export type CircuitBreakerName =
-  | "portfolio_drawdown"
-  | "correlation_shock"
-  | "liquidity_gap";
+export type CircuitBreakerName = "portfolio_drawdown" | "correlation_shock" | "liquidity_gap";
 
 export interface CircuitBreakerTrigger {
   name: CircuitBreakerName;
@@ -61,4 +58,3 @@ export function evaluateBaselineCircuitBreakers(
     triggers,
   };
 }
-

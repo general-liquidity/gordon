@@ -13,10 +13,7 @@
  * option, not a contract change.
  */
 
-import type {
-  MigrationScheduler,
-  MigrationSchedulerHandle,
-} from "./internal/contracts.ts";
+import type { MigrationScheduler, MigrationSchedulerHandle } from "./internal/contracts.ts";
 
 /**
  * Test seam: if omitted, we use the host runtime's global setInterval /
@@ -38,15 +35,12 @@ export function createMigrationScheduler(
   options: SchedulerOptions = {},
 ): MigrationScheduler {
   if (typeof runMigration !== "function") {
-    throw new Error(
-      "createMigrationScheduler: runMigration must be a function",
-    );
+    throw new Error("createMigrationScheduler: runMigration must be a function");
   }
 
   const timers: SchedulerTimers = options.timers ?? {
     setInterval: (handler, ms) => setInterval(handler, ms),
-    clearInterval: (handle) =>
-      clearInterval(handle as ReturnType<typeof setInterval>),
+    clearInterval: (handle) => clearInterval(handle as ReturnType<typeof setInterval>),
   };
 
   const onError =
@@ -59,9 +53,7 @@ export function createMigrationScheduler(
   const scheduler: MigrationScheduler = {
     start(intervalMs: number): MigrationSchedulerHandle {
       if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
-        throw new Error(
-          `migrationScheduler.start: intervalMs must be > 0, got ${intervalMs}`,
-        );
+        throw new Error(`migrationScheduler.start: intervalMs must be > 0, got ${intervalMs}`);
       }
 
       // Reentrancy flag — if a migration is still running when the next

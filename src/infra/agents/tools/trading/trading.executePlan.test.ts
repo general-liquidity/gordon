@@ -54,12 +54,14 @@ function makeExecContext(): { requestContext: RequestContext } {
 
 async function execPlan(status: PlanStatus) {
   mockGetPlan.mockImplementation(() => makePlan(status));
-  return (await (executePlanTool as unknown as {
-    execute: (
-      input: { planId: string; rationale: string },
-      ctx: { requestContext: RequestContext },
-    ) => Promise<{ success: boolean; error?: string }>;
-  }).execute({ planId: PLAN_ID, rationale: RATIONALE }, makeExecContext()));
+  return await (
+    executePlanTool as unknown as {
+      execute: (
+        input: { planId: string; rationale: string },
+        ctx: { requestContext: RequestContext },
+      ) => Promise<{ success: boolean; error?: string }>;
+    }
+  ).execute({ planId: PLAN_ID, rationale: RATIONALE }, makeExecContext());
 }
 
 describe("execute_plan — APPROVED gate", () => {

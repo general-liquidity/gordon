@@ -18,12 +18,7 @@
  *   - Error envelope
  */
 
-import {
-  passthrough,
-  safeStringifyLength,
-  looksLikeError,
-  type FilterResult,
-} from "./types.ts";
+import { passthrough, safeStringifyLength, looksLikeError, type FilterResult } from "./types.ts";
 
 interface OrderbookLevel {
   price: number;

@@ -6,11 +6,7 @@
  */
 
 import { startOAuthFlow, refreshAccessToken } from "./oauth-flow.ts";
-import {
-  buildOAuthFlowConfig,
-  getOAuthVenueConfig,
-  type OAuthVenueId,
-} from "./oauth-registry.ts";
+import { buildOAuthFlowConfig, getOAuthVenueConfig, type OAuthVenueId } from "./oauth-registry.ts";
 import {
   saveOAuthEntry,
   loadOAuthEntry,

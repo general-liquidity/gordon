@@ -11,7 +11,13 @@
  * vocabulary so composeHealth() folds the two verdicts.
  */
 
-import type { EdgeHealth, EdgeInvariant, EdgeSpec, EdgeStatusResult, InvariantCheck } from "./types.ts";
+import type {
+  EdgeHealth,
+  EdgeInvariant,
+  EdgeSpec,
+  EdgeStatusResult,
+  InvariantCheck,
+} from "./types.ts";
 
 export type EdgeMetrics = Record<string, number | string | undefined>;
 
@@ -25,14 +31,30 @@ export function evaluateCondition(cond: EdgeInvariant, metrics: EdgeMetrics): In
     const num = Number(value);
     const set = (cond.threshold as string[]).map?.(String) ?? [];
     switch (cond.comparator) {
-      case ">": satisfied = num > Number(cond.threshold); break;
-      case ">=": satisfied = num >= Number(cond.threshold); break;
-      case "<": satisfied = num < Number(cond.threshold); break;
-      case "<=": satisfied = num <= Number(cond.threshold); break;
-      case "==": satisfied = String(value) === String(cond.threshold); break;
-      case "!=": satisfied = String(value) !== String(cond.threshold); break;
-      case "in": satisfied = set.includes(String(value)); break;
-      case "not-in": satisfied = !set.includes(String(value)); break;
+      case ">":
+        satisfied = num > Number(cond.threshold);
+        break;
+      case ">=":
+        satisfied = num >= Number(cond.threshold);
+        break;
+      case "<":
+        satisfied = num < Number(cond.threshold);
+        break;
+      case "<=":
+        satisfied = num <= Number(cond.threshold);
+        break;
+      case "==":
+        satisfied = String(value) === String(cond.threshold);
+        break;
+      case "!=":
+        satisfied = String(value) !== String(cond.threshold);
+        break;
+      case "in":
+        satisfied = set.includes(String(value));
+        break;
+      case "not-in":
+        satisfied = !set.includes(String(value));
+        break;
     }
   }
   return { invariant: cond, value, satisfied };

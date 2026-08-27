@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -16,7 +17,9 @@ function benignManifest(overrides: Partial<MCPServerManifest> = {}): MCPServerMa
     description: "A benign MCP server",
     author: "tester",
     category: "general" as MCPServerManifest["category"],
-    tools: [{ name: "do_thing", description: "does a thing" } as MCPServerManifest["tools"][number]],
+    tools: [
+      { name: "do_thing", description: "does a thing" } as MCPServerManifest["tools"][number],
+    ],
     authentication: { type: "none" } as MCPServerManifest["authentication"],
     command: "npx",
     args: ["-y", "some-mcp"],
@@ -58,7 +61,9 @@ describe("validatePluginCommand", () => {
 
   it("does not let an absolute path bypass the launcher allowlist", () => {
     expect(validatePluginCommand("/bin/sh", ["-c", "echo hi"])).not.toBeNull();
-    expect(validatePluginCommand("C:\\Windows\\System32\\cmd.exe", ["/c", "echo hi"])).not.toBeNull();
+    expect(
+      validatePluginCommand("C:\\Windows\\System32\\cmd.exe", ["/c", "echo hi"]),
+    ).not.toBeNull();
     expect(validatePluginCommand("/usr/bin/node", ["server.mjs"])).toBeNull();
   });
 
@@ -131,11 +136,84 @@ describe("PluginInstaller listing.id path-traversal", () => {
     const dir = mkdtempSync(join(tmpdir(), "gordon-installer-"));
     try {
       const installer = new PluginInstaller(join(dir, "plugins"));
-      const listing = benignListing({ id: "good-mcp", manifest: benignManifest({ id: "good-mcp" }) });
+      const listing = benignListing({
+        id: "good-mcp",
+        manifest: benignManifest({ id: "good-mcp" }),
+      });
 
       const installed = await installer.install(listing);
       expect(installed.id).toBe("good-mcp");
       expect(installer.isInstalled("good-mcp")).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a listing whose id disagrees with its manifest id", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "gordon-installer-"));
+    try {
+      const installer = new PluginInstaller(join(dir, "plugins"));
+      const listing = benignListing({ id: "outer-id" });
+
+      await expect(installer.install(listing)).rejects.toThrow(/does not match manifest id/i);
+      expect(installer.isInstalled("outer-id")).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a marketplace manifest that does not match its published digest", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "gordon-installer-"));
+    try {
+      const installer = new PluginInstaller(join(dir, "plugins"));
+      const manifest = benignManifest();
+      const listing = benignListing({ manifest, manifestSha256: "0".repeat(64) });
+
+      await expect(installer.install(listing)).rejects.toThrow(/expected SHA-256/i);
+      expect(installer.isInstalled("some-mcp")).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("records and verifies the exact installed manifest bytes", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "gordon-installer-"));
+    try {
+      const pluginsDir = join(dir, "plugins");
+      const installer = new PluginInstaller(pluginsDir);
+      const manifest = benignManifest();
+      const bytes = JSON.stringify(manifest, null, 2);
+      const digest = createHash("sha256").update(bytes).digest("hex");
+
+      const installed = await installer.install(
+        benignListing({ manifest, manifestSha256: digest }),
+      );
+      expect(installed.manifestSha256).toBe(digest);
+      expect(await readFile(join(pluginsDir, "some-mcp", "manifest.json"), "utf-8")).toBe(bytes);
+
+      const reloaded = new PluginInstaller(pluginsDir);
+      await reloaded.initialize();
+      expect(reloaded.isInstalled("some-mcp")).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not load an installed plugin after its manifest is changed", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "gordon-installer-"));
+    try {
+      const pluginsDir = join(dir, "plugins");
+      const installer = new PluginInstaller(pluginsDir);
+      await installer.install(benignListing());
+      await writeFile(
+        join(pluginsDir, "some-mcp", "manifest.json"),
+        JSON.stringify(benignManifest({ command: "node", args: ["tampered.js"] }), null, 2),
+      );
+
+      const reloaded = new PluginInstaller(pluginsDir);
+      await reloaded.initialize();
+      expect(reloaded.isInstalled("some-mcp")).toBe(false);
+      expect(reloaded.getEnabled()).toEqual([]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -135,9 +135,7 @@ export {
 } from "./anti-rot/strategyMandates.ts";
 
 // Trader behavior pattern detector (cross-session pattern surfacing)
-export {
-  detectTraderBehaviorPatterns,
-} from "./anti-rot/traderBehaviorPatterns.ts";
+export { detectTraderBehaviorPatterns } from "./anti-rot/traderBehaviorPatterns.ts";
 export type {
   BehaviorPatternKind,
   BehaviorPattern,

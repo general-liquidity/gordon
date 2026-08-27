@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from "react";
+import type React from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { FullscreenLayout } from "../layout/FullscreenLayout.tsx";
 import type { PermissionMode } from "../../state/types.ts";
@@ -17,7 +18,16 @@ export interface SafetyDashboardViewProps {
   onClose: () => void;
 }
 
-const SCOPES: KillSwitchScope[] = ["firm", "instrument", "venue", "account", "strategy", "trader", "client", "gateway"];
+const SCOPES: KillSwitchScope[] = [
+  "firm",
+  "instrument",
+  "venue",
+  "account",
+  "strategy",
+  "trader",
+  "client",
+  "gateway",
+];
 
 interface SafetySnapshot {
   killSwitchEnabled: boolean;
@@ -26,7 +36,10 @@ interface SafetySnapshot {
   recent: RuntimeApprovalRequest[];
 }
 
-export function summarizeApprovalVelocity(recent: RuntimeApprovalRequest[], nowMs: number): {
+export function summarizeApprovalVelocity(
+  recent: RuntimeApprovalRequest[],
+  nowMs: number,
+): {
   approvedLastHour: number;
   deniedLastHour: number;
   autoApprovedLastHour: number;
@@ -60,7 +73,10 @@ export function deriveKillSwitchRows(
   });
 }
 
-export function SafetyDashboardView({ permissionMode, onClose }: SafetyDashboardViewProps): React.JSX.Element {
+export function SafetyDashboardView({
+  permissionMode,
+  onClose,
+}: SafetyDashboardViewProps): React.JSX.Element {
   const theme = useTheme();
   const [snapshot, setSnapshot] = useState<SafetySnapshot>(() => loadSnapshot());
   const refresh = useCallback(() => setSnapshot(loadSnapshot()), []);
@@ -84,36 +100,70 @@ export function SafetyDashboardView({ permissionMode, onClose }: SafetyDashboard
       content={
         <Box flexDirection="column">
           {!snapshot.killSwitchEnabled && (
-            <Text color={theme.riskWarning} bold>⚠ kill-switch engine DISABLED (GORDON_KILL_SWITCHES=0)</Text>
+            <Text color={theme.riskWarning} bold>
+              ⚠ kill-switch engine DISABLED (GORDON_KILL_SWITCHES=0)
+            </Text>
           )}
-          <Text bold>KILL SWITCHES                              engine: {snapshot.killSwitchEnabled ? "enabled" : "disabled"}</Text>
+          <Text bold>
+            KILL SWITCHES engine: {snapshot.killSwitchEnabled ? "enabled" : "disabled"}
+          </Text>
           <Box flexDirection="column">
             {rows.map((row) => (
-              <Text key={row.scope} color={row.status === "tripped" ? theme.riskDanger : row.status === "disabled" ? theme.riskWarning : theme.riskSafe}>
-                {"  "}{row.scope.padEnd(12)} {row.status === "tripped" ? `TRIPPED - ${row.reason}` : row.status}
+              <Text
+                key={row.scope}
+                color={
+                  row.status === "tripped"
+                    ? theme.riskDanger
+                    : row.status === "disabled"
+                      ? theme.riskWarning
+                      : theme.riskSafe
+                }
+              >
+                {"  "}
+                {row.scope.padEnd(12)}{" "}
+                {row.status === "tripped" ? `TRIPPED - ${row.reason}` : row.status}
               </Text>
             ))}
           </Box>
           <Divider />
           <Text bold>APPROVAL RULES ({snapshot.rules.length})</Text>
-          {snapshot.rules.length === 0 ? <Text dimColor>   none</Text> : snapshot.rules.map((rule, index) => (
-            <Text key={`${rule.createdAt}-${index}`}>
-              {"   "}{String(rule.decision).padEnd(6)} {(rule.toolName ?? rule.toolNamePattern ?? "<scope-wide>").padEnd(22)} {rule.scope} {rule.createdBy} {formatAge(rule.createdAt)}
-            </Text>
-          ))}
+          {snapshot.rules.length === 0 ? (
+            <Text dimColor> none</Text>
+          ) : (
+            snapshot.rules.map((rule, index) => (
+              <Text key={`${rule.createdAt}-${index}`}>
+                {"   "}
+                {String(rule.decision).padEnd(6)}{" "}
+                {(rule.toolName ?? rule.toolNamePattern ?? "<scope-wide>").padEnd(22)} {rule.scope}{" "}
+                {rule.createdBy} {formatAge(rule.createdAt)}
+              </Text>
+            ))
+          )}
           <Divider />
           <Text bold>RECENT DENIALS (last 50 decisions)</Text>
-          {denied.length === 0 ? <Text dimColor>   none in the last 50 decisions</Text> : denied.map((approval) => (
-            <Text key={approval.id}>
-              {"   "}{formatTime(approval.decidedAt ?? approval.requestedAt)}  {approval.toolName.padEnd(18)} denied by {approval.decisionSource ?? "unknown"} - {approval.reason ?? "no reason"}
-            </Text>
-          ))}
+          {denied.length === 0 ? (
+            <Text dimColor> none in the last 50 decisions</Text>
+          ) : (
+            denied.map((approval) => (
+              <Text key={approval.id}>
+                {"   "}
+                {formatTime(approval.decidedAt ?? approval.requestedAt)}{" "}
+                {approval.toolName.padEnd(18)} denied by {approval.decisionSource ?? "unknown"} -{" "}
+                {approval.reason ?? "no reason"}
+              </Text>
+            ))
+          )}
           <Divider />
-          <Text bold>APPROVAL VELOCITY (1h)  approved {velocity.approvedLastHour} · denied {velocity.deniedLastHour} · auto {velocity.autoApprovedLastHour}</Text>
+          <Text bold>
+            APPROVAL VELOCITY (1h) approved {velocity.approvedLastHour} · denied{" "}
+            {velocity.deniedLastHour} · auto {velocity.autoApprovedLastHour}
+          </Text>
         </Box>
       }
       statusBar={<Text dimColor>q close · r refresh</Text>}
-      input={<Text dimColor>Read-only safety surface. Mutations stay in /killswitch and /rules.</Text>}
+      input={
+        <Text dimColor>Read-only safety surface. Mutations stay in /killswitch and /rules.</Text>
+      }
     />
   );
 }
@@ -131,7 +181,9 @@ function loadSnapshot(): SafetySnapshot {
 function Header({ mode }: { mode: PermissionMode }): React.JSX.Element {
   return (
     <Box flexDirection="column">
-      <Text bold>SAFETY                                           {mode} · {new Date().toLocaleTimeString()}</Text>
+      <Text bold>
+        SAFETY {mode} · {new Date().toLocaleTimeString()}
+      </Text>
       <Text dimColor>{"─".repeat(72)}</Text>
     </Box>
   );

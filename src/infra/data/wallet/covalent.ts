@@ -100,9 +100,7 @@ export class CovalentWalletSource implements WalletIntelSource {
       logger.warn(`unsupported chain: ${chain}`);
       return [];
     }
-    const json = await this.fetchJson(
-      `/${cn}/address/${query.address}/balances_v2/`,
-    );
+    const json = await this.fetchJson(`/${cn}/address/${query.address}/balances_v2/`);
     const items: any[] = json?.data?.items ?? [];
     return items.map((it) => {
       const decimals = Number(it.contract_decimals ?? 0);
@@ -126,9 +124,7 @@ export class CovalentWalletSource implements WalletIntelSource {
       logger.warn(`unsupported chain: ${query.chain}`);
       return [];
     }
-    const json = await this.fetchJson(
-      `/${cn}/address/${query.address}/transactions_v3/`,
-    );
+    const json = await this.fetchJson(`/${cn}/address/${query.address}/transactions_v3/`);
     const items: any[] = json?.data?.items ?? [];
     const addr = query.address.toLowerCase();
     let txs: WalletTx[] = items.map((it) => {
@@ -140,10 +136,7 @@ export class CovalentWalletSource implements WalletIntelSource {
         from,
         to: it.to_address ?? "",
         valueUsd: it.value_quote ?? undefined,
-        direction:
-          from.toLowerCase() === addr
-            ? ("out" as const)
-            : ("in" as const),
+        direction: from.toLowerCase() === addr ? ("out" as const) : ("in" as const),
       } satisfies WalletTx;
     });
     if (query.sinceMs != null) {

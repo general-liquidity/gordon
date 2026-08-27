@@ -31,7 +31,9 @@ describe("computeCryptoFactorModel", () => {
       tok("FLAT", { lookbackReturn: 0.0 }),
       tok("LOSER", { lookbackReturn: -0.2 }),
     ])!;
-    expect(bySym(r, "LOSER").exposures.reversal).toBeGreaterThan(bySym(r, "FLAT").exposures.reversal);
+    expect(bySym(r, "LOSER").exposures.reversal).toBeGreaterThan(
+      bySym(r, "FLAT").exposures.reversal,
+    );
     expect(bySym(r, "FLAT").exposures.reversal).toBeGreaterThan(bySym(r, "WIN").exposures.reversal);
   });
 
@@ -50,7 +52,9 @@ describe("computeCryptoFactorModel", () => {
       tok("MID", { residualVol: 0.6 }),
       tok("HIGH", { residualVol: 1.5 }),
     ])!;
-    expect(bySym(r, "HIGH").exposures.volatility).toBeGreaterThan(bySym(r, "LOW").exposures.volatility);
+    expect(bySym(r, "HIGH").exposures.volatility).toBeGreaterThan(
+      bySym(r, "LOW").exposures.volatility,
+    );
   });
 
   it("quality: genuine on-chain usage gets the highest exposure", () => {
@@ -68,7 +72,9 @@ describe("computeCryptoFactorModel", () => {
       tok("MID", { valuationRatios: [50, 50] }),
       tok("CHEAP", { valuationRatios: [10, 10] }),
     ])!;
-    expect(bySym(r, "CHEAP").exposures.value).toBeGreaterThan(bySym(r, "EXPENSIVE").exposures.value);
+    expect(bySym(r, "CHEAP").exposures.value).toBeGreaterThan(
+      bySym(r, "EXPENSIVE").exposures.value,
+    );
   });
 
   it("orthogonalization: quality exposure is ⊥ size in the cross-section even when raw quality tracks mcap", () => {

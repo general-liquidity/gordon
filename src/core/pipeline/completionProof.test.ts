@@ -53,7 +53,13 @@ describe("buildCompletionProof — achieved path", () => {
 
   it("flags agreement when self-score and verdict both confirm", () => {
     const { state, score, requirements, verdict } = achievedFixture();
-    const proof = buildCompletionProof({ state, score, requirements, verdict, stopReason: "achieved" });
+    const proof = buildCompletionProof({
+      state,
+      score,
+      requirements,
+      verdict,
+      stopReason: "achieved",
+    });
     // self-score proposed completion (Sharpe 2.0 >= 1.5) AND verdict confirmed.
     expect(proof.selfScoreAgreesWithVerdict).toBe(true);
     expect(proof.selfScorePct).toBeGreaterThanOrEqual(1);
@@ -67,7 +73,13 @@ describe("buildCompletionProof — achieved path", () => {
       unmet: [],
       rationale: "held back",
     };
-    const proof = buildCompletionProof({ state, score, requirements, verdict: rejecting, stopReason: "achieved" });
+    const proof = buildCompletionProof({
+      state,
+      score,
+      requirements,
+      verdict: rejecting,
+      stopReason: "achieved",
+    });
     // self-score claims done, verdict says no -> disagreement surfaced.
     expect(proof.selfScoreAgreesWithVerdict).toBe(false);
   });
@@ -76,7 +88,10 @@ describe("buildCompletionProof — achieved path", () => {
 describe("buildCompletionProof — acknowledged-gaps path", () => {
   it("carries the named open gaps and a null verifier when self-score never proposed completion", () => {
     resetGoalIdCounterForTesting();
-    const state0 = createGoalState("/goal grow book until Sharpe >= 1.5", "2026-01-01T00:00:00.000Z");
+    const state0 = createGoalState(
+      "/goal grow book until Sharpe >= 1.5",
+      "2026-01-01T00:00:00.000Z",
+    );
     const obs: GoalObservation = { sharpe: 0.3, constraintViolations: [] };
     const score = scoreGoal(state0.parsedGoal, obs, 1);
     const recorded = recordGoalProgress(state0, score);

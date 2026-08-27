@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text, useInput } from "../ink-custom";
 
 // ============================================================================
@@ -18,7 +17,13 @@ interface Props {
   onCancel?: () => void;
 }
 
-export function SearchBox({ value, onChange, placeholder = "Search...", onSubmit, onCancel }: Props) {
+export function SearchBox({
+  value,
+  onChange,
+  placeholder = "Search...",
+  onSubmit,
+  onCancel,
+}: Props) {
   useInput((input, key) => {
     if (key.escape && onCancel) {
       onCancel();

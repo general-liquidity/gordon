@@ -3,10 +3,8 @@
  * EXPOSURE-REDUCING and is not gated on live consent. (Placing a resting stop
  * order is a different act and is not what this site does.)
  *
- * The module is long-only: it hardcodes SELL and computes long-only PnL. On a
- * short trade SELL is not the exit side, the reduction claim fails
- * verification, and the dispatch falls back to the consent gate rather than
- * silently doubling the position.
+ * Direction is part of the protective contract: longs exit with SELL, shorts
+ * with BUY, and PnL changes sign with the position direction.
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
@@ -71,7 +69,9 @@ function makeOpenTrade(direction: "long" | "short" = "long", exitQty = 0): Trade
     openedAt: new Date().toISOString(),
     closedAt: null,
     symbol: "BTCUSDT",
-    entries: [{ orderId: "entry-1", price: 50_000, quantity: 0.02, filledAt: new Date().toISOString() }],
+    entries: [
+      { orderId: "entry-1", price: 50_000, quantity: 0.02, filledAt: new Date().toISOString() },
+    ],
     exits: exitQty
       ? [
           {
@@ -100,6 +100,8 @@ function makeClient(isSandbox: boolean, placed: PlacedOrder[]): Exchange {
   return {
     exchangeId: "binance",
     isSandbox,
+    getOrderHistory: async () => [],
+    getOpenOrders: async () => [],
     placeOrder: async (params: { symbol: string; side: string; quantity: number }) => {
       placed.push({ symbol: params.symbol, side: params.side, quantity: params.quantity });
       return {
@@ -158,13 +160,14 @@ describe("executeTrailingStop is exposure-reducing, not consent-gated", () => {
     expect(placed[0]?.quantity).toBeCloseTo(0.015, 8);
   });
 
-  it("falls back to the consent gate on a short trade, where SELL is not the exit side", async () => {
+  it("closes a short with BUY and applies short-direction PnL", async () => {
     const trade = makeOpenTrade("short");
     const placed: PlacedOrder[] = [];
     const result = await trackerFor(trade).executeTrailingStop(makeClient(false, placed), trade.id);
 
-    expect(result.success).toBe(false);
-    expect(result.error).toMatch(/have not yet acknowledged live trading/);
-    expect(placed).toEqual([]);
+    expect(result.success).toBe(true);
+    expect(result.pnl).toBeCloseTo(-20, 8);
+    expect(placed).toHaveLength(1);
+    expect(placed[0]?.side).toBe("BUY");
   });
 });

@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import {
-  fanoutSubagentTasks,
-  MAX_FANOUT_TASKS,
-  type FanoutTask,
-} from "./subagentFanout.ts";
+import { fanoutSubagentTasks, MAX_FANOUT_TASKS, type FanoutTask } from "./subagentFanout.ts";
 import {
   AgentRegistry,
   _resetDefaultAgentRegistryForTests,
@@ -12,7 +8,15 @@ import type { DispatchableAgent } from "./subagentDispatcher.ts";
 import type { SubagentProfile } from "./subagentProfile.ts";
 
 const PROFILES = new Map<string, SubagentProfile>([
-  ["scout", { name: "scout", description: "Recon", instructions: "Recon.", tools: ["scan_market", "list_skills"] }],
+  [
+    "scout",
+    {
+      name: "scout",
+      description: "Recon",
+      instructions: "Recon.",
+      tools: ["scan_market", "list_skills"],
+    },
+  ],
   ["wide", { name: "wide", description: "Broad", instructions: "Broad.", tools: ["*"] }],
 ]);
 
@@ -89,7 +93,10 @@ describe("FW7 — fanoutSubagentTasks", () => {
 
   test("respects the concurrency pool (peak in-flight ≤ pool size)", async () => {
     const tracker = { inFlight: 0, max: 0 };
-    const tasks: FanoutTask[] = Array.from({ length: 6 }, (_, i) => ({ role: "scout", task: `t${i}` }));
+    const tasks: FanoutTask[] = Array.from({ length: 6 }, (_, i) => ({
+      role: "scout",
+      task: `t${i}`,
+    }));
     const rep = await fanoutSubagentTasks(PROFILES, tasks, FAKE_REGISTRY, {
       env: ENABLED,
       registry: new AgentRegistry(),
@@ -102,7 +109,10 @@ describe("FW7 — fanoutSubagentTasks", () => {
   });
 
   test("concurrency is clamped to MAX_FANOUT_CONCURRENCY and the task count", async () => {
-    const tasks: FanoutTask[] = Array.from({ length: 2 }, (_, i) => ({ role: "scout", task: `t${i}` }));
+    const tasks: FanoutTask[] = Array.from({ length: 2 }, (_, i) => ({
+      role: "scout",
+      task: `t${i}`,
+    }));
     const rep = await fanoutSubagentTasks(PROFILES, tasks, FAKE_REGISTRY, {
       env: ENABLED,
       registry: new AgentRegistry(),
@@ -134,21 +144,29 @@ describe("FW7 — fanoutSubagentTasks", () => {
 
   test("read-only invariant flows through: execution tools stay blocked per item", async () => {
     const captured: Record<string, unknown>[] = [];
-    const rep = await fanoutSubagentTasks(PROFILES, [{ role: "wide", task: "scan everything" }], FAKE_REGISTRY, {
-      env: ENABLED,
-      registry: new AgentRegistry(),
-      agentFactory: (cfg) => {
-        captured.push(cfg.tools);
-        return fakeAgent("ok");
+    const rep = await fanoutSubagentTasks(
+      PROFILES,
+      [{ role: "wide", task: "scan everything" }],
+      FAKE_REGISTRY,
+      {
+        env: ENABLED,
+        registry: new AgentRegistry(),
+        agentFactory: (cfg) => {
+          captured.push(cfg.tools);
+          return fakeAgent("ok");
+        },
       },
-    });
+    );
     expect(rep.items[0]!.result.toolFilter.blocked).toContain("place_market_order");
     expect(captured[0]).toHaveProperty("scan_market");
     expect(captured[0]).not.toHaveProperty("place_market_order");
   });
 
   test("caps at MAX_FANOUT_TASKS and surfaces the dropped count (no silent truncation)", async () => {
-    const tasks: FanoutTask[] = Array.from({ length: MAX_FANOUT_TASKS + 3 }, (_, i) => ({ role: "scout", task: `t${i}` }));
+    const tasks: FanoutTask[] = Array.from({ length: MAX_FANOUT_TASKS + 3 }, (_, i) => ({
+      role: "scout",
+      task: `t${i}`,
+    }));
     const rep = await fanoutSubagentTasks(PROFILES, tasks, FAKE_REGISTRY, {
       env: ENABLED,
       registry: new AgentRegistry(),
@@ -160,7 +178,10 @@ describe("FW7 — fanoutSubagentTasks", () => {
   });
 
   test("concurrent same-role dispatches get unique subagent ids (no Date.now collision)", async () => {
-    const tasks: FanoutTask[] = Array.from({ length: 6 }, (_, i) => ({ role: "scout", task: `t${i}` }));
+    const tasks: FanoutTask[] = Array.from({ length: 6 }, (_, i) => ({
+      role: "scout",
+      task: `t${i}`,
+    }));
     const rep = await fanoutSubagentTasks(PROFILES, tasks, FAKE_REGISTRY, {
       env: ENABLED,
       registry: new AgentRegistry(),

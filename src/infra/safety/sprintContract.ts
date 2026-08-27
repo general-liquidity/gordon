@@ -78,7 +78,6 @@ export interface ContractDiff {
   verdict: "clean" | "drift" | "violation";
 }
 
-
 function newContractId(): string {
   return `sprint-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -120,10 +119,7 @@ export function createSprintContract(draft: SprintContractDraft): SprintContract
  * case-insensitive for venues, matching how the rest of Gordon
  * normalizes venue IDs.
  */
-export function compareWithActuals(
-  contract: SprintContract,
-  actuals: SprintActuals,
-): ContractDiff {
+export function compareWithActuals(contract: SprintContract, actuals: SprintActuals): ContractDiff {
   const symbolsConstrained = contract.scope.symbols.length > 0;
   const venuesConstrained = contract.scope.venues.length > 0;
   const strategiesConstrained = contract.scope.strategies.length > 0;

@@ -192,7 +192,7 @@ export async function appendExecutionRecord(
   ledgerPath: string = defaultTradeLedgerPath(),
 ): Promise<void> {
   ensureLedgerDir(ledgerPath);
-  await appendFile(ledgerPath, JSON.stringify(record) + "\n", "utf-8");
+  await appendFile(ledgerPath, `${JSON.stringify(record)}\n`, "utf-8");
 }
 
 export interface ReadOptions {
@@ -269,9 +269,7 @@ export async function appendExecutionRecordFresh(
 
 // --------------------------- payload helper --------------------
 
-export function executionRecordToPayload(
-  record: ExecutionRecord,
-): Record<string, unknown> {
+export function executionRecordToPayload(record: ExecutionRecord): Record<string, unknown> {
   return {
     kind: "trade_ledger.recorded",
     recordId: record.recordId,
@@ -286,21 +284,13 @@ export function executionRecordToPayload(
       record.stateBefore?.netLiquidationUsd !== undefined &&
       record.stateAfter?.netLiquidationUsd !== undefined
         ? Number(
-            (
-              record.stateAfter.netLiquidationUsd -
-              record.stateBefore.netLiquidationUsd
-            ).toFixed(4),
+            (record.stateAfter.netLiquidationUsd - record.stateBefore.netLiquidationUsd).toFixed(4),
           )
         : null,
     realizedPnLDelta:
       record.stateBefore?.realizedPnLUsd !== undefined &&
       record.stateAfter?.realizedPnLUsd !== undefined
-        ? Number(
-            (
-              record.stateAfter.realizedPnLUsd -
-              record.stateBefore.realizedPnLUsd
-            ).toFixed(4),
-          )
+        ? Number((record.stateAfter.realizedPnLUsd - record.stateBefore.realizedPnLUsd).toFixed(4))
         : null,
     bodyHash: record.bodyHash,
   };

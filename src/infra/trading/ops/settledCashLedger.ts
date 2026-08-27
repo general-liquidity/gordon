@@ -143,8 +143,7 @@ export class SettledCashLedger {
       allowed: false,
       settledAvailable,
       shortfall: notional - settledAvailable,
-      reason:
-        "GFV: buy would draw on unsettled proceeds; settled cash does not cover the notional",
+      reason: "GFV: buy would draw on unsettled proceeds; settled cash does not cover the notional",
     };
   }
 

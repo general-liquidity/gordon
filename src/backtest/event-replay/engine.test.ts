@@ -1,11 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { runEventReplay } from "./engine.ts";
-import type {
-  HistoricalEvent,
-  OHLCBar,
-  ReplayStrategy,
-  StrategyOrder,
-} from "./types.ts";
+import type { HistoricalEvent, OHLCBar, ReplayStrategy, StrategyOrder } from "./types.ts";
 
 function makeEvent(overrides: Partial<HistoricalEvent> = {}): HistoricalEvent {
   return {
@@ -26,7 +21,10 @@ function makeEvent(overrides: Partial<HistoricalEvent> = {}): HistoricalEvent {
   };
 }
 
-function makeBars(prices: number[], startTime: number = Date.parse("2026-01-01T00:00:00Z")): OHLCBar[] {
+function makeBars(
+  prices: number[],
+  startTime: number = Date.parse("2026-01-01T00:00:00Z"),
+): OHLCBar[] {
   return prices.map((close, i) => ({
     time: startTime + i * 60 * 60 * 1000, // 1-hour bars
     open: i === 0 ? close : prices[i - 1]!,
@@ -40,7 +38,7 @@ function makeBars(prices: number[], startTime: number = Date.parse("2026-01-01T0
 // Strategy that holds a long position the whole time without managing risk
 const holdLongStrategy: ReplayStrategy = {
   init: () => ({ TEST: { qty: 0, avgPrice: 0 } }),
-  step: (state, bar, asset) => {
+  step: (state, _bar, asset) => {
     if (asset !== "TEST") return [];
     if (state.TEST!.qty === 0) {
       return [{ asset: "TEST", side: "buy", qty: 100, type: "market" }];
@@ -93,7 +91,7 @@ describe("runEventReplay — gap-through-stop", () => {
     // Strategy: enter long at first bar, set sell-stop at 95
     const stopStrategy: ReplayStrategy = {
       init: () => ({ TEST: { qty: 0, avgPrice: 0 } }),
-      step: (state, bar, asset) => {
+      step: (state, _bar, asset) => {
         if (asset !== "TEST") return [];
         const orders: StrategyOrder[] = [];
         if (state.TEST!.qty === 0) {
@@ -103,7 +101,14 @@ describe("runEventReplay — gap-through-stop", () => {
         return orders;
       },
     };
-    const event = makeEvent({ characteristics: { primaryMove: "gap", gapRisk: true, spreadWidening: false, sessionsHalted: false } });
+    const event = makeEvent({
+      characteristics: {
+        primaryMove: "gap",
+        gapRisk: true,
+        spreadWidening: false,
+        sessionsHalted: false,
+      },
+    });
     // Price goes 100 → 100 → GAP TO 80 (open 80, well below stop at 95)
     const t0 = Date.parse("2026-01-01T00:00:00Z");
     const bars = {
@@ -125,7 +130,7 @@ describe("runEventReplay — gap-through-stop", () => {
   it("normal stop fill (no gap) reports modest slippage", () => {
     const stopStrategy: ReplayStrategy = {
       init: () => ({ TEST: { qty: 0, avgPrice: 0 } }),
-      step: (state, bar, asset) => {
+      step: (state, _bar, asset) => {
         if (asset !== "TEST") return [];
         const orders: StrategyOrder[] = [];
         if (state.TEST!.qty === 0) {
@@ -166,7 +171,7 @@ describe("runEventReplay — risk response time", () => {
     // Strategy that reduces after entering
     const reducingStrategy: ReplayStrategy = {
       init: () => ({ TEST: { qty: 0, avgPrice: 0 } }),
-      step: (state, bar, asset) => {
+      step: (state, _bar, asset) => {
         if (asset !== "TEST") return [];
         const orders: StrategyOrder[] = [];
         if (state.TEST!.qty === 0) {
@@ -194,7 +199,12 @@ describe("runEventReplay — spread widening", () => {
   it("applies spread-widening multiplier when event flag is set", () => {
     const eventNoWidening = makeEvent();
     const eventWithWidening = makeEvent({
-      characteristics: { primaryMove: "test", gapRisk: false, spreadWidening: true, sessionsHalted: false },
+      characteristics: {
+        primaryMove: "test",
+        gapRisk: false,
+        spreadWidening: true,
+        sessionsHalted: false,
+      },
     });
     const bars = { TEST: makeBars([100, 101]) };
     const metricsNoWiden = runEventReplay({
@@ -209,6 +219,8 @@ describe("runEventReplay — spread widening", () => {
       strategy: holdLongStrategy,
       slippage: { baseMarketBps: 10, spreadWideningMultiplier: 5 },
     });
-    expect(metricsWiden.maxSingleTradeSlippage).toBeGreaterThan(metricsNoWiden.maxSingleTradeSlippage);
+    expect(metricsWiden.maxSingleTradeSlippage).toBeGreaterThan(
+      metricsNoWiden.maxSingleTradeSlippage,
+    );
   });
 });

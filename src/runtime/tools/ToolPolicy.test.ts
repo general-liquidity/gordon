@@ -3,11 +3,14 @@ import { GordonConfigSchema } from "../../types/index.ts";
 import type { GordonContext } from "../../infra/agents/types.ts";
 import { evaluateRuntimeToolPolicy } from "./ToolPolicy.ts";
 
-function createContext(permissionMode: "auto" | "ask" | "strict" | "paper" | "observe" | "plan" = "ask"): GordonContext {
+function createContext(
+  permissionMode: "auto" | "ask" | "strict" | "paper" | "observe" | "plan" = "ask",
+): GordonContext {
   const config = GordonConfigSchema.parse({
     permissionMode,
   });
-  return {    exchange: null,
+  return {
+    exchange: null,
     broker: null,
     llm: {} as GordonContext["llm"],
     config,

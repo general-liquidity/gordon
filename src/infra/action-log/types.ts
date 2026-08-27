@@ -32,7 +32,7 @@ export const ACTION_LOG_ENTRY_TYPES = [
   "custom",
 ] as const;
 
-export type ActionLogEntryType = typeof ACTION_LOG_ENTRY_TYPES[number];
+export type ActionLogEntryType = (typeof ACTION_LOG_ENTRY_TYPES)[number];
 
 export interface ActionLogEntry {
   id: string;
@@ -95,5 +95,5 @@ export function isActionLogEntryType(value: string): value is ActionLogEntryType
 }
 
 export function isActionLogGroupAlias(value: string): value is ActionLogGroupAlias {
-  return Object.prototype.hasOwnProperty.call(ACTION_LOG_GROUP_ALIASES, value);
+  return Object.hasOwn(ACTION_LOG_GROUP_ALIASES, value);
 }

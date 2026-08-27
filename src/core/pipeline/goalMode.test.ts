@@ -26,7 +26,6 @@ import {
   GOAL_MODE_FLAG_ENV,
   GOAL_STATE_PATH_ENV,
   GOAL_PROGRESS_PATH_ENV,
-  type GoalObservation,
 } from "./goalMode.ts";
 
 let tempDir: string;
@@ -274,11 +273,7 @@ describe("scoreGoal — custom + missing end state", () => {
 describe("scoreGoal — observations payload", () => {
   it("includes observed metrics in the payload", () => {
     const goal = parseGoal("trade until Sharpe >= 1.5");
-    const score = scoreGoal(
-      goal,
-      { sharpe: 1.2, winRate: 0.55, trades: 3 },
-      1,
-    );
+    const score = scoreGoal(goal, { sharpe: 1.2, winRate: 0.55, trades: 3 }, 1);
     expect(score.observations?.sharpe).toBe(1.2);
     expect(score.observations?.winRate).toBe(0.55);
     expect(score.observations?.trades).toBe(3);

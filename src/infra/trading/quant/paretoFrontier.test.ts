@@ -65,9 +65,7 @@ describe("weaklyDominates", () => {
 
 describe("computeParetoFrontier — validation", () => {
   it("rejects empty candidates", () => {
-    expect(() =>
-      computeParetoFrontier({ candidates: [], directions: dirs }),
-    ).toThrow();
+    expect(() => computeParetoFrontier({ candidates: [], directions: dirs })).toThrow();
   });
 
   it("rejects empty directions", () => {
@@ -145,8 +143,8 @@ describe("computeParetoFrontier — frontier computation", () => {
     expect(r.frontier[0]!.id).toBe("A");
     expect(r.dominated.length).toBe(1);
     expect(r.dominated[0]!.id).toBe("B");
-    expect(r.dominationMap["B"]).toEqual(["A"]);
-    expect(r.dominationMap["A"]).toEqual([]);
+    expect(r.dominationMap.B).toEqual(["A"]);
+    expect(r.dominationMap.A).toEqual([]);
   });
 
   it("identical objective vectors → both on frontier", () => {
@@ -185,17 +183,13 @@ describe("computeParetoFrontier — frontier computation", () => {
 
   it("dominated-by-multiple is captured in dominationMap", () => {
     const r = computeParetoFrontier({
-      candidates: [
-        mk("Best", 3, 2),
-        mk("Strong", 2.5, 3),
-        mk("Weak", 1, 10),
-      ],
+      candidates: [mk("Best", 3, 2), mk("Strong", 2.5, 3), mk("Weak", 1, 10)],
       directions: dirs,
     });
     // Best dominates Strong and Weak. Strong dominates Weak.
-    expect(r.dominationMap["Weak"]!.sort()).toEqual(["Best", "Strong"]);
-    expect(r.dominationMap["Strong"]).toEqual(["Best"]);
-    expect(r.dominationMap["Best"]).toEqual([]);
+    expect(r.dominationMap.Weak!.sort()).toEqual(["Best", "Strong"]);
+    expect(r.dominationMap.Strong).toEqual(["Best"]);
+    expect(r.dominationMap.Best).toEqual([]);
     expect(r.nFrontier).toBe(1);
   });
 
@@ -227,8 +221,8 @@ describe("computeParetoFrontier — many objectives", () => {
     // C dominates A on all 4 (sharpe 3>2, dd 4<5, cap 110>100, lat 15<20).
     // C vs B: C better on sharpe/drawdown/latency, worse on capacity (110<120) → no dominance.
     // A vs B: A better on sharpe/drawdown/latency, worse on capacity → no dominance.
-    expect(r.dominationMap["A"]).toEqual(["C"]);
-    expect(r.dominationMap["C"]).toEqual([]);
+    expect(r.dominationMap.A).toEqual(["C"]);
+    expect(r.dominationMap.C).toEqual([]);
     expect(r.nFrontier).toBe(2);
     expect(new Set(r.frontier.map((c) => c.id))).toEqual(new Set(["B", "C"]));
   });

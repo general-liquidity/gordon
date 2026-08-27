@@ -58,7 +58,7 @@ function snipOldToolResults(
     const snippedChars = msg.content.length - maxLen;
     return {
       ...msg,
-      content: msg.content.slice(0, maxLen) + `\n... (snipped ${snippedChars} chars)`,
+      content: `${msg.content.slice(0, maxLen)}\n... (snipped ${snippedChars} chars)`,
     };
   });
 
@@ -82,7 +82,7 @@ function deduplicateReads(
 
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
-    if (!msg || !msg.toolName || !readPattern.test(msg.toolName)) continue;
+    if (!msg?.toolName || !readPattern.test(msg.toolName)) continue;
 
     const match = msg.content.match(filePathPattern);
     if (match) {
@@ -224,12 +224,7 @@ function foldDuplicateSystemMessages(
 
     const prev = result[result.length - 1];
 
-    if (
-      prev &&
-      msg.role === "system" &&
-      prev.role === "system" &&
-      msg.content === prev.content
-    ) {
+    if (prev && msg.role === "system" && prev.role === "system" && msg.content === prev.content) {
       applied = true;
       continue; // skip duplicate
     }

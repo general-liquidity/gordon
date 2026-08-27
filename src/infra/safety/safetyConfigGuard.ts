@@ -67,10 +67,7 @@ export interface GuardResult {
 }
 
 export function isSafetyConfigGuardEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
-  return (
-    env[SAFETY_CONFIG_GUARD_FLAG_ENV] === "1" ||
-    env[SAFETY_CONFIG_GUARD_FLAG_ENV] === "true"
-  );
+  return env[SAFETY_CONFIG_GUARD_FLAG_ENV] === "1" || env[SAFETY_CONFIG_GUARD_FLAG_ENV] === "true";
 }
 
 /**
@@ -198,9 +195,7 @@ function buildResult(violations: GuardViolation[]): GuardResult {
   const passes = violations.every((v) => v.severity !== "block");
   const blocking = violations.filter((v) => v.severity === "block");
   const blockingFixInstruction =
-    blocking.length === 0
-      ? null
-      : blocking.map((v) => `[${v.rule}] ${v.fixInstruction}`).join(" ");
+    blocking.length === 0 ? null : blocking.map((v) => `[${v.rule}] ${v.fixInstruction}`).join(" ");
   return { passes, violations, blockingFixInstruction };
 }
 

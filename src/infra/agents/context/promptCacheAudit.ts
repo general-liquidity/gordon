@@ -26,11 +26,7 @@
 import { createHash } from "node:crypto";
 import type { GroundedPromptMessage } from "./contextBudget.ts";
 
-export type AuditProviderType =
-  | "anthropic"
-  | "openai"
-  | "google"
-  | "unknown";
+export type AuditProviderType = "anthropic" | "openai" | "google" | "unknown";
 
 export interface CacheBlockAuditResult {
   /** SHA-1 hash of the stable prefix block (first system message). */
@@ -65,21 +61,16 @@ function asString(content: unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     return content
-      .map((part) =>
-        typeof part === "string"
-          ? part
-          : (part as { text?: string }).text ?? "",
-      )
+      .map((part) => (typeof part === "string" ? part : ((part as { text?: string }).text ?? "")))
       .join("");
   }
   return "";
 }
 
-function detectCacheControlPresence(
-  message: GroundedPromptMessage | undefined,
-): boolean {
+function detectCacheControlPresence(message: GroundedPromptMessage | undefined): boolean {
   if (!message) return false;
-  const opts = (message as unknown as { providerOptions?: Record<string, unknown> }).providerOptions;
+  const opts = (message as unknown as { providerOptions?: Record<string, unknown> })
+    .providerOptions;
   if (!opts || typeof opts !== "object") return false;
 
   // Anthropic: providerOptions.anthropic.cacheControl
@@ -125,14 +116,14 @@ export function auditCacheBlocks(
   messages: GroundedPromptMessage[],
   providerType: AuditProviderType | string = "unknown",
 ): CacheBlockAuditResult {
-  const provider = typeof providerType === "string" && (
-    providerType === "anthropic" ||
-    providerType === "openai" ||
-    providerType === "google" ||
-    providerType === "unknown"
-  )
-    ? providerType
-    : inferProviderType(providerType);
+  const provider =
+    typeof providerType === "string" &&
+    (providerType === "anthropic" ||
+      providerType === "openai" ||
+      providerType === "google" ||
+      providerType === "unknown")
+      ? providerType
+      : inferProviderType(providerType);
 
   const systemMessages = messages.filter((m) => m.role === "system");
   const stablePrefix = systemMessages[0];
@@ -144,14 +135,12 @@ export function auditCacheBlocks(
   const dynamicBlockHash = dynamicBlockContent ? hashContent(dynamicBlockContent) : null;
 
   const cacheControlPresent =
-    detectCacheControlPresence(stablePrefix) ||
-    detectCacheControlPresence(dynamicBlock);
+    detectCacheControlPresence(stablePrefix) || detectCacheControlPresence(dynamicBlock);
 
   const stablePrefixChars = stablePrefixContent.length;
   const estimatedStablePrefixTokens = Math.ceil(stablePrefixChars / 4);
   const cacheControlExpected = expectsExplicitMarkers(provider);
-  const prefixLargeEnoughForCache =
-    estimatedStablePrefixTokens >= ANTHROPIC_MIN_CACHE_TOKENS;
+  const prefixLargeEnoughForCache = estimatedStablePrefixTokens >= ANTHROPIC_MIN_CACHE_TOKENS;
 
   const notes: string[] = [];
   if (systemMessages.length === 0) {

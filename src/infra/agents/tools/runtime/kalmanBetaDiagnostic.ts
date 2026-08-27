@@ -14,10 +14,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import {
-  kalmanBeta,
-  kalmanBetaToPayload,
-} from "../../../trading/quant/kalmanBeta.ts";
+import { kalmanBeta, kalmanBetaToPayload } from "../../../trading/quant/kalmanBeta.ts";
 import { recordStructuredObservation } from "../../../platform/observability/structured.ts";
 
 export const kalmanBetaDiagnosticTool = createTool({
@@ -34,7 +31,9 @@ export const kalmanBetaDiagnosticTool = createTool({
     marketReturns: z
       .array(z.number())
       .min(1)
-      .describe("Per-period returns of the market index (e.g. SPY daily returns). Must align with assetReturns."),
+      .describe(
+        "Per-period returns of the market index (e.g. SPY daily returns). Must align with assetReturns.",
+      ),
     q: z
       .number()
       .positive()
@@ -45,10 +44,7 @@ export const kalmanBetaDiagnosticTool = createTool({
       .positive()
       .default(1e-3)
       .describe("Measurement noise variance. Smaller = trust observations more. Default 1e-3."),
-    beta0: z
-      .number()
-      .default(1.0)
-      .describe("Initial beta prior. Default 1.0."),
+    beta0: z.number().default(1.0).describe("Initial beta prior. Default 1.0."),
   }),
   outputSchema: z.object({
     currentBeta: z.number(),

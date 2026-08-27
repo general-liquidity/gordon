@@ -115,8 +115,14 @@ describe("orderFlowPressure", () => {
 
   test("imbalanceWeight tilts the blend toward the imbalance leg", () => {
     // High weight → microprice confirmation contributes less.
-    const lowW = orderFlowPressure({ imbalance: 0.5, micropriceVsMid: 1e-5 }, { imbalanceWeight: 0.2 });
-    const highW = orderFlowPressure({ imbalance: 0.5, micropriceVsMid: 1e-5 }, { imbalanceWeight: 0.95 });
+    const lowW = orderFlowPressure(
+      { imbalance: 0.5, micropriceVsMid: 1e-5 },
+      { imbalanceWeight: 0.2 },
+    );
+    const highW = orderFlowPressure(
+      { imbalance: 0.5, micropriceVsMid: 1e-5 },
+      { imbalanceWeight: 0.95 },
+    );
     // With imb 0.5: lowW = 0.2*0.5 + 0.8 = 0.9 ; highW = 0.95*0.5 + 0.05 = 0.525
     expect(lowW).toBeGreaterThan(highW);
   });

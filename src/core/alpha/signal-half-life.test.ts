@@ -108,11 +108,20 @@ describe("signal half-life under crowding", () => {
   });
 
   test("correlated adopters crowd the signal out faster, independent ones do not crowd at all", () => {
-    const correlated = computeSignalHalfLife({ ...PAPER_CALIBRATION_2026, strategyCorrelation: 0.9 });
-    const lessCorrelated = computeSignalHalfLife({ ...PAPER_CALIBRATION_2026, strategyCorrelation: 0.3 });
+    const correlated = computeSignalHalfLife({
+      ...PAPER_CALIBRATION_2026,
+      strategyCorrelation: 0.9,
+    });
+    const lessCorrelated = computeSignalHalfLife({
+      ...PAPER_CALIBRATION_2026,
+      strategyCorrelation: 0.3,
+    });
     expect(correlated.halfLifeMonths).toBeLessThan(lessCorrelated.halfLifeMonths);
 
-    const independent = computeSignalHalfLife({ ...PAPER_CALIBRATION_2026, strategyCorrelation: 0 });
+    const independent = computeSignalHalfLife({
+      ...PAPER_CALIBRATION_2026,
+      strategyCorrelation: 0,
+    });
     expect(independent.adoptionDecayRate).toBe(0);
     expect(independent.halfLifeMonths).toBeCloseTo(independent.naturalHalfLifeMonths, 10);
   });
@@ -128,7 +137,9 @@ describe("signal half-life under crowding", () => {
     const first = computeSignalHalfLife(PAPER_CALIBRATION_2026);
     const second = computeSignalHalfLife(PAPER_CALIBRATION_2026);
     expect(second).toEqual(first);
-    expect(adoptionSensitivity(PAPER_CALIBRATION_2026)).toEqual(adoptionSensitivity(PAPER_CALIBRATION_2026));
+    expect(adoptionSensitivity(PAPER_CALIBRATION_2026)).toEqual(
+      adoptionSensitivity(PAPER_CALIBRATION_2026),
+    );
 
     const source = readFileSync(new URL("./signal-half-life.ts", import.meta.url), "utf8");
     expect(source).not.toContain("Date.now");
@@ -152,21 +163,37 @@ describe("signal half-life under crowding", () => {
     expect(validity.windowAverageEdgeFraction).toBe(1);
     expect(Number.isNaN(validity.overstatementFactor)).toBe(false);
 
-    expect(() => computeSignalHalfLife({ ...PAPER_CALIBRATION_2026, naturalDecayRate: -0.1 })).toThrow(RangeError);
-    expect(() => computeSignalHalfLife({ ...PAPER_CALIBRATION_2026, adoptionShare: -0.2 })).toThrow(RangeError);
-    expect(() => computeSignalHalfLife({ ...PAPER_CALIBRATION_2026, adoptionShare: 1.5 })).toThrow(RangeError);
-    expect(() => computeSignalHalfLife({ ...PAPER_CALIBRATION_2026, baseMarketDepth: 0 })).toThrow(RangeError);
+    expect(() =>
+      computeSignalHalfLife({ ...PAPER_CALIBRATION_2026, naturalDecayRate: -0.1 }),
+    ).toThrow(RangeError);
+    expect(() => computeSignalHalfLife({ ...PAPER_CALIBRATION_2026, adoptionShare: -0.2 })).toThrow(
+      RangeError,
+    );
+    expect(() => computeSignalHalfLife({ ...PAPER_CALIBRATION_2026, adoptionShare: 1.5 })).toThrow(
+      RangeError,
+    );
+    expect(() => computeSignalHalfLife({ ...PAPER_CALIBRATION_2026, baseMarketDepth: 0 })).toThrow(
+      RangeError,
+    );
     expect(() => remainingEdgeFraction(18, -1)).toThrow(RangeError);
     expect(() => monthsUntilEdgeBelow(18, 0)).toThrow(RangeError);
   });
 
   test("cost-floor horizon says when a backtested edge stops paying for its own execution", () => {
     const halfLife = computeSignalHalfLife(PAPER_CALIBRATION_2026).halfLifeMonths;
-    const horizon = monthsUntilBelowCostFloor({ backtestedEdge: 1.8, costFloorEdge: 0.9, halfLifeMonths: halfLife });
+    const horizon = monthsUntilBelowCostFloor({
+      backtestedEdge: 1.8,
+      costFloorEdge: 0.9,
+      halfLifeMonths: halfLife,
+    });
     expect(horizon.alreadyBelowFloor).toBe(false);
     expect(horizon.monthsUntilBelowFloor).toBeCloseTo(halfLife, 10);
 
-    const dead = monthsUntilBelowCostFloor({ backtestedEdge: 0.4, costFloorEdge: 0.5, halfLifeMonths: halfLife });
+    const dead = monthsUntilBelowCostFloor({
+      backtestedEdge: 0.4,
+      costFloorEdge: 0.5,
+      halfLifeMonths: halfLife,
+    });
     expect(dead.alreadyBelowFloor).toBe(true);
     expect(dead.monthsUntilBelowFloor).toBe(0);
   });
@@ -177,7 +204,9 @@ describe("signal half-life under crowding", () => {
     const share = critical as number;
     expect(share).toBeGreaterThan(0);
     expect(share).toBeLessThan(PAPER_CALIBRATION_2026.adoptionShare);
-    expect(computeSignalHalfLife({ ...PAPER_CALIBRATION_2026, adoptionShare: share }).halfLifeMonths).toBeCloseTo(24, 6);
+    expect(
+      computeSignalHalfLife({ ...PAPER_CALIBRATION_2026, adoptionShare: share }).halfLifeMonths,
+    ).toBeCloseTo(24, 6);
 
     expect(criticalAdoptionShare(PAPER_CALIBRATION_2026, 200)).toBe(0);
     expect(criticalAdoptionShare(PAPER_CALIBRATION_2026, 1)).toBeNull();
@@ -201,8 +230,12 @@ describe("signal half-life under crowding", () => {
     // its own uncontested half-life would suggest.
     const secondEvent = cascade.events[1];
     expect(secondEvent).toBeDefined();
-    const secondLife = (secondEvent as { halfLifeMonthsAtExtinction: number }).halfLifeMonthsAtExtinction;
-    const untouched = computeSignalHalfLife({ ...PAPER_CALIBRATION_2026, adoptionShare: 0.2 }).halfLifeMonths;
+    const secondLife = (secondEvent as { halfLifeMonthsAtExtinction: number })
+      .halfLifeMonthsAtExtinction;
+    const untouched = computeSignalHalfLife({
+      ...PAPER_CALIBRATION_2026,
+      adoptionShare: 0.2,
+    }).halfLifeMonths;
     expect(secondLife).toBeLessThan(untouched);
     expect(cascade.survivors).toHaveLength(0);
   });
@@ -211,7 +244,9 @@ describe("signal half-life under crowding", () => {
     const tradeoff = fragilityEfficiencyTradeoff(PAPER_CALIBRATION_2026);
     expect(tradeoff.efficientExceedsSafe).toBe(true);
     expect(tradeoff.gap).toBeGreaterThan(0);
-    expect(tradeoff.discoveryMaximisingAdoption).toBeGreaterThan(tradeoff.fragilityMinimisingAdoption);
+    expect(tradeoff.discoveryMaximisingAdoption).toBeGreaterThan(
+      tradeoff.fragilityMinimisingAdoption,
+    );
     expect(tradeoff.caveat).toContain("illustrative");
   });
 });

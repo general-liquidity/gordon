@@ -8,22 +8,26 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { loadGeneratedStrategy, getGeneratedStrategyBacktest } from "../../../../storage/entities/generated-strategies.ts";
-import type { StrategyDSL, SignalRule, Condition, StopLoss, TakeProfit } from "../../../../../strategies/dsl/schema.ts";
-import { getGordonContext, type MastraExecutionContext } from "../../types.ts";
+import {
+  loadGeneratedStrategy,
+  getGeneratedStrategyBacktest,
+} from "../../../../storage/entities/generated-strategies.ts";
+import type {
+  StrategyDSL,
+  SignalRule,
+  Condition,
+  StopLoss,
+  TakeProfit,
+} from "../../../../../strategies/dsl/schema.ts";
+import type { MastraExecutionContext } from "../../types.ts";
 
 // ============================================================================
 // Input/Output Schemas
 // ============================================================================
 
 const inputSchema = z.object({
-  strategyId: z
-    .string()
-    .describe("ID of the strategy to explain"),
-  includeBacktest: z
-    .boolean()
-    .default(true)
-    .describe("Include backtest performance summary"),
+  strategyId: z.string().describe("ID of the strategy to explain"),
+  includeBacktest: z.boolean().default(true).describe("Include backtest performance summary"),
   detailLevel: z
     .enum(["brief", "standard", "detailed"])
     .default("standard")
@@ -129,8 +133,8 @@ function explainTakeProfits(tps: TakeProfit[]): string {
         typeof tp.target === "number"
           ? `${tp.target}:1 risk-reward`
           : tp.target === "resistance"
-          ? "at resistance"
-          : `${tp.targetValue || 3}x ATR`;
+            ? "at resistance"
+            : `${tp.targetValue || 3}x ATR`;
 
       return `TP${i + 1}: Exit ${(tp.percent * 100).toFixed(0)}% at ${targetText}`;
     })
@@ -140,7 +144,10 @@ function explainTakeProfits(tps: TakeProfit[]): string {
 /**
  * Generate full strategy explanation
  */
-function generateExplanation(strategy: StrategyDSL, detailLevel: string): {
+function generateExplanation(
+  strategy: StrategyDSL,
+  _detailLevel: string,
+): {
   overview: string;
   entryExplanation: string;
   exitExplanation: string;
@@ -182,8 +189,8 @@ function generateExplanation(strategy: StrategyDSL, detailLevel: string): {
         strategy.filters.trendFilter === "up"
           ? "market is trending up"
           : strategy.filters.trendFilter === "down"
-          ? "market is trending down"
-          : "in any market direction"
+            ? "market is trending down"
+            : "in any market direction"
       }${
         strategy.filters.minVolume
           ? `, with volume at least ${strategy.filters.minVolume}x average`
@@ -205,7 +212,9 @@ function generateRiskSummary(strategy: StrategyDSL): string {
   const parts: string[] = [];
 
   // Risk level
-  parts.push(`Risk Level: ${strategy.riskLevel.charAt(0).toUpperCase() + strategy.riskLevel.slice(1)}`);
+  parts.push(
+    `Risk Level: ${strategy.riskLevel.charAt(0).toUpperCase() + strategy.riskLevel.slice(1)}`,
+  );
 
   // Stop loss type
   const stopType = strategy.exitRules.stopLoss.type;
@@ -226,7 +235,7 @@ function generateRiskSummary(strategy: StrategyDSL): string {
     parts.push("Uses trailing stop to protect profits");
   }
 
-  return parts.join(". ") + ".";
+  return `${parts.join(". ")}.`;
 }
 
 /**
@@ -275,7 +284,7 @@ function generateBacktestSummary(metrics: {
     parts.push(`low drawdown of ${metrics.maxDrawdown.toFixed(1)}%`);
   }
 
-  return parts.join(", ") + ".";
+  return `${parts.join(", ")}.`;
 }
 
 // ============================================================================
@@ -291,7 +300,7 @@ export const strategyExplainTool = createTool({
     "'what are the entry conditions', or wants to understand a strategy better.",
   inputSchema,
   outputSchema,
-  execute: async (input, execContext: MastraExecutionContext) => {
+  execute: async (input, _execContext: MastraExecutionContext) => {
     try {
       // Load the strategy
       const strategy = await loadGeneratedStrategy(input.strategyId);

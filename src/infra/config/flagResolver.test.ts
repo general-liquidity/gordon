@@ -20,11 +20,7 @@ function useTempProjectSettings(flags: Record<string, string>): void {
   const dir = mkdtempSync(join(tmpdir(), "gordon-flagres-"));
   dirs.push(dir);
   mkdirSync(join(dir, ".gordon"), { recursive: true });
-  writeFileSync(
-    join(dir, ".gordon", "settings.json"),
-    JSON.stringify({ flags }, null, 2),
-    "utf-8",
-  );
+  writeFileSync(join(dir, ".gordon", "settings.json"), JSON.stringify({ flags }, null, 2), "utf-8");
   process.chdir(dir);
   resetFlagCache();
 }

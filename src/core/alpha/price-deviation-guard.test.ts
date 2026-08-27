@@ -51,7 +51,12 @@ describe("checkPriceDeviation", () => {
 
   // Within tolerance with a side stays ok.
   test("buy at 101 vs 100, 2% threshold → ok", () => {
-    const r = checkPriceDeviation({ orderPrice: 101, referencePrice: 100, thresholdPct: 2, side: "buy" });
+    const r = checkPriceDeviation({
+      orderPrice: 101,
+      referencePrice: 100,
+      thresholdPct: 2,
+      side: "buy",
+    });
     expect(r!.deviationPct).toBe(1);
     expect(r!.breached).toBe(false);
     expect(r!.verdict).toBe("ok");

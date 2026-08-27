@@ -29,7 +29,10 @@ export interface RuntimeSessionState {
   lastUpdatedAt: string;
 }
 
-export function createDefaultRuntimeSessionState(runtimeId: string, sessionId?: string): RuntimeSessionState {
+export function createDefaultRuntimeSessionState(
+  runtimeId: string,
+  sessionId?: string,
+): RuntimeSessionState {
   return {
     runtimeId,
     sessionId,

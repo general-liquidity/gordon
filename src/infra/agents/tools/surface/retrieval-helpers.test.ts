@@ -70,14 +70,16 @@ describe("filterByAsOf", () => {
 
   test("throws on unparseable asOf in strict mode", () => {
     const recs = [{ createdAt: "2026-05-25", id: "a" }];
-    expect(() => filterByAsOf(recs, "not-a-date", (r) => r.createdAt, "strict"))
-      .toThrow(InvalidAsOfCutoffError);
+    expect(() => filterByAsOf(recs, "not-a-date", (r) => r.createdAt, "strict")).toThrow(
+      InvalidAsOfCutoffError,
+    );
   });
 
   test("throws on unparseable asOf in permissive mode too", () => {
     const recs = [{ createdAt: "2026-05-25", id: "a" }];
-    expect(() => filterByAsOf(recs, "not-a-date", (r) => r.createdAt, "permissive"))
-      .toThrow(InvalidAsOfCutoffError);
+    expect(() => filterByAsOf(recs, "not-a-date", (r) => r.createdAt, "permissive")).toThrow(
+      InvalidAsOfCutoffError,
+    );
   });
 
   test("accepts numeric ms-epoch timestamps", () => {
@@ -136,8 +138,14 @@ describe("classifyEvidenceQuality", () => {
 
 describe("mergeAndDedupe", () => {
   test("dedupes by id field", () => {
-    const a = [{ id: "1", content: "foo" }, { id: "2", content: "bar" }];
-    const b = [{ id: "2", content: "bar (dup)" }, { id: "3", content: "baz" }];
+    const a = [
+      { id: "1", content: "foo" },
+      { id: "2", content: "bar" },
+    ];
+    const b = [
+      { id: "2", content: "bar (dup)" },
+      { id: "3", content: "baz" },
+    ];
     const out = mergeAndDedupe(a, b);
     expect(out.map((r) => r.id)).toEqual(["1", "2", "3"]);
     expect(out.find((r) => r.id === "2")?.content).toBe("bar");

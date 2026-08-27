@@ -185,9 +185,7 @@ export function loadSubagentProfiles(
 
       const read = readFile(fullPath, options.fileContent);
       if (read.error) {
-        warnings.push(
-          `Could not read ${fullPath} (${source.origin}): ${read.error}`,
-        );
+        warnings.push(`Could not read ${fullPath} (${source.origin}): ${read.error}`);
         entry.rejected++;
         totalRejected++;
         continue;
@@ -253,19 +251,13 @@ export function loadSubagentProfiles(
 /**
  * One-line summary for operator-facing log output.
  */
-export function summarizeLoadedSubagentProfiles(
-  result: LoadedSubagentProfilesResult,
-): string {
+export function summarizeLoadedSubagentProfiles(result: LoadedSubagentProfilesResult): string {
   const sourcesFound = result.sources.filter((s) => s.found).length;
   const totalSources = result.sources.length;
-  const parts = [
-    `${result.totalAccepted} profile${result.totalAccepted === 1 ? "" : "s"}`,
-  ];
+  const parts = [`${result.totalAccepted} profile${result.totalAccepted === 1 ? "" : "s"}`];
   if (result.totalRejected > 0) parts.push(`${result.totalRejected} dropped`);
   if (result.warnings.length > 0) {
-    parts.push(
-      `${result.warnings.length} warning${result.warnings.length === 1 ? "" : "s"}`,
-    );
+    parts.push(`${result.warnings.length} warning${result.warnings.length === 1 ? "" : "s"}`);
   }
   return `subagent profiles loaded from ${sourcesFound}/${totalSources} sources: ${parts.join(", ")}.`;
 }

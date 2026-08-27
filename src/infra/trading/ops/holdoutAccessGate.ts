@@ -91,10 +91,6 @@ export function recordEvaluation(state: EvalState, split: string): EvalState {
 }
 
 /** True only when the split is trainable AND within budget. Convenience over `canEvaluate`. */
-export function isEvaluable(
-  config: HoldoutAccessConfig,
-  split: string,
-  state: EvalState,
-): boolean {
+export function isEvaluable(config: HoldoutAccessConfig, split: string, state: EvalState): boolean {
   return canEvaluate(config, split, state).allowed;
 }

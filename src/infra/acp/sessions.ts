@@ -80,7 +80,7 @@ export function appendSessionTurn(
 ): boolean {
   if (!ensureDir(env)) return false;
   try {
-    appendFileSync(sessionPath(sessionId, env), JSON.stringify(turn) + "\n", "utf-8");
+    appendFileSync(sessionPath(sessionId, env), `${JSON.stringify(turn)}\n`, "utf-8");
     return true;
   } catch {
     // The boolean lets the ACP boundary fail the operation without mutating its
@@ -98,7 +98,7 @@ export function appendSessionTurns(
   if (turns.length === 0) return true;
   if (!ensureDir(env)) return false;
   try {
-    const payload = turns.map((turn) => JSON.stringify(turn)).join("\n") + "\n";
+    const payload = `${turns.map((turn) => JSON.stringify(turn)).join("\n")}\n`;
     appendFileSync(sessionPath(sessionId, env), payload, "utf-8");
     return true;
   } catch {
@@ -114,7 +114,7 @@ export function appendSessionMode(
   if (!ensureDir(env)) return false;
   const record: AcpSessionModeRecord = { kind: "mode", modeId, ts: Date.now() };
   try {
-    appendFileSync(sessionPath(sessionId, env), JSON.stringify(record) + "\n", "utf-8");
+    appendFileSync(sessionPath(sessionId, env), `${JSON.stringify(record)}\n`, "utf-8");
     return true;
   } catch {
     // The caller keeps the prior in-memory mode when persistence fails.
@@ -182,9 +182,6 @@ export function loadSessionTurns(
  * Check whether a session id has any persisted turns. Used by
  * loadSession to decide between resume vs reject.
  */
-export function sessionExists(
-  sessionId: string,
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function sessionExists(sessionId: string, env: NodeJS.ProcessEnv = process.env): boolean {
   return existsSync(sessionPath(sessionId, env));
 }

@@ -8,7 +8,7 @@
  * Trading-contextual labels based on agent name.
  */
 
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GlimmerMessage } from "../spinners/GlimmerMessage.tsx";
 
@@ -60,7 +60,7 @@ function formatElapsed(ms: number): string {
 export function ThinkStep({ reasoning, agentName, elapsedMs, isComplete = false }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [showShimmer, setShowShimmer] = useState(false);
-  const mountTimeRef = useRef(Date.now());
+  const _mountTimeRef = useRef(Date.now());
 
   // Shimmer glow starts after 3s delay (Claude Code pattern)
   useEffect(() => {
@@ -91,7 +91,12 @@ export function ThinkStep({ reasoning, agentName, elapsedMs, isComplete = false 
     return (
       <Box paddingLeft={2} marginTop={0}>
         <Text dimColor italic>
-          {"\u2234"} {label.toLowerCase().replace(/ing$/, "ed").replace(/think$/, "thought")} for {elapsedStr}
+          {"\u2234"}{" "}
+          {label
+            .toLowerCase()
+            .replace(/ing$/, "ed")
+            .replace(/think$/, "thought")}{" "}
+          for {elapsedStr}
         </Text>
       </Box>
     );
@@ -105,7 +110,10 @@ export function ThinkStep({ reasoning, agentName, elapsedMs, isComplete = false 
           {showShimmer ? (
             <GlimmerMessage text={`\u2234 ${label}\u2026`} isActive={true} />
           ) : (
-            <Text dimColor italic>{"\u2234"} {label}{"\u2026"}</Text>
+            <Text dimColor italic>
+              {"\u2234"} {label}
+              {"\u2026"}
+            </Text>
           )}
           {elapsedStr && (
             <>
@@ -120,11 +128,17 @@ export function ThinkStep({ reasoning, agentName, elapsedMs, isComplete = false 
   }
 
   // Expanded mode
-  const lines = reasoning.split("\n").filter((l) => l.trim().length > 0).slice(0, 8);
+  const lines = reasoning
+    .split("\n")
+    .filter((l) => l.trim().length > 0)
+    .slice(0, 8);
   return (
     <Box flexDirection="column" paddingLeft={2}>
       <Box>
-        <Text dimColor italic>{"\u2234"} {label}{"\u2026"}</Text>
+        <Text dimColor italic>
+          {"\u2234"} {label}
+          {"\u2026"}
+        </Text>
         {elapsedStr && (
           <>
             <Text dimColor> {"\u00b7"} </Text>
@@ -135,7 +149,9 @@ export function ThinkStep({ reasoning, agentName, elapsedMs, isComplete = false 
       </Box>
       <Box flexDirection="column" paddingLeft={2}>
         {lines.map((line, i) => (
-          <Text key={i} dimColor>{line}</Text>
+          <Text key={i} dimColor>
+            {line}
+          </Text>
         ))}
         {reasoning.split("\n").length > 8 && (
           <Text dimColor>... (+{reasoning.split("\n").length - 8} more)</Text>

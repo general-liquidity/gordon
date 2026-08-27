@@ -85,10 +85,15 @@ function multipleOLS(X: number[][], y: number[]): number[] | null {
 
 const MIN_OBS = 40;
 
-export function computeGeneralizedImpulse(input: GeneralizedImpulseInput): GeneralizedImpulseResult {
+export function computeGeneralizedImpulse(
+  input: GeneralizedImpulseInput,
+): GeneralizedImpulseResult {
   const label1 = input.label1 ?? "market1";
   const label2 = input.label2 ?? "market2";
-  const convFrac = input.convergenceFrac && input.convergenceFrac > 0 && input.convergenceFrac < 1 ? input.convergenceFrac : 0.1;
+  const convFrac =
+    input.convergenceFrac && input.convergenceFrac > 0 && input.convergenceFrac < 1
+      ? input.convergenceFrac
+      : 0.1;
   const maxHorizon = Math.max(5, Math.floor(input.maxHorizon ?? 60));
   const tx = (v: number[]): number[] => (input.applyLog ? v.map((x) => Math.log(x)) : v.slice());
   const y1 = tx(input.series1);
@@ -96,9 +101,19 @@ export function computeGeneralizedImpulse(input: GeneralizedImpulseInput): Gener
   const n = Math.min(y1.length, y2.length);
 
   const low = (reason: string): GeneralizedImpulseResult => ({
-    label1, label2, beta: 0, alpha1: 0, alpha2: 0,
-    barsToConverge1: null, barsToConverge2: null, converged1: false, converged2: false,
-    fasterAbsorbed: "none", confidence: "low", sampleSize: n, interpretation: reason,
+    label1,
+    label2,
+    beta: 0,
+    alpha1: 0,
+    alpha2: 0,
+    barsToConverge1: null,
+    barsToConverge2: null,
+    converged1: false,
+    converged2: false,
+    fasterAbsorbed: "none",
+    confidence: "low",
+    sampleSize: n,
+    interpretation: reason,
   });
   if (n < MIN_OBS) return low(`need ≥ ${MIN_OBS} aligned observations, got ${n}`);
 
@@ -138,8 +153,12 @@ export function computeGeneralizedImpulse(input: GeneralizedImpulseInput): Gener
   const [, alpha2, g21, g22] = b2;
 
   // Residual covariance.
-  const e1 = dY1.map((y, i) => y - (b1[0]! + b1[1]! * X[i]![1]! + b1[2]! * X[i]![2]! + b1[3]! * X[i]![3]!));
-  const e2 = dY2.map((y, i) => y - (b2[0]! + b2[1]! * X[i]![1]! + b2[2]! * X[i]![2]! + b2[3]! * X[i]![3]!));
+  const e1 = dY1.map(
+    (y, i) => y - (b1[0]! + b1[1]! * X[i]![1]! + b1[2]! * X[i]![2]! + b1[3]! * X[i]![3]!),
+  );
+  const e2 = dY2.map(
+    (y, i) => y - (b2[0]! + b2[1]! * X[i]![1]! + b2[2]! * X[i]![2]! + b2[3]! * X[i]![3]!),
+  );
   const s1 = Math.sqrt(variance(e1));
   const s2 = Math.sqrt(variance(e2));
   const rho = s1 > 0 && s2 > 0 ? covariance(e1, e2) / (s1 * s2) : 0;
@@ -195,13 +214,15 @@ export function computeGeneralizedImpulse(input: GeneralizedImpulseInput): Gener
             : "");
 
   return {
-    label1, label2,
+    label1,
+    label2,
     beta: round(beta!),
     alpha1: round(alpha1!),
     alpha2: round(alpha2!),
     barsToConverge1: bars1,
     barsToConverge2: bars2,
-    converged1, converged2,
+    converged1,
+    converged2,
     fasterAbsorbed,
     confidence,
     sampleSize: n,

@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeInternalBatch,
-  type BatchOrderInput,
-} from "./internalBatch.ts";
+import { computeInternalBatch, type BatchOrderInput } from "./internalBatch.ts";
 
 function order(
   orderId: string,
@@ -158,10 +155,7 @@ describe("computeInternalBatch — requireDifferentStrategy", () => {
 describe("computeInternalBatch — minCrossQty threshold", () => {
   it("skips crossings below the minimum quantity threshold", () => {
     const result = computeInternalBatch(
-      [
-        order("a1", "AAPL", "buy", 5, 150),
-        order("a2", "AAPL", "sell", 5, 150),
-      ],
+      [order("a1", "AAPL", "buy", 5, 150), order("a2", "AAPL", "sell", 5, 150)],
       { minCrossQty: 10 },
     );
     expect(result.internalCrossings.length).toBe(0);
@@ -169,10 +163,7 @@ describe("computeInternalBatch — minCrossQty threshold", () => {
 
   it("crosses when quantity meets threshold", () => {
     const result = computeInternalBatch(
-      [
-        order("a1", "AAPL", "buy", 20, 150),
-        order("a2", "AAPL", "sell", 20, 150),
-      ],
+      [order("a1", "AAPL", "buy", 20, 150), order("a2", "AAPL", "sell", 20, 150)],
       { minCrossQty: 10 },
     );
     expect(result.internalCrossings.length).toBe(1);

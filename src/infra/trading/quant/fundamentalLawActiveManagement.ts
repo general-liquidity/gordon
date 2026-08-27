@@ -54,9 +54,7 @@ export interface FundamentalLawAMResult {
   reasoning: string;
 }
 
-export function computeFundamentalLawAM(
-  input: FundamentalLawAMInput,
-): FundamentalLawAMResult {
+export function computeFundamentalLawAM(input: FundamentalLawAMInput): FundamentalLawAMResult {
   const ic = input.informationCoefficient;
   const breadth = input.breadthPerYear;
 
@@ -98,9 +96,7 @@ export function computeFundamentalLawAM(
   };
 }
 
-export function fundamentalLawAMToPayload(
-  result: FundamentalLawAMResult,
-): Record<string, unknown> {
+export function fundamentalLawAMToPayload(result: FundamentalLawAMResult): Record<string, unknown> {
   return {
     kind: "fundamental_law_am.computed",
     theoreticalSharpe: Number(result.theoreticalSharpe.toFixed(4)),
@@ -111,8 +107,7 @@ export function fundamentalLawAMToPayload(
         ? Number(result.requiredICForTarget.toFixed(4))
         : result.requiredICForTarget,
     requiredBreadthForTarget:
-      result.requiredBreadthForTarget !== null &&
-      Number.isFinite(result.requiredBreadthForTarget)
+      result.requiredBreadthForTarget !== null && Number.isFinite(result.requiredBreadthForTarget)
         ? Number(result.requiredBreadthForTarget.toFixed(2))
         : result.requiredBreadthForTarget,
     meetsTarget: result.meetsTarget,

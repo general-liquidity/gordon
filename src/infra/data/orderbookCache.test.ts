@@ -8,10 +8,7 @@ import {
   _resetOrderbookCacheForTests,
   type OrderbookSnapshot,
 } from "./orderbookCache.ts";
-import {
-  setDatabasePathForTesting,
-  closeDatabase,
-} from "../storage/database.ts";
+import { setDatabasePathForTesting, closeDatabase } from "../storage/database.ts";
 import { unlinkSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,7 +18,11 @@ let currentDbPath = "";
 const cleanupPaths = new Set<string>();
 
 function safeUnlink(path: string): void {
-  try { if (existsSync(path)) unlinkSync(path); } catch { /* Windows-busy */ }
+  try {
+    if (existsSync(path)) unlinkSync(path);
+  } catch {
+    /* Windows-busy */
+  }
 }
 
 function snap(overrides: Partial<OrderbookSnapshot> = {}): OrderbookSnapshot {
@@ -29,8 +30,14 @@ function snap(overrides: Partial<OrderbookSnapshot> = {}): OrderbookSnapshot {
     venue: "binance",
     symbol: "BTC/USDT",
     takenAt: 1_000,
-    bids: [{ price: 99.0, quantity: 1.0 }, { price: 98.5, quantity: 2.0 }],
-    asks: [{ price: 100.0, quantity: 1.5 }, { price: 100.5, quantity: 2.5 }],
+    bids: [
+      { price: 99.0, quantity: 1.0 },
+      { price: 98.5, quantity: 2.0 },
+    ],
+    asks: [
+      { price: 100.0, quantity: 1.5 },
+      { price: 100.5, quantity: 2.5 },
+    ],
     ...overrides,
   };
 }

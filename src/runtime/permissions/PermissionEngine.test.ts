@@ -13,7 +13,9 @@ import { clearHooks, registerHook } from "../../infra/hooks/engine.ts";
 
 afterEach(() => clearHooks());
 
-function createPolicy(overrides: Partial<RuntimeToolPolicyDecision> = {}): RuntimeToolPolicyDecision {
+function createPolicy(
+  overrides: Partial<RuntimeToolPolicyDecision> = {},
+): RuntimeToolPolicyDecision {
   return {
     allowed: true,
     approvalClass: "per_action",
@@ -49,7 +51,12 @@ describe("PermissionEngine", () => {
 
   it("queues high-risk approvals and resolves them via explicit approval", async () => {
     const store = new RuntimeStore(createDefaultRuntimeSessionState("app"));
-    store.setSession({ runtimeId: "app", sessionId: "app", resourceId: "user-1", threadId: "thread-1" });
+    store.setSession({
+      runtimeId: "app",
+      sessionId: "app",
+      resourceId: "user-1",
+      threadId: "thread-1",
+    });
     const engine = new PermissionEngine(store);
 
     const evaluation = await engine.evaluate("place_market_order", context, createPolicy());
@@ -102,24 +109,21 @@ describe("PermissionEngine", () => {
     const store = new RuntimeStore(createDefaultRuntimeSessionState("app"));
     const engine = new PermissionEngine(store);
 
-    const first = await engine.evaluate(
-      "place_market_order",
-      context,
-      createPolicy(),
-      { symbol: "BTCUSDT", side: "buy", quantity: 1 },
-    );
-    const reorderedSame = await engine.evaluate(
-      "place_market_order",
-      context,
-      createPolicy(),
-      { quantity: 1, side: "buy", symbol: "BTCUSDT" },
-    );
-    const different = await engine.evaluate(
-      "place_market_order",
-      context,
-      createPolicy(),
-      { symbol: "BTCUSDT", side: "buy", quantity: 2 },
-    );
+    const first = await engine.evaluate("place_market_order", context, createPolicy(), {
+      symbol: "BTCUSDT",
+      side: "buy",
+      quantity: 1,
+    });
+    const reorderedSame = await engine.evaluate("place_market_order", context, createPolicy(), {
+      quantity: 1,
+      side: "buy",
+      symbol: "BTCUSDT",
+    });
+    const different = await engine.evaluate("place_market_order", context, createPolicy(), {
+      symbol: "BTCUSDT",
+      side: "buy",
+      quantity: 2,
+    });
 
     expect(reorderedSame.request?.id).toBe(first.request?.id);
     expect(different.request?.id).not.toBe(first.request?.id);
@@ -131,18 +135,14 @@ describe("PermissionEngine", () => {
     const engine = new PermissionEngine(store);
     engine.prependHook(() => ({ decision: "allow", actor: "test-policy" }));
 
-    const first = await engine.evaluate(
-      "place_market_order",
-      context,
-      createPolicy(),
-      { symbol: "BTCUSDT", quantity: 1 },
-    );
-    const second = await engine.evaluate(
-      "place_market_order",
-      context,
-      createPolicy(),
-      { symbol: "BTCUSDT", quantity: 2 },
-    );
+    const first = await engine.evaluate("place_market_order", context, createPolicy(), {
+      symbol: "BTCUSDT",
+      quantity: 1,
+    });
+    const second = await engine.evaluate("place_market_order", context, createPolicy(), {
+      symbol: "BTCUSDT",
+      quantity: 2,
+    });
 
     expect(first.request?.fingerprint).not.toBe(second.request?.fingerprint);
   });
@@ -180,7 +180,11 @@ describe("PermissionEngine", () => {
   });
 
   it("a PreApproval block prevents a pending request from being created", async () => {
-    registerHook({ id: "deny", point: "PreApproval", handler: () => ({ action: "block", reason: "closed" }) });
+    registerHook({
+      id: "deny",
+      point: "PreApproval",
+      handler: () => ({ action: "block", reason: "closed" }),
+    });
     const store = new RuntimeStore(createDefaultRuntimeSessionState("app"));
     const engine = new PermissionEngine(store);
     const evaluation = await engine.evaluate("place_market_order", context, createPolicy());
@@ -209,64 +213,90 @@ describe("PermissionEngine", () => {
 
   it("records human decisions into trust trajectory with permission scope", async () => {
     const store = new RuntimeStore(createDefaultRuntimeSessionState("app"));
-    store.setSession({ runtimeId: "app", sessionId: "app", resourceId: "user-1", threadId: "thread-1" });
+    store.setSession({
+      runtimeId: "app",
+      sessionId: "app",
+      resourceId: "user-1",
+      threadId: "thread-1",
+    });
     const engine = new PermissionEngine(store);
 
-    const evaluation = await engine.evaluate("rebalance_portfolio", context, createPolicy({
-      tool: {
-        ...createPolicy().tool,
-        id: "rebalance_portfolio",
-        permissionScope: "papertrade.execute",
-      },
-    }));
+    const evaluation = await engine.evaluate(
+      "rebalance_portfolio",
+      context,
+      createPolicy({
+        tool: {
+          ...createPolicy().tool,
+          id: "rebalance_portfolio",
+          permissionScope: "papertrade.execute",
+        },
+      }),
+    );
     expect(evaluation.status).toBe("pending");
 
     engine.approve(evaluation.request!.id, { actor: "operator" });
 
-    expect(getDefaultTrustTrajectory().listEvents()).toMatchObject([{
-      toolName: "rebalance_portfolio",
-      permissionScope: "papertrade.execute",
-      decision: "approved",
-    }]);
+    expect(getDefaultTrustTrajectory().listEvents()).toMatchObject([
+      {
+        toolName: "rebalance_portfolio",
+        permissionScope: "papertrade.execute",
+        decision: "approved",
+      },
+    ]);
   });
 
   it("a wildcard allow rule does NOT auto-allow a deny-listed tool, but does allow a benign one", async () => {
     const store = new RuntimeStore(createDefaultRuntimeSessionState("app"));
-    store.setSession({ runtimeId: "app", sessionId: "app", resourceId: "user-1", threadId: "thread-1" });
+    store.setSession({
+      runtimeId: "app",
+      sessionId: "app",
+      resourceId: "user-1",
+      threadId: "thread-1",
+    });
     // Broad, scope-less wildcard allow rule (matches any tool name / scope).
     store.setApprovalState({
-      rules: [{
-        id: "wildcard-allow",
-        decision: "allow",
-        scope: "persistent",
-        createdAt: new Date().toISOString(),
-        createdBy: "operator",
-      }],
+      rules: [
+        {
+          id: "wildcard-allow",
+          decision: "allow",
+          scope: "persistent",
+          createdAt: new Date().toISOString(),
+          createdBy: "operator",
+        },
+      ],
     });
     const engine = new PermissionEngine(store);
 
     // Safety-critical tool: the wildcard allow must be suppressed; it routes
     // to the human/confirmation queue instead of auto-allowing.
-    const denyListed = await engine.evaluate("place_order", context, createPolicy({
-      tool: { ...createPolicy().tool, id: "place_order" },
-    }));
+    const denyListed = await engine.evaluate(
+      "place_order",
+      context,
+      createPolicy({
+        tool: { ...createPolicy().tool, id: "place_order" },
+      }),
+    );
     expect(denyListed.status).toBe("pending");
     expect(denyListed.source).not.toBe("rule");
 
     // Non-safety-critical tool under the same wildcard rule IS allowed by it.
-    const benign = await engine.evaluate("get_portfolio", context, createPolicy({
-      tool: {
-        ...createPolicy().tool,
-        id: "get_portfolio",
-        category: "monitoring",
-        riskClass: "low",
-        permissionScope: "portfolio.read",
-        sideEffectLevel: "read",
-        requiresTradePermission: false,
-        idempotent: true,
-        auditEventType: "portfolio_read",
-      },
-    }));
+    const benign = await engine.evaluate(
+      "get_portfolio",
+      context,
+      createPolicy({
+        tool: {
+          ...createPolicy().tool,
+          id: "get_portfolio",
+          category: "monitoring",
+          riskClass: "low",
+          permissionScope: "portfolio.read",
+          sideEffectLevel: "read",
+          requiresTradePermission: false,
+          idempotent: true,
+          auditEventType: "portfolio_read",
+        },
+      }),
+    );
     expect(benign.status).toBe("allowed");
     expect(benign.source).toBe("rule");
   });
@@ -275,20 +305,24 @@ describe("PermissionEngine", () => {
     const store = new RuntimeStore(createDefaultRuntimeSessionState("app"));
     const engine = new PermissionEngine(store);
 
-    const evaluation = await engine.evaluate("check_positions", context, createPolicy({
-      approvalClass: "none",
-      tool: {
-        ...createPolicy().tool,
-        id: "check_positions",
-        category: "monitoring",
-        riskClass: "low",
-        permissionScope: "portfolio.read",
-        sideEffectLevel: "read",
-        requiresTradePermission: false,
-        idempotent: true,
-        auditEventType: "portfolio_read",
-      },
-    }));
+    const evaluation = await engine.evaluate(
+      "check_positions",
+      context,
+      createPolicy({
+        approvalClass: "none",
+        tool: {
+          ...createPolicy().tool,
+          id: "check_positions",
+          category: "monitoring",
+          riskClass: "low",
+          permissionScope: "portfolio.read",
+          sideEffectLevel: "read",
+          requiresTradePermission: false,
+          idempotent: true,
+          auditEventType: "portfolio_read",
+        },
+      }),
+    );
 
     expect(evaluation.status).toBe("allowed");
     expect(evaluation.source).toBe("classifier");
@@ -301,10 +335,14 @@ describe("PermissionEngine", () => {
     // Spec comes from the live registry, so this asserts the declaration, not a
     // fixture. Approval class matches ToolPolicy's mapping for system.mode.write.
     const spec = new CapabilityRegistry().resolveToolSpec("manage_flags");
-    const evaluation = await engine.evaluate("manage_flags", context, createPolicy({
-      approvalClass: "per_tool",
-      tool: spec,
-    }));
+    const evaluation = await engine.evaluate(
+      "manage_flags",
+      context,
+      createPolicy({
+        approvalClass: "per_tool",
+        tool: spec,
+      }),
+    );
 
     expect(evaluation.status).toBe("pending");
     expect(store.getState().approvals.pending).toHaveLength(1);
@@ -315,10 +353,14 @@ describe("PermissionEngine", () => {
     const engine = new PermissionEngine(store);
 
     const spec = new CapabilityRegistry().resolveToolSpec("zzz_unrecognized_widget");
-    const evaluation = await engine.evaluate("zzz_unrecognized_widget", context, createPolicy({
-      approvalClass: "per_tool",
-      tool: spec,
-    }));
+    const evaluation = await engine.evaluate(
+      "zzz_unrecognized_widget",
+      context,
+      createPolicy({
+        approvalClass: "per_tool",
+        tool: spec,
+      }),
+    );
 
     expect(evaluation.status).toBe("pending");
   });

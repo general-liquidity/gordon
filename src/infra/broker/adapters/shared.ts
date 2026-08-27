@@ -7,7 +7,7 @@ import type {
 
 export function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : null;
 }
 
@@ -96,7 +96,10 @@ export function unwrapPayload(payload: unknown): unknown {
 }
 
 export function normalizeOrderType(value: unknown): BrokerOrderType {
-  const normalized = String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
   switch (normalized) {
     case "market":
     case "mkt":
@@ -121,7 +124,10 @@ export function normalizeOrderType(value: unknown): BrokerOrderType {
 }
 
 export function normalizeTimeInForce(value: unknown): BrokerTimeInForce {
-  const normalized = String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
   switch (normalized) {
     case "day":
       return "day";
@@ -188,12 +194,10 @@ export function normalizeOrderStatus(value: unknown): BrokerOrderStatus {
 }
 
 export function normalizeSide(value: unknown): "buy" | "sell" {
-  const normalized = String(value ?? "").trim().toLowerCase();
-  if (
-    normalized === "sell"
-    || normalized === "s"
-    || normalized.startsWith("sell")
-  ) return "sell";
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (normalized === "sell" || normalized === "s" || normalized.startsWith("sell")) return "sell";
   return "buy";
 }
 
@@ -223,5 +227,10 @@ export function buildUsMarketClockFallback(): BrokerClock {
 }
 
 export function isOpenOrderStatus(status: BrokerOrderStatus): boolean {
-  return status === "new" || status === "accepted" || status === "partially_filled" || status === "pending_new";
+  return (
+    status === "new" ||
+    status === "accepted" ||
+    status === "partially_filled" ||
+    status === "pending_new"
+  );
 }

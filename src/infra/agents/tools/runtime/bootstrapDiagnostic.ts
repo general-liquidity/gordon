@@ -25,7 +25,12 @@ export const bootstrapDiagnosticTool = createTool({
       .array(z.number())
       .min(30)
       .describe("Per-period strategy returns as decimals (e.g. 0.012 = +1.2%)."),
-    resamples: z.number().int().positive().default(500).describe("Bootstrap resamples. Default 500."),
+    resamples: z
+      .number()
+      .int()
+      .positive()
+      .default(500)
+      .describe("Bootstrap resamples. Default 500."),
     blockResetProbability: z
       .number()
       .min(0)

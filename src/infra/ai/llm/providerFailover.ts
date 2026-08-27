@@ -39,7 +39,9 @@ export interface FailoverOptions<C, R> {
   isFatal?: (error: unknown) => boolean;
 }
 
-export async function executeWithFailover<C, R>(opts: FailoverOptions<C, R>): Promise<FailoverResult<R>> {
+export async function executeWithFailover<C, R>(
+  opts: FailoverOptions<C, R>,
+): Promise<FailoverResult<R>> {
   const errors: Array<{ id: string; error: string }> = [];
   const chain = opts.chain ?? [];
 
@@ -48,7 +50,15 @@ export async function executeWithFailover<C, R>(opts: FailoverOptions<C, R>): Pr
     const id = opts.idOf(candidate);
     try {
       const result = await opts.call(candidate, i);
-      return { ok: true, result, usedIndex: i, usedId: id, degraded: i > 0, attempts: i + 1, errors };
+      return {
+        ok: true,
+        result,
+        usedIndex: i,
+        usedId: id,
+        degraded: i > 0,
+        attempts: i + 1,
+        errors,
+      };
     } catch (e) {
       if (opts.isFatal?.(e)) throw e; // non-recoverable across providers → propagate
       errors.push({ id, error: e instanceof Error ? e.message : String(e) });

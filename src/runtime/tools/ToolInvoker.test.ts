@@ -9,11 +9,11 @@ import { createDefaultRuntimeSessionState } from "../state/SessionState.ts";
 import { TranscriptStore } from "../transcript/TranscriptStore.ts";
 import { ScratchpadStore } from "../workers/ScratchpadStore.ts";
 import { WorkerRegistry } from "../workers/WorkerRegistry.ts";
-import {
-  _resetDefaultTrustTrajectoryForTests,
-} from "../permissions/trustTrajectory.ts";
+import { _resetDefaultTrustTrajectoryForTests } from "../permissions/trustTrajectory.ts";
 
-function createContext(permissionMode: GordonContext["config"]["permissionMode"] = "strict"): GordonContext {
+function createContext(
+  permissionMode: GordonContext["config"]["permissionMode"] = "strict",
+): GordonContext {
   const config = GordonConfigSchema.parse({ permissionMode });
   return {
     exchange: null,

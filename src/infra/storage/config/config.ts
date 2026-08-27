@@ -1,6 +1,10 @@
 import { mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { GordonConfigSchema, migrateExchangeConfigTypes, type GordonConfig } from "../../../types/index.ts";
+import {
+  GordonConfigSchema,
+  migrateExchangeConfigTypes,
+  type GordonConfig,
+} from "../../../types/index.ts";
 import { GORDON_DIR } from "../paths.ts";
 export const CONFIG_PATH = join(GORDON_DIR, "config.json");
 export const PROFILES_DIR = join(GORDON_DIR, "profiles");
@@ -88,9 +92,10 @@ export function normalizeWorkspaceConfigPayload(raw: unknown): WorkspaceConfigPa
 
   if (explicitOverrides) {
     return {
-      profile: typeof raw.profile === "string" && raw.profile.trim().length > 0
-        ? raw.profile.trim()
-        : null,
+      profile:
+        typeof raw.profile === "string" && raw.profile.trim().length > 0
+          ? raw.profile.trim()
+          : null,
       overrides: explicitOverrides,
     };
   }
@@ -157,7 +162,9 @@ async function loadProjectConfig(): Promise<WorkspaceConfigPayload | null> {
   }
 }
 
-async function loadProfileConfig(profileName: string | null): Promise<Record<string, unknown> | null> {
+async function loadProfileConfig(
+  profileName: string | null,
+): Promise<Record<string, unknown> | null> {
   if (!profileName) {
     return null;
   }
@@ -165,7 +172,9 @@ async function loadProfileConfig(profileName: string | null): Promise<Record<str
   try {
     return await loadRawConfigFile(getProfilePath(profileName));
   } catch (err) {
-    console.warn(`[config] Failed to parse profile "${profileName}": ${err instanceof Error ? err.message : err}`);
+    console.warn(
+      `[config] Failed to parse profile "${profileName}": ${err instanceof Error ? err.message : err}`,
+    );
     return null;
   }
 }
@@ -194,12 +203,13 @@ export async function loadConfigBundle(): Promise<ResolvedConfigResult> {
   }
 
   const workspaceConfig = await loadProjectConfig();
-  const activeProfile = (
-    process.env.GORDON_PROFILE
-    || workspaceConfig?.profile
-    || globalConfig.activeProfile
-    || null
-  )?.trim() || null;
+  const activeProfile =
+    (
+      process.env.GORDON_PROFILE ||
+      workspaceConfig?.profile ||
+      globalConfig.activeProfile ||
+      null
+    )?.trim() || null;
 
   const profileOverrides = await loadProfileConfig(activeProfile);
   const mergedWithProfile = profileOverrides
@@ -209,10 +219,12 @@ export async function loadConfigBundle(): Promise<ResolvedConfigResult> {
     ? mergeConfigRecords(mergedWithProfile, workspaceConfig.overrides)
     : mergedWithProfile;
 
-  const config = GordonConfigSchema.parse(migrateExchangeConfigTypes({
-    ...merged,
-    activeProfile: activeProfile ?? undefined,
-  }));
+  const config = GordonConfigSchema.parse(
+    migrateExchangeConfigTypes({
+      ...merged,
+      activeProfile: activeProfile ?? undefined,
+    }),
+  );
 
   const layers: ConfigLayers = {
     activeProfile,
@@ -280,9 +292,7 @@ export async function saveResolvedConfig(
   layers: ConfigLayers,
   options?: SaveResolvedConfigOptions,
 ): Promise<void> {
-  await saveConfig(
-    config,
-    getResolvedConfigWriteScope(layers),
-    { profileName: options?.profileName ?? layers.activeProfile },
-  );
+  await saveConfig(config, getResolvedConfigWriteScope(layers), {
+    profileName: options?.profileName ?? layers.activeProfile,
+  });
 }

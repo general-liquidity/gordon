@@ -14,7 +14,10 @@ import { z } from "zod";
 
 import { scan } from "../../../../core/pipeline/scanner.ts";
 import { analyze } from "../../../../core/pipeline/analyzer.ts";
-import { getHistoricalOpportunities, getOpportunitySummary } from "../../../storage/entities/events.ts";
+import {
+  getHistoricalOpportunities,
+  getOpportunitySummary,
+} from "../../../storage/entities/events.ts";
 import {
   getGordonContext,
   validateToolOutput,
@@ -29,7 +32,6 @@ import { resolveInstrument } from "../../../domain/markets/instruments.ts";
 import {
   formatScanResults,
   formatAnalysisResults,
-  formatCurrency,
 } from "../../../../app/presenters/resultFormatting.ts";
 
 // ============================================================================
@@ -47,24 +49,30 @@ const errors = {
 const scanMarketOutputSchema = z.object({
   marketFamily: z.enum(["crypto", "stocks"]).optional(),
   venueRoute: z.enum(["exchange", "broker"]).optional(),
-  capabilities: z.object({
-    supportsQuotes: z.boolean(),
-    supportsBidAsk: z.boolean(),
-    supportsOrderBook: z.boolean(),
-    supportsSessionCalendar: z.boolean(),
-    supportsExtendedHours: z.boolean(),
-    supportsHistoricalBars: z.boolean(),
-  }).optional(),
+  capabilities: z
+    .object({
+      supportsQuotes: z.boolean(),
+      supportsBidAsk: z.boolean(),
+      supportsOrderBook: z.boolean(),
+      supportsSessionCalendar: z.boolean(),
+      supportsExtendedHours: z.boolean(),
+      supportsHistoricalBars: z.boolean(),
+    })
+    .optional(),
   timestamp: z.string().optional(),
   coinsScanned: z.number().optional(),
-  opportunities: z.array(z.object({
-    symbol: z.string(),
-    price: z.number(),
-    change24h: z.number(),
-    setupConfidence: z.number(),
-    bias: z.string(),
-    risk: z.string(),
-  })).optional(),
+  opportunities: z
+    .array(
+      z.object({
+        symbol: z.string(),
+        price: z.number(),
+        change24h: z.number(),
+        setupConfidence: z.number(),
+        bias: z.string(),
+        risk: z.string(),
+      }),
+    )
+    .optional(),
   executionTime: z.number().optional(),
   formattedSummary: z.string().optional(),
   error: z.string().optional(),
@@ -75,32 +83,44 @@ const analyzeCoinOutputSchema = z.object({
   venueRoute: z.enum(["exchange", "broker"]).optional(),
   quoteAsset: z.string().optional(),
   resolutionSource: z.enum(["exchange_catalog", "broker_quote", "heuristic"]).optional(),
-  capabilities: z.object({
-    supportsQuotes: z.boolean(),
-    supportsBidAsk: z.boolean(),
-    supportsOrderBook: z.boolean(),
-    supportsSessionCalendar: z.boolean(),
-    supportsExtendedHours: z.boolean(),
-    supportsHistoricalBars: z.boolean(),
-  }).optional(),
+  capabilities: z
+    .object({
+      supportsQuotes: z.boolean(),
+      supportsBidAsk: z.boolean(),
+      supportsOrderBook: z.boolean(),
+      supportsSessionCalendar: z.boolean(),
+      supportsExtendedHours: z.boolean(),
+      supportsHistoricalBars: z.boolean(),
+    })
+    .optional(),
   symbol: z.string().optional(),
   price: z.number().optional(),
   trend: z.string().optional(),
   setupDetected: z.boolean().optional(),
   setupConfidence: z.number().optional(),
-  supports: z.array(z.object({
-    price: z.number(),
-    strength: z.number(),
-  })).optional(),
-  resistances: z.array(z.object({
-    price: z.number(),
-    strength: z.number(),
-  })).optional(),
-  indicators: z.object({
-    rsi: z.number().nullable().optional(),
-    macdState: z.string().optional(),
-    volumeTrend: z.string().optional(),
-  }).optional(),
+  supports: z
+    .array(
+      z.object({
+        price: z.number(),
+        strength: z.number(),
+      }),
+    )
+    .optional(),
+  resistances: z
+    .array(
+      z.object({
+        price: z.number(),
+        strength: z.number(),
+      }),
+    )
+    .optional(),
+  indicators: z
+    .object({
+      rsi: z.number().nullable().optional(),
+      macdState: z.string().optional(),
+      volumeTrend: z.string().optional(),
+    })
+    .optional(),
   recommendation: z.string().optional(),
   executionTime: z.number().optional(),
   formattedSummary: z.string().optional(),
@@ -110,14 +130,16 @@ const analyzeCoinOutputSchema = z.object({
 const getHistoricalOpportunitiesOutputSchema = z.object({
   message: z.string(),
   totalOpportunities: z.number(),
-  opportunities: z.array(z.object({
-    symbol: z.string(),
-    timestamp: z.string(),
-    price: z.number(),
-    confidence: z.string(),
-    bias: z.string(),
-    risk: z.string(),
-  })),
+  opportunities: z.array(
+    z.object({
+      symbol: z.string(),
+      timestamp: z.string(),
+      price: z.number(),
+      confidence: z.string(),
+      bias: z.string(),
+      risk: z.string(),
+    }),
+  ),
   dailySummary: z.record(z.string(), z.number()),
 });
 
@@ -131,41 +153,47 @@ export const scanMarketTool = createTool({
     "Scan the market for trading opportunities. Finds coins near support with bullish signals. " +
     "Use this when the user wants to find trading opportunities or asks 'what should I buy?'",
   inputSchema: z.object({
-    topN: z
-      .number()
-      .min(10)
-      .max(200)
-      .default(50)
-      .describe("Number of top coins by volume to scan"),
+    topN: z.number().min(10).max(200).default(50).describe("Number of top coins by volume to scan"),
     timeframes: z
       .array(z.string())
       .default(["1h", "4h"])
-      .describe("Ordered timeframe preference for scan ranking. The scanner uses the first timeframe only for fast market scans."),
+      .describe(
+        "Ordered timeframe preference for scan ranking. The scanner uses the first timeframe only for fast market scans.",
+      ),
   }),
   outputSchema: scanMarketOutputSchema,
   execute: async ({ topN, timeframes }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange && !ctx?.broker) {
-      return validateToolOutput(scanMarketOutputSchema, errors.noExchange, { toolName: "scan_market" });
+      return validateToolOutput(scanMarketOutputSchema, errors.noExchange, {
+        toolName: "scan_market",
+      });
     }
     if (!ctx?.exchange && ctx?.broker) {
-      return validateToolOutput(scanMarketOutputSchema, {
-        marketFamily: "stocks",
-        venueRoute: "broker",
-        capabilities: {
-          supportsQuotes: true,
-          supportsBidAsk: true,
-          supportsOrderBook: false,
-          supportsSessionCalendar: true,
-          supportsExtendedHours: Boolean(ctx.broker.capabilities.supportsExtendedHours),
-          supportsHistoricalBars: Boolean(ctx.broker.capabilities.supportsHistoricalBars),
+      return validateToolOutput(
+        scanMarketOutputSchema,
+        {
+          marketFamily: "stocks",
+          venueRoute: "broker",
+          capabilities: {
+            supportsQuotes: true,
+            supportsBidAsk: true,
+            supportsOrderBook: false,
+            supportsSessionCalendar: true,
+            supportsExtendedHours: Boolean(ctx.broker.capabilities.supportsExtendedHours),
+            supportsHistoricalBars: Boolean(ctx.broker.capabilities.supportsHistoricalBars),
+          },
+          error:
+            "Market-wide scan currently requires a crypto venue with 24h ticker coverage. Use /analyze <ticker> for stock-specific analysis.",
         },
-        error: "Market-wide scan currently requires a crypto venue with 24h ticker coverage. Use /analyze <ticker> for stock-specific analysis.",
-      }, { toolName: "scan_market" });
+        { toolName: "scan_market" },
+      );
     }
     const exchange = ctx.exchange;
     if (!exchange) {
-      return validateToolOutput(scanMarketOutputSchema, errors.noExchange, { toolName: "scan_market" });
+      return validateToolOutput(scanMarketOutputSchema, errors.noExchange, {
+        toolName: "scan_market",
+      });
     }
 
     const startTime = Date.now();
@@ -218,11 +246,15 @@ export const scanMarketTool = createTool({
       const errorResponse = createToolErrorResponse(
         error instanceof Error ? error : new Error(String(error)),
         "/scan",
-        { topN, timeframes }
+        { topN, timeframes },
       );
-      return validateToolOutput(scanMarketOutputSchema, {
-        error: errorResponse.error,
-      }, { toolName: "scan_market" });
+      return validateToolOutput(
+        scanMarketOutputSchema,
+        {
+          error: errorResponse.error,
+        },
+        { toolName: "scan_market" },
+      );
     }
   },
 });
@@ -237,19 +269,16 @@ export const analyzeCoinTool = createTool({
     "Perform deep analysis on a specific coin/trading pair. " +
     "Use this when the user asks about a specific coin like 'analyze BTC' or 'what about ETH?'",
   inputSchema: z.object({
-    symbol: z
-      .string()
-      .describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETHUSDT')"),
-    timeframes: z
-      .array(z.string())
-      .default(["1h", "4h", "1d"])
-      .describe("Timeframes to analyze"),
+    symbol: z.string().describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETHUSDT')"),
+    timeframes: z.array(z.string()).default(["1h", "4h", "1d"]).describe("Timeframes to analyze"),
   }),
   outputSchema: analyzeCoinOutputSchema,
   execute: async ({ symbol, timeframes }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange && !ctx?.broker) {
-      return validateToolOutput(analyzeCoinOutputSchema, errors.noExchange, { toolName: "analyze_coin" });
+      return validateToolOutput(analyzeCoinOutputSchema, errors.noExchange, {
+        toolName: "analyze_coin",
+      });
     }
 
     const startTime = Date.now();
@@ -260,8 +289,13 @@ export const analyzeCoinTool = createTool({
       if (instrument.route === "broker" && ctx.broker) {
         const primaryTimeframe = timeframes?.[0] ?? "1h";
         const endTime = Date.now();
-        const timeframeMs = primaryTimeframe === "1d" ? 86_400_000 : primaryTimeframe === "4h" ? 14_400_000 : 3_600_000;
-        const startTimeMs = endTime - (120 * timeframeMs);
+        const timeframeMs =
+          primaryTimeframe === "1d"
+            ? 86_400_000
+            : primaryTimeframe === "4h"
+              ? 14_400_000
+              : 3_600_000;
+        const startTimeMs = endTime - 120 * timeframeMs;
         const candles = await ctx.broker.getHistoricalBars({
           symbol: normalizedSymbol,
           timeframe: primaryTimeframe,
@@ -271,29 +305,43 @@ export const analyzeCoinTool = createTool({
         });
 
         if (!candles || candles.length < 30) {
-          return validateToolOutput(analyzeCoinOutputSchema, {
-            error: `Insufficient market data for ${normalizedSymbol}.`,
-            symbol: normalizedSymbol,
-          }, { toolName: "analyze_coin" });
+          return validateToolOutput(
+            analyzeCoinOutputSchema,
+            {
+              error: `Insufficient market data for ${normalizedSymbol}.`,
+              symbol: normalizedSymbol,
+            },
+            { toolName: "analyze_coin" },
+          );
         }
 
         const indicatorsRaw = calculateIndicators(candles);
         const levels = detectLevels(candles);
         const currentPrice = candles[candles.length - 1]?.close ?? 0;
-        const supports = levels.filter((level) => level.type === "support").slice(0, 3).map((level) => ({
-          price: level.price,
-          strength: level.strength,
-        }));
-        const resistances = levels.filter((level) => level.type === "resistance").slice(0, 3).map((level) => ({
-          price: level.price,
-          strength: level.strength,
-        }));
+        const supports = levels
+          .filter((level) => level.type === "support")
+          .slice(0, 3)
+          .map((level) => ({
+            price: level.price,
+            strength: level.strength,
+          }));
+        const resistances = levels
+          .filter((level) => level.type === "resistance")
+          .slice(0, 3)
+          .map((level) => ({
+            price: level.price,
+            strength: level.strength,
+          }));
         const bounce = detectSupportBounce(candles, levels, indicatorsRaw);
         const trend = determineTrend(candles);
         const indicators = {
           rsi: indicatorsRaw.rsi,
-          macdState: indicatorsRaw.macd?.histogram && indicatorsRaw.macd.histogram > 0 ? "bullish" : "bearish",
-          volumeTrend: indicatorsRaw.volumeRatio && indicatorsRaw.volumeRatio > 1 ? "rising" : "stable",
+          macdState:
+            indicatorsRaw.macd?.histogram && indicatorsRaw.macd.histogram > 0
+              ? "bullish"
+              : "bearish",
+          volumeTrend:
+            indicatorsRaw.volumeRatio && indicatorsRaw.volumeRatio > 1 ? "rising" : "stable",
         };
         const executionTime = Date.now() - startTime;
         const formattedSummary = formatAnalysisResults({
@@ -308,32 +356,40 @@ export const analyzeCoinTool = createTool({
           executionTime,
         });
 
-        return validateToolOutput(analyzeCoinOutputSchema, {
-          marketFamily: instrument.marketFamily,
-          venueRoute: instrument.route,
-          quoteAsset: instrument.quoteAsset,
-          resolutionSource: instrument.resolutionSource,
-          capabilities: instrument.capabilities,
-          symbol: normalizedSymbol,
-          price: currentPrice,
-          trend,
-          setupDetected: bounce.detected,
-          setupConfidence: bounce.confidence,
-          supports,
-          resistances,
-          indicators,
-          recommendation: bounce.detected
-            ? "Actionable setup detected on the active stock broker feed."
-            : "No clean setup detected. Wait for clearer structure.",
-          executionTime,
-          formattedSummary,
-        }, { toolName: "analyze_coin" });
+        return validateToolOutput(
+          analyzeCoinOutputSchema,
+          {
+            marketFamily: instrument.marketFamily,
+            venueRoute: instrument.route,
+            quoteAsset: instrument.quoteAsset,
+            resolutionSource: instrument.resolutionSource,
+            capabilities: instrument.capabilities,
+            symbol: normalizedSymbol,
+            price: currentPrice,
+            trend,
+            setupDetected: bounce.detected,
+            setupConfidence: bounce.confidence,
+            supports,
+            resistances,
+            indicators,
+            recommendation: bounce.detected
+              ? "Actionable setup detected on the active stock broker feed."
+              : "No clean setup detected. Wait for clearer structure.",
+            executionTime,
+            formattedSummary,
+          },
+          { toolName: "analyze_coin" },
+        );
       }
 
       if (!ctx.exchange) {
-        return validateToolOutput(analyzeCoinOutputSchema, {
-          error: "No active crypto execution venue is connected.",
-        }, { toolName: "analyze_coin" });
+        return validateToolOutput(
+          analyzeCoinOutputSchema,
+          {
+            error: "No active crypto execution venue is connected.",
+          },
+          { toolName: "analyze_coin" },
+        );
       }
 
       const result = await analyze(ctx.exchange, normalizedSymbol, {
@@ -403,12 +459,16 @@ export const analyzeCoinTool = createTool({
       const errorResponse = createToolErrorResponse(
         error instanceof Error ? error : new Error(String(error)),
         `/analyze ${symbol}`,
-        { symbol: normalizedSymbol, timeframes }
+        { symbol: normalizedSymbol, timeframes },
       );
-      return validateToolOutput(analyzeCoinOutputSchema, {
-        error: errorResponse.error,
-        symbol: normalizedSymbol,
-      }, { toolName: "analyze_coin" });
+      return validateToolOutput(
+        analyzeCoinOutputSchema,
+        {
+          error: errorResponse.error,
+          symbol: normalizedSymbol,
+        },
+        { toolName: "analyze_coin" },
+      );
     }
   },
 });
@@ -423,12 +483,7 @@ export const getHistoricalOpportunitiesTool = createTool({
     "Query past trading opportunities that were detected by scans. " +
     "Use this to answer questions like 'did we miss any opportunities?' or 'what setups were found recently?'",
   inputSchema: z.object({
-    daysBack: z
-      .number()
-      .min(1)
-      .max(30)
-      .default(7)
-      .describe("Number of days to look back"),
+    daysBack: z.number().min(1).max(30).default(7).describe("Number of days to look back"),
     symbol: z
       .string()
       .default("")
@@ -441,7 +496,7 @@ export const getHistoricalOpportunitiesTool = createTool({
       .describe("Minimum confidence threshold (0-1). 0 for no filter."),
   }),
   outputSchema: getHistoricalOpportunitiesOutputSchema,
-  execute: async ({ daysBack, symbol, minConfidence }, execContext: MastraExecutionContext) => {
+  execute: async ({ daysBack, symbol, minConfidence }, _execContext: MastraExecutionContext) => {
     // This tool doesn't require an exchange client - it reads from local storage
     const opportunities = getHistoricalOpportunities({
       daysBack,
@@ -453,12 +508,16 @@ export const getHistoricalOpportunitiesTool = createTool({
     const summary = getOpportunitySummary(daysBack);
 
     if (opportunities.length === 0) {
-      return validateToolOutput(getHistoricalOpportunitiesOutputSchema, {
-        message: `No opportunities were detected in the last ${daysBack} days.`,
-        totalOpportunities: 0,
-        opportunities: [],
-        dailySummary: summary,
-      }, { toolName: "get_historical_opportunities" });
+      return validateToolOutput(
+        getHistoricalOpportunitiesOutputSchema,
+        {
+          message: `No opportunities were detected in the last ${daysBack} days.`,
+          totalOpportunities: 0,
+          opportunities: [],
+          dailySummary: summary,
+        },
+        { toolName: "get_historical_opportunities" },
+      );
     }
 
     const output = {
@@ -468,14 +527,16 @@ export const getHistoricalOpportunitiesTool = createTool({
         symbol: o.symbol,
         timestamp: o.timestamp,
         price: o.price,
-        confidence: Math.round(o.confidence * 100) + "%",
+        confidence: `${Math.round(o.confidence * 100)}%`,
         bias: o.bias,
         risk: o.risk,
       })),
       dailySummary: summary,
     };
 
-    return validateToolOutput(getHistoricalOpportunitiesOutputSchema, output, { toolName: "get_historical_opportunities" });
+    return validateToolOutput(getHistoricalOpportunitiesOutputSchema, output, {
+      toolName: "get_historical_opportunities",
+    });
   },
 });
 
@@ -495,5 +556,8 @@ export const getHistoricalOpportunitiesTool = createTool({
 export const marketTools = {
   scan_market: createCachedTool(scanMarketTool, TOOL_CACHE_CONFIG.scanning.ttl),
   analyze_coin: createCachedTool(analyzeCoinTool, TOOL_CACHE_CONFIG.analysis.ttl),
-  get_historical_opportunities: createCachedTool(getHistoricalOpportunitiesTool, TOOL_CACHE_CONFIG.historical.ttl),
+  get_historical_opportunities: createCachedTool(
+    getHistoricalOpportunitiesTool,
+    TOOL_CACHE_CONFIG.historical.ttl,
+  ),
 };

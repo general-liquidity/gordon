@@ -13,8 +13,14 @@ import { tradeEventProducer, resetTradeEventProducerState } from "./events/trade
 import { scanOpportunityProducer } from "./signals/scanOpportunityProducer.ts";
 import { riskProducer } from "./risk/riskProducer.ts";
 import { stopProducer } from "./risk/stopProducer.ts";
-import { producerHealthAlertProducer, resetProducerHealthAlertProducerState } from "./risk/producerHealthAlertProducer.ts";
-import { killSwitchAlertProducer, resetKillSwitchAlertProducerState } from "./risk/killSwitchAlertProducer.ts";
+import {
+  producerHealthAlertProducer,
+  resetProducerHealthAlertProducerState,
+} from "./risk/producerHealthAlertProducer.ts";
+import {
+  killSwitchAlertProducer,
+  resetKillSwitchAlertProducerState,
+} from "./risk/killSwitchAlertProducer.ts";
 import { periodicProducer, resetPeriodicProducerState } from "./periodicProducer.ts";
 import { portfolioDriftProducer } from "./risk/portfolioDriftProducer.ts";
 import {
@@ -22,14 +28,32 @@ import {
   resetPositionReviewProducerState,
 } from "./risk/positionReviewProducer.ts";
 import { regimeFlipProducer, resetRegimeFlipProducerState } from "./signals/regimeFlipProducer.ts";
-import { chartPatternProducer, resetChartPatternProducerState } from "./signals/chartPatternProducer.ts";
-import { volatilitySpikeProducer, resetVolatilitySpikeProducerState } from "./signals/volatilitySpikeProducer.ts";
-import { fundingAlertProducer, resetFundingAlertProducerState } from "./signals/fundingAlertProducer.ts";
+import {
+  chartPatternProducer,
+  resetChartPatternProducerState,
+} from "./signals/chartPatternProducer.ts";
+import {
+  volatilitySpikeProducer,
+  resetVolatilitySpikeProducerState,
+} from "./signals/volatilitySpikeProducer.ts";
+import {
+  fundingAlertProducer,
+  resetFundingAlertProducerState,
+} from "./signals/fundingAlertProducer.ts";
 import { newsEventProducer, resetNewsEventProducerState } from "./events/newsEventProducer.ts";
 import { whaleAlertProducer, resetWhaleAlertProducerState } from "./events/whaleAlertProducer.ts";
-import { stockNewsEventProducer, resetStockNewsEventProducerState } from "./events/stockNewsEventProducer.ts";
-import { playbookSuggestProducer, resetPlaybookSuggestProducerState } from "./signals/playbookSuggestProducer.ts";
-import { edgeAssessmentProducer, resetEdgeAssessmentProducerState } from "./signals/edgeAssessmentProducer.ts";
+import {
+  stockNewsEventProducer,
+  resetStockNewsEventProducerState,
+} from "./events/stockNewsEventProducer.ts";
+import {
+  playbookSuggestProducer,
+  resetPlaybookSuggestProducerState,
+} from "./signals/playbookSuggestProducer.ts";
+import {
+  edgeAssessmentProducer,
+  resetEdgeAssessmentProducerState,
+} from "./signals/edgeAssessmentProducer.ts";
 import {
   earningsApproachingProducer,
   insiderFlowProducer,

@@ -41,8 +41,7 @@ function parseArgs(argv: string[]): { k: number; dryRun: boolean; scenarioId?: s
 
 const { k, dryRun, scenarioId } = parseArgs(process.argv.slice(2));
 
-const scenario =
-  (scenarioId ? getScenarioById(scenarioId) : undefined) ?? ADVERSARIAL_SCENARIOS[0];
+const scenario = (scenarioId ? getScenarioById(scenarioId) : undefined) ?? ADVERSARIAL_SCENARIOS[0];
 
 if (!scenario) {
   console.error("No scenario found. Pass --scenario <id> or ensure adversarial scenarios exist.");
@@ -63,13 +62,15 @@ const result = await withEvalSandbox(
 );
 
 console.log("");
-console.log(`pass^k: ${result.passKResult.passes}/${result.passKResult.k} (${result.passKResult.passRate})`);
-console.log(`mode=${result.passKResult.mode} meets=${result.passKResult.meets} allPass=${result.passKResult.allPass}`);
+console.log(
+  `pass^k: ${result.passKResult.passes}/${result.passKResult.k} (${result.passKResult.passRate})`,
+);
+console.log(
+  `mode=${result.passKResult.mode} meets=${result.passKResult.meets} allPass=${result.passKResult.allPass}`,
+);
 
 if (!result.passKResult.meets) {
-  const failed = result.processResults
-    .map((r, i) => ({ i, r }))
-    .filter(({ r }) => !r.passed);
+  const failed = result.processResults.map((r, i) => ({ i, r })).filter(({ r }) => !r.passed);
   for (const { i, r } of failed) {
     console.error(`  run ${i}: ${r.violations.map((v) => v.rule).join(", ")}`);
   }

@@ -10,12 +10,15 @@
 
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
 
-import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "../agents/tools/types.ts";
-import { GORDON_MODELS, type LLMProvider } from "../ai/llm/types.ts";
+import {
+  getGordonContext,
+  normalizeSymbol,
+  type MastraExecutionContext,
+} from "../agents/tools/types.ts";
 
 // ============================================================================
 // Types and Constants
@@ -171,7 +174,7 @@ function detectPatterns(candles: ChartDataPoint[]): string[] {
   // Check for recent candle patterns
   const last = candles[len - 1]!;
   const prev = candles[len - 2]!;
-  const prev2 = candles[len - 3]!;
+  const _prev2 = candles[len - 3]!;
 
   // Doji detection
   const bodySize = Math.abs(last.close - last.open);
@@ -232,7 +235,7 @@ function detectPatterns(candles: ChartDataPoint[]): string[] {
  */
 function detectLevels(
   candles: ChartDataPoint[],
-  count: number = 3
+  count: number = 3,
 ): { support: number[]; resistance: number[] } {
   const highs = candles.map((c) => c.high);
   const lows = candles.map((c) => c.low);
@@ -304,7 +307,7 @@ function generateASCIIChart(
   candles: ChartDataPoint[],
   indicators: IndicatorData,
   symbol: string,
-  timeframe: string
+  timeframe: string,
 ): string {
   const height = CHART_HEIGHT - 6; // Reserve space for header, legend, etc.
   const width = Math.min(candles.length * 3, CHART_WIDTH - 12); // 3 chars per candle + price axis
@@ -317,9 +320,7 @@ function generateASCIIChart(
   const priceRange = maxPrice - minPrice || 1;
 
   // Initialize chart grid
-  const grid: string[][] = Array.from({ length: height }, () =>
-    Array(width).fill(" ")
-  );
+  const grid: string[][] = Array.from({ length: height }, () => Array(width).fill(" "));
 
   // Draw candles
   for (let i = 0; i < displayCandles.length; i++) {
@@ -359,7 +360,7 @@ function generateASCIIChart(
   if (indicators.ma20 && indicators.ma20.length > 0) {
     const ma = indicators.ma20.slice(-displayCandles.length);
     for (let i = 1; i < ma.length; i++) {
-      if (!isNaN(ma[i]!) && !isNaN(ma[i - 1]!)) {
+      if (!Number.isNaN(ma[i]!) && !Number.isNaN(ma[i - 1]!)) {
         const row = height - 1 - scaleToRow(ma[i]!, minPrice, maxPrice, height);
         const x = i * 3 + 1;
         if (row >= 0 && row < height && x < width) {
@@ -375,7 +376,7 @@ function generateASCIIChart(
   if (indicators.ma50 && indicators.ma50.length > 0) {
     const ma = indicators.ma50.slice(-displayCandles.length);
     for (let i = 1; i < ma.length; i++) {
-      if (!isNaN(ma[i]!) && !isNaN(ma[i - 1]!)) {
+      if (!Number.isNaN(ma[i]!) && !Number.isNaN(ma[i - 1]!)) {
         const row = height - 1 - scaleToRow(ma[i]!, minPrice, maxPrice, height);
         const x = i * 3 + 1;
         if (row >= 0 && row < height && x < width) {
@@ -417,18 +418,18 @@ function generateASCIIChart(
 
   // Legend
   lines.push("");
-  lines.push(`${ANSI.dim}Legend:${ANSI.reset} ${ANSI.green}███${ANSI.reset} Bullish  ${ANSI.red}░░░${ANSI.reset} Bearish  ${ANSI.yellow}~~~${ANSI.reset} MA20  ${ANSI.blue}---${ANSI.reset} MA50`);
+  lines.push(
+    `${ANSI.dim}Legend:${ANSI.reset} ${ANSI.green}███${ANSI.reset} Bullish  ${ANSI.red}░░░${ANSI.reset} Bearish  ${ANSI.yellow}~~~${ANSI.reset} MA20  ${ANSI.blue}---${ANSI.reset} MA50`,
+  );
 
   // RSI indicator
   if (indicators.rsi && indicators.rsi.length > 0) {
     const currentRSI = indicators.rsi[indicators.rsi.length - 1];
-    if (!isNaN(currentRSI!)) {
-      const rsiColor =
-        currentRSI! > 70 ? ANSI.red : currentRSI! < 30 ? ANSI.green : ANSI.white;
-      const rsiStatus =
-        currentRSI! > 70 ? "Overbought" : currentRSI! < 30 ? "Oversold" : "Neutral";
+    if (!Number.isNaN(currentRSI!)) {
+      const rsiColor = currentRSI! > 70 ? ANSI.red : currentRSI! < 30 ? ANSI.green : ANSI.white;
+      const rsiStatus = currentRSI! > 70 ? "Overbought" : currentRSI! < 30 ? "Oversold" : "Neutral";
       lines.push(
-        `${ANSI.dim}RSI(14):${ANSI.reset} ${rsiColor}${currentRSI!.toFixed(1)}${ANSI.reset} (${rsiStatus})`
+        `${ANSI.dim}RSI(14):${ANSI.reset} ${rsiColor}${currentRSI!.toFixed(1)}${ANSI.reset} (${rsiStatus})`,
       );
     }
   }
@@ -442,7 +443,7 @@ function generateASCIIChart(
 
   lines.push(
     `${ANSI.dim}Price:${ANSI.reset} ${ANSI.bold}${formatPrice(current.close)}${ANSI.reset} ` +
-      `${changeColor}${changeSign}${changePct.toFixed(2)}%${ANSI.reset}`
+      `${changeColor}${changeSign}${changePct.toFixed(2)}%${ANSI.reset}`,
   );
 
   return lines.join("\n");
@@ -455,7 +456,7 @@ function generateSVGChart(
   candles: ChartDataPoint[],
   indicators: IndicatorData,
   symbol: string,
-  timeframe: string
+  timeframe: string,
 ): string {
   const width = 800;
   const height = 400;
@@ -492,7 +493,7 @@ function generateSVGChart(
   // MA lines
   if (indicators.ma20) {
     const points = indicators.ma20
-      .map((val, i) => (!isNaN(val) ? `${scaleX(i)},${scaleY(val)}` : null))
+      .map((val, i) => (!Number.isNaN(val) ? `${scaleX(i)},${scaleY(val)}` : null))
       .filter(Boolean)
       .join(" ");
     if (points) {
@@ -502,7 +503,7 @@ function generateSVGChart(
 
   if (indicators.ma50) {
     const points = indicators.ma50
-      .map((val, i) => (!isNaN(val) ? `${scaleX(i)},${scaleY(val)}` : null))
+      .map((val, i) => (!Number.isNaN(val) ? `${scaleX(i)},${scaleY(val)}` : null))
       .filter(Boolean)
       .join(" ");
     if (points) {
@@ -563,28 +564,17 @@ export const generateChartTool = createTool({
     "Use when user wants to see a visual price chart or asks 'show me the chart'.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
-    timeframe: z
-      .enum(["1h", "4h", "1d"])
-      .default("4h")
-      .describe("Chart timeframe"),
-    periods: z
-      .number()
-      .min(20)
-      .max(100)
-      .default(50)
-      .describe("Number of candles to display"),
+    timeframe: z.enum(["1h", "4h", "1d"]).default("4h").describe("Chart timeframe"),
+    periods: z.number().min(20).max(100).default(50).describe("Number of candles to display"),
     indicators: z
       .array(z.enum(["ma20", "ma50", "rsi", "volume"]))
       .default(["ma20", "ma50", "rsi"])
       .describe("Technical indicators to include"),
-    saveImage: z
-      .boolean()
-      .default(false)
-      .describe("Save SVG image to temp file"),
+    saveImage: z.boolean().default(false).describe("Save SVG image to temp file"),
   }),
   execute: async (
     { symbol, timeframe, periods, indicators, saveImage },
-    execContext: MastraExecutionContext
+    execContext: MastraExecutionContext,
   ): Promise<ChartGenerationResult> => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
@@ -632,7 +622,7 @@ export const generateChartTool = createTool({
       if (indicators.includes("volume")) {
         indicatorData.volumeAvg = calculateSMA(
           candles.map((c) => c.volume),
-          20
+          20,
         );
       }
 
@@ -682,24 +672,12 @@ export const analyzeChartTool = createTool({
     "Use when user asks for 'technical analysis' or 'TA' on a symbol.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
-    timeframe: z
-      .enum(["1h", "4h", "1d"])
-      .default("4h")
-      .describe("Analysis timeframe"),
-    periods: z
-      .number()
-      .min(50)
-      .max(200)
-      .default(100)
-      .describe("Historical periods to analyze"),
-    useVision: z
-      .boolean()
-      .default(false)
-      .describe("Use vision model for advanced chart analysis (if available)"),
+    timeframe: z.enum(["1h", "4h", "1d"]).default("4h").describe("Analysis timeframe"),
+    periods: z.number().min(50).max(200).default(100).describe("Historical periods to analyze"),
   }),
   execute: async (
-    { symbol, timeframe, periods, useVision },
-    execContext: MastraExecutionContext
+    { symbol, timeframe, periods },
+    execContext: MastraExecutionContext,
   ): Promise<ChartAnalysisResult> => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
@@ -767,7 +745,7 @@ export const analyzeChartTool = createTool({
       const signals: string[] = [];
 
       // RSI signals
-      if (!isNaN(currentRSI)) {
+      if (!Number.isNaN(currentRSI)) {
         if (currentRSI > 70) signals.push("RSI overbought - potential pullback");
         if (currentRSI < 30) signals.push("RSI oversold - potential bounce");
         if (currentRSI > 50 && currentRSI < 70) signals.push("RSI bullish momentum");
@@ -775,7 +753,7 @@ export const analyzeChartTool = createTool({
       }
 
       // MA signals
-      if (!isNaN(currentMA20) && !isNaN(currentMA50)) {
+      if (!Number.isNaN(currentMA20) && !Number.isNaN(currentMA50)) {
         const prevMA20 = ma20[ma20.length - 2]!;
         const prevMA50 = ma50[ma50.length - 2]!;
 
@@ -812,7 +790,7 @@ export const analyzeChartTool = createTool({
         (levels.resistance.length > 0
           ? `Key resistance at $${levels.resistance.map(formatPrice).join(", $")}. `
           : "") +
-        (!isNaN(currentRSI) ? `RSI: ${currentRSI.toFixed(1)}.` : "");
+        (!Number.isNaN(currentRSI) ? `RSI: ${currentRSI.toFixed(1)}.` : "");
 
       // Generate recommendation
       let recommendation: string;
@@ -871,15 +849,9 @@ export const quickTATool = createTool({
     "Use when user asks '/ta <symbol>' or 'quick TA for BTC'.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'BTC')"),
-    timeframe: z
-      .enum(["1h", "4h", "1d"])
-      .default("4h")
-      .describe("Analysis timeframe"),
+    timeframe: z.enum(["1h", "4h", "1d"]).default("4h").describe("Analysis timeframe"),
   }),
-  execute: async (
-    { symbol, timeframe },
-    execContext: MastraExecutionContext
-  ) => {
+  execute: async ({ symbol, timeframe }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return { error: "Exchange client not connected. Please run setup first." };
@@ -956,9 +928,9 @@ export const quickTATool = createTool({
           trend,
           bias,
           price: currentPrice,
-          rsi: isNaN(currentRSI) ? null : Math.round(currentRSI * 10) / 10,
-          ma20: isNaN(currentMA20) ? null : currentMA20,
-          ma50: isNaN(currentMA50) ? null : currentMA50,
+          rsi: Number.isNaN(currentRSI) ? null : Math.round(currentRSI * 10) / 10,
+          ma20: Number.isNaN(currentMA20) ? null : currentMA20,
+          ma50: Number.isNaN(currentMA50) ? null : currentMA50,
           patterns: patterns.length > 0 ? patterns : ["None detected"],
           support: levels.support.map((p) => formatPrice(p)),
           resistance: levels.resistance.map((p) => formatPrice(p)),

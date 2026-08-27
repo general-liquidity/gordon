@@ -39,17 +39,17 @@ export function defaultJournalPath(env: NodeJS.ProcessEnv = process.env): string
 }
 
 export interface ThesisSection {
-  narrative: string;     // one-sentence fundamental/macro story
-  trigger: string;       // one-sentence technical setup that confirms timing
-  invalidation: string;  // structural price level (free-text — operator picks)
+  narrative: string; // one-sentence fundamental/macro story
+  trigger: string; // one-sentence technical setup that confirms timing
+  invalidation: string; // structural price level (free-text — operator picks)
 }
 
 export interface MathSection {
   freeCapitalUsd: number;
-  riskPercent: number;       // 0..1 (e.g. 0.01 = 1%)
-  dollarRiskBudget: number;  // freeCapital × riskPercent
-  stopDistance: number;      // |entry - stop|, post-buffer
-  positionUnits: number;     // dollarRiskBudget / stopDistance
+  riskPercent: number; // 0..1 (e.g. 0.01 = 1%)
+  dollarRiskBudget: number; // freeCapital × riskPercent
+  stopDistance: number; // |entry - stop|, post-buffer
+  positionUnits: number; // dollarRiskBudget / stopDistance
 }
 
 export interface PreMortemChecks {
@@ -148,7 +148,7 @@ export function recordJournalEntry(
   };
   try {
     mkdirSync(dirname(path), { recursive: true });
-    appendFileSync(path, JSON.stringify(entry) + "\n", "utf8");
+    appendFileSync(path, `${JSON.stringify(entry)}\n`, "utf8");
   } catch {
     /* best-effort */
   }

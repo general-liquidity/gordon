@@ -121,11 +121,17 @@ export function blocksTradeExecution(mode: PermissionMode | undefined): boolean 
 
 function operationLabel(op: TradingOperationContext): string {
   switch (op) {
-    case "execute": return "execute trade";
-    case "cancel": return "cancel order";
-    case "transfer": return "transfer funds";
-    case "autonomous": return "start autonomous mode";
-    case "plan_create": return "create plan";
-    case "state_mutation": return "mutate state";
+    case "execute":
+      return "execute trade";
+    case "cancel":
+      return "cancel order";
+    case "transfer":
+      return "transfer funds";
+    case "autonomous":
+      return "start autonomous mode";
+    case "plan_create":
+      return "create plan";
+    case "state_mutation":
+      return "mutate state";
   }
 }

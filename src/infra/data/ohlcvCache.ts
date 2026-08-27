@@ -32,11 +32,7 @@
  */
 
 import { createHash } from "node:crypto";
-import {
-  getDatabase,
-  executeWithLogging,
-  withTransaction,
-} from "../storage/database.ts";
+import { getDatabase, executeWithLogging, withTransaction } from "../storage/database.ts";
 import { createModuleLogger } from "../logger/index.ts";
 
 const logger = createModuleLogger("ohlcv-cache");
@@ -107,10 +103,7 @@ function ensureTable(): void {
     "CREATE INDEX idx_ohlcv_lookup",
   );
   executeWithLogging(
-    () =>
-      db.run(
-        "CREATE INDEX IF NOT EXISTS idx_ohlcv_stored_at ON ohlcv_candles(stored_at)",
-      ),
+    () => db.run("CREATE INDEX IF NOT EXISTS idx_ohlcv_stored_at ON ohlcv_candles(stored_at)"),
     "CREATE INDEX idx_ohlcv_stored_at",
   );
   tableInitialized = true;
@@ -246,18 +239,20 @@ export function readCandles(
     params.push(opts.limit!);
   }
   const db = getDatabase();
-  const rows = db.query<
-    {
-      bar_ts: number;
-      open: number;
-      high: number;
-      low: number;
-      close: number;
-      volume: number;
-      close_ts: number | null;
-    },
-    Array<string | number>
-  >(sql).all(...params);
+  const rows = db
+    .query<
+      {
+        bar_ts: number;
+        open: number;
+        high: number;
+        low: number;
+        close: number;
+        volume: number;
+        close_ts: number | null;
+      },
+      Array<string | number>
+    >(sql)
+    .all(...params);
   return rows.map((r) => ({
     openTime: r.bar_ts,
     open: r.open,
@@ -272,11 +267,7 @@ export function readCandles(
 /** Count cached candles for (venue, symbol, timeframe). Useful for
  *  cheap "do we have enough cached?" checks before deciding live vs
  *  cached reads. */
-export function countCachedCandles(
-  venue: string,
-  symbol: string,
-  timeframe: string,
-): number {
+export function countCachedCandles(venue: string, symbol: string, timeframe: string): number {
   ensureTable();
   const v = venue.trim();
   const s = symbol.trim().toUpperCase();

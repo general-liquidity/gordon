@@ -60,9 +60,7 @@ export type PromptCacheTtl = "5m" | "1h";
  * "300s" → "5m"; "1h" / "60m" / "3600s" → "1h"; anything else → "5m"
  * default.
  */
-export function resolvePromptCacheTtl(
-  env: NodeJS.ProcessEnv = process.env,
-): PromptCacheTtl {
+export function resolvePromptCacheTtl(env: NodeJS.ProcessEnv = process.env): PromptCacheTtl {
   const raw = env[PROMPT_CACHE_TTL_ENV]?.toLowerCase().trim();
   if (!raw) return "5m";
   if (raw === "1h" || raw === "60m" || raw === "3600s") return "1h";
@@ -160,10 +158,13 @@ export function providerRequiresExplicitCacheMarkers(provider: DirectProviderNam
  * Summary table used by `/context` or similar diagnostic surfaces to
  * explain what caching is active per provider.
  */
-export const PROVIDER_CACHING_MODEL: Record<DirectProviderName, {
-  model: "explicit" | "automatic" | "separate_api";
-  notes: string;
-}> = {
+export const PROVIDER_CACHING_MODEL: Record<
+  DirectProviderName,
+  {
+    model: "explicit" | "automatic" | "separate_api";
+    notes: string;
+  }
+> = {
   anthropic: {
     model: "explicit",
     notes: "cache_control markers on system blocks; min ~1024 input tokens",

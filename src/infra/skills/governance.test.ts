@@ -110,7 +110,9 @@ describe("summarizeSkillStatuses", () => {
   it("handles empty input", () => {
     const breakdown = summarizeSkillStatuses([]);
     expect(breakdown.total).toBe(0);
-    expect(breakdown.active + breakdown.experimental + breakdown.deprecated + breakdown.unspecified).toBe(0);
+    expect(
+      breakdown.active + breakdown.experimental + breakdown.deprecated + breakdown.unspecified,
+    ).toBe(0);
   });
 });
 

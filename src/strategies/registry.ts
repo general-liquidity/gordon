@@ -38,9 +38,7 @@ export class StrategyRegistry {
    */
   register(strategy: Strategy): void {
     if (this.strategies.has(strategy.id)) {
-      throw new Error(
-        `Strategy "${strategy.id}" is already registered. Use replace() to update.`
-      );
+      throw new Error(`Strategy "${strategy.id}" is already registered. Use replace() to update.`);
     }
     this.strategies.set(strategy.id, strategy);
   }
@@ -75,9 +73,7 @@ export class StrategyRegistry {
   getOrThrow(id: StrategyId): Strategy {
     const strategy = this.strategies.get(id);
     if (!strategy) {
-      throw new Error(
-        `Strategy "${id}" not found. Available: ${this.getIds().join(", ")}`
-      );
+      throw new Error(`Strategy "${id}" not found. Available: ${this.getIds().join(", ")}`);
     }
     return strategy;
   }

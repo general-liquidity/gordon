@@ -75,10 +75,7 @@ export class PriceCache {
   /**
    * Get or fetch price
    */
-  async getOrFetch(
-    symbol: string,
-    fetcher: () => Promise<number>
-  ): Promise<number> {
+  async getOrFetch(symbol: string, fetcher: () => Promise<number>): Promise<number> {
     const upperSymbol = symbol.toUpperCase();
     const cached = this.cache.get(upperSymbol);
 

@@ -23,10 +23,9 @@ const ESU = "\x1b[?2026l";
 
 const isSyncSupported = ((): boolean => {
   try {
-    const term = process.env["TERM_PROGRAM"] ?? "";
+    const term = process.env.TERM_PROGRAM ?? "";
     return (
-      /iTerm|WezTerm|Ghostty|kitty|foot|Contour/i.test(term) ||
-      Boolean(process.env["WT_SESSION"])
+      /iTerm|WezTerm|Ghostty|kitty|foot|Contour/i.test(term) || Boolean(process.env.WT_SESSION)
     );
   } catch {
     return false;
@@ -58,7 +57,7 @@ const createStandard = (
       cliCursor.hide();
       hasHiddenCursor = true;
     }
-    const output = str + "\n";
+    const output = `${str}\n`;
     if (output === previousOutput) return;
     previousOutput = output;
     stream.write(ansiEscapes.eraseLines(previousLineCount) + output);
@@ -79,7 +78,7 @@ const createStandard = (
     }
   };
   render.sync = (str: string) => {
-    const output = str + "\n";
+    const output = `${str}\n`;
     previousOutput = output;
     previousLineCount = output.split("\n").length;
   };
@@ -99,7 +98,7 @@ const createIncremental = (
       cliCursor.hide();
       hasHiddenCursor = true;
     }
-    const output = str + "\n";
+    const output = `${str}\n`;
     if (output === previousOutput) return;
 
     const previousCount = previousLines.length;
@@ -131,12 +130,7 @@ const createIncremental = (
         buffer.push(ansiEscapes.cursorNextLine);
         continue;
       }
-      buffer.push(
-        ansiEscapes.cursorTo(0) +
-          (nextLines[i] ?? "") +
-          ansiEscapes.eraseEndLine +
-          "\n",
-      );
+      buffer.push(`${ansiEscapes.cursorTo(0) + (nextLines[i] ?? "") + ansiEscapes.eraseEndLine}\n`);
     }
 
     if (isSyncSupported) stream.write(BSU);
@@ -161,7 +155,7 @@ const createIncremental = (
     }
   };
   render.sync = (str: string) => {
-    const output = str + "\n";
+    const output = `${str}\n`;
     previousOutput = output;
     previousLines = output.split("\n");
   };

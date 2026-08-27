@@ -15,15 +15,11 @@ describe("isTimeBasedExitEnabled", () => {
 
 describe("computeTimeBasedExit — validation", () => {
   it("rejects negative time-in-trade", () => {
-    expect(() =>
-      computeTimeBasedExit({ timeInTrade: -1, avgWinningDuration: 60 }),
-    ).toThrow();
+    expect(() => computeTimeBasedExit({ timeInTrade: -1, avgWinningDuration: 60 })).toThrow();
   });
 
   it("rejects non-positive avg-winning-duration", () => {
-    expect(() =>
-      computeTimeBasedExit({ timeInTrade: 60, avgWinningDuration: 0 }),
-    ).toThrow();
+    expect(() => computeTimeBasedExit({ timeInTrade: 60, avgWinningDuration: 0 })).toThrow();
   });
 
   it("rejects thresholdMultiplier ≤ 1", () => {

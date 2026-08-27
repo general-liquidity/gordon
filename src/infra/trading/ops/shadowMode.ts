@@ -164,7 +164,7 @@ export function recordShadowOpen(input: OpenShadowInput, path?: string): ShadowF
   };
   const target = path ?? defaultShadowFillsPath();
   ensureParentDir(target);
-  appendFileSync(target, JSON.stringify(fill) + "\n", "utf8");
+  appendFileSync(target, `${JSON.stringify(fill)}\n`, "utf8");
   return fill;
 }
 
@@ -175,7 +175,10 @@ export function recordShadowOpen(input: OpenShadowInput, path?: string): ShadowF
  * This is append-only: closed entries are diffs, not rewrites. Reading
  * is responsible for merging.
  */
-export function recordShadowClose(input: CloseShadowInput, path?: string): {
+export function recordShadowClose(
+  input: CloseShadowInput,
+  path?: string,
+): {
   planId: string;
   exitPrice: number;
   closeReason: string;
@@ -190,7 +193,7 @@ export function recordShadowClose(input: CloseShadowInput, path?: string): {
   };
   const target = path ?? defaultShadowFillsPath();
   ensureParentDir(target);
-  appendFileSync(target, JSON.stringify(record) + "\n", "utf8");
+  appendFileSync(target, `${JSON.stringify(record)}\n`, "utf8");
   return record;
 }
 
@@ -209,9 +212,16 @@ export function readShadowFills(opts: ShadowReadOptions = {}, path?: string): Sh
   const target = path ?? defaultShadowFillsPath();
   if (!existsSync(target)) return [];
 
-  const lines = readFileSync(target, "utf8").split("\n").filter((l) => l.trim().length > 0);
+  const lines = readFileSync(target, "utf8")
+    .split("\n")
+    .filter((l) => l.trim().length > 0);
   const byPlanId = new Map<string, ShadowFill>();
-  const closeRecords: Array<{ planId: string; exitPrice: number; closeReason: string; closedAt: number }> = [];
+  const closeRecords: Array<{
+    planId: string;
+    exitPrice: number;
+    closeReason: string;
+    closedAt: number;
+  }> = [];
 
   for (const line of lines) {
     try {
@@ -233,7 +243,7 @@ export function readShadowFills(opts: ShadowReadOptions = {}, path?: string): Sh
 
   for (const close of closeRecords) {
     const fill = byPlanId.get(close.planId);
-    if (!fill || fill.status !== "open") continue;
+    if (fill?.status !== "open") continue;
     const pnl = computePnl(fill.side, fill.entryPrice, close.exitPrice, fill.intendedSize);
     const notional = fill.entryPrice * fill.intendedSize;
     const pnlFraction = notional > 0 ? pnl / notional : null;

@@ -13,8 +13,8 @@ import type {
  * permissionScope are mandatory, and the registry uses it verbatim instead of
  * guessing from the tool id.
  */
-export type ToolCapabilityDeclaration =
-  Pick<RuntimeToolSpec, "category" | "permissionScope"> & Partial<RuntimeToolSpec>;
+export type ToolCapabilityDeclaration = Pick<RuntimeToolSpec, "category" | "permissionScope"> &
+  Partial<RuntimeToolSpec>;
 
 /**
  * Tools whose authority is DECLARED rather than inferred. Name-regex inference
@@ -342,11 +342,13 @@ const STATIC_TOOL_OVERRIDES: Record<string, Partial<RuntimeToolSpec>> = {
 
 function inferCategory(toolId: string): RuntimeToolCategory {
   const normalized = toolId.toLowerCase();
-  if (/order|trade|swap|execute|buy|sell|cancel|autonomous|liquidate|bridge/.test(normalized)) return "execution";
+  if (/order|trade|swap|execute|buy|sell|cancel|autonomous|liquidate|bridge/.test(normalized))
+    return "execution";
   if (/scan|market|price|orderbook|liquidation|pair|chart/.test(normalized)) return "market";
   if (/analy|signal|score|regime|research|detect/.test(normalized)) return "analysis";
   if (/plan|strategy|playbook|kelly|risk|mandate/.test(normalized)) return "planning";
-  if (/monitor|position|portfolio|account|history|status|balance/.test(normalized)) return "monitoring";
+  if (/monitor|position|portfolio|account|history|status|balance/.test(normalized))
+    return "monitoring";
   if (/wallet|transfer|withdraw|deposit/.test(normalized)) return "wallet";
   if (/arm|disarm|config|scheduler|runtime|system|daemon/.test(normalized)) return "system";
   if (/explain|lesson|teach/.test(normalized)) return "education";
@@ -359,15 +361,20 @@ function inferCategory(toolId: string): RuntimeToolCategory {
  * tool. An unplaced tool must not fall back to `analysis.run`: that scope
  * carries approvalClass "none", which the permission classifier auto-allows.
  */
-function inferPermissionScope(toolId: string, category: RuntimeToolCategory): RuntimePermissionScope | undefined {
+function inferPermissionScope(
+  toolId: string,
+  category: RuntimeToolCategory,
+): RuntimePermissionScope | undefined {
   const normalized = toolId.toLowerCase();
   if (/plugin|install/.test(normalized)) return "plugin.install";
   if (/mcp|reload_mcp/.test(normalized)) return "mcp.connect";
-  if (/arm|disarm|mode|config|scheduler|runtime|daemon/.test(normalized)) return "system.mode.write";
+  if (/arm|disarm|mode|config|scheduler|runtime|daemon/.test(normalized))
+    return "system.mode.write";
   if (/background|autonomous|run_cycle/.test(normalized)) return "runtime.background.write";
   if (/transfer|withdraw|bridge/.test(normalized)) return "transfer.execute";
   if (/wallet|send|stake|unstake/.test(normalized)) return "wallet.write";
-  if (/order|trade|swap|execute|buy|sell|cancel|liquidate/.test(normalized)) return "livetrade.execute";
+  if (/order|trade|swap|execute|buy|sell|cancel|liquidate/.test(normalized))
+    return "livetrade.execute";
   if (category === "planning") return "analysis.run";
   if (category === "monitoring") return "portfolio.read";
   if (category === "market" || category === "analysis") return "market.read";
@@ -383,7 +390,10 @@ function inferPermissionScope(toolId: string, category: RuntimeToolCategory): Ru
  */
 const UNCLASSIFIED_PERMISSION_SCOPE: RuntimePermissionScope = "system.mode.write";
 
-function inferRiskClass(scope: RuntimePermissionScope, category: RuntimeToolCategory): RuntimeRiskClass {
+function inferRiskClass(
+  scope: RuntimePermissionScope,
+  category: RuntimeToolCategory,
+): RuntimeRiskClass {
   switch (scope) {
     case "transfer.execute":
       return "critical";
@@ -430,11 +440,20 @@ function inferSideEffectLevel(scope: RuntimePermissionScope): RuntimeSideEffectL
   }
 }
 
-function inferWorkerRole(toolId: string, category: RuntimeToolCategory, scope: RuntimePermissionScope): RuntimeWorkerRole {
+function inferWorkerRole(
+  toolId: string,
+  category: RuntimeToolCategory,
+  scope: RuntimePermissionScope,
+): RuntimeWorkerRole {
   const normalized = toolId.toLowerCase();
   if (category === "education") return "Teacher";
   if (category === "backtest") return "Backtester";
-  if (scope === "livetrade.execute" || scope === "transfer.execute" || /autonomous|execute/.test(normalized)) return "Executor";
+  if (
+    scope === "livetrade.execute" ||
+    scope === "transfer.execute" ||
+    /autonomous|execute/.test(normalized)
+  )
+    return "Executor";
   if (category === "planning") return "Planner";
   if (category === "analysis") return "Analyst";
   if (category === "market") return /scan/.test(normalized) ? "Scanner" : "Analyst";
@@ -457,7 +476,8 @@ export class CapabilityRegistry {
     const permissionScope = inferredScope ?? UNCLASSIFIED_PERMISSION_SCOPE;
     const riskClass = inferRiskClass(permissionScope, category);
     const sideEffectLevel = inferSideEffectLevel(permissionScope);
-    const requiresTradePermission = permissionScope === "livetrade.execute" || permissionScope === "transfer.execute";
+    const requiresTradePermission =
+      permissionScope === "livetrade.execute" || permissionScope === "transfer.execute";
     const workerRole = inferWorkerRole(toolId, category, permissionScope);
 
     const base: RuntimeToolSpec = {
@@ -468,7 +488,8 @@ export class CapabilityRegistry {
       sideEffectLevel,
       requiresTradePermission,
       supportsStreaming: category === "analysis" || category === "planning",
-      supportsBackground: category === "system" || category === "monitoring" || category === "market",
+      supportsBackground:
+        category === "system" || category === "monitoring" || category === "market",
       idempotent: sideEffectLevel !== "execution",
       workerRole,
       auditEventType: `${category}.${toolId}`,

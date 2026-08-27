@@ -49,9 +49,12 @@ export interface FootprintImbalanceResult {
   interpretation: string;
 }
 
-const roundRatio = (x: number): number => (Number.isFinite(x) ? parseFloat(x.toFixed(2)) : Infinity);
+const roundRatio = (x: number): number =>
+  Number.isFinite(x) ? parseFloat(x.toFixed(2)) : Infinity;
 
-export function computeFootprintImbalance(input: FootprintImbalanceInput): FootprintImbalanceResult {
+export function computeFootprintImbalance(
+  input: FootprintImbalanceInput,
+): FootprintImbalanceResult {
   const threshold = input.threshold && input.threshold > 1 ? input.threshold : 3;
   const minStacked = Math.max(2, Math.floor(input.minStacked ?? 3));
   const levels = [...input.levels].sort((a, b) => a.priceLevel - b.priceLevel);
@@ -65,14 +68,22 @@ export function computeFootprintImbalance(input: FootprintImbalanceInput): Footp
       if (i >= 1 && lvl.buyVolume > 0) {
         const below = levels[i - 1]!.sellVolume;
         if (lvl.buyVolume >= threshold * below) {
-          markers.push({ priceLevel: lvl.priceLevel, side: "buy", ratio: roundRatio(below > 0 ? lvl.buyVolume / below : Infinity) });
+          markers.push({
+            priceLevel: lvl.priceLevel,
+            side: "buy",
+            ratio: roundRatio(below > 0 ? lvl.buyVolume / below : Infinity),
+          });
         }
       }
       // Bid/sell imbalance: sell@P vs buy@(P+1 tick) — the level above.
       if (i <= n - 2 && lvl.sellVolume > 0) {
         const above = levels[i + 1]!.buyVolume;
         if (lvl.sellVolume >= threshold * above) {
-          markers.push({ priceLevel: lvl.priceLevel, side: "sell", ratio: roundRatio(above > 0 ? lvl.sellVolume / above : Infinity) });
+          markers.push({
+            priceLevel: lvl.priceLevel,
+            side: "sell",
+            ratio: roundRatio(above > 0 ? lvl.sellVolume / above : Infinity),
+          });
         }
       }
     }

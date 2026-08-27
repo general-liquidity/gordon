@@ -1,12 +1,7 @@
 /**
  * Eigenportfolio residual s-scores following Avellaneda and Lee (2010).
  */
-import {
-  computeCovarianceMatrix,
-  eigenDecomposition,
-  invert,
-  multiplyVector,
-} from "./matrix.ts";
+import { computeCovarianceMatrix, eigenDecomposition, invert, multiplyVector } from "./matrix.ts";
 
 export interface ResidualSScore {
   asset: number;
@@ -58,9 +53,10 @@ function fitResidualOuScore(innovations: number[]): {
   }
   const innovationVariance = squaredError / Math.max(1, previous.length - 2);
   const equilibriumVariance = innovationVariance / (1 - beta ** 2);
-  const score = equilibriumVariance > Number.EPSILON
-    ? (residual - equilibriumMean) / Math.sqrt(equilibriumVariance)
-    : 0;
+  const score =
+    equilibriumVariance > Number.EPSILON
+      ? (residual - equilibriumMean) / Math.sqrt(equilibriumVariance)
+      : 0;
   return {
     score: Number.isFinite(score) ? score : 0,
     residual,
@@ -110,13 +106,14 @@ export function computeResidualSScores(
       return value - fitted;
     });
     const { score, residual, meanReverting } = fitResidualOuScore(residuals);
-    const signal = score <= -entry
-      ? "long"
-      : score >= entry
-        ? "short"
-        : Math.abs(score) <= exit
-          ? "exit"
-          : "hold";
+    const signal =
+      score <= -entry
+        ? "long"
+        : score >= entry
+          ? "short"
+          : Math.abs(score) <= exit
+            ? "exit"
+            : "hold";
     return { asset, score, residual, meanReverting, signal };
   });
 }

@@ -32,7 +32,10 @@ export function useMinDisplayTime<T>(value: T, minTimeMs = 500): T {
     }
 
     return () => {
-      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
     };
   }, [value, minTimeMs]);
 

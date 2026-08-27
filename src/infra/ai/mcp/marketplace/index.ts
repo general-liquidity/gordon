@@ -14,16 +14,16 @@ export type {
   PluginValidationResult,
   InstallationStatus,
   InstallationProgress,
-} from './types';
+} from "./types";
 
 // Registry Client
 export {
   MarketplaceRegistryClient,
   marketplaceClient,
-} from './registry';
+} from "./registry";
 
 // Installer
 export {
   PluginInstaller,
   pluginInstaller,
-} from './installer';
+} from "./installer";

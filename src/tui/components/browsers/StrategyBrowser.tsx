@@ -8,7 +8,7 @@
  * Pattern: Claude Code MCP/plugin browser (grouped list with status badges).
  */
 
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Box, Text } from "../../ink-custom";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 
@@ -58,8 +58,8 @@ const TIER_COLOR: Record<StrategyTier, string> = {
 };
 
 const STATUS_ICON: Record<StrategyStatus, string> = {
-  active: "\u25CF",   // ●
-  paused: "\u25CB",   // ○
+  active: "\u25CF", // ●
+  paused: "\u25CB", // ○
   archived: "\u2500", // ─
 };
 
@@ -117,9 +117,7 @@ function buildFlatList(strategies: Strategy[]): FlatEntry[] {
 }
 
 function selectableIndices(entries: FlatEntry[]): number[] {
-  return entries
-    .map((e, i) => (e.type === "strategy" ? i : -1))
-    .filter((i) => i >= 0);
+  return entries.map((e, i) => (e.type === "strategy" ? i : -1)).filter((i) => i >= 0);
 }
 
 function fmtPct(n: number): string {
@@ -134,53 +132,45 @@ function padRight(s: string, w: number): string {
 // Component
 // ============================================================================
 
-export function StrategyBrowser({
-  strategies,
-  onSelect,
-  onDeploy,
-  onClose,
-}: Props) {
+export function StrategyBrowser({ strategies, onSelect, onDeploy, onClose }: Props) {
   const flatList = useMemo(() => buildFlatList(strategies), [strategies]);
   const selectable = useMemo(() => selectableIndices(flatList), [flatList]);
   const [cursor, setCursor] = useState(0);
 
-  useRoutedInput((input, key) => {
-    if (key.escape) {
-      onClose();
-      return;
-    }
-    if (key.upArrow) {
-      setCursor((c) => Math.max(0, c - 1));
-      return;
-    }
-    if (key.downArrow) {
-      setCursor((c) => Math.min(selectable.length - 1, c + 1));
-      return;
-    }
-    if (key.return) {
-      const idx = selectable[cursor];
-      if (idx === undefined) return;
-      const entry = flatList[idx];
-      if (entry?.strategy) onDeploy(entry.strategy);
-      return;
-    }
-    if (input === " ") {
-      const idx = selectable[cursor];
-      if (idx === undefined) return;
-      const entry = flatList[idx];
-      if (entry?.strategy) onSelect(entry.strategy);
-    }
-  }, { id: "strategyBrowser", priority: FOCUS_PRIORITY.DIALOG });
+  useRoutedInput(
+    (input, key) => {
+      if (key.escape) {
+        onClose();
+        return;
+      }
+      if (key.upArrow) {
+        setCursor((c) => Math.max(0, c - 1));
+        return;
+      }
+      if (key.downArrow) {
+        setCursor((c) => Math.min(selectable.length - 1, c + 1));
+        return;
+      }
+      if (key.return) {
+        const idx = selectable[cursor];
+        if (idx === undefined) return;
+        const entry = flatList[idx];
+        if (entry?.strategy) onDeploy(entry.strategy);
+        return;
+      }
+      if (input === " ") {
+        const idx = selectable[cursor];
+        if (idx === undefined) return;
+        const entry = flatList[idx];
+        if (entry?.strategy) onSelect(entry.strategy);
+      }
+    },
+    { id: "strategyBrowser", priority: FOCUS_PRIORITY.DIALOG },
+  );
 
   if (strategies.length === 0) {
     return (
-      <Box
-        flexDirection="column"
-        borderStyle="round"
-        borderColor="cyan"
-        paddingX={2}
-        paddingY={1}
-      >
+      <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
         <Text bold color="cyan">
           STRATEGY BROWSER
         </Text>
@@ -195,13 +185,7 @@ export function StrategyBrowser({
   const selectedFlatIdx = selectable[cursor];
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
-      paddingX={2}
-      paddingY={1}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
       <Box>
         <Text bold color="cyan">
           STRATEGY BROWSER
@@ -268,20 +252,12 @@ export function StrategyBrowser({
               <Text dimColor>{padRight(s.type, COL_TYPE)}</Text>
             </Box>
             <Box width={COL_WIN}>
-              <Text
-                color={
-                  s.winRate >= 60 ? "green" : s.winRate >= 45 ? "yellow" : "red"
-                }
-              >
+              <Text color={s.winRate >= 60 ? "green" : s.winRate >= 45 ? "yellow" : "red"}>
                 {padRight(fmtPct(s.winRate), COL_WIN)}
               </Text>
             </Box>
             <Box width={COL_SHARPE}>
-              <Text
-                color={
-                  s.sharpe >= 1.5 ? "green" : s.sharpe >= 0.8 ? "yellow" : "red"
-                }
-              >
+              <Text color={s.sharpe >= 1.5 ? "green" : s.sharpe >= 0.8 ? "yellow" : "red"}>
                 {padRight(s.sharpe.toFixed(2), COL_SHARPE)}
               </Text>
             </Box>
@@ -296,8 +272,8 @@ export function StrategyBrowser({
 
       <Text> </Text>
       <Text dimColor>
-        {"\u2191\u2193"} navigate {"\u00b7"} Space details {"\u00b7"} Enter
-        deploy {"\u00b7"} Esc close
+        {"\u2191\u2193"} navigate {"\u00b7"} Space details {"\u00b7"} Enter deploy {"\u00b7"} Esc
+        close
       </Text>
     </Box>
   );

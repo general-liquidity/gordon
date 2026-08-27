@@ -82,7 +82,9 @@ async function main(): Promise<void> {
         bars.length > 0
           ? `${new Date(bars[0]!.time * 1000).toISOString().slice(0, 10)}…${new Date(bars[bars.length - 1]!.time * 1000).toISOString().slice(0, 10)}`
           : "—";
-      console.log(`  ${sym.padEnd(8)} ${pair.padEnd(9)} ${String(bars.length).padStart(5)} bars  ${span}`);
+      console.log(
+        `  ${sym.padEnd(8)} ${pair.padEnd(9)} ${String(bars.length).padStart(5)} bars  ${span}`,
+      );
     } catch (e) {
       console.log(`  ${sym.padEnd(8)} ✗ ${(e as Error).message}`);
     }

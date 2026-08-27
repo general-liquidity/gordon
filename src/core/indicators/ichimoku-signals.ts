@@ -89,7 +89,7 @@ export function calculateIchimokuSignals(
     kijunPeriod?: number;
     senkouBPeriod?: number;
     displacement?: number;
-  }
+  },
 ): IchimokuSignalsResult {
   const tenkanPeriod = opts?.tenkanPeriod ?? 9;
   const kijunPeriod = opts?.kijunPeriod ?? 26;
@@ -237,7 +237,7 @@ export function calculateIchimokuSignals(
     kijunBounce,
     kumoTwist,
     { active, flatKumo, target },
-    { gap, stretchPct, state }
+    { gap, stretchPct, state },
   );
 
   return {
@@ -263,15 +263,15 @@ export function calculateIchimokuSignals(
 }
 
 function buildInterpretation(
-  close: number,
-  tenkan: number | null,
+  _close: number,
+  _tenkan: number | null,
   kijun: number | null,
   kijunCross: string,
   kijunPosition: string,
   kijunBounce: boolean,
   kumoTwist: string,
   edge: { active: boolean; flatKumo: boolean; target: number | null },
-  tk: { gap: number; stretchPct: number; state: string }
+  tk: { gap: number; stretchPct: number; state: string },
 ): string {
   const parts: string[] = [];
 
@@ -280,18 +280,20 @@ function buildInterpretation(
   }
 
   if (kijunCross === "bullish") parts.push("BULLISH Kijun cross (close crossed above base line)");
-  else if (kijunCross === "bearish") parts.push("BEARISH Kijun cross (close crossed below base line)");
+  else if (kijunCross === "bearish")
+    parts.push("BEARISH Kijun cross (close crossed below base line)");
 
   if (kijunBounce) {
     parts.push(
       kijunPosition === "above"
         ? "Kijun bounce — price tested base line as support and held"
-        : "Kijun rejection — price tested base line as resistance and held"
+        : "Kijun rejection — price tested base line as resistance and held",
     );
   }
 
   if (kumoTwist === "bullish") parts.push("Future Kumo twist BULLISH (Senkou A crossed above B)");
-  else if (kumoTwist === "bearish") parts.push("Future Kumo twist BEARISH (Senkou A crossed below B)");
+  else if (kumoTwist === "bearish")
+    parts.push("Future Kumo twist BEARISH (Senkou A crossed below B)");
 
   if (edge.flatKumo) {
     if (edge.active && edge.target != null) {
@@ -308,5 +310,5 @@ function buildInterpretation(
   }
 
   if (parts.length === 0) return "No notable Ichimoku signals on the current bar.";
-  return parts.join(". ") + ".";
+  return `${parts.join(". ")}.`;
 }

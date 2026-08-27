@@ -10,10 +10,7 @@ import {
   FILESYSTEM_WRITE_GUARD_FLAG_ENV,
   FILESYSTEM_WRITE_GUARD_MODE_ENV,
 } from "./filesystemWriteGuard.ts";
-import {
-  NETWORK_ALLOWLIST_FLAG_ENV,
-  NETWORK_ALLOWLIST_MODE_ENV,
-} from "./networkAllowlist.ts";
+import { NETWORK_ALLOWLIST_FLAG_ENV, NETWORK_ALLOWLIST_MODE_ENV } from "./networkAllowlist.ts";
 
 describe("installProductionGuards", () => {
   const clearGuardEnv = () => {

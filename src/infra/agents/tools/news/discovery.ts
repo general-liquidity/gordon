@@ -12,6 +12,7 @@
  */
 
 import { createTool } from "@mastra/core/tools";
+import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { checkTradingPermission } from "../runtime/permissionHelpers.ts";
 import { runHooks } from "../../../hooks/engine.ts";
@@ -32,6 +33,11 @@ import { requireLiveConsent } from "../../../safety/consent.ts";
 const errors = {
   noExchange: { error: "No active trading venue is connected. Please run setup first." },
 };
+
+function bracketClientOrderId(seed: string, kind: "entry" | "stop" | "take" | "list" | "close") {
+  const digest = createHash("sha256").update(`${seed}:${kind}`).digest("hex").slice(0, 20);
+  return `gordon_br_${kind.slice(0, 2)}_${digest}`;
+}
 
 const marketOrderPlanOutputSchema = z.object({
   ready: z.boolean(),
@@ -576,6 +582,20 @@ export const placeBracketOrderTool = createTool({
     }
 
     const normalizedSymbol = normalizeCryptoSymbol(symbol);
+    const exchangeWithOco = ctx.exchange as ExchangeExtended;
+    if (!exchangeWithOco.placeOCOOrder) {
+      // Capability must be known before the entry. The old order was entry
+      // first, capability check second, leaving an unprotected position on a
+      // venue that could never provide the promised bracket.
+      return { error: "Bracket order refused before entry: OCO orders are not supported here." };
+    }
+
+    const executionIdentity =
+      (execContext as MastraExecutionContext & { toolCallId?: string; runId?: string })
+        .toolCallId ??
+      (execContext as MastraExecutionContext & { runId?: string }).runId ??
+      ctx.requestedActionId ??
+      randomUUID();
 
     // Risk gate: evaluate order before placement
     try {
@@ -617,12 +637,19 @@ export const placeBracketOrderTool = createTool({
         }
       }
 
-      // Step 1: Place market entry order
-      const entryOrder = await ctx.exchange.placeOrder({
+      // Step 1: Place an idempotent market entry. A transport timeout can mean
+      // the venue accepted the order even though the caller saw an error; the
+      // shared helper recovers that exact client ID before any retry can double
+      // the position.
+      const { placeOrderIdempotent, waitForFill } = await import(
+        "../../../../core/pipeline/executor.ts"
+      );
+      const entryOrder = await placeOrderIdempotent(ctx.exchange, {
         symbol: normalizedSymbol,
         side,
         type: "MARKET",
         quantity,
+        newClientOrderId: bracketClientOrderId(executionIdentity, "entry"),
       });
 
       if (!entryOrder || entryOrder.status === "REJECTED") {
@@ -640,11 +667,32 @@ export const placeBracketOrderTool = createTool({
 
       // Step 2: Place OCO order for stop-loss and take-profit
       const exitSide = side === "BUY" ? "SELL" : "BUY";
-      const filledQty = entryOrder.executedQty;
+      let filledQty = entryOrder.executedQty;
+      let avgFillPrice =
+        filledQty > 0 && entryOrder.cummulativeQuoteQty > 0
+          ? entryOrder.cummulativeQuoteQty / filledQty
+          : entryOrder.price;
+
+      if (entryOrder.status !== "FILLED") {
+        const fill = await waitForFill(ctx.exchange, normalizedSymbol, String(entryOrder.orderId), {
+          onPartialFill: "cancel",
+        });
+        filledQty = fill.fillStatus.filledQuantity;
+        avgFillPrice = fill.fillStatus.averagePrice;
+        if (fill.timedOut) {
+          try {
+            await ctx.exchange.cancelOrder(normalizedSymbol, String(entryOrder.orderId));
+          } catch (cancelError) {
+            return {
+              error: `CRITICAL: bracket entry ${entryOrder.orderId} timed out and cancellation could not be confirmed: ${cancelError instanceof Error ? cancelError.message : String(cancelError)}`,
+            };
+          }
+        }
+      }
 
       if (filledQty <= 0) {
         return {
-          error: "Entry order did not fill",
+          error: "Entry order did not fill; no protective orders were needed.",
           entryOrder: {
             orderId: Number(entryOrder.orderId) || 0,
             symbol: entryOrder.symbol,
@@ -655,22 +703,59 @@ export const placeBracketOrderTool = createTool({
         };
       }
 
-      // For OCO: price = limit/take-profit, stopPrice = stop trigger, stopLimitPrice = stop limit
-      const exchangeWithOco = ctx.exchange as ExchangeExtended;
-      if (!exchangeWithOco.placeOCOOrder) {
-        return { error: "OCO orders are not supported on this exchange." };
+      // For OCO: price = limit/take-profit, stopPrice = stop trigger, stopLimitPrice = stop limit.
+      // If protection fails after the entry fill, immediately flatten the
+      // exact filled quantity. Reporting an error while leaving a naked live
+      // position was the most dangerous possible partial success.
+      let ocoOrder: Awaited<ReturnType<NonNullable<ExchangeExtended["placeOCOOrder"]>>>;
+      try {
+        ocoOrder = await exchangeWithOco.placeOCOOrder({
+          symbol: normalizedSymbol,
+          side: exitSide,
+          quantity: filledQty,
+          price: takeProfitPrice,
+          stopPrice: stopLossPrice,
+          stopLimitPrice: stopLossPrice,
+          listClientOrderId: bracketClientOrderId(executionIdentity, "list"),
+          stopClientOrderId: bracketClientOrderId(executionIdentity, "stop"),
+          limitClientOrderId: bracketClientOrderId(executionIdentity, "take"),
+        });
+        if (!ocoOrder.orders.length) throw new Error("venue returned an empty OCO order list");
+      } catch (protectionError) {
+        try {
+          const closeOrder = await placeOrderIdempotent(
+            ctx.exchange,
+            {
+              symbol: normalizedSymbol,
+              side: exitSide,
+              type: "MARKET",
+              quantity: filledQty,
+              newClientOrderId: bracketClientOrderId(executionIdentity, "close"),
+            },
+            {
+              direction: "REDUCES_EXPOSURE",
+              reduction: {
+                side: exitSide,
+                quantity: filledQty,
+                exitSide,
+                remainingQuantity: filledQty,
+              },
+            },
+          );
+          if (closeOrder.status !== "FILLED" || closeOrder.executedQty < filledQty) {
+            throw new Error(
+              `compensating close ${closeOrder.orderId} was not fully filled (${closeOrder.executedQty}/${filledQty})`,
+            );
+          }
+          return {
+            error: `Bracket protection failed after entry; Gordon flattened the filled position: ${protectionError instanceof Error ? protectionError.message : String(protectionError)}`,
+          };
+        } catch (closeError) {
+          return {
+            error: `CRITICAL: bracket protection failed after entry and the compensating close was not confirmed. Position ${normalizedSymbol} ${filledQty} requires immediate operator attention. Protection error: ${protectionError instanceof Error ? protectionError.message : String(protectionError)}. Close error: ${closeError instanceof Error ? closeError.message : String(closeError)}`,
+          };
+        }
       }
-
-      const ocoOrder = await exchangeWithOco.placeOCOOrder({
-        symbol: normalizedSymbol,
-        side: exitSide,
-        quantity: filledQty,
-        price: takeProfitPrice, // Take profit limit price
-        stopPrice: stopLossPrice, // Stop loss trigger price
-        stopLimitPrice: stopLossPrice, // Stop loss limit price (same as trigger for immediate fill)
-      });
-
-      const avgFillPrice = entryOrder.cummulativeQuoteQty / filledQty;
 
       return {
         success: true,
@@ -768,9 +853,10 @@ export const placeMarketOrderTool = createTool({
       typeof plan.preview?.symbol === "string"
         ? String(plan.preview.symbol)
         : instrument.normalizedSymbol;
-    const sandboxActive = instrument.route === "broker"
-      ? ctx.broker?.isPaper ?? false
-      : ctx.exchange?.isSandbox ?? false;
+    const sandboxActive =
+      instrument.route === "broker"
+        ? (ctx.broker?.isPaper ?? false)
+        : (ctx.exchange?.isSandbox ?? false);
 
     // Permission gate — blocks strict/observe/plan/paper for real execution
     {
@@ -814,9 +900,8 @@ export const placeMarketOrderTool = createTool({
     try {
       const { evaluateOrderRisk } = await import("../trading/risk-gate.ts");
       const requestedQuantity = quantity ?? quoteOrderQty! / referencePrice;
-      const riskContext = instrument.route === "broker"
-        ? { ...ctx, exchange: null }
-        : { ...ctx, broker: null };
+      const riskContext =
+        instrument.route === "broker" ? { ...ctx, exchange: null } : { ...ctx, broker: null };
       const riskResult = await evaluateOrderRisk(
         {
           symbol: normalizedSymbol,
@@ -844,7 +929,7 @@ export const placeMarketOrderTool = createTool({
 
     const requestedOrder = {
       symbol: normalizedSymbol,
-      side: side.toLowerCase() === "sell" ? "sell" as const : "buy" as const,
+      side: side.toLowerCase() === "sell" ? ("sell" as const) : ("buy" as const),
       quantity: quantity ?? quoteOrderQty! / referencePrice,
       orderType: "MARKET",
       notionalUsd: quoteOrderQty ?? quantity! * referencePrice,
@@ -858,21 +943,23 @@ export const placeMarketOrderTool = createTool({
     const hookedOrder =
       (preHook.metadata?.finalPayload as typeof requestedOrder | undefined) ?? requestedOrder;
     if (
-      hookedOrder.symbol !== requestedOrder.symbol
-      || hookedOrder.side !== requestedOrder.side
-      || hookedOrder.orderType !== requestedOrder.orderType
-      || hookedOrder.referencePrice !== requestedOrder.referencePrice
+      hookedOrder.symbol !== requestedOrder.symbol ||
+      hookedOrder.side !== requestedOrder.side ||
+      hookedOrder.orderType !== requestedOrder.orderType ||
+      hookedOrder.referencePrice !== requestedOrder.referencePrice
     ) {
-      return { error: "PreOrderPlacement hook may reduce size but cannot change order identity or price." };
+      return {
+        error: "PreOrderPlacement hook may reduce size but cannot change order identity or price.",
+      };
     }
     const reducedNotional = Math.min(
       hookedOrder.notionalUsd,
       hookedOrder.quantity * referencePrice,
     );
     if (
-      !Number.isFinite(reducedNotional)
-      || reducedNotional <= 0
-      || reducedNotional > requestedOrder.notionalUsd
+      !Number.isFinite(reducedNotional) ||
+      reducedNotional <= 0 ||
+      reducedNotional > requestedOrder.notionalUsd
     ) {
       return { error: "PreOrderPlacement hook returned an invalid or exposure-increasing size." };
     }
@@ -899,7 +986,9 @@ export const placeMarketOrderTool = createTool({
           notionalUsd: orderResult.notional ?? reducedNotional,
         });
         if (postOrderHook.action === "block") {
-          console.error(`[hooks] PostOrderPlacement blocked after order ${String(orderResult.id)}: ${postOrderHook.reason ?? "blocked"}`);
+          console.error(
+            `[hooks] PostOrderPlacement blocked after order ${String(orderResult.id)}: ${postOrderHook.reason ?? "blocked"}`,
+          );
         }
 
         return {
@@ -952,7 +1041,9 @@ export const placeMarketOrderTool = createTool({
         notionalUsd: quoteQty,
       });
       if (postOrderHook.action === "block") {
-        console.error(`[hooks] PostOrderPlacement blocked after order ${String(orderResult.orderId ?? "unknown")}: ${postOrderHook.reason ?? "blocked"}`);
+        console.error(
+          `[hooks] PostOrderPlacement blocked after order ${String(orderResult.orderId ?? "unknown")}: ${postOrderHook.reason ?? "blocked"}`,
+        );
       }
 
       return {

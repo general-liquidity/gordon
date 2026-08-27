@@ -24,10 +24,7 @@ const CATEGORY_CONFIG = WORKFLOW_CONFIG;
  * @param mode - Help display mode (essential, advanced, all/expert) - defaults to "essential"
  * @param category - Optional category filter
  */
-export function formatCommandHelp(
-  mode: HelpMode = "essential",
-  category?: HelpCategory
-): string {
+export function formatCommandHelp(mode: HelpMode = "essential", category?: HelpCategory): string {
   let maxLevel: CommandLevel = 1;
   if (mode === "advanced") maxLevel = 2;
   if (mode === "all" || mode === "expert") maxLevel = 3;
@@ -41,7 +38,9 @@ export function formatCommandHelp(
 
   if (mode === "essential") {
     lines.push("**Core Workflows**\n");
-    lines.push("_Use `/help advanced` for more depth, or `/help all` to include operator commands._\n");
+    lines.push(
+      "_Use `/help advanced` for more depth, or `/help all` to include operator commands._\n",
+    );
   } else if (mode === "advanced") {
     lines.push("**Core + Advanced Workflows**\n");
     lines.push("_Use `/help all` to include operator-grade commands and maintenance surfaces._\n");
@@ -90,7 +89,16 @@ export function formatCommandHelp(
  * Useful for helping users choose the right analysis depth
  */
 export function formatAnalysisCommandsHelp(): string {
-  const analysisCommands = ["analyze", "ensemble", "deep", "fast-deep", "parallel", "mtf", "compare-coins", "scan"];
+  const analysisCommands = [
+    "analyze",
+    "ensemble",
+    "deep",
+    "fast-deep",
+    "parallel",
+    "mtf",
+    "compare-coins",
+    "scan",
+  ];
   const cmds = SLASH_COMMANDS.filter((c) => analysisCommands.includes(c.name));
 
   const lines: string[] = [
@@ -166,7 +174,7 @@ export function formatPaginatedCommandHelp(args?: string): string {
   }
 
   const pageMatch = parsedArgs.match(/^page\s*(\d+)$/);
-  if (pageMatch && pageMatch[1]) {
+  if (pageMatch?.[1]) {
     return formatHelpPageView(parseInt(pageMatch[1], 10), PAGE_SIZE);
   }
 
@@ -188,13 +196,13 @@ function formatHelpSummaryView(): string {
   for (const [cat, label] of Object.entries(PAGINATED_HELP_CATEGORIES)) {
     const workflow = cat as WorkflowGroup;
     const cmds = SLASH_COMMANDS.filter((c) => c.workflow === workflow);
-    lines.push(`  ${WORKFLOW_CONFIG[workflow].icon} **${label}** (${cmds.length}) - \`/help ${workflow}\``);
+    lines.push(
+      `  ${WORKFLOW_CONFIG[workflow].icon} **${label}** (${cmds.length}) - \`/help ${workflow}\``,
+    );
   }
 
   lines.push("\n**Recommended starting points:**");
-  const essentialCmds = SLASH_COMMANDS
-    .filter((c) => c.level === 1)
-    .slice(0, 10);
+  const essentialCmds = SLASH_COMMANDS.filter((c) => c.level === 1).slice(0, 10);
   for (const cmd of essentialCmds) {
     lines.push(`  /${cmd.name} - ${cmd.description}`);
   }
@@ -233,7 +241,7 @@ function formatHelpPageView(page: number, pageSize: number): string {
   if (currentPage > 1) nav.push(`\`/help page ${currentPage - 1}\``);
   if (currentPage < totalPages) nav.push(`\`/help page ${currentPage + 1}\``);
   nav.push("`/help`");
-  lines.push("Navigate: " + nav.join(" | "));
+  lines.push(`Navigate: ${nav.join(" | ")}`);
   return lines.join("\n");
 }
 
@@ -251,6 +259,6 @@ function formatHelpCategoryView(category: WorkflowGroup): string {
     .filter(([cat]) => cat !== category)
     .map(([cat]) => `\`/help ${cat}\``)
     .join(" | ");
-  lines.push("Other: " + otherCats + " | `/help`");
+  lines.push(`Other: ${otherCats} | \`/help\``);
   return lines.join("\n");
 }

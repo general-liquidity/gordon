@@ -7,7 +7,7 @@
  * Phase 17 of the TUI rebuild.
  */
 
-import React, { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { Text } from "../../ink-custom";
 
 // ============================================================================

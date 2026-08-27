@@ -98,7 +98,7 @@ const r1 = (x: number): number => parseFloat(x.toFixed(1));
 
 export function calculateRsiFailureSwing(
   closes: number[],
-  opts?: { rsiPeriod?: number; pivotWindow?: number }
+  opts?: { rsiPeriod?: number; pivotWindow?: number },
 ): RsiFailureSwingResult {
   const rsiPeriod = opts?.rsiPeriod ?? 14;
   const pivotWindow = opts?.pivotWindow ?? 2;

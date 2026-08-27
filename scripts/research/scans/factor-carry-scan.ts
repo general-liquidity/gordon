@@ -280,7 +280,10 @@ function runFactorBacktest(panel: Panel, cfg: FactorConfig): FactorRun {
       if (model) {
         const order = model.tokens; // sorted by composite desc
         const symToIdx = new Map(symbols.map((sym, i) => [sym, i]));
-        const k = Math.min(BASKET_K, Math.floor(order.length / (cfg.book === "long-short" ? 2 : 1)));
+        const k = Math.min(
+          BASKET_K,
+          Math.floor(order.length / (cfg.book === "long-short" ? 2 : 1)),
+        );
         if (k >= 1) {
           if (cfg.book === "long-short") {
             // Long top k (dollar-neutral): +1/k each long, -1/k each short.
@@ -407,18 +410,28 @@ function runFactorSweep(panel: Panel, periodsPerYear: number, label: string): vo
   }
 
   const rank = { PASS: 0, marginal: 1, FAIL: 2 } as const;
-  rows.sort((a, b) => (rank[a.verdict] !== rank[b.verdict] ? rank[a.verdict] - rank[b.verdict] : b.dsr - a.dsr));
+  rows.sort((a, b) =>
+    rank[a.verdict] !== rank[b.verdict] ? rank[a.verdict] - rank[b.verdict] : b.dsr - a.dsr,
+  );
 
   console.log("=".repeat(86));
   console.log(`FACTOR COMPOSITE SWEEP — ${label}`);
   console.log("=".repeat(86));
   console.log(`Universe           : ${panel.symbols.length} coins (${panel.symbols.join(", ")})`);
   console.log(`Aligned bars       : ${panel.times.length} (common timestamps)`);
-  console.log(`Factors populated  : reversal, volatility   |   OMITTED: size, quality, value, funding (no data)`);
-  console.log(`Cost               : ${COST_BPS_PER_SIDE} bps/side on turnover (spread=0 in data → fixed floor, ASSUMPTION)`);
-  console.log(`Basket             : top/bottom ${BASKET_K}   |   IS/OOS split ${(IS_FRAC * 100).toFixed(0)}/${((1 - IS_FRAC) * 100).toFixed(0)}`);
+  console.log(
+    `Factors populated  : reversal, volatility   |   OMITTED: size, quality, value, funding (no data)`,
+  );
+  console.log(
+    `Cost               : ${COST_BPS_PER_SIDE} bps/side on turnover (spread=0 in data → fixed floor, ASSUMPTION)`,
+  );
+  console.log(
+    `Basket             : top/bottom ${BASKET_K}   |   IS/OOS split ${(IS_FRAC * 100).toFixed(0)}/${((1 - IS_FRAC) * 100).toFixed(0)}`,
+  );
   console.log(`Configs (trials)   : ${effectiveTrials}   |   periods/yr ${periodsPerYear}`);
-  console.log(`E[max null Sharpe] : ${fmt(rows[0]?.expectedMaxNullSharpe ?? 0, 2)} (annualized, ${effectiveTrials} trials)`);
+  console.log(
+    `E[max null Sharpe] : ${fmt(rows[0]?.expectedMaxNullSharpe ?? 0, 2)} (annualized, ${effectiveTrials} trials)`,
+  );
   console.log("");
 
   const head = [
@@ -458,11 +471,15 @@ function runFactorSweep(panel: Panel, periodsPerYear: number, label: string): vo
   const passes = rows.filter((r) => r.verdict === "PASS");
   const marginals = rows.filter((r) => r.verdict === "marginal");
   if (passes.length > 0) {
-    console.log(`${passes.length} config(s) CLEARED the deflated bar (DSR>0.95, PSR>0.95, OOS Sharpe>0).`);
+    console.log(
+      `${passes.length} config(s) CLEARED the deflated bar (DSR>0.95, PSR>0.95, OOS Sharpe>0).`,
+    );
   } else {
     console.log("NOTHING cleared the deflated bar.");
     if (marginals.length > 0) {
-      console.log(`${marginals.length} config(s) marginal (positive OOS Sharpe, partial credibility) — leads, not edges.`);
+      console.log(
+        `${marginals.length} config(s) marginal (positive OOS Sharpe, partial credibility) — leads, not edges.`,
+      );
     }
   }
   console.log("");
@@ -566,7 +583,7 @@ function runFundingCarry(): void {
 
     let carry = 0;
     let price = 0;
-    let usableLegs = 0;
+    let _usableLegs = 0;
     const w = 1 / (2 * k); // equal weight, gross = 1
 
     for (const sym of shorts) {
@@ -576,7 +593,7 @@ function runFundingCarry(): void {
       const p1 = priceAt(sym, t1);
       if (p0 !== null && p1 !== null && p0 > 0) {
         price += w * -(p1 / p0 - 1); // short price P&L
-        usableLegs++;
+        _usableLegs++;
       }
     }
     for (const sym of longs) {
@@ -586,7 +603,7 @@ function runFundingCarry(): void {
       const p1 = priceAt(sym, t1);
       if (p0 !== null && p1 !== null && p0 > 0) {
         price += w * (p1 / p0 - 1); // long price P&L
-        usableLegs++;
+        _usableLegs++;
       }
     }
 
@@ -609,16 +626,26 @@ function runFundingCarry(): void {
   console.log("=".repeat(86));
   console.log("FUNDING CARRY — INDICATIVE ONLY (data-limited)");
   console.log("=".repeat(86));
-  console.log(`Funding coins      : ${funds.map((f) => f.symbol).join(", ")}  (${funds.length} of universe)`);
-  console.log(`Funding window     : ${new Date((stamps[0] ?? 0) * 1000).toISOString().slice(0, 10)} → ${new Date((stamps[stamps.length - 1] ?? 0) * 1000).toISOString().slice(0, 10)}`);
+  console.log(
+    `Funding coins      : ${funds.map((f) => f.symbol).join(", ")}  (${funds.length} of universe)`,
+  );
+  console.log(
+    `Funding window     : ${new Date((stamps[0] ?? 0) * 1000).toISOString().slice(0, 10)} → ${new Date((stamps[stamps.length - 1] ?? 0) * 1000).toISOString().slice(0, 10)}`,
+  );
   console.log(`Funding intervals  : ${intervals} (8-hourly)  ≈ ${(intervals / 3).toFixed(0)} days`);
-  console.log(`Book               : short top-${k} funding / long bottom-${k}, equal weight, gross 1.0`);
+  console.log(
+    `Book               : short top-${k} funding / long bottom-${k}, equal weight, gross 1.0`,
+  );
   console.log(`Cost               : ${COST_BPS_PER_SIDE} bps/side on turnover`);
   console.log("");
   console.log("⚠  ~1 month × ≤5 coins. A single IS/OOS split here is BARELY powered. The numbers");
-  console.log("   below are INDICATIVE, not a result. DSR uses effectiveTrials=1 (no grid was swept");
+  console.log(
+    "   below are INDICATIVE, not a result. DSR uses effectiveTrials=1 (no grid was swept",
+  );
   console.log("   for carry) — but the SAMPLE itself is too short for the Sharpe to be credible.");
-  console.log("   The competition venue has NO perp funding to collect; this is a 'real-alpha' probe.");
+  console.log(
+    "   The competition venue has NO perp funding to collect; this is a 'real-alpha' probe.",
+  );
   console.log("");
 
   const report = (name: string, rets: number[]) => {
@@ -662,7 +689,9 @@ function main(): void {
   console.log("");
   console.log("DATA-LIMIT BANNER:");
   console.log("  • spread=0 in the committed bars → cost is a FIXED assumption, not data-derived.");
-  console.log("  • Factor scan populates reversal+volatility ONLY; size/quality/value/funding omitted.");
+  console.log(
+    "  • Factor scan populates reversal+volatility ONLY; size/quality/value/funding omitted.",
+  );
   console.log("  • Funding carry is ~1 month × ≤5 coins → INDICATIVE, not powered.");
   console.log("");
 
@@ -677,10 +706,16 @@ function main(): void {
     const panel = buildPanel(series);
     const periodsPerYear = tf === "1d" ? 365 : 365 * 24;
     if (panel.times.length < 60) {
-      console.log(`FACTOR COMPOSITE — ${tf}: insufficient aligned bars (${panel.times.length}). Skipped.\n`);
+      console.log(
+        `FACTOR COMPOSITE — ${tf}: insufficient aligned bars (${panel.times.length}). Skipped.\n`,
+      );
       continue;
     }
-    runFactorSweep(panel, periodsPerYear, `${tf} (${panel.symbols.length} coins, ${panel.times.length} aligned bars)`);
+    runFactorSweep(
+      panel,
+      periodsPerYear,
+      `${tf} (${panel.symbols.length} coins, ${panel.times.length} aligned bars)`,
+    );
   }
 
   // (B) Funding carry.
@@ -689,8 +724,10 @@ function main(): void {
   // Sanity check that STYLE_FACTORS is the surface we expect (guards against a
   // silent model refactor changing the factor set under us).
   const expected = ["size", "reversal", "volatility", "quality", "value", "funding"];
-  const ok = STYLE_FACTORS.length === expected.length && STYLE_FACTORS.every((f, i) => f === expected[i]);
-  if (!ok) console.log(`WARNING: STYLE_FACTORS drifted from expected set: ${STYLE_FACTORS.join(",")}`);
+  const ok =
+    STYLE_FACTORS.length === expected.length && STYLE_FACTORS.every((f, i) => f === expected[i]);
+  if (!ok)
+    console.log(`WARNING: STYLE_FACTORS drifted from expected set: ${STYLE_FACTORS.join(",")}`);
 }
 
 if (import.meta.main) main();

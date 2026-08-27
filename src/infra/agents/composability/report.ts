@@ -80,7 +80,14 @@ const NATIVE_EXCHANGES = EXCHANGE_IDS;
 const BROKERS = ["ibkr", "alpaca", "tastytrade"] as const;
 
 const PEER_AGENTS_REGISTERED = ["cursor", "warp"] as const;
-const PEER_AGENTS_AVAILABLE = ["cursor", "warp", "hermes", "claude_code", "codex", "openclaw"] as const;
+const PEER_AGENTS_AVAILABLE = [
+  "cursor",
+  "warp",
+  "hermes",
+  "claude_code",
+  "codex",
+  "openclaw",
+] as const;
 
 const STRATEGY_RECIPES = [
   "regime-rsi",
@@ -170,9 +177,7 @@ function defaultCountMcpServers(): number {
 // Report
 // ============================================================================
 
-export function captureComposabilityReport(
-  probes: ComposabilityProbes = {},
-): ComposabilityReport {
+export function captureComposabilityReport(probes: ComposabilityProbes = {}): ComposabilityReport {
   const now = probes.now ?? (() => new Date());
   const countSkills = probes.countSkills ?? defaultCountSkills;
   const countMcp = probes.countMcpServers ?? defaultCountMcpServers;
@@ -188,7 +193,8 @@ export function captureComposabilityReport(
       availableCount: LLM_PROVIDERS.length,
       sample: [...LLM_PROVIDERS],
       pluggable: true,
-      description: "First-party model providers routable via Mastra's model router, plus OpenAI-compatible gateways and local hosts.",
+      description:
+        "First-party model providers routable via Mastra's model router, plus OpenAI-compatible gateways and local hosts.",
     },
     {
       axis: "exchange",
@@ -197,7 +203,8 @@ export function captureComposabilityReport(
       availableCount: NATIVE_EXCHANGES.length + 90, // native + CCXT-covered
       sample: [...NATIVE_EXCHANGES, "ccxt:<any of 90+ exchanges>"],
       pluggable: true,
-      description: "First-class native venues + 100+ via CCXT. Operator switches per session or per trade.",
+      description:
+        "First-class native venues + 100+ via CCXT. Operator switches per session or per trade.",
     },
     {
       axis: "broker",
@@ -215,7 +222,8 @@ export function captureComposabilityReport(
       availableCount: skillCount,
       sample: [],
       pluggable: true,
-      description: "Bundled + user-authored skills under ~/.gordon/skills/ and project .gordon/skills/. agentskills.io-compliant validation. Governance via /skills audit.",
+      description:
+        "Bundled + user-authored skills under ~/.gordon/skills/ and project .gordon/skills/. agentskills.io-compliant validation. Governance via /skills audit.",
     },
     {
       axis: "mcp_server",
@@ -224,7 +232,8 @@ export function captureComposabilityReport(
       availableCount: mcpCount,
       sample: [],
       pluggable: true,
-      description: "MCP marketplace catalog. Each server adds tool capabilities to Gordon's agents without modifying Gordon. CoW Swap, OpenBB Workspace, etc.",
+      description:
+        "MCP marketplace catalog. Each server adds tool capabilities to Gordon's agents without modifying Gordon. CoW Swap, OpenBB Workspace, etc.",
     },
     {
       axis: "peer_agent",
@@ -233,7 +242,8 @@ export function captureComposabilityReport(
       availableCount: PEER_AGENTS_AVAILABLE.length,
       sample: [...PEER_AGENTS_AVAILABLE],
       pluggable: true,
-      description: "Subprocess peer-delegation registry. /delegate <peer> <task> routes to external CLI agents. Cursor + Warp wired; Hermes / Claude Code / Codex / OpenClaw deferred.",
+      description:
+        "Subprocess peer-delegation registry. /delegate <peer> <task> routes to external CLI agents. Cursor + Warp wired; Hermes / Claude Code / Codex / OpenClaw deferred.",
     },
     {
       axis: "strategy_recipe",
@@ -242,7 +252,8 @@ export function captureComposabilityReport(
       availableCount: STRATEGY_RECIPES.length,
       sample: [...STRATEGY_RECIPES],
       pluggable: true,
-      description: "Composable pure-function signal-processing primitives. Operator-extensible by adding new recipe files.",
+      description:
+        "Composable pure-function signal-processing primitives. Operator-extensible by adding new recipe files.",
     },
     {
       axis: "risk_dimension",
@@ -251,7 +262,8 @@ export function captureComposabilityReport(
       availableCount: RISK_CLASSIFIER_DIMENSIONS.length,
       sample: [...RISK_CLASSIFIER_DIMENSIONS],
       pluggable: true,
-      description: "13 weighted dimensions in the pre-trade classifier. Each dimension is independent; new ones can be added without affecting existing scoring.",
+      description:
+        "13 weighted dimensions in the pre-trade classifier. Each dimension is independent; new ones can be added without affecting existing scoring.",
     },
     {
       axis: "alpha_diagnostic",
@@ -260,7 +272,8 @@ export function captureComposabilityReport(
       availableCount: ALPHA_DIAGNOSTICS.length,
       sample: [...ALPHA_DIAGNOSTICS],
       pluggable: true,
-      description: "Pluggable diagnostic primitives. IC tracker, IR diagnostic, effective N, marginal contribution, portfolio optimizer, walk-forward IC, too-good-check, vol-clustering, risk-of-ruin, OBI, expectancy-by-tag, internal batch, auction window.",
+      description:
+        "Pluggable diagnostic primitives. IC tracker, IR diagnostic, effective N, marginal contribution, portfolio optimizer, walk-forward IC, too-good-check, vol-clustering, risk-of-ruin, OBI, expectancy-by-tag, internal batch, auction window.",
     },
     {
       axis: "audit_layer",
@@ -269,7 +282,8 @@ export function captureComposabilityReport(
       availableCount: AUDIT_LAYERS.length,
       sample: [...AUDIT_LAYERS],
       pluggable: false,
-      description: "Append-only JSONL audit trails under ~/.gordon/. Trade ledger, skill usage, agent feedback, fork audit, A/B routing, structured observations. Operator-readable + replayable.",
+      description:
+        "Append-only JSONL audit trails under ~/.gordon/. Trade ledger, skill usage, agent feedback, fork audit, A/B routing, structured observations. Operator-readable + replayable.",
     },
   ];
 

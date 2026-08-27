@@ -144,18 +144,9 @@ export const getAdherenceReportTool = createTool({
     "the last 7 days.",
   ].join("\n"),
   inputSchema: z.object({
-    startTime: z
-      .string()
-      .optional()
-      .describe("ISO timestamp. Default: 7 days ago."),
-    endTime: z
-      .string()
-      .optional()
-      .describe("ISO timestamp. Default: now."),
-    userId: z
-      .string()
-      .optional()
-      .describe("Filter to a specific operator. Default: all."),
+    startTime: z.string().optional().describe("ISO timestamp. Default: 7 days ago."),
+    endTime: z.string().optional().describe("ISO timestamp. Default: now."),
+    userId: z.string().optional().describe("Filter to a specific operator. Default: all."),
   }),
   outputSchema: z.object({
     summary: z.string(),
@@ -187,7 +178,11 @@ export const getAdherenceReportTool = createTool({
     startTime,
     endTime,
     userId,
-  }: { startTime?: string; endTime?: string; userId?: string }) => {
+  }: {
+    startTime?: string;
+    endTime?: string;
+    userId?: string;
+  }) => {
     const report = getAdherenceReport({ startTime, endTime, userId });
     return {
       summary: summarizeAdherenceReport(report),

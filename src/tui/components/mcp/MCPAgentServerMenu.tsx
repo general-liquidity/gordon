@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 import { Divider } from "../layout/Divider.tsx";
@@ -75,7 +75,9 @@ export function MCPAgentServerMenu({ agents, servers, onAssign, onClose }: Props
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">ASSIGN MCP SERVERS TO AGENTS</Text>
+        <Text bold color="cyanBright">
+          ASSIGN MCP SERVERS TO AGENTS
+        </Text>
       </Box>
 
       <Divider />
@@ -83,7 +85,9 @@ export function MCPAgentServerMenu({ agents, servers, onAssign, onClose }: Props
       <Box marginTop={1} gap={4}>
         {/* Left: agent list */}
         <Box flexDirection="column" width={26}>
-          <Text bold dimColor>AGENT</Text>
+          <Text bold dimColor>
+            AGENT
+          </Text>
           {agents.map((agent, i) => {
             const isFocused = i === agentIdx;
             const currentServerName =
@@ -103,7 +107,7 @@ export function MCPAgentServerMenu({ agents, servers, onAssign, onClose }: Props
                 </Box>
                 {isFocused && (
                   <Box>
-                    <Text dimColor>    → {currentServerName}</Text>
+                    <Text dimColor> → {currentServerName}</Text>
                   </Box>
                 )}
               </Box>
@@ -115,7 +119,9 @@ export function MCPAgentServerMenu({ agents, servers, onAssign, onClose }: Props
         <Box flexDirection="column">
           <Text dimColor>│</Text>
           {agents.map((_, i) => (
-            <Text key={i} dimColor>│</Text>
+            <Text key={i} dimColor>
+              │
+            </Text>
           ))}
         </Box>
 
@@ -143,7 +149,7 @@ export function MCPAgentServerMenu({ agents, servers, onAssign, onClose }: Props
                   <Text dimColor>
                     {servers.find((s) => s.id === selectedAgent.currentServer)?.name ?? "— None —"}
                   </Text>
-                  <Text dimColor>  (Enter to change)</Text>
+                  <Text dimColor> (Enter to change)</Text>
                 </Box>
               )}
             </>

@@ -8,7 +8,7 @@
  * Pattern: matches IndicatorBrowser (grouped list with descriptions).
  */
 
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Box, Text } from "../../ink-custom";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { Pane } from "../../design-system/Pane.js";
@@ -76,9 +76,7 @@ function buildFlatList(): FlatEntry[] {
 }
 
 function selectableIndices(entries: FlatEntry[]): number[] {
-  return entries
-    .map((e, i) => (e.type === "asset" ? i : -1))
-    .filter((i) => i >= 0);
+  return entries.map((e, i) => (e.type === "asset" ? i : -1)).filter((i) => i >= 0);
 }
 
 function padRight(s: string, w: number): string {
@@ -157,35 +155,38 @@ export function HIP3AssetBrowser({ onSelect, onClose }: Props) {
     };
   }, []);
 
-  useRoutedInput((input, key) => {
-    if (key.escape) {
-      onClose();
-      return;
-    }
-    if (key.upArrow) {
-      setCursor((c) => Math.max(0, c - 1));
-      return;
-    }
-    if (key.downArrow) {
-      setCursor((c) => Math.min(selectable.length - 1, c + 1));
-      return;
-    }
-    if (key.return) {
-      const idx = selectable[cursor];
-      if (idx === undefined) return;
-      const entry = flatList[idx];
-      if (entry?.asset && onSelect) {
-        const quote = quotes.get(entry.asset.symbol);
-        onSelect({
-          symbol: entry.asset.symbol,
-          price: quote?.price ?? 0,
-          builder: entry.asset.builder,
-          collateral: entry.asset.collateral,
-          maxLeverage: entry.asset.maxLeverage,
-        });
+  useRoutedInput(
+    (_input, key) => {
+      if (key.escape) {
+        onClose();
+        return;
       }
-    }
-  }, { id: "hip3AssetBrowser", priority: FOCUS_PRIORITY.DIALOG });
+      if (key.upArrow) {
+        setCursor((c) => Math.max(0, c - 1));
+        return;
+      }
+      if (key.downArrow) {
+        setCursor((c) => Math.min(selectable.length - 1, c + 1));
+        return;
+      }
+      if (key.return) {
+        const idx = selectable[cursor];
+        if (idx === undefined) return;
+        const entry = flatList[idx];
+        if (entry?.asset && onSelect) {
+          const quote = quotes.get(entry.asset.symbol);
+          onSelect({
+            symbol: entry.asset.symbol,
+            price: quote?.price ?? 0,
+            builder: entry.asset.builder,
+            collateral: entry.asset.collateral,
+            maxLeverage: entry.asset.maxLeverage,
+          });
+        }
+      }
+    },
+    { id: "hip3AssetBrowser", priority: FOCUS_PRIORITY.DIALOG },
+  );
 
   const selectedFlatIdx = selectable[cursor] ?? -1;
   const focusedAsset = selectedFlatIdx >= 0 ? flatList[selectedFlatIdx]?.asset : undefined;
@@ -196,8 +197,7 @@ export function HIP3AssetBrowser({ onSelect, onClose }: Props) {
     <Pane title="HIP-3 ASSET BROWSER" tone="warning">
       <Box>
         <Text dimColor>
-          ({totalAssets} assets{" "}
-          {loading ? "loading..." : error ? `error: ${error}` : "live"})
+          ({totalAssets} assets {loading ? "loading..." : error ? `error: ${error}` : "live"})
         </Text>
       </Box>
       <Text> </Text>
@@ -205,22 +205,34 @@ export function HIP3AssetBrowser({ onSelect, onClose }: Props) {
       {/* Column headers */}
       <Box paddingLeft={3}>
         <Box width={10}>
-          <Text bold dimColor>SYMBOL</Text>
+          <Text bold dimColor>
+            SYMBOL
+          </Text>
         </Box>
         <Box width={14}>
-          <Text bold dimColor>PRICE</Text>
+          <Text bold dimColor>
+            PRICE
+          </Text>
         </Box>
         <Box width={10}>
-          <Text bold dimColor>24H</Text>
+          <Text bold dimColor>
+            24H
+          </Text>
         </Box>
         <Box width={12}>
-          <Text bold dimColor>FUNDING</Text>
+          <Text bold dimColor>
+            FUNDING
+          </Text>
         </Box>
         <Box width={10}>
-          <Text bold dimColor>OI</Text>
+          <Text bold dimColor>
+            OI
+          </Text>
         </Box>
         <Box width={6}>
-          <Text bold dimColor>LEV</Text>
+          <Text bold dimColor>
+            LEV
+          </Text>
         </Box>
       </Box>
 
@@ -249,9 +261,7 @@ export function HIP3AssetBrowser({ onSelect, onClose }: Props) {
           const change = quote
             ? formatChange(quote.price, quote.prevDayPrice)
             : { text: "   -   ", color: "white" };
-          const funding = quote
-            ? formatFunding(quote.fundingRate)
-            : { text: "-", color: "white" };
+          const funding = quote ? formatFunding(quote.fundingRate) : { text: "-", color: "white" };
           const oi = quote ? formatOI(quote.openInterest) : "-";
 
           return (

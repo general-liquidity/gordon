@@ -87,7 +87,9 @@ async function fetchHyperliquidFunding(): Promise<Map<string, number>> {
   }
 }
 
-export const fundingAlertProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
+export const fundingAlertProducer: CandidateProducer = async (
+  obs,
+): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop" || obs.eventType !== "tick_funding") return [];
 
   const fundingMap = await fetchHyperliquidFunding();
@@ -104,14 +106,19 @@ export const fundingAlertProducer: CandidateProducer = async (obs): Promise<Proa
 
     // Not anomalous → skip, but update state
     if (Math.abs(annualizedPct) < HIGH_FUNDING_ANNUAL_PCT) {
-      stateByCoin.set(coin, { lastAnnualizedPct: annualizedPct, lastFiredAt: state?.lastFiredAt ?? 0 });
+      stateByCoin.set(coin, {
+        lastAnnualizedPct: annualizedPct,
+        lastFiredAt: state?.lastFiredAt ?? 0,
+      });
       continue;
     }
 
     // Anomalous — check if we've fired recently for this coin with similar reading
     if (state) {
       const priceChange = Math.abs(annualizedPct - state.lastAnnualizedPct);
-      const signFlipped = Math.sign(annualizedPct) !== Math.sign(state.lastAnnualizedPct) && state.lastAnnualizedPct !== 0;
+      const signFlipped =
+        Math.sign(annualizedPct) !== Math.sign(state.lastAnnualizedPct) &&
+        state.lastAnnualizedPct !== 0;
       const recentFire = Date.now() - state.lastFiredAt < 2 * 60 * 60 * 1000; // 2 hour recency
       if (recentFire && !signFlipped && priceChange < CHANGE_THRESHOLD_PCT) {
         continue; // Same alert essentially — suppress
@@ -120,9 +127,12 @@ export const fundingAlertProducer: CandidateProducer = async (obs): Promise<Proa
 
     const direction = annualizedPct > 0 ? "longs paying shorts" : "shorts paying longs";
     const pressure = annualizedPct > 0 ? "long-biased" : "short-biased";
-    const flipWarning = state && Math.sign(annualizedPct) !== Math.sign(state.lastAnnualizedPct) && state.lastAnnualizedPct !== 0
-      ? ` FUNDING FLIPPED from ${state.lastAnnualizedPct.toFixed(1)}%.`
-      : "";
+    const flipWarning =
+      state &&
+      Math.sign(annualizedPct) !== Math.sign(state.lastAnnualizedPct) &&
+      state.lastAnnualizedPct !== 0
+        ? ` FUNDING FLIPPED from ${state.lastAnnualizedPct.toFixed(1)}%.`
+        : "";
 
     candidates.push(
       buildCandidate(
@@ -131,9 +141,11 @@ export const fundingAlertProducer: CandidateProducer = async (obs): Promise<Proa
         `Hyperliquid ${coin} perpetual funding is ${annualizedPct > 0 ? "+" : ""}${annualizedPct.toFixed(2)}% ` +
           `annualized (${direction}).${flipWarning} ` +
           `${pressure} positioning at this extreme is historically associated with elevated squeeze risk — ` +
-          `${annualizedPct > 0
-            ? "overextended longs can get flushed on any pullback"
-            : "overextended shorts can get squeezed on any rally"}. ` +
+          `${
+            annualizedPct > 0
+              ? "overextended longs can get flushed on any pullback"
+              : "overextended shorts can get squeezed on any rally"
+          }. ` +
           `Worth reviewing any open ${coin} positions and adjusting risk.`,
         {
           confidence: Math.abs(annualizedPct) > 40 ? 0.88 : 0.75,

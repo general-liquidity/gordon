@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import { mkdtempSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -56,9 +56,9 @@ function freshList(): FeatureList {
 
 describe("defaultTradingFeatureListPath", () => {
   it("honors env override", () => {
-    expect(
-      defaultTradingFeatureListPath({ [TRADING_FEATURE_LIST_PATH_ENV]: "/x.json" }),
-    ).toBe("/x.json");
+    expect(defaultTradingFeatureListPath({ [TRADING_FEATURE_LIST_PATH_ENV]: "/x.json" })).toBe(
+      "/x.json",
+    );
   });
   it("falls back to home-dir default", () => {
     expect(defaultTradingFeatureListPath({})).toContain("feature-list.json");
@@ -78,10 +78,7 @@ describe("makeEntry", () => {
 describe("createFeatureList", () => {
   it("sorts entries by priority ascending", () => {
     const list = freshList();
-    expect(list.entries.map((e) => e.id)).toEqual([
-      "venue-binance-connect",
-      "risk-mandate-block",
-    ]);
+    expect(list.entries.map((e) => e.id)).toEqual(["venue-binance-connect", "risk-mandate-block"]);
   });
 
   it("uses injected timestamp", () => {
@@ -97,7 +94,7 @@ describe("loadFeatureList / saveFeatureList", () => {
     expect(existsSync(listPath)).toBe(true);
     const b = loadFeatureList(listPath);
     expect(b?.entries.length).toBe(2);
-    expect(b?.entries[0]!.id).toBe("venue-binance-connect");
+    expect(b?.entries[0]?.id).toBe("venue-binance-connect");
   });
 
   it("returns null for missing file", () => {

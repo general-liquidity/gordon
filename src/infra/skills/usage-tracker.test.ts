@@ -19,7 +19,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* */ }
+  try {
+    rmSync(tempDir, { recursive: true, force: true });
+  } catch {
+    /* */
+  }
 });
 
 describe("recordSkillUsage", () => {
@@ -107,7 +111,7 @@ describe("getSkillUsageStats", () => {
       const ts = new Date(now.getTime() - r.days_ago * 24 * 60 * 60 * 1000).toISOString();
       return JSON.stringify({ timestamp: ts, skillId: r.skillId, source: r.source ?? "user" });
     });
-    writeFileSync(usagePath, lines.join("\n") + "\n");
+    writeFileSync(usagePath, `${lines.join("\n")}\n`);
   }
 
   it("returns empty when no records", () => {
@@ -165,17 +169,16 @@ describe("getSkillUsageStats", () => {
   });
 
   it("respects custom window size", () => {
-    const ts = (days: number) =>
-      new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
+    const ts = (days: number) => new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
     writeFileSync(
       usagePath,
-      [
+      `${[
         { timestamp: ts(1), skillId: "a", source: "user" },
         { timestamp: ts(5), skillId: "a", source: "user" },
         { timestamp: ts(15), skillId: "a", source: "user" },
       ]
         .map((r) => JSON.stringify(r))
-        .join("\n") + "\n",
+        .join("\n")}\n`,
     );
     const sevenDayWindow = getSkillUsageStats({ path: usagePath, now, windowDays: 7 });
     expect(sevenDayWindow[0]!.recentInvocations).toBe(2); // days 1 + 5 within 7-day window
@@ -186,7 +189,8 @@ describe("neverInvokedSkills", () => {
   it("returns skills from registry that have zero invocations", () => {
     writeFileSync(
       usagePath,
-      JSON.stringify({ timestamp: "2026-05-23T00:00:00Z", skillId: "used-a", source: "user" }) + "\n",
+      JSON.stringify({ timestamp: "2026-05-23T00:00:00Z", skillId: "used-a", source: "user" }) +
+        "\n",
     );
     const result = neverInvokedSkills(["used-a", "unused-b", "unused-c"], { path: usagePath });
     expect(result).toEqual(["unused-b", "unused-c"]);
@@ -200,7 +204,11 @@ describe("neverInvokedSkills", () => {
   it("excludes orphan entries (ledger has skill not in registry)", () => {
     writeFileSync(
       usagePath,
-      JSON.stringify({ timestamp: "2026-05-23T00:00:00Z", skillId: "deleted-skill", source: "user" }) + "\n",
+      `${JSON.stringify({
+        timestamp: "2026-05-23T00:00:00Z",
+        skillId: "deleted-skill",
+        source: "user",
+      })}\n`,
     );
     // 'deleted-skill' is in ledger but not in registry — not surfaced
     const result = neverInvokedSkills(["a", "b"], { path: usagePath });

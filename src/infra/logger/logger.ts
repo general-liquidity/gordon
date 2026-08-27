@@ -4,10 +4,7 @@
  */
 
 import { isGordonError, type GordonError } from "../../errors/index.ts";
-import {
-  redactDeep,
-  redactString,
-} from "../platform/observability/valueRedaction.ts";
+import { redactDeep, redactString } from "../platform/observability/valueRedaction.ts";
 
 /**
  * Log levels
@@ -53,9 +50,10 @@ const EXCHANGE_NOISE_RE =
 function isCloakedNoise(entry: LogEntry): boolean {
   const haystack =
     entry.message +
-    (entry.context ? " " + JSON.stringify(entry.context) : "") +
-    (entry.error ? " " + entry.error.name + ": " + entry.error.message : "");
-  if (process.env.GORDON_SHOW_BINANCE_ERRORS !== "1" && EXCHANGE_NOISE_RE.test(haystack)) return true;
+    (entry.context ? ` ${JSON.stringify(entry.context)}` : "") +
+    (entry.error ? ` ${entry.error.name}: ${entry.error.message}` : "");
+  if (process.env.GORDON_SHOW_BINANCE_ERRORS !== "1" && EXCHANGE_NOISE_RE.test(haystack))
+    return true;
   return false;
 }
 
@@ -65,8 +63,8 @@ function isCloakedNoise(entry: LogEntry): boolean {
 export class ConsoleTransport implements LogTransport {
   private colors = {
     debug: "\x1b[36m", // cyan
-    info: "\x1b[32m",  // green
-    warn: "\x1b[33m",  // yellow
+    info: "\x1b[32m", // green
+    warn: "\x1b[33m", // yellow
     error: "\x1b[31m", // red
     reset: "\x1b[0m",
   };
@@ -156,10 +154,7 @@ const LEVEL_PRIORITY: Record<LogLevel, number> = {
 };
 
 function isStartupQuietInfoSuppressed(level: LogLevel): boolean {
-  return (
-    level === "info" &&
-    process.env.GORDON_STARTUP_QUIET === "1"
-  );
+  return level === "info" && process.env.GORDON_STARTUP_QUIET === "1";
 }
 
 /**
@@ -195,7 +190,7 @@ export class Logger {
     level: LogLevel,
     message: string,
     context?: Record<string, unknown>,
-    error?: Error | GordonError
+    error?: Error | GordonError,
   ): LogEntry {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
@@ -267,7 +262,7 @@ export class Logger {
   error(
     message: string,
     errorOrContext?: Error | GordonError | Record<string, unknown>,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ): void {
     if (this.shouldLog("error")) {
       // Check if second arg is an Error instance or a plain context object
@@ -314,7 +309,7 @@ let defaultLogger: Logger | null = null;
 export function getLogger(): Logger {
   if (!defaultLogger) {
     defaultLogger = new Logger({
-      level: process.env.LOG_LEVEL as LogLevel || "error",
+      level: (process.env.LOG_LEVEL as LogLevel) || "error",
     });
   }
   return defaultLogger;

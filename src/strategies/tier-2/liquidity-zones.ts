@@ -91,7 +91,7 @@ export class LiquidityZonesStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, CANDLE_LIMIT);
     if (candles.length < 50) {
@@ -107,7 +107,7 @@ export class LiquidityZonesStrategy extends BaseStrategy {
     const pivots = this.detectPivots(candles);
     if (pivots.length < MIN_ZONE_TOUCHES) {
       return this.notDetected(
-        `Not enough pivot points detected (${pivots.length} < ${MIN_ZONE_TOUCHES})`
+        `Not enough pivot points detected (${pivots.length} < ${MIN_ZONE_TOUCHES})`,
       );
     }
 
@@ -132,12 +132,12 @@ export class LiquidityZonesStrategy extends BaseStrategy {
 
       if (nearbyZones.length === 0) {
         return this.notDetected(
-          `No liquidity zones within ${(ZONE_PROXIMITY_PERCENT * 100).toFixed(1)}% of current price ($${currentPrice.toFixed(2)})`
+          `No liquidity zones within ${(ZONE_PROXIMITY_PERCENT * 100).toFixed(1)}% of current price ($${currentPrice.toFixed(2)})`,
         );
       }
 
       return this.notDetected(
-        `Found ${nearbyZones.length} zone(s) near price but none with volume compression`
+        `Found ${nearbyZones.length} zone(s) near price but none with volume compression`,
       );
     }
 
@@ -158,7 +158,7 @@ export class LiquidityZonesStrategy extends BaseStrategy {
     if (bestZone.touches >= 5) {
       confidence += 0.15;
     } else if (bestZone.touches >= 4) {
-      confidence += 0.10;
+      confidence += 0.1;
     }
 
     // Volume compression bonus
@@ -179,14 +179,13 @@ export class LiquidityZonesStrategy extends BaseStrategy {
         olderATR.current > 0 &&
         recentATR.current < olderATR.current * 0.85
       ) {
-        confidence += 0.10;
+        confidence += 0.1;
       }
     }
 
     // RSI near neutral bonus
     const rsi = this.calculateRSI(candles);
-    const rsiNeutral =
-      rsi.current !== null && rsi.current >= 40 && rsi.current <= 60;
+    const rsiNeutral = rsi.current !== null && rsi.current >= 40 && rsi.current <= 60;
     if (rsiNeutral) {
       confidence += 0.05;
     }
@@ -203,14 +202,12 @@ export class LiquidityZonesStrategy extends BaseStrategy {
 
     const reasons: string[] = [];
     reasons.push(
-      `${bestZone.type.charAt(0).toUpperCase() + bestZone.type.slice(1)} zone at $${bestZone.price.toFixed(2)} tested ${bestZone.touches} times`
+      `${bestZone.type.charAt(0).toUpperCase() + bestZone.type.slice(1)} zone at $${bestZone.price.toFixed(2)} tested ${bestZone.touches} times`,
     );
     reasons.push(
-      `Volume declined ${bestZone.volumeDeclinePercent.toFixed(0)}% from first to last touch (compression)`
+      `Volume declined ${bestZone.volumeDeclinePercent.toFixed(0)}% from first to last touch (compression)`,
     );
-    reasons.push(
-      `Direction: ${direction.toUpperCase()} — price near compressed ${bestZone.type}`
-    );
+    reasons.push(`Direction: ${direction.toUpperCase()} — price near compressed ${bestZone.type}`);
     if (rsiNeutral) {
       reasons.push(`RSI neutral (${rsi.current?.toFixed(1)}) — not overextended`);
     }
@@ -240,10 +237,7 @@ export class LiquidityZonesStrategy extends BaseStrategy {
       // Check for local low (support pivot)
       let isLocalLow = true;
       for (let j = 1; j <= PIVOT_LOOKBACK; j++) {
-        if (
-          candles[i - j]!.low <= current.low ||
-          candles[i + j]!.low <= current.low
-        ) {
+        if (candles[i - j]!.low <= current.low || candles[i + j]!.low <= current.low) {
           isLocalLow = false;
           break;
         }
@@ -261,10 +255,7 @@ export class LiquidityZonesStrategy extends BaseStrategy {
       // Check for local high (resistance pivot)
       let isLocalHigh = true;
       for (let j = 1; j <= PIVOT_LOOKBACK; j++) {
-        if (
-          candles[i - j]!.high >= current.high ||
-          candles[i + j]!.high >= current.high
-        ) {
+        if (candles[i - j]!.high >= current.high || candles[i + j]!.high >= current.high) {
           isLocalHigh = false;
           break;
         }
@@ -320,12 +311,10 @@ export class LiquidityZonesStrategy extends BaseStrategy {
       // Determine zone type by majority of pivot types
       const lowCount = cluster.filter((p) => p.type === "low").length;
       const highCount = cluster.filter((p) => p.type === "high").length;
-      const zoneType: "support" | "resistance" =
-        lowCount >= highCount ? "support" : "resistance";
+      const zoneType: "support" | "resistance" = lowCount >= highCount ? "support" : "resistance";
 
       // Calculate zone price as the average of all pivot prices
-      const zonePrice =
-        cluster.reduce((sum, p) => sum + p.price, 0) / cluster.length;
+      const zonePrice = cluster.reduce((sum, p) => sum + p.price, 0) / cluster.length;
 
       // Extract volumes in chronological order
       const volumes = cluster.map((p) => p.volume);
@@ -337,9 +326,7 @@ export class LiquidityZonesStrategy extends BaseStrategy {
         firstVolume > 0 && lastVolume < firstVolume * VOLUME_COMPRESSION_THRESHOLD;
 
       const volumeDeclinePercent =
-        firstVolume > 0
-          ? ((firstVolume - lastVolume) / firstVolume) * 100
-          : 0;
+        firstVolume > 0 ? ((firstVolume - lastVolume) / firstVolume) * 100 : 0;
 
       zones.push({
         price: zonePrice,
@@ -358,10 +345,7 @@ export class LiquidityZonesStrategy extends BaseStrategy {
   // Plan Parameters
   // ==========================================================================
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "1h", CANDLE_LIMIT);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const atr = this.calculateATR(candles);
@@ -408,15 +392,8 @@ export class LiquidityZonesStrategy extends BaseStrategy {
       ];
     }
 
-    const avgTpPrice = takeProfits.reduce(
-      (sum, tp) => sum + tp.price * tp.percentToSell,
-      0
-    );
-    const riskRewardRatio = this.calculateRiskReward(
-      entryPrice,
-      stopLoss,
-      avgTpPrice
-    );
+    const avgTpPrice = takeProfits.reduce((sum, tp) => sum + tp.price * tp.percentToSell, 0);
+    const riskRewardRatio = this.calculateRiskReward(entryPrice, stopLoss, avgTpPrice);
 
     const direction = isSupport ? "LONG" : "SHORT";
     const zoneInfo = bestZone
@@ -499,7 +476,7 @@ that level. This compression signals an imminent strong bounce or breakout.
     bar: OHLC,
     index: number,
     data: OHLC[],
-    indicators: IndicatorState
+    _indicators: IndicatorState,
   ): Signal | null {
     // Need enough history for zone detection
     if (index < 50) return null;
@@ -556,10 +533,7 @@ that level. This compression signals an imminent strong bounce or breakout.
       // Check for local low (support pivot)
       let isLocalLow = true;
       for (let j = 1; j <= PIVOT_LOOKBACK; j++) {
-        if (
-          bars[i - j]!.low <= current.low ||
-          bars[i + j]!.low <= current.low
-        ) {
+        if (bars[i - j]!.low <= current.low || bars[i + j]!.low <= current.low) {
           isLocalLow = false;
           break;
         }
@@ -577,10 +551,7 @@ that level. This compression signals an imminent strong bounce or breakout.
       // Check for local high (resistance pivot)
       let isLocalHigh = true;
       for (let j = 1; j <= PIVOT_LOOKBACK; j++) {
-        if (
-          bars[i - j]!.high >= current.high ||
-          bars[i + j]!.high >= current.high
-        ) {
+        if (bars[i - j]!.high >= current.high || bars[i + j]!.high >= current.high) {
           isLocalHigh = false;
           break;
         }

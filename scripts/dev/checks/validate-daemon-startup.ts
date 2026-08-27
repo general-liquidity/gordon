@@ -12,9 +12,10 @@ const CHILD_FLAG = "GORDON_DAEMON_VALIDATION_CHILD";
 const ROOT_ENV = "GORDON_DAEMON_VALIDATION_ROOT";
 
 async function runValidationChild(root: string): Promise<void> {
-  const socketPath = process.platform === "win32"
-    ? `\\\\.\\pipe\\gordon-daemon-validation-${process.pid}-${Date.now()}`
-    : join(root, "daemon.sock");
+  const socketPath =
+    process.platform === "win32"
+      ? `\\\\.\\pipe\\gordon-daemon-validation-${process.pid}-${Date.now()}`
+      : join(root, "daemon.sock");
 
   // These must be set before importing any Gordon module because GORDON_DIR
   // is resolved at module initialization.
@@ -24,9 +25,9 @@ async function runValidationChild(root: string): Promise<void> {
   process.env.GORDON_RISK_MODE = "paper";
   process.env.GORDON_EVAL_SANDBOX = "1";
 
-  let daemon: Awaited<ReturnType<
-    typeof import("../../../src/gateway/daemon/process.ts")["startGatewayDaemonProcess"]
-  >> | null = null;
+  let daemon: Awaited<
+    ReturnType<typeof import("../../../src/gateway/daemon/process.ts")["startGatewayDaemonProcess"]>
+  > | null = null;
 
   try {
     const [
@@ -34,13 +35,12 @@ async function runValidationChild(root: string): Promise<void> {
       { sendIpcCommand, isIpcDaemonReachable },
       protocol,
       { getSchedulerTask, upsertSchedulerTask },
-    ] =
-      await Promise.all([
-        import("../../../src/gateway/daemon/process.ts"),
-        import("../../../src/gateway/daemon/ipc.ts"),
-        import("../../../src/gateway/protocol/index.ts"),
-        import("../../../src/gateway/store/scheduler-store.ts"),
-      ]);
+    ] = await Promise.all([
+      import("../../../src/gateway/daemon/process.ts"),
+      import("../../../src/gateway/daemon/ipc.ts"),
+      import("../../../src/gateway/protocol/index.ts"),
+      import("../../../src/gateway/store/scheduler-store.ts"),
+    ]);
 
     upsertSchedulerTask({
       taskId: "__validation_must_not_run",
@@ -72,7 +72,9 @@ async function runValidationChild(root: string): Promise<void> {
       },
     });
     if (!response.ok) {
-      throw new Error(`Daemon health command failed: ${response.error?.message ?? "unknown error"}`);
+      throw new Error(
+        `Daemon health command failed: ${response.error?.message ?? "unknown error"}`,
+      );
     }
     const healthTask = getSchedulerTask("__health_check");
     const hostileTask = getSchedulerTask("__validation_must_not_run");
@@ -86,17 +88,19 @@ async function runValidationChild(root: string): Promise<void> {
       throw new Error("Daemon IPC endpoint remained reachable after stop");
     }
 
-    console.log(JSON.stringify({
-      status: "pass",
-      validationOnly: true,
-      modelInference: false,
-      venueResolved: false,
-      orderDispatch: false,
-      healthOk: true,
-      schedulerHealthRan: true,
-      persistedTaskSuppressed: true,
-      stoppedCleanly: true,
-    }));
+    console.log(
+      JSON.stringify({
+        status: "pass",
+        validationOnly: true,
+        modelInference: false,
+        venueResolved: false,
+        orderDispatch: false,
+        healthOk: true,
+        schedulerHealthRan: true,
+        persistedTaskSuppressed: true,
+        stoppedCleanly: true,
+      }),
+    );
   } finally {
     if (daemon) await daemon.stop().catch(() => undefined);
   }

@@ -7,8 +7,7 @@
  * Pattern: Claude Code context panel with live data visualization.
  */
 
-import React from "react";
-import { Box, Text } from "../../ink-custom";
+import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 
 // ============================================================================
@@ -42,12 +41,21 @@ function zoneColor(zone?: IndicatorZone): string | undefined {
   return undefined;
 }
 
-function zoneBadge(zone?: IndicatorZone): string {
+function _zoneBadge(zone?: IndicatorZone): string {
   if (!zone) return "";
   return ` ${zone.toUpperCase()}`;
 }
 
-const SPARK_CHARS = ["\u2581", "\u2582", "\u2583", "\u2584", "\u2585", "\u2586", "\u2587", "\u2588"];
+const SPARK_CHARS = [
+  "\u2581",
+  "\u2582",
+  "\u2583",
+  "\u2584",
+  "\u2585",
+  "\u2586",
+  "\u2587",
+  "\u2588",
+];
 
 function renderSparkline(values?: number[]): string {
   if (!values || values.length === 0) return "";
@@ -67,7 +75,8 @@ function formatValue(v: number | string): string {
   if (typeof v === "string") return v;
   if (Number.isNaN(v)) return "\u2014";
   const abs = Math.abs(v);
-  if (abs >= 1000) return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (abs >= 1000)
+    return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (abs >= 1) return v.toFixed(2);
   return v.toFixed(4);
 }
@@ -85,14 +94,34 @@ function padLeft(s: string, w: number): string {
 // ============================================================================
 
 export function IndicatorValueViewer({ symbol, indicators, onClose }: Props) {
+  useInput((_input, key) => {
+    if (key.escape) onClose();
+  });
+
   return (
     <Pane title={`INDICATORS \u00b7 ${symbol}`}>
       {/* Header */}
       <Box>
-        <Box width={20}><Text bold dimColor>INDICATOR</Text></Box>
-        <Box width={14}><Text bold dimColor>{"     VALUE"}</Text></Box>
-        <Box width={12}><Text bold dimColor>ZONE</Text></Box>
-        <Box width={22}><Text bold dimColor>SPARKLINE</Text></Box>
+        <Box width={20}>
+          <Text bold dimColor>
+            INDICATOR
+          </Text>
+        </Box>
+        <Box width={14}>
+          <Text bold dimColor>
+            {"     VALUE"}
+          </Text>
+        </Box>
+        <Box width={12}>
+          <Text bold dimColor>
+            ZONE
+          </Text>
+        </Box>
+        <Box width={22}>
+          <Text bold dimColor>
+            SPARKLINE
+          </Text>
+        </Box>
       </Box>
 
       {/* Rows */}
@@ -109,7 +138,9 @@ export function IndicatorValueViewer({ symbol, indicators, onClose }: Props) {
               <Text color={color}>{padLeft(formatValue(ind.value), 14)}</Text>
             </Box>
             <Box width={12}>
-              <Text color={color}>{ind.zone ? padRight(ind.zone.toUpperCase(), 12) : padRight("", 12)}</Text>
+              <Text color={color}>
+                {ind.zone ? padRight(ind.zone.toUpperCase(), 12) : padRight("", 12)}
+              </Text>
             </Box>
             <Box width={22}>
               <Text color={color ?? "cyan"}>{spark}</Text>

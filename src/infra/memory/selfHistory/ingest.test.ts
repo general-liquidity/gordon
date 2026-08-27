@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  unlinkSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -10,7 +18,10 @@ let historyDir: string;
 let indexDir: string;
 let opts: RefreshOptions;
 
-function makeSession(id: string, messages: Array<{ role: string; content: string; agent?: string }>): ChatSession {
+function makeSession(
+  id: string,
+  messages: Array<{ role: string; content: string; agent?: string }>,
+): ChatSession {
   return {
     id,
     startedAt: "2026-06-01T10:00:00.000Z",
@@ -100,7 +111,11 @@ describe("refreshIndex — incremental re-index only touches changed files", () 
     expect(second.reused.sort()).toEqual(["a.json", "b.json"]);
 
     // Modify only a.json (new content + newer mtime).
-    writeSession("a.json", makeSession("a", [{ role: "user", content: "alpha content revised" }]), 2000);
+    writeSession(
+      "a.json",
+      makeSession("a", [{ role: "user", content: "alpha content revised" }]),
+      2000,
+    );
 
     const third = refreshIndex(opts);
     expect(third.indexed).toEqual(["a.json"]);

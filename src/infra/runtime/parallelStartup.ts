@@ -92,10 +92,7 @@ async function executeWithTimeout<T>(task: StartupTask<T>): Promise<TaskResult<T
   const start = Date.now();
 
   try {
-    const result = await Promise.race([
-      task.run(),
-      timeout(timeoutMs),
-    ]);
+    const result = await Promise.race([task.run(), timeout(timeoutMs)]);
 
     if (result === TIMEOUT_SENTINEL) {
       logger.warn(`Startup task '${task.id}' timed out after ${timeoutMs}ms`);
@@ -143,25 +140,55 @@ function timeout(ms: number): Promise<typeof TIMEOUT_SENTINEL> {
 
 /** Create a startup task for loading config. */
 export function configLoadTask(loader: () => Promise<unknown>): StartupTask {
-  return { id: "config", label: "Load configuration", run: loader, optional: false, timeoutMs: 5_000 };
+  return {
+    id: "config",
+    label: "Load configuration",
+    run: loader,
+    optional: false,
+    timeoutMs: 5_000,
+  };
 }
 
 /** Create a startup task for refreshing OAuth tokens. */
 export function oauthRefreshTask(refresher: () => Promise<unknown>): StartupTask {
-  return { id: "oauth-refresh", label: "Refresh OAuth tokens", run: refresher, optional: true, timeoutMs: 10_000 };
+  return {
+    id: "oauth-refresh",
+    label: "Refresh OAuth tokens",
+    run: refresher,
+    optional: true,
+    timeoutMs: 10_000,
+  };
 }
 
 /** Create a startup task for initializing MCP servers. */
 export function mcpInitTask(init: () => Promise<unknown>): StartupTask {
-  return { id: "mcp-init", label: "Initialize MCP servers", run: init, optional: true, timeoutMs: 15_000 };
+  return {
+    id: "mcp-init",
+    label: "Initialize MCP servers",
+    run: init,
+    optional: true,
+    timeoutMs: 15_000,
+  };
 }
 
 /** Create a startup task for testing exchange connectivity. */
 export function exchangePingTask(exchangeId: string, ping: () => Promise<unknown>): StartupTask {
-  return { id: `ping-${exchangeId}`, label: `Ping ${exchangeId}`, run: ping, optional: true, timeoutMs: 8_000 };
+  return {
+    id: `ping-${exchangeId}`,
+    label: `Ping ${exchangeId}`,
+    run: ping,
+    optional: true,
+    timeoutMs: 8_000,
+  };
 }
 
 /** Create a startup task for loading session memory. */
 export function memoryLoadTask(loader: () => Promise<unknown>): StartupTask {
-  return { id: "memory", label: "Load session memory", run: loader, optional: true, timeoutMs: 3_000 };
+  return {
+    id: "memory",
+    label: "Load session memory",
+    run: loader,
+    optional: true,
+    timeoutMs: 3_000,
+  };
 }

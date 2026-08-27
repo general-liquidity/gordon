@@ -2,7 +2,9 @@ import { describe, test, expect } from "bun:test";
 import { EventBus, emitEvent, getEventBus, setEventBus } from "./bus.ts";
 import type { EventData } from "./types.ts";
 
-function systemStartedEvent(permissionMode: "auto" | "ask" | "strict" = "ask"): EventData<"system:started"> {
+function systemStartedEvent(
+  permissionMode: "auto" | "ask" | "strict" = "ask",
+): EventData<"system:started"> {
   return {
     type: "system:started",
     timestamp: new Date().toISOString(),
@@ -10,7 +12,9 @@ function systemStartedEvent(permissionMode: "auto" | "ask" | "strict" = "ask"): 
   };
 }
 
-function systemModeChangedEvent(permissionMode: "auto" | "ask" | "strict" = "auto"): EventData<"system:permission_mode_changed"> {
+function systemModeChangedEvent(
+  permissionMode: "auto" | "ask" | "strict" = "auto",
+): EventData<"system:permission_mode_changed"> {
   return {
     type: "system:permission_mode_changed",
     timestamp: new Date().toISOString(),
@@ -31,7 +35,7 @@ describe("EventBus", () => {
       () => {
         calls.push("high");
       },
-      { priority: 10 }
+      { priority: 10 },
     );
 
     await bus.emit(systemStartedEvent());
@@ -94,7 +98,9 @@ describe("EventBus", () => {
 
     const started = bus.getHistory("system:started");
     expect(started).toHaveLength(1);
-    expect((started[0] as { permissionMode: "auto" | "ask" | "strict" }).permissionMode).toBe("auto");
+    expect((started[0] as { permissionMode: "auto" | "ask" | "strict" }).permissionMode).toBe(
+      "auto",
+    );
 
     bus.clearHistory();
     expect(bus.getHistory()).toHaveLength(0);

@@ -75,7 +75,12 @@ describe("strategyMandates", () => {
     it("normalizes case and persists", () => {
       saveMandates(
         [
-          { ...swingCrypto, assetClasses: ["Crypto"], venues: ["BINANCE"], strategyTags: ["SWING"] },
+          {
+            ...swingCrypto,
+            assetClasses: ["Crypto"],
+            venues: ["BINANCE"],
+            strategyTags: ["SWING"],
+          },
         ],
         tmpPath,
       );
@@ -93,18 +98,15 @@ describe("strategyMandates", () => {
 
   describe("selectMandateForPlan", () => {
     it("picks the most specific mandate", () => {
-      const m = selectMandateForPlan(
-        { assetClass: "crypto", strategyTag: "swing" },
-        [wildcard, swingCrypto],
-      );
+      const m = selectMandateForPlan({ assetClass: "crypto", strategyTag: "swing" }, [
+        wildcard,
+        swingCrypto,
+      ]);
       expect(m?.id).toBe("swing-crypto");
     });
 
     it("falls back to wildcard when no specific match", () => {
-      const m = selectMandateForPlan(
-        { assetClass: "fx" },
-        [wildcard, swingCrypto, incomeOptions],
-      );
+      const m = selectMandateForPlan({ assetClass: "fx" }, [wildcard, swingCrypto, incomeOptions]);
       expect(m?.id).toBe("global");
     });
 
@@ -127,12 +129,9 @@ describe("strategyMandates", () => {
     const budget = { currentOpenPositions: 0, currentAllocationPct: 0 };
 
     it("passes through when flag off", () => {
-      const r = gateAgainstMandate(
-        { assetClass: "crypto", proposedPositionPct: 5 },
-        budget,
-        {},
-        [swingCrypto],
-      );
+      const r = gateAgainstMandate({ assetClass: "crypto", proposedPositionPct: 5 }, budget, {}, [
+        swingCrypto,
+      ]);
       expect(r.ok).toBe(true);
     });
 

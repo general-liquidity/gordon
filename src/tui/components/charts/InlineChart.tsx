@@ -1,4 +1,3 @@
-import React from "react";
 import { Text } from "../../ink-custom";
 
 // ============================================================================
@@ -32,10 +31,12 @@ export function InlineChart({ data, width, showTrend = true }: Props) {
   const range = max - min || 1;
 
   // Build sparkline
-  const chars = resampled.map((v) => {
-    const idx = Math.floor(((v - min) / range) * (BLOCKS.length - 1));
-    return BLOCKS[Math.max(0, Math.min(idx, BLOCKS.length - 1))]!;
-  }).join("");
+  const chars = resampled
+    .map((v) => {
+      const idx = Math.floor(((v - min) / range) * (BLOCKS.length - 1));
+      return BLOCKS[Math.max(0, Math.min(idx, BLOCKS.length - 1))]!;
+    })
+    .join("");
 
   // Determine trend color
   const first = resampled[0]!;
@@ -43,13 +44,12 @@ export function InlineChart({ data, width, showTrend = true }: Props) {
   const color = last > first ? "green" : last < first ? "red" : undefined;
 
   // Trend arrow
-  const arrow = showTrend
-    ? last > first ? " \u2191" : last < first ? " \u2193" : " \u2192"
-    : "";
+  const arrow = showTrend ? (last > first ? " \u2191" : last < first ? " \u2193" : " \u2192") : "";
 
   return (
     <Text color={color}>
-      {chars}{arrow}
+      {chars}
+      {arrow}
     </Text>
   );
 }

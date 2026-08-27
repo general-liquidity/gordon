@@ -59,8 +59,8 @@ describe("computeEffectiveN — diversification verdicts", () => {
     for (let i = 0; i < n; i++) {
       // Walsh-like patterns at different group sizes
       a.push(i % 2 === 0 ? 1 : -1);
-      b.push(((i >> 1) % 2) === 0 ? 1 : -1);
-      c.push(((i >> 2) % 2) === 0 ? 1 : -1);
+      b.push((i >> 1) % 2 === 0 ? 1 : -1);
+      c.push((i >> 2) % 2 === 0 ? 1 : -1);
     }
     const result = computeEffectiveN({ a, b, c }, { diversifiedThreshold: 0.05 });
     expect(result.meanAbsCorrelation).toBeLessThan(0.05);
@@ -73,7 +73,7 @@ describe("computeEffectiveN — diversification verdicts", () => {
     const result = computeEffectiveN({
       a: same,
       b: same.map((v) => v + 0.001), // negligible noise to keep Pearson defined
-      c: same.map((v) => v * 2),     // perfectly correlated
+      c: same.map((v) => v * 2), // perfectly correlated
     });
     expect(result.meanAbsCorrelation).toBeGreaterThan(0.95);
     expect(result.verdict).toBe("redundant");

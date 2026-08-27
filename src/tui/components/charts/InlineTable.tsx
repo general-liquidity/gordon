@@ -24,7 +24,7 @@ import { PALETTE } from "../messages/markdownPalette.ts";
 const MIN_COLUMN_WIDTH = 3;
 const SAFETY_MARGIN = 4;
 const LEFT_PADDING = 2;
-const BORDER_CHARS_PER_COL = 3; // "│ " + " " for padding inside each cell
+const _BORDER_CHARS_PER_COL = 3; // "│ " + " " for padding inside each cell
 const MAX_ROW_LINES = 4;
 
 type CellAlign = "left" | "center" | "right";
@@ -171,7 +171,7 @@ export function InlineTable({ lines }: Props) {
     } else {
       const scale = availableWidth / naturalTotal;
       finalWidths = naturalWidths.map((w) => Math.max(MIN_COLUMN_WIDTH, Math.floor(w * scale)));
-      let actualTotal = finalWidths.reduce((a, b) => a + b, 0);
+      const actualTotal = finalWidths.reduce((a, b) => a + b, 0);
       if (actualTotal < availableWidth) {
         let widestIdx = 0;
         for (let i = 1; i < finalWidths.length; i++) {
@@ -183,7 +183,9 @@ export function InlineTable({ lines }: Props) {
 
     // Vertical fallback when cells would wrap past MAX_ROW_LINES
     const needsVerticalFallback = rows.some((row) =>
-      row.some((cell, c) => wrapCellText(cell, finalWidths[c] ?? MIN_COLUMN_WIDTH).length > MAX_ROW_LINES),
+      row.some(
+        (cell, c) => wrapCellText(cell, finalWidths[c] ?? MIN_COLUMN_WIDTH).length > MAX_ROW_LINES,
+      ),
     );
 
     if (needsVerticalFallback && headerIdx >= 0) {
@@ -230,7 +232,7 @@ export function InlineTable({ lines }: Props) {
           const width = finalWidths[c] ?? MIN_COLUMN_WIDTH;
           // Headers always center, data rows use alignment from separator
           const align: CellAlign = isHeader ? "center" : colAlign[c]!;
-          rowText += " " + padAligned(cellLine, width, align) + " " + BOX.vert;
+          rowText += ` ${padAligned(cellLine, width, align)} ${BOX.vert}`;
         }
         tableLines.push({ text: rowText, bold: isHeader, kind: "row" });
       }
@@ -249,7 +251,13 @@ export function InlineTable({ lines }: Props) {
   if (!rendered) return null;
 
   if (rendered.mode === "vertical") {
-    return <VerticalKeyValue rows={rendered.rows} headerIdx={rendered.headerIdx} maxWidth={rendered.maxWidth} />;
+    return (
+      <VerticalKeyValue
+        rows={rendered.rows}
+        headerIdx={rendered.headerIdx}
+        maxWidth={rendered.maxWidth}
+      />
+    );
   }
 
   return (
@@ -261,7 +269,12 @@ export function InlineTable({ lines }: Props) {
         const isBorder = line.kind === "border";
         const isHeader = line.bold;
         return (
-          <Text key={i} bold={isHeader} color={isHeader ? PALETTE.mustard : undefined} dimColor={isBorder}>
+          <Text
+            key={i}
+            bold={isHeader}
+            color={isHeader ? PALETTE.mustard : undefined}
+            dimColor={isBorder}
+          >
             {line.text}
           </Text>
         );
@@ -293,7 +306,11 @@ function VerticalKeyValue({
   return (
     <Box flexDirection="column" paddingLeft={LEFT_PADDING}>
       {dataRows.map((row, rowIdx) => (
-        <Box key={rowIdx} flexDirection="column" marginBottom={rowIdx < dataRows.length - 1 ? 1 : 0}>
+        <Box
+          key={rowIdx}
+          flexDirection="column"
+          marginBottom={rowIdx < dataRows.length - 1 ? 1 : 0}
+        >
           {row.map((cell, cellIdx) => {
             const label = headers[cellIdx] ?? "";
             const wrapped = wrapCellText(cell, maxWidth - labelWidth - 2);
@@ -302,7 +319,7 @@ function VerticalKeyValue({
                 {wrapped.map((line, lineIdx) => (
                   <Text key={lineIdx}>
                     {lineIdx === 0
-                      ? `${padRight(label + ":", labelWidth + 2)}${line}`
+                      ? `${padRight(`${label}:`, labelWidth + 2)}${line}`
                       : `${" ".repeat(labelWidth + 2)}${line}`}
                   </Text>
                 ))}

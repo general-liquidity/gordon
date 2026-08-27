@@ -40,7 +40,9 @@ const RADAR_PATTERNS = new Set<LmwPattern>(["HS", "IHS", "DTOP", "DBOT"]);
 // Last-fired timestamp per `${symbol}:${pattern}`. Cleared on producer unregister.
 const lastFiredAt = new Map<string, number>();
 
-export const chartPatternProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
+export const chartPatternProducer: CandidateProducer = async (
+  obs,
+): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop" || obs.eventType !== "tick_chart_pattern") return [];
 
   const symbols = await resolveMonitoredSymbols();
@@ -53,7 +55,7 @@ export const chartPatternProducer: CandidateProducer = async (obs): Promise<Proa
       if (candles.length < 40) return null;
       const closes = candles.map((c) => c.close);
 
-      let detection;
+      let detection: ReturnType<typeof detectLmwPatterns>;
       try {
         detection = detectLmwPatterns(closes);
       } catch (err) {

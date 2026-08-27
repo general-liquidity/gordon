@@ -946,14 +946,14 @@ import type { MastraExecutionContext } from "./types.ts";
 import { withValidation, TOOL_VALIDATION_CONFIG } from "./runtime/flow/validation.ts";
 import { withTimeout, TOOL_TIMEOUT_CONFIG } from "./runtime/rate/timeout.ts";
 import { withRateLimit, TOOL_RATE_LIMITS } from "./runtime/rate/rate-limiter.ts";
-import { translateError, createErrorResponse } from "./runtime/flow/error-translator.ts";
+import { createErrorResponse } from "./runtime/flow/error-translator.ts";
 
 /**
  * Tool executor function signature
  */
 type ToolExecutor<TInput, TOutput> = (
   input: TInput,
-  context?: MastraExecutionContext
+  context?: MastraExecutionContext,
 ) => Promise<TOutput>;
 
 /**
@@ -997,7 +997,7 @@ export interface EnhancedToolOptions {
 export function withEnhancements<TInput extends Record<string, unknown>, TOutput>(
   toolName: string,
   executor: ToolExecutor<TInput, TOutput>,
-  options: EnhancedToolOptions = {}
+  options: EnhancedToolOptions = {},
 ): ToolExecutor<TInput, TOutput | { error: string; [key: string]: unknown }> {
   const {
     enableValidation = toolName in TOOL_VALIDATION_CONFIG,
@@ -1007,7 +1007,8 @@ export function withEnhancements<TInput extends Record<string, unknown>, TOutput
   } = options;
 
   // Start with the original executor
-  let enhanced: ToolExecutor<TInput, TOutput | { error: string; [key: string]: unknown }> = executor;
+  let enhanced: ToolExecutor<TInput, TOutput | { error: string; [key: string]: unknown }> =
+    executor;
 
   // Apply timeout handling (innermost wrapper that affects execution)
   if (enableTimeout) {
@@ -1032,7 +1033,7 @@ export function withEnhancements<TInput extends Record<string, unknown>, TOutput
     const withErrorTranslation = enhanced;
     enhanced = async function errorTranslatedExecutor(
       input: TInput,
-      context?: MastraExecutionContext
+      context?: MastraExecutionContext,
     ): Promise<TOutput | { error: string; [key: string]: unknown }> {
       try {
         return await withErrorTranslation(input, context);
@@ -1111,7 +1112,7 @@ export const TOOL_ENHANCEMENT_CATEGORIES = {
  */
 export function shouldEnhanceTool(
   toolName: string,
-  enhancement: keyof typeof TOOL_ENHANCEMENT_CATEGORIES
+  enhancement: keyof typeof TOOL_ENHANCEMENT_CATEGORIES,
 ): boolean {
   const category = TOOL_ENHANCEMENT_CATEGORIES[enhancement] as readonly string[];
   return category.includes(toolName);

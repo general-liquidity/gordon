@@ -28,7 +28,11 @@ export type StrategyBias =
   | "neutral"
   | "mild_mean_reversion"
   | "strong_mean_reversion";
-export type FavoredStrategy = "momentum_long" | "momentum_short" | "mean_reversion_long" | "mean_reversion_short";
+export type FavoredStrategy =
+  | "momentum_long"
+  | "momentum_short"
+  | "mean_reversion_long"
+  | "mean_reversion_short";
 
 export interface SymbolSnapshot {
   symbol: string;
@@ -89,7 +93,9 @@ export function classifyMarketBreadth(input: MarketBreadthInput): MarketBreadthB
   const cap = input.breadthCap ?? 0.1;
 
   // Direction: magnitude-weighted net breadth, bounded so one outlier can't swing it.
-  const breadthScore = mean(syms.map((s) => Math.sign(s.return) * Math.min(Math.abs(s.return) / cap, 1)));
+  const breadthScore = mean(
+    syms.map((s) => Math.sign(s.return) * Math.min(Math.abs(s.return) / cap, 1)),
+  );
 
   // Strategy: trend-cleanliness across the significant movers (fall back to the
   // whole universe when nothing has moved enough to be a mover yet).
@@ -107,7 +113,10 @@ export function classifyMarketBreadth(input: MarketBreadthInput): MarketBreadthB
   const strategy = strategyTier(trendScore);
 
   const sampleFactor = Math.min(1, syms.length / 20);
-  const conviction = Math.min(1, ((Math.abs(breadthScore) + Math.abs(trendScore - 0.5) * 2) / 2) * sampleFactor);
+  const conviction = Math.min(
+    1,
+    ((Math.abs(breadthScore) + Math.abs(trendScore - 0.5) * 2) / 2) * sampleFactor,
+  );
 
   // Favored strategy-types from the grid: a clear lean on an axis selects it; an
   // ambiguous (neutral) axis keeps both sides of the axis that IS clear.
@@ -115,7 +124,8 @@ export function classifyMarketBreadth(input: MarketBreadthInput): MarketBreadthB
   const strat = trendScore > 0.55 ? "momentum" : trendScore < 0.45 ? "mean_reversion" : null;
   let favored: FavoredStrategy[] = [];
   if (dir && strat) favored = [`${strat}_${dir}` as FavoredStrategy];
-  else if (dir && !strat) favored = [`momentum_${dir}`, `mean_reversion_${dir}`] as FavoredStrategy[];
+  else if (dir && !strat)
+    favored = [`momentum_${dir}`, `mean_reversion_${dir}`] as FavoredStrategy[];
   else if (!dir && strat) favored = [`${strat}_long`, `${strat}_short`] as FavoredStrategy[];
 
   const summary =

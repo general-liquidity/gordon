@@ -25,18 +25,15 @@ import {
 // ============================================================================
 
 const inputSchema = z.object({
-  strategyId: z
-    .string()
-    .describe("ID of the strategy to improve"),
+  strategyId: z.string().describe("ID of the strategy to improve"),
   feedback: z
     .string()
     .min(10)
     .max(500)
-    .describe("Feedback on what to improve (e.g., 'improve win rate', 'reduce drawdown', 'add RSI filter')"),
-  symbol: z
-    .string()
-    .default("BTCUSDT")
-    .describe("Trading symbol to use for backtesting"),
+    .describe(
+      "Feedback on what to improve (e.g., 'improve win rate', 'reduce drawdown', 'add RSI filter')",
+    ),
+  symbol: z.string().default("BTCUSDT").describe("Trading symbol to use for backtesting"),
   backtestDays: z
     .number()
     .min(7)
@@ -184,7 +181,7 @@ export const strategyIterateTool = createTool({
           timeframes: existingStrategy.timeframes,
           backtestDays: input.backtestDays,
           symbol: normalizedSymbol,
-        }
+        },
       );
 
       // Save the improved strategy
@@ -220,7 +217,9 @@ export const strategyIterateTool = createTool({
         const drawdownImproved = newMetrics.maxDrawdown < previousMetrics.maxDrawdown;
 
         // Consider improved if majority of key metrics improved
-        const improvementCount = [sharpeImproved, returnImproved, drawdownImproved].filter(Boolean).length;
+        const improvementCount = [sharpeImproved, returnImproved, drawdownImproved].filter(
+          Boolean,
+        ).length;
         improved = improvementCount >= 2;
       }
 

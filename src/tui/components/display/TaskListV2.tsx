@@ -1,6 +1,5 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
-import { type BackgroundTaskData } from "../status/BackgroundTask.tsx";
+import type { BackgroundTaskData } from "../status/BackgroundTask.tsx";
 
 // ============================================================================
 // TaskListV2 — Compact embeddable task list (no keyboard handling)
@@ -12,9 +11,8 @@ import { type BackgroundTaskData } from "../status/BackgroundTask.tsx";
 
 interface Props {
   tasks: BackgroundTaskData[];
-  maxVisible?: number;          // default 5
+  maxVisible?: number; // default 5
   filter?: "all" | "running" | "completed";
-  onSelect?: (task: BackgroundTaskData) => void;
 }
 
 const STATUS_ICONS: Record<BackgroundTaskData["status"], string> = {
@@ -52,12 +50,7 @@ function formatElapsed(startedAt: number): string {
   return `${seconds}s`;
 }
 
-export function TaskListV2({
-  tasks,
-  maxVisible = 5,
-  filter = "all",
-  onSelect,
-}: Props) {
+export function TaskListV2({ tasks, maxVisible = 5, filter = "all" }: Props) {
   const filtered = tasks.filter((t) => {
     if (filter === "running") return t.status === "running";
     if (filter === "completed") return t.status === "completed";
@@ -70,7 +63,7 @@ export function TaskListV2({
   if (visible.length === 0) {
     return (
       <Box paddingLeft={1}>
-        <Text dimColor>No {filter === "all" ? "" : filter + " "}tasks.</Text>
+        <Text dimColor>No {filter === "all" ? "" : `${filter} `}tasks.</Text>
       </Box>
     );
   }
@@ -83,17 +76,12 @@ export function TaskListV2({
         const typeLabel = TYPE_LABELS[task.type];
 
         const elapsed =
-          task.startedAt &&
-          (task.status === "running" || task.status === "paused")
+          task.startedAt && (task.status === "running" || task.status === "paused")
             ? formatElapsed(task.startedAt)
             : null;
 
         return (
-          <Box
-            key={task.id}
-            flexDirection="row"
-            gap={1}
-          >
+          <Box key={task.id} flexDirection="row" gap={1}>
             <Text color={color}>{icon}</Text>
             <Text bold>{task.label.slice(0, 32).padEnd(33)}</Text>
             <Text color={color}>{task.status}</Text>
@@ -109,7 +97,9 @@ export function TaskListV2({
       })}
       {hiddenCount > 0 && (
         <Box paddingLeft={1}>
-          <Text dimColor>...and {hiddenCount} more task{hiddenCount !== 1 ? "s" : ""}</Text>
+          <Text dimColor>
+            ...and {hiddenCount} more task{hiddenCount !== 1 ? "s" : ""}
+          </Text>
         </Box>
       )}
     </Box>

@@ -27,7 +27,13 @@
 export type DirectProviderName = "anthropic" | "openai" | "google" | "xai";
 
 /** Hosted gateways natively in the Mastra 1.5.0 catalogue (prefix-routed). */
-export type GatewayName = "openrouter" | "huggingface" | "togetherai" | "fireworks-ai" | "siliconflow" | "deepinfra";
+export type GatewayName =
+  | "openrouter"
+  | "huggingface"
+  | "togetherai"
+  | "fireworks-ai"
+  | "siliconflow"
+  | "deepinfra";
 
 /**
  * Provider routing is PASS-THROUGH: any `provider/model` string the operator
@@ -115,9 +121,20 @@ const GATEWAY_PROVIDERS: readonly GatewayName[] = ["openrouter", "huggingface"];
  * is pass-through and forwards any well-formed `provider/model` string.
  */
 export const KNOWN_PROVIDER_IDS: readonly string[] = [
-  "anthropic", "openai", "google", "xai",
-  "openrouter", "huggingface", "togetherai", "fireworks-ai", "siliconflow", "deepinfra",
-  "ollama", "lmstudio", "local", "custom",
+  "anthropic",
+  "openai",
+  "google",
+  "xai",
+  "openrouter",
+  "huggingface",
+  "togetherai",
+  "fireworks-ai",
+  "siliconflow",
+  "deepinfra",
+  "ollama",
+  "lmstudio",
+  "local",
+  "custom",
 ];
 
 /**
@@ -147,7 +164,10 @@ export const DIRECT_MODELS = {
     balanced: "grok-4.5",
     fast: "grok-4.3",
   },
-} as const satisfies Record<DirectProviderName, { flagship: string; balanced: string; fast: string }>;
+} as const satisfies Record<
+  DirectProviderName,
+  { flagship: string; balanced: string; fast: string }
+>;
 
 const DIRECT_API_KEY_ENV: Record<DirectProviderName, string> = {
   openai: "OPENAI_API_KEY",
@@ -207,10 +227,10 @@ function splitModelString(modelId: string): { prefix?: string; rawModelId: strin
  * model with a separate provider hint.
  */
 function canonicalSpec(provider: string | undefined, model: string | undefined): string {
-  if (model && model.includes("/")) {
+  if (model?.includes("/")) {
     return model;
   }
-  if (model && model.includes(":")) {
+  if (model?.includes(":")) {
     const idx = model.indexOf(":");
     return `${model.slice(0, idx)}/${model.slice(idx + 1)}`;
   }
@@ -285,7 +305,8 @@ export class ProviderRegistry {
     const fullModelId = spec as ModelString;
     const apiKeyEnvVar = isDirectProviderName(prefix)
       ? DIRECT_API_KEY_ENV[prefix]
-      : (GATEWAY_API_KEY_ENV as Record<string, string>)[prefix] ?? `${prefix.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}_API_KEY`;
+      : ((GATEWAY_API_KEY_ENV as Record<string, string>)[prefix] ??
+        `${prefix.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}_API_KEY`);
 
     return {
       modelString: fullModelId,
@@ -299,7 +320,10 @@ export class ProviderRegistry {
     };
   }
 
-  private getRouteForSelection(provider: string | undefined, modelId: string | undefined): ModelRoute {
+  private getRouteForSelection(
+    provider: string | undefined,
+    modelId: string | undefined,
+  ): ModelRoute {
     return this.routeForSpec(canonicalSpec(provider, modelId));
   }
 
@@ -309,7 +333,7 @@ export class ProviderRegistry {
     const rawProvider = process.env.GORDON_PROVIDER;
     const rawModel = process.env.GORDON_MODEL;
 
-    if (rawModel && rawModel.includes("/")) {
+    if (rawModel?.includes("/")) {
       return this.routeForSpec(rawModel);
     }
 
@@ -330,11 +354,11 @@ export class ProviderRegistry {
       }
       throw new Error(
         "No LLM provider configured. Set one of these API keys in your .env file:\n" +
-        "  ANTHROPIC_API_KEY - Anthropic Claude\n" +
-        "  OPENAI_API_KEY    - OpenAI GPT\n" +
-        "  GOOGLE_GENERATIVE_AI_API_KEY - Google Gemini\n" +
-        "  XAI_API_KEY       - xAI Grok\n" +
-        "  OPENROUTER_API_KEY / HF_TOKEN - gateways",
+          "  ANTHROPIC_API_KEY - Anthropic Claude\n" +
+          "  OPENAI_API_KEY    - OpenAI GPT\n" +
+          "  GOOGLE_GENERATIVE_AI_API_KEY - Google Gemini\n" +
+          "  XAI_API_KEY       - xAI Grok\n" +
+          "  OPENROUTER_API_KEY / HF_TOKEN - gateways",
       );
     }
 
@@ -357,7 +381,9 @@ export class ProviderRegistry {
    */
   getDirectClientRoute(provider?: string, modelId?: string): ModelRoute {
     this.initializeFromEnv();
-    return provider || modelId ? this.getRouteForSelection(provider, modelId) : this.getDefaultRoute();
+    return provider || modelId
+      ? this.getRouteForSelection(provider, modelId)
+      : this.getDefaultRoute();
   }
 
   isModelAvailable(modelId: ModelString): boolean {
@@ -386,9 +412,8 @@ export class ProviderRegistry {
   getMastraModel(provider?: string, modelId?: string): MastraModelConfig {
     this.initializeFromEnv();
 
-    const route = provider || modelId
-      ? this.getRouteForSelection(provider, modelId)
-      : this.getDefaultRoute();
+    const route =
+      provider || modelId ? this.getRouteForSelection(provider, modelId) : this.getDefaultRoute();
 
     if (route.viaLocalHost && route.baseUrl) {
       const spec: MastraOpenAICompatibleModelConfig = {
@@ -412,7 +437,9 @@ export class ProviderRegistry {
 
   getFastModel(): ModelString {
     this.initializeFromEnv();
-    const provider = this.tierProvider(process.env.GORDON_FAST_PROVIDER || process.env.GORDON_PROVIDER);
+    const provider = this.tierProvider(
+      process.env.GORDON_FAST_PROVIDER || process.env.GORDON_PROVIDER,
+    );
     if (!provider) return this.getDefaultModel();
     const model = process.env.GORDON_FAST_MODEL || DIRECT_MODELS[provider].fast;
     return this.getModel(provider, model);
@@ -427,7 +454,9 @@ export class ProviderRegistry {
 
   getFastMastraModel(): MastraModelConfig {
     this.initializeFromEnv();
-    const provider = this.tierProvider(process.env.GORDON_FAST_PROVIDER || process.env.GORDON_PROVIDER);
+    const provider = this.tierProvider(
+      process.env.GORDON_FAST_PROVIDER || process.env.GORDON_PROVIDER,
+    );
     if (!provider) return this.getMastraModel();
     const model = process.env.GORDON_FAST_MODEL || DIRECT_MODELS[provider].fast;
     return this.getMastraModel(provider, model);

@@ -7,7 +7,6 @@
  * Pattern: Claude Code health dashboard with service status indicators.
  */
 
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 import { ProgressBar } from "../../design-system/ProgressBar.js";
@@ -105,18 +104,43 @@ export function DataSourceHealth({ sources, onClose }: Props) {
 
       {/* Column headers */}
       <Box paddingLeft={2}>
-        <Box width={16}><Text bold dimColor>SOURCE</Text></Box>
-        <Box width={10}><Text bold dimColor>TYPE</Text></Box>
-        <Box width={10}><Text bold dimColor>STATUS</Text></Box>
-        <Box width={10}><Text bold dimColor>LATENCY</Text></Box>
-        <Box width={16}><Text bold dimColor>CACHE HIT</Text></Box>
-        <Box width={10}><Text bold dimColor>UPDATED</Text></Box>
+        <Box width={16}>
+          <Text bold dimColor>
+            SOURCE
+          </Text>
+        </Box>
+        <Box width={10}>
+          <Text bold dimColor>
+            TYPE
+          </Text>
+        </Box>
+        <Box width={10}>
+          <Text bold dimColor>
+            STATUS
+          </Text>
+        </Box>
+        <Box width={10}>
+          <Text bold dimColor>
+            LATENCY
+          </Text>
+        </Box>
+        <Box width={16}>
+          <Text bold dimColor>
+            CACHE HIT
+          </Text>
+        </Box>
+        <Box width={10}>
+          <Text bold dimColor>
+            UPDATED
+          </Text>
+        </Box>
       </Box>
 
       {/* Source rows */}
       {sources.map((source) => {
         const st = statusConfig(source.status);
-        const cacheColor = source.cacheHitRate >= 0.9 ? "green" : source.cacheHitRate >= 0.7 ? "yellow" : "red";
+        const cacheColor =
+          source.cacheHitRate >= 0.9 ? "green" : source.cacheHitRate >= 0.7 ? "yellow" : "red";
 
         return (
           <Box key={source.name} paddingLeft={2}>
@@ -124,12 +148,12 @@ export function DataSourceHealth({ sources, onClose }: Props) {
               <Text bold>{padRight(source.name, 16)}</Text>
             </Box>
             <Box width={10}>
-              <Text color={typeColor(source.type)}>
-                {padRight(source.type.toUpperCase(), 10)}
-              </Text>
+              <Text color={typeColor(source.type)}>{padRight(source.type.toUpperCase(), 10)}</Text>
             </Box>
             <Box width={10}>
-              <Text color={st.color}>{st.icon} {st.label}</Text>
+              <Text color={st.color}>
+                {st.icon} {st.label}
+              </Text>
             </Box>
             <Box width={10}>
               <Text color={latencyColor(source.latencyMs)}>

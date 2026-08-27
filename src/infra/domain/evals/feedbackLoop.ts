@@ -10,7 +10,7 @@
  */
 
 import { createModuleLogger } from "../../logger/index.ts";
-import { getTrade, listTrades } from "../../storage/entities/trades.ts";
+import { listTrades } from "../../storage/entities/trades.ts";
 import { getPlan } from "../../storage/entities/plans.ts";
 import type { Trade, Plan } from "../../../types/index.ts";
 import {
@@ -74,7 +74,7 @@ export interface LearningInsights {
  */
 export function recordTradeClose(
   trade: Trade,
-  marketCondition?: "trending" | "ranging" | "volatile" | "unknown"
+  marketCondition?: "trending" | "ranging" | "volatile" | "unknown",
 ): TradeOutcome | null {
   if (trade.status !== "CLOSED") {
     logger.warn("Cannot record outcome for non-closed trade", { tradeId: trade.id });
@@ -90,9 +90,11 @@ export function recordTradeClose(
 
   // Calculate metrics
   const entryPrice = trade.averageEntry;
-  const exitPrice = trade.exits.length > 0
-    ? trade.exits.reduce((sum, e) => sum + e.price * e.quantity, 0) / trade.exits.reduce((sum, e) => sum + e.quantity, 0)
-    : trade.averageEntry;
+  const exitPrice =
+    trade.exits.length > 0
+      ? trade.exits.reduce((sum, e) => sum + e.price * e.quantity, 0) /
+        trade.exits.reduce((sum, e) => sum + e.quantity, 0)
+      : trade.averageEntry;
   const firstTakeProfit = plan.takeProfit[0];
   const targetPrice = firstTakeProfit ? firstTakeProfit.price : entryPrice * 1.1;
   const stopLossPrice = plan.stopLoss.price;
@@ -167,7 +169,7 @@ export function trackPlanRecommendation(
     confidenceAtEntry?: number;
     marketCondition?: "trending" | "ranging" | "volatile" | "unknown";
     timeframe?: string;
-  }
+  },
 ): TradeRecommendation {
   const entryPrice = plan.entry.price || 0;
   const firstTP = plan.takeProfit[0];
@@ -292,7 +294,9 @@ export function formatPerformanceContextForPrompt(context: PerformanceContext): 
   const lines: string[] = [];
   lines.push("");
   lines.push("## Recent Performance Context");
-  lines.push(`- Win Rate (last ${context.totalRecentTrades} trades): ${Math.round(context.winRateLast20 * 100)}%`);
+  lines.push(
+    `- Win Rate (last ${context.totalRecentTrades} trades): ${Math.round(context.winRateLast20 * 100)}%`,
+  );
 
   if (context.bestPerformingSetups.length > 0) {
     lines.push(`- Best performing setups: ${context.bestPerformingSetups.join(", ")}`);
@@ -315,7 +319,8 @@ export function formatPerformanceContextForPrompt(context: PerformanceContext): 
   }
 
   if (context.confidenceAdjustment !== 0) {
-    const direction = context.confidenceAdjustment > 0 ? "Slightly more confident" : "Slightly more cautious";
+    const direction =
+      context.confidenceAdjustment > 0 ? "Slightly more confident" : "Slightly more cautious";
     lines.push(`- Confidence adjustment: ${direction} based on recent results`);
   }
 
@@ -425,7 +430,9 @@ export function formatLearningInsights(insights: LearningInsights): string {
     lines.push("TOP PERFORMING STRATEGIES");
     lines.push("-".repeat(50));
     for (const strat of insights.topStrategies) {
-      lines.push(`  ${strat.strategy}: ${Math.round(strat.winRate * 100)}% win rate (${strat.trades} trades)`);
+      lines.push(
+        `  ${strat.strategy}: ${Math.round(strat.winRate * 100)}% win rate (${strat.trades} trades)`,
+      );
     }
     lines.push("");
   }
@@ -434,7 +441,9 @@ export function formatLearningInsights(insights: LearningInsights): string {
     lines.push("STRATEGIES NEEDING REVIEW");
     lines.push("-".repeat(50));
     for (const strat of insights.weakStrategies) {
-      lines.push(`  ${strat.strategy}: ${Math.round(strat.winRate * 100)}% win rate (${strat.trades} trades)`);
+      lines.push(
+        `  ${strat.strategy}: ${Math.round(strat.winRate * 100)}% win rate (${strat.trades} trades)`,
+      );
     }
     lines.push("");
   }

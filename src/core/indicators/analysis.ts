@@ -17,9 +17,9 @@ export function calculateTechnicalAnalysis(
   candles: Candle[],
   symbol: string,
   interval: string,
-  atrMultiplier: number = 1.5
+  atrMultiplier: number = 1.5,
 ): TechnicalAnalysis {
-  const closes = candles.map(c => c.close);
+  const closes = candles.map((c) => c.close);
   const currentPrice = closes[closes.length - 1]!;
 
   // Calculate all indicators
@@ -59,11 +59,8 @@ export function calculateTechnicalAnalysis(
 /**
  * Calculate quick technical signals for scanner
  */
-export function calculateTechnicalSignals(
-  candles: Candle[],
-  symbol: string
-): TechnicalSignals {
-  const closes = candles.map(c => c.close);
+export function calculateTechnicalSignals(candles: Candle[], symbol: string): TechnicalSignals {
+  const closes = candles.map((c) => c.close);
   const currentPrice = closes[closes.length - 1]!;
 
   const rsi = calculateRSI(closes);
@@ -99,7 +96,7 @@ function calculateBiasScore(
   rsi: ReturnType<typeof calculateRSI>,
   ema: ReturnType<typeof calculateMultiEMA>,
   macd: ReturnType<typeof calculateMACD>,
-  bollinger: ReturnType<typeof calculateBollingerBands>
+  bollinger: ReturnType<typeof calculateBollingerBands>,
 ): number {
   let score = 0;
 
@@ -154,9 +151,9 @@ export function getBias(score: number): TechnicalAnalysis["bias"] {
 function getConfidence(
   rsi: ReturnType<typeof calculateRSI>,
   ema: ReturnType<typeof calculateMultiEMA>,
-  macd: ReturnType<typeof calculateMACD>
+  macd: ReturnType<typeof calculateMACD>,
 ): "high" | "medium" | "low" {
-  let agreements = 0;
+  const _agreements = 0;
 
   // Check if indicators agree
   const rsiBullish = rsi.current !== null && rsi.current < 50;
@@ -167,15 +164,18 @@ function getConfidence(
   const emaBearish = ema.alignment === "bearish" || ema.pricePosition === "below_all";
   const macdBearish = macd.trend === "bearish";
 
-  if ((rsiBullish && emaBullish && macdBullish) ||
-      (rsiBearish && emaBearish && macdBearish)) {
+  if ((rsiBullish && emaBullish && macdBullish) || (rsiBearish && emaBearish && macdBearish)) {
     return "high";
   }
 
-  if ((rsiBullish && emaBullish) || (rsiBullish && macdBullish) ||
-      (emaBullish && macdBullish) ||
-      (rsiBearish && emaBearish) || (rsiBearish && macdBearish) ||
-      (emaBearish && macdBearish)) {
+  if (
+    (rsiBullish && emaBullish) ||
+    (rsiBullish && macdBullish) ||
+    (emaBullish && macdBullish) ||
+    (rsiBearish && emaBearish) ||
+    (rsiBearish && macdBearish) ||
+    (emaBearish && macdBearish)
+  ) {
     return "medium";
   }
 
@@ -190,7 +190,7 @@ function generateSummary(
   ema: ReturnType<typeof calculateMultiEMA>,
   macd: ReturnType<typeof calculateMACD>,
   bollinger: ReturnType<typeof calculateBollingerBands>,
-  bias: TechnicalAnalysis["bias"]
+  bias: TechnicalAnalysis["bias"],
 ): string {
   const parts: string[] = [];
 
@@ -238,7 +238,7 @@ function generateSignals(
   ema: ReturnType<typeof calculateMultiEMA>,
   macd: ReturnType<typeof calculateMACD>,
   bollinger: ReturnType<typeof calculateBollingerBands>,
-  score: number
+  score: number,
 ): TechnicalAnalysis["signals"] {
   const reasons: string[] = [];
 

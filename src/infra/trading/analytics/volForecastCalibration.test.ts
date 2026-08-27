@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { _internals } from "./volForecastCalibration.ts";
 
 const { computeMetrics } = _internals;
@@ -96,12 +96,7 @@ describe("computeMetrics — R² interpretation", () => {
 
 describe("computeMetrics — meanRealized field", () => {
   test("returns the mean of realized values", () => {
-    const m = computeMetrics(
-      [0.02, 0.03, 0.04],
-      [0.01, 0.02, 0.03],
-      "2026-01-01",
-      "2026-01-31",
-    );
+    const m = computeMetrics([0.02, 0.03, 0.04], [0.01, 0.02, 0.03], "2026-01-01", "2026-01-31");
     expect(m.meanRealized).toBeCloseTo(0.02, 5);
   });
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 import { ProgressBar } from "../../design-system/ProgressBar.js";
@@ -33,10 +33,10 @@ interface Props {
 }
 
 const STATUS_CONFIG: Record<SkillRunStatus, { icon: string; color: string }> = {
-  running:   { icon: "\u25CF", color: "cyanBright" },
+  running: { icon: "\u25CF", color: "cyanBright" },
   completed: { icon: "\u2713", color: "green" },
-  failed:    { icon: "\u2717", color: "red" },
-  paused:    { icon: "\u25C8", color: "yellow" },
+  failed: { icon: "\u2717", color: "red" },
+  paused: { icon: "\u25C8", color: "yellow" },
 };
 
 function elapsed(startedAt: number, completedAt?: number): string {
@@ -90,9 +90,15 @@ export function SkillExecutionViewer({ runs, onCancel, onClose }: Props) {
               </Text>
               <Text color={cfg.color}>{cfg.icon} </Text>
               <Text bold>{run.skillName}</Text>
-              <Text dimColor> {"\u00b7"} {elapsed(run.startedAt, run.completedAt)}</Text>
+              <Text dimColor>
+                {" "}
+                {"\u00b7"} {elapsed(run.startedAt, run.completedAt)}
+              </Text>
               {run.iterations != null && run.maxIterations != null && (
-                <Text dimColor> {"\u00b7"} cycle {run.iterations}/{run.maxIterations}</Text>
+                <Text dimColor>
+                  {" "}
+                  {"\u00b7"} cycle {run.iterations}/{run.maxIterations}
+                </Text>
               )}
             </Box>
 

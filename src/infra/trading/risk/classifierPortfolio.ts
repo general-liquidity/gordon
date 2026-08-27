@@ -28,15 +28,23 @@ export async function buildClassifierPortfolioContext(
           };
         }),
         dailyPnlUsd: live.todayPnL,
-        dailyLossLimitUsd:
-          (ctx.config?.riskManagement?.maxDailyLossPercent ?? 2) * total * 0.01,
+        dailyLossLimitUsd: (ctx.config?.riskManagement?.maxDailyLossPercent ?? 2) * total * 0.01,
         maxDrawdownPct: ctx.config?.riskManagement?.maxDrawdownPercent ?? 10,
         currentDrawdownPct: live.currentDrawdown,
+        // The daily tracker is the only source here. Using its count as the
+        // hourly value is a conservative upper bound; preserve the actual
+        // daily count separately so constitution checks do not invent `* 3`.
         recentTradeCount: live.todayTradeCount,
+        todayTradeCount: live.todayTradeCount,
         tradedSymbols: new Set(live.openPositions.map((p) => p.symbol)),
       };
-    } catch {
-      // fall through to context fields
+    } catch (error) {
+      // A live venue was explicitly supplied, so stale context fields and the
+      // synthetic 100k/50k defaults are not a safe substitute. Empty
+      // positions would make every concentration check look clean.
+      throw new Error("Live portfolio context is unavailable; refusing degraded risk scoring", {
+        cause: error,
+      });
     }
   }
 
@@ -53,6 +61,7 @@ export async function buildClassifierPortfolioContext(
     maxDrawdownPct: ctx?.config?.riskManagement?.maxDrawdownPercent ?? 10,
     currentDrawdownPct: 0,
     recentTradeCount: 0,
+    todayTradeCount: 0,
     tradedSymbols: new Set<string>(),
   };
 }

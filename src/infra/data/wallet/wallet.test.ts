@@ -16,9 +16,14 @@ describe("wallet intelligence adapter", () => {
   const sources = walletIntelSources();
 
   it("registers the six providers with distinct ids + priorities", () => {
-    expect(sources.map((s) => s.id).sort()).toEqual(
-      ["arkham", "covalent", "debank", "moralis", "nansen", "zerion"],
-    );
+    expect(sources.map((s) => s.id).sort()).toEqual([
+      "arkham",
+      "covalent",
+      "debank",
+      "moralis",
+      "nansen",
+      "zerion",
+    ]);
     expect(new Set(sources.map((s) => s.priority)).size).toBe(sources.length);
   });
 
@@ -32,8 +37,9 @@ describe("wallet intelligence adapter", () => {
         }
       }
       // At least one capability is declared.
-      const anyCap = (Object.keys(CAP_TO_METHOD) as Array<keyof typeof CAP_TO_METHOD>)
-        .some((k) => caps[k]);
+      const anyCap = (Object.keys(CAP_TO_METHOD) as Array<keyof typeof CAP_TO_METHOD>).some(
+        (k) => caps[k],
+      );
       expect(anyCap).toBeTrue();
     }
   });

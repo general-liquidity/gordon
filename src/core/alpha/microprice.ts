@@ -123,11 +123,7 @@ function clampIndex(idx: number, n: number): number {
  * i to bucket (N-1-i) — useful for the data-symmetrization trick from
  * the paper.
  */
-export function imbalanceBucket(
-  bidVolume: number,
-  askVolume: number,
-  numBuckets: number,
-): number {
+export function imbalanceBucket(bidVolume: number, askVolume: number, numBuckets: number): number {
   const total = bidVolume + askVolume;
   if (total <= 0) return Math.floor(numBuckets / 2);
   const imbalance = bidVolume / total; // 0..1
@@ -150,11 +146,7 @@ export function spreadBucket(
   return clampIndex(ticks, maxSpreadTicks);
 }
 
-function stateIndex(
-  imbalanceBucket: number,
-  spreadBucket: number,
-  numImbalance: number,
-): number {
+function stateIndex(imbalanceBucket: number, spreadBucket: number, numImbalance: number): number {
   return spreadBucket * numImbalance + imbalanceBucket;
 }
 
@@ -224,9 +216,7 @@ function solveMatrixSystem(
   const n = Q.length;
   if (n === 0 || RHS.length !== n) return null;
   // Build (I − Q).
-  const A: number[][] = Q.map((row, i) =>
-    row.map((q, j) => (i === j ? 1 - q : -q)),
-  );
+  const A: number[][] = Q.map((row, i) => row.map((q, j) => (i === j ? 1 - q : -q)));
   const cols = RHS[0]?.length ?? 0;
   if (cols === 0) return null;
   // Solve column-by-column.
@@ -257,7 +247,9 @@ interface TransitionMatrices {
 
 function estimateTransitions(
   snapshots: ReadonlyArray<BookSnapshot>,
-  config: Required<Pick<MicropriceConfig, "imbalanceBuckets" | "maxSpreadTicks" | "tickSize" | "outcomeTicks">>,
+  config: Required<
+    Pick<MicropriceConfig, "imbalanceBuckets" | "maxSpreadTicks" | "tickSize" | "outcomeTicks">
+  >,
 ): TransitionMatrices {
   const N = config.imbalanceBuckets * config.maxSpreadTicks;
   const K = config.outcomeTicks.length;
@@ -343,7 +335,12 @@ export function computeMicroprice(
   snapshots: ReadonlyArray<BookSnapshot>,
   config: MicropriceConfig,
 ): MicropriceResult {
-  const cfg: Required<Pick<MicropriceConfig, "imbalanceBuckets" | "maxSpreadTicks" | "tickSize" | "outcomeTicks" | "iterations">> = {
+  const cfg: Required<
+    Pick<
+      MicropriceConfig,
+      "imbalanceBuckets" | "maxSpreadTicks" | "tickSize" | "outcomeTicks" | "iterations"
+    >
+  > = {
     imbalanceBuckets: config.imbalanceBuckets ?? DEFAULT_MICROPRICE_CONFIG.imbalanceBuckets,
     maxSpreadTicks: config.maxSpreadTicks ?? DEFAULT_MICROPRICE_CONFIG.maxSpreadTicks,
     tickSize: config.tickSize,
@@ -390,13 +387,9 @@ export function computeMicroprice(
   // First compute R1·K (N-vector), then solve (I − Q) g1 = R1·K.
   const N = Q.length;
   const tickPrice = cfg.outcomeTicks.map((t) => t * cfg.tickSize);
-  const r1K = R1.map((row) =>
-    row.reduce((sum, p, k) => sum + p * tickPrice[k]!, 0),
-  );
+  const r1K = R1.map((row) => row.reduce((sum, p, k) => sum + p * tickPrice[k]!, 0));
 
-  const ImQ: number[][] = Q.map((row, i) =>
-    row.map((q, j) => (i === j ? 1 - q : -q)),
-  );
+  const ImQ: number[][] = Q.map((row, i) => row.map((q, j) => (i === j ? 1 - q : -q)));
   const g1 = solveLinearSystem(ImQ, r1K);
   if (!g1) {
     return {

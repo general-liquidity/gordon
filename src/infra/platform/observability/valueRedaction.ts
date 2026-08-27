@@ -116,8 +116,7 @@ const PATTERNS: ReadonlyArray<{
   // Capture group 1 is the secret value.
   {
     name: "hex64_keyed_secret",
-    pattern:
-      /(?:api[-_]?key|secret|token|apikey)["']?\s*[:=]\s*["']?([a-fA-F0-9]{64})["']?/gi,
+    pattern: /(?:api[-_]?key|secret|token|apikey)["']?\s*[:=]\s*["']?([a-fA-F0-9]{64})["']?/gi,
     strategy: "group1",
   },
   // Scoped account number — keyed on an account-name prefix. NO bare
@@ -220,11 +219,7 @@ export function redactDeep(value: unknown): unknown {
   return redactDeepInner(value, 0, new WeakSet());
 }
 
-function redactDeepInner(
-  value: unknown,
-  depth: number,
-  seen: WeakSet<object>,
-): unknown {
+function redactDeepInner(value: unknown, depth: number, seen: WeakSet<object>): unknown {
   if (depth > MAX_DEPTH) return "[REDACTED_DEPTH_LIMIT]";
   if (typeof value === "string") return redactString(value);
   if (typeof value !== "object" || value === null) return value;

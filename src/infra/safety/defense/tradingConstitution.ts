@@ -25,7 +25,6 @@ const logger = createModuleLogger("trading-constitution");
 // ============================================================================
 
 export const TRADING_CONSTITUTION = {
-
   // ── Layer 0: Absolute Hard Limits ──
 
   /** Max single position as % of portfolio. Market Wizards consensus. */
@@ -204,7 +203,6 @@ export const TRADING_CONSTITUTION = {
 
   /** After a halt, trading does not auto-resume. Manual reset required. */
   HALT_REQUIRES_MANUAL_RESET: true,
-
 } as const;
 
 // ============================================================================
@@ -513,7 +511,9 @@ export function checkConstitution(params: {
 
   // Stop distance
   if (params.stopDistancePct !== undefined) {
-    const maxStop = params.isCrypto ? C.MAX_STOP_DISTANCE_CRYPTO_PCT : C.MAX_STOP_DISTANCE_STOCKS_PCT;
+    const maxStop = params.isCrypto
+      ? C.MAX_STOP_DISTANCE_CRYPTO_PCT
+      : C.MAX_STOP_DISTANCE_STOCKS_PCT;
     if (params.stopDistancePct > maxStop) {
       violations.push({
         rule: "MAX_STOP_DISTANCE",
@@ -546,7 +546,10 @@ export function checkConstitution(params: {
   }
 
   // Correlated exposure
-  if (params.correlatedExposurePct && params.correlatedExposurePct > C.MAX_CORRELATED_EXPOSURE_PCT) {
+  if (
+    params.correlatedExposurePct &&
+    params.correlatedExposurePct > C.MAX_CORRELATED_EXPOSURE_PCT
+  ) {
     violations.push({
       rule: "MAX_CORRELATED_EXPOSURE_PCT",
       limit: C.MAX_CORRELATED_EXPOSURE_PCT,
@@ -617,7 +620,7 @@ export function passesConstitution(params: Parameters<typeof checkConstitution>[
 
   const severityOrder = { warning: 1, block: 2, halt: 3, emergency: 4 };
   const worstViolation = violations.reduce((worst, v) =>
-    severityOrder[v.severity] > severityOrder[worst.severity] ? v : worst
+    severityOrder[v.severity] > severityOrder[worst.severity] ? v : worst,
   );
   const worstSeverity = worstViolation.severity;
 
@@ -637,8 +640,8 @@ export function formatViolations(violations: ConstitutionViolation[]): string {
   if (violations.length === 0) return "All constitution checks passed.";
 
   const icons = { warning: "\u26A0", block: "\u2717", halt: "\u26D4", emergency: "\uD83D\uDEA8" };
-  const lines = violations.map((v) =>
-    `${icons[v.severity]} [${v.severity.toUpperCase()}] ${v.message}`
+  const lines = violations.map(
+    (v) => `${icons[v.severity]} [${v.severity.toUpperCase()}] ${v.message}`,
   );
 
   return `Trading Constitution Violations (${violations.length}):\n${lines.join("\n")}`;

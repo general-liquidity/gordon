@@ -54,21 +54,13 @@ export function emptyLike(like: Panel, fill: Cell = null): Panel {
 }
 
 /** Construct a panel from raw parts with shape validation at the boundary. */
-export function makePanel(
-  dates: string[],
-  tickers: string[],
-  values: Cell[][],
-): Panel {
+export function makePanel(dates: string[], tickers: string[], values: Cell[][]): Panel {
   if (values.length !== dates.length) {
-    throw new Error(
-      `Panel rows (${values.length}) != dates (${dates.length})`,
-    );
+    throw new Error(`Panel rows (${values.length}) != dates (${dates.length})`);
   }
   for (let r = 0; r < values.length; r++) {
     if (values[r]!.length !== tickers.length) {
-      throw new Error(
-        `Panel row ${r} width (${values[r]!.length}) != tickers (${tickers.length})`,
-      );
+      throw new Error(`Panel row ${r} width (${values[r]!.length}) != tickers (${tickers.length})`);
     }
   }
   return { dates, tickers, values };
@@ -191,8 +183,7 @@ export function binary(a: Panel, b: Panel, op: BinaryOp): Panel {
     for (let t = 0; t < ra.length; t++) {
       const x = ra[t]!;
       const y = rb[t]!;
-      if (x === null || y === null || !Number.isFinite(x) || !Number.isFinite(y))
-        continue;
+      if (x === null || y === null || !Number.isFinite(x) || !Number.isFinite(y)) continue;
       let r: number;
       switch (op) {
         case "add":
@@ -244,12 +235,7 @@ export function neg(p: Panel): Panel {
  * ticker. Returns null if the window runs off the start of the panel OR if any
  * cell in the window is null (insufficient/contaminated window -> null result).
  */
-function windowOf(
-  p: Panel,
-  dEnd: number,
-  t: number,
-  d: number,
-): number[] | null {
+function windowOf(p: Panel, dEnd: number, t: number, d: number): number[] | null {
   const start = dEnd - d + 1;
   if (start < 0) return null;
   const w: number[] = [];
@@ -262,11 +248,7 @@ function windowOf(
 }
 
 /** Generic per-ticker rolling reducer over the trailing window of length d. */
-function tsReduce(
-  p: Panel,
-  d: number,
-  reducer: (w: number[]) => number,
-): Panel {
+function tsReduce(p: Panel, d: number, reducer: (w: number[]) => number): Panel {
   const out = emptyLike(p);
   for (let t = 0; t < p.tickers.length; t++) {
     for (let dEnd = 0; dEnd < p.dates.length; dEnd++) {

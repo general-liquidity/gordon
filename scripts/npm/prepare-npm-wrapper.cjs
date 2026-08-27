@@ -1,5 +1,5 @@
-const fs = require("fs");
-const path = require("path");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const rootDirectory = path.resolve(__dirname, "..", "..");
 const rootPackagePath = path.join(rootDirectory, "package.json");
@@ -52,12 +52,12 @@ wrapperPkg.keywords = rootPkg.keywords;
 wrapperPkg.license = rootPkg.license;
 wrapperPkg.repository = {
   type: "git",
-  url: WRAPPER_REPOSITORY_URL
+  url: WRAPPER_REPOSITORY_URL,
 };
 
 const packageChanged = writeFileIfChanged(
   wrapperPackagePath,
-  `${JSON.stringify(wrapperPkg, null, 2)}\n`
+  `${JSON.stringify(wrapperPkg, null, 2)}\n`,
 );
 
 let copiedFiles = 0;
@@ -81,5 +81,5 @@ if (copiedFiles > 0) {
 console.log(
   changedParts.length > 0
     ? `Prepared npm wrapper (${changedParts.join(", ")}).`
-    : "npm wrapper is up to date."
+    : "npm wrapper is up to date.",
 );

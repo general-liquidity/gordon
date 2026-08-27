@@ -124,10 +124,7 @@ export function shouldActivateDebate(
   }
 
   // Large position activates
-  if (
-    trigger.positionSizePct &&
-    trigger.positionSizePct >= cfg.positionSizeThresholdPct
-  ) {
+  if (trigger.positionSizePct && trigger.positionSizePct >= cfg.positionSizeThresholdPct) {
     return {
       activate: true,
       reason: `Position size ${(trigger.positionSizePct * 100).toFixed(1)}% exceeds threshold`,
@@ -135,10 +132,7 @@ export function shouldActivateDebate(
   }
 
   // Long hold duration activates
-  if (
-    trigger.holdDurationDays &&
-    trigger.holdDurationDays >= cfg.holdDurationMinDays
-  ) {
+  if (trigger.holdDurationDays && trigger.holdDurationDays >= cfg.holdDurationMinDays) {
     return {
       activate: true,
       reason: `Hold duration ${trigger.holdDurationDays}d exceeds threshold`,
@@ -213,7 +207,15 @@ export async function runDebate(
   void emitEvent("debate:started", {
     debateId,
     topic: symbol,
-    participants: ["bull", "bear", "manager", "aggressive", "conservative", "neutral", "portfolio_manager"],
+    participants: [
+      "bull",
+      "bear",
+      "manager",
+      "aggressive",
+      "conservative",
+      "neutral",
+      "portfolio_manager",
+    ],
   });
 
   const investmentDebate: InvestmentDebate = {
@@ -269,10 +271,7 @@ export async function runDebate(
     .join("\n");
   const managerResp = await runAgentPrompt(
     "manager",
-    MANAGER_PROMPT.replace("{bullRounds}", bullRounds).replace(
-      "{bearRounds}",
-      bearRounds,
-    ),
+    MANAGER_PROMPT.replace("{bullRounds}", bullRounds).replace("{bearRounds}", bearRounds),
   );
   investmentDebate.managerSynthesis = managerResp;
 
@@ -334,16 +333,10 @@ export async function runDebate(
   riskDebate.portfolioManagerDecision = pmResp;
 
   const action: "BUY" | "SELL" | "HOLD" | "NO_ACTION" =
-    pmResp.verdict === "approve"
-      ? "BUY"
-      : pmResp.verdict === "reject"
-        ? "NO_ACTION"
-        : "HOLD";
+    pmResp.verdict === "approve" ? "BUY" : pmResp.verdict === "reject" ? "NO_ACTION" : "HOLD";
 
   const avgConf =
-    investmentDebate.rounds
-      .concat(riskDebate.rounds)
-      .reduce((s, r) => s + r.confidence, 0) /
+    investmentDebate.rounds.concat(riskDebate.rounds).reduce((s, r) => s + r.confidence, 0) /
     (investmentDebate.rounds.length + riskDebate.rounds.length);
 
   // Flatten the structured debate into a transcript for the resolved event
@@ -370,13 +363,12 @@ export async function runDebate(
       action,
       confidence: Math.round(avgConf),
       reasoning: pmResp.reasoning,
-      keyFactors: [
-        ...(managerResp.supportingArgs ?? []),
-        ...(pmResp.modifications ?? []),
-      ].slice(0, 5),
+      keyFactors: [...(managerResp.supportingArgs ?? []), ...(pmResp.modifications ?? [])].slice(
+        0,
+        5,
+      ),
     },
     durationMs: Date.now() - startTime,
-    totalRounds:
-      investmentDebate.rounds.length + riskDebate.rounds.length + 2, // +manager +PM
+    totalRounds: investmentDebate.rounds.length + riskDebate.rounds.length + 2, // +manager +PM
   };
 }

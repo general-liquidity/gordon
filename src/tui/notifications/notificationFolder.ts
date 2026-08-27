@@ -199,7 +199,11 @@ export class NotificationFolder {
   private notify(): void {
     const snapshot = [...this.queue];
     for (const l of this.listeners) {
-      try { l(snapshot); } catch { /* listener errors don't crash notifications */ }
+      try {
+        l(snapshot);
+      } catch {
+        /* listener errors don't crash notifications */
+      }
     }
   }
 }
@@ -220,7 +224,12 @@ export function resetNotificationFolder(): void {
 
 // ── Convenience: trading-specific helpers ──
 
-export function notifyOrderFilled(symbol: string, side: string, qty: number, price: number): Notification {
+export function notifyOrderFilled(
+  symbol: string,
+  side: string,
+  qty: number,
+  price: number,
+): Notification {
   return getNotificationFolder().push({
     key: `fill:${symbol}`,
     message: `${side} ${qty} ${symbol} @ ${price}`,
@@ -240,7 +249,10 @@ export function notifyOrderPending(symbol: string, orderId: string): Notificatio
   });
 }
 
-export function notifyRiskAlert(message: string, severity: "warn" | "critical" = "warn"): Notification {
+export function notifyRiskAlert(
+  message: string,
+  severity: "warn" | "critical" = "warn",
+): Notification {
   return getNotificationFolder().push({
     key: `risk:${Date.now()}`,
     message,

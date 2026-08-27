@@ -156,7 +156,7 @@ function parseEnrichmentResponse(content: string): LLMEnrichment | null {
 export async function enrichQuoteWithLLM(
   llmClient: LLMClient,
   quote: BaseQuote,
-  candles?: Candle[]
+  candles?: Candle[],
 ): Promise<LLMEnrichment | null> {
   const cacheKey = `enrichment:${quote.symbol.toUpperCase()}`;
 
@@ -173,8 +173,7 @@ export async function enrichQuoteWithLLM(
     const response = await llmClient.chat([
       {
         role: "system",
-        content:
-          "You are a concise market analyst. Respond only with the requested JSON.",
+        content: "You are a concise market analyst. Respond only with the requested JSON.",
       },
       { role: "user", content: prompt },
     ]);

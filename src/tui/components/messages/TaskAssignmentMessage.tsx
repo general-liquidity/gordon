@@ -10,7 +10,9 @@ function TaskAssignmentMessageInner({ message }: { message: Message }) {
     <Box flexDirection="row" marginTop={1} paddingLeft={2}>
       <Text color="cyanBright">{"→"}</Text>
       <Text>{" Delegated to "}</Text>
-      <Text color="cyanBright" bold>{agent}</Text>
+      <Text color="cyanBright" bold>
+        {agent}
+      </Text>
       {message.content ? (
         <>
           <Text>{": "}</Text>

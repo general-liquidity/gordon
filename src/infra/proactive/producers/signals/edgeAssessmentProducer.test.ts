@@ -45,8 +45,14 @@ function candle(volume: number, close = 100): ProactiveCandle {
 const HEALTHY: EdgeMetrics = { regime: "ranging", avgVol1mUsd: 250000, volumePattern: "flat" };
 // evaluateDecay windows: recent 20 / baseline 40.
 const STABLE_R = Array.from({ length: 60 }, () => 0.5); // ratio 1.0 → stable
-const DEGRADED_R = [...Array.from({ length: 20 }, () => 0.25), ...Array.from({ length: 40 }, () => 0.5)]; // 0.5 → degraded
-const DECAYED_R = [...Array.from({ length: 20 }, () => 0.1), ...Array.from({ length: 40 }, () => 0.5)]; // 0.2 → retire
+const DEGRADED_R = [
+  ...Array.from({ length: 20 }, () => 0.25),
+  ...Array.from({ length: 40 }, () => 0.5),
+]; // 0.5 → degraded
+const DECAYED_R = [
+  ...Array.from({ length: 20 }, () => 0.1),
+  ...Array.from({ length: 40 }, () => 0.5),
+]; // 0.2 → retire
 const rByStrategy = (rs: ReadonlyArray<number>) => new Map([["mean-reversion", rs]]);
 const tradeBy = (m: EdgeMetrics) => new Map([["mean-reversion", m]]);
 
@@ -101,7 +107,9 @@ describe("computeVolumePattern", () => {
 describe("collectEdgeMetrics", () => {
   test("derives volumePattern + per-minute USD volume, regime when a detector is present", () => {
     const c = Array(30).fill(candle(60, 100)); // close*vol = 6000/bar
-    const m = collectEdgeMetrics("BTCUSDT", c, { detectRegime: () => ({ regime: "ranging", confidence: 0.8 }) });
+    const m = collectEdgeMetrics("BTCUSDT", c, {
+      detectRegime: () => ({ regime: "ranging", confidence: 0.8 }),
+    });
     expect(m.regime).toBe("ranging");
     expect(m.volumePattern).toBe("flat");
     expect(m.avgVol1mUsd).toBeCloseTo(6000 / 60, 5); // hourly 6000 → /60 per-minute
@@ -119,12 +127,20 @@ describe("computeEdgeAlerts", () => {
   });
 
   test("stable: no card when measurable invariants hold and no kill fires", () => {
-    const cards = computeEdgeAlerts([LIVE_EDGE], metricsMap({ regime: "ranging", avgVol1mUsd: 250000, volumePattern: "flat" }), last);
+    const cards = computeEdgeAlerts(
+      [LIVE_EDGE],
+      metricsMap({ regime: "ranging", avgVol1mUsd: 250000, volumePattern: "flat" }),
+      last,
+    );
     expect(cards).toHaveLength(0);
   });
 
   test("retire: urgent card when a kill condition fires", () => {
-    const cards = computeEdgeAlerts([LIVE_EDGE], metricsMap({ regime: "trending_up", avgVol1mUsd: 250000 }), last);
+    const cards = computeEdgeAlerts(
+      [LIVE_EDGE],
+      metricsMap({ regime: "trending_up", avgVol1mUsd: 250000 }),
+      last,
+    );
     expect(cards).toHaveLength(1);
     expect(cards[0]!.category).toBe("edge_health");
     expect(cards[0]!.severity).toBe("urgent");
@@ -133,7 +149,11 @@ describe("computeEdgeAlerts", () => {
   });
 
   test("degraded: normal card when a measurable invariant breaks but no kill fires", () => {
-    const cards = computeEdgeAlerts([LIVE_EDGE], metricsMap({ regime: "ranging", avgVol1mUsd: 50000 }), last);
+    const cards = computeEdgeAlerts(
+      [LIVE_EDGE],
+      metricsMap({ regime: "ranging", avgVol1mUsd: 50000 }),
+      last,
+    );
     expect(cards).toHaveLength(1);
     expect(cards[0]!.severity).toBe("normal");
     expect(cards[0]!.triggers.metadata?.health).toBe("degraded");
@@ -147,8 +167,14 @@ describe("computeEdgeAlerts", () => {
   });
 
   test("worsening escalates: degraded → retire fires the retire card", () => {
-    expect(computeEdgeAlerts([LIVE_EDGE], metricsMap({ regime: "ranging", avgVol1mUsd: 50000 }), last)).toHaveLength(1);
-    const escalated = computeEdgeAlerts([LIVE_EDGE], metricsMap({ regime: "trending_up", avgVol1mUsd: 50000 }), last);
+    expect(
+      computeEdgeAlerts([LIVE_EDGE], metricsMap({ regime: "ranging", avgVol1mUsd: 50000 }), last),
+    ).toHaveLength(1);
+    const escalated = computeEdgeAlerts(
+      [LIVE_EDGE],
+      metricsMap({ regime: "trending_up", avgVol1mUsd: 50000 }),
+      last,
+    );
     expect(escalated).toHaveLength(1);
     expect(escalated[0]!.triggers.metadata?.health).toBe("retire");
   });
@@ -171,7 +197,9 @@ describe("computeEdgeAlerts — decay composition (realized R)", () => {
   });
 
   test("invariants healthy + decay stable → no card", () => {
-    expect(computeEdgeAlerts([LIVE_EDGE], metricsMap(HEALTHY), last, rByStrategy(STABLE_R))).toHaveLength(0);
+    expect(
+      computeEdgeAlerts([LIVE_EDGE], metricsMap(HEALTHY), last, rByStrategy(STABLE_R)),
+    ).toHaveLength(0);
   });
 
   test("invariants healthy + realized R collapsed → retire on decay alone", () => {
@@ -183,7 +211,12 @@ describe("computeEdgeAlerts — decay composition (realized R)", () => {
   });
 
   test("invariants healthy + realized R eroded → degraded with a scale-down multiplier", () => {
-    const cards = computeEdgeAlerts([LIVE_EDGE], metricsMap(HEALTHY), last, rByStrategy(DEGRADED_R));
+    const cards = computeEdgeAlerts(
+      [LIVE_EDGE],
+      metricsMap(HEALTHY),
+      last,
+      rByStrategy(DEGRADED_R),
+    );
     expect(cards).toHaveLength(1);
     expect(cards[0]!.severity).toBe("normal");
     expect(cards[0]!.triggers.metadata?.health).toBe("degraded");
@@ -192,10 +225,17 @@ describe("computeEdgeAlerts — decay composition (realized R)", () => {
   });
 
   test("kill fired AND decay both → single retire card naming both drivers", () => {
-    const cards = computeEdgeAlerts([LIVE_EDGE], metricsMap({ regime: "trending_up", avgVol1mUsd: 250000 }), last, rByStrategy(DECAYED_R));
+    const cards = computeEdgeAlerts(
+      [LIVE_EDGE],
+      metricsMap({ regime: "trending_up", avgVol1mUsd: 250000 }),
+      last,
+      rByStrategy(DECAYED_R),
+    );
     expect(cards).toHaveLength(1);
     expect(cards[0]!.triggers.metadata?.health).toBe("retire");
-    expect(cards[0]!.triggers.metadata?.breaks).toEqual(expect.arrayContaining(["regime-flip", "decay"]));
+    expect(cards[0]!.triggers.metadata?.breaks).toEqual(
+      expect.arrayContaining(["regime-flip", "decay"]),
+    );
   });
 
   test("no rMultiples for the strategy → behaves exactly as the invariant-only path", () => {
@@ -205,7 +245,11 @@ describe("computeEdgeAlerts — decay composition (realized R)", () => {
 });
 
 describe("tradeMetricsFromOutcomes", () => {
-  const mk = (outcome: "win" | "loss", pnlPct: number) => ({ outcome, profitLossPercent: pnlPct, riskRewardActual: pnlPct });
+  const mk = (outcome: "win" | "loss", pnlPct: number) => ({
+    outcome,
+    profitLossPercent: pnlPct,
+    riskRewardActual: pnlPct,
+  });
 
   test("returns empty below the minimum sample (too noisy to gate on)", () => {
     expect(tradeMetricsFromOutcomes(Array(5).fill(mk("win", 1)))).toEqual({});
@@ -233,19 +277,37 @@ describe("computeEdgeAlerts — trade-derived invariant metrics", () => {
   });
 
   test("healthy market + healthy trade metrics → stable, no card", () => {
-    const cards = computeEdgeAlerts([FULL_EDGE], metricsMap(HEALTHY), last, new Map(), tradeBy({ netEdgeBps: 40, winRate: 0.6 }));
+    const cards = computeEdgeAlerts(
+      [FULL_EDGE],
+      metricsMap(HEALTHY),
+      last,
+      new Map(),
+      tradeBy({ netEdgeBps: 40, winRate: 0.6 }),
+    );
     expect(cards).toHaveLength(0);
   });
 
   test("net edge gone (netEdgeBps ≤ 0) → ev-decayed kill fires → retire", () => {
-    const cards = computeEdgeAlerts([FULL_EDGE], metricsMap(HEALTHY), last, new Map(), tradeBy({ netEdgeBps: -12, winRate: 0.6 }));
+    const cards = computeEdgeAlerts(
+      [FULL_EDGE],
+      metricsMap(HEALTHY),
+      last,
+      new Map(),
+      tradeBy({ netEdgeBps: -12, winRate: 0.6 }),
+    );
     expect(cards).toHaveLength(1);
     expect(cards[0]!.triggers.metadata?.health).toBe("retire");
     expect(cards[0]!.triggers.metadata?.breaks).toContain("ev-decayed");
   });
 
   test("win rate below break-even (winRate < 0.45) → winrate-broke kill fires → retire", () => {
-    const cards = computeEdgeAlerts([FULL_EDGE], metricsMap(HEALTHY), last, new Map(), tradeBy({ netEdgeBps: 40, winRate: 0.3 }));
+    const cards = computeEdgeAlerts(
+      [FULL_EDGE],
+      metricsMap(HEALTHY),
+      last,
+      new Map(),
+      tradeBy({ netEdgeBps: 40, winRate: 0.3 }),
+    );
     expect(cards).toHaveLength(1);
     expect(cards[0]!.triggers.metadata?.health).toBe("retire");
     expect(cards[0]!.triggers.metadata?.breaks).toContain("winrate-broke");
@@ -253,7 +315,13 @@ describe("computeEdgeAlerts — trade-derived invariant metrics", () => {
 
   test("trade metrics drive a verdict even with no market metrics for the symbol", () => {
     // metricsBySymbol empty → assessed on trade metrics alone (ev-net-positive etc).
-    const cards = computeEdgeAlerts([FULL_EDGE], new Map(), last, new Map(), tradeBy({ netEdgeBps: -5, winRate: 0.6 }));
+    const cards = computeEdgeAlerts(
+      [FULL_EDGE],
+      new Map(),
+      last,
+      new Map(),
+      tradeBy({ netEdgeBps: -5, winRate: 0.6 }),
+    );
     expect(cards).toHaveLength(1);
     expect(cards[0]!.triggers.metadata?.health).toBe("retire");
   });
@@ -268,12 +336,20 @@ describe("edgeAssessmentProducer guard", () => {
   beforeEach(() => resetEdgeAssessmentProducerState());
 
   test("ignores non-tick observations", async () => {
-    const busObs: ProactiveObservation = { source: "event_bus", eventType: "tick_edge_assessment", timestamp: 0 };
+    const busObs: ProactiveObservation = {
+      source: "event_bus",
+      eventType: "tick_edge_assessment",
+      timestamp: 0,
+    };
     expect(await edgeAssessmentProducer(busObs)).toEqual([]);
   });
 
   test("ignores the wrong tick eventType", async () => {
-    const wrong: ProactiveObservation = { source: "monitor_loop", eventType: "tick_volatility", timestamp: 0 };
+    const wrong: ProactiveObservation = {
+      source: "monitor_loop",
+      eventType: "tick_volatility",
+      timestamp: 0,
+    };
     expect(await edgeAssessmentProducer(wrong)).toEqual([]);
   });
 });

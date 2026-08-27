@@ -38,13 +38,14 @@ type RegimeSignal = {
 
 interface RegimeDetectorClass {
   new (...args: unknown[]): unknown;
-  getInstance: () => { detectRegime: (candles: unknown[], symbol: string, timeframe?: string) => RegimeSignal };
+  getInstance: () => {
+    detectRegime: (candles: unknown[], symbol: string, timeframe?: string) => RegimeSignal;
+  };
 }
 
-async function loadRegimeDetector(): Promise<
-  | { detectRegime: (candles: unknown[], symbol: string, timeframe?: string) => RegimeSignal }
-  | null
-> {
+async function loadRegimeDetector(): Promise<{
+  detectRegime: (candles: unknown[], symbol: string, timeframe?: string) => RegimeSignal;
+} | null> {
   try {
     const mod = (await import("../../../../core/regime/detector.ts" as string)) as {
       RegimeDetector?: RegimeDetectorClass;
@@ -57,7 +58,9 @@ async function loadRegimeDetector(): Promise<
   }
 }
 
-export const regimeFlipProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
+export const regimeFlipProducer: CandidateProducer = async (
+  obs,
+): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop" || obs.eventType !== "tick_regime_flip") return [];
 
   const detector = await loadRegimeDetector();

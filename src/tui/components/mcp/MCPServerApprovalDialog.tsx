@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 
 // ============================================================================
@@ -32,7 +32,12 @@ function scopeLabel(scope: string): string {
   return scope;
 }
 
-export function MCPServerApprovalDialog({ serverName, serverUrl, requestedScopes, onDecision }: Props) {
+export function MCPServerApprovalDialog({
+  serverName,
+  serverUrl,
+  requestedScopes,
+  onDecision,
+}: Props) {
   const [focus, setFocus] = useState<"allow" | "deny">("allow");
 
   useInput((input, key) => {
@@ -56,16 +61,12 @@ export function MCPServerApprovalDialog({ serverName, serverUrl, requestedScopes
   const hasWriteScope = requestedScopes.some((s) => s.startsWith("write:"));
 
   return (
-    <Box
-      flexDirection="column"
-      paddingX={2}
-      paddingY={1}
-      borderStyle="round"
-      borderColor="yellow"
-    >
+    <Box flexDirection="column" paddingX={2} paddingY={1} borderStyle="round" borderColor="yellow">
       {/* Header */}
       <Box marginBottom={1}>
-        <Text bold color="yellow">⚠ Allow MCP server to connect?</Text>
+        <Text bold color="yellow">
+          ⚠ Allow MCP server to connect?
+        </Text>
       </Box>
 
       {/* Server info */}
@@ -84,7 +85,7 @@ export function MCPServerApprovalDialog({ serverName, serverUrl, requestedScopes
       </Box>
       {requestedScopes.length === 0 ? (
         <Box>
-          <Text dimColor>  (no specific scopes requested)</Text>
+          <Text dimColor> (no specific scopes requested)</Text>
         </Box>
       ) : (
         requestedScopes.map((scope) => {
@@ -92,11 +93,13 @@ export function MCPServerApprovalDialog({ serverName, serverUrl, requestedScopes
           const icon = SCOPE_ICONS[scope] ?? (isWrite ? "⚠" : "●");
           return (
             <Box key={scope}>
-              <Text color={isWrite ? "yellow" : "green"}>  {icon} </Text>
-              <Text color={isWrite ? "yellow" : undefined}>
-                {scopeLabel(scope)}
+              <Text color={isWrite ? "yellow" : "green"}> {icon} </Text>
+              <Text color={isWrite ? "yellow" : undefined}>{scopeLabel(scope)}</Text>
+              <Text dimColor>
+                {"  ("}
+                {scope}
+                {")"}
               </Text>
-              <Text dimColor>{"  ("}{scope}{")"}</Text>
             </Box>
           );
         })
@@ -104,7 +107,7 @@ export function MCPServerApprovalDialog({ serverName, serverUrl, requestedScopes
 
       {hasWriteScope && (
         <Box marginTop={1}>
-          <Text color="yellow">  This server requests write access. Proceed carefully.</Text>
+          <Text color="yellow"> This server requests write access. Proceed carefully.</Text>
         </Box>
       )}
 
@@ -131,7 +134,7 @@ export function MCPServerApprovalDialog({ serverName, serverUrl, requestedScopes
       </Box>
 
       <Box marginTop={1}>
-        <Text dimColor>←→ select  Enter confirm  A allow  D deny  Esc deny</Text>
+        <Text dimColor>←→ select Enter confirm A allow D deny Esc deny</Text>
       </Box>
     </Box>
   );

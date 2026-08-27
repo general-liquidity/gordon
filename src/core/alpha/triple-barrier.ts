@@ -65,14 +65,8 @@ export function computeTripleBarrier(input: {
       continue;
     }
 
-    const ptLevel =
-      side === "long"
-        ? entryPrice * (1 + ptPct)
-        : entryPrice * (1 - ptPct);
-    const slLevel =
-      side === "long"
-        ? entryPrice * (1 - slPct)
-        : entryPrice * (1 + slPct);
+    const ptLevel = side === "long" ? entryPrice * (1 + ptPct) : entryPrice * (1 - ptPct);
+    const slLevel = side === "long" ? entryPrice * (1 - slPct) : entryPrice * (1 + slPct);
 
     const verticalIndex = Math.min(entryIndex + verticalBars, end);
 
@@ -104,9 +98,7 @@ export function computeTripleBarrier(input: {
 
     const touchPrice = prices[touchIndex]!;
     const rawReturn =
-      side === "long"
-        ? touchPrice / entryPrice - 1
-        : -(touchPrice / entryPrice - 1);
+      side === "long" ? touchPrice / entryPrice - 1 : -(touchPrice / entryPrice - 1);
     const returnAtTouch = Number(rawReturn.toFixed(6));
 
     labels.push({ entryIndex, label, touchIndex, touchReason, returnAtTouch });

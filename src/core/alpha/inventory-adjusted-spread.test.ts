@@ -74,7 +74,7 @@ describe("computeInventoryAdjustedSpread", () => {
     const high = computeInventoryAdjustedSpread({
       midPrice: 100,
       inventory: 1000,
-      riskAversion: 0.50,
+      riskAversion: 0.5,
       volatility: 0.02,
       timeRemaining: 1,
       intensityDecay: 1.5,
@@ -93,7 +93,7 @@ describe("computeInventoryAdjustedSpread", () => {
     const high = computeInventoryAdjustedSpread({
       midPrice: 100,
       inventory: 0,
-      volatility: 0.10,
+      volatility: 0.1,
       timeRemaining: 1,
       intensityDecay: 1.5,
     });

@@ -34,9 +34,7 @@ describe("auditRiskBundle — complete coverage", () => {
   });
 
   it("no_go when 'no' tagged without hedge", () => {
-    const items = allCovered.map((i) =>
-      i.category === "gap" ? { ...i, hedge: undefined } : i,
-    );
+    const items = allCovered.map((i) => (i.category === "gap" ? { ...i, hedge: undefined } : i));
     const r = auditRiskBundle({ items });
     expect(r.verdict).toBe("no_go");
     expect(r.unhedgedNoItems[0]!.category).toBe("gap");

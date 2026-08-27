@@ -106,7 +106,10 @@ async function tickerToCik(ticker: string): Promise<string | null> {
 
   try {
     const res = await rateLimitedFetch("https://www.sec.gov/files/company_tickers.json");
-    const json = (await res.json()) as Record<string, { cik_str: number; ticker: string; title: string }>;
+    const json = (await res.json()) as Record<
+      string,
+      { cik_str: number; ticker: string; title: string }
+    >;
     for (const entry of Object.values(json)) {
       if (entry.ticker.toUpperCase() === ticker.toUpperCase()) {
         const paddedCik = String(entry.cik_str).padStart(10, "0");
@@ -170,7 +173,7 @@ export class SECInsiderClient {
         const acc = recent.accessionNumber[i]!;
         const doc = recent.primaryDocument[i]!;
         const accNoDashes = acc.replace(/-/g, "");
-        const formUrl = `https://www.sec.gov/Archives/edgar/data/${parseInt(cik)}/${accNoDashes}/${doc}`;
+        const formUrl = `https://www.sec.gov/Archives/edgar/data/${parseInt(cik, 10)}/${accNoDashes}/${doc}`;
 
         // Parse the Form 4 XML
         const parsed = await this.parseForm4(formUrl, acc, recent.filingDate[i]!);
@@ -209,19 +212,21 @@ export class SECInsiderClient {
       const role = officerTitle
         ? officerTitle
         : isDirector
-        ? "Director"
-        : isTenPct
-        ? "10% Owner"
-        : isOfficer
-        ? "Officer"
-        : "Other";
+          ? "Director"
+          : isTenPct
+            ? "10% Owner"
+            : isOfficer
+              ? "Officer"
+              : "Other";
 
       // Extract non-derivative transactions (actual share buys/sells)
       const transactions: InsiderTransaction[] = [];
-      const txBlocks = xml.match(/<nonDerivativeTransaction>[\s\S]*?<\/nonDerivativeTransaction>/g) ?? [];
+      const txBlocks =
+        xml.match(/<nonDerivativeTransaction>[\s\S]*?<\/nonDerivativeTransaction>/g) ?? [];
 
       for (const block of txBlocks) {
-        const txDate = block.match(/<transactionDate>[\s\S]*?<value>([^<]+)<\/value>/)?.[1] ?? filedDate;
+        const txDate =
+          block.match(/<transactionDate>[\s\S]*?<value>([^<]+)<\/value>/)?.[1] ?? filedDate;
         const code = block.match(/<transactionCode>([^<]+)<\/transactionCode>/)?.[1] ?? "";
         const shares = parseFloat(
           block.match(/<transactionShares>[\s\S]*?<value>([^<]+)<\/value>/)?.[1] ?? "0",
@@ -230,7 +235,8 @@ export class SECInsiderClient {
           block.match(/<transactionPricePerShare>[\s\S]*?<value>([^<]+)<\/value>/)?.[1] ?? "0",
         );
         const sharesAfter = parseFloat(
-          block.match(/<sharesOwnedFollowingTransaction>[\s\S]*?<value>([^<]+)<\/value>/)?.[1] ?? "0",
+          block.match(/<sharesOwnedFollowingTransaction>[\s\S]*?<value>([^<]+)<\/value>/)?.[1] ??
+            "0",
         );
 
         transactions.push({

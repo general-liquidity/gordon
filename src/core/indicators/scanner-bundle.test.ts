@@ -92,7 +92,7 @@ describe("calculateRSI", () => {
           close: 101 + i,
           high: 102 + i,
           low: 100 + i,
-        })
+        }),
       );
     }
     const result = calculateRSI(candles, 14);
@@ -108,7 +108,7 @@ describe("calculateRSI", () => {
           close: 199 - i,
           high: 200 - i,
           low: 198 - i,
-        })
+        }),
       );
     }
     const result = calculateRSI(candles, 14);
@@ -125,7 +125,7 @@ describe("calculateRSI", () => {
           close: 100,
           high: 100,
           low: 100,
-        })
+        }),
       );
     }
     const result = calculateRSI(candles, 14);
@@ -256,7 +256,7 @@ describe("detectLevels", () => {
           high: 100 + i * 2,
           low: 98 + i * 2,
           close: 99 + i * 2,
-        })
+        }),
       );
     }
 
@@ -266,7 +266,7 @@ describe("detectLevels", () => {
         high: 115,
         low: 108,
         close: 110,
-      })
+      }),
     );
 
     for (let i = 0; i < 5; i++) {
@@ -276,7 +276,7 @@ describe("detectLevels", () => {
           high: 108 - i * 2,
           low: 104 - i * 2,
           close: 105 - i * 2,
-        })
+        }),
       );
     }
 

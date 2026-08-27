@@ -41,10 +41,7 @@ function neutral(pivotWindow: number): BreakerBlockResult {
   };
 }
 
-function detectPivots(
-  candles: Candle[],
-  pivotWindow: number
-): { highs: Pivot[]; lows: Pivot[] } {
+function detectPivots(candles: Candle[], pivotWindow: number): { highs: Pivot[]; lows: Pivot[] } {
   const highs: Pivot[] = [];
   const lows: Pivot[] = [];
 
@@ -76,7 +73,7 @@ function detectPivots(
  */
 export function calculateBreakerBlock(
   candles: Candle[],
-  opts?: { pivotWindow?: number }
+  opts?: { pivotWindow?: number },
 ): BreakerBlockResult {
   const pivotWindow = opts?.pivotWindow ?? 2;
 
@@ -106,7 +103,7 @@ function detectBullishBreaker(
   highs: Pivot[],
   lows: Pivot[],
   lastClose: number,
-  pivotWindow: number
+  pivotWindow: number,
 ): { result: BreakerBlockResult; shIndex: number } | null {
   // Scan most recent swing highs first.
   for (let h = highs.length - 1; h >= 0; h--) {
@@ -182,7 +179,7 @@ function detectBearishBreaker(
   highs: Pivot[],
   lows: Pivot[],
   lastClose: number,
-  pivotWindow: number
+  pivotWindow: number,
 ): { result: BreakerBlockResult; slIndex: number } | null {
   for (let l = lows.length - 1; l >= 0; l--) {
     const sl = lows[l]!;

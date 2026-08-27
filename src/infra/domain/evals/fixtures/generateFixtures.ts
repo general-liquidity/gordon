@@ -82,5 +82,7 @@ writeFileSync(BASELINE_TRAJECTORIES_FIXTURE_PATH, `${JSON.stringify(baselineFile
 writeFileSync(GOLD_TRACES_FIXTURE_PATH, `${JSON.stringify(goldFile, null, 2)}\n`);
 
 const rel = (p: string) => relative(process.cwd(), p);
-console.log(`Wrote ${trajectories.length} trajectories → ${rel(BASELINE_TRAJECTORIES_FIXTURE_PATH)}`);
+console.log(
+  `Wrote ${trajectories.length} trajectories → ${rel(BASELINE_TRAJECTORIES_FIXTURE_PATH)}`,
+);
 console.log(`Wrote ${goldEntries.length} gold traces  → ${rel(GOLD_TRACES_FIXTURE_PATH)}`);

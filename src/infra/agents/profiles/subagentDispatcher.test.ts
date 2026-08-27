@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import {
   dispatchSubagentTask,
   isDynamicSubagentsEnabled,
@@ -163,18 +163,13 @@ describe("FW7 — dispatchSubagentTask", () => {
 
   test("maxSteps capped to profile.maxTurns", async () => {
     const capturedMaxSteps: number[] = [];
-    await dispatchSubagentTask(
-      { ...VALID_PROFILE, maxTurns: 5 },
-      "do x",
-      FAKE_REGISTRY,
-      {
-        env: { GORDON_DYNAMIC_SUBAGENTS: "1" },
-        agentFactory: (config) => {
-          capturedMaxSteps.push(config.maxSteps);
-          return fakeAgent("ok");
-        },
+    await dispatchSubagentTask({ ...VALID_PROFILE, maxTurns: 5 }, "do x", FAKE_REGISTRY, {
+      env: { GORDON_DYNAMIC_SUBAGENTS: "1" },
+      agentFactory: (config) => {
+        capturedMaxSteps.push(config.maxSteps);
+        return fakeAgent("ok");
       },
-    );
+    });
     expect(capturedMaxSteps[0]).toBe(5);
   });
 

@@ -169,7 +169,10 @@ export async function fetchUrl(url: string, opts: WebFetchOptions = {}): Promise
   try {
     const resp = await doFetch(url, {
       signal: controller.signal,
-      headers: { "user-agent": "gordon-web-fetch/1.0", accept: "text/html,application/xhtml+xml,text/plain" },
+      headers: {
+        "user-agent": "gordon-web-fetch/1.0",
+        accept: "text/html,application/xhtml+xml,text/plain",
+      },
     });
     const raw = await resp.text();
     const extracted = extractText(raw);
@@ -224,7 +227,10 @@ export interface WebSearchOptions {
  * Brave / Serper / Tavily / SearXNG-style APIs, so the operator can point at
  * any of them without a code change. Unrecognized fields are tolerated.
  */
-export async function searchWeb(query: string, opts: WebSearchOptions = {}): Promise<WebSearchResult> {
+export async function searchWeb(
+  query: string,
+  opts: WebSearchOptions = {},
+): Promise<WebSearchResult> {
   const env = opts.env ?? process.env;
   const endpoint = env[WEB_SEARCH_ENDPOINT_ENV];
   const apiKey = env[WEB_SEARCH_API_KEY_ENV];
@@ -320,7 +326,11 @@ export function normalizeSearchResults(body: unknown): WebSearchHit[] {
   else if (body && typeof body === "object") {
     const o = body as Record<string, unknown>;
     if (Array.isArray(o.results)) arr = o.results;
-    else if (o.web && typeof o.web === "object" && Array.isArray((o.web as Record<string, unknown>).results)) {
+    else if (
+      o.web &&
+      typeof o.web === "object" &&
+      Array.isArray((o.web as Record<string, unknown>).results)
+    ) {
       arr = (o.web as Record<string, unknown>).results as unknown[];
     }
   }

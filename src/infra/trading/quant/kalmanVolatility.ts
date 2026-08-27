@@ -141,9 +141,7 @@ export function kalmanVolatility(input: KalmanVolatilityInput): KalmanVolatility
   };
 }
 
-export function kalmanVolatilityToPayload(
-  result: KalmanVolatilityResult,
-): Record<string, unknown> {
+export function kalmanVolatilityToPayload(result: KalmanVolatilityResult): Record<string, unknown> {
   return {
     kind: "kalman_volatility.computed",
     currentAnnualVol: Number(result.currentAnnualVol.toFixed(4)),

@@ -110,7 +110,12 @@ export function computeASStationaryReservation(input: ASStationaryInput): ASStat
   const omega = 0.5 * g2s2 * (qMax + 1) * (qMax + 1); // ω = ½γ²σ²(qmax+1)²
   const denom = 2 * omega - g2s2 * q * q; // 2ω − γ²σ²q²
   if (denom <= 0) {
-    return { ...invalid(`inventory q=${q} beyond cap (2ω − γ²σ²q² ≤ 0)`), omega: round(omega), atCap: true, valid: false };
+    return {
+      ...invalid(`inventory q=${q} beyond cap (2ω − γ²σ²q² ≤ 0)`),
+      omega: round(omega),
+      atCap: true,
+      valid: false,
+    };
   }
 
   // r̃ᵃ = s + (1/γ)·ln(1 + (1−2q)·γ²σ²/denom);  r̃ᵇ uses (−1−2q).
@@ -123,7 +128,9 @@ export function computeASStationaryReservation(input: ASStationaryInput): ASStat
   const reservationBid = bidValid ? round(s + (1 / g) * Math.log(bidArg)) : null;
   const atCap = !askValid || !bidValid || Math.abs(q) >= qMax;
   const reservationMid =
-    reservationAsk !== null && reservationBid !== null ? round((reservationAsk + reservationBid) / 2) : null;
+    reservationAsk !== null && reservationBid !== null
+      ? round((reservationAsk + reservationBid) / 2)
+      : null;
   const inventorySkew = reservationMid !== null ? round(reservationMid - s) : null;
 
   const interpretation =

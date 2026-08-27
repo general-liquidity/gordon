@@ -84,8 +84,7 @@ export function createMessageQueue(): MessageQueue {
       if (items.length === 0) return [];
       const drained = items.sort(
         (a, b) =>
-          PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] ||
-          a.enqueuedAt - b.enqueuedAt,
+          PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] || a.enqueuedAt - b.enqueuedAt,
       );
       items = [];
       notify();

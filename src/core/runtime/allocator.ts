@@ -10,11 +10,7 @@
  */
 
 import { createModuleLogger } from "../../infra/logger/index.ts";
-import type {
-  StrategySlot,
-  AllocationStrategy,
-  RebalanceAction,
-} from "./types.ts";
+import type { StrategySlot, AllocationStrategy, RebalanceAction } from "./types.ts";
 
 const logger = createModuleLogger("capital-allocator");
 
@@ -40,10 +36,10 @@ export class CapitalAllocator {
     totalCapital: number,
     slots: StrategySlot[],
     strategy: AllocationStrategy,
-    performanceData?: Record<string, { sharpe: number; volatility: number }>
+    performanceData?: Record<string, { sharpe: number; volatility: number }>,
   ): Map<string, number> {
     const activeSlots = slots.filter(
-      (s) => s.status === "active" || s.status === "paused" || s.status === "cooldown"
+      (s) => s.status === "active" || s.status === "paused" || s.status === "cooldown",
     );
 
     if (activeSlots.length === 0) {
@@ -84,7 +80,7 @@ export class CapitalAllocator {
   rebalance(
     slots: StrategySlot[],
     totalCapital: number,
-    strategy: AllocationStrategy
+    strategy: AllocationStrategy,
   ): RebalanceAction[] {
     const targetAllocations = this.calculateAllocations(totalCapital, slots, strategy);
     const actions: RebalanceAction[] = [];
@@ -142,10 +138,7 @@ export class CapitalAllocator {
    * @param tradeSize - Proposed trade size in USD
    * @returns Whether the trade is allowed and reason if not
    */
-  canTrade(
-    slot: StrategySlot,
-    tradeSize: number
-  ): { allowed: boolean; reason?: string } {
+  canTrade(slot: StrategySlot, tradeSize: number): { allowed: boolean; reason?: string } {
     // Check slot status
     if (slot.status !== "active") {
       return {
@@ -180,10 +173,7 @@ export class CapitalAllocator {
   /**
    * Equal weight: divide total capital equally among active slots.
    */
-  private equalWeight(
-    totalCapital: number,
-    slots: StrategySlot[]
-  ): Map<string, number> {
+  private equalWeight(totalCapital: number, slots: StrategySlot[]): Map<string, number> {
     const perSlot = totalCapital / slots.length;
     const allocations = new Map<string, number>();
 
@@ -202,7 +192,7 @@ export class CapitalAllocator {
   private riskParity(
     totalCapital: number,
     slots: StrategySlot[],
-    performanceData?: Record<string, { sharpe: number; volatility: number }>
+    performanceData?: Record<string, { sharpe: number; volatility: number }>,
   ): Map<string, number> {
     if (!performanceData) {
       logger.debug("No performance data for risk_parity, using equal_weight");
@@ -248,7 +238,7 @@ export class CapitalAllocator {
   private performanceBased(
     totalCapital: number,
     slots: StrategySlot[],
-    performanceData?: Record<string, { sharpe: number; volatility: number }>
+    performanceData?: Record<string, { sharpe: number; volatility: number }>,
   ): Map<string, number> {
     if (!performanceData) {
       logger.debug("No performance data for performance strategy, using equal_weight");
@@ -283,10 +273,7 @@ export class CapitalAllocator {
    * Fixed: use each slot's existing allocated_percent.
    * Percentages are normalized if they don't sum to 100%.
    */
-  private fixed(
-    totalCapital: number,
-    slots: StrategySlot[]
-  ): Map<string, number> {
+  private fixed(totalCapital: number, slots: StrategySlot[]): Map<string, number> {
     const totalPercent = slots.reduce((sum, s) => sum + s.allocated_percent, 0);
     const allocations = new Map<string, number>();
 

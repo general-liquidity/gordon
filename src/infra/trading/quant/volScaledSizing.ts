@@ -118,8 +118,7 @@ export function computeVolScaledSizing(input: VolScaledSizingInput): VolScaledSi
 
   const band = pickBand(cv, bands);
   const verdict = classifyVerdict(mode, band.multiplier);
-  const reasoning =
-    `Vol ${(cv * 100).toFixed(1)}% (${mode}): applies band "${band.label ?? `>= ${band.volAtLeast}`}" → ${band.multiplier}× (${verdict})`;
+  const reasoning = `Vol ${(cv * 100).toFixed(1)}% (${mode}): applies band "${band.label ?? `>= ${band.volAtLeast}`}" → ${band.multiplier}× (${verdict})`;
 
   return {
     multiplier: band.multiplier,

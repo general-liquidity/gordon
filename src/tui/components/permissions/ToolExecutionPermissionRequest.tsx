@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 import { getRiskColor } from "../../design-system/colorMap.ts";
@@ -25,7 +24,7 @@ const MAX_ARGS = 3;
 const MAX_ARG_LEN = 60;
 
 function truncate(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max - 1) + "…" : s;
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
 function ArgList({ toolArgs }: { toolArgs: Record<string, unknown> }) {
@@ -58,11 +57,15 @@ export function ToolExecutionPermissionRequest({
 
   const content = (
     <>
-      <Text color={theme.riskWarning} bold>{"⚠"} TOOL EXECUTION REQUEST</Text>
+      <Text color={theme.riskWarning} bold>
+        {"⚠"} TOOL EXECUTION REQUEST
+      </Text>
       <Text> </Text>
       <Text>
         {"  "}Gordon wants to run:{" "}
-        <Text bold color={theme.uiBrand}>`{toolName}`</Text>
+        <Text bold color={theme.uiBrand}>
+          `{toolName}`
+        </Text>
       </Text>
       {toolArgs && Object.keys(toolArgs).length > 0 && (
         <Box flexDirection="column" marginTop={0}>
@@ -71,9 +74,16 @@ export function ToolExecutionPermissionRequest({
       )}
       <Box>
         <Text dimColor>{"  "}Risk: </Text>
-        <Text color={riskTone} bold>{riskClass.toUpperCase()}</Text>
+        <Text color={riskTone} bold>
+          {riskClass.toUpperCase()}
+        </Text>
       </Box>
-      {reason && <Text dimColor>{"  "}{reason}</Text>}
+      {reason && (
+        <Text dimColor>
+          {"  "}
+          {reason}
+        </Text>
+      )}
       <Text> </Text>
       <Box paddingLeft={2}>
         <Select

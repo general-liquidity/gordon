@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import { existsSync, mkdtempSync, rmSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -32,34 +32,42 @@ describe("isDecisionsLogEnabled", () => {
 
 describe("defaultDecisionsLogPath", () => {
   it("honors GORDON_DECISIONS_LOG_PATH override", () => {
-    expect(defaultDecisionsLogPath({ GORDON_DECISIONS_LOG_PATH: "/custom/path" } as NodeJS.ProcessEnv))
-      .toBe("/custom/path");
+    expect(
+      defaultDecisionsLogPath({ GORDON_DECISIONS_LOG_PATH: "/custom/path" } as NodeJS.ProcessEnv),
+    ).toBe("/custom/path");
   });
 });
 
 describe("recordDecision", () => {
   it("returns null when disabled", () => {
-    const res = recordDecision({
-      category: "plan",
-      context: "test",
-      selected: "A",
-      rationale: "because",
-    }, {});
+    const res = recordDecision(
+      {
+        category: "plan",
+        context: "test",
+        selected: "A",
+        rationale: "because",
+      },
+      {},
+    );
     expect(res).toBeNull();
     expect(existsSync(logPath)).toBe(false);
   });
 
   it("appends a JSONL line when enabled", () => {
     const env = enabledEnv(logPath);
-    const entry = recordDecision({
-      category: "plan",
-      context: "choose strategy",
-      selected: "regime-rsi",
-      alternatives: ["smc", "bounce"],
-      rationale: "current regime favors RSI mean reversion",
-      threadId: "t1",
-      symbols: ["BTCUSDT"],
-    }, env, logPath);
+    const entry = recordDecision(
+      {
+        category: "plan",
+        context: "choose strategy",
+        selected: "regime-rsi",
+        alternatives: ["smc", "bounce"],
+        rationale: "current regime favors RSI mean reversion",
+        threadId: "t1",
+        symbols: ["BTCUSDT"],
+      },
+      env,
+      logPath,
+    );
     expect(entry).not.toBeNull();
     expect(entry?.id).toMatch(/^dec-/);
     const content = readFileSync(logPath, "utf8");
@@ -72,16 +80,20 @@ describe("recordDecision", () => {
 
   it("accepts summary/symbol/evidence shorthand fields", () => {
     const env = enabledEnv(logPath);
-    const entry = recordDecision({
-      category: "plan",
-      summary: "Created support_bounce plan for BTCUSDT",
-      symbol: "BTCUSDT",
-      alternatives: ["bollinger_bounce"],
-      evidence: ["reflection:valid"],
-      metadata: { convictionRating: 4, rMultiple: 1.2 },
-      threadId: "t1",
-      stage: "planning",
-    }, env, logPath);
+    const entry = recordDecision(
+      {
+        category: "plan",
+        summary: "Created support_bounce plan for BTCUSDT",
+        symbol: "BTCUSDT",
+        alternatives: ["bollinger_bounce"],
+        evidence: ["reflection:valid"],
+        metadata: { convictionRating: 4, rMultiple: 1.2 },
+        threadId: "t1",
+        stage: "planning",
+      },
+      env,
+      logPath,
+    );
     expect(entry?.summary).toBe("Created support_bounce plan for BTCUSDT");
     expect(entry?.symbols).toEqual(["BTCUSDT"]);
     expect(entry?.evidence).toEqual(["reflection:valid"]);
@@ -91,32 +103,44 @@ describe("recordDecision", () => {
   it("creates the parent directory if missing", () => {
     const env = enabledEnv(logPath);
     const deepPath = join(tempDir, "a", "b", "decisions.jsonl");
-    recordDecision({
-      category: "plan",
-      context: "test",
-      selected: "X",
-      rationale: "r",
-    }, env, deepPath);
+    recordDecision(
+      {
+        category: "plan",
+        context: "test",
+        selected: "X",
+        rationale: "r",
+      },
+      env,
+      deepPath,
+    );
     expect(existsSync(deepPath)).toBe(true);
   });
 });
 
 describe("readDecisions", () => {
-  function seed(decisions: Array<Partial<Parameters<typeof recordDecision>[0]> & {
-    category?: Parameters<typeof recordDecision>[0]["category"];
-    selected?: string;
-    rationale?: string;
-    context?: string;
-  }>): void {
+  function seed(
+    decisions: Array<
+      Partial<Parameters<typeof recordDecision>[0]> & {
+        category?: Parameters<typeof recordDecision>[0]["category"];
+        selected?: string;
+        rationale?: string;
+        context?: string;
+      }
+    >,
+  ): void {
     const env = enabledEnv(logPath);
     for (const d of decisions) {
-      recordDecision({
-        category: d.category ?? "plan",
-        context: d.context ?? "ctx",
-        selected: d.selected ?? "sel",
-        rationale: d.rationale ?? "r",
-        ...d,
-      } as Parameters<typeof recordDecision>[0], env, logPath);
+      recordDecision(
+        {
+          category: d.category ?? "plan",
+          context: d.context ?? "ctx",
+          selected: d.selected ?? "sel",
+          rationale: d.rationale ?? "r",
+          ...d,
+        } as Parameters<typeof recordDecision>[0],
+        env,
+        logPath,
+      );
     }
   }
 
@@ -166,11 +190,7 @@ describe("readDecisions", () => {
   });
 
   it("respects limit", () => {
-    seed([
-      { selected: "A" },
-      { selected: "B" },
-      { selected: "C" },
-    ]);
+    seed([{ selected: "A" }, { selected: "B" }, { selected: "C" }]);
     expect(readDecisions({ limit: 2 }, {}, logPath)).toHaveLength(2);
   });
 
@@ -179,7 +199,7 @@ describe("readDecisions", () => {
     // Corrupt the file by appending garbage
     const { appendFileSync } = require("node:fs");
     appendFileSync(logPath, "not-json{\n");
-    appendFileSync(logPath, "{ \"id\": \"\", \"truncated\":\n");
+    appendFileSync(logPath, '{ "id": "", "truncated":\n');
     const decisions = readDecisions({}, {}, logPath);
     expect(decisions).toHaveLength(1);
     expect(decisions[0]?.selected).toBe("good");
@@ -190,12 +210,16 @@ describe("readRecentDecisions", () => {
   it("returns the most recent entries up to limit", () => {
     const env = enabledEnv(logPath);
     for (let i = 0; i < 5; i++) {
-      recordDecision({
-        category: "plan",
-        context: `ctx-${i}`,
-        selected: `sel-${i}`,
-        rationale: "r",
-      }, env, logPath);
+      recordDecision(
+        {
+          category: "plan",
+          context: `ctx-${i}`,
+          selected: `sel-${i}`,
+          rationale: "r",
+        },
+        env,
+        logPath,
+      );
     }
     expect(readRecentDecisions(3, env, logPath)).toHaveLength(3);
   });
@@ -209,9 +233,13 @@ describe("summarizeDecisionsForResume", () => {
   it("formats one line per decision with symbol prefix", () => {
     const out = summarizeDecisionsForResume([
       {
-        id: "1", recordedAt: "2026-01-15T10:00:00.000Z",
-        category: "plan", context: "ctx", selected: "X",
-        alternatives: ["Y"], rationale: "good reason",
+        id: "1",
+        recordedAt: "2026-01-15T10:00:00.000Z",
+        category: "plan",
+        context: "ctx",
+        selected: "X",
+        alternatives: ["Y"],
+        rationale: "good reason",
         symbols: ["BTCUSDT"],
       },
     ]);
@@ -222,8 +250,13 @@ describe("summarizeDecisionsForResume", () => {
 
   it("truncates at maxLines", () => {
     const decisions = Array.from({ length: 20 }, (_, i) => ({
-      id: `${i}`, recordedAt: `2026-01-${(i + 1).toString().padStart(2, "0")}T00:00:00.000Z`,
-      category: "plan" as const, context: "", selected: `s${i}`, alternatives: [], rationale: "r",
+      id: `${i}`,
+      recordedAt: `2026-01-${(i + 1).toString().padStart(2, "0")}T00:00:00.000Z`,
+      category: "plan" as const,
+      context: "",
+      selected: `s${i}`,
+      alternatives: [],
+      rationale: "r",
     }));
     const lines = summarizeDecisionsForResume(decisions, 5).split("\n");
     expect(lines).toHaveLength(5);

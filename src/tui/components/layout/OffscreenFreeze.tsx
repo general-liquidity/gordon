@@ -1,4 +1,4 @@
-import React, { useRef, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 
 // ============================================================================
 // OffscreenFreeze — Performance optimization via cached renders

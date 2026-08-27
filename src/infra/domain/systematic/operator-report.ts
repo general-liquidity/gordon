@@ -149,9 +149,7 @@ export function normalizeOperatorReport(report: OperatorReportInput): OperatorRe
 
 function pad(value: string, width: number, align: "left" | "right"): string {
   if (value.length >= width) return value;
-  return align === "right"
-    ? value.padStart(width, " ")
-    : value.padEnd(width, " ");
+  return align === "right" ? value.padStart(width, " ") : value.padEnd(width, " ");
 }
 
 function truncate(value: string, width: number): string {
@@ -160,7 +158,9 @@ function truncate(value: string, width: number): string {
   return `${value.slice(0, width - 1)}…`;
 }
 
-function statusGlyph(status: OperatorSeverity | OperatorGate["status"] | OperatorDiff["status"]): string {
+function statusGlyph(
+  status: OperatorSeverity | OperatorGate["status"] | OperatorDiff["status"],
+): string {
   switch (status) {
     case "success":
     case "pass":
@@ -190,11 +190,11 @@ function renderTable(table: OperatorTable): string[] {
   });
 
   const header = table.columns
-    .map((column, index) => pad(column.header, widths[index] ?? column.header.length, column.align ?? "left"))
+    .map((column, index) =>
+      pad(column.header, widths[index] ?? column.header.length, column.align ?? "left"),
+    )
     .join(" | ");
-  const divider = table.columns
-    .map((_, index) => "-".repeat(widths[index] ?? 4))
-    .join("-|-");
+  const divider = table.columns.map((_, index) => "-".repeat(widths[index] ?? 4)).join("-|-");
 
   const lines = [table.title, header, divider];
   for (const row of table.rows) {

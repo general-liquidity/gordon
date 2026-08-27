@@ -103,7 +103,11 @@ describe("market instrument resolution", () => {
   });
 
   it("still infers stock vs crypto synchronously for lightweight routing decisions", () => {
-    expect(inferMarketFamily({ exchange: {} as never, broker: {} as never }, "AAPL")).toBe("stocks");
-    expect(inferMarketFamily({ exchange: {} as never, broker: {} as never }, "BTC/USDT")).toBe("crypto");
+    expect(inferMarketFamily({ exchange: {} as never, broker: {} as never }, "AAPL")).toBe(
+      "stocks",
+    );
+    expect(inferMarketFamily({ exchange: {} as never, broker: {} as never }, "BTC/USDT")).toBe(
+      "crypto",
+    );
   });
 });

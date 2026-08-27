@@ -29,23 +29,18 @@ function rewriteExchangeEntry(entry: unknown): unknown {
  */
 export function migrateExchangeConfigTypes(raw: Record<string, unknown>): Record<string, unknown> {
   let migrated: Record<string, unknown> = { ...raw };
-  const exchanges = Array.isArray(migrated.exchanges)
-    ? [...migrated.exchanges]
-    : [];
+  const exchanges = Array.isArray(migrated.exchanges) ? [...migrated.exchanges] : [];
 
   if (isConfigRecord(migrated.exchange)) {
     const legacy = migrated.exchange;
     const apiKey = legacy.apiKey;
     const apiSecret = legacy.apiSecret;
     const alreadyPresent = exchanges.some(
-      (entry) => isConfigRecord(entry)
-        && (entry.type === "ccxt:binance" || entry.type === "binance" || entry.id === "binance"),
+      (entry) =>
+        isConfigRecord(entry) &&
+        (entry.type === "ccxt:binance" || entry.type === "binance" || entry.id === "binance"),
     );
-    if (
-      !alreadyPresent
-      && typeof apiKey === "string"
-      && typeof apiSecret === "string"
-    ) {
+    if (!alreadyPresent && typeof apiKey === "string" && typeof apiSecret === "string") {
       exchanges.push({
         id: "binance",
         type: "ccxt:binance",
@@ -71,11 +66,7 @@ export function migrateExchangeConfigTypes(raw: Record<string, unknown>): Record
 /**
  * Supported stock broker types
  */
-export const BrokerTypeSchema = z.enum([
-  "alpaca",
-  "tastytrade",
-  "ibkr",
-]);
+export const BrokerTypeSchema = z.enum(["alpaca", "tastytrade", "ibkr"]);
 
 /**
  * Multi-exchange configuration schema
@@ -205,7 +196,9 @@ export const RiskManagementConfigSchema = z.object({
  */
 export const StrategyRuntimeConfigSchema = z.object({
   /** Capital allocation strategy across active slots */
-  allocationStrategy: z.enum(["equal_weight", "risk_parity", "performance", "fixed"]).default("equal_weight"),
+  allocationStrategy: z
+    .enum(["equal_weight", "risk_parity", "performance", "fixed"])
+    .default("equal_weight"),
 });
 
 /**
@@ -222,39 +215,41 @@ export const RegimeDetectionConfigSchema = z.object({
  * Controls how strictly Gordon enforces research/validation discipline.
  */
 export const SystematicTradingConfigSchema = z.object({
-  executionMode: z
-    .enum(["assisted", "semi_systematic", "strict_systematic"])
-    .default("assisted"),
+  executionMode: z.enum(["assisted", "semi_systematic", "strict_systematic"]).default("assisted"),
   minTradesForPromotion: z.number().int().min(1).default(30),
   minValidationScore: z.number().min(0).max(100).default(60),
   autoSnapshotDatasets: z.boolean().default(true),
   autoCreateResearchExperiments: z.boolean().default(true),
-  simulationRealism: z.object({
-    profile: z.enum(["baseline", "realistic", "conservative"]).default("realistic"),
-    executionLagBars: z.number().int().min(0).max(3).default(1),
-    spreadBps: z.number().min(0).max(50).default(2),
-    marketImpactBps: z.number().min(0).max(50).default(1),
-  }).default({
-    profile: "realistic",
-    executionLagBars: 1,
-    spreadBps: 2,
-    marketImpactBps: 1,
-  }),
-  biasDiagnostics: z.object({
-    minBacktestDays: z.number().int().min(7).default(90),
-    minOutOfSampleWindows: z.number().int().min(1).default(3),
-    maxTradePnlConcentrationPercent: z.number().min(10).max(100).default(55),
-    maxCagrPercent: z.number().min(20).max(2000).default(300),
-    requireWalkForward: z.boolean().default(true),
-    requireMonteCarlo: z.boolean().default(true),
-  }).default({
-    minBacktestDays: 90,
-    minOutOfSampleWindows: 3,
-    maxTradePnlConcentrationPercent: 55,
-    maxCagrPercent: 300,
-    requireWalkForward: true,
-    requireMonteCarlo: true,
-  }),
+  simulationRealism: z
+    .object({
+      profile: z.enum(["baseline", "realistic", "conservative"]).default("realistic"),
+      executionLagBars: z.number().int().min(0).max(3).default(1),
+      spreadBps: z.number().min(0).max(50).default(2),
+      marketImpactBps: z.number().min(0).max(50).default(1),
+    })
+    .default({
+      profile: "realistic",
+      executionLagBars: 1,
+      spreadBps: 2,
+      marketImpactBps: 1,
+    }),
+  biasDiagnostics: z
+    .object({
+      minBacktestDays: z.number().int().min(7).default(90),
+      minOutOfSampleWindows: z.number().int().min(1).default(3),
+      maxTradePnlConcentrationPercent: z.number().min(10).max(100).default(55),
+      maxCagrPercent: z.number().min(20).max(2000).default(300),
+      requireWalkForward: z.boolean().default(true),
+      requireMonteCarlo: z.boolean().default(true),
+    })
+    .default({
+      minBacktestDays: 90,
+      minOutOfSampleWindows: 3,
+      maxTradePnlConcentrationPercent: 55,
+      maxCagrPercent: 300,
+      requireWalkForward: true,
+      requireMonteCarlo: true,
+    }),
 });
 
 /**

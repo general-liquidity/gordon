@@ -143,8 +143,7 @@ export const maeStopCalibratorDiagnosticTool = createTool({
         losers: result.losers,
         recommendedTightStopPct: result.recommendedTightStopPct,
         currentStopPct: result.currentStopPct,
-        savedFraction:
-          result.counterfactual?.estimatedSavedFractionOnLosers ?? null,
+        savedFraction: result.counterfactual?.estimatedSavedFractionOnLosers ?? null,
       },
     });
     return result;

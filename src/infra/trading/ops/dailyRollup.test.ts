@@ -3,11 +3,7 @@ import { appendFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import {
-  buildRollup,
-  formatRollup,
-  rollupToPayload,
-} from "./dailyRollup.ts";
+import { buildRollup, formatRollup, rollupToPayload } from "./dailyRollup.ts";
 
 let workDir: string;
 let decPath: string;
@@ -22,11 +18,15 @@ beforeEach(() => {
 });
 
 const cleanup = () => {
-  try { rmSync(workDir, { recursive: true, force: true }); } catch { /* ignore */ }
+  try {
+    rmSync(workDir, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
 };
 
 const writeRow = (path: string, row: Record<string, unknown>) =>
-  appendFileSync(path, JSON.stringify(row) + "\n", "utf8");
+  appendFileSync(path, `${JSON.stringify(row)}\n`, "utf8");
 
 describe("buildRollup — empty inputs", () => {
   it("returns zero counts when no files exist", () => {
@@ -54,10 +54,25 @@ describe("buildRollup — debrief aggregation", () => {
   it("counts quadrants and emits reinforce/fix recommendations", () => {
     const now = 1_700_000_000_000;
     const recent = new Date(now - 3 * 60 * 60_000).toISOString();
-    writeRow(debPath, { recordedAt: recent, quadrant: "deserved_success", symbol: "BTC", tradeId: "t1" });
-    writeRow(debPath, { recordedAt: recent, quadrant: "deserved_success", symbol: "ETH", tradeId: "t2" });
+    writeRow(debPath, {
+      recordedAt: recent,
+      quadrant: "deserved_success",
+      symbol: "BTC",
+      tradeId: "t1",
+    });
+    writeRow(debPath, {
+      recordedAt: recent,
+      quadrant: "deserved_success",
+      symbol: "ETH",
+      tradeId: "t2",
+    });
     writeRow(debPath, { recordedAt: recent, quadrant: "dumb_luck", symbol: "SOL", tradeId: "t3" });
-    writeRow(debPath, { recordedAt: recent, quadrant: "poetic_justice", symbol: "DOGE", tradeId: "t4" });
+    writeRow(debPath, {
+      recordedAt: recent,
+      quadrant: "poetic_justice",
+      symbol: "DOGE",
+      tradeId: "t4",
+    });
     const r = buildRollup({ debriefsPath: debPath, nowMs: now });
     expect(r.debriefCounts.deserved_success).toBe(2);
     expect(r.debriefCounts.dumb_luck).toBe(1);
@@ -70,8 +85,18 @@ describe("buildRollup — debrief aggregation", () => {
   it("toxic alpha alarm fires when dumb_luck > 20% of wins", () => {
     const now = Date.now();
     const recent = new Date(now - 1 * 60 * 60_000).toISOString();
-    writeRow(debPath, { recordedAt: recent, quadrant: "deserved_success", symbol: "BTC", tradeId: "t1" });
-    writeRow(debPath, { recordedAt: recent, quadrant: "deserved_success", symbol: "ETH", tradeId: "t2" });
+    writeRow(debPath, {
+      recordedAt: recent,
+      quadrant: "deserved_success",
+      symbol: "BTC",
+      tradeId: "t1",
+    });
+    writeRow(debPath, {
+      recordedAt: recent,
+      quadrant: "deserved_success",
+      symbol: "ETH",
+      tradeId: "t2",
+    });
     writeRow(debPath, { recordedAt: recent, quadrant: "dumb_luck", symbol: "SOL", tradeId: "t3" });
     const r = buildRollup({ debriefsPath: debPath, nowMs: now });
     expect(r.toxicAlphaWarning).toBe(true);
@@ -107,7 +132,12 @@ describe("formatRollup + rollupToPayload", () => {
   it("formats summary and emits stable payload", () => {
     const now = Date.now();
     const recent = new Date(now - 1 * 60 * 60_000).toISOString();
-    writeRow(debPath, { recordedAt: recent, quadrant: "deserved_success", symbol: "BTC", tradeId: "t1" });
+    writeRow(debPath, {
+      recordedAt: recent,
+      quadrant: "deserved_success",
+      symbol: "BTC",
+      tradeId: "t1",
+    });
     const r = buildRollup({ debriefsPath: debPath, nowMs: now });
     const out = formatRollup(r);
     expect(out).toContain("Daily rollup");

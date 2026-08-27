@@ -6,7 +6,14 @@ import { createCharPool } from "./charPool.ts";
 import { createStylePool } from "./stylePool.ts";
 import { CELL_DIRTY_BIT } from "./internal/contracts.ts";
 
-function paint(buf: ReturnType<typeof createCellBuffer>, pool: ReturnType<typeof createCharPool>, x: number, y: number, ch: string, styleId = 0) {
+function paint(
+  buf: ReturnType<typeof createCellBuffer>,
+  pool: ReturnType<typeof createCharPool>,
+  x: number,
+  y: number,
+  ch: string,
+  styleId = 0,
+) {
   buf.set(x, y, pool.intern(ch), styleId, 0);
 }
 

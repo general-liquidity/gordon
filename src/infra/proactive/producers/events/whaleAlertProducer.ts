@@ -45,7 +45,9 @@ function scoreWhaleHeadline(title: string): { confidence: number; labels: string
   return { confidence, labels };
 }
 
-export const whaleAlertProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
+export const whaleAlertProducer: CandidateProducer = async (
+  obs,
+): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop" || obs.eventType !== "tick_whale_alert") return [];
 
   const symbols = await resolveMonitoredSymbols();

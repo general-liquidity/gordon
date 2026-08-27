@@ -206,7 +206,9 @@ describe("runPairsSystem", () => {
         const conviction = Math.min(Math.abs(bar.z) / scaled.entryZ, 1);
         expect(Math.abs(bar.allocation)).toBeCloseTo(conviction * expectedFactor, 9);
         // Confidence sizing can only shrink exposure vs the unscaled baseline.
-        expect(Math.abs(bar.allocation)).toBeLessThanOrEqual(Math.abs(baseline.bars[i]!.allocation) + 1e-12);
+        expect(Math.abs(bar.allocation)).toBeLessThanOrEqual(
+          Math.abs(baseline.bars[i]!.allocation) + 1e-12,
+        );
       }
     }
   });

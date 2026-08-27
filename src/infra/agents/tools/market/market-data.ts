@@ -17,7 +17,14 @@ import type { Timeframe } from "../../../../types/timeframes.ts";
 
 /** Candle tool supports the common trading timeframes. */
 const CANDLE_TIMEFRAMES = [
-  "1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w",
+  "1m",
+  "5m",
+  "15m",
+  "30m",
+  "1h",
+  "4h",
+  "1d",
+  "1w",
 ] as const satisfies readonly Timeframe[];
 import { createCachedTool, TOOL_CACHE_CONFIG } from "../runtime/cache.ts";
 
@@ -39,9 +46,7 @@ export const getCandlesTool = createTool({
     "Fetch raw OHLCV candle data for a symbol. Returns array of candles with open, high, low, close, volume, and timestamp.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
-    interval: z
-      .enum(CANDLE_TIMEFRAMES)
-      .describe("Candle interval/timeframe"),
+    interval: z.enum(CANDLE_TIMEFRAMES).describe("Candle interval/timeframe"),
     limit: z
       .number()
       .min(1)
@@ -53,14 +58,18 @@ export const getCandlesTool = createTool({
     symbol: z.string().optional(),
     interval: z.string().optional(),
     count: z.number().optional(),
-    candles: z.array(z.object({
-      open: z.number(),
-      high: z.number(),
-      low: z.number(),
-      close: z.number(),
-      volume: z.number(),
-      timestamp: z.number(),
-    })).optional(),
+    candles: z
+      .array(
+        z.object({
+          open: z.number(),
+          high: z.number(),
+          low: z.number(),
+          close: z.number(),
+          volume: z.number(),
+          timestamp: z.number(),
+        }),
+      )
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol, interval, limit }, execContext: MastraExecutionContext) => {
@@ -99,8 +108,7 @@ export const getCandlesTool = createTool({
 
 export const getPriceTool = createTool({
   id: "get_price",
-  description:
-    "Get the current price of a trading pair.",
+  description: "Get the current price of a trading pair.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
   }),
@@ -154,16 +162,20 @@ export const getTickersTool = createTool({
   }),
   outputSchema: z.object({
     count: z.number().optional(),
-    tickers: z.array(z.object({
-      symbol: z.string(),
-      lastPrice: z.number(),
-      priceChange: z.number(),
-      priceChangePercent: z.number(),
-      highPrice: z.number(),
-      lowPrice: z.number(),
-      volume: z.number(),
-      quoteVolume: z.number(),
-    })).optional(),
+    tickers: z
+      .array(
+        z.object({
+          symbol: z.string(),
+          lastPrice: z.number(),
+          priceChange: z.number(),
+          priceChangePercent: z.number(),
+          highPrice: z.number(),
+          lowPrice: z.number(),
+          volume: z.number(),
+          quoteVolume: z.number(),
+        }),
+      )
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async ({ limit, quoteAsset }, execContext: MastraExecutionContext) => {
@@ -176,14 +188,13 @@ export const getTickersTool = createTool({
       const tickers = await ctx.exchange.get24hrTickers();
 
       // Filter by quote asset (default USDT to exclude fiat pairs like USDTIDR)
-      const filtered = quoteAsset === "ALL"
-        ? tickers
-        : tickers.filter((t) => t.symbol.endsWith(quoteAsset.toUpperCase()));
+      const filtered =
+        quoteAsset === "ALL"
+          ? tickers
+          : tickers.filter((t) => t.symbol.endsWith(quoteAsset.toUpperCase()));
 
       // Sort by quote volume descending and take top N
-      const sorted = filtered
-        .sort((a, b) => b.quoteVolume - a.quoteVolume)
-        .slice(0, limit);
+      const sorted = filtered.sort((a, b) => b.quoteVolume - a.quoteVolume).slice(0, limit);
 
       return {
         count: sorted.length,
@@ -237,9 +248,7 @@ export const getBookTickerTool = createTool({
       const bookTicker = await ctx.exchange.getBookTicker(normalizedSymbol);
 
       const spread = bookTicker.askPrice - bookTicker.bidPrice;
-      const spreadPercent = bookTicker.askPrice > 0
-        ? (spread / bookTicker.askPrice) * 100
-        : 0;
+      const spreadPercent = bookTicker.askPrice > 0 ? (spread / bookTicker.askPrice) * 100 : 0;
 
       return {
         symbol: bookTicker.symbol,
@@ -248,7 +257,7 @@ export const getBookTickerTool = createTool({
         askPrice: bookTicker.askPrice,
         askQty: bookTicker.askQty,
         spread: spread.toFixed(8),
-        spreadPercent: spreadPercent.toFixed(4) + "%",
+        spreadPercent: `${spreadPercent.toFixed(4)}%`,
       };
     } catch (error) {
       return { error: `Failed to get book ticker: ${(error as Error).message}` };

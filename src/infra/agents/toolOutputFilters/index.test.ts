@@ -131,9 +131,9 @@ describe("filterGetOrderbook", () => {
   });
 
   it("bypasses error envelopes", () => {
-    expect(
-      filterGetOrderbook({ status: "error", message: "no symbol" }).filterTag,
-    ).toBe("passthrough");
+    expect(filterGetOrderbook({ status: "error", message: "no symbol" }).filterTag).toBe(
+      "passthrough",
+    );
   });
 });
 
@@ -143,7 +143,7 @@ describe("filterScanMarket", () => {
       symbol: `SYM${i}`,
       changePct: (i - count / 2) * 0.5,
       price: 100 + i,
-      volume: 1000 + (i * 17) % 5000,
+      volume: 1000 + ((i * 17) % 5000),
       regime: i % 3 === 0 ? "trending_up" : i % 3 === 1 ? "ranging" : "trending_down",
     }));
   }
@@ -196,7 +196,9 @@ describe("applyToolOutputFilter dispatcher", () => {
       close: 100.5 + i * 0.01,
     }));
     expect(applyToolOutputFilter("get_candles", candles).filterTag).toContain("get_candles");
-    expect(applyToolOutputFilter("get_historical_klines", candles).filterTag).toContain("get_candles");
+    expect(applyToolOutputFilter("get_historical_klines", candles).filterTag).toContain(
+      "get_candles",
+    );
   });
 
   it("passes through for unknown tool names", () => {

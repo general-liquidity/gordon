@@ -121,8 +121,8 @@ export interface FatTailCredibilityResult {
   summary: string;
 }
 
-const DEFAULT_K_FRACTION = 0.10;
-const DEFAULT_K_GRID = [0.05, 0.075, 0.10, 0.15, 0.20] as const;
+const DEFAULT_K_FRACTION = 0.1;
+const DEFAULT_K_GRID = [0.05, 0.075, 0.1, 0.15, 0.2] as const;
 const DEFAULT_MIN_SAMPLE = 50;
 
 function median(values: number[]): number {
@@ -192,9 +192,7 @@ export function estimateFatTailCredibility(
   const minSample = input.minSampleSize ?? DEFAULT_MIN_SAMPLE;
   const primaryFrac = input.kFraction ?? DEFAULT_K_FRACTION;
   const grid =
-    input.kFractionGrid && input.kFractionGrid.length > 0
-      ? input.kFractionGrid
-      : DEFAULT_K_GRID;
+    input.kFractionGrid && input.kFractionGrid.length > 0 ? input.kFractionGrid : DEFAULT_K_GRID;
 
   if (input.returns.length < minSample) {
     return insufficient(
@@ -209,10 +207,7 @@ export function estimateFatTailCredibility(
     .filter((v) => v > 0)
     .sort((a, b) => b - a);
   if (abs.length < minSample) {
-    return insufficient(
-      `Non-zero sample size ${abs.length} < ${minSample}.`,
-      input.returns.length,
-    );
+    return insufficient(`Non-zero sample size ${abs.length} < ${minSample}.`, input.returns.length);
   }
 
   // Compute Hill α̂ across grid
@@ -296,9 +291,7 @@ export function estimateFatTailCredibility(
   };
 }
 
-export function formatFatTailCredibility(
-  result: FatTailCredibilityResult,
-): string {
+export function formatFatTailCredibility(result: FatTailCredibilityResult): string {
   const lines = [
     `Fat-Tail Credibility — ${result.fatTailClass.toUpperCase()}`,
     "",

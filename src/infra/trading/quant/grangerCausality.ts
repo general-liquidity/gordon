@@ -59,7 +59,7 @@ interface OLSResult {
   coefficients: number[];
   residuals: number[];
   rss: number; // Residual sum of squares
-  df: number;  // Degrees of freedom
+  df: number; // Degrees of freedom
 }
 
 /**
@@ -160,18 +160,18 @@ function fPValue(fStat: number, df1: number, df2: number): number {
   // More precisely, use the Wilson-Hilferty-like transform
   const a = df1 / 2;
   const b = df2 / 2;
-  const x = df1 * fStat / (df1 * fStat + df2);
+  const x = (df1 * fStat) / (df1 * fStat + df2);
 
   // Normal approximation for regularized incomplete beta
   // Accurate enough for df > 5
   if (a > 2 && b > 2) {
     const lambda = (a - 1) / (a + b - 2);
-    const z = (x - lambda) / Math.sqrt(lambda * (1 - lambda) / (a + b - 1));
+    const z = (x - lambda) / Math.sqrt((lambda * (1 - lambda)) / (a + b - 1));
     return 1 - normalCdf(z);
   }
 
   // Fallback: very rough approximation
-  return Math.exp(-fStat * df1 / (2 * df2));
+  return Math.exp((-fStat * df1) / (2 * df2));
 }
 
 // ============================================================================
@@ -251,7 +251,7 @@ export function grangerCausalityTest(
     };
   }
 
-  const fStat = ((restricted.rss - unrestricted.rss) / df1) / (unrestricted.rss / df2);
+  const fStat = (restricted.rss - unrestricted.rss) / df1 / (unrestricted.rss / df2);
   const pValue = fPValue(fStat, df1, df2);
   const rejectNull = pValue < 0.05;
 

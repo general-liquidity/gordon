@@ -44,12 +44,7 @@ export const startSchedulerTool = createTool({
       .max(240)
       .default(60)
       .describe("Minutes between scans (15-240, default: 60)"),
-    topN: z
-      .number()
-      .min(10)
-      .max(200)
-      .default(50)
-      .describe("Number of top coins to scan"),
+    topN: z.number().min(10).max(200).default(50).describe("Number of top coins to scan"),
     minConfidence: z
       .number()
       .min(0.3)
@@ -60,17 +55,22 @@ export const startSchedulerTool = createTool({
   outputSchema: z.object({
     success: z.boolean().optional(),
     message: z.string().optional(),
-    status: z.object({
-      isRunning: z.boolean(),
-      intervalMs: z.number().optional(),
-      lastScanTime: z.string().nullable().optional(),
-      nextScanTime: z.string().nullable().optional(),
-      scanCount: z.number().optional(),
-      opportunitiesFound: z.number().optional(),
-    }).optional(),
+    status: z
+      .object({
+        isRunning: z.boolean(),
+        intervalMs: z.number().optional(),
+        lastScanTime: z.string().nullable().optional(),
+        nextScanTime: z.string().nullable().optional(),
+        scanCount: z.number().optional(),
+        opportunitiesFound: z.number().optional(),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ intervalMinutes, topN, minConfidence }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { intervalMinutes, topN, minConfidence },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -115,10 +115,12 @@ export const stopSchedulerTool = createTool({
   outputSchema: z.object({
     success: z.boolean(),
     message: z.string(),
-    finalStats: z.object({
-      scanCount: z.number(),
-      opportunitiesFound: z.number(),
-    }).optional(),
+    finalStats: z
+      .object({
+        scanCount: z.number(),
+        opportunitiesFound: z.number(),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async () => {
@@ -158,10 +160,12 @@ export const getSchedulerStatusTool = createTool({
     message: z.string(),
     lastScan: z.string().nullable().optional(),
     nextScan: z.string().nullable().optional(),
-    stats: z.object({
-      totalScans: z.number(),
-      opportunitiesFound: z.number(),
-    }).optional(),
+    stats: z
+      .object({
+        totalScans: z.number(),
+        opportunitiesFound: z.number(),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async () => {

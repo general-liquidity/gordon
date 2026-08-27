@@ -8,8 +8,21 @@ describe("FocusStack", () => {
   test("dispatches by priority and falls through on false", () => {
     const calls: string[] = [];
     const stack = new FocusStack();
-    stack.register({ id: "chat", priority: 100, handler: () => { calls.push("chat"); } });
-    stack.register({ id: "dialog", priority: 300, handler: () => { calls.push("dialog"); return false; } });
+    stack.register({
+      id: "chat",
+      priority: 100,
+      handler: () => {
+        calls.push("chat");
+      },
+    });
+    stack.register({
+      id: "dialog",
+      priority: 300,
+      handler: () => {
+        calls.push("dialog");
+        return false;
+      },
+    });
 
     expect(stack.dispatch("x", key)).toBe("chat");
     expect(calls).toEqual(["dialog", "chat"]);

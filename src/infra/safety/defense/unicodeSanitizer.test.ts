@@ -1,15 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import {
-  sanitizeUnicode,
-  recursivelySanitizeUnicode,
-} from "./unicodeSanitizer.ts";
+import { sanitizeUnicode, recursivelySanitizeUnicode } from "./unicodeSanitizer.ts";
 
 // Encode an ASCII string into the Unicode Tag plane (U+E0000 + codepoint),
 // the classic invisible-instruction smuggling vector.
 function toTagPlane(ascii: string): string {
-  return [...ascii]
-    .map((ch) => String.fromCodePoint(0xe0000 + ch.charCodeAt(0)))
-    .join("");
+  return [...ascii].map((ch) => String.fromCodePoint(0xe0000 + ch.charCodeAt(0))).join("");
 }
 
 const ZWSP = "​";

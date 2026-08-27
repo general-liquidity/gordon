@@ -93,8 +93,7 @@ export const fatTailCredibilityDiagnosticTool = createTool({
       component: "estimate_fat_tail_credibility",
       toolName: "estimate_fat_tail_credibility",
       outcome:
-        result.fatTailClass === "gaussian_like" ||
-        result.fatTailClass === "moderately_heavy"
+        result.fatTailClass === "gaussian_like" || result.fatTailClass === "moderately_heavy"
           ? "info"
           : "failure",
       details: {
@@ -104,9 +103,7 @@ export const fatTailCredibilityDiagnosticTool = createTool({
           ? result.sampleSizeMultiplier
           : -1,
         adjustedMinimumSampleSize:
-          result.adjustedMinimumSampleSize === Infinity
-            ? -1
-            : result.adjustedMinimumSampleSize,
+          result.adjustedMinimumSampleSize === Infinity ? -1 : result.adjustedMinimumSampleSize,
       },
     });
     return result;

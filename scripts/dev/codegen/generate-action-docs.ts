@@ -67,7 +67,9 @@ async function main(): Promise<void> {
     markdownLines.push(`- Side effects: \`${action.sideEffectLevel}\``);
     markdownLines.push(`- Approval: \`${action.approvalPolicy}\``);
     markdownLines.push(`- Dry run: \`${action.dryRunSupported}\``);
-    markdownLines.push(`- Visibility: ${action.visibility.map((entry: string) => `\`${entry}\``).join(", ")}`);
+    markdownLines.push(
+      `- Visibility: ${action.visibility.map((entry: string) => `\`${entry}\``).join(", ")}`,
+    );
     if (action.slash) {
       markdownLines.push(`- Slash: \`/${action.slash.name}\``);
       if (action.slash.workflow) {
@@ -88,27 +90,31 @@ async function main(): Promise<void> {
 
   markdownLines.push("## Derived Tool Metadata", "");
   for (const tool of toolMetadata) {
-    markdownLines.push(`- \`${tool.toolName}\` -> \`${tool.actionId}\` (${tool.taskScope}, ${tool.sideEffectLevel})`);
+    markdownLines.push(
+      `- \`${tool.toolName}\` -> \`${tool.actionId}\` (${tool.taskScope}, ${tool.sideEffectLevel})`,
+    );
   }
 
   markdownLines.push("", "## Provider Capability Discovery", "");
   for (const capability of capabilities) {
     const capabilityLabel = capability.integration
       ? [
-        capability.integration.integrationDomain,
-        capability.integration.venueKind,
-        capability.integration.venueSubtype,
-        capability.integration.sourceKind,
-        capability.integration.providerKind,
-        capability.integration.accessPath,
-        capability.integration.railKind,
-        capability.integration.infraKind,
-        capability.integration.automationKind,
-        capability.integration.taxonomyScope,
-        capability.integration.parentSurfaceId
-          ? `parent:${capability.integration.parentSurfaceId}`
-          : undefined,
-      ].filter(Boolean).join(" / ")
+          capability.integration.integrationDomain,
+          capability.integration.venueKind,
+          capability.integration.venueSubtype,
+          capability.integration.sourceKind,
+          capability.integration.providerKind,
+          capability.integration.accessPath,
+          capability.integration.railKind,
+          capability.integration.infraKind,
+          capability.integration.automationKind,
+          capability.integration.taxonomyScope,
+          capability.integration.parentSurfaceId
+            ? `parent:${capability.integration.parentSurfaceId}`
+            : undefined,
+        ]
+          .filter(Boolean)
+          .join(" / ")
       : capability.providerKind;
 
     const capabilityName = capability.integration?.displayName ?? capability.providerId;
@@ -118,8 +124,14 @@ async function main(): Promise<void> {
   }
 
   await Bun.write(join(generatedDir, "actions.md"), `${markdownLines.join("\n")}\n`);
-  await Bun.write(join(generatedDir, "actions.json"), `${JSON.stringify(actionPayload, null, 2)}\n`);
-  await Bun.write(join(generatedDir, "action-playbooks.json"), `${JSON.stringify(playbookMetadata, null, 2)}\n`);
+  await Bun.write(
+    join(generatedDir, "actions.json"),
+    `${JSON.stringify(actionPayload, null, 2)}\n`,
+  );
+  await Bun.write(
+    join(generatedDir, "action-playbooks.json"),
+    `${JSON.stringify(playbookMetadata, null, 2)}\n`,
+  );
 }
 
 await main();

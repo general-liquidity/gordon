@@ -83,13 +83,9 @@ export class CounterfactualAnalyzer {
     // ---------- Stop-loss variants ----------
     const slPercents = [3, 5, 8, 10, 12, 15];
     for (const slPct of slPercents) {
-      const slPrice = isLong
-        ? entryPrice * (1 - slPct / 100)
-        : entryPrice * (1 + slPct / 100);
+      const slPrice = isLong ? entryPrice * (1 - slPct / 100) : entryPrice * (1 + slPct / 100);
 
-      const result = this.simulateWithStopLoss(
-        tradeCandles, entryPrice, slPrice, totalQty, isLong,
-      );
+      const result = this.simulateWithStopLoss(tradeCandles, entryPrice, slPrice, totalQty, isLong);
       scenarios.push({
         category: "stop_loss",
         label: `SL at ${slPct}%`,
@@ -101,12 +97,14 @@ export class CounterfactualAnalyzer {
     // ---------- Take-profit variants ----------
     const tpPercents = [3, 5, 8, 10, 15, 20];
     for (const tpPct of tpPercents) {
-      const tpPrice = isLong
-        ? entryPrice * (1 + tpPct / 100)
-        : entryPrice * (1 - tpPct / 100);
+      const tpPrice = isLong ? entryPrice * (1 + tpPct / 100) : entryPrice * (1 - tpPct / 100);
 
       const result = this.simulateWithTakeProfit(
-        tradeCandles, entryPrice, tpPrice, totalQty, isLong,
+        tradeCandles,
+        entryPrice,
+        tpPrice,
+        totalQty,
+        isLong,
       );
       scenarios.push({
         category: "take_profit",
@@ -127,7 +125,11 @@ export class CounterfactualAnalyzer {
       if (laterCandles.length < 2) continue;
 
       const result = this.simulateHoldToEnd(
-        laterCandles, laterEntry, totalQty, isLong, exitIdx - entryIdx - offset,
+        laterCandles,
+        laterEntry,
+        totalQty,
+        isLong,
+        exitIdx - entryIdx - offset,
       );
       scenarios.push({
         category: "entry_timing",
@@ -140,7 +142,7 @@ export class CounterfactualAnalyzer {
     // ---------- Position size variants ----------
     const sizeMultipliers = [0.5, 0.75, 1.25, 1.5];
     for (const mult of sizeMultipliers) {
-      const adjustedQty = totalQty * mult;
+      const _adjustedQty = totalQty * mult;
       // PnL scales linearly with position size
       scenarios.push({
         category: "position_size",
@@ -157,9 +159,8 @@ export class CounterfactualAnalyzer {
     const insights = this.extractInsights(scenarios, actualPnl, entryPrice);
 
     const bestPnl = Math.max(actualPnl, ...scenarios.map((s) => s.pnl));
-    const improvement = actualPnl !== 0
-      ? ((bestPnl - actualPnl) / Math.abs(actualPnl)) * 100
-      : bestPnl > 0 ? 100 : 0;
+    const improvement =
+      actualPnl !== 0 ? ((bestPnl - actualPnl) / Math.abs(actualPnl)) * 100 : bestPnl > 0 ? 100 : 0;
 
     const report: CounterfactualReport = {
       tradeId: trade.id,
@@ -187,8 +188,11 @@ export class CounterfactualAnalyzer {
   // ---------- Simulation helpers ----------
 
   private simulateWithStopLoss(
-    candles: Candle[], entryPrice: number, slPrice: number,
-    quantity: number, isLong: boolean,
+    candles: Candle[],
+    entryPrice: number,
+    slPrice: number,
+    quantity: number,
+    isLong: boolean,
   ): { pnl: number; pnlPercent: number; maxDrawdown: number; durationCandles: number } {
     let maxDrawdown = 0;
     let peakPnl = 0;
@@ -217,12 +221,20 @@ export class CounterfactualAnalyzer {
     const lastClose = candles[candles.length - 1]!.close;
     const finalPnl = (lastClose - entryPrice) * quantity * (isLong ? 1 : -1);
     const finalPercent = ((lastClose - entryPrice) / entryPrice) * 100 * (isLong ? 1 : -1);
-    return { pnl: finalPnl, pnlPercent: finalPercent, maxDrawdown, durationCandles: candles.length };
+    return {
+      pnl: finalPnl,
+      pnlPercent: finalPercent,
+      maxDrawdown,
+      durationCandles: candles.length,
+    };
   }
 
   private simulateWithTakeProfit(
-    candles: Candle[], entryPrice: number, tpPrice: number,
-    quantity: number, isLong: boolean,
+    candles: Candle[],
+    entryPrice: number,
+    tpPrice: number,
+    quantity: number,
+    isLong: boolean,
   ): { pnl: number; pnlPercent: number; maxDrawdown: number; durationCandles: number } {
     let maxDrawdown = 0;
     let peakPnl = 0;
@@ -252,12 +264,20 @@ export class CounterfactualAnalyzer {
     const lastClose = candles[candles.length - 1]!.close;
     const finalPnl = (lastClose - entryPrice) * quantity * (isLong ? 1 : -1);
     const finalPercent = ((lastClose - entryPrice) / entryPrice) * 100 * (isLong ? 1 : -1);
-    return { pnl: finalPnl, pnlPercent: finalPercent, maxDrawdown, durationCandles: candles.length };
+    return {
+      pnl: finalPnl,
+      pnlPercent: finalPercent,
+      maxDrawdown,
+      durationCandles: candles.length,
+    };
   }
 
   private simulateHoldToEnd(
-    candles: Candle[], entryPrice: number, quantity: number,
-    isLong: boolean, maxCandles: number,
+    candles: Candle[],
+    entryPrice: number,
+    quantity: number,
+    isLong: boolean,
+    maxCandles: number,
   ): { pnl: number; pnlPercent: number; maxDrawdown: number; durationCandles: number } {
     const limit = Math.min(candles.length, maxCandles);
     let maxDrawdown = 0;
@@ -285,14 +305,15 @@ export class CounterfactualAnalyzer {
   }
 
   private extractInsights(
-    scenarios: ScenarioResult[], actualPnl: number, entryPrice: number,
+    scenarios: ScenarioResult[],
+    actualPnl: number,
+    _entryPrice: number,
   ): CounterfactualInsight[] {
     const insights: CounterfactualInsight[] = [];
 
     // Best stop-loss
     const slScenarios = scenarios.filter((s) => s.category === "stop_loss");
-    const bestSL = slScenarios.reduce((best, s) =>
-      s.pnl > best.pnl ? s : best, slScenarios[0]!);
+    const bestSL = slScenarios.reduce((best, s) => (s.pnl > best.pnl ? s : best), slScenarios[0]!);
     if (bestSL && bestSL.pnl > actualPnl * 1.1) {
       insights.push({
         category: "stop_loss",
@@ -306,8 +327,7 @@ export class CounterfactualAnalyzer {
 
     // Best take-profit
     const tpScenarios = scenarios.filter((s) => s.category === "take_profit");
-    const bestTP = tpScenarios.reduce((best, s) =>
-      s.pnl > best.pnl ? s : best, tpScenarios[0]!);
+    const bestTP = tpScenarios.reduce((best, s) => (s.pnl > best.pnl ? s : best), tpScenarios[0]!);
     if (bestTP && bestTP.pnl > actualPnl * 1.1) {
       insights.push({
         category: "take_profit",
@@ -321,8 +341,10 @@ export class CounterfactualAnalyzer {
 
     // Best entry timing
     const timingScenarios = scenarios.filter((s) => s.category === "entry_timing");
-    const bestTiming = timingScenarios.reduce((best, s) =>
-      s.pnl > best.pnl ? s : best, timingScenarios[0]!);
+    const bestTiming = timingScenarios.reduce(
+      (best, s) => (s.pnl > best.pnl ? s : best),
+      timingScenarios[0]!,
+    );
     if (bestTiming && bestTiming.pnl > actualPnl * 1.15) {
       insights.push({
         category: "entry_timing",

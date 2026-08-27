@@ -63,7 +63,9 @@ describe("validateTradeProposal", () => {
     expect(validateTradeProposal(baseTrade({ price: 0 })).length).toBeGreaterThan(0);
     expect(validateTradeProposal(baseTrade({ price: -1 })).length).toBeGreaterThan(0);
     expect(validateTradeProposal(baseTrade({ price: Number.NaN })).length).toBeGreaterThan(0);
-    expect(validateTradeProposal(baseTrade({ price: Number.POSITIVE_INFINITY })).length).toBeGreaterThan(0);
+    expect(
+      validateTradeProposal(baseTrade({ price: Number.POSITIVE_INFINITY })).length,
+    ).toBeGreaterThan(0);
   });
 
   it("blocks classification outright on a zero-price sentinel", () => {
@@ -90,20 +92,34 @@ describe("validatePortfolioContext", () => {
   });
 
   it("rejects out-of-range drawdown values", () => {
-    expect(validatePortfolioContext(baseContext({ currentDrawdownPct: -5 })).length).toBeGreaterThan(0);
-    expect(validatePortfolioContext(baseContext({ currentDrawdownPct: 150 })).length).toBeGreaterThan(0);
+    expect(
+      validatePortfolioContext(baseContext({ currentDrawdownPct: -5 })).length,
+    ).toBeGreaterThan(0);
+    expect(
+      validatePortfolioContext(baseContext({ currentDrawdownPct: 150 })).length,
+    ).toBeGreaterThan(0);
     expect(validatePortfolioContext(baseContext({ maxDrawdownPct: 0 })).length).toBeGreaterThan(0);
-    expect(validatePortfolioContext(baseContext({ maxDrawdownPct: 101 })).length).toBeGreaterThan(0);
+    expect(validatePortfolioContext(baseContext({ maxDrawdownPct: 101 })).length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("rejects negative dailyLossLimitUsd and recentTradeCount", () => {
-    expect(validatePortfolioContext(baseContext({ dailyLossLimitUsd: -1 })).length).toBeGreaterThan(0);
-    expect(validatePortfolioContext(baseContext({ recentTradeCount: -1 })).length).toBeGreaterThan(0);
+    expect(validatePortfolioContext(baseContext({ dailyLossLimitUsd: -1 })).length).toBeGreaterThan(
+      0,
+    );
+    expect(validatePortfolioContext(baseContext({ recentTradeCount: -1 })).length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("rejects non-finite cashUsd and dailyPnlUsd", () => {
-    expect(validatePortfolioContext(baseContext({ cashUsd: Number.NaN })).length).toBeGreaterThan(0);
-    expect(validatePortfolioContext(baseContext({ dailyPnlUsd: Number.NaN })).length).toBeGreaterThan(0);
+    expect(validatePortfolioContext(baseContext({ cashUsd: Number.NaN })).length).toBeGreaterThan(
+      0,
+    );
+    expect(
+      validatePortfolioContext(baseContext({ dailyPnlUsd: Number.NaN })).length,
+    ).toBeGreaterThan(0);
   });
 });
 
@@ -175,10 +191,7 @@ describe("classifyTradeRisk — base dimension composition", () => {
   });
 
   it("escalates an oversized position", () => {
-    const result = classifyTradeRisk(
-      baseTrade({ notionalUsd: 25_000 }),
-      baseContext(),
-    );
+    const result = classifyTradeRisk(baseTrade({ notionalUsd: 25_000 }), baseContext());
     const dim = result.dimensions.find((d) => d.name === "Position Size")!;
     expect(dim.score).toBe(100);
     expect(result.tier).not.toBe("low");
@@ -219,7 +232,9 @@ describe("classifyTradeRisk — base dimension composition", () => {
   });
 
   it("adds Correlation Risk when target + position returns supplied", () => {
-    const returns = trendingPrices(61).map((p, i, arr) => (i === 0 ? 0 : (p - arr[i - 1]!) / arr[i - 1]!)).slice(1);
+    const returns = trendingPrices(61)
+      .map((p, i, arr) => (i === 0 ? 0 : (p - arr[i - 1]!) / arr[i - 1]!))
+      .slice(1);
     const result = classifyTradeRisk(
       baseTrade({ symbol: "ETHUSDT" }),
       baseContext({
@@ -235,7 +250,9 @@ describe("classifyTradeRisk — base dimension composition", () => {
 
   it("composes all 16 dimensions when every optional input is supplied", () => {
     const prices = trendingPrices(120);
-    const returns = prices.map((p, i, arr) => (i === 0 ? 0 : (p - arr[i - 1]!) / arr[i - 1]!)).slice(1);
+    const returns = prices
+      .map((p, i, arr) => (i === 0 ? 0 : (p - arr[i - 1]!) / arr[i - 1]!))
+      .slice(1);
     const result = classifyTradeRisk(
       baseTrade(),
       baseContext({

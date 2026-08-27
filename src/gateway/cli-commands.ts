@@ -1,10 +1,13 @@
 import { spawn } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import type { ParsedCLICommand } from "../cli.ts";
 import { createEnvelopeMeta } from "./protocol/envelope.ts";
-import { GatewayCommandTypeSchema, type GatewayCommandType, type GatewayCommandEnvelope } from "./protocol/commands.ts";
+import {
+  GatewayCommandTypeSchema,
+  type GatewayCommandType,
+  type GatewayCommandEnvelope,
+} from "./protocol/commands.ts";
 import { getOrCreateDaemonToken } from "./security/auth.ts";
 import { getDefaultIpcPath, isIpcDaemonReachable, sendIpcCommand } from "./daemon/ipc.ts";
 import { startGatewayDaemonProcess } from "./daemon/process.ts";
@@ -39,7 +42,10 @@ function buildSpawnArgs(): string[] {
   return ["run", "src/index.tsx", "daemon", "run"];
 }
 
-async function sendLocalCommand(commandType: GatewayCommandType, payload: Record<string, unknown>): Promise<void> {
+async function sendLocalCommand(
+  commandType: GatewayCommandType,
+  payload: Record<string, unknown>,
+): Promise<void> {
   const token = await getOrCreateDaemonToken();
   const envelope: GatewayCommandEnvelope = {
     meta: createEnvelopeMeta({
@@ -296,12 +302,18 @@ export async function runCLICommand(command: ParsedCLICommand): Promise<CLIComma
     const options = parseBootstrapArgs(command.args);
     const result = await applyBootstrap(options);
     if (options.json) {
-      console.log(JSON.stringify({
-        summary: result.summary,
-        savedEnvKeys: result.savedEnvKeys,
-        keyringStoredKeys: result.keyringStoredKeys,
-        doctor: result.doctor ? doctorReportToJson(result.doctor) : null,
-      }, null, 2));
+      console.log(
+        JSON.stringify(
+          {
+            summary: result.summary,
+            savedEnvKeys: result.savedEnvKeys,
+            keyringStoredKeys: result.keyringStoredKeys,
+            doctor: result.doctor ? doctorReportToJson(result.doctor) : null,
+          },
+          null,
+          2,
+        ),
+      );
     } else {
       console.log(result.summary.join("\n"));
       if (result.doctor) {

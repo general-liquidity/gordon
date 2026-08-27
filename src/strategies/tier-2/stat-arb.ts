@@ -85,13 +85,13 @@ export class StatArbStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     // 1. Fetch candles
     const candles = await this.fetchCandles(ctx, symbol, timeframe, 100);
     if (candles.length < MIN_CANDLES) {
       return this.notDetected(
-        `Insufficient data (need ${MIN_CANDLES}+ candles, got ${candles.length})`
+        `Insufficient data (need ${MIN_CANDLES}+ candles, got ${candles.length})`,
       );
     }
 
@@ -160,13 +160,13 @@ export class StatArbStrategy extends BaseStrategy {
       const absZ = Math.abs(zScore);
       if (absZ < ZSCORE_ENTRY) {
         return this.notDetected(
-          `Z-score not extreme enough (${zScore.toFixed(2)}, need |Z| > ${ZSCORE_ENTRY})`
+          `Z-score not extreme enough (${zScore.toFixed(2)}, need |Z| > ${ZSCORE_ENTRY})`,
         );
       }
       // Z-score is extreme but velocity not confirming
       return this.notDetected(
         `Z-score extreme (${zScore.toFixed(2)}) but velocity not confirming reversal ` +
-          `(acceleration: ${acceleration.toFixed(3)}%, need ${direction === null && zScore < 0 ? "> 0" : "< 0"})`
+          `(acceleration: ${acceleration.toFixed(3)}%, need ${direction === null && zScore < 0 ? "> 0" : "< 0"})`,
       );
     }
 
@@ -175,7 +175,7 @@ export class StatArbStrategy extends BaseStrategy {
     const bbWidth = bb.current.bandwidth;
 
     // 7. Volume analysis
-    const volumeTrend = this.analyzeVolumeTrend(candles, 5, 20);
+    const _volumeTrend = this.analyzeVolumeTrend(candles, 5, 20);
     const lastCandle = candles[candles.length - 1];
     const prevCandle = candles[candles.length - 2];
     const volumeIncreasing =
@@ -219,10 +219,10 @@ export class StatArbStrategy extends BaseStrategy {
 
     const reasons: string[] = [];
     reasons.push(
-      `${direction.toUpperCase()} signal: Z-score ${zScore.toFixed(2)} (extreme ${direction === "long" ? "low" : "high"})`
+      `${direction.toUpperCase()} signal: Z-score ${zScore.toFixed(2)} (extreme ${direction === "long" ? "low" : "high"})`,
     );
     reasons.push(
-      `Velocity: ${velocity.toFixed(2)}%, Acceleration: ${acceleration.toFixed(3)}% (confirming reversal)`
+      `Velocity: ${velocity.toFixed(2)}%, Acceleration: ${acceleration.toFixed(3)}% (confirming reversal)`,
     );
     if (absZ > ZSCORE_EXTREME) {
       reasons.push(`Extreme Z-score > ${ZSCORE_EXTREME} (+15% confidence)`);
@@ -237,10 +237,7 @@ export class StatArbStrategy extends BaseStrategy {
     return this.detected(confidence, signals, reasons.join(". "));
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "1h", 100);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const prices = this.extractPrices(candles);
@@ -260,14 +257,12 @@ export class StatArbStrategy extends BaseStrategy {
     // Stop: 0.5 Z-score units beyond the extreme
     // For longs: stop = entry - 0.5 * stdDev
     // For shorts: stop = entry + 0.5 * stdDev
-    const stopLoss = isLong
-      ? entryPrice - 0.5 * stdDev
-      : entryPrice + 0.5 * stdDev;
+    const stopLoss = isLong ? entryPrice - 0.5 * stdDev : entryPrice + 0.5 * stdDev;
 
     // Take-profit targets based on Z-score levels
     // For longs: TP1 = Z=-1 level, TP2 = Z=0 (mean), TP3 = Z=+0.5 (overshoot)
     // For shorts: TP1 = Z=+1 level, TP2 = Z=0 (mean), TP3 = Z=-0.5 (overshoot)
-    let takeProfits;
+    let takeProfits: Array<{ price: number; percentToSell: number }>;
     if (isLong) {
       takeProfits = [
         { price: sma - 1 * stdDev, percentToSell: 0.4 }, // TP1: Z = -1.0
@@ -283,15 +278,8 @@ export class StatArbStrategy extends BaseStrategy {
     }
 
     // Weighted average TP for R:R calculation
-    const avgTpPrice = takeProfits.reduce(
-      (sum, tp) => sum + tp.price * tp.percentToSell,
-      0
-    );
-    const riskRewardRatio = this.calculateRiskReward(
-      entryPrice,
-      stopLoss,
-      avgTpPrice
-    );
+    const avgTpPrice = takeProfits.reduce((sum, tp) => sum + tp.price * tp.percentToSell, 0);
+    const riskRewardRatio = this.calculateRiskReward(entryPrice, stopLoss, avgTpPrice);
 
     return {
       entryPrice,
@@ -362,7 +350,7 @@ the reversal to START before entering.
     bar: OHLC,
     index: number,
     data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     // Need enough history for velocity and acceleration
     if (index < SMA_PERIOD + VELOCITY_BARS + ACCELERATION_BARS) {
@@ -379,12 +367,7 @@ the reversal to START before entering.
     // BB upper = SMA + 2*stdDev, so stdDev = (upper - middle) / 2
     const bbUpper = indicators.bbUpper;
     const bbMiddle = indicators.bbMiddle;
-    if (
-      bbUpper === null ||
-      bbUpper === undefined ||
-      bbMiddle === null ||
-      bbMiddle === undefined
-    ) {
+    if (bbUpper === null || bbUpper === undefined || bbMiddle === null || bbMiddle === undefined) {
       return null;
     }
     const stdDev = (bbUpper - bbMiddle) / 2;
@@ -444,9 +427,8 @@ the reversal to START before entering.
    */
   private computeStdDev(prices: number[], mean: number): number {
     if (prices.length === 0) return 0;
-    const squaredDiffs = prices.map((p) => Math.pow(p - mean, 2));
-    const avgSquaredDiff =
-      squaredDiffs.reduce((a, b) => a + b, 0) / prices.length;
+    const squaredDiffs = prices.map((p) => (p - mean) ** 2);
+    const avgSquaredDiff = squaredDiffs.reduce((a, b) => a + b, 0) / prices.length;
     return Math.sqrt(avgSquaredDiff);
   }
 }

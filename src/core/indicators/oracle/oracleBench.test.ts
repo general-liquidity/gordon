@@ -3,8 +3,21 @@ import { calculateSMA, calculateEMA } from "../ema.ts";
 import { calculateWMA } from "../moving-averages.ts";
 import { calculateRSI } from "../rsi.ts";
 import { calculateBollingerBands } from "../bollinger.ts";
-import { refSMA, refEMA, refWMA, refRSI, refPopStdDev, refBollinger } from "./referenceIndicators.ts";
-import { compareSeries, runOracleCase, runOracleBench, makePrng, randomSeries } from "./oracleBench.ts";
+import {
+  refSMA,
+  refEMA,
+  refWMA,
+  refRSI,
+  refPopStdDev,
+  refBollinger,
+} from "./referenceIndicators.ts";
+import {
+  compareSeries,
+  runOracleCase,
+  runOracleBench,
+  makePrng,
+  randomSeries,
+} from "./oracleBench.ts";
 
 describe("oracleBench machinery", () => {
   it("matches identical series and flags real divergence", () => {

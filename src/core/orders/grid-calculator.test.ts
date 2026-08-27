@@ -1,5 +1,9 @@
 import { describe, it, expect } from "bun:test";
-import { calculatePyramidWeights, calculateEqualWeights, calculateGridLevels } from "./grid-calculator.ts";
+import {
+  calculatePyramidWeights,
+  calculateEqualWeights,
+  calculateGridLevels,
+} from "./grid-calculator.ts";
 import type { Level } from "../../types/index.ts";
 
 describe("grid-calculator", () => {
@@ -30,7 +34,9 @@ describe("grid-calculator", () => {
     it("should return equal weights summing to 1", () => {
       const weights = calculateEqualWeights(5);
       expect(weights).toHaveLength(5);
-      weights.forEach(w => expect(w).toBeCloseTo(0.2, 5));
+      weights.forEach((w) => {
+        expect(w).toBeCloseTo(0.2, 5);
+      });
     });
   });
 

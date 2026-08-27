@@ -66,7 +66,11 @@ export const DEFAULT_ATR_BREAKOUT_SETTINGS: AtrBreakoutSettings = {
   minAtrLong: 0,
 };
 
-export type AtrBreakoutVerdict = "armed" | "filtered_no_expansion" | "filtered_low_vol" | "invalid_input";
+export type AtrBreakoutVerdict =
+  | "armed"
+  | "filtered_no_expansion"
+  | "filtered_low_vol"
+  | "invalid_input";
 
 export interface AtrBreakoutLevels {
   /** Stop-buy entry price (long breakout above this level). */
@@ -112,8 +116,7 @@ export function evaluateAtrBreakout(input: AtrBreakoutInput): AtrBreakoutResult 
   const allowLong = input.allowLong ?? true;
   const allowShort = input.allowShort ?? true;
 
-  const validNumber = (v: unknown): v is number =>
-    typeof v === "number" && Number.isFinite(v);
+  const validNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
   if (
     !validNumber(input.barOpen) ||

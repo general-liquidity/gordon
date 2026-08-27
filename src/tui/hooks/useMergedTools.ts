@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { getRuntime } from "../bridge/runtime.js";
 
 // ============================================================================
@@ -115,7 +115,6 @@ export function toolSourceBadge(tool: MergedTool): string {
       return `MCP:${tool.serverName ?? "?"}`;
     case "plugin":
       return `PLG:${tool.pluginName ?? "?"}`;
-    case "builtin":
     default:
       return "BUILT-IN";
   }

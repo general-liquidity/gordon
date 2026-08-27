@@ -16,11 +16,14 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getXSearchClient, summarizeTweets, type XTweet } from "../../../data/providers/social/xSearch.ts";
+import {
+  getXSearchClient,
+  summarizeTweets,
+  type XTweet,
+} from "../../../data/providers/social/xSearch.ts";
 import {
   resolveXContext,
   listXEntitySymbols,
-  type XContextAnnotation,
   type XAnnotationCategory,
 } from "../../../data/providers/social/xContextAnnotations.ts";
 
@@ -79,15 +82,18 @@ export const searchXSentimentTool = createTool({
     "pre-trade social confirmation. Window defaults to 24h; X API allows up to 7 days " +
     "on Basic tier.",
   inputSchema: z.object({
-    query: z.string().describe(
-      "Cashtag ($BTC, $TSLA) or keyword phrase. Cashtags automatically prefix with '$'.",
-    ),
+    query: z
+      .string()
+      .describe("Cashtag ($BTC, $TSLA) or keyword phrase. Cashtags automatically prefix with '$'."),
     maxResults: z.number().int().min(10).max(100).optional().default(30),
     excludeReplies: z.boolean().optional().default(true),
     windowHours: z.number().int().min(1).max(168).optional().default(24),
-    minAuthorFollowers: z.number().int().min(0).optional().describe(
-      "Optional anti-noise filter: drop authors with fewer than N followers.",
-    ),
+    minAuthorFollowers: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe("Optional anti-noise filter: drop authors with fewer than N followers."),
   }),
   outputSchema: z.object({
     configured: z.boolean(),
@@ -248,8 +254,11 @@ export const getXTrendingCashtagsTool = createTool({
       const ranked = settled
         .filter((s): s is PromiseFulfilledResult<any> => s.status === "fulfilled")
         .map((s) => s.value)
-        .sort((a, b) => b.mentionCount * Math.log10(b.totalEngagement + 10)
-                      - a.mentionCount * Math.log10(a.totalEngagement + 10));
+        .sort(
+          (a, b) =>
+            b.mentionCount * Math.log10(b.totalEngagement + 10) -
+            a.mentionCount * Math.log10(a.totalEngagement + 10),
+        );
 
       return {
         configured: true,
@@ -405,9 +414,13 @@ export const watchXAccountsTool = createTool({
       .describe("Up to 15 X handles (with or without '@')."),
     windowHours: z.number().int().min(1).max(168).optional().default(6),
     maxPerAccount: z.number().int().min(5).max(50).optional().default(10),
-    minEngagement: z.number().int().min(0).optional().default(100).describe(
-      "Only surface tweets with engagement >= this threshold as highlights.",
-    ),
+    minEngagement: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .default(100)
+      .describe("Only surface tweets with engagement >= this threshold as highlights."),
   }),
   outputSchema: z.object({
     configured: z.boolean(),
@@ -469,7 +482,10 @@ export const watchXAccountsTool = createTool({
       );
 
       const results = settled
-        .filter((s): s is PromiseFulfilledResult<{ username: string; tweets: XTweet[] }> => s.status === "fulfilled")
+        .filter(
+          (s): s is PromiseFulfilledResult<{ username: string; tweets: XTweet[] }> =>
+            s.status === "fulfilled",
+        )
         .map((s) => s.value);
 
       const highlights = results
@@ -491,7 +507,9 @@ export const watchXAccountsTool = createTool({
 
       const perAccountSummary = results.map((r) => {
         const sentiments = r.tweets.map((t) => t.sentiment ?? 0);
-        const avg = sentiments.length ? sentiments.reduce((a, b) => a + b, 0) / sentiments.length : 0;
+        const avg = sentiments.length
+          ? sentiments.reduce((a, b) => a + b, 0) / sentiments.length
+          : 0;
         const topEngagement = r.tweets.reduce((max, t) => Math.max(max, engagementOf(t)), 0);
         return {
           username: r.username,
@@ -537,9 +555,11 @@ export const analyzeXNarrativeTool = createTool({
     "headline bull/bear quotes. Use when a user asks 'what's the narrative around " +
     "X?' or for pre-position confirmation on discretionary bets.",
   inputSchema: z.object({
-    narrative: z.string().describe(
-      "Narrative phrase — e.g. 'bitcoin ETF flows', 'AI agents trading', '$SOL breakout', 'solana outage'.",
-    ),
+    narrative: z
+      .string()
+      .describe(
+        "Narrative phrase — e.g. 'bitcoin ETF flows', 'AI agents trading', '$SOL breakout', 'solana outage'.",
+      ),
     windowHours: z.number().int().min(1).max(168).optional().default(24),
     maxResults: z.number().int().min(20).max(100).optional().default(60),
     minAuthorFollowers: z.number().int().min(0).optional().default(500),
@@ -549,18 +569,22 @@ export const analyzeXNarrativeTool = createTool({
     narrative: z.string(),
     windowHours: z.number(),
     totalTweets: z.number(),
-    narrativeStrength: z.object({
-      tweetsPerHour: z.number(),
-      engagementPerTweet: z.number(),
-      momentumLabel: z.string(),
-    }).optional(),
-    sentiment: z.object({
-      avg: z.number(),
-      weighted: z.number(),
-      label: z.string(),
-      bullRatio: z.number(),
-      bearRatio: z.number(),
-    }).optional(),
+    narrativeStrength: z
+      .object({
+        tweetsPerHour: z.number(),
+        engagementPerTweet: z.number(),
+        momentumLabel: z.string(),
+      })
+      .optional(),
+    sentiment: z
+      .object({
+        avg: z.number(),
+        weighted: z.number(),
+        label: z.string(),
+        bullRatio: z.number(),
+        bearRatio: z.number(),
+      })
+      .optional(),
     topVoices: z
       .array(
         z.object({
@@ -627,7 +651,10 @@ export const analyzeXNarrativeTool = createTool({
       else if (tweetsPerHour >= 3) momentumLabel = "active";
 
       // Top voices (by author)
-      const byAuthor = new Map<string, { count: number; engagement: number; sentimentSum: number }>();
+      const byAuthor = new Map<
+        string,
+        { count: number; engagement: number; sentimentSum: number }
+      >();
       for (const t of tweets) {
         const cur = byAuthor.get(t.authorId) ?? { count: 0, engagement: 0, sentimentSum: 0 };
         cur.count += 1;
@@ -711,17 +738,22 @@ export const searchXByEntityTool = createTool({
     "search and returns a note. NOTE: the context: search operator may require a " +
     "paid X API tier.",
   inputSchema: z.object({
-    entity: z.string().describe(
-      "Entity name, ticker, or alias — e.g. 'BTC', 'bitcoin', '$TSLA', 'tesla', 'solana', 'AAPL'.",
-    ),
+    entity: z
+      .string()
+      .describe(
+        "Entity name, ticker, or alias — e.g. 'BTC', 'bitcoin', '$TSLA', 'tesla', 'solana', 'AAPL'.",
+      ),
     maxResults: z.number().int().min(10).max(100).optional().default(50),
     excludeReplies: z.boolean().optional().default(true),
     windowHours: z.number().int().min(1).max(168).optional().default(24),
     minAuthorFollowers: z.number().int().min(0).optional().default(500),
-    additionalQuery: z.string().optional().describe(
-      "Optional additional keyword filter on top of the entity filter, " +
-      "e.g. 'etf' to narrow Bitcoin results to the ETF narrative.",
-    ),
+    additionalQuery: z
+      .string()
+      .optional()
+      .describe(
+        "Optional additional keyword filter on top of the entity filter, " +
+          "e.g. 'etf' to narrow Bitcoin results to the ETF narrative.",
+      ),
   }),
   outputSchema: z.object({
     configured: z.boolean(),
@@ -774,7 +806,14 @@ export const searchXByEntityTool = createTool({
       .optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ entity, maxResults, excludeReplies, windowHours, minAuthorFollowers, additionalQuery }) => {
+  execute: async ({
+    entity,
+    maxResults,
+    excludeReplies,
+    windowHours,
+    minAuthorFollowers,
+    additionalQuery,
+  }) => {
     const client = getXSearchClient();
     if (!(await client.isConfigured())) {
       return {
@@ -837,7 +876,10 @@ export const searchXByEntityTool = createTool({
 
       const summary = summarizeTweets(entity, tweets);
 
-      const coMentioned = new Map<string, { entityName: string; symbol: string; category: string; count: number }>();
+      const coMentioned = new Map<
+        string,
+        { entityName: string; symbol: string; category: string; count: number }
+      >();
       const resolvedEntityIds = new Set(annotations.map((a) => a.entityId));
       for (const t of tweets) {
         if (!t.contextAnnotations) continue;
@@ -929,9 +971,10 @@ export const listXTradingEntitiesTool = createTool({
   }),
   execute: async ({ category }) => {
     const all = listXEntitySymbols();
-    const filtered = !category || category === "all"
-      ? all
-      : all.filter((e) => e.category === (category as XAnnotationCategory));
+    const filtered =
+      !category || category === "all"
+        ? all
+        : all.filter((e) => e.category === (category as XAnnotationCategory));
     return {
       total: filtered.length,
       entities: filtered,

@@ -30,11 +30,11 @@ export const MutationSchema = z.object({
   to_value: z.unknown(),
   /** Category of mutation */
   mutation_type: z.enum([
-    "nudge",   // small parameter change (+/-10-20%)
-    "shift",   // larger parameter change (+/-30-50%)
-    "swap",    // replace one indicator/method with another
-    "add",     // add a new condition/filter
-    "remove",  // remove a condition/filter
+    "nudge", // small parameter change (+/-10-20%)
+    "shift", // larger parameter change (+/-30-50%)
+    "swap", // replace one indicator/method with another
+    "add", // add a new condition/filter
+    "remove", // remove a condition/filter
   ]),
   /** Why this mutation was suggested (agent-provided) */
   reason: z.string(),
@@ -71,12 +71,12 @@ export const GenomeSchema = z.object({
   // ---- Status ----
   /** Lifecycle status of this genome */
   status: z.enum([
-    "candidate",      // just created, not yet tested
-    "backtesting",    // being backtested
-    "paper_trading",  // running in paper mode
-    "live",           // promoted to live trading
-    "deprecated",     // superseded by a better variant
-    "rejected",       // failed testing, will not be used
+    "candidate", // just created, not yet tested
+    "backtesting", // being backtested
+    "paper_trading", // running in paper mode
+    "live", // promoted to live trading
+    "deprecated", // superseded by a better variant
+    "rejected", // failed testing, will not be used
   ]),
 
   // ---- Backtest Performance ----

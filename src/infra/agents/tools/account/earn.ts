@@ -30,15 +30,19 @@ export const getFlexibleProductsTool = createTool({
   }),
   outputSchema: z.object({
     total: z.number().optional(),
-    products: z.array(z.object({
-      asset: z.string(),
-      productId: z.string(),
-      apy: z.string(),
-      minPurchase: z.string(),
-      canRedeem: z.boolean(),
-      isSoldOut: z.boolean(),
-      hot: z.boolean(),
-    })).optional(),
+    products: z
+      .array(
+        z.object({
+          asset: z.string(),
+          productId: z.string(),
+          apy: z.string(),
+          minPurchase: z.string(),
+          canRedeem: z.boolean(),
+          isSoldOut: z.boolean(),
+          hot: z.boolean(),
+        }),
+      )
+      .optional(),
     message: z.string().optional(),
     error: z.string().optional(),
   }),
@@ -55,15 +59,19 @@ export const getLockedProductsTool = createTool({
   }),
   outputSchema: z.object({
     total: z.number().optional(),
-    products: z.array(z.object({
-      asset: z.string(),
-      projectId: z.string(),
-      duration: z.string(),
-      apy: z.string(),
-      minAmount: z.string(),
-      maxAmount: z.string(),
-      renewable: z.boolean(),
-    })).optional(),
+    products: z
+      .array(
+        z.object({
+          asset: z.string(),
+          projectId: z.string(),
+          duration: z.string(),
+          apy: z.string(),
+          minAmount: z.string(),
+          maxAmount: z.string(),
+          renewable: z.boolean(),
+        }),
+      )
+      .optional(),
     message: z.string().optional(),
     error: z.string().optional(),
   }),
@@ -76,26 +84,36 @@ export const getAllEarnPositionsTool = createTool({
     "Get ALL Simple Earn positions - both flexible AND locked, with total value summary.",
   inputSchema: z.object({}),
   outputSchema: z.object({
-    flexible: z.array(z.object({
-      asset: z.string(),
-      amount: z.string(),
-      apy: z.string(),
-      productName: z.string(),
-    })).optional(),
-    locked: z.array(z.object({
-      asset: z.string(),
-      amount: z.string(),
-      apy: z.string(),
-      duration: z.string(),
-      daysRemaining: z.number(),
-      redeemDate: z.string(),
-      autoRenew: z.boolean(),
-    })).optional(),
-    totalValue: z.object({
-      flexible: z.string().optional(),
-      locked: z.string().optional(),
-      total: z.string().optional(),
-    }).optional(),
+    flexible: z
+      .array(
+        z.object({
+          asset: z.string(),
+          amount: z.string(),
+          apy: z.string(),
+          productName: z.string(),
+        }),
+      )
+      .optional(),
+    locked: z
+      .array(
+        z.object({
+          asset: z.string(),
+          amount: z.string(),
+          apy: z.string(),
+          duration: z.string(),
+          daysRemaining: z.number(),
+          redeemDate: z.string(),
+          autoRenew: z.boolean(),
+        }),
+      )
+      .optional(),
+    totalValue: z
+      .object({
+        flexible: z.string().optional(),
+        locked: z.string().optional(),
+        total: z.string().optional(),
+      })
+      .optional(),
     message: z.string().optional(),
     error: z.string().optional(),
   }),
@@ -169,28 +187,36 @@ export const getEarnHistoryTool = createTool({
     limit: z.number().min(1).max(50).default(20),
   }),
   outputSchema: z.object({
-    subscriptions: z.object({
-      count: z.number(),
-      records: z.array(z.object({
-        amount: z.string(),
-        asset: z.string(),
-        time: z.string(),
-        purchaseId: z.number(),
-        sourceAccount: z.string(),
-        status: z.string(),
-      })),
-    }).optional(),
-    redemptions: z.object({
-      count: z.number(),
-      records: z.array(z.object({
-        amount: z.string(),
-        asset: z.string(),
-        time: z.string(),
-        redeemId: z.number(),
-        destAccount: z.string(),
-        status: z.string(),
-      })),
-    }).optional(),
+    subscriptions: z
+      .object({
+        count: z.number(),
+        records: z.array(
+          z.object({
+            amount: z.string(),
+            asset: z.string(),
+            time: z.string(),
+            purchaseId: z.number(),
+            sourceAccount: z.string(),
+            status: z.string(),
+          }),
+        ),
+      })
+      .optional(),
+    redemptions: z
+      .object({
+        count: z.number(),
+        records: z.array(
+          z.object({
+            amount: z.string(),
+            asset: z.string(),
+            time: z.string(),
+            redeemId: z.number(),
+            destAccount: z.string(),
+            status: z.string(),
+          }),
+        ),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async (_input, execContext) => earnUnavailable(execContext),

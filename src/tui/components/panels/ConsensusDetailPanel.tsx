@@ -8,7 +8,7 @@
  * Pattern: Claude Code agent decision tree with expandable detail.
  */
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 import { ProgressBar } from "../../design-system/ProgressBar.js";
@@ -96,7 +96,9 @@ export function ConsensusDetailPanel({
     <Pane title="CONSENSUS" color={decisionColor}>
       {/* Header */}
       <Box>
-        <Text bold color={decisionColor}>{finalDecision}</Text>
+        <Text bold color={decisionColor}>
+          {finalDecision}
+        </Text>
         <Text dimColor> {"\u00b7"} </Text>
         <Text bold>{symbol}</Text>
         <Text dimColor> {"\u00b7"} </Text>
@@ -110,10 +112,26 @@ export function ConsensusDetailPanel({
 
       {/* Column headers */}
       <Box paddingLeft={3}>
-        <Box width={16}><Text bold dimColor>EVALUATOR</Text></Box>
-        <Box width={8}><Text bold dimColor>WEIGHT</Text></Box>
-        <Box width={10}><Text bold dimColor>VOTE</Text></Box>
-        <Box width={12}><Text bold dimColor>CONFIDENCE</Text></Box>
+        <Box width={16}>
+          <Text bold dimColor>
+            EVALUATOR
+          </Text>
+        </Box>
+        <Box width={8}>
+          <Text bold dimColor>
+            WEIGHT
+          </Text>
+        </Box>
+        <Box width={10}>
+          <Text bold dimColor>
+            VOTE
+          </Text>
+        </Box>
+        <Box width={12}>
+          <Text bold dimColor>
+            CONFIDENCE
+          </Text>
+        </Box>
       </Box>
 
       {/* Evaluator rows */}
@@ -139,16 +157,16 @@ export function ConsensusDetailPanel({
                 </Text>
               </Box>
               <Box width={12}>
-                <Text color={confidenceColor(ev.confidence)}>
-                  {ev.confidence}%
-                </Text>
+                <Text color={confidenceColor(ev.confidence)}>{ev.confidence}%</Text>
               </Box>
             </Box>
 
             {/* Expanded reasoning */}
             {isExpanded && (
               <Box paddingLeft={4} marginBottom={1}>
-                <Text dimColor wrap="wrap">{ev.reasoning}</Text>
+                <Text dimColor wrap="wrap">
+                  {ev.reasoning}
+                </Text>
               </Box>
             )}
           </Box>
@@ -168,10 +186,14 @@ export function ConsensusDetailPanel({
           <Text dimColor>1.00</Text>
         </Box>
         <Box width={10}>
-          <Text color={decisionColor} bold>{finalDecision}</Text>
+          <Text color={decisionColor} bold>
+            {finalDecision}
+          </Text>
         </Box>
         <Box width={12}>
-          <Text color={confidenceColor(confidence)} bold>{confidence}%</Text>
+          <Text color={confidenceColor(confidence)} bold>
+            {confidence}%
+          </Text>
         </Box>
       </Box>
 

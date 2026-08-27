@@ -12,7 +12,6 @@
 
 import { Agent } from "@mastra/core/agent";
 import { TokenLimiterProcessor } from "@mastra/core/processors";
-import { GordonInputGuard, GordonOutputSanitizer } from "../processors/index.ts";
 import { composeAgentInstructionsWithSlots } from "../context/promptSections.ts";
 import {
   instrumentedQuoteVerifyTools,
@@ -30,19 +29,20 @@ import {
   gordonOutputSanitizer,
   gordonToolCallReconciler,
 } from "../tooling/instrumentedTools.ts";
-import { researcherContextFilter, isResearcherLeastContextEnabled } from "../processors/researcher-context-filter.ts";
+import {
+  researcherContextFilter,
+  isResearcherLeastContextEnabled,
+} from "../processors/researcher-context-filter.ts";
 import { createSubAgentMemory } from "../memory/memoryFactory.ts";
-import { createModelResolver, registerObservability, resolveRuntimeModel } from "../agentHelpers.ts";
+import {
+  createModelResolver,
+  registerObservability,
+  resolveRuntimeModel,
+} from "../agentHelpers.ts";
 import { instrumentedAgentTools } from "../tooling/instrumentedTools.ts";
-import {
-  getHarnessSuffixForModel,
-  isHarnessProfilesEnabled,
-} from "../profiles/harnessProfile.ts";
+import { getHarnessSuffixForModel, isHarnessProfilesEnabled } from "../profiles/harnessProfile.ts";
 import { applyNativeApprovalMarkers } from "../harness/nativeToolApproval.ts";
-import {
-  nativeInputProcessorsForAgent,
-  nativeOutputProcessorsForAgent,
-} from "../nativeWiring.ts";
+import { nativeInputProcessorsForAgent, nativeOutputProcessorsForAgent } from "../nativeWiring.ts";
 
 const RESEARCHER_INSTRUCTIONS = `You are a Researcher agent within Gordon, a trading CLI.
 
@@ -76,44 +76,42 @@ export function getResearcher(): Agent {
   // surface through but get rejected by the permission engine for this
   // subagent profile). Extracted so native tool-approval markers apply.
   const tools = {
-      // Anti-hallucination quote verification.
-      ...instrumentedQuoteVerifyTools,
-      // Producer health observability.
-      ...instrumentedProducerHealthTools,
+    // Anti-hallucination quote verification.
+    ...instrumentedQuoteVerifyTools,
+    // Producer health observability.
+    ...instrumentedProducerHealthTools,
 
-      // INTEGRATION tier — venue + social + research feeds.
-      ...instrumentedXSocialTools,
-      ...instrumentedFinnhubTools,
-      ...instrumentedFinnhubFundamentalsTools,
-      ...instrumentedFinnhubMarketsTools,
-      // Recovering a spilled tool result: cold tier, and only reachable after
-      // an offload has already happened.
-      ...(isHotTierOnly() ? {} : instrumentedOffloadedResultTools),
-      ...(isHotTierOnly() ? {} : instrumentedSecFilingTools),
-      // Open-web reach (web_fetch / web_search) — gated allowlist + injection-
-      // sanitized, COLD tier (DD/discovery, not the hot scan path).
-      ...(isHotTierOnly() ? {} : instrumentedWebTools),
+    // INTEGRATION tier — venue + social + research feeds.
+    ...instrumentedXSocialTools,
+    ...instrumentedFinnhubTools,
+    ...instrumentedFinnhubFundamentalsTools,
+    ...instrumentedFinnhubMarketsTools,
+    // Recovering a spilled tool result: cold tier, and only reachable after
+    // an offload has already happened.
+    ...(isHotTierOnly() ? {} : instrumentedOffloadedResultTools),
+    ...(isHotTierOnly() ? {} : instrumentedSecFilingTools),
+    // Open-web reach (web_fetch / web_search) — gated allowlist + injection-
+    // sanitized, COLD tier (DD/discovery, not the hot scan path).
+    ...(isHotTierOnly() ? {} : instrumentedWebTools),
 
-      // Canonical 22-tool agent surface.
-      ...instrumentedAgentTools,
+    // Canonical 22-tool agent surface.
+    ...instrumentedAgentTools,
 
-      // RLM recursive decomposition for oversized inputs (10-K, trade
-      // ledger, news history). COLD tier — deep-research path, not hot scan.
-      ...(isHotTierOnly() ? {} : instrumentedRecursiveDecomposeTools),
+    // RLM recursive decomposition for oversized inputs (10-K, trade
+    // ledger, news history). COLD tier — deep-research path, not hot scan.
+    ...(isHotTierOnly() ? {} : instrumentedRecursiveDecomposeTools),
 
-      // Self-history recall (search_session_history) — ranked, provenance-
-      // carrying search over Gordon's OWN past chat sessions. COLD tier —
-      // deep-recall path ("what did I conclude last time"), not hot scan.
-      ...(isHotTierOnly() ? {} : instrumentedSelfHistoryTools),
+    // Self-history recall (search_session_history) — ranked, provenance-
+    // carrying search over Gordon's OWN past chat sessions. COLD tier —
+    // deep-recall path ("what did I conclude last time"), not hot scan.
+    ...(isHotTierOnly() ? {} : instrumentedSelfHistoryTools),
   };
 
   // Native tool-approval (GORDON_NATIVE_TOOL_APPROVAL): mark any execute_plan /
   // cancel_* that surface through the shared agent surface. No-op when the flag
   // is unset. The researcher is read-only regardless — the permission engine
   // rejects execution here — so this is defense-in-depth, never a widening.
-  applyNativeApprovalMarkers(
-    tools as Record<string, { id?: string; requireApproval?: unknown }>,
-  );
+  applyNativeApprovalMarkers(tools as Record<string, { id?: string; requireApproval?: unknown }>);
 
   const agent = new Agent({
     id: "researcher",

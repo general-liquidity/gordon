@@ -78,7 +78,7 @@ function quantile(sorted: number[], q: number): number {
 function classify(p: number): RuinVerdict {
   if (p < 0.01) return "safe";
   if (p < 0.05) return "cautious";
-  if (p < 0.20) return "risky";
+  if (p < 0.2) return "risky";
   return "ruinous";
 }
 

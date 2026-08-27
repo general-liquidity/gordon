@@ -69,7 +69,12 @@ describe("runStatusLineHook — fail-closed safety", () => {
 
   it("returns null on timeout", async () => {
     const out = await runStatusLineHook("slow", {
-      runner: runnerReturning({ stdout: "partial", exitCode: null, timedOut: true, spawnFailed: false }),
+      runner: runnerReturning({
+        stdout: "partial",
+        exitCode: null,
+        timedOut: true,
+        spawnFailed: false,
+      }),
     });
     expect(out).toBeNull();
   });
@@ -83,7 +88,12 @@ describe("runStatusLineHook — fail-closed safety", () => {
 
   it("returns null on non-zero exit", async () => {
     const out = await runStatusLineHook("fails", {
-      runner: runnerReturning({ stdout: "noise", exitCode: 1, timedOut: false, spawnFailed: false }),
+      runner: runnerReturning({
+        stdout: "noise",
+        exitCode: 1,
+        timedOut: false,
+        spawnFailed: false,
+      }),
     });
     expect(out).toBeNull();
   });

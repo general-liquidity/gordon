@@ -71,9 +71,10 @@ const DEFAULT_CUMULATIVE_TARGET = 0.9;
 const DEFAULT_TOP_K = 5;
 const HIGH_CORR = 0.7;
 
-function buildCovariance(
-  series: ReadonlyArray<ReturnSeries>,
-): { matrix: number[][]; effectiveLen: number } {
+function buildCovariance(series: ReadonlyArray<ReturnSeries>): {
+  matrix: number[][];
+  effectiveLen: number;
+} {
   const n = series.length;
   const minLen = Math.min(...series.map((s) => s.returns.length));
   if (minLen < 2) return { matrix: [], effectiveLen: 0 };
@@ -232,7 +233,11 @@ export function computePcaConcentration(input: PcaConcentrationInput): PcaConcen
     for (let j = i + 1; j < n; j++) {
       const r = corr[i]![j]!;
       if (Math.abs(r) >= HIGH_CORR) {
-        highCorr.push({ a: input.series[i]!.strategyId, b: input.series[j]!.strategyId, correlation: r });
+        highCorr.push({
+          a: input.series[i]!.strategyId,
+          b: input.series[j]!.strategyId,
+          correlation: r,
+        });
       }
     }
   }
@@ -242,7 +247,10 @@ export function computePcaConcentration(input: PcaConcentrationInput): PcaConcen
   if (pc1 >= critical) verdict = "critical";
   else if (pc1 >= concentrated) verdict = "concentrated";
 
-  const topNames = topLoadings.slice(0, 3).map((l) => l.strategyId).join(", ");
+  const topNames = topLoadings
+    .slice(0, 3)
+    .map((l) => l.strategyId)
+    .join(", ");
   const reasoning =
     verdict === "diverse"
       ? `PC1 explains ${(pc1 * 100).toFixed(1)}% — no hidden factor concentration; ${nForTarget} PCs needed for ${(cumulativeTarget * 100).toFixed(0)}% variance`

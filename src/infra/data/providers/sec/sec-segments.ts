@@ -148,7 +148,7 @@ export class SECSegmentsClient {
       let revenueFacts: XBRLFact[] = [];
       let conceptUsed = "";
       for (const concept of REVENUE_CONCEPTS) {
-        const facts = usGaap[concept]?.units?.["USD"];
+        const facts = usGaap[concept]?.units?.USD;
         if (facts && facts.length > 0) {
           revenueFacts = facts;
           conceptUsed = concept;

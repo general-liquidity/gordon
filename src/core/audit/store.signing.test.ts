@@ -3,10 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import {
-  setDatabasePathForTesting,
-  getDatabase,
-} from "../../infra/storage/database.ts";
+import { setDatabasePathForTesting, getDatabase } from "../../infra/storage/database.ts";
 import { saveTrace, verifyStoredAuditChain } from "./store.ts";
 import { provisionAuditSchema } from "./testSupport.ts";
 import type { AuditTrace } from "./types.ts";
@@ -99,7 +96,9 @@ describe("audit store signing round-trip", () => {
         .get("rewritten by attacker") as { trace_id: string }
     ).trace_id;
     const successor = saveTrace(makeTrace("after the deleted trace"));
-    db.prepare("DELETE FROM audit_tool_calls WHERE step_id IN (SELECT step_id FROM audit_agent_steps WHERE trace_id = ?)").run(tamperedId);
+    db.prepare(
+      "DELETE FROM audit_tool_calls WHERE step_id IN (SELECT step_id FROM audit_agent_steps WHERE trace_id = ?)",
+    ).run(tamperedId);
     db.prepare("DELETE FROM audit_agent_steps WHERE trace_id = ?").run(tamperedId);
     db.prepare("DELETE FROM audit_traces WHERE trace_id = ?").run(tamperedId);
 

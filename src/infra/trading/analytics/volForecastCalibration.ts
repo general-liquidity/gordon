@@ -27,12 +27,7 @@
  * filtered by time window — fine for sub-million forecast volumes.
  */
 
-import {
-  appendFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-} from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { GORDON_DIR } from "../../storage/paths.ts";
 import { createModuleLogger } from "../../logger/index.ts";
@@ -95,7 +90,7 @@ function ensureDir(): void {
 function append(entry: JsonlEntry): void {
   ensureDir();
   try {
-    appendFileSync(CALIBRATION_FILE, JSON.stringify(entry) + "\n");
+    appendFileSync(CALIBRATION_FILE, `${JSON.stringify(entry)}\n`);
   } catch (err) {
     logger.warn("Failed to append vol-calibration entry", {
       err: err instanceof Error ? err.message : String(err),
@@ -195,9 +190,7 @@ function defaultEnd(): string {
  * pairs in the given window. Forecasts without a matching realization
  * are excluded — they're "open positions" from a calibration POV.
  */
-export function getVolCalibration(
-  window: VolCalibrationWindow = {},
-): VolCalibrationMetrics {
+export function getVolCalibration(window: VolCalibrationWindow = {}): VolCalibrationMetrics {
   const startTime = window.startTime ?? defaultStart();
   const endTime = window.endTime ?? defaultEnd();
   const entries = loadEntries();

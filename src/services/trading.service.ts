@@ -24,7 +24,7 @@ export class TradingService {
   /**
    * Validate a plan before execution
    */
-  async validatePlan(plan: Plan, config: GordonConfig, portfolioValue: number): Promise<void> {
+  async validatePlan(plan: Plan, config: GordonConfig, _portfolioValue: number): Promise<void> {
     // Check permissionMode allows trade execution
     if (config.permissionMode === "strict") {
       throw new TradingModeError("strict");
@@ -36,7 +36,7 @@ export class TradingService {
       throw new RiskLimitExceededError(
         "allocation",
         config.preferences.maxAllocationPerTrade,
-        allocationPercent
+        allocationPercent,
       );
     }
 
@@ -45,11 +45,7 @@ export class TradingService {
     const openTrades = container.tradesRepo.findOpen();
     const maxOpenPositions = 5; // Could be added to config in future
     if (openTrades.length >= maxOpenPositions) {
-      throw new RiskLimitExceededError(
-        "positions",
-        maxOpenPositions,
-        openTrades.length
-      );
+      throw new RiskLimitExceededError("positions", maxOpenPositions, openTrades.length);
     }
 
     // Check plan status
@@ -166,7 +162,7 @@ export class TradingService {
     tradeId: string,
     reason: "MANUAL" | "STOP" | "TP1" | "TP2" | "TP3",
     pnl: number,
-    pnlPercent: number
+    pnlPercent: number,
   ): Promise<Trade> {
     const container = getContainer();
 

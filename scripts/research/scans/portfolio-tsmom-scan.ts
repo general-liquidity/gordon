@@ -51,7 +51,10 @@ import { sizeWithVolTarget } from "../../../src/core/alpha/vol-target-sizer.ts";
 // re-run on a different committed universe (e.g. the stable momq competition
 // bars for parity tests) without touching code:
 //   PORT_DATA_DIR=data/momq/bars PORT_TF=M15 bun run scripts/research/scans/portfolio-tsmom-scan.ts
-const DATA_DIR = join(process.cwd(), process.env.PORT_DATA_DIR ?? join("data", "momq", "crypto-extended"));
+const DATA_DIR = join(
+  process.cwd(),
+  process.env.PORT_DATA_DIR ?? join("data", "momq", "crypto-extended"),
+);
 const TF = process.env.PORT_TF ?? "1d"; // 1d | 1h | M15
 const PERIODS_PER_YEAR = TF === "1d" ? 365 : TF === "1h" ? 365 * 24 : 365 * 24 * 4;
 const IS_FRAC = 0.7; // first 70% in-sample, back 30% out-of-sample.
@@ -141,9 +144,7 @@ function buildPanel(symData: SymbolData[]): Panel {
   for (const d of symData) for (const t of d.closeByTime.keys()) timeSet.add(t);
   const times = [...timeSet].sort((a, b) => a - b);
 
-  const close: number[][] = times.map((t) =>
-    symData.map((d) => d.closeByTime.get(t) ?? NaN),
-  );
+  const close: number[][] = times.map((t) => symData.map((d) => d.closeByTime.get(t) ?? NaN));
   const dataSpreadBps = symData.map((d) => d.medianSpreadBps);
   const spreadBps = dataSpreadBps.map((s) => Math.max(s, MIN_SPREAD_BPS));
 
@@ -226,12 +227,7 @@ function trailingVol(ret: number[][], t: number, s: number, lookback: number): n
  * sum(|w|)=1; long-short books are scaled to sum(|w|)=1 (dollar-neutral-ish in
  * risk space, beta-stripped by the long/short signs).
  */
-function targetWeights(
-  panel: Panel,
-  der: Derived,
-  cfg: Config,
-  t: number,
-): number[] {
+function targetWeights(panel: Panel, der: Derived, cfg: Config, t: number): number[] {
   const nS = der.nS;
   const w = new Array(nS).fill(0);
 
@@ -321,10 +317,15 @@ function runBacktest(panel: Panel, der: Derived, cfg: Config): BTResult {
       if (cfg.volTarget && cfg.style !== "buyhold") {
         // Book-level vol: realized per-bar vol of the target book over the
         // trailing window, annualized; scale via Gordon's vol-target sizer.
-        const bookVolAnn = bookTrailingVol(der, target, t, cfg.lookback) * Math.sqrt(PERIODS_PER_YEAR);
+        const bookVolAnn =
+          bookTrailingVol(der, target, t, cfg.lookback) * Math.sqrt(PERIODS_PER_YEAR);
         if (Number.isFinite(bookVolAnn) && bookVolAnn > 0) {
           const sized = sizeWithVolTarget(
-            { targetAnnualVol: TARGET_ANNUAL_VOL, currentAnnualVol: bookVolAnn, currentNotionalFraction: 1 },
+            {
+              targetAnnualVol: TARGET_ANNUAL_VOL,
+              currentAnnualVol: bookVolAnn,
+              currentNotionalFraction: 1,
+            },
             { leverageCap: 3, leverageFloor: 0, noTradeBandPct: 0 },
           );
           const mult = sized.clippedMultiplier > 0 ? sized.clippedMultiplier : 1;
@@ -499,20 +500,34 @@ function main(): void {
   const trials = grid.length; // deflated-Sharpe trial count = active grid size.
 
   // Passive benchmark (NOT counted in trials; it is the bar to beat).
-  const benchCfg: Config = { style: "buyhold", lookback: 14, rebalance: 20, volTarget: false, id: "buyhold_eqw" };
+  const benchCfg: Config = {
+    style: "buyhold",
+    lookback: 14,
+    rebalance: 20,
+    volTarget: false,
+    id: "buyhold_eqw",
+  };
   const bench = scoreConfig(panel, der, benchCfg, trials);
 
   console.log("=".repeat(82));
   console.log(`PORTFOLIO TSMOM + RISK-ALLOCATION BACKTEST — ${TF} extended crypto`);
   console.log("=".repeat(82));
   console.log(`Symbols           : ${panel.symbols.length} (${panel.symbols.join(", ")})`);
-  console.log(`Aligned bars      : ${panel.times.length} (union grid; per-asset active when it has data)`);
-  console.log(`Period            : ${new Date(panel.times[0]! * 1000).toISOString().slice(0, 10)} → ${new Date(panel.times.at(-1)! * 1000).toISOString().slice(0, 10)}`);
-  console.log(`IS/OOS            : ${(IS_FRAC * 100).toFixed(0)}% / ${((1 - IS_FRAC) * 100).toFixed(0)}%`);
+  console.log(
+    `Aligned bars      : ${panel.times.length} (union grid; per-asset active when it has data)`,
+  );
+  console.log(
+    `Period            : ${new Date(panel.times[0]! * 1000).toISOString().slice(0, 10)} → ${new Date(panel.times.at(-1)! * 1000).toISOString().slice(0, 10)}`,
+  );
+  console.log(
+    `IS/OOS            : ${(IS_FRAC * 100).toFixed(0)}% / ${((1 - IS_FRAC) * 100).toFixed(0)}%`,
+  );
   console.log(`Active grid (trials): ${trials} configs`);
   console.log(`periodsPerYear    : ${PERIODS_PER_YEAR}`);
   const dataSpread = median(panel.dataSpreadBps);
-  console.log(`Spread (data-implied median): ${fmt(dataSpread, 2)} bps — FLOORED to ${MIN_SPREAD_BPS} bps for cost (dataset records spread=0)`);
+  console.log(
+    `Spread (data-implied median): ${fmt(dataSpread, 2)} bps — FLOORED to ${MIN_SPREAD_BPS} bps for cost (dataset records spread=0)`,
+  );
   console.log(`Vol target (vt=1 configs): ${(TARGET_ANNUAL_VOL * 100).toFixed(0)}% annualized`);
 
   console.log("");
@@ -597,7 +612,9 @@ function main(): void {
   console.log("=".repeat(82));
   console.log("DEFLATED-SHARPE VERDICT");
   console.log("=".repeat(82));
-  console.log(`Expected-max Sharpe under null (annualized, ${trials} trials): ${fmt(expMaxNull, 2)}`);
+  console.log(
+    `Expected-max Sharpe under null (annualized, ${trials} trials): ${fmt(expMaxNull, 2)}`,
+  );
   console.log(`Configs clearing DSR>0.95 (deflated bar): ${cleared.length}`);
   console.log(`Configs marginal (0.5<DSR<=0.95, positive OOS): ${marginal.length}`);
   console.log("");
@@ -617,17 +634,27 @@ function main(): void {
 
   // ── The skill question ──
   const best = rows[0]!;
-  const lsBest = rows.filter((r) => r.cfg.style === "ls_tsmom").reduce((a, b) => (b.oosSharpeBar > a.oosSharpeBar ? b : a));
+  const lsBest = rows
+    .filter((r) => r.cfg.style === "ls_tsmom")
+    .reduce((a, b) => (b.oosSharpeBar > a.oosSharpeBar ? b : a));
   const nBeatBH = rows.filter((r) => r.oosSharpeBar > bench.oosSharpeBar).length;
 
   console.log("=".repeat(82));
   console.log("ACTIVE vs PASSIVE — IS THE PORTFOLIO EDGE REAL?");
   console.log("=".repeat(82));
-  console.log(`Equal-weight buy&hold OOS bar-Sharpe : ${fmt(bench.oosSharpeBar, 4)} (ann ${fmt(bench.oosSharpeAnn, 2)})`);
-  console.log(`Best ACTIVE config OOS bar-Sharpe    : ${fmt(best.oosSharpeBar, 4)} (${best.cfg.id})`);
-  console.log(`Best LONG-SHORT TSMOM (beta-stripped) : ${fmt(lsBest.oosSharpeBar, 4)} (${lsBest.cfg.id}), DSR ${fmt(lsBest.dsr, 2)}`);
+  console.log(
+    `Equal-weight buy&hold OOS bar-Sharpe : ${fmt(bench.oosSharpeBar, 4)} (ann ${fmt(bench.oosSharpeAnn, 2)})`,
+  );
+  console.log(
+    `Best ACTIVE config OOS bar-Sharpe    : ${fmt(best.oosSharpeBar, 4)} (${best.cfg.id})`,
+  );
+  console.log(
+    `Best LONG-SHORT TSMOM (beta-stripped) : ${fmt(lsBest.oosSharpeBar, 4)} (${lsBest.cfg.id}), DSR ${fmt(lsBest.dsr, 2)}`,
+  );
   console.log(`Active configs beating buy&hold OOS  : ${nBeatBH}/${rows.length}`);
-  console.log(`Best active − passive (bar-Sharpe Δ) : ${fmt(best.oosSharpeBar - bench.oosSharpeBar, 4)}`);
+  console.log(
+    `Best active − passive (bar-Sharpe Δ) : ${fmt(best.oosSharpeBar - bench.oosSharpeBar, 4)}`,
+  );
   console.log("");
 }
 

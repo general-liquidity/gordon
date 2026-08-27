@@ -27,7 +27,9 @@ export const getPerformanceMetricsTool = createTool({
     format: z
       .enum(["summary", "detailed", "json"])
       .default("summary")
-      .describe("Output format: summary (human readable), detailed (full report), or json (raw data)"),
+      .describe(
+        "Output format: summary (human readable), detailed (full report), or json (raw data)",
+      ),
   }),
   outputSchema: z.object({
     report: z.string().optional(),

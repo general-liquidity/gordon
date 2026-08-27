@@ -9,7 +9,10 @@ describe("detectGoalStall", () => {
   });
 
   it("plateau after a jump → halt", () => {
-    const r = detectGoalStall([0, 0.2, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], { patience: 6, minDelta: 0.01 });
+    const r = detectGoalStall([0, 0.2, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], {
+      patience: 6,
+      minDelta: 0.01,
+    });
     expect(r.stalled).toBe(true);
     expect(r.recommendation).toBe("halt");
     expect(r.cyclesSinceImprovement).toBeGreaterThanOrEqual(6);
@@ -28,7 +31,9 @@ describe("detectGoalStall", () => {
   });
 
   it("near-complete progress is not stalled even if flat", () => {
-    const r = detectGoalStall([0.999, 0.999, 0.999, 0.999, 0.999, 0.999, 0.999, 0.999], { patience: 5 });
+    const r = detectGoalStall([0.999, 0.999, 0.999, 0.999, 0.999, 0.999, 0.999, 0.999], {
+      patience: 5,
+    });
     expect(r.stalled).toBe(false);
     expect(r.recommendation).toBe("continue");
   });

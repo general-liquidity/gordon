@@ -73,7 +73,7 @@ export const recordGoalDeferredActionTool = createTool({
     });
     const path = defaultDeferredPath();
     mkdirSync(dirname(path), { recursive: true });
-    appendFileSync(path, serializeForJsonl(action) + "\n", "utf8");
+    appendFileSync(path, `${serializeForJsonl(action)}\n`, "utf8");
 
     recordStructuredObservation({
       eventType: "goal_deferred_action.recorded",
@@ -112,7 +112,10 @@ export const listGoalDeferredActionsTool = createTool({
     goalId: z.string().optional().describe("Filter to a specific goal ID."),
     category: CATEGORY_ENUM.optional().describe("Filter by category."),
     sinceMs: z.number().optional().describe("Only entries recorded at or after this ms timestamp."),
-    untilMs: z.number().optional().describe("Only entries recorded at or before this ms timestamp."),
+    untilMs: z
+      .number()
+      .optional()
+      .describe("Only entries recorded at or before this ms timestamp."),
     anyTag: z.array(z.string()).optional().describe("Match if any tag is in this list."),
     maxResults: z
       .number()
@@ -139,7 +142,7 @@ export const listGoalDeferredActionsTool = createTool({
   execute: async (input) => {
     const path = defaultDeferredPath();
     const maxResults = input.maxResults ?? 100;
-    let actions: DeferredAction[] = [];
+    const actions: DeferredAction[] = [];
     if (existsSync(path)) {
       const lines = readFileSync(path, "utf8")
         .split("\n")
@@ -147,12 +150,7 @@ export const listGoalDeferredActionsTool = createTool({
       for (const line of lines) {
         try {
           actions.push(parseFromJsonl(line));
-        } catch {
-          // Skip malformed lines silently — log is append-only and may
-          // contain partial writes; we don't want one bad line to fail
-          // the whole load.
-          continue;
-        }
+        } catch {}
       }
     }
     const filtered = filterDeferredActions(actions, {
@@ -163,8 +161,7 @@ export const listGoalDeferredActionsTool = createTool({
       anyTag: input.anyTag,
     }).slice(0, maxResults);
 
-    const summary =
-      `loaded ${actions.length} deferred actions from ${path}; ${filtered.length} after filter.`;
+    const summary = `loaded ${actions.length} deferred actions from ${path}; ${filtered.length} after filter.`;
 
     return {
       count: filtered.length,

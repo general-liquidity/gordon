@@ -62,7 +62,10 @@ export const DEFAULT_SIGNAL_CONFIG: PairsTradeSignal = {
 // Linear Regression (OLS)
 // ============================================================================
 
-function linearRegression(x: number[], y: number[]): { slope: number; intercept: number; residuals: number[] } {
+function linearRegression(
+  x: number[],
+  y: number[],
+): { slope: number; intercept: number; residuals: number[] } {
   const n = x.length;
   const sumX = x.reduce((s, v) => s + v, 0);
   const sumY = y.reduce((s, v) => s + v, 0);
@@ -89,7 +92,10 @@ function linearRegression(x: number[], y: number[]): { slope: number; intercept:
  * Uses the ADF regression: Δy_t = α + β*y_{t-1} + Σ(γ_i * Δy_{t-i}) + ε_t
  * We test if β < 0 (mean-reverting).
  */
-function adfTest(series: number[], maxLags: number = 1): {
+function adfTest(
+  series: number[],
+  maxLags: number = 1,
+): {
   statistic: number;
   criticalValues: { pct1: number; pct5: number; pct10: number };
 } {
@@ -110,7 +116,8 @@ function adfTest(series: number[], maxLags: number = 1): {
     dyDep.push(dy[i]!);
   }
 
-  if (yLag.length < 10) return { statistic: 0, criticalValues: { pct1: -3.43, pct5: -2.86, pct10: -2.57 } };
+  if (yLag.length < 10)
+    return { statistic: 0, criticalValues: { pct1: -3.43, pct5: -2.86, pct10: -2.57 } };
 
   // OLS: dyDep = α + β * yLag
   const reg = linearRegression(yLag, dyDep);
@@ -209,8 +216,10 @@ export function testCointegration(
   let signal: CointegrationResult["signal"] = "hold";
 
   if (cointegrated) {
-    if (currentZ < -signalConfig.entryThreshold) signal = "enter_long"; // Spread below mean → buy spread
-    else if (currentZ > signalConfig.entryThreshold) signal = "enter_short"; // Spread above mean → sell spread
+    if (currentZ < -signalConfig.entryThreshold)
+      signal = "enter_long"; // Spread below mean → buy spread
+    else if (currentZ > signalConfig.entryThreshold)
+      signal = "enter_short"; // Spread above mean → sell spread
     else if (Math.abs(currentZ) < signalConfig.exitThreshold) signal = "exit"; // Near mean → close
   }
 
@@ -231,13 +240,25 @@ export function testCointegration(
 /**
  * Format cointegration result for display.
  */
-export function formatCointegrationResult(r: CointegrationResult, symbolX: string, symbolY: string): string {
+export function formatCointegrationResult(
+  r: CointegrationResult,
+  symbolX: string,
+  symbolY: string,
+): string {
   const lines: string[] = [];
   lines.push(`Pairs Trading: ${symbolX} / ${symbolY}`);
-  lines.push(`  Cointegrated: ${r.cointegrated ? `YES (${r.significanceLevel} significance)` : "NO"}`);
-  lines.push(`  ADF Statistic: ${r.adfStatistic.toFixed(3)} (1%: ${r.criticalValues.pct1}, 5%: ${r.criticalValues.pct5})`);
-  lines.push(`  Hedge Ratio: ${r.hedgeRatio.toFixed(4)} (${r.hedgeRatio.toFixed(2)} ${symbolY} per 1 ${symbolX})`);
-  lines.push(`  Half-Life: ${r.halfLife === Infinity ? "N/A (no mean reversion)" : `${r.halfLife.toFixed(1)} periods`}`);
+  lines.push(
+    `  Cointegrated: ${r.cointegrated ? `YES (${r.significanceLevel} significance)` : "NO"}`,
+  );
+  lines.push(
+    `  ADF Statistic: ${r.adfStatistic.toFixed(3)} (1%: ${r.criticalValues.pct1}, 5%: ${r.criticalValues.pct5})`,
+  );
+  lines.push(
+    `  Hedge Ratio: ${r.hedgeRatio.toFixed(4)} (${r.hedgeRatio.toFixed(2)} ${symbolY} per 1 ${symbolX})`,
+  );
+  lines.push(
+    `  Half-Life: ${r.halfLife === Infinity ? "N/A (no mean reversion)" : `${r.halfLife.toFixed(1)} periods`}`,
+  );
   lines.push(`  Current Z-Score: ${r.currentZScore.toFixed(2)}`);
   lines.push(`  Signal: ${r.signal.replace("_", " ").toUpperCase()}`);
   return lines.join("\n");

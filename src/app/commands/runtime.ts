@@ -1,6 +1,9 @@
 import type { SessionRuntime } from "../../runtime/index.ts";
 import { getRuntimeApprovalShortId } from "../runtime/runtimeApprovalId.ts";
-import { createRuntimeInspectorViewModel, formatRuntimeInspectorSummary } from "../presenters/RuntimePresenter.ts";
+import {
+  createRuntimeInspectorViewModel,
+  formatRuntimeInspectorSummary,
+} from "../presenters/RuntimePresenter.ts";
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -109,7 +112,9 @@ export function formatRuntimeScratchpad(runtime: SessionRuntime, args: string): 
   return [
     worker ? `**Runtime Scratchpad: ${worker}**` : "**Runtime Scratchpad**",
     "",
-    ...entries.slice(-12).map((entry) => `- [${entry.timestamp}] ${entry.worker} [${entry.kind}]: ${entry.content}`),
+    ...entries
+      .slice(-12)
+      .map((entry) => `- [${entry.timestamp}] ${entry.worker} [${entry.kind}]: ${entry.content}`),
   ].join("\n");
 }
 
@@ -123,9 +128,12 @@ export function formatRuntimeHandoffs(runtime: SessionRuntime): string {
   return [
     "**Runtime Handoffs**",
     "",
-    ...handoffs.slice(-12).map((handoff) =>
-      `- [${handoff.timestamp}] ${handoff.fromWorker} -> ${handoff.toWorker}: ${handoff.reason}`,
-    ),
+    ...handoffs
+      .slice(-12)
+      .map(
+        (handoff) =>
+          `- [${handoff.timestamp}] ${handoff.fromWorker} -> ${handoff.toWorker}: ${handoff.reason}`,
+      ),
   ].join("\n");
 }
 
@@ -142,7 +150,9 @@ export function formatRuntimeApprovals(runtime: SessionRuntime): string {
     lines.push("Pending:");
     for (const request of pending.slice(0, 12)) {
       const shortId = getRuntimeApprovalShortId(request.id);
-      lines.push(`- ${shortId} · ${request.toolName} · ${request.approvalClass} · ${request.reason ?? "approval required"}`);
+      lines.push(
+        `- ${shortId} · ${request.toolName} · ${request.approvalClass} · ${request.reason ?? "approval required"}`,
+      );
       lines.push(`  Approve: /runtime-approve ${shortId} or approve ${shortId}`);
       lines.push(`  Approve + persist: /runtime-approve ${shortId} persist`);
       lines.push(`  Deny: /runtime-deny ${shortId} reason or deny ${shortId} reason`);
@@ -153,7 +163,9 @@ export function formatRuntimeApprovals(runtime: SessionRuntime): string {
   if (recent.length > 0) {
     lines.push("", "Recent:");
     for (const request of recent) {
-      lines.push(`- ${request.status.toUpperCase()} · ${getRuntimeApprovalShortId(request.id)} · ${request.toolName}${request.actor ? ` · ${request.actor}` : ""}`);
+      lines.push(
+        `- ${request.status.toUpperCase()} · ${getRuntimeApprovalShortId(request.id)} · ${request.toolName}${request.actor ? ` · ${request.actor}` : ""}`,
+      );
     }
   }
 
@@ -174,22 +186,28 @@ export function applyRuntimeApprovalDecision(
   }
 
   const persist = tokens.some((token) => token.toLowerCase() === "persist");
-  const reason = decision === "deny"
-    ? tokens.filter((token) => token.toLowerCase() !== "persist").slice(1).join(" ").trim() || undefined
-    : undefined;
+  const reason =
+    decision === "deny"
+      ? tokens
+          .filter((token) => token.toLowerCase() !== "persist")
+          .slice(1)
+          .join(" ")
+          .trim() || undefined
+      : undefined;
 
-  const result = decision === "approve"
-    ? runtime.approvePendingRequest(requestId, {
-        actor: "operator",
-        persist,
-        scope: persist ? "persistent" : "session",
-      })
-    : runtime.denyPendingRequest(requestId, {
-        actor: "operator",
-        persist,
-        scope: persist ? "persistent" : "session",
-        reason,
-      });
+  const result =
+    decision === "approve"
+      ? runtime.approvePendingRequest(requestId, {
+          actor: "operator",
+          persist,
+          scope: persist ? "persistent" : "session",
+        })
+      : runtime.denyPendingRequest(requestId, {
+          actor: "operator",
+          persist,
+          scope: persist ? "persistent" : "session",
+          reason,
+        });
 
   if (!result) {
     return `Approval request ${requestId} was not found.`;
@@ -204,7 +222,9 @@ export function applyRuntimeApprovalDecision(
     `- Scope: ${persist ? "persistent" : "session"}`,
     `- Status: ${result.status}`,
     result.reason ? `- Reason: ${result.reason}` : "",
-  ].filter(Boolean).join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 export function formatRuntimeBridge(runtime: SessionRuntime): string {
@@ -224,7 +244,9 @@ export function formatRuntimeBridge(runtime: SessionRuntime): string {
   if (bridge.recent.length > 0) {
     lines.push("", "Recent:");
     for (const session of bridge.recent.slice(0, 8)) {
-      lines.push(`- ${session.source} · ${session.commandType} · ${session.status}${session.detail ? ` · ${session.detail}` : ""}`);
+      lines.push(
+        `- ${session.source} · ${session.commandType} · ${session.status}${session.detail ? ` · ${session.detail}` : ""}`,
+      );
     }
   }
 
@@ -234,7 +256,7 @@ export function formatRuntimeBridge(runtime: SessionRuntime): string {
 export function formatRuntimeHistory(runtime: SessionRuntime, args: string): string {
   const tokens = args.split(/\s+/).filter(Boolean);
   const limit = Math.max(1, Math.min(parsePositiveInt(tokens[tokens.length - 1], 8), 30));
-  const query = tokens.length > 1 ? tokens.slice(0, -1).join(" ") : tokens[0] ?? "";
+  const query = tokens.length > 1 ? tokens.slice(0, -1).join(" ") : (tokens[0] ?? "");
 
   if (query) {
     const results = runtime.searchHistory(query, { limit });
@@ -245,7 +267,10 @@ export function formatRuntimeHistory(runtime: SessionRuntime, args: string): str
     return [
       `**Runtime History Search**: ${query}`,
       "",
-      ...results.map((result) => `- [${result.timestamp}] ${result.source}${result.worker ? `:${result.worker}` : ""} · ${result.content}`),
+      ...results.map(
+        (result) =>
+          `- [${result.timestamp}] ${result.source}${result.worker ? `:${result.worker}` : ""} · ${result.content}`,
+      ),
     ].join("\n");
   }
 
@@ -257,8 +282,9 @@ export function formatRuntimeHistory(runtime: SessionRuntime, args: string): str
   return [
     "**Persisted Runtime Sessions**",
     "",
-    ...sessions.map((session) =>
-      `- ${session.runtimeId} · ${session.savedAt} · thread=${session.threadId ?? "none"} · transcript=${session.transcriptEntryCount}`,
+    ...sessions.map(
+      (session) =>
+        `- ${session.runtimeId} · ${session.savedAt} · thread=${session.threadId ?? "none"} · transcript=${session.transcriptEntryCount}`,
     ),
   ].join("\n");
 }

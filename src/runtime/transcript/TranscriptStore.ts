@@ -27,7 +27,10 @@ export class TranscriptStore {
     };
   }
 
-  append(entry: Omit<RuntimeTranscriptEntry, "id" | "timestamp"> & Partial<Pick<RuntimeTranscriptEntry, "id" | "timestamp">>): RuntimeTranscriptEntry {
+  append(
+    entry: Omit<RuntimeTranscriptEntry, "id" | "timestamp"> &
+      Partial<Pick<RuntimeTranscriptEntry, "id" | "timestamp">>,
+  ): RuntimeTranscriptEntry {
     const nextEntry: RuntimeTranscriptEntry = {
       id: entry.id ?? randomUUID(),
       timestamp: entry.timestamp ?? new Date().toISOString(),
@@ -41,7 +44,10 @@ export class TranscriptStore {
     return nextEntry;
   }
 
-  replace(entries: RuntimeTranscriptEntry[], options: { compacted?: boolean } = {}): RuntimeTranscriptEntry[] {
+  replace(
+    entries: RuntimeTranscriptEntry[],
+    options: { compacted?: boolean } = {},
+  ): RuntimeTranscriptEntry[] {
     this.entries = [...entries];
     if (options.compacted) {
       this.compactionCount += 1;

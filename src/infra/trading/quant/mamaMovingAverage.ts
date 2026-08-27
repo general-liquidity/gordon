@@ -78,16 +78,28 @@ export function computeMAMA(input: MAMAInput): MAMAResult {
     Smooth[i] = (4 * price[i]! + 3 * price[i - 1]! + 2 * price[i - 2]! + price[i - 3]!) / 10;
     const adj = 0.075 * at(Period, i - 1) + 0.54;
     Detrender[i] =
-      (0.0962 * Smooth[i]! + 0.5769 * at(Smooth, i - 2) - 0.5769 * at(Smooth, i - 4) - 0.0962 * at(Smooth, i - 6)) * adj;
+      (0.0962 * Smooth[i]! +
+        0.5769 * at(Smooth, i - 2) -
+        0.5769 * at(Smooth, i - 4) -
+        0.0962 * at(Smooth, i - 6)) *
+      adj;
 
     // Quadrature (Q1) and in-phase (I1) components.
     Q1[i] =
-      (0.0962 * Detrender[i]! + 0.5769 * at(Detrender, i - 2) - 0.5769 * at(Detrender, i - 4) - 0.0962 * at(Detrender, i - 6)) * adj;
+      (0.0962 * Detrender[i]! +
+        0.5769 * at(Detrender, i - 2) -
+        0.5769 * at(Detrender, i - 4) -
+        0.0962 * at(Detrender, i - 6)) *
+      adj;
     I1[i] = at(Detrender, i - 3);
 
     // Advance phase of I1, Q1 by 90°.
-    const jI = (0.0962 * I1[i]! + 0.5769 * at(I1, i - 2) - 0.5769 * at(I1, i - 4) - 0.0962 * at(I1, i - 6)) * adj;
-    const jQ = (0.0962 * Q1[i]! + 0.5769 * at(Q1, i - 2) - 0.5769 * at(Q1, i - 4) - 0.0962 * at(Q1, i - 6)) * adj;
+    const jI =
+      (0.0962 * I1[i]! + 0.5769 * at(I1, i - 2) - 0.5769 * at(I1, i - 4) - 0.0962 * at(I1, i - 6)) *
+      adj;
+    const jQ =
+      (0.0962 * Q1[i]! + 0.5769 * at(Q1, i - 2) - 0.5769 * at(Q1, i - 4) - 0.0962 * at(Q1, i - 6)) *
+      adj;
 
     // Phasor addition for 3-bar averaging, then smooth.
     I2[i] = 0.2 * (I1[i]! - jQ) + 0.8 * at(I2, i - 1);

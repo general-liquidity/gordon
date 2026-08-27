@@ -100,7 +100,9 @@ export function loadStepRecords(path?: string): Map<string, StepRecord> {
   const target = path ?? defaultDurableStepPath();
   const out = new Map<string, StepRecord>();
   if (!existsSync(target)) return out;
-  const lines = readFileSync(target, "utf8").split("\n").filter((l) => l.trim().length > 0);
+  const lines = readFileSync(target, "utf8")
+    .split("\n")
+    .filter((l) => l.trim().length > 0);
   for (const line of lines) {
     try {
       const parsed = JSON.parse(line) as StepRecord;
@@ -123,7 +125,7 @@ export function loadStepRecord(stepId: string, path?: string): StepRecord | null
 function persistRecord(record: StepRecord, path?: string): void {
   const target = path ?? defaultDurableStepPath();
   ensureParentDir(target);
-  appendFileSync(target, JSON.stringify(record) + "\n", "utf8");
+  appendFileSync(target, `${JSON.stringify(record)}\n`, "utf8");
 }
 
 // In-memory tracking of in-flight steps for dedupe within a process.
@@ -152,7 +154,7 @@ export async function executeStep<T>(opts: ExecuteStepOptions<T>): Promise<Execu
   // 1. Check on-disk cache (replay path)
   if (!opts.noLog) {
     const cached = loadStepRecord(stepId, opts.storePath);
-    if (cached && cached.completedAt && cached.error === undefined && cached.inputHash === inputHash) {
+    if (cached?.completedAt && cached.error === undefined && cached.inputHash === inputHash) {
       return { result: cached.result as T, fromCache: true, stepId };
     }
   }

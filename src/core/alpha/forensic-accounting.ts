@@ -104,7 +104,10 @@ function present(...xs: Array<number | undefined>): boolean {
 function beneishM(t: ForensicYearInput, p: ForensicYearInput | undefined): number | null {
   if (!p) return null;
   // All eight components must be computable.
-  const dsri = ratio(ratio(t.receivables, t.sales) ?? undefined, ratio(p.receivables, p.sales) ?? undefined);
+  const dsri = ratio(
+    ratio(t.receivables, t.sales) ?? undefined,
+    ratio(p.receivables, p.sales) ?? undefined,
+  );
   const gmiNum = present(p.sales, p.cogs) ? (p.sales! - p.cogs!) / p.sales! : undefined;
   const gmiDen = present(t.sales, t.cogs) ? (t.sales! - t.cogs!) / t.sales! : undefined;
   const gmi = ratio(gmiNum, gmiDen);
@@ -116,12 +119,21 @@ function beneishM(t: ForensicYearInput, p: ForensicYearInput | undefined): numbe
     : undefined;
   const aqi = ratio(aqiT, aqiP);
   const sgi = ratio(t.sales, p.sales);
-  const depiP = present(p.depreciation, p.ppeNet) ? p.depreciation! / (p.depreciation! + p.ppeNet!) : undefined;
-  const depiT = present(t.depreciation, t.ppeNet) ? t.depreciation! / (t.depreciation! + t.ppeNet!) : undefined;
+  const depiP = present(p.depreciation, p.ppeNet)
+    ? p.depreciation! / (p.depreciation! + p.ppeNet!)
+    : undefined;
+  const depiT = present(t.depreciation, t.ppeNet)
+    ? t.depreciation! / (t.depreciation! + t.ppeNet!)
+    : undefined;
   const depi = ratio(depiP, depiT);
   const sgai = ratio(ratio(t.sga, t.sales) ?? undefined, ratio(p.sga, p.sales) ?? undefined);
-  const tata = present(t.netIncome, t.cfo, t.totalAssets) ? (t.netIncome! - t.cfo!) / t.totalAssets! : null;
-  const lvgi = ratio(ratio(t.totalLiabilities, t.totalAssets) ?? undefined, ratio(p.totalLiabilities, p.totalAssets) ?? undefined);
+  const tata = present(t.netIncome, t.cfo, t.totalAssets)
+    ? (t.netIncome! - t.cfo!) / t.totalAssets!
+    : null;
+  const lvgi = ratio(
+    ratio(t.totalLiabilities, t.totalAssets) ?? undefined,
+    ratio(p.totalLiabilities, p.totalAssets) ?? undefined,
+  );
 
   if ([dsri, gmi, aqi, sgi, depi, sgai, tata, lvgi].some((x) => x == null)) return null;
   return (
@@ -139,7 +151,18 @@ function beneishM(t: ForensicYearInput, p: ForensicYearInput | undefined): numbe
 
 // --- Altman Z-Score (current only) ---
 function altmanZ(t: ForensicYearInput): number | null {
-  if (!present(t.currentAssets, t.currentLiabilities, t.totalAssets, t.retainedEarnings, t.ebit, t.marketCap, t.totalLiabilities, t.sales)) {
+  if (
+    !present(
+      t.currentAssets,
+      t.currentLiabilities,
+      t.totalAssets,
+      t.retainedEarnings,
+      t.ebit,
+      t.marketCap,
+      t.totalLiabilities,
+      t.sales,
+    )
+  ) {
     return null;
   }
   const wc = t.currentAssets! - t.currentLiabilities!;
@@ -156,7 +179,17 @@ function altmanZ(t: ForensicYearInput): number | null {
 function piotroskiF(t: ForensicYearInput, p: ForensicYearInput | undefined): number | null {
   if (!p) return null;
   const need = (y: ForensicYearInput) =>
-    present(y.netIncome, y.cfo, y.totalAssets, y.currentAssets, y.currentLiabilities, y.longTermDebt, y.sharesOutstanding, y.sales, y.cogs);
+    present(
+      y.netIncome,
+      y.cfo,
+      y.totalAssets,
+      y.currentAssets,
+      y.currentLiabilities,
+      y.longTermDebt,
+      y.sharesOutstanding,
+      y.sales,
+      y.cogs,
+    );
   if (!need(t) || !need(p)) return null;
 
   let s = 0;
@@ -188,29 +221,35 @@ export function computeForensicScores(input: ForensicInput): ForensicResult {
   const accr = sloanAccruals(t);
 
   const mFlag = m != null && m > M_CUTOFF;
-  const zone: AltmanZone | null = z == null ? null : z < Z_DISTRESS ? "distress" : z > Z_SAFE ? "safe" : "grey";
+  const zone: AltmanZone | null =
+    z == null ? null : z < Z_DISTRESS ? "distress" : z > Z_SAFE ? "safe" : "grey";
   const accrFlag = accr != null && Math.abs(accr) > ACCRUAL_FLAG;
   const fFlag = f != null && f < F_STRONG;
 
   const flags: string[] = [];
   if (mFlag) flags.push(`Beneish M ${m!.toFixed(2)} > ${M_CUTOFF} — earnings-manipulation risk`);
-  if (zone === "distress") flags.push(`Altman Z ${z!.toFixed(2)} < ${Z_DISTRESS} — financial-distress zone`);
-  if (accrFlag) flags.push(`Sloan accruals ${(accr! * 100).toFixed(1)}% — earnings-quality red flag`);
+  if (zone === "distress")
+    flags.push(`Altman Z ${z!.toFixed(2)} < ${Z_DISTRESS} — financial-distress zone`);
+  if (accrFlag)
+    flags.push(`Sloan accruals ${(accr! * 100).toFixed(1)}% — earnings-quality red flag`);
   if (fFlag) flags.push(`Piotroski F ${f}/9 — not strengthening`);
 
   const anyComputed = m != null || z != null || f != null || accr != null;
-  const verdict: ForensicResult["verdict"] = !anyComputed ? "INSUFFICIENT" : flags.length > 0 ? "INVESTIGATE" : "CLEAN";
+  const verdict: ForensicResult["verdict"] = !anyComputed
+    ? "INSUFFICIENT"
+    : flags.length > 0
+      ? "INVESTIGATE"
+      : "CLEAN";
 
   const parts: string[] = [];
   if (m != null) parts.push(`M ${m.toFixed(2)}`);
   if (z != null) parts.push(`Z ${z.toFixed(2)} (${zone})`);
   if (f != null) parts.push(`F ${f}/9`);
   if (accr != null) parts.push(`accruals ${(accr * 100).toFixed(1)}%`);
-  const interpretation =
-    !anyComputed
-      ? "Insufficient financial-statement data to compute any forensic score."
-      : `${verdict}: ${parts.join(", ")}.` +
-        (verdict === "INVESTIGATE" ? " Open the filing — probability flag, not proof." : "");
+  const interpretation = !anyComputed
+    ? "Insufficient financial-statement data to compute any forensic score."
+    : `${verdict}: ${parts.join(", ")}.` +
+      (verdict === "INVESTIGATE" ? " Open the filing — probability flag, not proof." : "");
 
   return {
     beneishM: { score: m, flag: mFlag, cutoff: M_CUTOFF },

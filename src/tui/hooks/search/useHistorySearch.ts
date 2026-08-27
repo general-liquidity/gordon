@@ -46,7 +46,16 @@ export function useHistorySearch(entries: string[]) {
   }, []);
 
   return {
-    isActive, query, setQuery, matchedEntry, matchIndex,
-    matchCount: matches.length, nextMatch, prevMatch, accept, cancel, activate,
+    isActive,
+    query,
+    setQuery,
+    matchedEntry,
+    matchIndex,
+    matchCount: matches.length,
+    nextMatch,
+    prevMatch,
+    accept,
+    cancel,
+    activate,
   };
 }

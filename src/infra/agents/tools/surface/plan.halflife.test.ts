@@ -1,11 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
+import { assessBacktestWindowDecay, assessPlanDecay, resolveVerifyVerdict } from "./plan.ts";
 import {
-  assessBacktestWindowDecay,
-  assessPlanDecay,
-  resolveVerifyVerdict,
-} from "./plan.ts";
-import { computeSignalHalfLife, PAPER_CALIBRATION_2026 } from "../../../../core/alpha/signal-half-life.ts";
+  computeSignalHalfLife,
+  PAPER_CALIBRATION_2026,
+} from "../../../../core/alpha/signal-half-life.ts";
 
 const DEFAULT_HALF_LIFE = computeSignalHalfLife(PAPER_CALIBRATION_2026).halfLifeMonths;
 
@@ -30,7 +29,9 @@ describe("backtest window against the edge's own half-life", () => {
   });
 
   test("the default half-life is never presented as a measurement", () => {
-    expect(assessBacktestWindowDecay({ backtestWindowMonths: 3 }).calibration).toContain("not measured");
+    expect(assessBacktestWindowDecay({ backtestWindowMonths: 3 }).calibration).toContain(
+      "not measured",
+    );
     expect(assessPlanDecay({}).calibration).toContain("not measured");
   });
 
@@ -102,9 +103,15 @@ describe("plan edge against its cost floor", () => {
   });
 
   test("the annotation names the input that was missing", () => {
-    expect(assessPlanDecay({ costFloorEdge: 0.5, horizonMonths: 6 }).missingInputs).toEqual(["backtestedEdge"]);
-    expect(assessPlanDecay({ backtestedEdge: 1.5, costFloorEdge: 0.5 }).missingInputs).toEqual(["horizonMonths"]);
-    expect(assessPlanDecay({ backtestedEdge: 1.5, horizonMonths: 6 }).missingInputs).toEqual(["costFloorEdge"]);
+    expect(assessPlanDecay({ costFloorEdge: 0.5, horizonMonths: 6 }).missingInputs).toEqual([
+      "backtestedEdge",
+    ]);
+    expect(assessPlanDecay({ backtestedEdge: 1.5, costFloorEdge: 0.5 }).missingInputs).toEqual([
+      "horizonMonths",
+    ]);
+    expect(assessPlanDecay({ backtestedEdge: 1.5, horizonMonths: 6 }).missingInputs).toEqual([
+      "costFloorEdge",
+    ]);
   });
 
   test("a zero cost floor is never crossed by decay alone", () => {
@@ -140,9 +147,15 @@ describe("adding a decay reason can only make a verdict worse", () => {
   });
 
   test("a rejected plan stays rejected however many decay reasons are added", () => {
-    expect(resolveVerifyVerdict({ hasError: false, approved: false, reasonCount: 0 }).verdict).toBe("reject");
-    expect(resolveVerifyVerdict({ hasError: false, approved: false, reasonCount: 5 }).verdict).toBe("reject");
-    expect(resolveVerifyVerdict({ hasError: true, approved: true, reasonCount: 5 }).verdict).toBe("reject");
+    expect(resolveVerifyVerdict({ hasError: false, approved: false, reasonCount: 0 }).verdict).toBe(
+      "reject",
+    );
+    expect(resolveVerifyVerdict({ hasError: false, approved: false, reasonCount: 5 }).verdict).toBe(
+      "reject",
+    );
+    expect(resolveVerifyVerdict({ hasError: true, approved: true, reasonCount: 5 }).verdict).toBe(
+      "reject",
+    );
   });
 
   test("a missing decay input leaves the verdict exactly as it was", () => {

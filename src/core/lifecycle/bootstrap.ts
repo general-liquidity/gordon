@@ -84,7 +84,7 @@ export async function bootstrapV07(): Promise<BootstrapResult> {
   } catch (err) {
     logger.error(
       "Failed to initialize persistent memory",
-      err instanceof Error ? err : new Error(String(err))
+      err instanceof Error ? err : new Error(String(err)),
     );
   }
 
@@ -106,10 +106,7 @@ export async function bootstrapV07(): Promise<BootstrapResult> {
       elapsed: `${Date.now() - start}ms`,
     });
   } catch (err) {
-    logger.error(
-      "Failed to load playbooks",
-      err instanceof Error ? err : new Error(String(err))
-    );
+    logger.error("Failed to load playbooks", err instanceof Error ? err : new Error(String(err)));
   }
 
   // ------------------------------------------------------------------
@@ -124,7 +121,7 @@ export async function bootstrapV07(): Promise<BootstrapResult> {
   } catch (err) {
     logger.error(
       "Failed to initialize position store",
-      err instanceof Error ? err : new Error(String(err))
+      err instanceof Error ? err : new Error(String(err)),
     );
   }
 
@@ -140,7 +137,7 @@ export async function bootstrapV07(): Promise<BootstrapResult> {
     } catch (err) {
       logger.error(
         "Failed to wire memory to event bus",
-        err instanceof Error ? err : new Error(String(err))
+        err instanceof Error ? err : new Error(String(err)),
       );
     }
   }
@@ -162,7 +159,7 @@ export async function bootstrapV07(): Promise<BootstrapResult> {
   } catch (err) {
     logger.error(
       "Failed to register agent subscriptions",
-      err instanceof Error ? err : new Error(String(err))
+      err instanceof Error ? err : new Error(String(err)),
     );
   }
 
@@ -177,7 +174,7 @@ export async function bootstrapV07(): Promise<BootstrapResult> {
   } catch (err) {
     logger.error(
       "Failed to initialize audit chain tables",
-      err instanceof Error ? err : new Error(String(err))
+      err instanceof Error ? err : new Error(String(err)),
     );
   }
 
@@ -192,7 +189,7 @@ export async function bootstrapV07(): Promise<BootstrapResult> {
   } catch (err) {
     logger.error(
       "Failed to initialize playbook backtest tables",
-      err instanceof Error ? err : new Error(String(err))
+      err instanceof Error ? err : new Error(String(err)),
     );
   }
 
@@ -208,7 +205,7 @@ export async function bootstrapV07(): Promise<BootstrapResult> {
   } catch (err) {
     logger.error(
       "Failed to initialize strategy runtime tables",
-      err instanceof Error ? err : new Error(String(err))
+      err instanceof Error ? err : new Error(String(err)),
     );
   }
 

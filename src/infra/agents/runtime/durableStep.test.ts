@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import { mkdtempSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -157,9 +157,7 @@ describe("executeStep — error handling", () => {
       if (calls === 1) throw new Error("transient");
       return "ok";
     };
-    await expect(
-      executeStep({ stepId: "s-1", input: {}, fn, storePath }),
-    ).rejects.toThrow();
+    await expect(executeStep({ stepId: "s-1", input: {}, fn, storePath })).rejects.toThrow();
     resetInflightForTesting();
     const r = await executeStep({ stepId: "s-1", input: {}, fn, storePath });
     expect(r.fromCache).toBe(false);
@@ -233,7 +231,14 @@ describe("recordToPayload", () => {
 
   it("emits a failure payload", async () => {
     await expect(
-      executeStep({ stepId: "s-1", input: {}, fn: async () => { throw new Error("x"); }, storePath }),
+      executeStep({
+        stepId: "s-1",
+        input: {},
+        fn: async () => {
+          throw new Error("x");
+        },
+        storePath,
+      }),
     ).rejects.toThrow();
     const record = loadStepRecord("s-1", storePath)!;
     const p = recordToPayload(record);

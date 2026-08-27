@@ -12,7 +12,7 @@ import {
   createMockIndicators,
   createMockLevel,
 } from "../../test-utils/mocks.ts";
-import type { Candle, Indicators, Level } from "../../types/index.ts";
+import type { Candle, Level } from "../../types/index.ts";
 
 describe("determineTrend", () => {
   test("returns 'range' for empty candle array", () => {
@@ -45,7 +45,7 @@ describe("determineTrend", () => {
           low: basePrice - 0.5,
           close: basePrice + 1,
           closeTime: (i + 1) * 3600000,
-        })
+        }),
       );
     }
 
@@ -66,7 +66,7 @@ describe("determineTrend", () => {
           low: basePrice - 1.5,
           close: basePrice - 1,
           closeTime: (i + 1) * 3600000,
-        })
+        }),
       );
     }
 
@@ -87,7 +87,7 @@ describe("determineTrend", () => {
           low: basePrice - 0.5,
           close: basePrice + (i % 2 === 0 ? 0.2 : -0.2),
           closeTime: (i + 1) * 3600000,
-        })
+        }),
       );
     }
 
@@ -152,9 +152,7 @@ describe("detectSupportBounce", () => {
 
   test("detects support bounce when all conditions are met", () => {
     const candles = [createMockCandle({ close: 100 })];
-    const levels: Level[] = [
-      createMockLevel({ price: 99, type: "support", strength: 0.8 }),
-    ];
+    const levels: Level[] = [createMockLevel({ price: 99, type: "support", strength: 0.8 })];
     const indicators = createMockIndicators({ rsi: 30, volumeRatio: 1.0 });
 
     const result = detectSupportBounce(candles, levels, indicators);
@@ -183,12 +181,12 @@ describe("detectSupportBounce", () => {
     const weakOversold = detectSupportBounce(
       candles,
       levels,
-      createMockIndicators({ rsi: 38, volumeRatio: 1.0 })
+      createMockIndicators({ rsi: 38, volumeRatio: 1.0 }),
     );
     const strongOversold = detectSupportBounce(
       candles,
       levels,
-      createMockIndicators({ rsi: 20, volumeRatio: 1.0 })
+      createMockIndicators({ rsi: 20, volumeRatio: 1.0 }),
     );
 
     expect(strongOversold.confidence).toBeGreaterThan(weakOversold.confidence);

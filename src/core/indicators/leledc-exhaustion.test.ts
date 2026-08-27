@@ -2,7 +2,12 @@ import { describe, expect, it } from "bun:test";
 import { computeLeledcExhaustion, type LeledcCandle } from "./leledc-exhaustion.ts";
 
 /** A bearish candle around `base`. */
-const bearBar = (base: number): LeledcCandle => ({ open: base + 0.5, high: base + 0.7, low: base - 0.7, close: base - 0.5 });
+const bearBar = (base: number): LeledcCandle => ({
+  open: base + 0.5,
+  high: base + 0.7,
+  low: base - 0.7,
+  close: base - 0.5,
+});
 /** A bullish candle around `base`, with `lowOverride` to force a new extreme low. */
 const bullBar = (base: number, lowOverride?: number): LeledcCandle => ({
   open: base - 0.5,
@@ -40,7 +45,12 @@ describe("computeLeledcExhaustion", () => {
   });
 
   it("finds no exhaustion on a flat series (counters never advance)", () => {
-    const candles = Array.from({ length: 40 }, () => ({ open: 100, high: 100.5, low: 99.5, close: 100 }));
+    const candles = Array.from({ length: 40 }, () => ({
+      open: 100,
+      high: 100.5,
+      low: 99.5,
+      close: 100,
+    }));
     const r = computeLeledcExhaustion({ candles });
     expect(r.signals.length).toBe(0);
     expect(r.latestIsExhaustion).toBe(false);

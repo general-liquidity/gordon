@@ -24,7 +24,6 @@ import { getDynamicToolAgentMap } from "../../runtime/routing/manager.ts";
 import { checkToolSecurity } from "./guardrailEvaluator.ts";
 import { tryRecover } from "../wiring/runtimeRecoveryWiring.ts";
 import {
-  getAgentForTool,
   buildDefaultExecutorHandoffBudget,
   isPlanningArtifactTool,
   requiresPlanningArtifact,
@@ -95,10 +94,7 @@ export interface StreamProcessingState {
     result: unknown;
     agent: string | undefined;
   } | null;
-  pendingToolCalls: Map<
-    string,
-    { toolName: string; startedAt: number; agent: string | undefined }
-  >;
+  pendingToolCalls: Map<string, { toolName: string; startedAt: number; agent: string | undefined }>;
   /**
    * In-loop background tool dispatch manager. Optional + lazily created via
    * `getBackgroundManager(state)` so existing `StreamProcessingState` literals
@@ -335,8 +331,8 @@ export async function handleAgentSwitch(
   if (previousAgent !== "Gordon") {
     await endSubagentHook({
       key:
-        state.activeSubagentHookKey
-        ?? `stream:${context.threadId ?? "standalone"}:${previousAgent}`,
+        state.activeSubagentHookKey ??
+        `stream:${context.threadId ?? "standalone"}:${previousAgent}`,
       type: previousAgent,
       parent: "Gordon",
       status: "completed",
@@ -350,9 +346,7 @@ export async function handleAgentSwitch(
     toolName,
     toolArgs,
     handoffBudget:
-      state.currentAgent === "Executor"
-        ? buildDefaultExecutorHandoffBudget(context)
-        : undefined,
+      state.currentAgent === "Executor" ? buildDefaultExecutorHandoffBudget(context) : undefined,
     eventType,
     mode: context.config?.permissionMode,
   });
@@ -413,11 +407,14 @@ export async function processToolResult(
   // Wire: track tool result in conversation-wide budget
   try {
     const { getConversationBudget } = await import("../../context/budgeting/conversationBudget.ts");
-    const resultStr = typeof optimizedToolResult.result === "string"
-      ? optimizedToolResult.result
-      : JSON.stringify(optimizedToolResult.result);
+    const resultStr =
+      typeof optimizedToolResult.result === "string"
+        ? optimizedToolResult.result
+        : JSON.stringify(optimizedToolResult.result);
     getConversationBudget().add(toolName ?? "unknown", `tc_${Date.now()}`, resultStr, 0);
-  } catch { /* non-critical */ }
+  } catch {
+    /* non-critical */
+  }
 
   await runLifecycleHooks("tool_call_end", context, {
     threadId: context.threadId,
@@ -484,7 +481,7 @@ export async function* drainBackgroundResults(
   context: GordonContext,
 ): AsyncGenerator<StreamEvent, void> {
   const manager = state.background;
-  if (!manager || !manager.hasCompleted()) return;
+  if (!manager?.hasCompleted()) return;
 
   for (const task of manager.takeCompleted()) {
     logger.info("Re-injecting background tool result", {

@@ -28,9 +28,9 @@ interface RegimeSignal {
   confidence: number;
 }
 
-async function loadRegimeDetector(): Promise<
-  { detectRegime: (candles: unknown[], symbol: string, timeframe?: string) => RegimeSignal } | null
-> {
+async function loadRegimeDetector(): Promise<{
+  detectRegime: (candles: unknown[], symbol: string, timeframe?: string) => RegimeSignal;
+} | null> {
   try {
     const mod = (await import("../../../core/regime/detector.ts" as string)) as {
       RegimeDetector?: {

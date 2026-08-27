@@ -12,9 +12,7 @@ const validSignal: EarningsSignal = {
   sentimentScore: 0.6,
   managementConfidence: 0.8,
   guidanceRevision: "raised",
-  keyRiskFactors: [
-    "supply chain headwinds in the Greater China region",
-  ],
+  keyRiskFactors: ["supply chain headwinds in the Greater China region"],
   tradingBias: "mild_long",
 };
 
@@ -74,7 +72,9 @@ describe("validateEarningsSignal — coherence warnings", () => {
       tradingBias: "strong_short",
     });
     expect(result.ok).toBe(true);
-    expect(result.issues.some((i) => i.severity === "warning" && i.field === "tradingBias")).toBe(true);
+    expect(result.issues.some((i) => i.severity === "warning" && i.field === "tradingBias")).toBe(
+      true,
+    );
   });
 
   test("warns on raised guidance + short bias", () => {

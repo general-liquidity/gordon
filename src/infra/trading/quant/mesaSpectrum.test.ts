@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeMesaSpectrum,
-  mesaToPayload,
-} from "./mesaSpectrum.ts";
+import { computeMesaSpectrum, mesaToPayload } from "./mesaSpectrum.ts";
 
 describe("computeMesaSpectrum", () => {
   it("short input → NaN with reason", () => {
@@ -13,8 +10,9 @@ describe("computeMesaSpectrum", () => {
 
   it("recovers the dominant period of a clean sinusoid", () => {
     const truePeriod = 16;
-    const prices = Array.from({ length: 200 }, (_, i) =>
-      100 + 2 * Math.sin((2 * Math.PI * i) / truePeriod),
+    const prices = Array.from(
+      { length: 200 },
+      (_, i) => 100 + 2 * Math.sin((2 * Math.PI * i) / truePeriod),
     );
     const r = computeMesaSpectrum({ prices, arOrder: 12, minPeriod: 4, maxPeriod: 40 });
     expect(Math.abs(r.dominantPeriod - truePeriod)).toBeLessThanOrEqual(2);

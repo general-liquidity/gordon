@@ -69,11 +69,13 @@ function matMul(A: number[][], B: number[][]): number[][] {
   const rows = A.length;
   const cols = B[0]!.length;
   const inner = B.length;
-  const result: number[][] = Array.from({ length: rows }, () => new Array(cols).fill(0) as number[]);
+  const result: number[][] = Array.from(
+    { length: rows },
+    () => new Array(cols).fill(0) as number[],
+  );
   for (let i = 0; i < rows; i++)
     for (let j = 0; j < cols; j++)
-      for (let k = 0; k < inner; k++)
-        result[i]![j]! += A[i]![k]! * B[k]![j]!;
+      for (let k = 0; k < inner; k++) result[i]![j]! += A[i]![k]! * B[k]![j]!;
   return result;
 }
 
@@ -84,10 +86,11 @@ function matVecMul(A: number[][], v: number[]): number[] {
 function transpose(A: number[][]): number[][] {
   const rows = A.length;
   const cols = A[0]!.length;
-  const result: number[][] = Array.from({ length: cols }, () => new Array(rows).fill(0) as number[]);
-  for (let i = 0; i < rows; i++)
-    for (let j = 0; j < cols; j++)
-      result[j]![i] = A[i]![j]!;
+  const result: number[][] = Array.from(
+    { length: cols },
+    () => new Array(rows).fill(0) as number[],
+  );
+  for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) result[j]![i] = A[i]![j]!;
   return result;
 }
 
@@ -174,8 +177,10 @@ export function blackLitterman(inputs: BlackLittermanInputs): BlackLittermanResu
     // Higher confidence → lower uncertainty → stronger view impact
     const uncertainty = Math.max(0.01, 1 - view.confidence);
     const pRow = P[k]!;
-    const pSigmaP = pRow.reduce((s1, pi, i) =>
-      s1 + pi * pRow.reduce((s2, pj, j) => s2 + pj * tau * sigma[i]![j]!, 0), 0);
+    const pSigmaP = pRow.reduce(
+      (s1, pi, i) => s1 + pi * pRow.reduce((s2, pj, j) => s2 + pj * tau * sigma[i]![j]!, 0),
+      0,
+    );
     omegaDiag.push(pSigmaP * uncertainty);
   }
 
@@ -220,7 +225,7 @@ export function blackLitterman(inputs: BlackLittermanInputs): BlackLittermanResu
   const optimalWeights = rawWeights.map((w) => Math.max(0, w) / (sumW || 1));
 
   // View impact
-  const viewImpact = views.map((v, k) => {
+  const viewImpact = views.map((v, _k) => {
     const viewAssets = v.assets.map((i) => symbols[i]).join("/");
     return {
       view: `${viewAssets}: ${(v.expectedReturn * 100).toFixed(1)}% (${(v.confidence * 100).toFixed(0)}% confidence)`,

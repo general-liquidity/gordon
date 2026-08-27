@@ -44,7 +44,10 @@ describe("computeTokenUnlockRisk", () => {
   });
 
   test("invalid circulating supply is reported, not crashed", () => {
-    const r = computeTokenUnlockRisk({ events: [{ date: "2026-06-01", amount: 1 }], circulatingSupply: 0 });
+    const r = computeTokenUnlockRisk({
+      events: [{ date: "2026-06-01", amount: 1 }],
+      circulatingSupply: 0,
+    });
     expect(r.summary).toContain("Invalid");
   });
 });

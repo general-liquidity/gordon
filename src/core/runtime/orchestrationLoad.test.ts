@@ -69,7 +69,9 @@ describe("computeOrchestrationLoad — producer outpacing", () => {
 describe("computeOrchestrationLoad — custom thresholds", () => {
   test("custom thresholds shift the tiering", () => {
     // 3 pending / 6 = 0.5h. Default → slack. With saturated 0.4 → saturated.
-    expect(computeOrchestrationLoad({ pendingReviewItems: 3, reviewCapacityPerHour: 6 }).tier).toBe("slack");
+    expect(computeOrchestrationLoad({ pendingReviewItems: 3, reviewCapacityPerHour: 6 }).tier).toBe(
+      "slack",
+    );
     expect(
       computeOrchestrationLoad({
         pendingReviewItems: 3,
@@ -83,12 +85,18 @@ describe("computeOrchestrationLoad — custom thresholds", () => {
 
 describe("computeOrchestrationLoad — guards", () => {
   test("throws on non-positive capacity", () => {
-    expect(() => computeOrchestrationLoad({ pendingReviewItems: 1, reviewCapacityPerHour: 0 })).toThrow(/reviewCapacityPerHour/);
-    expect(() => computeOrchestrationLoad({ pendingReviewItems: 1, reviewCapacityPerHour: -2 })).toThrow(/reviewCapacityPerHour/);
+    expect(() =>
+      computeOrchestrationLoad({ pendingReviewItems: 1, reviewCapacityPerHour: 0 }),
+    ).toThrow(/reviewCapacityPerHour/);
+    expect(() =>
+      computeOrchestrationLoad({ pendingReviewItems: 1, reviewCapacityPerHour: -2 }),
+    ).toThrow(/reviewCapacityPerHour/);
   });
 
   test("throws on negative pending", () => {
-    expect(() => computeOrchestrationLoad({ pendingReviewItems: -1, reviewCapacityPerHour: 6 })).toThrow(/pendingReviewItems/);
+    expect(() =>
+      computeOrchestrationLoad({ pendingReviewItems: -1, reviewCapacityPerHour: 6 }),
+    ).toThrow(/pendingReviewItems/);
   });
 
   test("throws on inverted thresholds", () => {

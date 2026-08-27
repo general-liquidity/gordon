@@ -14,10 +14,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import {
-  composeGoalDraft,
-  goalDraftToPayload,
-} from "../../../../core/pipeline/goalDraft.ts";
+import { composeGoalDraft, goalDraftToPayload } from "../../../../core/pipeline/goalDraft.ts";
 import { recordStructuredObservation } from "../../../platform/observability/structured.ts";
 
 export const goalDraftDiagnosticTool = createTool({
@@ -31,7 +28,9 @@ export const goalDraftDiagnosticTool = createTool({
     vagueIntent: z
       .string()
       .min(1)
-      .describe("Operator's free-form intent (e.g., 'improve Sharpe', 'limit drawdown this week')."),
+      .describe(
+        "Operator's free-form intent (e.g., 'improve Sharpe', 'limit drawdown this week').",
+      ),
     recentStats: z
       .object({
         sharpe: z.number().optional(),
@@ -40,7 +39,9 @@ export const goalDraftDiagnosticTool = createTool({
         maxDrawdownPct: z.number().min(0).optional(),
       })
       .optional()
-      .describe("Recent performance stats over a caller-defined window. Used to ground thresholds."),
+      .describe(
+        "Recent performance stats over a caller-defined window. Used to ground thresholds.",
+      ),
     activeMandateExclusions: z
       .array(z.string())
       .optional()

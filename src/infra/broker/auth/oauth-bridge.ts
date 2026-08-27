@@ -45,10 +45,7 @@ export async function loadOAuthBrokerCredentials(
   const entry = await ensureValidOAuthTokens(venue, options?.clientId);
   if (!entry) return null;
 
-  const lifetimeSec = Math.max(
-    60,
-    Math.floor((entry.expiresAt - Date.now()) / 1000),
-  );
+  const lifetimeSec = Math.max(60, Math.floor((entry.expiresAt - Date.now()) / 1000));
 
   return {
     apiKey: entry.accessToken,

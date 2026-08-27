@@ -76,10 +76,7 @@ export function expectedReturnUnderLeverage(
  *   - equity/FX daily:     252
  *   - hourly crypto:       8760
  */
-export function annualizeSharpe(
-  sharpePerPeriod: number,
-  periodsPerYear: number,
-): number {
+export function annualizeSharpe(sharpePerPeriod: number, periodsPerYear: number): number {
   if (!(periodsPerYear > 0)) {
     throw new Error("periodsPerYear must be positive");
   }

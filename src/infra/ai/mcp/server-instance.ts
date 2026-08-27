@@ -3,14 +3,11 @@
  * Implementation of local MCP server process management
  */
 
-import { spawn, type ChildProcess } from 'child_process';
-import type {
-  MCPServerManifest,
-  MCPServerInstance,
-  MCPServerStatus,
-} from './types';
-import { credentialManager } from './credentials';
-import { wrapSandboxed } from '../../safety/subprocessSandbox.ts';
+import { spawn, type ChildProcess } from "node:child_process";
+import type { MCPServerManifest, MCPServerInstance, MCPServerStatus } from "./types";
+import { credentialManager } from "./credentials";
+import { wrapSandboxed } from "../../safety/subprocessSandbox.ts";
+import { validatePluginCommand } from "./marketplace/installer.ts";
 
 // ============================================================================
 // Local Server Instance
@@ -27,7 +24,7 @@ import { wrapSandboxed } from '../../safety/subprocessSandbox.ts';
  */
 export class LocalMCPServerInstance implements MCPServerInstance {
   manifest: MCPServerManifest;
-  status: MCPServerStatus = 'stopped';
+  status: MCPServerStatus = "stopped";
   error?: string;
   startedAt?: number;
 
@@ -41,7 +38,7 @@ export class LocalMCPServerInstance implements MCPServerInstance {
       timeout: ReturnType<typeof setTimeout>;
     }
   >();
-  private messageBuffer = '';
+  private messageBuffer = "";
   private readonly requestTimeout = 30000; // 30 seconds
 
   constructor(manifest: MCPServerManifest) {
@@ -52,17 +49,23 @@ export class LocalMCPServerInstance implements MCPServerInstance {
    * Start the server process
    */
   async start(): Promise<void> {
-    if (this.status === 'running') {
+    if (this.status === "running") {
       return;
     }
 
     if (!this.manifest.command) {
-      throw new Error(
-        `Server "${this.manifest.id}" has no command configured`
-      );
+      throw new Error(`Server "${this.manifest.id}" has no command configured`);
     }
 
-    this.status = 'starting';
+    // Registry callers can construct MCP manifests directly, bypassing the
+    // marketplace installer and client-side validation. The spawn boundary is
+    // therefore responsible for enforcing the launcher/argv policy again.
+    const commandError = validatePluginCommand(this.manifest.command, this.manifest.args);
+    if (commandError) {
+      throw new Error(`Refusing unsafe MCP server command: ${commandError}`);
+    }
+
+    this.status = "starting";
     this.error = undefined;
 
     try {
@@ -74,8 +77,11 @@ export class LocalMCPServerInstance implements MCPServerInstance {
       // executables (.exe, raw binaries) should NOT use shell to avoid
       // command-injection on whitespace and to keep the process tree clean.
       const cmdLower = this.manifest.command.toLowerCase();
-      const isShim = cmdLower.endsWith(".cmd") || cmdLower.endsWith(".bat") || cmdLower.endsWith(".ps1");
-      const looksLikeShimAlias = /^(npm|npx|bun|bunx|pnpm|yarn|node|deno)$/i.test(this.manifest.command);
+      const isShim =
+        cmdLower.endsWith(".cmd") || cmdLower.endsWith(".bat") || cmdLower.endsWith(".ps1");
+      const looksLikeShimAlias = /^(npm|npx|bun|bunx|pnpm|yarn|node|deno)$/i.test(
+        this.manifest.command,
+      );
       const needsShell = process.platform === "win32" && (isShim || looksLikeShimAlias);
 
       // Opt-in subprocess sandbox (no-op by default). When the operator sets
@@ -91,7 +97,7 @@ export class LocalMCPServerInstance implements MCPServerInstance {
 
       this.process = spawn(sandboxed.command, sandboxed.args, {
         env,
-        stdio: ['pipe', 'pipe', 'pipe'],
+        stdio: ["pipe", "pipe", "pipe"],
         shell: needsShell,
       });
 
@@ -101,10 +107,10 @@ export class LocalMCPServerInstance implements MCPServerInstance {
       // Wait for initialization
       await this.waitForInitialization();
 
-      this.status = 'running';
+      this.status = "running";
       this.startedAt = Date.now();
     } catch (err) {
-      this.status = 'error';
+      this.status = "error";
       this.error = err instanceof Error ? err.message : String(err);
       await this.cleanup();
       throw err;
@@ -115,12 +121,12 @@ export class LocalMCPServerInstance implements MCPServerInstance {
    * Stop the server process
    */
   async stop(): Promise<void> {
-    if (this.status === 'stopped') {
+    if (this.status === "stopped") {
       return;
     }
 
     await this.cleanup();
-    this.status = 'stopped';
+    this.status = "stopped";
     this.startedAt = undefined;
   }
 
@@ -131,22 +137,18 @@ export class LocalMCPServerInstance implements MCPServerInstance {
    * @returns Tool execution result
    */
   async callTool(toolName: string, params: unknown): Promise<unknown> {
-    if (this.status !== 'running') {
-      throw new Error(
-        `Server "${this.manifest.id}" is not running (status: ${this.status})`
-      );
+    if (this.status !== "running") {
+      throw new Error(`Server "${this.manifest.id}" is not running (status: ${this.status})`);
     }
 
     // Validate tool exists
     const tool = this.manifest.tools.find((t) => t.name === toolName);
     if (!tool) {
-      throw new Error(
-        `Tool "${toolName}" not found on server "${this.manifest.id}"`
-      );
+      throw new Error(`Tool "${toolName}" not found on server "${this.manifest.id}"`);
     }
 
     // Send JSON-RPC request
-    return this.sendRequest('tools/call', {
+    return this.sendRequest("tools/call", {
       name: toolName,
       arguments: params,
     });
@@ -165,11 +167,11 @@ export class LocalMCPServerInstance implements MCPServerInstance {
 
     // Add credentials to environment if needed
     const { authentication } = this.manifest;
-    if (authentication.type === 'api_key' && authentication.envVar) {
+    if (authentication.type === "api_key" && authentication.envVar) {
       const apiKey = credentialManager.getWithFallback(
         this.manifest.id,
-        'apiKey',
-        authentication.envVar
+        "apiKey",
+        authentication.envVar,
       );
       if (apiKey) {
         env[authentication.envVar] = apiKey;
@@ -186,13 +188,13 @@ export class LocalMCPServerInstance implements MCPServerInstance {
     if (!this.process) return;
 
     // Handle stdout (JSON-RPC messages)
-    this.process.stdout?.on('data', (data: Buffer) => {
+    this.process.stdout?.on("data", (data: Buffer) => {
       this.messageBuffer += data.toString();
       this.processMessageBuffer();
     });
 
     // Handle stderr (logging)
-    this.process.stderr?.on('data', (data: Buffer) => {
+    this.process.stderr?.on("data", (data: Buffer) => {
       // Log stderr output for debugging
       const message = data.toString().trim();
       if (message) {
@@ -201,17 +203,17 @@ export class LocalMCPServerInstance implements MCPServerInstance {
     });
 
     // Handle process exit
-    this.process.on('exit', (code, signal) => {
-      if (this.status === 'running') {
-        this.status = 'error';
+    this.process.on("exit", (code, signal) => {
+      if (this.status === "running") {
+        this.status = "error";
         this.error = `Process exited unexpectedly (code: ${code}, signal: ${signal})`;
       }
-      this.rejectAllPending(new Error(this.error || 'Process exited'));
+      this.rejectAllPending(new Error(this.error || "Process exited"));
     });
 
     // Handle process errors
-    this.process.on('error', (err) => {
-      this.status = 'error';
+    this.process.on("error", (err) => {
+      this.status = "error";
       this.error = err.message;
       this.rejectAllPending(err);
     });
@@ -222,8 +224,8 @@ export class LocalMCPServerInstance implements MCPServerInstance {
    */
   private processMessageBuffer(): void {
     // Split by newlines and process complete messages
-    const lines = this.messageBuffer.split('\n');
-    this.messageBuffer = lines.pop() || ''; // Keep incomplete line in buffer
+    const lines = this.messageBuffer.split("\n");
+    this.messageBuffer = lines.pop() || ""; // Keep incomplete line in buffer
 
     for (const line of lines) {
       const trimmed = line.trim();
@@ -243,12 +245,12 @@ export class LocalMCPServerInstance implements MCPServerInstance {
    * Handle an incoming JSON-RPC message
    */
   private handleMessage(message: unknown): void {
-    if (!message || typeof message !== 'object') return;
+    if (!message || typeof message !== "object") return;
 
     const msg = message as Record<string, unknown>;
 
     // Handle response
-    if ('id' in msg && 'result' in msg) {
+    if ("id" in msg && "result" in msg) {
       const pending = this.pendingRequests.get(msg.id as number);
       if (pending) {
         clearTimeout(pending.timeout);
@@ -259,13 +261,13 @@ export class LocalMCPServerInstance implements MCPServerInstance {
     }
 
     // Handle error response
-    if ('id' in msg && 'error' in msg) {
+    if ("id" in msg && "error" in msg) {
       const pending = this.pendingRequests.get(msg.id as number);
       if (pending) {
         clearTimeout(pending.timeout);
         this.pendingRequests.delete(msg.id as number);
         const error = msg.error as { message?: string };
-        pending.reject(new Error(error?.message || 'Unknown error'));
+        pending.reject(new Error(error?.message || "Unknown error"));
       }
       return;
     }
@@ -280,13 +282,13 @@ export class LocalMCPServerInstance implements MCPServerInstance {
   private sendRequest(method: string, params: unknown): Promise<unknown> {
     return new Promise((resolve, reject) => {
       if (!this.process?.stdin) {
-        reject(new Error('Process stdin not available'));
+        reject(new Error("Process stdin not available"));
         return;
       }
 
       const id = ++this.requestId;
       const request = {
-        jsonrpc: '2.0',
+        jsonrpc: "2.0",
         id,
         method,
         params,
@@ -303,7 +305,7 @@ export class LocalMCPServerInstance implements MCPServerInstance {
 
       // Send request
       try {
-        this.process.stdin.write(JSON.stringify(request) + '\n');
+        this.process.stdin.write(`${JSON.stringify(request)}\n`);
       } catch (err) {
         clearTimeout(timeout);
         this.pendingRequests.delete(id);
@@ -317,32 +319,32 @@ export class LocalMCPServerInstance implements MCPServerInstance {
    */
   private async waitForInitialization(): Promise<void> {
     // Send initialize request per MCP protocol
-    const result = await this.sendRequest('initialize', {
-      protocolVersion: '2024-11-05',
+    const result = await this.sendRequest("initialize", {
+      protocolVersion: "2024-11-05",
       capabilities: {},
       clientInfo: {
-        name: 'gordon',
-        version: '0.5.0',
+        name: "gordon",
+        version: "0.5.0",
       },
     });
 
     // Send initialized notification
     if (this.process?.stdin) {
       const notification = {
-        jsonrpc: '2.0',
-        method: 'notifications/initialized',
+        jsonrpc: "2.0",
+        method: "notifications/initialized",
       };
-      this.process.stdin.write(JSON.stringify(notification) + '\n');
+      this.process.stdin.write(`${JSON.stringify(notification)}\n`);
     }
 
-    return result as void;
+    void result;
   }
 
   /**
    * Reject all pending requests
    */
   private rejectAllPending(error: Error): void {
-    for (const [id, pending] of this.pendingRequests) {
+    for (const [_id, pending] of this.pendingRequests) {
       clearTimeout(pending.timeout);
       pending.reject(error);
     }
@@ -353,7 +355,7 @@ export class LocalMCPServerInstance implements MCPServerInstance {
    * Clean up the process
    */
   private async cleanup(): Promise<void> {
-    this.rejectAllPending(new Error('Server stopped'));
+    this.rejectAllPending(new Error("Server stopped"));
 
     if (this.process) {
       // Try graceful shutdown first
@@ -363,11 +365,11 @@ export class LocalMCPServerInstance implements MCPServerInstance {
       await new Promise<void>((resolve) => {
         const timeout = setTimeout(() => {
           // Force kill if still running
-          this.process?.kill('SIGKILL');
+          this.process?.kill("SIGKILL");
           resolve();
         }, 5000);
 
-        this.process?.on('exit', () => {
+        this.process?.on("exit", () => {
           clearTimeout(timeout);
           resolve();
         });
@@ -387,8 +389,6 @@ export class LocalMCPServerInstance implements MCPServerInstance {
  * @param manifest - Server manifest
  * @returns Server instance (not yet started)
  */
-export function createServerInstance(
-  manifest: MCPServerManifest
-): MCPServerInstance {
+export function createServerInstance(manifest: MCPServerManifest): MCPServerInstance {
   return new LocalMCPServerInstance(manifest);
 }

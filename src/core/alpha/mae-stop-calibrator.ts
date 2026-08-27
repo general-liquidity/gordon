@@ -173,7 +173,7 @@ function distributionOf(values: number[]): ExcursionDistribution | null {
     mean: parseFloat(mean.toFixed(6)),
     median: parseFloat(quantile(sorted, 0.5).toFixed(6)),
     p75: parseFloat(quantile(sorted, 0.75).toFixed(6)),
-    p90: parseFloat(quantile(sorted, 0.90).toFixed(6)),
+    p90: parseFloat(quantile(sorted, 0.9).toFixed(6)),
     p95: parseFloat(quantile(sorted, 0.95).toFixed(6)),
     p99: parseFloat(quantile(sorted, 0.99).toFixed(6)),
     min: parseFloat(sorted[0]!.toFixed(6)),
@@ -182,20 +182,13 @@ function distributionOf(values: number[]): ExcursionDistribution | null {
 }
 
 function computeExcursions(t: CalibratorTrade): { mae: number; mfe: number } {
-  if (
-    t.maxAdverseExcursionPct !== undefined &&
-    t.maxFavorableExcursionPct !== undefined
-  ) {
+  if (t.maxAdverseExcursionPct !== undefined && t.maxFavorableExcursionPct !== undefined) {
     return {
       mae: Math.max(0, t.maxAdverseExcursionPct),
       mfe: Math.max(0, t.maxFavorableExcursionPct),
     };
   }
-  if (
-    t.highWhileOpen !== undefined &&
-    t.lowWhileOpen !== undefined &&
-    t.entryPrice > 0
-  ) {
+  if (t.highWhileOpen !== undefined && t.lowWhileOpen !== undefined && t.entryPrice > 0) {
     let mae: number;
     let mfe: number;
     if (t.side === "LONG") {
@@ -210,10 +203,7 @@ function computeExcursions(t: CalibratorTrade): { mae: number; mfe: number } {
   return { mae: 0, mfe: 0 };
 }
 
-function classifyOutcome(
-  t: CalibratorTrade,
-  epsilon: number,
-): "winner" | "loser" | "breakeven" {
+function classifyOutcome(t: CalibratorTrade, epsilon: number): "winner" | "loser" | "breakeven" {
   if (t.outcome) return t.outcome;
   if (t.entryPrice <= 0) return "breakeven";
   const pnl =
@@ -397,10 +387,14 @@ export function formatMaeStopCalibrator(result: MaeStopCalibratorResult): string
   if (result.counterfactual) {
     lines.push("");
     lines.push(`  Counterfactual at recommended stop:`);
-    lines.push(`    Winners preserved: ${result.counterfactual.winnersPreservedAtNewStop} / ${result.winners}`);
+    lines.push(
+      `    Winners preserved: ${result.counterfactual.winnersPreservedAtNewStop} / ${result.winners}`,
+    );
     lines.push(`    Winners lost:      ${result.counterfactual.winnersLostAtNewStop}`);
     lines.push(`    Losers cut early:  ${result.counterfactual.losersCutEarlierAtNewStop}`);
-    lines.push(`    Saved fraction:    ${fmtPct(result.counterfactual.estimatedSavedFractionOnLosers)}`);
+    lines.push(
+      `    Saved fraction:    ${fmtPct(result.counterfactual.estimatedSavedFractionOnLosers)}`,
+    );
   }
   lines.push("");
   lines.push(`Summary: ${result.summary.trim()}`);

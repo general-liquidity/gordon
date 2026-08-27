@@ -40,7 +40,7 @@ class KalmanFilterEngine {
 
   constructor(
     private processVariance: number = 1e-5,
-    private measurementVariance: number = 1e-1
+    private measurementVariance: number = 1e-1,
   ) {}
 
   filter(measurement: number): number {
@@ -76,7 +76,7 @@ export function calculateKalmanFilter(
   candles: Candle[],
   processVariance: number = 1e-5,
   measurementVariance: number = 0.1,
-  deviationThreshold: number = 5
+  deviationThreshold: number = 5,
 ): KalmanFilterResult {
   if (candles.length < 2) {
     return {
@@ -116,7 +116,7 @@ export function calculateKalmanFilter(
     slope,
     deviation,
     trend,
-    overextended
+    overextended,
   );
 
   return {
@@ -131,12 +131,12 @@ export function calculateKalmanFilter(
 }
 
 function buildKalmanInterpretation(
-  price: number,
+  _price: number,
   fairValue: number,
-  slope: number,
+  _slope: number,
   deviation: number,
   trend: string,
-  overextended: boolean
+  overextended: boolean,
 ): string {
   const dir = trend === "bullish" ? "upward" : trend === "bearish" ? "downward" : "flat";
   const devStr = deviation > 0 ? "above" : "below";

@@ -2,7 +2,10 @@
 // Extract Memories — Auto-extract trading learnings from conversations
 // ============================================================================
 
-interface Message { role?: string; content?: string; }
+interface Message {
+  role?: string;
+  content?: string;
+}
 
 export interface ExtractedMemory {
   type: "user" | "feedback" | "project" | "reference";

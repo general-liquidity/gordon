@@ -25,8 +25,7 @@ export const GOAL_DEFERRED_ACTIONS_FLAG_ENV = "GORDON_GOAL_DEFERRED_ACTIONS";
 
 export function isGoalDeferredActionsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return (
-    env[GOAL_DEFERRED_ACTIONS_FLAG_ENV] === "1" ||
-    env[GOAL_DEFERRED_ACTIONS_FLAG_ENV] === "true"
+    env[GOAL_DEFERRED_ACTIONS_FLAG_ENV] === "1" || env[GOAL_DEFERRED_ACTIONS_FLAG_ENV] === "true"
   );
 }
 
@@ -152,7 +151,7 @@ export function deferredActionToPayload(action: DeferredAction): Record<string, 
     goalId: action.goalId,
     category: action.category,
     recordedAt: action.recordedAt,
-    actionPreview: action.action.length > 80 ? action.action.slice(0, 77) + "..." : action.action,
+    actionPreview: action.action.length > 80 ? `${action.action.slice(0, 77)}...` : action.action,
     tagCount: action.tags?.length ?? 0,
   };
 }

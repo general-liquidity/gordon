@@ -114,7 +114,7 @@ function tryRegime(symbol: string): SynthesisManifest["regime"] {
 
 function tryNews(tokens: string[]): SynthesisManifest["news"] {
   if (tokens.length === 0) return null;
-  let cached;
+  let cached: ReturnType<typeof peekCachedHeadlines>;
   try {
     cached = peekCachedHeadlines();
   } catch {
@@ -142,7 +142,7 @@ function tryNews(tokens: string[]): SynthesisManifest["news"] {
 
 function tryMatchedLessons(tokens: string[]): string[] {
   if (tokens.length === 0) return [];
-  let store;
+  let store: ReturnType<typeof loadACELessons>;
   try {
     store = loadACELessons();
   } catch {
@@ -230,6 +230,7 @@ export function summarizeManifest(m: SynthesisManifest): string {
   }
   parts.push(`obs: ${m.observationCount}`);
   if (m.matchedLessonIds.length) parts.push(`lessons: ${m.matchedLessonIds.length}`);
-  if (m.candleSnapshotRef) parts.push(`candles: ${m.candleSnapshotRef.barCount}@${m.candleSnapshotRef.timeframe}`);
+  if (m.candleSnapshotRef)
+    parts.push(`candles: ${m.candleSnapshotRef.barCount}@${m.candleSnapshotRef.timeframe}`);
   return parts.join(" | ");
 }

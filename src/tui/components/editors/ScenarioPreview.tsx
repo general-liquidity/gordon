@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 
@@ -63,11 +62,21 @@ export function ScenarioPreview({ scenarios: t }: { scenarios: TradeScenarios })
     <Pane title="SCENARIO PREVIEW">
       <Box flexDirection="column">
         <Box>
-          <Text dimColor bold>{"OUTCOME".padEnd(14)}</Text>
-          <Text dimColor bold>{"PRICE".padEnd(12)}</Text>
-          <Text dimColor bold>{"P&L $".padEnd(12)}</Text>
-          <Text dimColor bold>{"P&L %".padEnd(10)}</Text>
-          <Text dimColor bold>PORT</Text>
+          <Text dimColor bold>
+            {"OUTCOME".padEnd(14)}
+          </Text>
+          <Text dimColor bold>
+            {"PRICE".padEnd(12)}
+          </Text>
+          <Text dimColor bold>
+            {"P&L $".padEnd(12)}
+          </Text>
+          <Text dimColor bold>
+            {"P&L %".padEnd(10)}
+          </Text>
+          <Text dimColor bold>
+            PORT
+          </Text>
         </Box>
         {scenarios.map((s) => (
           <Box key={s.name}>
@@ -78,17 +87,23 @@ export function ScenarioPreview({ scenarios: t }: { scenarios: TradeScenarios })
               {s.pnlUsd >= 0 ? "+" : ""}${s.pnlUsd.toFixed(0).padEnd(9)}
             </Text>
             <Text color={s.color}>
-              {s.pnlPct >= 0 ? "+" : ""}{s.pnlPct.toFixed(2)}%{"".padEnd(5)}
+              {s.pnlPct >= 0 ? "+" : ""}
+              {s.pnlPct.toFixed(2)}%{"".padEnd(5)}
             </Text>
             {s.portfolioImpactPct !== undefined && (
-              <Text dimColor>{s.portfolioImpactPct >= 0 ? "+" : ""}{s.portfolioImpactPct.toFixed(2)}%</Text>
+              <Text dimColor>
+                {s.portfolioImpactPct >= 0 ? "+" : ""}
+                {s.portfolioImpactPct.toFixed(2)}%
+              </Text>
             )}
           </Box>
         ))}
         <Box marginTop={1}>
           <Text dimColor>Risk/Reward: </Text>
-          <Text bold color={rr >= 2 ? "green" : rr >= 1 ? "yellow" : "red"}>{rr.toFixed(2)}:1</Text>
-          <Text dimColor>  {"·"}  Win rate needed to break even: </Text>
+          <Text bold color={rr >= 2 ? "green" : rr >= 1 ? "yellow" : "red"}>
+            {rr.toFixed(2)}:1
+          </Text>
+          <Text dimColor> {"·"} Win rate needed to break even: </Text>
           <Text bold>{(100 / (1 + rr)).toFixed(0)}%</Text>
         </Box>
       </Box>

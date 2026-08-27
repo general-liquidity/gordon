@@ -66,12 +66,7 @@ export const getPnlDistributionShapeTool = createTool({
     stddev: z.number(),
     skewness: z.number(),
     excessKurtosis: z.number(),
-    verdict: z.enum([
-      "long_convexity",
-      "short_convexity",
-      "symmetric",
-      "insufficient_data",
-    ]),
+    verdict: z.enum(["long_convexity", "short_convexity", "symmetric", "insufficient_data"]),
     min: z.number(),
     max: z.number(),
   }),
@@ -193,10 +188,7 @@ export const detectCorrelationBreakdownTool = createTool({
       .array(
         z.object({
           symbol: z.string().min(1),
-          returns: z
-            .array(z.number())
-            .min(2)
-            .describe("Log-return series, oldest → newest."),
+          returns: z.array(z.number()).min(2).describe("Log-return series, oldest → newest."),
         }),
       )
       .min(2)

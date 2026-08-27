@@ -61,7 +61,7 @@ describe("PositionSizer.calculateWithKelly — cost-aware", () => {
 
   it("respects the 25% cap even with cost adjustment", () => {
     // Extreme win rate / huge edge that would blow past 25% raw
-    const result = sizer.calculateWithKelly(10_000, 0.95, 0.10, 0.01, 5);
+    const result = sizer.calculateWithKelly(10_000, 0.95, 0.1, 0.01, 5);
     expect(result.adjustedPercent).toBeLessThanOrEqual(25);
     expect(result.positionSize).toBeLessThanOrEqual(2500);
   });

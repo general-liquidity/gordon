@@ -32,7 +32,6 @@ import {
   rank,
   sign,
   log,
-  ts_lag,
   ts_delta,
   ts_rank,
   ts_argmax,
@@ -273,10 +272,7 @@ export const IMPLEMENTED_ALPHAS = Object.keys(REGISTRY) as AlphaName[];
  * (NULL-on-missing convention — does not throw on unknown name). Throws only at
  * the input boundary if a required OHLCV panel is absent for the chosen alpha.
  */
-export function computeFormulaicAlpha(
-  name: string,
-  inputs: AlphaInputs,
-): Panel | null {
+export function computeFormulaicAlpha(name: string, inputs: AlphaInputs): Panel | null {
   const fn = REGISTRY[name as AlphaName];
   if (!fn) return null;
   return fn(inputs);

@@ -37,17 +37,9 @@ const US_EQUITY_VENUES = new Set([
 
 const DEFI_VENUES = new Set<string>();
 
-export type InferredAssetClass =
-  | "crypto"
-  | "us_equity"
-  | "defi"
-  | "fx"
-  | "commodity"
-  | "unknown";
+export type InferredAssetClass = "crypto" | "us_equity" | "defi" | "fx" | "commodity" | "unknown";
 
-export function inferAssetClassFromVenue(
-  venue: string | undefined | null,
-): InferredAssetClass {
+export function inferAssetClassFromVenue(venue: string | undefined | null): InferredAssetClass {
   if (!venue) return "unknown";
   const v = venue.toLowerCase().trim();
   if (CRYPTO_VENUES.has(v)) return "crypto";
@@ -60,9 +52,31 @@ export function inferAssetClassFromVenue(
 
 // ISO-4217 codes seen in retail FX (majors + common minors/EM).
 const FIAT_CODES = new Set([
-  "USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD",
-  "CNH", "CNY", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN",
-  "MXN", "ZAR", "TRY", "HUF", "CZK", "ILS", "INR", "KRW", "THB",
+  "USD",
+  "EUR",
+  "GBP",
+  "JPY",
+  "CHF",
+  "CAD",
+  "AUD",
+  "NZD",
+  "CNH",
+  "CNY",
+  "HKD",
+  "SGD",
+  "SEK",
+  "NOK",
+  "DKK",
+  "PLN",
+  "MXN",
+  "ZAR",
+  "TRY",
+  "HUF",
+  "CZK",
+  "ILS",
+  "INR",
+  "KRW",
+  "THB",
 ]);
 
 // Precious-metal ISO-4217 codes (X-prefixed): XAU=gold, XAG=silver,
@@ -84,9 +98,7 @@ const METAL_WORDS = ["GOLD", "SILVER", "PLATINUM", "PALLADIUM"];
  * as `explicit` to `inferAssetClass`, or rely on the venue. Returns "unknown"
  * when the symbol isn't a definitional FX/metal shape.
  */
-export function inferAssetClassFromSymbol(
-  symbol: string | undefined | null,
-): InferredAssetClass {
+export function inferAssetClassFromSymbol(symbol: string | undefined | null): InferredAssetClass {
   if (!symbol) return "unknown";
   const s = symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (!s) return "unknown";
@@ -111,7 +123,8 @@ function normalizeExplicit(explicit: string | undefined | null): InferredAssetCl
   const e = explicit.toLowerCase().trim();
   if (e === "crypto" || e === "cryptocurrency" || e === "digital") return "crypto";
   if (e === "fx" || e === "forex" || e === "currency") return "fx";
-  if (e === "commodity" || e === "commodities" || e === "metal" || e === "metals") return "commodity";
+  if (e === "commodity" || e === "commodities" || e === "metal" || e === "metals")
+    return "commodity";
   if (e === "us_equity" || e === "equity" || e === "equities" || e === "stock" || e === "stocks") {
     return "us_equity";
   }

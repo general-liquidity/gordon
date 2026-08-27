@@ -5,13 +5,7 @@ import {
   createRelativeAnsiPatcher,
   type DiffFn,
 } from "./renderPipeline.ts";
-import type {
-  CellBuffer,
-  CellWidth,
-  CharPool,
-  Patch,
-  StylePool,
-} from "./internal/contracts.ts";
+import type { CellBuffer, CellWidth, CharPool, Patch, StylePool } from "./internal/contracts.ts";
 import {
   CELL_CHAR_MASK,
   CELL_STYLE_MASK,
@@ -30,13 +24,7 @@ function makeMockCellBuffer(width: number, height: number): CellBuffer {
   return {
     width,
     height,
-    set(
-      x: number,
-      y: number,
-      charIdx: number,
-      styleId: number,
-      cellWidth: CellWidth,
-    ): void {
+    set(x: number, y: number, charIdx: number, styleId: number, cellWidth: CellWidth): void {
       if (x < 0 || x >= width || y < 0 || y >= height) return;
       const packed =
         (charIdx & CELL_CHAR_MASK) |
@@ -199,9 +187,7 @@ describe("createPatchEmitter", () => {
     let called = 0;
     const custom: DiffFn = () => {
       called++;
-      return [
-        { x: 0, y: 0, content: "X", visualWidth: 1, styleId: -1 },
-      ];
+      return [{ x: 0, y: 0, content: "X", visualWidth: 1, styleId: -1 }];
     };
     const emitter = createPatchEmitter(custom);
     const prev = makeMockCellBuffer(2, 2);
@@ -256,11 +242,7 @@ describe("createAnsiPatcher", () => {
     //   (0,5) cursor (gap of 4 cells) + 'b'  - style unchanged
     //   (2,0) cursor + 'c'
     //   reset
-    const expected =
-      "\x1b[1;1H\x1b[31ma" +
-      "\x1b[1;6Hb" +
-      "\x1b[3;1Hc" +
-      "\x1b[0m";
+    const expected = "\x1b[1;1H\x1b[31ma" + "\x1b[1;6Hb" + "\x1b[3;1Hc" + "\x1b[0m";
     expect(out).toBe(expected);
   });
 
@@ -325,9 +307,7 @@ describe("createAnsiPatcher", () => {
 describe("createRelativeAnsiPatcher", () => {
   test("empty patch list yields empty string", () => {
     const patcher = createRelativeAnsiPatcher();
-    expect(patcher.write([], makeMockStylePool(), makeMockCharPool(), 3)).toBe(
-      "",
-    );
+    expect(patcher.write([], makeMockStylePool(), makeMockCharPool(), 3)).toBe("");
   });
 
   test("single patch at (y=0, x=0) with previousFrameHeight=3 emits pull-back + content + restore", () => {

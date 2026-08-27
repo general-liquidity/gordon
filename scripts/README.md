@@ -35,7 +35,7 @@ scripts/
 
 | File | What it does |
 |---|---|
-| `patch-mastra.cjs` | Postinstall: reverts Mastra's hardcoded `lastMessages: 0` for sub-agents (→ 0, the framework default), shims OpenAI `.responses()` → `createOpenAICompatible` for Dedalus, stubs empty `@solana/rpc-parsed-types`, and patches `@solana-agent-kit/plugin-token` named CJS imports. |
+| `patch-mastra.cjs` | Postinstall compatibility guard: reverts any stale `lastMessages: 10` mutation to Mastra's default and patches legacy Mastra OpenAI routing for custom compatible endpoints. Current Mastra releases provide the compatible chat route natively, which the guard verifies without rewriting dependencies. |
 | `patch-ink.cjs` | Postinstall: wraps Ink's render scheduler in `queueMicrotask()` (Claude Code's fork pattern) so React's layout phase commits before the terminal write. |
 
 Both run automatically via `npm install` → `package.json` postinstall hook.
@@ -277,11 +277,10 @@ sharpen Gordon's security posture if we ever need them:
   field; the CLI path forces a review prompt.
 - **`bun ci`** — alias for `bun install --frozen-lockfile`. Use in
   CI/CD pipelines where the lockfile must not drift.
-- **`bun audit --ignore <advisory-id>`** — silence specific known
-  advisories. Gordon's `ci.yml` critical audit uses a reviewed baseline for
-  protobufjs, form-data, and shell-quote transitives that cannot currently be
-  removed without upstream releases. `audit-risk-tree.cjs` identifies the
-  direct dependency paths and must be updated whenever that baseline changes.
+- **`bun run audit:dependencies`** — hard-gate every moderate-or-higher Bun
+  advisory. The only current exception is a low-severity advisory in Mastra's
+  unpatched legacy AI-SDK-v5 compatibility alias; OSV records it narrowly with
+  an expiry in `osv-scanner.toml` rather than hiding it from the Bun report.
 - **`bun patch` / `bun patch --commit`** — git-friendly persistent
   dependency patching. Future replacement for `scripts/patches/`
   if Mastra/Ink patches become persistent rather than postinstall.

@@ -29,7 +29,11 @@ import { registerAllProducers } from "../producers/index.ts";
 import { getSuggestionStore, type FeedbackRecord } from "../storage/suggestionStore.ts";
 import { getCategoryPolicy } from "../judges/categoryPolicy.ts";
 import { getOutcomeTracker } from "../judges/outcomeEvals.ts";
-import { loadProactiveState, saveProactiveStateNow, flushPendingSave } from "../storage/persistence.ts";
+import {
+  loadProactiveState,
+  saveProactiveStateNow,
+  flushPendingSave,
+} from "../storage/persistence.ts";
 
 const logger = createModuleLogger("proactive-observer");
 
@@ -57,29 +61,29 @@ let producerUnregister: (() => void) | null = null;
 
 // Tick cadences in ms — each producer gets its own schedule
 const TICK_INTERVALS = {
-  producer_health: 5 * 60 * 1000,   // 5 min — producer liveness alerting
-  kill_switch: 60 * 1000,           // 1 min — tripped kill switch alerting
-  shadow_close: 60 * 1000,          // 1 min — shadow fill close reconciliation
+  producer_health: 5 * 60 * 1000, // 5 min — producer liveness alerting
+  kill_switch: 60 * 1000, // 1 min — tripped kill switch alerting
+  shadow_close: 60 * 1000, // 1 min — shadow fill close reconciliation
   shadow_divergence: 24 * 60 * 60 * 1000, // 24h — shadow vs realized PnL divergence
-  session_review: 60 * 60 * 1000,   // 1 hour — checks time of week
-  journal_prompt: 60 * 60 * 1000,   // 1 hour — checks time of day
-  portfolio_drift: 30 * 60 * 1000,  // 30 min — position drift check
+  session_review: 60 * 60 * 1000, // 1 hour — checks time of week
+  journal_prompt: 60 * 60 * 1000, // 1 hour — checks time of day
+  portfolio_drift: 30 * 60 * 1000, // 30 min — position drift check
   position_review: 4 * 60 * 60 * 1000, // 4 hours — long-held open position review
-  regime_flip: 15 * 60 * 1000,      // 15 min — per-symbol regime polling
-  chart_pattern: 15 * 60 * 1000,    // 15 min — per-symbol LMW chart-pattern scan
-  volatility: 10 * 60 * 1000,       // 10 min — ATR expansion check
-  funding: 30 * 60 * 1000,          // 30 min — perp funding scan
-  news_event: 10 * 60 * 1000,       // 10 min — RSS headline polling
-  whale_alert: 15 * 60 * 1000,      // 15 min — whale-flow headline scan
+  regime_flip: 15 * 60 * 1000, // 15 min — per-symbol regime polling
+  chart_pattern: 15 * 60 * 1000, // 15 min — per-symbol LMW chart-pattern scan
+  volatility: 10 * 60 * 1000, // 10 min — ATR expansion check
+  funding: 30 * 60 * 1000, // 30 min — perp funding scan
+  news_event: 10 * 60 * 1000, // 10 min — RSS headline polling
+  whale_alert: 15 * 60 * 1000, // 15 min — whale-flow headline scan
   playbook_suggest: 30 * 60 * 1000, // 30 min — regime-matched playbook nudge
-  edge_assessment: 30 * 60 * 1000,  // 30 min — EDD Phase 5: re-verify live EDGE.md invariants
+  edge_assessment: 30 * 60 * 1000, // 30 min — EDD Phase 5: re-verify live EDGE.md invariants
   stock_news_event: 15 * 60 * 1000, // 15 min — stock RSS + EDGAR + Finnhub
   // Stock event ticks (Finnhub-driven)
-  earnings: 2 * 60 * 60 * 1000,     // 2 hours — upcoming earnings calendar
+  earnings: 2 * 60 * 60 * 1000, // 2 hours — upcoming earnings calendar
   insider_flow: 4 * 60 * 60 * 1000, // 4 hours — insider transaction clusters
-  analyst: 6 * 60 * 60 * 1000,      // 6 hours — analyst rating shifts
+  analyst: 6 * 60 * 60 * 1000, // 6 hours — analyst rating shifts
   congressional: 24 * 60 * 60 * 1000, // 24 hours — STOCK Act disclosures are already lagged
-  sleep_precompute: 5 * 60 * 1000,  // 5 min — idle pre-computation (GORDON_SLEEP_TIME=1)
+  sleep_precompute: 5 * 60 * 1000, // 5 min — idle pre-computation (GORDON_SLEEP_TIME=1)
 };
 
 const lastTickAt: Partial<Record<keyof typeof TICK_INTERVALS, number>> = {};
@@ -96,7 +100,11 @@ let lastTickLoopAt = 0;
 // Start / stop
 // ============================================================================
 
-export function startProactiveObserver(): { started: boolean; subscriptions: number; loadedFromDisk: boolean } {
+export function startProactiveObserver(): {
+  started: boolean;
+  subscriptions: number;
+  loadedFromDisk: boolean;
+} {
   const engine = getProactiveEngine();
 
   // Hydrate persisted state first — feedback ledger, category policy, and
@@ -227,19 +235,21 @@ export function startProactiveObserver(): { started: boolean; subscriptions: num
           // likely-next analyses so a follow-up query returns instantly. Opt-in
           // (GORDON_SLEEP_TIME=1) + idle-gated inside tickSleepTimePrecompute.
           void import("./sleepTimeCompute.ts")
-            .then(async ({
-              isSleepTimeEnabled,
-              getRegisteredSleepAnalyses,
-              registerSleepAnalyses,
-              tickSleepTimePrecompute,
-            }) => {
-              if (!isSleepTimeEnabled()) return;
-              if (getRegisteredSleepAnalyses().length === 0) {
-                const { buildDefaultSleepAnalyses } = await import("./sleepTimeAnalyses.ts");
-                registerSleepAnalyses(await buildDefaultSleepAnalyses());
-              }
-              await tickSleepTimePrecompute({ now });
-            })
+            .then(
+              async ({
+                isSleepTimeEnabled,
+                getRegisteredSleepAnalyses,
+                registerSleepAnalyses,
+                tickSleepTimePrecompute,
+              }) => {
+                if (!isSleepTimeEnabled()) return;
+                if (getRegisteredSleepAnalyses().length === 0) {
+                  const { buildDefaultSleepAnalyses } = await import("./sleepTimeAnalyses.ts");
+                  registerSleepAnalyses(await buildDefaultSleepAnalyses());
+                }
+                await tickSleepTimePrecompute({ now });
+              },
+            )
             .catch((err) => {
               logger.warn("sleep-time precompute tick failed", { err: String(err) });
             });
@@ -342,9 +352,7 @@ function eventToObservation(event: GordonEvent): ProactiveObservation | null {
     (raw.price as number | undefined) ??
     (raw.exitPrice as number | undefined);
 
-  const change =
-    (raw.pnlPercent as number | undefined) ??
-    (raw.change as number | undefined);
+  const change = (raw.pnlPercent as number | undefined) ?? (raw.change as number | undefined);
 
   return {
     source: "event_bus",

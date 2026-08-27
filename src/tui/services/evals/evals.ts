@@ -10,9 +10,9 @@
 // - Schema Compliance: does output parse as TradingSignal?
 // - Confidence Calibration: is stated confidence justified?
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { join } from "path";
-import { homedir } from "os";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 
 const EVALS_DIR = join(homedir(), ".gordon", "evals");
 
@@ -27,7 +27,10 @@ export interface EvalCase {
 
 export interface EvalAssertion {
   name: string;
-  check: (output: any, context?: Record<string, any>) => { passed: boolean; score: number; reason?: string };
+  check: (
+    output: any,
+    context?: Record<string, any>,
+  ) => { passed: boolean; score: number; reason?: string };
 }
 
 export interface EvalResult {
@@ -64,7 +67,11 @@ export const scorers = {
         schema.parse(output);
         return { passed: true, score: 1 };
       } catch (err) {
-        return { passed: false, score: 0, reason: err instanceof Error ? err.message : "Parse failed" };
+        return {
+          passed: false,
+          score: 0,
+          reason: err instanceof Error ? err.message : "Parse failed",
+        };
       }
     },
   }),
@@ -152,14 +159,23 @@ export const scorers = {
   }),
 
   // Custom scorer
-  custom: (name: string, fn: (output: any, context?: Record<string, any>) => { passed: boolean; score: number; reason?: string }): EvalAssertion => ({
+  custom: (
+    name: string,
+    fn: (
+      output: any,
+      context?: Record<string, any>,
+    ) => { passed: boolean; score: number; reason?: string },
+  ): EvalAssertion => ({
     name,
     check: fn,
   }),
 };
 
 export class EvalRunner {
-  async runCase(testCase: EvalCase, executeAgent: (input: string, context?: Record<string, any>) => Promise<any>): Promise<EvalResult> {
+  async runCase(
+    testCase: EvalCase,
+    executeAgent: (input: string, context?: Record<string, any>) => Promise<any>,
+  ): Promise<EvalResult> {
     const startTime = Date.now();
     let output: any;
     let error: string | undefined;
@@ -217,9 +233,8 @@ export class EvalRunner {
 
     const totalPassed = results.filter((r) => r.passed).length;
     const totalFailed = results.length - totalPassed;
-    const avgScore = results.length > 0
-      ? results.reduce((s, r) => s + r.score, 0) / results.length
-      : 0;
+    const avgScore =
+      results.length > 0 ? results.reduce((s, r) => s + r.score, 0) / results.length : 0;
 
     const run: EvalRun = {
       id: `run_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -246,7 +261,7 @@ export class EvalRunner {
 
   listRuns(): EvalRun[] {
     try {
-      const { readdirSync } = require("fs");
+      const { readdirSync } = require("node:fs");
       if (!existsSync(EVALS_DIR)) return [];
       const files = readdirSync(EVALS_DIR).filter((f: string) => f.endsWith(".json"));
       const runs: EvalRun[] = [];
@@ -262,7 +277,10 @@ export class EvalRunner {
   }
 
   // Compare two runs to detect regressions
-  compareRuns(runA: EvalRun, runB: EvalRun): {
+  compareRuns(
+    runA: EvalRun,
+    runB: EvalRun,
+  ): {
     improved: string[];
     degraded: string[];
     unchanged: string[];

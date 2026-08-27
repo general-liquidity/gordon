@@ -36,17 +36,21 @@ export function useSkillTracking() {
     });
   }, []);
 
-  const getTopSkills = useCallback((n: number = 5): SkillMetric[] => {
-    return [...metrics.values()]
-      .sort((a, b) => b.usageCount - a.usageCount)
-      .slice(0, n);
-  }, [metrics]);
+  const getTopSkills = useCallback(
+    (n: number = 5): SkillMetric[] => {
+      return [...metrics.values()].sort((a, b) => b.usageCount - a.usageCount).slice(0, n);
+    },
+    [metrics],
+  );
 
-  const getSuccessRate = useCallback((skillName: string): number => {
-    const m = metrics.get(skillName);
-    if (!m || m.usageCount === 0) return 0;
-    return m.successCount / m.usageCount;
-  }, [metrics]);
+  const getSuccessRate = useCallback(
+    (skillName: string): number => {
+      const m = metrics.get(skillName);
+      if (!m || m.usageCount === 0) return 0;
+      return m.successCount / m.usageCount;
+    },
+    [metrics],
+  );
 
   return { recordUsage, getTopSkills, getSuccessRate, metrics };
 }

@@ -59,7 +59,7 @@ export interface FlowScopeResult {
 export function calculateFlowScope(
   candles: Candle[],
   numBins: number = 20,
-  imbalanceThreshold: number = 0.65
+  imbalanceThreshold: number = 0.65,
 ): FlowScopeResult {
   if (candles.length < 5) {
     return {
@@ -164,12 +164,13 @@ export function calculateFlowScope(
   const pocTotal = pocBuyVolume + pocSellVolume;
   const pocBuyRatio = pocTotal > 0 ? pocBuyVolume / pocTotal : 0.5;
 
-  const pocImbalanced = pocBuyRatio >= imbalanceThreshold || pocBuyRatio <= (1 - imbalanceThreshold);
-  const imbalanceDirection: "buy" | "sell" | "neutral" = pocBuyRatio >= imbalanceThreshold
-    ? "buy"
-    : pocBuyRatio <= (1 - imbalanceThreshold)
-    ? "sell"
-    : "neutral";
+  const pocImbalanced = pocBuyRatio >= imbalanceThreshold || pocBuyRatio <= 1 - imbalanceThreshold;
+  const imbalanceDirection: "buy" | "sell" | "neutral" =
+    pocBuyRatio >= imbalanceThreshold
+      ? "buy"
+      : pocBuyRatio <= 1 - imbalanceThreshold
+        ? "sell"
+        : "neutral";
 
   const overallBuyRatio = totalVolume > 0 ? totalBuyVolume / totalVolume : 0.5;
   const pressureScore = parseFloat(((overallBuyRatio - 0.5) * 200).toFixed(1));
@@ -221,7 +222,7 @@ export function calculateFlowScope(
     pocImbalanced,
     imbalanceDirection,
     pressureScore,
-    overallBuyRatio
+    overallBuyRatio,
   );
 
   return {
@@ -248,15 +249,16 @@ function buildFlowScopeInterpretation(
   pocImbalanced: boolean,
   imbalanceDir: string,
   pressureScore: number,
-  overallBuyRatio: number
+  overallBuyRatio: number,
 ): string {
   let msg = `POC at ${poc.toFixed(2)} (buy ratio: ${(pocBuyRatio * 100).toFixed(0)}%). `;
 
   if (pocImbalanced) {
     msg += `POC IMBALANCED toward ${imbalanceDir.toUpperCase()} — `;
-    msg += imbalanceDir === "buy"
-      ? "strong buying at key level, bullish. "
-      : "strong selling at key level, bearish. ";
+    msg +=
+      imbalanceDir === "buy"
+        ? "strong buying at key level, bullish. "
+        : "strong selling at key level, bearish. ";
   } else {
     msg += "POC balanced — no dominant side. ";
   }

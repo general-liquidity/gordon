@@ -3,8 +3,8 @@ import type { Message } from "../../components/messages/MessageBubble.js";
 
 export interface SearchMatch {
   messageId: string;
-  messageIndex: number;   // index in the messages array
-  startOffset: number;    // char offset within content
+  messageIndex: number; // index in the messages array
+  startOffset: number; // char offset within content
   endOffset: number;
 }
 
@@ -12,12 +12,12 @@ export interface TranscriptSearchResult {
   query: string;
   setQuery: (q: string) => void;
   matches: SearchMatch[];
-  currentMatchIndex: number;     // -1 when no matches
+  currentMatchIndex: number; // -1 when no matches
   currentMatch: SearchMatch | null;
   navigateNext: () => void;
   navigatePrev: () => void;
   clearSearch: () => void;
-  isActive: boolean;             // true when query.length > 0
+  isActive: boolean; // true when query.length > 0
 }
 
 // ─── Bitmap pre-filter (B2) ──────────────────────────────────────────────────
@@ -46,7 +46,7 @@ export function computeLetterBitmap(input: string): number {
     if (lower >= A_CHAR && lower <= Z_CHAR) {
       mask |= 1 << (lower - A_CHAR);
       // Early-out micro-opt: once all 26 bits set, no further work needed.
-      if (mask === 0x3FFFFFF) return mask;
+      if (mask === 0x3ffffff) return mask;
     }
   }
   return mask;
@@ -107,7 +107,12 @@ export function useTranscriptSearch(messages: Message[]): TranscriptSearchResult
       while (true) {
         const idx = content.indexOf(lower, pos);
         if (idx === -1) break;
-        result.push({ messageId: msg.id, messageIndex: i, startOffset: idx, endOffset: idx + query.length });
+        result.push({
+          messageId: msg.id,
+          messageIndex: i,
+          startOffset: idx,
+          endOffset: idx + query.length,
+        });
         pos = idx + 1;
       }
     }

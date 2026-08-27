@@ -21,7 +21,10 @@ import {
   resumeAutonomousLoop,
   getAutonomousLoopStatus,
 } from "../../../../../core/pipeline/autonomous-loop.ts";
-import { loadMandateState, saveMandateState } from "../../../../../core/lifecycle/session-persistence.ts";
+import {
+  loadMandateState,
+  saveMandateState,
+} from "../../../../../core/lifecycle/session-persistence.ts";
 import { loadConfig } from "../../../../storage/config/config.ts";
 
 // ============================================================================
@@ -62,10 +65,7 @@ export const createSwingMandateTool = createTool({
       .enum(MANDATE_TIMEFRAMES)
       .optional()
       .describe("Optional higher timeframe used as a trend filter (e.g., 15m or 1h)"),
-    direction: z
-      .enum(["long", "short", "both"])
-      .default("long")
-      .describe("Trading direction"),
+    direction: z.enum(["long", "short", "both"]).default("long").describe("Trading direction"),
     maxRiskPerTrade: z
       .number()
       .min(0.1)
@@ -110,7 +110,9 @@ export const createSwingMandateTool = createTool({
     signalOnly: z
       .boolean()
       .default(true)
-      .describe("When true, emit signals and rationale only. No autonomous execution is attempted."),
+      .describe(
+        "When true, emit signals and rationale only. No autonomous execution is attempted.",
+      ),
     durationHours: z
       .number()
       .min(1)
@@ -143,10 +145,12 @@ export const createSwingMandateTool = createTool({
   outputSchema: z.object({
     mandate: z.any().optional(),
     summary: z.string().optional(),
-    validation: z.object({
-      valid: z.boolean(),
-      errors: z.array(z.string()),
-    }).optional(),
+    validation: z
+      .object({
+        valid: z.boolean(),
+        errors: z.array(z.string()),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async (input, _execContext: MastraExecutionContext) => {
@@ -204,7 +208,11 @@ export const createSwingMandateTool = createTool({
         `  Expires: ${mandate.expiresAt}`,
         ...(mandate.strategyNotes ? ["", `Strategy Notes:`, `  ${mandate.strategyNotes}`] : []),
         ...(mandate.additionalFilters.length > 0
-          ? ["", "Additional Filters:", ...mandate.additionalFilters.map((filter) => `  - ${filter}`)]
+          ? [
+              "",
+              "Additional Filters:",
+              ...mandate.additionalFilters.map((filter) => `  - ${filter}`),
+            ]
           : []),
         "",
         "Implementation note:",
@@ -255,7 +263,9 @@ export const startAutonomousModeTool = createTool({
 
     const effectiveConfig = await loadConfig().catch(() => ctx.config);
     {
-      const check = checkTradingPermission(effectiveConfig?.permissionMode, "autonomous", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
+      const check = checkTradingPermission(effectiveConfig?.permissionMode, "autonomous", {
+        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper,
+      });
       if (!check.allowed) {
         return { error: check.reason ?? "Autonomous mode not permitted under current mode" };
       }
@@ -263,7 +273,10 @@ export const startAutonomousModeTool = createTool({
 
     const resolvedMandate = (mandate as SwingMandate | undefined) ?? loadMandateState();
     if (!resolvedMandate) {
-      return { success: false, error: "No active mandate found. Create a mandate before starting autonomous mode." };
+      return {
+        success: false,
+        error: "No active mandate found. Create a mandate before starting autonomous mode.",
+      };
     }
     if (mandateId && resolvedMandate.id !== mandateId) {
       return {
@@ -278,7 +291,9 @@ export const startAutonomousModeTool = createTool({
         mandate: resolvedMandate,
         onOpportunityFound: async (opp) => {
           // Log the opportunity — actual execution happens through the agent pipeline
-          console.log(`[Autonomous] Opportunity: ${opp.symbol} ${opp.direction} (${(opp.confidence * 100).toFixed(0)}% confidence)`);
+          console.log(
+            `[Autonomous] Opportunity: ${opp.symbol} ${opp.direction} (${(opp.confidence * 100).toFixed(0)}% confidence)`,
+          );
           return false; // Default: don't auto-execute, let user approve
         },
         onMandateBreach: (reason) => {
@@ -320,10 +335,12 @@ export const stopAutonomousModeTool = createTool({
   outputSchema: z.object({
     success: z.boolean().optional(),
     message: z.string().optional(),
-    finalStats: z.object({
-      cycleCount: z.number(),
-      totalOpportunities: z.number(),
-    }).optional(),
+    finalStats: z
+      .object({
+        cycleCount: z.number(),
+        totalOpportunities: z.number(),
+      })
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async ({ reason }) => {
@@ -373,7 +390,8 @@ export const getAutonomousStatusTool = createTool({
     if (!status.isRunning) {
       return {
         isRunning: false,
-        message: "Autonomous mode is not running. Use create_swing_mandate and start_autonomous_mode to begin.",
+        message:
+          "Autonomous mode is not running. Use create_swing_mandate and start_autonomous_mode to begin.",
       };
     }
 
@@ -396,7 +414,8 @@ export const getAutonomousStatusTool = createTool({
 
 export const pauseAutonomousModeTool = createTool({
   id: "pause_autonomous_mode",
-  description: "Pause the autonomous loop without cancelling the mandate. Scans stop but state is preserved.",
+  description:
+    "Pause the autonomous loop without cancelling the mandate. Scans stop but state is preserved.",
   inputSchema: z.object({}),
   outputSchema: z.object({
     success: z.boolean().optional(),

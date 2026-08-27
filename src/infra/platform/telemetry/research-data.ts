@@ -324,13 +324,17 @@ function appendToFile(filePath: string, data: unknown): void {
       const stat = fs.statSync(filePath);
       if (stat.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
         // Rotate: rename to .bak, start fresh
-        const bakPath = filePath + ".bak";
-        try { fs.unlinkSync(bakPath); } catch { /* no-op */ }
+        const bakPath = `${filePath}.bak`;
+        try {
+          fs.unlinkSync(bakPath);
+        } catch {
+          /* no-op */
+        }
         fs.renameSync(filePath, bakPath);
       }
     }
 
-    fs.appendFileSync(filePath, JSON.stringify(data) + "\n", "utf-8");
+    fs.appendFileSync(filePath, `${JSON.stringify(data)}\n`, "utf-8");
   } catch {
     // Non-critical — never crash for data collection
   }
@@ -388,7 +392,8 @@ export function collectTrade(params: {
   // Calculate holding duration
   let holdingHours = 0;
   if (trade.openedAt && trade.closedAt) {
-    holdingHours = (new Date(trade.closedAt).getTime() - new Date(trade.openedAt).getTime()) / 3600000;
+    holdingHours =
+      (new Date(trade.closedAt).getTime() - new Date(trade.openedAt).getTime()) / 3600000;
   }
 
   // Normalize stop/TP distances as % from entry
@@ -671,7 +676,7 @@ export function clearResearchData(): number {
         fs.unlinkSync(filePath);
         cleared++;
       }
-      const bakPath = filePath + ".bak";
+      const bakPath = `${filePath}.bak`;
       if (fs.existsSync(bakPath)) {
         fs.unlinkSync(bakPath);
       }

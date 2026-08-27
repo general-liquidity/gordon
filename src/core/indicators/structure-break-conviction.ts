@@ -58,7 +58,7 @@ const round = (x: number, n: number) => parseFloat(x.toFixed(n));
 
 export function calculateStructureBreakConviction(
   candles: Candle[],
-  opts?: { pivotWindow?: number; minLevels?: number }
+  opts?: { pivotWindow?: number; minLevels?: number },
 ): StructureBreakConvictionResult {
   const pivotWindow = opts?.pivotWindow ?? 2;
   const minLevels = opts?.minLevels ?? 2;
@@ -135,8 +135,7 @@ export function calculateStructureBreakConviction(
       brokenLevels: [],
       minLevels,
       pivotWindow,
-      interpretation:
-        "No structure break — close has not taken out any significant swing level.",
+      interpretation: "No structure break — close has not taken out any significant swing level.",
     };
   }
   if (bearBroken.length >= bullBroken.length) {

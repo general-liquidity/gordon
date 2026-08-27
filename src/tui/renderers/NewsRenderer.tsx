@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../ink-custom";
 import { Link } from "../design-system/Link.js";
 import { timeAgo } from "../components/charts/DataTable.tsx";
@@ -31,7 +30,7 @@ const SOURCE_COLORS: Record<string, string> = {
   "Wall Street Journal": "cyan",
   "Financial Times": "red",
   "Yahoo Finance": "green",
-  "MarketWatch": "yellow",
+  MarketWatch: "yellow",
   "The Motley Fool": "blue",
   "Seeking Alpha": "green",
   "Barron's": "cyan",
@@ -53,7 +52,7 @@ function sourceColor(source: string): string {
 }
 
 function truncate(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max - 1) + "\u2026" : s;
+  return s.length > max ? `${s.slice(0, max - 1)}\u2026` : s;
 }
 
 export function NewsRenderer({ data }: Props) {

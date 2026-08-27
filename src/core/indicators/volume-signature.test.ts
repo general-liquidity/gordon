@@ -16,7 +16,7 @@ function flatBar(close: number, volume: number): Candle {
 
 describe("volume-signature — warmup nulls", () => {
   test("avgVolume is null before avgPeriod bars, then defined", () => {
-    const candles: Candle[] = Array.from({ length: 12 }, (_, i) => flatBar(100, 1000));
+    const candles: Candle[] = Array.from({ length: 12 }, (_, _i) => flatBar(100, 1000));
     const r = calculateVolumeSignature(candles, { avgPeriod: 10 });
     // indices 0..8 null, index 9 (10th bar) onward defined
     for (let i = 0; i < 9; i++) expect(r.avgVolume[i]).toBeNull();

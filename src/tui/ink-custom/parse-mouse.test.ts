@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  parseMouseSequence,
-  MOUSE_ENABLE,
-  MOUSE_DISABLE,
-} from "./parse-mouse.ts";
+import { parseMouseSequence, MOUSE_ENABLE, MOUSE_DISABLE } from "./parse-mouse.ts";
 
 describe("parseMouseSequence — happy paths", () => {
   test("left click press, no modifiers", () => {

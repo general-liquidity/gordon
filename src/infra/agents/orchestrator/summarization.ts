@@ -8,10 +8,9 @@
 import { createModuleLogger } from "../../logger/index.ts";
 import { emitEvent } from "../../../events/index.ts";
 import {
-  ConversationSummarizer,
+  type ConversationSummarizer,
   createSummarizer,
   createSummarizerConfigFromMemoryConfig,
-  type SummarizerConfig,
   type SummarizationResult,
 } from "../../domain/memory/index.ts";
 import { runLifecycleHooks } from "../harness/lifecycleHooks.ts";
@@ -60,7 +59,7 @@ export function resetSummarizer(): void {
 export async function summarizeIfNeeded(
   context: GordonContext,
   messages: Message[],
-  options?: ProcessingOptions
+  options?: ProcessingOptions,
 ): Promise<SummarizationResult> {
   // Check if summarization is enabled
   if (!options?.enableSummarization) {
@@ -89,8 +88,9 @@ export async function summarizeIfNeeded(
     // is already at the `full` threshold (emergency). "threshold" is the
     // normal case. "manual" would be set by a /compact caller that provided
     // its own reason — left as a future extension hook.
-    const pressureRatio = (messages.reduce((sum, m) => sum + Math.ceil(String(m.content).length / 4), 0))
-      / Math.max(1, summarizer.getConfig().maxContextTokensEstimate);
+    const pressureRatio =
+      messages.reduce((sum, m) => sum + Math.ceil(String(m.content).length / 4), 0) /
+      Math.max(1, summarizer.getConfig().maxContextTokensEstimate);
     const compactionReason: "manual" | "threshold" | "overflow" =
       pressureRatio >= 0.99 ? "overflow" : "threshold";
 
@@ -111,7 +111,7 @@ export async function summarizeIfNeeded(
       messageCount: messages.length,
     });
 
-    let result;
+    let result: Awaited<ReturnType<typeof summarizer.summarize>>;
     let aborted = false;
     try {
       result = await summarizer.summarize(messages);
@@ -213,10 +213,7 @@ export async function summarizeIfNeeded(
 /**
  * Check if conversation history needs summarization
  */
-export function needsSummarization(
-  context: GordonContext,
-  messages: Message[]
-): boolean {
+export function needsSummarization(context: GordonContext, messages: Message[]): boolean {
   const summarizer = getSummarizer(context);
   return summarizer.shouldSummarize(messages);
 }
@@ -226,7 +223,7 @@ export function needsSummarization(
  */
 export function getSummarizationStats(
   context: GordonContext,
-  messages: Message[]
+  messages: Message[],
 ): {
   messageCount: number;
   threshold: number;

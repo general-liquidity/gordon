@@ -24,7 +24,10 @@ let _memoryConfig: MemoryConfig = DEFAULT_MEMORY_CONFIG;
  */
 export function setMemoryConfig(config: Partial<MemoryConfig>): void {
   _memoryConfig = { ...DEFAULT_MEMORY_CONFIG, ...config };
-  logger.info("Memory config updated", { lastMessages: _memoryConfig.lastMessages, maxSessionHours: _memoryConfig.maxSessionDurationHours });
+  logger.info("Memory config updated", {
+    lastMessages: _memoryConfig.lastMessages,
+    maxSessionHours: _memoryConfig.maxSessionDurationHours,
+  });
 }
 
 /**

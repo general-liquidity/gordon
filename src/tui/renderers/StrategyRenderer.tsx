@@ -1,9 +1,4 @@
-import React from "react";
-import {
-  DataTable,
-  fmtNum,
-  type Column,
-} from "../components/charts/DataTable.tsx";
+import { DataTable, fmtNum, type Column } from "../components/charts/DataTable.tsx";
 import { getMoneyColor } from "../design-system/colorMap.ts";
 import { useTheme } from "../themes/ThemeProvider.tsx";
 

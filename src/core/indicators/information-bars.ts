@@ -73,7 +73,7 @@ function emptyResult(kind: InformationBarKind, threshold: number): InformationBa
 export function buildInformationBars(
   ticks: Tick[],
   kind: InformationBarKind,
-  threshold: number
+  threshold: number,
 ): InformationBarsResult {
   if (!Array.isArray(ticks) || ticks.length === 0 || !(threshold > 0)) {
     return emptyResult(kind, threshold);
@@ -177,7 +177,7 @@ export function buildInformationBars(
 export function buildInformationBarsFromOHLCV(
   ohlcv: OHLCVInput[],
   kind: InformationBarKind,
-  threshold: number
+  threshold: number,
 ): InformationBarsResult {
   if (!Array.isArray(ohlcv) || ohlcv.length === 0 || !(threshold > 0)) {
     return emptyResult(kind, threshold);

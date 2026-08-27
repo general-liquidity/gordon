@@ -482,7 +482,10 @@ export function runPortfolioEnsemble(input: PortfolioEnsembleInput): PortfolioEn
   return {
     methods,
     adversarial,
-    ensemble: { weights: combined.weights.map((w) => parseFloat(w.toFixed(6))), scheme: combined.scheme },
+    ensemble: {
+      weights: combined.weights.map((w) => parseFloat(w.toFixed(6))),
+      scheme: combined.scheme,
+    },
     summary:
       `Risk-structured ensemble over ${n} assets: ${methods.length} methods + adversarial diversifier ` +
       `(tracking-var ${adversarial.trackingVariance.toFixed(6)}, ${adversarial.feasible ? "feasible" : "infeasible"}), ` +

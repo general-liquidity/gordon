@@ -3,7 +3,10 @@ import { v4 as uuidv4 } from "uuid";
 import type { GordonConfig } from "../../../types/index.ts";
 import type { HistoricalFetchMetadata } from "../../../backtest/data/historical.ts";
 import { runMonteCarloSimulation } from "../../../backtest/analysis/monte-carlo.ts";
-import { detectOverfitting, type OptimizationEntry } from "../../../backtest/optimization/overfitting.ts";
+import {
+  detectOverfitting,
+  type OptimizationEntry,
+} from "../../../backtest/optimization/overfitting.ts";
 import type { BacktestMetrics, BacktestResult, OHLC, Trade } from "../../../backtest/types.ts";
 import { walkForwardTest } from "../../../backtest/analysis/walk-forward.ts";
 import type { Strategy } from "../../../strategies/types.ts";
@@ -109,7 +112,13 @@ function mapTradesForMonteCarlo(trades: BacktestResult["trades"]): Trade[] {
     commission: trade.fees,
     netPnL: trade.pnl,
     returnPct: trade.pnlPercent,
-    holdingPeriod: Math.max(1, Math.round((new Date(trade.exitTime).getTime() - new Date(trade.entryTime).getTime()) / timeframeMs("1h"))),
+    holdingPeriod: Math.max(
+      1,
+      Math.round(
+        (new Date(trade.exitTime).getTime() - new Date(trade.entryTime).getTime()) /
+          timeframeMs("1h"),
+      ),
+    ),
     exitReason: trade.exitReason,
   }));
 }
@@ -306,7 +315,10 @@ export function buildBiasDiagnostics(params: {
 
   const days = Math.max(
     1,
-    Math.round((new Date(params.endDate).getTime() - new Date(params.startDate).getTime()) / (24 * 60 * 60 * 1000)),
+    Math.round(
+      (new Date(params.endDate).getTime() - new Date(params.startDate).getTime()) /
+        (24 * 60 * 60 * 1000),
+    ),
   );
   const tradeConcentration = computeTradePnlConcentration(params.trades);
 
@@ -345,11 +357,15 @@ export function buildBiasDiagnostics(params: {
         : params.walkForward.windows.length >= minOosWindows
           ? "passed"
           : "failed",
-    score: !params.walkForward ? 0 : clamp((params.walkForward.windows.length / minOosWindows) * 100, 0, 100),
+    score: !params.walkForward
+      ? 0
+      : clamp((params.walkForward.windows.length / minOosWindows) * 100, 0, 100),
     detail: params.walkForward
       ? `${params.walkForward.windows.length} out-of-sample window(s) with verdict ${params.walkForward.stability.verdict}.`
       : "Walk-forward validation missing.",
-    blocker: requireWalkForward && (!params.walkForward || params.walkForward.windows.length < minOosWindows),
+    blocker:
+      requireWalkForward &&
+      (!params.walkForward || params.walkForward.windows.length < minOosWindows),
   });
 
   checks.push({
@@ -361,7 +377,9 @@ export function buildBiasDiagnostics(params: {
         : params.monteCarlo.riskMetrics.riskOfRuin <= 0.2
           ? "passed"
           : "warning",
-    score: !params.monteCarlo ? 0 : clamp((1 - params.monteCarlo.riskMetrics.riskOfRuin) * 100, 0, 100),
+    score: !params.monteCarlo
+      ? 0
+      : clamp((1 - params.monteCarlo.riskMetrics.riskOfRuin) * 100, 0, 100),
     detail: params.monteCarlo
       ? `Risk of ruin ${(params.monteCarlo.riskMetrics.riskOfRuin * 100).toFixed(1)}%.`
       : "Monte Carlo validation missing.",
@@ -370,12 +388,17 @@ export function buildBiasDiagnostics(params: {
 
   checks.push({
     name: "trade_pnl_concentration",
-    status: tradeConcentration <= maxTradePnlConcentrationPercent
-      ? "passed"
-      : tradeConcentration <= maxTradePnlConcentrationPercent + 10
-        ? "warning"
-        : "failed",
-    score: clamp(100 - Math.max(0, tradeConcentration - maxTradePnlConcentrationPercent) * 2, 0, 100),
+    status:
+      tradeConcentration <= maxTradePnlConcentrationPercent
+        ? "passed"
+        : tradeConcentration <= maxTradePnlConcentrationPercent + 10
+          ? "warning"
+          : "failed",
+    score: clamp(
+      100 - Math.max(0, tradeConcentration - maxTradePnlConcentrationPercent) * 2,
+      0,
+      100,
+    ),
     detail: `Top 3 trades contribute ${tradeConcentration.toFixed(1)}% of winning PnL.`,
     blocker: tradeConcentration > maxTradePnlConcentrationPercent + 10,
   });
@@ -383,7 +406,10 @@ export function buildBiasDiagnostics(params: {
   checks.push({
     name: "cagr_sanity",
     status: params.metrics.cagr <= maxCagrPercent ? "passed" : "failed",
-    score: params.metrics.cagr <= maxCagrPercent ? 100 : clamp(100 - (params.metrics.cagr - maxCagrPercent) / 5, 0, 100),
+    score:
+      params.metrics.cagr <= maxCagrPercent
+        ? 100
+        : clamp(100 - (params.metrics.cagr - maxCagrPercent) / 5, 0, 100),
     detail: `CAGR ${params.metrics.cagr.toFixed(1)}% vs max expected ${maxCagrPercent.toFixed(1)}%.`,
     blocker: params.metrics.cagr > maxCagrPercent,
   });
@@ -397,7 +423,9 @@ export function buildBiasDiagnostics(params: {
         : params.overfitting.severity === "moderate"
           ? "warning"
           : "passed",
-    score: !params.overfitting ? 50 : clamp(100 - (params.overfitting.overfitScore - 1) * 35, 0, 100),
+    score: !params.overfitting
+      ? 50
+      : clamp(100 - (params.overfitting.overfitScore - 1) * 35, 0, 100),
     detail: params.overfitting
       ? `Overfit score ${params.overfitting.overfitScore.toFixed(2)} (${params.overfitting.severity}).`
       : "No overfitting analysis available.",
@@ -406,11 +434,8 @@ export function buildBiasDiagnostics(params: {
 
   const blockerCount = checks.filter((check) => check.blocker && check.status === "failed").length;
   const warningCount = checks.filter((check) => check.status === "warning").length;
-  const status: BiasDiagnosticSummary["status"] = blockerCount > 0
-    ? "failed"
-    : warningCount > 0
-      ? "warning"
-      : "passed";
+  const status: BiasDiagnosticSummary["status"] =
+    blockerCount > 0 ? "failed" : warningCount > 0 ? "warning" : "passed";
   const notes = checks
     .filter((check) => check.status !== "passed")
     .map((check) => `${check.name}: ${check.detail}`);
@@ -474,7 +499,9 @@ function buildValidationGates(params: {
     },
     {
       name: "walk_forward",
-      passed: !params.walkForward || !["poor", "unreliable"].includes(params.walkForward.stability.verdict),
+      passed:
+        !params.walkForward ||
+        !["poor", "unreliable"].includes(params.walkForward.stability.verdict),
       score: walkForwardScore,
       detail: params.walkForward
         ? `Walk-forward verdict ${params.walkForward.stability.verdict}.`
@@ -482,7 +509,9 @@ function buildValidationGates(params: {
     },
     {
       name: "monte_carlo",
-      passed: !params.monteCarlo || !["poor", "unreliable"].includes(params.monteCarlo.robustness.verdict),
+      passed:
+        !params.monteCarlo ||
+        !["poor", "unreliable"].includes(params.monteCarlo.robustness.verdict),
       score: monteCarloScore,
       detail: params.monteCarlo
         ? `Monte Carlo verdict ${params.monteCarlo.robustness.verdict}, risk of ruin ${(params.monteCarlo.riskMetrics.riskOfRuin * 100).toFixed(1)}%.`
@@ -490,7 +519,7 @@ function buildValidationGates(params: {
     },
     {
       name: "overfitting",
-      passed: !params.overfittingScore || !params.overfittingScore.isLikelyOverfit,
+      passed: !params.overfittingScore?.isLikelyOverfit,
       score: overfittingScore,
       detail: params.overfittingScore
         ? `Overfit score ${params.overfittingScore.overfitScore.toFixed(2)} (${params.overfittingScore.severity}).`
@@ -498,7 +527,7 @@ function buildValidationGates(params: {
     },
     {
       name: "bias_diagnostics",
-      passed: !params.biasDiagnostics || params.biasDiagnostics.status !== "failed",
+      passed: params.biasDiagnostics?.status !== "failed",
       score: biasScore,
       detail: params.biasDiagnostics
         ? `Bias diagnostics ${params.biasDiagnostics.status} with ${params.biasDiagnostics.blockerCount} blocker(s) and ${params.biasDiagnostics.warningCount} warning(s).`
@@ -541,7 +570,10 @@ function computeValidationSummary(params: {
   const minValidationScore = params.config?.systematic?.minValidationScore ?? 60;
   const passedCount = gates.filter((gate) => gate.passed).length;
   const hasHardFailure = gates.some(
-    (gate) => ["minimum_trades", "dataset_quality", "risk_adjusted_return", "bias_diagnostics"].includes(gate.name) && !gate.passed,
+    (gate) =>
+      ["minimum_trades", "dataset_quality", "risk_adjusted_return", "bias_diagnostics"].includes(
+        gate.name,
+      ) && !gate.passed,
   );
 
   const status = hasHardFailure
@@ -550,7 +582,8 @@ function computeValidationSummary(params: {
       ? "passed"
       : "warning";
 
-  const liveEligible = !hasHardFailure && score >= minValidationScore && passedCount >= gates.length - 1;
+  const liveEligible =
+    !hasHardFailure && score >= minValidationScore && passedCount >= gates.length - 1;
 
   return {
     validationId: uuidv4(),
@@ -593,17 +626,35 @@ function computeValidationSummary(params: {
 }
 
 function computeDecayScore(
-  previous: Pick<BacktestMetrics, "totalReturn" | "sharpeRatio" | "maxDrawdown" | "winRate" | "totalTrades"> | undefined,
-  current: Pick<BacktestMetrics, "totalReturn" | "sharpeRatio" | "maxDrawdown" | "winRate" | "totalTrades">,
+  previous:
+    | Pick<
+        BacktestMetrics,
+        "totalReturn" | "sharpeRatio" | "maxDrawdown" | "winRate" | "totalTrades"
+      >
+    | undefined,
+  current: Pick<
+    BacktestMetrics,
+    "totalReturn" | "sharpeRatio" | "maxDrawdown" | "winRate" | "totalTrades"
+  >,
 ): number {
   if (!previous) return 0;
 
-  const returnDecay = Math.max(0, previous.totalReturn - current.totalReturn) / Math.max(Math.abs(previous.totalReturn), 1) * 100;
-  const sharpeDecay = Math.max(0, previous.sharpeRatio - current.sharpeRatio) / Math.max(Math.abs(previous.sharpeRatio), 0.5) * 100;
+  const returnDecay =
+    (Math.max(0, previous.totalReturn - current.totalReturn) /
+      Math.max(Math.abs(previous.totalReturn), 1)) *
+    100;
+  const sharpeDecay =
+    (Math.max(0, previous.sharpeRatio - current.sharpeRatio) /
+      Math.max(Math.abs(previous.sharpeRatio), 0.5)) *
+    100;
   const drawdownDecay = Math.max(0, current.maxDrawdown - previous.maxDrawdown) * 2;
   const winRateDecay = Math.max(0, previous.winRate - current.winRate);
 
-  return clamp(returnDecay * 0.35 + sharpeDecay * 0.35 + drawdownDecay * 0.2 + winRateDecay * 0.1, 0, 100);
+  return clamp(
+    returnDecay * 0.35 + sharpeDecay * 0.35 + drawdownDecay * 0.2 + winRateDecay * 0.1,
+    0,
+    100,
+  );
 }
 
 function estimateCapitalWeight(validationScore: number, liveEligible: boolean): number {
@@ -691,10 +742,13 @@ export async function processSystematicBacktest(
   let monteCarlo: Awaited<ReturnType<typeof runMonteCarloSimulation>> | undefined;
   if (input.backtestResult.trades.length >= 10) {
     try {
-      monteCarlo = await runMonteCarloSimulation(mapTradesForMonteCarlo(input.backtestResult.trades), {
-        iterations: 250,
-        initialCapital: input.backtestResult.metrics.initialValue,
-      });
+      monteCarlo = await runMonteCarloSimulation(
+        mapTradesForMonteCarlo(input.backtestResult.trades),
+        {
+          iterations: 250,
+          initialCapital: input.backtestResult.metrics.initialValue,
+        },
+      );
     } catch (error) {
       logger.warn("Monte Carlo validation skipped", {
         strategyId: input.strategyId,
@@ -745,7 +799,11 @@ export async function processSystematicBacktest(
     eventId: uuidv4(),
     strategyId: input.strategyId,
     eventType: "validation_recorded",
-    payload: { validationId: validation.validationId, status: validation.status, score: validation.score },
+    payload: {
+      validationId: validation.validationId,
+      status: validation.status,
+      score: validation.score,
+    },
     createdAt: timestamp,
   });
 
@@ -759,13 +817,14 @@ export async function processSystematicBacktest(
   };
   const decayScore = computeDecayScore(existingProfile?.lastMetrics, currentMetrics);
 
-  const nextStatus: SystematicStrategyProfile["status"] = decayScore >= 35
-    ? "degraded"
-    : validation.liveEligible
-      ? "validated"
-      : validation.status === "warning"
-        ? "research"
-        : "research";
+  const nextStatus: SystematicStrategyProfile["status"] =
+    decayScore >= 35
+      ? "degraded"
+      : validation.liveEligible
+        ? "validated"
+        : validation.status === "warning"
+          ? "research"
+          : "research";
 
   const profile: SystematicStrategyProfile = {
     strategyId: input.strategyId,
@@ -774,10 +833,17 @@ export async function processSystematicBacktest(
     status: nextStatus,
     validationStatus: validation.status,
     validationScore: validation.score,
-    returnDriver: existingProfile?.returnDriver ?? inferReturnDriver(input.strategyId, input.strategyName),
-    regimeTag: existingProfile?.regimeTag ?? inferRegimeTag(input.fetchMetadata.timeframe, input.backtestResult.metrics),
-    capitalWeight: existingProfile?.capitalWeight ?? estimateCapitalWeight(validation.score, validation.liveEligible),
-    maxAllocation: existingProfile?.maxAllocation ?? estimateMaxAllocation(validation.score, validation.liveEligible),
+    returnDriver:
+      existingProfile?.returnDriver ?? inferReturnDriver(input.strategyId, input.strategyName),
+    regimeTag:
+      existingProfile?.regimeTag ??
+      inferRegimeTag(input.fetchMetadata.timeframe, input.backtestResult.metrics),
+    capitalWeight:
+      existingProfile?.capitalWeight ??
+      estimateCapitalWeight(validation.score, validation.liveEligible),
+    maxAllocation:
+      existingProfile?.maxAllocation ??
+      estimateMaxAllocation(validation.score, validation.liveEligible),
     latestDatasetId: dataset.datasetId,
     latestDatasetSnapshotId: snapshot?.snapshotId,
     latestBacktestResultId: input.backtestResult.id,
@@ -806,8 +872,12 @@ export async function processSystematicBacktest(
       experimentId: uuidv4(),
       strategyId: input.strategyId,
       strategyName: input.strategyName,
-      hypothesis: input.hypothesis ?? `Validate ${input.strategyName} on ${input.fetchMetadata.symbol} ${input.fetchMetadata.timeframe}.`,
-      notes: input.notes ?? `Validation score ${validation.score.toFixed(1)} with ${input.backtestResult.metrics.totalTrades} trades.`,
+      hypothesis:
+        input.hypothesis ??
+        `Validate ${input.strategyName} on ${input.fetchMetadata.symbol} ${input.fetchMetadata.timeframe}.`,
+      notes:
+        input.notes ??
+        `Validation score ${validation.score.toFixed(1)} with ${input.backtestResult.metrics.totalTrades} trades.`,
       datasetId: dataset.datasetId,
       datasetSnapshotId: snapshot?.snapshotId,
       backtestResultId: input.backtestResult.id,
@@ -839,19 +909,21 @@ export async function processSystematicBacktest(
 export function buildSystematicPortfolioSummary(): StrategyPortfolioSummary {
   const profiles = listStrategyProfiles();
   const entries: StrategyPortfolioEntry[] = profiles.map((profile) => {
-    const similarProfiles = profiles.filter((candidate) =>
-      candidate.strategyId !== profile.strategyId
-      && (
-        candidate.returnDriver === profile.returnDriver
-        || candidate.regimeTag === profile.regimeTag
-        || candidate.marketFamily === profile.marketFamily
-      )
+    const similarProfiles = profiles.filter(
+      (candidate) =>
+        candidate.strategyId !== profile.strategyId &&
+        (candidate.returnDriver === profile.returnDriver ||
+          candidate.regimeTag === profile.regimeTag ||
+          candidate.marketFamily === profile.marketFamily),
     );
 
     const estimatedCorrelation = clamp(
-      (similarProfiles.length > 0 ? 0.35 : 0.15)
-      + (profiles.filter((candidate) => candidate.returnDriver === profile.returnDriver).length - 1) * 0.1
-      + (profiles.filter((candidate) => candidate.regimeTag === profile.regimeTag).length - 1) * 0.08,
+      (similarProfiles.length > 0 ? 0.35 : 0.15) +
+        (profiles.filter((candidate) => candidate.returnDriver === profile.returnDriver).length -
+          1) *
+          0.1 +
+        (profiles.filter((candidate) => candidate.regimeTag === profile.regimeTag).length - 1) *
+          0.08,
       0,
       0.95,
     );
@@ -872,30 +944,39 @@ export function buildSystematicPortfolioSummary(): StrategyPortfolioSummary {
   });
 
   const totalCapitalWeight = entries.reduce((sum, entry) => sum + entry.capitalWeight, 0);
-  const diversificationScore = entries.length === 0
-    ? 0
-    : clamp(
-        (entries.reduce((sum, entry) => sum + entry.diversificationContribution, 0) / entries.length) * 100,
-        0,
-        100,
-      );
+  const diversificationScore =
+    entries.length === 0
+      ? 0
+      : clamp(
+          (entries.reduce((sum, entry) => sum + entry.diversificationContribution, 0) /
+            entries.length) *
+            100,
+          0,
+          100,
+        );
 
-  const maxWeight = entries.length > 0 ? Math.max(...entries.map((entry) => entry.capitalWeight)) : 0;
-  const avgCorrelation = entries.length > 0
-    ? entries.reduce((sum, entry) => sum + entry.estimatedCorrelation, 0) / entries.length
-    : 0;
+  const maxWeight =
+    entries.length > 0 ? Math.max(...entries.map((entry) => entry.capitalWeight)) : 0;
+  const avgCorrelation =
+    entries.length > 0
+      ? entries.reduce((sum, entry) => sum + entry.estimatedCorrelation, 0) / entries.length
+      : 0;
 
-  const concentrationRisk = maxWeight > 0.35 || avgCorrelation > 0.7
-    ? "high"
-    : maxWeight > 0.2 || avgCorrelation > 0.5
-      ? "medium"
-      : "low";
+  const concentrationRisk =
+    maxWeight > 0.35 || avgCorrelation > 0.7
+      ? "high"
+      : maxWeight > 0.2 || avgCorrelation > 0.5
+        ? "medium"
+        : "low";
 
   const notes: string[] = [];
   if (entries.length === 0) notes.push("No validated systematic strategies are registered yet.");
-  if (concentrationRisk === "high") notes.push("Capital allocation is concentrated across similar drivers or regimes.");
-  if (entries.filter((entry) => entry.marketFamily === "stocks").length === 0) notes.push("No stock systematic strategies are currently represented.");
-  if (entries.filter((entry) => entry.marketFamily === "crypto").length === 0) notes.push("No crypto systematic strategies are currently represented.");
+  if (concentrationRisk === "high")
+    notes.push("Capital allocation is concentrated across similar drivers or regimes.");
+  if (entries.filter((entry) => entry.marketFamily === "stocks").length === 0)
+    notes.push("No stock systematic strategies are currently represented.");
+  if (entries.filter((entry) => entry.marketFamily === "crypto").length === 0)
+    notes.push("No crypto systematic strategies are currently represented.");
 
   return {
     portfolioId: "systematic-default",

@@ -27,10 +27,13 @@ describe("tips", () => {
 
   test("pickTip returns the longest-unseen tip and persists history", () => {
     const historyPath = join(tempDir, "tipHistory.json");
-    writeFileSync(historyPath, JSON.stringify({
-      lastShown: { "0": 10, "1": 1, "2": 9 },
-      sessionCount: 10,
-    }));
+    writeFileSync(
+      historyPath,
+      JSON.stringify({
+        lastShown: { "0": 10, "1": 1, "2": 9 },
+        sessionCount: 10,
+      }),
+    );
 
     expect(pickTip(["alpha", "bravo", "charlie"])).toBe("bravo");
     const persisted = JSON.parse(readFileSync(historyPath, "utf-8")) as {

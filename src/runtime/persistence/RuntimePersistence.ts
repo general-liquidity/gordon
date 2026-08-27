@@ -3,10 +3,7 @@ import { join } from "node:path";
 import { Database } from "bun:sqlite";
 
 import { GORDON_DIR } from "../../infra/storage/paths.ts";
-import type {
-  RuntimeHistoryResult,
-  RuntimeHistorySessionSummary,
-} from "../contracts/types.ts";
+import type { RuntimeHistoryResult, RuntimeHistorySessionSummary } from "../contracts/types.ts";
 import type { RuntimeSessionState } from "../state/SessionState.ts";
 import type { RuntimeTranscriptEntry } from "../contracts/types.ts";
 import type { HandoffArtifact, WorkerScratchpadEntry } from "../workers/HandoffArtifact.ts";
@@ -72,12 +69,12 @@ export class RuntimePersistence {
          ORDER BY entry_order ASC`,
       )
       .all(runtimeId) as Array<{
-        entry_id: string;
-        timestamp: string;
-        role: RuntimeTranscriptEntry["role"];
-        content: string;
-        metadata_json: string | null;
-      }>;
+      entry_id: string;
+      timestamp: string;
+      role: RuntimeTranscriptEntry["role"];
+      content: string;
+      metadata_json: string | null;
+    }>;
 
     const scratchpadRows = this.db
       .query(
@@ -87,13 +84,13 @@ export class RuntimePersistence {
          ORDER BY entry_order ASC`,
       )
       .all(runtimeId) as Array<{
-        entry_id: string;
-        timestamp: string;
-        worker: WorkerScratchpadEntry["worker"];
-        kind: WorkerScratchpadEntry["kind"];
-        content: string;
-        metadata_json: string | null;
-      }>;
+      entry_id: string;
+      timestamp: string;
+      worker: WorkerScratchpadEntry["worker"];
+      kind: WorkerScratchpadEntry["kind"];
+      content: string;
+      metadata_json: string | null;
+    }>;
 
     const handoffRows = this.db
       .query(
@@ -103,13 +100,13 @@ export class RuntimePersistence {
          ORDER BY entry_order ASC`,
       )
       .all(runtimeId) as Array<{
-        handoff_id: string;
-        timestamp: string;
-        from_worker: HandoffArtifact["fromWorker"];
-        to_worker: HandoffArtifact["toWorker"];
-        reason: string;
-        payload_json: string | null;
-      }>;
+      handoff_id: string;
+      timestamp: string;
+      from_worker: HandoffArtifact["fromWorker"];
+      to_worker: HandoffArtifact["toWorker"];
+      reason: string;
+      payload_json: string | null;
+    }>;
 
     const runtimeState = parseJson<RuntimeSessionState>(snapshotRow?.session_state_json ?? null);
     const transcript = transcriptRows.map((row) => ({
@@ -137,7 +134,12 @@ export class RuntimePersistence {
       }),
     }));
 
-    if (!runtimeState && transcript.length === 0 && scratchpadEntries.length === 0 && handoffs.length === 0) {
+    if (
+      !runtimeState &&
+      transcript.length === 0 &&
+      scratchpadEntries.length === 0 &&
+      handoffs.length === 0
+    ) {
       return null;
     }
 
@@ -193,19 +195,63 @@ export class RuntimePersistence {
 
       for (const [index, entry] of (snapshot.transcript ?? []).entries()) {
         const metadataJson = entry.metadata ? JSON.stringify(entry.metadata) : null;
-        transcriptInsert.run(runtimeId, index, entry.id, entry.timestamp, entry.role, entry.content, metadataJson);
-        historyInsert.run(runtimeId, "transcript", entry.id, entry.timestamp, entry.role, null, entry.content, metadataJson);
+        transcriptInsert.run(
+          runtimeId,
+          index,
+          entry.id,
+          entry.timestamp,
+          entry.role,
+          entry.content,
+          metadataJson,
+        );
+        historyInsert.run(
+          runtimeId,
+          "transcript",
+          entry.id,
+          entry.timestamp,
+          entry.role,
+          null,
+          entry.content,
+          metadataJson,
+        );
       }
 
       for (const [index, entry] of (snapshot.scratchpad?.entries ?? []).entries()) {
         const metadataJson = entry.metadata ? JSON.stringify(entry.metadata) : null;
-        scratchpadInsert.run(runtimeId, index, entry.id, entry.timestamp, entry.worker, entry.kind, entry.content, metadataJson);
-        historyInsert.run(runtimeId, "scratchpad", entry.id, entry.timestamp, null, entry.worker, entry.content, metadataJson);
+        scratchpadInsert.run(
+          runtimeId,
+          index,
+          entry.id,
+          entry.timestamp,
+          entry.worker,
+          entry.kind,
+          entry.content,
+          metadataJson,
+        );
+        historyInsert.run(
+          runtimeId,
+          "scratchpad",
+          entry.id,
+          entry.timestamp,
+          null,
+          entry.worker,
+          entry.content,
+          metadataJson,
+        );
       }
 
       for (const [index, handoff] of (snapshot.scratchpad?.handoffs ?? []).entries()) {
         const payloadJson = JSON.stringify(handoff);
-        handoffInsert.run(runtimeId, index, handoff.id, handoff.timestamp, handoff.fromWorker, handoff.toWorker, handoff.reason, payloadJson);
+        handoffInsert.run(
+          runtimeId,
+          index,
+          handoff.id,
+          handoff.timestamp,
+          handoff.fromWorker,
+          handoff.toWorker,
+          handoff.reason,
+          payloadJson,
+        );
         historyInsert.run(
           runtimeId,
           "handoff",
@@ -240,7 +286,9 @@ export class RuntimePersistence {
           approval.permissionScope,
           approval.reason,
           approval.actor,
-        ].filter(Boolean).join(" · ");
+        ]
+          .filter(Boolean)
+          .join(" · ");
         historyInsert.run(
           runtimeId,
           "approval",
@@ -260,7 +308,9 @@ export class RuntimePersistence {
           bridgeSession.commandType,
           bridgeSession.status,
           bridgeSession.detail,
-        ].filter(Boolean).join(" · ");
+        ]
+          .filter(Boolean)
+          .join(" · ");
         historyInsert.run(
           runtimeId,
           "bridge",
@@ -331,10 +381,10 @@ export class RuntimePersistence {
          LIMIT ?1`,
       )
       .all(Math.max(1, Math.min(limit, 100))) as Array<{
-        runtime_id: string;
-        saved_at: string;
-        session_state_json: string | null;
-      }>;
+      runtime_id: string;
+      saved_at: string;
+      session_state_json: string | null;
+    }>;
 
     const countQuery = this.db.query(
       "SELECT COUNT(*) as count FROM runtime_transcript_entries WHERE runtime_id = ?1",
@@ -436,5 +486,4 @@ export class RuntimePersistence {
       return fallbackDir;
     }
   }
-
 }

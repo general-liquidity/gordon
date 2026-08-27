@@ -151,7 +151,9 @@ export function params(input: Partial<TemperamentDials>): TemperamentParams {
   const convictionRaw = lerp(c.convictionCeil, c.convictionFloor, aggression);
 
   // Size: boldness + greed push up, skepticism pulls down.
-  const sizeDrive = clamp01(0.5 + (d.boldness + d.greed_fear - 2 * d.skepticism) / 4 + (d.greed_fear - 0.5) / 4);
+  const sizeDrive = clamp01(
+    0.5 + (d.boldness + d.greed_fear - 2 * d.skepticism) / 4 + (d.greed_fear - 0.5) / 4,
+  );
   const sizeRaw = lerp(c.sizeAggressionFloor, c.sizeAggressionCeil, sizeDrive);
 
   // Confirmations: skepticism adds, boldness removes. Round to an integer.

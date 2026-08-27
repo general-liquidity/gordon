@@ -3,7 +3,7 @@ import type { Key } from "../ink-custom";
 export interface FocusOwner {
   id: string;
   priority: number;
-  handler: (input: string, key: Key) => boolean | void;
+  handler: (input: string, key: Key) => boolean | undefined;
   isActive?: () => boolean;
 }
 

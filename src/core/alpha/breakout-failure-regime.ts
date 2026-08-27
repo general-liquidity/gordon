@@ -90,9 +90,9 @@ export interface BreakoutFailureRegimeResult {
 
 const DEFAULT_MIN_EVAL = 10;
 const DEFAULT_WINDOW = 30;
-const DEFAULT_HEALTHY_CEIL = 0.30;
-const DEFAULT_WEAKENING_CEIL = 0.50;
-const DEFAULT_BEARLIKE_CEIL = 0.70;
+const DEFAULT_HEALTHY_CEIL = 0.3;
+const DEFAULT_WEAKENING_CEIL = 0.5;
+const DEFAULT_BEARLIKE_CEIL = 0.7;
 
 export function analyzeBreakoutFailureRegime(
   events: ReadonlyArray<BreakoutEvent>,
@@ -104,9 +104,7 @@ export function analyzeBreakoutFailureRegime(
   const weakeningCeil = options.weakeningCeiling ?? DEFAULT_WEAKENING_CEIL;
   const bearLikeCeil = options.bearLikeCeiling ?? DEFAULT_BEARLIKE_CEIL;
 
-  if (
-    !(healthyCeil < weakeningCeil && weakeningCeil < bearLikeCeil && bearLikeCeil <= 1)
-  ) {
+  if (!(healthyCeil < weakeningCeil && weakeningCeil < bearLikeCeil && bearLikeCeil <= 1)) {
     return {
       totalEvents: events.length,
       evaluatedEvents: 0,
@@ -178,9 +176,7 @@ export function analyzeBreakoutFailureRegime(
   };
 }
 
-export function formatBreakoutFailureRegime(
-  result: BreakoutFailureRegimeResult,
-): string {
+export function formatBreakoutFailureRegime(result: BreakoutFailureRegimeResult): string {
   const lines = [
     `Breakout-Failure Regime — ${result.verdict.toUpperCase()} (bearish ${result.bearishScore.toFixed(2)})`,
     "",

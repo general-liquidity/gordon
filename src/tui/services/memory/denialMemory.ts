@@ -8,8 +8,8 @@
 // - "User denied 3 LONG trades on AAPL → dislikes AAPL longs"
 // - "User only approves trades with R:R >= 2:1 → min R:R threshold"
 
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { join } from "path";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import { getGordonDir } from "../../../infra/storage/paths.ts";
 
 const DENIALS_PATH = join(getGordonDir(), "denials.json");
@@ -41,7 +41,9 @@ export interface LearnedPreferences {
 export class DenialMemory {
   private denials: DenialRecord[] = [];
 
-  constructor() { this.load(); }
+  constructor() {
+    this.load();
+  }
 
   record(denial: Omit<DenialRecord, "id" | "timestamp">): void {
     const id = `den_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -52,8 +54,12 @@ export class DenialMemory {
   getLearnedPreferences(): LearnedPreferences {
     if (this.denials.length === 0) {
       return {
-        maxDrawdownPct: null, minRiskRewardRatio: null, minConfidence: null,
-        avoidedSymbols: [], avoidedSideBySymbol: {}, sampleSize: 0,
+        maxDrawdownPct: null,
+        minRiskRewardRatio: null,
+        minConfidence: null,
+        avoidedSymbols: [],
+        avoidedSideBySymbol: {},
+        sampleSize: 0,
       };
     }
 
@@ -135,11 +141,15 @@ export class DenialMemory {
       if (existsSync(DENIALS_PATH)) {
         this.denials = JSON.parse(readFileSync(DENIALS_PATH, "utf-8"));
       }
-    } catch { this.denials = []; }
+    } catch {
+      this.denials = [];
+    }
   }
 
   private save(): void {
-    try { writeFileSync(DENIALS_PATH, JSON.stringify(this.denials, null, 2)); } catch {}
+    try {
+      writeFileSync(DENIALS_PATH, JSON.stringify(this.denials, null, 2));
+    } catch {}
   }
 }
 

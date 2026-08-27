@@ -1,12 +1,9 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeOptimizationQuality,
-  optimizationQualityToPayload,
-} from "./optimizationQuality.ts";
+import { computeOptimizationQuality, optimizationQualityToPayload } from "./optimizationQuality.ts";
 
 // Deterministic pseudo-random Gaussian via Box-Muller.
 function makeGaussian(seed: number): () => number {
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   const rng = () => {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return Math.max(1e-12, s / 0x100000000);

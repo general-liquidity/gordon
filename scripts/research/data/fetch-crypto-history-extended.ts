@@ -59,7 +59,18 @@ const COMP_PAIRS: Array<{ pair: string; symbol: string }> = [
 
 // Exclude leveraged tokens, stablecoin/stablecoin pairs, and wrapped/fiat noise from
 // the cross-sectional universe (they aren't independent risk assets).
-const STABLE_BASES = new Set(["USDC", "BUSD", "TUSD", "DAI", "FDUSD", "USDP", "EUR", "GBP", "AEUR", "USD1"]);
+const STABLE_BASES = new Set([
+  "USDC",
+  "BUSD",
+  "TUSD",
+  "DAI",
+  "FDUSD",
+  "USDP",
+  "EUR",
+  "GBP",
+  "AEUR",
+  "USD1",
+]);
 const LEVERAGED = /(UP|DOWN|BULL|BEAR)USDT$/;
 
 interface Bar {
@@ -178,7 +189,11 @@ async function fetchKlines(pair: string, interval: string, startTime: number): P
 const fmtDate = (s: number) => new Date(s * 1000).toISOString().slice(0, 10);
 
 /** Run async jobs through a fixed-size concurrency pool. */
-async function pool<T>(items: T[], concurrency: number, worker: (item: T) => Promise<void>): Promise<void> {
+async function pool<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
   let idx = 0;
   const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
     while (true) {
@@ -210,7 +225,9 @@ async function main() {
   await mkdir(OUT_DIR, { recursive: true });
 
   console.log(`Output dir: ${OUT_DIR}`);
-  console.log(`Timeframes: ${tfFilter.join(", ")}  |  pairs: ${pairs.length}  |  concurrency: ${concurrency}  |  spacing: ${SPACING_MS}ms`);
+  console.log(
+    `Timeframes: ${tfFilter.join(", ")}  |  pairs: ${pairs.length}  |  concurrency: ${concurrency}  |  spacing: ${SPACING_MS}ms`,
+  );
   console.log(`Pairs: ${pairs.map((p) => p.pair).join(", ")}\n`);
 
   type Cov = { bars: number; from: string; to: string; bytes: number };
@@ -238,21 +255,30 @@ async function main() {
         const bytes = Buffer.byteLength(json);
         totalBytes += bytes;
         totalBars += bars.length;
-        coverage[key] = { bars: bars.length, from: fmtDate(first.time), to: fmtDate(last.time), bytes };
+        coverage[key] = {
+          bars: bars.length,
+          from: fmtDate(first.time),
+          to: fmtDate(last.time),
+          bytes,
+        };
       }
     } catch (err) {
       failures.push(`${key}: ${err instanceof Error ? err.message : String(err)}`);
     }
     done += 1;
     if (done % 10 === 0 || done === jobs.length) {
-      console.log(`  [${done}/${jobs.length}] ${(totalBytes / 1e6).toFixed(0)} MB, ${totalBars.toLocaleString()} bars so far`);
+      console.log(
+        `  [${done}/${jobs.length}] ${(totalBytes / 1e6).toFixed(0)} MB, ${totalBars.toLocaleString()} bars so far`,
+      );
     }
   });
 
   console.log("\n==================== COVERAGE ====================");
   for (const k of Object.keys(coverage).sort()) {
     const c = coverage[k]!;
-    console.log(`${k.padEnd(16)} ${String(c.bars).padStart(7)} bars  ${c.from} -> ${c.to}  ${(c.bytes / 1e6).toFixed(2)} MB`);
+    console.log(
+      `${k.padEnd(16)} ${String(c.bars).padStart(7)} bars  ${c.from} -> ${c.to}  ${(c.bytes / 1e6).toFixed(2)} MB`,
+    );
   }
   console.log("=================================================");
   console.log(`Datasets written: ${Object.keys(coverage).length} / ${jobs.length} jobs`);

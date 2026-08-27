@@ -11,22 +11,22 @@
 // ============================================================================
 
 export const ALLOWED_CATEGORIES = new Set([
-  "data-provider",     // Market data, on-chain data, financial data
-  "execution",         // Trading, order management, bridges
-  "research",          // Analytics, smart money, research platforms
-  "infrastructure",    // Blockchain nodes, custody, dev platforms
-  "analytics",         // AI predictions, quantitative analysis
-  "exchange",          // Exchange integrations
+  "data-provider", // Market data, on-chain data, financial data
+  "execution", // Trading, order management, bridges
+  "research", // Analytics, smart money, research platforms
+  "infrastructure", // Blockchain nodes, custody, dev platforms
+  "analytics", // AI predictions, quantitative analysis
+  "exchange", // Exchange integrations
 ]);
 
 export const BLOCKED_CATEGORIES = new Set([
-  "communication",     // Slack, email, Discord
-  "productivity",      // Notion, Linear, Jira
-  "weather",           // Weather APIs
-  "social",            // Social media (except financial sentiment)
-  "entertainment",     // Games, media
-  "general",           // Generic tools
-  "developer-tools",   // Code-specific tools (IDE, git, etc.)
+  "communication", // Slack, email, Discord
+  "productivity", // Notion, Linear, Jira
+  "weather", // Weather APIs
+  "social", // Social media (except financial sentiment)
+  "entertainment", // Games, media
+  "general", // Generic tools
+  "developer-tools", // Code-specific tools (IDE, git, etc.)
 ]);
 
 // ============================================================================
@@ -51,7 +51,8 @@ export function checkPluginCategory(category: string): CategoryCheckResult {
     return {
       allowed: false,
       category,
-      reason: `Category "${category}" is not allowed in Gordon's trading marketplace. ` +
+      reason:
+        `Category "${category}" is not allowed in Gordon's trading marketplace. ` +
         `Gordon only supports financial/trading MCP servers. ` +
         `To use this server anyway, add it manually to .gordon/mcp.json.`,
     };
@@ -61,7 +62,8 @@ export function checkPluginCategory(category: string): CategoryCheckResult {
   return {
     allowed: false,
     category,
-    reason: `Unknown category "${category}". Allowed categories: ${[...ALLOWED_CATEGORIES].join(", ")}. ` +
+    reason:
+      `Unknown category "${category}". Allowed categories: ${[...ALLOWED_CATEGORIES].join(", ")}. ` +
       `To use a non-marketplace MCP server, add it manually to .gordon/mcp.json.`,
   };
 }

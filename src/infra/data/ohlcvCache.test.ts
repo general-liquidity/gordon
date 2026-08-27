@@ -7,10 +7,7 @@ import {
   _resetCacheForTests,
   type CachedCandle,
 } from "./ohlcvCache.ts";
-import {
-  setDatabasePathForTesting,
-  closeDatabase,
-} from "../storage/database.ts";
+import { setDatabasePathForTesting, closeDatabase } from "../storage/database.ts";
 import { unlinkSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -24,7 +21,11 @@ let currentDbPath = "";
 const cleanupPaths = new Set<string>();
 
 function safeUnlink(path: string): void {
-  try { if (existsSync(path)) unlinkSync(path); } catch { /* Windows-busy — leave for next run / gitignore */ }
+  try {
+    if (existsSync(path)) unlinkSync(path);
+  } catch {
+    /* Windows-busy — leave for next run / gitignore */
+  }
 }
 
 function bar(openTime: number, base = 100, vol = 1_000): CachedCandle {
@@ -120,7 +121,11 @@ describe("ohlcvCache — read path", () => {
 
   test("filters by fromTs / toTs window", () => {
     upsertCandles("binance", "BTC/USDT", "1m", [
-      bar(1_000), bar(2_000), bar(3_000), bar(4_000), bar(5_000),
+      bar(1_000),
+      bar(2_000),
+      bar(3_000),
+      bar(4_000),
+      bar(5_000),
     ]);
     const out = readCandles("binance", "BTC/USDT", "1m", { fromTs: 2_000, toTs: 4_000 });
     expect(out.map((c) => c.openTime)).toEqual([2_000, 3_000, 4_000]);

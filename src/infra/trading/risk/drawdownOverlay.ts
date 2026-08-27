@@ -69,7 +69,7 @@ export const DEFAULT_VOL_TARGET_CONFIG: VolTargetConfig = {
 
 export const DEFAULT_DRAWDOWN_CONFIG: DrawdownOverlayConfig = {
   startThreshold: 0.05,
-  fullExitThreshold: 0.20,
+  fullExitThreshold: 0.2,
   scaleFunction: "linear",
 };
 
@@ -170,10 +170,14 @@ export function computeOverlay(
 
   const reasons: string[] = [];
   if (vol.scale < 0.99) {
-    reasons.push(`Vol targeting: ${(vol.realizedVol * 100).toFixed(0)}% realized vs ${(volConfig.targetVol * 100).toFixed(0)}% target → ${(vol.scale * 100).toFixed(0)}% scale`);
+    reasons.push(
+      `Vol targeting: ${(vol.realizedVol * 100).toFixed(0)}% realized vs ${(volConfig.targetVol * 100).toFixed(0)}% target → ${(vol.scale * 100).toFixed(0)}% scale`,
+    );
   }
   if (dd.scale < 0.99) {
-    reasons.push(`Drawdown overlay: ${(dd.currentDrawdown * 100).toFixed(1)}% drawdown → ${(dd.scale * 100).toFixed(0)}% scale`);
+    reasons.push(
+      `Drawdown overlay: ${(dd.currentDrawdown * 100).toFixed(1)}% drawdown → ${(dd.scale * 100).toFixed(0)}% scale`,
+    );
   }
   if (!overlayActive) {
     reasons.push("No overlay active — full position size.");

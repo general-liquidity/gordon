@@ -64,11 +64,14 @@ export class PlansRepository extends BaseRepository<Plan> {
    * Find plans by symbol
    */
   findBySymbol(symbol: string, options?: QueryOptions): Plan[] {
-    return this.findWhere({ symbol: symbol.toUpperCase() } as Partial<Record<keyof Plan, unknown>>, {
-      orderBy: "createdAt",
-      orderDir: "DESC",
-      ...options,
-    });
+    return this.findWhere(
+      { symbol: symbol.toUpperCase() } as Partial<Record<keyof Plan, unknown>>,
+      {
+        orderBy: "createdAt",
+        orderDir: "DESC",
+        ...options,
+      },
+    );
   }
 
   /**

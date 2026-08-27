@@ -84,7 +84,10 @@ const MIGRATIONS: Migration[] = [
   },
 ];
 
-export function runMigrations(config: Record<string, any>): { config: Record<string, any>; result: MigrationResult } {
+export function runMigrations(config: Record<string, any>): {
+  config: Record<string, any>;
+  result: MigrationResult;
+} {
   const applied: string[] = config.appliedMigrations ?? [];
   const result: MigrationResult = { applied: [], skipped: [], errors: [] };
   let current = { ...config };

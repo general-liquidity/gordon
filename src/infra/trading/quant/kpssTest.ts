@@ -74,7 +74,7 @@ const DEFAULT_REGRESSION: KpssRegression = "c";
 const DEFAULT_ALPHA: KpssAlpha = 0.05;
 
 function schwertLags(T: number): number {
-  return Math.floor(4 * Math.pow(T / 100, 0.25));
+  return Math.floor(4 * (T / 100) ** 0.25);
 }
 
 /** Residuals about the mean (level variant). */
@@ -136,7 +136,12 @@ export function runKpssTest(input: KpssInput): KpssResult {
   const n = y.length;
   const crit = CRITICAL_VALUES[regression];
 
-  const baseResult = (verdict: KpssVerdict, stat: number, lags: number, summary: string): KpssResult => ({
+  const baseResult = (
+    verdict: KpssVerdict,
+    stat: number,
+    lags: number,
+    summary: string,
+  ): KpssResult => ({
     verdict,
     testStatistic: stat,
     criticalValue: crit[alpha],
@@ -148,7 +153,12 @@ export function runKpssTest(input: KpssInput): KpssResult {
   });
 
   if (n < 10) {
-    return baseResult("insufficient_data", Number.NaN, 0, `need at least 10 observations, got ${n}`);
+    return baseResult(
+      "insufficient_data",
+      Number.NaN,
+      0,
+      `need at least 10 observations, got ${n}`,
+    );
   }
   for (let i = 0; i < n; i++) {
     if (!Number.isFinite(y[i]!)) {
@@ -169,7 +179,12 @@ export function runKpssTest(input: KpssInput): KpssResult {
 
   const s2 = longRunVariance(e, lags);
   if (s2 <= 0) {
-    return baseResult("insufficient_data", Number.NaN, lags, "degenerate series — zero long-run variance");
+    return baseResult(
+      "insufficient_data",
+      Number.NaN,
+      lags,
+      "degenerate series — zero long-run variance",
+    );
   }
 
   const stat = sumSt2 / (n * n * s2);

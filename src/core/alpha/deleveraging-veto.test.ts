@@ -29,14 +29,7 @@ describe("evaluateDeleveragingVeto", () => {
 
   it("triggers the veto when >=60% of the universe flips oversold", () => {
     // 6 names, 4 flip oversold (66%) -> above 60% and above min 3.
-    const assets = [
-      flip("A"),
-      flip("B"),
-      flip("C"),
-      flip("D"),
-      strong("E"),
-      strong("F"),
-    ];
+    const assets = [flip("A"), flip("B"), flip("C"), flip("D"), strong("E"), strong("F")];
     const r = evaluateDeleveragingVeto(assets);
     expect(r.verdict).toBe("veto");
     expect(r.vetoTriggered).toBe(true);
@@ -50,14 +43,7 @@ describe("evaluateDeleveragingVeto", () => {
 
   it("does NOT veto when the flush is idiosyncratic (below fraction)", () => {
     // 6 names, only 2 flip oversold (33%) -> no veto, treat as dips.
-    const assets = [
-      flip("A"),
-      flip("B"),
-      strong("C"),
-      strong("D"),
-      strong("E"),
-      strong("F"),
-    ];
+    const assets = [flip("A"), flip("B"), strong("C"), strong("D"), strong("E"), strong("F")];
     const r = evaluateDeleveragingVeto(assets);
     expect(r.verdict).toBe("no_veto");
     expect(r.vetoTriggered).toBe(false);

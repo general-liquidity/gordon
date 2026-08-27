@@ -124,14 +124,17 @@ export const deployStrategyTool = createTool({
     status: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({
-    playbook_name,
-    allocated_percent,
-    max_positions,
-    max_daily_trades,
-    max_loss_percent,
-    override_reason,
-  }, execContext?: MastraExecutionContext) => {
+  execute: async (
+    {
+      playbook_name,
+      allocated_percent,
+      max_positions,
+      max_daily_trades,
+      max_loss_percent,
+      override_reason,
+    },
+    execContext?: MastraExecutionContext,
+  ) => {
     try {
       const ctx = getGordonContext(execContext);
       const actor = ctx?.userId || "system";
@@ -146,7 +149,11 @@ export const deployStrategyTool = createTool({
           const reason = profile
             ? `Strategy ${playbook_name} is not live-eligible under strict systematic mode.`
             : `Strategy ${playbook_name} has no systematic validation profile yet.`;
-          getAuditLogger(actor).blocked("SYSTEMATIC_PROMOTION", { strategyId: playbook_name, targetStatus }, reason);
+          getAuditLogger(actor).blocked(
+            "SYSTEMATIC_PROMOTION",
+            { strategyId: playbook_name, targetStatus },
+            reason,
+          );
           return { success: false, error: reason };
         }
       }
@@ -183,16 +190,20 @@ export const deployStrategyTool = createTool({
         reason: override_reason,
         override: Boolean(override_reason),
       });
-      getAuditLogger(actor).success("SYSTEMATIC_PROMOTION", {
-        strategyId: playbook_name,
-        targetStatus,
-        allocated_percent: allocated_percent ?? 20,
-      }, {
-        metadata: {
-          validationScore: promoted?.validationScore ?? profile?.validationScore ?? null,
-          liveEligible: promoted?.liveEligible ?? profile?.liveEligible ?? false,
+      getAuditLogger(actor).success(
+        "SYSTEMATIC_PROMOTION",
+        {
+          strategyId: playbook_name,
+          targetStatus,
+          allocated_percent: allocated_percent ?? 20,
         },
-      });
+        {
+          metadata: {
+            validationScore: promoted?.validationScore ?? profile?.validationScore ?? null,
+            liveEligible: promoted?.liveEligible ?? profile?.liveEligible ?? false,
+          },
+        },
+      );
 
       return {
         success: true,
@@ -261,10 +272,7 @@ export const pauseStrategyTool = createTool({
     "Pause a running strategy slot. Existing positions are maintained but no new trades will be opened.",
   inputSchema: z.object({
     slot_id: z.string().describe("Strategy slot ID to pause"),
-    reason: z
-      .string()
-      .optional()
-      .describe("Reason for pausing (for logging)"),
+    reason: z.string().optional().describe("Reason for pausing (for logging)"),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -437,7 +445,7 @@ export const rebalancePortfolioTool = createTool({
     "Adjusts allocations based on the chosen strategy (equal_weight, risk_parity, performance, fixed).",
   inputSchema: z.object({
     strategy: AllocationStrategySchema.optional().describe(
-      "Allocation strategy: equal_weight, risk_parity, performance, or fixed (default: equal_weight)"
+      "Allocation strategy: equal_weight, risk_parity, performance, or fixed (default: equal_weight)",
     ),
   }),
   outputSchema: z.object({
@@ -449,7 +457,7 @@ export const rebalancePortfolioTool = createTool({
         from_amount: z.number(),
         to_amount: z.number(),
         reason: z.string(),
-      })
+      }),
     ),
     changes: z.number(),
     error: z.string().optional(),
@@ -498,7 +506,7 @@ export const checkPortfolioHealthTool = createTool({
         slot_id: z.string().optional(),
         reason: z.string(),
         severity: z.string(),
-      })
+      }),
     ),
     warnings: z.number(),
     critical: z.number(),
@@ -609,7 +617,9 @@ export const compareLiveVsBacktestTool = createTool({
     try {
       const runtime = getRuntime();
       const status = getSystematicStrategyStatus(strategyId);
-      const slot = runtime.getActiveSlots().find((candidate) => candidate.playbook_name === strategyId) ?? null;
+      const slot =
+        runtime.getActiveSlots().find((candidate) => candidate.playbook_name === strategyId) ??
+        null;
       const backtest = status.profile?.latestBacktestResultId
         ? loadBacktestResult(status.profile.latestBacktestResultId)
         : null;
@@ -648,13 +658,8 @@ export const approveStrategyTradeTool = createTool({
   inputSchema: z.object({
     slot_id: z.string().describe("Strategy slot ID requesting the trade"),
     symbol: z.string().describe("Trading pair symbol (e.g., 'BTC/USDT')"),
-    side: z
-      .enum(["long", "short"])
-      .describe("Trade direction"),
-    size_usd: z
-      .number()
-      .positive()
-      .describe("Trade size in USD"),
+    side: z.enum(["long", "short"]).describe("Trade direction"),
+    size_usd: z.number().positive().describe("Trade size in USD"),
   }),
   outputSchema: z.object({
     approved: z.boolean(),

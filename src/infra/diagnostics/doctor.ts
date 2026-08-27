@@ -367,7 +367,8 @@ function checkOutboundFetchGuard(
       id,
       label,
       status: "warn",
-      message: "Network allowlist disabled via GORDON_NETWORK_ALLOWLIST — outbound fetches are unguarded.",
+      message:
+        "Network allowlist disabled via GORDON_NETWORK_ALLOWLIST — outbound fetches are unguarded.",
     };
   }
   if (!status.installed) {
@@ -375,7 +376,8 @@ function checkOutboundFetchGuard(
       id,
       label,
       status: "fail",
-      message: "Network allowlist enabled but the fetch guard is NOT installed — the policy is inert. installProductionGuards() should run at process entry (src/index.tsx).",
+      message:
+        "Network allowlist enabled but the fetch guard is NOT installed — the policy is inert. installProductionGuards() should run at process entry (src/index.tsx).",
     };
   }
   if (status.warnViolations > 0) {
@@ -406,7 +408,8 @@ function checkFilesystemWriteGuard(
       id,
       label,
       status: "warn",
-      message: "Filesystem write guard disabled via GORDON_FILESYSTEM_WRITE_GUARD — writes are unguarded.",
+      message:
+        "Filesystem write guard disabled via GORDON_FILESYSTEM_WRITE_GUARD — writes are unguarded.",
     };
   }
   if (!status.installed) {
@@ -414,7 +417,8 @@ function checkFilesystemWriteGuard(
       id,
       label,
       status: "fail",
-      message: "Filesystem write guard enabled but NOT installed — the policy is inert. installProductionGuards() should run at process entry (src/index.tsx).",
+      message:
+        "Filesystem write guard enabled but NOT installed — the policy is inert. installProductionGuards() should run at process entry (src/index.tsx).",
     };
   }
   if (status.warnViolations > 0) {
@@ -489,7 +493,8 @@ function checkAuditChainIntegrity(): DiagnosticCheck {
           id,
           label,
           status: "info",
-          message: "No signed audit traces stored yet — chain verification will run once traces exist.",
+          message:
+            "No signed audit traces stored yet — chain verification will run once traces exist.",
         };
       }
       return {
@@ -608,7 +613,15 @@ function checkMastraPatchApplied(
  * fresh and intact.
  */
 function checkMcpMarketplaceCatalog(
-  catalogPath: string = resolve(process.cwd(), "src", "infra", "ai", "mcp", "marketplace", "catalog.json"),
+  catalogPath: string = resolve(
+    process.cwd(),
+    "src",
+    "infra",
+    "ai",
+    "mcp",
+    "marketplace",
+    "catalog.json",
+  ),
 ): DiagnosticCheck {
   if (!existsSync(catalogPath)) {
     return {
@@ -683,7 +696,8 @@ function checkInstallReleaseAge(
         id: "install-release-age",
         label: "Install release-age gate",
         status: "warn",
-        message: "bunfig.toml has no minimumReleaseAge — installs will pull versions published seconds ago. See scripts/README.md.",
+        message:
+          "bunfig.toml has no minimumReleaseAge — installs will pull versions published seconds ago. See scripts/README.md.",
       };
     }
     const secs = Number(match[1]);
@@ -878,7 +892,7 @@ function checkSuspiciousOptionalDependencies(
       }
     } else {
       if (inspect(join(nodeModulesRoot, entry, "package.json"), entry)) {
-        break outer; // first finding wins
+        break; // first finding wins
       }
     }
   }
@@ -924,9 +938,7 @@ function checkSuspiciousOptionalDependencies(
  * residue even if the originally-installed package has since been
  * removed.
  */
-function checkSupplyChainIocs(
-  projectRoot: string = process.cwd(),
-): DiagnosticCheck {
+function checkSupplyChainIocs(projectRoot: string = process.cwd()): DiagnosticCheck {
   const ioc_files = [
     "router_init.js",
     "router_runtime.js",
@@ -979,7 +991,8 @@ function checkSupplyChainIocs(
   }
   const parts: string[] = [];
   if (found.length > 0) parts.push(`IOC files: ${found.join(", ")}`);
-  if (taintedSettings.length > 0) parts.push(`tainted settings.json: ${taintedSettings.join(", ")}`);
+  if (taintedSettings.length > 0)
+    parts.push(`tainted settings.json: ${taintedSettings.join(", ")}`);
   return {
     id: "supply-chain-iocs",
     label: "Supply-chain IOC scan",
@@ -998,7 +1011,14 @@ function checkSupplyChainIocs(
  * before the next high-stakes critique misses regressions.
  */
 function checkCritiquePhaseRouting(
-  critiquePhasePath: string = resolve(process.cwd(), "src", "infra", "agents", "cognition", "critiquePhase.ts"),
+  critiquePhasePath: string = resolve(
+    process.cwd(),
+    "src",
+    "infra",
+    "agents",
+    "cognition",
+    "critiquePhase.ts",
+  ),
 ): DiagnosticCheck {
   if (!existsSync(critiquePhasePath)) {
     return {
@@ -1017,7 +1037,8 @@ function checkCritiquePhaseRouting(
         id: "critique-routing",
         label: "Critique-phase model routing",
         status: "fail",
-        message: "critiquePhase.ts routes through 'compaction' (fast model) — regression of commit b2f537fd. Critique needs main-model capability + clean context.",
+        message:
+          "critiquePhase.ts routes through 'compaction' (fast model) — regression of commit b2f537fd. Critique needs main-model capability + clean context.",
       };
     }
     if (!usesCritique) {
@@ -1025,7 +1046,8 @@ function checkCritiquePhaseRouting(
         id: "critique-routing",
         label: "Critique-phase model routing",
         status: "warn",
-        message: "critiquePhase.ts doesn't reference resolveWorkflowPhaseModelRoute('critique') — file may have been refactored. Verify routing manually.",
+        message:
+          "critiquePhase.ts doesn't reference resolveWorkflowPhaseModelRoute('critique') — file may have been refactored. Verify routing manually.",
       };
     }
     return {
@@ -1273,16 +1295,28 @@ function checkAuditAdvisories(
   // Bun's npm-audit JSON shape mirrors npm: { advisories: { <id>: { ... } } }
   // or under .vulnerabilities depending on the registry. Try both.
   const advisoryMap: Record<string, unknown> = {};
-  const root = parsed as { advisories?: Record<string, unknown>; vulnerabilities?: Record<string, unknown> };
+  const root = parsed as {
+    advisories?: Record<string, unknown>;
+    vulnerabilities?: Record<string, unknown>;
+  };
   if (root && typeof root === "object") {
-    if (root.advisories && typeof root.advisories === "object") Object.assign(advisoryMap, root.advisories);
-    if (root.vulnerabilities && typeof root.vulnerabilities === "object") Object.assign(advisoryMap, root.vulnerabilities);
+    if (root.advisories && typeof root.advisories === "object")
+      Object.assign(advisoryMap, root.advisories);
+    if (root.vulnerabilities && typeof root.vulnerabilities === "object")
+      Object.assign(advisoryMap, root.vulnerabilities);
   }
 
   const newAdvisories: Array<{ id: string; severity: string; module: string }> = [];
   for (const [_idKey, adv] of Object.entries(advisoryMap)) {
     if (!adv || typeof adv !== "object") continue;
-    const a = adv as { id?: string | number; github_advisory_id?: string; ghsa?: string; severity?: string; module_name?: string; name?: string };
+    const a = adv as {
+      id?: string | number;
+      github_advisory_id?: string;
+      ghsa?: string;
+      severity?: string;
+      module_name?: string;
+      name?: string;
+    };
     const ghsa = a.github_advisory_id ?? a.ghsa ?? (typeof a.id === "string" ? a.id : undefined);
     if (ghsa && ACCEPTED_ADVISORY_IDS.has(ghsa)) continue;
     const severity = a.severity ?? "unknown";

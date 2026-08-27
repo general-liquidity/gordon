@@ -116,7 +116,7 @@ function walkBook(
     const filled = sizeBase - remaining;
     throw new Error(
       `Insufficient liquidity: requested ${sizeBase}, filled ${filled.toFixed(8)} ` +
-      `across ${levelsConsumed} levels`,
+        `across ${levelsConsumed} levels`,
     );
   }
 
@@ -143,7 +143,8 @@ export function computeCost(input: CostInput): CostBreakdown {
   const referencePrice = referenceFor(side, book, input.referenceBasis ?? "best");
 
   // Slippage is always non-negative — price improvement isn't slippage.
-  const rawDelta = side === "buy" ? effectivePrice - referencePrice : referencePrice - effectivePrice;
+  const rawDelta =
+    side === "buy" ? effectivePrice - referencePrice : referencePrice - effectivePrice;
   const slippageQuotePerUnit = Math.max(0, rawDelta);
   const slippageQuote = slippageQuotePerUnit * sizeBase;
   const slippageRate = referencePrice > 0 ? slippageQuotePerUnit / referencePrice : 0;
@@ -208,9 +209,7 @@ export function compareVenues(inputs: CostInput[]): ComparisonResult {
 
   // For buys: lower allInQuote is better. For sells: higher is better.
   const buyMode = ranked[0]!.side === "buy";
-  ranked.sort((a, b) =>
-    buyMode ? a.allInQuote - b.allInQuote : b.allInQuote - a.allInQuote,
-  );
+  ranked.sort((a, b) => (buyMode ? a.allInQuote - b.allInQuote : b.allInQuote - a.allInQuote));
 
   const best = ranked[0]!.allInQuote;
   const savingsVsBest: Record<string, number> = {};

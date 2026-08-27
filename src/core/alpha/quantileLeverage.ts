@@ -61,7 +61,7 @@ export interface QuantileLeverageResult {
 /** Deterministic linear congruential generator — numerical-recipes constants. */
 function makeLcg(seed: number): () => number {
   // Keep state in unsigned 32-bit space.
-  let state = (seed >>> 0) || 1;
+  let state = seed >>> 0 || 1;
   return () => {
     // state = (1664525 * state + 1013904223) mod 2^32
     state = (Math.imul(1664525, state) + 1013904223) >>> 0;
@@ -174,9 +174,7 @@ export function quantileOptimalLeverage(
     const sorted = terminalLogWealth.slice().sort((a, b) => a - b);
     const qTerminal = quantileSorted(sorted, quantile);
     // Geometric mean = mean log-growth PER PERIOD (annualisation-agnostic).
-    const geoMeanAtQuantile = Number.isFinite(qTerminal)
-      ? qTerminal / horizon
-      : qTerminal;
+    const geoMeanAtQuantile = Number.isFinite(qTerminal) ? qTerminal / horizon : qTerminal;
 
     return {
       leverage,

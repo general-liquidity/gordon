@@ -28,8 +28,11 @@ import { fitGarch } from "../../../core/alpha/garch.ts";
 
 // ── Seeded RNG (LCG + Box-Muller) — reproducible, no Math.random ─────────────
 export function makeRng(seed: number): () => number {
-  let s = (seed >>> 0) || 1;
-  return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296);
+  let s = seed >>> 0 || 1;
+  return () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
 }
 function gauss(rng: () => number): number {
   let u = 0;
@@ -75,13 +78,19 @@ export function iidBootstrap(returns: number[], pathLen: number, rng: () => numb
  * circularly. Preserves short-range autocorrelation + volatility clustering, while the
  * random block length keeps the resampled series stationary (no fixed-block artifacts).
  */
-export function stationaryBootstrap(returns: number[], pathLen: number, meanBlock: number, rng: () => number): number[] {
+export function stationaryBootstrap(
+  returns: number[],
+  pathLen: number,
+  meanBlock: number,
+  rng: () => number,
+): number[] {
   const n = returns.length;
   const p = meanBlock > 1 ? 1 / meanBlock : 1; // P(start a new block each step)
   const out = new Array<number>(pathLen);
   let idx = Math.floor(rng() * n);
   for (let i = 0; i < pathLen; i++) {
-    if (i === 0 || rng() < p) idx = Math.floor(rng() * n); // start a fresh block
+    if (i === 0 || rng() < p)
+      idx = Math.floor(rng() * n); // start a fresh block
     else idx = (idx + 1) % n; // continue the current block (wrap)
     out[i] = returns[idx]!;
   }
@@ -97,7 +106,12 @@ export function stationaryBootstrap(returns: number[], pathLen: number, meanBloc
 export function garchPath(returns: number[], pathLen: number, rng: () => number): number[] {
   const fit = fitGarch(returns);
   if (!fit || !(fit.currentVariance > 0)) {
-    return stationaryBootstrap(returns, pathLen, Math.max(2, Math.round(Math.sqrt(returns.length))), rng);
+    return stationaryBootstrap(
+      returns,
+      pathLen,
+      Math.max(2, Math.round(Math.sqrt(returns.length))),
+      rng,
+    );
   }
   const mu = returns.reduce((a, b) => a + b, 0) / returns.length;
   const { omega, alpha, beta } = fit.params;
@@ -142,11 +156,18 @@ export function garchPath(returns: number[], pathLen: number, rng: () => number)
  * feeds only the mean-type outputs. (No antithetic for the iid / stationary bootstraps — they
  * resample real returns by index; the inverse-CDF trick is GARCH-only.)
  */
-export function garchAntitheticPair(returns: number[], pathLen: number, rng: () => number): [number[], number[]] {
+export function garchAntitheticPair(
+  returns: number[],
+  pathLen: number,
+  rng: () => number,
+): [number[], number[]] {
   const fit = fitGarch(returns);
   if (!fit || !(fit.currentVariance > 0)) {
     const mb = Math.max(2, Math.round(Math.sqrt(returns.length)));
-    return [stationaryBootstrap(returns, pathLen, mb, rng), stationaryBootstrap(returns, pathLen, mb, rng)];
+    return [
+      stationaryBootstrap(returns, pathLen, mb, rng),
+      stationaryBootstrap(returns, pathLen, mb, rng),
+    ];
   }
   const mu = returns.reduce((a, b) => a + b, 0) / returns.length;
   const { omega, alpha, beta } = fit.params;
@@ -243,7 +264,8 @@ function percentile(sorted: number[], q: number): number {
   return sorted[i]!;
 }
 
-const arrMean = (xs: number[]): number => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+const arrMean = (xs: number[]): number =>
+  xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
 
 /** Standard error of the mean: √(sample-variance / n). */
 function plainStdError(xs: number[]): number {
@@ -267,14 +289,24 @@ function pairedStdError(xs: number[]): number {
   return Math.sqrt(v / pairMeans.length);
 }
 
-function resample(method: ResampleMethod, returns: number[], pathLen: number, meanBlock: number, rng: () => number): number[] {
+function resample(
+  method: ResampleMethod,
+  returns: number[],
+  pathLen: number,
+  meanBlock: number,
+  rng: () => number,
+): number[] {
   if (method === "iid") return iidBootstrap(returns, pathLen, rng);
   if (method === "garch") return garchPath(returns, pathLen, rng);
   return stationaryBootstrap(returns, pathLen, meanBlock, rng);
 }
 
 /** Run the path-risk Monte Carlo for one resampling method. */
-export function monteCarloPathRisk(returns: number[], method: ResampleMethod, config: PathRiskConfig = {}): PathRiskResult {
+export function monteCarloPathRisk(
+  returns: number[],
+  method: ResampleMethod,
+  config: PathRiskConfig = {},
+): PathRiskResult {
   const nPathsReq = config.nPaths ?? 10_000;
   const pathLen = config.pathLen ?? returns.length;
   const meanBlock = config.meanBlock ?? Math.max(2, Math.round(Math.sqrt(returns.length)));
@@ -335,7 +367,10 @@ export function monteCarloPathRisk(returns: number[], method: ResampleMethod, co
 }
 
 /** Run all three methods so the tail-widening (iid → stationary → garch) is explicit. */
-export function pathRiskComparison(returns: number[], config: PathRiskConfig = {}): Record<ResampleMethod, PathRiskResult> {
+export function pathRiskComparison(
+  returns: number[],
+  config: PathRiskConfig = {},
+): Record<ResampleMethod, PathRiskResult> {
   return {
     iid: monteCarloPathRisk(returns, "iid", config),
     stationary: monteCarloPathRisk(returns, "stationary", config),

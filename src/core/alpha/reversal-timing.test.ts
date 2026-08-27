@@ -68,7 +68,10 @@ describe("detectReversals — basic", () => {
   });
 
   it("returns empty when series too short for window", () => {
-    const bars = buildBars([[5, 4], [4, 3]]);
+    const bars = buildBars([
+      [5, 4],
+      [4, 3],
+    ]);
     expect(detectReversals(bars, 3)).toEqual([]);
   });
 
@@ -122,7 +125,7 @@ describe("analyzeReversalTiming — verdict bands", () => {
   it("orthogonal phase sine waves → weaker correlation", () => {
     const a = buildSinusoidal(200, 10);
     // B has the same period but shifted by 5 bars (180° out of phase)
-    const b = buildSinusoidal(200, 10, 1, 0).map((bar, i) => {
+    const b = buildSinusoidal(200, 10, 1, 0).map((_bar, i) => {
       const src = a[Math.max(0, i - 5)]!;
       return { time: i, high: src.high, low: src.low };
     });

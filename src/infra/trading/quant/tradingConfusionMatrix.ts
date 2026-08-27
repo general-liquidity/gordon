@@ -127,20 +127,14 @@ export function computeTradingConfusionMatrix(
   const oracleLong = cells.longLong + cells.flatLong + cells.shortLong;
   const longPrecision = safeRatio(cells.longLong, actualLong);
   const longRecall = safeRatio(cells.longLong, oracleLong);
-  const longF1 = safeRatio(
-    2 * longPrecision * longRecall,
-    longPrecision + longRecall,
-  );
+  const longF1 = safeRatio(2 * longPrecision * longRecall, longPrecision + longRecall);
 
   // Short-class metrics
   const actualShort = cells.shortLong + cells.shortFlat + cells.shortShort;
   const oracleShort = cells.longShort + cells.flatShort + cells.shortShort;
   const shortPrecision = safeRatio(cells.shortShort, actualShort);
   const shortRecall = safeRatio(cells.shortShort, oracleShort);
-  const shortF1 = safeRatio(
-    2 * shortPrecision * shortRecall,
-    shortPrecision + shortRecall,
-  );
+  const shortF1 = safeRatio(2 * shortPrecision * shortRecall, shortPrecision + shortRecall);
 
   let alphaLeakage: number | null = null;
   if (input.realisedReturns !== undefined) {
@@ -192,8 +186,7 @@ export function tradingConfusionMatrixToPayload(
     shortPrecision: Number(result.shortPrecision.toFixed(4)),
     shortRecall: Number(result.shortRecall.toFixed(4)),
     shortF1: Number(result.shortF1.toFixed(4)),
-    alphaLeakage:
-      result.alphaLeakage !== null ? Number(result.alphaLeakage.toFixed(8)) : null,
+    alphaLeakage: result.alphaLeakage !== null ? Number(result.alphaLeakage.toFixed(8)) : null,
     cells: result.cells,
   };
 }

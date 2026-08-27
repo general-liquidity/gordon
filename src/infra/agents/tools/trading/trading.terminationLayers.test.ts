@@ -28,7 +28,9 @@ const mockExecutePlan = mock(async () => ({
     openedAt: new Date().toISOString(),
     closedAt: null,
     symbol: "BTCUSDT",
-    entries: [{ orderId: "ord_1", price: 100_000, quantity: 0.01, filledAt: new Date().toISOString() }],
+    entries: [
+      { orderId: "ord_1", price: 100_000, quantity: 0.01, filledAt: new Date().toISOString() },
+    ],
     exits: [],
     averageEntry: 100_000,
     realizedPnl: 0,
@@ -93,7 +95,7 @@ function makeExecContext(): { requestContext: RequestContext } {
     exchangeId: "binance",
     isSandbox: true,
     getPrice: async () => 100_000,
-    getBalance: async (asset: string) => asset === "USDT" ? 100_000 : 0,
+    getBalance: async (asset: string) => (asset === "USDT" ? 100_000 : 0),
     getFullAccountDetails: async () => ({
       accountInfo: {
         canTrade: true,
@@ -114,7 +116,10 @@ function makeExecContext(): { requestContext: RequestContext } {
       askPrice: 100_000,
     }),
   });
-  requestContext.set("config", { permissionMode: "auto", preferences: { maxAllocationPerTrade: 0.1, cashReservePercent: 0.1 } });
+  requestContext.set("config", {
+    permissionMode: "auto",
+    preferences: { maxAllocationPerTrade: 0.1, cashReservePercent: 0.1 },
+  });
   requestContext.set("portfolioValue", 100_000);
   requestContext.set("availableCash", 100_000);
   return { requestContext };
@@ -143,12 +148,14 @@ describe("execute_plan — termination layers shadow", () => {
   });
 
   test("records termination layer payloads without blocking execution", async () => {
-    const result = await (executePlanTool as unknown as {
-      execute: (
-        input: { planId: string; rationale: string },
-        ctx: { requestContext: RequestContext },
-      ) => Promise<{ success: boolean }>;
-    }).execute({ planId: PLAN_ID, rationale: RATIONALE }, makeExecContext());
+    const result = await (
+      executePlanTool as unknown as {
+        execute: (
+          input: { planId: string; rationale: string },
+          ctx: { requestContext: RequestContext },
+        ) => Promise<{ success: boolean }>;
+      }
+    ).execute({ planId: PLAN_ID, rationale: RATIONALE }, makeExecContext());
 
     expect(result.success).toBe(true);
     const terminationObs = observations.filter(

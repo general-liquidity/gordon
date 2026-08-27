@@ -210,7 +210,11 @@ export class HandoffCoordinator {
           count += r.count;
           return r.text;
         }
-        if (part && typeof part === "object" && typeof (part as { text?: unknown }).text === "string") {
+        if (
+          part &&
+          typeof part === "object" &&
+          typeof (part as { text?: unknown }).text === "string"
+        ) {
           const r = redactor((part as { text: string }).text);
           count += r.count;
           return { ...(part as Record<string, unknown>), text: r.text };
@@ -371,7 +375,11 @@ export class HandoffCoordinator {
     }, {});
   }
 
-  validate(fromAgent: string, toAgent: string, context?: Record<string, unknown>): HandoffValidation {
+  validate(
+    fromAgent: string,
+    toAgent: string,
+    context?: Record<string, unknown>,
+  ): HandoffValidation {
     const warnings: string[] = [];
     if (!this.workerRegistry.has(fromAgent)) {
       return {
@@ -404,11 +412,14 @@ export class HandoffCoordinator {
       };
     }
 
-    const lastSecondHandoffs = this.history.filter((handoff) => Date.now() - handoff.timestamp < 1000);
+    const lastSecondHandoffs = this.history.filter(
+      (handoff) => Date.now() - handoff.timestamp < 1000,
+    );
     if (lastSecondHandoffs.length >= 5) {
       return {
         valid: false,
-        reason: "Blocked: high handoff frequency detected (5+ handoffs in 1 second). Possible infinite loop.",
+        reason:
+          "Blocked: high handoff frequency detected (5+ handoffs in 1 second). Possible infinite loop.",
       };
     }
 
@@ -437,7 +448,11 @@ export class HandoffCoordinator {
     };
   }
 
-  async track(fromAgent: string, toAgent: string, metadata?: Record<string, unknown>): Promise<HandoffRecord> {
+  async track(
+    fromAgent: string,
+    toAgent: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<HandoffRecord> {
     const handoffId = `handoff_${Date.now()}_${++this.counter}`;
     const validation = this.validate(fromAgent, toAgent, metadata);
     const record: HandoffRecord = {

@@ -2,7 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { calculateTightConsolidation } from "./tight-consolidation.ts";
 import type { Candle } from "./types.ts";
 
-function makeCandle(open: number, high: number, low: number, close: number, volume: number, ts: number): Candle {
+function makeCandle(
+  open: number,
+  high: number,
+  low: number,
+  close: number,
+  volume: number,
+  ts: number,
+): Candle {
   return {
     openTime: ts,
     open,

@@ -8,12 +8,10 @@
 
 import type { Exchange, Ticker24hr } from "../../exchange/types.ts";
 import { getExchangeThrottleSignal } from "../../exchange/rateLimiter.ts";
-import { CoinGeckoClient, getCoinGeckoClient } from "./coingecko.ts";
-import type { CoinGeckoPrice } from "./coingecko.ts";
+import { type CoinGeckoClient, getCoinGeckoClient } from "./coingecko.ts";
 import {
   enrichQuoteWithLLM,
   type BaseQuote,
-  type LLMEnrichment,
   type TrendDirection,
   type Momentum,
   type VolumeAssessment,
@@ -144,18 +142,13 @@ function toUsdtPair(symbol: string): string {
 // Source Fetchers
 // ============================================================================
 
-async function fetchFromExchange(
-  exchange: Exchange,
-  symbol: string
-): Promise<SourceQuote | null> {
+async function fetchFromExchange(exchange: Exchange, symbol: string): Promise<SourceQuote | null> {
   try {
     const pair = toUsdtPair(symbol);
 
     // Fetch 24hr ticker for comprehensive data
     const tickers = await exchange.get24hrTickers();
-    const ticker = tickers.find(
-      (t: Ticker24hr) => t.symbol.toUpperCase() === pair
-    );
+    const ticker = tickers.find((t: Ticker24hr) => t.symbol.toUpperCase() === pair);
 
     if (!ticker) {
       // Fallback: just get current price
@@ -195,7 +188,7 @@ async function fetchFromExchange(
 
 async function fetchFromCoinGecko(
   client: CoinGeckoClient,
-  symbol: string
+  symbol: string,
 ): Promise<SourceQuote | null> {
   try {
     const price = await client.getPrice(symbol);
@@ -227,7 +220,7 @@ async function fetchFromCoinGecko(
 function mergeQuotes(
   symbol: string,
   quotes: SourceQuote[],
-  sourcesFailed: string[]
+  sourcesFailed: string[],
 ): EnrichedQuote {
   const prices = quotes.map((q) => q.price);
   const mergedPrice = median(prices);
@@ -238,18 +231,14 @@ function mergeQuotes(
   const degradedReasons: string[] = [];
   if (
     prices.length > 1 &&
-    (Math.max(...prices) - Math.min(...prices)) / mergedPrice >
-      SOURCE_DISAGREEMENT_THRESHOLD
+    (Math.max(...prices) - Math.min(...prices)) / mergedPrice > SOURCE_DISAGREEMENT_THRESHOLD
   ) {
     degradedReasons.push("source disagreement");
   }
 
   // For percentage change, take median of non-zero values
-  const changePercents = quotes
-    .map((q) => q.changePercent24h)
-    .filter((c) => c !== 0);
-  const mergedChangePercent =
-    changePercents.length > 0 ? median(changePercents) : 0;
+  const changePercents = quotes.map((q) => q.changePercent24h).filter((c) => c !== 0);
+  const mergedChangePercent = changePercents.length > 0 ? median(changePercents) : 0;
 
   // For absolute change, compute from price and percent
   const mergedChange24h = mergedPrice * (mergedChangePercent / 100);
@@ -261,10 +250,8 @@ function mergeQuotes(
   // High/Low: take the widest range
   const highs = quotes.map((q) => q.high24h).filter((h) => h > 0);
   const lows = quotes.map((q) => q.low24h).filter((l) => l > 0);
-  const mergedHigh =
-    highs.length > 0 ? Math.max(...highs) : mergedPrice;
-  const mergedLow =
-    lows.length > 0 ? Math.min(...lows) : mergedPrice;
+  const mergedHigh = highs.length > 0 ? Math.max(...highs) : mergedPrice;
+  const mergedLow = lows.length > 0 ? Math.min(...lows) : mergedPrice;
 
   const now = Date.now();
   return {
@@ -297,7 +284,7 @@ export class MultiSourceQuoteService {
   constructor(
     exchanges: Exchange[],
     llmClient?: LLMClient | null,
-    config?: MultiSourceQuoteConfig
+    config?: MultiSourceQuoteConfig,
   ) {
     this.exchanges = exchanges;
     this.coinGecko = getCoinGeckoClient();
@@ -336,10 +323,7 @@ export class MultiSourceQuoteService {
     fetchPromises.push(fetchFromCoinGecko(this.coinGecko, symbol));
 
     // Index-aligned with fetchPromises so failures can be attributed.
-    const sourceNames = [
-      ...this.exchanges.map((e) => e.displayName),
-      "CoinGecko",
-    ];
+    const sourceNames = [...this.exchanges.map((e) => e.displayName), "CoinGecko"];
 
     // Fetch all in parallel
     const results = await Promise.allSettled(fetchPromises);
@@ -393,11 +377,7 @@ export class MultiSourceQuoteService {
         candles = await this.fetchCandlesSafe(symbol);
       }
 
-      const enrichment = await enrichQuoteWithLLM(
-        this.llmClient,
-        baseQuote,
-        candles
-      );
+      const enrichment = await enrichQuoteWithLLM(this.llmClient, baseQuote, candles);
 
       if (enrichment) {
         merged.trendDirection = enrichment.trendDirection;
@@ -423,9 +403,7 @@ export class MultiSourceQuoteService {
    */
   async getQuotes(symbols: string[]): Promise<Map<string, EnrichedQuote>> {
     const results = new Map<string, EnrichedQuote>();
-    const settled = await Promise.allSettled(
-      symbols.map((s) => this.getQuote(s))
-    );
+    const settled = await Promise.allSettled(symbols.map((s) => this.getQuote(s)));
 
     for (let i = 0; i < symbols.length; i++) {
       const result = settled[i];
@@ -447,7 +425,7 @@ export class MultiSourceQuoteService {
         const candles = await exchange.getCandles(
           pair,
           this.config.candleTimeframe,
-          this.config.candleLookback
+          this.config.candleLookback,
         );
         if (candles.length > 0) return candles;
       } catch {

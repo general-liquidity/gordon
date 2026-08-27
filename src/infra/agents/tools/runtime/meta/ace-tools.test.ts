@@ -56,7 +56,10 @@ interface ACEExecuteResult {
   error?: string;
 }
 
-async function runTool(toolKey: keyof typeof aceTools, input: Record<string, unknown> = {}): Promise<ACEExecuteResult> {
+async function runTool(
+  toolKey: keyof typeof aceTools,
+  input: Record<string, unknown> = {},
+): Promise<ACEExecuteResult> {
   const tool = aceTools[toolKey];
   const exec = tool.execute as (args: unknown) => Promise<ACEExecuteResult>;
   return await exec(input);

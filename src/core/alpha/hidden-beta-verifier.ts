@@ -111,7 +111,7 @@ export interface HiddenBetaVerifierResult {
   summary: string;
 }
 
-const DEFAULT_THRESHOLD = 0.10;
+const DEFAULT_THRESHOLD = 0.1;
 const DEFAULT_MIN_SAMPLE = 30;
 
 function meanOf(values: ReadonlyArray<number>): number {
@@ -143,19 +143,12 @@ function insufficient(
   };
 }
 
-export function verifyHiddenBeta(
-  input: HiddenBetaVerifierInput,
-): HiddenBetaVerifierResult {
+export function verifyHiddenBeta(input: HiddenBetaVerifierInput): HiddenBetaVerifierResult {
   const threshold = input.hiddenBetaThreshold ?? DEFAULT_THRESHOLD;
   const minSample = input.minSampleSize ?? DEFAULT_MIN_SAMPLE;
 
   if (input.factors.length === 0) {
-    return insufficient(
-      "No factor series supplied.",
-      input.portfolioReturns.length,
-      0,
-      threshold,
-    );
+    return insufficient("No factor series supplied.", input.portfolioReturns.length, 0, threshold);
   }
   if (input.portfolioReturns.length < minSample) {
     return insufficient(
@@ -225,14 +218,11 @@ export function verifyHiddenBeta(
   // (most of portfolio variance is idiosyncratic). Drops with leakage and
   // with R² (more factor-explained variance).
   const residualFrac = 1 - fit.rSquared;
-  const maxMag =
-    perFactor.length > 0
-      ? Math.max(...perFactor.map((p) => p.betaMagnitude))
-      : 0;
+  const maxMag = perFactor.length > 0 ? Math.max(...perFactor.map((p) => p.betaMagnitude)) : 0;
   const magPenalty = Math.min(1, maxMag / Math.max(threshold * 3, 0.001));
   const rSqPenalty = Math.min(1, Math.max(0, fit.rSquared));
   const neutralityConfidence = parseFloat(
-    (Math.max(0, 1 - magPenalty * 0.6 - rSqPenalty * 0.4)).toFixed(4),
+    Math.max(0, 1 - magPenalty * 0.6 - rSqPenalty * 0.4).toFixed(4),
   );
 
   const summary =
@@ -260,9 +250,7 @@ export function verifyHiddenBeta(
   };
 }
 
-export function formatHiddenBetaVerifier(
-  result: HiddenBetaVerifierResult,
-): string {
+export function formatHiddenBetaVerifier(result: HiddenBetaVerifierResult): string {
   const lines = [
     `Hidden Beta Verifier — ${result.verdict.toUpperCase()} (confidence ${result.neutralityConfidence.toFixed(2)})`,
     "",

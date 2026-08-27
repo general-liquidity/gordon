@@ -2,9 +2,9 @@
 // Shell Completions — Auto-generate bash/zsh/fish completions for gordon CLI
 // ============================================================================
 
-import { writeFileSync, appendFileSync, readFileSync, existsSync } from "fs";
-import { join } from "path";
-import { homedir } from "os";
+import { writeFileSync, appendFileSync, readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { SLASH_COMMANDS } from "../../app/slash/slashCommands.ts";
 
 /**
@@ -41,15 +41,15 @@ export function generateCompletions(shell: "bash" | "zsh" | "fish"): string {
       return [
         "_gordon_completions() {",
         `  local commands="${subcommands.join(" ")}"`,
-        '  COMPREPLY=($(compgen -W "$commands" -- "${COMP_WORDS[COMP_CWORD]}"))',
+        `  COMPREPLY=($(compgen -W "$commands" -- "\${COMP_WORDS[COMP_CWORD]}"))`,
         "}",
         "complete -F _gordon_completions gordon",
       ].join("\n");
 
     case "fish":
-      return subcommands.map(
-        (cmd) => `complete -c gordon -a '${cmd}' -d '${cmd} command'`,
-      ).join("\n");
+      return subcommands
+        .map((cmd) => `complete -c gordon -a '${cmd}' -d '${cmd} command'`)
+        .join("\n");
   }
 }
 
@@ -59,7 +59,7 @@ export function installCompletions(shell: "bash" | "zsh" | "fish"): boolean {
     const home = homedir();
 
     const completionFile = join(home, ".gordon", `completions.${shell}`);
-    writeFileSync(completionFile, script + "\n");
+    writeFileSync(completionFile, `${script}\n`);
 
     // Add source line to shell rc
     const rcFiles: Record<string, string> = {
@@ -70,7 +70,7 @@ export function installCompletions(shell: "bash" | "zsh" | "fish"): boolean {
 
     const rcFile = rcFiles[shell]!;
     if (shell === "fish") {
-      writeFileSync(rcFile, script + "\n");
+      writeFileSync(rcFile, `${script}\n`);
     } else {
       const sourceLine = `\n# Gordon CLI completions\nsource "${completionFile}"\n`;
       if (existsSync(rcFile)) {

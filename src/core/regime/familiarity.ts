@@ -384,7 +384,7 @@ function countAtOrBelow(sorted: readonly number[], value: number): number {
  * new. Returned as a decision. Execution is somebody else's job.
  */
 export function conservativeVerdict(position: PositionState | undefined): ConservativeVerdict {
-  if (!position || !position.hasOpenPosition) {
+  if (!position?.hasOpenPosition) {
     return {
       action: "no_new_positions",
       allowNewPositions: false,
@@ -555,8 +555,7 @@ export function priceHistoryToStateVectors(
     if (returns.length === 0) continue;
 
     const mean = returns.reduce((s, r) => s + r, 0) / returns.length;
-    const variance =
-      returns.reduce((s, r) => s + (r - mean) * (r - mean), 0) / returns.length;
+    const variance = returns.reduce((s, r) => s + (r - mean) * (r - mean), 0) / returns.length;
 
     let peak = first;
     let maxDrawdown = 0;

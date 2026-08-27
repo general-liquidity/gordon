@@ -21,7 +21,7 @@ import type { ProactiveSuggestion } from "../../types.ts";
 import { createModuleLogger } from "../../../logger/index.ts";
 import { finnhub, isFinnhubConfigured } from "../../../data/providers/finnhub.ts";
 
-const logger = createModuleLogger("stock-events-producer");
+const _logger = createModuleLogger("stock-events-producer");
 
 // ============================================================================
 // Shared watchlist
@@ -56,7 +56,9 @@ function daysBack(n: number): string {
 // Track which earnings ids we've already fired on so we don't repeat
 const firedEarnings = new Set<string>();
 
-export const earningsApproachingProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
+export const earningsApproachingProducer: CandidateProducer = async (
+  obs,
+): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop" || obs.eventType !== "tick_earnings") return [];
   if (!isFinnhubConfigured()) return [];
 
@@ -77,8 +79,14 @@ export const earningsApproachingProducer: CandidateProducer = async (obs): Promi
     if (daysUntil > 3) continue;
 
     // Confidence scales with proximity: tomorrow = 0.85, 2 days = 0.72, 3 days = 0.62
-    const confidence = daysUntil === 0 ? 0.9 : daysUntil === 1 ? 0.85 : daysUntil === 2 ? 0.72 : 0.62;
-    const hour = e.hour === "bmo" ? "before market open" : e.hour === "amc" ? "after market close" : "during market hours";
+    const confidence =
+      daysUntil === 0 ? 0.9 : daysUntil === 1 ? 0.85 : daysUntil === 2 ? 0.72 : 0.62;
+    const hour =
+      e.hour === "bmo"
+        ? "before market open"
+        : e.hour === "amc"
+          ? "after market close"
+          : "during market hours";
     const estimate = e.epsEstimate != null ? `EPS est. ${e.epsEstimate}` : "no EPS estimate";
 
     candidates.push(
@@ -132,7 +140,9 @@ export const earningsApproachingProducer: CandidateProducer = async (obs): Promi
 
 const firedInsiderFlow = new Set<string>();
 
-export const insiderFlowProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
+export const insiderFlowProducer: CandidateProducer = async (
+  obs,
+): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop" || obs.eventType !== "tick_insider_flow") return [];
   if (!isFinnhubConfigured()) return [];
 
@@ -221,7 +231,9 @@ interface AnalystState {
 }
 const analystState = new Map<string, AnalystState>();
 
-export const analystUpgradeProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
+export const analystUpgradeProducer: CandidateProducer = async (
+  obs,
+): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop" || obs.eventType !== "tick_analyst") return [];
   if (!isFinnhubConfigured()) return [];
 
@@ -290,7 +302,9 @@ export const analystUpgradeProducer: CandidateProducer = async (obs): Promise<Pr
 
 const firedCongressional = new Set<string>();
 
-export const congressionalTradeProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
+export const congressionalTradeProducer: CandidateProducer = async (
+  obs,
+): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop" || obs.eventType !== "tick_congressional") return [];
   if (!isFinnhubConfigured()) return [];
 
@@ -352,7 +366,9 @@ export const congressionalTradeProducer: CandidateProducer = async (obs): Promis
   if (firedCongressional.size > 500) {
     const arr = [...firedCongressional];
     firedCongressional.clear();
-    arr.slice(-250).forEach((k) => firedCongressional.add(k));
+    arr.slice(-250).forEach((k) => {
+      firedCongressional.add(k);
+    });
   }
 
   return candidates;

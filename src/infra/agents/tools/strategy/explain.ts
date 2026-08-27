@@ -35,10 +35,7 @@ export const explainTool = createTool({
     "Use when the user asks 'what is X?' or 'explain Y' or needs help understanding something",
   inputSchema: z.object({
     topic: z.string().describe("The topic to explain"),
-    additionalContext: z
-      .string()
-      .default("")
-      .describe("Additional context for the explanation"),
+    additionalContext: z.string().default("").describe("Additional context for the explanation"),
   }),
   outputSchema: z.object({
     explanation: z.string().optional(),

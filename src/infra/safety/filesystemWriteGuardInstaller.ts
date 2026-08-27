@@ -81,7 +81,12 @@ export function guardWritePath(path: Fs.PathLike, caller: string): void {
 /** Mutators whose target path is the FIRST argument. */
 const DESTINATION_FIRST_MUTATORS = ["unlinkSync", "rmSync", "rmdirSync", "truncateSync"] as const;
 /** Mutators whose created/overwritten path is the SECOND argument. */
-const DESTINATION_SECOND_MUTATORS = ["renameSync", "copyFileSync", "linkSync", "symlinkSync"] as const;
+const DESTINATION_SECOND_MUTATORS = [
+  "renameSync",
+  "copyFileSync",
+  "linkSync",
+  "symlinkSync",
+] as const;
 
 function patchFirstPathArg(
   target: Record<string, unknown>,
@@ -132,7 +137,11 @@ function installBunWriteGuard(): void {
     const dest = args[0];
     if (typeof dest === "string" || dest instanceof URL) {
       guardWritePath(dest as Fs.PathLike, "Bun.write");
-    } else if (dest && typeof dest === "object" && typeof (dest as { name?: unknown }).name === "string") {
+    } else if (
+      dest &&
+      typeof dest === "object" &&
+      typeof (dest as { name?: unknown }).name === "string"
+    ) {
       // BunFile — its `name` is the path it was opened against.
       guardWritePath((dest as { name: string }).name, "Bun.write");
     }
@@ -175,13 +184,21 @@ export function installFilesystemWriteGuard(): void {
   const originalAppendFile = fsPromises.appendFile.bind(fsPromises);
   const originalMkdir = fsPromises.mkdir.bind(fsPromises);
 
-  mutablePromises.writeFile = (async (file: Fs.PathLike | FsPromises.FileHandle, ...args: unknown[]) => {
-    if (!(file && typeof file === "object" && "fd" in file)) guardWritePath(file as Fs.PathLike, "fs.promises.writeFile");
+  mutablePromises.writeFile = (async (
+    file: Fs.PathLike | FsPromises.FileHandle,
+    ...args: unknown[]
+  ) => {
+    if (!(file && typeof file === "object" && "fd" in file))
+      guardWritePath(file as Fs.PathLike, "fs.promises.writeFile");
     return forwardCall(originalWriteFile, fsPromises, [file, ...args]);
   }) as typeof fsPromises.writeFile;
 
-  mutablePromises.appendFile = (async (file: Fs.PathLike | FsPromises.FileHandle, ...args: unknown[]) => {
-    if (!(file && typeof file === "object" && "fd" in file)) guardWritePath(file as Fs.PathLike, "fs.promises.appendFile");
+  mutablePromises.appendFile = (async (
+    file: Fs.PathLike | FsPromises.FileHandle,
+    ...args: unknown[]
+  ) => {
+    if (!(file && typeof file === "object" && "fd" in file))
+      guardWritePath(file as Fs.PathLike, "fs.promises.appendFile");
     return forwardCall(originalAppendFile, fsPromises, [file, ...args]);
   }) as typeof fsPromises.appendFile;
 
@@ -200,11 +217,21 @@ export function installFilesystemWriteGuard(): void {
   // takes (target, path), so its destination is the second argument.
   for (const name of DESTINATION_FIRST_MUTATORS) {
     patchFirstPathArg(mutableFs, fs, name, `fs.${name}`);
-    patchFirstPathArg(mutablePromises, fsPromises, name.replace(/Sync$/, ""), `fs.promises.${name.replace(/Sync$/, "")}`);
+    patchFirstPathArg(
+      mutablePromises,
+      fsPromises,
+      name.replace(/Sync$/, ""),
+      `fs.promises.${name.replace(/Sync$/, "")}`,
+    );
   }
   for (const name of DESTINATION_SECOND_MUTATORS) {
     patchSecondPathArg(mutableFs, fs, name, `fs.${name}`);
-    patchSecondPathArg(mutablePromises, fsPromises, name.replace(/Sync$/, ""), `fs.promises.${name.replace(/Sync$/, "")}`);
+    patchSecondPathArg(
+      mutablePromises,
+      fsPromises,
+      name.replace(/Sync$/, ""),
+      `fs.promises.${name.replace(/Sync$/, "")}`,
+    );
   }
 
   installBunWriteGuard();
@@ -212,6 +239,8 @@ export function installFilesystemWriteGuard(): void {
   try {
     syncBuiltinESMExports();
   } catch (err) {
-    logger.warn("Could not sync patched fs exports", { err: err instanceof Error ? err.message : String(err) });
+    logger.warn("Could not sync patched fs exports", {
+      err: err instanceof Error ? err.message : String(err),
+    });
   }
 }

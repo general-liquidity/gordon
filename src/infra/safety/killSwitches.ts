@@ -118,13 +118,20 @@ export function reloadKillSwitchState(): void {
       trippedAt: Date.now(),
       reason: `kill-switch state file unreadable (${String(error)}) — failing closed firm-wide`,
     });
-    logger.error("Kill-switch state unreadable — failing closed with firm-wide trip", error as Error);
+    logger.error(
+      "Kill-switch state unreadable — failing closed with firm-wide trip",
+      error as Error,
+    );
   }
 }
 
 reloadKillSwitchState();
 
-export function tripKillSwitch(key: KillSwitchKey, reason: string, nowMs: number = Date.now()): void {
+export function tripKillSwitch(
+  key: KillSwitchKey,
+  reason: string,
+  nowMs: number = Date.now(),
+): void {
   TRIPS.set(keyOf(key), { trippedAt: nowMs, reason });
   persistTrips();
 }
@@ -204,7 +211,11 @@ export function isExecutionAllowed(ctx: ExecutionContext): ExecutionDecision {
   };
 }
 
-export function listTrippedSwitches(): Array<{ key: KillSwitchKey; reason: string; trippedAt: number }> {
+export function listTrippedSwitches(): Array<{
+  key: KillSwitchKey;
+  reason: string;
+  trippedAt: number;
+}> {
   const out: Array<{ key: KillSwitchKey; reason: string; trippedAt: number }> = [];
   for (const [k, v] of TRIPS) {
     const [scope, id] = k.split(":") as [KillSwitchScope, string | undefined];

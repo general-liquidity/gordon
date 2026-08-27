@@ -29,7 +29,12 @@ export const directionalEdgeTestDiagnosticTool = createTool({
       .array(z.number())
       .min(30)
       .describe("Per-period strategy returns as decimals (e.g. 0.012 = +1.2%)."),
-    samples: z.number().int().positive().default(500).describe("Sign-randomization samples. Default 500."),
+    samples: z
+      .number()
+      .int()
+      .positive()
+      .default(500)
+      .describe("Sign-randomization samples. Default 500."),
     periodsPerYear: z.number().positive().default(252).describe("Periods per year. Default 252."),
     seed: z.number().int().optional().describe("Optional deterministic seed."),
   }),

@@ -6,10 +6,7 @@ import { buildPermissionProfileHook } from "./profiles.ts";
 
 let defaultEngine: PermissionEngine | null = null;
 
-export function createPermissionEngine(
-  runtimeId: string,
-  sessionId?: string,
-): PermissionEngine {
+export function createPermissionEngine(runtimeId: string, sessionId?: string): PermissionEngine {
   const store = new RuntimeStore(createDefaultRuntimeSessionState(runtimeId, sessionId));
   const engine = new PermissionEngine(store);
   engine.prependHook(buildTrustTrajectoryHook(getDefaultTrustTrajectory()));

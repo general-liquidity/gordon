@@ -1,12 +1,6 @@
 import { describe, it, expect } from "bun:test";
-import {
-  forkContext,
-  type ContextForkAuditEntry,
-} from "./contextFork.ts";
-import type {
-  InvestigationAgentStep,
-  InvestigationMessage,
-} from "./investigation.ts";
+import { forkContext, type ContextForkAuditEntry } from "./contextFork.ts";
+import type { InvestigationAgentStep, InvestigationMessage } from "./investigation.ts";
 
 function scriptedAgentStep(
   responses: Array<{
@@ -20,10 +14,7 @@ function scriptedAgentStep(
     const next = responses[cursor] ?? { appendAssistant: "ok", finished: true };
     cursor += 1;
     return {
-      messages: [
-        ...messages,
-        { role: "assistant" as const, content: next.appendAssistant },
-      ],
+      messages: [...messages, { role: "assistant" as const, content: next.appendAssistant }],
       toolCalls: next.toolCalls ?? [],
       finished: next.finished ?? true,
     };
@@ -229,8 +220,16 @@ describe("forkContext — synthesis return", () => {
       },
       {
         agentStep: scriptedAgentStep([
-          { appendAssistant: "Step 1 done", toolCalls: [{ toolId: "scan_market" }], finished: false },
-          { appendAssistant: "Step 2 done", toolCalls: [{ toolId: "scan_market" }], finished: false },
+          {
+            appendAssistant: "Step 1 done",
+            toolCalls: [{ toolId: "scan_market" }],
+            finished: false,
+          },
+          {
+            appendAssistant: "Step 2 done",
+            toolCalls: [{ toolId: "scan_market" }],
+            finished: false,
+          },
           { appendAssistant: "Final synthesis: ETH bullish", toolCalls: [], finished: true },
         ]),
       },

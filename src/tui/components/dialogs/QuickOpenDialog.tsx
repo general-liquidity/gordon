@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 
 // ============================================================================
@@ -58,7 +58,9 @@ export function QuickOpenDialog({ items, onClose, onSelect }: Props) {
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="cyanBright" paddingX={1}>
-      <Text bold color="cyanBright">QUICK OPEN</Text>
+      <Text bold color="cyanBright">
+        QUICK OPEN
+      </Text>
       <Box>
         <Text dimColor>&gt; </Text>
         <Text color="cyanBright">{query}</Text>

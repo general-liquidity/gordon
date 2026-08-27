@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Button } from "../../design-system/Button.js";
 import { Divider } from "../layout/Divider.tsx";
@@ -78,14 +78,19 @@ export function MCPSettings({ server, onSave, onClose }: Props) {
     const isFocused = focusedField === field;
     return (
       <Box key={field} marginBottom={0}>
-        <Text color={isFocused ? "cyanBright" : undefined}>
-          {isFocused ? "▸ " : "  "}
+        <Text color={isFocused ? "cyanBright" : undefined}>{isFocused ? "▸ " : "  "}</Text>
+        <Text dimColor bold={false}>
+          {FIELD_LABEL[field].padEnd(14)}
         </Text>
-        <Text dimColor bold={false}>{FIELD_LABEL[field].padEnd(14)}</Text>
         <Text bold={isFocused} color={isFocused ? "cyanBright" : undefined}>
           {value}
         </Text>
-        {hint && <Text dimColor>{"  "}{hint}</Text>}
+        {hint && (
+          <Text dimColor>
+            {"  "}
+            {hint}
+          </Text>
+        )}
       </Box>
     );
   };
@@ -93,8 +98,10 @@ export function MCPSettings({ server, onSave, onClose }: Props) {
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">MCP SETTINGS</Text>
-        <Text dimColor>  {server.name}</Text>
+        <Text bold color="cyanBright">
+          MCP SETTINGS
+        </Text>
+        <Text dimColor> {server.name}</Text>
       </Box>
 
       <Divider />
@@ -116,16 +123,12 @@ export function MCPSettings({ server, onSave, onClose }: Props) {
           <Text color={focusedField === "enabled" ? "cyanBright" : undefined}>
             {focusedField === "enabled" ? "▸ " : "  "}
           </Text>
-          <Text dimColor bold={false}>{"Enabled".padEnd(14)}</Text>
+          <Text dimColor bold={false}>
+            {"Enabled".padEnd(14)}
+          </Text>
           <Text
             bold={focusedField === "enabled"}
-            color={
-              focusedField === "enabled"
-                ? "cyanBright"
-                : enabled
-                ? "green"
-                : "red"
-            }
+            color={focusedField === "enabled" ? "cyanBright" : enabled ? "green" : "red"}
           >
             {enabled ? "[x] Yes" : "[ ] No"}
           </Text>
@@ -151,7 +154,7 @@ export function MCPSettings({ server, onSave, onClose }: Props) {
       </Box>
 
       <Box marginTop={1}>
-        <Text dimColor>↑↓ navigate  S save  Esc cancel</Text>
+        <Text dimColor>↑↓ navigate S save Esc cancel</Text>
       </Box>
     </Box>
   );

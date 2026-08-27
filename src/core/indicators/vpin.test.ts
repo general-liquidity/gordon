@@ -80,7 +80,9 @@ describe("VPIN (Volume-Synchronized Probability of Informed Trading)", () => {
     // Irregular per-bar volume forces the proportional split logic. Verify the
     // volume clock by reconstructing: buckets × bucketVolume should equal the
     // total volume consumed by completed buckets, and VPIN stays bounded.
-    const vols = [37, 200, 13, 91, 150, 64, 88, 120, 45, 210, 33, 99, 175, 60, 80, 140, 50, 95, 110, 70];
+    const vols = [
+      37, 200, 13, 91, 150, 64, 88, 120, 45, 210, 33, 99, 175, 60, 80, 140, 50, 95, 110, 70,
+    ];
     const candles: Candle[] = vols.map((v, i) => bar(100 + Math.sin(i) * 3, v));
     const r = calculateVpin(candles, { numBuckets: 12, window: 3 });
     expect(r.current).not.toBeNull();

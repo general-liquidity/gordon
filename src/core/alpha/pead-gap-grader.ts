@@ -119,10 +119,7 @@ function clamp01(x: number): number {
   return x;
 }
 
-function resolveRamp(
-  defaults: ComponentRamp,
-  override?: Partial<ComponentRamp>,
-): ComponentRamp {
+function resolveRamp(defaults: ComponentRamp, override?: Partial<ComponentRamp>): ComponentRamp {
   return {
     weight: override?.weight ?? defaults.weight,
     zeroAt: override?.zeroAt ?? defaults.zeroAt,
@@ -162,10 +159,7 @@ export function gradePeadGapUp(
   // Normalize weights so callers can pass any positive magnitudes. A
   // non-positive total collapses to equal weighting.
   const weightTotal =
-    ramps.gap.weight +
-    ramps.trend.weight +
-    ramps.volume.weight +
-    ramps.maPosition.weight;
+    ramps.gap.weight + ramps.trend.weight + ramps.volume.weight + ramps.maPosition.weight;
   const norm = weightTotal > 0 ? weightTotal : 4;
 
   const names: ComponentScore["name"][] = ["gap", "trend", "volume", "maPosition"];
@@ -182,9 +176,7 @@ export function gradePeadGapUp(
     };
   });
 
-  const composite = clamp01(
-    components.reduce((sum, c) => sum + c.subScore * c.weight, 0),
-  );
+  const composite = clamp01(components.reduce((sum, c) => sum + c.subScore * c.weight, 0));
 
   const bands = {
     a: options.gradeBands?.a ?? DEFAULT_GRADE_BANDS.a,

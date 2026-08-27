@@ -7,11 +7,10 @@ import {
   marketplaceClient,
   pluginInstaller,
   type MarketplaceListing,
-  type InstalledPlugin,
-} from '../../infra/ai/mcp/marketplace';
-import { credentialManager } from '../../infra/ai/mcp/credentials';
-import type { MCPCategory, MCPToolDefinition } from '../../infra/ai/mcp/types';
-import { refreshRuntimeCredentials } from '../../infra/runtime/credentialRefresh.ts';
+} from "../../infra/ai/mcp/marketplace";
+import { credentialManager } from "../../infra/ai/mcp/credentials";
+import type { MCPCategory, MCPToolDefinition } from "../../infra/ai/mcp/types";
+import { refreshRuntimeCredentials } from "../../infra/runtime/credentialRefresh.ts";
 
 // ============================================================================
 // Showcase Data
@@ -32,51 +31,47 @@ interface ShowcaseCategory {
 
 const PLUGIN_SHOWCASE: ShowcaseCategory[] = [
   {
-    title: 'For Better Data',
-    description: 'Enhanced market data and historical prices',
+    title: "For Better Data",
+    description: "Enhanced market data and historical prices",
     plugins: [
-      { id: 'coingecko', summary: 'Historical prices, 50+ alt coins', pricingNote: 'freemium' },
-      { id: 'glassnode', summary: 'On-chain analytics', pricingNote: 'paid' },
+      { id: "coingecko", summary: "Historical prices, 50+ alt coins", pricingNote: "freemium" },
+      { id: "glassnode", summary: "On-chain analytics", pricingNote: "paid" },
     ],
   },
   {
-    title: 'For Alerts',
-    description: 'Stay notified about important market events',
+    title: "For Alerts",
+    description: "Stay notified about important market events",
     plugins: [
-      { id: 'telegram-alerts', summary: 'Position notifications' },
-      { id: 'tradingview-signals', summary: 'Webhook integration' },
+      { id: "telegram-alerts", summary: "Position notifications" },
+      { id: "tradingview-signals", summary: "Webhook integration" },
     ],
   },
   {
-    title: 'For DeFi',
-    description: 'Decentralized finance analytics and data',
+    title: "For DeFi",
+    description: "Decentralized finance analytics and data",
     plugins: [
-      { id: 'defi-llama', summary: 'TVL analytics' },
-      { id: 'dexscreener', summary: 'DEX trading data' },
+      { id: "defi-llama", summary: "TVL analytics" },
+      { id: "dexscreener", summary: "DEX trading data" },
     ],
   },
   {
-    title: 'For onchain data',
-    description: 'DEX pools, wallet labels, and multichain analytics (read-only)',
+    title: "For onchain data",
+    description: "DEX pools, wallet labels, and multichain analytics (read-only)",
     plugins: [
-      { id: 'dexscreener', summary: 'DEX pair discovery and volume' },
-      { id: 'nansen', summary: 'Smart-money labels and flows' },
-      { id: 'glassnode', summary: 'On-chain analytics and whale flows' },
+      { id: "dexscreener", summary: "DEX pair discovery and volume" },
+      { id: "nansen", summary: "Smart-money labels and flows" },
+      { id: "glassnode", summary: "On-chain analytics and whale flows" },
     ],
   },
   {
-    title: 'For Sentiment',
-    description: 'Social metrics and market sentiment',
-    plugins: [
-      { id: 'lunarcrush', summary: 'Social metrics', pricingNote: 'freemium' },
-    ],
+    title: "For Sentiment",
+    description: "Social metrics and market sentiment",
+    plugins: [{ id: "lunarcrush", summary: "Social metrics", pricingNote: "freemium" }],
   },
   {
-    title: 'For Portfolio',
-    description: 'Track and analyze your holdings',
-    plugins: [
-      { id: 'portfolio-tracker', summary: 'PnL tracking, tax reports' },
-    ],
+    title: "For Portfolio",
+    description: "Track and analyze your holdings",
+    plugins: [{ id: "portfolio-tracker", summary: "PnL tracking, tax reports" }],
   },
 ];
 
@@ -90,22 +85,56 @@ interface PluginSuggestion {
 }
 
 const PLUGIN_SUGGESTIONS: PluginSuggestion[] = [
-  { keywords: ['on-chain', 'onchain', 'nupl', 'sopr', 'whale', 'flow'], pluginId: 'glassnode', reason: 'provides on-chain analytics and whale tracking' },
-  { keywords: ['social', 'sentiment', 'twitter', 'influencer'], pluginId: 'lunarcrush', reason: 'tracks social media sentiment and influencer activity' },
-  { keywords: ['defi', 'tvl', 'yield', 'farming', 'protocol'], pluginId: 'defi-llama', reason: 'provides DeFi protocol analytics and TVL data' },
-  { keywords: ['dex', 'uniswap', 'pancakeswap', 'liquidity', 'new pair'], pluginId: 'dexscreener', reason: 'tracks DEX trading data and new pairs' },
-  { keywords: ['alert', 'notification', 'telegram', 'notify'], pluginId: 'telegram-alerts', reason: 'sends alerts to Telegram' },
-  { keywords: ['tradingview', 'signal', 'webhook'], pluginId: 'tradingview-signals', reason: 'integrates TradingView alerts' },
-  { keywords: ['historical', 'history', 'ohlc', 'altcoin', 'market cap'], pluginId: 'coingecko', reason: 'provides historical price data for thousands of coins' },
-  { keywords: ['portfolio', 'pnl', 'profit', 'loss', 'tax'], pluginId: 'portfolio-tracker', reason: 'tracks portfolio and generates tax reports' },
+  {
+    keywords: ["on-chain", "onchain", "nupl", "sopr", "whale", "flow"],
+    pluginId: "glassnode",
+    reason: "provides on-chain analytics and whale tracking",
+  },
+  {
+    keywords: ["social", "sentiment", "twitter", "influencer"],
+    pluginId: "lunarcrush",
+    reason: "tracks social media sentiment and influencer activity",
+  },
+  {
+    keywords: ["defi", "tvl", "yield", "farming", "protocol"],
+    pluginId: "defi-llama",
+    reason: "provides DeFi protocol analytics and TVL data",
+  },
+  {
+    keywords: ["dex", "uniswap", "pancakeswap", "liquidity", "new pair"],
+    pluginId: "dexscreener",
+    reason: "tracks DEX trading data and new pairs",
+  },
+  {
+    keywords: ["alert", "notification", "telegram", "notify"],
+    pluginId: "telegram-alerts",
+    reason: "sends alerts to Telegram",
+  },
+  {
+    keywords: ["tradingview", "signal", "webhook"],
+    pluginId: "tradingview-signals",
+    reason: "integrates TradingView alerts",
+  },
+  {
+    keywords: ["historical", "history", "ohlc", "altcoin", "market cap"],
+    pluginId: "coingecko",
+    reason: "provides historical price data for thousands of coins",
+  },
+  {
+    keywords: ["portfolio", "pnl", "profit", "loss", "tax"],
+    pluginId: "portfolio-tracker",
+    reason: "tracks portfolio and generates tax reports",
+  },
 ];
 
 function getBuiltInListing(_pluginId: string): MarketplaceListing | null {
-
   return null;
 }
 
-function mergeListings(primary: MarketplaceListing[], secondary: MarketplaceListing[]): MarketplaceListing[] {
+function mergeListings(
+  primary: MarketplaceListing[],
+  secondary: MarketplaceListing[],
+): MarketplaceListing[] {
   const seen = new Set<string>();
   const merged: MarketplaceListing[] = [];
   for (const listing of [...primary, ...secondary]) {
@@ -181,11 +210,11 @@ export async function mcpList(): Promise<MCPCommandResult> {
  * Convert stars count to star rating display
  */
 function getStarRating(stars?: number): string {
-  if (!stars) return '';
+  if (!stars) return "";
   // Normalize: 500+ stars = 5 stars, scale linearly below
   const rating = Math.min(5, Math.round((stars / 100) * 1));
   const filled = Math.max(1, Math.min(5, rating));
-  return '\u2605'.repeat(filled) + '\u2606'.repeat(5 - filled);
+  return "\u2605".repeat(filled) + "\u2606".repeat(5 - filled);
 }
 
 /**
@@ -193,12 +222,12 @@ function getStarRating(stars?: number): string {
  */
 function formatPricing(pricing: { type: string; freeUsage?: string }): string {
   switch (pricing.type) {
-    case 'free':
-      return 'Free';
-    case 'freemium':
-      return pricing.freeUsage ? `Freemium (${pricing.freeUsage})` : 'Freemium';
-    case 'paid':
-      return 'Paid';
+    case "free":
+      return "Free";
+    case "freemium":
+      return pricing.freeUsage ? `Freemium (${pricing.freeUsage})` : "Freemium";
+    case "paid":
+      return "Paid";
     default:
       return pricing.type;
   }
@@ -217,20 +246,22 @@ export async function mcpSearch(query: string): Promise<MCPCommandResult> {
     const categoryMatch = query.match(/category:(\S+)/);
     if (categoryMatch) {
       category = categoryMatch[1] as MCPCategory;
-      searchQuery = query.replace(/category:\S+/, '').trim();
+      searchQuery = query.replace(/category:\S+/, "").trim();
     }
 
-    const results = await marketplaceClient.searchAdvanced({
-      query: searchQuery || undefined,
-      category,
-      sortBy: 'downloads',
-      sortOrder: 'desc',
-      limit: 20,
-    }).catch(() => ({
-      plugins: [] as MarketplaceListing[],
-      total: 0,
-      query: searchQuery || undefined,
-    }));
+    const results = await marketplaceClient
+      .searchAdvanced({
+        query: searchQuery || undefined,
+        category,
+        sortBy: "downloads",
+        sortOrder: "desc",
+        limit: 20,
+      })
+      .catch(() => ({
+        plugins: [] as MarketplaceListing[],
+        total: 0,
+        query: searchQuery || undefined,
+      }));
 
     const builtIns: MarketplaceListing[] = [];
     const combinedListings = mergeListings(results.plugins, builtIns);
@@ -238,9 +269,7 @@ export async function mcpSearch(query: string): Promise<MCPCommandResult> {
     if (combinedListings.length === 0) {
       return {
         success: true,
-        message: query
-          ? `No plugins found matching "${query}"`
-          : 'No plugins available',
+        message: query ? `No plugins found matching "${query}"` : "No plugins available",
         data: { plugins: [], total: 0 },
       };
     }
@@ -249,7 +278,8 @@ export async function mcpSearch(query: string): Promise<MCPCommandResult> {
       id: p.id,
       name: p.manifest.name,
       description: p.manifest.description,
-      shortDescription: p.manifest.description.substring(0, 60) + (p.manifest.description.length > 60 ? '...' : ''),
+      shortDescription:
+        p.manifest.description.substring(0, 60) + (p.manifest.description.length > 60 ? "..." : ""),
       category: p.manifest.category,
       verified: p.verified,
       official: p.officialProvider,
@@ -264,20 +294,24 @@ export async function mcpSearch(query: string): Promise<MCPCommandResult> {
     }));
 
     // Build enhanced message output
-    const lines = [`Found ${combinedListings.length} plugin(s)${query ? ` matching "${query}"` : ''}:\n`];
+    const lines = [
+      `Found ${combinedListings.length} plugin(s)${query ? ` matching "${query}"` : ""}:\n`,
+    ];
 
     for (const plugin of pluginList) {
-      const status = plugin.installed ? '[installed]' : '';
-      const verified = plugin.verified ? '\u2713' : '';
+      const status = plugin.installed ? "[installed]" : "";
+      const verified = plugin.verified ? "\u2713" : "";
       lines.push(`${plugin.id} (${plugin.category}) ${plugin.starRating} ${status}`);
       lines.push(`  ${plugin.shortDescription}`);
-      lines.push(`  Pricing: ${plugin.pricingFormatted} | Verified: ${verified || '-'} | Tools: ${plugin.toolCount}`);
-      lines.push('');
+      lines.push(
+        `  Pricing: ${plugin.pricingFormatted} | Verified: ${verified || "-"} | Tools: ${plugin.toolCount}`,
+      );
+      lines.push("");
     }
 
     return {
       success: true,
-      message: lines.join('\n'),
+      message: lines.join("\n"),
       data: { plugins: pluginList, total: combinedListings.length },
     };
   } catch (error) {
@@ -303,7 +337,9 @@ export async function mcpInstall(pluginId: string): Promise<MCPCommandResult> {
     }
 
     // Fetch plugin from marketplace
-    const listing = (await marketplaceClient.getPlugin(pluginId).catch(() => null)) ?? getBuiltInListing(pluginId);
+    const listing =
+      (await marketplaceClient.getPlugin(pluginId).catch(() => null)) ??
+      getBuiltInListing(pluginId);
     if (!listing) {
       return {
         success: false,
@@ -320,7 +356,7 @@ export async function mcpInstall(pluginId: string): Promise<MCPCommandResult> {
 
     // Check if credentials are needed
     const needsCredentials =
-      listing.manifest.authentication.type !== 'none' &&
+      listing.manifest.authentication.type !== "none" &&
       !credentialManager.hasRequiredCredentials(listing.manifest);
 
     let message = `Successfully installed "${listing.manifest.name}" v${installed.version}`;
@@ -402,7 +438,7 @@ export async function mcpConfigure(pluginId: string): Promise<MCPCommandResult> 
 
     const { authentication } = plugin.manifest;
 
-    if (authentication.type === 'none') {
+    if (authentication.type === "none") {
       return {
         success: true,
         message: `Plugin "${plugin.manifest.name}" does not require any credentials`,
@@ -422,15 +458,15 @@ export async function mcpConfigure(pluginId: string): Promise<MCPCommandResult> 
     // Build configuration instructions
     let instructions: string;
 
-    if (authentication.type === 'api_key' && authentication.envVar) {
+    if (authentication.type === "api_key" && authentication.envVar) {
       instructions = `Set the ${authentication.envVar} environment variable, or store credentials using the credential manager.`;
     } else if (authentication.fields) {
       const fieldList = authentication.fields
-        .map((f) => `- ${f.label} (${f.name})${f.sensitive ? ' [sensitive]' : ''}`)
-        .join('\n');
+        .map((f) => `- ${f.label} (${f.name})${f.sensitive ? " [sensitive]" : ""}`)
+        .join("\n");
       instructions = `Required credentials:\n${fieldList}`;
     } else {
-      instructions = `Missing credentials: ${missing.join(', ')}`;
+      instructions = `Missing credentials: ${missing.join(", ")}`;
     }
 
     return {
@@ -536,7 +572,7 @@ export async function mcpUpdate(): Promise<MCPCommandResult> {
     if (installed.length === 0) {
       return {
         success: true,
-        message: 'No plugins installed to update',
+        message: "No plugins installed to update",
       };
     }
 
@@ -546,7 +582,7 @@ export async function mcpUpdate(): Promise<MCPCommandResult> {
     if (updates.length === 0) {
       return {
         success: true,
-        message: 'All plugins are up to date',
+        message: "All plugins are up to date",
         data: { updated: [], checked: installed.length },
       };
     }
@@ -608,17 +644,20 @@ export async function mcpUpdate(): Promise<MCPCommandResult> {
  * Format tool signature for display
  */
 function formatToolSignature(tool: MCPToolDefinition): string {
-  const schema = tool.inputSchema as { properties?: Record<string, { type?: string }>; required?: string[] };
+  const schema = tool.inputSchema as {
+    properties?: Record<string, { type?: string }>;
+    required?: string[];
+  };
   const properties = schema.properties || {};
   const required = schema.required || [];
 
   const params = Object.entries(properties).map(([name, prop]) => {
     const isRequired = required.includes(name);
-    const type = prop.type || 'any';
+    const type = prop.type || "any";
     return isRequired ? `${name}: ${type}` : `${name}?: ${type}`;
   });
 
-  return `${tool.name}(${params.join(', ')})`;
+  return `${tool.name}(${params.join(", ")})`;
 }
 
 /**
@@ -626,14 +665,14 @@ function formatToolSignature(tool: MCPToolDefinition): string {
  */
 function getIntegrationCommands(category: MCPCategory): string[] {
   const integrations: Record<MCPCategory, string[]> = {
-    'data-provider': ['/scan', '/analyze', '/compare', '/history'],
-    'analytics': ['/scan', '/analyze', '/signals'],
-    'execution': ['/trade', '/order', '/position'],
-    'exchange': ['/trade', '/order', '/balance'],
-    'infrastructure': ['/scan', '/analyze'],
-    'portfolio': ['/portfolio', '/pnl', '/balance'],
-    'research': ['/analyze', '/research', '/sentiment'],
-    'utility': ['/alert', '/notify'],
+    "data-provider": ["/scan", "/analyze", "/compare", "/history"],
+    analytics: ["/scan", "/analyze", "/signals"],
+    execution: ["/trade", "/order", "/position"],
+    exchange: ["/trade", "/order", "/balance"],
+    infrastructure: ["/scan", "/analyze"],
+    portfolio: ["/portfolio", "/pnl", "/balance"],
+    research: ["/analyze", "/research", "/sentiment"],
+    utility: ["/alert", "/notify"],
   };
   return integrations[category] || [];
 }
@@ -646,7 +685,9 @@ export async function mcpInfo(pluginId: string): Promise<MCPCommandResult> {
   try {
     // Check installed first
     const installed = pluginInstaller.getPlugin(pluginId);
-    const listing = (await marketplaceClient.getPlugin(pluginId).catch(() => null)) ?? getBuiltInListing(pluginId);
+    const listing =
+      (await marketplaceClient.getPlugin(pluginId).catch(() => null)) ??
+      getBuiltInListing(pluginId);
 
     if (!installed && !listing) {
       return {
@@ -694,58 +735,60 @@ export async function mcpInfo(pluginId: string): Promise<MCPCommandResult> {
     const lines: string[] = [];
 
     // Header
-    const verifiedMark = listing?.verified ? '\u2713' : '';
+    const verifiedMark = listing?.verified ? "\u2713" : "";
     lines.push(`Plugin: ${manifest.name}`);
-    lines.push(`Version: ${info.version} | Category: ${manifest.category} | Verified: ${verifiedMark || '-'}`);
-    lines.push('');
+    lines.push(
+      `Version: ${info.version} | Category: ${manifest.category} | Verified: ${verifiedMark || "-"}`,
+    );
+    lines.push("");
 
     // What it does
-    lines.push('What it does:');
+    lines.push("What it does:");
     // Split description into bullet points if it contains sentences
     const descParts = manifest.description.split(/[.!]\s+/).filter(Boolean);
     for (const part of descParts) {
       lines.push(`  \u2022 ${part.trim()}`);
     }
-    lines.push('');
+    lines.push("");
 
     // Tools added
-    lines.push('Tools added:');
+    lines.push("Tools added:");
     for (const tool of manifest.tools) {
       lines.push(`  - ${formatToolSignature(tool)}`);
       lines.push(`      ${tool.description}`);
     }
-    lines.push('');
+    lines.push("");
 
     // Requirements
-    lines.push('Requirements:');
-    if (auth.type === 'none') {
-      lines.push('  \u2022 No authentication required');
-    } else if (auth.type === 'api_key') {
-      const envNote = auth.envVar ? ` (set ${auth.envVar})` : '';
-      const urlNote = pricing?.pricingUrl ? ` - Get at ${pricing.pricingUrl}` : '';
+    lines.push("Requirements:");
+    if (auth.type === "none") {
+      lines.push("  \u2022 No authentication required");
+    } else if (auth.type === "api_key") {
+      const envNote = auth.envVar ? ` (set ${auth.envVar})` : "";
+      const urlNote = pricing?.pricingUrl ? ` - Get at ${pricing.pricingUrl}` : "";
       lines.push(`  \u2022 API Key: Required${envNote}${urlNote}`);
-    } else if (auth.type === 'oauth') {
-      lines.push('  \u2022 OAuth: Authorization required');
+    } else if (auth.type === "oauth") {
+      lines.push("  \u2022 OAuth: Authorization required");
     }
     if (auth.fields && auth.fields.length > 0) {
       for (const field of auth.fields) {
-        const sensitive = field.sensitive ? ' [sensitive]' : '';
+        const sensitive = field.sensitive ? " [sensitive]" : "";
         lines.push(`    - ${field.label}${sensitive}`);
       }
     }
-    lines.push('');
+    lines.push("");
 
     // Integration
     const integrations = getIntegrationCommands(manifest.category);
     if (integrations.length > 0) {
-      lines.push('Integration:');
-      lines.push(`  \u2022 Works with: ${integrations.join(', ')}`);
-      if (auth.type === 'none') {
-        lines.push('  \u2022 Auto-enabled after installation');
+      lines.push("Integration:");
+      lines.push(`  \u2022 Works with: ${integrations.join(", ")}`);
+      if (auth.type === "none") {
+        lines.push("  \u2022 Auto-enabled after installation");
       } else {
-        lines.push('  \u2022 Auto-enabled after configuration');
+        lines.push("  \u2022 Auto-enabled after configuration");
       }
-      lines.push('');
+      lines.push("");
     }
 
     // Pricing
@@ -754,7 +797,7 @@ export async function mcpInfo(pluginId: string): Promise<MCPCommandResult> {
       if (pricing.pricingUrl) {
         lines.push(`  See: ${pricing.pricingUrl}`);
       }
-      lines.push('');
+      lines.push("");
     }
 
     // Stats
@@ -763,7 +806,7 @@ export async function mcpInfo(pluginId: string): Promise<MCPCommandResult> {
       if (listing.stars) stats.push(`${listing.stars} stars`);
       if (listing.downloads) stats.push(`${(listing.downloads / 1000).toFixed(1)}k downloads`);
       if (stats.length > 0) {
-        lines.push(`Stats: ${stats.join(' | ')}`);
+        lines.push(`Stats: ${stats.join(" | ")}`);
       }
       if (listing.repository) {
         lines.push(`Repository: ${listing.repository}`);
@@ -772,8 +815,8 @@ export async function mcpInfo(pluginId: string): Promise<MCPCommandResult> {
 
     // Installation status
     if (installed) {
-      lines.push('');
-      lines.push(`Status: Installed ${installed.enabled ? '(enabled)' : '(disabled)'}`);
+      lines.push("");
+      lines.push(`Status: Installed ${installed.enabled ? "(enabled)" : "(disabled)"}`);
       if (installed.installedAt) {
         lines.push(`Installed: ${new Date(installed.installedAt).toLocaleDateString()}`);
       }
@@ -781,7 +824,7 @@ export async function mcpInfo(pluginId: string): Promise<MCPCommandResult> {
 
     return {
       success: true,
-      message: lines.join('\n'),
+      message: lines.join("\n"),
       data: info,
     };
   } catch (error) {
@@ -799,20 +842,20 @@ export async function mcpInfo(pluginId: string): Promise<MCPCommandResult> {
 export async function mcpShowcase(): Promise<MCPCommandResult> {
   try {
     const lines: string[] = [];
-    lines.push('=== Recommended Plugins by Use Case ===');
-    lines.push('');
+    lines.push("=== Recommended Plugins by Use Case ===");
+    lines.push("");
 
     for (const category of PLUGIN_SHOWCASE) {
       lines.push(`${category.title}:`);
 
       for (const plugin of category.plugins) {
-        const pricingNote = plugin.pricingNote ? ` (${plugin.pricingNote})` : '';
+        const pricingNote = plugin.pricingNote ? ` (${plugin.pricingNote})` : "";
         const isInstalled = pluginInstaller.isInstalled(plugin.id);
-        const installedMark = isInstalled ? ' [installed]' : '';
+        const installedMark = isInstalled ? " [installed]" : "";
         lines.push(`  \u2022 ${plugin.id} - ${plugin.summary}${pricingNote}${installedMark}`);
       }
 
-      lines.push('');
+      lines.push("");
     }
 
     lines.push('Tip: Use "/mcp info <plugin>" for details or "/mcp install <plugin>" to add.');
@@ -829,7 +872,7 @@ export async function mcpShowcase(): Promise<MCPCommandResult> {
 
     return {
       success: true,
-      message: lines.join('\n'),
+      message: lines.join("\n"),
       data: { categories: showcaseData },
     };
   } catch (error) {
@@ -858,7 +901,7 @@ export async function mcpSuggest(query: string): Promise<MCPCommandResult> {
     // Find matching suggestions
     for (const suggestion of PLUGIN_SUGGESTIONS) {
       const matchedKeywords = suggestion.keywords.filter((kw) =>
-        queryLower.includes(kw.toLowerCase())
+        queryLower.includes(kw.toLowerCase()),
       );
 
       if (matchedKeywords.length > 0) {
@@ -885,15 +928,17 @@ export async function mcpSuggest(query: string): Promise<MCPCommandResult> {
     // Build output
     const lines: string[] = [];
     lines.push(`Plugin suggestions for "${query}":`);
-    lines.push('');
+    lines.push("");
 
     for (const match of matches) {
-      const status = match.installed ? '[installed]' : '';
+      const status = match.installed ? "[installed]" : "";
 
       // Fetch additional info from marketplace
-      const listing = (await marketplaceClient.getPlugin(match.pluginId).catch(() => null)) ?? getBuiltInListing(match.pluginId);
+      const listing =
+        (await marketplaceClient.getPlugin(match.pluginId).catch(() => null)) ??
+        getBuiltInListing(match.pluginId);
       const name = listing?.manifest.name || match.pluginId;
-      const pricing = listing ? formatPricing(listing.pricing) : '';
+      const pricing = listing ? formatPricing(listing.pricing) : "";
 
       lines.push(`\u2022 ${name} (${match.pluginId}) ${status}`);
       lines.push(`  ${match.reason}`);
@@ -903,12 +948,12 @@ export async function mcpSuggest(query: string): Promise<MCPCommandResult> {
       if (!match.installed) {
         lines.push(`  Install: /mcp install ${match.pluginId}`);
       }
-      lines.push('');
+      lines.push("");
     }
 
     return {
       success: true,
-      message: lines.join('\n'),
+      message: lines.join("\n"),
       data: { suggestions: matches },
     };
   } catch (error) {
@@ -934,9 +979,7 @@ export function checkForPluginSuggestions(userMessage: string): PluginSuggestion
       continue;
     }
 
-    const hasMatch = suggestion.keywords.some((kw) =>
-      messageLower.includes(kw.toLowerCase())
-    );
+    const hasMatch = suggestion.keywords.some((kw) => messageLower.includes(kw.toLowerCase()));
 
     if (hasMatch) {
       matches.push(suggestion);
@@ -951,9 +994,9 @@ export function checkForPluginSuggestions(userMessage: string): PluginSuggestion
  * Call this when you want to include suggestions in a response
  */
 export function formatPluginSuggestionsMessage(suggestions: PluginSuggestion[]): string {
-  if (suggestions.length === 0) return '';
+  if (suggestions.length === 0) return "";
 
-  const lines = ['\n---', 'Tip: Plugins available for this feature:'];
+  const lines = ["\n---", "Tip: Plugins available for this feature:"];
 
   for (const suggestion of suggestions.slice(0, 3)) {
     lines.push(`  \u2022 ${suggestion.pluginId} - ${suggestion.reason}`);
@@ -963,7 +1006,7 @@ export function formatPluginSuggestionsMessage(suggestions: PluginSuggestion[]):
     lines.push(`Use "/mcp suggest <topic>" for more or "/mcp showcase" to browse all.`);
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 // ============================================================================
@@ -975,101 +1018,101 @@ export function formatPluginSuggestionsMessage(suggestions: PluginSuggestion[]):
  * @param args - Command arguments (e.g., ["list"], ["install", "coingecko"])
  */
 export async function handleMCPCommand(args: string[]): Promise<MCPCommandResult> {
-  const subcommand = args[0]?.toLowerCase() ?? 'list';
+  const subcommand = args[0]?.toLowerCase() ?? "list";
   const subArgs = args.slice(1);
 
   switch (subcommand) {
-    case 'list':
-    case 'ls':
+    case "list":
+    case "ls":
       return mcpList();
 
-    case 'search':
-    case 'find':
+    case "search":
+    case "find":
       if (subArgs.length === 0) {
         // Show all plugins if no query
-        return mcpSearch('');
+        return mcpSearch("");
       }
-      return mcpSearch(subArgs.join(' '));
+      return mcpSearch(subArgs.join(" "));
 
-    case 'install':
-    case 'add':
+    case "install":
+    case "add":
       if (subArgs.length === 0 || !subArgs[0]) {
         return {
           success: false,
-          message: 'Usage: /mcp install <pluginId>',
+          message: "Usage: /mcp install <pluginId>",
         };
       }
       return mcpInstall(subArgs[0]);
 
-    case 'uninstall':
-    case 'remove':
-    case 'rm':
+    case "uninstall":
+    case "remove":
+    case "rm":
       if (subArgs.length === 0 || !subArgs[0]) {
         return {
           success: false,
-          message: 'Usage: /mcp uninstall <pluginId>',
+          message: "Usage: /mcp uninstall <pluginId>",
         };
       }
       return mcpUninstall(subArgs[0]);
 
-    case 'configure':
-    case 'config':
+    case "configure":
+    case "config":
       if (subArgs.length === 0 || !subArgs[0]) {
         return {
           success: false,
-          message: 'Usage: /mcp configure <pluginId>',
+          message: "Usage: /mcp configure <pluginId>",
         };
       }
       return mcpConfigure(subArgs[0]);
 
-    case 'enable':
+    case "enable":
       if (subArgs.length === 0 || !subArgs[0]) {
         return {
           success: false,
-          message: 'Usage: /mcp enable <pluginId>',
+          message: "Usage: /mcp enable <pluginId>",
         };
       }
       return mcpEnable(subArgs[0]);
 
-    case 'disable':
+    case "disable":
       if (subArgs.length === 0 || !subArgs[0]) {
         return {
           success: false,
-          message: 'Usage: /mcp disable <pluginId>',
+          message: "Usage: /mcp disable <pluginId>",
         };
       }
       return mcpDisable(subArgs[0]);
 
-    case 'update':
-    case 'upgrade':
+    case "update":
+    case "upgrade":
       return mcpUpdate();
 
-    case 'info':
-    case 'show':
+    case "info":
+    case "show":
       if (subArgs.length === 0 || !subArgs[0]) {
         return {
           success: false,
-          message: 'Usage: /mcp info <pluginId>',
+          message: "Usage: /mcp info <pluginId>",
         };
       }
       return mcpInfo(subArgs[0]);
 
-    case 'showcase':
-    case 'recommended':
-    case 'featured':
+    case "showcase":
+    case "recommended":
+    case "featured":
       return mcpShowcase();
 
-    case 'suggest':
-    case 'recommend':
+    case "suggest":
+    case "recommend":
       if (subArgs.length === 0) {
         return {
           success: false,
-          message: 'Usage: /mcp suggest <query>\nExample: /mcp suggest on-chain data',
+          message: "Usage: /mcp suggest <query>\nExample: /mcp suggest on-chain data",
         };
       }
-      return mcpSuggest(subArgs.join(' '));
+      return mcpSuggest(subArgs.join(" "));
 
-    case 'help':
+    case "help":
       return {
         success: true,
         message: `MCP Plugin Manager Commands:

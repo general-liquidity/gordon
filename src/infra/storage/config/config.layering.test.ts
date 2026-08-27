@@ -67,28 +67,34 @@ describe("config layering helpers", () => {
   });
 
   it("writes to the highest-precedence active config layer", () => {
-    expect(getResolvedConfigWriteScope({
-      activeProfile: null,
-      sources: ["global"],
-      globalPath: "global.json",
-      workspacePath: ".gordonrc",
-      profilePath: null,
-    })).toBe("global");
+    expect(
+      getResolvedConfigWriteScope({
+        activeProfile: null,
+        sources: ["global"],
+        globalPath: "global.json",
+        workspacePath: ".gordonrc",
+        profilePath: null,
+      }),
+    ).toBe("global");
 
-    expect(getResolvedConfigWriteScope({
-      activeProfile: "swing",
-      sources: ["global", "profile"],
-      globalPath: "global.json",
-      workspacePath: ".gordonrc",
-      profilePath: "profiles/swing.json",
-    })).toBe("profile");
+    expect(
+      getResolvedConfigWriteScope({
+        activeProfile: "swing",
+        sources: ["global", "profile"],
+        globalPath: "global.json",
+        workspacePath: ".gordonrc",
+        profilePath: "profiles/swing.json",
+      }),
+    ).toBe("profile");
 
-    expect(getResolvedConfigWriteScope({
-      activeProfile: "workspace-profile",
-      sources: ["global", "profile", "workspace"],
-      globalPath: "global.json",
-      workspacePath: ".gordonrc",
-      profilePath: "profiles/workspace-profile.json",
-    })).toBe("workspace");
+    expect(
+      getResolvedConfigWriteScope({
+        activeProfile: "workspace-profile",
+        sources: ["global", "profile", "workspace"],
+        globalPath: "global.json",
+        workspacePath: ".gordonrc",
+        profilePath: "profiles/workspace-profile.json",
+      }),
+    ).toBe("workspace");
   });
 });

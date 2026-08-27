@@ -179,21 +179,24 @@ export function formatSymbolHover(ctx: SymbolContext): string {
   lines.push(`${ctx.symbol} ${ctx.venue ? `(${ctx.venue})` : ""}`);
 
   if (ctx.price !== undefined) {
-    const changeStr = ctx.change24hPct !== undefined
-      ? ` (${ctx.change24hPct >= 0 ? "+" : ""}${ctx.change24hPct.toFixed(2)}%)`
-      : "";
+    const changeStr =
+      ctx.change24hPct !== undefined
+        ? ` (${ctx.change24hPct >= 0 ? "+" : ""}${ctx.change24hPct.toFixed(2)}%)`
+        : "";
     lines.push(`  Price: $${ctx.price.toLocaleString()}${changeStr}`);
   }
 
   if (ctx.spread) {
-    const spreadBps = ((ctx.spread.ask - ctx.spread.bid) / ctx.spread.bid * 10000).toFixed(1);
+    const spreadBps = (((ctx.spread.ask - ctx.spread.bid) / ctx.spread.bid) * 10000).toFixed(1);
     lines.push(`  Spread: $${ctx.spread.bid} / $${ctx.spread.ask} (${spreadBps}bps)`);
   }
 
   if (ctx.position) {
     const { side, quantity, entryPrice, unrealizedPnl, unrealizedPnlPct } = ctx.position;
     const pnlSign = unrealizedPnl >= 0 ? "+" : "";
-    lines.push(`  Position: ${side} ${quantity} @ $${entryPrice.toFixed(2)} | P&L: ${pnlSign}$${unrealizedPnl.toFixed(2)} (${pnlSign}${unrealizedPnlPct.toFixed(1)}%)`);
+    lines.push(
+      `  Position: ${side} ${quantity} @ $${entryPrice.toFixed(2)} | P&L: ${pnlSign}$${unrealizedPnl.toFixed(2)} (${pnlSign}${unrealizedPnlPct.toFixed(1)}%)`,
+    );
   }
 
   if (ctx.openOrders?.length) {

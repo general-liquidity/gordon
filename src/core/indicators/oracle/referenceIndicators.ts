@@ -79,7 +79,8 @@ export function refRSI(closes: number[], period: number): (number | null)[] {
   g /= period;
   l /= period;
 
-  const rsiOf = (gain: number, loss: number): number => (loss === 0 ? 100 : 100 - 100 / (1 + gain / loss));
+  const rsiOf = (gain: number, loss: number): number =>
+    loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
   const out: (number | null)[] = [];
   for (let i = 0; i < period; i++) out.push(null);
   out.push(rsiOf(g, l));

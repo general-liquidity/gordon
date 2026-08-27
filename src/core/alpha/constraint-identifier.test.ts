@@ -40,7 +40,7 @@ describe("identifyConstraint", () => {
 
   test("low win rate → win_rate is dominant constraint", () => {
     const r = identifyConstraint({
-      winRate: { current: 0.30, target: 0.55 },
+      winRate: { current: 0.3, target: 0.55 },
       avgWin: { current: 1.5, target: 1.5 },
       avgLoss: { current: 1.0, target: 1.0 },
       frequency: { current: 30, target: 30 },
@@ -83,7 +83,7 @@ describe("identifyConstraint", () => {
 
   test("ranking is stable and largest-first", () => {
     const r = identifyConstraint({
-      winRate: { current: 0.50, target: 0.55 }, // 9% deficit
+      winRate: { current: 0.5, target: 0.55 }, // 9% deficit
       avgWin: { current: 1.2, target: 1.5 }, // 20% deficit
       avgLoss: { current: 1.5, target: 1.0 }, // 50% above
       frequency: { current: 30, target: 30 },
@@ -95,7 +95,7 @@ describe("identifyConstraint", () => {
 
   test("recommended lever attached per component", () => {
     const r = identifyConstraint({
-      winRate: { current: 0.30, target: 0.55 },
+      winRate: { current: 0.3, target: 0.55 },
       avgWin: { current: 1.5, target: 1.5 },
       avgLoss: { current: 1.0, target: 1.0 },
       frequency: { current: 30, target: 30 },
@@ -105,23 +105,23 @@ describe("identifyConstraint", () => {
 
   test("meetsTarget flag flipped correctly per component", () => {
     const r = identifyConstraint({
-      winRate: { current: 0.60, target: 0.55 },
+      winRate: { current: 0.6, target: 0.55 },
       avgWin: { current: 1.5, target: 1.5 },
       avgLoss: { current: 1.5, target: 1.0 },
       frequency: { current: 25, target: 30 },
     });
     const byComponent = Object.fromEntries(r.components.map((c) => [c.component, c]));
-    expect(byComponent["win_rate"]!.meetsTarget).toBe(true);
-    expect(byComponent["avg_win"]!.meetsTarget).toBe(true);
-    expect(byComponent["avg_loss"]!.meetsTarget).toBe(false);
-    expect(byComponent["frequency"]!.meetsTarget).toBe(false);
+    expect(byComponent.win_rate!.meetsTarget).toBe(true);
+    expect(byComponent.avg_win!.meetsTarget).toBe(true);
+    expect(byComponent.avg_loss!.meetsTarget).toBe(false);
+    expect(byComponent.frequency!.meetsTarget).toBe(false);
   });
 });
 
 describe("formatConstraint", () => {
   test("renders header + ranked table", () => {
     const r = identifyConstraint({
-      winRate: { current: 0.40, target: 0.55 },
+      winRate: { current: 0.4, target: 0.55 },
       avgWin: { current: 1.5, target: 1.5 },
       avgLoss: { current: 1.0, target: 1.0 },
       frequency: { current: 30, target: 30 },

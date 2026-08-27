@@ -51,7 +51,7 @@ export interface SupertrendChannelResult {
  */
 export function calculateSupertrendChannel(
   candles: Candle[],
-  params?: { atrPeriod?: number; multiplier?: number }
+  params?: { atrPeriod?: number; multiplier?: number },
 ): SupertrendChannelResult {
   const atrPeriod = params?.atrPeriod ?? 10;
   const multiplier = params?.multiplier ?? 3;
@@ -141,7 +141,7 @@ export function calculateSupertrendChannel(
     curMin,
     curAvg,
     curDir,
-    trendChange
+    trendChange,
   );
 
   return {
@@ -167,7 +167,7 @@ function buildInterpretation(
   min: number | null,
   avg: number | null,
   dir: 1 | -1,
-  trendChange: boolean
+  trendChange: boolean,
 ): string {
   if (max == null || min == null || avg == null) {
     return "Insufficient data for Supertrend Channel.";
@@ -182,10 +182,12 @@ function buildInterpretation(
 
   if (close >= avg) {
     msg += `Price ${close.toFixed(2)} sits in the upper half of the channel`;
-    msg += dir === 1 ? " — momentum aligned with the uptrend." : " — bouncing within the downtrend.";
+    msg +=
+      dir === 1 ? " — momentum aligned with the uptrend." : " — bouncing within the downtrend.";
   } else {
     msg += `Price ${close.toFixed(2)} sits in the lower half of the channel`;
-    msg += dir === 1 ? " — pullback toward midline support." : " — momentum aligned with the downtrend.";
+    msg +=
+      dir === 1 ? " — pullback toward midline support." : " — momentum aligned with the downtrend.";
   }
 
   return msg;

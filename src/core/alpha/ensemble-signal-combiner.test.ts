@@ -155,11 +155,7 @@ describe("combineEnsembleSignals", () => {
       { id: "fip_quality", value: 0.4, description: "smooth" },
       { id: "agg_ratio", value: 0.3, description: "taker buys dominant" },
     ]);
-    expect(r.perSource.map((p) => p.id)).toEqual([
-      "cs_momentum",
-      "fip_quality",
-      "agg_ratio",
-    ]);
+    expect(r.perSource.map((p) => p.id)).toEqual(["cs_momentum", "fip_quality", "agg_ratio"]);
     expect(r.perSource[0]!.description).toBe("top decile");
   });
 

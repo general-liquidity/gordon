@@ -1,14 +1,6 @@
 import { describe, it, expect, afterEach } from "bun:test";
-import {
-  CcxtAdapter,
-  toCcxtSymbol,
-  fromCcxtSymbol,
-  DEFAULT_MAX_LEVERAGE,
-} from "./ccxt-adapter.ts";
-import {
-  tripKillSwitch,
-  resetAllKillSwitches,
-} from "../../safety/killSwitches.ts";
+import { CcxtAdapter, toCcxtSymbol, fromCcxtSymbol, DEFAULT_MAX_LEVERAGE } from "./ccxt-adapter.ts";
+import { tripKillSwitch, resetAllKillSwitches } from "../../safety/killSwitches.ts";
 
 // =================== symbol normalization ===================
 
@@ -110,15 +102,29 @@ function makeMockClient(overrides: Record<string, unknown> = {}): unknown {
     },
     fetchOrderBook: async (_symbol: string, _limit?: number) => ({
       timestamp: Date.now(),
-      bids: [[49990, 1.5], [49980, 2.0], [49970, 3.0]],
-      asks: [[50010, 1.2], [50020, 2.5], [50030, 3.1]],
+      bids: [
+        [49990, 1.5],
+        [49980, 2.0],
+        [49970, 3.0],
+      ],
+      asks: [
+        [50010, 1.2],
+        [50020, 2.5],
+        [50030, 3.1],
+      ],
     }),
     fetchBalance: async () => ({
       free: { USDT: 5000, BTC: 0.1 },
       used: { USDT: 100, BTC: 0 },
       total: { USDT: 5100, BTC: 0.1 },
     }),
-    createOrder: async (symbol: string, type: string, side: string, amount: number, price?: number) => ({
+    createOrder: async (
+      symbol: string,
+      type: string,
+      side: string,
+      amount: number,
+      price?: number,
+    ) => ({
       id: "order-123",
       symbol,
       type,
@@ -132,7 +138,17 @@ function makeMockClient(overrides: Record<string, unknown> = {}): unknown {
     }),
     cancelOrder: async (_orderId: string, _symbol?: string) => ({ id: "order-123" }),
     fetchOpenOrders: async (_symbol?: string) => [
-      { id: "order-456", symbol: "BTC/USDT", side: "buy", type: "limit", price: 48000, amount: 0.05, filled: 0, cost: 0, status: "open" },
+      {
+        id: "order-456",
+        symbol: "BTC/USDT",
+        side: "buy",
+        type: "limit",
+        price: 48000,
+        amount: 0.05,
+        filled: 0,
+        cost: 0,
+        status: "open",
+      },
     ],
     fetchOrder: async (orderId: string, _symbol?: string) => ({
       id: orderId,
@@ -215,6 +231,47 @@ describe("CcxtAdapter — market data (mocked)", () => {
     const tops = await adapter.getTopSymbols(2);
     expect(tops).toEqual(["BTC/USDT", "ETH/USDT"]);
   });
+
+  it("preserves an omitted public aggressor side as unknown", async () => {
+    const adapter = CcxtAdapter.__forTesting(
+      "binance",
+      makeMockClient({
+        fetchTrades: async () => [
+          {
+            id: "public-1",
+            symbol: "BTC/USDT",
+            price: 50_000,
+            amount: 0.25,
+            timestamp: Date.parse("2026-08-26T12:00:00Z"),
+          },
+        ],
+      }),
+    );
+
+    await expect(adapter.getRecentTrades("BTCUSDT", 1)).resolves.toMatchObject([
+      { id: "public-1", side: "UNKNOWN", price: 50_000, quantity: 0.25 },
+    ]);
+  });
+
+  it("refuses malformed public trade numerics instead of emitting NaN", async () => {
+    const adapter = CcxtAdapter.__forTesting(
+      "binance",
+      makeMockClient({
+        fetchTrades: async () => [
+          {
+            id: "public-bad",
+            symbol: "BTC/USDT",
+            side: "buy",
+            price: "not-a-price",
+            amount: 0.25,
+            timestamp: Date.now(),
+          },
+        ],
+      }),
+    );
+
+    await expect(adapter.getRecentTrades("BTCUSDT", 1)).rejects.toThrow("invalid price");
+  });
 });
 
 describe("CcxtAdapter — account (mocked)", () => {
@@ -245,6 +302,57 @@ describe("CcxtAdapter — account (mocked)", () => {
     const adapter = CcxtAdapter.__forTesting("binance", mock);
     const balances = await adapter.getAllBalances();
     expect(balances.map((b) => b.asset)).toEqual(["USDT"]);
+  });
+
+  it("getFullAccountDetails values every positive balance in quote units", async () => {
+    const adapter = CcxtAdapter.__forTesting("binance", makeMockClient());
+
+    const details = await adapter.getFullAccountDetails();
+
+    expect(details.totalUsdtValue).toBe(10_100);
+    expect(details.nonZeroBalances.map((balance) => balance.asset)).toEqual(["USDT", "BTC"]);
+  });
+
+  it("getFullAccountDetails refuses an unpriced positive balance", async () => {
+    const adapter = CcxtAdapter.__forTesting(
+      "binance",
+      makeMockClient({ fetchTickers: async () => ({}) }),
+    );
+
+    await expect(adapter.getFullAccountDetails()).rejects.toThrow(/Cannot value positive BTC/);
+  });
+
+  it("getFullAccountDetails propagates a ticker outage instead of reporting zero equity", async () => {
+    const adapter = CcxtAdapter.__forTesting(
+      "binance",
+      makeMockClient({
+        fetchTickers: async () => {
+          throw new Error("ticker service unavailable");
+        },
+      }),
+    );
+
+    await expect(adapter.getFullAccountDetails()).rejects.toThrow("ticker service unavailable");
+  });
+
+  it("refuses an authenticated fill with no side", async () => {
+    const adapter = CcxtAdapter.__forTesting(
+      "binance",
+      makeMockClient({
+        fetchMyTrades: async () => [
+          {
+            id: "fill-1",
+            order: "order-1",
+            symbol: "BTC/USDT",
+            price: 50_000,
+            amount: 0.25,
+            timestamp: Date.now(),
+          },
+        ],
+      }),
+    );
+
+    await expect(adapter.getTradeHistory("BTCUSDT", 1)).rejects.toThrow("valid side");
   });
 });
 
@@ -278,6 +386,70 @@ describe("CcxtAdapter — trading (mocked)", () => {
     expect(order.orderId).toBe("order-789");
   });
 
+  it("refuses an order response whose side is absent instead of inventing a buy", async () => {
+    const adapter = CcxtAdapter.__forTesting(
+      "binance",
+      makeMockClient({
+        fetchOrder: async () => ({
+          id: "order-no-side",
+          symbol: "BTC/USDT",
+          type: "limit",
+          status: "open",
+          price: 48_000,
+          amount: 0.05,
+          filled: 0,
+          cost: 0,
+        }),
+      }),
+    );
+
+    await expect(adapter.getOrderStatus("BTCUSDT", "order-no-side")).rejects.toThrow(
+      "unsupported side",
+    );
+  });
+
+  it("refuses unknown order status and inconsistent filled quantity", async () => {
+    const unknownStatus = CcxtAdapter.__forTesting(
+      "binance",
+      makeMockClient({
+        fetchOrder: async () => ({
+          id: "order-unknown-status",
+          symbol: "BTC/USDT",
+          side: "buy",
+          type: "limit",
+          status: "venue_magic",
+          price: 48_000,
+          amount: 0.05,
+          filled: 0,
+          cost: 0,
+        }),
+      }),
+    );
+    await expect(unknownStatus.getOrderStatus("BTCUSDT", "order-unknown-status")).rejects.toThrow(
+      "unsupported status",
+    );
+
+    const overfilled = CcxtAdapter.__forTesting(
+      "binance",
+      makeMockClient({
+        fetchOrder: async () => ({
+          id: "order-overfilled",
+          symbol: "BTC/USDT",
+          side: "buy",
+          type: "limit",
+          status: "closed",
+          price: 48_000,
+          amount: 0.05,
+          filled: 0.06,
+          cost: 2_880,
+        }),
+      }),
+    );
+    await expect(overfilled.getOrderStatus("BTCUSDT", "order-overfilled")).rejects.toThrow(
+      "inconsistent quantities",
+    );
+  });
+
   it("cancelOrder calls through without throwing", async () => {
     let calledWith: { orderId?: string; symbol?: string } = {};
     const mock = makeMockClient({
@@ -297,8 +469,28 @@ describe("CcxtAdapter — trading (mocked)", () => {
     const mock = makeMockClient({
       has: { cancelAllOrders: false },
       fetchOpenOrders: async () => [
-        { id: "1", symbol: "BTC/USDT", side: "buy", status: "open", price: 50000, amount: 0.1, filled: 0, cost: 0 },
-        { id: "2", symbol: "BTC/USDT", side: "sell", status: "open", price: 60000, amount: 0.1, filled: 0, cost: 0 },
+        {
+          id: "1",
+          symbol: "BTC/USDT",
+          side: "buy",
+          type: "limit",
+          status: "open",
+          price: 50000,
+          amount: 0.1,
+          filled: 0,
+          cost: 0,
+        },
+        {
+          id: "2",
+          symbol: "BTC/USDT",
+          side: "sell",
+          type: "limit",
+          status: "open",
+          price: 60000,
+          amount: 0.1,
+          filled: 0,
+          cost: 0,
+        },
       ],
       cancelOrder: async () => {
         cancelCalls++;
@@ -311,16 +503,57 @@ describe("CcxtAdapter — trading (mocked)", () => {
     expect(cancelled.length).toBe(2);
   });
 
-  it("testOrder always returns true (CCXT has no unified test-order)", async () => {
-    const adapter = CcxtAdapter.__forTesting("binance", makeMockClient());
-    const ok = await adapter.testOrder({
-      symbol: "BTCUSDT",
-      side: "BUY",
-      type: "LIMIT",
-      quantity: 0.1,
-      price: 50000,
+  it("attempts every cancellation and then reports a partial failure", async () => {
+    const attempted: string[] = [];
+    const mock = makeMockClient({
+      has: { cancelAllOrders: false },
+      fetchOpenOrders: async () => [
+        {
+          id: "fails",
+          symbol: "BTC/USDT",
+          side: "buy",
+          type: "limit",
+          status: "open",
+          price: 50_000,
+          amount: 0.1,
+          filled: 0,
+          cost: 0,
+        },
+        {
+          id: "succeeds",
+          symbol: "BTC/USDT",
+          side: "sell",
+          type: "limit",
+          status: "open",
+          price: 60_000,
+          amount: 0.1,
+          filled: 0,
+          cost: 0,
+        },
+      ],
+      cancelOrder: async (id: string) => {
+        attempted.push(id);
+        if (id === "fails") throw new Error("venue refused cancellation");
+        return {};
+      },
     });
-    expect(ok).toBe(true);
+    const adapter = CcxtAdapter.__forTesting("binance", mock);
+
+    await expect(adapter.cancelAllOrders("BTCUSDT")).rejects.toThrow("1/2 cancellations cleanly");
+    expect(attempted).toEqual(["fails", "succeeds"]);
+  });
+
+  it("testOrder refuses to invent venue acceptance when CCXT has no unified endpoint", async () => {
+    const adapter = CcxtAdapter.__forTesting("binance", makeMockClient());
+    await expect(
+      adapter.testOrder({
+        symbol: "BTCUSDT",
+        side: "BUY",
+        type: "LIMIT",
+        quantity: 0.1,
+        price: 50000,
+      }),
+    ).rejects.toThrow("does not expose a non-dispatching order-validation endpoint");
   });
 });
 
@@ -337,7 +570,11 @@ describe("CcxtAdapter — circuit breaker", () => {
     const adapter = CcxtAdapter.__forTesting("binance", failingMock);
     expect(adapter.getCircuitBreakerState()).toBe("closed");
     for (let i = 0; i < 3; i++) {
-      try { await adapter.getPrice("BTCUSDT"); } catch { /* expected */ }
+      try {
+        await adapter.getPrice("BTCUSDT");
+      } catch {
+        /* expected */
+      }
     }
     expect(adapter.getCircuitBreakerState()).toBe("open");
   });
@@ -345,11 +582,17 @@ describe("CcxtAdapter — circuit breaker", () => {
   it("resetCircuitBreaker restores closed state", async () => {
     const failingMock = {
       ...(makeMockClient() as Record<string, unknown>),
-      fetchTicker: async () => { throw new Error("boom"); },
+      fetchTicker: async () => {
+        throw new Error("boom");
+      },
     };
     const adapter = CcxtAdapter.__forTesting("binance", failingMock);
     for (let i = 0; i < 3; i++) {
-      try { await adapter.getPrice("BTCUSDT"); } catch { /* */ }
+      try {
+        await adapter.getPrice("BTCUSDT");
+      } catch {
+        /* */
+      }
     }
     expect(adapter.getCircuitBreakerState()).toBe("open");
     adapter.resetCircuitBreaker();
@@ -369,11 +612,17 @@ describe("CcxtAdapter — rate limit status", () => {
   it("shouldThrottle returns true when circuit is open", async () => {
     const failingMock = {
       ...(makeMockClient() as Record<string, unknown>),
-      fetchTicker: async () => { throw new Error("boom"); },
+      fetchTicker: async () => {
+        throw new Error("boom");
+      },
     };
     const adapter = CcxtAdapter.__forTesting("binance", failingMock);
     for (let i = 0; i < 3; i++) {
-      try { await adapter.getPrice("BTCUSDT"); } catch { /* */ }
+      try {
+        await adapter.getPrice("BTCUSDT");
+      } catch {
+        /* */
+      }
     }
     expect(adapter.shouldThrottle()).toBe(true);
   });
@@ -622,7 +871,16 @@ describe("CcxtAdapter — derivatives (ExchangeDerivatives)", () => {
       createOrder: async (symbol: string, type: string, side: string, amount: number) => {
         placedSide = side;
         placedAmount = amount;
-        return { id: "close-1", symbol, type, side, amount, status: "closed", filled: amount, cost: 0 };
+        return {
+          id: "close-1",
+          symbol,
+          type,
+          side,
+          amount,
+          status: "closed",
+          filled: amount,
+          cost: 0,
+        };
       },
     });
     const adapter = CcxtAdapter.__forTesting("bybit", mock);
@@ -722,7 +980,16 @@ describe("CcxtAdapter — order management", () => {
       priceToPrecision: (_s: string, p: number) => String(p),
       createOrder: async (symbol: string, type: string, side: string, amount: number) => {
         createCalls++;
-        return { id: `seq-${createCalls}`, symbol, type, side, amount, status: "open", filled: 0, cost: 0 };
+        return {
+          id: `seq-${createCalls}`,
+          symbol,
+          type,
+          side,
+          amount,
+          status: "open",
+          filled: 0,
+          cost: 0,
+        };
       },
     });
     const adapter = CcxtAdapter.__forTesting("bybit", mock);
@@ -867,7 +1134,13 @@ describe("CcxtAdapter — setLeverage clamp (P1-5b)", () => {
 describe("CcxtAdapter — malformed order responses throw (P1-9)", () => {
   it("throws when the order id is missing", async () => {
     const mock = makeMockClient({
-      createOrder: async (symbol: string, type: string, side: string, amount: number, price?: number) => ({
+      createOrder: async (
+        symbol: string,
+        type: string,
+        side: string,
+        amount: number,
+        price?: number,
+      ) => ({
         // no id
         symbol,
         type,
@@ -887,7 +1160,13 @@ describe("CcxtAdapter — malformed order responses throw (P1-9)", () => {
 
   it("throws when status is missing", async () => {
     const mock = makeMockClient({
-      createOrder: async (symbol: string, type: string, side: string, amount: number, price?: number) => ({
+      createOrder: async (
+        symbol: string,
+        type: string,
+        side: string,
+        amount: number,
+        price?: number,
+      ) => ({
         id: "order-123",
         symbol,
         type,
@@ -907,7 +1186,13 @@ describe("CcxtAdapter — malformed order responses throw (P1-9)", () => {
 
   it("throws when filled coerces to NaN", async () => {
     const mock = makeMockClient({
-      createOrder: async (symbol: string, type: string, side: string, amount: number, price?: number) => ({
+      createOrder: async (
+        symbol: string,
+        type: string,
+        side: string,
+        amount: number,
+        price?: number,
+      ) => ({
         id: "order-123",
         symbol,
         type,
@@ -960,9 +1245,7 @@ describe("CcxtAdapter — malformed order responses throw (P1-9)", () => {
 
   it("getCandles throws on a malformed OHLC value", async () => {
     const mock = makeMockClient({
-      fetchOHLCV: async () => [
-        [Date.now(), 100, "bad-high", 90, 105, 1000],
-      ],
+      fetchOHLCV: async () => [[Date.now(), 100, "bad-high", 90, 105, 1000]],
     });
     const adapter = CcxtAdapter.__forTesting("binance", mock);
     await expect(adapter.getCandles("BTCUSDT", "1m", 1)).rejects.toThrow(/malformed OHLC/i);

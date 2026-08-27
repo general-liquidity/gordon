@@ -27,7 +27,10 @@ describe("computeNakedPoc", () => {
   });
 
   it("is neutral on insufficient data", () => {
-    const r = computeNakedPoc({ candles: Array.from({ length: 6 }, () => bar(100)), periodBars: 5 });
+    const r = computeNakedPoc({
+      candles: Array.from({ length: 6 }, () => bar(100)),
+      periodBars: 5,
+    });
     expect(r.nakedPocs).toEqual([]);
     expect(r.interpretation).toContain("insufficient");
   });

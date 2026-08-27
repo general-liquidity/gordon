@@ -49,10 +49,7 @@ export interface KalmanTrendInput {
   velocityThreshold?: number;
 }
 
-export type KalmanTrendSignal =
-  | "bullish_reversal"
-  | "bearish_reversal"
-  | "none";
+export type KalmanTrendSignal = "bullish_reversal" | "bearish_reversal" | "none";
 
 export interface KalmanTrendResult {
   /** Filtered level series (aligned to prices). */
@@ -180,14 +177,9 @@ export function computeKalmanTrend(input: KalmanTrendInput): KalmanTrendResult {
 
   const currentLevel = levels[n - 1]!;
   const currentVelocity = velocities[n - 1]!;
-  const threshold =
-    input.velocityThreshold ?? Math.abs(currentLevel) * 1e-4;
+  const threshold = input.velocityThreshold ?? Math.abs(currentLevel) * 1e-4;
   const trend: "bullish" | "bearish" | "neutral" =
-    currentVelocity > threshold
-      ? "bullish"
-      : currentVelocity < -threshold
-        ? "bearish"
-        : "neutral";
+    currentVelocity > threshold ? "bullish" : currentVelocity < -threshold ? "bearish" : "neutral";
 
   // The latest-bar reversal signal fires only if the last bar is the crossing.
   const signal: KalmanTrendSignal =
@@ -228,8 +220,7 @@ function buildInterpretation(
   lastCrossingIndex: number | null,
   lastCrossingDirection: "up" | "down" | null,
 ): string {
-  let msg =
-    `Kalman trend level ${level.toFixed(2)}, velocity ${velocity.toFixed(4)}/bar (${trend}).`;
+  let msg = `Kalman trend level ${level.toFixed(2)}, velocity ${velocity.toFixed(4)}/bar (${trend}).`;
 
   if (signal === "bullish_reversal") {
     msg += " Velocity just crossed up through zero: bullish reversal signal.";

@@ -8,12 +8,7 @@
 
 import type { Exchange } from "../../../infra/exchange/types.ts";
 import { createModuleLogger } from "../../../infra/logger/index.ts";
-import type {
-  IcebergConfig,
-  ExecutionSession,
-  ExecutionSlice,
-  OrderSubmitter,
-} from "./types.ts";
+import type { IcebergConfig, ExecutionSession, ExecutionSlice, OrderSubmitter } from "./types.ts";
 
 const logger = createModuleLogger("iceberg-executor");
 
@@ -110,10 +105,7 @@ export class IcebergExecutor {
     // Calculate visible portion with randomization
     const baseVisible = this.session.totalQuantity * this.config.showRatio;
     const jitter = baseVisible * (this.config.randomizePercent / 100);
-    const visibleQty = Math.min(
-      remaining,
-      baseVisible + (Math.random() * 2 - 1) * jitter,
-    );
+    const visibleQty = Math.min(remaining, baseVisible + (Math.random() * 2 - 1) * jitter);
 
     const slice: ExecutionSlice = {
       sliceIndex: this.sliceCounter++,
@@ -141,9 +133,7 @@ export class IcebergExecutor {
         slice.status = "filled";
         slice.filledQuantity = result.executedQty ?? visibleQty;
         slice.avgFillPrice =
-          result.executedQty > 0
-            ? result.cummulativeQuoteQty / result.executedQty
-            : result.price;
+          result.executedQty > 0 ? result.cummulativeQuoteQty / result.executedQty : result.price;
         slice.placedAt = new Date().toISOString();
         slice.filledAt = new Date().toISOString();
 
@@ -168,8 +158,8 @@ export class IcebergExecutor {
         const spread = await this.exchange.getSpread(symbol);
         const offsetMultiplier = side === "BUY" ? -1 : 1;
         const limitPrice =
-          (spread.bidPrice + spread.askPrice) / 2 *
-          (1 + offsetMultiplier * (this.config.limitOffsetBps ?? 5) / 10000);
+          ((spread.bidPrice + spread.askPrice) / 2) *
+          (1 + (offsetMultiplier * (this.config.limitOffsetBps ?? 5)) / 10000);
 
         const result = await this.submitOrder({
           symbol,
@@ -206,18 +196,13 @@ export class IcebergExecutor {
     if (this.session.status !== "running" || !slice.orderId) return;
 
     try {
-      const status = await this.exchange.getOrderStatus(
-        this.session.intent.symbol,
-        slice.orderId,
-      );
+      const status = await this.exchange.getOrderStatus(this.session.intent.symbol, slice.orderId);
 
       if (status.status === "FILLED") {
         slice.status = "filled";
         slice.filledQuantity = status.executedQty ?? slice.quantity;
         slice.avgFillPrice =
-          status.executedQty > 0
-            ? status.cummulativeQuoteQty / status.executedQty
-            : status.price;
+          status.executedQty > 0 ? status.cummulativeQuoteQty / status.executedQty : status.price;
         slice.filledAt = new Date().toISOString();
 
         this.updateSessionAverages(slice);

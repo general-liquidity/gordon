@@ -11,11 +11,7 @@ export class GordonError extends Error {
   public readonly timestamp: string;
   public readonly context?: Record<string, unknown>;
 
-  constructor(
-    message: string,
-    code: string,
-    context?: Record<string, unknown>
-  ) {
+  constructor(message: string, code: string, context?: Record<string, unknown>) {
     super(message);
     this.name = "GordonError";
     this.code = code;
@@ -64,11 +60,7 @@ export class ConfigurationError extends GordonError {
 export class ValidationError extends GordonError {
   public readonly field?: string;
 
-  constructor(
-    message: string,
-    field?: string,
-    context?: Record<string, unknown>
-  ) {
+  constructor(message: string, field?: string, context?: Record<string, unknown>) {
     super(message, "VALIDATION_ERROR", { ...context, field });
     this.name = "ValidationError";
     this.field = field;
@@ -83,11 +75,7 @@ export class NotFoundError extends GordonError {
   public readonly resourceId: string;
 
   constructor(resourceType: string, resourceId: string) {
-    super(
-      `${resourceType} not found: ${resourceId}`,
-      "NOT_FOUND",
-      { resourceType, resourceId }
-    );
+    super(`${resourceType} not found: ${resourceId}`, "NOT_FOUND", { resourceType, resourceId });
     this.name = "NotFoundError";
     this.resourceType = resourceType;
     this.resourceId = resourceId;
@@ -115,7 +103,7 @@ export class InvalidStateError extends GordonError {
     message: string,
     currentState: string,
     requiredState?: string,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, "INVALID_STATE", { ...context, currentState, requiredState });
     this.name = "InvalidStateError";
@@ -134,7 +122,10 @@ export function isGordonError(error: unknown): error is GordonError {
 /**
  * Wrap unknown errors in a GordonError
  */
-export function wrapError(error: unknown, defaultMessage: string = "An unexpected error occurred"): GordonError {
+export function wrapError(
+  error: unknown,
+  defaultMessage: string = "An unexpected error occurred",
+): GordonError {
   if (isGordonError(error)) {
     return error;
   }

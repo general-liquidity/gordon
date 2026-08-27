@@ -9,8 +9,8 @@
  * Phase 18 of the TUI rebuild plan.
  */
 
-import React, { useState, useMemo } from "react";
-import { Box, Text } from "../../ink-custom";
+import { useEffect, useMemo, useState } from "react";
+import { Box, Text, useInput } from "../../ink-custom";
 import { useMemory, type MemoryType, type MemoryEntry } from "../../state/MemoryProvider.js";
 
 // ============================================================================
@@ -49,7 +49,7 @@ function formatDate(iso: string): string {
 
 function truncate(s: string, maxLen: number): string {
   if (s.length <= maxLen) return s;
-  return s.slice(0, maxLen - 1) + "\u2026";
+  return `${s.slice(0, maxLen - 1)}\u2026`;
 }
 
 // ============================================================================
@@ -66,6 +66,7 @@ interface Props {
 export function MemorySelector({ selected, onSelect }: Props) {
   const { memories, loading, error } = useMemory();
   const [viewingEntry, setViewingEntry] = useState<MemoryEntry | null>(null);
+  const [cursor, setCursor] = useState(0);
 
   // Group memories by type
   const grouped = useMemo(() => {
@@ -79,6 +80,34 @@ export function MemorySelector({ selected, onSelect }: Props) {
     }
     return map;
   }, [memories]);
+
+  const orderedEntries = useMemo(
+    () => GROUPS.flatMap((group) => grouped.get(group.type) ?? []),
+    [grouped],
+  );
+
+  useEffect(() => {
+    if (!selected) return;
+    const selectedIndex = orderedEntries.findIndex((entry) => entry.name === selected);
+    if (selectedIndex >= 0) setCursor(selectedIndex);
+  }, [orderedEntries, selected]);
+
+  useInput((input, key) => {
+    if (loading || error || orderedEntries.length === 0) return;
+    if (viewingEntry) {
+      if (key.escape || input === "q") setViewingEntry(null);
+      return;
+    }
+    if (key.upArrow) setCursor((current) => Math.max(0, current - 1));
+    if (key.downArrow) setCursor((current) => Math.min(orderedEntries.length - 1, current + 1));
+    if (key.return) {
+      const entry = orderedEntries[cursor];
+      if (entry) {
+        setViewingEntry(entry);
+        onSelect?.(entry);
+      }
+    }
+  });
 
   // ── Loading state ──
   if (loading) {
@@ -112,12 +141,19 @@ export function MemorySelector({ selected, onSelect }: Props) {
     return (
       <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
         <Box marginBottom={1}>
-          <Text bold color="cyan">{viewingEntry.name}</Text>
-          <Text dimColor>  [{viewingEntry.type}]  {formatDate(viewingEntry.lastModified)}</Text>
+          <Text bold color="cyan">
+            {viewingEntry.name}
+          </Text>
+          <Text dimColor>
+            {" "}
+            [{viewingEntry.type}] {formatDate(viewingEntry.lastModified)}
+          </Text>
         </Box>
         {viewingEntry.description ? (
           <Box marginBottom={1}>
-            <Text dimColor italic>{viewingEntry.description}</Text>
+            <Text dimColor italic>
+              {viewingEntry.description}
+            </Text>
           </Box>
         ) : null}
         <Box flexDirection="column">
@@ -137,7 +173,7 @@ export function MemorySelector({ selected, onSelect }: Props) {
     <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
       <Box marginBottom={1}>
         <Text bold>Memory Files</Text>
-        <Text dimColor>  ({memories.length} total)</Text>
+        <Text dimColor> ({memories.length} total)</Text>
       </Box>
 
       {GROUPS.map((group) => {
@@ -151,12 +187,12 @@ export function MemorySelector({ selected, onSelect }: Props) {
               <Text bold color={group.color}>
                 {group.label}
               </Text>
-              <Text dimColor>  ({entries.length})</Text>
+              <Text dimColor> ({entries.length})</Text>
             </Box>
 
             {/* Entries */}
             {entries.map((entry) => {
-              const isSelected = selected === entry.name;
+              const isSelected = orderedEntries[cursor]?.name === entry.name;
               return (
                 <Box key={entry.name} paddingLeft={2}>
                   <Text color={isSelected ? "cyan" : undefined} bold={isSelected}>
@@ -175,6 +211,7 @@ export function MemorySelector({ selected, onSelect }: Props) {
           </Box>
         );
       })}
+      <Text dimColor>↑↓ navigate · Enter open</Text>
     </Box>
   );
 }

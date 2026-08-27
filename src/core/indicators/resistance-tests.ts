@@ -136,13 +136,10 @@ export function calculateResistanceTests(
   }
 
   const testCount = rejections.length;
-  const lastTestBarsAgo = testCount > 0
-    ? lastIdx - rejections[rejections.length - 1]!.barIdx
-    : null;
+  const lastTestBarsAgo =
+    testCount > 0 ? lastIdx - rejections[rejections.length - 1]!.barIdx : null;
   const avgRejectionPct =
-    testCount > 0
-      ? rejections.reduce((a, b) => a + b.rejectionPct, 0) / testCount
-      : 0;
+    testCount > 0 ? rejections.reduce((a, b) => a + b.rejectionPct, 0) / testCount : 0;
   const confidence = confidenceFromCount(testCount);
 
   const interpretation =

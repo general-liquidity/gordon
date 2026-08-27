@@ -36,9 +36,12 @@ const EDGAR_ATOM_AAPL = `<?xml version="1.0"?>
 
 const originalFetch = globalThis.fetch;
 
-function mockFetchByUrl(handlers: Array<{ match: (url: string) => boolean; body: string; status?: number }>) {
+function mockFetchByUrl(
+  handlers: Array<{ match: (url: string) => boolean; body: string; status?: number }>,
+) {
   globalThis.fetch = (async (input: RequestInfo | URL) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    const url =
+      typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     for (const h of handlers) {
       if (h.match(url)) {
         return new Response(h.body, { status: h.status ?? 200 });
@@ -142,9 +145,7 @@ describe("fetchStockHeadlines", () => {
   });
 
   it("normalises ticker case (lowercase input still matches uppercase map)", async () => {
-    mockFetchByUrl([
-      { match: (u) => u.includes("AAPL"), body: YAHOO_RSS_AAPL },
-    ]);
+    mockFetchByUrl([{ match: (u) => u.includes("AAPL"), body: YAHOO_RSS_AAPL }]);
     const out = await fetchStockHeadlines({
       tickers: ["aapl"],
       sources: ["yahoo"],

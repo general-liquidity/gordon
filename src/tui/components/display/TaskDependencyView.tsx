@@ -8,7 +8,7 @@
  * Pattern: Claude Code task/plugin browser (navigable list with actions).
  */
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 import { OrderedList } from "../../design-system/OrderedList.js";
@@ -30,11 +30,11 @@ interface Props {
 // ============================================================================
 
 const STATUS_ICON: Record<TaskNode["status"], string> = {
-  completed: "\u2713",   // checkmark
+  completed: "\u2713", // checkmark
   in_progress: "\u25CF", // filled circle
-  pending: "\u25CB",     // empty circle
-  failed: "\u2717",      // cross
-  blocked: "\u2298",     // circled division
+  pending: "\u25CB", // empty circle
+  failed: "\u2717", // cross
+  blocked: "\u2298", // circled division
 };
 
 const STATUS_COLOR: Record<TaskNode["status"], string> = {
@@ -115,9 +115,7 @@ export function TaskDependencyView({ tasks, onStart, onCancel, onClose }: Props)
     return (
       <Pane title="TASK PIPELINE">
         <Text dimColor>No tasks in pipeline.</Text>
-        {onClose && (
-          <Text dimColor>Esc close</Text>
-        )}
+        {onClose && <Text dimColor>Esc close</Text>}
       </Pane>
     );
   }
@@ -155,12 +153,8 @@ export function TaskDependencyView({ tasks, onStart, onCancel, onClose }: Props)
                 <Text bold={isFocused} color={isFocused ? color : undefined}>
                   {task.title}
                 </Text>
-                {blockedLabel && (
-                  <Text dimColor> ({blockedLabel})</Text>
-                )}
-                {task.error && (
-                  <Text color="red"> [{task.error}]</Text>
-                )}
+                {blockedLabel && <Text dimColor> ({blockedLabel})</Text>}
+                {task.error && <Text color="red"> [{task.error}]</Text>}
               </Box>
             </OrderedList.Item>
           );
@@ -185,9 +179,7 @@ export function TaskDependencyView({ tasks, onStart, onCancel, onClose }: Props)
                 {tasks[cursor].dependencies
                   .map((depId) => {
                     const dep = tasks.find((t) => t.id === depId);
-                    return dep
-                      ? `#${taskIndex(depId, tasks)} ${dep.title}`
-                      : depId;
+                    return dep ? `#${taskIndex(depId, tasks)} ${dep.title}` : depId;
                   })
                   .join(", ")}
               </Text>
@@ -200,9 +192,7 @@ export function TaskDependencyView({ tasks, onStart, onCancel, onClose }: Props)
                 {tasks[cursor].dependents
                   .map((depId) => {
                     const dep = tasks.find((t) => t.id === depId);
-                    return dep
-                      ? `#${taskIndex(depId, tasks)} ${dep.title}`
-                      : depId;
+                    return dep ? `#${taskIndex(depId, tasks)} ${dep.title}` : depId;
                   })
                   .join(", ")}
               </Text>

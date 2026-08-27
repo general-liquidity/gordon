@@ -64,15 +64,10 @@ export function createPoolMigrator(context: MigrationContext): PoolMigrator {
     typeof context.createStylePool !== "function" ||
     typeof context.createHyperlinkPool !== "function"
   ) {
-    throw new Error(
-      "createPoolMigrator: context must provide all three pool factory functions",
-    );
+    throw new Error("createPoolMigrator: context must provide all three pool factory functions");
   }
 
-  function captureSnapshot(
-    frontFrame: CellBuffer,
-    hyperlinkPool: HyperlinkPool,
-  ): PoolSnapshot {
+  function captureSnapshot(frontFrame: CellBuffer, hyperlinkPool: HyperlinkPool): PoolSnapshot {
     const liveChars = new Set<number>();
     const liveStyles = new Set<number>();
 
@@ -147,9 +142,7 @@ export function createPoolMigrator(context: MigrationContext): PoolMigrator {
       styles.set(oldId, newId);
     }
 
-    const sortedHyperlinkIds = Array.from(snapshot.liveHyperlinks).sort(
-      (a, b) => a - b,
-    );
+    const sortedHyperlinkIds = Array.from(snapshot.liveHyperlinks).sort((a, b) => a - b);
     for (const oldId of sortedHyperlinkIds) {
       const url = hyperlinkPool.get(oldId);
       if (url === undefined) continue;
@@ -174,9 +167,7 @@ export function createPoolMigrator(context: MigrationContext): PoolMigrator {
     // back to ID 0 so the output is renderable (blank glyph / empty style).
     // In dev we warn so integration bugs surface fast.
     const isDev =
-      (typeof process !== "undefined" &&
-        process.env?.NODE_ENV !== "production") ||
-      false;
+      (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") || false;
 
     for (let i = 0; i < len; i++) {
       const cell = raw[i] ?? 0;

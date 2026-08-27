@@ -152,10 +152,7 @@ function resolveOptions(opts: AuditOptions): Required<AuditOptions> {
 
 // --- Per-theme auditors -----------------------------------------------------
 
-function auditScriptHealth(
-  scripts: readonly ScriptHealth[],
-  o: Required<AuditOptions>,
-): Finding[] {
+function auditScriptHealth(scripts: readonly ScriptHealth[], o: Required<AuditOptions>): Finding[] {
   const findings: Finding[] = [];
   const now = o.now();
   for (const s of scripts) {
@@ -195,10 +192,7 @@ function auditScriptHealth(
   return findings;
 }
 
-function auditDiscoveryCoverage(
-  cov: DiscoveryCoverage,
-  o: Required<AuditOptions>,
-): Finding[] {
+function auditDiscoveryCoverage(cov: DiscoveryCoverage, o: Required<AuditOptions>): Finding[] {
   const findings: Finding[] = [];
   if (cov.universeSize <= 0) return findings;
   const ratio = cov.scannedCount / cov.universeSize;
@@ -223,10 +217,7 @@ function auditDiscoveryCoverage(
   return findings;
 }
 
-function auditUnusedAssets(
-  assets: readonly AssetUsage[],
-  o: Required<AuditOptions>,
-): Finding[] {
+function auditUnusedAssets(assets: readonly AssetUsage[], o: Required<AuditOptions>): Finding[] {
   const findings: Finding[] = [];
   const now = o.now();
   for (const a of assets) {
@@ -288,10 +279,7 @@ function auditGuardrails(guardrails: readonly GuardrailStatus[]): Finding[] {
   return findings;
 }
 
-function auditDataApiTokens(
-  tokens: readonly DataApiToken[],
-  o: Required<AuditOptions>,
-): Finding[] {
+function auditDataApiTokens(tokens: readonly DataApiToken[], o: Required<AuditOptions>): Finding[] {
   const findings: Finding[] = [];
   const now = o.now();
   for (const t of tokens) {

@@ -45,9 +45,7 @@ describe("targetChalkLevel", () => {
   });
 
   it("tmux-inside-VS-Code boosts then re-clamps to 2 (passthrough limit wins)", () => {
-    expect(
-      targetChalkLevel(2, { TERM_PROGRAM: "vscode", TMUX: "/tmp/tmux" }),
-    ).toBe(2);
+    expect(targetChalkLevel(2, { TERM_PROGRAM: "vscode", TMUX: "/tmp/tmux" })).toBe(2);
   });
 
   it("leaves a plain truecolor terminal at level 3", () => {

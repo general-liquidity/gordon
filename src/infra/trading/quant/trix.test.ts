@@ -29,8 +29,8 @@ describe("computeTrix", () => {
   it("identifies a crossover after a trend flip", () => {
     // Use multiplicative growth/decay so TRIX (a rate-of-change indicator)
     // stays well-behaved across the flip rather than asymptoting.
-    const down = Array.from({ length: 60 }, (_, i) => 200 * Math.pow(0.98, i));
-    const up = Array.from({ length: 60 }, (_, i) => down[59]! * Math.pow(1.02, i + 1));
+    const down = Array.from({ length: 60 }, (_, i) => 200 * 0.98 ** i);
+    const up = Array.from({ length: 60 }, (_, i) => down[59]! * 1.02 ** (i + 1));
     const r = computeTrix({ prices: [...down, ...up] });
     expect(["bullish", "bearish"]).toContain(r.lastCross);
   });

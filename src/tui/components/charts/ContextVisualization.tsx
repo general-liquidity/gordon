@@ -13,7 +13,7 @@
  * Phase 17 of the TUI rebuild.
  */
 
-import React from "react";
+import type React from "react";
 import { Box, Text } from "../../ink-custom";
 
 // ============================================================================
@@ -77,16 +77,12 @@ export function ContextVisualization({ context }: Props) {
   } = context;
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
-      paddingX={1}
-      paddingY={0}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1} paddingY={0}>
       {/* Header */}
       <Box>
-        <Text bold color="cyan">CONTEXT</Text>
+        <Text bold color="cyan">
+          CONTEXT
+        </Text>
       </Box>
 
       {/* Active positions */}

@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "bun:test";
-import { mkdtempSync, rmSync, readFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -96,9 +96,18 @@ describe("supervisionRust", () => {
 
   describe("recordSupervisionResult + readSupervisionScore", () => {
     it("appends records and aggregates score", () => {
-      recordSupervisionResult(newSupervisionRecord("wrong_direction", "wrong_direction", "p1", true), tmpPath);
-      recordSupervisionResult(newSupervisionRecord("excessive_size", "excessive_size", "p2", false), tmpPath);
-      recordSupervisionResult(newSupervisionRecord("missing_stop", "missing_stop", "p3", false), tmpPath);
+      recordSupervisionResult(
+        newSupervisionRecord("wrong_direction", "wrong_direction", "p1", true),
+        tmpPath,
+      );
+      recordSupervisionResult(
+        newSupervisionRecord("excessive_size", "excessive_size", "p2", false),
+        tmpPath,
+      );
+      recordSupervisionResult(
+        newSupervisionRecord("missing_stop", "missing_stop", "p3", false),
+        tmpPath,
+      );
 
       const score = readSupervisionScore(tmpPath);
       expect(score.total).toBe(3);
@@ -115,7 +124,10 @@ describe("supervisionRust", () => {
     });
 
     it("skips malformed JSONL lines without throwing", () => {
-      recordSupervisionResult(newSupervisionRecord("wrong_direction", "wrong_direction", "p1", false), tmpPath);
+      recordSupervisionResult(
+        newSupervisionRecord("wrong_direction", "wrong_direction", "p1", false),
+        tmpPath,
+      );
       // Manually append garbage
       const fs = require("node:fs");
       fs.appendFileSync(tmpPath, "not-json-at-all\n");

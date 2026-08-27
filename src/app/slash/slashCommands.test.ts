@@ -66,11 +66,13 @@ describe("slash command UX formatting", () => {
   });
 
   it("orders commands alphabetically within each workflow", () => {
-    const tradeCommandNames = SLASH_COMMANDS
-      .filter((command) => command.workflow === "trade")
-      .map((command) => command.name);
+    const tradeCommandNames = SLASH_COMMANDS.filter((command) => command.workflow === "trade").map(
+      (command) => command.name,
+    );
 
-    expect(tradeCommandNames).toEqual([...tradeCommandNames].sort((left, right) => left.localeCompare(right)));
+    expect(tradeCommandNames).toEqual(
+      [...tradeCommandNames].sort((left, right) => left.localeCompare(right)),
+    );
   });
 
   it("normalizes all slash commands with workflow and audience metadata", () => {
@@ -132,7 +134,9 @@ describe("slash command UX formatting", () => {
     const threadSummary = SLASH_COMMANDS.find((command) => command.name === "thread-summary");
     const compactThread = SLASH_COMMANDS.find((command) => command.name === "compact-thread");
     const runtimeState = SLASH_COMMANDS.find((command) => command.name === "runtime-state");
-    const runtimeTranscript = SLASH_COMMANDS.find((command) => command.name === "runtime-transcript");
+    const runtimeTranscript = SLASH_COMMANDS.find(
+      (command) => command.name === "runtime-transcript",
+    );
 
     expect(rename?.aliases).toContain("name");
     expect(actionLog?.aliases).toContain("log");
@@ -232,8 +236,12 @@ describe("slash command UX formatting", () => {
 
   it("wires runtime inspection commands directly", () => {
     const runtimeState = SLASH_COMMANDS.find((command) => command.name === "runtime-state");
-    const runtimeTranscript = SLASH_COMMANDS.find((command) => command.name === "runtime-transcript");
-    const runtimeScratchpad = SLASH_COMMANDS.find((command) => command.name === "runtime-scratchpad");
+    const runtimeTranscript = SLASH_COMMANDS.find(
+      (command) => command.name === "runtime-transcript",
+    );
+    const runtimeScratchpad = SLASH_COMMANDS.find(
+      (command) => command.name === "runtime-scratchpad",
+    );
     const runtimeHandoffs = SLASH_COMMANDS.find((command) => command.name === "runtime-handoffs");
     const runtimeApprovals = SLASH_COMMANDS.find((command) => command.name === "runtime-approvals");
     const runtimeApprove = SLASH_COMMANDS.find((command) => command.name === "runtime-approve");

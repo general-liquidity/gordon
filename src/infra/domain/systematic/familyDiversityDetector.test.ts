@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  detectFamilyClustering,
-  diversityHintToPayload,
-} from "./familyDiversityDetector.ts";
+import { detectFamilyClustering, diversityHintToPayload } from "./familyDiversityDetector.ts";
 
 interface Exp {
   tags: string[];
@@ -92,11 +89,7 @@ describe("detectFamilyClustering — cluster does NOT fire", () => {
 
 describe("detectFamilyClustering — custom options", () => {
   it("custom window size", () => {
-    const experiments = [
-      exp(["mean-reversion"]),
-      exp(["momentum"]),
-      exp(["momentum"]),
-    ];
+    const experiments = [exp(["mean-reversion"]), exp(["momentum"]), exp(["momentum"])];
     const r = detectFamilyClustering(experiments, { window: 3, clusterFraction: 0.5 });
     expect(r).not.toBeNull();
     expect(r!.dominantFamily).toBe("momentum");

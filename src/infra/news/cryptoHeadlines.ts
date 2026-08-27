@@ -112,7 +112,7 @@ function extractTag(block: string, tag: string): string {
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, "\"")
+    .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'")
     .replace(/<[^>]+>/g, "") // strip any leftover inline HTML
@@ -213,7 +213,12 @@ function expandQuery(query?: string): RegExp | null {
 }
 
 export async function fetchHeadlines(options: FetchOptions = {}): Promise<NewsHeadline[]> {
-  const { sources = (Object.keys(SOURCES) as NewsSource[]), hoursBack = 24, limit = 30, signal } = options;
+  const {
+    sources = Object.keys(SOURCES) as NewsSource[],
+    hoursBack = 24,
+    limit = 30,
+    signal,
+  } = options;
   const since = Date.now() - hoursBack * 60 * 60 * 1000;
   const queryRe = expandQuery(options.query);
 

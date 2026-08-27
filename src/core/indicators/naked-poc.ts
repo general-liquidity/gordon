@@ -75,7 +75,11 @@ export function computeNakedPoc(input: NakedPocInput): NakedPocResult {
     if (filled) {
       filledCount += 1;
     } else {
-      naked.push({ poc: parseFloat(poc.toFixed(6)), createdAtBar, barsSince: n - 1 - createdAtBar });
+      naked.push({
+        poc: parseFloat(poc.toFixed(6)),
+        createdAtBar,
+        barsSince: n - 1 - createdAtBar,
+      });
     }
   }
 

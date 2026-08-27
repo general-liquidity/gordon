@@ -17,10 +17,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import {
-  computeEffectiveN,
-  effectiveNToPayload,
-} from "../../../trading/quant/effectiveN.ts";
+import { computeEffectiveN, effectiveNToPayload } from "../../../trading/quant/effectiveN.ts";
 import { recordStructuredObservation } from "../../../platform/observability/structured.ts";
 
 export const effectiveNDiagnosticTool = createTool({

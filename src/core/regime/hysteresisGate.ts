@@ -77,7 +77,12 @@ export function applyHysteresis(
       shifted: true,
       pending: false,
       pendingCount: 0,
-      state: { acceptedRegime: detected, pendingRegime: null, pendingCount: 0, pendingSinceMs: null },
+      state: {
+        acceptedRegime: detected,
+        pendingRegime: null,
+        pendingCount: 0,
+        pendingSinceMs: null,
+      },
     };
   }
 
@@ -107,7 +112,12 @@ export function applyHysteresis(
       shifted: true,
       pending: false,
       pendingCount,
-      state: { acceptedRegime: detected, pendingRegime: null, pendingCount: 0, pendingSinceMs: null },
+      state: {
+        acceptedRegime: detected,
+        pendingRegime: null,
+        pendingCount: 0,
+        pendingSinceMs: null,
+      },
     };
   }
 
@@ -157,7 +167,9 @@ export function isRegimeHysteresisEnabled(env: NodeJS.ProcessEnv = process.env):
 }
 
 /** Read hysteresis config from env: bar count and optional dwell minutes. */
-export function regimeHysteresisConfigFromEnv(env: NodeJS.ProcessEnv = process.env): HysteresisConfig {
+export function regimeHysteresisConfigFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): HysteresisConfig {
   const config: HysteresisConfig = {};
   const bars = Number(env[REGIME_HYSTERESIS_BARS_ENV]);
   if (Number.isFinite(bars) && bars >= 1) config.confirmBars = Math.trunc(bars);

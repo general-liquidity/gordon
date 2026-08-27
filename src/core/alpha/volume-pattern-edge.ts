@@ -225,10 +225,7 @@ export function classifyVolumePatternEdge(
   if (pattern === "increasing" || pattern === "decreasing") {
     patternScore = Math.min(1, Math.abs(slopePctPerBar) / (slopeThreshold * 3));
   } else if (pattern === "flat") {
-    patternScore = Math.max(
-      0,
-      1 - Math.abs(slopePctPerBar) / slopeThreshold,
-    );
+    patternScore = Math.max(0, 1 - Math.abs(slopePctPerBar) / slopeThreshold);
   } else if (pattern === "spike_with_price") {
     const volComp = Math.min(1, (terminalMult - spikeMult) / spikeMult + 0.5);
     const bodyComp = Math.min(1, terminalBody / (bodyFrac * 3));

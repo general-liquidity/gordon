@@ -67,11 +67,7 @@ export function createRunContext(query: string): RunContext {
 }
 
 /** Update the RunContext after an API response. */
-export function recordApiUsage(
-  ctx: RunContext,
-  inputTokens: number,
-  outputTokens: number,
-): void {
+export function recordApiUsage(ctx: RunContext, inputTokens: number, outputTokens: number): void {
   ctx.tokenCounter.recordApiUsage(inputTokens, outputTokens);
   ctx.lastApiInputTokens = inputTokens;
 }

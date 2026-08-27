@@ -18,7 +18,11 @@ beforeEach(() => {
 
 const cleanup = () => {
   delete process.env[FEEDBACK_PATH_ENV];
-  try { rmSync(workDir, { recursive: true, force: true }); } catch { /* ignore */ }
+  try {
+    rmSync(workDir, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
 };
 
 const execShadow = (input: Record<string, unknown>) =>

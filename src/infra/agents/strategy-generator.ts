@@ -22,17 +22,13 @@ import { fetchHistoricalData } from "../../backtest/data/historical.ts";
 import type { Exchange } from "../exchange/index.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { DSLStrategyAdapter } from "../../strategies/dsl/adapter.ts";
-import {
-  validateStrategyCode,
-} from "../trading/ops/strategyCodeValidator.ts";
-import {
-  recordAttempt,
-  dynamicDeflatedThreshold,
-} from "../trading/ops/multipleTestingTracker.ts";
+import { validateStrategyCode } from "../trading/ops/strategyCodeValidator.ts";
+import { recordAttempt, dynamicDeflatedThreshold } from "../trading/ops/multipleTestingTracker.ts";
 import { capacitySweep } from "../../backtest/analysis/marketImpact.ts";
 
 const logger = createModuleLogger("strategy-generator");
-export const BACKTEST_NOT_PERFORMED_WARNING = "Backtest not performed - exchange client unavailable";
+export const BACKTEST_NOT_PERFORMED_WARNING =
+  "Backtest not performed - exchange client unavailable";
 
 /**
  * Resolve a model tier ("flagship" / "fast") to a provider + model against
@@ -229,16 +225,8 @@ export class StrategyGeneratorAgent {
    * 5. If metrics below threshold, iterate with feedback
    * 6. Return final strategy with results
    */
-  async generateFromPrompt(
-    prompt: string,
-    options: GenerationOptions
-  ): Promise<GeneratedStrategy> {
-    const {
-      minSharpe = 0.5,
-      maxIterations = 3,
-      minWinRate = 40,
-      maxDrawdown = 30,
-    } = options;
+  async generateFromPrompt(prompt: string, options: GenerationOptions): Promise<GeneratedStrategy> {
+    const { minSharpe = 0.5, maxIterations = 3, minWinRate = 40, maxDrawdown = 30 } = options;
 
     logger.info("Starting strategy generation", { prompt: prompt.slice(0, 100) });
 
@@ -374,13 +362,9 @@ export class StrategyGeneratorAgent {
 
           logger.info("Iterating to improve strategy", { iteration: iterations, feedback });
 
-          const improved = await this.iterateStrategy(
-            strategy,
-            backtestResult,
-            feedback,
-            options,
-            { reBacktest: false }
-          );
+          const improved = await this.iterateStrategy(strategy, backtestResult, feedback, options, {
+            reBacktest: false,
+          });
           strategy = improved.strategy;
           backtestResult = improved.backtestResult;
           iterations++;
@@ -436,7 +420,11 @@ export class StrategyGeneratorAgent {
   private recordGenerationTrial(
     family: string,
     strategy: StrategyDSL,
-    outcome: { verdict: "accepted" | "rejected" | "errored"; observedSharpe: number; notes?: string },
+    outcome: {
+      verdict: "accepted" | "rejected" | "errored";
+      observedSharpe: number;
+      notes?: string;
+    },
   ): void {
     recordAttempt({
       family,
@@ -455,7 +443,7 @@ export class StrategyGeneratorAgent {
     backtestResult: BacktestResult,
     feedback: string,
     options: GenerationOptions,
-    iterateOptions: IterateStrategyOptions = {}
+    iterateOptions: IterateStrategyOptions = {},
   ): Promise<GeneratedStrategy> {
     const { reBacktest = true } = iterateOptions;
 
@@ -492,7 +480,7 @@ Please improve the strategy based on this feedback. Return ONLY valid JSON match
       const response = await this.llm.chatWithJSON<StrategyDSL>(
         messages,
         StrategyDSLSchema,
-        this.getModelConfig()
+        this.getModelConfig(),
       );
 
       // Update metadata
@@ -509,16 +497,18 @@ Please improve the strategy based on this feedback. Return ONLY valid JSON match
             nextBacktestResult = await this.runStrategyBacktest(response, options);
           } catch (error) {
             const message = error instanceof Error ? error.message : "Unknown error";
-            logger.warn("Iteration backtest failed, preserving previous backtest result", { error: message });
+            logger.warn("Iteration backtest failed, preserving previous backtest result", {
+              error: message,
+            });
             nextBacktestResult = this.withBacktestWarning(
               backtestResult,
-              `Iteration backtest failed: ${message}`
+              `Iteration backtest failed: ${message}`,
             );
           }
         } else {
           nextBacktestResult = this.withBacktestWarning(
             backtestResult,
-            BACKTEST_NOT_PERFORMED_WARNING
+            BACKTEST_NOT_PERFORMED_WARNING,
           );
         }
       }
@@ -551,7 +541,7 @@ Please improve the strategy based on this feedback. Return ONLY valid JSON match
   private async parseIntent(
     prompt: string,
     options: GenerationOptions,
-    degradations: GenerationDegradation[]
+    degradations: GenerationDegradation[],
   ): Promise<ParsedIntent> {
     const intentSchema = z.object({
       style: z.string(),
@@ -607,8 +597,8 @@ Timeframes: ${options.timeframes.join(", ")}`,
           options.riskLevel === "low"
             ? "conservative"
             : options.riskLevel === "high"
-            ? "aggressive"
-            : "moderate",
+              ? "aggressive"
+              : "moderate",
         marketConditions: ["trending markets"],
       };
     }
@@ -620,7 +610,7 @@ Timeframes: ${options.timeframes.join(", ")}`,
   private async generateDSL(
     intent: ParsedIntent,
     options: GenerationOptions,
-    degradations: GenerationDegradation[]
+    degradations: GenerationDegradation[],
   ): Promise<StrategyDSL> {
     const messages: Message[] = [
       {
@@ -657,7 +647,7 @@ Return ONLY valid JSON matching the StrategyDSL schema.
       const strategy = await this.llm.chatWithJSON<StrategyDSL>(
         messages,
         StrategyDSLSchema,
-        this.getModelConfig()
+        this.getModelConfig(),
       );
 
       // Ensure metadata is set
@@ -687,7 +677,7 @@ Return ONLY valid JSON matching the StrategyDSL schema.
   private async fixValidationErrors(
     strategy: StrategyDSL,
     errors: string[],
-    degradations: GenerationDegradation[]
+    degradations: GenerationDegradation[],
   ): Promise<StrategyDSL> {
     const messages: Message[] = [
       {
@@ -726,7 +716,7 @@ Fix these errors and return valid JSON.
       return await this.llm.chatWithJSON<StrategyDSL>(
         messages,
         StrategyDSLSchema,
-        this.getModelConfig()
+        this.getModelConfig(),
       );
     } catch (error) {
       degradations.push({
@@ -750,7 +740,7 @@ Fix these errors and return valid JSON.
    */
   private async runStrategyBacktest(
     strategy: StrategyDSL,
-    options: GenerationOptions
+    options: GenerationOptions,
   ): Promise<BacktestResult> {
     if (!this.exchange) {
       throw new Error("Exchange client not available for backtesting");
@@ -762,7 +752,7 @@ Fix these errors and return valid JSON.
       this.exchange,
       options.symbol,
       timeframe,
-      options.backtestDays
+      options.backtestDays,
     );
 
     if (ohlcData.length < 100) {
@@ -829,42 +819,42 @@ Fix these errors and return valid JSON.
    */
   private generateFeedback(
     metrics: BacktestMetrics,
-    thresholds: { minSharpe: number; minWinRate: number; maxDrawdown: number }
+    thresholds: { minSharpe: number; minWinRate: number; maxDrawdown: number },
   ): string {
     const issues: string[] = [];
 
     if (metrics.sharpeRatio < thresholds.minSharpe) {
       issues.push(
         `Sharpe ratio (${metrics.sharpeRatio.toFixed(2)}) is below target (${thresholds.minSharpe}). ` +
-          "Consider tightening entry conditions or improving risk-reward ratio."
+          "Consider tightening entry conditions or improving risk-reward ratio.",
       );
     }
 
     if (metrics.winRate < thresholds.minWinRate) {
       issues.push(
         `Win rate (${metrics.winRate.toFixed(1)}%) is below target (${thresholds.minWinRate}%). ` +
-          "Consider adding confirmation signals or adjusting entry timing."
+          "Consider adding confirmation signals or adjusting entry timing.",
       );
     }
 
     if (metrics.maxDrawdown > thresholds.maxDrawdown) {
       issues.push(
         `Max drawdown (${metrics.maxDrawdown.toFixed(1)}%) exceeds limit (${thresholds.maxDrawdown}%). ` +
-          "Consider tighter stop losses or reducing position sizes."
+          "Consider tighter stop losses or reducing position sizes.",
       );
     }
 
     if (metrics.totalTrades < 10) {
       issues.push(
         `Only ${metrics.totalTrades} trades in backtest period. ` +
-          "Consider relaxing entry conditions to generate more signals."
+          "Consider relaxing entry conditions to generate more signals.",
       );
     }
 
     if (metrics.profitFactor < 1.5) {
       issues.push(
         `Profit factor (${metrics.profitFactor.toFixed(2)}) is low. ` +
-          "Consider improving take profit levels or tightening stop loss."
+          "Consider improving take profit levels or tightening stop loss.",
       );
     }
 
@@ -874,10 +864,7 @@ Fix these errors and return valid JSON.
   /**
    * Create a fallback strategy template
    */
-  private createFallbackStrategy(
-    intent: ParsedIntent,
-    options: GenerationOptions
-  ): StrategyDSL {
+  private createFallbackStrategy(intent: ParsedIntent, options: GenerationOptions): StrategyDSL {
     // Start with an appropriate template based on style
     const template =
       intent.style.includes("momentum") || intent.style.includes("crossover")
@@ -898,7 +885,6 @@ Fix these errors and return valid JSON.
       },
     };
   }
-
 
   private withBacktestWarning(backtestResult: BacktestResult, warning: string): BacktestResult {
     if (backtestResult.warnings.includes(warning)) {
@@ -1015,7 +1001,7 @@ Return ONLY the improved strategy as valid JSON. No explanation, no markdown.`;
  */
 export function createStrategyGenerator(
   llm: LLMClient,
-  exchange?: Exchange
+  exchange?: Exchange,
 ): StrategyGeneratorAgent {
   return new StrategyGeneratorAgent(llm, exchange);
 }

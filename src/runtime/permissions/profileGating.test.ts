@@ -13,9 +13,7 @@ import type { RuntimeToolPolicyDecision } from "../tools/ToolPolicy.ts";
 import { PermissionEngine } from "./PermissionEngine.ts";
 import { RuntimeStore } from "../state/RuntimeStore.ts";
 import { createDefaultRuntimeSessionState } from "../state/SessionState.ts";
-import {
-  _resetDefaultTrustTrajectoryForTests,
-} from "./trustTrajectory.ts";
+import { _resetDefaultTrustTrajectoryForTests } from "./trustTrajectory.ts";
 import {
   buildPermissionProfileHook,
   resolveSelectedProfile,
@@ -24,7 +22,9 @@ import {
   isSafetyCritical,
 } from "./profiles.ts";
 
-function createPolicy(overrides: Partial<RuntimeToolPolicyDecision> = {}): RuntimeToolPolicyDecision {
+function createPolicy(
+  overrides: Partial<RuntimeToolPolicyDecision> = {},
+): RuntimeToolPolicyDecision {
   return {
     allowed: true,
     approvalClass: "per_action",
@@ -67,7 +67,12 @@ const context = {
 
 function newEngine(): { engine: PermissionEngine; store: RuntimeStore } {
   const store = new RuntimeStore(createDefaultRuntimeSessionState("app"));
-  store.setSession({ runtimeId: "app", sessionId: "app", resourceId: "user-1", threadId: "thread-1" });
+  store.setSession({
+    runtimeId: "app",
+    sessionId: "app",
+    resourceId: "user-1",
+    threadId: "thread-1",
+  });
   return { engine: new PermissionEngine(store), store };
 }
 
@@ -119,20 +124,24 @@ describe("default behavior is UNCHANGED when no profile is selected", () => {
     const { engine } = newEngine();
     engine.prependHook(buildPermissionProfileHook({ profileOverride: "" }));
 
-    const evaluation = await engine.evaluate("check_positions", context, createPolicy({
-      approvalClass: "none",
-      tool: {
-        ...createPolicy().tool,
-        id: "check_positions",
-        category: "monitoring",
-        riskClass: "low",
-        permissionScope: "portfolio.read",
-        sideEffectLevel: "read",
-        requiresTradePermission: false,
-        idempotent: true,
-        auditEventType: "portfolio_read",
-      },
-    }));
+    const evaluation = await engine.evaluate(
+      "check_positions",
+      context,
+      createPolicy({
+        approvalClass: "none",
+        tool: {
+          ...createPolicy().tool,
+          id: "check_positions",
+          category: "monitoring",
+          riskClass: "low",
+          permissionScope: "portfolio.read",
+          sideEffectLevel: "read",
+          requiresTradePermission: false,
+          idempotent: true,
+          auditEventType: "portfolio_read",
+        },
+      }),
+    );
     expect(evaluation.status).toBe("allowed");
     expect(evaluation.source).toBe("classifier");
   });
@@ -165,9 +174,13 @@ describe("a SELECTED profile only adds auto-allow for its non-safety tools", () 
     const plan = await engine.evaluate("create_plan", context, planPolicy("create_plan"));
     expect(plan.status).toBe("pending");
 
-    const exec = await engine.evaluate("execute_plan", context, createPolicy({
-      tool: { ...createPolicy().tool, id: "execute_plan" },
-    }));
+    const exec = await engine.evaluate(
+      "execute_plan",
+      context,
+      createPolicy({
+        tool: { ...createPolicy().tool, id: "execute_plan" },
+      }),
+    );
     expect(exec.status).toBe("pending");
   });
 
@@ -179,9 +192,13 @@ describe("a SELECTED profile only adds auto-allow for its non-safety tools", () 
     expect(plan.status).toBe("allowed");
     expect(plan.request?.actor).toBe("classifier:permission-profile");
 
-    const exec = await engine.evaluate("execute_plan", context, createPolicy({
-      tool: { ...createPolicy().tool, id: "execute_plan" },
-    }));
+    const exec = await engine.evaluate(
+      "execute_plan",
+      context,
+      createPolicy({
+        tool: { ...createPolicy().tool, id: "execute_plan" },
+      }),
+    );
     expect(exec.status).toBe("pending");
   });
 
@@ -241,10 +258,16 @@ describe("NO profile ever auto-allows a safety-critical / deny-list tool", () =>
     for (const tool of denyListed) {
       const { engine } = newEngine();
       engine.prependHook(buildPermissionProfileHook({ profileOverride: "live_trading" }));
-      const evaluation = await engine.evaluate(tool, context, createPolicy({
-        tool: { ...createPolicy().tool, id: tool },
-      }));
-      expect(evaluation.status, `${tool} must not be allowed under live_trading`).not.toBe("allowed");
+      const evaluation = await engine.evaluate(
+        tool,
+        context,
+        createPolicy({
+          tool: { ...createPolicy().tool, id: tool },
+        }),
+      );
+      expect(evaluation.status, `${tool} must not be allowed under live_trading`).not.toBe(
+        "allowed",
+      );
     }
   });
 

@@ -51,7 +51,7 @@ export interface DeltaLadderResult {
 export function calculateDeltaLadder(
   candles: Candle[],
   numLevels: number = 10,
-  lookback: number = 50
+  lookback: number = 50,
 ): DeltaLadderResult {
   if (candles.length < 10) {
     return {
@@ -115,9 +115,10 @@ export function calculateDeltaLadder(
     const sellVol = c.volume * (1 - buyRatio);
 
     // Distribute to POC level (simplified — place at close)
-    const levelIdx = range > 0
-      ? Math.min(numLevels - 1, Math.max(0, Math.floor((c.close - minPrice) / levelSize)))
-      : 0;
+    const levelIdx =
+      range > 0
+        ? Math.min(numLevels - 1, Math.max(0, Math.floor((c.close - minPrice) / levelSize)))
+        : 0;
     levels[levelIdx]!.buy += buyVol;
     levels[levelIdx]!.sell += sellVol;
     levels[levelIdx]!.total += c.volume;
@@ -175,14 +176,21 @@ export function calculateDeltaLadder(
   else if (trend === "buying_pressure" && deltaRatio > 0.2) signal = "buy";
   else if (trend === "selling_pressure" && deltaRatio > 0.2) signal = "sell";
 
-  const interpretation = buildDeltaInterpretation(currentDelta, cumDelta, deltaRatio, trend, reversal, poc);
+  const interpretation = buildDeltaInterpretation(
+    currentDelta,
+    cumDelta,
+    deltaRatio,
+    trend,
+    reversal,
+    poc,
+  );
 
   return {
     currentDelta: parseFloat(currentDelta.toFixed(2)),
     cumulativeDelta: parseFloat(cumDelta.toFixed(2)),
     deltaRatio: parseFloat(deltaRatio.toFixed(3)),
     poc: poc !== null ? parseFloat(poc.toFixed(4)) : null,
-    cumulativeDeltaValues: cumDeltas.map(v => parseFloat(v.toFixed(2))),
+    cumulativeDeltaValues: cumDeltas.map((v) => parseFloat(v.toFixed(2))),
     levels: outputLevels,
     trend,
     reversal,
@@ -192,8 +200,12 @@ export function calculateDeltaLadder(
 }
 
 function buildDeltaInterpretation(
-  barDelta: number, cumDelta: number, ratio: number,
-  trend: string, reversal: boolean, poc: number | null
+  barDelta: number,
+  cumDelta: number,
+  ratio: number,
+  trend: string,
+  reversal: boolean,
+  poc: number | null,
 ): string {
   let msg = `Delta: bar ${barDelta > 0 ? "+" : ""}${barDelta.toFixed(0)}, `;
   msg += `cumulative ${cumDelta > 0 ? "+" : ""}${cumDelta.toFixed(0)} (ratio: ${(ratio * 100).toFixed(0)}%). `;
@@ -201,15 +213,17 @@ function buildDeltaInterpretation(
   if (poc !== null) msg += `POC: ${poc.toFixed(2)}. `;
 
   if (reversal) {
-    msg += cumDelta > 0
-      ? "DELTA REVERSAL — cumulative delta flipped positive. Buying taking over."
-      : "DELTA REVERSAL — cumulative delta flipped negative. Selling taking over.";
+    msg +=
+      cumDelta > 0
+        ? "DELTA REVERSAL — cumulative delta flipped positive. Buying taking over."
+        : "DELTA REVERSAL — cumulative delta flipped negative. Selling taking over.";
   } else {
-    msg += trend === "buying_pressure"
-      ? "Net buying pressure — bulls in control."
-      : trend === "selling_pressure"
-      ? "Net selling pressure — bears in control."
-      : "Balanced order flow.";
+    msg +=
+      trend === "buying_pressure"
+        ? "Net buying pressure — bulls in control."
+        : trend === "selling_pressure"
+          ? "Net selling pressure — bears in control."
+          : "Balanced order flow.";
   }
 
   return msg;

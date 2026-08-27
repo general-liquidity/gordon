@@ -16,4 +16,3 @@ export {
   type RegimeMemoryQuery,
   type RegimeMemoryResult,
 } from "./regime-memory.ts";
-

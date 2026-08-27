@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { getRiskColor, type RiskLevel } from "../../design-system/colorMap.ts";
 import { useTheme } from "../../themes/ThemeProvider.tsx";
@@ -14,7 +13,8 @@ interface Props {
 
 export function PressEnterToContinue({ message, severity = "info", onConfirm, onCancel }: Props) {
   const theme = useTheme();
-  const riskLevel: RiskLevel = severity === "critical" ? "critical" : severity === "warning" ? "medium" : "low";
+  const riskLevel: RiskLevel =
+    severity === "critical" ? "critical" : severity === "warning" ? "medium" : "low";
   const color = severity === "info" ? theme.uiMuted : getRiskColor(riskLevel, theme);
 
   useInput((_input, key) => {

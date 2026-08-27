@@ -46,9 +46,7 @@ export class PerformanceProfiler {
   getMetrics(): PerfMetrics {
     const totalQueries = this.queryTimes.length;
     const avgQueryMs =
-      totalQueries > 0
-        ? this.queryTimes.reduce((a, b) => a + b, 0) / totalQueries
-        : 0;
+      totalQueries > 0 ? this.queryTimes.reduce((a, b) => a + b, 0) / totalQueries : 0;
 
     return {
       startupMs: this.startupDuration ?? Date.now() - this.startTime,

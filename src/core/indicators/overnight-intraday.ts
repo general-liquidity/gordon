@@ -46,12 +46,22 @@ function meanStd(xs: number[]): { mean: number; std: number } {
   return { mean: statsMean(xs), std: populationStd(xs) };
 }
 
-export function calculateOvernightIntraday(candles: ReadonlyArray<OHLCBar>, input: OvernightIntradayInput = {}): OvernightIntradayResult {
+export function calculateOvernightIntraday(
+  candles: ReadonlyArray<OHLCBar>,
+  input: OvernightIntradayInput = {},
+): OvernightIntradayResult {
   const threshold = input.suspiciousThresholdPct ?? 10;
   const empty: OvernightIntradayResult = {
-    cumulativeOvernightReturnPct: 0, cumulativeIntradayReturnPct: 0, cumulativeTotalReturnPct: 0,
-    meanOvernightReturnPct: 0, meanIntradayReturnPct: 0, overnightVolPct: 0, intradayVolPct: 0,
-    divergence: "balanced", suspiciousSignature: false, bars: 0,
+    cumulativeOvernightReturnPct: 0,
+    cumulativeIntradayReturnPct: 0,
+    cumulativeTotalReturnPct: 0,
+    meanOvernightReturnPct: 0,
+    meanIntradayReturnPct: 0,
+    overnightVolPct: 0,
+    intradayVolPct: 0,
+    divergence: "balanced",
+    suspiciousSignature: false,
+    bars: 0,
     interpretation: "insufficient data — need ≥ 2 candles with open/close",
   };
   if (candles.length < 2) return empty;
@@ -81,7 +91,11 @@ export function calculateOvernightIntraday(candles: ReadonlyArray<OHLCBar>, inpu
   const id = meanStd(intraday);
 
   const divergence: OvernightIntradayResult["divergence"] =
-    cumOnPct > 0 && cumIdPct < 0 ? "overnight_premium" : cumIdPct > 0 && cumOnPct < 0 ? "intraday_premium" : "balanced";
+    cumOnPct > 0 && cumIdPct < 0
+      ? "overnight_premium"
+      : cumIdPct > 0 && cumOnPct < 0
+        ? "intraday_premium"
+        : "balanced";
   const suspiciousSignature = cumOnPct >= threshold && cumIdPct <= -threshold;
 
   const interpretation = suspiciousSignature

@@ -13,7 +13,7 @@
  * analytics opt-in, with the ability to change later.
  */
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 
 export interface PrivacyChoices {
@@ -71,7 +71,9 @@ export function PrivacyConsent({ onComplete }: Props) {
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyan">Gordon CLI — Privacy & Data</Text>
+        <Text bold color="cyan">
+          Gordon CLI — Privacy & Data
+        </Text>
       </Box>
 
       {step === "intro" && (
@@ -96,7 +98,7 @@ export function PrivacyConsent({ onComplete }: Props) {
           <Text>Endpoint: telemetry.gordon.sh (batched every 5 min, 3-second timeout)</Text>
           <Text> </Text>
           <Text bold>Enable anonymous telemetry?</Text>
-          <Text dimColor>[Y] yes  [N/Enter] no</Text>
+          <Text dimColor>[Y] yes [N/Enter] no</Text>
         </Box>
       )}
 
@@ -112,7 +114,7 @@ export function PrivacyConsent({ onComplete }: Props) {
           <Text>research-upload. You always control what leaves your machine.</Text>
           <Text> </Text>
           <Text bold>Enable research data collection?</Text>
-          <Text dimColor>[Y] yes  [N/Enter] no</Text>
+          <Text dimColor>[Y] yes [N/Enter] no</Text>
         </Box>
       )}
 
@@ -120,14 +122,22 @@ export function PrivacyConsent({ onComplete }: Props) {
         <Box flexDirection="column">
           <Text bold>Your choices</Text>
           <Text> </Text>
-          <Text>Anonymous telemetry: <Text color={telemetry ? "green" : "gray"}>{telemetry ? "ENABLED" : "DISABLED"}</Text></Text>
-          <Text>Research data:       <Text color={research ? "green" : "gray"}>{research ? "ENABLED" : "DISABLED"}</Text></Text>
+          <Text>
+            Anonymous telemetry:{" "}
+            <Text color={telemetry ? "green" : "gray"}>{telemetry ? "ENABLED" : "DISABLED"}</Text>
+          </Text>
+          <Text>
+            Research data:{" "}
+            <Text color={research ? "green" : "gray"}>{research ? "ENABLED" : "DISABLED"}</Text>
+          </Text>
           <Text> </Text>
           <Text dimColor>You can change these later via /telemetry enable|disable|</Text>
           <Text dimColor>research-enable|research-disable.</Text>
           <Text> </Text>
           <Text dimColor>Use /telemetry export to see what's been collected.</Text>
-          <Text dimColor>Use /telemetry forget to wipe all local data and reset your install ID.</Text>
+          <Text dimColor>
+            Use /telemetry forget to wipe all local data and reset your install ID.
+          </Text>
           <Text> </Text>
           <Text dimColor>Press Enter to continue to Gordon.</Text>
         </Box>

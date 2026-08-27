@@ -30,7 +30,10 @@ const HEALTHY = { netEdgeBps: 6, regime: "ranging" };
 // 60 trades so evaluateDecay has its full recent(20)+baseline(40) windows.
 const STABLE_R = Array.from({ length: 60 }, () => 0.5);
 // Recent 20 collapsed to ~0.1R vs 0.5R baseline → ratio 0.2 < retire(0.3).
-const DECAYED_R = [...Array.from({ length: 20 }, () => 0.1), ...Array.from({ length: 40 }, () => 0.5)];
+const DECAYED_R = [
+  ...Array.from({ length: 20 }, () => 0.1),
+  ...Array.from({ length: 40 }, () => 0.5),
+];
 
 describe("assessEdge", () => {
   it("is stable when invariants hold and no rMultiples are supplied", () => {

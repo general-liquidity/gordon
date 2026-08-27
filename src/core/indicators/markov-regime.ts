@@ -127,10 +127,7 @@ function smoothRegimes(regimes: number[], smoothing: number): number[] {
 /**
  * Build transition probability matrix with Laplace smoothing
  */
-function buildTransitionMatrix(
-  states: number[],
-  laplaceSmoothingAlpha: number = 1
-): number[][] {
+function buildTransitionMatrix(states: number[], laplaceSmoothingAlpha: number = 1): number[][] {
   // 3x3 matrix: Bear(0), Neutral(1), Bull(2)
   const counts: number[][] = [
     [laplaceSmoothingAlpha, laplaceSmoothingAlpha, laplaceSmoothingAlpha],
@@ -168,7 +165,7 @@ export function calculateMarkovRegime(
   candles: Candle[],
   lookback: number = 50,
   zThreshold: number = 1 / 3,
-  regimeSmoothing: number = 3
+  regimeSmoothing: number = 3,
 ): MarkovRegimeResult {
   if (candles.length < lookback * 2 + 2) {
     return {
@@ -239,7 +236,7 @@ export function calculateMarkovRegime(
 
   // Confidence: how dominant is the highest transition probability?
   const maxProb = Math.max(probToBull, probToBear, probStaySame);
-  const confidence = parseFloat(((maxProb - 1 / 3) / (2 / 3) * 100).toFixed(1));
+  const confidence = parseFloat((((maxProb - 1 / 3) / (2 / 3)) * 100).toFixed(1));
 
   const currentZScore = zScores[zScores.length - 1]!;
 
@@ -254,7 +251,7 @@ export function calculateMarkovRegime(
     probToBear,
     probStaySame,
     currentZScore,
-    confidence
+    confidence,
   );
 
   return {
@@ -277,10 +274,7 @@ export function calculateMarkovRegime(
 // Transition-matrix stability diagnostic
 // ============================================================================
 
-function countTransitions(
-  states: number[],
-  laplaceAlpha: number = 0,
-): number[][] {
+function countTransitions(states: number[], laplaceAlpha: number = 0): number[][] {
   const counts: number[][] = [
     [laplaceAlpha, laplaceAlpha, laplaceAlpha],
     [laplaceAlpha, laplaceAlpha, laplaceAlpha],
@@ -373,8 +367,8 @@ export function assessMatrixStability(states: number[]): MatrixStability {
       const colTotal = o1 + o2;
       const e1 = (n1 * colTotal) / (n1 + n2);
       const e2 = (n2 * colTotal) / (n1 + n2);
-      if (e1 > 0) chiSquare += ((o1 - e1) ** 2) / e1;
-      if (e2 > 0) chiSquare += ((o2 - e2) ** 2) / e2;
+      if (e1 > 0) chiSquare += (o1 - e1) ** 2 / e1;
+      if (e2 > 0) chiSquare += (o2 - e2) ** 2 / e2;
     }
     df += nonZeroCols.length - 1;
   }
@@ -392,7 +386,7 @@ export function assessMatrixStability(states: number[]): MatrixStability {
 
   const pValue = chiSquarePValue(chiSquare, df);
   const verdict: MatrixStability["verdict"] =
-    pValue > 0.10 ? "stable" : pValue > 0.01 ? "drifting" : "unstable";
+    pValue > 0.1 ? "stable" : pValue > 0.01 ? "drifting" : "unstable";
 
   return {
     chiSquare: parseFloat(chiSquare.toFixed(3)),
@@ -412,7 +406,7 @@ function buildMarkovInterpretation(
   pBear: number,
   pSame: number,
   zScore: number,
-  confidence: number
+  confidence: number,
 ): string {
   let msg = `Market regime: ${regime.toUpperCase()} (Z-score: ${zScore.toFixed(2)}). `;
 

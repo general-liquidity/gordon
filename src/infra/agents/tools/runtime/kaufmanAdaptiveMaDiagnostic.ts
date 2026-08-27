@@ -19,7 +19,12 @@ export const kaufmanAdaptiveMaDiagnosticTool = createTool({
     "Returns the current KAMA value, current smoothing constant, trend direction, and last trend-change index.",
   inputSchema: z.object({
     prices: z.array(z.number()).min(11).describe("Price series, newest last."),
-    erPeriod: z.number().int().positive().default(10).describe("Efficiency-ratio lookback. Default 10."),
+    erPeriod: z
+      .number()
+      .int()
+      .positive()
+      .default(10)
+      .describe("Efficiency-ratio lookback. Default 10."),
     fastPeriod: z.number().int().positive().default(2).describe("Fast EMA period. Default 2."),
     slowPeriod: z.number().int().positive().default(30).describe("Slow EMA period. Default 30."),
     trendFilterStdevs: z
@@ -56,7 +61,9 @@ export const kaufmanAdaptiveMaDiagnosticTool = createTool({
       details: { ...(kamaToPayload(result) as Record<string, unknown>) },
     });
     return {
-      currentKama: Number.isFinite(result.currentKama) ? Number(result.currentKama.toFixed(5)) : null,
+      currentKama: Number.isFinite(result.currentKama)
+        ? Number(result.currentKama.toFixed(5))
+        : null,
       currentSc: Number.isFinite(result.currentSc) ? Number(result.currentSc.toFixed(5)) : null,
       trend: result.trend,
       trendChangeIndex: result.trendChangeIndex,

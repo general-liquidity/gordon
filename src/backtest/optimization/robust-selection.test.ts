@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { GridSearchOptimizer } from "./grid-search.ts";
-import type {
-  BacktestEngine,
-  BacktestResult,
-  ParameterSet,
-} from "./grid-search.ts";
+import type { BacktestEngine, BacktestResult, ParameterSet } from "./grid-search.ts";
 import { RandomSearchOptimizer } from "./random-search.ts";
 import type { OHLC } from "../types.ts";
 import type { Strategy } from "../../strategies/types.ts";
@@ -12,18 +8,14 @@ import type { Strategy } from "../../strategies/types.ts";
 const SAMPLE_SIZE = 40;
 
 /** Small, steady gains every bar: whatever order the bars arrive in, the path survives. */
-const ROBUST_SERIES: readonly number[] = Array.from(
-  { length: SAMPLE_SIZE },
-  () => 0.006
-);
+const ROBUST_SERIES: readonly number[] = Array.from({ length: SAMPLE_SIZE }, () => 0.006);
 
 /**
  * Higher observed return, but only because history dealt its losing bars LAST, after thirty
  * winners had built a cushion. Reorder the path and it is stopped out.
  */
-const LUCKY_SERIES: readonly number[] = Array.from(
-  { length: SAMPLE_SIZE },
-  (_, i) => (i < 30 ? 0.027 : -0.05)
+const LUCKY_SERIES: readonly number[] = Array.from({ length: SAMPLE_SIZE }, (_, i) =>
+  i < 30 ? 0.027 : -0.05,
 );
 
 const SERIES_BY_LOOKBACK: Record<number, readonly number[]> = {
@@ -59,11 +51,7 @@ function equityCurveOf(returns: readonly number[]): Array<{ equity: number }> {
 /** Deterministic engine: the parameter set selects a pre-baked path. */
 function makeEngine(options: { withEquityCurve: boolean }): BacktestEngine {
   return {
-    run(
-      _strategy: Strategy,
-      _data: OHLC[],
-      params?: ParameterSet
-    ): BacktestResult {
+    run(_strategy: Strategy, _data: OHLC[], params?: ParameterSet): BacktestResult {
       const lookback = params?.lookback ?? 10;
       const series = SERIES_BY_LOOKBACK[lookback] ?? ROBUST_SERIES;
       const totalReturn = barrieredReturn(series) * 100;
@@ -81,9 +69,7 @@ function makeEngine(options: { withEquityCurve: boolean }): BacktestEngine {
         },
         params,
         executionTimeMs: 0,
-        ...(options.withEquityCurve
-          ? { equityCurve: equityCurveOf(series) }
-          : {}),
+        ...(options.withEquityCurve ? { equityCurve: equityCurveOf(series) } : {}),
       };
     },
   };
@@ -93,11 +79,7 @@ const STRATEGY = { name: "stub" } as unknown as Strategy;
 const DATA: OHLC[] = [];
 
 function gridOptimizer(withEquityCurve = true): GridSearchOptimizer {
-  return new GridSearchOptimizer(
-    makeEngine({ withEquityCurve }),
-    STRATEGY,
-    DATA
-  );
+  return new GridSearchOptimizer(makeEngine({ withEquityCurve }), STRATEGY, DATA);
 }
 
 const ROBUST_OPTIONS = {
@@ -182,12 +164,8 @@ describe("robust parameter selection", () => {
     expect(lucky).toBeDefined();
     expect(robust).toBeDefined();
     expect(lucky?.overfitGap ?? 0).toBeGreaterThan(robust?.overfitGap ?? 0);
-    expect(result.robustSelection?.argmaxWinnerOverfitGap).toBe(
-      lucky?.overfitGap ?? 0
-    );
-    expect(result.robustSelection?.percentileWinnerOverfitGap).toBe(
-      robust?.overfitGap ?? 0
-    );
+    expect(result.robustSelection?.argmaxWinnerOverfitGap).toBe(lucky?.overfitGap ?? 0);
+    expect(result.robustSelection?.percentileWinnerOverfitGap).toBe(robust?.overfitGap ?? 0);
   });
 
   test("the same seed yields the same percentile utilities", () => {
@@ -198,9 +176,7 @@ describe("robust parameter selection", () => {
       robustSelection: ROBUST_OPTIONS,
     });
 
-    expect(second.robustSelection?.candidates).toEqual(
-      first.robustSelection?.candidates ?? []
-    );
+    expect(second.robustSelection?.candidates).toEqual(first.robustSelection?.candidates ?? []);
   });
 
   test("a result without a per-period series is reported unavailable, not scored", () => {
@@ -209,9 +185,7 @@ describe("robust parameter selection", () => {
     });
 
     expect(result.robustSelection?.available).toBe(false);
-    expect(result.robustSelection?.unavailableReason).toContain(
-      "per-period return series"
-    );
+    expect(result.robustSelection?.unavailableReason).toContain("per-period return series");
     expect(result.robustSelection?.percentileWinner).toBeNull();
     expect(result.bestParams).toEqual(LUCKY_PARAMS);
   });
@@ -229,7 +203,7 @@ describe("robust parameter selection", () => {
     const optimizer = new RandomSearchOptimizer(
       makeEngine({ withEquityCurve: true }),
       STRATEGY,
-      DATA
+      DATA,
     );
     const result = optimizer.optimize({ lookback: [10, 20] }, 12, "totalReturn", {
       seed: 3,
@@ -245,13 +219,13 @@ describe("robust parameter selection", () => {
     const plain = new RandomSearchOptimizer(
       makeEngine({ withEquityCurve: true }),
       STRATEGY,
-      DATA
+      DATA,
     ).optimize({ lookback: [10, 20] }, 12, "totalReturn", { seed: 3 });
 
     const disabled = new RandomSearchOptimizer(
       makeEngine({ withEquityCurve: true }),
       STRATEGY,
-      DATA
+      DATA,
     ).optimize({ lookback: [10, 20] }, 12, "totalReturn", {
       seed: 3,
       robustSelection: { ...ROBUST_OPTIONS, enabled: false },

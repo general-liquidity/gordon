@@ -104,11 +104,7 @@ function skewnessOf(values: ReadonlyArray<number>, m: number, s: number): number
   return sum / values.length;
 }
 
-function excessKurtosisOf(
-  values: ReadonlyArray<number>,
-  m: number,
-  s: number,
-): number {
+function excessKurtosisOf(values: ReadonlyArray<number>, m: number, s: number): number {
   if (values.length === 0 || s === 0) return 0;
   let sum = 0;
   for (const v of values) {
@@ -125,9 +121,7 @@ function excessKurtosisOf(
  * scale-invariant on skewness/kurtosis. Mean/stddev/min/max carry the
  * input units.
  */
-export function computePnlDistributionShape(
-  pnls: ReadonlyArray<number>,
-): PnlDistributionShape {
+export function computePnlDistributionShape(pnls: ReadonlyArray<number>): PnlDistributionShape {
   const count = pnls.length;
   if (count === 0) {
     return {
@@ -181,9 +175,7 @@ export function computePnlDistributionShape(
  *   "P&L shape: 47 trades, mean=+0.42%, skew=+0.81 → long convexity
  *    (right tail heavier); excess-kurt=+1.2 (fat-tailed)."
  */
-export function summarizePnlDistributionShape(
-  shape: PnlDistributionShape,
-): string {
+export function summarizePnlDistributionShape(shape: PnlDistributionShape): string {
   if (shape.verdict === "insufficient_data") {
     return `P&L shape: ${shape.count} trade${shape.count === 1 ? "" : "s"} — not enough data for distribution shape (need ${INSUFFICIENT_DATA_THRESHOLD}+).`;
   }

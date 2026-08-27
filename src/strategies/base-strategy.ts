@@ -64,13 +64,10 @@ export abstract class BaseStrategy implements Strategy {
   abstract detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult>;
 
-  abstract getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams>;
+  abstract getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams>;
 
   abstract getPromptFragment(): string;
 
@@ -87,7 +84,7 @@ export abstract class BaseStrategy implements Strategy {
     _bar: OHLC,
     _index: number,
     _data: OHLC[],
-    _indicators: IndicatorState
+    _indicators: IndicatorState,
   ): Signal | null {
     return null;
   }
@@ -113,7 +110,7 @@ export abstract class BaseStrategy implements Strategy {
     ctx: StrategyContext,
     symbol: string,
     timeframe: string = DEFAULT_TIMEFRAME,
-    limit: number = DEFAULT_CANDLE_LIMIT
+    limit: number = DEFAULT_CANDLE_LIMIT,
   ): Promise<Candle[]> {
     // Use cached candles if available and match the request
     if (ctx.candles && ctx.candles.length >= limit) {
@@ -154,7 +151,7 @@ export abstract class BaseStrategy implements Strategy {
    */
   protected calculateEMA(
     candles: Candle[],
-    period: number
+    period: number,
   ): { values: (number | null)[]; current: number | null; period: number } {
     const prices = this.extractPrices(candles);
     return calculateEMA(prices, period);
@@ -165,7 +162,7 @@ export abstract class BaseStrategy implements Strategy {
    */
   protected calculateSMA(
     candles: Candle[],
-    period: number
+    period: number,
   ): { values: (number | null)[]; current: number | null } {
     const prices = this.extractPrices(candles);
     const values = calculateSMA(prices, period);
@@ -182,7 +179,7 @@ export abstract class BaseStrategy implements Strategy {
     candles: Candle[],
     fastPeriod: number = 12,
     slowPeriod: number = 26,
-    signalPeriod: number = 9
+    signalPeriod: number = 9,
   ): MACDResult {
     const prices = this.extractPrices(candles);
     return calculateMACD(prices, fastPeriod, slowPeriod, signalPeriod);
@@ -194,7 +191,7 @@ export abstract class BaseStrategy implements Strategy {
   protected calculateATR(
     candles: Candle[],
     period: number = 14,
-    multiplier: number = 2
+    multiplier: number = 2,
   ): ATRResult {
     const currentPrice = candles[candles.length - 1]?.close ?? 0;
     return calculateATR(candles, period, multiplier, currentPrice);
@@ -206,7 +203,7 @@ export abstract class BaseStrategy implements Strategy {
   protected calculateBollingerBands(
     candles: Candle[],
     period: number = 20,
-    stdDev: number = 2
+    stdDev: number = 2,
   ): BollingerResult {
     const prices = this.extractPrices(candles);
     return calculateBollingerBands(prices, period, stdDev);
@@ -228,7 +225,7 @@ export abstract class BaseStrategy implements Strategy {
     rsiPeriod: number = 14,
     stochPeriod: number = 14,
     kPeriod: number = 3,
-    dPeriod: number = 3
+    dPeriod: number = 3,
   ): StochasticRSIResult {
     const prices = this.extractPrices(candles);
     return calculateStochasticRSI(prices, rsiPeriod, stochPeriod, kPeriod, dPeriod);
@@ -237,7 +234,7 @@ export abstract class BaseStrategy implements Strategy {
   /**
    * Detect support and resistance levels.
    */
-  protected detectLevels(candles: Candle[], currentPrice: number): Level[] {
+  protected detectLevels(candles: Candle[], _currentPrice: number): Level[] {
     // Convert Candle to the format expected by detectLevels
     const compatibleCandles = candles.map((c) => ({
       openTime: c.openTime ?? 0,
@@ -257,10 +254,7 @@ export abstract class BaseStrategy implements Strategy {
   protected getSupports(levels: Level[], currentPrice: number): Level[] {
     return levels
       .filter((l) => l.type === "support")
-      .sort(
-        (a, b) =>
-          Math.abs(a.price - currentPrice) - Math.abs(b.price - currentPrice)
-      );
+      .sort((a, b) => Math.abs(a.price - currentPrice) - Math.abs(b.price - currentPrice));
   }
 
   /**
@@ -269,19 +263,13 @@ export abstract class BaseStrategy implements Strategy {
   protected getResistances(levels: Level[], currentPrice: number): Level[] {
     return levels
       .filter((l) => l.type === "resistance")
-      .sort(
-        (a, b) =>
-          Math.abs(a.price - currentPrice) - Math.abs(b.price - currentPrice)
-      );
+      .sort((a, b) => Math.abs(a.price - currentPrice) - Math.abs(b.price - currentPrice));
   }
 
   /**
    * Calculate distance to a price level as percentage.
    */
-  protected calculateDistancePercent(
-    currentPrice: number,
-    targetPrice: number
-  ): number {
+  protected calculateDistancePercent(currentPrice: number, targetPrice: number): number {
     if (currentPrice === 0) return 0;
     return ((currentPrice - targetPrice) / currentPrice) * 100;
   }
@@ -289,11 +277,7 @@ export abstract class BaseStrategy implements Strategy {
   /**
    * Calculate risk-reward ratio.
    */
-  protected calculateRiskReward(
-    entryPrice: number,
-    stopLoss: number,
-    takeProfit: number
-  ): number {
+  protected calculateRiskReward(entryPrice: number, stopLoss: number, takeProfit: number): number {
     const risk = Math.abs(entryPrice - stopLoss);
     const reward = Math.abs(takeProfit - entryPrice);
     if (risk === 0) return 0;
@@ -307,7 +291,7 @@ export abstract class BaseStrategy implements Strategy {
   protected createTakeProfitLevels(
     entryPrice: number,
     stopLoss: number,
-    rrTargets: number[] = [1.5, 2.5, 4.0]
+    rrTargets: number[] = [1.5, 2.5, 4.0],
   ): TakeProfitLevel[] {
     const risk = Math.abs(entryPrice - stopLoss);
     const distribution = [0.4, 0.4, 0.2];
@@ -324,22 +308,17 @@ export abstract class BaseStrategy implements Strategy {
   protected analyzeVolumeTrend(
     candles: Candle[],
     recentPeriods: number = 10,
-    olderPeriods: number = 20
+    olderPeriods: number = 20,
   ): "rising" | "falling" | "stable" {
     if (candles.length < recentPeriods + olderPeriods) {
       return "stable";
     }
 
     const recentCandles = candles.slice(-recentPeriods);
-    const recentAvg =
-      recentCandles.reduce((sum, c) => sum + c.volume, 0) / recentPeriods;
+    const recentAvg = recentCandles.reduce((sum, c) => sum + c.volume, 0) / recentPeriods;
 
-    const olderCandles = candles.slice(
-      -(recentPeriods + olderPeriods),
-      -recentPeriods
-    );
-    const olderAvg =
-      olderCandles.reduce((sum, c) => sum + c.volume, 0) / olderPeriods;
+    const olderCandles = candles.slice(-(recentPeriods + olderPeriods), -recentPeriods);
+    const olderAvg = olderCandles.reduce((sum, c) => sum + c.volume, 0) / olderPeriods;
 
     if (olderAvg === 0) return "stable";
 
@@ -368,7 +347,7 @@ export abstract class BaseStrategy implements Strategy {
   protected detected(
     confidence: number,
     signals: Record<string, unknown>,
-    reasoning: string
+    reasoning: string,
   ): StrategyDetectionResult {
     return {
       detected: true,

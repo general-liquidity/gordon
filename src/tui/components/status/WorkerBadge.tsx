@@ -1,4 +1,3 @@
-import React from "react";
 import { Text } from "../../ink-custom";
 
 // ============================================================================
@@ -29,7 +28,8 @@ export function WorkerBadge({ agent, showBullet = true }: Props) {
   const color = WORKER_COLORS[agent] ?? "rgb(52,238,176)";
   return (
     <Text color={color} bold>
-      {showBullet ? "\u25CF " : ""}{agent}
+      {showBullet ? "\u25CF " : ""}
+      {agent}
     </Text>
   );
 }

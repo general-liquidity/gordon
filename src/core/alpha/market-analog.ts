@@ -211,7 +211,10 @@ export function retrieveAnalogs(
 ): MarketAnalogResult {
   const dim = query.length;
   const valid = candidates.filter(
-    (c) => c.features.length === dim && c.features.every(Number.isFinite) && Number.isFinite(c.forwardReturn),
+    (c) =>
+      c.features.length === dim &&
+      c.features.every(Number.isFinite) &&
+      Number.isFinite(c.forwardReturn),
   );
   if (valid.length === 0 || dim === 0) {
     const empty = describe([]);
@@ -239,7 +242,9 @@ export function retrieveAnalogs(
   }
   const fw = opts.featureWeights ?? new Array<number>(dim).fill(1);
   const z = (vec: number[]): number[] =>
-    vec.map((x, d) => (stds[d]! > 1e-12 ? ((x - means[d]!) / stds[d]!) * Math.sqrt(Math.max(fw[d]!, 0)) : 0));
+    vec.map((x, d) =>
+      stds[d]! > 1e-12 ? ((x - means[d]!) / stds[d]!) * Math.sqrt(Math.max(fw[d]!, 0)) : 0,
+    );
   const qz = z(query);
 
   // 2. Standardized, feature-weighted Euclidean distance to every candidate.
@@ -290,7 +295,17 @@ export function retrieveAnalogs(
   const confidence = gradeConfidence(k, valid.length, proximity, pValue);
   const summary = buildSummary(analog, edgeShift, proximity, pValue, confidence, k);
 
-  return { query, neighbors, analog, unconditional, edgeShift, pValue, proximity, confidence, summary };
+  return {
+    query,
+    neighbors,
+    analog,
+    unconditional,
+    edgeShift,
+    pValue,
+    proximity,
+    confidence,
+    summary,
+  };
 }
 
 function median(xs: number[]): number {

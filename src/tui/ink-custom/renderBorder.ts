@@ -52,7 +52,9 @@ export function renderBorder(
 
   let topBorder: string | undefined = showTop
     ? colorize(
-        (showLeft ? box.topLeft : "") + box.top.repeat(Math.max(0, contentWidth)) + (showRight ? box.topRight : ""),
+        (showLeft ? box.topLeft : "") +
+          box.top.repeat(Math.max(0, contentWidth)) +
+          (showRight ? box.topRight : ""),
         topBorderColor,
         "foreground",
       )
@@ -63,15 +65,21 @@ export function renderBorder(
   if (showTop) verticalHeight -= 1;
   if (showBottom) verticalHeight -= 1;
 
-  let leftBorder = (colorize(box.left, leftBorderColor, "foreground") + "\n").repeat(Math.max(0, verticalHeight));
+  let leftBorder = `${colorize(box.left, leftBorderColor, "foreground")}\n`.repeat(
+    Math.max(0, verticalHeight),
+  );
   if (dimLeft) leftBorder = chalk.dim(leftBorder);
 
-  let rightBorder = (colorize(box.right, rightBorderColor, "foreground") + "\n").repeat(Math.max(0, verticalHeight));
+  let rightBorder = `${colorize(box.right, rightBorderColor, "foreground")}\n`.repeat(
+    Math.max(0, verticalHeight),
+  );
   if (dimRight) rightBorder = chalk.dim(rightBorder);
 
   let bottomBorder: string | undefined = showBottom
     ? colorize(
-        (showLeft ? box.bottomLeft : "") + box.bottom.repeat(Math.max(0, contentWidth)) + (showRight ? box.bottomRight : ""),
+        (showLeft ? box.bottomLeft : "") +
+          box.bottom.repeat(Math.max(0, contentWidth)) +
+          (showRight ? box.bottomRight : ""),
         bottomBorderColor,
         "foreground",
       )

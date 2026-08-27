@@ -1,4 +1,3 @@
-import React from "react";
 import { Text, useStdout } from "../../ink-custom";
 import { useAnimationClock } from "../../hooks/animation/useAnimationClock.js";
 
@@ -38,8 +37,8 @@ export function UnseenDivider({ count }: Props) {
       <Text color="cyanBright" bold>
         {arrow}
       </Text>
-      <Text color="cyanBright">{"  " + count + " new"}</Text>
-      <Text dimColor>{" " + dashes}</Text>
+      <Text color="cyanBright">{`  ${count} new`}</Text>
+      <Text dimColor>{` ${dashes}`}</Text>
     </Text>
   );
 }

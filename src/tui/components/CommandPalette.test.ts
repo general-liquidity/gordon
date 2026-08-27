@@ -15,16 +15,11 @@ function discoverLabels(groups: ReturnType<typeof groupPaletteItems>): string[] 
 
 describe("groupPaletteItems frecency ordering", () => {
   test("without frecency, equally-scored matches keep insertion order", () => {
-    expect(discoverLabels(groupPaletteItems(items, "scan"))).toEqual([
-      "/scan-one",
-      "/scan-two",
-    ]);
+    expect(discoverLabels(groupPaletteItems(items, "scan"))).toEqual(["/scan-one", "/scan-two"]);
   });
 
   test("a recently-used command ranks above an equal-score never-used one", () => {
-    const frecency: FrecencyMap = new Map([
-      ["scan-two", { usageCount: 3, lastUsed: Date.now() }],
-    ]);
+    const frecency: FrecencyMap = new Map([["scan-two", { usageCount: 3, lastUsed: Date.now() }]]);
     expect(discoverLabels(groupPaletteItems(items, "scan", frecency))).toEqual([
       "/scan-two",
       "/scan-one",
@@ -38,9 +33,7 @@ describe("groupPaletteItems frecency ordering", () => {
       { id: "scan", label: "/scan", workflowId: "discover" },
       { id: "scan-two", label: "/scan-two", workflowId: "discover" },
     ];
-    const frecency: FrecencyMap = new Map([
-      ["scan-two", { usageCount: 50, lastUsed: Date.now() }],
-    ]);
+    const frecency: FrecencyMap = new Map([["scan-two", { usageCount: 50, lastUsed: Date.now() }]]);
     expect(discoverLabels(groupPaletteItems(withExact, "scan", frecency))[0]).toBe("/scan");
   });
 });

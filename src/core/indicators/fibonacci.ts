@@ -92,7 +92,7 @@ function findSwingLow(candles: Candle[]): number {
 function determineTrend(
   price: number,
   swingHigh: number,
-  swingLow: number
+  swingLow: number,
 ): "uptrend" | "downtrend" | "neutral" {
   const midpoint = (swingHigh + swingLow) / 2;
   const range = swingHigh - swingLow;
@@ -115,10 +115,7 @@ function determineTrend(
 /**
  * Find the Fibonacci level closest to the current price.
  */
-function findNearestLevel(
-  levels: FibonacciLevel[],
-  price: number
-): FibonacciLevel | null {
+function findNearestLevel(levels: FibonacciLevel[], price: number): FibonacciLevel | null {
   if (levels.length === 0) return null;
 
   let nearest = levels[0]!;
@@ -154,7 +151,7 @@ function findNearestLevel(
 export function calculateFibonacci(
   candles: Candle[],
   lookbackPeriod: number = 50,
-  currentPrice?: number
+  currentPrice?: number,
 ): FibonacciResult {
   if (candles.length < 2) {
     return {
@@ -187,7 +184,7 @@ export function calculateFibonacci(
   }
 
   const lastCandle = candles[candles.length - 1];
-  const price = currentPrice ?? (lastCandle?.close ?? 0);
+  const price = currentPrice ?? lastCandle?.close ?? 0;
   const trend = determineTrend(price, swingHigh, swingLow);
   const range = swingHigh - swingLow;
 
@@ -223,7 +220,7 @@ export function calculateFibonacci(
     swingLow,
     trend,
     nearestLevel,
-    range
+    range,
   );
 
   return {
@@ -244,7 +241,7 @@ function buildRetracementInterpretation(
   swingLow: number,
   trend: "uptrend" | "downtrend" | "neutral",
   nearestLevel: FibonacciLevel | null,
-  range: number
+  range: number,
 ): string {
   if (!nearestLevel) {
     return "Unable to determine Fibonacci levels";
@@ -292,7 +289,7 @@ function buildRetracementInterpretation(
 export function calculateFibonacciExtensions(
   candles: Candle[],
   lookbackPeriod: number = 50,
-  currentPrice?: number
+  currentPrice?: number,
 ): FibonacciExtensionResult {
   if (candles.length < 2) {
     return {
@@ -323,7 +320,7 @@ export function calculateFibonacciExtensions(
   }
 
   const lastCandle = candles[candles.length - 1];
-  const price = currentPrice ?? (lastCandle?.close ?? 0);
+  const price = currentPrice ?? lastCandle?.close ?? 0;
   const trend = determineTrend(price, swingHigh, swingLow);
   const range = swingHigh - swingLow;
 
@@ -359,7 +356,7 @@ export function calculateFibonacciExtensions(
     swingLow,
     trend,
     nearestLevel,
-    levels
+    levels,
   );
 
   return {
@@ -380,7 +377,7 @@ function buildExtensionInterpretation(
   swingLow: number,
   trend: "uptrend" | "downtrend" | "neutral",
   nearestLevel: FibonacciLevel | null,
-  levels: FibonacciLevel[]
+  levels: FibonacciLevel[],
 ): string {
   if (!nearestLevel || levels.length === 0) {
     return "Unable to determine Fibonacci extension levels";

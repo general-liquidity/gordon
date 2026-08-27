@@ -177,8 +177,7 @@ describe("selectByBootstrapPercentile", () => {
       sampleSize: flat.length,
       resamples: 50,
       seed: 3,
-      evaluate: (series, indices) =>
-        indices.reduce((a, i) => a + series[i]!, 0) / indices.length,
+      evaluate: (series, indices) => indices.reduce((a, i) => a + series[i]!, 0) / indices.length,
     });
     const evidence = constant.evidence[0]!;
     expect(evidence.stdDev).toBeCloseTo(0, 12);
@@ -198,9 +197,9 @@ describe("selectByBootstrapPercentile", () => {
     expect(() =>
       selectByBootstrapPercentile({ ...base, candidates: ["a"], sampleSize: 0 }),
     ).toThrow(/positive integer/);
-    expect(() =>
-      selectByBootstrapPercentile({ ...base, candidates: ["a"], alpha: 1.5 }),
-    ).toThrow(/\[0, 1\]/);
+    expect(() => selectByBootstrapPercentile({ ...base, candidates: ["a"], alpha: 1.5 })).toThrow(
+      /\[0, 1\]/,
+    );
   });
 
   test("stamps the result only from an injected clock", () => {
@@ -305,7 +304,12 @@ describe("dependence-preserving resampling", () => {
 
   test("stays inside the observation range for every sample size, including one", () => {
     for (const n of [1, 2, 7, 50]) {
-      const idx = stationaryBootstrapIndices(n, 25, defaultMeanBlockLength(n), makeCounterStream(1, n));
+      const idx = stationaryBootstrapIndices(
+        n,
+        25,
+        defaultMeanBlockLength(n),
+        makeCounterStream(1, n),
+      );
       expect(idx.length).toBe(25);
       expect(Math.min(...idx)).toBeGreaterThanOrEqual(0);
       expect(Math.max(...idx)).toBeLessThan(n);

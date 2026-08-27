@@ -22,12 +22,7 @@ import { denylistScenarios } from "./denylist-source.ts";
 import { rubricRedFlagScenarios } from "./rubric-source.ts";
 import { memoryScenarios } from "./memory-source.ts";
 
-export type GeneratorSource =
-  | "constitution"
-  | "risk-dimension"
-  | "denylist"
-  | "rubric"
-  | "memory";
+export type GeneratorSource = "constitution" | "risk-dimension" | "denylist" | "rubric" | "memory";
 
 export const ALL_GENERATOR_SOURCES: ReadonlyArray<GeneratorSource> = [
   "constitution",

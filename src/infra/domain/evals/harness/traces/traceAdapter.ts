@@ -80,9 +80,7 @@ export function auditTraceToTrajectory(
   const toolNames = trace.agent_steps.flatMap((s) => s.tool_calls.map((t) => t.tool_name));
 
   const userTurns =
-    opts.userTurns && opts.userTurns.length > 0
-      ? opts.userTurns
-      : [trace.trigger.payload_summary];
+    opts.userTurns && opts.userTurns.length > 0 ? opts.userTurns : [trace.trigger.payload_summary];
   const userMessages = userTurns.map((content) => ({ role: "user" as const, content }));
 
   return {
@@ -142,10 +140,7 @@ export interface PromoteOptions {
  * real trigger that produced the (flagged) behavior; provenance is the trace
  * id so the promoted scenario is auditable back to the run it came from.
  */
-export function promoteTraceToScenario(
-  trace: AuditTrace,
-  opts: PromoteOptions,
-): EvalScenario {
+export function promoteTraceToScenario(trace: AuditTrace, opts: PromoteOptions): EvalScenario {
   const shortId = trace.trace_id.slice(0, 8);
   const category = opts.category ?? inferCategory(trace);
   const hasTurns = opts.turns !== undefined && opts.turns.length > 0;

@@ -7,16 +7,12 @@
  * and triggers agent reconstruction on changes.
  */
 
-import * as fs from "fs/promises";
-import * as path from "path";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import type { Tool } from "@mastra/core/tools";
 
 import { pluginInstaller } from "../../ai/mcp/marketplace/installer.ts";
-import {
-  getMCPTools,
-  getMCPToolsByServer,
-  reloadMCPTools,
-} from "../../ai/mcp/client.ts";
+import { getMCPTools, getMCPToolsByServer, reloadMCPTools } from "../../ai/mcp/client.ts";
 import { resetAgents } from "../../agents/agents.ts";
 import type { AgentAffinity, RoutingManifest, ResolvedRouting } from "./types.ts";
 
@@ -37,9 +33,7 @@ let _initialized = false;
  * Load routing.json for a plugin, returning null if not found.
  * Falls back to skill.json for backward compatibility with existing installs.
  */
-async function loadRoutingManifest(
-  pluginId: string,
-): Promise<RoutingManifest | null> {
+async function loadRoutingManifest(pluginId: string): Promise<RoutingManifest | null> {
   const pluginDir = pluginInstaller.getPluginsDir();
 
   // Try routing.json first (new name)
@@ -104,13 +98,10 @@ function rebuildRoutingTables(): void {
       // MCPClient namespaces as serverId_toolName
       const underscoreIdx = namespacedToolName.indexOf("_");
       const bareToolName =
-        underscoreIdx > 0
-          ? namespacedToolName.substring(underscoreIdx + 1)
-          : namespacedToolName;
+        underscoreIdx > 0 ? namespacedToolName.substring(underscoreIdx + 1) : namespacedToolName;
 
       // Determine agent: per-tool override > default agent
-      const agent =
-        perToolMap.get(bareToolName) ?? routing.routingManifest.defaultAgent;
+      const agent = perToolMap.get(bareToolName) ?? routing.routingManifest.defaultAgent;
 
       // Add to dynamic TOOL_AGENT_MAP (skip Gordon — those don't need handoff detection)
       if (agent !== "Gordon") {
@@ -128,8 +119,8 @@ function rebuildRoutingTables(): void {
 
         // Also add to Gordon if requested
         if (routing.routingManifest.alsoOnGordon && agent !== "Gordon") {
-          if (!_toolsByAgent["Gordon"]) _toolsByAgent["Gordon"] = {};
-          _toolsByAgent["Gordon"]![namespacedToolName] = tool;
+          if (!_toolsByAgent.Gordon) _toolsByAgent.Gordon = {};
+          _toolsByAgent.Gordon![namespacedToolName] = tool;
         }
       }
     }
@@ -156,8 +147,7 @@ export async function initRouting(): Promise<void> {
   _resolvedRoutings = [];
   for (const plugin of installed) {
     const routingManifest =
-      (await loadRoutingManifest(plugin.id)) ??
-      buildDefaultRoutingManifest(plugin.id);
+      (await loadRoutingManifest(plugin.id)) ?? buildDefaultRoutingManifest(plugin.id);
     _resolvedRoutings.push({
       pluginId: plugin.id,
       routingManifest,
@@ -190,9 +180,7 @@ export function getDynamicToolAgentMap(): Record<string, string> {
  * Get MCP/routing tools for a specific agent.
  * Spread these into the agent's tools at construction time.
  */
-export function getRoutingToolsForAgent(
-  agentName: string,
-): Record<string, Tool> {
+export function getRoutingToolsForAgent(agentName: string): Record<string, Tool> {
   return { ...(_toolsByAgent[agentName] ?? {}) };
 }
 
@@ -242,13 +230,7 @@ export function isRoutingInitialized(): boolean {
 /**
  * Write a routing.json manifest to disk.
  */
-export async function writeRoutingManifest(
-  manifest: RoutingManifest,
-): Promise<void> {
-  const routingPath = path.join(
-    pluginInstaller.getPluginsDir(),
-    manifest.pluginId,
-    "routing.json",
-  );
+export async function writeRoutingManifest(manifest: RoutingManifest): Promise<void> {
+  const routingPath = path.join(pluginInstaller.getPluginsDir(), manifest.pluginId, "routing.json");
   await fs.writeFile(routingPath, JSON.stringify(manifest, null, 2));
 }

@@ -109,7 +109,11 @@ export function loadCatalog(indexDir: string = defaultIndexDir()): HistoryIndexC
   if (!existsSync(path)) return { version: CATALOG_VERSION, files: {} };
   try {
     const parsed = JSON.parse(readFileSync(path, "utf-8")) as HistoryIndexCatalog;
-    if (parsed.version !== CATALOG_VERSION || typeof parsed.files !== "object" || parsed.files === null) {
+    if (
+      parsed.version !== CATALOG_VERSION ||
+      typeof parsed.files !== "object" ||
+      parsed.files === null
+    ) {
       return { version: CATALOG_VERSION, files: {} };
     }
     return parsed;
@@ -119,7 +123,10 @@ export function loadCatalog(indexDir: string = defaultIndexDir()): HistoryIndexC
 }
 
 /** Persist the catalog (creates the index dir on first write). */
-export function saveCatalog(catalog: HistoryIndexCatalog, indexDir: string = defaultIndexDir()): void {
+export function saveCatalog(
+  catalog: HistoryIndexCatalog,
+  indexDir: string = defaultIndexDir(),
+): void {
   if (!existsSync(indexDir)) mkdirSync(indexDir, { recursive: true });
   writeFileSync(catalogPath(indexDir), JSON.stringify(catalog), { encoding: "utf-8", mode: 0o600 });
 }

@@ -32,7 +32,10 @@ describe("computeJensensAlpha", () => {
 
   it("calls disguised beta insignificant: pure factor exposure, no intercept", () => {
     // Demean so the TRUE intercept is exactly 0 (raw streams carry a small sample mean = a real alpha).
-    const dm = (a: number[]): number[] => { const m = a.reduce((s, x) => s + x, 0) / a.length; return a.map((x) => x - m); };
+    const dm = (a: number[]): number[] => {
+      const m = a.reduce((s, x) => s + x, 0) / a.length;
+      return a.map((x) => x - m);
+    };
     const factor = dm(noise(3, N, 0.04));
     const eps = dm(noise(4, N, 0.02));
     const y = factor.map((x, i) => 1.0 * x + eps[i]!); // y = beta·factor, true alpha = 0
@@ -49,7 +52,10 @@ describe("computeJensensAlpha", () => {
     const innov = noise(6, N, 0.003);
     const resid: number[] = [];
     let prev = 0;
-    for (let i = 0; i < N; i++) { prev = 0.8 * prev + innov[i]!; resid.push(prev); }
+    for (let i = 0; i < N; i++) {
+      prev = 0.8 * prev + innov[i]!;
+      resid.push(prev);
+    }
     const y = factor.map((_, i) => 0.001 + resid[i]!);
     const r = computeJensensAlpha({ returns: y, factors: [factor] });
     expect(r.alphaPValue).toBeGreaterThanOrEqual(r.alphaPValueOLS); // HAC widens SE → larger p
@@ -67,7 +73,11 @@ describe("computeJensensAlpha", () => {
   });
 
   it("insufficient on too little data or no factors", () => {
-    expect(computeJensensAlpha({ returns: [1, 2, 3], factors: [[1, 2, 3]] }).verdict).toBe("insufficient");
-    expect(computeJensensAlpha({ returns: new Array(100).fill(0.01), factors: [] }).verdict).toBe("insufficient");
+    expect(computeJensensAlpha({ returns: [1, 2, 3], factors: [[1, 2, 3]] }).verdict).toBe(
+      "insufficient",
+    );
+    expect(computeJensensAlpha({ returns: new Array(100).fill(0.01), factors: [] }).verdict).toBe(
+      "insufficient",
+    );
   });
 });

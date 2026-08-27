@@ -9,13 +9,19 @@
 // - "Backtest this strategy with 50 parameter combinations, show me top 5 in the morning"
 // - "Monitor BTC for volatility regime change, alert me when it shifts"
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { join, dirname } from "path";
-import { homedir } from "os";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 
 const WORKFLOWS_DIR = join(homedir(), ".gordon", "workflows");
 
-export type WorkflowStatus = "pending" | "running" | "suspended" | "completed" | "failed" | "cancelled";
+export type WorkflowStatus =
+  | "pending"
+  | "running"
+  | "suspended"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 export interface WorkflowStep {
   id: string;
@@ -56,10 +62,17 @@ export class OvernightWorkflowManager {
     this.loadAll();
   }
 
-  create(title: string, description: string, steps: Array<{ id: string; name: string }>, metadata: Record<string, any> = {}): WorkflowState {
+  create(
+    title: string,
+    description: string,
+    steps: Array<{ id: string; name: string }>,
+    metadata: Record<string, any> = {},
+  ): WorkflowState {
     const id = `wf_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const state: WorkflowState = {
-      id, title, description,
+      id,
+      title,
+      description,
       status: "pending",
       createdAt: Date.now(),
       currentStepIndex: 0,
@@ -73,7 +86,7 @@ export class OvernightWorkflowManager {
 
   start(id: string): WorkflowState | null {
     const wf = this.workflows.get(id);
-    if (!wf || wf.status !== "pending") return null;
+    if (wf?.status !== "pending") return null;
     wf.status = "running";
     wf.startedAt = Date.now();
     this.save(wf);
@@ -82,7 +95,7 @@ export class OvernightWorkflowManager {
 
   advanceStep(id: string, result: any): WorkflowState | null {
     const wf = this.workflows.get(id);
-    if (!wf || wf.status !== "running") return null;
+    if (wf?.status !== "running") return null;
 
     const step = wf.steps[wf.currentStepIndex];
     if (!step) return wf;
@@ -102,9 +115,13 @@ export class OvernightWorkflowManager {
     return wf;
   }
 
-  suspend(id: string, reason: string, awaitingApproval?: WorkflowState["awaitingApproval"]): WorkflowState | null {
+  suspend(
+    id: string,
+    reason: string,
+    awaitingApproval?: WorkflowState["awaitingApproval"],
+  ): WorkflowState | null {
     const wf = this.workflows.get(id);
-    if (!wf || wf.status !== "running") return null;
+    if (wf?.status !== "running") return null;
 
     wf.status = "suspended";
     wf.suspendedAt = Date.now();
@@ -117,7 +134,7 @@ export class OvernightWorkflowManager {
 
   resume(id: string): WorkflowState | null {
     const wf = this.workflows.get(id);
-    if (!wf || wf.status !== "suspended") return null;
+    if (wf?.status !== "suspended") return null;
 
     wf.status = "running";
     wf.resumedAt = Date.now();
@@ -134,7 +151,10 @@ export class OvernightWorkflowManager {
     wf.status = "failed";
     wf.completedAt = Date.now();
     const step = wf.steps[wf.currentStepIndex];
-    if (step) { step.status = "failed"; step.error = error; }
+    if (step) {
+      step.status = "failed";
+      step.error = error;
+    }
     this.save(wf);
     return wf;
   }
@@ -174,7 +194,7 @@ export class OvernightWorkflowManager {
 
   private loadAll(): void {
     try {
-      const { readdirSync } = require("fs");
+      const { readdirSync } = require("node:fs");
       const files = readdirSync(WORKFLOWS_DIR).filter((f: string) => f.endsWith(".json"));
       for (const file of files) {
         try {

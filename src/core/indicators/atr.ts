@@ -8,11 +8,7 @@ import type { Candle, ATRResult } from "./types.ts";
 /**
  * Calculate True Range for a single candle
  */
-function calculateTrueRange(
-  high: number,
-  low: number,
-  prevClose: number
-): number {
+function calculateTrueRange(high: number, low: number, prevClose: number): number {
   const hl = high - low;
   const hc = Math.abs(high - prevClose);
   const lc = Math.abs(low - prevClose);
@@ -38,7 +34,7 @@ export function calculateATR(
   candles: Candle[],
   period: number = 14,
   currentPrice?: number,
-  atrMultiplier: number = 1.5
+  atrMultiplier: number = 1.5,
 ): ATRResult {
   if (candles.length < period + 1) {
     return {
@@ -84,13 +80,13 @@ export function calculateATR(
 
   const currentATR = atrValues[atrValues.length - 1] ?? null;
   const lastCandle = candles[candles.length - 1];
-  const price = currentPrice ?? (lastCandle?.close ?? 0);
+  const price = currentPrice ?? lastCandle?.close ?? 0;
 
   // Calculate stop-loss levels
   const stopDistance = currentATR !== null ? currentATR * atrMultiplier : 0;
   const stopLoss = {
-    long: price - stopDistance,    // Stop for long position
-    short: price + stopDistance,   // Stop for short position
+    long: price - stopDistance, // Stop for long position
+    short: price + stopDistance, // Stop for short position
     distance: stopDistance,
   };
 
@@ -134,7 +130,7 @@ export function calculatePositionSize(
   accountRisk: number,
   atr: number,
   atrMultiplier: number,
-  price: number
+  price: number,
 ): {
   positionSize: number;
   shares: number;

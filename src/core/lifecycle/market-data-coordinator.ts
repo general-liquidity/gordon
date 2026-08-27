@@ -54,7 +54,7 @@ function setCachedValue<T>(
   cache: Map<string, CacheEntry<T>>,
   key: string,
   value: T,
-  ttlMs: number
+  ttlMs: number,
 ): void {
   cache.set(key, {
     value,
@@ -78,7 +78,7 @@ function createPriceKey(exchange: Exchange, symbol: string, pollIntervalMs: numb
 
 export async function runSharedScan(
   exchange: Exchange,
-  options?: ScanOptions
+  options?: ScanOptions,
 ): Promise<ScanResult> {
   const key = createScanKey(exchange, options);
   const cached = getCachedValue(sharedScanCache, key);
@@ -136,7 +136,7 @@ export async function runSharedMonitorCycle(exchange: Exchange): Promise<Monitor
 async function fetchAndBroadcastPrice(
   exchange: Exchange,
   symbol: string,
-  pollerKey: string
+  pollerKey: string,
 ): Promise<number> {
   const poller = pricePollers.get(pollerKey);
   if (!poller) {
@@ -177,7 +177,7 @@ export function subscribeToMarketPrice(
   exchange: Exchange,
   symbol: string,
   listener: (price: number) => void,
-  options: { pollIntervalMs?: number; emitCachedImmediately?: boolean } = {}
+  options: { pollIntervalMs?: number; emitCachedImmediately?: boolean } = {},
 ): () => void {
   const pollIntervalMs = options.pollIntervalMs ?? 30_000;
   const pollerKey = createPriceKey(exchange, symbol, pollIntervalMs);

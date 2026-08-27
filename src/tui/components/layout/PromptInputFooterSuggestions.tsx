@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 
 // ============================================================================
@@ -52,16 +52,22 @@ export function PromptInputFooterSuggestions({ visible, onSelect }: Props) {
   return (
     <Box flexDirection="row" paddingLeft={2} gap={3}>
       <Text dimColor>
-        <Text dimColor bold>1</Text>
-        {" "}{s1}
+        <Text dimColor bold>
+          1
+        </Text>{" "}
+        {s1}
       </Text>
       <Text dimColor>
-        <Text dimColor bold>2</Text>
-        {" "}{s2}
+        <Text dimColor bold>
+          2
+        </Text>{" "}
+        {s2}
       </Text>
       <Text dimColor>
-        <Text dimColor bold>3</Text>
-        {" "}{s3}
+        <Text dimColor bold>
+          3
+        </Text>{" "}
+        {s3}
       </Text>
     </Box>
   );

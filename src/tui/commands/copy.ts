@@ -27,7 +27,10 @@ export function copyLastResponse(messages: Message[]): { success: boolean; text:
   return { success: false, text: "" };
 }
 
-export function copyCodeBlock(messages: Message[], blockIndex = 0): { success: boolean; text: string } {
+export function copyCodeBlock(
+  messages: Message[],
+  blockIndex = 0,
+): { success: boolean; text: string } {
   // Find last assistant message and extract code blocks
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i]!;
@@ -51,8 +54,7 @@ interface CodeBlock {
 function extractCodeBlocks(content: string): CodeBlock[] {
   const blocks: CodeBlock[] = [];
   const regex = /```(\w*)\n([\s\S]*?)```/g;
-  let match;
-  while ((match = regex.exec(content)) !== null) {
+  for (const match of content.matchAll(regex)) {
     blocks.push({
       language: match[1] ?? "",
       code: match[2] ?? "",

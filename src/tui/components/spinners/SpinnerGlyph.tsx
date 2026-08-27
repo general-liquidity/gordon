@@ -1,4 +1,3 @@
-import React from "react";
 import { Text } from "../../ink-custom";
 
 // ============================================================================
@@ -28,9 +27,7 @@ export function SpinnerGlyph({ frame = 0, color = "cyanBright", stalled = false,
     return <Text color="red">{"●"}</Text>;
   }
 
-  const allFrames = frames
-    ? [...frames, ...[...frames].reverse()]
-    : DEFAULT_ALL_FRAMES;
+  const allFrames = frames ? [...frames, ...[...frames].reverse()] : DEFAULT_ALL_FRAMES;
 
   const char = allFrames[frame % allFrames.length] ?? "·";
 

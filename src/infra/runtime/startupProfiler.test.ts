@@ -42,8 +42,20 @@ describe("profileCheckpoint", () => {
       totalDurationMs: 50,
       allRequiredSucceeded: true,
       tasks: [
-        { id: "config", label: "Load configuration", success: true, durationMs: 45, timedOut: false },
-        { id: "memory", label: "Load session memory", success: false, durationMs: 3, timedOut: true },
+        {
+          id: "config",
+          label: "Load configuration",
+          success: true,
+          durationMs: 45,
+          timedOut: false,
+        },
+        {
+          id: "memory",
+          label: "Load session memory",
+          success: false,
+          durationMs: 3,
+          timedOut: true,
+        },
       ],
     };
     foldParallelStartup(result);

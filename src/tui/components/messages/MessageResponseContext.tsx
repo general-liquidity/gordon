@@ -1,4 +1,4 @@
-import React, { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { Box } from "../../ink-custom";
 import { NoSelect } from "../layout/NoSelect.tsx";
 

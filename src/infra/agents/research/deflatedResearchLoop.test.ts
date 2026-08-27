@@ -66,7 +66,12 @@ describe("pairwiseCorrelation", () => {
   it("is 1 for identical series and ~-1 for inverted", () => {
     const a = [1, 2, 3, 4, 5];
     expect(pairwiseCorrelation(a, a)).toBeCloseTo(1, 6);
-    expect(pairwiseCorrelation(a, a.map((x) => -x))).toBeCloseTo(-1, 6);
+    expect(
+      pairwiseCorrelation(
+        a,
+        a.map((x) => -x),
+      ),
+    ).toBeCloseTo(-1, 6);
   });
 
   it("returns 0 (safe default) for no variance or no overlap", () => {
@@ -141,8 +146,7 @@ describe("runDeflatedResearchLoop — genuine signal", () => {
     // realistic per-candidate inputs.)
     const score: ResearchLoopDeps["score"] = (oos, totalTrials): ScoreResult => {
       const m = oos.reduce((a, b) => a + b, 0) / oos.length;
-      const sd =
-        Math.sqrt(oos.reduce((a, b) => a + (b - m) ** 2, 0) / oos.length) || 1e-9;
+      const sd = Math.sqrt(oos.reduce((a, b) => a + (b - m) ** 2, 0) / oos.length) || 1e-9;
       const sharpe = (m / sd) * Math.sqrt(252);
       const bar = Math.sqrt(2 * Math.log(totalTrials + 1)) * 1.0; // rises with trials
       return { sharpe, deflatedSignificant: sharpe > bar };
@@ -155,9 +159,7 @@ describe("runDeflatedResearchLoop — genuine signal", () => {
     });
 
     expect(result.approved.length).toBe(3);
-    expect(result.approved.every((c) => c.hypothesis.id.startsWith("signal-"))).toBe(
-      true,
-    );
+    expect(result.approved.every((c) => c.hypothesis.id.startsWith("signal-"))).toBe(true);
     expect(result.stopReason).toBe("target_reached");
   });
 });

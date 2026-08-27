@@ -113,14 +113,14 @@ function runCase(
       throw new Error(`DCF: fcfProjections[${t}] is not finite`);
     }
     // Discount factor at end-of-period convention: 1/(1+w)^(t+1).
-    pvExplicit += fcf / Math.pow(1 + c.wacc, t + 1);
+    pvExplicit += fcf / (1 + c.wacc) ** (t + 1);
   }
 
   // Terminal value: TV_N = FCF_N * (1 + g) / (w - g). Discounted back
   // from the END of year N, so divisor exponent is N.
   const lastFcf = fcfProjections[n - 1]!;
   const terminalValue = (lastFcf * (1 + c.terminalGrowthPct)) / (c.wacc - c.terminalGrowthPct);
-  const pvTerminal = terminalValue / Math.pow(1 + c.wacc, n);
+  const pvTerminal = terminalValue / (1 + c.wacc) ** n;
 
   const enterpriseValue = pvExplicit + pvTerminal;
   const equityValue = enterpriseValue + netCash;

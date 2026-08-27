@@ -48,19 +48,22 @@ export const TRADER_REMINDER_CATEGORIES: Record<TraderReminderCategory, TraderRe
   },
   stale_mandate: {
     category: "stale_mandate",
-    description: "Execution phase entered without a clear action mandate (intended symbol/direction).",
+    description:
+      "Execution phase entered without a clear action mandate (intended symbol/direction).",
     triggerCondition: "phase === 'execution' && context.requestedActionId === undefined",
     defaultMaxAttempts: 1,
   },
   repeated_loop: {
     category: "repeated_loop",
-    description: "Doom-loop detector fired — same fingerprint observed >= 3 times in last 20 calls.",
+    description:
+      "Doom-loop detector fired — same fingerprint observed >= 3 times in last 20 calls.",
     triggerCondition: "recordToolCallFingerprint().count >= 3",
     defaultMaxAttempts: 2,
   },
   incomplete_runtime_task: {
     category: "incomplete_runtime_task",
-    description: "Approved plan has outstanding next-steps; do not claim completion until executed or deferred.",
+    description:
+      "Approved plan has outstanding next-steps; do not claim completion until executed or deferred.",
     triggerCondition: "artifact.approved && extractedTasks.length > 0",
     defaultMaxAttempts: 2,
   },

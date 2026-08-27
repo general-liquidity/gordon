@@ -39,11 +39,7 @@
  */
 
 export type StreakMode = "informational" | "active";
-export type StreakClassification =
-  | "hot"
-  | "neutral_positive"
-  | "neutral_negative"
-  | "cold";
+export type StreakClassification = "hot" | "neutral_positive" | "neutral_negative" | "cold";
 
 export interface HotStreakSizerInput {
   /**
@@ -95,16 +91,12 @@ export interface HotStreakSizerResult {
   reasoning: string;
 }
 
-const DEFAULT_HOT = 0.20;
+const DEFAULT_HOT = 0.2;
 const DEFAULT_COOL = -0.05;
 const DEFAULT_MAX_MULTIPLIER = 1.5;
 const DEFAULT_COLD_MULTIPLIER = 0.5;
 
-function classify(
-  pnl: number,
-  hotThreshold: number,
-  coolThreshold: number,
-): StreakClassification {
+function classify(pnl: number, hotThreshold: number, coolThreshold: number): StreakClassification {
   if (pnl >= hotThreshold) return "hot";
   if (pnl > 0) return "neutral_positive";
   if (pnl >= coolThreshold) return "neutral_negative";
@@ -194,9 +186,7 @@ export function computeHotStreakSizing(input: HotStreakSizerInput): HotStreakSiz
   };
 }
 
-export function hotStreakSizerToPayload(
-  result: HotStreakSizerResult,
-): Record<string, unknown> {
+export function hotStreakSizerToPayload(result: HotStreakSizerResult): Record<string, unknown> {
   return {
     kind: "hot_streak_sizer.computed",
     classification: result.classification,

@@ -213,7 +213,12 @@ function validateOrderShape(order: OrderParams): string[] {
   if (order.quantity === undefined && order.quoteOrderQty === undefined) {
     errors.push("quantity or quoteOrderQty is required");
   }
-  if ((order.type === "LIMIT" || order.type === "STOP_LOSS_LIMIT" || order.type === "TAKE_PROFIT_LIMIT") && !isPositiveFinite(order.price)) {
+  if (
+    (order.type === "LIMIT" ||
+      order.type === "STOP_LOSS_LIMIT" ||
+      order.type === "TAKE_PROFIT_LIMIT") &&
+    !isPositiveFinite(order.price)
+  ) {
     errors.push(`${order.type} order requires a finite positive price`);
   }
   if (order.price !== undefined && !isPositiveFinite(order.price)) {
@@ -276,17 +281,27 @@ export async function runExecutionPreflight(
   // operator has acknowledged the disclaimer. Paper / sandbox never gated.
   const consent = requireLiveConsent({ sandboxActive });
   if (!consent.ok) {
-    return fail(input, preflightId, "live_consent_required", consent.reason ?? "Live-trading consent required.");
+    return fail(
+      input,
+      preflightId,
+      "live_consent_required",
+      consent.reason ?? "Live-trading consent required.",
+    );
   }
 
   let warnings: string[] = [];
   let order = input.order;
   if (!input.skipRiskGate) {
     const riskPrice = await resolveRiskPrice(input);
-    const quantity = order.quantity ??
-      (order.quoteOrderQty && riskPrice ? order.quoteOrderQty / riskPrice : 0);
+    const quantity =
+      order.quantity ?? (order.quoteOrderQty && riskPrice ? order.quoteOrderQty / riskPrice : 0);
     if (!isPositiveFinite(quantity)) {
-      return fail(input, preflightId, "risk_quantity_unavailable", "Risk gate requires a positive base quantity.");
+      return fail(
+        input,
+        preflightId,
+        "risk_quantity_unavailable",
+        "Risk gate requires a positive base quantity.",
+      );
     }
     try {
       const { evaluateOrderRisk } = await import("../../agents/tools/trading/risk-gate.ts");

@@ -87,7 +87,7 @@ export function calculateThreeMountainsRivers(
   tolerance: number = 0.02,
   minSpacing: number = 15,
   maxSpacing: number = 60,
-  confirmPct: number = 0.02
+  confirmPct: number = 0.02,
 ): TMRResult {
   if (candles.length < order * 2 + minSpacing * 3) {
     return {
@@ -99,8 +99,8 @@ export function calculateThreeMountainsRivers(
     };
   }
 
-  const highs = candles.map(c => c.high);
-  const lows = candles.map(c => c.low);
+  const highs = candles.map((c) => c.high);
+  const lows = candles.map((c) => c.low);
   const currentPrice = candles[candles.length - 1]!.close;
 
   const peaks = findPeaks(highs, order);
@@ -134,7 +134,11 @@ export function calculateThreeMountainsRivers(
 
         bestPattern = {
           type: "three_mountains",
-          prices: [parseFloat(p1.price.toFixed(4)), parseFloat(p2.price.toFixed(4)), parseFloat(p3.price.toFixed(4))],
+          prices: [
+            parseFloat(p1.price.toFixed(4)),
+            parseFloat(p2.price.toFixed(4)),
+            parseFloat(p3.price.toFixed(4)),
+          ],
           bars: [p1.bar, p2.bar, p3.bar],
           averageLevel: parseFloat(avg.toFixed(4)),
           alignment,
@@ -166,7 +170,11 @@ export function calculateThreeMountainsRivers(
 
         bestPattern = {
           type: "three_rivers",
-          prices: [parseFloat(t1.price.toFixed(4)), parseFloat(t2.price.toFixed(4)), parseFloat(t3.price.toFixed(4))],
+          prices: [
+            parseFloat(t1.price.toFixed(4)),
+            parseFloat(t2.price.toFixed(4)),
+            parseFloat(t3.price.toFixed(4)),
+          ],
           bars: [t1.bar, t2.bar, t3.bar],
           averageLevel: parseFloat(avg.toFixed(4)),
           alignment,
@@ -209,20 +217,28 @@ export function calculateThreeMountainsRivers(
 }
 
 function buildTMRInterpretation(
-  pattern: TMRPattern, confirmed: boolean, signal: string, price: number
+  pattern: TMRPattern,
+  confirmed: boolean,
+  _signal: string,
+  _price: number,
 ): string {
-  const name = pattern.type === "three_mountains" ? "THREE MOUNTAINS (Triple Top)" : "THREE RIVERS (Triple Bottom)";
+  const name =
+    pattern.type === "three_mountains"
+      ? "THREE MOUNTAINS (Triple Top)"
+      : "THREE RIVERS (Triple Bottom)";
   let msg = `${name} detected at ${pattern.averageLevel.toFixed(2)} (alignment: ${pattern.alignment}%). `;
-  msg += `Peaks/Troughs: ${pattern.prices.map(p => p.toFixed(2)).join(", ")}. `;
+  msg += `Peaks/Troughs: ${pattern.prices.map((p) => p.toFixed(2)).join(", ")}. `;
 
   if (confirmed) {
-    msg += pattern.type === "three_mountains"
-      ? "CONFIRMED — price broke below pattern. Bearish reversal signal."
-      : "CONFIRMED — price broke above pattern. Bullish reversal signal.";
+    msg +=
+      pattern.type === "three_mountains"
+        ? "CONFIRMED — price broke below pattern. Bearish reversal signal."
+        : "CONFIRMED — price broke above pattern. Bullish reversal signal.";
   } else {
-    msg += pattern.type === "three_mountains"
-      ? "Not yet confirmed — watching for breakdown below neckline."
-      : "Not yet confirmed — watching for breakout above neckline.";
+    msg +=
+      pattern.type === "three_mountains"
+        ? "Not yet confirmed — watching for breakdown below neckline."
+        : "Not yet confirmed — watching for breakout above neckline.";
   }
 
   return msg;

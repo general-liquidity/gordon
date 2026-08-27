@@ -11,20 +11,17 @@ export {
   calculateAgentMetrics,
   calculateSystemMetrics,
   getAllMetrics,
-
   // Metrics recording
   recordRequest,
   recordToolCall,
   recordNetworkRouting,
   recordError,
   recordApiCall,
-
   // Per-agent metrics
   recordAgentCall,
   getAgentMetrics,
   getAgentHealthReport,
   formatAgentHealthReport,
-
   // Rate limiting
   checkRateLimit,
   recordRateLimitedCall,
@@ -33,13 +30,10 @@ export {
   resetRateLimit,
   resetAllRateLimits,
   getRateLimitViolations,
-
   // Display
   formatMetricsReport,
-
   // Reset
   resetSessionMetrics,
-
   // Types
   type TradeMetrics,
   type RiskMetrics,
@@ -56,30 +50,24 @@ export {
   // Initialization
   initializeTracing,
   shutdownTracing,
-
   // Configuration
   getTracingConfig,
   isTracingEnabled,
   getTracingStatus,
-
   // Span context management
   createSpanContext,
   storeSpanContext,
   getSpanContext,
   removeSpanContext,
   getCurrentSpanContext,
-
   // ID generation
   generateTraceId,
   generateSpanId,
-
   // Tracing utilities
   buildTracingOptions,
   withTracing,
-
   // Mastra observability
   getMastraInstance,
-
   // Types
   type TracingConfig,
   type SpanContext,

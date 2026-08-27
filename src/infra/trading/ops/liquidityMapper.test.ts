@@ -1,9 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  mapLiquidity,
-  liquidityToPayload,
-} from "./liquidityMapper.ts";
+import { mapLiquidity, liquidityToPayload } from "./liquidityMapper.ts";
 
 describe("mapLiquidity — basic mapping", () => {
   it("support level → cluster below price minus buffer", () => {

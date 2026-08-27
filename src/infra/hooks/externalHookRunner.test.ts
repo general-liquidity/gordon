@@ -68,10 +68,7 @@ describe("resolveHandlerPath", () => {
 
 describe("runExternalHook — missing handler", () => {
   it("returns block with spawnFailed=true when handler is missing", async () => {
-    const r = await runExternalHook(
-      baseConfig(join(tempDir, "missing.sh")),
-      sampleToolPayload,
-    );
+    const r = await runExternalHook(baseConfig(join(tempDir, "missing.sh")), sampleToolPayload);
     expect(r.result.action).toBe("block");
     expect(r.meta.spawnFailed).toBe(true);
     expect(r.result.reason).toContain("not found");
@@ -86,14 +83,20 @@ describe("runExternalHook — exit-code semantics", () => {
   });
 
   it("exit 2 → block with stderr reason", async () => {
-    const r = await runExternalHook(portableConfig("console.error('protected path'); process.exit(2);"), sampleToolPayload);
+    const r = await runExternalHook(
+      portableConfig("console.error('protected path'); process.exit(2);"),
+      sampleToolPayload,
+    );
     expect(r.result.action).toBe("block");
     expect(r.result.reason).toContain("protected path");
     expect(r.meta.exitCode).toBe(2);
   });
 
   it("exit 5 → block (fail-closed on unexpected code)", async () => {
-    const r = await runExternalHook(portableConfig("console.error('something odd'); process.exit(5);"), sampleToolPayload);
+    const r = await runExternalHook(
+      portableConfig("console.error('something odd'); process.exit(5);"),
+      sampleToolPayload,
+    );
     expect(r.result.action).toBe("block");
     expect(r.result.reason).toContain("something odd");
   });
@@ -101,20 +104,33 @@ describe("runExternalHook — exit-code semantics", () => {
 
 describe("runExternalHook — JSON-on-stdout overrides exit code", () => {
   it("parses stdout JSON for action=modify", async () => {
-    const r = await runExternalHook(portableConfig("process.stdout.write(JSON.stringify({action:'modify',replacement:{qty:0.05}}));"), sampleToolPayload);
+    const r = await runExternalHook(
+      portableConfig(
+        "process.stdout.write(JSON.stringify({action:'modify',replacement:{qty:0.05}}));",
+      ),
+      sampleToolPayload,
+    );
     expect(r.result.action).toBe("modify");
     expect(r.result.replacement).toEqual({ qty: 0.05 });
     expect(r.meta.stdoutJsonParsed).toBe(true);
   });
 
   it("ignores invalid JSON on stdout and uses exit code", async () => {
-    const r = await runExternalHook(portableConfig("process.stdout.write('not json');"), sampleToolPayload);
+    const r = await runExternalHook(
+      portableConfig("process.stdout.write('not json');"),
+      sampleToolPayload,
+    );
     expect(r.result.action).toBe("allow");
     expect(r.meta.stdoutJsonParsed).toBe(false);
   });
 
   it("preserves metadata field from stdout JSON", async () => {
-    const r = await runExternalHook(portableConfig("process.stdout.write(JSON.stringify({action:'allow',metadata:{reviewedBy:'compliance'}}));"), sampleToolPayload);
+    const r = await runExternalHook(
+      portableConfig(
+        "process.stdout.write(JSON.stringify({action:'allow',metadata:{reviewedBy:'compliance'}}));",
+      ),
+      sampleToolPayload,
+    );
     expect(r.result.metadata).toEqual({ reviewedBy: "compliance" });
   });
 });
@@ -144,7 +160,9 @@ describe("runExternalHook — a handler that never reads stdin", () => {
 describe("runExternalHook — payload delivery", () => {
   it("delivers payload as JSON on stdin", async () => {
     const output = join(tempDir, "payload.json");
-    const config = portableConfig("let data=''; for await (const c of process.stdin) data += c; await Bun.write(process.env.OUT, data);");
+    const config = portableConfig(
+      "let data=''; for await (const c of process.stdin) data += c; await Bun.write(process.env.OUT, data);",
+    );
     config.env = { OUT: output };
     await runExternalHook(config, sampleToolPayload);
     const written = require("node:fs").readFileSync(output, "utf8");
@@ -184,7 +202,9 @@ describe("runExternalHook — timeout", () => {
 describe("runExternalHook — bounded output", () => {
   it("kills and blocks a handler whose output exceeds the process budget", async () => {
     const r = await runExternalHook(
-      portableConfig("process.stdout.write('x'.repeat(70_000)); await new Promise(r => setTimeout(r, 5000));"),
+      portableConfig(
+        "process.stdout.write('x'.repeat(70_000)); await new Promise(r => setTimeout(r, 5000));",
+      ),
       sampleToolPayload,
     );
     expect(r.result.action).toBe("block");
@@ -215,7 +235,10 @@ describe("runExternalHook — args + env", () => {
 
   it("passes env vars to handler", async () => {
     const r = await runExternalHook(
-      { ...portableConfig("process.exit(process.env.GORDON_TEST_VAR === 'yes' ? 0 : 2);"), env: { GORDON_TEST_VAR: "yes" } },
+      {
+        ...portableConfig("process.exit(process.env.GORDON_TEST_VAR === 'yes' ? 0 : 2);"),
+        env: { GORDON_TEST_VAR: "yes" },
+      },
       sampleToolPayload,
     );
     expect(r.result.action).toBe("allow");
@@ -245,7 +268,9 @@ describe("runMetaToPayload", () => {
 describe("Trading scenario — pre-order CPI-release check", () => {
   it("operator wires custom policy: block if it's CPI day", async () => {
     // External hook reads stdin, blocks all orders if env CPI_TODAY=1.
-    const config = portableConfig("if(process.env.CPI_TODAY==='1'){console.error('CPI release imminent — no orders allowed');process.exit(2)}");
+    const config = portableConfig(
+      "if(process.env.CPI_TODAY==='1'){console.error('CPI release imminent — no orders allowed');process.exit(2)}",
+    );
     const blocked = await runExternalHook(
       { ...config, env: { CPI_TODAY: "1" } },
       sampleToolPayload,

@@ -17,12 +17,9 @@ import {
   recordSupervisionResult,
   readSupervisionScore,
   saveUniverse,
-  loadUniverse,
   checkUniverse,
   saveRunningThesis,
-  loadRunningThesis,
   saveMandates,
-  loadMandates,
   type FlawType,
   type StrategyMandate,
 } from "../../../../safety/index.ts";
@@ -46,10 +43,12 @@ export const recordUserThesisTool = createTool({
           "fabricate it on their behalf.",
       })
       .describe("The user's verbatim thesis in their own words."),
-    source: z.enum(["user_input", "agent_summarized"]).optional()
+    source: z
+      .enum(["user_input", "agent_summarized"])
+      .optional()
       .describe(
         "How the thesis was captured. Default 'user_input'. Use 'agent_summarized' " +
-        "only if the user explicitly delegated summarization — divergence will be logged.",
+          "only if the user explicitly delegated summarization — divergence will be logged.",
       ),
   }),
   outputSchema: z.object({
@@ -94,13 +93,7 @@ export const recordSupervisionOutcomeTool = createTool({
   inputSchema: z.object({
     flawId: z.string().describe("Identifier of the injected flaw."),
     flawType: z
-      .enum([
-        "wrong_direction",
-        "excessive_size",
-        "missing_stop",
-        "inverted_rr",
-        "stale_data",
-      ])
+      .enum(["wrong_direction", "excessive_size", "missing_stop", "inverted_rr", "stale_data"])
       .describe("Category of the injected flaw."),
     planId: z.string().describe("Plan the flaw was injected into."),
     userAccepted: z
@@ -113,12 +106,7 @@ export const recordSupervisionOutcomeTool = createTool({
     totalChecks: z.number(),
   }),
   execute: async ({ flawId, flawType, planId, userAccepted }) => {
-    const rec = newSupervisionRecord(
-      flawId,
-      flawType as FlawType,
-      planId,
-      userAccepted,
-    );
+    const rec = newSupervisionRecord(flawId, flawType as FlawType, planId, userAccepted);
     recordSupervisionResult(rec);
     const score = readSupervisionScore();
     return {
@@ -137,11 +125,21 @@ export const setTradingUniverseTool = createTool({
     "Anti-scope-creep guard: defends against drifting from 'I trade BTC/ETH' into 'I trade 50 tokens'. " +
     "Each axis is independent — empty list on an axis means unrestricted on that axis.",
   inputSchema: z.object({
-    symbols: z.array(z.string()).default([])
-      .describe("Allowed symbols, e.g. ['BTCUSDT','ETHUSDT','AAPL']. Empty = unrestricted on this axis."),
-    assetClasses: z.array(z.string()).default([])
-      .describe("Allowed asset classes: 'crypto', 'us_equity', 'options', 'defi'. Empty = unrestricted."),
-    venues: z.array(z.string()).default([])
+    symbols: z
+      .array(z.string())
+      .default([])
+      .describe(
+        "Allowed symbols, e.g. ['BTCUSDT','ETHUSDT','AAPL']. Empty = unrestricted on this axis.",
+      ),
+    assetClasses: z
+      .array(z.string())
+      .default([])
+      .describe(
+        "Allowed asset classes: 'crypto', 'us_equity', 'options', 'defi'. Empty = unrestricted.",
+      ),
+    venues: z
+      .array(z.string())
+      .default([])
       .describe("Allowed venues, e.g. ['binance','alpaca']. Empty = unrestricted."),
     note: z.string().optional().describe("Trader's note on why this universe."),
   }),
@@ -218,10 +216,16 @@ export const setRunningThesisTool = createTool({
     "incoherent. Ask the user to articulate the thesis — do not fabricate.",
   inputSchema: z.object({
     bias: z.enum(["long", "short", "neutral"]),
-    marketFocus: z.array(z.string()).default([])
+    marketFocus: z
+      .array(z.string())
+      .default([])
       .describe("Asset classes in focus: 'crypto', 'us_equity', 'options', 'defi'."),
     timeHorizon: z.enum(["intraday", "swing", "position"]),
-    convictionMin: z.number().int().min(1).max(10)
+    convictionMin: z
+      .number()
+      .int()
+      .min(1)
+      .max(10)
       .describe("Minimum conviction (1-10) required for a plan."),
     note: z.string().min(10).describe("Trader's verbatim thesis note."),
     expiresAt: z.string().optional().describe("ISO timestamp when this thesis goes stale."),
@@ -278,19 +282,21 @@ export const setStrategyMandateTool = createTool({
     "trying to cover crypto + equity + options + DeFi simultaneously. Each call replaces the full " +
     "mandate registry (idempotent re-declaration model).",
   inputSchema: z.object({
-    mandates: z.array(
-      z.object({
-        id: z.string().min(1),
-        name: z.string().min(1),
-        assetClasses: z.array(z.string()).default([]),
-        venues: z.array(z.string()).default([]),
-        strategyTags: z.array(z.string()).default([]),
-        maxPositionPct: z.number().min(0).max(100),
-        maxAllocationPct: z.number().min(0).max(100),
-        maxOpenPositions: z.number().int().min(0),
-        note: z.string().optional(),
-      }),
-    ).min(1),
+    mandates: z
+      .array(
+        z.object({
+          id: z.string().min(1),
+          name: z.string().min(1),
+          assetClasses: z.array(z.string()).default([]),
+          venues: z.array(z.string()).default([]),
+          strategyTags: z.array(z.string()).default([]),
+          maxPositionPct: z.number().min(0).max(100),
+          maxAllocationPct: z.number().min(0).max(100),
+          maxOpenPositions: z.number().int().min(0),
+          note: z.string().optional(),
+        }),
+      )
+      .min(1),
   }),
   outputSchema: z.object({
     saved: z.boolean(),

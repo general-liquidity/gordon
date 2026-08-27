@@ -31,14 +31,25 @@ export {
   removeSandbox,
   compareSandboxes,
 } from "./ops/strategySandbox.ts";
-export type { SandboxConfig, SandboxSnapshot, VirtualPosition, VirtualTrade } from "./ops/strategySandbox.ts";
+export type {
+  SandboxConfig,
+  SandboxSnapshot,
+  VirtualPosition,
+  VirtualTrade,
+} from "./ops/strategySandbox.ts";
 
 // Portfolio Diff
 export {
   computePortfolioDiff,
   formatPortfolioDiff,
 } from "./portfolio/portfolioDiff.ts";
-export type { PortfolioDiff, PositionDiff, PortfolioState, PositionState, DiffAction } from "./portfolio/portfolioDiff.ts";
+export type {
+  PortfolioDiff,
+  PositionDiff,
+  PortfolioState,
+  PositionState,
+  DiffAction,
+} from "./portfolio/portfolioDiff.ts";
 
 // Market Context Protocol
 export {
@@ -46,14 +57,25 @@ export {
   getMarketContext,
   formatSymbolHover,
 } from "./signals/marketContext.ts";
-export type { SymbolContext, OrderContext, MarketContextProvider } from "./signals/marketContext.ts";
+export type {
+  SymbolContext,
+  OrderContext,
+  MarketContextProvider,
+} from "./signals/marketContext.ts";
 
 // Risk Classifier
 export {
   classifyTradeRisk,
   DEFAULT_CLASSIFIER_CONFIG,
 } from "./risk/riskClassifier.ts";
-export type { RiskAssessment, RiskTier, RiskDimension, TradeProposal, PortfolioContext, ClassifierConfig } from "./risk/riskClassifier.ts";
+export type {
+  RiskAssessment,
+  RiskTier,
+  RiskDimension,
+  TradeProposal,
+  PortfolioContext,
+  ClassifierConfig,
+} from "./risk/riskClassifier.ts";
 
 // Strategy Checkpointing
 export {
@@ -78,14 +100,26 @@ export {
   formatCycleStatus,
   DEFAULT_REBALANCE_CONFIG,
 } from "./portfolio/autoRebalance.ts";
-export type { RebalanceCycle, RebalanceStep, RebalanceProposal, DriftDetection, RebalanceConfig } from "./portfolio/autoRebalance.ts";
+export type {
+  RebalanceCycle,
+  RebalanceStep,
+  RebalanceProposal,
+  DriftDetection,
+  RebalanceConfig,
+} from "./portfolio/autoRebalance.ts";
 
 // Multi-Leg Atomic Execution
 export {
   executeAtomicGroup,
   formatAtomicGroup,
 } from "./ops/atomicExecution.ts";
-export type { OrderLeg, LegResult, AtomicGroup, OrderSubmitter, OrderCanceller } from "./ops/atomicExecution.ts";
+export type {
+  OrderLeg,
+  LegResult,
+  AtomicGroup,
+  OrderSubmitter,
+  OrderCanceller,
+} from "./ops/atomicExecution.ts";
 
 // Shadow Mode (Paper/Ghost Fill Tracking)
 export {
@@ -155,9 +189,7 @@ export {
 export type { CorrelationCheck } from "./risk/correlationLimits.ts";
 
 // Scenario-Based Valuation (DCF)
-export {
-  runScenarioValuation,
-} from "./quant/scenarioValuation.ts";
+export { runScenarioValuation } from "./quant/scenarioValuation.ts";
 export type { ValuationResult, ScenarioResult, DCFInputs } from "./quant/scenarioValuation.ts";
 
 // Hurst Exponent (Regime Detection)
@@ -168,9 +200,7 @@ export {
 export type { HurstAnalysis, HurstRegime } from "./quant/hurstExponent.ts";
 
 // Tail Risk Scoring
-export {
-  computeTailRisk,
-} from "./risk/tailRisk.ts";
+export { computeTailRisk } from "./risk/tailRisk.ts";
 export type { TailRiskProfile } from "./risk/tailRisk.ts";
 
 // Cointegration Test (Pairs Trading)
@@ -199,7 +229,11 @@ export type { GrangerResult, BiDirectionalGrangerResult } from "./quant/grangerC
 
 // Black-Litterman Portfolio Optimization
 export { blackLitterman } from "./portfolio/blackLitterman.ts";
-export type { BlackLittermanInputs, BlackLittermanResult, InvestorView } from "./portfolio/blackLitterman.ts";
+export type {
+  BlackLittermanInputs,
+  BlackLittermanResult,
+  InvestorView,
+} from "./portfolio/blackLitterman.ts";
 
 // Volatility-Targeting + Drawdown Overlay
 export {
@@ -209,7 +243,11 @@ export {
   DEFAULT_VOL_TARGET_CONFIG,
   DEFAULT_DRAWDOWN_CONFIG,
 } from "./risk/drawdownOverlay.ts";
-export type { VolTargetConfig, DrawdownOverlayConfig, OverlayResult } from "./risk/drawdownOverlay.ts";
+export type {
+  VolTargetConfig,
+  DrawdownOverlayConfig,
+  OverlayResult,
+} from "./risk/drawdownOverlay.ts";
 
 // Backtest Credibility Tests
 export {
@@ -236,14 +274,24 @@ export {
   analyzeMarkovRegime,
   DEFAULT_MARKOV_CONFIG,
 } from "./quant/markovRegime.ts";
-export type { MarkovRegimeResult, MarkovState, TransitionMatrix, MarkovConfig } from "./quant/markovRegime.ts";
+export type {
+  MarkovRegimeResult,
+  MarkovState,
+  TransitionMatrix,
+  MarkovConfig,
+} from "./quant/markovRegime.ts";
 
 // Orderflow Delta Ladder
 export {
   analyzeOrderflow,
   DEFAULT_ORDERFLOW_CONFIG,
 } from "./signals/orderflowDelta.ts";
-export type { OrderflowResult, DeltaBar, OHLCV, OrderflowConfig } from "./signals/orderflowDelta.ts";
+export type {
+  OrderflowResult,
+  DeltaBar,
+  OHLCV,
+  OrderflowConfig,
+} from "./signals/orderflowDelta.ts";
 
 // Auto-Optimizer (Self-Improving Strategies)
 export {
@@ -282,7 +330,12 @@ export type {
 
 // Reflexivity Engine (Soros Theory)
 export { assessReflexivity } from "./quant/reflexivity.ts";
-export type { ReflexivityAssessment, ReflexivityInputs, FeedbackSignal, FeedbackLoopType } from "./quant/reflexivity.ts";
+export type {
+  ReflexivityAssessment,
+  ReflexivityInputs,
+  FeedbackSignal,
+  FeedbackLoopType,
+} from "./quant/reflexivity.ts";
 
 // Janus Meta-Weighting (Dynamic Signal Source Weighting)
 export {
@@ -292,10 +345,24 @@ export {
   runMetaWeighting,
   DEFAULT_META_WEIGHTING_CONFIG,
 } from "./portfolio/metaWeighting.ts";
-export type { SignalSource, WeightedPrediction, BlendedRecommendation, EmergentRegime, MetaWeightingResult, MetaWeightingConfig } from "./portfolio/metaWeighting.ts";
+export type {
+  SignalSource,
+  WeightedPrediction,
+  BlendedRecommendation,
+  EmergentRegime,
+  MetaWeightingResult,
+  MetaWeightingConfig,
+} from "./portfolio/metaWeighting.ts";
 
 // Synthetic Futures Generator (Monte Carlo)
 export { generateSyntheticFutures, formatFuturesSummary } from "./signals/syntheticFutures.ts";
-export type { AssetConfig, CorrelationPair, ScenarioEvent, FuturesConfig, FuturesResult, ScenarioType } from "./signals/syntheticFutures.ts";
+export type {
+  AssetConfig,
+  CorrelationPair,
+  ScenarioEvent,
+  FuturesConfig,
+  FuturesResult,
+  ScenarioType,
+} from "./signals/syntheticFutures.ts";
 export { validateScenarioRealism } from "./signals/scenarioRealism.ts";
 export type { ScenarioRealism } from "./signals/scenarioRealism.ts";

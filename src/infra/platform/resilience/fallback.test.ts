@@ -108,9 +108,9 @@ describe("CircuitBreaker", () => {
       }
     }
 
-    await expect(
-      breaker.execute(async () => "should not run")
-    ).rejects.toThrow(CircuitBreakerOpenError);
+    await expect(breaker.execute(async () => "should not run")).rejects.toThrow(
+      CircuitBreakerOpenError,
+    );
   });
 
   it("should enter half-open state after timeout", async () => {
@@ -218,6 +218,30 @@ describe("withFallback", () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
+  it("uses the caller's cache TTL instead of the global default", async () => {
+    let value = 0;
+    const fn = mock(() => Promise.resolve(++value));
+
+    const first = await withFallback(fn, "test-key-short-ttl", {
+      cacheTTL: 15,
+      maxRetries: 0,
+    });
+    const cached = await withFallback(fn, "test-key-short-ttl", {
+      cacheTTL: 15,
+      maxRetries: 0,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const refreshed = await withFallback(fn, "test-key-short-ttl", {
+      cacheTTL: 15,
+      maxRetries: 0,
+    });
+
+    expect(first).toMatchObject({ data: 1, source: "fresh" });
+    expect(cached).toMatchObject({ data: 1, source: "cache" });
+    expect(refreshed).toMatchObject({ data: 2, source: "fresh" });
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
   it("should use cached data when API fails", async () => {
     // First successful call to populate cache
     let callCount = 0;
@@ -264,7 +288,7 @@ describe("withFallback", () => {
       withFallback(fn, "test-key-5", {
         maxRetries: 0,
         useStaleOnError: false,
-      })
+      }),
     ).rejects.toThrow("no fallback");
   });
 

@@ -20,7 +20,9 @@ function keyLabel(key: KillSwitchKey): string {
   return key.id ? `${key.scope}:${key.id}` : key.scope;
 }
 
-export const killSwitchAlertProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
+export const killSwitchAlertProducer: CandidateProducer = async (
+  obs,
+): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop" || obs.eventType !== "tick_kill_switch") return [];
 
   const trips = listTrippedSwitches();

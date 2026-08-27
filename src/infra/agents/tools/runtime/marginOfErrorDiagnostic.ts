@@ -28,9 +28,7 @@ export const marginOfErrorDiagnosticTool = createTool({
     structuralBias: z
       .enum(["trending", "ranging", "none"])
       .describe("Structural bias (trending / ranging / none)."),
-    strategyDirection: z
-      .enum(["long", "short"])
-      .describe("Strategy direction (long or short)."),
+    strategyDirection: z.enum(["long", "short"]).describe("Strategy direction (long or short)."),
     strategyType: z
       .enum(["breakout", "mean_reversion"])
       .describe("Strategy type (breakout / mean_reversion)."),

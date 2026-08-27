@@ -36,8 +36,8 @@ describe("MCP discoveryCache", () => {
 
   it("round-trips a saved cache", async () => {
     const descriptors = {
-      "axiom_query": { serverId: "axiom", toolName: "query", description: "Run KQL" },
-      "exa_search": { serverId: "exa", toolName: "search" },
+      axiom_query: { serverId: "axiom", toolName: "query", description: "Run KQL" },
+      exa_search: { serverId: "exa", toolName: "search" },
     };
     await saveDiscoveryCache("fp-A", descriptors, { cachePath });
 
@@ -49,7 +49,7 @@ describe("MCP discoveryCache", () => {
   });
 
   it("flags fingerprint mismatch as stale even within TTL", async () => {
-    await saveDiscoveryCache("fp-A", { "x_y": { serverId: "x", toolName: "y" } }, { cachePath });
+    await saveDiscoveryCache("fp-A", { x_y: { serverId: "x", toolName: "y" } }, { cachePath });
     const result = await loadDiscoveryCache("fp-DIFFERENT", { cachePath });
     expect(result.cache).not.toBeNull();
     expect(result.fresh).toBe(false);
@@ -57,7 +57,7 @@ describe("MCP discoveryCache", () => {
   });
 
   it("flags expired cache when older than ttlMs", async () => {
-    await saveDiscoveryCache("fp-A", { "x_y": { serverId: "x", toolName: "y" } }, { cachePath });
+    await saveDiscoveryCache("fp-A", { x_y: { serverId: "x", toolName: "y" } }, { cachePath });
     const result = await loadDiscoveryCache("fp-A", { cachePath, ttlMs: 0 });
     expect(result.cache).not.toBeNull();
     expect(result.fresh).toBe(false);
@@ -70,13 +70,13 @@ describe("MCP discoveryCache", () => {
 
   it("buildDescriptorsFromLiveTools splits namespaced names", () => {
     const tools = {
-      "axiom_query": { description: "Run KQL" },
-      "exa_search": { description: "Web search" },
-      "noUnderscoreToolIgnored": { description: "should be skipped" },
+      axiom_query: { description: "Run KQL" },
+      exa_search: { description: "Web search" },
+      noUnderscoreToolIgnored: { description: "should be skipped" },
     };
     const descriptors = buildDescriptorsFromLiveTools(tools);
     expect(Object.keys(descriptors).sort()).toEqual(["axiom_query", "exa_search"]);
-    expect(descriptors["axiom_query"]).toEqual({
+    expect(descriptors.axiom_query).toEqual({
       serverId: "axiom",
       toolName: "query",
       description: "Run KQL",
@@ -85,7 +85,7 @@ describe("MCP discoveryCache", () => {
 
   it("clearDiscoveryCache removes file silently when missing", async () => {
     await clearDiscoveryCache({ cachePath }); // no error
-    await saveDiscoveryCache("fp-A", { "x_y": { serverId: "x", toolName: "y" } }, { cachePath });
+    await saveDiscoveryCache("fp-A", { x_y: { serverId: "x", toolName: "y" } }, { cachePath });
     await clearDiscoveryCache({ cachePath });
     const result = await loadDiscoveryCache("fp-A", { cachePath });
     expect(result.cache).toBeNull();
@@ -104,7 +104,11 @@ describe("MCP discoveryCache", () => {
     const { writeFile, mkdir } = await import("node:fs/promises");
     const path = await import("node:path");
     await mkdir(path.dirname(cachePath), { recursive: true });
-    await writeFile(cachePath, JSON.stringify({ version: 99, savedAt: Date.now(), fingerprint: "x", tools: {} }), "utf-8");
+    await writeFile(
+      cachePath,
+      JSON.stringify({ version: 99, savedAt: Date.now(), fingerprint: "x", tools: {} }),
+      "utf-8",
+    );
     const result = await loadDiscoveryCache("x", { cachePath });
     expect(result.cache).toBeNull();
     expect(result.reason).toBe("unknown cache version");

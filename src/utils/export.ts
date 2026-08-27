@@ -4,12 +4,12 @@
  */
 
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { GORDON_DIR } from "../infra/storage/paths.ts";
 
-import type { ScanResult, CoinAnalysis } from "../types/market.ts";
+import type { ScanResult } from "../types/market.ts";
 import type { DetailedAnalysis } from "../core/pipeline/analyzer.ts";
-import type { BacktestResult, BacktestMetrics } from "../backtest/types.ts";
+import type { BacktestResult } from "../backtest/types.ts";
 import type { ChatSession } from "../infra/storage/entities/chat-history.ts";
 
 // ============================================================================
@@ -58,7 +58,7 @@ async function ensureExportsDir(customDir?: string): Promise<string> {
 function generateFilename(
   base: string,
   format: ExportFormat,
-  includeTimestamp: boolean = true
+  includeTimestamp: boolean = true,
 ): string {
   const sanitizedBase = base.toLowerCase().replace(/[^a-z0-9-_]/g, "-");
   const date = new Date();
@@ -98,7 +98,7 @@ function escapeCSV(value: unknown): string {
  */
 export async function exportScanResults(
   data: ScanResult,
-  options: ExportOptions
+  options: ExportOptions,
 ): Promise<ExportResult> {
   const { format, filename, includeTimestamp = true, outputDir } = options;
 
@@ -133,11 +133,11 @@ export async function exportScanResults(
             })),
           },
           null,
-          2
+          2,
         );
         break;
 
-      case "csv":
+      case "csv": {
         const csvHeader = [
           "Symbol",
           "Price",
@@ -161,13 +161,14 @@ export async function exportScanResults(
             escapeCSV(c.risk),
             escapeCSV(c.trend),
             escapeCSV(formatNumber(c.indicators.rsi)),
-          ].join(",")
+          ].join(","),
         );
 
         content = [csvHeader, ...csvRows].join("\n");
         break;
+      }
 
-      case "markdown":
+      case "markdown": {
         const lines: string[] = [
           `# Gordon Market Scan Report`,
           "",
@@ -185,7 +186,7 @@ export async function exportScanResults(
 
         for (const c of opportunities.slice(0, 20)) {
           lines.push(
-            `| ${c.symbol} | $${formatNumber(c.price, 4)} | ${formatNumber(c.change24h)}% | ${formatNumber(c.setupConfidence * 100)}% | ${c.bias} | ${c.risk} | ${formatNumber(c.indicators.rsi, 0)} |`
+            `| ${c.symbol} | $${formatNumber(c.price, 4)} | ${formatNumber(c.change24h)}% | ${formatNumber(c.setupConfidence * 100)}% | ${c.bias} | ${c.risk} | ${formatNumber(c.indicators.rsi, 0)} |`,
           );
         }
 
@@ -197,6 +198,7 @@ export async function exportScanResults(
 
         content = lines.join("\n");
         break;
+      }
     }
 
     await writeFile(filepath, content, "utf-8");
@@ -226,7 +228,7 @@ export async function exportScanResults(
  */
 export async function exportAnalysis(
   data: DetailedAnalysis,
-  options: ExportOptions
+  options: ExportOptions,
 ): Promise<ExportResult> {
   const { format, filename, includeTimestamp = true, outputDir } = options;
 
@@ -273,11 +275,11 @@ export async function exportAnalysis(
             setupDetails: data.setupDetails,
           },
           null,
-          2
+          2,
         );
         break;
 
-      case "csv":
+      case "csv": {
         // For single analysis, CSV is a simple key-value format
         const pairs = [
           ["Field", "Value"],
@@ -289,21 +291,28 @@ export async function exportAnalysis(
           ["Bias", data.bias],
           ["Risk", data.risk],
           ["Setup Detected", data.setupDetected ? "Yes" : "No"],
-          ["Setup Confidence", formatNumber(data.setupConfidence * 100) + "%"],
+          ["Setup Confidence", `${formatNumber(data.setupConfidence * 100)}%`],
           ["RSI", formatNumber(data.indicators.rsi)],
           ["RSI State", data.rsiState],
           ["MACD State", data.macdState],
           ["Volume Trend", data.volumeTrend],
           ["Support 1", data.supports[0] ? formatNumber(data.supports[0].price, 4) : "N/A"],
           ["Support 2", data.supports[1] ? formatNumber(data.supports[1].price, 4) : "N/A"],
-          ["Resistance 1", data.resistances[0] ? formatNumber(data.resistances[0].price, 4) : "N/A"],
-          ["Resistance 2", data.resistances[1] ? formatNumber(data.resistances[1].price, 4) : "N/A"],
+          [
+            "Resistance 1",
+            data.resistances[0] ? formatNumber(data.resistances[0].price, 4) : "N/A",
+          ],
+          [
+            "Resistance 2",
+            data.resistances[1] ? formatNumber(data.resistances[1].price, 4) : "N/A",
+          ],
         ];
 
         content = pairs.map((row) => row.map(escapeCSV).join(",")).join("\n");
         break;
+      }
 
-      case "markdown":
+      case "markdown": {
         const mdLines: string[] = [
           `# ${data.symbol} Analysis Report`,
           "",
@@ -336,14 +345,18 @@ export async function exportAnalysis(
 
         for (let i = 0; i < Math.min(3, data.supports.length); i++) {
           const s = data.supports[i]!;
-          mdLines.push(`- **S${i + 1}:** $${formatNumber(s.price, 4)} (strength: ${formatNumber(s.strength * 100)}%)`);
+          mdLines.push(
+            `- **S${i + 1}:** $${formatNumber(s.price, 4)} (strength: ${formatNumber(s.strength * 100)}%)`,
+          );
         }
 
         mdLines.push("", "### Resistance Levels", "");
 
         for (let i = 0; i < Math.min(3, data.resistances.length); i++) {
           const r = data.resistances[i]!;
-          mdLines.push(`- **R${i + 1}:** $${formatNumber(r.price, 4)} (strength: ${formatNumber(r.strength * 100)}%)`);
+          mdLines.push(
+            `- **R${i + 1}:** $${formatNumber(r.price, 4)} (strength: ${formatNumber(r.strength * 100)}%)`,
+          );
         }
 
         if (data.setupDetails.nearestSupport) {
@@ -353,7 +366,7 @@ export async function exportAnalysis(
             "",
             `- **Nearest Support:** $${formatNumber(data.setupDetails.nearestSupport.price, 4)}`,
             `- **Distance to Support:** ${formatNumber(data.setupDetails.distanceToSupport)}%`,
-            `- **Invalidation Price:** $${formatNumber(data.setupDetails.invalidationPrice, 4)}`
+            `- **Invalidation Price:** $${formatNumber(data.setupDetails.invalidationPrice, 4)}`,
           );
         }
 
@@ -361,6 +374,7 @@ export async function exportAnalysis(
 
         content = mdLines.join("\n");
         break;
+      }
     }
 
     await writeFile(filepath, content, "utf-8");
@@ -390,7 +404,7 @@ export async function exportAnalysis(
  */
 export async function exportBacktest(
   data: BacktestResult,
-  options: ExportOptions
+  options: ExportOptions,
 ): Promise<ExportResult> {
   const { format, filename, includeTimestamp = true, outputDir } = options;
 
@@ -398,7 +412,9 @@ export async function exportBacktest(
     const dir = await ensureExportsDir(outputDir);
     const strategyLower = data.strategyName.toLowerCase().replace(/[^a-z0-9]/g, "-");
     const symbolLower = data.config.symbol.toLowerCase().replace("usdt", "");
-    const fname = filename || generateFilename(`backtest-${strategyLower}-${symbolLower}`, format, includeTimestamp);
+    const fname =
+      filename ||
+      generateFilename(`backtest-${strategyLower}-${symbolLower}`, format, includeTimestamp);
     const filepath = join(dir, fname);
 
     let content: string;
@@ -443,11 +459,11 @@ export async function exportBacktest(
             warnings: data.warnings,
           },
           null,
-          2
+          2,
         );
         break;
 
-      case "csv":
+      case "csv": {
         // CSV for trades
         const header = [
           "Trade ID",
@@ -472,7 +488,7 @@ export async function exportBacktest(
             escapeCSV(formatNumber(t.pnl)),
             escapeCSV(formatNumber(t.pnlPercent)),
             escapeCSV(t.exitReason),
-          ].join(",")
+          ].join(","),
         );
 
         // Add summary at the top
@@ -488,8 +504,9 @@ export async function exportBacktest(
 
         content = [...summaryLines, header, ...rows].join("\n");
         break;
+      }
 
-      case "markdown":
+      case "markdown": {
         const mdContent: string[] = [
           `# Backtest Report: ${data.strategyName}`,
           "",
@@ -541,7 +558,7 @@ export async function exportBacktest(
           const exitDate = t.exitTime.split("T")[0];
           const pnlSign = t.pnl >= 0 ? "+" : "";
           mdContent.push(
-            `| ${i + 1} | ${entryDate} | ${exitDate} | ${t.side} | $${formatNumber(t.entryPrice, 4)} | $${formatNumber(t.exitPrice, 4)} | ${pnlSign}$${formatNumber(t.pnl)} | ${pnlSign}${formatNumber(t.pnlPercent)}% |`
+            `| ${i + 1} | ${entryDate} | ${exitDate} | ${t.side} | $${formatNumber(t.entryPrice, 4)} | $${formatNumber(t.exitPrice, 4)} | ${pnlSign}$${formatNumber(t.pnl)} | ${pnlSign}${formatNumber(t.pnlPercent)}% |`,
           );
         }
 
@@ -560,11 +577,12 @@ export async function exportBacktest(
           "",
           "---",
           `*Backtest executed in ${(data.executionTime / 1000).toFixed(2)}s*`,
-          `*Exported by Gordon CLI on ${new Date().toISOString()}*`
+          `*Exported by Gordon CLI on ${new Date().toISOString()}*`,
         );
 
         content = mdContent.join("\n");
         break;
+      }
     }
 
     await writeFile(filepath, content, "utf-8");
@@ -594,7 +612,7 @@ export async function exportBacktest(
  */
 export async function exportData(
   data: unknown,
-  options: ExportOptions & { name?: string }
+  options: ExportOptions & { name?: string },
 ): Promise<ExportResult> {
   const { format, filename, includeTimestamp = true, outputDir, name = "data" } = options;
 
@@ -613,7 +631,7 @@ export async function exportData(
             data,
           },
           null,
-          2
+          2,
         );
         break;
 
@@ -623,7 +641,7 @@ export async function exportData(
           const keys = Object.keys(data[0] as object);
           const header = keys.map(escapeCSV).join(",");
           const rows = data.map((item) =>
-            keys.map((key) => escapeCSV((item as Record<string, unknown>)[key])).join(",")
+            keys.map((key) => escapeCSV((item as Record<string, unknown>)[key])).join(","),
           );
           content = [header, ...rows].join("\n");
         } else {
@@ -672,7 +690,7 @@ export async function exportData(
  */
 export async function exportSession(
   session: ChatSession,
-  options: ExportOptions
+  options: ExportOptions,
 ): Promise<ExportResult> {
   const { format, filename, includeTimestamp = true, outputDir } = options;
 
@@ -702,11 +720,11 @@ export async function exportSession(
             messages: session.messages,
           },
           null,
-          2
+          2,
         );
         break;
 
-      case "csv":
+      case "csv": {
         const csvHeader = ["Timestamp", "Role", "Content", "Agent", "Tool Calls"].join(",");
         const csvRows = session.messages.map((m) =>
           [
@@ -715,12 +733,13 @@ export async function exportSession(
             escapeCSV(m.content.slice(0, 500)),
             escapeCSV(m.agent || ""),
             escapeCSV((m.toolCalls || []).join("; ")),
-          ].join(",")
+          ].join(","),
         );
         content = [csvHeader, ...csvRows].join("\n");
         break;
+      }
 
-      case "markdown":
+      case "markdown": {
         const mdLines: string[] = [
           `# Gordon Session Export`,
           "",
@@ -748,7 +767,12 @@ export async function exportSession(
         ];
 
         for (const msg of session.messages) {
-          const roleLabel = msg.role === "user" ? "**You:**" : msg.role === "assistant" ? "**Gordon:**" : "**System:**";
+          const roleLabel =
+            msg.role === "user"
+              ? "**You:**"
+              : msg.role === "assistant"
+                ? "**Gordon:**"
+                : "**System:**";
           mdLines.push(roleLabel);
           mdLines.push("");
           mdLines.push(msg.content);
@@ -765,6 +789,7 @@ export async function exportSession(
 
         content = mdLines.join("\n");
         break;
+      }
     }
 
     await writeFile(filepath, content, "utf-8");
@@ -794,7 +819,12 @@ export async function exportSession(
  */
 export function parseExportFormat(formatStr: string): ExportFormat | null {
   const normalized = formatStr.toLowerCase().trim();
-  if (normalized === "csv" || normalized === "json" || normalized === "markdown" || normalized === "md") {
+  if (
+    normalized === "csv" ||
+    normalized === "json" ||
+    normalized === "markdown" ||
+    normalized === "md"
+  ) {
     return normalized === "md" ? "markdown" : (normalized as ExportFormat);
   }
   return null;

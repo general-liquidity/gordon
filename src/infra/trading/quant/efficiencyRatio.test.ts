@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeEfficiencyRatio,
-  efficiencyRatioToPayload,
-} from "./efficiencyRatio.ts";
+import { computeEfficiencyRatio, efficiencyRatioToPayload } from "./efficiencyRatio.ts";
 
 describe("computeEfficiencyRatio", () => {
   it("monotone rise → ER ≈ 1, trending", () => {

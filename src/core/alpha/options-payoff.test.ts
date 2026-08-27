@@ -8,10 +8,7 @@ import {
   type OptionLeg,
 } from "./options-payoff.ts";
 
-function payoffAt(
-  result: ReturnType<typeof computeOptionsPayoff>,
-  price: number,
-): number {
+function payoffAt(result: ReturnType<typeof computeOptionsPayoff>, price: number): number {
   const pt = result.payoffCurve.find((p) => Math.abs(p.price - price) < 1e-6);
   if (!pt) throw new Error(`grid has no point at ${price}`);
   return pt.payoff;

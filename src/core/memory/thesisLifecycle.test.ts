@@ -32,7 +32,11 @@ describe("thesis FSM transitions", () => {
     expect(thesis.openQuantity).toBe(10);
     expect(thesis.nextReviewAt).toBe("2026-01-03T00:00:00.000Z");
 
-    thesis = recordPartialClose(thesis, { quantity: 4, exitPrice: 120 }, "2026-01-04T00:00:00.000Z");
+    thesis = recordPartialClose(
+      thesis,
+      { quantity: 4, exitPrice: 120 },
+      "2026-01-04T00:00:00.000Z",
+    );
     expect(thesis.state).toBe("PARTIALLY_CLOSED");
     expect(thesis.openQuantity).toBe(6);
     expect(thesis.realizedPnl).toBeCloseTo((120 - 100) * 4, 9);
@@ -72,7 +76,11 @@ describe("thesis FSM transitions", () => {
       { symbol: "BTC", side: "long", rationale: "x" },
       "2026-01-01T00:00:00.000Z",
     );
-    thesis = enterPosition(markEntryReady(thesis, t("2026-01-01T01:00:00.000Z")), { entryPrice: 100, quantity: 2 }, "2026-01-02T00:00:00.000Z");
+    thesis = enterPosition(
+      markEntryReady(thesis, t("2026-01-01T01:00:00.000Z")),
+      { entryPrice: 100, quantity: 2 },
+      "2026-01-02T00:00:00.000Z",
+    );
     expect(() =>
       recordPartialClose(thesis, { quantity: 3, exitPrice: 110 }, "2026-01-03T00:00:00.000Z"),
     ).toThrow(RangeError);
@@ -85,7 +93,11 @@ describe("MAE / MFE tracking", () => {
       { symbol: "BTC", side: "long", rationale: "x" },
       "2026-01-01T00:00:00.000Z",
     );
-    thesis = enterPosition(markEntryReady(thesis, t("2026-01-01T01:00:00.000Z")), { entryPrice: 100, quantity: 1 }, "2026-01-02T00:00:00.000Z");
+    thesis = enterPosition(
+      markEntryReady(thesis, t("2026-01-01T01:00:00.000Z")),
+      { entryPrice: 100, quantity: 1 },
+      "2026-01-02T00:00:00.000Z",
+    );
     thesis = updateExcursion(thesis, 90, "2026-01-02T06:00:00.000Z"); // -10 adverse
     thesis = updateExcursion(thesis, 115, "2026-01-02T12:00:00.000Z"); // +15 favorable
     thesis = updateExcursion(thesis, 105, "2026-01-02T18:00:00.000Z");
@@ -97,11 +109,17 @@ describe("MAE / MFE tracking", () => {
 describe("review scheduler", () => {
   it("surfaces only open theses whose review is due", () => {
     const base = "2026-01-01T00:00:00.000Z";
-    let active = createThesis({ symbol: "A", side: "long", rationale: "x", reviewEveryMs: DAY }, base);
+    let active = createThesis(
+      { symbol: "A", side: "long", rationale: "x", reviewEveryMs: DAY },
+      base,
+    );
     active = enterPosition(markEntryReady(active, base), { entryPrice: 10, quantity: 1 }, base);
     // nextReviewAt = base + 1 day.
 
-    let closed = createThesis({ symbol: "B", side: "long", rationale: "x", reviewEveryMs: DAY }, base);
+    let closed = createThesis(
+      { symbol: "B", side: "long", rationale: "x", reviewEveryMs: DAY },
+      base,
+    );
     closed = enterPosition(markEntryReady(closed, base), { entryPrice: 10, quantity: 1 }, base);
     closed = closePosition(closed, 12, base);
 
@@ -116,7 +134,10 @@ describe("review scheduler", () => {
 
   it("reschedules on completeReview", () => {
     const base = "2026-01-01T00:00:00.000Z";
-    let thesis = createThesis({ symbol: "A", side: "long", rationale: "x", reviewEveryMs: DAY }, base);
+    let thesis = createThesis(
+      { symbol: "A", side: "long", rationale: "x", reviewEveryMs: DAY },
+      base,
+    );
     thesis = enterPosition(markEntryReady(thesis, base), { entryPrice: 10, quantity: 1 }, base);
     thesis = completeReview(thesis, "2026-01-02T00:00:00.000Z");
     expect(thesis.nextReviewAt).toBe("2026-01-03T00:00:00.000Z");
@@ -126,7 +147,10 @@ describe("review scheduler", () => {
 describe("termination", () => {
   it("moves to TERMINATED and clears the review schedule", () => {
     const base = "2026-01-01T00:00:00.000Z";
-    let thesis = createThesis({ symbol: "A", side: "long", rationale: "x", reviewEveryMs: DAY }, base);
+    let thesis = createThesis(
+      { symbol: "A", side: "long", rationale: "x", reviewEveryMs: DAY },
+      base,
+    );
     thesis = enterPosition(markEntryReady(thesis, base), { entryPrice: 10, quantity: 1 }, base);
     thesis = terminate(thesis, "thesis invalidated by regime shift", "2026-01-02T00:00:00.000Z");
     expect(thesis.state).toBe("TERMINATED");

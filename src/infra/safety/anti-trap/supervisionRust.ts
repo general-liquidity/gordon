@@ -157,7 +157,7 @@ export function recordSupervisionResult(
   path: string = defaultSupervisionLogPath(),
 ): void {
   mkdirSync(dirname(path), { recursive: true });
-  appendFileSync(path, JSON.stringify(rec) + "\n", "utf8");
+  appendFileSync(path, `${JSON.stringify(rec)}\n`, "utf8");
 }
 
 export interface SupervisionScore {
@@ -167,9 +167,7 @@ export interface SupervisionScore {
   catchRate: number;
 }
 
-export function readSupervisionScore(
-  path: string = defaultSupervisionLogPath(),
-): SupervisionScore {
+export function readSupervisionScore(path: string = defaultSupervisionLogPath()): SupervisionScore {
   if (!existsSync(path)) {
     return { total: 0, caught: 0, missed: 0, catchRate: 1 };
   }

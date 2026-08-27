@@ -89,12 +89,22 @@ describe("Johansen trace test", () => {
   });
 
   test("null-on-missing: ragged series → insufficient_data", () => {
-    const r = runJohansenTest({ series: [[1, 2, 3], [1, 2]] });
+    const r = runJohansenTest({
+      series: [
+        [1, 2, 3],
+        [1, 2],
+      ],
+    });
     expect(r.verdict).toBe("insufficient_data");
   });
 
   test("null-on-missing: too few observations → insufficient_data", () => {
-    const r = runJohansenTest({ series: [[1, 2, 3, 4], [2, 3, 4, 5]] });
+    const r = runJohansenTest({
+      series: [
+        [1, 2, 3, 4],
+        [2, 3, 4, 5],
+      ],
+    });
     expect(r.verdict).toBe("insufficient_data");
   });
 });

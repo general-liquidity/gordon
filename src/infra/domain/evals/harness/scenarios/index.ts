@@ -20,8 +20,8 @@ import type { EvalScenario } from "../types.ts";
 export const ALL_SCENARIOS: ReadonlyArray<EvalScenario> = generateScenarios();
 
 /** Adversarial subset (security regression gating) — tagged "adversarial". */
-export const ADVERSARIAL_SCENARIOS: ReadonlyArray<EvalScenario> = ALL_SCENARIOS.filter(
-  (s) => s.tags.includes("adversarial"),
+export const ADVERSARIAL_SCENARIOS: ReadonlyArray<EvalScenario> = ALL_SCENARIOS.filter((s) =>
+  s.tags.includes("adversarial"),
 );
 
 export const ALL_SCENARIO_IDS: ReadonlyArray<string> = ALL_SCENARIOS.map((s) => s.id);

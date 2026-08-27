@@ -82,7 +82,13 @@ describe("scoreCandidateAtHorizon — long", () => {
   const c = longCandidate(); // entry 100, stop 90 (R=10), target 120 (reward 20 = 2R)
 
   it("cost a gain when target hit and no stop (positive regret)", () => {
-    const obs: HorizonObservation = { candidateId: "c1", horizonDays: 5, high: 125, low: 98, close: 122 };
+    const obs: HorizonObservation = {
+      candidateId: "c1",
+      horizonDays: 5,
+      high: 125,
+      low: 98,
+      close: 122,
+    };
     const e = scoreCandidateAtHorizon(c, obs);
     expect(e.outcome).toBe("would_have_won");
     expect(e.regretR).toBe(2); // reward 20 / risk 10
@@ -91,7 +97,13 @@ describe("scoreCandidateAtHorizon — long", () => {
   });
 
   it("saved a loss when stop hit and no target (negative regret)", () => {
-    const obs: HorizonObservation = { candidateId: "c1", horizonDays: 5, high: 105, low: 88, close: 92 };
+    const obs: HorizonObservation = {
+      candidateId: "c1",
+      horizonDays: 5,
+      high: 105,
+      low: 88,
+      close: 92,
+    };
     const e = scoreCandidateAtHorizon(c, obs);
     expect(e.outcome).toBe("would_have_lost");
     expect(e.regretR).toBe(-1);
@@ -100,14 +112,26 @@ describe("scoreCandidateAtHorizon — long", () => {
   });
 
   it("marks-to-market when neither level hit (open)", () => {
-    const obs: HorizonObservation = { candidateId: "c1", horizonDays: 5, high: 108, low: 95, close: 105 };
+    const obs: HorizonObservation = {
+      candidateId: "c1",
+      horizonDays: 5,
+      high: 108,
+      low: 95,
+      close: 105,
+    };
     const e = scoreCandidateAtHorizon(c, obs);
     expect(e.outcome).toBe("open");
     expect(e.regretR).toBeCloseTo(0.5, 10); // (105-100)/10
   });
 
   it("resolves ambiguous (both touched) by close", () => {
-    const obs: HorizonObservation = { candidateId: "c1", horizonDays: 5, high: 121, low: 89, close: 95 };
+    const obs: HorizonObservation = {
+      candidateId: "c1",
+      horizonDays: 5,
+      high: 121,
+      low: 89,
+      close: 95,
+    };
     const e = scoreCandidateAtHorizon(c, obs);
     expect(e.outcome).toBe("ambiguous");
     expect(e.regretR).toBeCloseTo(-0.5, 10); // (95-100)/10
@@ -127,7 +151,13 @@ describe("scoreCandidateAtHorizon — short", () => {
   });
 
   it("cost a gain when target (down) hit and no stop", () => {
-    const obs: HorizonObservation = { candidateId: "s1", horizonDays: 20, high: 104, low: 78, close: 82 };
+    const obs: HorizonObservation = {
+      candidateId: "s1",
+      horizonDays: 20,
+      high: 104,
+      low: 78,
+      close: 82,
+    };
     const e = scoreCandidateAtHorizon(c, obs);
     expect(e.outcome).toBe("would_have_won");
     expect(e.regretR).toBe(2);
@@ -135,7 +165,13 @@ describe("scoreCandidateAtHorizon — short", () => {
   });
 
   it("saved a loss when stop (up) hit and no target", () => {
-    const obs: HorizonObservation = { candidateId: "s1", horizonDays: 20, high: 112, low: 96, close: 108 };
+    const obs: HorizonObservation = {
+      candidateId: "s1",
+      horizonDays: 20,
+      high: 112,
+      low: 96,
+      close: 108,
+    };
     const e = scoreCandidateAtHorizon(c, obs);
     expect(e.outcome).toBe("would_have_lost");
     expect(e.regretR).toBe(-1);
@@ -143,7 +179,13 @@ describe("scoreCandidateAtHorizon — short", () => {
   });
 
   it("open marks-to-market: short profits when price falls", () => {
-    const obs: HorizonObservation = { candidateId: "s1", horizonDays: 20, high: 105, low: 94, close: 96 };
+    const obs: HorizonObservation = {
+      candidateId: "s1",
+      horizonDays: 20,
+      high: 105,
+      low: 94,
+      close: 96,
+    };
     const e = scoreCandidateAtHorizon(c, obs);
     expect(e.outcome).toBe("open");
     expect(e.regretR).toBeCloseTo(0.4, 10); // (100-96)/10
@@ -198,7 +240,13 @@ describe("summarizeByGate", () => {
     const entries = [];
     for (let i = 0; i < 6; i++) {
       entries.push(
-        scoreCandidateAtHorizon(c, { candidateId: "c1", horizonDays: 5, high: 125, low: 98, close: 122 }),
+        scoreCandidateAtHorizon(c, {
+          candidateId: "c1",
+          horizonDays: 5,
+          high: 125,
+          low: 98,
+          close: 122,
+        }),
       );
     }
     const [summary] = summarizeByGate(entries);
@@ -214,7 +262,13 @@ describe("summarizeByGate", () => {
     const entries = [];
     for (let i = 0; i < 6; i++) {
       entries.push(
-        scoreCandidateAtHorizon(c, { candidateId: "c1", horizonDays: 5, high: 105, low: 88, close: 92 }),
+        scoreCandidateAtHorizon(c, {
+          candidateId: "c1",
+          horizonDays: 5,
+          high: 105,
+          low: 88,
+          close: 92,
+        }),
       );
     }
     const [summary] = summarizeByGate(entries);
@@ -226,7 +280,13 @@ describe("summarizeByGate", () => {
   it("returns insufficient_data below the minimum sample", () => {
     const c = longCandidate();
     const entries = [
-      scoreCandidateAtHorizon(c, { candidateId: "c1", horizonDays: 5, high: 125, low: 98, close: 122 }),
+      scoreCandidateAtHorizon(c, {
+        candidateId: "c1",
+        horizonDays: 5,
+        high: 125,
+        low: 98,
+        close: 122,
+      }),
     ];
     const [summary] = summarizeByGate(entries);
     expect(summary!.amendmentSignal).toBe("insufficient_data");

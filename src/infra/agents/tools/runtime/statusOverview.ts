@@ -41,9 +41,13 @@ function readRecentDecisionCount(windowHours: number): number {
       try {
         const row = JSON.parse(line) as { recordedAt?: string };
         if (row.recordedAt && Date.parse(row.recordedAt) >= cutoff) count++;
-      } catch { /* skip */ }
+      } catch {
+        /* skip */
+      }
     }
-  } catch { /* skip */ }
+  } catch {
+    /* skip */
+  }
   return count;
 }
 
@@ -80,9 +84,13 @@ function readRecentDebriefs(windowHours: number): DebriefSummary {
           (counts[row.quadrant] as number)++;
           counts.total++;
         }
-      } catch { /* skip */ }
+      } catch {
+        /* skip */
+      }
     }
-  } catch { /* skip */ }
+  } catch {
+    /* skip */
+  }
   const wins = counts.deserved_success + counts.dumb_luck;
   counts.toxicAlphaWarning = wins > 0 && counts.dumb_luck / wins > 0.2;
   return counts;
@@ -102,9 +110,13 @@ function readRecentFrictionUsd(windowHours: number): number {
         const row = JSON.parse(line) as { recordedAt?: string; costUsd?: number };
         if (!row.recordedAt || Date.parse(row.recordedAt) < cutoff) continue;
         if (typeof row.costUsd === "number") total += row.costUsd;
-      } catch { /* skip */ }
+      } catch {
+        /* skip */
+      }
     }
-  } catch { /* skip */ }
+  } catch {
+    /* skip */
+  }
   return total;
 }
 
@@ -151,7 +163,8 @@ function formatStatus(args: {
   }
   if (state.sessionHwmUsd !== null && state.currentEquityUsd !== null) {
     const drawdownFromHwm = state.sessionHwmUsd - state.currentEquityUsd;
-    if (drawdownFromHwm > 0) lines.push(`- Drawdown from session HWM: -$${drawdownFromHwm.toFixed(2)}`);
+    if (drawdownFromHwm > 0)
+      lines.push(`- Drawdown from session HWM: -$${drawdownFromHwm.toFixed(2)}`);
   }
   if (state.ytdPnLUsd !== null) {
     lines.push(`- YTD PnL: ${state.ytdPnLUsd >= 0 ? "+" : ""}$${state.ytdPnLUsd.toFixed(2)}`);
@@ -208,7 +221,11 @@ function formatStatus(args: {
     },
     {
       name: "Anti-rot",
-      flags: ["GORDON_TRADING_UNIVERSE", "GORDON_THESIS_COHERENCE", "GORDON_TRADER_BEHAVIOR_PATTERNS"],
+      flags: [
+        "GORDON_TRADING_UNIVERSE",
+        "GORDON_THESIS_COHERENCE",
+        "GORDON_TRADER_BEHAVIOR_PATTERNS",
+      ],
     },
     {
       name: "Harness",

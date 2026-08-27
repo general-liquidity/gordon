@@ -24,7 +24,11 @@ beforeEach(() => {
 });
 
 const cleanup = () => {
-  try { rmSync(workDir, { recursive: true, force: true }); } catch { /* ignore */ }
+  try {
+    rmSync(workDir, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
 };
 
 const cleanThesis: ThesisSection = {
@@ -79,15 +83,15 @@ describe("evaluateVerdict — math blockers", () => {
   });
 
   it("blocks on risk percent out of band", () => {
-    expect(
-      evaluateVerdict(cleanThesis, { ...cleanMath, riskPercent: 0 }, noFlags).verdict,
-    ).toBe("no_go");
-    expect(
-      evaluateVerdict(cleanThesis, { ...cleanMath, riskPercent: 0.15 }, noFlags).verdict,
-    ).toBe("no_go");
-    expect(
-      evaluateVerdict(cleanThesis, { ...cleanMath, riskPercent: 0.05 }, noFlags).verdict,
-    ).toBe("go");
+    expect(evaluateVerdict(cleanThesis, { ...cleanMath, riskPercent: 0 }, noFlags).verdict).toBe(
+      "no_go",
+    );
+    expect(evaluateVerdict(cleanThesis, { ...cleanMath, riskPercent: 0.15 }, noFlags).verdict).toBe(
+      "no_go",
+    );
+    expect(evaluateVerdict(cleanThesis, { ...cleanMath, riskPercent: 0.05 }, noFlags).verdict).toBe(
+      "go",
+    );
   });
 
   it("blocks on zero stop distance", () => {

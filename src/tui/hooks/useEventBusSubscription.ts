@@ -100,5 +100,5 @@ export function useEventBusSubscriptions(
     };
     // Stringify the array to detect changes in the list of event types
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(eventTypes), enabled]);
+  }, [enabled, eventTypes.length, eventTypes]);
 }

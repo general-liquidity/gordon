@@ -21,7 +21,7 @@ function makeNormal(seed: number): () => number {
       return s;
     }
     let a = u();
-    let b = u();
+    const b = u();
     if (a < 1e-12) a = 1e-12;
     const r = Math.sqrt(-2 * Math.log(a));
     const theta = 2 * Math.PI * b;

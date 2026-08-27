@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import { mkdtempSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -56,7 +56,9 @@ describe("isCitationAgentEnabled", () => {
 
 describe("defaultCitationManifestPath", () => {
   it("honors env override", () => {
-    expect(defaultCitationManifestPath({ [CITATION_MANIFEST_PATH_ENV]: "/x.jsonl" })).toBe("/x.jsonl");
+    expect(defaultCitationManifestPath({ [CITATION_MANIFEST_PATH_ENV]: "/x.jsonl" })).toBe(
+      "/x.jsonl",
+    );
   });
   it("falls back to home-dir default", () => {
     expect(defaultCitationManifestPath({})).toContain("citation-manifests.jsonl");
@@ -65,30 +67,27 @@ describe("defaultCitationManifestPath", () => {
 
 describe("findEvidenceForClaim — ticker match", () => {
   it("matches a BTC claim against BTC evidence (ticker overlap)", () => {
-    const { refs, topScore } = findEvidenceForClaim(
-      "Long BTC/USD on oversold RSI",
-      [btcCandlesEv, ethCandlesEv],
-    );
+    const { refs, topScore } = findEvidenceForClaim("Long BTC/USD on oversold RSI", [
+      btcCandlesEv,
+      ethCandlesEv,
+    ]);
     expect(refs.length).toBeGreaterThan(0);
     expect(refs[0]!.toolCallId).toBe("call-1");
     expect(topScore).toBeGreaterThan(0.4);
   });
 
   it("matches ETH claim against ETH evidence", () => {
-    const { refs } = findEvidenceForClaim(
-      "ETH/USD is consolidating",
-      [btcCandlesEv, ethCandlesEv],
-    );
+    const { refs } = findEvidenceForClaim("ETH/USD is consolidating", [btcCandlesEv, ethCandlesEv]);
     expect(refs[0]!.toolCallId).toBe("call-2");
   });
 });
 
 describe("findEvidenceForClaim — no match", () => {
   it("returns empty for irrelevant evidence", () => {
-    const { refs } = findEvidenceForClaim(
-      "DOGE/USD looks weak on weekly chart",
-      [btcCandlesEv, ethCandlesEv],
-    );
+    const { refs } = findEvidenceForClaim("DOGE/USD looks weak on weekly chart", [
+      btcCandlesEv,
+      ethCandlesEv,
+    ]);
     expect(refs).toEqual([]);
   });
 
@@ -107,19 +106,13 @@ describe("findEvidenceForClaim — no match", () => {
 
 describe("findEvidenceForClaim — indicator + number overlap", () => {
   it("matches when claim and evidence share an indicator name", () => {
-    const { refs, topScore } = findEvidenceForClaim(
-      "RSI signals oversold",
-      [btcCandlesEv],
-    );
+    const { refs, topScore } = findEvidenceForClaim("RSI signals oversold", [btcCandlesEv]);
     expect(refs.length).toBe(1);
     expect(topScore).toBeGreaterThan(0);
   });
 
   it("matches when claim and evidence share a numeric value", () => {
-    const { refs } = findEvidenceForClaim(
-      "Target 50000 on a bounce",
-      [btcCandlesEv],
-    );
+    const { refs } = findEvidenceForClaim("Target 50000 on a bounce", [btcCandlesEv]);
     expect(refs.length).toBeGreaterThan(0);
   });
 });
@@ -139,10 +132,7 @@ describe("buildCitationManifest", () => {
   it("builds a manifest with claim → evidence links", () => {
     const m = buildCitationManifest({
       recommendationId: "plan-1",
-      claims: [
-        "Long BTC/USD on RSI 22 oversold",
-        "Take profit at 52000",
-      ],
+      claims: ["Long BTC/USD on RSI 22 oversold", "Take profit at 52000"],
       evidence: [btcCandlesEv, ethCandlesEv],
       now: "2026-05-13T10:30:00.000Z",
     });
@@ -156,8 +146,8 @@ describe("buildCitationManifest", () => {
     const m = buildCitationManifest({
       recommendationId: "plan-1",
       claims: [
-        "Long BTC/USD on RSI 22",                  // supported
-        "Solana validators are showing problems",  // unsupported
+        "Long BTC/USD on RSI 22", // supported
+        "Solana validators are showing problems", // unsupported
       ],
       evidence: [btcCandlesEv],
     });
@@ -253,11 +243,21 @@ describe("persistCitationManifest / readCitationManifests", () => {
 
   it("returns newest-first", () => {
     persistCitationManifest(
-      buildCitationManifest({ recommendationId: "old", claims: [], evidence: [], now: "2026-01-01T00:00:00Z" }),
+      buildCitationManifest({
+        recommendationId: "old",
+        claims: [],
+        evidence: [],
+        now: "2026-01-01T00:00:00Z",
+      }),
       manifestPath,
     );
     persistCitationManifest(
-      buildCitationManifest({ recommendationId: "new", claims: [], evidence: [], now: "2026-05-01T00:00:00Z" }),
+      buildCitationManifest({
+        recommendationId: "new",
+        claims: [],
+        evidence: [],
+        now: "2026-05-01T00:00:00Z",
+      }),
       manifestPath,
     );
     const out = readCitationManifests({}, manifestPath);

@@ -25,10 +25,7 @@ import type {
   TakeProfitLevel,
 } from "../types.ts";
 import type { Candle } from "../../core/indicators/types.ts";
-import {
-  calculateFlowScope,
-  calculateDeltaLadder,
-} from "../../core/indicators/index.ts";
+import { calculateFlowScope, calculateDeltaLadder } from "../../core/indicators/index.ts";
 import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 
 // ============================================================================
@@ -58,7 +55,7 @@ export class WhaleAccumulationStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, CANDLE_LIMIT);
     if (candles.length < 30) {
@@ -82,7 +79,7 @@ export class WhaleAccumulationStrategy extends BaseStrategy {
 
     if (absorptionCandles.length === 0) {
       return this.notDetected(
-        `No recent candles with volume in top 5% (threshold: ${volumeThreshold.toFixed(0)})`
+        `No recent candles with volume in top 5% (threshold: ${volumeThreshold.toFixed(0)})`,
       );
     }
 
@@ -95,7 +92,7 @@ export class WhaleAccumulationStrategy extends BaseStrategy {
 
     if (!isTight && absorptionCandles.length < 2) {
       return this.notDetected(
-        `Price range not tight enough (body: ${bodyRange.toFixed(2)}, threshold: ${(atrVal * 1.5).toFixed(2)})`
+        `Price range not tight enough (body: ${bodyRange.toFixed(2)}, threshold: ${(atrVal * 1.5).toFixed(2)})`,
       );
     }
 
@@ -105,7 +102,7 @@ export class WhaleAccumulationStrategy extends BaseStrategy {
 
     if (buyingPressure < BUY_PRESSURE_MIN) {
       return this.notDetected(
-        `Buying pressure too low: ${(buyingPressure * 100).toFixed(1)}% (need > ${BUY_PRESSURE_MIN * 100}%)`
+        `Buying pressure too low: ${(buyingPressure * 100).toFixed(1)}% (need > ${BUY_PRESSURE_MIN * 100}%)`,
       );
     }
 
@@ -138,8 +135,8 @@ export class WhaleAccumulationStrategy extends BaseStrategy {
     // Support proximity
     const levels = this.detectLevels(candles, currentPrice);
     const supports = this.getSupports(levels, currentPrice);
-    const nearSupport = supports.length > 0 &&
-      Math.abs(supports[0]!.price - currentPrice) / currentPrice < 0.02;
+    const nearSupport =
+      supports.length > 0 && Math.abs(supports[0]!.price - currentPrice) / currentPrice < 0.02;
     if (nearSupport) confidence += 0.1;
 
     const signals = {
@@ -159,9 +156,14 @@ export class WhaleAccumulationStrategy extends BaseStrategy {
 
     const reasons: string[] = [];
     reasons.push(`${absorptionCandles.length} absorption candle(s) — volume in top 5%`);
-    reasons.push(`Buying pressure: ${(buyingPressure * 100).toFixed(1)}% (${flowScope.imbalanceDirection})`);
+    reasons.push(
+      `Buying pressure: ${(buyingPressure * 100).toFixed(1)}% (${flowScope.imbalanceDirection})`,
+    );
     if (isTight) reasons.push("Tight price range = volume absorption");
-    if (adxResult.adx !== null) reasons.push(`ADX: ${adxResult.adx.toFixed(1)} (${adxResult.adx < ADX_MAX ? "low — ranging" : "trending"})`);
+    if (adxResult.adx !== null)
+      reasons.push(
+        `ADX: ${adxResult.adx.toFixed(1)} (${adxResult.adx < ADX_MAX ? "low — ranging" : "trending"})`,
+      );
     if (deltaLadder.trend === "buying_pressure") reasons.push("Delta Ladder confirms net buying");
     if (nearSupport) reasons.push("Price near support level");
 
@@ -186,7 +188,7 @@ export class WhaleAccumulationStrategy extends BaseStrategy {
       const tr = Math.max(
         current.high - current.low,
         Math.abs(current.high - previous.close),
-        Math.abs(current.low - previous.close)
+        Math.abs(current.low - previous.close),
       );
       trueRanges.push(tr);
 
@@ -206,8 +208,8 @@ export class WhaleAccumulationStrategy extends BaseStrategy {
     for (let i = 0; i < smoothTR.length; i++) {
       const pdi = (smoothPlusDM[i]! / smoothTR[i]!) * 100;
       const mdi = (smoothMinusDM[i]! / smoothTR[i]!) * 100;
-      const dx = Math.abs(pdi - mdi) / (pdi + mdi) * 100;
-      if (!isNaN(dx)) dxValues.push(dx);
+      const dx = (Math.abs(pdi - mdi) / (pdi + mdi)) * 100;
+      if (!Number.isNaN(dx)) dxValues.push(dx);
     }
 
     const adxValues = this.wilderSmooth(dxValues, period);
@@ -235,10 +237,7 @@ export class WhaleAccumulationStrategy extends BaseStrategy {
     return result;
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", CANDLE_LIMIT);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const atr = this.calculateATR(candles);
@@ -313,8 +312,8 @@ When creating a plan using the Whale Accumulation strategy:
   override generateSignal(
     bar: OHLC,
     index: number,
-    data: OHLC[],
-    indicators: IndicatorState
+    _data: OHLC[],
+    indicators: IndicatorState,
   ): Signal | null {
     if (index < 20) return null;
 

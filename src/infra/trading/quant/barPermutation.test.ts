@@ -1,13 +1,9 @@
 import { describe, it, expect } from "bun:test";
-import {
-  permuteOHLCBars,
-  barPermutationToPayload,
-  type OHLCBar,
-} from "./barPermutation.ts";
+import { permuteOHLCBars, barPermutationToPayload, type OHLCBar } from "./barPermutation.ts";
 
 // Deterministic RNG for synthetic data.
 function makeRng(seed: number): () => number {
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   return () => {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return s / 0x100000000;
@@ -120,15 +116,11 @@ describe("permuteOHLCBars — determinism", () => {
 
 describe("permuteOHLCBars — validation", () => {
   it("throws on negative startIndex", () => {
-    expect(() =>
-      permuteOHLCBars({ ohlc: makeSyntheticOHLC(10), startIndex: -1 }),
-    ).toThrow();
+    expect(() => permuteOHLCBars({ ohlc: makeSyntheticOHLC(10), startIndex: -1 })).toThrow();
   });
 
   it("throws on series too short for startIndex", () => {
-    expect(() =>
-      permuteOHLCBars({ ohlc: makeSyntheticOHLC(5), startIndex: 10 }),
-    ).toThrow();
+    expect(() => permuteOHLCBars({ ohlc: makeSyntheticOHLC(5), startIndex: 10 })).toThrow();
   });
 
   it("throws on non-positive prices", () => {

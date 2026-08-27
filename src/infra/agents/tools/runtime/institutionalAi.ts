@@ -134,9 +134,7 @@ export const validateEarningsSignalTool = createTool({
       };
     }
     const signal = validation.signal;
-    const quoteCheck = transcript
-      ? crossCheckRiskFactorQuotes(signal, transcript)
-      : undefined;
+    const quoteCheck = transcript ? crossCheckRiskFactorQuotes(signal, transcript) : undefined;
     const score = scoreEarningsSignal(signal, quoteCheck);
     return {
       valid: true,
@@ -192,7 +190,9 @@ export const getDisciplineAuditTool = createTool({
       .number()
       .positive()
       .optional()
-      .describe("Window (ms) within which a clustered override fires emotional_trading. Default 2h."),
+      .describe(
+        "Window (ms) within which a clustered override fires emotional_trading. Default 2h.",
+      ),
   }),
   outputSchema: z.object({
     summary: z.string(),
@@ -336,7 +336,9 @@ export const getDisciplineTrajectoryTool = createTool({
           ...(input.userId !== undefined && { userId: input.userId }),
           ...(input.maxTradesPerDay !== undefined && { maxTradesPerDay: input.maxTradesPerDay }),
           ...(input.maxDistinctSlots !== undefined && { maxDistinctSlots: input.maxDistinctSlots }),
-          ...(input.emotionalProximityMs !== undefined && { emotionalProximityMs: input.emotionalProximityMs }),
+          ...(input.emotionalProximityMs !== undefined && {
+            emotionalProximityMs: input.emotionalProximityMs,
+          }),
         }),
       );
     }
@@ -465,8 +467,16 @@ export const computeOrchestrationLoadTool = createTool({
       .min(0)
       .optional()
       .describe("Items produced in the last hour — surfaces producer-outpacing-consumer."),
-    saturatedThreshold: z.number().positive().optional().describe("Backlog hours → saturated. Default 0.75."),
-    overloadedThreshold: z.number().positive().optional().describe("Backlog hours → overloaded. Default 1.0."),
+    saturatedThreshold: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Backlog hours → saturated. Default 0.75."),
+    overloadedThreshold: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Backlog hours → overloaded. Default 1.0."),
   }),
   outputSchema: z.object({
     backlogHours: z.number(),
@@ -521,7 +531,12 @@ export const classifySurvivorshipRiskTool = createTool({
     universeConstruction: z
       .enum(["single_symbol", "liquid_broad", "current_snapshot", "point_in_time"])
       .describe("How the backtest universe was assembled."),
-    universeSize: z.number().int().min(1).optional().describe("Number of instruments selected among. Default 1."),
+    universeSize: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe("Number of instruments selected among. Default 1."),
     windowDays: z.number().min(0).optional().describe("Backtest window length in days. Default 0."),
     assetClass: z.enum(["crypto", "equity", "other"]).optional().describe("Default 'other'."),
   }),

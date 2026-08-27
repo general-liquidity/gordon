@@ -7,7 +7,7 @@
  * Pattern: Claude Code service manager with status indicators.
  */
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 
@@ -36,9 +36,30 @@ interface Props {
 // ============================================================================
 
 export const DEFAULT_BROKERS: BrokerInfo[] = [
-  { id: "alpaca", name: "Alpaca", connected: false, accountType: "margin", buyingPower: 0, orderTypes: ["market", "limit", "stop", "trailing_stop"] },
-  { id: "ibkr", name: "IBKR", connected: false, accountType: "margin", buyingPower: 0, orderTypes: ["market", "limit", "stop", "algo", "bracket"] },
-  { id: "tastytrade", name: "Tastytrade", connected: false, accountType: "margin", buyingPower: 0, orderTypes: ["market", "limit", "stop", "options"] },
+  {
+    id: "alpaca",
+    name: "Alpaca",
+    connected: false,
+    accountType: "margin",
+    buyingPower: 0,
+    orderTypes: ["market", "limit", "stop", "trailing_stop"],
+  },
+  {
+    id: "ibkr",
+    name: "IBKR",
+    connected: false,
+    accountType: "margin",
+    buyingPower: 0,
+    orderTypes: ["market", "limit", "stop", "algo", "bracket"],
+  },
+  {
+    id: "tastytrade",
+    name: "Tastytrade",
+    connected: false,
+    accountType: "margin",
+    buyingPower: 0,
+    orderTypes: ["market", "limit", "stop", "options"],
+  },
 ];
 
 // ============================================================================
@@ -60,12 +81,7 @@ function fmtUSD(n: number): string {
 // Component
 // ============================================================================
 
-export function BrokerManagerPanel({
-  brokers,
-  onConnect,
-  onDisconnect,
-  onClose,
-}: Props) {
+export function BrokerManagerPanel({ brokers, onConnect, onDisconnect, onClose }: Props) {
   const [cursor, setCursor] = useState(0);
 
   useInput((_input, key) => {
@@ -106,11 +122,31 @@ export function BrokerManagerPanel({
 
       {/* Column headers */}
       <Box paddingLeft={3}>
-        <Box width={16}><Text bold dimColor>BROKER</Text></Box>
-        <Box width={6}><Text bold dimColor>STATUS</Text></Box>
-        <Box width={10}><Text bold dimColor>ACCOUNT</Text></Box>
-        <Box width={14}><Text bold dimColor>BUYING POWER</Text></Box>
-        <Box width={24}><Text bold dimColor>ORDER TYPES</Text></Box>
+        <Box width={16}>
+          <Text bold dimColor>
+            BROKER
+          </Text>
+        </Box>
+        <Box width={6}>
+          <Text bold dimColor>
+            STATUS
+          </Text>
+        </Box>
+        <Box width={10}>
+          <Text bold dimColor>
+            ACCOUNT
+          </Text>
+        </Box>
+        <Box width={14}>
+          <Text bold dimColor>
+            BUYING POWER
+          </Text>
+        </Box>
+        <Box width={24}>
+          <Text bold dimColor>
+            ORDER TYPES
+          </Text>
+        </Box>
       </Box>
 
       {/* Broker rows */}

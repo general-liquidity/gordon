@@ -37,7 +37,7 @@ import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 // Constants (tuned from liq_momentum_bot.py backtest params)
 // ============================================================================
 
-const FUNDING_THRESHOLD_ANNUALIZED = 0.30; // 30% annualized = extreme
+const FUNDING_THRESHOLD_ANNUALIZED = 0.3; // 30% annualized = extreme
 const PRICE_CHANGE_MIN = 0.015; // 1.5% move against crowd
 const OI_VOLUME_RATIO_MIN = 2.0; // Overleveraged threshold
 const PREMIUM_DIVERGENCE_MIN = 0.005; // 0.5% premium = significant
@@ -61,7 +61,7 @@ export class LiquidationMomentumStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, CANDLE_LIMIT);
     if (candles.length < 30) {
@@ -77,25 +77,19 @@ export class LiquidationMomentumStrategy extends BaseStrategy {
     const hlData = await this.fetchHyperliquidData(symbol);
     if (!hlData) {
       return this.notDetected(
-        "Could not fetch Hyperliquid data — strategy requires aggregate funding/OI data"
+        "Could not fetch Hyperliquid data — strategy requires aggregate funding/OI data",
       );
     }
 
-    const {
-      fundingRate,
-      annualizedFunding,
-      openInterest,
-      dailyVolume,
-      premium,
-      priceChange24h,
-    } = hlData;
+    const { fundingRate, annualizedFunding, openInterest, dailyVolume, premium, priceChange24h } =
+      hlData;
 
     // OI/Volume ratio check — need overleveraged market
     const oiVolumeRatio = dailyVolume > 0 ? openInterest / dailyVolume : 0;
     if (oiVolumeRatio < OI_VOLUME_RATIO_MIN) {
       return this.notDetected(
         `OI/Volume ratio ${oiVolumeRatio.toFixed(1)}x too low (need > ${OI_VOLUME_RATIO_MIN}x). ` +
-        `Market not overleveraged enough for cascade.`
+          `Market not overleveraged enough for cascade.`,
       );
     }
 
@@ -104,7 +98,7 @@ export class LiquidationMomentumStrategy extends BaseStrategy {
     if (absFunding < FUNDING_THRESHOLD_ANNUALIZED) {
       return this.notDetected(
         `Annualized funding ${(annualizedFunding * 100).toFixed(1)}% not extreme enough ` +
-        `(need > ${FUNDING_THRESHOLD_ANNUALIZED * 100}%). No crowded side to squeeze.`
+          `(need > ${FUNDING_THRESHOLD_ANNUALIZED * 100}%). No crowded side to squeeze.`,
       );
     }
 
@@ -125,7 +119,7 @@ export class LiquidationMomentumStrategy extends BaseStrategy {
     if (!direction) {
       return this.notDetected(
         `Extreme funding (${(annualizedFunding * 100).toFixed(1)}%) but price moving with the crowd ` +
-        `(${(priceChange24h * 100).toFixed(1)}%). No cascade in progress — crowd still winning.`
+          `(${(priceChange24h * 100).toFixed(1)}%). No cascade in progress — crowd still winning.`,
       );
     }
 
@@ -134,8 +128,7 @@ export class LiquidationMomentumStrategy extends BaseStrategy {
     const absPriceChange = Math.abs(priceChange24h);
     const cascadeExhausted = absPriceChange > 0.03;
     const cascadePhase: "early" | "mid" | "exhausted" =
-      absPriceChange < 0.02 ? "early" :
-      absPriceChange < 0.03 ? "mid" : "exhausted";
+      absPriceChange < 0.02 ? "early" : absPriceChange < 0.03 ? "mid" : "exhausted";
 
     // Build confidence
     let confidence = 0.55; // Extreme funding + price against crowd is already strong
@@ -154,7 +147,7 @@ export class LiquidationMomentumStrategy extends BaseStrategy {
     }
 
     // Stronger funding = stronger cascade
-    if (absFunding > 0.50) {
+    if (absFunding > 0.5) {
       confidence += 0.1;
     }
 
@@ -194,14 +187,18 @@ export class LiquidationMomentumStrategy extends BaseStrategy {
 
     const reasons: string[] = [];
     reasons.push(`${cascadeType} detected — ${direction} signal`);
-    reasons.push(`Cascade phase: ${cascadePhase}${cascadeExhausted ? " (EXHAUSTED — consider fading instead)" : ""}`);
     reasons.push(
-      `Funding: ${(annualizedFunding * 100).toFixed(1)}% annualized (${fundingRate > 0 ? "longs paying" : "shorts paying"})`
+      `Cascade phase: ${cascadePhase}${cascadeExhausted ? " (EXHAUSTED — consider fading instead)" : ""}`,
+    );
+    reasons.push(
+      `Funding: ${(annualizedFunding * 100).toFixed(1)}% annualized (${fundingRate > 0 ? "longs paying" : "shorts paying"})`,
     );
     reasons.push(`Price: ${(priceChange24h * 100).toFixed(1)}% 24h (against crowd)`);
     reasons.push(`OI/Volume: ${oiVolumeRatio.toFixed(1)}x (overleveraged)`);
     if (Math.abs(premium) > PREMIUM_DIVERGENCE_MIN) {
-      reasons.push(`Premium: ${(premium * 100).toFixed(2)}% (${premium > 0 ? "mark > index" : "mark < index"})`);
+      reasons.push(
+        `Premium: ${(premium * 100).toFixed(2)}% (${premium > 0 ? "mark > index" : "mark < index"})`,
+      );
     }
     if (adxResult.adx !== null) {
       reasons.push(`ADX: ${adxResult.adx.toFixed(1)} (${adxResult.adxTrend})`);
@@ -248,9 +245,7 @@ export class LiquidationMomentumStrategy extends BaseStrategy {
       // Normalize symbol: "BTCUSDT" → "BTC", "ETHUSDT" → "ETH"
       const coin = symbol.replace(/USDT$/i, "").replace(/USD$/i, "").toUpperCase();
 
-      const idx = meta.universe.findIndex(
-        (a) => a.name.toUpperCase() === coin
-      );
+      const idx = meta.universe.findIndex((a) => a.name.toUpperCase() === coin);
       if (idx === -1) return null;
 
       const ctx = assetCtxs[idx];
@@ -263,8 +258,7 @@ export class LiquidationMomentumStrategy extends BaseStrategy {
       const premium = parseFloat(ctx.premium);
       const markPrice = parseFloat(ctx.markPx);
       const prevDayPrice = parseFloat(ctx.prevDayPx);
-      const priceChange24h =
-        prevDayPrice > 0 ? (markPrice - prevDayPrice) / prevDayPrice : 0;
+      const priceChange24h = prevDayPrice > 0 ? (markPrice - prevDayPrice) / prevDayPrice : 0;
 
       return {
         fundingRate,
@@ -283,9 +277,10 @@ export class LiquidationMomentumStrategy extends BaseStrategy {
   // ADX Helper (shared pattern with other tier-2 strategies)
   // ============================================================================
 
-  private calculateADXSimple(
-    candles: { high: number; low: number; close: number }[]
-  ): { adx: number | null; adxTrend: "rising" | "falling" | "flat" } {
+  private calculateADXSimple(candles: { high: number; low: number; close: number }[]): {
+    adx: number | null;
+    adxTrend: "rising" | "falling" | "flat";
+  } {
     if (candles.length < 28) return { adx: null, adxTrend: "flat" };
 
     const period = 14;
@@ -300,7 +295,7 @@ export class LiquidationMomentumStrategy extends BaseStrategy {
       const tr = Math.max(
         current.high - current.low,
         Math.abs(current.high - previous.close),
-        Math.abs(current.low - previous.close)
+        Math.abs(current.low - previous.close),
       );
       trueRanges.push(tr);
 
@@ -321,7 +316,7 @@ export class LiquidationMomentumStrategy extends BaseStrategy {
       const pdi = (smoothPlusDM[i]! / smoothTR[i]!) * 100;
       const mdi = (smoothMinusDM[i]! / smoothTR[i]!) * 100;
       const dx = (Math.abs(pdi - mdi) / (pdi + mdi)) * 100;
-      if (!isNaN(dx)) dxValues.push(dx);
+      if (!Number.isNaN(dx)) dxValues.push(dx);
     }
 
     const adxValues = this.wilderSmooth(dxValues, period);
@@ -353,10 +348,7 @@ export class LiquidationMomentumStrategy extends BaseStrategy {
   // Plan Parameters
   // ============================================================================
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "1h", CANDLE_LIMIT);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const atr = this.calculateATR(candles);
@@ -376,15 +368,8 @@ export class LiquidationMomentumStrategy extends BaseStrategy {
       { price: entryPrice + risk * 3, percentToSell: 0.25 },
     ];
 
-    const avgTpPrice = takeProfits.reduce(
-      (sum, tp) => sum + tp.price * tp.percentToSell,
-      0
-    );
-    const riskRewardRatio = this.calculateRiskReward(
-      entryPrice,
-      stopLoss,
-      avgTpPrice
-    );
+    const avgTpPrice = takeProfits.reduce((sum, tp) => sum + tp.price * tp.percentToSell, 0);
+    const riskRewardRatio = this.calculateRiskReward(entryPrice, stopLoss, avgTpPrice);
 
     return {
       entryPrice,
@@ -457,8 +442,8 @@ When creating a plan using the Liquidation Momentum strategy:
   override generateSignal(
     bar: OHLC,
     index: number,
-    data: OHLC[],
-    indicators: IndicatorState
+    _data: OHLC[],
+    indicators: IndicatorState,
   ): Signal | null {
     if (index < 30) return null;
 

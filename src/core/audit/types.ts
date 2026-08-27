@@ -72,13 +72,7 @@ export type AuditAgentStep = z.infer<typeof AuditAgentStepSchema>;
  * What triggered a decision chain.
  */
 export const AuditTriggerSchema = z.object({
-  type: z.enum([
-    "user_message",
-    "market_event",
-    "scheduled",
-    "agent_handoff",
-    "system",
-  ]),
+  type: z.enum(["user_message", "market_event", "scheduled", "agent_handoff", "system"]),
   event_type: z.string().optional(),
   source: z.string(),
   payload_summary: z.string(),

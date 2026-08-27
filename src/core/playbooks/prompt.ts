@@ -55,10 +55,7 @@ export class PlaybookPromptGenerator {
    * @returns Prompt fragment for Analyst
    */
   generateForAnalyst(playbook: Playbook): string {
-    const lines: string[] = [
-      `### Playbook: ${playbook.name}`,
-      "",
-    ];
+    const lines: string[] = [`### Playbook: ${playbook.name}`, ""];
 
     if (playbook.analysis.validationCriteria.length > 0) {
       lines.push("Validate:");
@@ -77,9 +74,7 @@ export class PlaybookPromptGenerator {
 
     if (playbook.analysis.requiredIndicators.length > 0) {
       lines.push("");
-      lines.push(
-        `Required indicators: ${playbook.analysis.requiredIndicators.join(", ")}`
-      );
+      lines.push(`Required indicators: ${playbook.analysis.requiredIndicators.join(", ")}`);
     }
 
     return lines.join("\n");
@@ -97,7 +92,7 @@ export class PlaybookPromptGenerator {
     const lines: string[] = [
       `### Playbook: ${playbook.name}`,
       "",
-      `Entry: ${exec.entryDescription || exec.entryType + " order"}`,
+      `Entry: ${exec.entryDescription || `${exec.entryType} order`}`,
       `Stop Loss: ${exec.stopLoss.description || exec.stopLoss.type}`,
       `Take Profit: ${exec.takeProfit.description || "See management rules"}`,
       `Position Sizing: ${exec.positionSizing.description || "Default sizing"}`,
@@ -147,10 +142,7 @@ export class PlaybookPromptGenerator {
    * @returns Prompt fragment for Teacher
    */
   generateForTeacher(playbook: Playbook): string {
-    const lines: string[] = [
-      `### Playbook: ${playbook.name}`,
-      "",
-    ];
+    const lines: string[] = [`### Playbook: ${playbook.name}`, ""];
 
     if (playbook.review.criteria.length > 0) {
       lines.push("Evaluate:");

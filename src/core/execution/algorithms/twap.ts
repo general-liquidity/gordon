@@ -7,12 +7,7 @@
 
 import type { Exchange } from "../../../infra/exchange/types.ts";
 import { createModuleLogger } from "../../../infra/logger/index.ts";
-import type {
-  TWAPConfig,
-  ExecutionSession,
-  ExecutionSlice,
-  OrderSubmitter,
-} from "./types.ts";
+import type { TWAPConfig, ExecutionSession, ExecutionSlice, OrderSubmitter } from "./types.ts";
 
 const logger = createModuleLogger("twap-executor");
 
@@ -193,9 +188,7 @@ export class TWAPExecutor {
       slice.status = "filled";
       slice.filledQuantity = result.executedQty ?? slice.quantity;
       slice.avgFillPrice =
-        result.executedQty > 0
-          ? result.cummulativeQuoteQty / result.executedQty
-          : result.price;
+        result.executedQty > 0 ? result.cummulativeQuoteQty / result.executedQty : result.price;
       slice.placedAt = new Date().toISOString();
       slice.filledAt = new Date().toISOString();
 
@@ -207,7 +200,7 @@ export class TWAPExecutor {
       const midPrice = (spread.bidPrice + spread.askPrice) / 2;
       const offsetMultiplier = side === "BUY" ? -1 : 1;
       const offsetPrice =
-        midPrice * (1 + offsetMultiplier * (this.config.limitOffsetBps ?? 5) / 10000);
+        midPrice * (1 + (offsetMultiplier * (this.config.limitOffsetBps ?? 5)) / 10000);
 
       const result = await this.submitOrder({
         symbol,

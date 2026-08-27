@@ -6,7 +6,7 @@
 // WSL_DISTRO_NAME, KUBERNETES_SERVICE_HOST.
 // ============================================================================
 
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync } from "node:fs";
 
 export interface ContainerInfo {
   isContainer: boolean;
@@ -17,7 +17,7 @@ export interface ContainerInfo {
 
 export function detectContainer(): ContainerInfo {
   // Check Kubernetes first (most specific) — env var works on all platforms
-  if (process.env["KUBERNETES_SERVICE_HOST"]) {
+  if (process.env.KUBERNETES_SERVICE_HOST) {
     return {
       isContainer: true,
       runtime: "kubernetes",
@@ -68,7 +68,7 @@ export function detectContainer(): ContainerInfo {
   }
 
   // Check WSL
-  if (process.env["WSL_DISTRO_NAME"]) {
+  if (process.env.WSL_DISTRO_NAME) {
     return {
       isContainer: false,
       runtime: "wsl",
@@ -100,9 +100,9 @@ export function isDocker(): boolean {
 }
 
 export function isWSL(): boolean {
-  return !!process.env["WSL_DISTRO_NAME"];
+  return !!process.env.WSL_DISTRO_NAME;
 }
 
 export function isKubernetes(): boolean {
-  return !!process.env["KUBERNETES_SERVICE_HOST"];
+  return !!process.env.KUBERNETES_SERVICE_HOST;
 }

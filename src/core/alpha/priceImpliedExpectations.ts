@@ -92,11 +92,11 @@ function dcfEv(
   let pvExplicit = 0;
   let lastFcf = baseFcf;
   for (let t = 1; t <= horizonYears; t++) {
-    lastFcf = baseFcf * Math.pow(1 + growthRate, t);
-    pvExplicit += lastFcf / Math.pow(1 + wacc, t);
+    lastFcf = baseFcf * (1 + growthRate) ** t;
+    pvExplicit += lastFcf / (1 + wacc) ** t;
   }
   const terminal = (lastFcf * (1 + terminalGrowthPct)) / (wacc - terminalGrowthPct);
-  const pvTerminal = terminal / Math.pow(1 + wacc, horizonYears);
+  const pvTerminal = terminal / (1 + wacc) ** horizonYears;
   return pvExplicit + pvTerminal;
 }
 

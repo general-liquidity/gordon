@@ -42,9 +42,7 @@ type Props = {
 
 export default function ErrorOverview({ error }: Props): React.JSX.Element {
   const stack = error.stack ? error.stack.split("\n").slice(1) : undefined;
-  const origin: ParsedStackLine | undefined = stack
-    ? stackUtils.parseLine(stack[0])
-    : undefined;
+  const origin: ParsedStackLine | undefined = stack ? stackUtils.parseLine(stack[0]) : undefined;
   const filePath = cleanupPath(origin?.file);
   let excerpt: ReturnType<typeof codeExcerpt> | undefined;
   let lineWidth = 0;
@@ -63,13 +61,7 @@ export default function ErrorOverview({ error }: Props): React.JSX.Element {
     React.createElement(
       Box,
       null,
-      React.createElement(
-        Text,
-        { backgroundColor: "red", color: "white" },
-        " ",
-        "ERROR",
-        " ",
-      ),
+      React.createElement(Text, { backgroundColor: "red", color: "white" }, " ", "ERROR", " "),
       React.createElement(Text, null, " ", error.message),
     ),
     origin &&
@@ -105,10 +97,7 @@ export default function ErrorOverview({ error }: Props): React.JSX.Element {
                   dimColor: line !== origin.line,
                   backgroundColor: line === origin.line ? "red" : undefined,
                   color: line === origin.line ? "white" : undefined,
-                  "aria-label":
-                    line === origin.line
-                      ? `Line ${line}, error`
-                      : `Line ${line}`,
+                  "aria-label": line === origin.line ? `Line ${line}, error` : `Line ${line}`,
                 },
                 String(line).padStart(lineWidth, " "),
                 ":",
@@ -121,7 +110,7 @@ export default function ErrorOverview({ error }: Props): React.JSX.Element {
                 backgroundColor: line === origin.line ? "red" : undefined,
                 color: line === origin.line ? "white" : undefined,
               },
-              " " + value,
+              ` ${value}`,
             ),
           ),
         ),
@@ -136,8 +125,7 @@ export default function ErrorOverview({ error }: Props): React.JSX.Element {
           // Key by position, not line text — recursive frames (e.g. React's
           // commit-phase traversal) repeat verbatim and would collide.
           .map((line, index) => {
-            const parsedLine: ParsedStackLine | undefined =
-              stackUtils.parseLine(line);
+            const parsedLine: ParsedStackLine | undefined = stackUtils.parseLine(line);
             // If the line from the stack cannot be parsed, we print out the
             // unparsed line.
             if (!parsedLine) {
@@ -145,24 +133,14 @@ export default function ErrorOverview({ error }: Props): React.JSX.Element {
                 Box,
                 { key: index },
                 React.createElement(Text, { dimColor: true }, "- "),
-                React.createElement(
-                  Text,
-                  { dimColor: true, bold: true },
-                  line,
-                  "\\t",
-                  " ",
-                ),
+                React.createElement(Text, { dimColor: true, bold: true }, line, "\\t", " "),
               );
             }
             return React.createElement(
               Box,
               { key: index },
               React.createElement(Text, { dimColor: true }, "- "),
-              React.createElement(
-                Text,
-                { dimColor: true, bold: true },
-                parsedLine.function,
-              ),
+              React.createElement(Text, { dimColor: true, bold: true }, parsedLine.function),
               React.createElement(
                 Text,
                 {

@@ -1,6 +1,6 @@
-import { readFileSync, existsSync } from "fs";
-import { join } from "path";
-import { homedir } from "os";
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { KeyContext, type KeyBinding } from "./types.js";
 import { parseChord } from "./parser.js";
 import { isReserved } from "./reservedShortcuts.js";
@@ -42,9 +42,9 @@ export function loadUserBindings(): KeyBinding[] {
         const obj = value as { action?: string; context?: string };
         if (obj.action) {
           const context =
-            (obj.context && obj.context in KeyContext
+            obj.context && obj.context in KeyContext
               ? KeyContext[obj.context as keyof typeof KeyContext]
-              : KeyContext.Global);
+              : KeyContext.Global;
           bindings.push({ chord, action: obj.action as any, context });
         }
       }

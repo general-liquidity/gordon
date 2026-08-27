@@ -75,9 +75,8 @@ export class PortfolioService {
       } else {
         // Try to get price from cache first, then fetch
         try {
-          const price = await priceCache.getOrFetch(
-            `${balance.asset}USDT`,
-            () => exchange.getPrice(`${balance.asset}USDT`)
+          const price = await priceCache.getOrFetch(`${balance.asset}USDT`, () =>
+            exchange.getPrice(`${balance.asset}USDT`),
           );
           usdValue = total * price;
         } catch {
@@ -155,9 +154,8 @@ export class PortfolioService {
       usdValue = balance;
     } else {
       try {
-        const price = await priceCache.getOrFetch(
-          `${asset}USDT`,
-          () => exchange.getPrice(`${asset}USDT`)
+        const price = await priceCache.getOrFetch(`${asset}USDT`, () =>
+          exchange.getPrice(`${asset}USDT`),
         );
         usdValue = balance * price;
       } catch {
@@ -176,11 +174,7 @@ export class PortfolioService {
   /**
    * Calculate allocation for a trade
    */
-  calculateAllocation(
-    portfolioValue: number,
-    percentage: number,
-    maxAmount?: number
-  ): number {
+  calculateAllocation(portfolioValue: number, percentage: number, maxAmount?: number): number {
     let allocation = portfolioValue * percentage;
 
     if (maxAmount && allocation > maxAmount) {

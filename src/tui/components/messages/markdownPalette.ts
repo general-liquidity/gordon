@@ -113,7 +113,7 @@ export const ANSI = {
  * even if the second number lacks a sign).
  */
 export const SIGNED_NUMBER_RE =
-  /(?<![\w\-])[+\-]\$?\d[\d,]*(?:\.\d+)?%?(?:\s*(?:[\-–]|to)\s*[+\-]?\$?\d[\d,]*(?:\.\d+)?%?)?(?:\/(?:mo|yr|wk|d|hr|h))?/g;
+  /(?<![\w-])[+-]\$?\d[\d,]*(?:\.\d+)?%?(?:\s*(?:[-–]|to)\s*[+-]?\$?\d[\d,]*(?:\.\d+)?%?)?(?:\/(?:mo|yr|wk|d|hr|h))?/g;
 
 /** Single number — optionally signed, optionally $, optionally %. */
 const NUM = "[+\\-]?\\$?\\d[\\d,]*(?:\\.\\d+)?%?";
@@ -183,7 +183,7 @@ export const SIDE_ARROW_RE = /[→←↔➜]/g;
  *  thing that should be highlighted as a tool / domain term. The set is
  *  technical enough that false positives are rare in trading prose. */
 export const INDICATOR_LABEL_RE =
-  /\b(?:RSI|MACD|EMA|SMA|ATR|ADX|VWAP|MFI|OBV|CMF|Bollinger|Ichimoku|Stochastic|Supertrend|FVG|ICT|SMC|Fibonacci|Sharpe|Sortino|Calmar|Stop[\s\-]?Loss|Take[\s\-]?Profit|Take[\s\-]?Profit|Entry|Exit|Target|Risk|Reward|Position|Leverage|Spread|Direction)\b/g;
+  /\b(?:RSI|MACD|EMA|SMA|ATR|ADX|VWAP|MFI|OBV|CMF|Bollinger|Ichimoku|Stochastic|Supertrend|FVG|ICT|SMC|Fibonacci|Sharpe|Sortino|Calmar|Stop[\s-]?Loss|Take[\s-]?Profit|Take[\s-]?Profit|Entry|Exit|Target|Risk|Reward|Position|Leverage|Spread|Direction)\b/g;
 
 /** snake_case identifiers — function / strategy / parameter names. The
  *  LLM frequently emits these without backticks (volume_surge,
@@ -214,7 +214,7 @@ export const RISK_HIGH_RE = new RegExp(`${RISK_PRECEDED}\\bHigh\\b`, "gm");
  *  '1.2h' don't mis-color. 'M' is omitted as a short suffix because it
  *  doubles as the magnitude suffix for millions. */
 export const TIMEFRAME_RE =
-  /(?<![\d$.])\b\d{1,3}(?:\s*[\-–]\s*\d{1,3})?(?:\s*(?:m|h|d|D|w|W)|\s*(?:min(?:ute)?s?|hour?s?|day?s?|week?s?|month?s?|year?s?|sec(?:ond)?s?))\b/g;
+  /(?<![\d$.])\b\d{1,3}(?:\s*[-–]\s*\d{1,3})?(?:\s*(?:m|h|d|D|w|W)|\s*(?:min(?:ute)?s?|hour?s?|day?s?|week?s?|month?s?|year?s?|sec(?:ond)?s?))\b/g;
 
 /**
  * Fiat / stablecoin suffixes used by exchange pair conventions
@@ -224,21 +224,29 @@ export const TIMEFRAME_RE =
  * Order matters for the regex engine's alternation backtracking — list
  * longer fiats first so e.g. USDT wins over USD when scanning BTCUSDT.
  */
-const FIAT_LIST = ["USDT", "USDC", "FDUSD", "TUSD", "BUSD", "USD", "EUR", "GBP", "JPY", "TRY", "INR", "KRW", "DAI"];
+const FIAT_LIST = [
+  "USDT",
+  "USDC",
+  "FDUSD",
+  "TUSD",
+  "BUSD",
+  "USD",
+  "EUR",
+  "GBP",
+  "JPY",
+  "TRY",
+  "INR",
+  "KRW",
+  "DAI",
+];
 
 /** Pair like BTCUSDT — generic prefix `[A-Z]{2,10}` + known fiat suffix.
  *  No hardcoded crypto list, so any new asset the API surfaces colors
  *  correctly without a code change. Captures: 1=asset, 2=fiat. */
-export const PAIR_RE = new RegExp(
-  `\\b([A-Z]{2,10}?)(${FIAT_LIST.join("|")})\\b`,
-  "g",
-);
+export const PAIR_RE = new RegExp(`\\b([A-Z]{2,10}?)(${FIAT_LIST.join("|")})\\b`, "g");
 
 /** Standalone fiat tokens (USD, USDT, ...) not part of a pair suffix. */
-export const FIAT_RE = new RegExp(
-  `(?<![A-Z])\\b(${FIAT_LIST.join("|")})\\b`,
-  "g",
-);
+export const FIAT_RE = new RegExp(`(?<![A-Z])\\b(${FIAT_LIST.join("|")})\\b`, "g");
 
 /** Cash-tag tickers — `$BTC`, `$AAPL`, etc. Catches whatever the user
  *  or LLM types regardless of the registry. Captures group 1 = ticker. */
@@ -275,7 +283,15 @@ export const PERCENT_RE = /(?<![\w\-+.])\d+(?:\.\d+)?%/g;
  * actual exchange / broker.
  */
 const SYMBOL_REGISTRY = new Set<string>([
-  "BTC", "ETH", "SOL", "BNB", "XRP", "USD", "AAPL", "NVDA", "SPY",
+  "BTC",
+  "ETH",
+  "SOL",
+  "BNB",
+  "XRP",
+  "USD",
+  "AAPL",
+  "NVDA",
+  "SPY",
 ]);
 
 /** Add tickers to the runtime registry. Idempotent, case-normalized. */
@@ -347,8 +363,7 @@ function pushAll(
   for (const m of text.matchAll(re)) {
     const grp = groupIdx === 0 ? m[0] : m[groupIdx];
     if (!grp) continue;
-    const grpStart =
-      groupIdx === 0 ? m.index! : m.index! + m[0].lastIndexOf(grp);
+    const grpStart = groupIdx === 0 ? m.index! : m.index! + m[0].lastIndexOf(grp);
     hits.push({ start: grpStart, end: grpStart + grp.length, color, prio });
   }
 }
@@ -410,7 +425,12 @@ export function findColorHits(text: string): ColorHit[] {
     const ticker = m[1];
     if (!ticker) continue;
     const tickerStart = m.index! + 1; // skip the '$'
-    hits.push({ start: tickerStart, end: tickerStart + ticker.length, color: PALETTE.ice, prio: 5 });
+    hits.push({
+      start: tickerStart,
+      end: tickerStart + ticker.length,
+      color: PALETTE.ice,
+      prio: 5,
+    });
   }
   // Standalone tickers from the runtime registry (BTC, ETH, AAPL, ...
   // populated from API responses).
@@ -449,9 +469,13 @@ export function findColorHits(text: string): ColorHit[] {
  */
 export function headingColor(depth: number): string {
   switch (depth) {
-    case 1: return PALETTE.gold;
-    case 2: return "whiteBright";
-    case 3: return PALETTE.platinum;
-    default: return PALETTE.ash;
+    case 1:
+      return PALETTE.gold;
+    case 2:
+      return "whiteBright";
+    case 3:
+      return PALETTE.platinum;
+    default:
+      return PALETTE.ash;
   }
 }

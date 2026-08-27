@@ -109,11 +109,7 @@ export interface StrategyOrder {
  */
 export interface ReplayStrategy {
   init: () => Record<string, AssetPosition>;
-  step: (
-    state: Record<string, AssetPosition>,
-    bar: OHLCBar,
-    asset: string,
-  ) => StrategyOrder[];
+  step: (state: Record<string, AssetPosition>, bar: OHLCBar, asset: string) => StrategyOrder[];
 }
 
 /**

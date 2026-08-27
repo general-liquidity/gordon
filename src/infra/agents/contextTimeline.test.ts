@@ -70,15 +70,35 @@ describe("recordAgentStart", () => {
   });
 
   it("preserves insertion order across multiple agents", () => {
-    recordAgentStart({ agentId: "a", agentName: "first", agentType: "main", contextTokenEstimate: 100 });
-    recordAgentStart({ agentId: "b", agentName: "second", agentType: "investigation", contextTokenEstimate: 100 });
-    recordAgentStart({ agentId: "c", agentName: "third", agentType: "fork", contextTokenEstimate: 100 });
+    recordAgentStart({
+      agentId: "a",
+      agentName: "first",
+      agentType: "main",
+      contextTokenEstimate: 100,
+    });
+    recordAgentStart({
+      agentId: "b",
+      agentName: "second",
+      agentType: "investigation",
+      contextTokenEstimate: 100,
+    });
+    recordAgentStart({
+      agentId: "c",
+      agentName: "third",
+      agentType: "fork",
+      contextTokenEstimate: 100,
+    });
     const snap = captureContextTimeline();
     expect(snap.agents.map((a) => a.agentName)).toEqual(["first", "second", "third"]);
   });
 
   it("records parent agent id when supplied", () => {
-    recordAgentStart({ agentId: "parent", agentName: "main", agentType: "main", contextTokenEstimate: 1000 });
+    recordAgentStart({
+      agentId: "parent",
+      agentName: "main",
+      agentType: "main",
+      contextTokenEstimate: 1000,
+    });
     recordAgentStart({
       agentId: "child",
       agentName: "inv",
@@ -94,7 +114,12 @@ describe("recordAgentStart", () => {
 
 describe("recordAgentEnd", () => {
   it("marks an active agent as completed", () => {
-    recordAgentStart({ agentId: "a", agentName: "x", agentType: "main", contextTokenEstimate: 100 });
+    recordAgentStart({
+      agentId: "a",
+      agentName: "x",
+      agentType: "main",
+      contextTokenEstimate: 100,
+    });
     recordAgentEnd("a");
     const snap = captureContextTimeline();
     expect(snap.agents[0]!.isActive).toBe(false);
@@ -103,7 +128,12 @@ describe("recordAgentEnd", () => {
   });
 
   it("is idempotent (calling end twice is a no-op)", () => {
-    recordAgentStart({ agentId: "a", agentName: "x", agentType: "main", contextTokenEstimate: 100 });
+    recordAgentStart({
+      agentId: "a",
+      agentName: "x",
+      agentType: "main",
+      contextTokenEstimate: 100,
+    });
     recordAgentEnd("a");
     const firstSnap = captureContextTimeline();
     const firstEnd = firstSnap.agents[0]!.endedAt;
@@ -121,14 +151,24 @@ describe("recordAgentEnd", () => {
 
 describe("recordAgentProgress", () => {
   it("updates token estimate", () => {
-    recordAgentStart({ agentId: "a", agentName: "x", agentType: "main", contextTokenEstimate: 100 });
+    recordAgentStart({
+      agentId: "a",
+      agentName: "x",
+      agentType: "main",
+      contextTokenEstimate: 100,
+    });
     recordAgentProgress("a", { contextTokenEstimate: 500 });
     const snap = captureContextTimeline();
     expect(snap.agents[0]!.contextTokenEstimate).toBe(500);
   });
 
   it("updates tool call count", () => {
-    recordAgentStart({ agentId: "a", agentName: "x", agentType: "main", contextTokenEstimate: 100 });
+    recordAgentStart({
+      agentId: "a",
+      agentName: "x",
+      agentType: "main",
+      contextTokenEstimate: 100,
+    });
     recordAgentProgress("a", { toolCallCount: 7 });
     const snap = captureContextTimeline();
     expect(snap.agents[0]!.toolCallCount).toBe(7);
@@ -141,9 +181,24 @@ describe("recordAgentProgress", () => {
 
 describe("captureContextTimeline", () => {
   it("rolls up active + total + largest", () => {
-    recordAgentStart({ agentId: "main", agentName: "Main", agentType: "main", contextTokenEstimate: 1000 });
-    recordAgentStart({ agentId: "inv1", agentName: "Inv1", agentType: "investigation", contextTokenEstimate: 200 });
-    recordAgentStart({ agentId: "inv2", agentName: "Inv2", agentType: "investigation", contextTokenEstimate: 5000 });
+    recordAgentStart({
+      agentId: "main",
+      agentName: "Main",
+      agentType: "main",
+      contextTokenEstimate: 1000,
+    });
+    recordAgentStart({
+      agentId: "inv1",
+      agentName: "Inv1",
+      agentType: "investigation",
+      contextTokenEstimate: 200,
+    });
+    recordAgentStart({
+      agentId: "inv2",
+      agentName: "Inv2",
+      agentType: "investigation",
+      contextTokenEstimate: 5000,
+    });
     recordAgentEnd("inv1");
 
     const snap = captureContextTimeline();
@@ -154,8 +209,18 @@ describe("captureContextTimeline", () => {
 
   it("rolls up by type", () => {
     recordAgentStart({ agentId: "1", agentName: "a", agentType: "main", contextTokenEstimate: 1 });
-    recordAgentStart({ agentId: "2", agentName: "b", agentType: "investigation", contextTokenEstimate: 1 });
-    recordAgentStart({ agentId: "3", agentName: "c", agentType: "investigation", contextTokenEstimate: 1 });
+    recordAgentStart({
+      agentId: "2",
+      agentName: "b",
+      agentType: "investigation",
+      contextTokenEstimate: 1,
+    });
+    recordAgentStart({
+      agentId: "3",
+      agentName: "c",
+      agentType: "investigation",
+      contextTokenEstimate: 1,
+    });
     recordAgentStart({ agentId: "4", agentName: "d", agentType: "fork", contextTokenEstimate: 1 });
 
     const snap = captureContextTimeline();
@@ -172,7 +237,12 @@ describe("captureContextTimeline", () => {
   });
 
   it("returned snapshot is a shallow copy (callers cannot mutate registry)", () => {
-    recordAgentStart({ agentId: "a", agentName: "x", agentType: "main", contextTokenEstimate: 100 });
+    recordAgentStart({
+      agentId: "a",
+      agentName: "x",
+      agentType: "main",
+      contextTokenEstimate: 100,
+    });
     const snap1 = captureContextTimeline();
     snap1.agents[0]!.contextTokenEstimate = 99999;
     const snap2 = captureContextTimeline();
@@ -197,8 +267,19 @@ describe("formatContextTimeline", () => {
   });
 
   it("renders headers + per-agent lines", () => {
-    recordAgentStart({ agentId: "main", agentName: "Main", agentType: "main", contextTokenEstimate: 1000 });
-    recordAgentStart({ agentId: "inv", agentName: "Investigation", agentType: "investigation", contextTokenEstimate: 200, parentAgentId: "main" });
+    recordAgentStart({
+      agentId: "main",
+      agentName: "Main",
+      agentType: "main",
+      contextTokenEstimate: 1000,
+    });
+    recordAgentStart({
+      agentId: "inv",
+      agentName: "Investigation",
+      agentType: "investigation",
+      contextTokenEstimate: 200,
+      parentAgentId: "main",
+    });
     const text = formatContextTimeline(captureContextTimeline());
     expect(text).toContain("Context Timeline");
     expect(text).toContain("Main");
@@ -207,8 +288,18 @@ describe("formatContextTimeline", () => {
   });
 
   it("shows status markers for active vs completed", () => {
-    recordAgentStart({ agentId: "a", agentName: "Active", agentType: "main", contextTokenEstimate: 100 });
-    recordAgentStart({ agentId: "b", agentName: "Done", agentType: "main", contextTokenEstimate: 100 });
+    recordAgentStart({
+      agentId: "a",
+      agentName: "Active",
+      agentType: "main",
+      contextTokenEstimate: 100,
+    });
+    recordAgentStart({
+      agentId: "b",
+      agentName: "Done",
+      agentType: "main",
+      contextTokenEstimate: 100,
+    });
     recordAgentEnd("b");
     const text = formatContextTimeline(captureContextTimeline());
     // Active uses ●, completed uses ○

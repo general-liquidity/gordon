@@ -50,18 +50,12 @@ describe("an operator who configured no limit is governed exactly as before", ()
   });
 
   it("ignores a limit outside the fraction range rather than inventing a threshold", () => {
-    expect(
-      readAbsorbingBarrierConfigFromEnv({ [INCEPTION_LOSS_FRACTION_ENV]: "0" }),
-    ).toEqual({});
-    expect(
-      readAbsorbingBarrierConfigFromEnv({ [INCEPTION_LOSS_FRACTION_ENV]: "20" }),
-    ).toEqual({});
-    expect(
-      readAbsorbingBarrierConfigFromEnv({ [INCEPTION_LOSS_FRACTION_ENV]: "abc" }),
-    ).toEqual({});
-    expect(
-      readAbsorbingBarrierConfigFromEnv({ [INCEPTION_LOSS_FRACTION_ENV]: "0.2" }),
-    ).toEqual({ inceptionLossFraction: 0.2 });
+    expect(readAbsorbingBarrierConfigFromEnv({ [INCEPTION_LOSS_FRACTION_ENV]: "0" })).toEqual({});
+    expect(readAbsorbingBarrierConfigFromEnv({ [INCEPTION_LOSS_FRACTION_ENV]: "20" })).toEqual({});
+    expect(readAbsorbingBarrierConfigFromEnv({ [INCEPTION_LOSS_FRACTION_ENV]: "abc" })).toEqual({});
+    expect(readAbsorbingBarrierConfigFromEnv({ [INCEPTION_LOSS_FRACTION_ENV]: "0.2" })).toEqual({
+      inceptionLossFraction: 0.2,
+    });
   });
 });
 

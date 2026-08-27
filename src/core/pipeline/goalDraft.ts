@@ -86,8 +86,16 @@ const KEYWORD_TABLE: ReadonlyArray<{ regex: RegExp; type: EndStateType; keyword:
   { regex: /\b(sharpe|risk[- ]adjusted|consistency)\b/i, type: "sharpe", keyword: "sharpe" },
   { regex: /\b(win[- ]?rate|hit[- ]?rate|accuracy)\b/i, type: "winrate", keyword: "win rate" },
   { regex: /\b(trade[s]?|execution[s]?|fills?)\b/i, type: "trades", keyword: "trades" },
-  { regex: /\b(drawdown|downside|loss[- ]cap|max[- ]?loss)\b/i, type: "drawdown_under", keyword: "drawdown" },
-  { regex: /\b(checklist|checkbox|complete every|tick off)\b/i, type: "checklist", keyword: "checklist" },
+  {
+    regex: /\b(drawdown|downside|loss[- ]cap|max[- ]?loss)\b/i,
+    type: "drawdown_under",
+    keyword: "drawdown",
+  },
+  {
+    regex: /\b(checklist|checkbox|complete every|tick off)\b/i,
+    type: "checklist",
+    keyword: "checklist",
+  },
 ];
 
 const HORIZON_REGEX = /\b(\d+)\s*(hour|hours|day|days|week|weeks|month|months)\b/i;
@@ -109,7 +117,10 @@ function detectHorizon(intent: string, fallback: "hours" | "days" | "weeks"): st
   return `7 ${fallback}`;
 }
 
-function proposeSharpe(stats: DraftRecentStats | undefined): { threshold: number; rationale: string } {
+function proposeSharpe(stats: DraftRecentStats | undefined): {
+  threshold: number;
+  rationale: string;
+} {
   if (typeof stats?.sharpe === "number" && Number.isFinite(stats.sharpe)) {
     const proposed = Math.max(0.5, Math.min(2.0, stats.sharpe * 1.2));
     return {
@@ -117,10 +128,16 @@ function proposeSharpe(stats: DraftRecentStats | undefined): { threshold: number
       rationale: `recent Sharpe ${stats.sharpe.toFixed(2)} × 1.2 (conservative improvement), capped at 2.0`,
     };
   }
-  return { threshold: 1.0, rationale: "no recent Sharpe available — using conventional Sharpe ≥ 1.0 default" };
+  return {
+    threshold: 1.0,
+    rationale: "no recent Sharpe available — using conventional Sharpe ≥ 1.0 default",
+  };
 }
 
-function proposeWinRate(stats: DraftRecentStats | undefined): { threshold: number; rationale: string } {
+function proposeWinRate(stats: DraftRecentStats | undefined): {
+  threshold: number;
+  rationale: string;
+} {
   if (typeof stats?.winRatePct === "number" && Number.isFinite(stats.winRatePct)) {
     const proposed = Math.min(70, stats.winRatePct + 5);
     return {
@@ -131,7 +148,10 @@ function proposeWinRate(stats: DraftRecentStats | undefined): { threshold: numbe
   return { threshold: 55, rationale: "no recent win rate available — using 55% default" };
 }
 
-function proposeTrades(stats: DraftRecentStats | undefined): { threshold: number; rationale: string } {
+function proposeTrades(stats: DraftRecentStats | undefined): {
+  threshold: number;
+  rationale: string;
+} {
   if (typeof stats?.tradeCount === "number" && stats.tradeCount > 0) {
     const proposed = Math.max(5, Math.round(stats.tradeCount * 2));
     return {
@@ -142,7 +162,10 @@ function proposeTrades(stats: DraftRecentStats | undefined): { threshold: number
   return { threshold: 20, rationale: "no recent trade count available — using 20 default" };
 }
 
-function proposeDrawdown(stats: DraftRecentStats | undefined): { threshold: number; rationale: string } {
+function proposeDrawdown(stats: DraftRecentStats | undefined): {
+  threshold: number;
+  rationale: string;
+} {
   if (typeof stats?.maxDrawdownPct === "number" && stats.maxDrawdownPct > 0) {
     const proposed = Math.max(1, stats.maxDrawdownPct * 0.8);
     return {
@@ -258,7 +281,8 @@ export function composeGoalDraft(input: ComposeGoalDraftInput): ComposeGoalDraft
   const proposedEndStateText = endStateText(endStateType, threshold);
 
   const proposedConstraints: string[] = [...(input.activeMandateExclusions ?? [])];
-  const constraintsClause = proposedConstraints.length > 0 ? proposedConstraints.join(", ") : "exceeding daily loss limit";
+  const constraintsClause =
+    proposedConstraints.length > 0 ? proposedConstraints.join(", ") : "exceeding daily loss limit";
   if (proposedConstraints.length === 0) {
     proposedConstraints.push("exceeding daily loss limit");
   }

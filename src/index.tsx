@@ -102,7 +102,7 @@ if (hasStdinData()) {
   process.env.GORDON_STDIN_PIPED = "1";
 }
 
-import { maybePromptForUpdate, runSelfUpgrade } from "./utils/update-notifier.ts";
+import { runSelfUpgrade } from "./utils/update-notifier.ts";
 
 if (flags.upgrade) {
   const result = await runSelfUpgrade();
@@ -110,7 +110,9 @@ if (flags.upgrade) {
     process.exit(0);
   }
   if (result === "unsupported") {
-    console.error("This Gordon install channel does not support in-place self-upgrade. Reinstall the latest release manually.");
+    console.error(
+      "This Gordon install channel does not support in-place self-upgrade. Reinstall the latest release manually.",
+    );
     process.exit(1);
   }
   console.error("Gordon update failed. Retry `gordon --upgrade` or reinstall manually.");
@@ -119,7 +121,7 @@ if (flags.upgrade) {
 
 // Skip interactive update prompt — it blocks stdin before TUI loads
 // Users can manually update via `gordon --upgrade`
-const updateResult = "skipped";
+const _updateResult = "skipped";
 
 // ============================================================================
 // TUI Launch
@@ -144,7 +146,9 @@ async function gracefulShutdown(signal: string, code: number = 0): Promise<void>
       const { loadConfig } = await import("./infra/storage/config/config.ts");
       const config = await loadConfig();
       if (config.permissionMode === "auto") {
-        console.log("\n[warn] permissionMode is 'auto'. Open positions will continue on the exchange.");
+        console.log(
+          "\n[warn] permissionMode is 'auto'. Open positions will continue on the exchange.",
+        );
         console.log("       Use /ask before exiting if you want per-action approval next session.");
       }
     } catch {
@@ -157,11 +161,12 @@ async function gracefulShutdown(signal: string, code: number = 0): Promise<void>
 
   try {
     const { shutdownRuntime } = await import("./tui/bridge/runtime.ts");
-    const lifecycleReason = signal === "uncaughtException"
-      ? "error"
-      : signal === "exit"
-        ? "user_quit"
-        : "external_signal";
+    const lifecycleReason =
+      signal === "uncaughtException"
+        ? "error"
+        : signal === "exit"
+          ? "user_quit"
+          : "external_signal";
     await shutdownRuntime(lifecycleReason);
   } catch (error) {
     console.error("Runtime lifecycle shutdown failed:", error);
@@ -251,12 +256,17 @@ function classifyConfigError(err: unknown): "syntax" | "settings" | null {
 
 // Wire: parallel startup — run config + observability concurrently
 try {
-  const { runParallelStartup, configLoadTask, memoryLoadTask } = await import("./infra/runtime/parallelStartup.ts");
+  const { runParallelStartup, configLoadTask, memoryLoadTask } = await import(
+    "./infra/runtime/parallelStartup.ts"
+  );
   const { formatMemoriesForPrompt } = await import("./infra/memory/sessionMemory.ts");
   const { setCliOverrides } = await import("./infra/config/settingsLayers.ts");
 
   // Pass any CLI flag overrides to the 7-level settings layer
-  if ((flags as unknown as Record<string, unknown>).permissionMode) setCliOverrides({ permissionMode: (flags as unknown as Record<string, unknown>).permissionMode as string });
+  if ((flags as unknown as Record<string, unknown>).permissionMode)
+    setCliOverrides({
+      permissionMode: (flags as unknown as Record<string, unknown>).permissionMode as string,
+    });
 
   const startupResult = await runParallelStartup([
     configLoadTask(() => loadConfig()),
@@ -276,7 +286,9 @@ try {
   const startupConfig = configTask?.result as { permissionMode?: string } | undefined;
   const startupPermissionMode = startupConfig?.permissionMode;
   const narrowedStartupMode: "auto" | "ask" | "strict" =
-    startupPermissionMode === "auto" || startupPermissionMode === "ask" || startupPermissionMode === "strict"
+    startupPermissionMode === "auto" ||
+    startupPermissionMode === "ask" ||
+    startupPermissionMode === "strict"
       ? startupPermissionMode
       : "ask";
   await emitEvent("system:started", { permissionMode: narrowedStartupMode });
@@ -290,7 +302,9 @@ try {
   try {
     const startupConfig = await loadConfig();
     const fallbackPermissionMode: "auto" | "ask" | "strict" =
-      startupConfig.permissionMode === "auto" || startupConfig.permissionMode === "ask" || startupConfig.permissionMode === "strict"
+      startupConfig.permissionMode === "auto" ||
+      startupConfig.permissionMode === "ask" ||
+      startupConfig.permissionMode === "strict"
         ? startupConfig.permissionMode
         : "ask";
     await emitEvent("system:started", { permissionMode: fallbackPermissionMode });
@@ -304,7 +318,10 @@ try {
 }
 
 // Opt-in proactive radar auto-start (GORDON_PROACTIVE_AUTO_START=1)
-if (process.env.GORDON_PROACTIVE_AUTO_START === "1" || process.env.GORDON_PROACTIVE_AUTO_START === "true") {
+if (
+  process.env.GORDON_PROACTIVE_AUTO_START === "1" ||
+  process.env.GORDON_PROACTIVE_AUTO_START === "true"
+) {
   try {
     const { startProactiveObserver } = await import("./infra/proactive/engine/observer.ts");
     startProactiveObserver();

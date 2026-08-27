@@ -1,9 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  resolveTaskSupport,
-  buildTaskAnnotations,
-  getTaskToolSets,
-} from "./tasks.ts";
+import { resolveTaskSupport, buildTaskAnnotations, getTaskToolSets } from "./tasks.ts";
 
 describe("resolveTaskSupport", () => {
   it("flags backtests as required (slow)", () => {

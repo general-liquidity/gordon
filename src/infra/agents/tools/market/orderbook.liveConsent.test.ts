@@ -8,7 +8,13 @@ import { existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CONSENT_PATH_ENV } from "../../../safety/consent.ts";
-import { cancelAllOrdersTool, cancelOrderTool, placeLimitOrderTool } from "./orderbook.ts";
+import {
+  cancelAllOrdersTool,
+  cancelOrderListTool,
+  cancelOrderTool,
+  getRecentTradesTool,
+  placeLimitOrderTool,
+} from "./orderbook.ts";
 
 const consentPath = join(tmpdir(), `gordon-consent-orderbook-${process.pid}-${Date.now()}.json`);
 let previousConsentPath: string | undefined;
@@ -27,6 +33,7 @@ afterAll(() => {
 function makeExecContext(placed: string[], isSandbox: boolean, cancelled: string[] = []) {
   const exchange = {
     exchangeId: "binance",
+    displayName: "Binance",
     isSandbox,
     getPrice: async () => 100,
     placeOrder: async (params: { symbol: string }) => {
@@ -116,5 +123,111 @@ describe("cancel_order live-consent gate", () => {
 
     expect(res.error).toMatch(/have not yet acknowledged live trading/);
     expect(cancelled).toEqual([]);
+  });
+});
+
+describe("cancel_order_list adapter path", () => {
+  it("refuses a live list cancellation without explicit live consent", async () => {
+    const cancelled: string[] = [];
+    const context = makeExecContext([], false);
+    const exchange = (context as any).requestContext.get("exchange");
+    exchange.cancelOrderList = async (symbol: string, orderListId: number) => {
+      cancelled.push(`${symbol}:${orderListId}`);
+    };
+
+    const result = (await cancelOrderListTool.execute!(
+      {
+        symbol: "BTCUSDT",
+        orderListId: 42,
+        rationale: "Both protective legs are invalid after the position was closed",
+      },
+      context,
+    )) as { error?: string };
+
+    expect(result.error).toMatch(/have not yet acknowledged live trading/);
+    expect(cancelled).toEqual([]);
+  });
+
+  it("calls a supported sandbox adapter and reports the cancelled list", async () => {
+    const cancelled: string[] = [];
+    const context = makeExecContext([], true);
+    const exchange = (context as any).requestContext.get("exchange");
+    exchange.cancelOrderList = async (symbol: string, orderListId: number) => {
+      cancelled.push(`${symbol}:${orderListId}`);
+    };
+
+    const result = (await cancelOrderListTool.execute!(
+      {
+        symbol: "btc/usdt",
+        orderListId: 99,
+        rationale: "Both sandbox order-list legs were invalidated by the strategy reset",
+      },
+      context,
+    )) as { success?: boolean; orderListId?: number; status?: string; error?: string };
+
+    expect(result.error).toBeUndefined();
+    expect(result).toMatchObject({ success: true, orderListId: 99, status: "CANCELLED" });
+    expect(cancelled).toEqual(["BTCUSDT:99"]);
+  });
+});
+
+describe("get_market_trades", () => {
+  it("uses public venue trades and computes side-volume dominance", async () => {
+    const calls: Array<[string, number]> = [];
+    const exchange = {
+      getRecentTrades: async (symbol: string, limit: number) => {
+        calls.push([symbol, limit]);
+        return [
+          { price: 100, quantity: 2, side: "BUY", time: Date.parse("2026-08-26T12:00:00Z") },
+          { price: 101, quantity: 0.5, side: "SELL", time: Date.parse("2026-08-26T12:00:01Z") },
+          {
+            price: 99,
+            quantity: 0.25,
+            side: "UNKNOWN",
+            time: Date.parse("2026-08-26T12:00:02Z"),
+          },
+        ];
+      },
+    };
+    const values: Record<string, unknown> = { exchange };
+    const context = { requestContext: { get: (key: string) => values[key] } } as never;
+
+    const result = (await getRecentTradesTool.execute!(
+      { symbol: "btc/usdt", limit: 2 },
+      context,
+    )) as any;
+
+    expect(calls).toEqual([["BTCUSDT", 2]]);
+    expect(result.error).toBeUndefined();
+    expect(result.analysis).toEqual({
+      buyVolume: "2.00000000",
+      sellVolume: "0.50000000",
+      unknownVolume: "0.25000000",
+      ratio: "4.00",
+      dominance: "BUY",
+    });
+    expect(result.trades).toEqual([
+      {
+        price: "100.00000000",
+        quantity: "2.00000000",
+        value: "200.00000000",
+        side: "BUY",
+        time: "2026-08-26T12:00:00.000Z",
+      },
+      {
+        price: "101.00000000",
+        quantity: "0.50000000",
+        value: "50.50000000",
+        side: "SELL",
+        time: "2026-08-26T12:00:01.000Z",
+      },
+      {
+        price: "99.00000000",
+        quantity: "0.25000000",
+        value: "24.75000000",
+        side: "UNKNOWN",
+        time: "2026-08-26T12:00:02.000Z",
+      },
+    ]);
   });
 });

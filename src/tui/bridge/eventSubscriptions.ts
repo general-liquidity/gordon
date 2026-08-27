@@ -5,15 +5,13 @@
  */
 
 import { getEventBus } from "../../events/index.ts";
-import type { EventType, EventData } from "../../events/index.ts";
+import type { EventData } from "../../events/index.ts";
 import type { Dispatch, TuiNotification } from "../state/types.ts";
 import { getNotificationFolder } from "../notifications/notificationFolder.js";
 import type { Message } from "../components/messages/MessageBubble.tsx";
-import {
-  isPlanRubricEnabled,
-  runCritiqueWithRubric,
-} from "../../infra/safety/planRubric.ts";
+import { isPlanRubricEnabled, runCritiqueWithRubric } from "../../infra/safety/planRubric.ts";
 import { createCoalescer } from "../utils/coalescer.ts";
+import { recordTradeOutcome } from "../../infra/trading/ops/feedbackLoop.ts";
 
 // ============================================================================
 // Helpers
@@ -36,7 +34,9 @@ function makeNotification(
       variant: variant as "fill" | "alert" | "strategy" | "info" | "error" | "system",
       priority: variant === "error" ? "immediate" : "normal",
     });
-  } catch { /* non-critical */ }
+  } catch {
+    /* non-critical */
+  }
 
   return {
     id: makeId(),
@@ -69,7 +69,8 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   const positionUpdateCoalescer = createCoalescer<EventData<"position:updated">>((events) => {
     const symbols = Array.from(new Set(events.map((event) => event.symbol).filter(Boolean)));
     const display = symbols.slice(0, 5);
-    const more = symbols.length > display.length ? `, +${symbols.length - display.length} more` : "";
+    const more =
+      symbols.length > display.length ? `, +${symbols.length - display.length} more` : "";
     notify(
       dispatch,
       "position:updated",
@@ -85,7 +86,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 1. position:created
   unsubs.push(
     bus.on("position:created", (event: EventData<"position:created">) => {
-      notify(dispatch, "position:created", "fill",
+      notify(
+        dispatch,
+        "position:created",
+        "fill",
         `\u25C8 Position created: ${event.symbol} ${event.side} [${event.positionId}]`,
       );
     }),
@@ -94,7 +98,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 2. position:opened
   unsubs.push(
     bus.on("position:opened", (event: EventData<"position:opened">) => {
-      notify(dispatch, "position:opened", "fill",
+      notify(
+        dispatch,
+        "position:opened",
+        "fill",
         `\u2713 Position opened: ${event.symbol} @ $${event.entryPrice.toFixed(2)} \u00D7 ${event.quantity}`,
       );
     }),
@@ -104,7 +111,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   unsubs.push(
     bus.on("position:closed", (event: EventData<"position:closed">) => {
       const sign = event.realizedPnL >= 0 ? "+" : "";
-      notify(dispatch, "position:closed", "fill",
+      notify(
+        dispatch,
+        "position:closed",
+        "fill",
         `\u2713 Position closed: ${event.symbol} — P&L ${sign}$${event.realizedPnL.toFixed(2)}`,
       );
       dispatch({ type: "UPDATE_COST", pnl: event.realizedPnL, pnlPercent: 0 });
@@ -114,7 +124,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 4. position:cancelled
   unsubs.push(
     bus.on("position:cancelled", (event: EventData<"position:cancelled">) => {
-      notify(dispatch, "position:cancelled", "alert",
+      notify(
+        dispatch,
+        "position:cancelled",
+        "alert",
         `\u2717 Position cancelled: ${event.symbol} — ${event.reason} (was ${event.fromState})`,
       );
     }),
@@ -123,7 +136,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 5. position:rejected
   unsubs.push(
     bus.on("position:rejected", (event: EventData<"position:rejected">) => {
-      notify(dispatch, "position:rejected", "alert",
+      notify(
+        dispatch,
+        "position:rejected",
+        "alert",
         `\u2717 Position rejected: ${event.symbol} — ${event.reason}`,
       );
     }),
@@ -132,7 +148,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 6. position:reviewed
   unsubs.push(
     bus.on("position:reviewed", (event: EventData<"position:reviewed">) => {
-      notify(dispatch, "position:reviewed", "info",
+      notify(
+        dispatch,
+        "position:reviewed",
+        "info",
         `\u25C8 Position reviewed: ${event.symbol} — grade ${event.review.grade ?? "N/A"}`,
       );
     }),
@@ -152,7 +171,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 8. trade:opened
   unsubs.push(
     bus.on("trade:opened", (event: EventData<"trade:opened">) => {
-      notify(dispatch, "trade:opened", "fill",
+      notify(
+        dispatch,
+        "trade:opened",
+        "fill",
         `\u2713 Trade opened: ${event.trade.symbol} ${(event.trade as any).side ?? ""}`.trim(),
       );
     }),
@@ -162,14 +184,16 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   unsubs.push(
     bus.on("trade:closed", (event: EventData<"trade:closed">) => {
       const pnlSign = event.pnl >= 0 ? "+" : "";
-      notify(dispatch, "trade:closed", "fill",
+      notify(
+        dispatch,
+        "trade:closed",
+        "fill",
         `\u2713 Trade closed: ${event.trade.symbol} — ${event.reason} — P&L ${pnlSign}$${event.pnl.toFixed(2)} (${pnlSign}${event.pnlPercent.toFixed(1)}%)`,
       );
       dispatch({ type: "UPDATE_COST", pnl: event.pnl, pnlPercent: event.pnlPercent });
 
       // Wire: feedback loop — record outcome for pattern confidence adjustment
       try {
-        const { recordTradeOutcome } = require("../../infra/trading/feedbackLoop.ts") as typeof import("../../infra/trading/ops/feedbackLoop.ts");
         recordTradeOutcome({
           id: `trade_${Date.now()}`,
           pattern: (event.trade as any).strategy ?? (event.trade as any).setupType ?? "manual",
@@ -186,16 +210,16 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
           closedAt: new Date().toISOString(),
           strategy: (event.trade as any).strategy,
         });
-      } catch { /* non-critical */ }
+      } catch {
+        /* non-critical */
+      }
     }),
   );
 
   // 10. trade:updated
   unsubs.push(
     bus.on("trade:updated", (event: EventData<"trade:updated">) => {
-      notify(dispatch, "trade:updated", "info",
-        `\u25C8 Trade updated: ${event.tradeId}`,
-      );
+      notify(dispatch, "trade:updated", "info", `\u25C8 Trade updated: ${event.tradeId}`);
     }),
   );
 
@@ -203,7 +227,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   unsubs.push(
     bus.on("trade:partial_close", (event: EventData<"trade:partial_close">) => {
       const pnlSign = event.pnl >= 0 ? "+" : "";
-      notify(dispatch, "trade:partial_close", "fill",
+      notify(
+        dispatch,
+        "trade:partial_close",
+        "fill",
         `\u25C8 Partial close: ${event.symbol} — closed ${event.closedQuantity}, remaining ${event.remainingQuantity} — P&L ${pnlSign}$${event.pnl.toFixed(2)} (${event.reason})`,
       );
     }),
@@ -216,7 +243,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 12. alert:price
   unsubs.push(
     bus.on("alert:price", (event: EventData<"alert:price">) => {
-      notify(dispatch, "alert:price", "alert",
+      notify(
+        dispatch,
+        "alert:price",
+        "alert",
         `\u26A0 Price alert: ${event.symbol} ${event.condition} $${event.threshold} (now $${event.price.toFixed(2)})`,
       );
     }),
@@ -225,7 +255,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 13. alert:stop_approaching
   unsubs.push(
     bus.on("alert:stop_approaching", (event: EventData<"alert:stop_approaching">) => {
-      notify(dispatch, "alert:stop_approaching", "alert",
+      notify(
+        dispatch,
+        "alert:stop_approaching",
+        "alert",
         `\u26A0 Stop approaching: ${event.symbol} — price $${event.currentPrice.toFixed(2)}, stop $${event.stopPrice.toFixed(2)} (${event.distance.toFixed(1)}% away)`,
       );
     }),
@@ -234,7 +267,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 14. alert:tp_hit
   unsubs.push(
     bus.on("alert:tp_hit", (event: EventData<"alert:tp_hit">) => {
-      notify(dispatch, "alert:tp_hit", "fill",
+      notify(
+        dispatch,
+        "alert:tp_hit",
+        "fill",
         `\u2713 Take profit hit: ${event.symbol} TP${event.level} @ $${event.price.toFixed(2)}`,
       );
     }),
@@ -244,7 +280,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   unsubs.push(
     bus.on("alert:stop_triggered", (event: EventData<"alert:stop_triggered">) => {
       const pnlStr = event.pnl != null ? ` — P&L $${event.pnl.toFixed(2)}` : "";
-      notify(dispatch, "alert:stop_triggered", "alert",
+      notify(
+        dispatch,
+        "alert:stop_triggered",
+        "alert",
         `\u2717 Stop triggered: ${event.symbol} @ $${event.stopPrice.toFixed(2)}${pnlStr}`,
       );
     }),
@@ -257,7 +296,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 16. scan:started
   unsubs.push(
     bus.on("scan:started", (event: EventData<"scan:started">) => {
-      notify(dispatch, "scan:started", "info",
+      notify(
+        dispatch,
+        "scan:started",
+        "info",
         `\u25C8 Scan started: ${event.universe} [${event.timeframes.join(", ")}]`,
       );
     }),
@@ -266,7 +308,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 17. scan:completed
   unsubs.push(
     bus.on("scan:completed", (event: EventData<"scan:completed">) => {
-      notify(dispatch, "scan:completed", "info",
+      notify(
+        dispatch,
+        "scan:completed",
+        "info",
         `\u2713 Scan completed: ${event.coinsScanned} coins, ${event.opportunitiesFound} opportunities (${(event.duration / 1000).toFixed(1)}s)`,
       );
     }),
@@ -275,7 +320,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 18. scan:opportunity
   unsubs.push(
     bus.on("scan:opportunity", (event: EventData<"scan:opportunity">) => {
-      notify(dispatch, "scan:opportunity", "strategy",
+      notify(
+        dispatch,
+        "scan:opportunity",
+        "strategy",
         `\u25C8 Opportunity: ${event.symbol} — ${event.bias} (${(event.confidence * 100).toFixed(0)}% confidence)`,
       );
     }),
@@ -288,7 +336,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 19. plan:created
   unsubs.push(
     bus.on("plan:created", (event: EventData<"plan:created">) => {
-      notify(dispatch, "plan:created", "info",
+      notify(
+        dispatch,
+        "plan:created",
+        "info",
         `Plan created: ${event.plan.symbol ?? event.plan.id ?? "unknown"} — ${event.plan.direction ?? ""}`.trim(),
       );
 
@@ -338,16 +389,17 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 20. plan:approved
   unsubs.push(
     bus.on("plan:approved", (event: EventData<"plan:approved">) => {
-      notify(dispatch, "plan:approved", "fill",
-        `\u2713 Plan approved: ${event.planId}`,
-      );
+      notify(dispatch, "plan:approved", "fill", `\u2713 Plan approved: ${event.planId}`);
     }),
   );
 
   // 21. plan:rejected
   unsubs.push(
     bus.on("plan:rejected", (event: EventData<"plan:rejected">) => {
-      notify(dispatch, "plan:rejected", "alert",
+      notify(
+        dispatch,
+        "plan:rejected",
+        "alert",
         `\u2717 Plan rejected: ${event.planId}${event.reason ? ` — ${event.reason}` : ""}`,
       );
     }),
@@ -356,7 +408,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 22. plan:cancelled
   unsubs.push(
     bus.on("plan:cancelled", (event: EventData<"plan:cancelled">) => {
-      notify(dispatch, "plan:cancelled", "alert",
+      notify(
+        dispatch,
+        "plan:cancelled",
+        "alert",
         `\u2717 Plan cancelled: ${event.planId}${event.reason ? ` — ${event.reason}` : ""}`,
       );
     }),
@@ -369,7 +424,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 23. risk:approved
   unsubs.push(
     bus.on("risk:approved", (event: EventData<"risk:approved">) => {
-      notify(dispatch, "risk:approved", "fill",
+      notify(
+        dispatch,
+        "risk:approved",
+        "fill",
         `\u2713 Risk approved: ${event.symbol} (${event.action}, ${event.checks} checks)`,
       );
     }),
@@ -378,7 +436,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 24. risk:rejected
   unsubs.push(
     bus.on("risk:rejected", (event: EventData<"risk:rejected">) => {
-      notify(dispatch, "risk:rejected", "alert",
+      notify(
+        dispatch,
+        "risk:rejected",
+        "alert",
         `\u2717 Risk rejected: ${event.symbol} — ${event.reason ?? event.checks.join(", ")}`,
       );
     }),
@@ -391,7 +452,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 25. autonomous:started
   unsubs.push(
     bus.on("autonomous:started", (event: EventData<"autonomous:started">) => {
-      notify(dispatch, "autonomous:started", "strategy",
+      notify(
+        dispatch,
+        "autonomous:started",
+        "strategy",
         `\u25C8 Autonomous loop started: mandate ${event.mandateId}`,
       );
       dispatch({ type: "SET_AUTONOMOUS_ACTIVE", active: true });
@@ -401,7 +465,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 26. autonomous:stopped
   unsubs.push(
     bus.on("autonomous:stopped", (event: EventData<"autonomous:stopped">) => {
-      notify(dispatch, "autonomous:stopped", "strategy",
+      notify(
+        dispatch,
+        "autonomous:stopped",
+        "strategy",
         `\u25C8 Autonomous loop stopped${event.reason ? `: ${event.reason}` : ""} — ${event.totalCycles} cycles, ${event.totalOpportunities} opportunities`,
       );
       dispatch({ type: "SET_AUTONOMOUS_ACTIVE", active: false, strategyCount: 0 });
@@ -411,7 +478,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 27. autonomous:paused
   unsubs.push(
     bus.on("autonomous:paused", (event: EventData<"autonomous:paused">) => {
-      notify(dispatch, "autonomous:paused", "strategy",
+      notify(
+        dispatch,
+        "autonomous:paused",
+        "strategy",
         `\u25C8 Autonomous loop paused${event.mandateId ? `: ${event.mandateId}` : ""}`,
       );
     }),
@@ -420,7 +490,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 28. autonomous:resumed
   unsubs.push(
     bus.on("autonomous:resumed", (event: EventData<"autonomous:resumed">) => {
-      notify(dispatch, "autonomous:resumed", "strategy",
+      notify(
+        dispatch,
+        "autonomous:resumed",
+        "strategy",
         `\u25C8 Autonomous loop resumed${event.mandateId ? `: ${event.mandateId}` : ""}`,
       );
     }),
@@ -429,7 +502,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 29. autonomous:cycle_completed
   unsubs.push(
     bus.on("autonomous:cycle_completed", (event: EventData<"autonomous:cycle_completed">) => {
-      notify(dispatch, "autonomous:cycle_completed", "strategy",
+      notify(
+        dispatch,
+        "autonomous:cycle_completed",
+        "strategy",
         `\u25C8 Cycle #${event.cycleNumber} completed: ${event.opportunities} opportunities found`,
       );
     }),
@@ -438,7 +514,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 30. autonomous:cycle_failed
   unsubs.push(
     bus.on("autonomous:cycle_failed", (event: EventData<"autonomous:cycle_failed">) => {
-      notify(dispatch, "autonomous:cycle_failed", "error",
+      notify(
+        dispatch,
+        "autonomous:cycle_failed",
+        "error",
         `\u2717 Cycle #${event.cycleNumber} failed: ${event.error}`,
       );
     }),
@@ -447,7 +526,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 31. autonomous:mandate_breached
   unsubs.push(
     bus.on("autonomous:mandate_breached", (event: EventData<"autonomous:mandate_breached">) => {
-      notify(dispatch, "autonomous:mandate_breached", "alert",
+      notify(
+        dispatch,
+        "autonomous:mandate_breached",
+        "alert",
         `\u26A0 Mandate breached: ${event.mandateId} — ${event.reason}`,
       );
     }),
@@ -488,7 +570,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 36. agent:fallback — only notify on error variant (user needs to know)
   unsubs.push(
     bus.on("agent:fallback", (event: EventData<"agent:fallback">) => {
-      notify(dispatch, "agent:fallback", "alert",
+      notify(
+        dispatch,
+        "agent:fallback",
+        "alert",
         `\u26A0 Agent fallback: ${event.primaryAgent} \u2192 ${event.fallbackTarget} — ${event.reason}`,
       );
     }),
@@ -528,17 +613,26 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
 
   // 41. system:permission_mode_changed
   unsubs.push(
-    bus.on("system:permission_mode_changed", (event: EventData<"system:permission_mode_changed">) => {
-      notify(dispatch, "system:permission_mode_changed", "strategy",
-        `\u25C8 permissionMode = '${event.permissionMode}'${event.previous ? ` (was '${event.previous}')` : ""}${event.reason ? ` — ${event.reason}` : ""}`,
-      );
-    }),
+    bus.on(
+      "system:permission_mode_changed",
+      (event: EventData<"system:permission_mode_changed">) => {
+        notify(
+          dispatch,
+          "system:permission_mode_changed",
+          "strategy",
+          `\u25C8 permissionMode = '${event.permissionMode}'${event.previous ? ` (was '${event.previous}')` : ""}${event.reason ? ` — ${event.reason}` : ""}`,
+        );
+      },
+    ),
   );
 
   // 42. system:error
   unsubs.push(
     bus.on("system:error", (event: EventData<"system:error">) => {
-      notify(dispatch, "system:error", "error",
+      notify(
+        dispatch,
+        "system:error",
+        "error",
         `\u2717 System error: ${event.error.message}${event.error.code ? ` [${event.error.code}]` : ""}`,
       );
     }),
@@ -569,7 +663,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 45. exchange:rate_limit
   unsubs.push(
     bus.on("exchange:rate_limit", (event: EventData<"exchange:rate_limit">) => {
-      notify(dispatch, "exchange:rate_limit", "alert",
+      notify(
+        dispatch,
+        "exchange:rate_limit",
+        "alert",
         `\u26A0 ${event.exchangeId} rate limit: ${event.weight}/${event.limit} weight used`,
       );
     }),
@@ -582,7 +679,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 46. guardrail:blocked
   unsubs.push(
     bus.on("guardrail:blocked", (event: EventData<"guardrail:blocked">) => {
-      notify(dispatch, "guardrail:blocked", "alert",
+      notify(
+        dispatch,
+        "guardrail:blocked",
+        "alert",
         `\u2717 Guardrail blocked (${event.guardrailType}): ${event.reason}`,
       );
     }),
@@ -591,7 +691,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 47. guardrail:input_blocked
   unsubs.push(
     bus.on("guardrail:input_blocked", (event: EventData<"guardrail:input_blocked">) => {
-      notify(dispatch, "guardrail:input_blocked", "alert",
+      notify(
+        dispatch,
+        "guardrail:input_blocked",
+        "alert",
         `\u2717 Input blocked: ${event.reason}${event.severity ? ` [${event.severity}]` : ""}`,
       );
     }),
@@ -600,7 +703,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 48. guardrail:output_sanitized
   unsubs.push(
     bus.on("guardrail:output_sanitized", (event: EventData<"guardrail:output_sanitized">) => {
-      notify(dispatch, "guardrail:output_sanitized", "info",
+      notify(
+        dispatch,
+        "guardrail:output_sanitized",
+        "info",
         `\u25C8 Output sanitized: ${event.patterns.length} pattern(s) removed (${event.sanitizedLength} chars)`,
       );
     }),
@@ -613,8 +719,11 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 49. access_control:denied
   unsubs.push(
     bus.on("access_control:denied", (event: EventData<"access_control:denied">) => {
-      notify(dispatch, "access_control:denied", "alert",
-        `\u2717 Access denied: ${event.reason}${event.toolName ?? event.tool ? ` (tool: ${event.toolName ?? event.tool})` : ""}${event.permissionMode ? ` [${event.permissionMode}]` : ""}`,
+      notify(
+        dispatch,
+        "access_control:denied",
+        "alert",
+        `\u2717 Access denied: ${event.reason}${(event.toolName ?? event.tool) ? ` (tool: ${event.toolName ?? event.tool})` : ""}${event.permissionMode ? ` [${event.permissionMode}]` : ""}`,
       );
     }),
   );
@@ -622,8 +731,11 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 50. access_control:warning
   unsubs.push(
     bus.on("access_control:warning", (event: EventData<"access_control:warning">) => {
-      notify(dispatch, "access_control:warning", "alert",
-        `\u26A0 Access warning: ${event.message}${event.toolName ?? event.tool ? ` (tool: ${event.toolName ?? event.tool})` : ""}`,
+      notify(
+        dispatch,
+        "access_control:warning",
+        "alert",
+        `\u26A0 Access warning: ${event.message}${(event.toolName ?? event.tool) ? ` (tool: ${event.toolName ?? event.tool})` : ""}`,
       );
     }),
   );
@@ -636,7 +748,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   unsubs.push(
     bus.on("scheduler:started", (event: EventData<"scheduler:started">) => {
       const interval = event.intervalMinutes ?? event.config?.intervalMinutes ?? "?";
-      notify(dispatch, "scheduler:started", "strategy",
+      notify(
+        dispatch,
+        "scheduler:started",
+        "strategy",
         `\u25C8 Scheduler started: every ${interval}m`,
       );
     }),
@@ -645,9 +760,7 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 52. scheduler:stopped
   unsubs.push(
     bus.on("scheduler:stopped", (_event: EventData<"scheduler:stopped">) => {
-      notify(dispatch, "scheduler:stopped", "strategy",
-        `\u25C8 Scheduler stopped`,
-      );
+      notify(dispatch, "scheduler:stopped", "strategy", `\u25C8 Scheduler stopped`);
     }),
   );
 
@@ -656,7 +769,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
     bus.on("scheduler:scan_completed", (event: EventData<"scheduler:scan_completed">) => {
       const coins = event.coinsScanned ?? "?";
       const opps = event.opportunitiesFound ?? event.opportunities ?? 0;
-      notify(dispatch, "scheduler:scan_completed", "info",
+      notify(
+        dispatch,
+        "scheduler:scan_completed",
+        "info",
         `\u2713 Scheduled scan #${event.scanNumber ?? "?"}: ${coins} coins, ${opps} opportunities`,
       );
     }),
@@ -665,7 +781,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 54. scheduler:scan_failed
   unsubs.push(
     bus.on("scheduler:scan_failed", (event: EventData<"scheduler:scan_failed">) => {
-      notify(dispatch, "scheduler:scan_failed", "error",
+      notify(
+        dispatch,
+        "scheduler:scan_failed",
+        "error",
         `\u2717 Scheduled scan #${event.scanNumber ?? "?"} failed: ${event.error}`,
       );
     }),
@@ -708,9 +827,7 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 58. agent:elicitation_requested
   unsubs.push(
     bus.on("agent:elicitation_requested", (event: EventData<"agent:elicitation_requested">) => {
-      notify(dispatch, "agent:elicitation_requested", "info",
-        `◈ Agent asks: ${event.prompt}`,
-      );
+      notify(dispatch, "agent:elicitation_requested", "info", `◈ Agent asks: ${event.prompt}`);
     }),
   );
 
@@ -728,7 +845,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 60. debate:started
   unsubs.push(
     bus.on("debate:started", (event: EventData<"debate:started">) => {
-      notify(dispatch, "debate:started", "strategy",
+      notify(
+        dispatch,
+        "debate:started",
+        "strategy",
         `◈ Debate started: ${event.topic} (${event.participants.join(", ")})`,
       );
     }),
@@ -737,7 +857,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 61. debate:resolved
   unsubs.push(
     bus.on("debate:resolved", (event: EventData<"debate:resolved">) => {
-      notify(dispatch, "debate:resolved", "strategy",
+      notify(
+        dispatch,
+        "debate:resolved",
+        "strategy",
         `✓ Debate resolved: ${event.topic} → ${event.conclusion.slice(0, 80)}`,
       );
     }),

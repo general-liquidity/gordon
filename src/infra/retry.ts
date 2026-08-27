@@ -114,7 +114,7 @@ export class RetryError extends Error {
   constructor(
     message: string,
     public readonly attempts: number,
-    public readonly lastError: Error
+    public readonly lastError: Error,
   ) {
     super(message);
     this.name = "RetryError";
@@ -128,20 +128,14 @@ export class CircuitOpenError extends Error {
   }
 }
 
-function calculateDelay(
-  attempt: number,
-  config: RetryConfig
-): number {
-  const exponentialDelay = config.baseDelayMs * Math.pow(2, attempt);
+function calculateDelay(attempt: number, config: RetryConfig): number {
+  const exponentialDelay = config.baseDelayMs * 2 ** attempt;
   const cappedDelay = Math.min(exponentialDelay, config.maxDelayMs);
   const jitter = cappedDelay * config.jitterFactor * (Math.random() - 0.5);
   return Math.max(0, cappedDelay + jitter);
 }
 
-function isRetryableError(
-  error: unknown,
-  config: RetryConfig
-): boolean {
+function isRetryableError(error: unknown, config: RetryConfig): boolean {
   if (error instanceof Error) {
     // Check error code (network errors)
     const code = (error as Error & { code?: string }).code;
@@ -188,7 +182,7 @@ function sleep(ms: number): Promise<void> {
  */
 export async function withRetry<T>(
   fn: () => Promise<T>,
-  config: Partial<RetryConfig> = {}
+  config: Partial<RetryConfig> = {},
 ): Promise<T> {
   const fullConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
   let lastError: Error | undefined;
@@ -211,7 +205,7 @@ export async function withRetry<T>(
   throw new RetryError(
     `Failed after ${fullConfig.maxRetries + 1} attempts`,
     fullConfig.maxRetries + 1,
-    lastError!
+    lastError!,
   );
 }
 
@@ -221,7 +215,7 @@ export async function withRetry<T>(
 export async function withCircuitBreaker<T>(
   fn: () => Promise<T>,
   circuitBreaker: CircuitBreaker,
-  retryConfig: Partial<RetryConfig> = {}
+  retryConfig: Partial<RetryConfig> = {},
 ): Promise<T> {
   if (!circuitBreaker.canExecute()) {
     throw new CircuitOpenError();
@@ -242,7 +236,7 @@ export async function withCircuitBreaker<T>(
  */
 export function makeRetryable<TArgs extends unknown[], TResult>(
   fn: (...args: TArgs) => Promise<TResult>,
-  config: Partial<RetryConfig> = {}
+  config: Partial<RetryConfig> = {},
 ): (...args: TArgs) => Promise<TResult> {
   return (...args: TArgs) => withRetry(() => fn(...args), config);
 }

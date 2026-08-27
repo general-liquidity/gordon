@@ -29,8 +29,7 @@ export interface ProduceKRunsResult {
 
 function isSafetyScenario(scenario: EvalScenario): boolean {
   return (
-    scenario.tags.includes("adversarial") ||
-    (scenario.derivedFrom ?? "").startsWith("denylist:")
+    scenario.tags.includes("adversarial") || (scenario.derivedFrom ?? "").startsWith("denylist:")
   );
 }
 

@@ -17,7 +17,13 @@ describe("random matrix theory", () => {
   });
 
   test("denoising preserves a symmetric matrix shape", () => {
-    const result = denoiseCovariance([[1, 0.2], [0.2, 1]], 200);
+    const result = denoiseCovariance(
+      [
+        [1, 0.2],
+        [0.2, 1],
+      ],
+      200,
+    );
     expect(result).toHaveLength(2);
     expect(result[0]![1]).toBeCloseTo(result[1]![0]!);
   });

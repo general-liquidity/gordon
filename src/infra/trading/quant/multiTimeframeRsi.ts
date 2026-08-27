@@ -32,12 +32,7 @@ export interface MtfRsiInput {
   oversold?: number;
 }
 
-export type MtfRsiZone =
-  | "overbought"
-  | "uptrend"
-  | "neutral"
-  | "downtrend"
-  | "oversold";
+export type MtfRsiZone = "overbought" | "uptrend" | "neutral" | "downtrend" | "oversold";
 
 export interface PerTimeframeRsi {
   timeframe: Timeframe;

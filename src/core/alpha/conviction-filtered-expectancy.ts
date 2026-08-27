@@ -31,7 +31,7 @@
  *   - "pnl_per_hour"  — maximize PnL given a fixed time budget per
  *                       trade (operator-supplied)
  */
-import { mean, sampleStd } from "./helpers.ts";
+import { sampleStd } from "./helpers.ts";
 
 export interface TradeRecord {
   /** Identifier for the trade. */
@@ -156,9 +156,7 @@ function simulateAtThreshold(
   const std = sampleStd(pnls);
   const sharpe = std > 0 ? avg / std : 0;
   const pnlPerHour =
-    timePerTrade !== undefined && timePerTrade > 0
-      ? total / (keptCount * timePerTrade)
-      : null;
+    timePerTrade !== undefined && timePerTrade > 0 ? total / (keptCount * timePerTrade) : null;
 
   let objectiveValue: number;
   switch (objective) {
@@ -171,7 +169,6 @@ function simulateAtThreshold(
     case "pnl_per_hour":
       objectiveValue = pnlPerHour ?? -Infinity;
       break;
-    case "total_pnl":
     default:
       objectiveValue = total;
       break;
@@ -202,12 +199,7 @@ export function simulateConvictionFilteredExpectancy(
   if (trades.length < minKept) {
     return {
       totalTrades: trades.length,
-      baselineMetrics: simulateAtThreshold(
-        trades,
-        -Infinity,
-        objective,
-        options.timePerTrade,
-      ),
+      baselineMetrics: simulateAtThreshold(trades, -Infinity, objective, options.timePerTrade),
       optimalThreshold: null,
       improvementOverBaseline: 0,
       optimalKeptFraction: 0,
@@ -219,19 +211,12 @@ export function simulateConvictionFilteredExpectancy(
 
   // Baseline = keep all trades (threshold = -Infinity, i.e., min conviction).
   const minConviction = Math.min(...trades.map((t) => t.conviction));
-  const baseline = simulateAtThreshold(
-    trades,
-    minConviction,
-    objective,
-    options.timePerTrade,
-  );
+  const baseline = simulateAtThreshold(trades, minConviction, objective, options.timePerTrade);
 
   // Build threshold candidate set: unique conviction values, capped at
   // resolutionCap evenly-spaced quantiles to avoid pathological cost
   // on huge ledgers.
-  const sortedConvictions = [...new Set(trades.map((t) => t.conviction))].sort(
-    (a, b) => a - b,
-  );
+  const sortedConvictions = [...new Set(trades.map((t) => t.conviction))].sort((a, b) => a - b);
   let candidates: number[];
   if (sortedConvictions.length <= resolutionCap) {
     candidates = sortedConvictions;
@@ -316,13 +301,17 @@ export function formatConvictionFilteredExpectancy(
   if (result.optimalThreshold !== null) {
     lines.push("");
     lines.push(`  Optimal threshold: ${result.optimalThreshold.threshold.toFixed(4)}`);
-    lines.push(`    Kept count:  ${result.optimalThreshold.keptCount} (${(result.optimalThreshold.keptFraction * 100).toFixed(1)}% of original)`);
+    lines.push(
+      `    Kept count:  ${result.optimalThreshold.keptCount} (${(result.optimalThreshold.keptFraction * 100).toFixed(1)}% of original)`,
+    );
     lines.push(`    Hit rate:    ${(result.optimalThreshold.hitRate * 100).toFixed(1)}%`);
     lines.push(`    Total PnL:   ${result.optimalThreshold.totalPnl.toFixed(2)}`);
     lines.push(`    Avg PnL:     ${result.optimalThreshold.avgPnl.toFixed(4)}`);
     lines.push(`    Sharpe:      ${result.optimalThreshold.sharpeRatio.toFixed(3)}`);
     lines.push("");
-    lines.push(`  Improvement over baseline: ${result.improvementOverBaseline >= 0 ? "+" : ""}${result.improvementOverBaseline.toFixed(4)}`);
+    lines.push(
+      `  Improvement over baseline: ${result.improvementOverBaseline >= 0 ? "+" : ""}${result.improvementOverBaseline.toFixed(4)}`,
+    );
   }
   lines.push("");
   lines.push(`Summary: ${result.summary}`);

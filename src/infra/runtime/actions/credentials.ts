@@ -37,8 +37,8 @@ function parseEnv(content: string): EnvMapRecord {
     const key = match[1].trim();
     let value = match[2]?.trim() ?? "";
     if (
-      (value.startsWith("'") && value.endsWith("'"))
-      || (value.startsWith("\"") && value.endsWith("\""))
+      (value.startsWith("'") && value.endsWith("'")) ||
+      (value.startsWith('"') && value.endsWith('"'))
     ) {
       value = value.slice(1, -1);
     }
@@ -49,10 +49,7 @@ function parseEnv(content: string): EnvMapRecord {
 
 async function readEnvFiles(): Promise<EnvMapRecord> {
   const merged: EnvMapRecord = {};
-  const candidates = [
-    join(process.env.HOME || "", ".gordon", ".env"),
-    join(process.cwd(), ".env"),
-  ];
+  const candidates = [join(process.env.HOME || "", ".gordon", ".env"), join(process.cwd(), ".env")];
 
   for (const candidate of candidates) {
     const file = Bun.file(candidate);
@@ -129,9 +126,10 @@ function buildStatus(
     fields,
     missing,
     notes,
-    integration: providerKind === "exchange" || providerKind === "broker"
-      ? getExecutionVenueMetadata((integrationId ?? providerId) as ExchangeId | BrokerId)
-      : getIntegrationSurfaceMetadata(integrationId ?? providerId),
+    integration:
+      providerKind === "exchange" || providerKind === "broker"
+        ? getExecutionVenueMetadata((integrationId ?? providerId) as ExchangeId | BrokerId)
+        : getIntegrationSurfaceMetadata(integrationId ?? providerId),
   };
 }
 
@@ -144,7 +142,10 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
   ]);
 }
 
-function getLlmStatuses(envKeys: EnvMapRecord, keyringKeys: Set<string>): ProviderCredentialStatus[] {
+function getLlmStatuses(
+  envKeys: EnvMapRecord,
+  keyringKeys: Set<string>,
+): ProviderCredentialStatus[] {
   const providers = [
     { id: "anthropic", key: "ANTHROPIC_API_KEY", label: "Anthropic", authMode: "api_key" },
     { id: "openai", key: "OPENAI_API_KEY", label: "OpenAI", authMode: "api_key" },
@@ -152,15 +153,17 @@ function getLlmStatuses(envKeys: EnvMapRecord, keyringKeys: Set<string>): Provid
     { id: "xai", key: "XAI_API_KEY", label: "xAI", authMode: "api_key" },
   ];
 
-  return providers.map((provider) => buildStatus(
-    provider.id,
-    "llm",
-    getIntegrationSurfaceMetadata(provider.id).displayName,
-    "ops",
-    provider.authMode,
-    "static",
-    [resolveFieldStatus(provider.key, provider.key, true, { envKeys, keyringKeys })],
-  ));
+  return providers.map((provider) =>
+    buildStatus(
+      provider.id,
+      "llm",
+      getIntegrationSurfaceMetadata(provider.id).displayName,
+      "ops",
+      provider.authMode,
+      "static",
+      [resolveFieldStatus(provider.key, provider.key, true, { envKeys, keyringKeys })],
+    ),
+  );
 }
 
 function getExchangeSessionMode(exchangeId: ExchangeId): ProviderCredentialStatus["sessionMode"] {
@@ -189,32 +192,40 @@ function getExchangeStatuses(
       : EXCHANGE_ENV_MAP[exchange.type as NativeExchangeId];
     const fields: CredentialFieldStatus[] = [];
     if (envMap?.key) {
-      fields.push(resolveFieldStatus(envMap.key, "API key", true, {
-        envKeys,
-        keyringKeys,
-        configValue: exchange.apiKey,
-      }));
+      fields.push(
+        resolveFieldStatus(envMap.key, "API key", true, {
+          envKeys,
+          keyringKeys,
+          configValue: exchange.apiKey,
+        }),
+      );
     }
     if (envMap?.secret) {
-      fields.push(resolveFieldStatus(envMap.secret, "API secret", true, {
-        envKeys,
-        keyringKeys,
-        configValue: exchange.apiSecret,
-      }));
+      fields.push(
+        resolveFieldStatus(envMap.secret, "API secret", true, {
+          envKeys,
+          keyringKeys,
+          configValue: exchange.apiSecret,
+        }),
+      );
     }
     if (envMap?.passphrase) {
-      fields.push(resolveFieldStatus(envMap.passphrase, "Passphrase", true, {
-        envKeys,
-        keyringKeys,
-        configValue: exchange.passphrase,
-      }));
+      fields.push(
+        resolveFieldStatus(envMap.passphrase, "Passphrase", true, {
+          envKeys,
+          keyringKeys,
+          configValue: exchange.passphrase,
+        }),
+      );
     }
     if (envMap?.wallet) {
-      fields.push(resolveFieldStatus(envMap.wallet, "Wallet private key", true, {
-        envKeys,
-        keyringKeys,
-        configValue: exchange.walletPrivateKey,
-      }));
+      fields.push(
+        resolveFieldStatus(envMap.wallet, "Wallet private key", true, {
+          envKeys,
+          keyringKeys,
+          configValue: exchange.walletPrivateKey,
+        }),
+      );
     }
 
     return buildStatus(
@@ -252,11 +263,13 @@ function getBrokerStatuses(
     ];
 
     if (envMap.accountId) {
-      fields.push(resolveFieldStatus(envMap.accountId, "Account ID", false, {
-        envKeys,
-        keyringKeys,
-        configValue: broker.accountId,
-      }));
+      fields.push(
+        resolveFieldStatus(envMap.accountId, "Account ID", false, {
+          envKeys,
+          keyringKeys,
+          configValue: broker.accountId,
+        }),
+      );
     }
 
     return buildStatus(
@@ -292,16 +305,18 @@ async function getMcpStatuses(): Promise<ProviderCredentialStatus[]> {
           key: plugin.manifest.authentication.envVar,
           label: plugin.manifest.authentication.envVar,
           sensitive: true,
-          present: Boolean(credentialManager.getWithFallback(
-            plugin.id,
-            "apiKey",
-            plugin.manifest.authentication.envVar,
-          )),
+          present: Boolean(
+            credentialManager.getWithFallback(
+              plugin.id,
+              "apiKey",
+              plugin.manifest.authentication.envVar,
+            ),
+          ),
           source: credentialManager.hasCredentials(plugin.id)
             ? "runtime"
             : process.env[plugin.manifest.authentication.envVar]
-            ? "process_env"
-            : "missing",
+              ? "process_env"
+              : "missing",
         });
       }
       for (const field of plugin.manifest.authentication.fields ?? []) {
@@ -332,7 +347,9 @@ async function getMcpStatuses(): Promise<ProviderCredentialStatus[]> {
   }
 }
 
-export async function getProviderCredentialStatuses(config: GordonConfig): Promise<ProviderCredentialStatus[]> {
+export async function getProviderCredentialStatuses(
+  config: GordonConfig,
+): Promise<ProviderCredentialStatus[]> {
   const envKeys = await readEnvFiles();
   const keyringKeys = await getKeyringKeySet(config.useKeyring);
 
@@ -341,7 +358,7 @@ export async function getProviderCredentialStatuses(config: GordonConfig): Promi
     ...getExchangeStatuses(config, envKeys, keyringKeys),
     ...getBrokerStatuses(config, envKeys, keyringKeys),
     ...getDataAndAutomationStatuses(envKeys, keyringKeys),
-    ...await getMcpStatuses(),
+    ...(await getMcpStatuses()),
   ];
 }
 
@@ -354,10 +371,13 @@ export async function getCredentialSummaryForKinds(
   missing: string[];
   statuses: ProviderCredentialStatus[];
 }> {
-  const statuses = (await getProviderCredentialStatuses(config))
-    .filter((status) => kinds.includes(status.providerKind));
+  const statuses = (await getProviderCredentialStatuses(config)).filter((status) =>
+    kinds.includes(status.providerKind),
+  );
 
-  const missing = statuses.flatMap((status) => status.missing.map((field) => `${status.providerId}:${field}`));
+  const missing = statuses.flatMap((status) =>
+    status.missing.map((field) => `${status.providerId}:${field}`),
+  );
   return {
     ready: missing.length === 0,
     providers: statuses.map((status) => status.providerId),

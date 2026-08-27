@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../ink-custom";
 import { InlineChart } from "../components/charts/InlineChart.tsx";
 
@@ -55,7 +54,9 @@ export function MarketAnalysisRenderer({ data }: Props) {
     <Box flexDirection="column" paddingLeft={2} marginTop={1}>
       {/* Header */}
       <Box>
-        <Text bold color="cyanBright">{data.symbol}</Text>
+        <Text bold color="cyanBright">
+          {data.symbol}
+        </Text>
         <Text dimColor> {"\u00b7"} </Text>
         <Text bold>{data.type.toUpperCase()} ANALYSIS</Text>
         <Text dimColor> {"\u00b7"} </Text>
@@ -64,13 +65,16 @@ export function MarketAnalysisRenderer({ data }: Props) {
 
       {/* Summary */}
       <Box marginTop={1}>
-        <Text dimColor>  {data.summary}</Text>
+        <Text dimColor> {data.summary}</Text>
       </Box>
 
       {/* Multi-timeframe section */}
       {data.timeframes && data.timeframes.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
-          <Text bold dimColor>  TIMEFRAMES</Text>
+          <Text bold dimColor>
+            {" "}
+            TIMEFRAMES
+          </Text>
           {data.timeframes.map((tf, i) => (
             <Box key={i} paddingLeft={2}>
               <Box width={8}>
@@ -93,7 +97,10 @@ export function MarketAnalysisRenderer({ data }: Props) {
       {/* Ensemble section */}
       {data.ensemble && data.ensemble.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
-          <Text bold dimColor>  ENSEMBLE VOTES</Text>
+          <Text bold dimColor>
+            {" "}
+            ENSEMBLE VOTES
+          </Text>
           {data.ensemble.map((vote, i) => (
             <Box key={i} paddingLeft={2}>
               <Box width={16}>
@@ -111,7 +118,10 @@ export function MarketAnalysisRenderer({ data }: Props) {
       {/* Key levels */}
       {data.keyLevels && data.keyLevels.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
-          <Text bold dimColor>  KEY LEVELS</Text>
+          <Text bold dimColor>
+            {" "}
+            KEY LEVELS
+          </Text>
           {data.keyLevels.map((level, i) => (
             <Box key={i} paddingLeft={2}>
               <Box width={12}>
@@ -132,8 +142,10 @@ export function MarketAnalysisRenderer({ data }: Props) {
 
       {/* Signal */}
       <Box marginTop={1}>
-        <Text dimColor>  Signal: </Text>
-        <Text bold color={signalColor(data.signal)}>{data.signal}</Text>
+        <Text dimColor> Signal: </Text>
+        <Text bold color={signalColor(data.signal)}>
+          {data.signal}
+        </Text>
       </Box>
     </Box>
   );

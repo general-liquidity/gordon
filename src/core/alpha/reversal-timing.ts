@@ -176,10 +176,7 @@ function pairReversals(
   return pairs;
 }
 
-function classifyVerdict(
-  matchRateA: number,
-  matchRateB: number,
-): ReversalTimingResult["verdict"] {
+function classifyVerdict(matchRateA: number, matchRateB: number): ReversalTimingResult["verdict"] {
   if (matchRateA >= 0.7 && matchRateB >= 0.7) return "highly_correlated";
   if (matchRateA >= 0.4 && matchRateB >= 0.4) return "moderately_correlated";
   if (matchRateA >= 0.2 || matchRateB >= 0.2) return "weakly_correlated";
@@ -289,9 +286,7 @@ export function formatReversalTiming(result: ReversalTimingResult): string {
     `  Mean lag: ${result.meanLagBars.toFixed(2)} bars (σ=${result.lagStdBars.toFixed(2)})`,
   ];
   if (Math.abs(result.meanLagBars) > 0.5) {
-    lines.push(
-      `  → ${result.meanLagBars < 0 ? "B leads A" : "B lags A"} on average`,
-    );
+    lines.push(`  → ${result.meanLagBars < 0 ? "B leads A" : "B lags A"} on average`);
   } else {
     lines.push(`  → synchronous (no consistent lead/lag)`);
   }

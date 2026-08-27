@@ -26,7 +26,12 @@ function suggestion(
 function floodPending(n: number): void {
   const store = getSuggestionStore();
   for (let i = 0; i < n; i++) {
-    store.add(suggestion("news_event", { id: `flood-${i}`, triggers: { source: "test", symbol: `SYM${i}` } }));
+    store.add(
+      suggestion("news_event", {
+        id: `flood-${i}`,
+        triggers: { source: "test", symbol: `SYM${i}` },
+      }),
+    );
   }
 }
 
@@ -72,7 +77,9 @@ describe("HeuristicJudge — orchestration backpressure", () => {
     floodPending(20);
     const judge = new HeuristicJudge();
     const riskVerdict = await judge.evaluate(suggestion("risk_warning"));
-    const stopVerdict = await judge.evaluate(suggestion("stop_loss_tighten", { triggers: { source: "test", symbol: "BTC" } }));
+    const stopVerdict = await judge.evaluate(
+      suggestion("stop_loss_tighten", { triggers: { source: "test", symbol: "BTC" } }),
+    );
     expect(riskVerdict.shouldFire).toBe(true);
     expect(stopVerdict.shouldFire).toBe(true);
   });

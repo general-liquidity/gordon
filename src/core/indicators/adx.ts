@@ -62,10 +62,7 @@ function wilderSmooth(values: number[], period: number): number[] {
  * @param period - ADX period (default 14)
  * @returns ADXResult
  */
-export function calculateADX(
-  candles: Candle[],
-  period: number = 14
-): ADXResult {
+export function calculateADX(candles: Candle[], period: number = 14): ADXResult {
   if (candles.length < period * 2 + 1) {
     return {
       adx: null,
@@ -235,16 +232,16 @@ export function calculateADX(
     currentMinusDI,
     trendStrength,
     direction,
-    diCrossover
+    diCrossover,
   );
 
   return {
     adx: currentADX !== null ? parseFloat(currentADX.toFixed(1)) : null,
     plusDI: currentPlusDI !== null ? parseFloat(currentPlusDI.toFixed(1)) : null,
     minusDI: currentMinusDI !== null ? parseFloat(currentMinusDI.toFixed(1)) : null,
-    adxValues: adxFinal.map(v => parseFloat(v.toFixed(2))),
-    plusDIValues: plusDIValues.map(v => parseFloat(v.toFixed(2))),
-    minusDIValues: minusDIValues.map(v => parseFloat(v.toFixed(2))),
+    adxValues: adxFinal.map((v) => parseFloat(v.toFixed(2))),
+    plusDIValues: plusDIValues.map((v) => parseFloat(v.toFixed(2))),
+    minusDIValues: minusDIValues.map((v) => parseFloat(v.toFixed(2))),
     trendStrength,
     direction,
     diCrossover,
@@ -259,7 +256,7 @@ function buildADXInterpretation(
   minusDI: number | null,
   strength: string,
   direction: string,
-  crossover: string
+  crossover: string,
 ): string {
   if (adx === null) return "Insufficient data for ADX.";
 
@@ -271,11 +268,12 @@ function buildADXInterpretation(
   }
 
   if (strength === "strong") {
-    msg += direction === "bullish"
-      ? "Strong uptrend — trend-following longs favored."
-      : direction === "bearish"
-      ? "Strong downtrend — trend-following shorts favored."
-      : "Strong trend but unclear direction — wait for DI separation.";
+    msg +=
+      direction === "bullish"
+        ? "Strong uptrend — trend-following longs favored."
+        : direction === "bearish"
+          ? "Strong downtrend — trend-following shorts favored."
+          : "Strong trend but unclear direction — wait for DI separation.";
   } else if (strength === "moderate") {
     msg += "Developing trend — watch for ADX expansion above 25.";
   } else {

@@ -47,7 +47,10 @@ const ALL_COMMANDS: TypeaheadMatch[] = (() => {
 const BEGINNER_COMMANDS = ALL_COMMANDS.filter((cmd) => (cmd as any).level === 1);
 
 // Index of commands that have subcommands
-const SUBCOMMAND_PARENTS = new Map<string, { subcommands: string[]; descriptions: Record<string, string>; workflow: string }>();
+const SUBCOMMAND_PARENTS = new Map<
+  string,
+  { subcommands: string[]; descriptions: Record<string, string>; workflow: string }
+>();
 for (const cmd of SLASH_COMMANDS) {
   const c = cmd as any;
   if (c.subcommands?.length) {
@@ -81,12 +84,14 @@ export function useSlashCommandTypeahead(
         // Show subcommands for this parent
         const subs = parent.subcommands
           .filter((s) => !subQuery || s.startsWith(subQuery) || s.includes(subQuery))
-          .map((s): TypeaheadMatch => ({
-            name: `${parentName} ${s}`,
-            description: parent.descriptions[s] ?? "",
-            workflow: parent.workflow,
-            isSubcommand: true,
-          }));
+          .map(
+            (s): TypeaheadMatch => ({
+              name: `${parentName} ${s}`,
+              description: parent.descriptions[s] ?? "",
+              workflow: parent.workflow,
+              isSubcommand: true,
+            }),
+          );
         setMatches(subs);
         return;
       }
@@ -96,7 +101,10 @@ export function useSlashCommandTypeahead(
     // User can scroll to see all, or start typing to search everything
     if (!query && showAllOnEmpty) {
       // Show beginner commands first, then the rest — progressive disclosure
-      const progressive = [...BEGINNER_COMMANDS, ...ALL_COMMANDS.filter((cmd) => (cmd as any).level !== 1)];
+      const progressive = [
+        ...BEGINNER_COMMANDS,
+        ...ALL_COMMANDS.filter((cmd) => (cmd as any).level !== 1),
+      ];
       setMatches(progressive.slice(0, maxResults));
       return;
     }
@@ -121,7 +129,9 @@ export function useSlashCommandTypeahead(
           const aExact = a.name.toLowerCase() === lower ? 1 : 0;
           const bExact = b.name.toLowerCase() === lower ? 1 : 0;
           if (aExact !== bExact) return bExact - aExact;
-          return frecencyScore(frecency.get(b.name), now) - frecencyScore(frecency.get(a.name), now);
+          return (
+            frecencyScore(frecency.get(b.name), now) - frecencyScore(frecency.get(a.name), now)
+          );
         });
       }
       results.push(...prefixMatches);

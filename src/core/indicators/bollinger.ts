@@ -38,7 +38,7 @@ export function calculateBollingerBands(
   closes: number[],
   period: number = 20,
   stdDevMultiplier: number = 2,
-  currentPrice?: number
+  currentPrice?: number,
 ): BollingerResult {
   if (closes.length < period) {
     const nullArray = closes.map(() => null);
@@ -74,8 +74,8 @@ export function calculateBollingerBands(
       const sma = middle[i]!;
       const stdDev = calculateStdDev(window);
 
-      const upperBand = sma + (stdDev * stdDevMultiplier);
-      const lowerBand = sma - (stdDev * stdDevMultiplier);
+      const upperBand = sma + stdDev * stdDevMultiplier;
+      const lowerBand = sma - stdDev * stdDevMultiplier;
 
       upper.push(upperBand);
       lower.push(lowerBand);
@@ -92,7 +92,7 @@ export function calculateBollingerBands(
   const currentLower = lower[lower.length - 1] ?? null;
   const currentBandwidth = bandwidth[bandwidth.length - 1] ?? null;
   const lastClose = closes[closes.length - 1];
-  const price = currentPrice ?? (lastClose ?? 0);
+  const price = currentPrice ?? lastClose ?? 0;
 
   // Determine position within bands
   let position: "above_upper" | "upper" | "middle" | "lower" | "below_lower" = "middle";
@@ -110,9 +110,10 @@ export function calculateBollingerBands(
 
   // Detect squeeze (bandwidth below 20-period average bandwidth)
   const recentBandwidths = bandwidth.slice(-20).filter((b): b is number => b !== null);
-  const avgBandwidth = recentBandwidths.length > 0
-    ? recentBandwidths.reduce((a, b) => a + b, 0) / recentBandwidths.length
-    : 0;
+  const avgBandwidth =
+    recentBandwidths.length > 0
+      ? recentBandwidths.reduce((a, b) => a + b, 0) / recentBandwidths.length
+      : 0;
   const squeeze = currentBandwidth !== null && currentBandwidth < avgBandwidth * 0.75;
 
   // Generate interpretation

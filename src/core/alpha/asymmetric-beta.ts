@@ -57,8 +57,16 @@ export function computeAsymmetricBeta(input: AsymmetricBetaInput): AsymmetricBet
   const n = Math.min(y.length, b.length);
 
   const neutral = (reason: string): AsymmetricBetaResult => ({
-    alpha: 0, betaUp: 0, betaDown: 0, betaDiff: 0, betaDiffT: 0, rSquared: 0,
-    verdict: "insufficient", fakeMarketNeutral: false, sampleSize: n, interpretation: reason,
+    alpha: 0,
+    betaUp: 0,
+    betaDown: 0,
+    betaDiff: 0,
+    betaDiffT: 0,
+    rSquared: 0,
+    verdict: "insufficient",
+    fakeMarketNeutral: false,
+    sampleSize: n,
+    interpretation: reason,
   });
   if (n < MIN_OBS) return neutral(`need ≥ ${MIN_OBS} aligned returns, got ${n}`);
 
@@ -114,12 +122,15 @@ export function computeAsymmetricBeta(input: AsymmetricBetaInput): AsymmetricBet
   } else {
     verdict = "symmetric";
   }
-  const fakeMarketNeutral = verdict === "asymmetric_downside" && Math.abs(betaUp) < SMALL_BETA && betaDown > 0.3;
+  const fakeMarketNeutral =
+    verdict === "asymmetric_downside" && Math.abs(betaUp) < SMALL_BETA && betaDown > 0.3;
 
   const interpretation =
     verdict === "asymmetric_downside"
       ? `ASYMMETRIC DOWNSIDE: β⁺=${round(betaUp)} vs β⁻=${round(betaDown)} (diff t=${round(betaDiffT, 2)})` +
-        (fakeMarketNeutral ? " — FAKE MARKET-NEUTRAL: looks neutral up, heavy beta in selloffs" : " — bigger exposure in down markets")
+        (fakeMarketNeutral
+          ? " — FAKE MARKET-NEUTRAL: looks neutral up, heavy beta in selloffs"
+          : " — bigger exposure in down markets")
       : verdict === "asymmetric_upside"
         ? `asymmetric upside: β⁺=${round(betaUp)} > β⁻=${round(betaDown)} (diff t=${round(betaDiffT, 2)})`
         : verdict === "market_neutral"

@@ -11,21 +11,21 @@
  * - /exchange compare <symbol> - Compare prices across exchanges
  */
 
-import { loadConfig, saveConfig } from '../../infra/storage/config/config.ts';
-import { ExchangeFactory } from '../../infra/exchange/factory.ts';
-import type { ExchangeId, Exchange, NativeExchangeId, CcxtExchangeId } from '../../infra/exchange/types.ts';
-import { isCcxtExchangeId, normalizeExchangeId, ccxtIdToNativeVenue } from '../../infra/exchange/types.ts';
+import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
+import { ExchangeFactory } from "../../infra/exchange/factory.ts";
+import type { ExchangeId, NativeExchangeId, CcxtExchangeId } from "../../infra/exchange/types.ts";
+import { normalizeExchangeId, ccxtIdToNativeVenue } from "../../infra/exchange/types.ts";
 import {
   ccxtExchangeRequiresPassphrase,
   ccxtExchangeRequiresWallet,
   getCcxtSetupInstructions,
   getCcxtHelpFragment,
-} from '../../infra/exchange/ccxt-ux.ts';
-import type { MultiExchangeConfig, GordonConfig } from '../../types/index.ts';
-import { createModuleLogger } from '../../infra/logger/index.ts';
-import { refreshRuntimeCredentials } from '../../infra/runtime/credentialRefresh.ts';
+} from "../../infra/exchange/ccxt-ux.ts";
+import type { GordonConfig } from "../../types/index.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
+import { refreshRuntimeCredentials } from "../../infra/runtime/credentialRefresh.ts";
 
-const logger = createModuleLogger('exchange-commands');
+const logger = createModuleLogger("exchange-commands");
 
 // ============================================================================
 // Types
@@ -74,8 +74,10 @@ export async function exchangeList(): Promise<ExchangeCommandResult> {
         sandbox: ex.sandbox || false,
         isWalletAuth: isWallet,
         keyPrefix: isWallet
-          ? (ex.walletPrivateKey ? ex.walletPrivateKey.substring(0, 10) + '...' : 'wallet')
-          : ex.apiKey.substring(0, 8) + '...',
+          ? ex.walletPrivateKey
+            ? `${ex.walletPrivateKey.substring(0, 10)}...`
+            : "wallet"
+          : `${ex.apiKey.substring(0, 8)}...`,
       };
     });
 
@@ -83,7 +85,7 @@ export async function exchangeList(): Promise<ExchangeCommandResult> {
 
     return {
       success: true,
-      message: `${exchanges.length} exchange(s) configured${activeCount > 0 ? ` (1 active)` : ''}`,
+      message: `${exchanges.length} exchange(s) configured${activeCount > 0 ? ` (1 active)` : ""}`,
       data: {
         exchanges: exchangeList,
         activeId: config.activeExchangeId,
@@ -105,14 +107,17 @@ export async function exchangeList(): Promise<ExchangeCommandResult> {
  * Returns the credentials needed and setup instructions.
  * The actual credential entry is done via /setup or the SetupWizard UI.
  */
-export async function exchangeAdd(exchangeType: string, sandbox = false): Promise<ExchangeCommandResult> {
+export async function exchangeAdd(
+  exchangeType: string,
+  sandbox = false,
+): Promise<ExchangeCommandResult> {
   try {
     // Validate exchange type
     if (!ExchangeFactory.isSupported(exchangeType)) {
       const supported = ExchangeFactory.getSupportedExchanges();
       return {
         success: false,
-        message: `Unsupported exchange type: "${exchangeType}". Supported: ${supported.join(', ')}`,
+        message: `Unsupported exchange type: "${exchangeType}". Supported: ${supported.join(", ")}`,
         data: { supportedTypes: supported },
       };
     }
@@ -133,8 +138,8 @@ export async function exchangeAdd(exchangeType: string, sandbox = false): Promis
     const needsWallet = ccxtExchangeRequiresWallet(type);
 
     const requiredFields = needsWallet
-      ? ['walletPrivateKey']
-      : ['apiKey', 'apiSecret', ...(needsPassphrase ? ['passphrase'] : [])];
+      ? ["walletPrivateKey"]
+      : ["apiKey", "apiSecret", ...(needsPassphrase ? ["passphrase"] : [])];
 
     const label = sandbox ? `${type} (testnet/sandbox)` : type;
     const authMessage = needsWallet
@@ -152,7 +157,7 @@ export async function exchangeAdd(exchangeType: string, sandbox = false): Promis
         needsPassphrase,
         needsWallet,
         requiredFields,
-        optionalFields: needsWallet ? [] : (sandbox ? [] : ['sandbox']),
+        optionalFields: needsWallet ? [] : sandbox ? [] : ["sandbox"],
         instructions: getExchangeSetupInstructions(type, sandbox),
       },
     };
@@ -179,7 +184,7 @@ export async function exchangeSwitch(exchangeId: string): Promise<ExchangeComman
       const available = config.exchanges.map((ex) => ex.id);
       return {
         success: false,
-        message: `Exchange "${exchangeId}" not found. Available: ${available.length > 0 ? available.join(', ') : 'none'}`,
+        message: `Exchange "${exchangeId}" not found. Available: ${available.length > 0 ? available.join(", ") : "none"}`,
         data: { availableIds: available },
       };
     }
@@ -201,7 +206,7 @@ export async function exchangeSwitch(exchangeId: string): Promise<ExchangeComman
     // the TUI's GatewayContextResolver in one call.
     await refreshRuntimeCredentials();
 
-    logger.info('Switched active exchange', { exchangeId, type: exchange.type });
+    logger.info("Switched active exchange", { exchangeId, type: exchange.type });
 
     return {
       success: true,
@@ -279,7 +284,7 @@ export async function exchangeRemove(exchangeId: string): Promise<ExchangeComman
     });
     await refreshRuntimeCredentials();
 
-    logger.info('Removed exchange', { exchangeId, type: exchange.type });
+    logger.info("Removed exchange", { exchangeId, type: exchange.type });
 
     return {
       success: true,
@@ -312,7 +317,7 @@ export async function exchangeStatus(): Promise<ExchangeCommandResult> {
     if (exchanges.length === 0) {
       return {
         success: true,
-        message: 'No exchanges configured',
+        message: "No exchanges configured",
         data: { statuses: [] },
       };
     }
@@ -388,7 +393,7 @@ export async function exchangeCompare(symbol: string): Promise<ExchangeCommandRe
     if (!symbol) {
       return {
         success: false,
-        message: 'Usage: /exchange compare <symbol> (e.g., /exchange compare BTCUSDT)',
+        message: "Usage: /exchange compare <symbol> (e.g., /exchange compare BTCUSDT)",
       };
     }
 
@@ -599,9 +604,12 @@ Or HMAC API keys:
   };
 
   if (sandbox) {
-    return sandboxInstructions[native] ?? `No dedicated testnet for ${type}. Check the exchange docs for a sandbox or demo environment.`;
+    return (
+      sandboxInstructions[native] ??
+      `No dedicated testnet for ${type}. Check the exchange docs for a sandbox or demo environment.`
+    );
   }
-  return liveInstructions[native] ?? 'Follow the exchange documentation to create API keys.';
+  return liveInstructions[native] ?? "Follow the exchange documentation to create API keys.";
 }
 
 // ============================================================================
@@ -614,14 +622,30 @@ Or HMAC API keys:
  */
 /** Known subcommands — anything else is treated as an exchange ID to switch to. */
 const EXCHANGE_SUBCOMMANDS = new Set([
-  'list', 'ls', 'add', 'new', 'switch', 'use', 'select',
-  'remove', 'delete', 'rm', 'status', 'check', 'compare',
-  'cmp', 'prices', 'help', 'setup', 'paper', 'sandbox',
+  "list",
+  "ls",
+  "add",
+  "new",
+  "switch",
+  "use",
+  "select",
+  "remove",
+  "delete",
+  "rm",
+  "status",
+  "check",
+  "compare",
+  "cmp",
+  "prices",
+  "help",
+  "setup",
+  "paper",
+  "sandbox",
 ]);
 
 export async function handleExchangeCommand(args: string): Promise<string> {
   const parts = args.trim().split(/\s+/);
-  const subcommand = parts[0]?.toLowerCase() ?? 'list';
+  const subcommand = parts[0]?.toLowerCase() ?? "list";
   const subArgs = parts.slice(1);
 
   let result: ExchangeCommandResult;
@@ -634,65 +658,68 @@ export async function handleExchangeCommand(args: string): Promise<string> {
   }
 
   switch (subcommand) {
-    case 'list':
-    case 'ls':
-    case '':
+    case "list":
+    case "ls":
+    case "":
       result = await exchangeList();
       break;
 
-    case 'add':
-    case 'new':
+    case "add":
+    case "new":
       if (subArgs.length === 0 || !subArgs[0]) {
         result = {
           success: false,
-          message: `Usage: /exchange add <type> [--sandbox]\nNative types: ${ExchangeFactory.getSupportedExchanges().join(', ')}\n\nCCXT-routed (107 exchanges): ccxt:bybit, ccxt:kucoin, ccxt:mexc, ccxt:crypto_com, ccxt:<any-ccxt-sub-id>\n\nFor testnet/paper setups: /exchange add binance --sandbox`,
+          message: `Usage: /exchange add <type> [--sandbox]\nNative types: ${ExchangeFactory.getSupportedExchanges().join(", ")}\n\nCCXT-routed (107 exchanges): ccxt:bybit, ccxt:kucoin, ccxt:mexc, ccxt:crypto_com, ccxt:<any-ccxt-sub-id>\n\nFor testnet/paper setups: /exchange add binance --sandbox`,
         };
       } else {
-        const isSandbox = subArgs.includes('--sandbox') || subArgs.includes('--paper') || subArgs.includes('--testnet');
+        const isSandbox =
+          subArgs.includes("--sandbox") ||
+          subArgs.includes("--paper") ||
+          subArgs.includes("--testnet");
         result = await exchangeAdd(subArgs[0], isSandbox);
       }
       break;
 
-    case 'switch':
-    case 'use':
-    case 'select':
+    case "switch":
+    case "use":
+    case "select":
       if (subArgs.length === 0 || !subArgs[0]) {
         result = {
           success: false,
-          message: 'Usage: /exchange switch <id>',
+          message: "Usage: /exchange switch <id>",
         };
       } else {
         result = await exchangeSwitch(subArgs[0]);
       }
       break;
 
-    case 'remove':
-    case 'delete':
-    case 'rm':
+    case "remove":
+    case "delete":
+    case "rm":
       if (subArgs.length === 0 || !subArgs[0]) {
         result = {
           success: false,
-          message: 'Usage: /exchange remove <id>',
+          message: "Usage: /exchange remove <id>",
         };
       } else {
         result = await exchangeRemove(subArgs[0]);
       }
       break;
 
-    case 'status':
-    case 'check':
+    case "status":
+    case "check":
       result = await exchangeStatus();
       break;
 
-    case 'compare':
-    case 'cmp':
-    case 'prices':
-      result = await exchangeCompare(subArgs.join(' '));
+    case "compare":
+    case "cmp":
+    case "prices":
+      result = await exchangeCompare(subArgs.join(" "));
       break;
 
-    case 'setup':
-    case 'paper':
-    case 'sandbox': {
+    case "setup":
+    case "paper":
+    case "sandbox": {
       // /exchange setup <type>  or  /exchange paper <type>
       const sandboxType = subArgs[0]?.toLowerCase();
       if (!sandboxType) {
@@ -706,7 +733,7 @@ export async function handleExchangeCommand(args: string): Promise<string> {
       break;
     }
 
-    case 'help':
+    case "help":
       result = {
         success: true,
         message: `Exchange Management Commands:
@@ -720,7 +747,7 @@ export async function handleExchangeCommand(args: string): Promise<string> {
   /exchange status              - Check connection status
   /exchange compare <symbol>    - Compare prices across exchanges
 
-Native exchange types: ${ExchangeFactory.getSupportedExchanges().join(', ')}
+Native exchange types: ${ExchangeFactory.getSupportedExchanges().join(", ")}
 
 Paper trading venues: binance (testnet), coinbase (sandbox), okx (demo), gemini (sandbox), hyperliquid (testnet), kraken (demo)
 
@@ -768,10 +795,10 @@ function formatExchangeResult(result: ExchangeCommandResult): string {
       }>;
 
       if (exchanges.length > 0) {
-        lines.push('');
+        lines.push("");
         for (const ex of exchanges) {
-          const status = ex.isActive ? '[ACTIVE]' : '';
-          const sandbox = ex.sandbox ? '[SANDBOX]' : '';
+          const status = ex.isActive ? "[ACTIVE]" : "";
+          const sandbox = ex.sandbox ? "[SANDBOX]" : "";
           lines.push(`  ${ex.id} (${ex.type}) ${status} ${sandbox}`.trim());
         }
       }
@@ -789,11 +816,11 @@ function formatExchangeResult(result: ExchangeCommandResult): string {
       }>;
 
       if (statuses.length > 0) {
-        lines.push('');
+        lines.push("");
         for (const status of statuses) {
-          const connIcon = status.connected ? '[OK]' : '[DISCONNECTED]';
-          const activeLabel = status.isActive ? ' (active)' : '';
-          const throttle = status.rateLimitStatus?.isThrottling ? ' [THROTTLED]' : '';
+          const connIcon = status.connected ? "[OK]" : "[DISCONNECTED]";
+          const activeLabel = status.isActive ? " (active)" : "";
+          const throttle = status.rateLimitStatus?.isThrottling ? " [THROTTLED]" : "";
           lines.push(`  ${status.id}${activeLabel}: ${connIcon}${throttle}`);
           if (status.error) {
             lines.push(`    Error: ${status.error}`);
@@ -812,12 +839,12 @@ function formatExchangeResult(result: ExchangeCommandResult): string {
       }>;
 
       if (prices.length > 0) {
-        lines.push('');
+        lines.push("");
         for (const p of prices) {
           if (p.price !== null) {
             lines.push(`  ${p.exchangeId}: $${p.price.toLocaleString()}`);
           } else {
-            lines.push(`  ${p.exchangeId}: N/A (${p.error || 'unknown error'})`);
+            lines.push(`  ${p.exchangeId}: N/A (${p.error || "unknown error"})`);
           }
         }
 
@@ -831,7 +858,7 @@ function formatExchangeResult(result: ExchangeCommandResult): string {
         } | null;
 
         if (stats) {
-          lines.push('');
+          lines.push("");
           lines.push(`  Spread: ${stats.spreadPercent}%`);
           lines.push(`  Best buy: ${stats.bestBuy} ($${stats.minPrice.toLocaleString()})`);
           lines.push(`  Best sell: ${stats.bestSell} ($${stats.maxPrice.toLocaleString()})`);
@@ -841,11 +868,11 @@ function formatExchangeResult(result: ExchangeCommandResult): string {
 
     // Setup instructions
     if (data.instructions) {
-      lines.push('');
-      lines.push('Setup Instructions:');
+      lines.push("");
+      lines.push("Setup Instructions:");
       lines.push(data.instructions as string);
     }
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }

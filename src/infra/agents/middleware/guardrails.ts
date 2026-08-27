@@ -46,41 +46,114 @@ const WHITELISTED_PHRASES = [
  * Patterns that indicate potentially dangerous commands
  * Using word boundaries (\b) to prevent false positives
  */
-const DANGEROUS_PATTERNS: { pattern: RegExp; description: string; severity: "high" | "medium" }[] = [
-  // High severity - immediate execution or bypass attempts
-  { pattern: /\bexecute\s+immediately\s+without\b/i, description: "Immediate execution without safeguards", severity: "high" },
-  { pattern: /\bbypass\s+(?:all\s+)?safety\b/i, description: "Attempting to bypass safety mechanisms", severity: "high" },
-  { pattern: /\bignore\s+(?:all\s+)?limits?\b/i, description: "Attempting to ignore trading limits", severity: "high" },
-  { pattern: /\bdisable\s+(?:all\s+)?(?:safety|guardrails?|limits?)\b/i, description: "Attempting to disable safety features", severity: "high" },
-  { pattern: /\boverride\s+(?:all\s+)?(?:safety|limits?|restrictions?)\b/i, description: "Attempting to override restrictions", severity: "high" },
-  { pattern: /\bskip\s+(?:all\s+)?(?:validation|checks?|verification)\b/i, description: "Attempting to skip validation", severity: "high" },
+const DANGEROUS_PATTERNS: { pattern: RegExp; description: string; severity: "high" | "medium" }[] =
+  [
+    // High severity - immediate execution or bypass attempts
+    {
+      pattern: /\bexecute\s+immediately\s+without\b/i,
+      description: "Immediate execution without safeguards",
+      severity: "high",
+    },
+    {
+      pattern: /\bbypass\s+(?:all\s+)?safety\b/i,
+      description: "Attempting to bypass safety mechanisms",
+      severity: "high",
+    },
+    {
+      pattern: /\bignore\s+(?:all\s+)?limits?\b/i,
+      description: "Attempting to ignore trading limits",
+      severity: "high",
+    },
+    {
+      pattern: /\bdisable\s+(?:all\s+)?(?:safety|guardrails?|limits?)\b/i,
+      description: "Attempting to disable safety features",
+      severity: "high",
+    },
+    {
+      pattern: /\boverride\s+(?:all\s+)?(?:safety|limits?|restrictions?)\b/i,
+      description: "Attempting to override restrictions",
+      severity: "high",
+    },
+    {
+      pattern: /\bskip\s+(?:all\s+)?(?:validation|checks?|verification)\b/i,
+      description: "Attempting to skip validation",
+      severity: "high",
+    },
 
-  // Medium severity - risky trading patterns
-  { pattern: /\bmax(?:imum)?\s+leverage\b/i, description: "Requesting maximum leverage", severity: "medium" },
-  { pattern: /\b(?:100|hundred)\s*%\s+(?:of\s+)?(?:portfolio|balance|funds?)\b/i, description: "Requesting 100% allocation", severity: "medium" },
-  { pattern: /\ball[\s-]in\b(?!\s+(?:one|all|favor|good|the|clusive))/i, description: "All-in trading request", severity: "medium" },
-  { pattern: /\byolo\s+(?:trade|buy|sell|everything)\b/i, description: "YOLO trading request", severity: "medium" },
-  { pattern: /\bbet\s+everything\b/i, description: "Betting everything", severity: "medium" },
-  { pattern: /\binvest\s+(?:all|everything|entire)\b/i, description: "Investing entire balance", severity: "medium" },
+    // Medium severity - risky trading patterns
+    {
+      pattern: /\bmax(?:imum)?\s+leverage\b/i,
+      description: "Requesting maximum leverage",
+      severity: "medium",
+    },
+    {
+      pattern: /\b(?:100|hundred)\s*%\s+(?:of\s+)?(?:portfolio|balance|funds?)\b/i,
+      description: "Requesting 100% allocation",
+      severity: "medium",
+    },
+    {
+      pattern: /\ball[\s-]in\b(?!\s+(?:one|all|favor|good|the|clusive))/i,
+      description: "All-in trading request",
+      severity: "medium",
+    },
+    {
+      pattern: /\byolo\s+(?:trade|buy|sell|everything)\b/i,
+      description: "YOLO trading request",
+      severity: "medium",
+    },
+    { pattern: /\bbet\s+everything\b/i, description: "Betting everything", severity: "medium" },
+    {
+      pattern: /\binvest\s+(?:all|everything|entire)\b/i,
+      description: "Investing entire balance",
+      severity: "medium",
+    },
 
-  // SQL injection attempts (medium severity - shouldn't work but flag anyway)
-  { pattern: /\bdrop\s+(?:table|database|index)\b/i, description: "SQL injection attempt", severity: "medium" },
-  { pattern: /\bdelete\s+from\s+\w+\s+where\b/i, description: "SQL injection attempt", severity: "medium" },
-  { pattern: /;\s*(?:drop|delete|truncate|update)\b/i, description: "SQL injection attempt", severity: "medium" },
+    // SQL injection attempts (medium severity - shouldn't work but flag anyway)
+    {
+      pattern: /\bdrop\s+(?:table|database|index)\b/i,
+      description: "SQL injection attempt",
+      severity: "medium",
+    },
+    {
+      pattern: /\bdelete\s+from\s+\w+\s+where\b/i,
+      description: "SQL injection attempt",
+      severity: "medium",
+    },
+    {
+      pattern: /;\s*(?:drop|delete|truncate|update)\b/i,
+      description: "SQL injection attempt",
+      severity: "medium",
+    },
 
-  // Prompt injection attempts
-  { pattern: /\bignore\s+(?:previous|all|your)\s+instructions?\b/i, description: "Prompt injection attempt", severity: "high" },
-  { pattern: /\bforget\s+(?:all\s+)?(?:previous\s+)?(?:instructions?|rules?)\b/i, description: "Prompt injection attempt", severity: "high" },
-  { pattern: /\byou\s+are\s+now\s+(?:a|an)\b/i, description: "Prompt injection attempt", severity: "high" },
-  { pattern: /\bact\s+as\s+(?:if|though)\s+you\s+(?:have\s+)?no\s+restrictions?\b/i, description: "Prompt injection attempt", severity: "high" },
-];
+    // Prompt injection attempts
+    {
+      pattern: /\bignore\s+(?:previous|all|your)\s+instructions?\b/i,
+      description: "Prompt injection attempt",
+      severity: "high",
+    },
+    {
+      pattern: /\bforget\s+(?:all\s+)?(?:previous\s+)?(?:instructions?|rules?)\b/i,
+      description: "Prompt injection attempt",
+      severity: "high",
+    },
+    {
+      pattern: /\byou\s+are\s+now\s+(?:a|an)\b/i,
+      description: "Prompt injection attempt",
+      severity: "high",
+    },
+    {
+      pattern: /\bact\s+as\s+(?:if|though)\s+you\s+(?:have\s+)?no\s+restrictions?\b/i,
+      description: "Prompt injection attempt",
+      severity: "high",
+    },
+  ];
 
 /**
  * Check if input contains a whitelisted phrase
  */
 function containsWhitelistedPhrase(input: string): boolean {
   const lowerInput = input.toLowerCase();
-  return WHITELISTED_PHRASES.some(phrase => lowerInput.includes(phrase));
+  return WHITELISTED_PHRASES.some((phrase) => lowerInput.includes(phrase));
 }
 
 /**
@@ -116,7 +189,10 @@ export async function checkInputGuardrails(input: string): Promise<{
     // Still continue to check for high-severity patterns even with whitelist
     for (const { pattern, description, severity } of DANGEROUS_PATTERNS) {
       if (severity === "high" && pattern.test(input)) {
-        logger.warn("Input guardrail triggered (high severity)", { pattern: pattern.source, description });
+        logger.warn("Input guardrail triggered (high severity)", {
+          pattern: pattern.source,
+          description,
+        });
         await emitEvent("guardrail:input_blocked", {
           reason: "dangerous_pattern",
           pattern: pattern.source,
@@ -198,7 +274,7 @@ export async function checkOutputGuardrails(output: string): Promise<{
 }> {
   const warnings: string[] = [];
   let sanitized = output;
-  let blocked = false;
+  const blocked = false;
 
   // Check for potential API keys or secrets
   for (const pattern of SENSITIVE_PATTERNS) {
@@ -268,14 +344,12 @@ export function validateTrade(input: TradeValidationInput): {
 
     if (allocationPercent > maxAllocationPercent * 100) {
       errors.push(
-        `Trade allocation (${allocationPercent.toFixed(1)}%) exceeds max allowed (${(maxAllocationPercent * 100).toFixed(1)}%)`
+        `Trade allocation (${allocationPercent.toFixed(1)}%) exceeds max allowed (${(maxAllocationPercent * 100).toFixed(1)}%)`,
       );
     }
 
     if (allocationPercent > 20) {
-      warnings.push(
-        `Large allocation: ${allocationPercent.toFixed(1)}% of portfolio`
-      );
+      warnings.push(`Large allocation: ${allocationPercent.toFixed(1)}% of portfolio`);
     }
   }
 
@@ -370,7 +444,7 @@ export function validateRiskReward(input: RiskRewardInput): {
 export async function withGuardrails<T>(
   input: string,
   operation: () => Promise<T>,
-  options: { skipInputCheck?: boolean; skipOutputCheck?: boolean } = {}
+  options: { skipInputCheck?: boolean; skipOutputCheck?: boolean } = {},
 ): Promise<{ result: T; warnings: string[] } | { error: string }> {
   const warnings: string[] = [];
 

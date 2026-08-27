@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeOptimalPairsTrading,
-  optimalPairsTradingToPayload,
-} from "./optimalPairsTrading.ts";
+import { computeOptimalPairsTrading, optimalPairsTradingToPayload } from "./optimalPairsTrading.ts";
 
 describe("computeOptimalPairsTrading — validation", () => {
   const base = {

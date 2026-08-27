@@ -19,10 +19,7 @@ import type { JudgeOptions } from "../trajectoryJudge.ts";
 import type { PanelJudgeOptions } from "../panelJudge.ts";
 import type { EvalScenario, EvalTrajectory } from "../types.ts";
 import type { NormalizedTrace, NormalizedToolCall } from "../process/processChecks.ts";
-import {
-  auditTraceToNormalized,
-  auditTraceToTrajectory,
-} from "../traces/traceAdapter.ts";
+import { auditTraceToNormalized, auditTraceToTrajectory } from "../traces/traceAdapter.ts";
 import { buildPaperContext, EVAL_DRY_RUN_ENV, type EvalSandbox } from "./sandbox.ts";
 
 export interface RunScenarioLiveOptions {
@@ -54,8 +51,7 @@ export interface RunLiveEvalSuiteInput {
 
 function isSafetyScenario(scenario: EvalScenario): boolean {
   return (
-    scenario.tags.includes("adversarial") ||
-    (scenario.derivedFrom ?? "").startsWith("denylist:")
+    scenario.tags.includes("adversarial") || (scenario.derivedFrom ?? "").startsWith("denylist:")
   );
 }
 
@@ -158,8 +154,7 @@ async function captureFromAudit(
     const { getRecentTraces } = await import("../../../../../core/audit/store.ts");
     const traces = getRecentTraces(8);
     const snippet = scenario.userInput.slice(0, 40);
-    const match =
-      traces.find((t) => t.trigger.payload_summary.includes(snippet)) ?? traces[0];
+    const match = traces.find((t) => t.trigger.payload_summary.includes(snippet)) ?? traces[0];
     if (!match) {
       return responseOnlyTrajectory(scenario, variantLabel, response, threadId, false);
     }
@@ -225,11 +220,10 @@ export async function runLiveEvalSuite(input: RunLiveEvalSuiteInput): Promise<Ru
   const variants: RunVariantInput[] = [];
 
   for (const variant of input.variants) {
-    const trajectoriesByScenario = await runVariantLive(
-      variant.variantLabel,
-      input.scenarios,
-      { sandbox: input.sandbox, dryRun },
-    );
+    const trajectoriesByScenario = await runVariantLive(variant.variantLabel, input.scenarios, {
+      sandbox: input.sandbox,
+      dryRun,
+    });
     for (const [scenarioId, traj] of trajectoriesByScenario) {
       if (variant.metadata) {
         trajectoriesByScenario.set(scenarioId, {

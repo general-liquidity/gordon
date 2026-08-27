@@ -36,20 +36,24 @@ describe("ExecutionSessionManager submitter routing", () => {
     const submitted: string[] = [];
     const manager = ExecutionSessionManager.getInstance();
 
-    const session = await manager.startSession(intent, makeExchange(rawPlacements), async (params) => {
-      submitted.push(params.symbol);
-      return {
-        orderId: `slice-${submitted.length}`,
-        symbol: params.symbol,
-        side: "BUY",
-        type: "MARKET",
-        status: "FILLED",
-        price: 100,
-        quantity: params.quantity ?? 0,
-        executedQty: params.quantity ?? 0,
-        cummulativeQuoteQty: (params.quantity ?? 0) * 100,
-      } as never;
-    });
+    const session = await manager.startSession(
+      intent,
+      makeExchange(rawPlacements),
+      async (params) => {
+        submitted.push(params.symbol);
+        return {
+          orderId: `slice-${submitted.length}`,
+          symbol: params.symbol,
+          side: "BUY",
+          type: "MARKET",
+          status: "FILLED",
+          price: 100,
+          quantity: params.quantity ?? 0,
+          executedQty: params.quantity ?? 0,
+          cummulativeQuoteQty: (params.quantity ?? 0) * 100,
+        } as never;
+      },
+    );
 
     await manager.cancelSession(session.sessionId);
 

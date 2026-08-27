@@ -95,7 +95,20 @@ export interface CalendarEffectReport {
 // ============================================================================
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_NAMES = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 function buildSegmenter(
   segmenter: CalendarSegmenter | ((d: Date) => string),
@@ -236,8 +249,7 @@ export function analyzeCalendarEffect(
     else if (n >= preliminaryThreshold) significance = "preliminary";
     else significance = "insufficient";
 
-    const significantlyNonZero =
-      pValue < sigThreshold && significance !== "insufficient";
+    const significantlyNonZero = pValue < sigThreshold && significance !== "insufficient";
 
     segments.push({
       segment,

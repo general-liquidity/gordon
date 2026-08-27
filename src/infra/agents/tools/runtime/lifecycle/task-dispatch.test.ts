@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  buildTaskDispatchTool,
-  shouldRegisterTaskDispatchTool,
-} from "./task-dispatch.ts";
+import { buildTaskDispatchTool, shouldRegisterTaskDispatchTool } from "./task-dispatch.ts";
 import type { SubagentProfile } from "../../../profiles/subagentProfile.ts";
 
 const PROFILE_A: SubagentProfile = {
@@ -84,10 +81,7 @@ describe("FW7 — buildTaskDispatchTool", () => {
   });
 
   test("known role with flag off returns 'disabled' status", async () => {
-    const tool = buildTaskDispatchTool(
-      new Map([[PROFILE_A.name, PROFILE_A]]),
-      FAKE_TOOL_REGISTRY,
-    );
+    const tool = buildTaskDispatchTool(new Map([[PROFILE_A.name, PROFILE_A]]), FAKE_TOOL_REGISTRY);
     const previous = process.env.GORDON_DYNAMIC_SUBAGENTS;
     delete process.env.GORDON_DYNAMIC_SUBAGENTS;
     try {
@@ -117,12 +111,11 @@ describe("Patch 1 — role schema is a zod enum", () => {
     const inputSchema = (tool as any).inputSchema as { shape: { role: any } };
     const roleSchema = inputSchema.shape.role;
     // zod enum exposes `.options` (or `._def.values`) — accept either
-    const enumValues =
-      roleSchema._def?.values ??
-      roleSchema.options ??
-      roleSchema._def?.entries;
+    const enumValues = roleSchema._def?.values ?? roleSchema.options ?? roleSchema._def?.entries;
     expect(enumValues).toBeDefined();
-    const set = new Set<string>(Array.isArray(enumValues) ? enumValues : Object.values(enumValues ?? {}));
+    const set = new Set<string>(
+      Array.isArray(enumValues) ? enumValues : Object.values(enumValues ?? {}),
+    );
     expect(set.has("analyst-a")).toBe(true);
     expect(set.has("analyst-b")).toBe(true);
   });
@@ -138,11 +131,10 @@ describe("Patch 1 — role schema is a zod enum", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const inputSchema = (tool as any).inputSchema as { shape: { role: any } };
     const roleSchema = inputSchema.shape.role;
-    const enumValues =
-      roleSchema._def?.values ??
-      roleSchema.options ??
-      roleSchema._def?.entries;
-    const set = new Set<string>(Array.isArray(enumValues) ? enumValues : Object.values(enumValues ?? {}));
+    const enumValues = roleSchema._def?.values ?? roleSchema.options ?? roleSchema._def?.entries;
+    const set = new Set<string>(
+      Array.isArray(enumValues) ? enumValues : Object.values(enumValues ?? {}),
+    );
     expect(set.has("analyst-a")).toBe(true);
     expect(set.has("dead")).toBe(false);
   });
@@ -162,9 +154,7 @@ describe("Patch 1 — role schema is a zod enum", () => {
 
 describe("FW7 — shouldRegisterTaskDispatchTool", () => {
   test("non-empty profiles → register", () => {
-    expect(
-      shouldRegisterTaskDispatchTool(new Map([[PROFILE_A.name, PROFILE_A]]), {}),
-    ).toBe(true);
+    expect(shouldRegisterTaskDispatchTool(new Map([[PROFILE_A.name, PROFILE_A]]), {})).toBe(true);
   });
 
   test("empty profiles + flag off → no register", () => {

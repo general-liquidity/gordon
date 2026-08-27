@@ -79,12 +79,7 @@ export type InstitutionalFootprintVerdict =
   | "insufficient_data";
 
 export interface AxisCheck {
-  axis:
-    | "consecutive_volume"
-    | "run_magnitude"
-    | "signal_bar"
-    | "base_tightness"
-    | "holds_ma";
+  axis: "consecutive_volume" | "run_magnitude" | "signal_bar" | "base_tightness" | "holds_ma";
   passed: boolean;
   observed: number;
   threshold: number;
@@ -125,10 +120,10 @@ export interface InstitutionalFootprintResult {
 const DEFAULT_MIN_VOL_BARS = 4;
 const DEFAULT_ELEVATED_MULT = 1.2;
 const DEFAULT_BASELINE_WINDOW = 20;
-const DEFAULT_MIN_RUN_MOVE = 0.20;
-const DEFAULT_MAX_RUN_MOVE = 0.40;
-const DEFAULT_MIN_SIGNAL_BODY = 0.10;
-const DEFAULT_MAX_BASE_RANGE = 0.10;
+const DEFAULT_MIN_RUN_MOVE = 0.2;
+const DEFAULT_MAX_RUN_MOVE = 0.4;
+const DEFAULT_MIN_SIGNAL_BODY = 0.1;
+const DEFAULT_MAX_BASE_RANGE = 0.1;
 const DEFAULT_MA_LENGTH = 21;
 const DEFAULT_MIN_BARS = 30;
 const DEFAULT_MIN_BASE_LENGTH = 3;
@@ -358,8 +353,9 @@ export function analyzeInstitutionalFootprint(
     longestConsecutiveVolumeBars: longestConsecVol,
     baselineVolume: parseFloat(baselineVol.toFixed(2)),
     runVolume: parseFloat(runVol.toFixed(2)),
-    baseRangeOverLow:
-      Number.isFinite(baseRangeOverLow) ? parseFloat(baseRangeOverLow.toFixed(6)) : -1,
+    baseRangeOverLow: Number.isFinite(baseRangeOverLow)
+      ? parseFloat(baseRangeOverLow.toFixed(6))
+      : -1,
     holdingMaValue: parseFloat(holdingMa.toFixed(6)),
     latestClose: parseFloat(latestClose.toFixed(6)),
     axesPassed,
@@ -370,9 +366,7 @@ export function analyzeInstitutionalFootprint(
   };
 }
 
-export function formatInstitutionalFootprint(
-  result: InstitutionalFootprintResult,
-): string {
+export function formatInstitutionalFootprint(result: InstitutionalFootprintResult): string {
   const lines = [
     `Institutional Footprint — ${result.verdict.toUpperCase()} (score ${result.signatureScore.toFixed(2)})`,
     "",

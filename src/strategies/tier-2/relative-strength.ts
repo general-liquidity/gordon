@@ -62,7 +62,7 @@ export class RelativeStrengthStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     // Skip BTC itself
     if (symbol.toUpperCase().startsWith("BTC")) {
@@ -80,7 +80,7 @@ export class RelativeStrengthStrategy extends BaseStrategy {
     }
 
     // Fetch BTC candles for comparison
-    let btcCandles;
+    let btcCandles: typeof candles;
     try {
       btcCandles = await this.fetchCandles(ctx, "BTCUSDT", timeframe, 100);
     } catch {
@@ -98,16 +98,14 @@ export class RelativeStrengthStrategy extends BaseStrategy {
 
     if (outperformance7d < MIN_OUTPERFORMANCE) {
       return this.notDetected(
-        `Not outperforming BTC (${outperformance7d.toFixed(1)}% < ${MIN_OUTPERFORMANCE}%)`
+        `Not outperforming BTC (${outperformance7d.toFixed(1)}% < ${MIN_OUTPERFORMANCE}%)`,
       );
     }
 
     // Check RSI not overbought
     const rsi = this.calculateRSI(candles);
     if (rsi.current !== null && rsi.current > RSI_OVERBOUGHT) {
-      return this.notDetected(
-        `RSI overbought (${rsi.current.toFixed(1)} > ${RSI_OVERBOUGHT})`
-      );
+      return this.notDetected(`RSI overbought (${rsi.current.toFixed(1)} > ${RSI_OVERBOUGHT})`);
     }
 
     // Calculate 14-day return if enough data
@@ -128,7 +126,9 @@ export class RelativeStrengthStrategy extends BaseStrategy {
     if (outperformance7d >= STRONG_OUTPERFORMANCE) {
       confidence += 0.15;
     } else {
-      confidence += (outperformance7d - MIN_OUTPERFORMANCE) / (STRONG_OUTPERFORMANCE - MIN_OUTPERFORMANCE) * 0.1;
+      confidence +=
+        ((outperformance7d - MIN_OUTPERFORMANCE) / (STRONG_OUTPERFORMANCE - MIN_OUTPERFORMANCE)) *
+        0.1;
     }
 
     // Sustained outperformance bonus
@@ -164,10 +164,10 @@ export class RelativeStrengthStrategy extends BaseStrategy {
     };
 
     const reasons: string[] = [];
+    reasons.push(`Outperforming BTC by ${outperformance7d.toFixed(1)}% (7d)`);
     reasons.push(
-      `Outperforming BTC by ${outperformance7d.toFixed(1)}% (7d)`
+      `Coin: ${coinReturn7d >= 0 ? "+" : ""}${coinReturn7d.toFixed(1)}% vs BTC: ${btcReturn7d >= 0 ? "+" : ""}${btcReturn7d.toFixed(1)}%`,
     );
-    reasons.push(`Coin: ${coinReturn7d >= 0 ? "+" : ""}${coinReturn7d.toFixed(1)}% vs BTC: ${btcReturn7d >= 0 ? "+" : ""}${btcReturn7d.toFixed(1)}%`);
     if (outperformance14d !== null) {
       reasons.push(`14d outperformance: ${outperformance14d.toFixed(1)}%`);
     }
@@ -182,10 +182,7 @@ export class RelativeStrengthStrategy extends BaseStrategy {
   /**
    * Calculate return over lookback period
    */
-  private calculateReturn(
-    candles: { close: number }[],
-    lookback: number
-  ): number {
+  private calculateReturn(candles: { close: number }[], lookback: number): number {
     const startIdx = Math.max(0, candles.length - lookback);
     const startPrice = candles[startIdx]?.close ?? 0;
     const endPrice = candles[candles.length - 1]?.close ?? 0;
@@ -200,7 +197,7 @@ export class RelativeStrengthStrategy extends BaseStrategy {
   private calculateRSRatio(
     coinCandles: { close: number }[],
     btcCandles: { close: number }[],
-    period: number
+    period: number,
   ): { current: number; trend: "rising" | "falling" | "flat" } {
     const minLen = Math.min(coinCandles.length, btcCandles.length);
     const ratios: number[] = [];
@@ -234,14 +231,11 @@ export class RelativeStrengthStrategy extends BaseStrategy {
     return { current, trend };
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", 100);
     const currentPrice = this.getCurrentPrice(candles, ctx);
 
-    const atr = this.calculateATR(candles);
+    const _atr = this.calculateATR(candles);
     const levels = this.detectLevels(candles, currentPrice);
     const supports = this.getSupports(levels, currentPrice);
 
@@ -268,7 +262,8 @@ export class RelativeStrengthStrategy extends BaseStrategy {
       stopLoss,
       takeProfits,
       riskRewardRatio,
-      notes: `Relative strength trade vs BTC. Stop at $${stopLoss.toFixed(2)}. ` +
+      notes:
+        `Relative strength trade vs BTC. Stop at $${stopLoss.toFixed(2)}. ` +
         `Monitor RS ratio for exit signals. R:R ${riskRewardRatio.toFixed(1)}:1`,
     };
   }
@@ -333,7 +328,7 @@ When creating a plan using the Relative Strength strategy:
     bar: OHLC,
     _index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     const price = bar.close;
     const { rsi14, sma50, ema26, volumeRatio } = indicators;

@@ -5,10 +5,7 @@
  * access control enforcement, rate limiting, and permission initialization.
  */
 
-import {
-  enforceRateLimit,
-  type RateLimitResult,
-} from "../../platform/observability/index.ts";
+import { enforceRateLimit } from "../../platform/observability/index.ts";
 import { auditLog } from "../../platform/audit/index.ts";
 import { evaluateRuntimeToolPolicy } from "../../../runtime/tools/ToolPolicy.ts";
 import type { GordonContext } from "../types.ts";
@@ -35,7 +32,7 @@ export async function checkToolSecurity(
   agentName: string,
   toolName: string,
   context: GordonContext,
-  options: { rateLimit?: number } = {}
+  options: { rateLimit?: number } = {},
 ): Promise<ToolSecurityCheckResult> {
   const userId = context.userId || "unknown";
 
@@ -51,13 +48,9 @@ export async function checkToolSecurity(
   // Check rate limiting
   const rateLimitResult = enforceRateLimit(agentName, toolName, options.rateLimit);
   if (!rateLimitResult.allowed) {
-    auditLog.record(
-      userId,
-      "RATE_LIMIT_EXCEEDED",
-      { agentName, toolName },
-      "BLOCKED",
-      { resultDetails: rateLimitResult.error }
-    );
+    auditLog.record(userId, "RATE_LIMIT_EXCEEDED", { agentName, toolName }, "BLOCKED", {
+      resultDetails: rateLimitResult.error,
+    });
 
     return {
       allowed: false,
@@ -114,7 +107,9 @@ export async function initializeWithPermissionCheck(context: GordonContext): Pro
     );
     return {
       success: true,
-      warnings: ["API key permission introspection is limited under CCXT; using exchange account flags."],
+      warnings: [
+        "API key permission introspection is limited under CCXT; using exchange account flags.",
+      ],
       errors: [],
       isReadOnly,
     };

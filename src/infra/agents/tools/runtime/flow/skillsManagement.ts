@@ -26,7 +26,9 @@ import {
 
 const subcommandSchema = z
   .enum(["audit", "list", "usage", "review"])
-  .describe("Subcommand: audit (full report) | list (all skills) | usage (invocation stats) | review (stale/never-reviewed skills)");
+  .describe(
+    "Subcommand: audit (full report) | list (all skills) | usage (invocation stats) | review (stale/never-reviewed skills)",
+  );
 
 export const skillsManagementTool = createTool({
   id: "skills_manage",
@@ -72,9 +74,7 @@ export const skillsManagementTool = createTool({
               const status: SkillStatus = skillStatus(s);
               const staleness = assessSkillStaleness(s);
               const age =
-                staleness.daysSinceReview !== null
-                  ? `${staleness.daysSinceReview}d`
-                  : "never";
+                staleness.daysSinceReview !== null ? `${staleness.daysSinceReview}d` : "never";
               return { id: s.id, status, source: s.source, lastReviewed: age };
             })
             .sort((a, b) => a.id.localeCompare(b.id));

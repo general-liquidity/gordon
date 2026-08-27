@@ -11,10 +11,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import {
-  computeFaeFtaCut,
-  faeFtaCutToPayload,
-} from "../../../trading/quant/faeFtaCut.ts";
+import { computeFaeFtaCut, faeFtaCutToPayload } from "../../../trading/quant/faeFtaCut.ts";
 import { recordStructuredObservation } from "../../../platform/observability/structured.ts";
 
 export const faeFtaCutDiagnosticTool = createTool({
@@ -41,7 +38,9 @@ export const faeFtaCutDiagnosticTool = createTool({
     priceHistory: z
       .array(z.number().positive())
       .optional()
-      .describe("Optional closed-candle close prices during the trade (excluding entry). Used to compute MAE/MFE."),
+      .describe(
+        "Optional closed-candle close prices during the trade (excluding entry). Used to compute MAE/MFE.",
+      ),
   }),
   outputSchema: z.object({
     riskUnit: z.number(),

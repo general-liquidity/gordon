@@ -1,9 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  attributeEdge,
-  attributionToPayload,
-} from "./edgeAttribution.ts";
+import { attributeEdge, attributionToPayload } from "./edgeAttribution.ts";
 
 describe("attributeEdge — valid edge cases", () => {
   it("Wright's structural example: panic seller margin call", () => {
@@ -95,7 +92,8 @@ describe("attributionToPayload", () => {
       edgeType: "structural",
       counterparty: "forced sellers under margin call",
       constraint: "leveraged liquidation cascade",
-      edgeArticulation: "Forced selling creates predictable dislocation that I can exploit through patient liquidity provision until forced flow exhausts and price recovers",
+      edgeArticulation:
+        "Forced selling creates predictable dislocation that I can exploit through patient liquidity provision until forced flow exhausts and price recovers",
     });
     const p = attributionToPayload(r) as { kind: string; verdict: string };
     expect(p.kind).toBe("edge_attribution.evaluated");

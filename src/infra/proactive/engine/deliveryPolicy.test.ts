@@ -132,10 +132,18 @@ describe("DeliveryPolicy", () => {
   });
 
   test("urgent cards also coalesce on dedupeKey (no duplicate card)", () => {
-    const first = mkSuggestion("risk_warning", { severity: "urgent", symbol: "BTC", eventType: "risk:rejected" });
+    const first = mkSuggestion("risk_warning", {
+      severity: "urgent",
+      symbol: "BTC",
+      eventType: "risk:rejected",
+    });
     expect(policy.admit(first).kind).toBe("deliver");
 
-    const dup = mkSuggestion("risk_warning", { severity: "urgent", symbol: "BTC", eventType: "risk:rejected" });
+    const dup = mkSuggestion("risk_warning", {
+      severity: "urgent",
+      symbol: "BTC",
+      eventType: "risk:rejected",
+    });
     expect(policy.admit(dup).kind).toBe("coalesce");
   });
 
@@ -183,7 +191,9 @@ describe("delivery helpers", () => {
   });
 
   test("buildDedupeKey needs at least category + one of symbol/trigger", () => {
-    expect(buildDedupeKey(mkSuggestion("funding_alert", { symbol: "BTC" }))).toBe("funding_alert:BTC");
+    expect(buildDedupeKey(mkSuggestion("funding_alert", { symbol: "BTC" }))).toBe(
+      "funding_alert:BTC",
+    );
     expect(buildDedupeKey(mkSuggestion("regime_flip", { eventType: "rc" }))).toBe("regime_flip:rc");
     expect(
       buildDedupeKey(mkSuggestion("funding_alert", { symbol: "BTC", eventType: "funding" })),

@@ -67,7 +67,7 @@ export class TokenManager {
   constructor(config: TokenConfig) {
     this.accessToken = config.accessToken;
     this.refreshToken = config.refreshToken;
-    this.expiresAt = config.expiresAt ?? (Date.now() + DEFAULT_LIFETIME_MS);
+    this.expiresAt = config.expiresAt ?? Date.now() + DEFAULT_LIFETIME_MS;
     this.tokenEndpoint = config.tokenEndpoint;
     this.clientId = config.clientId;
     this.clientSecret = config.clientSecret;
@@ -224,9 +224,7 @@ export class TokenManager {
 
     if (!response.ok) {
       const text = await response.text().catch(() => "");
-      throw new Error(
-        `Token endpoint returned ${response.status}: ${text.slice(0, 200)}`,
-      );
+      throw new Error(`Token endpoint returned ${response.status}: ${text.slice(0, 200)}`);
     }
 
     const json = (await response.json()) as Record<string, unknown>;

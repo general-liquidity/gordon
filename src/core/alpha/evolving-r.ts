@@ -87,10 +87,8 @@ export function computeEvolvingR(input: EvolvingRInput): EvolvingRResult | null 
   }
   if (currentRR > RR_CAP) currentRR = RR_CAP;
 
-  const targetReached =
-    side === "long" ? currentPrice >= target : currentPrice <= target;
-  const stopped =
-    side === "long" ? currentPrice <= stop : currentPrice >= stop;
+  const targetReached = side === "long" ? currentPrice >= target : currentPrice <= target;
+  const stopped = side === "long" ? currentPrice <= stop : currentPrice >= stop;
 
   let verdict: EvolvingRResult["verdict"];
   let interpretation: string;
@@ -109,8 +107,7 @@ export function computeEvolvingR(input: EvolvingRInput): EvolvingRResult | null 
       "In profit but the remaining reward is poor versus the risk back to stop (currentRR < 0.5) — trail or trim; do not risk a large give-back for a small remaining gain.";
   } else {
     verdict = "hold";
-    interpretation =
-      "Risk-reward from here still justifies holding the trade toward target.";
+    interpretation = "Risk-reward from here still justifies holding the trade toward target.";
   }
 
   return {

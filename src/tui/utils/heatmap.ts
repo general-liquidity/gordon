@@ -20,7 +20,7 @@ export function generateHeatmap(data: DayData[], weeks = 52): string[] {
   const values = data.map((d) => d.value).filter((v) => v !== 0);
   const sorted = [...values].sort((a, b) => a - b);
   const p25 = sorted[Math.floor(sorted.length * 0.25)] ?? 0;
-  const p50 = sorted[Math.floor(sorted.length * 0.50)] ?? 0;
+  const p50 = sorted[Math.floor(sorted.length * 0.5)] ?? 0;
   const p75 = sorted[Math.floor(sorted.length * 0.75)] ?? 0;
 
   function bucket(value: number): number {

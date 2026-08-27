@@ -24,11 +24,7 @@ function bar(close: number, venue: Partial<TradabilityBar> = {}): TradabilityBar
 
 describe("buildTradabilityMask", () => {
   it("marks a bar carrying an explicit venue halt as non-executable", () => {
-    const mask = buildTradabilityMask([
-      bar(100),
-      bar(101, { halted: true }),
-      bar(102),
-    ]);
+    const mask = buildTradabilityMask([bar(100), bar(101, { halted: true }), bar(102)]);
     expect(mask.tradable).toEqual([true, false, true]);
     expect(mask.reasons[1]).toBe("halted");
     expect(mask.maskedCount).toBe(1);
@@ -102,18 +98,7 @@ describe("buildTradabilityMask", () => {
 
 describe("propagateMask", () => {
   it("keeps a window invalid for its whole length after one masked bar", () => {
-    const mask = maskFromFlags([
-      true,
-      true,
-      true,
-      true,
-      false,
-      true,
-      true,
-      true,
-      true,
-      true,
-    ]);
+    const mask = maskFromFlags([true, true, true, true, false, true, true, true, true, true]);
     const out = propagateMask(mask, 3);
 
     expect(out.tradable.slice(0, 2)).toEqual([false, false]);
@@ -127,9 +112,9 @@ describe("propagateMask", () => {
   it("scales contamination with the window length, not the number of halts", () => {
     const flags = Array.from({ length: 40 }, (_, i) => i !== 20);
     const mask = maskFromFlags(flags);
-    const contaminated = propagateMask(mask, 20)
-      .reasons.filter((r) => r === "window_contaminated")
-      .length;
+    const contaminated = propagateMask(mask, 20).reasons.filter(
+      (r) => r === "window_contaminated",
+    ).length;
     expect(contaminated).toBe(20);
   });
 });
@@ -208,11 +193,9 @@ describe("crossSectionalNormalize", () => {
   });
 
   it("computes the z-score mean and deviation from executable names only", () => {
-    const z = crossSectionalNormalize(
-      [1, 2, 3, 100],
-      maskFromFlags([true, true, true, false]),
-      { method: "zscore" },
-    );
+    const z = crossSectionalNormalize([1, 2, 3, 100], maskFromFlags([true, true, true, false]), {
+      method: "zscore",
+    });
     const std = Math.sqrt(2 / 3);
     expect(z[1]).toBeCloseTo(0, 12);
     expect(z[0]).toBeCloseTo(-1 / std, 12);

@@ -71,7 +71,10 @@ export function decomposeReturns(input: DecompositionInput): DecompositionResult
     verdict = "noise";
   } else if (alphaFraction >= 0.5) {
     verdict = "skill";
-  } else if (Math.abs(betaContribution) > Math.abs(factorTotal) && Math.abs(betaContribution) > Math.abs(alpha)) {
+  } else if (
+    Math.abs(betaContribution) > Math.abs(factorTotal) &&
+    Math.abs(betaContribution) > Math.abs(alpha)
+  ) {
     verdict = "leveraged_beta";
   } else {
     verdict = "factor_harvester";
@@ -94,7 +97,9 @@ export function formatDecomposition(result: DecompositionResult): string {
   lines.push(`Decomposition: ${pct(result.totalReturn)} total return`);
   lines.push(`  Beta:    ${pct(result.betaContribution)}`);
   lines.push(`  Factors: ${pct(result.factorTotal)}`);
-  lines.push(`  Alpha:   ${pct(result.alpha)} (${pct(result.alphaFractionOfTotal)} of total) → ${result.verdict}`);
+  lines.push(
+    `  Alpha:   ${pct(result.alpha)} (${pct(result.alphaFractionOfTotal)} of total) → ${result.verdict}`,
+  );
   return lines.join("\n");
 }
 

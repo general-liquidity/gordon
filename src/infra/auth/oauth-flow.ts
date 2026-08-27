@@ -52,6 +52,21 @@ export interface OAuthFlowResult extends OAuthTokens {
   tokenUrl: string;
 }
 
+export interface BrowserLaunch {
+  command: string;
+  args: string[];
+}
+
+/** Argument-vector browser launch candidates, ordered by platform preference. */
+export function browserLaunchCandidates(url: string, platform: NodeJS.Platform): BrowserLaunch[] {
+  if (platform === "darwin") return [{ command: "open", args: [url] }];
+  if (platform === "win32") return [{ command: "explorer.exe", args: [url] }];
+  return ["xdg-open", "gio", "kde-open5", "kde-open", "wslview"].map((command) => ({
+    command,
+    args: command === "gio" ? ["open", url] : [url],
+  }));
+}
+
 /**
  * Open a URL in the user's default browser. On Linux, falls through a
  * chain of common openers (xdg-open → gio → kde-open → wslview) before
@@ -60,46 +75,29 @@ export interface OAuthFlowResult extends OAuthTokens {
  */
 async function openBrowser(url: string): Promise<void> {
   const { spawn } = await import("node:child_process");
-  const platform = process.platform;
-
-  // macOS — `open` is always present
-  if (platform === "darwin") {
-    try {
-      spawn("open", [url], { detached: true, stdio: "ignore" }).unref();
-    } catch {
-      // user opens manually
-    }
-    return;
-  }
-
-  // Windows — `cmd /c start` is always present
-  if (platform === "win32") {
-    try {
-      spawn("cmd", ["/c", "start", "", url], { detached: true, stdio: "ignore" }).unref();
-    } catch {
-      // user opens manually
-    }
-    return;
-  }
-
-  // Linux / other Unix — try a chain of openers. spawn() doesn't throw
-  // until exec, so we can't catch missing-binary errors synchronously.
-  // Spawn the first candidate and rely on the user fallback in the caller.
-  const candidates = ["xdg-open", "gio", "kde-open5", "kde-open", "wslview"];
-  for (const opener of candidates) {
-    try {
-      const child = spawn(opener, opener === "gio" ? ["open", url] : [url], {
-        detached: true,
-        stdio: "ignore",
-      });
-      child.on("error", () => {
-        // Binary not found — try the next candidate
-      });
-      child.unref();
-      return;
-    } catch {
-      // spawn() rarely throws synchronously; loop to next opener
-    }
+  for (const candidate of browserLaunchCandidates(url, process.platform)) {
+    const launched = await new Promise<boolean>((resolve) => {
+      try {
+        const child = spawn(candidate.command, candidate.args, {
+          detached: true,
+          stdio: "ignore",
+        });
+        let settled = false;
+        const finish = (ok: boolean): void => {
+          if (settled) return;
+          settled = true;
+          resolve(ok);
+        };
+        child.once("spawn", () => {
+          child.unref();
+          finish(true);
+        });
+        child.once("error", () => finish(false));
+      } catch {
+        resolve(false);
+      }
+    });
+    if (launched) return;
   }
 }
 
@@ -161,27 +159,29 @@ function waitForCallback(
       const error = reqUrl.searchParams.get("error");
 
       if (error) {
-        res.writeHead(400, { "content-type": "text/html" }).end(
-          `<html><body><h2>Authorization failed: ${error}</h2><p>You can close this window.</p></body></html>`,
-        );
+        res
+          .writeHead(400, { "content-type": "text/html" })
+          .end(
+            `<html><body><h2>Authorization failed: ${error}</h2><p>You can close this window.</p></body></html>`,
+          );
         server.close();
         reject(new Error(`OAuth authorization failed: ${error}`));
         return;
       }
 
       if (!code || !state) {
-        res.writeHead(400, { "content-type": "text/html" }).end(
-          "<html><body><h2>Missing code or state</h2></body></html>",
-        );
+        res
+          .writeHead(400, { "content-type": "text/html" })
+          .end("<html><body><h2>Missing code or state</h2></body></html>");
         server.close();
         reject(new Error("OAuth callback missing code or state"));
         return;
       }
 
       if (state !== expectedState) {
-        res.writeHead(400, { "content-type": "text/html" }).end(
-          "<html><body><h2>State mismatch (possible CSRF)</h2></body></html>",
-        );
+        res
+          .writeHead(400, { "content-type": "text/html" })
+          .end("<html><body><h2>State mismatch (possible CSRF)</h2></body></html>");
         server.close();
         reject(new Error("OAuth state mismatch — possible CSRF attack"));
         return;
@@ -248,9 +248,7 @@ export async function exchangeCodeForToken(
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(
-      `Token exchange failed (${response.status}): ${text.slice(0, 300)}`,
-    );
+    throw new Error(`Token exchange failed (${response.status}): ${text.slice(0, 300)}`);
   }
 
   const json = (await response.json()) as Record<string, unknown>;
@@ -295,12 +293,7 @@ export async function startOAuthFlow(
   const state = base64url(randomBytes(24));
   const pkce = (config.usePKCE ?? true) ? generatePKCE() : null;
 
-  const authUrl = buildAuthUrl(
-    config,
-    redirectUri,
-    state,
-    pkce?.challenge ?? null,
-  );
+  const authUrl = buildAuthUrl(config, redirectUri, state, pkce?.challenge ?? null);
 
   // Start server + open browser in parallel.
   const callbackPromise = waitForCallback(port, path, state, timeoutMs);
@@ -309,12 +302,7 @@ export async function startOAuthFlow(
 
   const { code } = await callbackPromise;
 
-  const tokens = await exchangeCodeForToken(
-    config,
-    code,
-    redirectUri,
-    pkce?.verifier ?? null,
-  );
+  const tokens = await exchangeCodeForToken(config, code, redirectUri, pkce?.verifier ?? null);
 
   return {
     ...tokens,

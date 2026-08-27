@@ -61,7 +61,10 @@ export class SuggestionStore {
   }
 
   /** Return recent suggestions, newest-first. */
-  getRecent(limit = 20, filter?: { status?: ProactiveStatus; category?: ProactiveCategory }): ProactiveSuggestion[] {
+  getRecent(
+    limit = 20,
+    filter?: { status?: ProactiveStatus; category?: ProactiveCategory },
+  ): ProactiveSuggestion[] {
     let list = this.suggestions.slice();
     if (filter?.status) list = list.filter((s) => s.status === filter.status);
     if (filter?.category) list = list.filter((s) => s.category === filter.category);
@@ -71,7 +74,12 @@ export class SuggestionStore {
   /** Count suggestions by lifecycle status. */
   counts(): Record<ProactiveStatus, number> & { total: number } {
     const out = {
-      pending: 0, accepted: 0, dismissed: 0, suppressed: 0, expired: 0, total: 0,
+      pending: 0,
+      accepted: 0,
+      dismissed: 0,
+      suppressed: 0,
+      expired: 0,
+      total: 0,
     };
     for (const s of this.suggestions) {
       out[s.status] += 1;
@@ -95,9 +103,7 @@ export class SuggestionStore {
   } {
     const now = Date.now();
     const cutoff = now - windowMs;
-    const relevant = this.feedback.filter(
-      (f) => f.category === category && f.at >= cutoff,
-    );
+    const relevant = this.feedback.filter((f) => f.category === category && f.at >= cutoff);
     const fired = relevant.length;
     const accepted = relevant.filter((f) => f.status === "accepted").length;
     const dismissed = relevant.filter((f) => f.status === "dismissed").length;
@@ -106,10 +112,7 @@ export class SuggestionStore {
   }
 
   /** Recent dismissal count in a window — used for auto-suppression. */
-  recentDismissals(
-    category: ProactiveCategory,
-    windowMs: number = 60 * 60 * 1000,
-  ): number {
+  recentDismissals(category: ProactiveCategory, windowMs: number = 60 * 60 * 1000): number {
     const cutoff = Date.now() - windowMs;
     return this.feedback.filter(
       (f) => f.category === category && f.status === "dismissed" && f.at >= cutoff,

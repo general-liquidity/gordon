@@ -62,7 +62,7 @@ describe("retrieveAnalogs", () => {
     const candidates: AnalogState[] = [];
     for (let i = 0; i < 300; i++) {
       const predictive = (rf() * 6 - 3) * 0.001; // scale ~1e-3
-      const nuisance = (rg() * 2000 - 1000); // scale ~1e3, independent of return
+      const nuisance = rg() * 2000 - 1000; // scale ~1e3, independent of return
       candidates.push({ features: [predictive, nuisance], forwardReturn: 10 * predictive });
     }
     // Query: high on the predictive axis, neutral on the nuisance axis.

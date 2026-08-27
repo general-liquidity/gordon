@@ -215,9 +215,13 @@ function buildBwrapArgv(
   allowNetwork: boolean,
 ): WrappedCommand {
   const bwrapArgs: string[] = [
-    "--ro-bind", "/", "/",
-    "--dev", "/dev",
-    "--proc", "/proc",
+    "--ro-bind",
+    "/",
+    "/",
+    "--dev",
+    "/dev",
+    "--proc",
+    "/proc",
     "--die-with-parent",
   ];
   for (const root of writableRoots) {

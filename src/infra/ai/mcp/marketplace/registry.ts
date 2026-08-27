@@ -3,14 +3,14 @@
  * Fetches and searches the plugin marketplace registry
  */
 
-import * as fs from 'fs/promises';
-import type { MCPCategory } from '../types';
+import * as fs from "node:fs/promises";
+import type { MCPCategory } from "../types";
 import type {
   MarketplaceRegistry,
   MarketplaceListing,
   MarketplaceSearchOptions,
   MarketplaceSearchResult,
-} from './types';
+} from "./types";
 
 // ============================================================================
 // Constants
@@ -18,7 +18,7 @@ import type {
 
 /** Default URL for the marketplace registry */
 const REGISTRY_URL =
-  'https://raw.githubusercontent.com/general-liquidity/gordon-mcp-marketplace/master/registry.json';
+  "https://raw.githubusercontent.com/general-liquidity/gordon-mcp-marketplace/master/registry.json";
 
 /** Default cache TTL (1 hour) */
 const DEFAULT_CACHE_TTL = 3600000;
@@ -62,16 +62,14 @@ export class MarketplaceRegistryClient {
       const response = await fetch(this.registryUrl);
 
       if (!response.ok) {
-        throw new Error(
-          `Failed to fetch registry: ${response.status} ${response.statusText}`
-        );
+        throw new Error(`Failed to fetch registry: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
 
       // Validate basic structure
       if (!this.isValidRegistry(data)) {
-        throw new Error('Invalid registry format');
+        throw new Error("Invalid registry format");
       }
 
       this.cache = data as MarketplaceRegistry;
@@ -82,8 +80,8 @@ export class MarketplaceRegistryClient {
       // If we have stale cache, return it rather than failing
       if (this.cache) {
         console.warn(
-          'Failed to refresh registry, using stale cache:',
-          error instanceof Error ? error.message : error
+          "Failed to refresh registry, using stale cache:",
+          error instanceof Error ? error.message : error,
         );
         return this.cache;
       }
@@ -97,10 +95,7 @@ export class MarketplaceRegistryClient {
    * @param category - Optional category filter
    * @returns Array of matching plugins
    */
-  async search(
-    query: string,
-    category?: MCPCategory
-  ): Promise<MarketplaceListing[]> {
+  async search(query: string, category?: MCPCategory): Promise<MarketplaceListing[]> {
     const result = await this.searchAdvanced({
       query,
       category,
@@ -113,9 +108,7 @@ export class MarketplaceRegistryClient {
    * @param options - Search options
    * @returns Search result with plugins and metadata
    */
-  async searchAdvanced(
-    options: MarketplaceSearchOptions
-  ): Promise<MarketplaceSearchResult> {
+  async searchAdvanced(options: MarketplaceSearchOptions): Promise<MarketplaceSearchResult> {
     const registry = await this.fetchRegistry();
     let plugins = [...registry.plugins];
 
@@ -127,15 +120,13 @@ export class MarketplaceRegistryClient {
           p.id.toLowerCase().includes(queryLower) ||
           p.manifest.name.toLowerCase().includes(queryLower) ||
           p.manifest.description.toLowerCase().includes(queryLower) ||
-          p.manifest.author.toLowerCase().includes(queryLower)
+          p.manifest.author.toLowerCase().includes(queryLower),
       );
     }
 
     // Category filter
     if (options.category) {
-      plugins = plugins.filter(
-        (p) => p.manifest.category === options.category
-      );
+      plugins = plugins.filter((p) => p.manifest.category === options.category);
     }
 
     // Pricing filter
@@ -157,28 +148,28 @@ export class MarketplaceRegistryClient {
     const total = plugins.length;
 
     // Sort
-    const sortBy = options.sortBy ?? 'name';
-    const sortOrder = options.sortOrder ?? 'asc';
+    const sortBy = options.sortBy ?? "name";
+    const sortOrder = options.sortOrder ?? "asc";
 
     plugins.sort((a, b) => {
       let comparison = 0;
 
       switch (sortBy) {
-        case 'name':
+        case "name":
           comparison = a.manifest.name.localeCompare(b.manifest.name);
           break;
-        case 'stars':
+        case "stars":
           comparison = (a.stars ?? 0) - (b.stars ?? 0);
           break;
-        case 'downloads':
+        case "downloads":
           comparison = (a.downloads ?? 0) - (b.downloads ?? 0);
           break;
-        case 'lastUpdated':
+        case "lastUpdated":
           comparison = new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime();
           break;
       }
 
-      return sortOrder === 'desc' ? -comparison : comparison;
+      return sortOrder === "desc" ? -comparison : comparison;
     });
 
     // Apply limit
@@ -221,8 +212,8 @@ export class MarketplaceRegistryClient {
   async getFeatured(limit = 10): Promise<MarketplaceListing[]> {
     const result = await this.searchAdvanced({
       verifiedOnly: true,
-      sortBy: 'downloads',
-      sortOrder: 'desc',
+      sortBy: "downloads",
+      sortOrder: "desc",
       limit,
     });
     return result.plugins;
@@ -233,11 +224,11 @@ export class MarketplaceRegistryClient {
    * @param path - Path to the local registry JSON file
    */
   async loadLocalRegistry(path: string): Promise<void> {
-    const content = await fs.readFile(path, 'utf-8');
+    const content = await fs.readFile(path, "utf-8");
     const data = JSON.parse(content);
 
     if (!this.isValidRegistry(data)) {
-      throw new Error('Invalid local registry format');
+      throw new Error("Invalid local registry format");
     }
 
     this.cache = data as MarketplaceRegistry;
@@ -277,13 +268,13 @@ export class MarketplaceRegistryClient {
    * Validate that data is a valid registry
    */
   private isValidRegistry(data: unknown): data is MarketplaceRegistry {
-    if (!data || typeof data !== 'object') return false;
+    if (!data || typeof data !== "object") return false;
 
     const registry = data as Record<string, unknown>;
 
     return (
-      typeof registry.version === 'string' &&
-      typeof registry.lastUpdated === 'string' &&
+      typeof registry.version === "string" &&
+      typeof registry.lastUpdated === "string" &&
       Array.isArray(registry.plugins)
     );
   }

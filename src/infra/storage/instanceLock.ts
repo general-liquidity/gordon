@@ -21,7 +21,11 @@ export class InstanceLockCollisionError extends Error {
   readonly holder: InstanceLockInfo | null;
 
   constructor(path: string, holder: InstanceLockInfo | null) {
-    super(holder?.pid ? `Another Gordon instance is already running (pid ${holder.pid}).` : "Another Gordon instance is already running.");
+    super(
+      holder?.pid
+        ? `Another Gordon instance is already running (pid ${holder.pid}).`
+        : "Another Gordon instance is already running.",
+    );
     this.name = "InstanceLockCollisionError";
     this.path = path;
     this.pid = holder?.pid ?? null;
@@ -29,8 +33,14 @@ export class InstanceLockCollisionError extends Error {
   }
 }
 
-export function acquireInstanceLock(name = "tui", options?: { force?: boolean }): InstanceLock | null {
-  if (!options?.force && (process.env.NODE_ENV === "test" || process.env.GORDON_ALLOW_MULTI_INSTANCE === "1")) {
+export function acquireInstanceLock(
+  name = "tui",
+  options?: { force?: boolean },
+): InstanceLock | null {
+  if (
+    !options?.force &&
+    (process.env.NODE_ENV === "test" || process.env.GORDON_ALLOW_MULTI_INSTANCE === "1")
+  ) {
     return null;
   }
 
@@ -102,7 +112,8 @@ function readLockInfo(path: string): InstanceLockInfo | null {
     if (!Number.isInteger(parsed.pid) || parsed.pid! <= 0) return null;
     return {
       pid: parsed.pid!,
-      startedAt: typeof parsed.startedAt === "string" ? parsed.startedAt : new Date(0).toISOString(),
+      startedAt:
+        typeof parsed.startedAt === "string" ? parsed.startedAt : new Date(0).toISOString(),
       cwd: typeof parsed.cwd === "string" ? parsed.cwd : "",
     };
   } catch {

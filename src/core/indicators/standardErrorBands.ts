@@ -22,11 +22,7 @@
 
 import { rollingLinearRegression } from "./linearRegression.ts";
 
-export type SebTrendVerdict =
-  | "trending_up"
-  | "trending_down"
-  | "flat"
-  | "noisy";
+export type SebTrendVerdict = "trending_up" | "trending_down" | "flat" | "noisy";
 
 export interface StandardErrorBandsParams {
   /** Bars in each rolling regression. Default 21. */
@@ -118,17 +114,12 @@ export function calculateStandardErrorBands(
   }
 
   const lastIdx = n - 1;
-  const latestCenterline = lastIdx >= 0 ? reg.centerline[lastIdx] ?? null : null;
-  const latestUpperBand = lastIdx >= 0 ? upper[lastIdx] ?? null : null;
-  const latestLowerBand = lastIdx >= 0 ? lower[lastIdx] ?? null : null;
-  const latestSlope = lastIdx >= 0 ? reg.slopes[lastIdx] ?? null : null;
-  const latestRSquared = lastIdx >= 0 ? reg.rSquared[lastIdx] ?? null : null;
-  const latestVerdict = classifyTrend(
-    latestSlope,
-    latestRSquared,
-    slopeThreshold,
-    rSqThreshold,
-  );
+  const latestCenterline = lastIdx >= 0 ? (reg.centerline[lastIdx] ?? null) : null;
+  const latestUpperBand = lastIdx >= 0 ? (upper[lastIdx] ?? null) : null;
+  const latestLowerBand = lastIdx >= 0 ? (lower[lastIdx] ?? null) : null;
+  const latestSlope = lastIdx >= 0 ? (reg.slopes[lastIdx] ?? null) : null;
+  const latestRSquared = lastIdx >= 0 ? (reg.rSquared[lastIdx] ?? null) : null;
+  const latestVerdict = classifyTrend(latestSlope, latestRSquared, slopeThreshold, rSqThreshold);
 
   const interpretation =
     latestVerdict === null

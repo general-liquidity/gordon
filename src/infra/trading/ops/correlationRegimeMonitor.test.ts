@@ -25,8 +25,8 @@ describe("evaluateCorrelationRegime — elevated", () => {
     const r = evaluateCorrelationRegime({
       correlations: [
         [1.0, 0.55, 0.65],
-        [0.55, 1.0, 0.60],
-        [0.65, 0.60, 1.0],
+        [0.55, 1.0, 0.6],
+        [0.65, 0.6, 1.0],
       ],
     });
     expect(r.regime).toBe("elevated");
@@ -38,9 +38,9 @@ describe("evaluateCorrelationRegime — crisis", () => {
   it("high correlations across the board → crisis", () => {
     const r = evaluateCorrelationRegime({
       correlations: [
-        [1.0, 0.85, 0.90],
-        [0.85, 1.0, 0.80],
-        [0.90, 0.80, 1.0],
+        [1.0, 0.85, 0.9],
+        [0.85, 1.0, 0.8],
+        [0.9, 0.8, 1.0],
       ],
     });
     expect(r.regime).toBe("crisis");
@@ -51,9 +51,9 @@ describe("evaluateCorrelationRegime — crisis", () => {
   it("near-perfect pair flag fires at |r| > 0.95", () => {
     const r = evaluateCorrelationRegime({
       correlations: [
-        [1.0, 0.97, 0.20],
+        [1.0, 0.97, 0.2],
         [0.97, 1.0, 0.15],
-        [0.20, 0.15, 1.0],
+        [0.2, 0.15, 1.0],
       ],
     });
     expect(r.hasNearPerfectPair).toBe(true);

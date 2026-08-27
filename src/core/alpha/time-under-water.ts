@@ -86,7 +86,8 @@ export function computeTimeUnderWater(input: TimeUnderWaterInput): TimeUnderWate
   const equity = new Array<number>(N + 1);
   equity[0] = initial;
   for (let i = 0; i < N; i++) {
-    equity[i + 1] = mode === "compound" ? equity[i]! * (1 + returns[i]!) : equity[i]! + returns[i]! * initial;
+    equity[i + 1] =
+      mode === "compound" ? equity[i]! * (1 + returns[i]!) : equity[i]! + returns[i]! * initial;
   }
 
   const episodes: UnderwaterEpisode[] = [];
@@ -150,15 +151,17 @@ export function computeTimeUnderWater(input: TimeUnderWaterInput): TimeUnderWate
   let mar: number | null = null;
   if (input.periodsPerYear && input.periodsPerYear > 0 && maxDrawdownPct > 0) {
     const finalEquity = equity[N]!;
-    const cagr = Math.pow(finalEquity / initial, input.periodsPerYear / N) - 1;
+    const cagr = (finalEquity / initial) ** (input.periodsPerYear / N) - 1;
     mar = round(cagr / maxDrawdownPct, 4);
   }
 
   const interpretation =
     `${N} periods: longest underwater spell ${maxUnderwaterPeriods} periods, ` +
-    `${(underwaterCount / N * 100).toFixed(1)}% of time underwater across ${episodes.length} episode(s); ` +
+    `${((underwaterCount / N) * 100).toFixed(1)}% of time underwater across ${episodes.length} episode(s); ` +
     `max drawdown ${(maxDrawdownPct * 100).toFixed(2)}%` +
-    (currentlyUnderwater ? `; currently ${currentUnderwaterPeriods} periods underwater` : "; at/near a high") +
+    (currentlyUnderwater
+      ? `; currently ${currentUnderwaterPeriods} periods underwater`
+      : "; at/near a high") +
     (mar !== null ? `; MAR ${mar}` : "") +
     ". " +
     (maxUnderwaterPeriods === 0

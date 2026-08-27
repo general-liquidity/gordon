@@ -1,10 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  sizePosition,
-  classifyPerformanceState,
-  sizingToPayload,
-} from "./pathDependentSizer.ts";
+import { sizePosition, classifyPerformanceState, sizingToPayload } from "./pathDependentSizer.ts";
 
 describe("sizePosition — Type I (standard)", () => {
   it("neutral state: 0.75% of adjusted RC", () => {

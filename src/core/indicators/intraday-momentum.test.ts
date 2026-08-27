@@ -57,7 +57,11 @@ describe("calculateIntradayMomentum", () => {
       makeDay(barsPerDay, 6, 6, 0.005, 0.004),
     ];
     const candles = days.flat();
-    const r = calculateIntradayMomentum(candles, { firstWindowBars, predictWindowBars, barsPerDay });
+    const r = calculateIntradayMomentum(candles, {
+      firstWindowBars,
+      predictWindowBars,
+      barsPerDay,
+    });
 
     expect(r.sampleDays).toBe(5);
     expect(r.hitRate).toBe(1);
@@ -80,7 +84,11 @@ describe("calculateIntradayMomentum", () => {
       makeDay(barsPerDay, 6, 6, -0.01, 0.01), // miss
     ];
     const candles = days.flat();
-    const r = calculateIntradayMomentum(candles, { firstWindowBars, predictWindowBars, barsPerDay });
+    const r = calculateIntradayMomentum(candles, {
+      firstWindowBars,
+      predictWindowBars,
+      barsPerDay,
+    });
 
     expect(r.sampleDays).toBe(4);
     expect(r.hitRate).toBe(0.5);
@@ -114,7 +122,11 @@ describe("calculateIntradayMomentum", () => {
 
   it("insufficient data: barsPerDay given but only one full day → neutral", () => {
     const candles = makeDay(barsPerDay, 6, 6, 0.01, 0.01);
-    const r = calculateIntradayMomentum(candles, { firstWindowBars, predictWindowBars, barsPerDay });
+    const r = calculateIntradayMomentum(candles, {
+      firstWindowBars,
+      predictWindowBars,
+      barsPerDay,
+    });
 
     expect(r.signal).toBe("flat");
     expect(r.sampleDays).toBe(0);
@@ -129,7 +141,11 @@ describe("calculateIntradayMomentum", () => {
       makeDay(barsPerDay, 6, 6, -0.01, -0.01), // match
     ];
     const candles = days.flat();
-    const r = calculateIntradayMomentum(candles, { firstWindowBars, predictWindowBars, barsPerDay });
+    const r = calculateIntradayMomentum(candles, {
+      firstWindowBars,
+      predictWindowBars,
+      barsPerDay,
+    });
 
     expect(r.sampleDays).toBe(2);
     expect(r.hitRate).toBe(1);

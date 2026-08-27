@@ -38,10 +38,7 @@ export interface IteratedLocalSearchInput {
   /** Local-search step. Receives a seed state, returns a (possibly improved) state and its objective value. */
   localSearch: (seed: ReadonlyArray<number>) => LocalSearchOutcome;
   /** Perturbation operator. Takes the current best and produces a perturbed seed for the next local search. */
-  perturb: (
-    state: ReadonlyArray<number>,
-    rng: () => number,
-  ) => number[];
+  perturb: (state: ReadonlyArray<number>, rng: () => number) => number[];
   /** Initial state. */
   initialState: ReadonlyArray<number>;
   /** Max outer iterations (perturbation+local-search cycles). Default 20. */
@@ -68,7 +65,7 @@ export interface IteratedLocalSearchResult {
 }
 
 function makeLCG(seed: number): () => number {
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   return () => {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return s / 0x100000000;
@@ -158,8 +155,6 @@ export function iteratedLocalSearchToPayload(
     acceptedRestarts: result.acceptedRestarts,
     stagnated: result.stagnated,
     bestState: result.bestState.map((x) => Number(x.toFixed(6))),
-    improvementOverInitial: Number(
-      (result.bestValue - result.restartHistory[0]!).toFixed(6),
-    ),
+    improvementOverInitial: Number((result.bestValue - result.restartHistory[0]!).toFixed(6)),
   };
 }

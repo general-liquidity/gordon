@@ -82,9 +82,7 @@ const EMPTY: ContStylizedFacts = {
 };
 
 function mean(values: number[]): number {
-  return values.length === 0
-    ? 0
-    : values.reduce((sum, v) => sum + v, 0) / values.length;
+  return values.length === 0 ? 0 : values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
 function excessKurtosis(values: number[]): number {
@@ -218,8 +216,7 @@ export function validateContStylizedFacts(
     const futureFine = fine.slice(zumbachLag);
     const pastFine = fine.slice(0, fine.length - zumbachLag);
     const futureCoarse = coarse.slice(zumbachLag);
-    zumbachAsymmetry =
-      correlation(pastCoarse, futureFine) - correlation(pastFine, futureCoarse);
+    zumbachAsymmetry = correlation(pastCoarse, futureFine) - correlation(pastFine, futureCoarse);
   }
 
   // --- Aggregational Gaussianity: kurtosis shrinks under aggregation.

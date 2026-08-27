@@ -35,10 +35,7 @@ export type MarketDataSourceKind =
   | "explorer"
   | "aggregator";
 export type RailKind = "funding_onramp_offramp" | "agentic_micropayments";
-export type InfrastructureKind =
-  | "rpc_data_platform"
-  | "bridge_protocol"
-  | "chain_ecosystem";
+export type InfrastructureKind = "rpc_data_platform" | "bridge_protocol" | "chain_ecosystem";
 export type ModelProviderKind = "native" | "gateway";
 export type ModelAccessPath = "native" | "routed" | "direct_openai_compatible";
 export type AutomationKind = "web_agent";
@@ -82,7 +79,9 @@ const EXECUTION_SURFACES: IntegrationSurfaceMetadata[] = [
     venueKind: "cex",
     executionModel: "centralized",
     gordonEnabledMarkets: ["crypto"],
-    notes: ["Single adapter over ~100+ CEX/DEX venues; address any as `ccxt:<sub-id>` (e.g. ccxt:binance, ccxt:bybit, ccxt:hyperliquid)."],
+    notes: [
+      "Single adapter over ~100+ CEX/DEX venues; address any as `ccxt:<sub-id>` (e.g. ccxt:binance, ccxt:bybit, ccxt:hyperliquid).",
+    ],
   },
   {
     id: "alpaca",
@@ -171,8 +170,16 @@ const INTEGRATION_SURFACE_MAP = new Map<string, IntegrationSurfaceMetadata>(
  * classifier is curated. Everything else defaults to a centralized CEX.
  */
 const CCXT_DEX_SUBIDS = new Set<string>([
-  "hyperliquid", "dydx", "vertex", "paradex", "apex",
-  "derive", "pacifica", "lighter", "hibachi", "woofipro",
+  "hyperliquid",
+  "dydx",
+  "vertex",
+  "paradex",
+  "apex",
+  "derive",
+  "pacifica",
+  "lighter",
+  "hibachi",
+  "woofipro",
 ]);
 
 /**
@@ -207,7 +214,10 @@ export function getExecutionVenueMetadata(
     return deriveCcxtVenueMetadata(extractCcxtSubId(venueId), venueId);
   }
   if (venueId in NATIVE_TO_CCXT_SUBID) {
-    return deriveCcxtVenueMetadata(NATIVE_TO_CCXT_SUBID[venueId as keyof typeof NATIVE_TO_CCXT_SUBID], venueId);
+    return deriveCcxtVenueMetadata(
+      NATIVE_TO_CCXT_SUBID[venueId as keyof typeof NATIVE_TO_CCXT_SUBID],
+      venueId,
+    );
   }
   return {
     id: venueId,
@@ -217,11 +227,13 @@ export function getExecutionVenueMetadata(
 }
 
 export function getIntegrationSurfaceMetadata(id: string): IntegrationSurfaceMetadata {
-  return INTEGRATION_SURFACE_MAP.get(id) ?? {
-    id,
-    displayName: id,
-    integrationDomain: "system",
-  };
+  return (
+    INTEGRATION_SURFACE_MAP.get(id) ?? {
+      id,
+      displayName: id,
+      integrationDomain: "system",
+    }
+  );
 }
 
 export function listIntegrationSurfaces(): IntegrationSurfaceMetadata[] {

@@ -29,11 +29,7 @@ afterAll(() => {
 });
 
 let seq = 0;
-function outcome(
-  pattern: string,
-  result: TradeOutcome["result"],
-  pnlPct?: number,
-): TradeOutcome {
+function outcome(pattern: string, result: TradeOutcome["result"], pnlPct?: number): TradeOutcome {
   seq++;
   return {
     id: `t${seq}`,
@@ -48,7 +44,7 @@ function outcome(
 }
 
 function record(pattern: string, results: Array<TradeOutcome["result"]>) {
-  let stats;
+  let stats: ReturnType<typeof recordTradeOutcome> | undefined;
   for (const r of results) stats = recordTradeOutcome(outcome(pattern, r));
   return stats!;
 }

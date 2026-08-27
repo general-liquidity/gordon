@@ -7,7 +7,11 @@ describe("extractSection", () => {
       "PART I\nItem 1. Business\nWe make widgets.\n" +
       "Item 1A. Risk Factors\nWe face intense competition. A key supplier could fail.\n" +
       "Item 1B. Unresolved Staff Comments\nNone.\n";
-    const rf = extractSection(filing, SECTION_MARKERS.risk_factors.start, SECTION_MARKERS.risk_factors.end);
+    const rf = extractSection(
+      filing,
+      SECTION_MARKERS.risk_factors.start,
+      SECTION_MARKERS.risk_factors.end,
+    );
     expect(rf).toContain("intense competition");
     expect(rf).toContain("key supplier");
     expect(rf).not.toContain("Unresolved");
@@ -26,7 +30,11 @@ describe("extractSection", () => {
       "PART I Item 1. Business We make widgets. " +
       "Item 1A. Risk Factors We face intense competition and customer-concentration risk that could materially harm our results. " +
       "Item 1B. Unresolved Staff Comments None.";
-    const rf = extractSection(filing, SECTION_MARKERS.risk_factors.start, SECTION_MARKERS.risk_factors.end);
+    const rf = extractSection(
+      filing,
+      SECTION_MARKERS.risk_factors.start,
+      SECTION_MARKERS.risk_factors.end,
+    );
     expect(rf).toContain("intense competition");
     expect(rf).toContain("customer-concentration");
     expect(rf).not.toContain("Unresolved");

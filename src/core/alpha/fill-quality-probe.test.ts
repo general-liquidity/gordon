@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  analyzeFillQualityProbe,
-  formatFillQualityProbe,
-} from "./fill-quality-probe.ts";
+import { analyzeFillQualityProbe, formatFillQualityProbe } from "./fill-quality-probe.ts";
 
 describe("analyzeFillQualityProbe", () => {
   test("zero size → insufficient_data", () => {
@@ -25,7 +22,7 @@ describe("analyzeFillQualityProbe", () => {
       intendedQty: 1000,
       filledQty: 400, // 40% — poor
       submitMidPrice: 100,
-      avgFillPrice: 100.20, // 20bps slippage
+      avgFillPrice: 100.2, // 20bps slippage
       expectedSlippageBps: 5, // expected 5bps → 4× over
       latencyMs: 2000,
       latencyBudgetMs: 500, // 4× over
@@ -71,7 +68,7 @@ describe("analyzeFillQualityProbe", () => {
       intendedQty: 1000,
       filledQty: 300,
       submitMidPrice: 100,
-      avgFillPrice: 99.80, // adverse for SELL = 20bps positive
+      avgFillPrice: 99.8, // adverse for SELL = 20bps positive
       expectedSlippageBps: 5,
       latencyMs: 2000,
       latencyBudgetMs: 500,
@@ -116,7 +113,7 @@ describe("analyzeFillQualityProbe", () => {
       intendedQty: 1000,
       filledQty: 700,
       submitMidPrice: 100,
-      avgFillPrice: 100.10,
+      avgFillPrice: 100.1,
       expectedSlippageBps: 5,
       latencyMs: 1000,
       latencyBudgetMs: 500,
@@ -138,7 +135,7 @@ describe("formatFillQualityProbe", () => {
       intendedQty: 1000,
       filledQty: 400,
       submitMidPrice: 100,
-      avgFillPrice: 100.20,
+      avgFillPrice: 100.2,
       expectedSlippageBps: 5,
       latencyMs: 2000,
       latencyBudgetMs: 500,

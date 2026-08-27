@@ -1,9 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  empiricalKelly,
-  empiricalKellyToPayload,
-} from "./empiricalKelly.ts";
+import { empiricalKelly, empiricalKellyToPayload } from "./empiricalKelly.ts";
 
 describe("empiricalKelly — Kelly formula correctness", () => {
   it("p=0.6, b=1 → f_kelly = 0.2", () => {

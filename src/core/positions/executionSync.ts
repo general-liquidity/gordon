@@ -32,7 +32,7 @@ async function cancelDebrisPosition(positionId: string, reason: string): Promise
 export async function recordExecutedPlanPosition(
   plan: Plan,
   trade: Trade,
-  exchangeId: string,
+  _exchangeId: string,
 ): Promise<string | null> {
   let positionId: string | null = null;
   try {
@@ -42,8 +42,7 @@ export async function recordExecutedPlanPosition(
     // through to the plan price instead of recording a zero-entry fill.
     const entryPrice = (trade.averageEntry || plan.entry.price) ?? 0;
     const qty =
-      trade.entries[0]?.quantity ||
-      (entryPrice > 0 ? plan.allocation.amount / entryPrice : 0);
+      trade.entries[0]?.quantity || (entryPrice > 0 ? plan.allocation.amount / entryPrice : 0);
 
     const position = await pm.reportSetup({
       symbol: plan.symbol,
@@ -107,7 +106,10 @@ export async function recordExecutedPlanPosition(
       error: err instanceof Error ? err.message : String(err),
     });
     if (positionId) {
-      await cancelDebrisPosition(positionId, "position sync failed — auto-cancelled (phantom guard)");
+      await cancelDebrisPosition(
+        positionId,
+        "position sync failed — auto-cancelled (phantom guard)",
+      );
     }
     return null;
   }

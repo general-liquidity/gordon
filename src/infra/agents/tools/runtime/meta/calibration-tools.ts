@@ -62,7 +62,10 @@ export const recordConfidentDecisionTool = createTool({
       .describe("Stated confidence 0..1 — be honest, don't round up."),
     decision: z.string().min(1).describe("One-sentence description of what you decided"),
     reasoning: z.string().optional().describe("Why you decided this — captured for audit"),
-    tags: z.record(z.string(), z.string()).optional().describe("Context tags (symbol, category, timeframe)"),
+    tags: z
+      .record(z.string(), z.string())
+      .optional()
+      .describe("Context tags (symbol, category, timeframe)"),
   }),
   outputSchema: z.object({
     recorded: z.boolean(),
@@ -128,7 +131,13 @@ export const getCalibrationStatsTool = createTool({
     "or 'is my regime classifier reliable above 70% confidence?'.",
   inputSchema: z.object({
     domain: DOMAIN_SCHEMA.optional().describe("Filter to a specific decision domain"),
-    daysBack: z.number().int().min(1).max(730).optional().describe("Only consider decisions from the last N days"),
+    daysBack: z
+      .number()
+      .int()
+      .min(1)
+      .max(730)
+      .optional()
+      .describe("Only consider decisions from the last N days"),
   }),
   outputSchema: z.object({
     totalDecisions: z.number(),
@@ -161,7 +170,10 @@ export const getCalibrationStatsTool = createTool({
       totalWithOutcomes: stats.totalWithOutcomes,
       overallAccuracy: stats.overallAccuracy,
       calibrationError: stats.calibrationError,
-      bucketStats: stats.bucketStats as Record<string, { count: number; correct: number; accuracy: number }>,
+      bucketStats: stats.bucketStats as Record<
+        string,
+        { count: number; correct: number; accuracy: number }
+      >,
       byDomain: stats.byDomain,
     };
   },

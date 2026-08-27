@@ -257,10 +257,7 @@ export function detectCorrelationBreakdown(
 /**
  * One-line operator summary listing the top N flagged pairs.
  */
-export function summarizeBreakdownReport(
-  report: BreakdownReport,
-  topN = 3,
-): string {
+export function summarizeBreakdownReport(report: BreakdownReport, topN = 3): string {
   if (report.pairs.length === 0) {
     return `Correlation breakdown: no pairs available (need ≥2 aligned return series).`;
   }

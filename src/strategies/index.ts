@@ -181,33 +181,27 @@ export {
   StrategyDSLSchema,
   validateStrategyDSL,
   createStrategyDSL,
-
   // Condition evaluation
   evaluateCondition,
   evaluateConditionWithResult,
   evaluateSignalRule,
-
   // Interpreter
   DSLBasedStrategy,
   DSLStrategyInterpreter,
   interpretDSL,
   parseStrategy,
-
   // Adapter (for Backtest Engine)
   DSLStrategyAdapter,
   createStrategyFromDSL,
-
   // Storage
   saveStrategy,
   loadStrategy,
   listStrategies as listGeneratedStrategies,
   deleteStrategy,
-
   // Convenience functions
   createAndSaveStrategy,
   loadAndInterpret,
   loadAllAsStrategies,
-
   // Example templates
   EXAMPLE_RSI_BOUNCE_DSL,
   EXAMPLE_MACD_CROSSOVER_DSL,

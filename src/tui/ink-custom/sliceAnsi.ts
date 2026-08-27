@@ -35,11 +35,7 @@ function filterStartCodes(codes: AnsiCode[]): AnsiCode[] {
  * Unlike the slice-ansi package, this properly handles OSC 8 hyperlink
  * sequences because @alcalzone/ansi-tokenize tokenizes them correctly.
  */
-export default function sliceAnsi(
-  str: string,
-  start: number,
-  end?: number,
-): string {
+export default function sliceAnsi(str: string, start: number, end?: number): string {
   // Don't pass `end` to tokenize — it counts code units, not display cells,
   // so it drops tokens early for text with zero-width combining marks.
   const tokens = tokenize(str);
@@ -54,12 +50,7 @@ export default function sliceAnsi(
     // advanced position past `end` early and truncated the slice. Callers
     // pass start/end in display cells (via stringWidth), so position must
     // track the same units.
-    const width =
-      token.type === "ansi"
-        ? 0
-        : token.fullWidth
-          ? 2
-          : stringWidth(token.value);
+    const width = token.type === "ansi" ? 0 : token.fullWidth ? 2 : stringWidth(token.value);
 
     // Break AFTER trailing zero-width marks — a combining mark attaches to
     // the preceding base char, so "भा" (भ + ा, 1 display cell) sliced at

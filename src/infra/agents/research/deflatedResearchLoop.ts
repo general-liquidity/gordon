@@ -148,11 +148,7 @@ export function pairwiseCorrelation(a: number[], b: number[]): number {
  */
 export function defaultDeflatedScore(periodsPerYear: number = 365) {
   return (oosReturns: number[], totalTrials: number): ScoreResult => {
-    const result = deflatedSharpeRatio(
-      oosReturns,
-      Math.max(1, totalTrials),
-      periodsPerYear,
-    );
+    const result = deflatedSharpeRatio(oosReturns, Math.max(1, totalTrials), periodsPerYear);
     return {
       sharpe: result.observedSharpe,
       deflatedSignificant: result.significant,
@@ -219,20 +215,14 @@ export async function runDeflatedResearchLoop(
       continue;
     }
 
-    const { sharpe, deflatedSignificant } = deps.score(
-      candidate.oosReturns,
-      trials,
-    );
+    const { sharpe, deflatedSignificant } = deps.score(candidate.oosReturns, trials);
 
     const reject = (reason: RejectReason): void => {
       rejectionCounts[reason]++;
       rejected.push({ candidate, reason, sharpe, trialsAtScore: trials });
     };
 
-    if (
-      config.minTrades !== undefined &&
-      candidate.oosReturns.length < config.minTrades
-    ) {
+    if (config.minTrades !== undefined && candidate.oosReturns.length < config.minTrades) {
       reject("insufficient_trades");
       continue;
     }
@@ -250,9 +240,8 @@ export async function runDeflatedResearchLoop(
     if (config.maxCorrelation !== undefined) {
       const tooCorrelated = approved.some(
         (a) =>
-          Math.abs(
-            pairwiseCorrelation(candidate.oosReturns, a.oosReturns),
-          ) >= config.maxCorrelation!,
+          Math.abs(pairwiseCorrelation(candidate.oosReturns, a.oosReturns)) >=
+          config.maxCorrelation!,
       );
       if (tooCorrelated) {
         reject("correlated");

@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeHedgeFundReplication,
-  replicationToPayload,
-} from "./hedgeFundReplication.ts";
+import { computeHedgeFundReplication, replicationToPayload } from "./hedgeFundReplication.ts";
 
 describe("computeHedgeFundReplication — edge cases", () => {
   it("insufficient observations → NaN with reason", () => {

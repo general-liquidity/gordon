@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../ink-custom";
 
 /**
@@ -40,7 +39,7 @@ export function DoctorRenderer({ data }: Props) {
           <CheckIcon ok={check.ok} severity={check.severity} />
           <Text> </Text>
           <Text bold>{check.label}</Text>
-          <Text dimColor>  {check.message}</Text>
+          <Text dimColor> {check.message}</Text>
         </Box>
       ))}
     </Box>

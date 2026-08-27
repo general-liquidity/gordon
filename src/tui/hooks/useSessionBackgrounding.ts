@@ -13,11 +13,14 @@ export function useSessionBackgrounding() {
     return taskId;
   }, []);
 
-  const foreground = useCallback((taskId: string) => {
-    if (backgroundedTaskId === taskId) {
-      setBackgroundedTaskId(null);
-    }
-  }, [backgroundedTaskId]);
+  const foreground = useCallback(
+    (taskId: string) => {
+      if (backgroundedTaskId === taskId) {
+        setBackgroundedTaskId(null);
+      }
+    },
+    [backgroundedTaskId],
+  );
 
   return {
     backgroundedTaskId,

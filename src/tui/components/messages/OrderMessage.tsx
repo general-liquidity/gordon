@@ -16,7 +16,9 @@ export const OrderMessage = React.memo(function OrderMessage({ message }: { mess
     <Box flexDirection="column" marginTop={1}>
       <Box>
         <Text color={color}>{icon} </Text>
-        <Text bold color={color}>{label}</Text>
+        <Text bold color={color}>
+          {label}
+        </Text>
       </Box>
       <Box paddingLeft={2}>
         <Text>{message.content}</Text>

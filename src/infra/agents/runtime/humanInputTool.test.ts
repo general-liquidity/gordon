@@ -74,7 +74,10 @@ describe("createRequest", () => {
         question: "Close ETH long or hold?",
         format: "choose",
         urgency: "high",
-        options: [{ id: "close", label: "close now" }, { id: "hold", label: "hold" }],
+        options: [
+          { id: "close", label: "close now" },
+          { id: "hold", label: "hold" },
+        ],
       },
       logPath,
     );
@@ -167,10 +170,7 @@ describe("answerRequest", () => {
   });
 
   it("supports optionId for choose-format", () => {
-    const r = createRequest(
-      { agentId: "exec", question: "?", format: "choose" },
-      logPath,
-    );
+    const r = createRequest({ agentId: "exec", question: "?", format: "choose" }, logPath);
     const resp = answerRequest(r.id, "close now", { optionId: "close", path: logPath });
     expect(resp.optionId).toBe("close");
   });
@@ -237,9 +237,9 @@ describe("waitForAnswer — in-process resolution", () => {
 
   it("times out after timeoutMs", async () => {
     const r = createRequest({ agentId: "exec", question: "X?" }, logPath);
-    await expect(
-      waitForAnswer(r.id, { path: logPath, timeoutMs: 30 }),
-    ).rejects.toThrow(RequestTimeoutError);
+    await expect(waitForAnswer(r.id, { path: logPath, timeoutMs: 30 })).rejects.toThrow(
+      RequestTimeoutError,
+    );
   });
 });
 

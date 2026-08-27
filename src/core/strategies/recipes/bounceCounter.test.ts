@@ -8,7 +8,13 @@ import {
 function step(
   state: BounceCounterState,
   rsi: number,
-  opts: { high?: number; low?: number; persistence?: number; required?: number; reset?: number } = {},
+  opts: {
+    high?: number;
+    low?: number;
+    persistence?: number;
+    required?: number;
+    reset?: number;
+  } = {},
 ) {
   const r = applyBounceCounter({
     state,
@@ -25,7 +31,7 @@ function step(
 describe("applyBounceCounter", () => {
   it("does not fire on first entry when requiredBounces > 0", () => {
     let s = newBounceCounterState();
-    let r = step(s, 80, { required: 2 });
+    const r = step(s, 80, { required: 2 });
     expect(r.signal).toBe("none");
     s = r.state;
     expect(s.zone).toBe("high");

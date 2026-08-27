@@ -138,7 +138,7 @@ function parseFilename(filename: string): Date | null {
     parseInt(day!, 10),
     parseInt(hours!, 10),
     parseInt(minutes!, 10),
-    parseInt(seconds!, 10)
+    parseInt(seconds!, 10),
   );
 }
 
@@ -149,9 +149,33 @@ function parseFilename(filename: string): Date | null {
 function extractSymbols(messages: ChatHistoryMessage[]): string[] {
   const symbolPattern = /\b([A-Z]{2,10})(USDT|BTC|ETH|BNB|BUSD)?\b/g;
   const commonCryptos = new Set([
-    "BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "DOGE", "DOT", "MATIC",
-    "SHIB", "AVAX", "LINK", "LTC", "UNI", "ATOM", "XLM", "TRX", "ETC",
-    "NEAR", "APT", "OP", "ARB", "INJ", "SUI", "SEI", "PEPE", "WIF",
+    "BTC",
+    "ETH",
+    "BNB",
+    "SOL",
+    "XRP",
+    "ADA",
+    "DOGE",
+    "DOT",
+    "MATIC",
+    "SHIB",
+    "AVAX",
+    "LINK",
+    "LTC",
+    "UNI",
+    "ATOM",
+    "XLM",
+    "TRX",
+    "ETC",
+    "NEAR",
+    "APT",
+    "OP",
+    "ARB",
+    "INJ",
+    "SUI",
+    "SEI",
+    "PEPE",
+    "WIF",
   ]);
 
   const found = new Set<string>();
@@ -198,7 +222,7 @@ export async function saveChatSession(
     version?: string;
     threadId?: string;
     resourceId?: string;
-  } = {}
+  } = {},
 ): Promise<{ filename: string; path: string }> {
   await ensureHistoryDir();
 
@@ -260,15 +284,17 @@ export async function loadLatestSession(): Promise<ChatSession | null> {
 /**
  * List all saved chat sessions
  */
-export async function listChatSessions(options: {
-  limit?: number;
-  offset?: number;
-  /** Filter by date range (inclusive) */
-  fromDate?: Date;
-  toDate?: Date;
-  /** Filter by symbols discussed */
-  symbols?: string[];
-} = {}): Promise<ChatSessionSummary[]> {
+export async function listChatSessions(
+  options: {
+    limit?: number;
+    offset?: number;
+    /** Filter by date range (inclusive) */
+    fromDate?: Date;
+    toDate?: Date;
+    /** Filter by symbols discussed */
+    symbols?: string[];
+  } = {},
+): Promise<ChatSessionSummary[]> {
   await ensureHistoryDir();
 
   let files: string[];
@@ -283,7 +309,7 @@ export async function listChatSessions(options: {
 
   // Filter to only .json files and sort by date descending (newest first)
   const jsonFiles = files
-    .filter(f => f.endsWith(".json"))
+    .filter((f) => f.endsWith(".json"))
     .sort((a, b) => {
       const dateA = parseFilename(a);
       const dateB = parseFilename(b);
@@ -294,7 +320,7 @@ export async function listChatSessions(options: {
   // Apply date filters
   let filtered = jsonFiles;
   if (options.fromDate || options.toDate) {
-    filtered = jsonFiles.filter(f => {
+    filtered = jsonFiles.filter((f) => {
       const date = parseFilename(f);
       if (!date) return false;
       if (options.fromDate && date < options.fromDate) return false;
@@ -321,8 +347,8 @@ export async function listChatSessions(options: {
 
         // Apply symbol filter
         if (options.symbols && options.symbols.length > 0) {
-          const hasSymbol = options.symbols.some(s =>
-            session.symbolsDiscussed.includes(s.toUpperCase())
+          const hasSymbol = options.symbols.some((s) =>
+            session.symbolsDiscussed.includes(s.toUpperCase()),
           );
           if (!hasSymbol) {
             return null;
@@ -330,7 +356,7 @@ export async function listChatSessions(options: {
         }
 
         // Get preview message (first user message)
-        const firstUserMsg = session.messages.find(m => m.role === "user");
+        const firstUserMsg = session.messages.find((m) => m.role === "user");
 
         const summary: ChatSessionSummary = {
           id: session.id,
@@ -346,7 +372,7 @@ export async function listChatSessions(options: {
         // Skip corrupted files
         return null;
       }
-    }
+    },
   );
 
   return summaryCandidates.filter((summary): summary is ChatSessionSummary => summary !== null);
@@ -412,16 +438,18 @@ export async function searchChatHistory(
   options: {
     limit?: number;
     caseSensitive?: boolean;
-  } = {}
-): Promise<Array<{
-  session: ChatSessionSummary;
-  matches: Array<{
-    messageIndex: number;
-    role: string;
-    content: string;
-    timestamp: string;
-  }>;
-}>> {
+  } = {},
+): Promise<
+  Array<{
+    session: ChatSessionSummary;
+    matches: Array<{
+      messageIndex: number;
+      role: string;
+      content: string;
+      timestamp: string;
+    }>;
+  }>
+> {
   const sessions = await listChatSessions({ limit: options.limit || 50 });
   const results: Array<{
     session: ChatSessionSummary;
@@ -470,12 +498,14 @@ export async function searchChatHistory(
       }
 
       return { session: summary, matches };
-    }
+    },
   );
 
   results.push(
     ...perSessionResults.filter(
-      (entry): entry is {
+      (
+        entry,
+      ): entry is {
         session: ChatSessionSummary;
         matches: Array<{
           messageIndex: number;
@@ -483,8 +513,8 @@ export async function searchChatHistory(
           content: string;
           timestamp: string;
         }>;
-      } => entry !== null
-    )
+      } => entry !== null,
+    ),
   );
 
   return results;
@@ -524,7 +554,7 @@ export async function getChatHistoryStats(): Promise<{
   const loadedSessions = await mapWithConcurrency(
     sessions,
     HISTORY_READ_CONCURRENCY,
-    async (summary) => loadChatSession(summary.filename)
+    async (summary) => loadChatSession(summary.filename),
   );
 
   for (const session of loadedSessions) {
@@ -568,11 +598,9 @@ export async function getChatHistoryStats(): Promise<{
 /**
  * Export chat history to a single JSON file
  */
-export async function exportChatHistory(options: {
-  fromDate?: Date;
-  toDate?: Date;
-  outputPath?: string;
-} = {}): Promise<string> {
+export async function exportChatHistory(
+  options: { fromDate?: Date; toDate?: Date; outputPath?: string } = {},
+): Promise<string> {
   const sessions = await listChatSessions({
     fromDate: options.fromDate,
     toDate: options.toDate,
@@ -581,7 +609,7 @@ export async function exportChatHistory(options: {
   const loadedSessions = await mapWithConcurrency(
     sessions,
     HISTORY_READ_CONCURRENCY,
-    async (summary) => loadChatSession(summary.filename)
+    async (summary) => loadChatSession(summary.filename),
   );
   const fullSessions = loadedSessions.filter((session): session is ChatSession => session !== null);
 

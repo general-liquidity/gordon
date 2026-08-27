@@ -99,7 +99,12 @@ export function kalmanFilter(
   config: KalmanConfig = DEFAULT_KALMAN_CONFIG,
 ): KalmanResult {
   if (prices.length === 0) {
-    return { filtered: [], gains: [], slopes: [], state: { estimate: 0, errorVariance: 1, kalmanGain: 0 } };
+    return {
+      filtered: [],
+      gains: [],
+      slopes: [],
+      state: { estimate: 0, errorVariance: 1, kalmanGain: 0 },
+    };
   }
 
   const Q = config.processVariance;
@@ -139,7 +144,8 @@ export function autoTuneKalman(prices: number[]): KalmanConfig {
   }
 
   const meanReturn = returns.reduce((s, r) => s + r, 0) / returns.length;
-  const returnVariance = returns.reduce((s, r) => s + (r - meanReturn) ** 2, 0) / (returns.length - 1);
+  const returnVariance =
+    returns.reduce((s, r) => s + (r - meanReturn) ** 2, 0) / (returns.length - 1);
 
   // R = measurement noise ≈ half of return variance
   // Q = process noise ≈ fraction of return variance (how fast true value moves)
@@ -217,9 +223,7 @@ function median(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1]! + sorted[mid]!) / 2
-    : sorted[mid]!;
+  return sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!;
 }
 
 /**
@@ -260,11 +264,8 @@ export function kalmanFilterAdaptiveQ(
   const maxScale = config.maxScale ?? 10;
 
   // Reference vol: explicit, else the median of the finite positive vols.
-  const positiveVols = realizedVol.filter(
-    (v) => Number.isFinite(v) && v > 0,
-  ) as number[];
-  const referenceVol =
-    config.referenceVol ?? (positiveVols.length > 0 ? median(positiveVols) : 0);
+  const positiveVols = realizedVol.filter((v) => Number.isFinite(v) && v > 0) as number[];
+  const referenceVol = config.referenceVol ?? (positiveVols.length > 0 ? median(positiveVols) : 0);
 
   let state: KalmanState = {
     estimate: config.initialEstimate ?? prices[0]!,
@@ -280,9 +281,7 @@ export function kalmanFilterAdaptiveQ(
   for (let i = 0; i < prices.length; i++) {
     // Align the vol series by index; carry the last value forward if shorter.
     const rawVol =
-      realizedVol.length > 0
-        ? realizedVol[Math.min(i, realizedVol.length - 1)]!
-        : referenceVol;
+      realizedVol.length > 0 ? realizedVol[Math.min(i, realizedVol.length - 1)]! : referenceVol;
     let scale = 1;
     if (referenceVol > 0 && Number.isFinite(rawVol) && rawVol > 0) {
       scale = Math.min(rawVol / referenceVol, maxScale);

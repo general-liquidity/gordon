@@ -314,7 +314,7 @@ export class SECFilingsClient {
     // Try to fetch the full text from EFTS rendering endpoint
     let fullText = "";
     try {
-      const textUrl = `${EFTS_BASE}/search-index?q=%22${accessionNumber}%22&size=1&_source=file_description`;
+      const _textUrl = `${EFTS_BASE}/search-index?q=%22${accessionNumber}%22&size=1&_source=file_description`;
       const textRes = await rateLimitedFetch(
         `${SEC_ARCHIVES}/${cleanAcc}/${accessionNumber}-index.htm`,
       );

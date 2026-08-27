@@ -6,7 +6,13 @@ import {
 } from "./executionDiscipline.ts";
 
 interface BatchResult {
-  internalCrossings: Array<{ symbol: string; qty: number; clearingPrice: number; buyOrderId: string; sellOrderId: string }>;
+  internalCrossings: Array<{
+    symbol: string;
+    qty: number;
+    clearingPrice: number;
+    buyOrderId: string;
+    sellOrderId: string;
+  }>;
   externalOrders: Array<{ orderId: string; residualQty: number }>;
   totalCrossedQty: number;
   totalExternalQty: number;

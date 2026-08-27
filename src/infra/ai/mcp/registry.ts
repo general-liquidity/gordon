@@ -13,9 +13,9 @@ import type {
   MCPServerManifest,
   MCPServerEvent,
   MCPServerEventHandler,
-} from './types';
-import { createServerInstance } from './server-instance';
-import { credentialManager } from './credentials';
+} from "./types";
+import { createServerInstance } from "./server-instance";
+import { credentialManager } from "./credentials";
 
 // ============================================================================
 // MCP Server Registry
@@ -128,7 +128,7 @@ export class MCPServerRegistry {
   async getInstance(serverId: string): Promise<MCPServerInstance> {
     // Check if already running
     const existing = this.instances.get(serverId);
-    if (existing && existing.status === 'running') {
+    if (existing && existing.status === "running") {
       return existing;
     }
 
@@ -155,14 +155,12 @@ export class MCPServerRegistry {
     // Check credentials
     if (!credentialManager.hasRequiredCredentials(manifest)) {
       const missing = credentialManager.getMissingCredentials(manifest);
-      throw new Error(
-        `Missing required credentials for "${serverId}": ${missing.join(', ')}`
-      );
+      throw new Error(`Missing required credentials for "${serverId}": ${missing.join(", ")}`);
     }
 
     // Check if already running
     const existing = this.instances.get(serverId);
-    if (existing && existing.status === 'running') {
+    if (existing && existing.status === "running") {
       return existing;
     }
 
@@ -177,7 +175,7 @@ export class MCPServerRegistry {
       this.instances.set(serverId, instance);
 
       this.emitEvent({
-        type: 'started',
+        type: "started",
         serverId,
         timestamp: Date.now(),
       });
@@ -185,7 +183,7 @@ export class MCPServerRegistry {
       return instance;
     } catch (err) {
       this.emitEvent({
-        type: 'error',
+        type: "error",
         serverId,
         error: err instanceof Error ? err.message : String(err),
         timestamp: Date.now(),
@@ -210,7 +208,7 @@ export class MCPServerRegistry {
       this.instances.delete(serverId);
 
       this.emitEvent({
-        type: 'stopped',
+        type: "stopped",
         serverId,
         timestamp: Date.now(),
       });
@@ -221,9 +219,7 @@ export class MCPServerRegistry {
    * Stop all running servers
    */
   async stopAll(): Promise<void> {
-    const stopPromises = Array.from(this.instances.keys()).map((id) =>
-      this.stopServer(id)
-    );
+    const stopPromises = Array.from(this.instances.keys()).map((id) => this.stopServer(id));
     await Promise.allSettled(stopPromises);
   }
 
@@ -232,13 +228,13 @@ export class MCPServerRegistry {
    * @param serverId - Server ID
    * @returns Server status
    */
-  getStatus(serverId: string): MCPServerInstance['status'] | 'unregistered' {
+  getStatus(serverId: string): MCPServerInstance["status"] | "unregistered" {
     if (!this.manifests.has(serverId)) {
-      return 'unregistered';
+      return "unregistered";
     }
 
     const instance = this.instances.get(serverId);
-    return instance?.status || 'stopped';
+    return instance?.status || "stopped";
   }
 
   /**
@@ -247,7 +243,7 @@ export class MCPServerRegistry {
    */
   listRunning(): string[] {
     return Array.from(this.instances.entries())
-      .filter(([_, instance]) => instance.status === 'running')
+      .filter(([_, instance]) => instance.status === "running")
       .map(([id]) => id);
   }
 
@@ -324,15 +320,11 @@ export class MCPServerRegistry {
    * @param params - Tool parameters
    * @returns Tool result
    */
-  async callTool(
-    serverId: string,
-    toolName: string,
-    params: unknown
-  ): Promise<unknown> {
+  async callTool(serverId: string, toolName: string, params: unknown): Promise<unknown> {
     const instance = await this.getInstance(serverId);
 
     this.emitEvent({
-      type: 'tool_called',
+      type: "tool_called",
       serverId,
       toolName,
       timestamp: Date.now(),
@@ -375,12 +367,12 @@ export class MCPServerRegistry {
   getAllTools(): Array<{
     serverId: string;
     serverName: string;
-    tool: MCPServerManifest['tools'][number];
+    tool: MCPServerManifest["tools"][number];
   }> {
     const tools: Array<{
       serverId: string;
       serverName: string;
-      tool: MCPServerManifest['tools'][number];
+      tool: MCPServerManifest["tools"][number];
     }> = [];
 
     for (const manifest of this.manifests.values()) {
@@ -455,14 +447,14 @@ export class MCPServerRegistry {
     byCategory: Record<MCPCategory, number>;
   } {
     const byCategory: Record<MCPCategory, number> = {
-      'data-provider': 0,
-      'analytics': 0,
-      'execution': 0,
-      'exchange': 0,
-      'infrastructure': 0,
-      'portfolio': 0,
-      'research': 0,
-      'utility': 0,
+      "data-provider": 0,
+      analytics: 0,
+      execution: 0,
+      exchange: 0,
+      infrastructure: 0,
+      portfolio: 0,
+      research: 0,
+      utility: 0,
     };
 
     let enabled = 0;

@@ -138,8 +138,7 @@ export function evaluateVolRegimeConvergence(
   const volStorm = volState === "high";
   const volCalm = volState === "low" || volState === "neutral";
   const regimeStorm = regimeFlipping || isStormState(regime.currentState);
-  const regimeCalm =
-    !regimeFlipping && isCalmState(regime.currentState);
+  const regimeCalm = !regimeFlipping && isCalmState(regime.currentState);
 
   if (volStorm && regimeStorm) {
     verdict = "aligned_storm";
@@ -180,9 +179,7 @@ export function evaluateVolRegimeConvergence(
   };
 }
 
-export function convergenceToPayload(
-  result: VolRegimeConvergenceResult,
-): Record<string, unknown> {
+export function convergenceToPayload(result: VolRegimeConvergenceResult): Record<string, unknown> {
   return {
     kind: "vol_regime_convergence.evaluated",
     verdict: result.verdict,

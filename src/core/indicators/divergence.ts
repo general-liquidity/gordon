@@ -87,7 +87,7 @@ function calcRSI(closes: number[], period: number): number[] {
 /**
  * Find rolling maximum indices within a window
  */
-function rollingMaxIdx(values: number[], window: number): number[] {
+function _rollingMaxIdx(values: number[], window: number): number[] {
   const result: number[] = [];
   for (let i = 0; i < values.length; i++) {
     if (i < window - 1) {
@@ -106,7 +106,7 @@ function rollingMaxIdx(values: number[], window: number): number[] {
 /**
  * Find rolling minimum indices within a window
  */
-function rollingMinIdx(values: number[], window: number): number[] {
+function _rollingMinIdx(values: number[], window: number): number[] {
   const result: number[] = [];
   for (let i = 0; i < values.length; i++) {
     if (i < window - 1) {
@@ -137,7 +137,7 @@ export function calculateDivergence(
   rsiPeriod: number = 14,
   lookback: number = 10,
   priceTolerance: number = 0.005,
-  rsiTolerance: number = 1
+  rsiTolerance: number = 1,
 ): DivergenceResult {
   if (candles.length < rsiPeriod + lookback * 2 + 1) {
     return {
@@ -151,9 +151,9 @@ export function calculateDivergence(
     };
   }
 
-  const closes = candles.map(c => c.close);
-  const highs = candles.map(c => c.high);
-  const lows = candles.map(c => c.low);
+  const closes = candles.map((c) => c.close);
+  const highs = candles.map((c) => c.high);
+  const lows = candles.map((c) => c.low);
   const rsiValues = calcRSI(closes, rsiPeriod);
 
   // Rolling extremes for price and RSI
@@ -235,8 +235,9 @@ export function calculateDivergence(
 
   // Find most recent divergence
   const lastBar = candles.length - 1;
-  const recentDivergences = divergences.filter(d => lastBar - d.currentBar <= lookback);
-  const mostRecent = recentDivergences.length > 0 ? recentDivergences[recentDivergences.length - 1]! : null;
+  const recentDivergences = divergences.filter((d) => lastBar - d.currentBar <= lookback);
+  const mostRecent =
+    recentDivergences.length > 0 ? recentDivergences[recentDivergences.length - 1]! : null;
 
   const currentRSI = rsiValues[rsiValues.length - 1] ?? null;
   const divergenceDetected = mostRecent !== null;
@@ -253,12 +254,12 @@ export function calculateDivergence(
     signal,
     strength,
     mostRecent,
-    divergences.length
+    divergences.length,
   );
 
   return {
     rsi: currentRSI !== null ? parseFloat(currentRSI.toFixed(1)) : null,
-    rsiValues: rsiValues.map(v => parseFloat(v.toFixed(2))),
+    rsiValues: rsiValues.map((v) => parseFloat(v.toFixed(2))),
     divergenceDetected,
     signal,
     divergences: recentDivergences,
@@ -319,7 +320,7 @@ function buildDivergenceInterpretation(
   signal: string,
   strength: number,
   recent: DivergenceSignal | null,
-  totalCount: number
+  totalCount: number,
 ): string {
   if (rsi === null) return "Insufficient data for divergence detection.";
 

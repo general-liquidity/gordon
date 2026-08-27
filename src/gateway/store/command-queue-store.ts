@@ -162,9 +162,10 @@ export function markQueueCommandFailed(id: number, error: string, retryDelayMs: 
 
   const row = executeWithLogging(
     () =>
-      db
-        .query("SELECT attempts, maxAttempts FROM gateway_command_queue WHERE id = ?")
-        .get(id) as { attempts: number; maxAttempts: number } | null,
+      db.query("SELECT attempts, maxAttempts FROM gateway_command_queue WHERE id = ?").get(id) as {
+        attempts: number;
+        maxAttempts: number;
+      } | null,
     "SELECT gateway_command_queue retry-state",
   );
 
@@ -223,7 +224,12 @@ const CRASH_RETRY_SAFE_COMMANDS = new Set<string>([
 export interface OrphanedCommandResetResult {
   requeued: number;
   failed: number;
-  entries: Array<{ id: number; commandType: string; outcome: "pending" | "failed"; reason: string }>;
+  entries: Array<{
+    id: number;
+    commandType: string;
+    outcome: "pending" | "failed";
+    reason: string;
+  }>;
 }
 
 /**
@@ -314,4 +320,3 @@ export function getQueueDepth(sessionId: string): {
     failed: rows.find((r) => r.status === "failed")?.count ?? 0,
   };
 }
-

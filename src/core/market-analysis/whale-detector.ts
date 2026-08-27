@@ -69,7 +69,7 @@ export class WhaleDetector {
   analyzeWhaleOrders(
     bids: OrderBookEntry[],
     asks: OrderBookEntry[],
-    currentPrice: number
+    _currentPrice: number,
   ): WhaleAnalysis {
     try {
       if (!bids.length || !asks.length) {
@@ -152,7 +152,7 @@ export class WhaleDetector {
   calculateDepth(
     bids: OrderBookEntry[],
     asks: OrderBookEntry[],
-    depthLevels: number = 10
+    depthLevels: number = 10,
   ): DepthAnalysis {
     try {
       if (!bids.length || !asks.length) {
@@ -210,7 +210,7 @@ export class WhaleDetector {
     bids: OrderBookEntry[],
     asks: OrderBookEntry[],
     orderSizeUsd: number,
-    side: "BUY" | "SELL"
+    side: "BUY" | "SELL",
   ): MarketImpactEstimate {
     try {
       if (!bids.length || !asks.length) {
@@ -264,13 +264,11 @@ export class WhaleDetector {
         avgPrice = orderSizeUsd > 0 ? totalCost / orderSizeUsd : bestPrice;
       }
 
-      const slippagePercent = bestPrice > 0
-        ? (Math.abs(avgPrice - bestPrice) / bestPrice) * 100
-        : 0;
+      const slippagePercent =
+        bestPrice > 0 ? (Math.abs(avgPrice - bestPrice) / bestPrice) * 100 : 0;
 
-      const fillPercentage = remainingSize === 0
-        ? 1.0
-        : (orderSizeUsd - remainingSize) / orderSizeUsd;
+      const fillPercentage =
+        remainingSize === 0 ? 1.0 : (orderSizeUsd - remainingSize) / orderSizeUsd;
 
       return {
         impactPrice: avgPrice,

@@ -140,7 +140,7 @@ describe("judgeTrajectories", () => {
         "test-scenario": [
           { id: "a", score: 0.92, explanation: "best" },
           { id: "b", score: 0.45, explanation: "ok" },
-          { id: "c", score: 0.10, explanation: "worst" },
+          { id: "c", score: 0.1, explanation: "worst" },
         ],
       },
     });
@@ -346,7 +346,10 @@ describe("runEvalSuite", () => {
 });
 
 describe("detectRegressions", () => {
-  function makeResult(label: string, perScenario: Array<{ id: string; score: number }>): VariantRunResult {
+  function makeResult(
+    label: string,
+    perScenario: Array<{ id: string; score: number }>,
+  ): VariantRunResult {
     const aggregate =
       perScenario.reduce((s, p) => s + p.score, 0) / Math.max(1, perScenario.length);
     return {
@@ -373,7 +376,7 @@ describe("detectRegressions", () => {
     ]);
     const candidate = makeResult("candidate", [
       { id: "a", score: 0.92 }, // +0.02 — within tolerance
-      { id: "b", score: 0.6 },  // -0.20 — regression
+      { id: "b", score: 0.6 }, // -0.20 — regression
       { id: "c", score: 0.72 }, // +0.02 — within tolerance
     ]);
     const report = detectRegressions(baseline, candidate, { toleranceDelta: 0.05 });
@@ -617,8 +620,7 @@ describe("detectRegressions — cost gate", () => {
     const candidate = makeCostResult("candidate", 0.7, { tokens: 1300 }); // +30%
     expect(detectRegressions(baseline, candidate).costRegression).toBeDefined(); // default 20%
     expect(
-      detectRegressions(baseline, candidate, { costToleranceRatio: 0.5 })
-        .costRegression,
+      detectRegressions(baseline, candidate, { costToleranceRatio: 0.5 }).costRegression,
     ).toBeUndefined();
   });
 
@@ -640,7 +642,12 @@ describe("detectRegressions — cost gate", () => {
       userInput: "how does BTC look right now?",
     };
     const client = buildMockJudgeClient({
-      responses: { "cost-agg": [{ id: "cheap", score: 0.8 }, { id: "pricey", score: 0.8 }] },
+      responses: {
+        "cost-agg": [
+          { id: "cheap", score: 0.8 },
+          { id: "pricey", score: 0.8 },
+        ],
+      },
     });
     function variant(label: string, tokens: number): RunVariantInput {
       const map = new Map<string, EvalTrajectory>();
@@ -922,17 +929,29 @@ describe("judgeTrajectoriesPanel", () => {
   it("differentiates scores per model via byModel and averages", async () => {
     const client = buildMockJudgeClient({
       responses: {
-        "panel-test": [{ id: "a", score: 0.5 }, { id: "b", score: 0.5 }],
+        "panel-test": [
+          { id: "a", score: 0.5 },
+          { id: "b", score: 0.5 },
+        ],
       },
       byModel: {
         "anthropic/test": {
-          "panel-test": [{ id: "a", score: 0.9 }, { id: "b", score: 0.2 }],
+          "panel-test": [
+            { id: "a", score: 0.9 },
+            { id: "b", score: 0.2 },
+          ],
         },
         "openai/test": {
-          "panel-test": [{ id: "a", score: 0.8 }, { id: "b", score: 0.3 }],
+          "panel-test": [
+            { id: "a", score: 0.8 },
+            { id: "b", score: 0.3 },
+          ],
         },
         "google/test": {
-          "panel-test": [{ id: "a", score: 0.7 }, { id: "b", score: 0.4 }],
+          "panel-test": [
+            { id: "a", score: 0.7 },
+            { id: "b", score: 0.4 },
+          ],
         },
       },
     });
@@ -957,7 +976,10 @@ describe("judgeTrajectoriesPanel", () => {
   it("drops a failing judge and proceeds with quorum-1", async () => {
     const client = buildMockJudgeClient({
       responses: {
-        "panel-test": [{ id: "a", score: 0.7 }, { id: "b", score: 0.3 }],
+        "panel-test": [
+          { id: "a", score: 0.7 },
+          { id: "b", score: 0.3 },
+        ],
       },
       throwForModel: "openai/test",
     });
@@ -1127,9 +1149,7 @@ describe("review queue", () => {
       variantLabel: "baseline",
       judgeModel: "test",
       ranAt: "2026-05-11T00:00:00Z",
-      perScenario: [
-        { scenarioId: "x", score: 0.9, rank: 1, explanation: "" },
-      ],
+      perScenario: [{ scenarioId: "x", score: 0.9, rank: 1, explanation: "" }],
       aggregate: 0.9,
       winCount: 1,
       scenarioCount: 1,
@@ -1137,9 +1157,7 @@ describe("review queue", () => {
     const candidate: VariantRunResult = {
       ...baseline,
       variantLabel: "candidate",
-      perScenario: [
-        { scenarioId: "x", score: 0.4, rank: 1, explanation: "" },
-      ],
+      perScenario: [{ scenarioId: "x", score: 0.4, rank: 1, explanation: "" }],
       aggregate: 0.4,
     };
     const report = detectRegressions(baseline, candidate, {

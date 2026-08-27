@@ -9,10 +9,7 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
-import {
-  PLAYBOOK_PROTOCOL_VERSION,
-  PlaybookProtocolSchema,
-} from "./protocol.ts";
+import { PLAYBOOK_PROTOCOL_VERSION, PlaybookProtocolSchema } from "./protocol.ts";
 import type { PlaybookProtocol } from "./protocol.ts";
 import type { Playbook } from "./types.ts";
 
@@ -59,7 +56,7 @@ export function playbookToProtocol(pb: Playbook): PlaybookProtocol {
   const indicators = pb.trigger.conditions.map((cond) => {
     const params: Record<string, string | number> = {};
     if (cond.timeframe) {
-      params["timeframe"] = cond.timeframe;
+      params.timeframe = cond.timeframe;
     }
     return {
       name: cond.indicator ?? "custom",
@@ -72,7 +69,10 @@ export function playbookToProtocol(pb: Playbook): PlaybookProtocol {
   const takeProfitLevels = buildTakeProfitLevels(pb);
 
   // Infer stop loss type mapping
-  const stopLossTypeMap: Record<string, "fixed_percent" | "atr_multiple" | "support_level" | "trailing"> = {
+  const stopLossTypeMap: Record<
+    string,
+    "fixed_percent" | "atr_multiple" | "support_level" | "trailing"
+  > = {
     fixed_percent: "fixed_percent",
     atr: "atr_multiple",
     structure: "support_level",
@@ -106,9 +106,8 @@ export function playbookToProtocol(pb: Playbook): PlaybookProtocol {
       description: pb.trigger.description,
       indicators,
       confluence_required: Math.max(1, indicators.length),
-      filters: pb.analysis.invalidationCriteria.length > 0
-        ? pb.analysis.invalidationCriteria
-        : undefined,
+      filters:
+        pb.analysis.invalidationCriteria.length > 0 ? pb.analysis.invalidationCriteria : undefined,
     },
 
     exit: {
@@ -118,11 +117,9 @@ export function playbookToProtocol(pb: Playbook): PlaybookProtocol {
         // An ATR stop's value is a multiple, every other type's is a percent.
         value:
           pb.execution.stopLoss.type === "atr"
-            ? pb.execution.stopLoss.atrMultiple ?? 2
-            : pb.execution.stopLoss.percentValue ?? 2,
-        params: pb.execution.stopLoss.type === "atr"
-          ? { atr_period: 14 }
-          : undefined,
+            ? (pb.execution.stopLoss.atrMultiple ?? 2)
+            : (pb.execution.stopLoss.percentValue ?? 2),
+        params: pb.execution.stopLoss.type === "atr" ? { atr_period: 14 } : undefined,
       },
       take_profit: takeProfitLevels,
       trailing_stop: inferTrailingStop(pb),
@@ -219,7 +216,9 @@ export function protocolToMarkdown(protocol: PlaybookProtocol): string {
   lines.push("## Analysis");
   lines.push("");
   lines.push("Analyst validates:");
-  lines.push(`- Confluence required: ${protocol.entry.confluence_required} of ${protocol.entry.indicators.length} indicators`);
+  lines.push(
+    `- Confluence required: ${protocol.entry.confluence_required} of ${protocol.entry.indicators.length} indicators`,
+  );
   if (protocol.entry.filters && protocol.entry.filters.length > 0) {
     lines.push("");
     lines.push("Trade is invalidated if:");
@@ -232,15 +231,21 @@ export function protocolToMarkdown(protocol: PlaybookProtocol): string {
   // ---- Execution ----
   lines.push("## Execution");
   lines.push("");
-  lines.push(`- **Entry**: ${capitalize(protocol.execution.order_type)} order (${protocol.execution.entry_method})`);
-  lines.push(`- **Stop Loss**: ${capitalize(protocol.exit.stop_loss.type.replace(/_/g, " "))} at ${protocol.exit.stop_loss.value}%`);
+  lines.push(
+    `- **Entry**: ${capitalize(protocol.execution.order_type)} order (${protocol.execution.entry_method})`,
+  );
+  lines.push(
+    `- **Stop Loss**: ${capitalize(protocol.exit.stop_loss.type.replace(/_/g, " "))} at ${protocol.exit.stop_loss.value}%`,
+  );
   if (protocol.exit.take_profit.length > 0) {
     const tpDesc = protocol.exit.take_profit
       .map((tp) => `${tp.size_percent}% at ${tp.level}R`)
       .join(", ");
     lines.push(`- **Take Profit**: ${tpDesc}`);
   }
-  lines.push(`- **Position Size**: Risk ${protocol.risk.max_risk_per_trade_percent}% of portfolio per trade`);
+  lines.push(
+    `- **Position Size**: Risk ${protocol.risk.max_risk_per_trade_percent}% of portfolio per trade`,
+  );
   lines.push("");
 
   // ---- Management ----
@@ -249,7 +254,9 @@ export function protocolToMarkdown(protocol: PlaybookProtocol): string {
   let ruleNum = 1;
   if (protocol.exit.trailing_stop?.enabled) {
     if (protocol.exit.trailing_stop.activation !== undefined) {
-      lines.push(`${ruleNum}. At ${protocol.exit.trailing_stop.activation}% profit -> Activate trailing stop at ${protocol.exit.trailing_stop.distance ?? 1}% distance`);
+      lines.push(
+        `${ruleNum}. At ${protocol.exit.trailing_stop.activation}% profit -> Activate trailing stop at ${protocol.exit.trailing_stop.distance ?? 1}% distance`,
+      );
       ruleNum++;
     }
   }
@@ -258,7 +265,9 @@ export function protocolToMarkdown(protocol: PlaybookProtocol): string {
     ruleNum++;
   }
   if (protocol.exit.time_stop?.enabled && protocol.exit.time_stop.max_duration_hours) {
-    lines.push(`${ruleNum}. After ${protocol.exit.time_stop.max_duration_hours}h -> Close remaining position (time stop)`);
+    lines.push(
+      `${ruleNum}. After ${protocol.exit.time_stop.max_duration_hours}h -> Close remaining position (time stop)`,
+    );
     ruleNum++;
   }
   if (ruleNum === 1) {
@@ -313,9 +322,7 @@ export function jsonToProtocol(json: string): PlaybookProtocol {
 
   const result = PlaybookProtocolSchema.safeParse(raw);
   if (!result.success) {
-    const issues = result.error.issues
-      .map((i) => `${i.path.join(".")}: ${i.message}`)
-      .join("; ");
+    const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     throw new Error(`Protocol validation failed: ${issues}`);
   }
 
@@ -343,42 +350,50 @@ function inferTimeframeCategory(timeframes: string[]): "scalp" | "intraday" | "s
  */
 function inferTimeframesFromCategory(category: string): string[] {
   switch (category) {
-    case "scalp": return ["1m", "5m"];
-    case "intraday": return ["15m", "1h"];
-    case "swing": return ["4h", "1d"];
-    case "position": return ["1d", "1w"];
-    default: return ["1h"];
+    case "scalp":
+      return ["1m", "5m"];
+    case "intraday":
+      return ["15m", "1h"];
+    case "swing":
+      return ["4h", "1d"];
+    case "position":
+      return ["1d", "1w"];
+    default:
+      return ["1h"];
   }
 }
 
 /**
  * Format a condition comparison + value into a string expression.
  */
-function formatCondition(
-  comparison: string,
-  value: number | [number, number] | undefined
-): string {
+function formatCondition(comparison: string, value: number | [number, number] | undefined): string {
   if (value === undefined) return comparison;
   if (Array.isArray(value)) return `between ${value[0]} and ${value[1]}`;
 
   switch (comparison) {
-    case "above": return `> ${value}`;
-    case "below": return `< ${value}`;
-    case "crosses_above": return `crosses above ${value}`;
-    case "crosses_below": return `crosses below ${value}`;
-    case "spike": return `spike > ${value}x`;
-    case "between": return `between (see value)`;
-    case "divergence": return "divergence detected";
-    default: return `${comparison} ${value}`;
+    case "above":
+      return `> ${value}`;
+    case "below":
+      return `< ${value}`;
+    case "crosses_above":
+      return `crosses above ${value}`;
+    case "crosses_below":
+      return `crosses below ${value}`;
+    case "spike":
+      return `spike > ${value}x`;
+    case "between":
+      return `between (see value)`;
+    case "divergence":
+      return "divergence detected";
+    default:
+      return `${comparison} ${value}`;
   }
 }
 
 /**
  * Build take profit levels from the existing Playbook's management rules.
  */
-function buildTakeProfitLevels(
-  pb: Playbook
-): Array<{ level: number; size_percent: number }> {
+function buildTakeProfitLevels(pb: Playbook): Array<{ level: number; size_percent: number }> {
   const levels: Array<{ level: number; size_percent: number }> = [];
 
   // Try to extract from management rules (e.g., "At 2R profit → Scale out 50%")
@@ -427,7 +442,7 @@ function buildExitDescription(pb: Playbook): string {
  * Infer trailing stop configuration from management rules.
  */
 function inferTrailingStop(
-  pb: Playbook
+  pb: Playbook,
 ): { enabled: boolean; activation?: number; distance?: number } | undefined {
   for (const rule of pb.management.rules) {
     const lower = rule.description.toLowerCase();

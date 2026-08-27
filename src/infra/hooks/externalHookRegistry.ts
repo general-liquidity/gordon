@@ -80,9 +80,11 @@ function parseEntry(value: unknown, index: number): ExternalHookFileEntry {
   }
   const env = record.env;
   if (
-    env !== undefined
-    && (!env || typeof env !== "object" || Array.isArray(env)
-      || Object.values(env as Record<string, unknown>).some((item) => typeof item !== "string"))
+    env !== undefined &&
+    (!env ||
+      typeof env !== "object" ||
+      Array.isArray(env) ||
+      Object.values(env as Record<string, unknown>).some((item) => typeof item !== "string"))
   ) {
     throw new Error(`hooks[${index}].env must map strings to strings`);
   }
@@ -126,12 +128,13 @@ export function loadExternalHookConfig(path: string): ExternalHookFileEntry[] {
   try {
     parsed = JSON.parse(readFileSync(path, "utf-8"));
   } catch (error) {
-    throw new Error(`External hook config is unreadable or invalid JSON: ${path}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `External hook config is unreadable or invalid JSON: ${path}: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
-  const values = Array.isArray(parsed)
-    ? parsed
-    : asRecord(parsed, "external hook config").hooks;
-  if (!Array.isArray(values)) throw new Error("External hook config must be an array or { hooks: [...] }");
+  const values = Array.isArray(parsed) ? parsed : asRecord(parsed, "external hook config").hooks;
+  if (!Array.isArray(values))
+    throw new Error("External hook config must be an array or { hooks: [...] }");
   if (values.length === 0) {
     throw new Error(
       `External hook runner is enabled but ${path} declares no hooks; disable the runner or configure at least one policy hook`,
@@ -146,7 +149,9 @@ export function loadExternalHookConfig(path: string): ExternalHookFileEntry[] {
   return entries;
 }
 
-export function installExternalHooks(env: NodeJS.ProcessEnv = process.env): ExternalHookInstallerState {
+export function installExternalHooks(
+  env: NodeJS.ProcessEnv = process.env,
+): ExternalHookInstallerState {
   if (!isExternalHookRunnerEnabled(env)) return getExternalHookInstallerState();
   if (state.installed) return getExternalHookInstallerState();
 
@@ -165,7 +170,8 @@ export function installExternalHooks(env: NodeJS.ProcessEnv = process.env): Exte
         toolFilter: config.toolFilter,
         asyncRewake: config.asyncRewake,
         statusMessage: config.statusMessage,
-        handler: async (payload) => (await runExternalHook(resolvedConfig, payload as never, { cwd })).result,
+        handler: async (payload) =>
+          (await runExternalHook(resolvedConfig, payload as never, { cwd })).result,
       };
       return registerHook(definition);
     });
@@ -175,7 +181,9 @@ export function installExternalHooks(env: NodeJS.ProcessEnv = process.env): Exte
     for (const unregister of unregisterInstalled.splice(0)) unregister();
     const message = error instanceof Error ? error.message : String(error);
     state = { installed: false, configPath, hookCount: 0, error: message };
-    throw new Error(`${EXTERNAL_HOOK_RUNNER_FLAG_ENV}=1 but external hooks were not installed: ${message}`);
+    throw new Error(
+      `${EXTERNAL_HOOK_RUNNER_FLAG_ENV}=1 but external hooks were not installed: ${message}`,
+    );
   }
 }
 

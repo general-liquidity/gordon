@@ -10,10 +10,16 @@ import type { Exchange } from "../../infra/exchange/index.ts";
 import type { Plan, Trade } from "../../types/index.ts";
 import { setDatabasePathForTesting } from "../../infra/storage/database.ts";
 import { createPlan } from "../../infra/storage/entities/plans.ts";
-import { createTrade } from "../../infra/storage/entities/trades.ts";
-import { CONSENT_PATH_ENV, recordLiveConsent } from "../../infra/safety/consent.ts";
-import { placeGridTakeProfits, remainingTradeQuantity } from "./monitor.ts";
+import { createTrade, updateTrade } from "../../infra/storage/entities/trades.ts";
+import { CONSENT_PATH_ENV } from "../../infra/safety/consent.ts";
+import {
+  calculateRealizedPnl,
+  calculateUnrealizedPnl,
+  placeGridTakeProfits,
+  remainingTradeQuantity,
+} from "./monitor.ts";
 import type { OrderParams } from "../../infra/exchange/index.ts";
+import { generateDeterministicClientOrderId } from "./executor.ts";
 
 const dbPath = join(tmpdir(), `gordon-consent-monitor-${process.pid}-${Date.now()}.db`);
 const consentPath = join(tmpdir(), `gordon-consent-monitor-${process.pid}-${Date.now()}.json`);
@@ -83,24 +89,38 @@ function makeGridTrade(): Trade {
   });
 }
 
-function makeExchange(isSandbox: boolean, placed: OrderParams[]): Exchange {
+function makeExchange(isSandbox: boolean, placed: OrderParams[], trade: Trade): Exchange {
   return {
     exchangeId: "binance",
     isSandbox,
-    getPrice: async () => 48_500,
+    getPrice: async () => 53_000,
+    getOrderHistory: async () =>
+      GRID_PRICES.map((price, index) => ({
+        orderId: `entry-${index}`,
+        clientOrderId: generateDeterministicClientOrderId(trade.planId, `grid${index + 1}`),
+        symbol: trade.symbol,
+        side: "BUY" as const,
+        type: "LIMIT" as const,
+        status: "FILLED" as const,
+        price,
+        quantity: 0.01,
+        executedQty: 0.01,
+        cummulativeQuoteQty: price * 0.01,
+      })),
     getOpenOrders: async () => [],
+    cancelOrder: async () => undefined,
     placeOrder: async (params: OrderParams) => {
       placed.push(params);
       return {
         orderId: `tp-${placed.length}`,
         symbol: params.symbol,
-        side: "SELL",
-        type: "LIMIT",
-        status: "NEW",
-        price: 52_000,
-        quantity: 0.03,
-        executedQty: 0,
-        cummulativeQuoteQty: 0,
+        side: params.side,
+        type: params.type,
+        status: "FILLED",
+        price: 53_000,
+        quantity: params.quantity ?? 0,
+        executedQty: params.quantity ?? 0,
+        cummulativeQuoteQty: 53_000 * (params.quantity ?? 0),
       };
     },
   } as unknown as Exchange;
@@ -109,7 +129,8 @@ function makeExchange(isSandbox: boolean, placed: OrderParams[]): Exchange {
 describe("placeGridTakeProfits live-consent gate", () => {
   it("allows a verified exposure reduction on a live venue without fresh consent", async () => {
     const placed: OrderParams[] = [];
-    const result = await placeGridTakeProfits(makeGridTrade(), makeExchange(false, placed));
+    const trade = makeGridTrade();
+    const result = await placeGridTakeProfits(trade, makeExchange(false, placed, trade));
 
     expect(result.success).toBe(true);
     expect(placed).toHaveLength(1);
@@ -118,7 +139,6 @@ describe("placeGridTakeProfits live-consent gate", () => {
   });
 
   it("never replaces quantity that a manual exit already closed", async () => {
-    recordLiveConsent();
     const trade = makeGridTrade();
     trade.exits.push({
       orderId: "manual-partial",
@@ -127,8 +147,9 @@ describe("placeGridTakeProfits live-consent gate", () => {
       filledAt: new Date().toISOString(),
       reason: "MANUAL",
     });
+    updateTrade(trade.id, { exits: trade.exits, status: "PARTIAL" });
     const placed: OrderParams[] = [];
-    const result = await placeGridTakeProfits(trade, makeExchange(false, placed));
+    const result = await placeGridTakeProfits(trade, makeExchange(false, placed, trade));
 
     expect(result.success).toBe(true);
     expect(placed).toHaveLength(1);
@@ -157,5 +178,27 @@ describe("remainingTradeQuantity", () => {
         exits: [{ orderId: "x", price: 90, quantity: 2, filledAt: "now", reason: "STOP" }],
       }),
     ).toBe(0);
+  });
+});
+
+describe("short-position PnL", () => {
+  const trade = {
+    entries: [{ orderId: "e", price: 100, quantity: 2, filledAt: "now" }],
+    exits: [{ orderId: "x", price: 90, quantity: 0.5, filledAt: "now", reason: "TP1" }],
+    averageEntry: 100,
+  } as Trade;
+
+  it("reports a falling price as positive unrealized PnL for a short", () => {
+    expect(calculateUnrealizedPnl(trade, 80, { direction: "short" })).toEqual({
+      unrealizedPnl: 30,
+      unrealizedPnlPercent: 20,
+    });
+  });
+
+  it("reports a lower confirmed exit as positive realized PnL for a short", () => {
+    expect(calculateRealizedPnl(trade, { direction: "short" })).toEqual({
+      realizedPnl: 5,
+      realizedPnlPercent: 10,
+    });
   });
 });

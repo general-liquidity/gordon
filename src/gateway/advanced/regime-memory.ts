@@ -26,7 +26,9 @@ export interface RegimeMemoryResult {
  * Retrieve memory scoped to current market regime context.
  * Falls back to symbol-scoped retrieval if no current regime is cached.
  */
-export async function queryRegimeScopedMemory(input: RegimeMemoryQuery): Promise<RegimeMemoryResult> {
+export async function queryRegimeScopedMemory(
+  input: RegimeMemoryQuery,
+): Promise<RegimeMemoryResult> {
   const timeframe = input.timeframe ?? "1h";
   const detector = RegimeDetector.getInstance();
   const regime = detector.getCurrentRegime(input.symbol.toUpperCase(), timeframe);
@@ -35,7 +37,9 @@ export async function queryRegimeScopedMemory(input: RegimeMemoryQuery): Promise
   const queryParts = [
     input.symbol.toUpperCase(),
     regime?.regime,
-    regime?.metrics?.atr_percentile !== undefined ? `atr ${regime.metrics.atr_percentile.toFixed(0)}` : null,
+    regime?.metrics?.atr_percentile !== undefined
+      ? `atr ${regime.metrics.atr_percentile.toFixed(0)}`
+      : null,
     input.query ?? null,
   ].filter(Boolean);
   const query = queryParts.join(" ");

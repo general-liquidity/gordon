@@ -51,7 +51,7 @@ export interface VolumeImbalanceResult {
  */
 export function calculateVolumeImbalance(
   candles: Candle[],
-  opts?: { lookback?: number }
+  opts?: { lookback?: number },
 ): VolumeImbalanceResult {
   if (candles.length < 2) {
     return {
@@ -69,8 +69,7 @@ export function calculateVolumeImbalance(
   const currentPrice = candles[lastBar]!.close;
 
   const lookback = opts?.lookback;
-  const startBar =
-    lookback != null && lookback > 0 ? Math.max(1, candles.length - lookback) : 1;
+  const startBar = lookback != null && lookback > 0 ? Math.max(1, candles.length - lookback) : 1;
 
   const allImbalances: VolumeImbalance[] = [];
 
@@ -147,7 +146,7 @@ export function calculateVolumeImbalance(
     bullishImbalances,
     bearishImbalances,
     nearestUnfilledBullish,
-    nearestUnfilledBearish
+    nearestUnfilledBearish,
   );
 
   return {
@@ -165,7 +164,7 @@ function buildInterpretation(
   bullish: VolumeImbalance[],
   bearish: VolumeImbalance[],
   nearBull: VolumeImbalance | null,
-  nearBear: VolumeImbalance | null
+  nearBear: VolumeImbalance | null,
 ): string {
   const bullUnfilled = bullish.filter((v) => !v.filled).length;
   const bearUnfilled = bearish.filter((v) => !v.filled).length;

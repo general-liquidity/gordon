@@ -36,13 +36,8 @@ export interface RunningThesis {
 
 let cachedThesis: RunningThesis | null = null;
 
-export function isCoherenceEnabled(
-  env: NodeJS.ProcessEnv = flagEnv(),
-): boolean {
-  return (
-    env.GORDON_THESIS_COHERENCE === "1" ||
-    env.GORDON_THESIS_COHERENCE === "true"
-  );
+export function isCoherenceEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
+  return env.GORDON_THESIS_COHERENCE === "1" || env.GORDON_THESIS_COHERENCE === "true";
 }
 
 export function defaultThesisPath(): string {
@@ -53,9 +48,7 @@ export function defaultThesisPath(): string {
 
 const DEFAULT_COHERENCE_THRESHOLD = 0.5;
 
-export function getCoherenceThreshold(
-  env: NodeJS.ProcessEnv = flagEnv(),
-): number {
+export function getCoherenceThreshold(env: NodeJS.ProcessEnv = flagEnv()): number {
   const raw = env.GORDON_THESIS_COHERENCE_THRESHOLD;
   if (!raw) return DEFAULT_COHERENCE_THRESHOLD;
   const n = Number(raw);
@@ -63,9 +56,7 @@ export function getCoherenceThreshold(
   return n;
 }
 
-export function loadRunningThesis(
-  path: string = defaultThesisPath(),
-): RunningThesis | null {
+export function loadRunningThesis(path: string = defaultThesisPath()): RunningThesis | null {
   if (cachedThesis) return cachedThesis;
   if (!existsSync(path)) return null;
   try {
@@ -99,9 +90,7 @@ export function saveRunningThesis(
   return normalized;
 }
 
-export function clearRunningThesis(
-  path: string = defaultThesisPath(),
-): void {
+export function clearRunningThesis(path: string = defaultThesisPath()): void {
   cachedThesis = null;
   if (existsSync(path)) {
     writeFileSync(path, "", "utf8");
@@ -127,10 +116,7 @@ export interface CoherenceScore {
   failures: string[];
 }
 
-export function scoreCoherence(
-  plan: PlanShape,
-  thesis: RunningThesis,
-): CoherenceScore {
+export function scoreCoherence(plan: PlanShape, thesis: RunningThesis): CoherenceScore {
   const reasons: string[] = [];
   const failures: string[] = [];
   let achieved = 0;
@@ -153,7 +139,10 @@ export function scoreCoherence(
 
   if (plan.assetClass) {
     total += 2;
-    if (thesis.marketFocus.length === 0 || thesis.marketFocus.includes(plan.assetClass.toLowerCase())) {
+    if (
+      thesis.marketFocus.length === 0 ||
+      thesis.marketFocus.includes(plan.assetClass.toLowerCase())
+    ) {
       achieved += 2;
       reasons.push(`asset class ${plan.assetClass} within thesis focus`);
     } else {
@@ -169,9 +158,7 @@ export function scoreCoherence(
       achieved += 1;
       reasons.push(`time horizon ${plan.timeHorizon} matches thesis`);
     } else {
-      failures.push(
-        `time horizon ${plan.timeHorizon} differs from thesis ${thesis.timeHorizon}`,
-      );
+      failures.push(`time horizon ${plan.timeHorizon} differs from thesis ${thesis.timeHorizon}`);
     }
   }
 
@@ -181,9 +168,7 @@ export function scoreCoherence(
       achieved += 1;
       reasons.push(`conviction ${plan.conviction} meets thesis floor ${thesis.convictionMin}`);
     } else {
-      failures.push(
-        `conviction ${plan.conviction} below thesis floor ${thesis.convictionMin}`,
-      );
+      failures.push(`conviction ${plan.conviction} below thesis floor ${thesis.convictionMin}`);
     }
   }
 

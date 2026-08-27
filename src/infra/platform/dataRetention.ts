@@ -57,11 +57,23 @@ function loadPolicyFromEnv(): RetentionPolicy {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   };
   return {
-    telemetryEventsDays: overrideNumber("GORDON_RETENTION_TELEMETRY_DAYS", DEFAULT_RETENTION_POLICY.telemetryEventsDays),
-    researchDataDays: overrideNumber("GORDON_RETENTION_RESEARCH_DAYS", DEFAULT_RETENTION_POLICY.researchDataDays),
-    auditLogDays: overrideNumber("GORDON_RETENTION_AUDIT_DAYS", DEFAULT_RETENTION_POLICY.auditLogDays),
+    telemetryEventsDays: overrideNumber(
+      "GORDON_RETENTION_TELEMETRY_DAYS",
+      DEFAULT_RETENTION_POLICY.telemetryEventsDays,
+    ),
+    researchDataDays: overrideNumber(
+      "GORDON_RETENTION_RESEARCH_DAYS",
+      DEFAULT_RETENTION_POLICY.researchDataDays,
+    ),
+    auditLogDays: overrideNumber(
+      "GORDON_RETENTION_AUDIT_DAYS",
+      DEFAULT_RETENTION_POLICY.auditLogDays,
+    ),
     logsDays: overrideNumber("GORDON_RETENTION_LOGS_DAYS", DEFAULT_RETENTION_POLICY.logsDays),
-    costSessionsDays: overrideNumber("GORDON_RETENTION_COST_DAYS", DEFAULT_RETENTION_POLICY.costSessionsDays),
+    costSessionsDays: overrideNumber(
+      "GORDON_RETENTION_COST_DAYS",
+      DEFAULT_RETENTION_POLICY.costSessionsDays,
+    ),
   };
 }
 
@@ -96,10 +108,24 @@ export async function sweepRetention(
   };
 
   const sweeps: Array<{ name: string; fn: () => Promise<void> | void }> = [
-    { name: "research-jsonl", fn: () => sweepJsonlDir(path.join(GORDON_DIR, "research"), policy.researchDataDays, result) },
-    { name: "telemetry-jsonl", fn: () => sweepJsonlDir(path.join(GORDON_DIR, "telemetry"), policy.telemetryEventsDays, result) },
-    { name: "logs", fn: () => sweepLogsDir(path.join(GORDON_DIR, "logs"), policy.logsDays, result) },
-    { name: "cost-sessions", fn: () => sweepCostSessions(path.join(GORDON_DIR, "sessions"), policy.costSessionsDays, result) },
+    {
+      name: "research-jsonl",
+      fn: () => sweepJsonlDir(path.join(GORDON_DIR, "research"), policy.researchDataDays, result),
+    },
+    {
+      name: "telemetry-jsonl",
+      fn: () =>
+        sweepJsonlDir(path.join(GORDON_DIR, "telemetry"), policy.telemetryEventsDays, result),
+    },
+    {
+      name: "logs",
+      fn: () => sweepLogsDir(path.join(GORDON_DIR, "logs"), policy.logsDays, result),
+    },
+    {
+      name: "cost-sessions",
+      fn: () =>
+        sweepCostSessions(path.join(GORDON_DIR, "sessions"), policy.costSessionsDays, result),
+    },
     { name: "audit-log", fn: () => sweepAuditLog(policy.auditLogDays, result) },
   ];
 

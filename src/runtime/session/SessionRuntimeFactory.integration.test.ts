@@ -15,10 +15,11 @@ describe("SessionRuntimeFactory integration", () => {
     try {
       factory = new SessionRuntimeFactory({
         persistence,
-        resolveContext: async () => ({
-          userId: "user-1",
-          config: { permissionMode: "ask" },
-        }) as any,
+        resolveContext: async () =>
+          ({
+            userId: "user-1",
+            config: { permissionMode: "ask" },
+          }) as any,
       });
 
       const runtime = factory.get("app", { sessionId: "app" });
@@ -39,10 +40,11 @@ describe("SessionRuntimeFactory integration", () => {
 
       reloadedFactory = new SessionRuntimeFactory({
         persistence,
-        resolveContext: async () => ({
-          userId: "user-1",
-          config: { permissionMode: "ask" },
-        }) as any,
+        resolveContext: async () =>
+          ({
+            userId: "user-1",
+            config: { permissionMode: "ask" },
+          }) as any,
       });
 
       const restored = reloadedFactory.get("app", { sessionId: "app" });

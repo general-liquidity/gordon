@@ -29,4 +29,3 @@ export {
 } from "./errors.ts";
 
 export { validateGatewayCommand, validateGatewayEvent } from "./schema.ts";
-

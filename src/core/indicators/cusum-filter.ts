@@ -36,8 +36,7 @@ export function calculateCusumFilter(
     logReturns.push(Math.log(curr / prev));
   }
 
-  const rawThreshold =
-    opts?.threshold != null ? opts.threshold : sampleStd(logReturns);
+  const rawThreshold = opts?.threshold != null ? opts.threshold : sampleStd(logReturns);
   const threshold = Number(rawThreshold.toFixed(8));
 
   const eventIndices: number[] = [];
@@ -60,8 +59,7 @@ export function calculateCusumFilter(
   }
 
   const lastBarIndex = candles.length - 1;
-  const lastEventIndex =
-    eventIndices.length > 0 ? eventIndices[eventIndices.length - 1]! : null;
+  const lastEventIndex = eventIndices.length > 0 ? eventIndices[eventIndices.length - 1]! : null;
   const firedThisBar = lastEventIndex === lastBarIndex;
 
   let interpretation: string;

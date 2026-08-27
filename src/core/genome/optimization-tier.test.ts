@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  selectOptimizationTier,
-  filterMutationsByTier,
-} from "./optimization-tier.ts";
+import { selectOptimizationTier, filterMutationsByTier } from "./optimization-tier.ts";
 import type { Mutation } from "./types.ts";
 
 function mut(type: Mutation["mutation_type"]): Mutation {
@@ -110,10 +107,7 @@ describe("filterMutationsByTier", () => {
 
   it("keeps add/remove at structure tier", () => {
     const result = selectOptimizationTier({ criticalRisk: true });
-    const kept = filterMutationsByTier(
-      [mut("nudge"), mut("add"), mut("remove")],
-      result,
-    );
+    const kept = filterMutationsByTier([mut("nudge"), mut("add"), mut("remove")], result);
     expect(kept.map((m) => m.mutation_type)).toEqual(["add", "remove"]);
   });
 

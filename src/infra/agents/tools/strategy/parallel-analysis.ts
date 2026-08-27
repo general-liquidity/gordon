@@ -13,15 +13,13 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
+import { runParallel } from "../../parallel.ts";
 import {
-  runParallel,
-  runDeepParallelAnalysis,
-  runMultiCoinParallelAnalysis,
-  runParallelTimeframeAnalysis,
-  createScanAnalyzeWorkflow,
-  type ParallelOptions,
-} from "../../parallel.ts";
-import { getGordonContext, normalizeSymbol, validateToolOutput, type MastraExecutionContext } from "../types.ts";
+  getGordonContext,
+  normalizeSymbol,
+  validateToolOutput,
+  type MastraExecutionContext,
+} from "../types.ts";
 import { scan } from "../../../../core/pipeline/scanner.ts";
 import { analyze } from "../../../../core/pipeline/analyzer.ts";
 import type { BackgroundEligibleTool } from "../../background/backgroundDispatch.ts";
@@ -45,12 +43,16 @@ const parallelScanAnalyzeOutputSchema = z.object({
     success: z.boolean(),
     coinsScanned: z.number().optional(),
     opportunitiesFound: z.number().optional(),
-    topOpportunities: z.array(z.object({
-      symbol: z.string(),
-      price: z.number(),
-      confidence: z.number(),
-      bias: z.string(),
-    })).optional(),
+    topOpportunities: z
+      .array(
+        z.object({
+          symbol: z.string(),
+          price: z.number(),
+          confidence: z.number(),
+          bias: z.string(),
+        }),
+      )
+      .optional(),
     error: z.string().optional(),
   }),
   analysis: z.object({
@@ -76,20 +78,24 @@ const parallelMultiCoinOutputSchema = z.object({
     analyzed: z.number(),
     failed: z.number(),
   }),
-  topOpportunities: z.array(z.object({
-    symbol: z.string(),
-    confidence: z.number(),
-    bias: z.string(),
-    price: z.number().optional(),
-    change24h: z.number().optional(),
-  })),
-  allResults: z.array(z.object({
-    symbol: z.string(),
-    success: z.boolean(),
-    bias: z.string().optional(),
-    confidence: z.number().optional(),
-    error: z.string().optional(),
-  })),
+  topOpportunities: z.array(
+    z.object({
+      symbol: z.string(),
+      confidence: z.number(),
+      bias: z.string(),
+      price: z.number().optional(),
+      change24h: z.number().optional(),
+    }),
+  ),
+  allResults: z.array(
+    z.object({
+      symbol: z.string(),
+      success: z.boolean(),
+      bias: z.string().optional(),
+      confidence: z.number().optional(),
+      error: z.string().optional(),
+    }),
+  ),
 });
 
 const parallelDeepAnalysisOutputSchema = z.object({
@@ -97,48 +103,58 @@ const parallelDeepAnalysisOutputSchema = z.object({
   timestamp: z.string(),
   duration: z.number(),
   results: z.object({
-    technical: z.object({
-      success: z.boolean(),
-      bias: z.string().optional(),
-      score: z.number().optional(),
-      rsi: z.number().optional(),
-      trend: z.string().optional(),
-      error: z.string().optional(),
-    }).optional(),
-    whale: z.object({
-      success: z.boolean(),
-      bias: z.string().optional(),
-      strength: z.number().optional(),
-      interpretation: z.string().optional(),
-      error: z.string().optional(),
-    }).optional(),
-    orderbook: z.object({
-      success: z.boolean(),
-      imbalance: z.string().optional(),
-      bidAskRatio: z.number().optional(),
-      error: z.string().optional(),
-    }).optional(),
+    technical: z
+      .object({
+        success: z.boolean(),
+        bias: z.string().optional(),
+        score: z.number().optional(),
+        rsi: z.number().optional(),
+        trend: z.string().optional(),
+        error: z.string().optional(),
+      })
+      .optional(),
+    whale: z
+      .object({
+        success: z.boolean(),
+        bias: z.string().optional(),
+        strength: z.number().optional(),
+        interpretation: z.string().optional(),
+        error: z.string().optional(),
+      })
+      .optional(),
+    orderbook: z
+      .object({
+        success: z.boolean(),
+        imbalance: z.string().optional(),
+        bidAskRatio: z.number().optional(),
+        error: z.string().optional(),
+      })
+      .optional(),
   }),
-  consensus: z.object({
-    bias: z.string(),
-    confidence: z.number(),
-    agreementScore: z.number(),
-    summary: z.string(),
-  }).optional(),
+  consensus: z
+    .object({
+      bias: z.string(),
+      confidence: z.number(),
+      agreementScore: z.number(),
+      summary: z.string(),
+    })
+    .optional(),
 });
 
 const parallelTimeframeOutputSchema = z.object({
   symbol: z.string(),
   timestamp: z.string(),
   duration: z.number(),
-  timeframes: z.array(z.object({
-    timeframe: z.string(),
-    success: z.boolean(),
-    bias: z.string().optional(),
-    trend: z.string().optional(),
-    rsi: z.number().optional(),
-    error: z.string().optional(),
-  })),
+  timeframes: z.array(
+    z.object({
+      timeframe: z.string(),
+      success: z.boolean(),
+      bias: z.string().optional(),
+      trend: z.string().optional(),
+      rsi: z.number().optional(),
+      error: z.string().optional(),
+    }),
+  ),
   multiTimeframeConsensus: z.object({
     dominantTrend: z.string(),
     dominantBias: z.string(),
@@ -164,7 +180,12 @@ export const parallelScanAnalyzeTool = createTool({
   inputSchema: z.object({
     symbol: z.string().default("BTCUSDT").describe("Primary coin to analyze (e.g., 'BTCUSDT')"),
     topN: z.number().min(10).max(100).default(30).describe("Number of coins to scan"),
-    timeframes: z.array(z.string()).default(["1h", "4h"]).describe("Ordered timeframe preference. The scan leg uses the first timeframe only; the deep analysis leg uses the full list."),
+    timeframes: z
+      .array(z.string())
+      .default(["1h", "4h"])
+      .describe(
+        "Ordered timeframe preference. The scan leg uses the first timeframe only; the deep analysis leg uses the full list.",
+      ),
   }),
   outputSchema: parallelScanAnalyzeOutputSchema,
   execute: async ({ symbol, topN, timeframes }, execContext: MastraExecutionContext) => {
@@ -172,13 +193,17 @@ export const parallelScanAnalyzeTool = createTool({
     const ctx = getGordonContext(execContext);
 
     if (!ctx?.exchange) {
-      return validateToolOutput(parallelScanAnalyzeOutputSchema, {
-        timestamp: new Date().toISOString(),
-        duration: 0,
-        scan: { success: false, error: errors.noExchange.error },
-        analysis: { success: false, error: errors.noExchange.error },
-        combined: { recommendedAction: "Connect an exchange first" },
-      }, { toolName: "parallel_scan_analyze" });
+      return validateToolOutput(
+        parallelScanAnalyzeOutputSchema,
+        {
+          timestamp: new Date().toISOString(),
+          duration: 0,
+          scan: { success: false, error: errors.noExchange.error },
+          analysis: { success: false, error: errors.noExchange.error },
+          combined: { recommendedAction: "Connect an exchange first" },
+        },
+        { toolName: "parallel_scan_analyze" },
+      );
     }
 
     // Normalize symbol
@@ -247,7 +272,9 @@ export const parallelScanAnalyzeTool = createTool({
     let overallConfidence: number | undefined;
 
     if (scanSuccess && analysisSuccess) {
-      const opportunities = (scanResult as Awaited<ReturnType<typeof scan>>).coins.filter((c) => c.setupDetected);
+      const opportunities = (scanResult as Awaited<ReturnType<typeof scan>>).coins.filter(
+        (c) => c.setupDetected,
+      );
       const analysis = analysisResult as Awaited<ReturnType<typeof analyze>>;
 
       if (opportunities.length > 0) {
@@ -311,7 +338,11 @@ export const parallelMultiCoinTool = createTool({
     "Faster than sequential analysis. Use when comparing several coins at once. " +
     "Example: 'compare BTC ETH SOL AVAX' or 'analyze top 5 coins'.",
   inputSchema: z.object({
-    symbols: z.array(z.string()).min(2).max(10).describe("List of symbols to analyze (e.g., ['BTC', 'ETH', 'SOL'])"),
+    symbols: z
+      .array(z.string())
+      .min(2)
+      .max(10)
+      .describe("List of symbols to analyze (e.g., ['BTC', 'ETH', 'SOL'])"),
     timeframes: z.array(z.string()).default(["4h"]).describe("Timeframes for analysis"),
     concurrency: z.number().min(1).max(5).default(3).describe("Max concurrent analyses"),
   }),
@@ -321,23 +352,25 @@ export const parallelMultiCoinTool = createTool({
     const ctx = getGordonContext(execContext);
 
     if (!ctx?.exchange) {
-      return validateToolOutput(parallelMultiCoinOutputSchema, {
-        timestamp: new Date().toISOString(),
-        duration: 0,
-        summary: { total: symbols.length, analyzed: 0, failed: symbols.length },
-        topOpportunities: [],
-        allResults: symbols.map((s) => ({
-          symbol: s.toUpperCase(),
-          success: false,
-          error: errors.noExchange.error,
-        })),
-      }, { toolName: "parallel_multi_coin" });
+      return validateToolOutput(
+        parallelMultiCoinOutputSchema,
+        {
+          timestamp: new Date().toISOString(),
+          duration: 0,
+          summary: { total: symbols.length, analyzed: 0, failed: symbols.length },
+          topOpportunities: [],
+          allResults: symbols.map((s) => ({
+            symbol: s.toUpperCase(),
+            success: false,
+            error: errors.noExchange.error,
+          })),
+        },
+        { toolName: "parallel_multi_coin" },
+      );
     }
 
     // Normalize symbols
-    const normalizedSymbols = symbols.map((s) =>
-      normalizeSymbol(s)
-    );
+    const normalizedSymbols = symbols.map((s) => normalizeSymbol(s));
 
     // Create parallel operations
     const operations = normalizedSymbols.map((symbol) => async () => {
@@ -434,14 +467,18 @@ export const parallelDeepAnalysisTool = createTool({
     const ctx = getGordonContext(execContext);
 
     if (!ctx?.exchange) {
-      return validateToolOutput(parallelDeepAnalysisOutputSchema, {
-        symbol: symbol.toUpperCase(),
-        timestamp: new Date().toISOString(),
-        duration: 0,
-        results: {
-          technical: { success: false, error: errors.noExchange.error },
+      return validateToolOutput(
+        parallelDeepAnalysisOutputSchema,
+        {
+          symbol: symbol.toUpperCase(),
+          timestamp: new Date().toISOString(),
+          duration: 0,
+          results: {
+            technical: { success: false, error: errors.noExchange.error },
+          },
         },
-      }, { toolName: "parallel_deep_analysis" });
+        { toolName: "parallel_deep_analysis" },
+      );
     }
 
     // Normalize symbol
@@ -481,14 +518,15 @@ export const parallelDeepAnalysisTool = createTool({
     };
 
     // Build consensus from the full analysis
-    const consensus = fullAnalysisResult.combinedScore !== undefined
-      ? {
-          bias: fullAnalysisResult.consensus,
-          confidence: fullAnalysisResult.confidence,
-          agreementScore: fullAnalysisResult.confidence, // Use confidence as agreement proxy
-          summary: fullAnalysisResult.summary,
-        }
-      : undefined;
+    const consensus =
+      fullAnalysisResult.combinedScore !== undefined
+        ? {
+            bias: fullAnalysisResult.consensus,
+            confidence: fullAnalysisResult.confidence,
+            agreementScore: fullAnalysisResult.confidence, // Use confidence as agreement proxy
+            summary: fullAnalysisResult.summary,
+          }
+        : undefined;
 
     const output = {
       symbol: normalizedSymbol,
@@ -531,7 +569,10 @@ export const parallelTimeframeTool = createTool({
     "Use for 'analyze BTC across all timeframes' or multi-timeframe confirmation.",
   inputSchema: z.object({
     symbol: z.string().describe("Symbol to analyze (e.g., 'BTCUSDT', 'BTC')"),
-    timeframes: z.array(z.string()).default(["15m", "1h", "4h", "1d"]).describe("Timeframes to analyze"),
+    timeframes: z
+      .array(z.string())
+      .default(["15m", "1h", "4h", "1d"])
+      .describe("Timeframes to analyze"),
   }),
   outputSchema: parallelTimeframeOutputSchema,
   execute: async ({ symbol, timeframes }, execContext: MastraExecutionContext) => {
@@ -539,22 +580,26 @@ export const parallelTimeframeTool = createTool({
     const ctx = getGordonContext(execContext);
 
     if (!ctx?.exchange) {
-      return validateToolOutput(parallelTimeframeOutputSchema, {
-        symbol: symbol.toUpperCase(),
-        timestamp: new Date().toISOString(),
-        duration: 0,
-        timeframes: timeframes.map((tf) => ({
-          timeframe: tf,
-          success: false,
-          error: errors.noExchange.error,
-        })),
-        multiTimeframeConsensus: {
-          dominantTrend: "unknown",
-          dominantBias: "neutral",
-          agreementPercent: 0,
-          recommendation: "Connect an exchange first",
+      return validateToolOutput(
+        parallelTimeframeOutputSchema,
+        {
+          symbol: symbol.toUpperCase(),
+          timestamp: new Date().toISOString(),
+          duration: 0,
+          timeframes: timeframes.map((tf) => ({
+            timeframe: tf,
+            success: false,
+            error: errors.noExchange.error,
+          })),
+          multiTimeframeConsensus: {
+            dominantTrend: "unknown",
+            dominantBias: "neutral",
+            agreementPercent: 0,
+            recommendation: "Connect an exchange first",
+          },
         },
-      }, { toolName: "parallel_timeframe" });
+        { toolName: "parallel_timeframe" },
+      );
     }
 
     // Normalize symbol
@@ -625,9 +670,10 @@ export const parallelTimeframeTool = createTool({
     }
 
     // Calculate agreement percentage
-    const agreementPercent = successfulResults.length > 0
-      ? (Math.max(maxTrendCount, maxBiasCount) / successfulResults.length) * 100
-      : 0;
+    const agreementPercent =
+      successfulResults.length > 0
+        ? (Math.max(maxTrendCount, maxBiasCount) / successfulResults.length) * 100
+        : 0;
 
     // Generate recommendation
     let recommendation: string;

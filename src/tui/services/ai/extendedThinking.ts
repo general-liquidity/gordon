@@ -30,7 +30,7 @@ const DEFAULT_CONFIG: ThinkingConfig = {
   showThinkingBlocks: true,
 };
 
-let config: ThinkingConfig = loadConfig();
+const config: ThinkingConfig = loadConfig();
 
 // ============================================================================
 // Persistence helpers
@@ -95,7 +95,9 @@ export function getThinkingBudget(): number {
  * Returns the thinking parameters to include in an LLM request
  * when extended thinking is enabled. Returns null when disabled.
  */
-export function getThinkingRequestParams(): { thinking: { type: "enabled"; budget_tokens: number } } | null {
+export function getThinkingRequestParams(): {
+  thinking: { type: "enabled"; budget_tokens: number };
+} | null {
   if (!config.enabled) return null;
   return { thinking: { type: "enabled", budget_tokens: config.budgetTokens } };
 }

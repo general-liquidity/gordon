@@ -57,9 +57,7 @@ function median(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1]! + sorted[mid]!) / 2
-    : sorted[mid]!;
+  return sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!;
 }
 
 export function calculateHighestVolumeEver(
@@ -93,9 +91,7 @@ export function calculateHighestVolumeEver(
     const v = candles[i]!.volume ?? 0;
     if (!Number.isFinite(v) || v <= 0) continue;
     // Define the lookback window: start at max(0, i - lookbackBars).
-    const windowStart = Number.isFinite(lookbackBars)
-      ? Math.max(0, i - lookbackBars)
-      : 0;
+    const windowStart = Number.isFinite(lookbackBars) ? Math.max(0, i - lookbackBars) : 0;
     let isRecord = true;
     for (let j = windowStart; j < i; j++) {
       const w = candles[j]!.volume ?? 0;
@@ -110,13 +106,10 @@ export function calculateHighestVolumeEver(
     }
   }
 
-  const latestHveBarIndex = hveBarIndices.length > 0
-    ? hveBarIndices[hveBarIndices.length - 1]!
-    : null;
+  const latestHveBarIndex =
+    hveBarIndices.length > 0 ? hveBarIndices[hveBarIndices.length - 1]! : null;
   const lastIdx = n - 1;
-  const barsSinceLatestHve = latestHveBarIndex !== null
-    ? lastIdx - latestHveBarIndex
-    : null;
+  const barsSinceLatestHve = latestHveBarIndex !== null ? lastIdx - latestHveBarIndex : null;
 
   let volumeMultipleOfMedian: number | null = null;
   if (latestHveBarIndex !== null) {

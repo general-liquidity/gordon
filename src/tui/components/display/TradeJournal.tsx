@@ -8,7 +8,7 @@
  * Phase 18 of the TUI rebuild plan.
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Box, Text } from "../../ink-custom";
 import { useMemory } from "../../state/MemoryProvider.js";
 
@@ -40,7 +40,8 @@ export interface TradeData {
 // ============================================================================
 
 function fmtPrice(n: number): string {
-  if (n >= 1) return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (n >= 1)
+    return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (n >= 0.01) return n.toFixed(4);
   return n.toFixed(6);
 }
@@ -52,16 +53,17 @@ function fmtPnl(n: number): string {
 
 function pnlPct(entry: number, exit: number, side: "long" | "short"): string {
   if (entry === 0) return "N/A";
-  const raw = side === "long"
-    ? ((exit - entry) / entry) * 100
-    : ((entry - exit) / entry) * 100;
+  const raw = side === "long" ? ((exit - entry) / entry) * 100 : ((entry - exit) / entry) * 100;
   const sign = raw >= 0 ? "+" : "";
   return `${sign}${raw.toFixed(2)}%`;
 }
 
 function formatTimestamp(ts?: string): string {
   const d = ts ? new Date(ts) : new Date();
-  return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+  return d
+    .toISOString()
+    .replace("T", " ")
+    .replace(/\.\d+Z$/, " UTC");
 }
 
 /**
@@ -166,15 +168,18 @@ export function TradeJournal({ trade, onSaved }: Props) {
   return (
     <Box paddingLeft={2} flexDirection="column">
       <Box>
-        <Text color="green" bold>Journal saved </Text>
+        <Text color="green" bold>
+          Journal saved{" "}
+        </Text>
         <Text>
           {trade.side.toUpperCase()} {trade.symbol}
         </Text>
         <Text color={trade.pnl >= 0 ? "green" : "red"}>
-          {" "}{outcome} {fmtPnl(trade.pnl)} ({pct})
+          {" "}
+          {outcome} {fmtPnl(trade.pnl)} ({pct})
         </Text>
       </Box>
-      <Text dimColor>  Stored as feedback memory in ~/.gordon/memory/</Text>
+      <Text dimColor> Stored as feedback memory in ~/.gordon/memory/</Text>
     </Box>
   );
 }

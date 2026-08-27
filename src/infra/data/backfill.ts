@@ -97,7 +97,7 @@ function sleep(ms: number): Promise<void> {
  *  CcxtAdapter doesn't surface it on the Exchange interface, so probe it
  *  defensively and fall back to the polite minimum. */
 function pageDelayMs(exchange: Exchange): number {
-  const probed = (exchange as { rateLimit?: number; client?: { rateLimit?: number } });
+  const probed = exchange as { rateLimit?: number; client?: { rateLimit?: number } };
   const rl = probed.rateLimit ?? probed.client?.rateLimit;
   return Math.max(Number.isFinite(rl) ? Number(rl) : 0, MIN_PAGE_DELAY_MS);
 }
@@ -182,9 +182,10 @@ export async function backfillOHLCV(opts: BackfillOptions): Promise<BackfillResu
   }
 
   const gaps = countGaps(venue, symbol, timeframe, from, to, tfMs);
-  const datasetId = fetched > 0
-    ? registerDataset({ venue, symbol, timeframe, from, to, candles: fetched, tfMs })
-    : null;
+  const datasetId =
+    fetched > 0
+      ? registerDataset({ venue, symbol, timeframe, from, to, candles: fetched, tfMs })
+      : null;
 
   logger.info("Backfill complete", {
     venue,

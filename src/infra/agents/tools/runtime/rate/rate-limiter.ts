@@ -28,7 +28,7 @@ import type { MastraExecutionContext } from "../../types.ts";
  */
 export type ToolExecutor<TInput, TOutput> = (
   input: TInput,
-  context?: MastraExecutionContext
+  context?: MastraExecutionContext,
 ) => Promise<TOutput>;
 
 /**
@@ -139,16 +139,17 @@ export function checkEndpointRateLimit(
   configOverride?: EndpointRateLimitConfig,
 ): { allowed: boolean; waitTimeMs?: number; reason?: string } {
   const key = `${exchange}:${endpoint}`;
-  const config = configOverride
-    ?? ENDPOINT_RATE_LIMITS[key]
-    ?? ENDPOINT_RATE_LIMITS[`${exchange}:*`];
+  const config =
+    configOverride ?? ENDPOINT_RATE_LIMITS[key] ?? ENDPOINT_RATE_LIMITS[`${exchange}:*`];
   if (!config) return { allowed: true };
 
   const now = Date.now();
-  const state = endpointRateLimitState.get(key) ?? {
-    lastCallTime: 0,
-    callsInWindow: [],
-  } as RateLimitState;
+  const state =
+    endpointRateLimitState.get(key) ??
+    ({
+      lastCallTime: 0,
+      callsInWindow: [],
+    } as RateLimitState);
 
   if (state.lastCallTime > 0 && now - state.lastCallTime < config.cooldownMs) {
     const waitTimeMs = config.cooldownMs - (now - state.lastCallTime);
@@ -160,7 +161,11 @@ export function checkEndpointRateLimit(
   if (recent.length >= config.maxCallsPerWindow) {
     const oldest = recent[0] ?? now;
     const waitTimeMs = config.windowMs - (now - oldest);
-    return { allowed: false, waitTimeMs, reason: config.rateLimitMessage ?? "endpoint window full" };
+    return {
+      allowed: false,
+      waitTimeMs,
+      reason: config.rateLimitMessage ?? "endpoint window full",
+    };
   }
 
   return { allowed: true };
@@ -173,10 +178,12 @@ export function checkEndpointRateLimit(
 export function recordEndpointCall(exchange: string, endpoint: string): void {
   const key = `${exchange}:${endpoint}`;
   const now = Date.now();
-  const state = endpointRateLimitState.get(key) ?? {
-    lastCallTime: 0,
-    callsInWindow: [],
-  } as RateLimitState;
+  const state =
+    endpointRateLimitState.get(key) ??
+    ({
+      lastCallTime: 0,
+      callsInWindow: [],
+    } as RateLimitState);
   state.lastCallTime = now;
   state.callsInWindow.push(now);
   const wildcardKey = `${exchange}:*`;
@@ -394,10 +401,7 @@ export const TOOL_RATE_LIMITS: Record<string, ToolRateLimitConfig> = {
  * @param config - Rate limit configuration
  * @returns Rate limit result
  */
-export function checkRateLimit(
-  toolName: string,
-  config: ToolRateLimitConfig
-): RateLimitResult {
+export function checkRateLimit(toolName: string, config: ToolRateLimitConfig): RateLimitResult {
   const now = Date.now();
   const state = rateLimitState.get(toolName) ?? {
     lastCallTime: 0,
@@ -506,7 +510,7 @@ export function formatWaitTime(ms: number): string {
 export function withRateLimit<TInput, TOutput>(
   toolName: string,
   executor: ToolExecutor<TInput, TOutput>,
-  config?: Partial<ToolRateLimitConfig>
+  config?: Partial<ToolRateLimitConfig>,
 ): ToolExecutor<TInput, TOutput | { error: string; rateLimited: true; waitTimeMs: number }> {
   // Merge configurations: provided config > tool-specific > defaults
   const toolConfig = TOOL_RATE_LIMITS[toolName];
@@ -522,7 +526,7 @@ export function withRateLimit<TInput, TOutput>(
 
   return async function rateLimitedExecutor(
     input: TInput,
-    context?: MastraExecutionContext
+    context?: MastraExecutionContext,
   ): Promise<TOutput | { error: string; rateLimited: true; waitTimeMs: number }> {
     // Check rate limit
     const result = checkRateLimit(toolName, finalConfig);
@@ -565,7 +569,7 @@ export function getToolRateLimitConfig(toolId: string): ToolRateLimitConfig {
  * @returns Whether the result indicates rate limiting
  */
 export function isRateLimitedResult(
-  result: unknown
+  result: unknown,
 ): result is { error: string; rateLimited: true; waitTimeMs: number } {
   return (
     result !== null &&

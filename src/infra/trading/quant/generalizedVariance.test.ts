@@ -71,7 +71,17 @@ describe("computeGeneralizedVariance", () => {
   });
 
   it("is insufficient with <2 series or too little data", () => {
-    expect(computeGeneralizedVariance({ returns: [[1, 2, 3]], window: 60 }).regime).toBe("insufficient");
-    expect(computeGeneralizedVariance({ returns: [[1, 2], [3, 4]], window: 60 }).regime).toBe("insufficient");
+    expect(computeGeneralizedVariance({ returns: [[1, 2, 3]], window: 60 }).regime).toBe(
+      "insufficient",
+    );
+    expect(
+      computeGeneralizedVariance({
+        returns: [
+          [1, 2],
+          [3, 4],
+        ],
+        window: 60,
+      }).regime,
+    ).toBe("insufficient");
   });
 });

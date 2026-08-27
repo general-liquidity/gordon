@@ -1,5 +1,4 @@
-import React from "react";
-import { Box, Text } from "../../ink-custom";
+import { Box, Text, useInput } from "../../ink-custom";
 
 // Away summary — shows what happened while user was idle/away
 // "While you were away: BTC +2.3%, ETH -1.1%, 1 stop hit"
@@ -16,19 +15,28 @@ interface Props {
 }
 
 export function AwaySummary({ items, awayDuration, onDismiss }: Props) {
+  useInput(() => onDismiss(), { isActive: items.length > 0 });
   if (items.length === 0) return null;
 
   return (
-    <Box flexDirection="column" paddingX={2} marginBottom={1} borderStyle="single" borderColor="gray">
+    <Box
+      flexDirection="column"
+      paddingX={2}
+      marginBottom={1}
+      borderStyle="single"
+      borderColor="gray"
+    >
       <Box>
         <Text dimColor>While you were away ({awayDuration}):</Text>
       </Box>
       {items.map((item, i) => (
         <Box key={i} paddingLeft={2}>
-          <Text color={item.color as any ?? undefined}>{"\u2022"} {item.text}</Text>
+          <Text color={(item.color as any) ?? undefined}>
+            {"\u2022"} {item.text}
+          </Text>
         </Box>
       ))}
-      <Text dimColor>  Press any key to dismiss</Text>
+      <Text dimColor> Press any key to dismiss</Text>
     </Box>
   );
 }

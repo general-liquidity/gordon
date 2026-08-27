@@ -102,7 +102,10 @@ function approximatePValue(testStat: number, table: Record<0.01 | 0.05 | 0.1, nu
     const frac = (testStat - table[0.05]) / span;
     return 0.05 + frac * (0.1 - 0.05);
   }
-  return 0.5 + 0.49 * Math.min(1, Math.max(0, (testStat - table[0.1]) / Math.max(0.5, Math.abs(table[0.1]))));
+  return (
+    0.5 +
+    0.49 * Math.min(1, Math.max(0, (testStat - table[0.1]) / Math.max(0.5, Math.abs(table[0.1]))))
+  );
 }
 
 interface OlsResult {
@@ -154,7 +157,10 @@ function olsWithSe(X: number[][], y: number[]): OlsResult | null {
 
 function invertSymmetric(a: number[][]): number[][] | null {
   const n = a.length;
-  const aug: number[][] = a.map((row, i) => [...row, ...Array.from({ length: n }, (_, j) => (i === j ? 1 : 0))]);
+  const aug: number[][] = a.map((row, i) => [
+    ...row,
+    ...Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)),
+  ]);
   for (let i = 0; i < n; i++) {
     let pivot = i;
     let best = Math.abs(aug[i]![i]!);
@@ -243,7 +249,9 @@ export function runAdfTest(input: AdfInput): AdfResult {
   const gammaSe = fit.se[1]!;
   const testStat = gammaSe > 0 ? gammaHat / gammaSe : Number.NaN;
   const criticalValue = criticalTable[alpha];
-  const approxP = Number.isFinite(testStat) ? approximatePValue(testStat, criticalTable) : Number.NaN;
+  const approxP = Number.isFinite(testStat)
+    ? approximatePValue(testStat, criticalTable)
+    : Number.NaN;
 
   let verdict: AdfVerdict;
   let reasoning: string;
@@ -274,9 +282,13 @@ export function adfToPayload(result: AdfResult): Record<string, unknown> {
   return {
     kind: "stationarity_test.evaluated",
     verdict: result.verdict,
-    testStatistic: Number.isFinite(result.testStatistic) ? Number(result.testStatistic.toFixed(4)) : null,
+    testStatistic: Number.isFinite(result.testStatistic)
+      ? Number(result.testStatistic.toFixed(4))
+      : null,
     criticalValue: Number(result.criticalValue.toFixed(2)),
-    approximatePValue: Number.isFinite(result.approximatePValue) ? Number(result.approximatePValue.toFixed(4)) : null,
+    approximatePValue: Number.isFinite(result.approximatePValue)
+      ? Number(result.approximatePValue.toFixed(4))
+      : null,
     sampleSize: result.sampleSize,
   };
 }

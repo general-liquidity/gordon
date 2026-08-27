@@ -35,7 +35,11 @@ export const CHF_UNPEG_2015: HistoricalEvent = {
   windowEnd: "2015-01-16T22:00:00Z",
   volExpansionStart: "2015-01-15T09:30:00Z",
   primaryAssets: [
-    { symbol: "EURCHF", market: "fx", reactionNote: "Down ~30% in minutes, gapped through 1.20 floor" },
+    {
+      symbol: "EURCHF",
+      market: "fx",
+      reactionNote: "Down ~30% in minutes, gapped through 1.20 floor",
+    },
     { symbol: "USDCHF", market: "fx", reactionNote: "Down ~28% on the move" },
     { symbol: "GBPCHF", market: "fx", reactionNote: "Down ~32% — illiquid crosses worst hit" },
   ],
@@ -103,17 +107,26 @@ export const US_ELECTION_OVERNIGHT_2016: HistoricalEvent = {
   windowEnd: "2016-11-09T22:00:00Z",
   volExpansionStart: "2016-11-09T03:00:00Z",
   primaryAssets: [
-    { symbol: "MXNUSD", market: "fx", reactionNote: "Peso -13% before partial reversal — worst-hit major" },
+    {
+      symbol: "MXNUSD",
+      market: "fx",
+      reactionNote: "Peso -13% before partial reversal — worst-hit major",
+    },
     { symbol: "USDJPY", market: "fx", reactionNote: "Down ~4% then reversed to +2%" },
     { symbol: "EURUSD", market: "fx", reactionNote: "Up ~2.5% then mostly reversed" },
   ],
   contagionAssets: [
-    { symbol: "SPX", market: "equity_index", reactionNote: "Futures down ~5%, circuit-breakered, then closed +1%" },
+    {
+      symbol: "SPX",
+      market: "equity_index",
+      reactionNote: "Futures down ~5%, circuit-breakered, then closed +1%",
+    },
     { symbol: "XAUUSD", market: "metals", reactionNote: "Spiked +5%, ended -1%" },
     { symbol: "BTCUSD", market: "crypto", reactionNote: "+5% safe-haven bid, sustained" },
   ],
   characteristics: {
-    primaryMove: "Major FX +/- 3-13% in 60min; index futures circuit-breakered; overnight management gap",
+    primaryMove:
+      "Major FX +/- 3-13% in 60min; index futures circuit-breakered; overnight management gap",
     gapRisk: true,
     spreadWidening: true,
     sessionsHalted: true,
@@ -138,14 +151,30 @@ export const COVID_VOL_SPIKE_2020: HistoricalEvent = {
   windowEnd: "2020-03-24T20:00:00Z",
   volExpansionStart: "2020-03-11T13:00:00Z",
   primaryAssets: [
-    { symbol: "SPX", market: "equity_index", reactionNote: "Down ~12% on 16 March; multiple limit-down events" },
-    { symbol: "VIX", market: "equity_index", reactionNote: "82.69 close on 16 March — second-highest ever" },
-    { symbol: "DXY", market: "fx", reactionNote: "Spiked from 95 to 103 in 10 days — dollar squeeze" },
+    {
+      symbol: "SPX",
+      market: "equity_index",
+      reactionNote: "Down ~12% on 16 March; multiple limit-down events",
+    },
+    {
+      symbol: "VIX",
+      market: "equity_index",
+      reactionNote: "82.69 close on 16 March — second-highest ever",
+    },
+    {
+      symbol: "DXY",
+      market: "fx",
+      reactionNote: "Spiked from 95 to 103 in 10 days — dollar squeeze",
+    },
   ],
   contagionAssets: [
     { symbol: "AUDUSD", market: "fx", reactionNote: "Down ~10% from 0.66 to 0.55" },
     { symbol: "EURUSD", market: "fx", reactionNote: "Down ~5% then reversed sharply" },
-    { symbol: "XAUUSD", market: "metals", reactionNote: "Down ~12% mid-event despite safe-haven status (liquidation flow)" },
+    {
+      symbol: "XAUUSD",
+      market: "metals",
+      reactionNote: "Down ~12% mid-event despite safe-haven status (liquidation flow)",
+    },
     { symbol: "WTI", market: "commodity", reactionNote: "Down ~50% across the event" },
     { symbol: "BTCUSD", market: "crypto", reactionNote: "Down ~50% on March 12" },
   ],

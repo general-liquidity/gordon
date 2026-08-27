@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 
 // ============================================================================
@@ -54,7 +53,7 @@ function formatResult(result?: string): string {
   if (!result) return "";
   const trimmed = result.trim();
   // Keep result compact — max 40 chars inline
-  if (trimmed.length > 40) return trimmed.slice(0, 40) + "...";
+  if (trimmed.length > 40) return `${trimmed.slice(0, 40)}...`;
   return trimmed;
 }
 
@@ -98,13 +97,11 @@ export function ToolActivityList({ activities, maxVisible }: Props) {
             )}
             {activity.status === "error" && activity.result && (
               <>
-                <Text dimColor>  error: </Text>
+                <Text dimColor> error: </Text>
                 <Text color="red">{formatResult(activity.result)}</Text>
               </>
             )}
-            {durationStr && (
-              <Text dimColor>  ({durationStr})</Text>
-            )}
+            {durationStr && <Text dimColor> ({durationStr})</Text>}
           </Box>
         );
       })}

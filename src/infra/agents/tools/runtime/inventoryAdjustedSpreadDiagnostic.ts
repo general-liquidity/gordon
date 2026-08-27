@@ -25,19 +25,14 @@ export const inventoryAdjustedSpreadDiagnosticTool = createTool({
     "sided execution depth) and Kelly/wipeout-cap sizers (no quote setpoint).",
   inputSchema: z.object({
     midPrice: z.number().positive().describe("Current mid price."),
-    inventory: z
-      .number()
-      .describe("Signed inventory position. Positive = long, negative = short."),
+    inventory: z.number().describe("Signed inventory position. Positive = long, negative = short."),
     riskAversion: z.number().positive().optional().describe("γ. Default 0.1."),
     volatility: z.number().min(0).describe("Per-period volatility σ."),
     timeRemaining: z
       .number()
       .positive()
       .describe("Horizon remaining (T − t) in same time units as σ."),
-    intensityDecay: z
-      .number()
-      .positive()
-      .describe("Order-arrival intensity decay k."),
+    intensityDecay: z.number().positive().describe("Order-arrival intensity decay k."),
     inventoryHardLimit: z
       .number()
       .positive()
@@ -66,9 +61,7 @@ export const inventoryAdjustedSpreadDiagnosticTool = createTool({
       component: "compute_inventory_adjusted_spread",
       toolName: "compute_inventory_adjusted_spread",
       outcome:
-        result.verdict === "long_capped" || result.verdict === "short_capped"
-          ? "failure"
-          : "info",
+        result.verdict === "long_capped" || result.verdict === "short_capped" ? "failure" : "info",
       details: {
         verdict: result.verdict,
         reservationSkew: result.reservationSkew,

@@ -8,7 +8,15 @@
 import type { Exchange } from "../../infra/exchange/index.ts";
 import { calculateIndicators } from "../indicators/scanner-bundle.ts";
 import { detectLevels } from "../indicators/price-levels.ts";
-import type { CoinAnalysis, Level, Candle, Indicators, Trend, Bias, Risk } from "../../types/index.ts";
+import type {
+  CoinAnalysis,
+  Level,
+  Candle,
+  Indicators,
+  Trend,
+  Bias,
+  Risk,
+} from "../../types/index.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 
 const logger = createModuleLogger("analyzer");
@@ -71,7 +79,7 @@ const INVALIDATION_BUFFER_PERCENT = 1; // 1% below support is invalidation
 export async function analyze(
   client: Exchange,
   symbol: string,
-  options?: AnalyzeOptions
+  options?: AnalyzeOptions,
 ): Promise<DetailedAnalysis> {
   const timeframes = options?.timeframes ?? DEFAULT_TIMEFRAMES;
   const candleLimit = options?.candleLimit ?? DEFAULT_CANDLE_LIMIT;
@@ -162,7 +170,7 @@ export async function analyze(
       trend,
       bias,
       setupDetected,
-      setupConfidence: setupConfidence.toFixed(2)
+      setupConfidence: setupConfidence.toFixed(2),
     });
 
     return result;
@@ -218,7 +226,7 @@ function createEmptyAnalysis(symbol: string): DetailedAnalysis {
  */
 function separateAndSortLevels(
   levels: Level[],
-  currentPrice: number
+  currentPrice: number,
 ): { supports: Level[]; resistances: Level[] } {
   const supports = levels
     .filter((level) => level.type === "support")
@@ -247,10 +255,9 @@ function analyzeVolumeTrend(candles: Candle[]): "rising" | "falling" | "stable" 
   // Calculate average volume for older periods (before recent)
   const olderCandles = candles.slice(
     -(VOLUME_RECENT_PERIODS + VOLUME_OLDER_PERIODS),
-    -VOLUME_RECENT_PERIODS
+    -VOLUME_RECENT_PERIODS,
   );
-  const olderAvgVolume =
-    olderCandles.reduce((sum, c) => sum + c.volume, 0) / VOLUME_OLDER_PERIODS;
+  const olderAvgVolume = olderCandles.reduce((sum, c) => sum + c.volume, 0) / VOLUME_OLDER_PERIODS;
 
   if (olderAvgVolume === 0) {
     return "stable";
@@ -272,7 +279,7 @@ function analyzeVolumeTrend(candles: Candle[]): "rising" | "falling" | "stable" 
  */
 function determineMacdState(
   candles: Candle[],
-  indicators: Indicators
+  indicators: Indicators,
 ): "bullish_cross" | "bearish_cross" | "bullish" | "bearish" | "neutral" {
   if (!indicators.macd) {
     return "neutral";
@@ -284,7 +291,7 @@ function determineMacdState(
   // A crossover occurs when histogram changes sign
   if (candles.length >= 2) {
     // Calculate previous MACD values (simplified - check histogram sign change)
-    const prevHistogram = histogram; // In real implementation, calculate from previous candles
+    const _prevHistogram = histogram; // In real implementation, calculate from previous candles
 
     // Current state based on MACD line vs signal line
     if (macd > signal) {
@@ -396,11 +403,7 @@ function determineTrend(candles: Candle[], indicators: Indicators): Trend {
   const changePercent = ((recentAvg - olderAvg) / olderAvg) * 100;
 
   // Also consider MACD direction
-  const macdBias = indicators.macd
-    ? indicators.macd.macd > indicators.macd.signal
-      ? 1
-      : -1
-    : 0;
+  const macdBias = indicators.macd ? (indicators.macd.macd > indicators.macd.signal ? 1 : -1) : 0;
 
   // Combined score
   const trendScore = changePercent + macdBias * 2;
@@ -417,11 +420,7 @@ function determineTrend(candles: Candle[], indicators: Indicators): Trend {
 /**
  * Determine overall bias from multiple factors
  */
-function determineBias(
-  macdState: string,
-  rsiState: string,
-  trend: Trend
-): Bias {
+function determineBias(macdState: string, rsiState: string, trend: Trend): Bias {
   let score = 0;
 
   // MACD contribution
@@ -461,7 +460,7 @@ function determineRisk(
   rsiState: string,
   volumeTrend: string,
   supports: Level[],
-  currentPrice: number
+  currentPrice: number,
 ): Risk {
   let riskScore = 0;
 
@@ -481,8 +480,7 @@ function determineRisk(
   } else {
     const nearestSupport = supports[0];
     if (nearestSupport) {
-      const distancePercent =
-        ((currentPrice - nearestSupport.price) / currentPrice) * 100;
+      const distancePercent = ((currentPrice - nearestSupport.price) / currentPrice) * 100;
 
       // Far from support is riskier
       if (distancePercent > 10) {
@@ -510,7 +508,7 @@ function determineRisk(
  */
 function calculateSetupDetails(
   supports: Level[],
-  currentPrice: number
+  currentPrice: number,
 ): DetailedAnalysis["setupDetails"] {
   if (supports.length === 0 || currentPrice === 0) {
     return {
@@ -534,8 +532,7 @@ function calculateSetupDetails(
   }
 
   // Calculate distance as percentage
-  const distanceToSupport =
-    ((currentPrice - nearestSupport.price) / currentPrice) * 100;
+  const distanceToSupport = ((currentPrice - nearestSupport.price) / currentPrice) * 100;
 
   // Setup is valid if:
   // 1. Price is above support (not below it)
@@ -548,8 +545,7 @@ function calculateSetupDetails(
     nearestSupport.strength >= 0.3;
 
   // Invalidation price is below the support level
-  const invalidationPrice =
-    nearestSupport.price * (1 - INVALIDATION_BUFFER_PERCENT / 100);
+  const invalidationPrice = nearestSupport.price * (1 - INVALIDATION_BUFFER_PERCENT / 100);
 
   return {
     nearestSupport: nearestSupport ?? null,
@@ -565,7 +561,7 @@ function calculateSetupDetails(
 function calculateSetupConfidence(
   setupDetails: DetailedAnalysis["setupDetails"],
   volumeTrend: string,
-  rsiState: string
+  rsiState: string,
 ): number {
   if (!setupDetails.setupValid || !setupDetails.nearestSupport) {
     return 0;
@@ -579,8 +575,7 @@ function calculateSetupConfidence(
   // Closer to support = higher confidence
   const proximityBonus = Math.max(
     0,
-    (SETUP_MAX_DISTANCE_PERCENT - setupDetails.distanceToSupport) /
-      SETUP_MAX_DISTANCE_PERCENT
+    (SETUP_MAX_DISTANCE_PERCENT - setupDetails.distanceToSupport) / SETUP_MAX_DISTANCE_PERCENT,
   );
   confidence += proximityBonus * 0.15;
 

@@ -6,8 +6,16 @@ import {
   type TouchSnapshot,
 } from "./touchDynamics.ts";
 
-function makeSnapshots(specs: Array<{ t: number; bid: number; ask: number; bs: number; as: number }>): TouchSnapshot[] {
-  return specs.map((s) => ({ t: s.t, bestBid: s.bid, bestAsk: s.ask, bidSize: s.bs, askSize: s.as }));
+function makeSnapshots(
+  specs: Array<{ t: number; bid: number; ask: number; bs: number; as: number }>,
+): TouchSnapshot[] {
+  return specs.map((s) => ({
+    t: s.t,
+    bestBid: s.bid,
+    bestAsk: s.ask,
+    bidSize: s.bs,
+    askSize: s.as,
+  }));
 }
 
 describe("evaluateTouchDynamics — quiet baseline", () => {
@@ -27,7 +35,7 @@ describe("evaluateTouchDynamics — hot regime detection", () => {
     const snaps: TouchSnapshot[] = [];
     for (let i = 0; i < 100; i++) {
       const sizeJitter = 100 + 90 * Math.sin(i * 1.7);
-      const midJitter = (i % 2 === 0 ? 100 : 100.05);
+      const midJitter = i % 2 === 0 ? 100 : 100.05;
       snaps.push({
         t: i * 5,
         bestBid: midJitter - 0.01,
@@ -54,7 +62,13 @@ describe("evaluateTouchDynamics — sub-metrics", () => {
 
   it("mid-jitter increases with reversals", () => {
     const stable = makeSnapshots(
-      Array.from({ length: 20 }, (_, i) => ({ t: i * 10, bid: 100 + i * 0.01, ask: 100.01 + i * 0.01, bs: 50, as: 50 })),
+      Array.from({ length: 20 }, (_, i) => ({
+        t: i * 10,
+        bid: 100 + i * 0.01,
+        ask: 100.01 + i * 0.01,
+        bs: 50,
+        as: 50,
+      })),
     );
     const jittery = makeSnapshots(
       Array.from({ length: 20 }, (_, i) => ({
@@ -95,10 +109,24 @@ describe("evaluateTouchDynamics — boundary cases", () => {
   it("respects custom thresholds", () => {
     const snaps: TouchSnapshot[] = [];
     for (let i = 0; i < 20; i++) {
-      snaps.push({ t: i * 10, bestBid: 100 + (i % 2) * 0.1, bestAsk: 100.05 + (i % 2) * 0.1, bidSize: 50, askSize: 100 + i });
+      snaps.push({
+        t: i * 10,
+        bestBid: 100 + (i % 2) * 0.1,
+        bestAsk: 100.05 + (i % 2) * 0.1,
+        bidSize: 50,
+        askSize: 100 + i,
+      });
     }
-    const tight = evaluateTouchDynamics({ snapshots: snaps, hotThreshold: 0.1, elevatedThreshold: 0.05 });
-    const lax = evaluateTouchDynamics({ snapshots: snaps, hotThreshold: 0.99, elevatedThreshold: 0.9 });
+    const tight = evaluateTouchDynamics({
+      snapshots: snaps,
+      hotThreshold: 0.1,
+      elevatedThreshold: 0.05,
+    });
+    const lax = evaluateTouchDynamics({
+      snapshots: snaps,
+      hotThreshold: 0.99,
+      elevatedThreshold: 0.9,
+    });
     expect(tight.state).not.toBe("quiet");
     expect(lax.state).toBe("quiet");
   });

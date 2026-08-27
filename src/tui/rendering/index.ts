@@ -10,7 +10,11 @@
  * - SyncOutput: BSU/ESU atomic terminal painting
  */
 
-export { installLineDiffRenderer, resetLineDiffCache, getLineDiffStats } from "./LineDiffRenderer.js";
+export {
+  installLineDiffRenderer,
+  resetLineDiffCache,
+  getLineDiffStats,
+} from "./LineDiffRenderer.js";
 export { cachedStringWidth, clearStringWidthCache } from "./StringWidthCache.js";
 export { getCachedStyle, getCachedTransition, clearStyleCaches } from "./StyleCache.js";
 export { beginSync, endSync, writeSynchronized } from "../utils/syncOutput.js";

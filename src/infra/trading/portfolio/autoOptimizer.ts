@@ -22,6 +22,8 @@
  *   - Session memory for persisting improvements
  */
 
+import { shuffled } from "../../../utils/shuffle.ts";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -140,10 +142,10 @@ function generateMutations(
 
     // Mutate 1-3 random parameters
     const numToMutate = 1 + Math.floor(Math.random() * Math.min(3, keys.length));
-    const shuffled = [...keys].sort(() => Math.random() - 0.5);
+    const shuffledKeys = shuffled(keys);
 
     for (let j = 0; j < numToMutate; j++) {
-      const key = shuffled[j]!;
+      const key = shuffledKeys[j]!;
       const original = base[key]!;
 
       // Random perturbation scaled by temperature
@@ -199,19 +201,28 @@ function meetsConstraints(
   constraints?: OptimizationDirective["constraints"],
 ): boolean {
   if (!constraints) return true;
-  if (constraints.maxDrawdownPct && score.metrics.maxDrawdownPct > constraints.maxDrawdownPct) return false;
+  if (constraints.maxDrawdownPct && score.metrics.maxDrawdownPct > constraints.maxDrawdownPct)
+    return false;
   if (constraints.minWinRate && score.metrics.winRate < constraints.minWinRate) return false;
   if (constraints.minTrades && score.metrics.tradeCount < constraints.minTrades) return false;
   return true;
 }
 
-function getObjectiveValue(score: BacktestScore, objective: OptimizationDirective["objective"]): number {
+function getObjectiveValue(
+  score: BacktestScore,
+  objective: OptimizationDirective["objective"],
+): number {
   switch (objective) {
-    case "sharpe": return score.metrics.sharpe;
-    case "sortino": return score.metrics.sortino;
-    case "return": return score.metrics.totalReturn;
-    case "calmar": return score.metrics.calmar;
-    case "winRate": return score.metrics.winRate;
+    case "sharpe":
+      return score.metrics.sharpe;
+    case "sortino":
+      return score.metrics.sortino;
+    case "return":
+      return score.metrics.totalReturn;
+    case "calmar":
+      return score.metrics.calmar;
+    case "winRate":
+      return score.metrics.winRate;
   }
 }
 
@@ -242,9 +253,14 @@ export async function runAutoOptimization(
 
   // Import enhancements
   const {
-    createRatchetHistory, recordRatchetEntry, saveRatchetHistory,
-    diagnoseFailure, generateTargetedMutation,
-    initializeIslands, crossPollinate, getBestIsland,
+    createRatchetHistory,
+    recordRatchetEntry,
+    saveRatchetHistory,
+    diagnoseFailure,
+    generateTargetedMutation,
+    initializeIslands,
+    crossPollinate,
+    getBestIsland,
     DEFAULT_ISLAND_CONFIG,
   } = await import("./optimizerEnhancements.ts");
 
@@ -303,7 +319,11 @@ export async function runAutoOptimization(
     const temperature = adaptiveTemperature(iteration, maxIterations);
     let iterationImproved = false;
 
-    onProgress?.(iteration, bestObjective, `Iteration ${iteration}/${maxIterations} (temp: ${(temperature * 100).toFixed(0)}%, islands: ${numIslands})`);
+    onProgress?.(
+      iteration,
+      bestObjective,
+      `Iteration ${iteration}/${maxIterations} (temp: ${(temperature * 100).toFixed(0)}%, islands: ${numIslands})`,
+    );
 
     // Cross-pollinate islands periodically
     if (iteration % crossPollinationInterval === 0 && numIslands > 1) {
@@ -318,7 +338,9 @@ export async function runAutoOptimization(
 
       if (lastFailureDiagnosis && Math.random() < 0.5) {
         // 50% chance: use targeted mutation based on last failure diagnosis
-        mutations.push(generateTargetedMutation(island.parameters, lastFailureDiagnosis, temperature));
+        mutations.push(
+          generateTargetedMutation(island.parameters, lastFailureDiagnosis, temperature),
+        );
       }
 
       // Fill remaining with standard mutations
@@ -353,15 +375,28 @@ export async function runAutoOptimization(
               noImprovementStreak = 0;
               lastFailureDiagnosis = null; // Reset — we improved
 
-              onProgress?.(iteration, bestObjective, `Improvement! Island ${island.id}: ${directive.objective} ${bestObjective.toFixed(3)}`);
+              onProgress?.(
+                iteration,
+                bestObjective,
+                `Improvement! Island ${island.id}: ${directive.objective} ${bestObjective.toFixed(3)}`,
+              );
             }
           } else {
             // Mutation made things worse — diagnose WHY
-            const mutatedKeys = Object.keys(mutation).filter((k) => mutation[k] !== island.parameters[k]);
+            const mutatedKeys = Object.keys(mutation).filter(
+              (k) => mutation[k] !== island.parameters[k],
+            );
             lastFailureDiagnosis = diagnoseFailure(island.bestScore!, score, mutatedKeys);
 
             // Record in ratchet as "revert"
-            recordRatchetEntry(ratchetHistory, iteration, mutation, score, "revert", island.parameters);
+            recordRatchetEntry(
+              ratchetHistory,
+              iteration,
+              mutation,
+              score,
+              "revert",
+              island.parameters,
+            );
           }
         } catch {
           totalBacktests++;
@@ -378,7 +413,7 @@ export async function runAutoOptimization(
     history.push({
       iteration,
       bestObjective,
-      mutationsTested: islands.reduce((s, isl) => s + Math.ceil(mutationsPerIter / numIslands), 0),
+      mutationsTested: islands.reduce((s, _isl) => s + Math.ceil(mutationsPerIter / numIslands), 0),
       improved: iterationImproved,
     });
   }
@@ -396,25 +431,31 @@ export async function runAutoOptimization(
   }
 
   // Save ratchet history to disk
-  try { saveRatchetHistory(ratchetHistory); } catch { /* non-critical */ }
+  try {
+    saveRatchetHistory(ratchetHistory);
+  } catch {
+    /* non-critical */
+  }
 
   const durationMs = Date.now() - startTime;
   const improved = bestObjective > originalObjective;
 
   // Parameter changes
-  const parameterChanges = Object.keys(initialParams).map((param) => {
-    const from = initialParams[param]!;
-    const to = bestParams[param]!;
-    return {
-      param,
-      from,
-      to,
-      changePct: from !== 0 ? ((to - from) / from) * 100 : 0,
-    };
-  }).filter((c) => Math.abs(c.changePct) > 0.1);
+  const parameterChanges = Object.keys(initialParams)
+    .map((param) => {
+      const from = initialParams[param]!;
+      const to = bestParams[param]!;
+      return {
+        param,
+        from,
+        to,
+        changePct: from !== 0 ? ((to - from) / from) * 100 : 0,
+      };
+    })
+    .filter((c) => Math.abs(c.changePct) > 0.1);
 
   // Credibility check on the best result
-  const totalStrategiesTested = (directive.priorStrategiesTested ?? 0) + totalBacktests;
+  const _totalStrategiesTested = (directive.priorStrategiesTested ?? 0) + totalBacktests;
   const credibilityCheck = {
     psr: bestScore.psr,
     dsr: bestScore.credible ? 0.95 : 0.5, // Simplified — full DSR would need returns
@@ -425,16 +466,24 @@ export async function runAutoOptimization(
   // Summary
   const summaryParts: string[] = [];
   summaryParts.push(`Auto-Optimization: ${directive.description}`);
-  summaryParts.push(`${improved ? "IMPROVED" : "NO IMPROVEMENT"} after ${history.length} iterations, ${totalBacktests} backtests, ${(durationMs / 60000).toFixed(1)}min`);
-  summaryParts.push(`${directive.objective}: ${originalObjective.toFixed(3)} → ${bestObjective.toFixed(3)} (${improved ? "+" : ""}${((bestObjective - originalObjective) / Math.abs(originalObjective || 1) * 100).toFixed(1)}%)`);
+  summaryParts.push(
+    `${improved ? "IMPROVED" : "NO IMPROVEMENT"} after ${history.length} iterations, ${totalBacktests} backtests, ${(durationMs / 60000).toFixed(1)}min`,
+  );
+  summaryParts.push(
+    `${directive.objective}: ${originalObjective.toFixed(3)} → ${bestObjective.toFixed(3)} (${improved ? "+" : ""}${(((bestObjective - originalObjective) / Math.abs(originalObjective || 1)) * 100).toFixed(1)}%)`,
+  );
   summaryParts.push(`Stop reason: ${stopReason}`);
   if (parameterChanges.length > 0) {
     summaryParts.push("Parameter changes:");
     for (const c of parameterChanges) {
-      summaryParts.push(`  ${c.param}: ${c.from.toFixed(2)} → ${c.to.toFixed(2)} (${c.changePct > 0 ? "+" : ""}${c.changePct.toFixed(1)}%)`);
+      summaryParts.push(
+        `  ${c.param}: ${c.from.toFixed(2)} → ${c.to.toFixed(2)} (${c.changePct > 0 ? "+" : ""}${c.changePct.toFixed(1)}%)`,
+      );
     }
   }
-  summaryParts.push(`Credible: ${credibilityCheck.credible ? "YES" : "NO"} (PSR: ${(credibilityCheck.psr * 100).toFixed(0)}%)`);
+  summaryParts.push(
+    `Credible: ${credibilityCheck.credible ? "YES" : "NO"} (PSR: ${(credibilityCheck.psr * 100).toFixed(0)}%)`,
+  );
 
   return {
     improved,

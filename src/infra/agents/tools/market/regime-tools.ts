@@ -43,13 +43,8 @@ export const detectMarketRegimeTool = createTool({
     "Classifies conditions as trending_up, trending_down, ranging, volatile, quiet, or breakout. " +
     "Use when user asks 'what is the market doing?', 'is BTC trending?', 'market conditions for ETH', 'regime'.",
   inputSchema: z.object({
-    symbol: z
-      .string()
-      .describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
-    timeframe: z
-      .string()
-      .default("1h")
-      .describe("Candle timeframe (e.g., '1h', '4h', '1d')"),
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
+    timeframe: z.string().default("1h").describe("Candle timeframe (e.g., '1h', '4h', '1d')"),
     candle_limit: z
       .number()
       .min(30)
@@ -67,10 +62,7 @@ export const detectMarketRegimeTool = createTool({
     matching_playbooks: z.array(z.string()).optional(),
     error: z.string().optional(),
   }),
-  execute: async (
-    { symbol, timeframe, candle_limit },
-    execContext: MastraExecutionContext,
-  ) => {
+  execute: async ({ symbol, timeframe, candle_limit }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange && !ctx?.broker) {
       return errors.noExchange;
@@ -79,19 +71,16 @@ export const detectMarketRegimeTool = createTool({
     try {
       const instrument = await resolveInstrument(ctx, symbol);
       const normalizedSymbol = instrument.normalizedSymbol;
-      const candles = instrument.route === "broker" && ctx.broker
-        ? await ctx.broker.getHistoricalBars({
-          symbol: normalizedSymbol,
-          timeframe,
-          startTime: Date.now() - (candle_limit * timeframeToMs(timeframe)),
-          endTime: Date.now(),
-          limit: candle_limit,
-        })
-        : await ctx.exchange!.getCandles(
-          normalizedSymbol,
-          timeframe,
-          candle_limit,
-        );
+      const candles =
+        instrument.route === "broker" && ctx.broker
+          ? await ctx.broker.getHistoricalBars({
+              symbol: normalizedSymbol,
+              timeframe,
+              startTime: Date.now() - candle_limit * timeframeToMs(timeframe),
+              endTime: Date.now(),
+              limit: candle_limit,
+            })
+          : await ctx.exchange!.getCandles(normalizedSymbol, timeframe, candle_limit);
 
       if (!candles || candles.length < 30) {
         return {
@@ -134,12 +123,7 @@ export const getRegimeHistoryTool = createTool({
     "Use when user asks 'regime history', 'how has the market changed?', 'regime transitions'.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
-    limit: z
-      .number()
-      .min(1)
-      .max(50)
-      .default(10)
-      .describe("Max history entries to return"),
+    limit: z.number().min(1).max(50).default(10).describe("Max history entries to return"),
   }),
   outputSchema: z.object({
     symbol: z.string().optional(),
@@ -178,21 +162,16 @@ export const matchPlaybooksToRegimeTool = createTool({
     "Use when user asks 'which playbooks for this market?', 'best strategy right now?', " +
     "'playbooks for trending market'.",
   inputSchema: z.object({
-    regime: MarketRegimeSchema
-      .optional()
-      .describe(
-        "Market regime to match. If omitted, will auto-detect from symbol.",
-      ),
+    regime: MarketRegimeSchema.optional().describe(
+      "Market regime to match. If omitted, will auto-detect from symbol.",
+    ),
     symbol: z
       .string()
       .optional()
       .describe(
         "Trading pair for auto-detection (e.g., 'BTCUSDT'). Used when regime is not provided.",
       ),
-    timeframe: z
-      .string()
-      .default("1h")
-      .describe("Timeframe for auto-detection"),
+    timeframe: z.string().default("1h").describe("Timeframe for auto-detection"),
   }),
   outputSchema: z.object({
     regime: MarketRegimeSchema.optional(),
@@ -202,10 +181,7 @@ export const matchPlaybooksToRegimeTool = createTool({
     auto_detected: z.boolean().optional(),
     error: z.string().optional(),
   }),
-  execute: async (
-    { regime, symbol, timeframe },
-    execContext: MastraExecutionContext,
-  ) => {
+  execute: async ({ regime, symbol, timeframe }, execContext: MastraExecutionContext) => {
     try {
       const detector = RegimeDetector.getInstance();
 
@@ -222,19 +198,16 @@ export const matchPlaybooksToRegimeTool = createTool({
 
         const instrument = await resolveInstrument(ctx!, symbol);
         const normalizedSymbol = instrument.normalizedSymbol;
-        const candles = instrument.route === "broker" && ctx?.broker
-          ? await ctx.broker.getHistoricalBars({
-            symbol: normalizedSymbol,
-            timeframe,
-            startTime: Date.now() - (100 * timeframeToMs(timeframe)),
-            endTime: Date.now(),
-            limit: 100,
-          })
-          : await ctx!.exchange!.getCandles(
-            normalizedSymbol,
-            timeframe,
-            100,
-          );
+        const candles =
+          instrument.route === "broker" && ctx?.broker
+            ? await ctx.broker.getHistoricalBars({
+                symbol: normalizedSymbol,
+                timeframe,
+                startTime: Date.now() - 100 * timeframeToMs(timeframe),
+                endTime: Date.now(),
+                limit: 100,
+              })
+            : await ctx!.exchange!.getCandles(normalizedSymbol, timeframe, 100);
 
         if (!candles || candles.length < 30) {
           return {
@@ -242,11 +215,7 @@ export const matchPlaybooksToRegimeTool = createTool({
           };
         }
 
-        const signal = detector.detectRegime(
-          candles,
-          normalizedSymbol,
-          timeframe,
-        );
+        const signal = detector.detectRegime(candles, normalizedSymbol, timeframe);
         resolvedRegime = signal.regime;
         confidence = signal.confidence;
         autoDetected = true;
@@ -254,8 +223,7 @@ export const matchPlaybooksToRegimeTool = createTool({
 
       if (!resolvedRegime) {
         return {
-          error:
-            "Either 'regime' or 'symbol' must be provided to match playbooks.",
+          error: "Either 'regime' or 'symbol' must be provided to match playbooks.",
         };
       }
 
@@ -289,9 +257,7 @@ export const multiTimeframeRegimeTool = createTool({
     "Shows whether timeframes agree or conflict, plus a consensus regime. " +
     "Use when user asks 'full regime analysis', 'multi-TF regime', 'are timeframes aligned?'.",
   inputSchema: z.object({
-    symbol: z
-      .string()
-      .describe("Trading pair (e.g., 'BTCUSDT')"),
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
   }),
   outputSchema: z.object({
     symbol: z.string().optional(),
@@ -312,10 +278,7 @@ export const multiTimeframeRegimeTool = createTool({
     matching_playbooks: z.array(z.string()).optional(),
     error: z.string().optional(),
   }),
-  execute: async (
-    { symbol },
-    execContext: MastraExecutionContext,
-  ) => {
+  execute: async ({ symbol }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange && !ctx?.broker) {
       return errors.noExchange;
@@ -326,27 +289,28 @@ export const multiTimeframeRegimeTool = createTool({
       const normalizedSymbol = instrument.normalizedSymbol;
 
       // Fetch candles for both timeframes in parallel
-      const [hourlyCandles, dailyCandles] = instrument.route === "broker" && ctx.broker
-        ? await Promise.all([
-          ctx.broker.getHistoricalBars({
-            symbol: normalizedSymbol,
-            timeframe: "1h",
-            startTime: Date.now() - (100 * 3_600_000),
-            endTime: Date.now(),
-            limit: 100,
-          }),
-          ctx.broker.getHistoricalBars({
-            symbol: normalizedSymbol,
-            timeframe: "1d",
-            startTime: Date.now() - (100 * 86_400_000),
-            endTime: Date.now(),
-            limit: 100,
-          }),
-        ])
-        : await Promise.all([
-          ctx.exchange!.getCandles(normalizedSymbol, "1h", 100),
-          ctx.exchange!.getCandles(normalizedSymbol, "1d", 100),
-        ]);
+      const [hourlyCandles, dailyCandles] =
+        instrument.route === "broker" && ctx.broker
+          ? await Promise.all([
+              ctx.broker.getHistoricalBars({
+                symbol: normalizedSymbol,
+                timeframe: "1h",
+                startTime: Date.now() - 100 * 3_600_000,
+                endTime: Date.now(),
+                limit: 100,
+              }),
+              ctx.broker.getHistoricalBars({
+                symbol: normalizedSymbol,
+                timeframe: "1d",
+                startTime: Date.now() - 100 * 86_400_000,
+                endTime: Date.now(),
+                limit: 100,
+              }),
+            ])
+          : await Promise.all([
+              ctx.exchange!.getCandles(normalizedSymbol, "1h", 100),
+              ctx.exchange!.getCandles(normalizedSymbol, "1d", 100),
+            ]);
 
       if (!hourlyCandles || hourlyCandles.length < 30) {
         return {
@@ -366,9 +330,7 @@ export const multiTimeframeRegimeTool = createTool({
         normalizedSymbol,
       );
 
-      const matchingPlaybooks = detector.getPlaybooksForRegime(
-        result.consensus,
-      );
+      const matchingPlaybooks = detector.getPlaybooksForRegime(result.consensus);
 
       return {
         symbol: normalizedSymbol,

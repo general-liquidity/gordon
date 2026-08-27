@@ -26,12 +26,7 @@ export interface EntrySignal {
 
 export interface ExitSignal {
   triggered: boolean;
-  reason:
-    | "stop_loss"
-    | "take_profit"
-    | "trailing_stop"
-    | "time_stop"
-    | "signal_exit";
+  reason: "stop_loss" | "take_profit" | "trailing_stop" | "time_stop" | "signal_exit";
 }
 
 // ============================================================================
@@ -98,11 +93,11 @@ function calcRSI(closes: number[], period: number = 14): number | null {
   return 100 - 100 / (1 + rs);
 }
 
-function calcMACD(
+function _calcMACD(
   closes: number[],
   fast: number = 12,
   slow: number = 26,
-  signal: number = 9
+  signal: number = 9,
 ): { macdLine: number | null; signalLine: number | null; histogram: number | null } {
   if (closes.length < slow + signal) {
     return { macdLine: null, signalLine: null, histogram: null };
@@ -132,14 +127,14 @@ function calcMACD(
 function calcBollingerBands(
   closes: number[],
   period: number = 20,
-  stdMult: number = 2
+  stdMult: number = 2,
 ): { upper: number | null; middle: number | null; lower: number | null; width: number | null } {
   if (closes.length < period) {
     return { upper: null, middle: null, lower: null, width: null };
   }
   const slice = closes.slice(closes.length - period);
   const mean = slice.reduce((a, b) => a + b, 0) / period;
-  const variance = slice.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / period;
+  const variance = slice.reduce((a, b) => a + (b - mean) ** 2, 0) / period;
   const stdDev = Math.sqrt(variance);
   const upper = mean + stdMult * stdDev;
   const lower = mean - stdMult * stdDev;
@@ -155,17 +150,13 @@ function calcVolumeMA(volumes: number[], period: number = 20): number | null {
   return calcSMA(volumes, period);
 }
 
-function calcATR(candles: Candle[], period: number = 14): number | null {
+function _calcATR(candles: Candle[], period: number = 14): number | null {
   if (candles.length < period + 1) return null;
   const trueRanges: number[] = [];
   for (let i = 1; i < candles.length; i++) {
     const c = candles[i]!;
     const prevClose = candles[i - 1]!.close;
-    const tr = Math.max(
-      c.high - c.low,
-      Math.abs(c.high - prevClose),
-      Math.abs(c.low - prevClose)
-    );
+    const tr = Math.max(c.high - c.low, Math.abs(c.high - prevClose), Math.abs(c.low - prevClose));
     trueRanges.push(tr);
   }
   if (trueRanges.length < period) return null;
@@ -194,8 +185,8 @@ function calcADX(candles: Candle[], period: number = 14): number | null {
       Math.max(
         curr.high - curr.low,
         Math.abs(curr.high - prev.close),
-        Math.abs(curr.low - prev.close)
-      )
+        Math.abs(curr.low - prev.close),
+      ),
     );
   }
 
@@ -228,12 +219,12 @@ function calcADX(candles: Candle[], period: number = 14): number | null {
   return adx;
 }
 
-function calcHighest(values: number[], period: number): number | null {
+function _calcHighest(values: number[], period: number): number | null {
   if (values.length < period) return null;
   return Math.max(...values.slice(values.length - period));
 }
 
-function calcLowest(values: number[], period: number): number | null {
+function _calcLowest(values: number[], period: number): number | null {
   if (values.length < period) return null;
   return Math.min(...values.slice(values.length - period));
 }
@@ -242,10 +233,7 @@ function calcLowest(values: number[], period: number): number | null {
 // Parsed Condition Types
 // ============================================================================
 
-type ConditionCheck = (
-  candles: Candle[],
-  currentIndex: number
-) => boolean;
+type ConditionCheck = (candles: Candle[], currentIndex: number) => boolean;
 
 interface ParsedCondition {
   check: ConditionCheck;
@@ -263,7 +251,6 @@ export class PlaybookRuleEngine {
   private exitTPMultiplier: number;
   private riskPercent: number;
   private trailingStopEnabled: boolean;
-  private timeStopCandles: number;
 
   constructor(playbook: Playbook) {
     this.playbook = playbook;
@@ -272,7 +259,6 @@ export class PlaybookRuleEngine {
     this.exitTPMultiplier = this.parseTakeProfitMultiplier();
     this.riskPercent = this.parseRiskPercent();
     this.trailingStopEnabled = this.hasTrailingStop();
-    this.timeStopCandles = 0; // Not used for the 3 built-in playbooks
   }
 
   /**
@@ -317,7 +303,12 @@ export class PlaybookRuleEngine {
 
     const totalConditions = this.entryConditions.length;
     if (totalConditions === 0) {
-      return { triggered: false, side: "long", confidence: 0, reason: "No entry conditions parsed" };
+      return {
+        triggered: false,
+        side: "long",
+        confidence: 0,
+        reason: "No entry conditions parsed",
+      };
     }
 
     const confidence = matchCount / totalConditions;
@@ -349,7 +340,7 @@ export class PlaybookRuleEngine {
       entry_time: number;
       highest_since_entry: number;
       lowest_since_entry: number;
-    }
+    },
   ): ExitSignal {
     const current = candles[currentIndex];
     if (!current) {
@@ -486,7 +477,11 @@ export class PlaybookRuleEngine {
     }
 
     // RSI crosses below X (oversold trigger)
-    if (cond.indicator === "RSI" && cond.comparison === "crosses_below" && typeof cond.value === "number") {
+    if (
+      cond.indicator === "RSI" &&
+      cond.comparison === "crosses_below" &&
+      typeof cond.value === "number"
+    ) {
       const threshold = cond.value;
       return {
         description: `RSI crosses below ${threshold}`,
@@ -496,7 +491,9 @@ export class PlaybookRuleEngine {
           const closesCurr = candles.slice(0, idx + 1).map((c) => c.close);
           const rsiPrev = calcRSI(closesPrev);
           const rsiCurr = calcRSI(closesCurr);
-          return rsiPrev !== null && rsiCurr !== null && rsiPrev >= threshold && rsiCurr < threshold;
+          return (
+            rsiPrev !== null && rsiCurr !== null && rsiPrev >= threshold && rsiCurr < threshold
+          );
         },
       };
     }
@@ -529,10 +526,7 @@ export class PlaybookRuleEngine {
     }
 
     // Volume above average
-    if (
-      desc.includes("volume") &&
-      (desc.includes("above") || desc.includes("greater"))
-    ) {
+    if (desc.includes("volume") && (desc.includes("above") || desc.includes("greater"))) {
       // Try to extract multiplier
       const multMatch = desc.match(/(\d+(?:\.\d+)?)x/);
       const multiplier = multMatch ? parseFloat(multMatch[1]!) : 1;
@@ -550,7 +544,7 @@ export class PlaybookRuleEngine {
     // Price above/closes above N-period high (breakout)
     if (desc.includes("price") && desc.includes("above") && desc.includes("period high")) {
       const periodMatch = desc.match(/(\d+)-?period/);
-      const period = periodMatch ? parseInt(periodMatch[1]!) : 20;
+      const period = periodMatch ? parseInt(periodMatch[1]!, 10) : 20;
       return {
         description: `Price closes above ${period}-period high`,
         check: (candles, idx) => {
@@ -567,8 +561,8 @@ export class PlaybookRuleEngine {
       // Parse periods from description
       const emaMatch = desc.match(/ema\s*(\d+)\s*cross(?:es)?\s*above\s*ema\s*(\d+)/);
       if (emaMatch) {
-        const fastPeriod = parseInt(emaMatch[1]!);
-        const slowPeriod = parseInt(emaMatch[2]!);
+        const fastPeriod = parseInt(emaMatch[1]!, 10);
+        const slowPeriod = parseInt(emaMatch[2]!, 10);
         return {
           description: `EMA(${fastPeriod}) crosses above EMA(${slowPeriod})`,
           check: (candles, idx) => {
@@ -579,7 +573,8 @@ export class PlaybookRuleEngine {
             const slowPrev = calcEMA(closesPrev, slowPeriod);
             const fastCurr = calcEMA(closesCurr, fastPeriod);
             const slowCurr = calcEMA(closesCurr, slowPeriod);
-            if (fastPrev === null || slowPrev === null || fastCurr === null || slowCurr === null) return false;
+            if (fastPrev === null || slowPrev === null || fastCurr === null || slowCurr === null)
+              return false;
             return fastPrev <= slowPrev && fastCurr > slowCurr;
           },
         };
@@ -589,7 +584,7 @@ export class PlaybookRuleEngine {
     // Price above EMA (N) — trend alignment
     if (desc.includes("price") && desc.includes("above") && desc.includes("ema")) {
       const emaMatch = desc.match(/(\d+)\s*ema/);
-      const period = emaMatch ? parseInt(emaMatch[1]!) : 50;
+      const period = emaMatch ? parseInt(emaMatch[1]!, 10) : 50;
       return {
         description: `Price above EMA(${period})`,
         check: (candles, idx) => {
@@ -731,7 +726,13 @@ export class PlaybookRuleEngine {
           const slow21Prev = calcEMA(closesPrev, 21);
           const fast9Curr = calcEMA(closesCurr, 9);
           const slow21Curr = calcEMA(closesCurr, 21);
-          if (fast9Prev === null || slow21Prev === null || fast9Curr === null || slow21Curr === null) return false;
+          if (
+            fast9Prev === null ||
+            slow21Prev === null ||
+            fast9Curr === null ||
+            slow21Curr === null
+          )
+            return false;
           return fast9Prev <= slow21Prev && fast9Curr > slow21Curr;
         },
       },
@@ -818,7 +819,7 @@ export class PlaybookRuleEngine {
       (r) =>
         r.description.toLowerCase().includes("trail") ||
         r.description.toLowerCase().includes("breakeven") ||
-        r.description.toLowerCase().includes("move stop")
+        r.description.toLowerCase().includes("move stop"),
     );
   }
 }

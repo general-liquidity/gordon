@@ -1,13 +1,10 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeMarginalContribution,
-  equityCurveToReturns,
-} from "./marginal-contribution.ts";
+import { computeMarginalContribution, equityCurveToReturns } from "./marginal-contribution.ts";
 
 function syntheticEquity(n: number, drift: number, vol: number, seed: number = 1): number[] {
   let state = (seed | 0) >>> 0;
   const rng = () => {
-    state = (state + 0x6D2B79F5) | 0;
+    state = (state + 0x6d2b79f5) | 0;
     let t = state;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
@@ -24,8 +21,7 @@ function syntheticEquity(n: number, drift: number, vol: number, seed: number = 1
 describe("equityCurveToReturns", () => {
   it("computes period-over-period returns", () => {
     expect(equityCurveToReturns([100, 110, 99]).map((r) => parseFloat(r.toFixed(4)))).toEqual([
-      0.1,
-      -0.1,
+      0.1, -0.1,
     ]);
   });
 
@@ -64,11 +60,7 @@ describe("computeMarginalContribution — verdict bands", () => {
   it("flags identical-twin candidate as redundant", () => {
     const existing = syntheticEquity(100, 0.001, 0.02, 42);
     const candidate = [...existing]; // identical curve
-    const result = computeMarginalContribution(
-      { strategy_a: existing },
-      "twin",
-      candidate,
-    );
+    const result = computeMarginalContribution({ strategy_a: existing }, "twin", candidate);
     expect(["redundant", "marginal", "worse"]).toContain(result.verdict);
     expect(Math.abs(result.meanAbsCorrelation)).toBeGreaterThan(0.95);
   });
@@ -97,11 +89,7 @@ describe("computeMarginalContribution — verdict bands", () => {
     const a = syntheticEquity(80, 0.001, 0.02, 1);
     const b = syntheticEquity(80, 0.001, 0.02, 2);
     const c = syntheticEquity(80, 0.001, 0.02, 3);
-    const result = computeMarginalContribution(
-      { strat_a: a, strat_b: b },
-      "strat_c",
-      c,
-    );
+    const result = computeMarginalContribution({ strat_a: a, strat_b: b }, "strat_c", c);
     expect(result.pairwiseCorrelations.length).toBe(2);
     expect(result.pairwiseCorrelations.map((p) => p.existingId).sort()).toEqual([
       "strat_a",

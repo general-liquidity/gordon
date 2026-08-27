@@ -1,4 +1,9 @@
-import { KeyContext, type KeyBinding, type KeybindingAction, type ParsedKeystroke } from "./types.js";
+import {
+  KeyContext,
+  type KeyBinding,
+  type KeybindingAction,
+  type ParsedKeystroke,
+} from "./types.js";
 import { keystrokesEqual } from "./parser.js";
 
 // ============================================================================
@@ -98,7 +103,9 @@ export class KeybindingResolver {
   getBindingForAction(action: KeybindingAction, context?: KeyContext): KeyBinding | null {
     return (
       this.bindings.find(
-        (b) => b.action === action && (!context || b.context === context || b.context === KeyContext.Global),
+        (b) =>
+          b.action === action &&
+          (!context || b.context === context || b.context === KeyContext.Global),
       ) ?? null
     );
   }

@@ -43,8 +43,8 @@ export const getCryptoNewsHeadlinesTool = createTool({
       .optional()
       .describe(
         "Symbol or substring filter, case-insensitive. 'BTC' expands to " +
-        "match 'bitcoin' too. Pass 'BTC|ETH|SOL' for multi-asset. Omit " +
-        "for the full crypto news firehose.",
+          "match 'bitcoin' too. Pass 'BTC|ETH|SOL' for multi-asset. Omit " +
+          "for the full crypto news firehose.",
       ),
     hoursBack: z.number().int().positive().max(168).optional().describe("Default 24."),
     sources: z.array(z.enum(SOURCE_ENUM)).optional(),
@@ -66,12 +66,8 @@ export const getCryptoNewsHeadlinesTool = createTool({
       bearishCount: z.number(),
       neutralCount: z.number(),
       netScore: z.number(),
-      topBullish: z
-        .object({ title: z.string(), confidence: z.number() })
-        .optional(),
-      topBearish: z
-        .object({ title: z.string(), confidence: z.number() })
-        .optional(),
+      topBullish: z.object({ title: z.string(), confidence: z.number() }).optional(),
+      topBearish: z.object({ title: z.string(), confidence: z.number() }).optional(),
     }),
     summary: z.string(),
     /**
@@ -83,19 +79,17 @@ export const getCryptoNewsHeadlinesTool = createTool({
     untrustedContentBlock: z.string(),
     error: z.string().optional(),
   }),
-  execute: async (
-    {
-      query,
-      hoursBack,
-      sources,
-      limit,
-    }: {
-      query?: string;
-      hoursBack?: number;
-      sources?: NewsSource[];
-      limit?: number;
-    },
-  ) => {
+  execute: async ({
+    query,
+    hoursBack,
+    sources,
+    limit,
+  }: {
+    query?: string;
+    hoursBack?: number;
+    sources?: NewsSource[];
+    limit?: number;
+  }) => {
     try {
       const raw = await fetchHeadlines({ query, hoursBack, sources, limit });
       const scored = raw.map((h) => {
@@ -122,20 +116,14 @@ export const getCryptoNewsHeadlinesTool = createTool({
         `over the last ${hoursBack ?? 24}h: ${aggregate.bullishCount} bullish, ` +
         `${aggregate.bearishCount} bearish, ${aggregate.neutralCount} neutral. ` +
         `Tone: ${tone}.` +
-        (aggregate.topBearish
-          ? ` Top bearish: '${aggregate.topBearish.title}'.`
-          : "") +
-        (aggregate.topBullish
-          ? ` Top bullish: '${aggregate.topBullish.title}'.`
-          : "");
+        (aggregate.topBearish ? ` Top bearish: '${aggregate.topBearish.title}'.` : "") +
+        (aggregate.topBullish ? ` Top bullish: '${aggregate.topBullish.title}'.` : "");
 
       // Wrap each title under its own source marker. The model gets one
       // explicit "this is external data" signal per headline rather than
       // a single blob. Order matches `scored` so the agent can cross-
       // reference the structured field if needed.
-      const wrappedParts = scored.map((h) =>
-        wrapUntrustedContent(h.title, h.source),
-      );
+      const wrappedParts = scored.map((h) => wrapUntrustedContent(h.title, h.source));
       const untrustedContentBlock = wrappedParts.join("\n");
 
       return { headlines: scored, aggregate, summary, untrustedContentBlock };

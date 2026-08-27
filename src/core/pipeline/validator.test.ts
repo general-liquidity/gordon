@@ -5,16 +5,8 @@
  */
 
 import { describe, test, expect } from "bun:test";
-import {
-  validatePlan,
-  calculateRiskReward,
-  calculateAllocationPercent,
-} from "./validator.ts";
-import {
-  createMockPlan,
-  createMockConfig,
-  createMockPortfolio,
-} from "../../test-utils/mocks.ts";
+import { validatePlan, calculateRiskReward, calculateAllocationPercent } from "./validator.ts";
+import { createMockPlan, createMockConfig, createMockPortfolio } from "../../test-utils/mocks.ts";
 import type { Plan } from "../../types/index.ts";
 
 describe("calculateRiskReward", () => {
@@ -72,23 +64,39 @@ describe("calculateRiskReward", () => {
     const result = calculateRiskReward(plan);
     expect(result).toBe(1);
   });
+
+  test("calculates risk/reward in the short direction", () => {
+    const plan = createMockPlan({
+      direction: "short",
+      entry: { type: "limit", price: 100 },
+      stopLoss: { price: 105 },
+      takeProfit: [{ price: 90, percentToSell: 1 }],
+    });
+    expect(calculateRiskReward(plan)).toBe(2);
+  });
 });
 
 describe("calculateAllocationPercent", () => {
   test("returns 0 for zero portfolio value", () => {
-    const plan = createMockPlan({ allocation: { currency: "USDT", amount: 500, percentOfPortfolio: 0.05 } });
+    const plan = createMockPlan({
+      allocation: { currency: "USDT", amount: 500, percentOfPortfolio: 0.05 },
+    });
     const result = calculateAllocationPercent(plan, 0);
     expect(result).toBe(0);
   });
 
   test("returns 0 for negative portfolio value", () => {
-    const plan = createMockPlan({ allocation: { currency: "USDT", amount: 500, percentOfPortfolio: 0.05 } });
+    const plan = createMockPlan({
+      allocation: { currency: "USDT", amount: 500, percentOfPortfolio: 0.05 },
+    });
     const result = calculateAllocationPercent(plan, -1000);
     expect(result).toBe(0);
   });
 
   test("calculates correct percentage", () => {
-    const plan = createMockPlan({ allocation: { currency: "USDT", amount: 500, percentOfPortfolio: 0.05 } });
+    const plan = createMockPlan({
+      allocation: { currency: "USDT", amount: 500, percentOfPortfolio: 0.05 },
+    });
     const result = calculateAllocationPercent(plan, 10000);
     expect(result).toBe(0.05);
   });
@@ -154,6 +162,42 @@ describe("validatePlan - Structure Validation", () => {
     const result = validatePlan(plan, config, portfolio);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes("must be below entry price"))).toBe(true);
+  });
+
+  test("accepts valid short geometry", () => {
+    const plan = createMockPlan({
+      direction: "short",
+      entry: { type: "limit", price: 100 },
+      stopLoss: { price: 105 },
+      takeProfit: [{ price: 90, percentToSell: 1 }],
+      dca: [{ price: 103, percentOfAllocation: 1 }],
+    });
+    const result = validatePlan(plan, createMockConfig(), createMockPortfolio());
+    expect(result.errors.filter((error) => /short positions/.test(error))).toEqual([]);
+  });
+
+  test("rejects short stop, targets, and DCA on the long side", () => {
+    const plan = createMockPlan({
+      direction: "short",
+      entry: { type: "limit", price: 100 },
+      stopLoss: { price: 95 },
+      takeProfit: [{ price: 110, percentToSell: 1 }],
+      dca: [{ price: 90, percentOfAllocation: 1 }],
+    });
+    const result = validatePlan(plan, createMockConfig(), createMockPortfolio());
+    expect(
+      result.errors.some(
+        (error) => error.includes("above entry price") && error.includes("Stop loss"),
+      ),
+    ).toBe(true);
+    expect(
+      result.errors.some(
+        (error) => error.includes("below entry price") && error.includes("Take profit"),
+      ),
+    ).toBe(true);
+    expect(
+      result.errors.some((error) => error.includes("above entry price") && error.includes("DCA")),
+    ).toBe(true);
   });
 
   test("rejects plan without take profit levels", () => {
@@ -469,7 +513,7 @@ describe("validatePlan - grid_entry", () => {
     };
     const result = validatePlan(badPlan, mockConfig, mockPortfolio);
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes("sum to 100%"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("sum to 100%"))).toBe(true);
   });
 
   test("should error if grid levels are not descending", () => {
@@ -486,7 +530,7 @@ describe("validatePlan - grid_entry", () => {
     };
     const result = validatePlan(badPlan, mockConfig, mockPortfolio);
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes("descending"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("descending"))).toBe(true);
   });
 
   test("should error if stop loss is above lowest grid level", () => {
@@ -496,7 +540,7 @@ describe("validatePlan - grid_entry", () => {
     };
     const result = validatePlan(badPlan, mockConfig, mockPortfolio);
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes("below lowest grid level"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("below lowest grid level"))).toBe(true);
   });
 
   test("should warn if grid range is too wide", () => {
@@ -508,7 +552,7 @@ describe("validatePlan - grid_entry", () => {
       },
     };
     const result = validatePlan(widePlan, mockConfig, mockPortfolio);
-    expect(result.warnings.some(w => w.includes("range"))).toBe(true);
+    expect(result.warnings.some((w) => w.includes("range"))).toBe(true);
   });
 
   test("should error if grid has fewer than 3 levels", () => {
@@ -524,7 +568,7 @@ describe("validatePlan - grid_entry", () => {
     };
     const result = validatePlan(badPlan, mockConfig, mockPortfolio);
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes("3-7 levels"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("3-7 levels"))).toBe(true);
   });
 
   test("should error if grid has more than 7 levels", () => {
@@ -546,6 +590,6 @@ describe("validatePlan - grid_entry", () => {
     };
     const result = validatePlan(badPlan, mockConfig, mockPortfolio);
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes("3-7 levels"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("3-7 levels"))).toBe(true);
   });
 });

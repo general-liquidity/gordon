@@ -13,7 +13,9 @@ describe("isStreakCircuitBreakerEnabled", () => {
     expect(isStreakCircuitBreakerEnabled({})).toBe(true);
     expect(isStreakCircuitBreakerEnabled({ [STREAK_CIRCUIT_BREAKER_FLAG_ENV]: "1" })).toBe(true);
     expect(isStreakCircuitBreakerEnabled({ [STREAK_CIRCUIT_BREAKER_FLAG_ENV]: "0" })).toBe(false);
-    expect(isStreakCircuitBreakerEnabled({ [STREAK_CIRCUIT_BREAKER_FLAG_ENV]: "false" })).toBe(false);
+    expect(isStreakCircuitBreakerEnabled({ [STREAK_CIRCUIT_BREAKER_FLAG_ENV]: "false" })).toBe(
+      false,
+    );
   });
 });
 

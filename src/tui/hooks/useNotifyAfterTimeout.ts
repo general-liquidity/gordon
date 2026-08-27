@@ -15,9 +15,13 @@ export function useNotifyAfterTimeout(
 
   // Track user activity
   useEffect(() => {
-    const onData = () => { lastInteractionRef.current = Date.now(); };
+    const onData = () => {
+      lastInteractionRef.current = Date.now();
+    };
     process.stdin.on("data", onData);
-    return () => { process.stdin.off("data", onData); };
+    return () => {
+      process.stdin.off("data", onData);
+    };
   }, []);
 
   useEffect(() => {

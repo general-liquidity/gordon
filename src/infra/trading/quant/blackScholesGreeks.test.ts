@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeBlackScholesGreeks,
-  blackScholesGreeksToPayload,
-} from "./blackScholesGreeks.ts";
+import { computeBlackScholesGreeks, blackScholesGreeksToPayload } from "./blackScholesGreeks.ts";
 
 // Reference values cross-checked against Hull (2017) "Options, Futures,
 // and Other Derivatives" Ch 15 examples + multiple online BS calculators.
@@ -71,10 +68,7 @@ describe("computeBlackScholesGreeks — put-call parity", () => {
     };
     const c = computeBlackScholesGreeks({ ...params, optionType: "call" });
     const p = computeBlackScholesGreeks({ ...params, optionType: "put" });
-    expect(c.delta - p.delta).toBeCloseTo(
-      Math.exp(-params.dividendYield * params.timeYears),
-      8,
-    );
+    expect(c.delta - p.delta).toBeCloseTo(Math.exp(-params.dividendYield * params.timeYears), 8);
   });
 
   it("Γ_call = Γ_put", () => {
@@ -216,14 +210,10 @@ describe("computeBlackScholesGreeks — validation", () => {
     expect(() => computeBlackScholesGreeks({ ...ok, strike: 0 })).toThrow();
   });
   it("throws on negative T", () => {
-    expect(() =>
-      computeBlackScholesGreeks({ ...ok, timeYears: -1 }),
-    ).toThrow();
+    expect(() => computeBlackScholesGreeks({ ...ok, timeYears: -1 })).toThrow();
   });
   it("throws on non-positive sigma", () => {
-    expect(() =>
-      computeBlackScholesGreeks({ ...ok, volatility: 0 }),
-    ).toThrow();
+    expect(() => computeBlackScholesGreeks({ ...ok, volatility: 0 })).toThrow();
   });
 });
 
@@ -405,8 +395,13 @@ describe("impliedVolatility — failure modes", () => {
 
 describe("second-order Greeks — vanna / charm / vomma", () => {
   const base = {
-    spot: 100, strike: 105, timeYears: 0.5, rate: 0.03,
-    volatility: 0.25, dividendYield: 0.01, optionType: "call" as const,
+    spot: 100,
+    strike: 105,
+    timeYears: 0.5,
+    rate: 0.03,
+    volatility: 0.25,
+    dividendYield: 0.01,
+    optionType: "call" as const,
   };
   const h = 1e-5;
   const bump = (k: "volatility" | "timeYears", dv: number) =>

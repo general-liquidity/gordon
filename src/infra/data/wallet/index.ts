@@ -57,12 +57,12 @@ export {
  * self-skip via isAvailable() when their key is unset. */
 export function walletIntelSources(): WalletIntelSource[] {
   return [
-    new NansenWalletSource(),   // 28 — labels + smart-money flow
-    new ArkhamWalletSource(),   // 29 — labels + balances
+    new NansenWalletSource(), // 28 — labels + smart-money flow
+    new ArkhamWalletSource(), // 29 — labels + balances
     new CovalentWalletSource(), // 30 — balances + tx + holders
-    new MoralisWalletSource(),  // 32 — balances + tx + portfolio
-    new ZerionWalletSource(),   // 34 — portfolio + balances
-    new DeBankWalletSource(),   // 36 — portfolio + balances
+    new MoralisWalletSource(), // 32 — balances + tx + portfolio
+    new ZerionWalletSource(), // 34 — portfolio + balances
+    new DeBankWalletSource(), // 36 — portfolio + balances
   ];
 }
 

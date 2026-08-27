@@ -176,7 +176,12 @@ describe("familiarity gate", () => {
       "constant",
       Array.from({ length: 10 }, () => [1, 2, 3]),
     );
-    const ragged = buildFamiliarityReference("ragged", [[1, 2], [1, 2, 3], [1, 2], [1, 2]]);
+    const ragged = buildFamiliarityReference("ragged", [
+      [1, 2],
+      [1, 2, 3],
+      [1, 2],
+      [1, 2],
+    ]);
 
     expect(empty.defect).toBe("empty");
     expect(single.defect).toBe("insufficient_samples");

@@ -36,7 +36,9 @@ describe("PositionStore phantom write guard", () => {
 
   it("rejects explicit zero entryPrice", async () => {
     const store = await getPositionStore();
-    await expect(store.save(record({ entryPrice: 0 }))).rejects.toThrow(/Phantom position rejected/);
+    await expect(store.save(record({ entryPrice: 0 }))).rejects.toThrow(
+      /Phantom position rejected/,
+    );
   });
 
   it("rejects negative quantity", async () => {
@@ -73,12 +75,17 @@ describe("PositionStateMachine reload + zero-fill guards", () => {
     await sm.transition(created.id, "approved");
     await sm.transition(created.id, "ordering");
 
-    await expect(sm.transition(created.id, "filled")).rejects.toThrow(/positive entryPrice\/quantity/);
+    await expect(sm.transition(created.id, "filled")).rejects.toThrow(
+      /positive entryPrice\/quantity/,
+    );
     await expect(
       sm.transition(created.id, "filled", { entryPrice: 0, quantity: 0 }),
     ).rejects.toThrow(/positive entryPrice\/quantity/);
 
-    const filled = await sm.transition(created.id, "filled", { entryPrice: 50_000, quantity: 0.01 });
+    const filled = await sm.transition(created.id, "filled", {
+      entryPrice: 50_000,
+      quantity: 0.01,
+    });
     expect(filled.state).toBe("filled");
   });
 });
@@ -90,14 +97,16 @@ describe("PositionStore phantom read filter", () => {
 
     await store.save(record({ id: "pos_phantom", createdAt: stale, updatedAt: stale }));
     await store.save(record({ id: "pos_fresh_idea" }));
-    await store.save(record({
-      id: "pos_real",
-      state: "filled",
-      createdAt: stale,
-      updatedAt: stale,
-      entryPrice: 50_000,
-      quantity: 0.01,
-    }));
+    await store.save(
+      record({
+        id: "pos_real",
+        state: "filled",
+        createdAt: stale,
+        updatedAt: stale,
+        entryPrice: 50_000,
+        quantity: 0.01,
+      }),
+    );
 
     const active = await store.getActive();
     const ids = active.map((p) => p.id);

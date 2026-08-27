@@ -115,8 +115,7 @@ export function computePairsEligibilityFilter(
   };
 
   const hlInRange =
-    input.halfLifePeriods >= t.minHalfLife &&
-    input.halfLifePeriods <= t.maxHalfLife;
+    input.halfLifePeriods >= t.minHalfLife && input.halfLifePeriods <= t.maxHalfLife;
   const halfLife: ConditionResult = {
     passed: hlInRange,
     value: input.halfLifePeriods,
@@ -136,14 +135,12 @@ export function computePairsEligibilityFilter(
   };
 
   const conditions = { cointegration: coint, hurst, halfLife, meanCrossings };
-  const eligible =
-    coint.passed && hurst.passed && halfLife.passed && meanCrossings.passed;
+  const eligible = coint.passed && hurst.passed && halfLife.passed && meanCrossings.passed;
   const failureReasons: string[] = [];
   if (!coint.passed) failureReasons.push(`cointegration: ${coint.reason}`);
   if (!hurst.passed) failureReasons.push(`hurst: ${hurst.reason}`);
   if (!halfLife.passed) failureReasons.push(`half-life: ${halfLife.reason}`);
-  if (!meanCrossings.passed)
-    failureReasons.push(`mean-crossings: ${meanCrossings.reason}`);
+  if (!meanCrossings.passed) failureReasons.push(`mean-crossings: ${meanCrossings.reason}`);
 
   const reasoning = eligible
     ? `eligible: ${coint.reason}, ${hurst.reason}, ${halfLife.reason}, ${meanCrossings.reason}`

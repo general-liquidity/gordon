@@ -34,7 +34,9 @@ function renderAceContext(threadId = "ace-test-thread"): string {
       evaluateToolAccess: async () => ({ status: "allowed" as const }),
     },
   } satisfies GordonContext;
-  return composeRuntimePromptSections(context).map((section) => section.content).join("\n\n");
+  return composeRuntimePromptSections(context)
+    .map((section) => section.content)
+    .join("\n\n");
 }
 
 afterEach(() => {
@@ -51,22 +53,28 @@ describe("ACE lesson prompt integration", () => {
     const dir = mkdtempSync(join(tmpdir(), "gordon-ace-prompt-"));
     tempDirs.push(dir);
     const path = join(dir, "ace-lessons.json");
-    writeFileSync(path, JSON.stringify({
-      version: 1,
-      revision: 7,
-      updatedAt: new Date().toISOString(),
-      lessons: [{
-        id: "risk_event::respect-drawdown",
-        category: "risk_event",
-        text: "Respect the session drawdown stop.",
-        evidenceCount: 3,
-        firstSeenAt: 1,
-        lastSeenAt: 2,
-        evidenceEntryIds: ["e1"],
-        score: 0.9,
-        curatedAt: new Date().toISOString(),
-      }],
-    }), "utf-8");
+    writeFileSync(
+      path,
+      JSON.stringify({
+        version: 1,
+        revision: 7,
+        updatedAt: new Date().toISOString(),
+        lessons: [
+          {
+            id: "risk_event::respect-drawdown",
+            category: "risk_event",
+            text: "Respect the session drawdown stop.",
+            evidenceCount: 3,
+            firstSeenAt: 1,
+            lastSeenAt: 2,
+            evidenceEntryIds: ["e1"],
+            score: 0.9,
+            curatedAt: new Date().toISOString(),
+          },
+        ],
+      }),
+      "utf-8",
+    );
     process.env.GORDON_ACE_ENABLED = "true";
     process.env.GORDON_ACE_LESSONS_PATH = path;
     resetPromptSectionCache();
@@ -85,17 +93,19 @@ describe("ACE lesson prompt integration", () => {
       version: 1,
       revision,
       updatedAt: new Date().toISOString(),
-      lessons: [{
-        id: "risk_event::refresh",
-        category: "risk_event",
-        text,
-        evidenceCount: 3,
-        firstSeenAt: 1,
-        lastSeenAt: 2,
-        evidenceEntryIds: ["e1"],
-        score: 0.9,
-        curatedAt: new Date().toISOString(),
-      }],
+      lessons: [
+        {
+          id: "risk_event::refresh",
+          category: "risk_event",
+          text,
+          evidenceCount: 3,
+          firstSeenAt: 1,
+          lastSeenAt: 2,
+          evidenceEntryIds: ["e1"],
+          score: 0.9,
+          curatedAt: new Date().toISOString(),
+        },
+      ],
     });
     writeFileSync(path, JSON.stringify(lesson(1, "First governed lesson.")), "utf-8");
     process.env.GORDON_ACE_ENABLED = "true";
@@ -117,17 +127,19 @@ describe("ACE lesson prompt integration", () => {
       version: 1,
       revision,
       updatedAt: new Date().toISOString(),
-      lessons: [{
-        id: `risk_event::session-${revision}`,
-        category: "risk_event",
-        text,
-        evidenceCount: 3,
-        firstSeenAt: 1,
-        lastSeenAt: 2,
-        evidenceEntryIds: ["e1"],
-        score: 0.9,
-        curatedAt: new Date().toISOString(),
-      }],
+      lessons: [
+        {
+          id: `risk_event::session-${revision}`,
+          category: "risk_event",
+          text,
+          evidenceCount: 3,
+          firstSeenAt: 1,
+          lastSeenAt: 2,
+          evidenceEntryIds: ["e1"],
+          score: 0.9,
+          curatedAt: new Date().toISOString(),
+        },
+      ],
     });
     process.env.GORDON_ACE_ENABLED = "true";
     process.env.GORDON_ACE_LESSONS_PATH = path;
@@ -143,22 +155,28 @@ describe("ACE lesson prompt integration", () => {
     const dir = mkdtempSync(join(tmpdir(), "gordon-ace-disable-"));
     tempDirs.push(dir);
     const path = join(dir, "ace-lessons.json");
-    writeFileSync(path, JSON.stringify({
-      version: 1,
-      revision: 9,
-      updatedAt: new Date().toISOString(),
-      lessons: [{
-        id: "risk_event::disable",
-        category: "risk_event",
-        text: "A governed lesson.",
-        evidenceCount: 3,
-        firstSeenAt: 1,
-        lastSeenAt: 2,
-        evidenceEntryIds: ["e1"],
-        score: 0.9,
-        curatedAt: new Date().toISOString(),
-      }],
-    }), "utf-8");
+    writeFileSync(
+      path,
+      JSON.stringify({
+        version: 1,
+        revision: 9,
+        updatedAt: new Date().toISOString(),
+        lessons: [
+          {
+            id: "risk_event::disable",
+            category: "risk_event",
+            text: "A governed lesson.",
+            evidenceCount: 3,
+            firstSeenAt: 1,
+            lastSeenAt: 2,
+            evidenceEntryIds: ["e1"],
+            score: 0.9,
+            curatedAt: new Date().toISOString(),
+          },
+        ],
+      }),
+      "utf-8",
+    );
     process.env.GORDON_ACE_ENABLED = "true";
     process.env.GORDON_ACE_LESSONS_PATH = path;
     renderAceContext();

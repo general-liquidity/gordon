@@ -68,18 +68,11 @@ function getPrimaryScanTimeframe(timeframes?: string[]): string {
   return timeframes?.[0] ?? "1h";
 }
 
-function createScanCacheKey(
-  client: Exchange,
-  topN: number,
-  timeframe: string
-): string {
+function createScanCacheKey(client: Exchange, topN: number, timeframe: string): string {
   return `${getExchangeCacheKey(client)}:${topN}:${timeframe}`;
 }
 
-function getCachedValue<T>(
-  cache: Map<string, CacheEntry<T>>,
-  key: string
-): T | null {
+function getCachedValue<T>(cache: Map<string, CacheEntry<T>>, key: string): T | null {
   const entry = cache.get(key);
   if (!entry) {
     return null;
@@ -97,7 +90,7 @@ function setCachedValue<T>(
   cache: Map<string, CacheEntry<T>>,
   key: string,
   value: T,
-  ttlMs: number
+  ttlMs: number,
 ): void {
   cache.set(key, {
     value,
@@ -108,7 +101,7 @@ function setCachedValue<T>(
 async function mapWithConcurrency<TInput, TOutput>(
   items: TInput[],
   concurrency: number,
-  mapper: (item: TInput, index: number) => Promise<TOutput>
+  mapper: (item: TInput, index: number) => Promise<TOutput>,
 ): Promise<TOutput[]> {
   if (items.length === 0) {
     return [];
@@ -140,10 +133,7 @@ async function mapWithConcurrency<TInput, TOutput>(
   return results;
 }
 
-async function getTopSymbolsCached(
-  client: Exchange,
-  topN: number
-): Promise<string[]> {
+async function getTopSymbolsCached(client: Exchange, topN: number): Promise<string[]> {
   const exchangeKey = getExchangeCacheKey(client);
   const cached = topSymbolsCache.get(exchangeKey);
   const now = Date.now();
@@ -174,10 +164,8 @@ export function determineTrend(candles: Candle[]): Trend {
   const firstHalf = recentCandles.slice(0, 10);
   const secondHalf = recentCandles.slice(-10);
 
-  const firstAvg =
-    firstHalf.reduce((sum, c) => sum + c.close, 0) / firstHalf.length;
-  const secondAvg =
-    secondHalf.reduce((sum, c) => sum + c.close, 0) / secondHalf.length;
+  const firstAvg = firstHalf.reduce((sum, c) => sum + c.close, 0) / firstHalf.length;
+  const secondAvg = secondHalf.reduce((sum, c) => sum + c.close, 0) / secondHalf.length;
 
   const percentChange = ((secondAvg - firstAvg) / firstAvg) * 100;
 
@@ -215,7 +203,7 @@ export function determineTrend(candles: Candle[]): Trend {
 export function detectSupportBounce(
   candles: Candle[],
   levels: Level[],
-  indicators: Indicators
+  indicators: Indicators,
 ): SupportBounceResult {
   if (candles.length === 0) {
     return { detected: false, confidence: 0 };
@@ -240,8 +228,7 @@ export function detectSupportBounce(
     return { detected: false, confidence: 0 };
   }
 
-  const distancePercent =
-    ((currentPrice - nearestSupport.price) / nearestSupport.price) * 100;
+  const distancePercent = ((currentPrice - nearestSupport.price) / nearestSupport.price) * 100;
   const nearSupport = distancePercent <= 2;
 
   const rsi = indicators.rsi;
@@ -261,7 +248,7 @@ export function detectSupportBounce(
   }
 
   if (volumeOk && volumeRatio !== null) {
-    confidence += Math.min(0.2, 0.2 * (volumeRatio - 0.8) / 0.5);
+    confidence += Math.min(0.2, (0.2 * (volumeRatio - 0.8)) / 0.5);
   }
 
   confidence += 0.1 * nearestSupport.strength;
@@ -277,9 +264,7 @@ export function detectSupportBounce(
 /**
  * Categorize risk level based on analysis
  */
-export function categorizeRisk(
-  analysis: Partial<CoinAnalysis>
-): Risk {
+export function categorizeRisk(analysis: Partial<CoinAnalysis>): Risk {
   let riskScore = 0;
 
   if (analysis.levels && analysis.levels.length > 0) {
@@ -328,11 +313,7 @@ export function categorizeRisk(
 /**
  * Determine bias based on setup detection and price position
  */
-function determineBias(
-  setupDetected: boolean,
-  currentPrice: number,
-  levels: Level[]
-): Bias {
+function determineBias(setupDetected: boolean, currentPrice: number, levels: Level[]): Bias {
   if (setupDetected) {
     return "bullish";
   }
@@ -344,8 +325,7 @@ function determineBias(
   if (resistanceLevels.length > 0) {
     const nearestResistance = resistanceLevels[0];
     if (nearestResistance) {
-      const distancePercent =
-        ((nearestResistance.price - currentPrice) / currentPrice) * 100;
+      const distancePercent = ((nearestResistance.price - currentPrice) / currentPrice) * 100;
 
       if (distancePercent <= 2) {
         return "bearish";
@@ -362,7 +342,7 @@ function determineBias(
 async function analyzeCoin(
   client: Exchange,
   symbol: string,
-  timeframe: string
+  timeframe: string,
 ): Promise<CoinAnalysis | null> {
   try {
     const candles = await client.getCandles(symbol, timeframe, 100);
@@ -462,10 +442,7 @@ function calculateVolume24h(candles: Candle[], timeframe: string): number {
 /**
  * Main scan function - fetches market data and ranks opportunities
  */
-export async function scan(
-  client: Exchange,
-  options?: ScanOptions
-): Promise<ScanResult> {
+export async function scan(client: Exchange, options?: ScanOptions): Promise<ScanResult> {
   const topN = options?.topN ?? 50;
   const requestedTimeframes = options?.timeframes ?? ["1h", "4h"];
   const primaryTimeframe = getPrimaryScanTimeframe(requestedTimeframes);
@@ -503,10 +480,8 @@ export async function scan(
     const symbols = await getTopSymbolsCached(client, topN);
     logger.debug("Got top symbols", { count: symbols.length });
 
-    const analysisResults = await mapWithConcurrency(
-      symbols,
-      SCAN_CONCURRENCY,
-      (symbol) => analyzeCoin(client, symbol, primaryTimeframe)
+    const analysisResults = await mapWithConcurrency(symbols, SCAN_CONCURRENCY, (symbol) =>
+      analyzeCoin(client, symbol, primaryTimeframe),
     );
 
     // Filter out failed analyses and sort by setup confidence

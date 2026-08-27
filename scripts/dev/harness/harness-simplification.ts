@@ -50,26 +50,106 @@ interface HarnessFlag {
 }
 
 const HARNESS_FLAGS: HarnessFlag[] = [
-  { name: "GORDON_TOOL_OUTPUT_FILTERS", description: "Semantic compression of large tool outputs", defaultEnabled: false },
-  { name: "GORDON_TOOL_RESULT_CACHE", description: "Cache tool results with `unchanged` envelopes", defaultEnabled: false },
-  { name: "GORDON_EXTENDED_THINKING", description: "Anthropic native budget_tokens per workflow phase", defaultEnabled: false },
-  { name: "GORDON_AGENT_LIST_ATTACHMENT", description: "Agent list as system attachment", defaultEnabled: false },
-  { name: "GORDON_RECOVERY_TIERS", description: "Doom-loop escalation Notify→Redirect→ForceStop", defaultEnabled: false },
-  { name: "GORDON_TOOL_DEFERRAL", description: "Hide deferred tools from schema until activated", defaultEnabled: false },
-  { name: "GORDON_REMINDERS", description: "Turn-cadence reminders in autonomous loop", defaultEnabled: false },
-  { name: "GORDON_PERMISSION_BUBBLE", description: "Fork-tagged permission requests", defaultEnabled: false },
-  { name: "GORDON_ACE_ENABLED", description: "ACE Reflector→Curator lesson distillation", defaultEnabled: false },
-  { name: "GORDON_EXPLAIN_FIRST", description: "User writes thesis before seeing Gordon's", defaultEnabled: false },
-  { name: "GORDON_SUPERVISION_RUST_RATE", description: "Periodic flawed-plan calibration check", defaultEnabled: false },
-  { name: "GORDON_RISK_ACK", description: "Medium+ tier plans require risk acknowledgement", defaultEnabled: false },
-  { name: "GORDON_LOCAL_FALLBACK", description: "Read-only tools fall back to raw data when provider down", defaultEnabled: false },
-  { name: "GORDON_TRADING_UNIVERSE", description: "Universe-scope sentinel", defaultEnabled: false },
-  { name: "GORDON_THESIS_COHERENCE", description: "Portfolio coherence vs running thesis", defaultEnabled: false },
-  { name: "GORDON_STRATEGY_MANDATES", description: "Per-strategy mandate decomposition", defaultEnabled: false },
-  { name: "GORDON_TRADER_BEHAVIOR_PATTERNS", description: "Cross-session behavior pattern surfacing", defaultEnabled: false },
-  { name: "GORDON_SPRINT_CONTRACT", description: "Pre-session scope contract", defaultEnabled: false },
-  { name: "GORDON_PLAN_RUBRIC", description: "6-dimension plan-card rubric", defaultEnabled: false },
-  { name: "GORDON_CLEAN_STATE_GATE", description: "Session-end clean-state enforcement", defaultEnabled: false },
+  {
+    name: "GORDON_TOOL_OUTPUT_FILTERS",
+    description: "Semantic compression of large tool outputs",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_TOOL_RESULT_CACHE",
+    description: "Cache tool results with `unchanged` envelopes",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_EXTENDED_THINKING",
+    description: "Anthropic native budget_tokens per workflow phase",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_AGENT_LIST_ATTACHMENT",
+    description: "Agent list as system attachment",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_RECOVERY_TIERS",
+    description: "Doom-loop escalation Notify→Redirect→ForceStop",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_TOOL_DEFERRAL",
+    description: "Hide deferred tools from schema until activated",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_REMINDERS",
+    description: "Turn-cadence reminders in autonomous loop",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_PERMISSION_BUBBLE",
+    description: "Fork-tagged permission requests",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_ACE_ENABLED",
+    description: "ACE Reflector→Curator lesson distillation",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_EXPLAIN_FIRST",
+    description: "User writes thesis before seeing Gordon's",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_SUPERVISION_RUST_RATE",
+    description: "Periodic flawed-plan calibration check",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_RISK_ACK",
+    description: "Medium+ tier plans require risk acknowledgement",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_LOCAL_FALLBACK",
+    description: "Read-only tools fall back to raw data when provider down",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_TRADING_UNIVERSE",
+    description: "Universe-scope sentinel",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_THESIS_COHERENCE",
+    description: "Portfolio coherence vs running thesis",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_STRATEGY_MANDATES",
+    description: "Per-strategy mandate decomposition",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_TRADER_BEHAVIOR_PATTERNS",
+    description: "Cross-session behavior pattern surfacing",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_SPRINT_CONTRACT",
+    description: "Pre-session scope contract",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_PLAN_RUBRIC",
+    description: "6-dimension plan-card rubric",
+    defaultEnabled: false,
+  },
+  {
+    name: "GORDON_CLEAN_STATE_GATE",
+    description: "Session-end clean-state enforcement",
+    defaultEnabled: false,
+  },
 ];
 
 type Outcome = "keep" | "remove" | "replace";
@@ -85,8 +165,8 @@ interface RotationState {
   entries: RotationEntry[];
 }
 
-const ROTATION_PATH = process.env.GORDON_HARNESS_ROTATION_PATH ||
-  join(homedir(), ".gordon", "harness-rotation.json");
+const ROTATION_PATH =
+  process.env.GORDON_HARNESS_ROTATION_PATH || join(homedir(), ".gordon", "harness-rotation.json");
 
 function loadRotation(path: string = ROTATION_PATH): RotationState {
   if (!existsSync(path)) return { entries: [] };
@@ -111,7 +191,10 @@ function saveRotation(state: RotationState, path: string = ROTATION_PATH): void 
  * already been removed). A flag with outcome `replace` re-enters the
  * rotation after 90 days.
  */
-function pickNextFlag(state: RotationState, flags: HarnessFlag[] = HARNESS_FLAGS): HarnessFlag | null {
+function pickNextFlag(
+  state: RotationState,
+  flags: HarnessFlag[] = HARNESS_FLAGS,
+): HarnessFlag | null {
   const byName = new Map<string, RotationEntry>();
   for (const e of state.entries) byName.set(e.flag, e);
   const now = Date.now();
@@ -196,7 +279,9 @@ function formatStatus(state: RotationState): string {
   } else {
     const sorted = [...state.entries].sort((a, b) => a.lastTestedAt.localeCompare(b.lastTestedAt));
     for (const e of sorted) {
-      lines.push(`  ${e.lastTestedAt.slice(0, 10)}  ${e.outcome.padEnd(8)}  ${e.flag}${e.notes ? "  — " + e.notes : ""}`);
+      lines.push(
+        `  ${e.lastTestedAt.slice(0, 10)}  ${e.outcome.padEnd(8)}  ${e.flag}${e.notes ? `  — ${e.notes}` : ""}`,
+      );
     }
   }
   const next = pickNextFlag(state);
@@ -205,7 +290,12 @@ function formatStatus(state: RotationState): string {
   return lines.join("\n");
 }
 
-function recordOutcome(state: RotationState, flag: string, outcome: Outcome, notes?: string): RotationState {
+function recordOutcome(
+  state: RotationState,
+  flag: string,
+  outcome: Outcome,
+  notes?: string,
+): RotationState {
   const known = HARNESS_FLAGS.find((f) => f.name === flag);
   if (!known) {
     throw new Error(`Unknown flag: ${flag}. Known: ${HARNESS_FLAGS.map((f) => f.name).join(", ")}`);
@@ -224,7 +314,15 @@ function recordOutcome(state: RotationState, flag: string, outcome: Outcome, not
 // CLI
 // ============================================================================
 
-export { HARNESS_FLAGS, pickNextFlag, recordOutcome, renderReport, formatStatus, loadRotation, saveRotation };
+export {
+  HARNESS_FLAGS,
+  pickNextFlag,
+  recordOutcome,
+  renderReport,
+  formatStatus,
+  loadRotation,
+  saveRotation,
+};
 
 if (import.meta.main) {
   const args = process.argv.slice(2);

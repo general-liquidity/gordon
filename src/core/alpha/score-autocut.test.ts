@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { selectByScoreDiscontinuity, type AutocutItem } from "./score-autocut.ts";
 
-const items = (scores: number[]): AutocutItem[] => scores.map((score, i) => ({ id: `c${i}`, score }));
+const items = (scores: number[]): AutocutItem[] =>
+  scores.map((score, i) => ({ id: `c${i}`, score }));
 
 describe("selectByScoreDiscontinuity", () => {
   it("cuts at a clear cliff and returns the leading cluster", () => {
@@ -69,9 +70,11 @@ describe("selectByScoreDiscontinuity", () => {
   });
 
   it("carries item ids through and sorts descending", () => {
-    const r = selectByScoreDiscontinuity(
-      [{ id: "low", score: 1 }, { id: "high", score: 100 }, { id: "mid", score: 2 }],
-    );
+    const r = selectByScoreDiscontinuity([
+      { id: "low", score: 1 },
+      { id: "high", score: 100 },
+      { id: "mid", score: 2 },
+    ]);
     expect(r.selected[0]!.id).toBe("high");
   });
 

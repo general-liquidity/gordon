@@ -33,7 +33,7 @@ import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 const SQUEEZE_PERCENTILE = 20; // Lowest 20% of bandwidth
 
 /** Minimum consolidation periods */
-const MIN_CONSOLIDATION_CANDLES = 5;
+const _MIN_CONSOLIDATION_CANDLES = 5;
 
 /** Volume ratio for breakout confirmation */
 const BREAKOUT_VOLUME_RATIO = 1.5;
@@ -56,7 +56,7 @@ export class ConsolidationPopStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, 100);
     if (candles.length < 50) {
@@ -90,7 +90,7 @@ export class ConsolidationPopStrategy extends BaseStrategy {
       lastCandle &&
       lastCandle.close > lastCandle.open && // Bullish
       (currentPrice > recentHigh * 0.99 || // Near/above recent high
-       (bb.current.upper && currentPrice > bb.current.upper)); // Breaking upper band
+        (bb.current.upper && currentPrice > bb.current.upper)); // Breaking upper band
 
     if (!isBreakingOut) {
       return this.notDetected("No breakout detected (still consolidating)");
@@ -100,7 +100,7 @@ export class ConsolidationPopStrategy extends BaseStrategy {
     const volumeRatio = this.getVolumeRatio(candles);
     if (volumeRatio < BREAKOUT_VOLUME_RATIO) {
       return this.notDetected(
-        `Insufficient volume on breakout (${volumeRatio.toFixed(1)}x < ${BREAKOUT_VOLUME_RATIO}x)`
+        `Insufficient volume on breakout (${volumeRatio.toFixed(1)}x < ${BREAKOUT_VOLUME_RATIO}x)`,
       );
     }
 
@@ -131,7 +131,7 @@ export class ConsolidationPopStrategy extends BaseStrategy {
     const levels = this.detectLevels(candles, currentPrice);
     const resistances = this.getResistances(levels, currentPrice);
     const breakingResistance = resistances.some(
-      (r) => Math.abs(currentPrice - r.price) / r.price < 0.01
+      (r) => Math.abs(currentPrice - r.price) / r.price < 0.01,
     );
     if (breakingResistance) {
       confidence += 0.1;
@@ -183,20 +183,16 @@ export class ConsolidationPopStrategy extends BaseStrategy {
    */
   private getVolumeRatio(candles: { volume: number }[]): number {
     const lastVolume = candles[candles.length - 1]?.volume ?? 0;
-    const avgVolume =
-      candles.slice(-21, -1).reduce((sum, c) => sum + c.volume, 0) / 20;
+    const avgVolume = candles.slice(-21, -1).reduce((sum, c) => sum + c.volume, 0) / 20;
     return avgVolume > 0 ? lastVolume / avgVolume : 0;
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", 100);
     const currentPrice = this.getCurrentPrice(candles, ctx);
 
     const bb = this.calculateBollingerBands(candles);
-    const atr = this.calculateATR(candles);
+    const _atr = this.calculateATR(candles);
 
     const entryPrice = currentPrice;
 
@@ -221,7 +217,8 @@ export class ConsolidationPopStrategy extends BaseStrategy {
       stopLoss,
       takeProfits,
       riskRewardRatio,
-      notes: `Consolidation breakout. Stop below range at $${stopLoss.toFixed(2)}. ` +
+      notes:
+        `Consolidation breakout. Stop below range at $${stopLoss.toFixed(2)}. ` +
         `Volatility expansion expected. R:R ${riskRewardRatio.toFixed(1)}:1`,
     };
   }
@@ -283,7 +280,7 @@ When creating a plan using the Consolidation Pop strategy:
     bar: OHLC,
     _index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     const price = bar.close;
     const { rsi14, bbUpper, bbMiddle, bbWidth, sma20, sma50, volumeRatio } = indicators;

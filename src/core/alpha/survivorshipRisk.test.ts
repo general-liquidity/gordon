@@ -139,10 +139,18 @@ describe("classifySurvivorshipRisk — output shape + guards", () => {
 
   test("throws on invalid universeSize / windowDays", () => {
     expect(() =>
-      classifySurvivorshipRisk({ crossSectional: true, universeConstruction: "current_snapshot", universeSize: 0 }),
+      classifySurvivorshipRisk({
+        crossSectional: true,
+        universeConstruction: "current_snapshot",
+        universeSize: 0,
+      }),
     ).toThrow(/universeSize/);
     expect(() =>
-      classifySurvivorshipRisk({ crossSectional: true, universeConstruction: "current_snapshot", windowDays: -1 }),
+      classifySurvivorshipRisk({
+        crossSectional: true,
+        universeConstruction: "current_snapshot",
+        windowDays: -1,
+      }),
     ).toThrow(/windowDays/);
   });
 });

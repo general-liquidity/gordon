@@ -45,7 +45,9 @@ export async function generateAwaySummary(
   }
 
   if (signals.length > 0) {
-    lines.push(`  \u25C8 ${signals.length} strategy signal${signals.length > 1 ? "s" : ""} detected`);
+    lines.push(
+      `  \u25C8 ${signals.length} strategy signal${signals.length > 1 ? "s" : ""} detected`,
+    );
   }
 
   // Position summary

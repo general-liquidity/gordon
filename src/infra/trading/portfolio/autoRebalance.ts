@@ -141,7 +141,11 @@ export function startStep(cycle: RebalanceCycle, stepId: RebalanceStepId): Rebal
 /**
  * Complete a step successfully.
  */
-export function completeStep(cycle: RebalanceCycle, stepId: RebalanceStepId, result?: unknown): void {
+export function completeStep(
+  cycle: RebalanceCycle,
+  stepId: RebalanceStepId,
+  result?: unknown,
+): void {
   const step = cycle.steps.find((s) => s.id === stepId);
   if (!step) return;
   step.status = "success";
@@ -203,7 +207,10 @@ export function detectDrift(
   targetAllocations: Record<string, number>,
   thresholdPct: number = 5,
 ): DriftDetection {
-  const allSymbols = new Set([...Object.keys(currentAllocations), ...Object.keys(targetAllocations)]);
+  const allSymbols = new Set([
+    ...Object.keys(currentAllocations),
+    ...Object.keys(targetAllocations),
+  ]);
   const drifted: DriftDetection["driftedPositions"] = [];
   let totalDrift = 0;
 
@@ -239,11 +246,15 @@ export function formatCycleStatus(cycle: RebalanceCycle): string {
 
   for (const step of cycle.steps) {
     const icon =
-      step.status === "success" ? "✓" :
-      step.status === "failed" ? "✗" :
-      step.status === "running" ? "●" :
-      step.status === "skipped" ? "○" :
-      "·";
+      step.status === "success"
+        ? "✓"
+        : step.status === "failed"
+          ? "✗"
+          : step.status === "running"
+            ? "●"
+            : step.status === "skipped"
+              ? "○"
+              : "·";
     const time = step.durationMs ? ` (${(step.durationMs / 1000).toFixed(1)}s)` : "";
     const err = step.error ? ` — ${step.error}` : "";
     lines.push(`  ${icon} ${step.label}${time}${err}`);

@@ -25,7 +25,7 @@ import type { MastraExecutionContext } from "../../types.ts";
  */
 export type ToolExecutor<TInput, TOutput> = (
   input: TInput,
-  context?: MastraExecutionContext
+  context?: MastraExecutionContext,
 ) => Promise<TOutput>;
 
 /**
@@ -97,14 +97,16 @@ export const TOOL_TIMEOUT_CONFIG: Record<string, ToolTimeoutConfig> = {
   },
   compare_backtests: {
     timeout: 90_000,
-    timeoutMessage: "Backtest comparison timed out after 90 seconds. Try comparing fewer strategies.",
+    timeoutMessage:
+      "Backtest comparison timed out after 90 seconds. Try comparing fewer strategies.",
     returnPartialOnTimeout: true,
   },
 
   // Market scanning tools - medium operations
   scan_market: {
     timeout: 30_000,
-    timeoutMessage: "Market scan timed out after 30 seconds. Try scanning fewer coins (reduce topN).",
+    timeoutMessage:
+      "Market scan timed out after 30 seconds. Try scanning fewer coins (reduce topN).",
     returnPartialOnTimeout: true,
   },
   detect_whale_activity: {
@@ -126,7 +128,8 @@ export const TOOL_TIMEOUT_CONFIG: Record<string, ToolTimeoutConfig> = {
   // Analysis tools - short-medium operations
   analyze_coin: {
     timeout: 15_000,
-    timeoutMessage: "Coin analysis timed out after 15 seconds. The exchange may be experiencing delays.",
+    timeoutMessage:
+      "Coin analysis timed out after 15 seconds. The exchange may be experiencing delays.",
     returnPartialOnTimeout: false,
   },
   score_trading_opportunity: {
@@ -148,7 +151,8 @@ export const TOOL_TIMEOUT_CONFIG: Record<string, ToolTimeoutConfig> = {
   },
   get_bollinger_bands: {
     timeout: 10_000,
-    timeoutMessage: "Bollinger Bands calculation timed out. The exchange may be experiencing delays.",
+    timeoutMessage:
+      "Bollinger Bands calculation timed out. The exchange may be experiencing delays.",
     returnPartialOnTimeout: false,
   },
   get_technical_analysis: {
@@ -290,7 +294,7 @@ function createTimeoutPromise(ms: number, message: string): Promise<never> {
 export async function executeWithTimeout<T>(
   fn: () => Promise<T>,
   timeout: number,
-  timeoutMessage = "Operation timed out"
+  timeoutMessage = "Operation timed out",
 ): Promise<TimeoutResult<T>> {
   const startTime = Date.now();
 
@@ -349,7 +353,7 @@ export async function executeWithTimeout<T>(
 export function withTimeout<TInput, TOutput>(
   toolName: string,
   executor: ToolExecutor<TInput, TOutput>,
-  config?: Partial<ToolTimeoutConfig>
+  config?: Partial<ToolTimeoutConfig>,
 ): ToolExecutor<TInput, TOutput | { error: string; timedOut: true; executionTime: number }> {
   // Merge configurations: provided config > tool-specific > defaults
   const toolConfig = TOOL_TIMEOUT_CONFIG[toolName];
@@ -365,12 +369,12 @@ export function withTimeout<TInput, TOutput>(
 
   return async function timedExecutor(
     input: TInput,
-    context?: MastraExecutionContext
+    context?: MastraExecutionContext,
   ): Promise<TOutput | { error: string; timedOut: true; executionTime: number }> {
     const result = await executeWithTimeout(
       () => executor(input, context),
       finalConfig.timeout,
-      finalConfig.timeoutMessage
+      finalConfig.timeoutMessage,
     );
 
     if (result.completed && result.result !== undefined) {

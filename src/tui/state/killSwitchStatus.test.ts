@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { buildKillSwitchStatus, formatKillSwitchBadge, formatKillSwitchKey } from "./killSwitchStatus.ts";
+import {
+  buildKillSwitchStatus,
+  formatKillSwitchBadge,
+  formatKillSwitchKey,
+} from "./killSwitchStatus.ts";
 
 describe("killSwitchStatus", () => {
   it("formats scoped keys", () => {
@@ -41,30 +45,38 @@ describe("killSwitchStatus", () => {
     });
 
     it("formats a single firm trip without a count", () => {
-      const badge = formatKillSwitchBadge(buildKillSwitchStatus({
-        enabled: true,
-        trips: [{ key: { scope: "firm" }, reason: "operator halt", trippedAt: 10 }],
-      }));
+      const badge = formatKillSwitchBadge(
+        buildKillSwitchStatus({
+          enabled: true,
+          trips: [{ key: { scope: "firm" }, reason: "operator halt", trippedAt: 10 }],
+        }),
+      );
       expect(badge).toEqual({ text: "⛔ HALTED: firm", severity: "halted" });
     });
 
     it("formats a single scoped trip with its id", () => {
-      const badge = formatKillSwitchBadge(buildKillSwitchStatus({
-        enabled: true,
-        trips: [{ key: { scope: "venue", id: "binance" }, reason: "venue degraded", trippedAt: 20 }],
-      }));
+      const badge = formatKillSwitchBadge(
+        buildKillSwitchStatus({
+          enabled: true,
+          trips: [
+            { key: { scope: "venue", id: "binance" }, reason: "venue degraded", trippedAt: 20 },
+          ],
+        }),
+      );
       expect(badge).toEqual({ text: "⛔ HALTED: venue:binance", severity: "halted" });
     });
 
     it("leads with the firm trip and counts the rest", () => {
-      const badge = formatKillSwitchBadge(buildKillSwitchStatus({
-        enabled: true,
-        trips: [
-          { key: { scope: "venue", id: "binance" }, reason: "venue degraded", trippedAt: 20 },
-          { key: { scope: "firm" }, reason: "operator halt", trippedAt: 30 },
-          { key: { scope: "instrument", id: "BTC/USDT" }, reason: "vol spike", trippedAt: 40 },
-        ],
-      }));
+      const badge = formatKillSwitchBadge(
+        buildKillSwitchStatus({
+          enabled: true,
+          trips: [
+            { key: { scope: "venue", id: "binance" }, reason: "venue degraded", trippedAt: 20 },
+            { key: { scope: "firm" }, reason: "operator halt", trippedAt: 30 },
+            { key: { scope: "instrument", id: "BTC/USDT" }, reason: "vol spike", trippedAt: 40 },
+          ],
+        }),
+      );
       expect(badge).toEqual({ text: "⛔ HALTED: firm +2", severity: "halted" });
     });
   });

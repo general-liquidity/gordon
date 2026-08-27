@@ -160,18 +160,15 @@ export function evaluateDeleveragingVeto(
   let oversoldCount = 0;
   const evaluated = valid.map((a) => {
     const currentlyOversold = a.oscillator <= threshold;
-    const priorKnown =
-      typeof a.priorOscillator === "number" && Number.isFinite(a.priorOscillator);
-    const flippedThisCycle =
-      currentlyOversold && priorKnown && a.priorOscillator! > threshold;
+    const priorKnown = typeof a.priorOscillator === "number" && Number.isFinite(a.priorOscillator);
+    const flippedThisCycle = currentlyOversold && priorKnown && a.priorOscillator! > threshold;
     if (currentlyOversold) oversoldCount += 1;
     if (flippedThisCycle) flippedCount += 1;
     return { asset: a, currentlyOversold, flippedThisCycle };
   });
 
   const flipFraction = flippedCount / valid.length;
-  const vetoTriggered =
-    flippedCount >= minOversold && flipFraction >= vetoFraction;
+  const vetoTriggered = flippedCount >= minOversold && flipFraction >= vetoFraction;
 
   const assetResults: OversoldAssetResult[] = evaluated.map((e) => {
     let status: OversoldStatus;
@@ -187,12 +184,8 @@ export function evaluateDeleveragingVeto(
     };
   });
 
-  const vetoedSymbols = assetResults
-    .filter((r) => r.status === "vetoed")
-    .map((r) => r.symbol);
-  const dipSymbols = assetResults
-    .filter((r) => r.status === "oversold_dip")
-    .map((r) => r.symbol);
+  const vetoedSymbols = assetResults.filter((r) => r.status === "vetoed").map((r) => r.symbol);
+  const dipSymbols = assetResults.filter((r) => r.status === "oversold_dip").map((r) => r.symbol);
 
   const verdict: DeleveragingVetoVerdict = vetoTriggered ? "veto" : "no_veto";
   const summary = vetoTriggered
@@ -230,11 +223,15 @@ export function formatDeleveragingVeto(result: DeleveragingVetoResult): string {
   ];
   if (result.vetoedSymbols.length > 0) {
     lines.push("");
-    lines.push(`  Vetoed longs (${result.vetoedSymbols.length}): ${result.vetoedSymbols.join(", ")}`);
+    lines.push(
+      `  Vetoed longs (${result.vetoedSymbols.length}): ${result.vetoedSymbols.join(", ")}`,
+    );
   }
   if (result.dipSymbols.length > 0) {
     lines.push("");
-    lines.push(`  Idiosyncratic dips (${result.dipSymbols.length}): ${result.dipSymbols.join(", ")}`);
+    lines.push(
+      `  Idiosyncratic dips (${result.dipSymbols.length}): ${result.dipSymbols.join(", ")}`,
+    );
   }
   lines.push("");
   lines.push(`Summary: ${result.summary}`);

@@ -17,12 +17,8 @@ function makeRecord(
   // Use `in` checks so callers can explicitly set stateBefore/stateAfter
   // to undefined to test missing-snapshot paths. The `??` operator
   // would otherwise fall through to the default for explicit undefined.
-  const stateBefore = "stateBefore" in overrides
-    ? overrides.stateBefore
-    : { realizedPnLUsd: 0 };
-  const stateAfter = "stateAfter" in overrides
-    ? overrides.stateAfter
-    : { realizedPnLUsd: pnl };
+  const stateBefore = "stateBefore" in overrides ? overrides.stateBefore : { realizedPnLUsd: 0 };
+  const stateAfter = "stateAfter" in overrides ? overrides.stateAfter : { realizedPnLUsd: pnl };
   const base: ExecutionRecord = {
     recordId: overrides.recordId ?? `r-${Math.random().toString(36).slice(2, 10)}`,
     priorRecordId: overrides.priorRecordId ?? null,
@@ -172,13 +168,9 @@ describe("computeExpectancyReport — best/worst tags", () => {
   it("identifies best and worst tags among robust tiers", () => {
     const records = [
       // Tag A: 50 wins of 10, no losses
-      ...Array.from({ length: 50 }, () =>
-        makeRecord({ symbol: "A", pnl: 10 }),
-      ),
+      ...Array.from({ length: 50 }, () => makeRecord({ symbol: "A", pnl: 10 })),
       // Tag B: 50 losses of 5, no wins
-      ...Array.from({ length: 50 }, () =>
-        makeRecord({ symbol: "B", pnl: -5 }),
-      ),
+      ...Array.from({ length: 50 }, () => makeRecord({ symbol: "B", pnl: -5 })),
     ];
     const report = computeExpectancyReport(records);
     expect(report.bestTag!.tag).toBe("A");
@@ -188,13 +180,9 @@ describe("computeExpectancyReport — best/worst tags", () => {
   it("excludes insufficient-tier tags from best/worst selection", () => {
     const records = [
       // Tag A: 5 samples (insufficient)
-      ...Array.from({ length: 5 }, () =>
-        makeRecord({ symbol: "A", pnl: 1000 }),
-      ),
+      ...Array.from({ length: 5 }, () => makeRecord({ symbol: "A", pnl: 1000 })),
       // Tag B: 50 samples (robust), moderately profitable
-      ...Array.from({ length: 50 }, () =>
-        makeRecord({ symbol: "B", pnl: 5 }),
-      ),
+      ...Array.from({ length: 50 }, () => makeRecord({ symbol: "B", pnl: 5 })),
     ];
     const report = computeExpectancyReport(records);
     expect(report.bestTag!.tag).toBe("B"); // A is excluded for insufficiency
@@ -261,7 +249,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* */ }
+  try {
+    rmSync(tempDir, { recursive: true, force: true });
+  } catch {
+    /* */
+  }
 });
 
 describe("readLedgerRecords", () => {
@@ -276,7 +268,7 @@ describe("readLedgerRecords", () => {
       makeRecord({ symbol: "BTC", pnl: 10 }),
       makeRecord({ symbol: "ETH", pnl: -5 }),
     ];
-    writeFileSync(path, records.map((r) => JSON.stringify(r)).join("\n") + "\n");
+    writeFileSync(path, `${records.map((r) => JSON.stringify(r)).join("\n")}\n`);
     const read = readLedgerRecords(path);
     expect(read.length).toBe(2);
   });

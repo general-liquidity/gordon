@@ -1,11 +1,7 @@
 import { describe, it, expect } from "bun:test";
 
 import { parseGoal, scoreGoal, type GoalObservation } from "./goalMode.ts";
-import {
-  deriveRequirements,
-  unmetRequirements,
-  summarizeGaps,
-} from "./goalGapFinding.ts";
+import { deriveRequirements, unmetRequirements, summarizeGaps } from "./goalGapFinding.ts";
 
 function requirements(goalText: string, obs: GoalObservation) {
   const goal = parseGoal(goalText);

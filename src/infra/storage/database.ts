@@ -1,4 +1,4 @@
-import { Database, type Statement } from "bun:sqlite";
+import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createModuleLogger } from "../logger/index.ts";
@@ -18,6 +18,16 @@ export function setDatabasePathForTesting(databasePath: string | null): void {
 }
 
 let dbInstance: Database | null = null;
+let databaseGeneration = 0;
+
+/**
+ * Monotonic identity for the currently opened SQLite handle. Consumers that
+ * cache per-database schema state can key it without retaining a closed native
+ * Database object (which keeps the file locked on Windows).
+ */
+export function getDatabaseGeneration(): number {
+  return databaseGeneration;
+}
 
 // Query logging configuration
 const SLOW_QUERY_THRESHOLD_MS = 100;
@@ -61,6 +71,7 @@ export function initDatabase(): Database {
   ensureGordonDirSync();
 
   const db = new Database(getDatabasePath());
+  databaseGeneration += 1;
 
   // Enable WAL mode for better concurrent access
   db.run("PRAGMA journal_mode = WAL");
@@ -227,8 +238,12 @@ export function initDatabase(): Database {
       expiresAt TEXT
     )
   `);
-  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_idempotency_session ON gateway_idempotency(sessionId)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_idempotency_created ON gateway_idempotency(createdAt)");
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_gateway_idempotency_session ON gateway_idempotency(sessionId)",
+  );
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_gateway_idempotency_created ON gateway_idempotency(createdAt)",
+  );
 
   // Replay protection nonces
   db.run(`
@@ -262,9 +277,15 @@ export function initDatabase(): Database {
       updatedAt TEXT NOT NULL
     )
   `);
-  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_queue_session_status ON gateway_command_queue(sessionId, status)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_queue_available ON gateway_command_queue(availableAt)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_queue_correlation ON gateway_command_queue(correlationId)");
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_gateway_queue_session_status ON gateway_command_queue(sessionId, status)",
+  );
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_gateway_queue_available ON gateway_command_queue(availableAt)",
+  );
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_gateway_queue_correlation ON gateway_command_queue(correlationId)",
+  );
 
   // Immutable gateway audit/event log
   db.run(`
@@ -280,9 +301,13 @@ export function initDatabase(): Database {
       signature TEXT
     )
   `);
-  db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_gateway_audit_entry_hash ON gateway_audit_log(entryHash)");
+  db.run(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_gateway_audit_entry_hash ON gateway_audit_log(entryHash)",
+  );
   db.run("CREATE INDEX IF NOT EXISTS idx_gateway_audit_timestamp ON gateway_audit_log(timestamp)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_audit_correlation ON gateway_audit_log(correlationId)");
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_gateway_audit_correlation ON gateway_audit_log(correlationId)",
+  );
 
   // Local cron scheduler tasks
   db.run(`
@@ -298,8 +323,12 @@ export function initDatabase(): Database {
       updatedAt TEXT NOT NULL
     )
   `);
-  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_scheduler_next_run ON gateway_scheduler_tasks(nextRunAt)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_scheduler_enabled ON gateway_scheduler_tasks(enabled)");
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_gateway_scheduler_next_run ON gateway_scheduler_tasks(nextRunAt)",
+  );
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_gateway_scheduler_enabled ON gateway_scheduler_tasks(enabled)",
+  );
 
   // Typed action log for chat, tools, daemon, scheduler, thread branching, and bookmarks
   db.run(`
@@ -320,11 +349,21 @@ export function initDatabase(): Database {
       createdAt TEXT NOT NULL
     )
   `);
-  db.run("CREATE INDEX IF NOT EXISTS idx_action_log_thread_created ON action_log_entries(threadId, createdAt)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_action_log_session_created ON action_log_entries(sessionId, createdAt)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_action_log_type_created ON action_log_entries(entryType, createdAt)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_action_log_bookmarked_created ON action_log_entries(bookmarked, createdAt)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_action_log_correlation ON action_log_entries(correlationId)");
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_action_log_thread_created ON action_log_entries(threadId, createdAt)",
+  );
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_action_log_session_created ON action_log_entries(sessionId, createdAt)",
+  );
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_action_log_type_created ON action_log_entries(entryType, createdAt)",
+  );
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_action_log_bookmarked_created ON action_log_entries(bookmarked, createdAt)",
+  );
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_action_log_correlation ON action_log_entries(correlationId)",
+  );
 
   // Persistent cumulative token/cost ledger by thread/session
   db.run(`
@@ -446,10 +485,7 @@ export function getAverageQueryTime(): number {
 /**
  * Execute a query with timing and logging
  */
-export function executeWithLogging<T>(
-  fn: () => T,
-  sql: string
-): T {
+export function executeWithLogging<T>(fn: () => T, sql: string): T {
   const startTime = performance.now();
   try {
     return fn();
@@ -489,10 +525,7 @@ export interface TransactionOptions {
  * });
  * ```
  */
-export function withTransaction<T>(
-  fn: () => T,
-  options: TransactionOptions = {}
-): T {
+export function withTransaction<T>(fn: () => T, options: TransactionOptions = {}): T {
   const db = getDatabase();
   const { mode = "DEFERRED" } = options;
   const isNested = transactionDepth > 0;
@@ -503,17 +536,11 @@ export function withTransaction<T>(
     if (isNested) {
       // Nested transaction: use savepoint
       savepointName = `sp_${++savepointCounter}`;
-      executeWithLogging(
-        () => db.run(`SAVEPOINT ${savepointName}`),
-        `SAVEPOINT ${savepointName}`
-      );
+      executeWithLogging(() => db.run(`SAVEPOINT ${savepointName}`), `SAVEPOINT ${savepointName}`);
       logger.debug("Savepoint created", { name: savepointName, depth: transactionDepth + 1 });
     } else {
       // Top-level transaction: BEGIN
-      executeWithLogging(
-        () => db.run(`BEGIN ${mode} TRANSACTION`),
-        `BEGIN ${mode} TRANSACTION`
-      );
+      executeWithLogging(() => db.run(`BEGIN ${mode} TRANSACTION`), `BEGIN ${mode} TRANSACTION`);
       logger.debug("Transaction started", { mode });
     }
 
@@ -553,14 +580,11 @@ function commitOrRelease(db: Database, savepointName: string | null): void {
   if (savepointName) {
     executeWithLogging(
       () => db.run(`RELEASE SAVEPOINT ${savepointName}`),
-      `RELEASE SAVEPOINT ${savepointName}`
+      `RELEASE SAVEPOINT ${savepointName}`,
     );
     logger.debug("Savepoint released", { name: savepointName });
   } else {
-    executeWithLogging(
-      () => db.run("COMMIT"),
-      "COMMIT"
-    );
+    executeWithLogging(() => db.run("COMMIT"), "COMMIT");
     logger.debug("Transaction committed");
   }
 }
@@ -575,12 +599,12 @@ function rollbackOrRevert(db: Database, savepointName: string | null): void {
     try {
       executeWithLogging(
         () => db.run(`ROLLBACK TO SAVEPOINT ${savepointName}`),
-        `ROLLBACK TO SAVEPOINT ${savepointName}`
+        `ROLLBACK TO SAVEPOINT ${savepointName}`,
       );
       // Release the savepoint after rollback
       executeWithLogging(
         () => db.run(`RELEASE SAVEPOINT ${savepointName}`),
-        `RELEASE SAVEPOINT ${savepointName}`
+        `RELEASE SAVEPOINT ${savepointName}`,
       );
       logger.debug("Savepoint rolled back", { name: savepointName });
     } catch (e) {
@@ -588,10 +612,7 @@ function rollbackOrRevert(db: Database, savepointName: string | null): void {
     }
   } else {
     try {
-      executeWithLogging(
-        () => db.run("ROLLBACK"),
-        "ROLLBACK"
-      );
+      executeWithLogging(() => db.run("ROLLBACK"), "ROLLBACK");
       logger.debug("Transaction rolled back");
     } catch (e) {
       logger.error("Failed to rollback transaction", e instanceof Error ? e : undefined);
@@ -619,7 +640,7 @@ export function getTransactionDepth(): number {
  */
 export function createPlanAndTradeInTransaction<P, T>(
   createPlanFn: () => P,
-  createTradeFn: (plan: P) => T
+  createTradeFn: (plan: P) => T,
 ): { plan: P; trade: T } {
   return withTransaction(() => {
     const plan = createPlanFn();

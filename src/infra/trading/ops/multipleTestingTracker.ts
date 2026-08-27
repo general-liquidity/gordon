@@ -96,10 +96,7 @@ export function resetAttemptCounterForTesting(): void {
   _attemptCounter = 0;
 }
 
-export function recordAttempt(
-  input: RecordAttemptInput,
-  path?: string,
-): StrategyAttempt {
+export function recordAttempt(input: RecordAttemptInput, path?: string): StrategyAttempt {
   const attempt: StrategyAttempt = {
     attemptId: nextAttemptId(),
     family: input.family,
@@ -112,7 +109,7 @@ export function recordAttempt(
   };
   const target = path ?? defaultAttemptsLogPath();
   ensureParentDir(target);
-  appendFileSync(target, JSON.stringify(attempt) + "\n", "utf8");
+  appendFileSync(target, `${JSON.stringify(attempt)}\n`, "utf8");
   return attempt;
 }
 
@@ -122,14 +119,13 @@ export interface ReadAttemptsOptions {
   limit?: number;
 }
 
-export function readAttempts(
-  opts: ReadAttemptsOptions = {},
-  path?: string,
-): StrategyAttempt[] {
+export function readAttempts(opts: ReadAttemptsOptions = {}, path?: string): StrategyAttempt[] {
   const target = path ?? defaultAttemptsLogPath();
   if (!existsSync(target)) return [];
 
-  const lines = readFileSync(target, "utf8").split("\n").filter((l) => l.trim().length > 0);
+  const lines = readFileSync(target, "utf8")
+    .split("\n")
+    .filter((l) => l.trim().length > 0);
   const attempts: StrategyAttempt[] = [];
   for (const line of lines) {
     try {
@@ -191,14 +187,17 @@ export function expectedMaxSharpeUnderNull(numTrials: number): number {
     if (p >= 1) return Infinity;
     if (p === 0.5) return 0;
     const t = p < 0.5 ? Math.sqrt(-2 * Math.log(p)) : Math.sqrt(-2 * Math.log(1 - p));
-    const c0 = 2.515517, c1 = 0.802853, c2 = 0.010328;
-    const d1 = 1.432788, d2 = 0.189269, d3 = 0.001308;
+    const c0 = 2.515517,
+      c1 = 0.802853,
+      c2 = 0.010328;
+    const d1 = 1.432788,
+      d2 = 0.189269,
+      d3 = 0.001308;
     const result = t - (c0 + c1 * t + c2 * t ** 2) / (1 + d1 * t + d2 * t ** 2 + d3 * t ** 3);
     return p < 0.5 ? -result : result;
   };
   const gamma = 0.5772156649;
-  const eZ =
-    (1 - gamma) * invNorm(1 - 1 / n) + gamma * invNorm(1 - 1 / (n * Math.E));
+  const eZ = (1 - gamma) * invNorm(1 - 1 / n) + gamma * invNorm(1 - 1 / (n * Math.E));
   return eZ;
 }
 
@@ -255,8 +254,7 @@ export function dynamicDeflatedThreshold(input: DynamicThresholdInput): DynamicT
   const n = input.periods;
   const ann = input.annualization ?? 252;
   const trialCount =
-    input.trialCountOverride ??
-    countTrials(input.family, input.attemptsLogPath).distinctCount;
+    input.trialCountOverride ?? countTrials(input.family, input.attemptsLogPath).distinctCount;
 
   if (n < 30) {
     return {

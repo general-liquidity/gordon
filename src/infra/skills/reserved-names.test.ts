@@ -19,9 +19,7 @@ describe("validateSkillFrontmatter — reserved name guard", () => {
       { name: "ccxt", description: "test description" },
       "ccxt",
     );
-    const reservedError = issues.find(
-      (i) => i.message.includes("reserved"),
-    );
+    const reservedError = issues.find((i) => i.message.includes("reserved"));
     expect(reservedError).toBeUndefined();
   });
 
@@ -31,9 +29,7 @@ describe("validateSkillFrontmatter — reserved name guard", () => {
       { name: "learn-skills", description: "test description" },
       "learn-skills",
     );
-    const reservedError = issues.find(
-      (i) => i.message.includes("reserved"),
-    );
+    const reservedError = issues.find((i) => i.message.includes("reserved"));
     expect(reservedError).toBeUndefined();
   });
 });

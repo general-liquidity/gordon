@@ -18,8 +18,7 @@ describe("normalizePemSecret", () => {
   });
 
   it("handles literal \\r\\n escapes", () => {
-    const raw =
-      "-----BEGIN EC PRIVATE KEY-----\\r\\nBODYLINE\\r\\n-----END EC PRIVATE KEY-----";
+    const raw = "-----BEGIN EC PRIVATE KEY-----\\r\\nBODYLINE\\r\\n-----END EC PRIVATE KEY-----";
     const out = normalizePemSecret(raw);
     expect(out.includes("\\r")).toBe(false);
     expect(out.includes("\\n")).toBe(false);
@@ -27,16 +26,14 @@ describe("normalizePemSecret", () => {
   });
 
   it("strips surrounding double quotes around a PEM", () => {
-    const raw =
-      '"-----BEGIN EC PRIVATE KEY-----\\nBODY\\n-----END EC PRIVATE KEY-----"';
+    const raw = '"-----BEGIN EC PRIVATE KEY-----\\nBODY\\n-----END EC PRIVATE KEY-----"';
     const out = normalizePemSecret(raw);
     expect(out.startsWith("-----BEGIN")).toBe(true);
     expect(out.endsWith("-----END EC PRIVATE KEY-----")).toBe(true);
   });
 
   it("strips surrounding single quotes around a PEM", () => {
-    const raw =
-      "'-----BEGIN EC PRIVATE KEY-----\\nBODY\\n-----END EC PRIVATE KEY-----'";
+    const raw = "'-----BEGIN EC PRIVATE KEY-----\\nBODY\\n-----END EC PRIVATE KEY-----'";
     const out = normalizePemSecret(raw);
     expect(out.startsWith("-----BEGIN")).toBe(true);
     expect(out.endsWith("-----END EC PRIVATE KEY-----")).toBe(true);
@@ -136,7 +133,12 @@ describe("resolveExchangeCredentials — passphrase handling", () => {
 });
 
 describe("resolveExchangeCredentials — generic env fallback for long-tail venues", () => {
-  const NAMES = ["BYBIT_API_KEY", "BYBIT_API_SECRET", "CCXT_BYBIT_API_KEY", "CCXT_BYBIT_API_SECRET"];
+  const NAMES = [
+    "BYBIT_API_KEY",
+    "BYBIT_API_SECRET",
+    "CCXT_BYBIT_API_KEY",
+    "CCXT_BYBIT_API_SECRET",
+  ];
   const SAVED: Record<string, string | undefined> = {};
 
   afterEach(() => {

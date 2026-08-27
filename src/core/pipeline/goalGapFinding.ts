@@ -49,9 +49,7 @@ export function deriveRequirements(
   if (goal.endState) {
     const es = goal.endState;
     const label =
-      es.threshold !== undefined
-        ? `${es.metric ?? es.type} >= ${es.threshold}`
-        : es.type;
+      es.threshold !== undefined ? `${es.metric ?? es.type} >= ${es.threshold}` : es.type;
     reqs.push({
       id: `end_state:${es.type}`,
       kind: "end_state",

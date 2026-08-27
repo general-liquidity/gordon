@@ -43,7 +43,7 @@ const DEFAULT_EDIT_BUDGET = 4;
 
 function getEditBudget(): number {
   const raw = process.env.GORDON_ACE_EDIT_BUDGET;
-  if (raw && raw.trim()) {
+  if (raw?.trim()) {
     const parsed = Number(raw);
     if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
   }
@@ -111,7 +111,7 @@ const CATEGORY_BASE_SCORE: Record<ACELessonCandidate["category"], number> = {
   // risk event so it surfaces aggressively and is evicted last.
   operator_override: 0.92,
   execution_failure: 0.85,
-  strategy_decay: 0.80,
+  strategy_decay: 0.8,
   // Self-reported agent blocks are high-signal — the agent explicitly named
   // intent + blocker, which is more actionable than inferring from a tool
   // failure. Score above execution_failure so these surface early.
@@ -130,14 +130,14 @@ const CATEGORY_BASE_SCORE: Record<ACELessonCandidate["category"], number> = {
   // user's running behavior, high-signal but inherently noisier than
   // per-event rules because the threshold logic makes inferences.
   aggregate_pattern: 0.73,
-  venue_quirk: 0.70,
+  venue_quirk: 0.7,
   execution_success: 0.55,
-  operational: 0.50,
+  operational: 0.5,
 };
 
 export function getACELessonsPath(): string {
   const override = process.env.GORDON_ACE_LESSONS_PATH;
-  if (override && override.trim()) return override;
+  if (override?.trim()) return override;
   return join(homedir(), ".gordon", "ace-lessons.json");
 }
 
@@ -167,7 +167,7 @@ export function loadACELessons(): ACELessonStore {
   try {
     const raw = readFileSync(path, "utf8");
     const parsed = JSON.parse(raw) as Partial<ACELessonStore>;
-    if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.lessons)) {
+    if (parsed?.version !== 1 || !Array.isArray(parsed.lessons)) {
       return emptyStore();
     }
     return {
@@ -189,7 +189,11 @@ export function loadACELessons(): ACELessonStore {
 }
 
 function lessonId(category: ACELessonCandidate["category"], text: string): string {
-  const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+  const slug = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
   return `${category}::${slug}`;
 }
 
@@ -362,9 +366,7 @@ export function loadLessonEvidence(
 ): { lesson: ACELesson; entries: Array<ActionLogEntry | null> } | null {
   const store = loadACELessons();
   const lesson =
-    typeof lessonOrId === "string"
-      ? store.lessons.find((l) => l.id === lessonOrId)
-      : lessonOrId;
+    typeof lessonOrId === "string" ? store.lessons.find((l) => l.id === lessonOrId) : lessonOrId;
   if (!lesson) return null;
 
   const ids = lesson.evidenceEntryIds ?? [];
@@ -399,7 +401,10 @@ export function formatACELessonsForPrompt(store: ACELessonStore, maxLessons = 12
   const lines = [
     "[GORDON_ACE_LESSONS]",
     `Lessons accumulated across prior sessions (Reflector→Curator output) — lesson-set revision ${store.revision}:`,
-    ...top.map((l) => `- [${l.category}] ${l.text} (evidence: ${l.evidenceCount}, score: ${l.score.toFixed(2)})`),
+    ...top.map(
+      (l) =>
+        `- [${l.category}] ${l.text} (evidence: ${l.evidenceCount}, score: ${l.score.toFixed(2)})`,
+    ),
   ];
   return lines.join("\n");
 }

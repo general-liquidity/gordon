@@ -52,9 +52,7 @@ export function isSettingsSyncEnabled(env: NodeJS.ProcessEnv = process.env): boo
 export function resolveSyncKey(env: NodeJS.ProcessEnv = process.env): string {
   const key = env[SETTINGS_SYNC_KEY_ENV];
   if (!key || key.length === 0) {
-    throw new Error(
-      `settings-sync requires an operator key in ${SETTINGS_SYNC_KEY_ENV}`,
-    );
+    throw new Error(`settings-sync requires an operator key in ${SETTINGS_SYNC_KEY_ENV}`);
   }
   return key;
 }
@@ -124,7 +122,11 @@ export function verifySnapshot(snapshot: unknown, key: string): SnapshotVerifica
     (snapshot as SettingsSnapshot).values === null ||
     typeof (snapshot as SettingsSnapshot).signedAt !== "number"
   ) {
-    return { valid: false, reason: "malformed", detail: "snapshot is not a well-formed settings snapshot" };
+    return {
+      valid: false,
+      reason: "malformed",
+      detail: "snapshot is not a well-formed settings snapshot",
+    };
   }
   const snap = snapshot as SettingsSnapshot;
   if (!snap.signature || snap.signature.length === 0) {
@@ -133,7 +135,11 @@ export function verifySnapshot(snapshot: unknown, key: string): SnapshotVerifica
   const { signature: _sig, ...content } = snap;
   const expected = computeSnapshotSignature(content, key);
   if (expected !== snap.signature) {
-    return { valid: false, reason: "signature_mismatch", detail: "HMAC signature does not verify with the configured key" };
+    return {
+      valid: false,
+      reason: "signature_mismatch",
+      detail: "HMAC signature does not verify with the configured key",
+    };
   }
   return { valid: true };
 }
@@ -318,9 +324,7 @@ export async function pullSettings(options: PullOptions): Promise<PullResult> {
     return { status: "rejected", reason: verification.reason, detail: verification.detail };
   }
 
-  const relaxations = options.current
-    ? detectSafetyRelaxations(options.current, raw.values)
-    : [];
+  const relaxations = options.current ? detectSafetyRelaxations(options.current, raw.values) : [];
 
   if (relaxations.length > 0) {
     warn("Remote settings snapshot would RELAX safety-critical field(s)", {
@@ -351,7 +355,10 @@ export function syncCachePath(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 /** Persist a verified snapshot to the local cache (mode 0600, best-effort). */
-export function writeSyncCache(snapshot: SettingsSnapshot, env: NodeJS.ProcessEnv = process.env): void {
+export function writeSyncCache(
+  snapshot: SettingsSnapshot,
+  env: NodeJS.ProcessEnv = process.env,
+): void {
   const path = syncCachePath(env);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, JSON.stringify(snapshot, null, 2), { mode: 0o600 });

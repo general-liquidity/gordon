@@ -38,12 +38,7 @@ export const GENESIS_SIGNATURE = "genesis";
 // that is added AFTER a trace is signed. Excluding it keeps the content hash
 // identical whether it is absent or populated, so annotating a signed trace
 // never breaks the tamper chain. See types.ts (ParentAbsorptionRecord).
-const SIGNING_FIELDS = new Set([
-  "content_hash",
-  "prev_signature",
-  "signature",
-  "absorptions",
-]);
+const SIGNING_FIELDS = new Set(["content_hash", "prev_signature", "signature", "absorptions"]);
 
 /**
  * Deterministic JSON: sorted object keys, undefined-valued keys dropped.
@@ -74,7 +69,9 @@ export function computeTraceContentHash(trace: AuditTrace): string {
 }
 
 function hmacSignature(key: string, contentHash: string, prevSignature: string): string {
-  return createHmac("sha256", key).update(contentHash + prevSignature).digest("hex");
+  return createHmac("sha256", key)
+    .update(contentHash + prevSignature)
+    .digest("hex");
 }
 
 /**

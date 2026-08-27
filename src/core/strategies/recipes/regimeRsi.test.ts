@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  regimeRsiSignal,
-  DEFAULT_REGIME_RSI_SETTINGS,
-} from "./regimeRsi.ts";
+import { regimeRsiSignal, DEFAULT_REGIME_RSI_SETTINGS } from "./regimeRsi.ts";
 
 describe("regimeRsiSignal", () => {
   it("uses bull bands in trending_up regime", () => {

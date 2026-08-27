@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { Box, Text } from "../../ink-custom";
 import { DataTable, fmtNum, fmtPct, type Column } from "../charts/DataTable.tsx";
 import { InlineChart } from "../charts/InlineChart.tsx";
@@ -65,7 +65,11 @@ function tryParseStructuredData(content: string, theme: GordonTheme): React.Reac
   return null;
 }
 
-function renderStructuredJson(data: unknown, surroundingText: string, theme: GordonTheme): React.ReactNode {
+function renderStructuredJson(
+  data: unknown,
+  surroundingText: string,
+  theme: GordonTheme,
+): React.ReactNode {
   const elements: React.ReactNode[] = [];
 
   // Surrounding text before the data
@@ -75,7 +79,7 @@ function renderStructuredJson(data: unknown, surroundingText: string, theme: Gor
         {surroundingText.split("\n").map((line, i) => (
           <RichLine key={i} line={line} theme={theme} />
         ))}
-      </Box>
+      </Box>,
     );
   }
 
@@ -96,8 +100,16 @@ function renderStructuredJson(data: unknown, surroundingText: string, theme: Gor
     const columns = inferColumns(keys, rows, theme);
 
     // Check for price history in any row
-    const priceKey = keys.find((k) => k.toLowerCase().includes("sparkline") || k.toLowerCase().includes("history"));
-    const priceData = priceKey ? rows.map((r) => r[priceKey]).filter(Array.isArray).flat().map(Number) : null;
+    const priceKey = keys.find(
+      (k) => k.toLowerCase().includes("sparkline") || k.toLowerCase().includes("history"),
+    );
+    const priceData = priceKey
+      ? rows
+          .map((r) => r[priceKey])
+          .filter(Array.isArray)
+          .flat()
+          .map(Number)
+      : null;
 
     elements.push(
       <DataTable
@@ -105,14 +117,14 @@ function renderStructuredJson(data: unknown, surroundingText: string, theme: Gor
         columns={columns}
         data={rows}
         /* borderColor omitted — DataTable uses plain aligned columns */
-      />
+      />,
     );
 
     if (priceData && priceData.length > 2) {
       elements.push(
         <Box key="chart" paddingLeft={2} marginBottom={1}>
           <InlineChart data={priceData} width={30} />
-        </Box>
+        </Box>,
       );
     }
 
@@ -136,7 +148,7 @@ function renderStructuredJson(data: unknown, surroundingText: string, theme: Gor
         ]}
         data={rows}
         /* borderColor omitted — DataTable uses plain aligned columns */
-      />
+      />,
     );
 
     return <>{elements}</>;
@@ -163,7 +175,12 @@ function detectRenderer(data: unknown): { name: string; props: Record<string, un
     }
 
     // position: array with symbol + side + qty + pnl
-    if (keys.includes("symbol") && keys.includes("side") && keys.includes("qty") && keys.includes("pnl")) {
+    if (
+      keys.includes("symbol") &&
+      keys.includes("side") &&
+      keys.includes("qty") &&
+      keys.includes("pnl")
+    ) {
       return { name: "position", props: { data } };
     }
 
@@ -173,7 +190,12 @@ function detectRenderer(data: unknown): { name: string; props: Record<string, un
     }
 
     // strategy: array with name + status + pnl + sharpe
-    if (keys.includes("name") && keys.includes("status") && keys.includes("pnl") && keys.includes("sharpe")) {
+    if (
+      keys.includes("name") &&
+      keys.includes("status") &&
+      keys.includes("pnl") &&
+      keys.includes("sharpe")
+    ) {
       return { name: "strategy", props: { data } };
     }
   }
@@ -189,7 +211,12 @@ function detectRenderer(data: unknown): { name: string; props: Record<string, un
     }
 
     // plan: object with symbol + side + entry + stop
-    if (keys.includes("symbol") && keys.includes("side") && keys.includes("entry") && keys.includes("stop")) {
+    if (
+      keys.includes("symbol") &&
+      keys.includes("side") &&
+      keys.includes("entry") &&
+      keys.includes("stop")
+    ) {
       return { name: "plan", props: { data: obj } };
     }
 
@@ -209,18 +236,33 @@ function detectRenderer(data: unknown): { name: string; props: Record<string, un
     }
 
     // risk: object with positionSize + dailyLoss + drawdown + leverage
-    if (keys.includes("positionSize") && keys.includes("dailyLoss") && keys.includes("drawdown") && keys.includes("leverage")) {
+    if (
+      keys.includes("positionSize") &&
+      keys.includes("dailyLoss") &&
+      keys.includes("drawdown") &&
+      keys.includes("leverage")
+    ) {
       return { name: "risk", props: { data: obj } };
     }
 
     // marketanalysis: object with symbol + type + summary + signal + confidence (deep/ensemble/mtf)
-    if (keys.includes("symbol") && keys.includes("type") && keys.includes("summary") && keys.includes("confidence") &&
-        (keys.includes("timeframes") || keys.includes("ensemble") || keys.includes("keyLevels"))) {
+    if (
+      keys.includes("symbol") &&
+      keys.includes("type") &&
+      keys.includes("summary") &&
+      keys.includes("confidence") &&
+      (keys.includes("timeframes") || keys.includes("ensemble") || keys.includes("keyLevels"))
+    ) {
       return { name: "marketanalysis", props: { data: obj } };
     }
 
     // indicator: object with rsi + macd + trend
-    if (keys.includes("rsi") && keys.includes("macd") && keys.includes("trend") && keys.includes("macdState")) {
+    if (
+      keys.includes("rsi") &&
+      keys.includes("macd") &&
+      keys.includes("trend") &&
+      keys.includes("macdState")
+    ) {
       return { name: "indicator", props: { data: obj } };
     }
 
@@ -237,12 +279,24 @@ function detectRenderer(data: unknown): { name: string; props: Record<string, un
 // Infer DataTable columns from data shape
 // ============================================================================
 
-function inferColumns(keys: string[], rows: Record<string, unknown>[], theme: GordonTheme): Column<Record<string, unknown>>[] {
+function inferColumns(
+  keys: string[],
+  rows: Record<string, unknown>[],
+  theme: GordonTheme,
+): Column<Record<string, unknown>>[] {
   return keys.map((key) => {
     const lower = key.toLowerCase();
     const isNumeric = rows.every((r) => typeof r[key] === "number" || r[key] == null);
-    const isPct = lower.includes("pct") || lower.includes("change") || lower.includes("pnl%") || lower.includes("win");
-    const isPrice = lower.includes("price") || lower.includes("last") || lower.includes("entry") || lower.includes("mark");
+    const isPct =
+      lower.includes("pct") ||
+      lower.includes("change") ||
+      lower.includes("pnl%") ||
+      lower.includes("win");
+    const isPrice =
+      lower.includes("price") ||
+      lower.includes("last") ||
+      lower.includes("entry") ||
+      lower.includes("mark");
     const isSide = lower === "side";
     const isStatus = lower === "status";
     const isSignal = lower === "signal" || lower === "sig";
@@ -251,43 +305,55 @@ function inferColumns(keys: string[], rows: Record<string, unknown>[], theme: Go
     const header = HEADER_MAP[lower] ?? key.toUpperCase().slice(0, 8);
 
     // Width
-    const width = lower === "symbol" || lower === "sym" ? 8
-      : isPct ? 8
-      : isPrice ? 10
-      : isNumeric ? 10
-      : isSide ? 6
-      : isStatus || isSignal ? 8
-      : 12;
+    const width =
+      lower === "symbol" || lower === "sym"
+        ? 8
+        : isPct
+          ? 8
+          : isPrice
+            ? 10
+            : isNumeric
+              ? 10
+              : isSide
+                ? 6
+                : isStatus || isSignal
+                  ? 8
+                  : 12;
 
     // Alignment
-    const align = isNumeric || isPct || isPrice ? "right" as const : "left" as const;
+    const align = isNumeric || isPct || isPrice ? ("right" as const) : ("left" as const);
 
     // Color function
     const color = isPct
       ? (val: unknown) => getMoneyColor(Number(val), theme)
       : isSide
-      ? (val: unknown) => getSignalColor(
-          String(val).toLowerCase().includes("long") || String(val).toLowerCase().includes("buy")
-            ? "long"
-            : "short",
-          theme,
-        )
-      : isStatus
-      ? (val: unknown) => {
-          const s = String(val).toLowerCase();
-          return s.includes("active") || s.includes("filled") || s.includes("ok") ? theme.riskSafe
-            : s.includes("paused") || s.includes("partial") || s.includes("pending") ? theme.riskWarning
-            : s.includes("error") || s.includes("fail") || s.includes("cancelled") ? theme.riskDanger
-            : undefined;
-        }
-      : undefined;
+        ? (val: unknown) =>
+            getSignalColor(
+              String(val).toLowerCase().includes("long") ||
+                String(val).toLowerCase().includes("buy")
+                ? "long"
+                : "short",
+              theme,
+            )
+        : isStatus
+          ? (val: unknown) => {
+              const s = String(val).toLowerCase();
+              return s.includes("active") || s.includes("filled") || s.includes("ok")
+                ? theme.riskSafe
+                : s.includes("paused") || s.includes("partial") || s.includes("pending")
+                  ? theme.riskWarning
+                  : s.includes("error") || s.includes("fail") || s.includes("cancelled")
+                    ? theme.riskDanger
+                    : undefined;
+            }
+          : undefined;
 
     // Format function
     const format = isPct
       ? (val: unknown) => fmtPct(Number(val))
       : isPrice || isNumeric
-      ? (val: unknown) => fmtNum(Number(val))
-      : undefined;
+        ? (val: unknown) => fmtNum(Number(val))
+        : undefined;
 
     return { key, header, width, align, color, format };
   });
@@ -331,14 +397,26 @@ const HEADER_MAP: Record<string, string> = {
 function RichLine({ line, theme }: { line: string; theme: GordonTheme }) {
   if (line.trim() === "") return <Text> </Text>;
 
-  if (line.startsWith("### ")) return <Text bold>  {line.slice(4)}</Text>;
-  if (line.startsWith("## ")) return <Text bold>  {line.slice(3)}</Text>;
-  if (line.startsWith("# ")) return <Text bold color={theme.riskWarning}>  {line.slice(2)}</Text>;
+  if (line.startsWith("### ")) return <Text bold> {line.slice(4)}</Text>;
+  if (line.startsWith("## ")) return <Text bold> {line.slice(3)}</Text>;
+  if (line.startsWith("# "))
+    return (
+      <Text bold color={theme.riskWarning}>
+        {" "}
+        {line.slice(2)}
+      </Text>
+    );
 
-  if (line.startsWith("```")) return <Text dimColor>  {"\u2500".repeat(30)}</Text>;
+  if (line.startsWith("```")) return <Text dimColor> {"\u2500".repeat(30)}</Text>;
 
-  if (line.match(/^\s*[-*]\s/)) return <Text>  {"\u2022"} {line.replace(/^\s*[-*]\s/, "")}</Text>;
-  if (line.match(/^\s*\d+\.\s/)) return <Text>  {line.trimStart()}</Text>;
+  if (line.match(/^\s*[-*]\s/))
+    return (
+      <Text>
+        {" "}
+        {"\u2022"} {line.replace(/^\s*[-*]\s/, "")}
+      </Text>
+    );
+  if (line.match(/^\s*\d+\.\s/)) return <Text> {line.trimStart()}</Text>;
 
   // Pipe-separated table rows — render as a single Text with padded cells.
   // Previously used nested Box children with fixed widths that made Ink
@@ -349,11 +427,14 @@ function RichLine({ line, theme }: { line: string; theme: GordonTheme }) {
   if (line.includes("|") && line.split("|").length >= 3) {
     // Skip separator rows (---|---|---)
     if (line.match(/^\s*\|?\s*[-:]+\s*\|/)) return null;
-    const cells = line.split("|").map((c) => c.trim()).filter(Boolean);
-    return <Text>  {cells.join("  ")}</Text>;
+    const cells = line
+      .split("|")
+      .map((c) => c.trim())
+      .filter(Boolean);
+    return <Text> {cells.join("  ")}</Text>;
   }
 
-  if (line.startsWith("> ")) return <Text dimColor>  {line.slice(2)}</Text>;
+  if (line.startsWith("> ")) return <Text dimColor> {line.slice(2)}</Text>;
 
-  return <Text>  {line}</Text>;
+  return <Text> {line}</Text>;
 }

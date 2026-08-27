@@ -12,9 +12,9 @@ beforeEach(() => {
 
 const exec = async (input: Record<string, unknown>) => {
   // bypass Mastra runtime by calling execute directly
-  return (await (shadowPlanTool as unknown as { execute: (i: unknown) => Promise<unknown> }).execute(
-    input,
-  )) as {
+  return (await (
+    shadowPlanTool as unknown as { execute: (i: unknown) => Promise<unknown> }
+  ).execute(input)) as {
     planId: string;
     verdict: string;
     blockerCount: number;

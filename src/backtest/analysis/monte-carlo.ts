@@ -6,8 +6,7 @@
  * strategy robustness under different trade orderings.
  */
 
-import type { Trade, BacktestMetrics, BacktestParams } from "../types.ts";
-import { DEFAULT_BACKTEST_PARAMS } from "../types.ts";
+import type { Trade } from "../types.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import {
   mean as statsMean,
@@ -271,7 +270,7 @@ export interface MonteCarloResult {
  */
 export async function runMonteCarloSimulation(
   trades: Trade[],
-  config?: Partial<MonteCarloConfig>
+  config?: Partial<MonteCarloConfig>,
 ): Promise<MonteCarloResult> {
   const startTime = Date.now();
   const fullConfig: MonteCarloConfig = {
@@ -295,9 +294,7 @@ export async function runMonteCarloSimulation(
   const originalMaxDrawdown = calculateMaxDrawdown(originalEquityCurve);
 
   // Initialize PRNG if seed provided
-  const random = fullConfig.seed !== undefined
-    ? createSeededRandom(fullConfig.seed)
-    : Math.random;
+  const random = fullConfig.seed !== undefined ? createSeededRandom(fullConfig.seed) : Math.random;
 
   // Run simulations
   const iterations: SimulationIteration[] = [];
@@ -320,9 +317,7 @@ export async function runMonteCarloSimulation(
         : calculateEquityCurve(shuffleArray([...trades], random), fullConfig.initialCapital);
     const finalEquity = equityCurve[equityCurve.length - 1] ?? fullConfig.initialCapital;
     const iterationReturn = calculateReturn(equityCurve, fullConfig.initialCapital);
-    const maxDrawdown = fullConfig.calculateDrawdowns
-      ? calculateMaxDrawdown(equityCurve)
-      : 0;
+    const maxDrawdown = fullConfig.calculateDrawdowns ? calculateMaxDrawdown(equityCurve) : 0;
 
     iterations.push({
       iteration: i + 1,
@@ -359,18 +354,9 @@ export async function runMonteCarloSimulation(
   }
 
   // Calculate distributions
-  const equityDistribution = calculateDistribution(
-    finalEquities,
-    fullConfig.confidenceLevels
-  );
-  const returnDistribution = calculateDistribution(
-    returns,
-    fullConfig.confidenceLevels
-  );
-  const drawdownDistribution = calculateDistribution(
-    drawdowns,
-    fullConfig.confidenceLevels
-  );
+  const equityDistribution = calculateDistribution(finalEquities, fullConfig.confidenceLevels);
+  const returnDistribution = calculateDistribution(returns, fullConfig.confidenceLevels);
+  const drawdownDistribution = calculateDistribution(drawdowns, fullConfig.confidenceLevels);
 
   // Calculate scenarios
   const scenarios = calculateScenarios(returns, drawdowns, finalEquities);
@@ -384,7 +370,7 @@ export async function runMonteCarloSimulation(
     originalMaxDrawdown,
     returnDistribution,
     drawdownDistribution,
-    scenarios
+    scenarios,
   );
 
   const result: MonteCarloResult = {
@@ -515,10 +501,7 @@ function calculateMaxDrawdown(equityCurve: number[]): number {
 /**
  * Calculate distribution statistics.
  */
-function calculateDistribution(
-  values: number[],
-  confidenceLevels: number[]
-): MetricDistribution {
+function calculateDistribution(values: number[], confidenceLevels: number[]): MetricDistribution {
   if (values.length === 0) {
     return createEmptyDistribution(confidenceLevels);
   }
@@ -570,7 +553,7 @@ function calculateDistribution(
 function calculateScenarios(
   returns: number[],
   drawdowns: number[],
-  finalEquities: number[]
+  finalEquities: number[],
 ): MonteCarloResult["scenarios"] {
   const n = returns.length;
   if (n === 0) {
@@ -620,7 +603,7 @@ function calculateScenarios(
 function calculateRiskMetrics(
   returns: number[],
   drawdowns: number[],
-  initialCapital: number
+  _initialCapital: number,
 ): MonteCarloResult["riskMetrics"] {
   const n = returns.length;
   if (n === 0) {
@@ -643,9 +626,10 @@ function calculateRiskMetrics(
 
   // Expected Shortfall (average of returns below VaR5)
   const tailReturns = sortedReturns.slice(0, var5Index + 1);
-  const expectedShortfall = tailReturns.length > 0
-    ? Math.abs(tailReturns.reduce((sum, r) => sum + r, 0) / tailReturns.length)
-    : 0;
+  const expectedShortfall =
+    tailReturns.length > 0
+      ? Math.abs(tailReturns.reduce((sum, r) => sum + r, 0) / tailReturns.length)
+      : 0;
 
   // Risk of Ruin (probability of 50% drawdown)
   const riskOfRuin = drawdowns.filter((d) => d >= 50).length / n;
@@ -663,10 +647,10 @@ function calculateRiskMetrics(
  */
 function assessRobustness(
   originalReturn: number,
-  originalMaxDrawdown: number,
+  _originalMaxDrawdown: number,
   returnDist: MetricDistribution,
-  drawdownDist: MetricDistribution,
-  scenarios: MonteCarloResult["scenarios"]
+  _drawdownDist: MetricDistribution,
+  scenarios: MonteCarloResult["scenarios"],
 ): MonteCarloResult["robustness"] {
   const observations: string[] = [];
   let score = 100;
@@ -676,9 +660,7 @@ function assessRobustness(
   if (ci95) {
     if (originalReturn < ci95.lower || originalReturn > ci95.upper) {
       score -= 20;
-      observations.push(
-        "Original return is outside 95% confidence interval - sequence-dependent"
-      );
+      observations.push("Original return is outside 95% confidence interval - sequence-dependent");
     }
   }
 
@@ -686,16 +668,16 @@ function assessRobustness(
   if (scenarios.profitProbability < 0.5) {
     score -= 30;
     observations.push(
-      `Low profit probability (${(scenarios.profitProbability * 100).toFixed(0)}%)`
+      `Low profit probability (${(scenarios.profitProbability * 100).toFixed(0)}%)`,
     );
   } else if (scenarios.profitProbability < 0.7) {
     score -= 15;
     observations.push(
-      `Moderate profit probability (${(scenarios.profitProbability * 100).toFixed(0)}%)`
+      `Moderate profit probability (${(scenarios.profitProbability * 100).toFixed(0)}%)`,
     );
   } else if (scenarios.profitProbability > 0.9) {
     observations.push(
-      `High profit probability (${(scenarios.profitProbability * 100).toFixed(0)}%)`
+      `High profit probability (${(scenarios.profitProbability * 100).toFixed(0)}%)`,
     );
   }
 
@@ -703,12 +685,12 @@ function assessRobustness(
   if (scenarios.highDrawdownProbability > 0.3) {
     score -= 25;
     observations.push(
-      `High drawdown probability (${(scenarios.highDrawdownProbability * 100).toFixed(0)}% chance of >20% drawdown)`
+      `High drawdown probability (${(scenarios.highDrawdownProbability * 100).toFixed(0)}% chance of >20% drawdown)`,
     );
   } else if (scenarios.highDrawdownProbability > 0.1) {
     score -= 10;
     observations.push(
-      `Moderate drawdown risk (${(scenarios.highDrawdownProbability * 100).toFixed(0)}% chance of >20% drawdown)`
+      `Moderate drawdown risk (${(scenarios.highDrawdownProbability * 100).toFixed(0)}% chance of >20% drawdown)`,
     );
   }
 
@@ -720,13 +702,11 @@ function assessRobustness(
   // of variation was ~1e-14. That cleared the `< 0.3` arm on every single
   // run, so "consistent performance" was awarded to any strategy at all.
   // Only a distribution that actually varies can be scored.
-  const returnDistributionIsDegenerate =
-    !(returnDist.stdDev > Math.abs(returnDist.mean) * 1e-9);
+  const returnDistributionIsDegenerate = !(returnDist.stdDev > Math.abs(returnDist.mean) * 1e-9);
 
   if (!returnDistributionIsDegenerate) {
-    const returnCV = returnDist.mean !== 0
-      ? Math.abs(returnDist.stdDev / returnDist.mean)
-      : Infinity;
+    const returnCV =
+      returnDist.mean !== 0 ? Math.abs(returnDist.stdDev / returnDist.mean) : Infinity;
 
     if (returnCV > 1) {
       score -= 15;
@@ -740,12 +720,12 @@ function assessRobustness(
   if (scenarios.worstCase.return < -30) {
     score -= 20;
     observations.push(
-      `Severe worst case scenario (${scenarios.worstCase.return.toFixed(1)}% return)`
+      `Severe worst case scenario (${scenarios.worstCase.return.toFixed(1)}% return)`,
     );
   } else if (scenarios.worstCase.return < -15) {
     score -= 10;
     observations.push(
-      `Significant worst case scenario (${scenarios.worstCase.return.toFixed(1)}% return)`
+      `Significant worst case scenario (${scenarios.worstCase.return.toFixed(1)}% return)`,
     );
   }
 

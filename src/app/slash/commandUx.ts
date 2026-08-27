@@ -4,7 +4,15 @@ export type WorkspaceId = "desk" | "market" | "plan" | "lab" | "monitor";
 
 export type SlashCommandCategory = "trading" | "market" | "account" | "system" | "strategy";
 export type CommandLevel = 1 | 2 | 3;
-export type WorkflowGroup = "discover" | "analyze" | "trade" | "run" | "accounts" | "monitor" | "build" | "operate";
+export type WorkflowGroup =
+  | "discover"
+  | "analyze"
+  | "trade"
+  | "run"
+  | "accounts"
+  | "monitor"
+  | "build"
+  | "operate";
 export type CommandAudience = "core" | "advanced" | "operator";
 export type PaletteWorkflowId = "discover" | "plan" | "execute" | "monitor" | "safety" | "system";
 
@@ -45,7 +53,13 @@ export interface PaletteWorkflowConfigEntry {
   label: string;
   icon: string;
   order: number;
-  colorToken: "agentScanner" | "agentPlanner" | "agentExecutor" | "agentMonitor" | "riskDanger" | "uiMuted";
+  colorToken:
+    | "agentScanner"
+    | "agentPlanner"
+    | "agentExecutor"
+    | "agentMonitor"
+    | "riskDanger"
+    | "uiMuted";
 }
 
 export interface QuickActionItem {
@@ -205,14 +219,7 @@ const MONITOR_COMMANDS = new Set([
   "autonomous",
 ]);
 
-const BUILD_COMMANDS = new Set([
-  "mcp",
-  "routing",
-  "workflow",
-  "export",
-  "keyring",
-  "gen",
-]);
+const BUILD_COMMANDS = new Set(["mcp", "routing", "workflow", "export", "keyring", "gen"]);
 
 const SYSTEM_COMMANDS = new Set([
   "help",
@@ -258,28 +265,54 @@ const SYSTEM_COMMANDS = new Set([
 ]);
 
 export const PALETTE_SAFETY_COMMANDS: ReadonlySet<string> = new Set([
-  "killswitch", "emergency", "risk", "rules", "deny-all",
-  "runtime-approvals", "runtime-approve", "runtime-deny",
-  "auto", "ask", "strict", "paper", "live", "observe", "planmode",
+  "killswitch",
+  "emergency",
+  "risk",
+  "rules",
+  "deny-all",
+  "runtime-approvals",
+  "runtime-approve",
+  "runtime-deny",
+  "auto",
+  "ask",
+  "strict",
+  "paper",
+  "live",
+  "observe",
+  "planmode",
   "safety",
 ]);
 
-export const PALETTE_PLAN_COMMANDS: ReadonlySet<string> = new Set([
-  "plan", "plans", "simulate",
-]);
+export const PALETTE_PLAN_COMMANDS: ReadonlySet<string> = new Set(["plan", "plans", "simulate"]);
 
 export const PALETTE_EXECUTE_COMMANDS: ReadonlySet<string> = new Set([
-  "deploy", "rebalance", "withdraw",
+  "deploy",
+  "rebalance",
+  "withdraw",
 ]);
 
 export const PALETTE_MONITOR_COMMANDS: ReadonlySet<string> = new Set([
-  "strategies-live", "pause", "resume-strategy", "stop",
-  "radar", "ack", "pass", "snooze",
-  "goal-status", "sprint-status", "wip-status", "shadow-divergence",
-  "perf", "journal", "queue",
+  "strategies-live",
+  "pause",
+  "resume-strategy",
+  "stop",
+  "radar",
+  "ack",
+  "pass",
+  "snooze",
+  "goal-status",
+  "sprint-status",
+  "wip-status",
+  "shadow-divergence",
+  "perf",
+  "journal",
+  "queue",
 ]);
 
-export function paletteWorkflowFor(cmd: { name: string; workflow?: WorkflowGroup }): PaletteWorkflowId {
+export function paletteWorkflowFor(cmd: {
+  name: string;
+  workflow?: WorkflowGroup;
+}): PaletteWorkflowId {
   if (PALETTE_SAFETY_COMMANDS.has(cmd.name)) return "safety";
   if (PALETTE_PLAN_COMMANDS.has(cmd.name)) return "plan";
   if (PALETTE_EXECUTE_COMMANDS.has(cmd.name)) return "execute";
@@ -296,8 +329,6 @@ export function paletteWorkflowFor(cmd: { name: string; workflow?: WorkflowGroup
     case "accounts":
     case "monitor":
       return "monitor";
-    case "build":
-    case "operate":
     default:
       return "system";
   }
@@ -321,7 +352,9 @@ export function getAudienceLabel(audience: CommandAudience): string {
   return AUDIENCE_LABELS[audience];
 }
 
-export function inferWorkflowGroup(command: Pick<CommandUxShape, "name" | "category">): WorkflowGroup {
+export function inferWorkflowGroup(
+  command: Pick<CommandUxShape, "name" | "category">,
+): WorkflowGroup {
   const name = command.name.toLowerCase();
 
   if (ANALYZE_COMMANDS.has(name)) return "analyze";
@@ -351,7 +384,9 @@ export function normalizeCommandUx<T extends CommandUxShape>(command: T): T & Co
   };
 }
 
-export function sortCommandsForPresentation<T extends CommandUxMetadata & { name: string }>(commands: T[]): T[] {
+export function sortCommandsForPresentation<T extends CommandUxMetadata & { name: string }>(
+  commands: T[],
+): T[] {
   return [...commands].sort((left, right) => {
     const workflowDiff = left.workflowOrder - right.workflowOrder;
     if (workflowDiff !== 0) return workflowDiff;
@@ -364,7 +399,9 @@ export function resolveWorkflowTopic(arg: string): WorkflowGroup | undefined {
   const normalized = arg.trim().toLowerCase();
   if (!normalized) return undefined;
 
-  for (const [workflow, config] of Object.entries(WORKFLOW_CONFIG) as Array<[WorkflowGroup, WorkflowConfigEntry]>) {
+  for (const [workflow, config] of Object.entries(WORKFLOW_CONFIG) as Array<
+    [WorkflowGroup, WorkflowConfigEntry]
+  >) {
     if (config.helpAliases.includes(normalized)) {
       return workflow;
     }
@@ -409,7 +446,11 @@ export function getQuickActionItems(context: QuickActionContext): QuickActionIte
         { label: "Strategies", command: "/strategies", workflow: "run" },
         { label: "Generate", command: "/gen trend strategy for ETH", workflow: "run" },
         { label: "Playbooks", command: "/strategy playbooks", workflow: "run" },
-        { label: "Backtest", command: "/workflow backtest-cycle sma_crossover BTCUSDT", workflow: "run" },
+        {
+          label: "Backtest",
+          command: "/workflow backtest-cycle sma_crossover BTCUSDT",
+          workflow: "run",
+        },
         { label: "Running", command: "/strategy running", workflow: "run" },
       ];
     case "monitor":
@@ -420,7 +461,6 @@ export function getQuickActionItems(context: QuickActionContext): QuickActionIte
         { label: "Runtime", command: "/runtime-state", workflow: "operate" },
         { label: "Health", command: "/health", workflow: "operate" },
       ];
-    case "desk":
     default:
       break;
   }

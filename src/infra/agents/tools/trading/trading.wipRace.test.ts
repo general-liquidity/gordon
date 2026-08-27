@@ -3,10 +3,7 @@ import { RequestContext } from "@mastra/core/request-context";
 import type { Plan, PlanStatus } from "../../../../types/plan.ts";
 import { resetAllKillSwitches } from "../../../safety/killSwitches.ts";
 import { WIP_FLAG_ENV } from "../../../safety/wipLimit.ts";
-import {
-  deactivateSessionPlan,
-  sessionWipSnapshot,
-} from "../../../safety/wipSessionRegistry.ts";
+import { deactivateSessionPlan, sessionWipSnapshot } from "../../../safety/wipSessionRegistry.ts";
 import { installTempGordonHome } from "../../../../test-utils/tempGordonHome.ts";
 
 installTempGordonHome("gordon-wiprace-test-");
@@ -60,12 +57,14 @@ function makeExecContext(): { requestContext: RequestContext } {
 type ExecResult = { success: boolean; error?: string };
 
 function execPlan(planId: string): Promise<ExecResult> {
-  return (executePlanTool as unknown as {
-    execute: (
-      input: { planId: string; rationale: string },
-      ctx: { requestContext: RequestContext },
-    ) => Promise<ExecResult>;
-  }).execute({ planId, rationale: RATIONALE }, makeExecContext());
+  return (
+    executePlanTool as unknown as {
+      execute: (
+        input: { planId: string; rationale: string },
+        ctx: { requestContext: RequestContext },
+      ) => Promise<ExecResult>;
+    }
+  ).execute({ planId, rationale: RATIONALE }, makeExecContext());
 }
 
 describe("execute_plan — WIP slot race", () => {
@@ -91,8 +90,8 @@ describe("execute_plan — WIP slot race", () => {
     const [a, b] = await Promise.all([execPlan(PLAN_A), execPlan(PLAN_B)]);
 
     const results = [a, b];
-    const wipBlocked = results.filter((r) =>
-      !r.success && /WIP limit reached/i.test(r.error ?? ""),
+    const wipBlocked = results.filter(
+      (r) => !r.success && /WIP limit reached/i.test(r.error ?? ""),
     );
     expect(wipBlocked).toHaveLength(1);
   });

@@ -77,7 +77,13 @@ function oneLine(row: unknown, cap = 120): string {
   return s.length > cap ? `${s.slice(0, cap)}…` : s;
 }
 
-interface ColAgg { field: string; min: number; max: number; mean: number; last: number }
+interface ColAgg {
+  field: string;
+  min: number;
+  max: number;
+  mean: number;
+  last: number;
+}
 
 function aggregateNumericColumns(rows: Record<string, unknown>[], maxFields: number): ColAgg[] {
   const acc = new Map<string, { sum: number; min: number; max: number; last: number; n: number }>();
@@ -87,7 +93,11 @@ function aggregateNumericColumns(rows: Record<string, unknown>[], maxFields: num
       if (typeof v !== "number" || !Number.isFinite(v)) continue;
       const a = acc.get(k);
       if (a) {
-        a.sum += v; a.min = Math.min(a.min, v); a.max = Math.max(a.max, v); a.last = v; a.n++;
+        a.sum += v;
+        a.min = Math.min(a.min, v);
+        a.max = Math.max(a.max, v);
+        a.last = v;
+        a.n++;
       } else {
         acc.set(k, { sum: v, min: v, max: v, last: v, n: 1 });
       }
@@ -123,16 +133,24 @@ function build(result: unknown, opts: DigestOptions): string | null {
       `${arr.length} values${ctxSuffix}: min ${fmt(Math.min(...finite))} max ${fmt(Math.max(...finite))} ` +
         `mean ${fmt(sum / Math.max(finite.length, 1))} last ${fmt(nums[nums.length - 1])}`,
     );
-    lines.push(`first ${sampleRows}: ${nums.slice(0, sampleRows).map(fmt).join(", ")} …and ${arr.length - sampleRows} more`);
+    lines.push(
+      `first ${sampleRows}: ${nums.slice(0, sampleRows).map(fmt).join(", ")} …and ${arr.length - sampleRows} more`,
+    );
   } else if (arr.every((x) => x !== null && typeof x === "object" && !Array.isArray(x))) {
     const rows = arr as Record<string, unknown>[];
     lines.push(`${arr.length} rows${ctxSuffix}`);
     for (const a of aggregateNumericColumns(rows, opts.maxFields ?? 8)) {
-      lines.push(`  ${a.field}: min ${fmt(a.min)} max ${fmt(a.max)} mean ${fmt(a.mean)} last ${fmt(a.last)}`);
+      lines.push(
+        `  ${a.field}: min ${fmt(a.min)} max ${fmt(a.max)} mean ${fmt(a.mean)} last ${fmt(a.last)}`,
+      );
     }
     let shown = sampleRows;
     const render = (n: number): string =>
-      [`sample (first ${n} of ${arr.length}):`, ...rows.slice(0, n).map((r) => `  ${oneLine(r)}`), `…and ${arr.length - n} more rows`].join("\n");
+      [
+        `sample (first ${n} of ${arr.length}):`,
+        ...rows.slice(0, n).map((r) => `  ${oneLine(r)}`),
+        `…and ${arr.length - n} more rows`,
+      ].join("\n");
     // Drop sample rows until the whole digest fits the budget (keep the aggregates).
     let body = render(shown);
     while (shown > 1 && [...lines, body].join("\n").length > maxChars) {

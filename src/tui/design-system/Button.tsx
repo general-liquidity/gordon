@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { Text, useInput } from "../ink-custom";
 import type { GordonTheme } from "../themes/themes.ts";
 import { useTheme } from "../themes/ThemeProvider.tsx";
@@ -42,27 +42,38 @@ export function buttonVariantColor(variant: ButtonVariant, theme: GordonTheme): 
   }
 }
 
-function ButtonImpl({ label, onPress, focused = false, disabled = false, variant = "primary" }: Props) {
+function ButtonImpl({
+  label,
+  onPress,
+  focused = false,
+  disabled = false,
+  variant = "primary",
+}: Props) {
   const color = buttonVariantColor(variant, useTheme());
   const colorProps = { color };
 
-  useInput(
-    (input, key) => {
-      if (disabled || !focused) return;
-      if (key.return || input === " ") {
-        onPress();
-      }
-    },
-  );
+  useInput((input, key) => {
+    if (disabled || !focused) return;
+    if (key.return || input === " ") {
+      onPress();
+    }
+  });
 
   if (disabled) {
-    return <Text dimColor>{"[ "}{label}{" ]"}</Text>;
+    return (
+      <Text dimColor>
+        {"[ "}
+        {label}
+        {" ]"}
+      </Text>
+    );
   }
 
   if (focused) {
     return (
       <Text {...colorProps} bold inverse>
-        {" "}{label}{" "}
+        {" "}
+        {label}{" "}
       </Text>
     );
   }

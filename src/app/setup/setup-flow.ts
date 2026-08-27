@@ -1,12 +1,6 @@
 export type SetupWizardMode = "quickstart" | "advanced" | "configure";
 
-export type SetupWizardSection =
-  | "exchange"
-  | "broker"
-  | "chains"
-  | "mcp"
-  | "llm"
-  | "preferences";
+export type SetupWizardSection = "exchange" | "broker" | "chains" | "mcp" | "llm" | "preferences";
 
 export interface OnboardingSelection {
   mode: "quickstart" | "advanced" | "demo";

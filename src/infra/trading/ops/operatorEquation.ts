@@ -29,13 +29,8 @@
 
 export const OPERATOR_EQUATION_FLAG_ENV = "GORDON_OPERATOR_EQUATION";
 
-export function isOperatorEquationEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env[OPERATOR_EQUATION_FLAG_ENV] === "1" ||
-    env[OPERATOR_EQUATION_FLAG_ENV] === "true"
-  );
+export function isOperatorEquationEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env[OPERATOR_EQUATION_FLAG_ENV] === "1" || env[OPERATOR_EQUATION_FLAG_ENV] === "true";
 }
 
 export interface OperatorEquationInput {
@@ -77,15 +72,11 @@ const SIZE_JUNKIE_EXPOSURE = 0.05;
 const PENNY_PINCHER_EV_R = 0.05;
 const UNDEREXPOSED_FRACTION = 0.002;
 
-export function evaluateOperatorEquation(
-  input: OperatorEquationInput,
-): OperatorEquationResult {
+export function evaluateOperatorEquation(input: OperatorEquationInput): OperatorEquationResult {
   const gross = input.expectedValueR * input.optimalExposureFraction;
   const performanceR = gross - input.frictionR;
   const performanceUsd =
-    input.riskCapitalUsd === undefined
-      ? null
-      : performanceR * input.riskCapitalUsd;
+    input.riskCapitalUsd === undefined ? null : performanceR * input.riskCapitalUsd;
 
   const denomGross = Math.abs(gross);
   const frictionRatio = denomGross > 0 ? input.frictionR / denomGross : Number.POSITIVE_INFINITY;
@@ -101,17 +92,11 @@ export function evaluateOperatorEquation(
     failureMode = "edge_chaser";
     recommendation =
       "Friction eats a large share of gross edge. Trade less frequently or use limit orders more aggressively.";
-  } else if (
-    input.optimalExposureFraction >= SIZE_JUNKIE_EXPOSURE &&
-    input.expectedValueR <= 0.2
-  ) {
+  } else if (input.optimalExposureFraction >= SIZE_JUNKIE_EXPOSURE && input.expectedValueR <= 0.2) {
     failureMode = "size_junkie";
     recommendation =
       "Large exposure relative to modest edge. Reduce position size — Kelly assumes perfect knowledge of EV, which you don't have.";
-  } else if (
-    input.expectedValueR <= PENNY_PINCHER_EV_R &&
-    input.frictionR < gross * 0.05
-  ) {
+  } else if (input.expectedValueR <= PENNY_PINCHER_EV_R && input.frictionR < gross * 0.05) {
     failureMode = "penny_pincher";
     recommendation =
       "Edge is marginal and friction is well-managed but performance is constrained by EV. Hunt for higher-quality setups instead of optimizing further on friction.";
@@ -152,8 +137,11 @@ export function equationToPayload(result: OperatorEquationResult): Record<string
   return {
     kind: "operator_equation.evaluated",
     performanceR: Number(result.performanceR.toFixed(4)),
-    performanceUsd: result.performanceUsd === null ? null : Number(result.performanceUsd.toFixed(2)),
-    frictionRatio: Number.isFinite(result.frictionRatio) ? Number(result.frictionRatio.toFixed(3)) : null,
+    performanceUsd:
+      result.performanceUsd === null ? null : Number(result.performanceUsd.toFixed(2)),
+    frictionRatio: Number.isFinite(result.frictionRatio)
+      ? Number(result.frictionRatio.toFixed(3))
+      : null,
     failureMode: result.failureMode,
   };
 }

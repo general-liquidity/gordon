@@ -7,13 +7,7 @@
  */
 
 import type { Strategy } from "../../strategies/types.ts";
-import type {
-  OHLC,
-  BacktestMetrics,
-  BacktestEngineResult,
-  ParameterSet,
-  BacktestParams,
-} from "../types.ts";
+import type { OHLC, BacktestMetrics, ParameterSet, BacktestParams } from "../types.ts";
 import { DEFAULT_BACKTEST_PARAMS } from "../types.ts";
 import { runBacktest } from "../engine.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
@@ -258,7 +252,7 @@ export interface WalkForwardResult {
 export async function walkForwardTest(
   strategy: Strategy,
   data: OHLC[],
-  config: WalkForwardConfig
+  config: WalkForwardConfig,
 ): Promise<WalkForwardResult> {
   const startTime = Date.now();
   const fullConfig = {
@@ -294,7 +288,7 @@ export async function walkForwardTest(
   if (trainSize < 50 || testSize < 20) {
     throw new Error(
       `Window sizes too small. Train: ${trainSize}, Test: ${testSize}. ` +
-      "Increase data or reduce number of windows."
+        "Increase data or reduce number of windows.",
     );
   }
 
@@ -303,7 +297,7 @@ export async function walkForwardTest(
 
   if (purgeBars >= trainSize) {
     throw new Error(
-      `purgeBars (${purgeBars}) must be smaller than the train window size (${trainSize}).`
+      `purgeBars (${purgeBars}) must be smaller than the train window size (${trainSize}).`,
     );
   }
 
@@ -366,7 +360,7 @@ export async function walkForwardTest(
       trainData,
       fullConfig.parameterRanges,
       fullConfig.optimizeFor,
-      backtestParams
+      backtestParams,
     );
 
     // Report progress
@@ -386,18 +380,14 @@ export async function walkForwardTest(
     // Calculate overfit ratio
     const trainValue = getMetricValue(trainMetrics, fullConfig.optimizeFor);
     const testValue = getMetricValue(testMetrics, fullConfig.optimizeFor);
-    const overfitRatio = computeOverfitRatio(
-      trainValue,
-      testValue,
-      fullConfig.optimizeFor,
-    );
+    const overfitRatio = computeOverfitRatio(trainValue, testValue, fullConfig.optimizeFor);
 
     // Check for concerning overfit
     if (overfitRatio > 2) {
       warnings.push(
         `Window ${i + 1}: High overfit ratio (${overfitRatio.toFixed(2)}). ` +
-        `Train ${fullConfig.optimizeFor}: ${trainValue.toFixed(2)}, ` +
-        `Test: ${testValue.toFixed(2)}`
+          `Train ${fullConfig.optimizeFor}: ${trainValue.toFixed(2)}, ` +
+          `Test: ${testValue.toFixed(2)}`,
       );
     }
 
@@ -427,8 +417,7 @@ export async function walkForwardTest(
     startDate: new Date(data[0]?.timestamp ?? 0).toISOString(),
     endDate: new Date(data[data.length - 1]?.timestamp ?? 0).toISOString(),
     totalDays: Math.round(
-      ((data[data.length - 1]?.timestamp ?? 0) - (data[0]?.timestamp ?? 0)) /
-      (1000 * 60 * 60 * 24)
+      ((data[data.length - 1]?.timestamp ?? 0) - (data[0]?.timestamp ?? 0)) / (1000 * 60 * 60 * 24),
     ),
   };
 
@@ -496,7 +485,7 @@ function optimizeOnTrainData(
   trainData: OHLC[],
   parameterRanges: Record<string, number[]>,
   optimizeFor: keyof BacktestMetrics,
-  backtestParams: BacktestParams
+  backtestParams: BacktestParams,
 ): { bestParams: ParameterSet; trainMetrics: BacktestMetrics } {
   const paramNames = Object.keys(parameterRanges);
 
@@ -560,7 +549,7 @@ function getMetricValue(metrics: BacktestMetrics, key: keyof BacktestMetrics): n
  * Calculate aggregated metrics across all windows.
  */
 function calculateAggregatedMetrics(
-  windows: WalkForwardWindow[]
+  windows: WalkForwardWindow[],
 ): WalkForwardResult["aggregatedMetrics"] {
   if (windows.length === 0) {
     return {
@@ -602,7 +591,7 @@ function calculateAggregatedMetrics(
 function assessStability(
   windows: WalkForwardWindow[],
   aggregatedMetrics: WalkForwardResult["aggregatedMetrics"],
-  existingWarnings: string[]
+  existingWarnings: string[],
 ): WalkForwardResult["stability"] {
   const warnings = [...existingWarnings];
 

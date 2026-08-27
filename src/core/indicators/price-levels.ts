@@ -82,7 +82,7 @@ function detectSwingPoints(candles: Candle[], lookback: number): SwingPoint[] {
  */
 function clusterLevels(
   swingPoints: SwingPoint[],
-  tolerance: number
+  tolerance: number,
 ): { price: number; type: "support" | "resistance"; touches: number }[] {
   if (swingPoints.length === 0) return [];
 
@@ -107,8 +107,7 @@ function clusterLevels(
     if (!point) continue;
 
     const avgPrice =
-      currentCluster.prices.reduce((a, b) => a + b, 0) /
-      currentCluster.prices.length;
+      currentCluster.prices.reduce((a, b) => a + b, 0) / currentCluster.prices.length;
 
     // Guard against division by zero when avgPrice is 0
     if (avgPrice === 0) {
@@ -136,8 +135,7 @@ function clusterLevels(
 
   // Convert clusters to levels
   return clusters.map((cluster) => {
-    const avgPrice =
-      cluster.prices.reduce((a, b) => a + b, 0) / cluster.prices.length;
+    const avgPrice = cluster.prices.reduce((a, b) => a + b, 0) / cluster.prices.length;
 
     // Determine type based on majority of swing points
     const highCount = cluster.types.filter((t) => t === "high").length;
@@ -160,11 +158,7 @@ function clusterLevels(
  * @param tolerance - Percentage tolerance for touch detection
  * @returns Number of touches
  */
-function countTouches(
-  candles: Candle[],
-  level: number,
-  tolerance: number
-): number {
+function countTouches(candles: Candle[], level: number, tolerance: number): number {
   // A price level of 0 can't have meaningful touches
   if (level === 0) return 0;
 
@@ -222,9 +216,8 @@ export function detectLevels(candles: Candle[], sensitivity: number = 3): Level[
 
   // Calculate strength score (0-1)
   // Strength based on number of touches, normalized
-  const maxTouches = levelsWithTouches.length > 0
-    ? Math.max(...levelsWithTouches.map((l) => l.touches), 1)
-    : 1;
+  const maxTouches =
+    levelsWithTouches.length > 0 ? Math.max(...levelsWithTouches.map((l) => l.touches), 1) : 1;
 
   const levels: Level[] = levelsWithTouches.map((level) => ({
     price: level.price,
@@ -248,7 +241,7 @@ export function detectLevels(candles: Candle[], sensitivity: number = 3): Level[
  */
 export function findNearestLevels(
   levels: Level[],
-  currentPrice: number
+  currentPrice: number,
 ): { support: Level | null; resistance: Level | null } {
   let nearestSupport: Level | null = null;
   let nearestResistance: Level | null = null;

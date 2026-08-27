@@ -36,9 +36,9 @@ describe("generateScenarios", () => {
 
   it("every scenario carries provenance, a category, and a usable rubric", () => {
     for (const s of generateScenarios()) {
-      expect(s.derivedFrom && s.derivedFrom.length).toBeTruthy();
+      expect(s.derivedFrom?.length).toBeTruthy();
       expect(s.category).toBeDefined();
-      expect(s.extraRubric && s.extraRubric.length).toBeTruthy();
+      expect(s.extraRubric?.length).toBeTruthy();
       expect(s.systemPrompt.length).toBeGreaterThan(50);
       expect(s.userInput.length).toBeGreaterThan(10);
     }
@@ -212,11 +212,15 @@ describe("paraphrase seam", () => {
     const withParaphrase = loadScenariosWithParaphrase({ cachePath: path });
     const base = generateScenarios();
     expect(withParaphrase.length).toBe(base.length + 1);
-    expect(withParaphrase.some((s) => s.id === "gen-constitution-mandatory-stop-loss-p1")).toBe(true);
+    expect(withParaphrase.some((s) => s.id === "gen-constitution-mandatory-stop-loss-p1")).toBe(
+      true,
+    );
   });
 
   it("loadScenariosWithParaphrase returns the deterministic base when no cache exists", () => {
-    const withNoCache = loadScenariosWithParaphrase({ cachePath: join(tmpdir(), "nope-not-here.json") });
+    const withNoCache = loadScenariosWithParaphrase({
+      cachePath: join(tmpdir(), "nope-not-here.json"),
+    });
     expect(withNoCache.map((s) => s.id)).toEqual(generateScenarios().map((s) => s.id));
   });
 });

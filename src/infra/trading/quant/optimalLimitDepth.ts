@@ -81,9 +81,7 @@ function computePsi(q: number, lambdaRatio: number, alpha: number, tau: number):
   return sum;
 }
 
-export function computeOptimalLimitDepth(
-  input: OptimalLimitDepthInput,
-): OptimalLimitDepthResult {
+export function computeOptimalLimitDepth(input: OptimalLimitDepthInput): OptimalLimitDepthResult {
   if (input.timeRemaining <= 0) {
     throw new Error("timeRemaining must be > 0");
   }

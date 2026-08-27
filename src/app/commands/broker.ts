@@ -137,7 +137,11 @@ export async function brokerSwitch(brokerId: string): Promise<BrokerCommandResul
     await saveConfig(updatedConfig);
     await refreshRuntimeCredentials();
 
-    logger.info("Switched active broker", { brokerId, type: broker.type, paper: broker.paper ?? true });
+    logger.info("Switched active broker", {
+      brokerId,
+      type: broker.type,
+      paper: broker.paper ?? true,
+    });
 
     return {
       success: true,
@@ -173,9 +177,8 @@ export async function brokerRemove(brokerId: string): Promise<BrokerCommandResul
 
     const updatedBrokers = brokers.filter((entry) => entry.id !== brokerId);
     const fallbackActive = updatedBrokers[0]?.id;
-    const nextActiveId = config.activeBrokerId === brokerId
-      ? fallbackActive
-      : config.activeBrokerId;
+    const nextActiveId =
+      config.activeBrokerId === brokerId ? fallbackActive : config.activeBrokerId;
 
     const normalizedBrokers = updatedBrokers.map((entry, index) => ({
       ...entry,
@@ -395,7 +398,7 @@ export async function handleBrokerCommand(args: string): Promise<string> {
       if (brokerType && paperGuides[brokerType]) {
         result = { success: true, message: paperGuides[brokerType]! };
       } else {
-        const supported = Object.keys(paperGuides).join(", ");
+        const _supported = Object.keys(paperGuides).join(", ");
         result = {
           success: true,
           message: `Stock Broker Paper Trading Setup\n\nBrokers with paper/sandbox support:\n  alpaca      — Paper API (paper-api.alpaca.markets)\n  tastytrade  — Cert environment (api.cert.tastyworks.com)\n  ibkr        — Paper trading account (TWS)\n\nUsage: /broker setup <type>\nExample: /broker setup alpaca`,
@@ -476,7 +479,12 @@ function formatBrokerResult(result: BrokerCommandResult): string {
         const conn = status.connected ? "[OK]" : "[DISCONNECTED]";
         const active = status.isActive ? " (active)" : "";
         const mode = status.paper ? "[PAPER]" : "[LIVE]";
-        const market = status.marketOpen === undefined ? "" : status.marketOpen ? " [MARKET OPEN]" : " [MARKET CLOSED]";
+        const market =
+          status.marketOpen === undefined
+            ? ""
+            : status.marketOpen
+              ? " [MARKET OPEN]"
+              : " [MARKET CLOSED]";
         lines.push(`  ${status.id}${active}: ${conn} ${mode}${market}`.trim());
         if (status.error) {
           lines.push(`    Error: ${status.error}`);

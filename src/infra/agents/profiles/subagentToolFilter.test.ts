@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  filterToolsForProfile,
-  isExecutionTool,
-} from "./subagentToolFilter.ts";
+import { filterToolsForProfile, isExecutionTool } from "./subagentToolFilter.ts";
 
 const READONLY_REGISTRY = [
   "scan_market",
@@ -76,39 +73,27 @@ describe("FW7 — isExecutionTool", () => {
 
 describe("FW7 — filterToolsForProfile", () => {
   test("exact match of read-only tools", () => {
-    const result = filterToolsForProfile(
-      ["scan_market", "list_skills"],
-      READONLY_REGISTRY,
-    );
+    const result = filterToolsForProfile(["scan_market", "list_skills"], READONLY_REGISTRY);
     expect(result.allowed).toEqual(["scan_market", "list_skills"]);
     expect(result.unmatched).toEqual([]);
     expect(result.blocked).toEqual([]);
   });
 
   test("execution tool listed explicitly is blocked", () => {
-    const result = filterToolsForProfile(
-      ["scan_market", "place_market_order"],
-      READONLY_REGISTRY,
-    );
+    const result = filterToolsForProfile(["scan_market", "place_market_order"], READONLY_REGISTRY);
     expect(result.allowed).toEqual(["scan_market"]);
     expect(result.blocked).toEqual(["place_market_order"]);
   });
 
   test("glob matches multiple read-only tools", () => {
-    const result = filterToolsForProfile(
-      ["smc_*"],
-      READONLY_REGISTRY,
-    );
+    const result = filterToolsForProfile(["smc_*"], READONLY_REGISTRY);
     expect(result.allowed).toContain("smc_pattern_detect");
     expect(result.allowed).toContain("smc_swept_liquidity");
     expect(result.blocked).toEqual([]);
   });
 
   test("glob that includes execution tools drops them silently", () => {
-    const result = filterToolsForProfile(
-      ["*"],
-      READONLY_REGISTRY,
-    );
+    const result = filterToolsForProfile(["*"], READONLY_REGISTRY);
     expect(result.allowed).toContain("scan_market");
     expect(result.allowed).not.toContain("place_market_order");
     expect(result.allowed).not.toContain("execute_plan");
@@ -117,19 +102,13 @@ describe("FW7 — filterToolsForProfile", () => {
   });
 
   test("unmatched pattern surfaces", () => {
-    const result = filterToolsForProfile(
-      ["this_tool_does_not_exist"],
-      READONLY_REGISTRY,
-    );
+    const result = filterToolsForProfile(["this_tool_does_not_exist"], READONLY_REGISTRY);
     expect(result.allowed).toEqual([]);
     expect(result.unmatched).toEqual(["this_tool_does_not_exist"]);
   });
 
   test("execution tool unknown to registry is still blocked", () => {
-    const result = filterToolsForProfile(
-      ["place_nonexistent_order"],
-      READONLY_REGISTRY,
-    );
+    const result = filterToolsForProfile(["place_nonexistent_order"], READONLY_REGISTRY);
     expect(result.blocked).toEqual(["place_nonexistent_order"]);
     expect(result.unmatched).toEqual([]);
   });

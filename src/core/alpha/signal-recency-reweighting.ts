@@ -81,10 +81,7 @@ export interface SignalReweightingOptions {
   minPeriodsPerSignal?: number;
 }
 
-export type ReweightingVerdict =
-  | "reweighted"
-  | "equal_weighted_fallback"
-  | "insufficient_data";
+export type ReweightingVerdict = "reweighted" | "equal_weighted_fallback" | "insufficient_data";
 
 export interface SignalWeightAssignment {
   signalId: string;
@@ -106,7 +103,7 @@ export interface SignalReweightingResult {
 
 const DEFAULT_STRENGTH = 0.13;
 const DEFAULT_MIN_WEIGHT = 0.02;
-const DEFAULT_MAX_WEIGHT = 0.50;
+const DEFAULT_MAX_WEIGHT = 0.5;
 const DEFAULT_MIN_PERIODS = 5;
 const DEFAULT_ANNUALIZATION = 1;
 
@@ -185,8 +182,7 @@ export function reweightSignals(
       metric,
       weights,
       verdict: "equal_weighted_fallback",
-      summary:
-        `Fewer than 2 signals have ≥${minPeriods} periods. Falling back to equal weights.`,
+      summary: `Fewer than 2 signals have ≥${minPeriods} periods. Falling back to equal weights.`,
     };
   }
 
@@ -289,9 +285,7 @@ export function reweightSignals(
   };
 }
 
-export function formatSignalReweighting(
-  result: SignalReweightingResult,
-): string {
+export function formatSignalReweighting(result: SignalReweightingResult): string {
   const lines = [
     `Signal Reweighting — ${result.verdict.toUpperCase()}`,
     "",

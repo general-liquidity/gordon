@@ -12,7 +12,13 @@ import { scoreTrace, scoreRecentTraces } from "./traceScorer.ts";
 import { appendToPromotionQueue, readPromotionQueue } from "./promotionQueue.ts";
 
 function tc(name: string, ok = true): AuditToolCall {
-  return { tool_name: name, input_summary: "in", output_summary: "out", duration_ms: 10, success: ok };
+  return {
+    tool_name: name,
+    input_summary: "in",
+    output_summary: "out",
+    duration_ms: 10,
+    success: ok,
+  };
 }
 
 function makeTrace(
@@ -107,13 +113,15 @@ describe("traceAdapter", () => {
     });
     expect(s.turns?.length).toBe(2);
     expect(s.userInput).toBe("clean up my crypto exposure");
-    expect(s.turns?.[0]!.expectedElicitation).toBe("which venue");
+    expect(s.turns?.[0]?.expectedElicitation).toBe("which venue");
   });
 });
 
 describe("scoreTrace", () => {
   it("flags a trace that placed an order with no risk gate", () => {
-    const s = scoreTrace(makeTrace("bad", [tc("place_market_order")], { outcome: "trade_executed" }));
+    const s = scoreTrace(
+      makeTrace("bad", [tc("place_market_order")], { outcome: "trade_executed" }),
+    );
     expect(s.flagged).toBe(true);
     expect(s.processResult.passed).toBe(false);
   });
@@ -174,7 +182,9 @@ describe("scoreRecentTraces", () => {
   it("does not promote when promote=false", () => {
     const path = tmpPath();
     const res = scoreRecentTraces({
-      getTraces: () => [makeTrace("unsafe2", [tc("place_market_order")], { outcome: "trade_executed" })],
+      getTraces: () => [
+        makeTrace("unsafe2", [tc("place_market_order")], { outcome: "trade_executed" }),
+      ],
       promote: false,
       promotionPath: path,
     });

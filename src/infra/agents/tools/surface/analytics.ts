@@ -151,12 +151,21 @@ import { computeInverseConvexity } from "../../../trading/quant/inverseConvexity
 import { computePriceDiscovery } from "../../../trading/quant/priceDiscovery.ts";
 import { computeGeneralizedImpulse } from "../../../trading/quant/generalizedImpulse.ts";
 import { computeGeneralizedVariance } from "../../../trading/quant/generalizedVariance.ts";
-import { computePopulationStability, computeVaRBacktest } from "../../../trading/quant/riskModelValidation.ts";
+import {
+  computePopulationStability,
+  computeVaRBacktest,
+} from "../../../trading/quant/riskModelValidation.ts";
 import { computeJensensAlpha } from "../../../trading/quant/jensensAlpha.ts";
-import { computeFundamentalQuality, computeWACC } from "../../../../core/alpha/fundamental-quality.ts";
+import {
+  computeFundamentalQuality,
+  computeWACC,
+} from "../../../../core/alpha/fundamental-quality.ts";
 import { computeFootprintImbalance } from "../../../../core/indicators/footprint-imbalance.ts";
 import { computeNakedPoc } from "../../../../core/indicators/naked-poc.ts";
-import { computeASIntensityCalibration, computeASStationaryReservation } from "../../../../core/alpha/as-market-making.ts";
+import {
+  computeASIntensityCalibration,
+  computeASStationaryReservation,
+} from "../../../../core/alpha/as-market-making.ts";
 import { computeAsymmetricBeta } from "../../../../core/alpha/asymmetric-beta.ts";
 import { constructRotationBars } from "../../../../core/indicators/rotation-bars.ts";
 import { computeVZO } from "../../../../core/indicators/vzo.ts";
@@ -168,7 +177,10 @@ import { fitOU } from "../../../trading/quant/ouParameterFit.ts";
 import { computeMinHalfLifeHedgeRatio } from "../../../trading/quant/minHalfLifeHedgeRatio.ts";
 import { computeAdfOptimalHedgeRatio } from "../../../trading/quant/adfOptimalHedgeRatio.ts";
 import { computeOuOptimalThresholds } from "../../../trading/quant/ouOptimalThresholds.ts";
-import { diffFilingSections, diffNamedSection } from "../../../../core/alpha/filing-section-diff.ts";
+import {
+  diffFilingSections,
+  diffNamedSection,
+} from "../../../../core/alpha/filing-section-diff.ts";
 import { computeTokenUnlockRisk } from "../../../../core/alpha/token-unlock-risk.ts";
 import { computeHolderConcentration } from "../../../../core/alpha/holder-concentration.ts";
 import { fitGarch } from "../../../../core/alpha/garch.ts";
@@ -181,7 +193,10 @@ import {
 import { makePanel, type Cell } from "../../../../core/alpha/formulaic-alpha-operators.ts";
 import { runAdfTest, adfToPayload } from "../../../trading/quant/stationarityTest.ts";
 import { runKpssTest, kpssToPayload } from "../../../trading/quant/kpssTest.ts";
-import { runJohansenTest, johansenToPayload } from "../../../trading/quant/johansenCointegration.ts";
+import {
+  runJohansenTest,
+  johansenToPayload,
+} from "../../../trading/quant/johansenCointegration.ts";
 import { acf, pacf } from "../../../trading/quant/autocorrelation.ts";
 import { computeRobustnessMetrics } from "../../../../core/alpha/robustness-metrics.ts";
 import { runFeeSensitivitySweep } from "../../../../backtest/analysis/fee-sensitivity.ts";
@@ -208,7 +223,10 @@ import {
 import { RegimeDetector } from "../../../../core/regime/index.ts";
 import { checkRiskTool as implCheckRisk } from "../trading/risk-gate.ts";
 import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
-import { queuePositionSignal, spreadCrossingProbability } from "../../../../core/microstructure/queue-dynamics.ts";
+import {
+  queuePositionSignal,
+  spreadCrossingProbability,
+} from "../../../../core/microstructure/queue-dynamics.ts";
 import { computeTriangularArbitrageParity } from "../../../trading/signals/triangularArbitrageParity.ts";
 import { computeDealerGreeksExposure } from "../../../trading/quant/dealerGreeksExposure.ts";
 import { fetchOptionsChain } from "../../../data/options/index.ts";
@@ -314,16 +332,20 @@ async function maybeAutoCollect(
       await new Promise((r) => setTimeout(r, intervalMs));
     }
     if (snapshots.length < 5) {
-      return { error: `auto-collect microprice: only ${snapshots.length} snapshots gathered — increase durationSec` };
+      return {
+        error: `auto-collect microprice: only ${snapshots.length} snapshots gathered — increase durationSec`,
+      };
     }
     const tickSize =
       typeof params.tickSize === "number" && params.tickSize > 0
         ? params.tickSize
-        : inferredTickSize ?? 0.01;
+        : (inferredTickSize ?? 0.01);
     return {
       snapshots,
       tickSize,
-      ...(typeof params.imbalanceBuckets === "number" && { imbalanceBuckets: params.imbalanceBuckets }),
+      ...(typeof params.imbalanceBuckets === "number" && {
+        imbalanceBuckets: params.imbalanceBuckets,
+      }),
       ...(typeof params.maxSpreadTicks === "number" && { maxSpreadTicks: params.maxSpreadTicks }),
       ...(typeof params.iterations === "number" && { iterations: params.iterations }),
     };
@@ -338,7 +360,9 @@ async function maybeAutoCollect(
       const book = await exchange.getOrderBook(symbol, 5);
       return { ...params, snapshot: { bids: book.bids ?? [], asks: book.asks ?? [] } };
     } catch (e) {
-      return { error: `auto-collect queue_dynamics: ${e instanceof Error ? e.message : String(e)}` };
+      return {
+        error: `auto-collect queue_dynamics: ${e instanceof Error ? e.message : String(e)}`,
+      };
     }
   }
 
@@ -358,7 +382,11 @@ async function maybeAutoCollect(
       for (let i = 1; i < candles.length; i++) {
         const c = candles[i]!;
         const prev = candles[i - 1]!;
-        const tr = Math.max(c.high - c.low, Math.abs(c.high - prev.close), Math.abs(c.low - prev.close));
+        const tr = Math.max(
+          c.high - c.low,
+          Math.abs(c.high - prev.close),
+          Math.abs(c.low - prev.close),
+        );
         trSum += tr;
       }
       atr = trSum / Math.max(candles.length - 1, 1);
@@ -442,7 +470,9 @@ async function maybeAutoCollect(
     );
     const minLen = Math.min(...seriesEntries.map((s) => s.returns.length));
     if (minLen < 60) {
-      return { error: `auto-collect regime_policy: only ${minLen} aligned returns — need ≥ 60 for a stable HMM fit` };
+      return {
+        error: `auto-collect regime_policy: only ${minLen} aligned returns — need ≥ 60 for a stable HMM fit`,
+      };
     }
     // Align to common tail length; returns[asset][t].
     const aligned = seriesEntries.map((s) => s.returns.slice(s.returns.length - minLen));
@@ -494,7 +524,9 @@ async function maybeAutoCollect(
     const candles = await exchange.getCandles(symbol, timeframe, lookbackBars);
     const prices = candles.map((c) => c.close);
     if (prices.length < 60) {
-      return { error: `auto-collect market_memory: only ${prices.length} candles — need ≥ 60 for a meaningful Hurst estimate` };
+      return {
+        error: `auto-collect market_memory: only ${prices.length} candles — need ≥ 60 for a meaningful Hurst estimate`,
+      };
     }
     return {
       prices,
@@ -615,7 +647,7 @@ const INDICATOR_NAMES = [
   "leledc_exhaustion",
 ] as const;
 
-type IndicatorName = typeof INDICATOR_NAMES[number];
+type IndicatorName = (typeof INDICATOR_NAMES)[number];
 
 const _INDICATOR_EXHAUSTIVE: Record<IndicatorName, true> = Object.fromEntries(
   INDICATOR_NAMES.map((n) => [n, true]),
@@ -691,7 +723,9 @@ function dispatchIndicator(
       );
     case "overnight_intraday":
       return calculateOvernightIntraday(candles, {
-        ...(typeof params.suspiciousThresholdPct === "number" && { suspiciousThresholdPct: params.suspiciousThresholdPct }),
+        ...(typeof params.suspiciousThresholdPct === "number" && {
+          suspiciousThresholdPct: params.suspiciousThresholdPct,
+        }),
       });
     case "gmma":
       return calculateGMMA(closes, {
@@ -707,9 +741,7 @@ function dispatchIndicator(
       return computeMAMA({
         // Ehlers' MAMA defaults Price = (H+L)/2 (hl2); allow source: 'close'.
         values:
-          (params.source as string) === "close"
-            ? closes
-            : candles.map((c) => (c.high + c.low) / 2),
+          (params.source as string) === "close" ? closes : candles.map((c) => (c.high + c.low) / 2),
         ...(typeof params.fastLimit === "number" && { fastLimit: params.fastLimit }),
         ...(typeof params.slowLimit === "number" && { slowLimit: params.slowLimit }),
       });
@@ -741,9 +773,15 @@ function dispatchIndicator(
       return computeKalmanTrend({
         prices: closes,
         ...(typeof params.processNoise === "number" && { processNoise: params.processNoise }),
-        ...(typeof params.measurementNoise === "number" && { measurementNoise: params.measurementNoise }),
-        ...(typeof params.initialErrorVariance === "number" && { initialErrorVariance: params.initialErrorVariance }),
-        ...(typeof params.velocityThreshold === "number" && { velocityThreshold: params.velocityThreshold }),
+        ...(typeof params.measurementNoise === "number" && {
+          measurementNoise: params.measurementNoise,
+        }),
+        ...(typeof params.initialErrorVariance === "number" && {
+          initialErrorVariance: params.initialErrorVariance,
+        }),
+        ...(typeof params.velocityThreshold === "number" && {
+          velocityThreshold: params.velocityThreshold,
+        }),
       });
     case "markov_regime":
       return calculateMarkovRegime(candles);
@@ -781,23 +819,33 @@ function dispatchIndicator(
       return calculateUndercutRally(candles, {
         ...(typeof params.srLookback === "number" && { srLookback: params.srLookback }),
         ...(typeof params.reclaimWindow === "number" && { reclaimWindow: params.reclaimWindow }),
-        ...(typeof params.breakdownThresholdPct === "number" && { breakdownThresholdPct: params.breakdownThresholdPct }),
+        ...(typeof params.breakdownThresholdPct === "number" && {
+          breakdownThresholdPct: params.breakdownThresholdPct,
+        }),
         ...(typeof params.reclaimMargin === "number" && { reclaimMargin: params.reclaimMargin }),
         ...(typeof params.volumeMult === "number" && { volumeMult: params.volumeMult }),
       });
     case "trim_state":
       return calculateTrimState(candles, {
         ...(typeof params.entryBarIndex === "number" && { entryBarIndex: params.entryBarIndex }),
-        ...(typeof params.firstResistanceLevel === "number" && { firstResistanceLevel: params.firstResistanceLevel }),
+        ...(typeof params.firstResistanceLevel === "number" && {
+          firstResistanceLevel: params.firstResistanceLevel,
+        }),
       });
     case "resistance_tests": {
       const level = typeof params.level === "number" ? params.level : NaN;
       return calculateResistanceTests(candles, level, {
         ...(typeof params.tolerancePct === "number" && { tolerancePct: params.tolerancePct }),
         ...(typeof params.windowBars === "number" && { windowBars: params.windowBars }),
-        ...(typeof params.minRejectionPct === "number" && { minRejectionPct: params.minRejectionPct }),
-        ...(typeof params.rejectionWindow === "number" && { rejectionWindow: params.rejectionWindow }),
-        ...(typeof params.minBarsBetweenTests === "number" && { minBarsBetweenTests: params.minBarsBetweenTests }),
+        ...(typeof params.minRejectionPct === "number" && {
+          minRejectionPct: params.minRejectionPct,
+        }),
+        ...(typeof params.rejectionWindow === "number" && {
+          rejectionWindow: params.rejectionWindow,
+        }),
+        ...(typeof params.minBarsBetweenTests === "number" && {
+          minBarsBetweenTests: params.minBarsBetweenTests,
+        }),
       });
     }
     case "candlestick_patterns":
@@ -808,8 +856,12 @@ function dispatchIndicator(
           ) as CandlestickPatternName[],
         }),
         ...(typeof params.windowBars === "number" && { windowBars: params.windowBars }),
-        ...(typeof params.dojiBodyThresholdPct === "number" && { dojiBodyThresholdPct: params.dojiBodyThresholdPct }),
-        ...(typeof params.shadowToBodyRatio === "number" && { shadowToBodyRatio: params.shadowToBodyRatio }),
+        ...(typeof params.dojiBodyThresholdPct === "number" && {
+          dojiBodyThresholdPct: params.dojiBodyThresholdPct,
+        }),
+        ...(typeof params.shadowToBodyRatio === "number" && {
+          shadowToBodyRatio: params.shadowToBodyRatio,
+        }),
       });
     case "linear_regression":
       // Single least-squares fit over the full closes series. Pass a
@@ -821,12 +873,16 @@ function dispatchIndicator(
         ...(typeof params.period === "number" && { period: params.period }),
         ...(typeof params.multiplier === "number" && { multiplier: params.multiplier }),
         ...(typeof params.slopeThreshold === "number" && { slopeThreshold: params.slopeThreshold }),
-        ...(typeof params.rSquaredThreshold === "number" && { rSquaredThreshold: params.rSquaredThreshold }),
+        ...(typeof params.rSquaredThreshold === "number" && {
+          rSquaredThreshold: params.rSquaredThreshold,
+        }),
       });
     case "highest_volume_ever":
       return calculateHighestVolumeEver(candles, {
         ...(typeof params.lookbackBars === "number" && { lookbackBars: params.lookbackBars }),
-        ...(typeof params.minBarsBeforeDetection === "number" && { minBarsBeforeDetection: params.minBarsBeforeDetection }),
+        ...(typeof params.minBarsBeforeDetection === "number" && {
+          minBarsBeforeDetection: params.minBarsBeforeDetection,
+        }),
       });
     case "lmw_patterns": {
       // Lo-Mamaysky-Wang kernel-extrema geometric patterns. Omit the full
@@ -871,7 +927,11 @@ function dispatchIndicator(
     case "chaikin_ad":
       return calculateChaikinAD(candles);
     case "chaikin_osc":
-      return calculateChaikinOscillator(candles, (params.fast as number) ?? 3, (params.slow as number) ?? 10);
+      return calculateChaikinOscillator(
+        candles,
+        (params.fast as number) ?? 3,
+        (params.slow as number) ?? 10,
+      );
     case "wma":
     case "dema":
     case "tema":
@@ -1002,12 +1062,18 @@ function dispatchIndicator(
       });
     case "open_pivot":
       return calculateOpenPivot(candles, {
-        ...(typeof params.wickFracThreshold === "number" && { wickFracThreshold: params.wickFracThreshold }),
+        ...(typeof params.wickFracThreshold === "number" && {
+          wickFracThreshold: params.wickFracThreshold,
+        }),
       });
     case "intraday_momentum":
       return calculateIntradayMomentum(candles, {
-        ...(typeof params.firstWindowBars === "number" && { firstWindowBars: params.firstWindowBars }),
-        ...(typeof params.predictWindowBars === "number" && { predictWindowBars: params.predictWindowBars }),
+        ...(typeof params.firstWindowBars === "number" && {
+          firstWindowBars: params.firstWindowBars,
+        }),
+        ...(typeof params.predictWindowBars === "number" && {
+          predictWindowBars: params.predictWindowBars,
+        }),
         ...(typeof params.barsPerDay === "number" && { barsPerDay: params.barsPerDay }),
       });
     case "displacement_break":
@@ -1056,30 +1122,23 @@ function dispatchIndicator(
         ...(typeof params.swingLookback === "number" && { swingLookback: params.swingLookback }),
       });
     case "smc_order_blocks":
-      return detectSmcOrderBlocks(
-        toSmcBars(candles),
-        (params.swingLookback as number) ?? 5,
-      );
+      return detectSmcOrderBlocks(toSmcBars(candles), (params.swingLookback as number) ?? 5);
     case "smc_fvg":
       return detectFairValueGaps(toSmcBars(candles), {
         ...(typeof params.minGapPct === "number" && { minGapPct: params.minGapPct }),
         ...(typeof params.checkFilled === "boolean" && { checkFilled: params.checkFilled }),
       });
     case "smc_choch":
-      return detectChangeOfCharacter(
-        toSmcBars(candles),
-        (params.swingLookback as number) ?? 5,
-      );
+      return detectChangeOfCharacter(toSmcBars(candles), (params.swingLookback as number) ?? 5);
     case "smc_liquidity_sweeps":
       return detectLiquiditySweeps(toSmcBars(candles), {
         ...(typeof params.swingLookback === "number" && { swingLookback: params.swingLookback }),
-        ...(typeof params.minRangeMultiple === "number" && { minRangeMultiple: params.minRangeMultiple }),
+        ...(typeof params.minRangeMultiple === "number" && {
+          minRangeMultiple: params.minRangeMultiple,
+        }),
       });
     case "smc_premium_discount":
-      return detectPremiumDiscountZones(
-        toSmcBars(candles),
-        (params.swingLookback as number) ?? 5,
-      );
+      return detectPremiumDiscountZones(toSmcBars(candles), (params.swingLookback as number) ?? 5);
     case "frac_diff":
       return calculateFracDiff(candles, {
         ...(typeof params.d === "number" && { d: params.d }),
@@ -1112,10 +1171,14 @@ function dispatchIndicator(
         ...(typeof params.closeUpperPct === "number" && { closeUpperPct: params.closeUpperPct }),
         ...(typeof params.accVolMult === "number" && { accVolMult: params.accVolMult }),
         ...(typeof params.distVolMult === "number" && { distVolMult: params.distVolMult }),
-        ...(typeof params.distCountWindow === "number" && { distCountWindow: params.distCountWindow }),
+        ...(typeof params.distCountWindow === "number" && {
+          distCountWindow: params.distCountWindow,
+        }),
         ...(typeof params.churnVolMult === "number" && { churnVolMult: params.churnVolMult }),
         ...(typeof params.atrPeriod === "number" && { atrPeriod: params.atrPeriod }),
-        ...(typeof params.maxProgressVsAtr === "number" && { maxProgressVsAtr: params.maxProgressVsAtr }),
+        ...(typeof params.maxProgressVsAtr === "number" && {
+          maxProgressVsAtr: params.maxProgressVsAtr,
+        }),
       });
     default: {
       const _exhaustive: never = indicator;
@@ -1194,13 +1257,10 @@ export const computeIndicatorTool = createTool({
     params: z
       .record(z.string(), z.unknown())
       .optional()
-      .describe("Per-indicator parameters. E.g. RSI: { period: 14 }; MACD: { fast: 12, slow: 26, signal: 9 }."),
-    bars: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe("Lookback bars. Default 200."),
+      .describe(
+        "Per-indicator parameters. E.g. RSI: { period: 14 }; MACD: { fast: 12, slow: 26, signal: 9 }.",
+      ),
+    bars: z.number().int().positive().optional().describe("Lookback bars. Default 200."),
   }),
   outputSchema: z.object({
     indicator: z.string(),
@@ -1239,7 +1299,11 @@ export const computeIndicatorTool = createTool({
         args.timeframe ?? "1h",
         args.bars ?? 200,
       );
-      const result = dispatchIndicator(args.indicator, candles as IndicatorCandle[], args.params ?? {});
+      const result = dispatchIndicator(
+        args.indicator,
+        candles as IndicatorCandle[],
+        args.params ?? {},
+      );
       // Every indicator here is built on a rolling window, so one non-executable
       // bar contaminates every value whose window touched it. The candles are
       // reported, never rewritten: silently substituting prices would change
@@ -1290,16 +1354,8 @@ export const computeRegimeTool = createTool({
   ].join("\n"),
   inputSchema: z.object({
     symbol: z.string(),
-    timeframe: z
-      .enum(["15m", "30m", "1h", "4h", "1d"])
-      .optional()
-      .describe("Default '1h'."),
-    lookbackBars: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe("Default 200."),
+    timeframe: z.enum(["15m", "30m", "1h", "4h", "1d"]).optional().describe("Default '1h'."),
+    lookbackBars: z.number().int().positive().optional().describe("Default 200."),
   }),
   outputSchema: z.object({
     symbol: z.string(),
@@ -1316,7 +1372,12 @@ export const computeRegimeTool = createTool({
     const ctx = getGordonContext(execContext);
     const exchange = ctx?.exchange;
     if (!exchange) {
-      return { symbol: args.symbol, regime: "unknown", confidence: 0, metadata: { error: "No exchange connected." } };
+      return {
+        symbol: args.symbol,
+        regime: "unknown",
+        confidence: 0,
+        metadata: { error: "No exchange connected." },
+      };
     }
     try {
       const candles = await exchange.getCandles(
@@ -1465,7 +1526,8 @@ export const computeRiskTool = createTool({
       compositeScore: result.consensus?.score ?? (approved ? 0.7 : 0.3),
       dimensionScores: undefined,
       constitutionViolations: warnings as unknown[],
-      summary: result.reason ?? result.error ?? (approved ? "Risk gate passed." : "Risk gate flagged."),
+      summary:
+        result.reason ?? result.error ?? (approved ? "Risk gate passed." : "Risk gate flagged."),
     };
   },
 });
@@ -1921,9 +1983,7 @@ export const computeMicrostructureTool = createTool({
   ].join("\n"),
   inputSchema: z.object({
     operation: z.enum(MICROSTRUCTURE_OPS),
-    params: z
-      .record(z.string(), z.unknown())
-      .describe("Operation-specific arguments."),
+    params: z.record(z.string(), z.unknown()).describe("Operation-specific arguments."),
   }),
   outputSchema: z.object({
     operation: z.string(),
@@ -1972,10 +2032,16 @@ export const computeMicrostructureTool = createTool({
       queue_dynamics: {
         execute: async (p: Record<string, unknown>) => {
           const snapshot = p.snapshot as
-            | { bids: Array<{ price: number; quantity: number }>; asks: Array<{ price: number; quantity: number }> }
+            | {
+                bids: Array<{ price: number; quantity: number }>;
+                asks: Array<{ price: number; quantity: number }>;
+              }
             | undefined;
           if (!snapshot) {
-            return { error: "queue_dynamics: provide `symbol` (auto-collect) or a `snapshot` { bids[], asks[] }." };
+            return {
+              error:
+                "queue_dynamics: provide `symbol` (auto-collect) or a `snapshot` { bids[], asks[] }.",
+            };
           }
           const queue = queuePositionSignal({
             snapshot,
@@ -1999,12 +2065,14 @@ export const computeMicrostructureTool = createTool({
           const currency = typeof p.currency === "string" ? p.currency.toUpperCase() : "BTC";
           try {
             const chain = await fetchOptionsChain(currency);
-            if (!chain.contracts.length) return { error: `dealer_exposure: empty options chain for ${currency}` };
+            if (!chain.contracts.length)
+              return { error: `dealer_exposure: empty options chain for ${currency}` };
             const result = computeDealerGreeksExposure(chain.contracts, {
               spot: chain.spotUsd,
               rate: typeof p.rate === "number" ? p.rate : 0.04,
               // Deribit crypto options are 1 contract = 1 unit of the underlying.
-              contractMultiplier: typeof p.contractMultiplier === "number" ? p.contractMultiplier : 1,
+              contractMultiplier:
+                typeof p.contractMultiplier === "number" ? p.contractMultiplier : 1,
               ...(typeof p.dividendYield === "number" && { dividendYield: p.dividendYield }),
               ...(typeof p.callSign === "number" && { callSign: p.callSign as 1 | -1 }),
               ...(typeof p.putSign === "number" && { putSign: p.putSign as 1 | -1 }),
@@ -2029,7 +2097,9 @@ export const computeMicrostructureTool = createTool({
       },
       regime_policy: {
         execute: async (p: Record<string, unknown>) =>
-          runRegimeAllocationPolicy(p as unknown as Parameters<typeof runRegimeAllocationPolicy>[0]),
+          runRegimeAllocationPolicy(
+            p as unknown as Parameters<typeof runRegimeAllocationPolicy>[0],
+          ),
       },
       regime_filter_value: {
         execute: async (p: Record<string, unknown>) =>
@@ -2037,7 +2107,9 @@ export const computeMicrostructureTool = createTool({
       },
       damped_cycle: {
         execute: async (p: Record<string, unknown>) =>
-          computeDampedCycleDecomposition(p as unknown as Parameters<typeof computeDampedCycleDecomposition>[0]),
+          computeDampedCycleDecomposition(
+            p as unknown as Parameters<typeof computeDampedCycleDecomposition>[0],
+          ),
       },
       forensic_screen: {
         execute: async (p: Record<string, unknown>) =>
@@ -2057,7 +2129,10 @@ export const computeMicrostructureTool = createTool({
       triangular_arbitrage_parity: {
         execute: async (p: Record<string, unknown>) => {
           if (!Array.isArray(p.legAB) || !Array.isArray(p.legBC) || !Array.isArray(p.directAC)) {
-            return { error: "triangular_arbitrage_parity: `legAB` (A/B), `legBC` (B/C), and `directAC` (A/C) number[] rate series are required" };
+            return {
+              error:
+                "triangular_arbitrage_parity: `legAB` (A/B), `legBC` (B/C), and `directAC` (A/C) number[] rate series are required",
+            };
           }
           return computeTriangularArbitrageParity(
             p as unknown as Parameters<typeof computeTriangularArbitrageParity>[0],
@@ -2100,7 +2175,9 @@ export const computeMicrostructureTool = createTool({
       },
       ou_optimal_thresholds: {
         execute: async (p: Record<string, unknown>) =>
-          computeOuOptimalThresholds(p as unknown as Parameters<typeof computeOuOptimalThresholds>[0]),
+          computeOuOptimalThresholds(
+            p as unknown as Parameters<typeof computeOuOptimalThresholds>[0],
+          ),
       },
       triple_barrier: {
         execute: async (p: Record<string, unknown>) =>
@@ -2150,7 +2227,10 @@ export const computeMicrostructureTool = createTool({
       price_discovery: {
         execute: async (p: Record<string, unknown>) => {
           if (!Array.isArray(p.series1) || !Array.isArray(p.series2)) {
-            return { error: "price_discovery: `series1` and `series2` (aligned number[] price series) are required" };
+            return {
+              error:
+                "price_discovery: `series1` and `series2` (aligned number[] price series) are required",
+            };
           }
           return computePriceDiscovery(p as unknown as Parameters<typeof computePriceDiscovery>[0]);
         },
@@ -2158,17 +2238,27 @@ export const computeMicrostructureTool = createTool({
       generalized_impulse: {
         execute: async (p: Record<string, unknown>) => {
           if (!Array.isArray(p.series1) || !Array.isArray(p.series2)) {
-            return { error: "generalized_impulse: `series1` and `series2` (aligned number[] price series) are required" };
+            return {
+              error:
+                "generalized_impulse: `series1` and `series2` (aligned number[] price series) are required",
+            };
           }
-          return computeGeneralizedImpulse(p as unknown as Parameters<typeof computeGeneralizedImpulse>[0]);
+          return computeGeneralizedImpulse(
+            p as unknown as Parameters<typeof computeGeneralizedImpulse>[0],
+          );
         },
       },
       footprint_imbalance: {
         execute: async (p: Record<string, unknown>) => {
           if (!Array.isArray(p.levels)) {
-            return { error: "footprint_imbalance: `levels` ([{priceLevel, buyVolume, sellVolume}]) is required" };
+            return {
+              error:
+                "footprint_imbalance: `levels` ([{priceLevel, buyVolume, sellVolume}]) is required",
+            };
           }
-          return computeFootprintImbalance(p as unknown as Parameters<typeof computeFootprintImbalance>[0]);
+          return computeFootprintImbalance(
+            p as unknown as Parameters<typeof computeFootprintImbalance>[0],
+          );
         },
       },
       naked_poc: {
@@ -2181,16 +2271,23 @@ export const computeMicrostructureTool = createTool({
       },
       as_intensity: {
         execute: async (p: Record<string, unknown>) =>
-          computeASIntensityCalibration(p as unknown as Parameters<typeof computeASIntensityCalibration>[0]),
+          computeASIntensityCalibration(
+            p as unknown as Parameters<typeof computeASIntensityCalibration>[0],
+          ),
       },
       as_stationary_reservation: {
         execute: async (p: Record<string, unknown>) =>
-          computeASStationaryReservation(p as unknown as Parameters<typeof computeASStationaryReservation>[0]),
+          computeASStationaryReservation(
+            p as unknown as Parameters<typeof computeASStationaryReservation>[0],
+          ),
       },
       asymmetric_beta: {
         execute: async (p: Record<string, unknown>) => {
           if (!Array.isArray(p.strategyReturns) || !Array.isArray(p.benchmarkReturns)) {
-            return { error: "asymmetric_beta: `strategyReturns` and `benchmarkReturns` (aligned number[]) are required" };
+            return {
+              error:
+                "asymmetric_beta: `strategyReturns` and `benchmarkReturns` (aligned number[]) are required",
+            };
           }
           return computeAsymmetricBeta(p as unknown as Parameters<typeof computeAsymmetricBeta>[0]);
         },
@@ -2198,31 +2295,51 @@ export const computeMicrostructureTool = createTool({
       generalized_variance: {
         execute: async (p: Record<string, unknown>) => {
           if (!Array.isArray(p.returns) || !Array.isArray(p.returns[0])) {
-            return { error: "generalized_variance: `returns` (≥2 aligned number[][] return series) is required" };
+            return {
+              error:
+                "generalized_variance: `returns` (≥2 aligned number[][] return series) is required",
+            };
           }
-          return computeGeneralizedVariance(p as unknown as Parameters<typeof computeGeneralizedVariance>[0]);
+          return computeGeneralizedVariance(
+            p as unknown as Parameters<typeof computeGeneralizedVariance>[0],
+          );
         },
       },
       population_stability: {
         execute: async (p: Record<string, unknown>) => {
           if (!Array.isArray(p.expected) || !Array.isArray(p.actual)) {
-            return { error: "population_stability: `expected` (reference number[]) and `actual` (current number[]) are required" };
+            return {
+              error:
+                "population_stability: `expected` (reference number[]) and `actual` (current number[]) are required",
+            };
           }
-          return computePopulationStability(p as unknown as Parameters<typeof computePopulationStability>[0]);
+          return computePopulationStability(
+            p as unknown as Parameters<typeof computePopulationStability>[0],
+          );
         },
       },
       var_backtest: {
         execute: async (p: Record<string, unknown>) => {
           if (!Array.isArray(p.returns) || !Array.isArray(p.varForecasts)) {
-            return { error: "var_backtest: `returns` (realized number[]) and `varForecasts` (positive loss magnitudes, aligned) are required" };
+            return {
+              error:
+                "var_backtest: `returns` (realized number[]) and `varForecasts` (positive loss magnitudes, aligned) are required",
+            };
           }
           return computeVaRBacktest(p as unknown as Parameters<typeof computeVaRBacktest>[0]);
         },
       },
       jensens_alpha: {
         execute: async (p: Record<string, unknown>) => {
-          if (!Array.isArray(p.returns) || !Array.isArray(p.factors) || !Array.isArray(p.factors[0])) {
-            return { error: "jensens_alpha: `returns` (number[]) and `factors` (number[][], ≥1 aligned factor series) are required" };
+          if (
+            !Array.isArray(p.returns) ||
+            !Array.isArray(p.factors) ||
+            !Array.isArray(p.factors[0])
+          ) {
+            return {
+              error:
+                "jensens_alpha: `returns` (number[]) and `factors` (number[][], ≥1 aligned factor series) are required",
+            };
           }
           return computeJensensAlpha(p as unknown as Parameters<typeof computeJensensAlpha>[0]);
         },
@@ -2230,27 +2347,46 @@ export const computeMicrostructureTool = createTool({
       fundamental_quality: {
         execute: async (p: Record<string, unknown>) => {
           if (typeof p.revenue !== "number") {
-            return { error: "fundamental_quality: `revenue` (number) is required; optional: revenueGrowthPct|priorRevenue, freeCashFlow, operatingCashFlow, netIncome, cogs, accountsReceivable, inventory, accountsPayable, daysInPeriod" };
+            return {
+              error:
+                "fundamental_quality: `revenue` (number) is required; optional: revenueGrowthPct|priorRevenue, freeCashFlow, operatingCashFlow, netIncome, cogs, accountsReceivable, inventory, accountsPayable, daysInPeriod",
+            };
           }
-          return computeFundamentalQuality(p as unknown as Parameters<typeof computeFundamentalQuality>[0]);
+          return computeFundamentalQuality(
+            p as unknown as Parameters<typeof computeFundamentalQuality>[0],
+          );
         },
       },
       wacc: {
         execute: async (p: Record<string, unknown>) => {
-          const req = ["riskFreeRate", "beta", "equityRiskPremium", "marketCapEquity", "marketValueDebt", "costOfDebt", "taxRate"];
+          const req = [
+            "riskFreeRate",
+            "beta",
+            "equityRiskPremium",
+            "marketCapEquity",
+            "marketValueDebt",
+            "costOfDebt",
+            "taxRate",
+          ];
           if (req.some((k) => typeof p[k] !== "number")) {
-            return { error: `wacc: requires numbers for ${req.join(", ")} (+ optional additionalPremium)` };
+            return {
+              error: `wacc: requires numbers for ${req.join(", ")} (+ optional additionalPremium)`,
+            };
           }
           return computeWACC(p as unknown as Parameters<typeof computeWACC>[0]);
         },
       },
       inventory_order_size: {
         execute: async (p: Record<string, unknown>) =>
-          computeInventoryOrderSize(p as unknown as Parameters<typeof computeInventoryOrderSize>[0]),
+          computeInventoryOrderSize(
+            p as unknown as Parameters<typeof computeInventoryOrderSize>[0],
+          ),
       },
       mm_markov: {
         execute: async (p: Record<string, unknown>) =>
-          computeMarketMakingMarkov(p as unknown as Parameters<typeof computeMarketMakingMarkov>[0]),
+          computeMarketMakingMarkov(
+            p as unknown as Parameters<typeof computeMarketMakingMarkov>[0],
+          ),
       },
       filing_diff: {
         execute: async (p: Record<string, unknown>) => {
@@ -2260,7 +2396,11 @@ export const computeMicrostructureTool = createTool({
           if (p.section === "risk_factors" || p.section === "mdna") {
             return diffNamedSection(prior, current, p.section, sim);
           }
-          return diffFilingSections({ prior, current, ...(sim !== undefined && { similarityThreshold: sim }) });
+          return diffFilingSections({
+            prior,
+            current,
+            ...(sim !== undefined && { similarityThreshold: sim }),
+          });
         },
       },
       token_unlock_risk: {
@@ -2269,12 +2409,21 @@ export const computeMicrostructureTool = createTool({
       },
       holder_concentration: {
         execute: async (p: Record<string, unknown>) =>
-          computeHolderConcentration(p as unknown as Parameters<typeof computeHolderConcentration>[0]),
+          computeHolderConcentration(
+            p as unknown as Parameters<typeof computeHolderConcentration>[0],
+          ),
       },
       hrp_allocation: {
         execute: async (p: Record<string, unknown>) => {
-          const r = hierarchicalRiskParity(p as unknown as Parameters<typeof hierarchicalRiskParity>[0]);
-          return r ?? { error: "hrp_allocation: insufficient input — need a returns matrix or a covariance matrix (≥ 2 assets)" };
+          const r = hierarchicalRiskParity(
+            p as unknown as Parameters<typeof hierarchicalRiskParity>[0],
+          );
+          return (
+            r ?? {
+              error:
+                "hrp_allocation: insufficient input — need a returns matrix or a covariance matrix (≥ 2 assets)",
+            }
+          );
         },
       },
       formulaic_alpha: {
@@ -2283,7 +2432,10 @@ export const computeMicrostructureTool = createTool({
           const dates = Array.isArray(p.dates) ? (p.dates as string[]) : [];
           const tickers = Array.isArray(p.tickers) ? (p.tickers as string[]) : [];
           if (!Array.isArray(p.close)) {
-            return { error: "formulaic_alpha: `close` (a date × ticker matrix) is required, alongside `dates` and `tickers`." };
+            return {
+              error:
+                "formulaic_alpha: `close` (a date × ticker matrix) is required, alongside `dates` and `tickers`.",
+            };
           }
           const toPanel = (m: unknown) =>
             Array.isArray(m) ? makePanel(dates, tickers, m as Cell[][]) : undefined;
@@ -2329,7 +2481,9 @@ export const computeMicrostructureTool = createTool({
           const a = acf(series, maxLag);
           const pa = pacf(series, maxLag);
           if (!a || !pa) {
-            return { error: `acf_pacf: insufficient series — need n ≥ maxLag + 2 (maxLag=${maxLag})` };
+            return {
+              error: `acf_pacf: insufficient series — need n ≥ maxLag + 2 (maxLag=${maxLag})`,
+            };
           }
           return {
             acf: a.acf,
@@ -2364,7 +2518,10 @@ export const computeMicrostructureTool = createTool({
               threshold,
             );
           }
-          return { error: "information_bars: pass either `ticks` ({price,volume,timestamp}[]) or `ohlcv` ({close,volume}[])." };
+          return {
+            error:
+              "information_bars: pass either `ticks` ({price,volume,timestamp}[]) or `ohlcv` ({close,volume}[]).",
+          };
         },
       },
       robustness_metrics: {
@@ -2374,24 +2531,40 @@ export const computeMicrostructureTool = createTool({
             ...(typeof p.higherIsBetter === "boolean" && { higherIsBetter: p.higherIsBetter }),
             ...(typeof p.eps === "number" && { eps: p.eps }),
           });
-          return r ?? { error: "robustness_metrics: need ≥ 5 finite outcomes (a distribution of stress-test results)." };
+          return (
+            r ?? {
+              error:
+                "robustness_metrics: need ≥ 5 finite outcomes (a distribution of stress-test results).",
+            }
+          );
         },
       },
       fee_sensitivity: {
         execute: async (p: Record<string, unknown>) => {
-          const r = runFeeSensitivitySweep(p as unknown as Parameters<typeof runFeeSensitivitySweep>[0]);
-          return r ?? { error: "fee_sensitivity: need `grossReturns` (per-round-trip gross return fractions) and at least one fee `schedule`." };
+          const r = runFeeSensitivitySweep(
+            p as unknown as Parameters<typeof runFeeSensitivitySweep>[0],
+          );
+          return (
+            r ?? {
+              error:
+                "fee_sensitivity: need `grossReturns` (per-round-trip gross return fractions) and at least one fee `schedule`.",
+            }
+          );
         },
       },
       black_scholes: {
         execute: async (p: Record<string, unknown>) => {
-          const num = (k: string): number | null => (typeof p[k] === "number" ? (p[k] as number) : null);
+          const num = (k: string): number | null =>
+            typeof p[k] === "number" ? (p[k] as number) : null;
           const spot = num("spot");
           const strike = num("strike");
           const timeToExpiry = num("timeToExpiry");
           const riskFreeRate = num("riskFreeRate");
           if (spot == null || strike == null || timeToExpiry == null || riskFreeRate == null) {
-            return { error: "black_scholes: spot, strike, timeToExpiry (years), riskFreeRate are required numbers." };
+            return {
+              error:
+                "black_scholes: spot, strike, timeToExpiry (years), riskFreeRate are required numbers.",
+            };
           }
           const optionType = p.optionType === "put" ? ("put" as const) : ("call" as const);
           const q = num("dividendYield");
@@ -2422,12 +2595,17 @@ export const computeMicrostructureTool = createTool({
               optionType,
             );
           }
-          return { error: "black_scholes: provide `sigma` (→ price + Greeks) or `marketPrice` (→ implied volatility)." };
+          return {
+            error:
+              "black_scholes: provide `sigma` (→ price + Greeks) or `marketPrice` (→ implied volatility).",
+          };
         },
       },
       options_payoff: {
         execute: async (p: Record<string, unknown>) => {
-          const r = computeOptionsPayoff(p as unknown as Parameters<typeof computeOptionsPayoff>[0]);
+          const r = computeOptionsPayoff(
+            p as unknown as Parameters<typeof computeOptionsPayoff>[0],
+          );
           // Downsample the (potentially ~200-point) payoff curve; the model
           // wants breakevens / max-P / max-L, not the raw grid.
           const { payoffCurve, ...rest } = r;
@@ -2445,29 +2623,46 @@ export const computeMicrostructureTool = createTool({
             ? (p.candles as Parameters<typeof injectGaps>[0])
             : null;
           if (!candles) return { error: "stress_inject: `candles` array required." };
-          const sp = (typeof p.params === "object" && p.params !== null ? p.params : {}) as Record<string, unknown>;
+          const sp = (typeof p.params === "object" && p.params !== null ? p.params : {}) as Record<
+            string,
+            unknown
+          >;
           let perturbed: typeof candles;
           switch (p.method) {
             case "gaps":
               perturbed = injectGaps(candles, sp as unknown as Parameters<typeof injectGaps>[1]);
               break;
             case "crash_blocks":
-              perturbed = injectCrashBlocks(candles, sp as unknown as Parameters<typeof injectCrashBlocks>[1]);
+              perturbed = injectCrashBlocks(
+                candles,
+                sp as unknown as Parameters<typeof injectCrashBlocks>[1],
+              );
               break;
             case "flatline_blocks":
-              perturbed = injectFlatlineBlocks(candles, sp as unknown as Parameters<typeof injectFlatlineBlocks>[1]);
+              perturbed = injectFlatlineBlocks(
+                candles,
+                sp as unknown as Parameters<typeof injectFlatlineBlocks>[1],
+              );
               break;
             case "vol_stretch":
-              perturbed = stretchVolatility(candles, sp as unknown as Parameters<typeof stretchVolatility>[1]);
+              perturbed = stretchVolatility(
+                candles,
+                sp as unknown as Parameters<typeof stretchVolatility>[1],
+              );
               break;
             case "reverse_path":
               perturbed = reversePath(candles);
               break;
             case "trend_invert":
-              perturbed = invertTrendWindows(candles, sp as unknown as Parameters<typeof invertTrendWindows>[1]);
+              perturbed = invertTrendWindows(
+                candles,
+                sp as unknown as Parameters<typeof invertTrendWindows>[1],
+              );
               break;
             default:
-              return { error: `stress_inject: unknown method '${String(p.method)}'. Use gaps | crash_blocks | flatline_blocks | vol_stretch | reverse_path | trend_invert.` };
+              return {
+                error: `stress_inject: unknown method '${String(p.method)}'. Use gaps | crash_blocks | flatline_blocks | vol_stretch | reverse_path | trend_invert.`,
+              };
           }
           return {
             method: p.method,
@@ -2486,7 +2681,12 @@ export const computeMicrostructureTool = createTool({
             scenario,
             ...(typeof p.alpha === "number" && { alpha: p.alpha }),
           });
-          return r ?? { error: "pnl_significance: need ≥ 5 finite values in each of `baseline` and `scenario`." };
+          return (
+            r ?? {
+              error:
+                "pnl_significance: need ≥ 5 finite values in each of `baseline` and `scenario`.",
+            }
+          );
         },
       },
       omega_ratio: {
@@ -2504,19 +2704,36 @@ export const computeMicrostructureTool = createTool({
       price_deviation_guard: {
         execute: async (p: Record<string, unknown>) => {
           const r = checkPriceDeviation(p as unknown as Parameters<typeof checkPriceDeviation>[0]);
-          return r ?? { error: "price_deviation_guard: orderPrice and referencePrice must be positive finite numbers." };
+          return (
+            r ?? {
+              error:
+                "price_deviation_guard: orderPrice and referencePrice must be positive finite numbers.",
+            }
+          );
         },
       },
       evolving_r: {
         execute: async (p: Record<string, unknown>) => {
           const r = computeEvolvingR(p as unknown as Parameters<typeof computeEvolvingR>[0]);
-          return r ?? { error: "evolving_r: need finite entry/stop/target/currentPrice and valid geometry (long: stop<entry<target; short: target<entry<stop)." };
+          return (
+            r ?? {
+              error:
+                "evolving_r: need finite entry/stop/target/currentPrice and valid geometry (long: stop<entry<target; short: target<entry<stop).",
+            }
+          );
         },
       },
       overthrow_stop: {
         execute: async (p: Record<string, unknown>) => {
-          const r = computeOverthrowStop(p as unknown as Parameters<typeof computeOverthrowStop>[0]);
-          return r ?? { error: "overthrow_stop: need candles[], a finite positive brokenLevel, side long|short, and a detectable overshoot+reclaim of the level." };
+          const r = computeOverthrowStop(
+            p as unknown as Parameters<typeof computeOverthrowStop>[0],
+          );
+          return (
+            r ?? {
+              error:
+                "overthrow_stop: need candles[], a finite positive brokenLevel, side long|short, and a detectable overshoot+reclaim of the level.",
+            }
+          );
         },
       },
     };
@@ -2532,11 +2749,7 @@ export const computeMicrostructureTool = createTool({
       // Auto-collect shortcut: when the LLM passes a symbol-based payload
       // for an op that normally requires pre-collected data, gather what's
       // needed from the live exchange first, then call the underlying tool.
-      const params = await maybeAutoCollect(
-        args.operation,
-        args.params,
-        execContext,
-      );
+      const params = await maybeAutoCollect(args.operation, args.params, execContext);
       if ("error" in params) {
         return { operation: args.operation, result: params, computedAt };
       }

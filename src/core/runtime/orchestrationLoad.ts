@@ -51,9 +51,7 @@ export interface OrchestrationLoadResult {
 const DEFAULT_SATURATED = 0.75;
 const DEFAULT_OVERLOADED = 1.0;
 
-export function computeOrchestrationLoad(
-  input: OrchestrationLoadInput,
-): OrchestrationLoadResult {
+export function computeOrchestrationLoad(input: OrchestrationLoadInput): OrchestrationLoadResult {
   const { pendingReviewItems, reviewCapacityPerHour } = input;
   if (!Number.isFinite(pendingReviewItems) || pendingReviewItems < 0) {
     throw new Error("orchestrationLoad: pendingReviewItems must be a non-negative number");

@@ -12,7 +12,6 @@ import type { GordonContext } from "../types.ts";
 import { resolveWorkflowPhaseModelRoute } from "./workflowPhase.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { recordPhaseLLMCost } from "../../platform/costTracker.ts";
-import { resolveFlag } from "../../config/flagResolver.ts";
 import {
   isPlanRubricEnabled,
   emptyRubric,
@@ -186,7 +185,9 @@ export async function runCritiqueWithRubric(
     const raw = response.content?.trim() ?? "";
     const parsed = parseCritiqueRubricJson(raw);
     if (!parsed) {
-      logger.warn("Critique-with-rubric returned unparseable JSON, treating as empty", { sample: raw.slice(0, 120) });
+      logger.warn("Critique-with-rubric returned unparseable JSON, treating as empty", {
+        sample: raw.slice(0, 120),
+      });
       return { critique: raw, rubric: emptyRubric() };
     }
     return parsed;
@@ -206,13 +207,21 @@ function parseCritiqueRubricJson(text: string): CritiqueWithRubric | null {
     // Try to find the first {...} block.
     const match = stripped.match(/\{[\s\S]*\}/);
     if (!match) return null;
-    try { body = JSON.parse(match[0]); } catch { return null; }
+    try {
+      body = JSON.parse(match[0]);
+    } catch {
+      return null;
+    }
   }
   if (!body || typeof body !== "object") return null;
   const obj = body as Record<string, unknown>;
   const dims: Array<keyof PlanRubric> = [
-    "correctness", "verification", "scopeDiscipline",
-    "reliability", "maintainability", "handoffReadiness",
+    "correctness",
+    "verification",
+    "scopeDiscipline",
+    "reliability",
+    "maintainability",
+    "handoffReadiness",
   ];
   const rubric: Record<string, number> = {};
   for (const d of dims) {

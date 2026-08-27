@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { execSync } from "child_process";
+import { execSync } from "node:child_process";
 
 // ============================================================================
 // useCopyOnSelect — Clipboard copy utility for terminal text

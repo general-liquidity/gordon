@@ -88,9 +88,7 @@ describe("compareWithActuals", () => {
       symbolsTouched: ["BTCUSDT"],
       venuesUsed: ["binance"],
       strategiesInvoked: ["regime-rsi"],
-      verificationOutcomes: [
-        { standard: "win rate above 60%", met: false },
-      ],
+      verificationOutcomes: [{ standard: "win rate above 60%", met: false }],
       detectedViolations: [],
     });
     expect(diff.verdict).toBe("drift");

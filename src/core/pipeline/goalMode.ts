@@ -237,7 +237,10 @@ const END_STATE_PATTERNS: Array<{
  * Strips a leading "/goal " if present.
  */
 export function parseGoal(raw: string): ParsedGoal {
-  const trimmed = raw.trim().replace(/^\/goal\s+/i, "").trim();
+  const trimmed = raw
+    .trim()
+    .replace(/^\/goal\s+/i, "")
+    .trim();
 
   // Constraints: split on each "without ..." clause, plus comma-separated extras.
   const withoutMatch = trimmed.match(/\bwithout\b/i);
@@ -247,9 +250,15 @@ export function parseGoal(raw: string): ParsedGoal {
     beforeWithout = trimmed.slice(0, withoutMatch.index).trim();
     const rest = trimmed.slice(withoutMatch.index!).trim();
     // Split on "without" then on commas inside each segment.
-    const segments = rest.split(/\bwithout\b/i).map((s) => s.trim()).filter(Boolean);
+    const segments = rest
+      .split(/\bwithout\b/i)
+      .map((s) => s.trim())
+      .filter(Boolean);
     for (const seg of segments) {
-      for (const part of seg.split(",").map((p) => p.trim()).filter(Boolean)) {
+      for (const part of seg
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean)) {
         constraints.push(part);
       }
     }
@@ -392,7 +401,8 @@ function extractObservations(
   if (obs.trades !== undefined) out.trades = obs.trades;
   if (obs.maxDrawdown !== undefined) out.maxDrawdown = obs.maxDrawdown;
   if (obs.elapsedHours !== undefined) out.elapsedHours = obs.elapsedHours;
-  if (obs.checklistChecks !== undefined) out.checklistDone = obs.checklistChecks.filter(Boolean).length;
+  if (obs.checklistChecks !== undefined)
+    out.checklistDone = obs.checklistChecks.filter(Boolean).length;
   if (obs.constraintViolations !== undefined) out.violations = obs.constraintViolations.length;
   return out;
 }
@@ -495,7 +505,14 @@ export async function finalizeGoalCompletion(
   const unmet = requirements.filter((r) => !r.met);
 
   if (!isCompletionCandidate(score)) {
-    return { state, requirements, unmet, verdict: null, sealed: false, blockedPrematureCompletion: false };
+    return {
+      state,
+      requirements,
+      unmet,
+      verdict: null,
+      sealed: false,
+      blockedPrematureCompletion: false,
+    };
   }
 
   const verdict = await verifyCompletion(verifier, {
@@ -512,14 +529,31 @@ export async function finalizeGoalCompletion(
       status: "achieved",
       notes: [...state.notes, `completion verified by ${verdict.verifierId}: ${verdict.rationale}`],
     };
-    return { state: sealedState, requirements, unmet, verdict, sealed: true, blockedPrematureCompletion: false };
+    return {
+      state: sealedState,
+      requirements,
+      unmet,
+      verdict,
+      sealed: true,
+      blockedPrematureCompletion: false,
+    };
   }
 
   const blockedState: GoalState = {
     ...state,
-    notes: [...state.notes, `self-scored completion blocked by ${verdict.verifierId}: ${verdict.rationale}`],
+    notes: [
+      ...state.notes,
+      `self-scored completion blocked by ${verdict.verifierId}: ${verdict.rationale}`,
+    ],
   };
-  return { state: blockedState, requirements, unmet, verdict, sealed: false, blockedPrematureCompletion: true };
+  return {
+    state: blockedState,
+    requirements,
+    unmet,
+    verdict,
+    sealed: false,
+    blockedPrematureCompletion: true,
+  };
 }
 
 /**
@@ -613,11 +647,7 @@ export function loadActiveGoal(path?: string): GoalState | null {
  *   - <rationale>
  *   - observations: { ... }
  */
-export function appendProgressLog(
-  state: GoalState,
-  score: GoalScore,
-  path?: string,
-): void {
+export function appendProgressLog(state: GoalState, score: GoalScore, path?: string): void {
   const target = path ?? defaultGoalProgressPath();
   ensureParentDir(target);
 

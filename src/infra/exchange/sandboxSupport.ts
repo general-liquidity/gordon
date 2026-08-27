@@ -41,15 +41,18 @@ export const EXCHANGE_SANDBOX_SUPPORT: Record<NativeExchangeId, SandboxSupportEn
   },
   binance_us: {
     kind: "unsupported",
-    notSupportedHint: "Binance US does not offer a public testnet. Use live mode with small amounts or switch to Binance (com) testnet.",
+    notSupportedHint:
+      "Binance US does not offer a public testnet. Use live mode with small amounts or switch to Binance (com) testnet.",
   },
   coinbase: {
     kind: "unsupported",
-    notSupportedHint: "CCXT's coinbase (Advanced Trade) has no sandbox — the old native api-sandbox.coinbase.com path is gone. Use binance or okx for sandbox/paper, or run live deliberately.",
+    notSupportedHint:
+      "CCXT's coinbase (Advanced Trade) has no sandbox — the old native api-sandbox.coinbase.com path is gone. Use binance or okx for sandbox/paper, or run live deliberately.",
   },
   kraken: {
     kind: "unsupported",
-    notSupportedHint: "Kraken spot API does not offer a sandbox. Kraken Futures has a demo at demo-futures.kraken.com but requires a dedicated futures adapter.",
+    notSupportedHint:
+      "Kraken spot API does not offer a sandbox. Kraken Futures has a demo at demo-futures.kraken.com but requires a dedicated futures adapter.",
   },
   bitfinex: {
     kind: "credential",

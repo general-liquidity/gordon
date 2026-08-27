@@ -114,12 +114,7 @@ function stamp<T extends Thesis>(thesis: T, at: string): T {
  * below (enterPosition / recordPartialClose / …) which also carry the side
  * effects; use this directly only for pure state moves like terminate.
  */
-export function transition(
-  thesis: Thesis,
-  to: ThesisState,
-  at: string,
-  reason?: string,
-): Thesis {
+export function transition(thesis: Thesis, to: ThesisState, at: string, reason?: string): Thesis {
   if (!canTransition(thesis.state, to)) {
     throw new Error(`illegal thesis transition ${thesis.state} -> ${to}`);
   }
@@ -177,11 +172,7 @@ export interface EnterPositionParams {
   reviewEveryMs?: number;
 }
 
-export function enterPosition(
-  thesis: Thesis,
-  params: EnterPositionParams,
-  at: string,
-): Thesis {
+export function enterPosition(thesis: Thesis, params: EnterPositionParams, at: string): Thesis {
   assertPositive(params.entryPrice, "entryPrice");
   assertPositive(params.quantity, "quantity");
   const moved = transition(thesis, "ACTIVE", at);
@@ -205,11 +196,7 @@ export interface CloseParams {
  * Trim a portion of the open position. Realizes PnL on the closed quantity and
  * moves to PARTIALLY_CLOSED, or CLOSED when the trim empties the position.
  */
-export function recordPartialClose(
-  thesis: Thesis,
-  params: CloseParams,
-  at: string,
-): Thesis {
+export function recordPartialClose(thesis: Thesis, params: CloseParams, at: string): Thesis {
   assertPositive(params.quantity, "close quantity");
   assertPositive(params.exitPrice, "exitPrice");
   if (thesis.entryPrice === undefined) {
@@ -220,8 +207,7 @@ export function recordPartialClose(
       `close quantity ${params.quantity} exceeds open quantity ${thesis.openQuantity}`,
     );
   }
-  const perUnit =
-    (params.exitPrice - thesis.entryPrice) * (thesis.side === "long" ? 1 : -1);
+  const perUnit = (params.exitPrice - thesis.entryPrice) * (thesis.side === "long" ? 1 : -1);
   const realized = perUnit * params.quantity;
   const remaining = thesis.openQuantity - params.quantity;
   const target: ThesisState = remaining <= 1e-9 ? "CLOSED" : "PARTIALLY_CLOSED";
@@ -269,9 +255,7 @@ export function completeReview(thesis: Thesis, at: string): Thesis {
   return stamp(
     {
       ...thesis,
-      nextReviewAt: cadence
-        ? new Date(new Date(at).getTime() + cadence).toISOString()
-        : undefined,
+      nextReviewAt: cadence ? new Date(new Date(at).getTime() + cadence).toISOString() : undefined,
     },
     at,
   );

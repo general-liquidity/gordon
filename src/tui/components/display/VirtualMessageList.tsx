@@ -1,4 +1,5 @@
-import React, { useCallback, useRef, useMemo } from "react";
+import type React from "react";
+import { useCallback, useRef, useMemo } from "react";
 import { Box, Static } from "../../ink-custom";
 import type { DOMElement } from "ink";
 import { MessageBubble, type Message } from "../messages/MessageBubble.tsx";
@@ -87,7 +88,7 @@ export function VirtualMessageList({ messages, scrollEnabled = true, header }: P
 
   // Collapse >3 consecutive tool/hook_progress messages into a single summary
   const lastMsg = completedMessages[completedMessages.length - 1];
-  const collapseKey = `${completedMessages.length}:${lastMsg?.id ?? ""}:${(lastMsg?.content ?? "").length}`;
+  const _collapseKey = `${completedMessages.length}:${lastMsg?.id ?? ""}:${(lastMsg?.content ?? "").length}`;
   const collapsedMessages = useMemo(() => {
     const result: Message[] = [];
     let toolGroup: Message[] = [];
@@ -123,7 +124,7 @@ export function VirtualMessageList({ messages, scrollEnabled = true, header }: P
     }
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collapseKey]);
+  }, [completedMessages]);
 
   // Commit cursor — monotonically advancing.
   // Keeps last LIVE_TAIL stable messages + any streaming message in Ink's frame.
@@ -172,7 +173,9 @@ export function VirtualMessageList({ messages, scrollEnabled = true, header }: P
     // DOMElement from "../../ink-custom" is structurally compatible with ink-custom's
     // DOMElement (createScrollBox only touches `attributes` + optional
     // `yogaNode.markDirty`). Cast through unknown for type-checker peace.
-    scrollBoxRef.current = createScrollBox(node as unknown as Parameters<typeof createScrollBox>[0]);
+    scrollBoxRef.current = createScrollBox(
+      node as unknown as Parameters<typeof createScrollBox>[0],
+    );
     return scrollBoxRef.current;
   }, []);
 
@@ -196,9 +199,11 @@ export function VirtualMessageList({ messages, scrollEnabled = true, header }: P
       {staticItems.length > 0 && (
         <Static items={staticItems}>
           {(item) =>
-            item.kind === "header"
-              ? <Box key="__boot_header__">{header}</Box>
-              : <MessageBubble key={item.message.id} message={item.message} />
+            item.kind === "header" ? (
+              <Box key="__boot_header__">{header}</Box>
+            ) : (
+              <MessageBubble key={item.message.id} message={item.message} />
+            )
           }
         </Static>
       )}

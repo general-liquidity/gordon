@@ -10,17 +10,10 @@
  * - Time-based performance trends
  */
 
-import { z } from "zod";
-import { getDatabase } from "../../storage/database.ts";
 import { createModuleLogger } from "../../logger/index.ts";
-import {
-  getTradeOutcomes,
-  getStrategyPerformance,
-  type TradeOutcome,
-  type StrategyPerformance,
-} from "./tradeEvaluator.ts";
+import { getTradeOutcomes, type StrategyPerformance } from "./tradeEvaluator.ts";
 
-const logger = createModuleLogger("performance-metrics");
+const _logger = createModuleLogger("performance-metrics");
 
 // ============================================================================
 // Types
@@ -172,7 +165,10 @@ function getDateRangeForPeriod(period: TimePeriod): { start: Date; end: Date } {
 /**
  * Calculate win rate by strategy
  */
-export function getWinRateByStrategy(): Map<string, { winRate: number; trades: number; trend: string }> {
+export function getWinRateByStrategy(): Map<
+  string,
+  { winRate: number; trades: number; trend: string }
+> {
   const outcomes = getTradeOutcomes({});
   const strategyStats = new Map<string, { wins: number; total: number; recent: boolean[] }>();
 
@@ -196,9 +192,7 @@ export function getWinRateByStrategy(): Map<string, { winRate: number; trades: n
     if (stats.recent.length >= 5) {
       const recentWinRate = stats.recent.slice(0, 5).filter((w) => w).length / 5;
       const olderWinRate =
-        stats.recent.length >= 10
-          ? stats.recent.slice(5, 10).filter((w) => w).length / 5
-          : winRate;
+        stats.recent.length >= 10 ? stats.recent.slice(5, 10).filter((w) => w).length / 5 : winRate;
 
       if (recentWinRate > olderWinRate + 0.15) trend = "improving";
       else if (recentWinRate < olderWinRate - 0.15) trend = "declining";
@@ -262,10 +256,8 @@ export function getRiskRewardAnalysis(): RiskRewardAnalysis {
   const wins = outcomes.filter((o) => o.outcome === "win");
   const losses = outcomes.filter((o) => o.outcome === "loss");
 
-  const avgPlannedRR =
-    outcomes.reduce((sum, o) => sum + o.riskRewardPlanned, 0) / outcomes.length;
-  const avgActualRR =
-    outcomes.reduce((sum, o) => sum + o.riskRewardActual, 0) / outcomes.length;
+  const avgPlannedRR = outcomes.reduce((sum, o) => sum + o.riskRewardPlanned, 0) / outcomes.length;
+  const avgActualRR = outcomes.reduce((sum, o) => sum + o.riskRewardActual, 0) / outcomes.length;
 
   const rrEfficiency = avgPlannedRR > 0 ? avgActualRR / avgPlannedRR : 0;
 
@@ -302,7 +294,7 @@ export function getRiskRewardAnalysis(): RiskRewardAnalysis {
     let bestWinRate = 0;
     for (const range of rrRanges) {
       const inRange = outcomes.filter(
-        (o) => o.riskRewardPlanned >= range.min && o.riskRewardPlanned < range.max
+        (o) => o.riskRewardPlanned >= range.min && o.riskRewardPlanned < range.max,
       );
       if (inRange.length >= 3) {
         const winRate = inRange.filter((o) => o.outcome === "win").length / inRange.length;
@@ -493,8 +485,8 @@ export function getPerformanceBySymbol(): SymbolPerformance[] {
         stats.totalLoss > 0
           ? stats.totalProfit / stats.totalLoss
           : stats.totalProfit > 0
-          ? Infinity
-          : 0,
+            ? Infinity
+            : 0,
       bestStrategy,
       avgHoldingHours: total > 0 ? stats.holdingHours / total : 0,
     });
@@ -571,7 +563,7 @@ export function getTimeBasedPerformance(period: TimePeriod): TimeBasedPerformanc
 
   // Sort by timestamp for streak calculation
   const sorted = [...outcomes].sort(
-    (a, b) => new Date(a.exitTimestamp).getTime() - new Date(b.exitTimestamp).getTime()
+    (a, b) => new Date(a.exitTimestamp).getTime() - new Date(b.exitTimestamp).getTime(),
   );
 
   for (const outcome of sorted) {
@@ -661,7 +653,11 @@ export function generatePerformanceReport(period: TimePeriod = "month"): Perform
       avgProfitPercent: stratWins.length > 0 ? stratTotalProfit / stratWins.length : 0,
       avgLossPercent: stratLosses.length > 0 ? stratTotalLoss / stratLosses.length : 0,
       profitFactor:
-        stratTotalLoss > 0 ? stratTotalProfit / stratTotalLoss : stratTotalProfit > 0 ? Infinity : 0,
+        stratTotalLoss > 0
+          ? stratTotalProfit / stratTotalLoss
+          : stratTotalProfit > 0
+            ? Infinity
+            : 0,
       avgRiskRewardActual:
         stratOutcomes.length > 0
           ? stratOutcomes.reduce((sum, o) => sum + o.riskRewardActual, 0) / stratOutcomes.length
@@ -749,7 +745,7 @@ export function generatePerformanceReport(period: TimePeriod = "month"): Perform
     insights.push(`Strong win rate of ${Math.round(overallWinRate * 100)}% over this period`);
   } else if (overallWinRate < 0.4 && outcomes.length >= 5) {
     insights.push(
-      `Win rate of ${Math.round(overallWinRate * 100)}% is below target - consider reviewing strategy selection`
+      `Win rate of ${Math.round(overallWinRate * 100)}% is below target - consider reviewing strategy selection`,
     );
   }
 
@@ -757,12 +753,14 @@ export function generatePerformanceReport(period: TimePeriod = "month"): Perform
   if (riskReward.rrEfficiency > 0.8) {
     insights.push("Excellent R:R execution - achieving planned targets consistently");
   } else if (riskReward.rrEfficiency < 0.5 && outcomes.length >= 5) {
-    insights.push("R:R efficiency is low - consider holding winners longer or reviewing exit strategy");
+    insights.push(
+      "R:R efficiency is low - consider holding winners longer or reviewing exit strategy",
+    );
   }
 
   if (riskReward.optimalRRRange) {
     insights.push(
-      `Optimal R:R range is ${riskReward.optimalRRRange.min}:1 to ${riskReward.optimalRRRange.max}:1`
+      `Optimal R:R range is ${riskReward.optimalRRRange.min}:1 to ${riskReward.optimalRRRange.max}:1`,
     );
   }
 
@@ -774,7 +772,7 @@ export function generatePerformanceReport(period: TimePeriod = "month"): Perform
     const best = sortedStrategies[0];
     if (best) {
       insights.push(
-        `Best performing strategy: ${best.strategy} (${Math.round(best.winRate * 100)}% win rate)`
+        `Best performing strategy: ${best.strategy} (${Math.round(best.winRate * 100)}% win rate)`,
       );
     }
   }
@@ -784,7 +782,7 @@ export function generatePerformanceReport(period: TimePeriod = "month"): Perform
     const worst = sortedStrategies[sortedStrategies.length - 1];
     if (worst && worst.winRate < 0.4) {
       insights.push(
-        `Consider avoiding: ${worst.strategy} (${Math.round(worst.winRate * 100)}% win rate)`
+        `Consider avoiding: ${worst.strategy} (${Math.round(worst.winRate * 100)}% win rate)`,
       );
     }
   }
@@ -828,7 +826,7 @@ export function formatPerformanceReport(report: PerformanceReport): string {
   lines.push(`Total Trades: ${report.overview.totalTrades}`);
   lines.push(`Win Rate: ${(report.overview.winRate * 100).toFixed(1)}%`);
   lines.push(
-    `Profit Factor: ${report.overview.profitFactor === Infinity ? "Inf" : report.overview.profitFactor.toFixed(2)}`
+    `Profit Factor: ${report.overview.profitFactor === Infinity ? "Inf" : report.overview.profitFactor.toFixed(2)}`,
   );
   lines.push(`Total P&L: ${report.overview.totalPnlPercent.toFixed(2)}%`);
   lines.push(`Avg Win: +${report.overview.avgWinPercent.toFixed(2)}%`);
@@ -843,7 +841,7 @@ export function formatPerformanceReport(report: PerformanceReport): string {
   lines.push(`R:R Efficiency: ${(report.riskReward.rrEfficiency * 100).toFixed(0)}%`);
   if (report.riskReward.optimalRRRange) {
     lines.push(
-      `Optimal Range: ${report.riskReward.optimalRRRange.min}:1 - ${report.riskReward.optimalRRRange.max}:1`
+      `Optimal Range: ${report.riskReward.optimalRRRange.min}:1 - ${report.riskReward.optimalRRRange.max}:1`,
     );
   }
   lines.push("");
@@ -854,7 +852,7 @@ export function formatPerformanceReport(report: PerformanceReport): string {
     const topStrategies = report.byStrategy.slice(0, 5);
     for (const strat of topStrategies) {
       lines.push(
-        `${strat.strategy}: ${(strat.winRate * 100).toFixed(0)}% win (${strat.wins}W/${strat.losses}L)`
+        `${strat.strategy}: ${(strat.winRate * 100).toFixed(0)}% win (${strat.wins}W/${strat.losses}L)`,
       );
     }
     lines.push("");

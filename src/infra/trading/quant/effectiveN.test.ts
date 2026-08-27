@@ -1,10 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  computeEffectiveN,
-  simpleEffectiveN,
-  effectiveNToPayload,
-} from "./effectiveN.ts";
+import { computeEffectiveN, simpleEffectiveN, effectiveNToPayload } from "./effectiveN.ts";
 
 const identity = (n: number): number[][] => {
   const m: number[][] = [];
@@ -221,7 +217,7 @@ describe("Gordon 12-primitive chain scenario", () => {
       m.push(new Array(n).fill(0));
       m[i]![i] = 1;
       for (let j = 0; j < n; j++) {
-        if (i !== j) m[i]![j] = 0.35 + (((i + j) % 5) * 0.05);
+        if (i !== j) m[i]![j] = 0.35 + ((i + j) % 5) * 0.05;
       }
     }
     // Symmetrize

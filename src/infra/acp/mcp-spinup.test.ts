@@ -110,7 +110,14 @@ describe("isSafeForwardedUrl", () => {
   });
 
   it("the connector lookup rejects a hostname with any private DNS answer", async () => {
-    const resolver = ((_hostname: string, _options: unknown, callback: Function) => {
+    const resolver = ((
+      _hostname: string,
+      _options: unknown,
+      callback: (
+        error: NodeJS.ErrnoException | null,
+        addresses: Array<{ address: string; family: number }>,
+      ) => void,
+    ) => {
       callback(null, [
         { address: "93.184.216.34", family: 4 },
         { address: "127.0.0.1", family: 4 },
@@ -126,15 +133,24 @@ describe("isSafeForwardedUrl", () => {
   it("the connector lookup accepts only globally routable answers", async () => {
     expect(isPublicNetworkAddress("93.184.216.34")).toBe(true);
     expect(isPublicNetworkAddress("2001:4860:4860::8888")).toBe(true);
-    const resolver = ((_hostname: string, _options: unknown, callback: Function) => {
+    const resolver = ((
+      _hostname: string,
+      _options: unknown,
+      callback: (
+        error: NodeJS.ErrnoException | null,
+        addresses: Array<{ address: string; family: number }>,
+      ) => void,
+    ) => {
       callback(null, [{ address: "93.184.216.34", family: 4 }]);
     }) as unknown as typeof import("node:dns")["lookup"];
     const lookup = createPublicOnlyLookup(resolver);
-    const result = await new Promise<{ error: NodeJS.ErrnoException | null; address?: string }>((resolve) => {
-      lookup("public.example", { all: false }, (error, address) => {
-        resolve({ error, address: typeof address === "string" ? address : undefined });
-      });
-    });
+    const result = await new Promise<{ error: NodeJS.ErrnoException | null; address?: string }>(
+      (resolve) => {
+        lookup("public.example", { all: false }, (error, address) => {
+          resolve({ error, address: typeof address === "string" ? address : undefined });
+        });
+      },
+    );
     expect(result).toEqual({ error: null, address: "93.184.216.34" });
   });
 });

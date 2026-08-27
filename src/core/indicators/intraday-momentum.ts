@@ -145,8 +145,10 @@ export function calculateIntradayMomentum(
   }
 
   const hitRate = scored > 0 ? parseFloat((hits / scored).toFixed(4)) : null;
-  const meanLastGivenPositiveFirst = countPos > 0 ? parseFloat((sumLastPos / countPos).toFixed(6)) : null;
-  const meanLastGivenNegativeFirst = countNeg > 0 ? parseFloat((sumLastNeg / countNeg).toFixed(6)) : null;
+  const meanLastGivenPositiveFirst =
+    countPos > 0 ? parseFloat((sumLastPos / countPos).toFixed(6)) : null;
+  const meanLastGivenNegativeFirst =
+    countNeg > 0 ? parseFloat((sumLastNeg / countNeg).toFixed(6)) : null;
 
   // Latest (possibly partial) day's live signal.
   const latestStart = fullDays * barsPerDay;
@@ -163,14 +165,21 @@ export function calculateIntradayMomentum(
   }
 
   const signal = signalFromReturn(currentFirstReturn);
-  const roundedCurrent = currentFirstReturn == null ? null : parseFloat(currentFirstReturn.toFixed(6));
+  const roundedCurrent =
+    currentFirstReturn == null ? null : parseFloat(currentFirstReturn.toFixed(6));
 
   let interpretation: string;
   if (scored === 0) {
-    interpretation = "No scored days (all first-window returns flat) — no intraday-momentum estimate";
+    interpretation =
+      "No scored days (all first-window returns flat) — no intraday-momentum estimate";
   } else {
     const hitPct = hitRate == null ? "n/a" : `${(hitRate * 100).toFixed(0)}%`;
-    const dir = signal === "long" ? "up into the close" : signal === "short" ? "down into the close" : "no directional";
+    const dir =
+      signal === "long"
+        ? "up into the close"
+        : signal === "short"
+          ? "down into the close"
+          : "no directional";
     interpretation =
       signal === "flat"
         ? `Flat open window on latest session; first→last hit-rate ${hitPct} over ${scored} day(s)`

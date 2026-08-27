@@ -71,7 +71,7 @@ describe("memoryGate", () => {
     });
 
     it("preserves the leading content when truncating", () => {
-      const big = "leading-marker" + "y".repeat(MAX_WORKING_MEMORY_CHARS);
+      const big = `leading-marker${"y".repeat(MAX_WORKING_MEMORY_CHARS)}`;
       const out = truncateWorkingMemoryValue(big);
       expect(out.startsWith("leading-marker")).toBe(true);
     });
@@ -82,8 +82,9 @@ describe("memoryGate", () => {
       const { memory, writes } = makeFakeMemory();
       wrapMemoryWithGate(memory);
       const big = "z".repeat(MAX_WORKING_MEMORY_CHARS + 200);
-      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory({ threadId: "t", resourceId: "r", workingMemory: big });
+      await (
+        memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory({ threadId: "t", resourceId: "r", workingMemory: big });
       expect(writes.length).toBe(1);
       expect(writes[0]!.workingMemory.length).toBeLessThanOrEqual(MAX_WORKING_MEMORY_CHARS);
       _resetMemoryGateForTests(memory);
@@ -92,8 +93,9 @@ describe("memoryGate", () => {
     it("passes small writes through unchanged", async () => {
       const { memory, writes } = makeFakeMemory();
       wrapMemoryWithGate(memory);
-      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory({ threadId: "t", resourceId: "r", workingMemory: "ok" });
+      await (
+        memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory({ threadId: "t", resourceId: "r", workingMemory: "ok" });
       expect(writes).toEqual([{ threadId: "t", resourceId: "r", workingMemory: "ok" }]);
       _resetMemoryGateForTests(memory);
     });
@@ -102,8 +104,9 @@ describe("memoryGate", () => {
       const { memory, writes } = makeFakeMemory();
       wrapMemoryWithGate(memory);
       wrapMemoryWithGate(memory);
-      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory({ threadId: "t", resourceId: "r", workingMemory: "ok" });
+      await (
+        memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory({ threadId: "t", resourceId: "r", workingMemory: "ok" });
       expect(writes.length).toBe(1);
       _resetMemoryGateForTests(memory);
     });
@@ -121,8 +124,9 @@ describe("memoryGate", () => {
     it("buffers writes instead of applying them when defer is on", async () => {
       const { memory, writes } = makeFakeMemory();
       wrapMemoryWithGate(memory, { defer: true });
-      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "hello" });
+      await (
+        memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "hello" });
       expect(writes.length).toBe(0);
       const pending = inspectDeferredWorkingMemory(memory);
       expect(pending.length).toBe(1);
@@ -134,8 +138,9 @@ describe("memoryGate", () => {
     it("flushDeferredWorkingMemoryWrites applies buffered writes in enqueue order", async () => {
       const { memory, writes } = makeFakeMemory();
       wrapMemoryWithGate(memory, { defer: true });
-      const update = (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory;
+      const update = (
+        memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory;
       await update({ threadId: "t1", resourceId: "r1", workingMemory: "a" });
       await update({ threadId: "t2", resourceId: "r1", workingMemory: "b" });
       const count = await flushDeferredWorkingMemoryWrites(memory);
@@ -149,8 +154,9 @@ describe("memoryGate", () => {
     it("last-write-wins per (threadId, resourceId) key", async () => {
       const { memory, writes } = makeFakeMemory();
       wrapMemoryWithGate(memory, { defer: true });
-      const update = (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory;
+      const update = (
+        memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory;
       await update({ threadId: "t1", resourceId: "r1", workingMemory: "first" });
       await update({ threadId: "t1", resourceId: "r1", workingMemory: "second" });
       await update({ threadId: "t1", resourceId: "r1", workingMemory: "third" });
@@ -164,8 +170,9 @@ describe("memoryGate", () => {
       const { memory } = makeFakeMemory();
       wrapMemoryWithGate(memory, { defer: true });
       const big = "z".repeat(MAX_WORKING_MEMORY_CHARS + 500);
-      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory({ threadId: "t", resourceId: "r", workingMemory: big });
+      await (
+        memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory({ threadId: "t", resourceId: "r", workingMemory: big });
       const pending = inspectDeferredWorkingMemory(memory);
       expect(pending[0]!.bytes).toBeLessThanOrEqual(MAX_WORKING_MEMORY_CHARS);
       _resetMemoryGateForTests(memory);
@@ -174,8 +181,9 @@ describe("memoryGate", () => {
     it("discardDeferredWorkingMemoryWrites clears without applying", async () => {
       const { memory, writes } = makeFakeMemory();
       wrapMemoryWithGate(memory, { defer: true });
-      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory({ threadId: "t", resourceId: "r", workingMemory: "buffered" });
+      await (
+        memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory({ threadId: "t", resourceId: "r", workingMemory: "buffered" });
       const dropped = discardDeferredWorkingMemoryWrites(memory);
       expect(dropped).toBe(1);
       expect(writes.length).toBe(0);
@@ -186,8 +194,9 @@ describe("memoryGate", () => {
     it("flush continues past a single failed write", async () => {
       const fake = makeFakeMemory();
       wrapMemoryWithGate(fake.memory, { defer: true });
-      const update = (fake.memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory;
+      const update = (
+        fake.memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory;
       await update({ threadId: "t1", resourceId: "r", workingMemory: "a" });
       await update({ threadId: "t2", resourceId: "r", workingMemory: "b" });
       fake.failNext!();
@@ -201,8 +210,9 @@ describe("memoryGate", () => {
       process.env[FLAG] = "1";
       const { memory, writes } = makeFakeMemory();
       wrapMemoryWithGate(memory);
-      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory({ threadId: "t", resourceId: "r", workingMemory: "x" });
+      await (
+        memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory({ threadId: "t", resourceId: "r", workingMemory: "x" });
       expect(writes.length).toBe(0);
       expect(inspectDeferredWorkingMemory(memory).length).toBe(1);
       _resetMemoryGateForTests(memory);
@@ -277,8 +287,9 @@ describe("memoryGate", () => {
     it("defaults to llm_assertion source for writes without explicit provenance", async () => {
       const { memory } = makeFakeMemory();
       wrapMemoryWithGate(memory);
-      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "x" });
+      await (
+        memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "x" });
       expect(getProvenance(memory, "t1", "r1")).toBe("llm_assertion");
       _resetMemoryGateForTests(memory);
     });
@@ -287,8 +298,9 @@ describe("memoryGate", () => {
       const { memory } = makeFakeMemory();
       wrapMemoryWithGate(memory);
       recordTrustedProvenance(memory, "t1", "r1", "setup_wizard");
-      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "x" });
+      await (
+        memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "x" });
       expect(getProvenance(memory, "t1", "r1")).toBe("setup_wizard");
       _resetMemoryGateForTests(memory);
     });
@@ -297,11 +309,13 @@ describe("memoryGate", () => {
       const { memory } = makeFakeMemory();
       wrapMemoryWithGate(memory);
       recordTrustedProvenance(memory, "t1", "r1", "user_verified");
-      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "first" });
+      await (
+        memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "first" });
       expect(getProvenance(memory, "t1", "r1")).toBe("user_verified");
-      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "second" });
+      await (
+        memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "second" });
       expect(getProvenance(memory, "t1", "r1")).toBe("llm_assertion");
       _resetMemoryGateForTests(memory);
     });
@@ -324,10 +338,12 @@ describe("memoryGate", () => {
       const { memory } = makeFakeMemory();
       wrapMemoryWithGate(memory);
       recordTrustedProvenance(memory, "t1", "r1", "oauth");
-      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "a" });
-      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
-        .updateWorkingMemory({ threadId: "t2", resourceId: "r2", workingMemory: "b" });
+      await (
+        memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "a" });
+      await (
+        memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> }
+      ).updateWorkingMemory({ threadId: "t2", resourceId: "r2", workingMemory: "b" });
       expect(getProvenance(memory, "t1", "r1")).toBe("oauth");
       expect(getProvenance(memory, "t2", "r2")).toBe("llm_assertion");
       _resetMemoryGateForTests(memory);
@@ -336,10 +352,11 @@ describe("memoryGate", () => {
 
   describe("write guard enforcement (GORDON_MEMORY_WRITE_GUARD)", () => {
     const SENSITIVE = "Max Risk Per Trade: 50%";
-    const wm = (p: { threadId: string; resourceId: string; workingMemory: string }) =>
-      (m: Memory) =>
-        (m as unknown as { updateWorkingMemory: (x: FakeMemoryRecord) => Promise<void> })
-          .updateWorkingMemory(p);
+    const wm =
+      (p: { threadId: string; resourceId: string; workingMemory: string }) => (m: Memory) =>
+        (
+          m as unknown as { updateWorkingMemory: (x: FakeMemoryRecord) => Promise<void> }
+        ).updateWorkingMemory(p);
 
     it("blocks an UNTRUSTED write that changes a sensitive field when enforcing", async () => {
       const { memory, writes } = makeFakeMemory();
@@ -383,7 +400,9 @@ describe("memoryGate", () => {
       await wm({ threadId: "t", resourceId: "r", workingMemory: "Max Risk Per Trade: 2%" })(memory);
       expect(writes.length).toBe(1);
       // untrusted attempt to raise the limit → blocked, prior value intact
-      await wm({ threadId: "t", resourceId: "r", workingMemory: "Max Risk Per Trade: 90%" })(memory);
+      await wm({ threadId: "t", resourceId: "r", workingMemory: "Max Risk Per Trade: 90%" })(
+        memory,
+      );
       expect(writes.length).toBe(1); // no second write got through
       _resetMemoryGateForTests(memory);
     });

@@ -210,11 +210,7 @@ export const computeInventoryAdjustedPriceTool = createTool({
     adjustedPrice: z.number(),
     adjustment: z.number(),
     adjustmentPct: z.number(),
-    bias: z.enum([
-      "long_inventory_sell_bias",
-      "short_inventory_buy_bias",
-      "neutral",
-    ]),
+    bias: z.enum(["long_inventory_sell_bias", "short_inventory_buy_bias", "neutral"]),
     sizeMultiplier: z.number().optional(),
     inputs: z.object({
       mid: z.number(),
@@ -248,11 +244,7 @@ export const computeInventoryAdjustedPriceTool = createTool({
     });
     let sizeMultiplier: number | undefined;
     if (intendedSide !== undefined && intendedSide !== 0) {
-      sizeMultiplier = inventoryAwareSizeMultiplier(
-        inventory,
-        intendedSide,
-        result.adjustmentPct,
-      );
+      sizeMultiplier = inventoryAwareSizeMultiplier(inventory, intendedSide, result.adjustmentPct);
     }
     return {
       summary: summarizeInventoryAdjustment(result),
@@ -289,12 +281,24 @@ export const computeMonteCarloPathTool = createTool({
     "Treat as a sizing aid, not a forecast.",
   ].join("\n"),
   inputSchema: z.object({
-    prices: z.array(z.number()).min(2).describe("Price history, oldest → newest. ≥ 60 points recommended."),
+    prices: z
+      .array(z.number())
+      .min(2)
+      .describe("Price history, oldest → newest. ≥ 60 points recommended."),
     horizonBars: z.number().int().min(1).max(2000).describe("Bars to project forward."),
     nSims: z.number().int().min(100).max(100_000).optional().describe("Default 10000."),
     model: z.enum(["markov", "gbm"]).optional().describe("Default 'markov'."),
-    nStates: z.number().int().min(2).max(50).optional().describe("Return-discretization buckets for Markov. Default 10."),
-    exceedanceLevels: z.array(z.number()).optional().describe("Prices for P(terminal ≥ level) reporting."),
+    nStates: z
+      .number()
+      .int()
+      .min(2)
+      .max(50)
+      .optional()
+      .describe("Return-discretization buckets for Markov. Default 10."),
+    exceedanceLevels: z
+      .array(z.number())
+      .optional()
+      .describe("Prices for P(terminal ≥ level) reporting."),
   }),
   outputSchema: z.object({
     summary: z.string(),
@@ -311,9 +315,7 @@ export const computeMonteCarloPathTool = createTool({
       p75: z.number(),
       p95: z.number(),
     }),
-    exceedance: z.array(
-      z.object({ level: z.number(), probability: z.number() }),
-    ),
+    exceedance: z.array(z.object({ level: z.number(), probability: z.number() })),
     metadata: z.object({
       fittedMu: z.number(),
       fittedSigma: z.number(),
@@ -354,7 +356,12 @@ export const computeKellySizeTool = createTool({
     bankrollUsd: z.number().positive(),
     payoutRatio: z.number().positive(),
     mode: z.enum(["binary", "rr"]).optional(),
-    fractionMultiplier: z.number().min(0).max(1).optional().describe("Default 0.25 (quarter-Kelly)."),
+    fractionMultiplier: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe("Default 0.25 (quarter-Kelly)."),
   }),
   outputSchema: z.object({
     summary: z.string(),
@@ -403,10 +410,22 @@ export const computeMarketMemoryTool = createTool({
     "below 100 returns, 'high' above 500.",
   ].join("\n"),
   inputSchema: z.object({
-    prices: z.array(z.number()).min(16).describe("Price series, oldest → newest. ≥ 60 strongly recommended."),
+    prices: z
+      .array(z.number())
+      .min(16)
+      .describe("Price series, oldest → newest. ≥ 60 strongly recommended."),
     nSurrogates: z.number().int().min(100).max(5000).optional().describe("Default 1000."),
-    minWindow: z.number().int().min(2).max(50).optional().describe("Smallest R/S window. Default 8."),
-    vrHorizons: z.array(z.number().int().positive()).optional().describe("Variance-ratio horizons. Default [2, 5, 10, 20]."),
+    minWindow: z
+      .number()
+      .int()
+      .min(2)
+      .max(50)
+      .optional()
+      .describe("Smallest R/S window. Default 8."),
+    vrHorizons: z
+      .array(z.number().int().positive())
+      .optional()
+      .describe("Variance-ratio horizons. Default [2, 5, 10, 20]."),
     pValueCutoff: z.number().min(0).max(1).optional().describe("Significance gate. Default 0.05."),
   }),
   outputSchema: z.object({
@@ -469,12 +488,8 @@ export const computeDcfTool = createTool({
       wacc: z.number().positive(),
       terminalGrowthPct: z.number(),
     }),
-    bear: z
-      .object({ wacc: z.number().positive(), terminalGrowthPct: z.number() })
-      .optional(),
-    bull: z
-      .object({ wacc: z.number().positive(), terminalGrowthPct: z.number() })
-      .optional(),
+    bear: z.object({ wacc: z.number().positive(), terminalGrowthPct: z.number() }).optional(),
+    bull: z.object({ wacc: z.number().positive(), terminalGrowthPct: z.number() }).optional(),
   }),
   outputSchema: z.object({
     base: z.unknown(),

@@ -109,13 +109,25 @@ export function constructRotationBars(input: RotationBarsInput): RotationBarsRes
     for (let i = 1; i < n; i++) {
       let diff = values[i]! - base;
       while (diff >= size) {
-        bars.push({ open: round(base), high: round(base + size), low: round(base), close: round(base + size), direction: 1 });
+        bars.push({
+          open: round(base),
+          high: round(base + size),
+          low: round(base),
+          close: round(base + size),
+          direction: 1,
+        });
         base += size;
         diff = values[i]! - base;
         if (bars.length >= maxBars) break;
       }
       while (diff <= -size) {
-        bars.push({ open: round(base), high: round(base), low: round(base - size), close: round(base - size), direction: -1 });
+        bars.push({
+          open: round(base),
+          high: round(base),
+          low: round(base - size),
+          close: round(base - size),
+          direction: -1,
+        });
         base -= size;
         diff = values[i]! - base;
         if (bars.length >= maxBars) break;

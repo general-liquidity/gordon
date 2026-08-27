@@ -8,7 +8,12 @@ import {
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 
-function buildDay(dayIndex: number, high: number, low: number, close: number): AtrProgressionCandle[] {
+function buildDay(
+  dayIndex: number,
+  high: number,
+  low: number,
+  close: number,
+): AtrProgressionCandle[] {
   // One candle per hour, 24 candles per day. We only care about high/low/close
   // aggregation, so just emit two candles per day with the desired extremes.
   const base = dayIndex * DAY_MS;
@@ -94,7 +99,9 @@ describe("atrProgressionToPayload", () => {
       suggestedAction: string;
     };
     expect(p.kind).toBe("atr_progression.computed");
-    expect(["low", "moderate", "active", "high", "warning", "exceeded", "extreme"]).toContain(p.zone);
+    expect(["low", "moderate", "active", "high", "warning", "exceeded", "extreme"]).toContain(
+      p.zone,
+    );
     expect(["continue", "caution", "avoid"]).toContain(p.suggestedAction);
   });
 });

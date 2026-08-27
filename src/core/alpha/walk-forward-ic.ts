@@ -34,11 +34,7 @@
  */
 
 import { trackIc, type IcSnapshot, type IcOptions } from "./ic-tracker.ts";
-import {
-  mean as arrayMean,
-  sampleStd,
-  trendSlope as computeTrendSlope,
-} from "./helpers.ts";
+import { mean as arrayMean, sampleStd, trendSlope as computeTrendSlope } from "./helpers.ts";
 
 export type WalkForwardVerdict =
   | "robust"
@@ -145,9 +141,7 @@ function median(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1]! + sorted[mid]!) / 2
-    : sorted[mid]!;
+  return sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!;
 }
 
 function longestStreak(values: number[], predicate: (v: number) => boolean): number {
@@ -249,8 +243,7 @@ export function walkForwardIc(
       windows,
       validWindowCount: validIcs.length,
       verdict: "insufficient_data",
-      summary:
-        `${signalName}: ${validIcs.length} valid windows < 5 needed for walk-forward analysis`,
+      summary: `${signalName}: ${validIcs.length} valid windows < 5 needed for walk-forward analysis`,
     };
   }
 

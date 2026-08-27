@@ -1,13 +1,10 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeMCPT,
-  mcptToPayload,
-} from "./mcpt.ts";
+import { computeMCPT, mcptToPayload } from "./mcpt.ts";
 import type { OHLCBar } from "./barPermutation.ts";
 
 // Deterministic RNG.
 function makeRng(seed: number): () => number {
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   return () => {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return s / 0x100000000;

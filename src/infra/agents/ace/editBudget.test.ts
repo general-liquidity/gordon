@@ -6,10 +6,20 @@ import { runCurator, loadACELessons } from "./Curator.ts";
 import { rejectLesson, loadRejectedBuffer } from "./RejectedBuffer.ts";
 import type { ACELessonCandidate, ReflectorOutput } from "./Reflector.ts";
 
-const LESSONS_PATH = join(tmpdir(), `gordon-ace-lessons-budget-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`);
-const REJECTED_PATH = join(tmpdir(), `gordon-ace-rejected-budget-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`);
+const LESSONS_PATH = join(
+  tmpdir(),
+  `gordon-ace-lessons-budget-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`,
+);
+const REJECTED_PATH = join(
+  tmpdir(),
+  `gordon-ace-rejected-budget-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`,
+);
 
-function candidate(category: ACELessonCandidate["category"], text: string, evidence = 1): ACELessonCandidate {
+function candidate(
+  category: ACELessonCandidate["category"],
+  text: string,
+  evidence = 1,
+): ACELessonCandidate {
   return {
     category,
     text,

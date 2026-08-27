@@ -64,8 +64,7 @@ function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
-const REGEN_HINT =
-  "regenerate: bun run src/infra/domain/evals/fixtures/generateFixtures.ts";
+const REGEN_HINT = "regenerate: bun run src/infra/domain/evals/fixtures/generateFixtures.ts";
 
 const scenarios = generateScenarios();
 const generatedIds = scenarios.map((s) => s.id).sort();
@@ -83,37 +82,35 @@ console.log("[1/4] Structural — generated scenario suite");
 
 // 2. Committed fixtures — integrity + coverage -------------------------------
 console.log("[2/4] Committed fixtures — integrity + coverage");
-{
-  if (!existsSync(BASELINE_TRAJECTORIES_FIXTURE_PATH)) {
-    fail(`committed baseline fixture missing (${BASELINE_TRAJECTORIES_FIXTURE_PATH}); ${REGEN_HINT}`);
-  } else {
-    try {
-      const fixture = parseTrajectoryFixture(readJson(BASELINE_TRAJECTORIES_FIXTURE_PATH));
-      const fixtureIds = fixture.trajectories.map((t) => t.scenarioId).sort();
-      if (JSON.stringify(fixtureIds) !== JSON.stringify(generatedIds)) {
-        fail(`baseline fixture scenario ids drifted from generator output; ${REGEN_HINT}`);
-      } else {
-        ok(`baseline fixture: ${fixture.trajectories.length} trajectories cover the suite`);
-      }
-    } catch (err) {
-      fail(`baseline fixture malformed: ${err instanceof Error ? err.message : String(err)}`);
+if (!existsSync(BASELINE_TRAJECTORIES_FIXTURE_PATH)) {
+  fail(`committed baseline fixture missing (${BASELINE_TRAJECTORIES_FIXTURE_PATH}); ${REGEN_HINT}`);
+} else {
+  try {
+    const fixture = parseTrajectoryFixture(readJson(BASELINE_TRAJECTORIES_FIXTURE_PATH));
+    const fixtureIds = fixture.trajectories.map((t) => t.scenarioId).sort();
+    if (JSON.stringify(fixtureIds) !== JSON.stringify(generatedIds)) {
+      fail(`baseline fixture scenario ids drifted from generator output; ${REGEN_HINT}`);
+    } else {
+      ok(`baseline fixture: ${fixture.trajectories.length} trajectories cover the suite`);
     }
+  } catch (err) {
+    fail(`baseline fixture malformed: ${err instanceof Error ? err.message : String(err)}`);
   }
+}
 
-  if (!existsSync(GOLD_TRACES_FIXTURE_PATH)) {
-    fail(`committed gold-trace fixture missing (${GOLD_TRACES_FIXTURE_PATH}); ${REGEN_HINT}`);
-  } else {
-    try {
-      const parsed = parseGoldTraces(readJson(GOLD_TRACES_FIXTURE_PATH));
-      const goldIds = [...(parsed.scenarioIds ?? [])].sort();
-      if (JSON.stringify(goldIds) !== JSON.stringify(generatedIds)) {
-        fail(`gold-trace fixture scenario ids drifted from generator output; ${REGEN_HINT}`);
-      } else {
-        ok(`gold-trace fixture: ${parsed.traces.length} traces cover the suite`);
-      }
-    } catch (err) {
-      fail(`gold-trace fixture malformed: ${err instanceof Error ? err.message : String(err)}`);
+if (!existsSync(GOLD_TRACES_FIXTURE_PATH)) {
+  fail(`committed gold-trace fixture missing (${GOLD_TRACES_FIXTURE_PATH}); ${REGEN_HINT}`);
+} else {
+  try {
+    const parsed = parseGoldTraces(readJson(GOLD_TRACES_FIXTURE_PATH));
+    const goldIds = [...(parsed.scenarioIds ?? [])].sort();
+    if (JSON.stringify(goldIds) !== JSON.stringify(generatedIds)) {
+      fail(`gold-trace fixture scenario ids drifted from generator output; ${REGEN_HINT}`);
+    } else {
+      ok(`gold-trace fixture: ${parsed.traces.length} traces cover the suite`);
     }
+  } catch (err) {
+    fail(`gold-trace fixture malformed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -139,7 +136,9 @@ console.log("[3/4] Gold-trace process checks");
       }
       if (bad === 0) ok(`${traces.length} gold traces still pass process checks`);
     } catch (err) {
-      fail(`gold-trace file unreadable/malformed: ${err instanceof Error ? err.message : String(err)}`);
+      fail(
+        `gold-trace file unreadable/malformed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 }

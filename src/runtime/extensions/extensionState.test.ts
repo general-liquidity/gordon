@@ -19,7 +19,11 @@ describe("extensionState save/load roundtrip", () => {
   });
   afterEach(() => {
     setExtensionStateDirForTesting(null);
-    try { rmSync(testDir, { recursive: true, force: true }); } catch {/* ignore */}
+    try {
+      rmSync(testDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
   });
 
   it("returns null when no snapshot exists", () => {

@@ -34,9 +34,7 @@ const BASELINE_CHARS: readonly string[] = buildBaselineChars();
 
 export function createCharPool(capacity: number = DEFAULT_CAPACITY): CharPool {
   if (!Number.isInteger(capacity) || capacity < BASELINE_CHARS.length) {
-    throw new Error(
-      `createCharPool: capacity ${capacity} must be >= ${BASELINE_CHARS.length}`,
-    );
+    throw new Error(`createCharPool: capacity ${capacity} must be >= ${BASELINE_CHARS.length}`);
   }
 
   // Same LRU skeleton as stylePool but over graphemes. For Phase 1 this is a

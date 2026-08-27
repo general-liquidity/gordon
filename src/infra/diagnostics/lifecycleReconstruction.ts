@@ -118,7 +118,10 @@ export function reconstructLifecycle(input: ReconstructionInput): Reconstruction
   if (!permissionSeen) anomalies.add("missing_permission_check");
   if (firstFillBeforeSubmit) anomalies.add("fill_before_submit_event");
 
-  if (anomalies.has("rapid_cancel_after_submit") && anomalies.has("cancel_without_intermediate_fill")) {
+  if (
+    anomalies.has("rapid_cancel_after_submit") &&
+    anomalies.has("cancel_without_intermediate_fill")
+  ) {
     hints.push("matches quote-stuffing cancel signature");
   }
   if (anomalies.has("excessive_modifications")) {

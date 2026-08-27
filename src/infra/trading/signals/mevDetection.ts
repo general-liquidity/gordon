@@ -138,8 +138,8 @@ function detectSandwichesAndFrontruns(
           severity,
           reasoning:
             `victim ${victim.side} ${victim.size.toFixed(4)}@${victim.price.toFixed(6)}; ` +
-            `pred ${pred.side}@${pred.price.toFixed(6)} (${(victim.timestamp - pred.timestamp)}ms before); ` +
-            `succ ${succ.side}@${succ.price.toFixed(6)} (${(succ.timestamp - victim.timestamp)}ms after); ` +
+            `pred ${pred.side}@${pred.price.toFixed(6)} (${victim.timestamp - pred.timestamp}ms before); ` +
+            `succ ${succ.side}@${succ.price.toFixed(6)} (${succ.timestamp - victim.timestamp}ms after); ` +
             `round-trip ${roundTripBps.toFixed(2)} bps`,
         });
         break;
@@ -154,10 +154,7 @@ function detectSandwichesAndFrontruns(
       if (pred.size >= largeThreshold) continue;
       const sizeRatio = pred.size / victim.size;
       if (sizeRatio > 0.5) continue;
-      const severity = Math.min(
-        1,
-        (victim.size / largeThreshold) * 0.6 + (1 - sizeRatio) * 0.4,
-      );
+      const severity = Math.min(1, (victim.size / largeThreshold) * 0.6 + (1 - sizeRatio) * 0.4);
       frontruns.push({
         kind: "frontrun",
         timestamp: victim.timestamp,
@@ -165,7 +162,7 @@ function detectSandwichesAndFrontruns(
         severity,
         reasoning:
           `victim ${victim.side} ${victim.size.toFixed(4)}; ` +
-          `pred ${pred.side} ${pred.size.toFixed(4)} (${(victim.timestamp - pred.timestamp)}ms before); ` +
+          `pred ${pred.side} ${pred.size.toFixed(4)} (${victim.timestamp - pred.timestamp}ms before); ` +
           `size ratio ${sizeRatio.toFixed(3)}`,
       });
       break;
@@ -175,10 +172,7 @@ function detectSandwichesAndFrontruns(
   return { sandwiches, frontruns };
 }
 
-function detectSpoofs(
-  spoofEvents: ReadonlyArray<MevSpoofEvent>,
-  maxLifeMs: number,
-): MevEvent[] {
+function detectSpoofs(spoofEvents: ReadonlyArray<MevSpoofEvent>, maxLifeMs: number): MevEvent[] {
   const out: MevEvent[] = [];
   for (const ev of spoofEvents) {
     if (ev.filled) continue;

@@ -138,13 +138,16 @@ function buildZigzag(candles: Candle[], reversalPct: number): ZigzagPoint[] {
  * - Wave 3 is not the shortest impulse wave (1, 3, 5)
  * - Wave 4 does not overlap Wave 1 end price
  */
-function checkElliottRules(pts: ZigzagPoint[], direction: "bullish" | "bearish"): { valid: boolean; score: number } {
+function checkElliottRules(
+  pts: ZigzagPoint[],
+  direction: "bullish" | "bearish",
+): { valid: boolean; score: number } {
   // For bullish: points alternate low-high-low-high-low-high (6 points = 5 waves)
   // p0=low, p1=high (W1 end), p2=low (W2 end), p3=high (W3 end), p4=low (W4 end), p5=high (W5 end)
 
   if (pts.length < 6) return { valid: false, score: 0 };
 
-  const p = pts.map(pt => pt.price);
+  const p = pts.map((pt) => pt.price);
   let score = 0;
 
   if (direction === "bullish") {
@@ -229,10 +232,13 @@ function checkElliottRules(pts: ZigzagPoint[], direction: "bullish" | "bearish")
 /**
  * Validate Fibonacci ratios in the wave structure.
  */
-function checkFibRatios(pts: ZigzagPoint[], direction: "bullish" | "bearish"): { valid: boolean; ratios: (number | null)[] } {
+function checkFibRatios(
+  pts: ZigzagPoint[],
+  direction: "bullish" | "bearish",
+): { valid: boolean; ratios: (number | null)[] } {
   if (pts.length < 6) return { valid: false, ratios: [] };
 
-  const p = pts.map(pt => pt.price);
+  const p = pts.map((pt) => pt.price);
   const ratios: (number | null)[] = [null]; // Wave 1 has no ratio
 
   if (direction === "bullish") {
@@ -297,7 +303,7 @@ function checkFibRatios(pts: ZigzagPoint[], direction: "bullish" | "bearish"): {
  */
 export function calculateElliottWave(
   candles: Candle[],
-  reversalPct: number = 0.03
+  reversalPct: number = 0.03,
 ): ElliottWaveResult {
   const emptyResult: ElliottWaveResult = {
     zigzagPoints: [],
@@ -404,7 +410,7 @@ export function calculateElliottWave(
     fibResult.valid,
     currentWave,
     wave5Target,
-    waves
+    waves,
   );
 
   return {
@@ -426,7 +432,7 @@ function buildElliottInterpretation(
   fibValid: boolean,
   currentWave: number,
   wave5Target: number | null,
-  waves: WaveLabel[]
+  _waves: WaveLabel[],
 ): string {
   let msg = `Elliott Wave: ${direction.toUpperCase()} 5-wave impulse detected (score: ${score}/100). `;
 
@@ -443,13 +449,15 @@ function buildElliottInterpretation(
   }
 
   if (currentWave <= 3) {
-    msg += direction === "bullish"
-      ? "Impulse in progress — look for pullbacks to ride the trend."
-      : "Bearish impulse in progress — avoid longs until completion.";
+    msg +=
+      direction === "bullish"
+        ? "Impulse in progress — look for pullbacks to ride the trend."
+        : "Bearish impulse in progress — avoid longs until completion.";
   } else if (currentWave === 4) {
-    msg += direction === "bullish"
-      ? "Wave 4 correction — potential Wave 5 rally ahead."
-      : "Wave 4 correction — potential final selloff ahead.";
+    msg +=
+      direction === "bullish"
+        ? "Wave 4 correction — potential Wave 5 rally ahead."
+        : "Wave 4 correction — potential final selloff ahead.";
   } else {
     msg += "Wave 5 complete or nearing completion — expect corrective move (ABC).";
   }

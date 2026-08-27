@@ -21,15 +21,11 @@
  * and re-exports agent accessors for backward compatibility.
  */
 
-import { Agent } from "@mastra/core/agent";
+import type { Agent } from "@mastra/core/agent";
 import { createModuleLogger } from "../logger/logger.ts";
 import { getMemoryStats, resetSharedMemory } from "./context/shared-context.ts";
 import { resetSubAgentMemory } from "./memory/memoryFactory.ts";
-import {
-  getExecutor,
-  getGordon,
-  getResearcher,
-} from "./definitions/index.ts";
+import { getExecutor, getGordon, getResearcher } from "./definitions/index.ts";
 import { setMemoryConfig, getMemoryConfig } from "./memory/memoryConfig.ts";
 
 // Re-export memory config functions for backward compatibility
@@ -247,10 +243,18 @@ function getResearcherAgent(): Agent {
 export const gordonAgent = getGordonAgent;
 
 /** Executor agent — isolated trade execution */
-export const executorAgent = { get agent() { return getExecutorAgent(); } };
+export const executorAgent = {
+  get agent() {
+    return getExecutorAgent();
+  },
+};
 
 /** Researcher agent — on-demand parallel work */
-export const researcherAgent = { get agent() { return getResearcherAgent(); } };
+export const researcherAgent = {
+  get agent() {
+    return getResearcherAgent();
+  },
+};
 
 /**
  * Get all agents (4-agent architecture)

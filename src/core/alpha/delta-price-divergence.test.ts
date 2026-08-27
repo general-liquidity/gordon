@@ -203,13 +203,7 @@ describe("detectDeltaPriceDivergence", () => {
   });
 
   test("start close non-positive → insufficient_data", () => {
-    const bars: DeltaPriceBar[] = [
-      bar(0, 0),
-      bar(1, 100),
-      bar(2, 200),
-      bar(3, 300),
-      bar(4, 400),
-    ];
+    const bars: DeltaPriceBar[] = [bar(0, 0), bar(1, 100), bar(2, 200), bar(3, 300), bar(4, 400)];
     const r = detectDeltaPriceDivergence(bars);
     expect(r.verdict).toBe("insufficient_data");
   });

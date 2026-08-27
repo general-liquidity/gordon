@@ -6,7 +6,7 @@
  */
 
 import { getDatabase } from "../../infra/storage/index.ts";
-import type { BacktestResult, BacktestMetrics } from "../types.ts";
+import type { BacktestResult } from "../types.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 
 const logger = createModuleLogger("backtest-storage");
@@ -290,7 +290,7 @@ export function saveBacktestResult(result: BacktestResult): StorageOperationResu
       result.metrics.maxDrawdown,
       result.metrics.sharpeRatio,
       result.metrics.winRate,
-      result.metrics.totalTrades
+      result.metrics.totalTrades,
     );
 
     logger.info("Saved backtest result", {
@@ -355,13 +355,11 @@ export function loadBacktestResultByKey(key: BacktestKey): BacktestResult | null
     // Ensure table exists
     initBacktestResultsTable();
 
-    const startDate = typeof key.startDate === "number"
-      ? new Date(key.startDate).toISOString()
-      : key.startDate;
+    const startDate =
+      typeof key.startDate === "number" ? new Date(key.startDate).toISOString() : key.startDate;
 
-    const endDate = typeof key.endDate === "number"
-      ? new Date(key.endDate).toISOString()
-      : key.endDate;
+    const endDate =
+      typeof key.endDate === "number" ? new Date(key.endDate).toISOString() : key.endDate;
 
     let sql = `
       SELECT * FROM backtest_results
@@ -412,9 +410,7 @@ export function loadBacktestResultByKey(key: BacktestKey): BacktestResult | null
  * });
  * ```
  */
-export function listBacktestHistory(
-  options: BacktestQueryOptions = {}
-): BacktestSummary[] {
+export function listBacktestHistory(options: BacktestQueryOptions = {}): BacktestSummary[] {
   try {
     const db = getDatabase();
 
@@ -523,7 +519,7 @@ export function listBacktestHistory(
  * @returns Number of matching results
  */
 export function countBacktestHistory(
-  options: Omit<BacktestQueryOptions, "orderBy" | "orderDirection" | "limit" | "offset"> = {}
+  options: Omit<BacktestQueryOptions, "orderBy" | "orderDirection" | "limit" | "offset"> = {},
 ): number {
   try {
     const db = getDatabase();
@@ -607,10 +603,7 @@ export function deleteBacktestResult(id: string): boolean {
 export function deleteBacktestResultsByStrategy(strategyId: string): number {
   try {
     const db = getDatabase();
-    const result = db.run(
-      "DELETE FROM backtest_results WHERE strategy_id = ?",
-      [strategyId]
-    );
+    const result = db.run("DELETE FROM backtest_results WHERE strategy_id = ?", [strategyId]);
     return result.changes;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -631,14 +624,9 @@ export function deleteBacktestResultsByStrategy(strategyId: string): number {
 export function cleanupOldBacktestResults(olderThanDays: number): number {
   try {
     const db = getDatabase();
-    const cutoff = new Date(
-      Date.now() - olderThanDays * 24 * 60 * 60 * 1000
-    ).toISOString();
+    const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000).toISOString();
 
-    const result = db.run(
-      "DELETE FROM backtest_results WHERE created_at < ?",
-      [cutoff]
-    );
+    const result = db.run("DELETE FROM backtest_results WHERE created_at < ?", [cutoff]);
 
     if (result.changes > 0) {
       logger.info("Cleaned up old backtest results", {
@@ -680,9 +668,9 @@ export function getBacktestStorageStats(): {
     initBacktestResultsTable();
 
     // Total count
-    const totalResult = db.prepare<{ count: number }, []>(
-      "SELECT COUNT(*) as count FROM backtest_results"
-    ).get();
+    const totalResult = db
+      .prepare<{ count: number }, []>("SELECT COUNT(*) as count FROM backtest_results")
+      .get();
     const totalResults = totalResult?.count ?? 0;
 
     if (totalResults === 0) {
@@ -698,38 +686,40 @@ export function getBacktestStorageStats(): {
     }
 
     // Strategy counts
-    const strategyRows = db.prepare<{ strategy_id: string; count: number }, []>(
-      "SELECT strategy_id, COUNT(*) as count FROM backtest_results GROUP BY strategy_id"
-    ).all();
+    const strategyRows = db
+      .prepare<{ strategy_id: string; count: number }, []>(
+        "SELECT strategy_id, COUNT(*) as count FROM backtest_results GROUP BY strategy_id",
+      )
+      .all();
     const strategyCounts: Record<string, number> = {};
     for (const row of strategyRows) {
       strategyCounts[row.strategy_id] = row.count;
     }
 
     // Symbol counts
-    const symbolRows = db.prepare<{ symbol: string; count: number }, []>(
-      "SELECT symbol, COUNT(*) as count FROM backtest_results GROUP BY symbol"
-    ).all();
+    const symbolRows = db
+      .prepare<{ symbol: string; count: number }, []>(
+        "SELECT symbol, COUNT(*) as count FROM backtest_results GROUP BY symbol",
+      )
+      .all();
     const symbolCounts: Record<string, number> = {};
     for (const row of symbolRows) {
       symbolCounts[row.symbol] = row.count;
     }
 
     // Date range
-    const dateResult = db.prepare<
-      { oldest: string | null; newest: string | null },
-      []
-    >(
-      "SELECT MIN(created_at) as oldest, MAX(created_at) as newest FROM backtest_results"
-    ).get();
+    const dateResult = db
+      .prepare<{ oldest: string | null; newest: string | null }, []>(
+        "SELECT MIN(created_at) as oldest, MAX(created_at) as newest FROM backtest_results",
+      )
+      .get();
 
     // Averages
-    const avgResult = db.prepare<
-      { avg_return: number | null; avg_sharpe: number | null },
-      []
-    >(
-      "SELECT AVG(total_return) as avg_return, AVG(sharpe_ratio) as avg_sharpe FROM backtest_results"
-    ).get();
+    const avgResult = db
+      .prepare<{ avg_return: number | null; avg_sharpe: number | null }, []>(
+        "SELECT AVG(total_return) as avg_return, AVG(sharpe_ratio) as avg_sharpe FROM backtest_results",
+      )
+      .get();
 
     return {
       totalResults,

@@ -13,7 +13,7 @@
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { InvalidStateError, NotFoundError } from "../../errors/index.ts";
 import type { EventBus } from "../../events/bus.ts";
-import { PositionStore } from "./store.ts";
+import type { PositionStore } from "./store.ts";
 import {
   PositionRecordSchema,
   VALID_TRANSITIONS,
@@ -26,18 +26,18 @@ import {
 
 const logger = createModuleLogger("position-state-machine");
 
-function validateMergedPosition(record: PositionRecord, currentState: PositionState): PositionRecord {
+function validateMergedPosition(
+  record: PositionRecord,
+  currentState: PositionState,
+): PositionRecord {
   const parsed = PositionRecordSchema.safeParse(record);
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.message}`)
       .join("; ");
-    throw new InvalidStateError(
-      `Invalid position data merge: ${issues}`,
-      currentState,
-      undefined,
-      { issues },
-    );
+    throw new InvalidStateError(`Invalid position data merge: ${issues}`, currentState, undefined, {
+      issues,
+    });
   }
   return parsed.data;
 }
@@ -58,7 +58,7 @@ function generatePositionId(): string {
 export class PositionStateMachine {
   constructor(
     private bus: EventBus,
-    private store: PositionStore
+    private store: PositionStore,
   ) {}
 
   /**
@@ -124,7 +124,7 @@ export class PositionStateMachine {
     toState: PositionState,
     data?: Partial<PositionRecord>,
     reason?: string,
-    agent?: string
+    agent?: string,
   ): Promise<PositionRecord> {
     const existing = await this.store.get(positionId);
     if (!existing) {
@@ -138,18 +138,18 @@ export class PositionStateMachine {
       throw new InvalidStateError(
         `Position ${positionId} is in terminal state '${fromState}' and cannot transition`,
         fromState,
-        toState
+        toState,
       );
     }
 
     // Validate the transition is legal
     const allowed = VALID_TRANSITIONS[fromState];
-    if (!allowed || !allowed.includes(toState)) {
+    if (!allowed?.includes(toState)) {
       throw new InvalidStateError(
         `Invalid transition: '${fromState}' -> '${toState}' for position ${positionId}. ` +
           `Allowed transitions from '${fromState}': [${(allowed || []).join(", ")}]`,
         fromState,
-        toState
+        toState,
       );
     }
 
@@ -181,13 +181,15 @@ export class PositionStateMachine {
     // Phantom guard: a fill without positive entry data is not a position.
     // The schema enforces positivity when present; this enforces presence.
     if (toState === "filled") {
-      if (!(typeof updated.entryPrice === "number" && updated.entryPrice > 0) ||
-          !(typeof updated.quantity === "number" && updated.quantity > 0)) {
+      if (
+        !(typeof updated.entryPrice === "number" && updated.entryPrice > 0) ||
+        !(typeof updated.quantity === "number" && updated.quantity > 0)
+      ) {
         throw new InvalidStateError(
           `Cannot transition position ${positionId} to 'filled' without positive ` +
             `entryPrice/quantity (got entryPrice=${updated.entryPrice}, quantity=${updated.quantity})`,
           fromState,
-          toState
+          toState,
         );
       }
     }
@@ -254,10 +256,7 @@ export class PositionStateMachine {
    * Update position data without changing state.
    * Useful for live price updates, trailing stop adjustments, etc.
    */
-  async update(
-    positionId: string,
-    data: Partial<PositionRecord>
-  ): Promise<PositionRecord> {
+  async update(positionId: string, data: Partial<PositionRecord>): Promise<PositionRecord> {
     const existing = await this.store.get(positionId);
     if (!existing) {
       throw new NotFoundError("Position", positionId);
@@ -268,18 +267,21 @@ export class PositionStateMachine {
       throw new InvalidStateError(
         "Cannot change state via update(). Use transition() instead.",
         existing.state,
-        data.state
+        data.state,
       );
     }
 
     const now = new Date().toISOString();
-    const updated = validateMergedPosition({
-      ...existing,
-      ...data,
-      state: existing.state, // preserve state
-      id: existing.id,       // preserve id
-      updatedAt: now,
-    }, existing.state);
+    const updated = validateMergedPosition(
+      {
+        ...existing,
+        ...data,
+        state: existing.state, // preserve state
+        id: existing.id, // preserve id
+        updatedAt: now,
+      },
+      existing.state,
+    );
 
     await this.store.save(updated);
 
@@ -306,7 +308,7 @@ export class PositionStateMachine {
     position: PositionRecord,
     fromState: PositionState,
     toState: PositionState,
-    reason?: string
+    reason?: string,
   ): Promise<void> {
     const now = new Date().toISOString();
 

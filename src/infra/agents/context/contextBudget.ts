@@ -193,7 +193,9 @@ function formatRuntimeState(context: GordonContext): string {
     lines.push(`- Requested task scope: ${context.requestedTaskScope}`);
   }
   if (workflowPhase === "execution") {
-    lines.push(`- Execution readiness: ${executionReadiness.ready ? "ready" : executionReadiness.reason ?? "blocked"}`);
+    lines.push(
+      `- Execution readiness: ${executionReadiness.ready ? "ready" : (executionReadiness.reason ?? "blocked")}`,
+    );
   }
 
   return `${RUNTIME_STATE_MARKER}\n${lines.join("\n")}`;
@@ -228,7 +230,10 @@ function formatRuntimeReminders(context: GordonContext): string {
   return `${REMINDER_MARKER}\n${reminders.map((line) => `- ${line}`).join("\n")}`;
 }
 
-function getActiveIntegrationIds(context: GordonContext, selection: IntegrationGlossarySelection): string[] {
+function getActiveIntegrationIds(
+  context: GordonContext,
+  selection: IntegrationGlossarySelection,
+): string[] {
   const ids = new Set<string>(selection.matchedIds);
   if (context.exchange?.exchangeId) ids.add(context.exchange.exchangeId);
   if (context.broker?.brokerId) ids.add(context.broker.brokerId);
@@ -300,12 +305,17 @@ function buildReport(
   const workflowPhase = determineWorkflowPhase(context);
   const executionReadiness = getExecutionReadiness(context);
   const model = normalizeModel(context.config);
-  const runtimeStateBlock = contextPieces.find((piece) => piece.kind === "runtime_state")?.content ?? "";
-  const projectTruthBlock = contextPieces.find((piece) => piece.kind === "project_truth")?.content ?? "";
-  const glossaryBlock = contextPieces.find((piece) => piece.kind === "integration_glossary")?.content ?? "";
+  const runtimeStateBlock =
+    contextPieces.find((piece) => piece.kind === "runtime_state")?.content ?? "";
+  const projectTruthBlock =
+    contextPieces.find((piece) => piece.kind === "project_truth")?.content ?? "";
+  const glossaryBlock =
+    contextPieces.find((piece) => piece.kind === "integration_glossary")?.content ?? "";
   const toolHintsBlock = contextPieces.find((piece) => piece.kind === "tool_hints")?.content ?? "";
-  const phaseGuidanceBlock = contextPieces.find((piece) => piece.kind === "phase_guidance")?.content ?? "";
-  const reminderBlock = contextPieces.find((piece) => piece.kind === "runtime_reminders")?.content ?? "";
+  const phaseGuidanceBlock =
+    contextPieces.find((piece) => piece.kind === "phase_guidance")?.content ?? "";
+  const reminderBlock =
+    contextPieces.find((piece) => piece.kind === "runtime_reminders")?.content ?? "";
   const sectionBudget: PromptContextSectionBudget = {
     runtimeState: estimateTokens(runtimeStateBlock),
     projectTruth: estimateTokens(projectTruthBlock),
@@ -343,9 +353,12 @@ function buildReport(
     sectionBudget,
     selectionReasons: selection.reasons,
     workflowPhase,
-    executionReadiness: workflowPhase === "execution"
-      ? (executionReadiness.ready ? "ready" : "blocked")
-      : "not_applicable",
+    executionReadiness:
+      workflowPhase === "execution"
+        ? executionReadiness.ready
+          ? "ready"
+          : "blocked"
+        : "not_applicable",
     cache: getPromptCacheMetadata(context, stablePrefix),
     contextPieces: contextPieces.map((piece) => ({
       id: piece.id,
@@ -369,20 +382,46 @@ export function buildPromptEnvelope(
 ): PromptEnvelope {
   const runtimeStateBlock = formatRuntimeState(context);
   const projectTruthBlock = formatProjectTruth();
-  const glossaryBlock = glossaryText
-    ? `${INTEGRATION_GLOSSARY_MARKER}\n${glossaryText}`
-    : "";
+  const glossaryBlock = glossaryText ? `${INTEGRATION_GLOSSARY_MARKER}\n${glossaryText}` : "";
   const toolHintsBlock = formatToolHints(selection.toolHints);
   const phaseGuidanceBlock = formatPhaseGuidance(context);
   const reminderBlock = formatRuntimeReminders(context);
 
   const contextPieces: PromptContextPiece[] = [
     buildContextPiece("runtime-state", "runtime_state", "runtime", true, 10, runtimeStateBlock),
-    buildContextPiece("project-truth", "project_truth", "product-truth", true, 20, projectTruthBlock),
-    buildContextPiece("integration-glossary", "integration_glossary", "glossary", true, 30, glossaryBlock),
+    buildContextPiece(
+      "project-truth",
+      "project_truth",
+      "product-truth",
+      true,
+      20,
+      projectTruthBlock,
+    ),
+    buildContextPiece(
+      "integration-glossary",
+      "integration_glossary",
+      "glossary",
+      true,
+      30,
+      glossaryBlock,
+    ),
     buildContextPiece("tool-hints", "tool_hints", "tool-routing", true, 40, toolHintsBlock),
-    buildContextPiece("phase-guidance", "phase_guidance", "workflow-phase", false, 50, phaseGuidanceBlock),
-    buildContextPiece("runtime-reminders", "runtime_reminders", "runtime-harness", false, 60, reminderBlock),
+    buildContextPiece(
+      "phase-guidance",
+      "phase_guidance",
+      "workflow-phase",
+      false,
+      50,
+      phaseGuidanceBlock,
+    ),
+    buildContextPiece(
+      "runtime-reminders",
+      "runtime_reminders",
+      "runtime-harness",
+      false,
+      60,
+      reminderBlock,
+    ),
     ...(options.additionalSections ?? []).map((section, index) =>
       buildContextPiece(
         section.id ?? `${section.kind}-${index + 1}`,
@@ -401,7 +440,7 @@ export function buildPromptEnvelope(
         section.stable,
         section.priority,
         section.content,
-      )
+      ),
     ),
   ].filter((piece) => piece.content.trim().length > 0);
 
@@ -443,18 +482,21 @@ export function buildPromptEnvelope(
   // cleanly assign into Mastra's strict `SharedV2ProviderOptions` without
   // a cast. Keeping the inline literal here preserves strict typing; new
   // callsites outside Mastra's typed flow should prefer the helper.
-  const providerOptions = report.cache.supported && isAnthropicProvider(report.cache.provider)
-    ? { anthropic: { cacheControl: { type: "ephemeral" as const } } }
-    : undefined;
+  const providerOptions =
+    report.cache.supported && isAnthropicProvider(report.cache.provider)
+      ? { anthropic: { cacheControl: { type: "ephemeral" as const } } }
+      : undefined;
 
   const messages: GroundedPromptMessage[] = [];
   if (stablePrefix.trim()) {
     messages.push({
       role: "system",
       content: stablePrefix,
-      ...(providerOptions ? {
-        providerOptions,
-      } : {}),
+      ...(providerOptions
+        ? {
+            providerOptions,
+          }
+        : {}),
     });
   }
   if (dynamicContextBlock.trim()) {
@@ -482,7 +524,9 @@ export function buildPromptEnvelope(
 
   // Microcompact: trim content of old read-only tool results to save tokens.
   // Pass-through if the array has no compactable tool messages.
-  const mc = microcompactMessages(messages as unknown as Array<{ role: string; toolName?: string; content: unknown }>);
+  const mc = microcompactMessages(
+    messages as unknown as Array<{ role: string; toolName?: string; content: unknown }>,
+  );
   if (mc.cleared > 0) {
     // Replace in place with the compacted version.
     messages.length = 0;
@@ -614,14 +658,20 @@ export function formatPromptContextReport(report: PromptContextReport | null): s
     lines.push("");
     lines.push("Context pieces:");
     for (const piece of report.contextPieces) {
-      lines.push(`- ${piece.kind} · ${piece.source} · ${piece.tokenEstimate} tok${piece.stable ? " · stable" : ""}`);
+      lines.push(
+        `- ${piece.kind} · ${piece.source} · ${piece.tokenEstimate} tok${piece.stable ? " · stable" : ""}`,
+      );
     }
   }
 
   lines.push("");
   lines.push("Compaction policy:");
-  lines.push("- Stable project truth and integration glossary grounding are rebuilt on every turn.");
-  lines.push("- They sit outside conversation summaries and are preserved even if chat history is compacted.");
+  lines.push(
+    "- Stable project truth and integration glossary grounding are rebuilt on every turn.",
+  );
+  lines.push(
+    "- They sit outside conversation summaries and are preserved even if chat history is compacted.",
+  );
 
   return lines.join("\n");
 }

@@ -45,23 +45,24 @@ export const CONSISTENCY_LEGS: readonly ConsistencyLeg[] = [
 ] as const;
 
 /** Which pair of the triple each leg relates, for prompt construction and reporting. */
-export const LEG_RELATION: Record<ConsistencyLeg, { from: string; to: string; question: string }> = {
-  factuality: {
-    from: "evidence",
-    to: "reasoning",
-    question: "Is every substantive claim in the reasoning supported by the evidence?",
-  },
-  deduction: {
-    from: "reasoning",
-    to: "decision",
-    question: "Does the decision follow from the reasoning, with no unstated leap?",
-  },
-  consistency: {
-    from: "evidence",
-    to: "decision",
-    question: "Does the decision align with the evidence directly, ignoring the reasoning?",
-  },
-};
+export const LEG_RELATION: Record<ConsistencyLeg, { from: string; to: string; question: string }> =
+  {
+    factuality: {
+      from: "evidence",
+      to: "reasoning",
+      question: "Is every substantive claim in the reasoning supported by the evidence?",
+    },
+    deduction: {
+      from: "reasoning",
+      to: "decision",
+      question: "Does the decision follow from the reasoning, with no unstated leap?",
+    },
+    consistency: {
+      from: "evidence",
+      to: "decision",
+      question: "Does the decision align with the evidence directly, ignoring the reasoning?",
+    },
+  };
 
 export interface EvidenceChunk {
   id: string;
@@ -159,7 +160,7 @@ export function buildLegPrompt(leg: ConsistencyLeg, triple: RationaleTriple): st
     "unsupported or contradicted. Judge only this relation: do not reward fluency,",
     "confidence, or the parts of the triple this relation does not cover.",
     "",
-    "Output JSON only: { \"score\": <number 0..1>, \"justification\": \"<one sentence>\" }",
+    'Output JSON only: { "score": <number 0..1>, "justification": "<one sentence>" }',
     "",
   ];
   if (leg !== "deduction") {
@@ -202,7 +203,9 @@ export async function scoreTriangularConsistency(
       verdict = await judge({ leg, triple, prompt });
     } catch (error) {
       failedLegs.push(leg);
-      failureNotes.push(`${leg}: judge threw (${error instanceof Error ? error.message : String(error)})`);
+      failureNotes.push(
+        `${leg}: judge threw (${error instanceof Error ? error.message : String(error)})`,
+      );
       continue;
     }
     if (verdict === null || verdict === undefined) {
@@ -390,7 +393,7 @@ export function narrowEvidence(
   const ranked = remainder
     .map((chunk, index) => ({ chunk, index, score: options.ranker(chunk, decision) }))
     // Index breaks ties so the same input always yields the same ordering.
-    .sort((a, b) => (b.score - a.score) || (a.index - b.index))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
     .slice(0, Math.max(0, topK))
     .map((entry) => entry.chunk);
 

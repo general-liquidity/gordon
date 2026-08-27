@@ -27,7 +27,14 @@ function makeBars(n: number): OHLC[] {
   const bars: OHLC[] = [];
   for (let i = 0; i < n; i++) {
     const price = 100 + Math.sin(i / 7) * 2;
-    bars.push({ timestamp: i, open: price, high: price + 1, low: price - 1, close: price, volume: 1000 });
+    bars.push({
+      timestamp: i,
+      open: price,
+      high: price + 1,
+      low: price - 1,
+      close: price,
+      volume: 1000,
+    });
   }
   return bars;
 }
@@ -172,7 +179,9 @@ describe("walkForwardTest — expanding / anchored mode", () => {
     });
 
     // Test windows are identical between modes; only the train side differs.
-    expect(expanding.windows.map((w) => w.testStart)).toEqual(rolling.windows.map((w) => w.testStart));
+    expect(expanding.windows.map((w) => w.testStart)).toEqual(
+      rolling.windows.map((w) => w.testStart),
+    );
     expect(expanding.windows.map((w) => w.testEnd)).toEqual(rolling.windows.map((w) => w.testEnd));
     // Fold 0 is identical in both modes (rolling trainStart is already 0).
     expect(expanding.windows[0]!.trainStart).toBe(rolling.windows[0]!.trainStart);
@@ -202,12 +211,8 @@ describe("computeOverfitRatio", () => {
     // train +2.0 / test -1.0 used to give -2, which clears every `> 2`
     // threshold and then pulls avgOverfitRatio DOWN, scoring the exact
     // failure the metric exists to catch as maximum robustness.
-    expect(computeOverfitRatio(2.0, -1.0, "sharpeRatio")).toBe(
-      Number.POSITIVE_INFINITY,
-    );
-    expect(computeOverfitRatio(2.0, 0, "sharpeRatio")).toBe(
-      Number.POSITIVE_INFINITY,
-    );
+    expect(computeOverfitRatio(2.0, -1.0, "sharpeRatio")).toBe(Number.POSITIVE_INFINITY);
+    expect(computeOverfitRatio(2.0, 0, "sharpeRatio")).toBe(Number.POSITIVE_INFINITY);
   });
 
   it("still measures ordinary degradation the same way", () => {

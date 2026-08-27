@@ -38,10 +38,9 @@ describe("applyHysteresis", () => {
   });
 
   it("accepts a shift once it persists confirmBars consecutive detections", () => {
-    const { accepted, state } = feed(
-      ["ranging", "volatile", "volatile", "volatile"],
-      { confirmBars: 3 },
-    );
+    const { accepted, state } = feed(["ranging", "volatile", "volatile", "volatile"], {
+      confirmBars: 3,
+    });
     expect(accepted).toEqual(["ranging", "ranging", "ranging", "volatile"]);
     expect(state.acceptedRegime).toBe("volatile");
   });
@@ -57,10 +56,9 @@ describe("applyHysteresis", () => {
   });
 
   it("switches between two distinct pending candidates without confirming either", () => {
-    const { accepted, state } = feed(
-      ["ranging", "volatile", "breakout", "volatile", "breakout"],
-      { confirmBars: 3 },
-    );
+    const { accepted, state } = feed(["ranging", "volatile", "breakout", "volatile", "breakout"], {
+      confirmBars: 3,
+    });
     expect(state.acceptedRegime).toBe("ranging");
     expect(accepted.every((r) => r === "ranging")).toBe(true);
   });

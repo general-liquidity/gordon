@@ -21,9 +21,7 @@ describe("resolveVisionPath", () => {
   });
 
   it("refuses unknown values instead of silently changing operator intent", () => {
-    expect(() => resolveVisionPath({ [VISION_PATH_ENV]: "weird" })).toThrow(
-      /must be "inline"/,
-    );
+    expect(() => resolveVisionPath({ [VISION_PATH_ENV]: "weird" })).toThrow(/must be "inline"/);
   });
 });
 

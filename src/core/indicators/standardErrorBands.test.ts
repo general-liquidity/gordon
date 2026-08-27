@@ -52,8 +52,8 @@ describe("standardErrorBands — noisy trend", () => {
     const noisy = noisyUptrend(30, 1, 100, 7);
     const c = calculateStandardErrorBands(clean, { period: 21 });
     const n = calculateStandardErrorBands(noisy, { period: 21 });
-    const cWidth = (c.latestUpperBand! - c.latestLowerBand!);
-    const nWidth = (n.latestUpperBand! - n.latestLowerBand!);
+    const cWidth = c.latestUpperBand! - c.latestLowerBand!;
+    const nWidth = n.latestUpperBand! - n.latestLowerBand!;
     expect(nWidth).toBeGreaterThan(cWidth);
   });
 

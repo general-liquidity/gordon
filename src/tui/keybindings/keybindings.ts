@@ -174,7 +174,10 @@ export function getBinding(action: BindableAction): KeyBinding | undefined {
 /**
  * Get all bindings for a key combo (may match multiple if vim/non-vim differ).
  */
-export function getActionsForKey(key: string, mode: "normalMode" | "insertMode" | "always" = "always"): BindableAction[] {
+export function getActionsForKey(
+  key: string,
+  mode: "normalMode" | "insertMode" | "always" = "always",
+): BindableAction[] {
   return getResolvedBindings()
     .filter((b) => {
       if (b.key !== key) return false;
@@ -207,7 +210,10 @@ export function getResolvedBindings(): KeyBinding[] {
 export function validateKeybindings(
   bindings: KeyBinding[] = getResolvedBindings(),
 ): KeybindingConflict[] {
-  const groups = new Map<string, Array<{ binding: KeyBinding; index: number; scope: NonNullable<KeyBinding["when"]> }>>();
+  const groups = new Map<
+    string,
+    Array<{ binding: KeyBinding; index: number; scope: NonNullable<KeyBinding["when"]> }>
+  >();
 
   bindings.forEach((binding, index) => {
     const key = normalizeBindingKey(binding);
@@ -295,10 +301,15 @@ export function formatKeybindingHelp(): string {
 
   const groups: Record<string, KeyBinding[]> = {};
   for (const b of bindings) {
-    const group = b.when === "normalMode" ? "Vim — prompt input (Normal mode)"
-      : b.when === "insertMode" ? "Vim — prompt input (Insert mode)"
-      : "Global";
-    (groups[group] ??= []).push(b);
+    const group =
+      b.when === "normalMode"
+        ? "Vim — prompt input (Normal mode)"
+        : b.when === "insertMode"
+          ? "Vim — prompt input (Insert mode)"
+          : "Global";
+    if (!groups[group]) groups[group] = [];
+    const bindingsForGroup = groups[group];
+    bindingsForGroup.push(b);
   }
 
   for (const [group, binds] of Object.entries(groups)) {
@@ -328,7 +339,10 @@ function normalizeBindingKey(binding: KeyBinding): string {
 }
 
 function normalizeKeyCombo(key: string): string {
-  const rawParts = key.split("+").map((part) => part.trim()).filter(Boolean);
+  const rawParts = key
+    .split("+")
+    .map((part) => part.trim())
+    .filter(Boolean);
   const modifiers = new Set<string>();
   let base = "";
 

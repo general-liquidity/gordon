@@ -245,9 +245,7 @@ export function getGenome(genomeId: string): Genome | null {
   try {
     initGenomeTables();
     const db = getDatabase();
-    const stmt = db.prepare<GenomeRow, [string]>(
-      "SELECT * FROM genomes WHERE genome_id = ?"
-    );
+    const stmt = db.prepare<GenomeRow, [string]>("SELECT * FROM genomes WHERE genome_id = ?");
     const row = stmt.get(genomeId);
     return row ? rowToGenome(row) : null;
   } catch (err) {
@@ -265,7 +263,7 @@ export function getGenomesByPlaybook(playbookName: string): Genome[] {
     initGenomeTables();
     const db = getDatabase();
     const stmt = db.prepare<GenomeRow, [string]>(
-      "SELECT * FROM genomes WHERE playbook_name = ? ORDER BY generation ASC, created_at ASC"
+      "SELECT * FROM genomes WHERE playbook_name = ? ORDER BY generation ASC, created_at ASC",
     );
     return stmt.all(playbookName).map(rowToGenome);
   } catch (err) {
@@ -283,7 +281,7 @@ export function getGenomesByStatus(status: Genome["status"]): Genome[] {
     initGenomeTables();
     const db = getDatabase();
     const stmt = db.prepare<GenomeRow, [string]>(
-      "SELECT * FROM genomes WHERE status = ? ORDER BY fitness_score DESC"
+      "SELECT * FROM genomes WHERE status = ? ORDER BY fitness_score DESC",
     );
     return stmt.all(status).map(rowToGenome);
   } catch (err) {
@@ -301,7 +299,7 @@ export function getBestGenome(playbookName: string): Genome | null {
     initGenomeTables();
     const db = getDatabase();
     const stmt = db.prepare<GenomeRow, [string]>(
-      "SELECT * FROM genomes WHERE playbook_name = ? AND fitness_score IS NOT NULL ORDER BY fitness_score DESC LIMIT 1"
+      "SELECT * FROM genomes WHERE playbook_name = ? AND fitness_score IS NOT NULL ORDER BY fitness_score DESC LIMIT 1",
     );
     const row = stmt.get(playbookName);
     return row ? rowToGenome(row) : null;
@@ -425,7 +423,7 @@ export function getExperiment(experimentId: string): Experiment | null {
     initGenomeTables();
     const db = getDatabase();
     const stmt = db.prepare<ExperimentRow, [string]>(
-      "SELECT * FROM experiments WHERE experiment_id = ?"
+      "SELECT * FROM experiments WHERE experiment_id = ?",
     );
     const row = stmt.get(experimentId);
     return row ? rowToExperiment(row) : null;
@@ -444,7 +442,7 @@ export function getActiveExperiments(): Experiment[] {
     initGenomeTables();
     const db = getDatabase();
     const stmt = db.prepare<ExperimentRow, []>(
-      "SELECT * FROM experiments WHERE status = 'running' ORDER BY started_at DESC"
+      "SELECT * FROM experiments WHERE status = 'running' ORDER BY started_at DESC",
     );
     return stmt.all().map(rowToExperiment);
   } catch (err) {
@@ -459,10 +457,19 @@ export function getActiveExperiments(): Experiment[] {
  */
 export function updateExperiment(
   experimentId: string,
-  data: Partial<Pick<Experiment,
-    "status" | "control_trades" | "control_pnl" | "variant_trades" | "variant_pnl" |
-    "winner" | "winner_reason" | "ended_at"
-  >>
+  data: Partial<
+    Pick<
+      Experiment,
+      | "status"
+      | "control_trades"
+      | "control_pnl"
+      | "variant_trades"
+      | "variant_pnl"
+      | "winner"
+      | "winner_reason"
+      | "ended_at"
+    >
+  >,
 ): void {
   const existing = getExperiment(experimentId);
   if (!existing) {
@@ -543,7 +550,7 @@ export function getPendingSuggestions(genomeId: string): MutationSuggestion[] {
     initGenomeTables();
     const db = getDatabase();
     const stmt = db.prepare<SuggestionRow, [string]>(
-      "SELECT * FROM mutation_suggestions WHERE genome_id = ? AND status = 'pending' ORDER BY confidence DESC"
+      "SELECT * FROM mutation_suggestions WHERE genome_id = ? AND status = 'pending' ORDER BY confidence DESC",
     );
     return stmt.all(genomeId).map(rowToSuggestion);
   } catch (err) {

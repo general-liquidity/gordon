@@ -27,7 +27,11 @@ describe("construction", () => {
   it("rejects an initial state that breaches the floor", () => {
     expect(
       () =>
-        new RiskStateLineage(DIMS, { maxPositionPct: 50, maxLeverage: 2, minStopDistancePct: 1.5 }, FLOOR),
+        new RiskStateLineage(
+          DIMS,
+          { maxPositionPct: 50, maxLeverage: 2, minStopDistancePct: 1.5 },
+          FLOOR,
+        ),
     ).toThrow();
   });
 });

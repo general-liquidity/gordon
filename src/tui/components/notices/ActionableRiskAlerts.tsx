@@ -1,4 +1,3 @@
-import React, { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { TitledBox } from "../../design-system/TitledBox.js";
 
@@ -38,7 +37,10 @@ export function ActionableRiskAlerts({ alerts, onFix, onIgnore }: Props) {
   useInput((input) => {
     const alert = alerts.find((a) => a.fixAction.key === input);
     if (alert) onFix(alert.id);
-    else if (input === "i") alerts.forEach((a) => onIgnore(a.id));
+    else if (input === "i")
+      alerts.forEach((a) => {
+        onIgnore(a.id);
+      });
   });
 
   if (alerts.length === 0) {
@@ -59,20 +61,29 @@ export function ActionableRiskAlerts({ alerts, onFix, onIgnore }: Props) {
           return (
             <Box key={alert.id} flexDirection="column" marginBottom={1}>
               <Box>
-                <Text color={color} bold>{icon} </Text>
+                <Text color={color} bold>
+                  {icon}{" "}
+                </Text>
                 <Text bold>{alert.message}</Text>
               </Box>
               <Box>
-                <Text dimColor>  Current: </Text>
+                <Text dimColor> Current: </Text>
                 <Text color={color}>
-                  {alert.currentValue.toFixed(2)}{alert.unit}
+                  {alert.currentValue.toFixed(2)}
+                  {alert.unit}
                 </Text>
                 <Text dimColor> / Limit: </Text>
-                <Text>{alert.limitValue.toFixed(2)}{alert.unit}</Text>
+                <Text>
+                  {alert.limitValue.toFixed(2)}
+                  {alert.unit}
+                </Text>
                 <Text dimColor> ({pct.toFixed(0)}%)</Text>
               </Box>
               <Box>
-                <Text color="cyanBright" bold>  [{alert.fixAction.key}]</Text>
+                <Text color="cyanBright" bold>
+                  {" "}
+                  [{alert.fixAction.key}]
+                </Text>
                 <Text> {alert.fixAction.label}</Text>
                 <Text dimColor> — {alert.fixAction.description}</Text>
               </Box>

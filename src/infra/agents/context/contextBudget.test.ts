@@ -56,7 +56,7 @@ describe("estimateTokens — JSON-aware estimation", () => {
     });
 
     // Rough true tokens: count atomic pieces (numbers, keys, punctuation runs).
-    const roughTrue = (orderBook.match(/[A-Za-z0-9.\-]+|[{}\[\]:,]/g) ?? []).length;
+    const roughTrue = (orderBook.match(/[A-Za-z0-9.-]+|[{}[\]:,]/g) ?? []).length;
 
     const flatEstimate = Math.ceil(orderBook.length / 4);
     const jsonEstimate = estimateTokens(orderBook); // auto → json ratio

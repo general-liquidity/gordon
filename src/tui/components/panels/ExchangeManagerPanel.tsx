@@ -7,7 +7,7 @@
  * Pattern: Claude Code service manager with status indicators.
  */
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 import { ProgressBar } from "../../design-system/ProgressBar.js";
@@ -39,13 +39,76 @@ interface Props {
 // ============================================================================
 
 export const DEFAULT_EXCHANGES: ExchangeInfo[] = [
-  { id: "binance", name: "Binance", connected: false, apiKeySet: false, latencyMs: 0, rateLimitUsed: 0, rateLimitMax: 1200, features: ["spot", "futures", "margin"] },
-  { id: "binanceus", name: "Binance US", connected: false, apiKeySet: false, latencyMs: 0, rateLimitUsed: 0, rateLimitMax: 1200, features: ["spot"] },
-  { id: "coinbase", name: "Coinbase", connected: false, apiKeySet: false, latencyMs: 0, rateLimitUsed: 0, rateLimitMax: 600, features: ["spot"] },
-  { id: "kraken", name: "Kraken", connected: false, apiKeySet: false, latencyMs: 0, rateLimitUsed: 0, rateLimitMax: 500, features: ["spot", "futures"] },
-  { id: "hyperliquid", name: "Hyperliquid", connected: false, apiKeySet: false, latencyMs: 0, rateLimitUsed: 0, rateLimitMax: 1000, features: ["perps"] },
-  { id: "bitfinex", name: "Bitfinex", connected: false, apiKeySet: false, latencyMs: 0, rateLimitUsed: 0, rateLimitMax: 900, features: ["spot", "margin"] },
-  { id: "robinhood", name: "Robinhood", connected: false, apiKeySet: false, latencyMs: 0, rateLimitUsed: 0, rateLimitMax: 300, features: ["crypto", "stocks"] },
+  {
+    id: "binance",
+    name: "Binance",
+    connected: false,
+    apiKeySet: false,
+    latencyMs: 0,
+    rateLimitUsed: 0,
+    rateLimitMax: 1200,
+    features: ["spot", "futures", "margin"],
+  },
+  {
+    id: "binanceus",
+    name: "Binance US",
+    connected: false,
+    apiKeySet: false,
+    latencyMs: 0,
+    rateLimitUsed: 0,
+    rateLimitMax: 1200,
+    features: ["spot"],
+  },
+  {
+    id: "coinbase",
+    name: "Coinbase",
+    connected: false,
+    apiKeySet: false,
+    latencyMs: 0,
+    rateLimitUsed: 0,
+    rateLimitMax: 600,
+    features: ["spot"],
+  },
+  {
+    id: "kraken",
+    name: "Kraken",
+    connected: false,
+    apiKeySet: false,
+    latencyMs: 0,
+    rateLimitUsed: 0,
+    rateLimitMax: 500,
+    features: ["spot", "futures"],
+  },
+  {
+    id: "hyperliquid",
+    name: "Hyperliquid",
+    connected: false,
+    apiKeySet: false,
+    latencyMs: 0,
+    rateLimitUsed: 0,
+    rateLimitMax: 1000,
+    features: ["perps"],
+  },
+  {
+    id: "bitfinex",
+    name: "Bitfinex",
+    connected: false,
+    apiKeySet: false,
+    latencyMs: 0,
+    rateLimitUsed: 0,
+    rateLimitMax: 900,
+    features: ["spot", "margin"],
+  },
+  {
+    id: "robinhood",
+    name: "Robinhood",
+    connected: false,
+    apiKeySet: false,
+    latencyMs: 0,
+    rateLimitUsed: 0,
+    rateLimitMax: 300,
+    features: ["crypto", "stocks"],
+  },
 ];
 
 // ============================================================================
@@ -67,12 +130,7 @@ function latencyColor(ms: number): string {
 // Component
 // ============================================================================
 
-export function ExchangeManagerPanel({
-  exchanges,
-  onConnect,
-  onDisconnect,
-  onClose,
-}: Props) {
+export function ExchangeManagerPanel({ exchanges, onConnect, onDisconnect, onClose }: Props) {
   const [cursor, setCursor] = useState(0);
 
   useInput((_input, key) => {
@@ -113,11 +171,31 @@ export function ExchangeManagerPanel({
 
       {/* Column headers */}
       <Box paddingLeft={3}>
-        <Box width={16}><Text bold dimColor>EXCHANGE</Text></Box>
-        <Box width={6}><Text bold dimColor>STATUS</Text></Box>
-        <Box width={10}><Text bold dimColor>LATENCY</Text></Box>
-        <Box width={20}><Text bold dimColor>RATE LIMIT</Text></Box>
-        <Box width={20}><Text bold dimColor>FEATURES</Text></Box>
+        <Box width={16}>
+          <Text bold dimColor>
+            EXCHANGE
+          </Text>
+        </Box>
+        <Box width={6}>
+          <Text bold dimColor>
+            STATUS
+          </Text>
+        </Box>
+        <Box width={10}>
+          <Text bold dimColor>
+            LATENCY
+          </Text>
+        </Box>
+        <Box width={20}>
+          <Text bold dimColor>
+            RATE LIMIT
+          </Text>
+        </Box>
+        <Box width={20}>
+          <Text bold dimColor>
+            FEATURES
+          </Text>
+        </Box>
       </Box>
 
       {/* Exchange rows */}
@@ -147,7 +225,10 @@ export function ExchangeManagerPanel({
               {ex.rateLimitMax > 0 ? (
                 <>
                   <ProgressBar value={rlRatio} width={8} fillColor={rlColor} />
-                  <Text dimColor> {ex.rateLimitUsed}/{ex.rateLimitMax}</Text>
+                  <Text dimColor>
+                    {" "}
+                    {ex.rateLimitUsed}/{ex.rateLimitMax}
+                  </Text>
                 </>
               ) : (
                 <Text dimColor>{"\u2014"}</Text>

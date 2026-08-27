@@ -40,4 +40,3 @@ describe("handleKillSwitchCommand", () => {
     expect(isExecutionAllowed({ venue: "coinbase" }).allowed).toBe(true);
   });
 });
-

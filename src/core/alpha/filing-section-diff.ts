@@ -54,12 +54,10 @@ function segment(text: string): Segment[] {
 
 /** All start-marker match positions, scanned globally. */
 function allStartMatches(text: string, start: RegExp): Array<{ index: number; length: number }> {
-  const g = new RegExp(start.source, start.flags.includes("g") ? start.flags : start.flags + "g");
+  const g = new RegExp(start.source, start.flags.includes("g") ? start.flags : `${start.flags}g`);
   const out: Array<{ index: number; length: number }> = [];
-  let m: RegExpExecArray | null;
-  while ((m = g.exec(text)) !== null) {
+  for (const m of text.matchAll(g)) {
     out.push({ index: m.index, length: m[0].length });
-    if (m[0].length === 0) g.lastIndex++; // guard against zero-width loops
   }
   return out;
 }
@@ -74,11 +72,7 @@ function allStartMatches(text: string, start: RegExp): Array<{ index: number; le
  * LONGEST slice — the body always dwarfs the one-line TOC entry. Returns "" if
  * the start marker isn't found.
  */
-export function extractSection(
-  filingText: string,
-  start: RegExp,
-  end?: RegExp,
-): string {
+export function extractSection(filingText: string, start: RegExp, end?: RegExp): string {
   const starts = allStartMatches(filingText, start);
   if (starts.length === 0) return "";
   let best = "";

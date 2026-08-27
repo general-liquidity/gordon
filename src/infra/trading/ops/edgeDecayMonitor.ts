@@ -84,7 +84,7 @@ export function evaluateDecay(input: DecayInput): DecayResult {
 
   const recentR = mean(recent);
   const baselineR = mean(baseline);
-  const ratio = baselineR > 0 ? recentR / baselineR : (recentR >= 0 ? 1 : 0);
+  const ratio = baselineR > 0 ? recentR / baselineR : recentR >= 0 ? 1 : 0;
 
   let state: DecayState;
   let mult: number;

@@ -17,9 +17,10 @@
  * these handle parameter-level optimization with smarter search.
  */
 
-import type { StrategyParameters, BacktestScore, OptimizationResult } from "./autoOptimizer.ts";
+import type { StrategyParameters, BacktestScore } from "./autoOptimizer.ts";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { shuffled } from "../../../utils/shuffle.ts";
 import { GORDON_DIR } from "../../storage/paths.ts";
 
 // ============================================================================
@@ -117,14 +118,20 @@ export function recordRatchetEntry(
 export function saveRatchetHistory(history: RatchetHistory): void {
   ensureRatchetDir();
   const filename = `ratchet_${history.startedAt.replace(/[:.]/g, "-")}.json`;
-  writeFileSync(join(RATCHET_DIR, filename), JSON.stringify(history, null, 2), { encoding: "utf-8", mode: 0o600 });
+  writeFileSync(join(RATCHET_DIR, filename), JSON.stringify(history, null, 2), {
+    encoding: "utf-8",
+    mode: 0o600,
+  });
 }
 
 export function loadLatestRatchetHistory(): RatchetHistory | null {
   ensureRatchetDir();
   try {
     const { readdirSync } = require("node:fs") as typeof import("node:fs");
-    const files = readdirSync(RATCHET_DIR).filter((f: string) => f.startsWith("ratchet_")).sort().reverse();
+    const files = readdirSync(RATCHET_DIR)
+      .filter((f: string) => f.startsWith("ratchet_"))
+      .sort()
+      .reverse();
     if (files.length === 0) return null;
     return JSON.parse(readFileSync(join(RATCHET_DIR, files[0]!), "utf-8"));
   } catch {
@@ -137,11 +144,11 @@ export function loadLatestRatchetHistory(): RatchetHistory | null {
 // ============================================================================
 
 export type WeaknessCategory =
-  | "return_degraded"      // Total return dropped
-  | "risk_increased"       // Drawdown or volatility increased
-  | "consistency_dropped"  // Win rate or Sortino dropped
-  | "insufficient_trades"  // Too few trades (overfitting to few signals)
-  | "multiple_degraded";   // Several metrics got worse simultaneously
+  | "return_degraded" // Total return dropped
+  | "risk_increased" // Drawdown or volatility increased
+  | "consistency_dropped" // Win rate or Sortino dropped
+  | "insufficient_trades" // Too few trades (overfitting to few signals)
+  | "multiple_degraded"; // Several metrics got worse simultaneously
 
 export interface Diagnosis {
   category: WeaknessCategory;
@@ -163,12 +170,42 @@ export function diagnoseFailure(
   mutatedParams: string[],
 ): Diagnosis {
   const deltas: Array<{ metric: string; before: number; after: number; changePct: number }> = [
-    { metric: "sharpe", before: before.metrics.sharpe, after: after.metrics.sharpe, changePct: pctChange(before.metrics.sharpe, after.metrics.sharpe) },
-    { metric: "sortino", before: before.metrics.sortino, after: after.metrics.sortino, changePct: pctChange(before.metrics.sortino, after.metrics.sortino) },
-    { metric: "totalReturn", before: before.metrics.totalReturn, after: after.metrics.totalReturn, changePct: pctChange(before.metrics.totalReturn, after.metrics.totalReturn) },
-    { metric: "winRate", before: before.metrics.winRate, after: after.metrics.winRate, changePct: pctChange(before.metrics.winRate, after.metrics.winRate) },
-    { metric: "maxDrawdownPct", before: before.metrics.maxDrawdownPct, after: after.metrics.maxDrawdownPct, changePct: pctChange(before.metrics.maxDrawdownPct, after.metrics.maxDrawdownPct) },
-    { metric: "tradeCount", before: before.metrics.tradeCount, after: after.metrics.tradeCount, changePct: pctChange(before.metrics.tradeCount, after.metrics.tradeCount) },
+    {
+      metric: "sharpe",
+      before: before.metrics.sharpe,
+      after: after.metrics.sharpe,
+      changePct: pctChange(before.metrics.sharpe, after.metrics.sharpe),
+    },
+    {
+      metric: "sortino",
+      before: before.metrics.sortino,
+      after: after.metrics.sortino,
+      changePct: pctChange(before.metrics.sortino, after.metrics.sortino),
+    },
+    {
+      metric: "totalReturn",
+      before: before.metrics.totalReturn,
+      after: after.metrics.totalReturn,
+      changePct: pctChange(before.metrics.totalReturn, after.metrics.totalReturn),
+    },
+    {
+      metric: "winRate",
+      before: before.metrics.winRate,
+      after: after.metrics.winRate,
+      changePct: pctChange(before.metrics.winRate, after.metrics.winRate),
+    },
+    {
+      metric: "maxDrawdownPct",
+      before: before.metrics.maxDrawdownPct,
+      after: after.metrics.maxDrawdownPct,
+      changePct: pctChange(before.metrics.maxDrawdownPct, after.metrics.maxDrawdownPct),
+    },
+    {
+      metric: "tradeCount",
+      before: before.metrics.tradeCount,
+      after: after.metrics.tradeCount,
+      changePct: pctChange(before.metrics.tradeCount, after.metrics.tradeCount),
+    },
   ];
 
   // Find worst degradation (for drawdown, higher = worse, so invert)
@@ -187,7 +224,7 @@ export function diagnoseFailure(
     };
   }
 
-  const worst = degraded.reduce((w, d) => Math.abs(d.changePct) > Math.abs(w.changePct) ? d : w);
+  const worst = degraded.reduce((w, d) => (Math.abs(d.changePct) > Math.abs(w.changePct) ? d : w));
 
   let category: WeaknessCategory;
   let suggestion: string;
@@ -264,10 +301,10 @@ export function generateTargetedMutation(
 
   // Mutate 1-2 targeted parameters
   const numToMutate = Math.min(2, targetKeys.length);
-  const shuffled = [...targetKeys].sort(() => Math.random() - 0.5);
+  const shuffledKeys = shuffled(targetKeys);
 
   for (let i = 0; i < numToMutate; i++) {
-    const key = shuffled[i]!;
+    const key = shuffledKeys[i]!;
     const original = base[key]!;
     const perturbation = 1 + (Math.random() * 2 - 1) * temperature;
     let newValue = original * perturbation;
@@ -358,9 +395,7 @@ export function crossPollinate(
   config: IslandEvolutionConfig = DEFAULT_ISLAND_CONFIG,
 ): void {
   // Find the best island
-  const best = islands.reduce((b, island) =>
-    island.bestObjective > b.bestObjective ? island : b,
-  );
+  const best = islands.reduce((b, island) => (island.bestObjective > b.bestObjective ? island : b));
 
   // Skip island to preserve diversity (random selection)
   const skipIdx = Math.floor(Math.random() * islands.length);
@@ -399,7 +434,9 @@ export function formatIslandStatus(islands: Island[]): string {
     const isBest = island.id === best.id;
     const icon = isBest ? "\u2605" : "\u25CB";
     const score = island.bestObjective === -Infinity ? "—" : island.bestObjective.toFixed(3);
-    lines.push(`  ${icon} Island ${island.id}: score ${score} | ${island.iterations} iters | ${island.improvements} improvements${isBest ? " (BEST)" : ""}`);
+    lines.push(
+      `  ${icon} Island ${island.id}: score ${score} | ${island.iterations} iters | ${island.improvements} improvements${isBest ? " (BEST)" : ""}`,
+    );
   }
 
   return lines.join("\n");

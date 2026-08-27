@@ -8,11 +8,7 @@
 import { describe, expect, test } from "bun:test";
 import parseKeypress from "./parse-keypress.ts";
 import type { MouseEvent } from "./parse-mouse.ts";
-import {
-  createTokenizer,
-  createInputPipeline,
-  type Token,
-} from "./stdin-tokenizer.ts";
+import { createTokenizer, createInputPipeline, type Token } from "./stdin-tokenizer.ts";
 
 // A deterministic, hand-fired timer scheduler for the pipeline's ESC / paste
 // timers. `fireAll` drains the currently-scheduled callbacks (re-arms land in a
@@ -302,11 +298,7 @@ describe("createInputPipeline — regression: ordinary keys route identically", 
 describe("token shape sanity", () => {
   test("tokenizer never emits an empty token", () => {
     const t = createTokenizer();
-    const all: Token[] = [
-      ...t.feed("a\x1b[Ab"),
-      ...t.feed("\x1b[<0;1;1M"),
-      ...t.flush(),
-    ];
+    const all: Token[] = [...t.feed("a\x1b[Ab"), ...t.feed("\x1b[<0;1;1M"), ...t.flush()];
     for (const tok of all) expect(tok.value.length).toBeGreaterThan(0);
   });
 });

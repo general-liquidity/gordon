@@ -141,17 +141,13 @@ export function computeVerdict(
   // ---- Layer 1: sample size + exposure ----
   checks.sampleSize = metrics.totalTrades >= thresholds.minTrades;
   if (!checks.sampleSize) {
-    violations.push(
-      `sample_size: ${metrics.totalTrades} trades < ${thresholds.minTrades} minimum`,
-    );
+    violations.push(`sample_size: ${metrics.totalTrades} trades < ${thresholds.minTrades} minimum`);
   }
 
   const exposurePct = approximateExposurePct(metrics, windowDays);
   checks.exposure = exposurePct >= thresholds.minExposurePct;
   if (!checks.exposure) {
-    violations.push(
-      `exposure: ${exposurePct.toFixed(1)}% < ${thresholds.minExposurePct}% minimum`,
-    );
+    violations.push(`exposure: ${exposurePct.toFixed(1)}% < ${thresholds.minExposurePct}% minimum`);
   }
 
   if (!checks.sampleSize || !checks.exposure) {
@@ -168,9 +164,7 @@ export function computeVerdict(
   const absDrawdown = Math.abs(metrics.maxDrawdown);
   checks.drawdownCap = absDrawdown <= thresholds.maxDrawdownPct;
   if (!checks.drawdownCap) {
-    violations.push(
-      `drawdown: ${absDrawdown.toFixed(1)}% > ${thresholds.maxDrawdownPct}% cap`,
-    );
+    violations.push(`drawdown: ${absDrawdown.toFixed(1)}% > ${thresholds.maxDrawdownPct}% cap`);
     return {
       verdict: "DISCARD_RISK",
       verdictLine: `[VERDICT] DISCARD (risk) — ${violations.join("; ")}`,
@@ -183,18 +177,14 @@ export function computeVerdict(
   // ---- Layer 2b: profit (risk-adjusted) ----
   checks.sharpe = metrics.sharpeRatio >= thresholds.minSharpe;
   if (!checks.sharpe) {
-    violations.push(
-      `sharpe: ${metrics.sharpeRatio.toFixed(2)} < ${thresholds.minSharpe} minimum`,
-    );
+    violations.push(`sharpe: ${metrics.sharpeRatio.toFixed(2)} < ${thresholds.minSharpe} minimum`);
   }
 
   // Calmar can be missing on short runs; treat missing as fail
   const calmar = Number.isFinite(metrics.calmarRatio) ? metrics.calmarRatio : 0;
   checks.calmar = calmar >= thresholds.minCalmar;
   if (!checks.calmar) {
-    violations.push(
-      `calmar: ${calmar.toFixed(2)} < ${thresholds.minCalmar} minimum`,
-    );
+    violations.push(`calmar: ${calmar.toFixed(2)} < ${thresholds.minCalmar} minimum`);
   }
 
   if (!checks.sharpe || !checks.calmar) {
@@ -233,15 +223,12 @@ export function computeVerdict(
  * unavailable — assumes roughly 4% of window is spent in-trade per trade, a
  * loose heuristic tuned to typical 4h-timeframe strategies.
  */
-function approximateExposurePct(
-  metrics: BacktestMetrics,
-  windowDays?: number,
-): number {
+function approximateExposurePct(metrics: BacktestMetrics, windowDays?: number): number {
   const days = windowDays ?? 90;
   const windowHours = days * 24;
   const avgDuration = metrics.avgTradeDuration ?? metrics.avgHoldingPeriod ?? 0;
   if (avgDuration > 0 && windowHours > 0) {
-    return Math.min(100, (avgDuration * metrics.totalTrades) / windowHours * 100);
+    return Math.min(100, ((avgDuration * metrics.totalTrades) / windowHours) * 100);
   }
   // Fallback heuristic — assumes each trade takes ~4% of a 90-day window
   return Math.min(100, metrics.totalTrades * 4);
@@ -252,8 +239,6 @@ function approximateExposurePct(
  * `verdictLine` for parsing. This is for UIs and logs.
  */
 export function formatVerdictSummary(result: VerdictResult): string {
-  const icon =
-    result.verdict === "ELIGIBLE" ? "✓" :
-    result.verdict === "CRASH" ? "✗" : "⚠";
+  const icon = result.verdict === "ELIGIBLE" ? "✓" : result.verdict === "CRASH" ? "✗" : "⚠";
   return `${icon} ${result.verdict}${result.violations.length ? ` — ${result.violations[0]}` : ""}`;
 }

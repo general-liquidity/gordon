@@ -6,29 +6,16 @@
  */
 
 import { assessBacktestCredibility } from "../../infra/trading/ops/backtestCredibility.ts";
-import {
-  geometricFromArithmetic,
-  volatilityDrag,
-} from "../../infra/trading/ops/volatilityDrag.ts";
-import {
-  calculateHurst,
-} from "../../infra/trading/ops/hurstExponent.ts";
-import {
-  decomposeReturns,
-} from "../../infra/trading/ops/performanceDecomposition.ts";
-import {
-  evaluateDecay,
-} from "../../infra/trading/ops/edgeDecayMonitor.ts";
+import { geometricFromArithmetic, volatilityDrag } from "../../infra/trading/ops/volatilityDrag.ts";
+import { calculateHurst } from "../../infra/trading/ops/hurstExponent.ts";
+import { decomposeReturns } from "../../infra/trading/ops/performanceDecomposition.ts";
+import { evaluateDecay } from "../../infra/trading/ops/edgeDecayMonitor.ts";
 import {
   isOperatorEquationEnabled,
   evaluateOperatorEquation,
 } from "../../infra/trading/ops/operatorEquation.ts";
-import {
-  empiricalKelly,
-} from "../../infra/trading/quant/empiricalKelly.ts";
-import {
-  kalmanVolatility,
-} from "../../infra/trading/quant/kalmanVolatility.ts";
+import { empiricalKelly } from "../../infra/trading/quant/empiricalKelly.ts";
+import { kalmanVolatility } from "../../infra/trading/quant/kalmanVolatility.ts";
 import {
   isBacktestTaxEnabled,
   applyBacktestTax,
@@ -50,7 +37,7 @@ import type {
  * Format a number with specified decimal places
  */
 function formatNumber(value: number, decimals = 2): string {
-  if (value === undefined || value === null || isNaN(value)) {
+  if (value === undefined || value === null || Number.isNaN(value)) {
     return "N/A";
   }
   return value.toFixed(decimals);
@@ -60,7 +47,7 @@ function formatNumber(value: number, decimals = 2): string {
  * Format a percentage value
  */
 function formatPercent(value: number, decimals = 2): string {
-  if (value === undefined || value === null || isNaN(value)) {
+  if (value === undefined || value === null || Number.isNaN(value)) {
     return "N/A";
   }
   const sign = value >= 0 ? "+" : "";
@@ -71,7 +58,7 @@ function formatPercent(value: number, decimals = 2): string {
  * Format a currency value
  */
 function formatCurrency(value: number, decimals = 2): string {
-  if (value === undefined || value === null || isNaN(value)) {
+  if (value === undefined || value === null || Number.isNaN(value)) {
     return "N/A";
   }
   const sign = value >= 0 ? "+" : "";
@@ -82,7 +69,7 @@ function formatCurrency(value: number, decimals = 2): string {
  * Format duration in hours to human readable string
  */
 function formatDuration(hours: number): string {
-  if (hours === undefined || hours === null || isNaN(hours)) {
+  if (hours === undefined || hours === null || Number.isNaN(hours)) {
     return "N/A";
   }
   if (hours < 1) {
@@ -117,8 +104,12 @@ function getRiskLevel(metrics: BacktestMetrics): "LOW" | "MEDIUM" | "HIGH" | "EX
 /**
  * Get color indicator for a metric value
  */
-function getMetricIndicator(value: number, thresholds: { good: number; bad: number }, higherIsBetter = true): string {
-  if (value === undefined || value === null || isNaN(value)) {
+function getMetricIndicator(
+  value: number,
+  thresholds: { good: number; bad: number },
+  higherIsBetter = true,
+): string {
+  if (value === undefined || value === null || Number.isNaN(value)) {
     return "";
   }
   if (higherIsBetter) {
@@ -170,12 +161,18 @@ export function formatBacktestResult(result: BacktestResult): string {
   lines.push("### Performance Metrics");
   lines.push(`| Metric | Value |`);
   lines.push(`|--------|-------|`);
-  lines.push(`| Total Return | ${formatPercent(metrics.totalReturn)}${getMetricIndicator(metrics.totalReturn, { good: 10, bad: 0 })} |`);
+  lines.push(
+    `| Total Return | ${formatPercent(metrics.totalReturn)}${getMetricIndicator(metrics.totalReturn, { good: 10, bad: 0 })} |`,
+  );
   lines.push(`| Net Profit | ${formatCurrency(metrics.netProfit)} |`);
   lines.push(`| Final Equity | $${formatNumber(metrics.finalValue)} |`);
   lines.push(`| CAGR | ${formatPercent(metrics.cagr)} |`);
-  lines.push(`| Max Drawdown | ${formatPercent(Math.abs(metrics.maxDrawdown) * -1)}${getMetricIndicator(metrics.maxDrawdown, { good: 10, bad: 25 }, false)} |`);
-  lines.push(`| Sharpe Ratio | ${formatNumber(metrics.sharpeRatio)}${getMetricIndicator(metrics.sharpeRatio, { good: 1.5, bad: 0.5 })} |`);
+  lines.push(
+    `| Max Drawdown | ${formatPercent(Math.abs(metrics.maxDrawdown) * -1)}${getMetricIndicator(metrics.maxDrawdown, { good: 10, bad: 25 }, false)} |`,
+  );
+  lines.push(
+    `| Sharpe Ratio | ${formatNumber(metrics.sharpeRatio)}${getMetricIndicator(metrics.sharpeRatio, { good: 1.5, bad: 0.5 })} |`,
+  );
   lines.push(`| Sortino Ratio | ${formatNumber(metrics.sortinoRatio)} |`);
   lines.push(`| Calmar Ratio | ${formatNumber(metrics.calmarRatio)} |`);
   lines.push(`| Volatility | ${formatPercent(metrics.volatility)} |`);
@@ -186,17 +183,23 @@ export function formatBacktestResult(result: BacktestResult): string {
   lines.push(`| Metric | Value |`);
   lines.push(`|--------|-------|`);
   lines.push(`| Total Trades | ${metrics.totalTrades} |`);
-  lines.push(`| Win Rate | ${formatPercent(metrics.winRate * 100)}${getMetricIndicator(metrics.winRate * 100, { good: 50, bad: 35 })} |`);
+  lines.push(
+    `| Win Rate | ${formatPercent(metrics.winRate * 100)}${getMetricIndicator(metrics.winRate * 100, { good: 50, bad: 35 })} |`,
+  );
   lines.push(`| Winning Trades | ${metrics.winningTrades} |`);
   lines.push(`| Losing Trades | ${metrics.losingTrades} |`);
-  lines.push(`| Profit Factor | ${formatNumber(metrics.profitFactor)}${getMetricIndicator(metrics.profitFactor, { good: 1.5, bad: 1 })} |`);
+  lines.push(
+    `| Profit Factor | ${formatNumber(metrics.profitFactor)}${getMetricIndicator(metrics.profitFactor, { good: 1.5, bad: 1 })} |`,
+  );
   lines.push(`| Average Trade | ${formatCurrency(metrics.averageTrade)} |`);
   lines.push(`| Average Win | ${formatCurrency(metrics.averageWin)} |`);
   lines.push(`| Average Loss | ${formatCurrency(metrics.averageLoss)} |`);
   lines.push(`| Expectancy | ${formatCurrency(metrics.expectancy)} |`);
   lines.push(`| Avg Duration | ${formatDuration(metrics.avgTradeDuration)} |`);
   lines.push(`| Max Consecutive Wins | ${metrics.maxConsecutiveWins} |`);
-  lines.push(`| Max Consecutive Losses | ${metrics.maxConsecutiveLosses}${getMetricIndicator(metrics.maxConsecutiveLosses, { good: 3, bad: 7 }, false)} |`);
+  lines.push(
+    `| Max Consecutive Losses | ${metrics.maxConsecutiveLosses}${getMetricIndicator(metrics.maxConsecutiveLosses, { good: 3, bad: 7 }, false)} |`,
+  );
   lines.push(`| Total Fees | ${formatCurrency(metrics.totalFees * -1)} |`);
   lines.push("");
 
@@ -209,13 +212,19 @@ export function formatBacktestResult(result: BacktestResult): string {
   if (riskLevel === "HIGH" || riskLevel === "EXTREME") {
     lines.push("> **Warning:** This strategy shows elevated risk characteristics.");
     if (metrics.maxDrawdown > 20) {
-      lines.push(`> - Maximum drawdown of ${formatPercent(metrics.maxDrawdown)} exceeds safe threshold`);
+      lines.push(
+        `> - Maximum drawdown of ${formatPercent(metrics.maxDrawdown)} exceeds safe threshold`,
+      );
     }
     if (metrics.sharpeRatio < 0.5) {
-      lines.push(`> - Sharpe ratio of ${formatNumber(metrics.sharpeRatio)} indicates poor risk-adjusted returns`);
+      lines.push(
+        `> - Sharpe ratio of ${formatNumber(metrics.sharpeRatio)} indicates poor risk-adjusted returns`,
+      );
     }
     if (metrics.maxConsecutiveLosses > 6) {
-      lines.push(`> - ${metrics.maxConsecutiveLosses} consecutive losses could deplete capital quickly`);
+      lines.push(
+        `> - ${metrics.maxConsecutiveLosses} consecutive losses could deplete capital quickly`,
+      );
     }
     lines.push("");
   }
@@ -228,7 +237,7 @@ export function formatBacktestResult(result: BacktestResult): string {
     const recentTrades = trades.slice(-5);
     for (const trade of recentTrades) {
       lines.push(
-        `| ${trade.entryTime.slice(0, 10)} | $${formatNumber(trade.entryPrice)} | $${formatNumber(trade.exitPrice)} | ${formatPercent(trade.pnlPercent)} | ${trade.exitReason} |`
+        `| ${trade.entryTime.slice(0, 10)} | $${formatNumber(trade.entryPrice)} | $${formatNumber(trade.exitPrice)} | ${formatPercent(trade.pnlPercent)} | ${trade.exitReason} |`,
       );
     }
     lines.push("");
@@ -264,7 +273,16 @@ export function formatBacktestResult(result: BacktestResult): string {
  *   - Performance comparison
  */
 export function formatOptimizationResult(result: OptimizationResult): string {
-  const { strategyId, symbol, timeframe, bestParameters, bestMetrics, topCombinations, totalCombinations, executionTime } = result;
+  const {
+    strategyId,
+    symbol,
+    timeframe,
+    bestParameters,
+    bestMetrics,
+    topCombinations,
+    totalCombinations,
+    executionTime,
+  } = result;
   const lines: string[] = [];
 
   // Header
@@ -300,7 +318,13 @@ export function formatOptimizationResult(result: OptimizationResult): string {
   // Build header row with parameter names
   const paramNames = Object.keys(bestParameters);
   const headerRow = ["Rank", ...paramNames, "Return", "Sharpe", "Win Rate"].join(" | ");
-  const separatorRow = ["----", ...paramNames.map(() => "------"), "------", "------", "--------"].join(" | ");
+  const separatorRow = [
+    "----",
+    ...paramNames.map(() => "------"),
+    "------",
+    "------",
+    "--------",
+  ].join(" | ");
 
   lines.push(`| ${headerRow} |`);
   lines.push(`| ${separatorRow} |`);
@@ -370,7 +394,7 @@ export function formatComparisonResult(result: ComparisonResult): string {
     const suffix = isBest ? "** [BEST]" : "";
 
     lines.push(
-      `| ${prefix}${backtest.strategyName}${suffix} | ${formatPercent(m.totalReturn)} | ${formatNumber(m.sharpeRatio)} | ${formatPercent(m.maxDrawdown * -1)} | ${formatPercent(m.winRate * 100)} | ${m.totalTrades} | ${formatNumber(m.profitFactor)} |`
+      `| ${prefix}${backtest.strategyName}${suffix} | ${formatPercent(m.totalReturn)} | ${formatNumber(m.sharpeRatio)} | ${formatPercent(m.maxDrawdown * -1)} | ${formatPercent(m.winRate * 100)} | ${m.totalTrades} | ${formatNumber(m.profitFactor)} |`,
     );
   }
   lines.push("");
@@ -412,7 +436,9 @@ export function formatComparisonResult(result: ComparisonResult): string {
   if (bestResult) {
     lines.push("### Recommendation");
     lines.push("");
-    lines.push(`**${bestResult.strategyName}** is the best overall performer based on a balanced score of:`);
+    lines.push(
+      `**${bestResult.strategyName}** is the best overall performer based on a balanced score of:`,
+    );
     lines.push(`- Return: ${formatPercent(bestResult.metrics.totalReturn)}`);
     lines.push(`- Sharpe: ${formatNumber(bestResult.metrics.sharpeRatio)}`);
     lines.push(`- Max DD: ${formatPercent(bestResult.metrics.maxDrawdown * -1)}`);
@@ -532,8 +558,7 @@ export function formatBacktestSummary(
       extra += `\n  Credibility: PSR ${psr}, DSR ${dsr}, ${verdict}`;
 
       const mean = returns.reduce((s, r) => s + r, 0) / returns.length;
-      const variance =
-        returns.reduce((s, r) => s + (r - mean) * (r - mean), 0) / returns.length;
+      const variance = returns.reduce((s, r) => s + (r - mean) * (r - mean), 0) / returns.length;
       const sigma = Math.sqrt(variance);
 
       {
@@ -586,9 +611,10 @@ export function formatBacktestSummary(
         const wins = metrics.winningTrades;
         const losses = metrics.losingTrades;
         const winRate = wins / Math.max(wins + losses, 1);
-        const payoff = metrics.averageWin > 0 && metrics.averageLoss !== 0
-          ? metrics.averageWin / Math.abs(metrics.averageLoss)
-          : 0;
+        const payoff =
+          metrics.averageWin > 0 && metrics.averageLoss !== 0
+            ? metrics.averageWin / Math.abs(metrics.averageLoss)
+            : 0;
         if (winRate > 0 && payoff > 0) {
           const taxed = applyBacktestTax({ stats: { winRate, payoffRatio: payoff } });
           const evAfter = expectedRAfterTax(taxed);
@@ -605,9 +631,10 @@ export function formatBacktestSummary(
         const wins = metrics.winningTrades;
         const losses = metrics.losingTrades;
         const winRate = wins / Math.max(wins + losses, 1);
-        const payoff = metrics.averageWin > 0 && metrics.averageLoss !== 0
-          ? metrics.averageWin / Math.abs(metrics.averageLoss)
-          : 0;
+        const payoff =
+          metrics.averageWin > 0 && metrics.averageLoss !== 0
+            ? metrics.averageWin / Math.abs(metrics.averageLoss)
+            : 0;
         if (winRate > 0 && payoff > 0) {
           const ek = empiricalKelly({
             winRate,

@@ -12,17 +12,15 @@
  * layer (`executeWithFailover`) can move to the next candidate.
  */
 
-import { z } from "zod";
+import type { z } from "zod";
 import { Agent } from "@mastra/core/agent";
-import type {
-  LLMClientConfig,
-  LLMProvider,
-  LLMResponse,
-  Message,
-  ModelConfig,
-} from "./types.ts";
+import type { LLMClientConfig, LLMProvider, LLMResponse, Message, ModelConfig } from "./types.ts";
 import { GORDON_MODELS } from "./types.ts";
-import { getMastraModel, getActiveRoute, type MastraModelConfig } from "../../runtime/providers/registry.ts";
+import {
+  getMastraModel,
+  getActiveRoute,
+  type MastraModelConfig,
+} from "../../runtime/providers/registry.ts";
 import { providerCacheHints } from "./providerCaching.ts";
 import { isCostHalted } from "../../platform/costTracker.ts";
 
@@ -97,7 +95,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 function getBackoffDelay(attempt: number, initialDelayMs: number): number {
-  const delay = initialDelayMs * Math.pow(2, attempt);
+  const delay = initialDelayMs * 2 ** attempt;
   const jitter = Math.random() * 0.3 * delay;
   return Math.min(delay + jitter, MAX_RETRY_DELAY_MS);
 }
@@ -173,7 +171,12 @@ export class LLMClient {
     systemBlocks?: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }>,
   ): Promise<LLMResponse> {
     if (isCostHalted()) {
-      throw new LLMError("Cost budget halted — LLM dispatch blocked", 402, "cost_halt", config.provider);
+      throw new LLMError(
+        "Cost budget halted — LLM dispatch blocked",
+        402,
+        "cost_halt",
+        config.provider,
+      );
     }
 
     const spec = getMastraModel(config.provider, config.model);
@@ -189,17 +192,25 @@ export class LLMClient {
 
     // Anthropic first-party prompt caching still applies on the direct path:
     // mark the stable system prefix as a cache breakpoint when present.
-    const cacheHints = systemBlocks && systemBlocks.length > 0
-      ? providerCacheHints(config.provider as never)
-      : undefined;
+    const cacheHints =
+      systemBlocks && systemBlocks.length > 0
+        ? providerCacheHints(config.provider as never)
+        : undefined;
 
     const convo = messages
       .filter((m) => m.role !== "system")
       .map((m) => ({ role: m.role, content: m.content }));
 
-    const systemMessage = systemText.length > 0
-      ? [{ role: "system" as const, content: systemText, ...(cacheHints ? { providerOptions: cacheHints } : {}) }]
-      : [];
+    const systemMessage =
+      systemText.length > 0
+        ? [
+            {
+              role: "system" as const,
+              content: systemText,
+              ...(cacheHints ? { providerOptions: cacheHints } : {}),
+            },
+          ]
+        : [];
 
     const agent = this.agentFor(spec);
 
@@ -236,7 +247,13 @@ export class LLMClient {
           continue;
         }
         const message = error instanceof Error ? error.message : String(error);
-        throw new ProviderExhaustedError(message, 0, "generation_error", config.provider, attempt + 1);
+        throw new ProviderExhaustedError(
+          message,
+          0,
+          "generation_error",
+          config.provider,
+          attempt + 1,
+        );
       }
     }
   }
@@ -314,9 +331,7 @@ export class LLMClient {
     const modifiedMessages = hasJsonInstruction
       ? messages
       : messages.map((m) =>
-          m.role === "system"
-            ? { ...m, content: `${m.content}\n\nRespond with valid JSON.` }
-            : m,
+          m.role === "system" ? { ...m, content: `${m.content}\n\nRespond with valid JSON.` } : m,
         );
 
     const llmResponse = await this.generate(
@@ -356,14 +371,22 @@ export class LLMClient {
    * Convenience method for intent parsing (fast, cheap)
    */
   async parseIntent<T>(messages: Message[], schema: z.ZodSchema<T>): Promise<T> {
-    return this.chatWithJSON(messages, schema, this.resolvePresetConfig(GORDON_MODELS.intentParsing));
+    return this.chatWithJSON(
+      messages,
+      schema,
+      this.resolvePresetConfig(GORDON_MODELS.intentParsing),
+    );
   }
 
   /**
    * Convenience method for plan generation (reasoning)
    */
   async generatePlan<T>(messages: Message[], schema: z.ZodSchema<T>): Promise<T> {
-    return this.chatWithJSON(messages, schema, this.resolvePresetConfig(GORDON_MODELS.planGeneration));
+    return this.chatWithJSON(
+      messages,
+      schema,
+      this.resolvePresetConfig(GORDON_MODELS.planGeneration),
+    );
   }
 
   /**
@@ -390,7 +413,9 @@ export class LLMClient {
    * Get list of available providers (env keys present).
    */
   getAvailableProviders(): LLMProvider[] {
-    return (["openai", "anthropic", "google", "xai"] as LLMProvider[]).filter((p) => this.hasProvider(p));
+    return (["openai", "anthropic", "google", "xai"] as LLMProvider[]).filter((p) =>
+      this.hasProvider(p),
+    );
   }
 }
 

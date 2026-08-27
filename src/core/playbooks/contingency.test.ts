@@ -190,9 +190,7 @@ describe("validateContingencyPlan", () => {
 
   it("errors on an inverted [low, high] pair", () => {
     const plan = samplePlan();
-    plan.branches[1]!.triggers = [
-      { metric: "vix", operator: "between", threshold: [25, 15] },
-    ];
+    plan.branches[1]!.triggers = [{ metric: "vix", operator: "between", threshold: [25, 15] }];
     const v = validateContingencyPlan(plan);
     expect(v.valid).toBe(false);
     expect(v.errors.some((e) => e.includes("low 25 > high 15"))).toBe(true);

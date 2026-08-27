@@ -248,19 +248,18 @@ export async function getEarningsEstimates(
   symbol: string,
   freq: "quarterly" | "annual" = "quarterly",
 ): Promise<FinnhubEarningsEstimate[]> {
-  const res = await finnhubGet<{ data?: FinnhubEarningsEstimate[] }>(
-    "/stock/eps-estimate",
-    { symbol, freq },
-  );
+  const res = await finnhubGet<{ data?: FinnhubEarningsEstimate[] }>("/stock/eps-estimate", {
+    symbol,
+    freq,
+  });
   if (!res.ok) return [];
   return res.data.data ?? [];
 }
 
 /** Economic calendar — macro releases across major economies. */
-export async function getEconomicCalendar(options: {
-  from?: string;
-  to?: string;
-} = {}): Promise<FinnhubEconomicEvent[]> {
+export async function getEconomicCalendar(
+  options: { from?: string; to?: string } = {},
+): Promise<FinnhubEconomicEvent[]> {
   const res = await finnhubGet<{ economicCalendar?: FinnhubEconomicEvent[] }>(
     "/calendar/economic",
     options,
@@ -299,10 +298,7 @@ export async function getCongressionalTrading(
 export async function getRecommendationTrends(
   symbol: string,
 ): Promise<FinnhubRecommendationTrend[]> {
-  const res = await finnhubGet<FinnhubRecommendationTrend[]>(
-    "/stock/recommendation",
-    { symbol },
-  );
+  const res = await finnhubGet<FinnhubRecommendationTrend[]>("/stock/recommendation", { symbol });
   if (!res.ok) return [];
   return res.data ?? [];
 }
@@ -312,29 +308,20 @@ export async function getSecFilings(
   symbol: string,
   options: { form?: string; from?: string; to?: string } = {},
 ): Promise<FinnhubSecFiling[]> {
-  const res = await finnhubGet<FinnhubSecFiling[]>(
-    "/stock/filings",
-    { symbol, ...options },
-  );
+  const res = await finnhubGet<FinnhubSecFiling[]>("/stock/filings", { symbol, ...options });
   if (!res.ok) return [];
   return res.data ?? [];
 }
 
 /** Aggregate news sentiment for a symbol (buzz + bullish/bearish percent). */
 export async function getNewsSentiment(symbol: string): Promise<FinnhubNewsSentiment | null> {
-  const res = await finnhubGet<FinnhubNewsSentiment>(
-    "/news-sentiment",
-    { symbol },
-  );
+  const res = await finnhubGet<FinnhubNewsSentiment>("/news-sentiment", { symbol });
   return res.ok ? res.data : null;
 }
 
 /** ETF holdings — constituent weights. Useful for detecting ETF inclusion/exclusion flow. */
 export async function getEtfHoldings(symbol: string): Promise<FinnhubEtfHolding[]> {
-  const res = await finnhubGet<{ holdings?: FinnhubEtfHolding[] }>(
-    "/etf/holdings",
-    { symbol },
-  );
+  const res = await finnhubGet<{ holdings?: FinnhubEtfHolding[] }>("/etf/holdings", { symbol });
   if (!res.ok) return [];
   return res.data.holdings ?? [];
 }
@@ -422,7 +409,7 @@ export interface FinnhubEarningsSurprise {
 
 export async function getEarningsSurprises(symbol: string): Promise<FinnhubEarningsSurprise[]> {
   const res = await finnhubGet<FinnhubEarningsSurprise[]>("/stock/earnings", { symbol });
-  return res.ok ? res.data ?? [] : [];
+  return res.ok ? (res.data ?? []) : [];
 }
 
 export interface FinnhubRevenueEstimate {
@@ -450,7 +437,7 @@ export async function getPeerCompanies(
   grouping: "industry" | "sector" | "subIndustry" = "industry",
 ): Promise<string[]> {
   const res = await finnhubGet<string[]>("/stock/peers", { symbol, grouping });
-  return res.ok ? res.data ?? [] : [];
+  return res.ok ? (res.data ?? []) : [];
 }
 
 export interface FinnhubDividend {
@@ -470,7 +457,7 @@ export async function getDividends(
   options: { from?: string; to?: string } = {},
 ): Promise<FinnhubDividend[]> {
   const res = await finnhubGet<FinnhubDividend[]>("/stock/dividend2", { symbol, ...options });
-  return res.ok ? res.data ?? [] : [];
+  return res.ok ? (res.data ?? []) : [];
 }
 
 export interface FinnhubSplit {
@@ -485,7 +472,7 @@ export async function getSplits(
   options: { from?: string; to?: string } = {},
 ): Promise<FinnhubSplit[]> {
   const res = await finnhubGet<FinnhubSplit[]>("/stock/split", { symbol, ...options });
-  return res.ok ? res.data ?? [] : [];
+  return res.ok ? (res.data ?? []) : [];
 }
 
 // ============================================================================
@@ -523,7 +510,7 @@ export async function getUpgradeDowngrade(
     symbol,
     ...options,
   });
-  return res.ok ? res.data ?? [] : [];
+  return res.ok ? (res.data ?? []) : [];
 }
 
 export interface FinnhubInsiderSentiment {
@@ -736,9 +723,10 @@ export interface FinnhubSupplyChainRelationship {
   twoWeekCorrelation: number;
 }
 
-export async function getSupplyChain(
-  symbol: string,
-): Promise<{ suppliers: FinnhubSupplyChainRelationship[]; customers: FinnhubSupplyChainRelationship[] }> {
+export async function getSupplyChain(symbol: string): Promise<{
+  suppliers: FinnhubSupplyChainRelationship[];
+  customers: FinnhubSupplyChainRelationship[];
+}> {
   const res = await finnhubGet<{
     data?: Array<FinnhubSupplyChainRelationship & { type: "supplier" | "customer" }>;
   }>("/stock/supply-chain", { symbol });
@@ -773,9 +761,12 @@ export interface FinnhubTranscriptMeta {
 }
 
 export async function listTranscripts(symbol: string): Promise<FinnhubTranscriptMeta[]> {
-  const res = await finnhubGet<{ transcripts?: FinnhubTranscriptMeta[] }>("/stock/transcripts/list", {
-    symbol,
-  });
+  const res = await finnhubGet<{ transcripts?: FinnhubTranscriptMeta[] }>(
+    "/stock/transcripts/list",
+    {
+      symbol,
+    },
+  );
   if (!res.ok) return [];
   return res.data.transcripts ?? [];
 }
@@ -810,7 +801,10 @@ export interface FinnhubIpoEntry {
   totalSharesValue: number;
 }
 
-export async function getIpoCalendar(options: { from: string; to: string }): Promise<FinnhubIpoEntry[]> {
+export async function getIpoCalendar(options: {
+  from: string;
+  to: string;
+}): Promise<FinnhubIpoEntry[]> {
   const res = await finnhubGet<{ ipoCalendar?: FinnhubIpoEntry[] }>("/calendar/ipo", options);
   if (!res.ok) return [];
   return res.data.ipoCalendar ?? [];
@@ -870,7 +864,7 @@ export interface FinnhubSymbolEntry {
 
 export async function getStockSymbols(exchange: string): Promise<FinnhubSymbolEntry[]> {
   const res = await finnhubGet<FinnhubSymbolEntry[]>("/stock/symbol", { exchange });
-  return res.ok ? res.data ?? [] : [];
+  return res.ok ? (res.data ?? []) : [];
 }
 
 export interface FinnhubSymbolLookupResult {
@@ -881,7 +875,9 @@ export interface FinnhubSymbolLookupResult {
 }
 
 export async function symbolLookup(q: string): Promise<FinnhubSymbolLookupResult[]> {
-  const res = await finnhubGet<{ count: number; result?: FinnhubSymbolLookupResult[] }>("/search", { q });
+  const res = await finnhubGet<{ count: number; result?: FinnhubSymbolLookupResult[] }>("/search", {
+    q,
+  });
   if (!res.ok) return [];
   return res.data.result ?? [];
 }
@@ -895,7 +891,9 @@ export interface FinnhubMarketStatus {
   t: number;
 }
 
-export async function getMarketStatus(exchange: string = "US"): Promise<FinnhubMarketStatus | null> {
+export async function getMarketStatus(
+  exchange: string = "US",
+): Promise<FinnhubMarketStatus | null> {
   const res = await finnhubGet<FinnhubMarketStatus>("/stock/market-status", { exchange });
   return res.ok ? res.data : null;
 }
@@ -921,7 +919,7 @@ export async function getCompanyNews(
   options: { from: string; to: string },
 ): Promise<FinnhubNewsArticle[]> {
   const res = await finnhubGet<FinnhubNewsArticle[]>("/company-news", { symbol, ...options });
-  return res.ok ? res.data ?? [] : [];
+  return res.ok ? (res.data ?? []) : [];
 }
 
 export async function getMarketNews(
@@ -929,7 +927,7 @@ export async function getMarketNews(
   minId?: number,
 ): Promise<FinnhubNewsArticle[]> {
   const res = await finnhubGet<FinnhubNewsArticle[]>("/news", { category, minId });
-  return res.ok ? res.data ?? [] : [];
+  return res.ok ? (res.data ?? []) : [];
 }
 
 // ============================================================================
@@ -1045,13 +1043,17 @@ export interface FinnhubEtfExposureEntry {
 }
 
 export async function getEtfCountryExposure(symbol: string): Promise<FinnhubEtfExposureEntry[]> {
-  const res = await finnhubGet<{ countryExposure?: FinnhubEtfExposureEntry[] }>("/etf/country", { symbol });
+  const res = await finnhubGet<{ countryExposure?: FinnhubEtfExposureEntry[] }>("/etf/country", {
+    symbol,
+  });
   if (!res.ok) return [];
   return res.data.countryExposure ?? [];
 }
 
 export async function getEtfSectorExposure(symbol: string): Promise<FinnhubEtfExposureEntry[]> {
-  const res = await finnhubGet<{ sectorExposure?: FinnhubEtfExposureEntry[] }>("/etf/sector", { symbol });
+  const res = await finnhubGet<{ sectorExposure?: FinnhubEtfExposureEntry[] }>("/etf/sector", {
+    symbol,
+  });
   if (!res.ok) return [];
   return res.data.sectorExposure ?? [];
 }
@@ -1072,8 +1074,12 @@ export interface FinnhubMutualFundProfile {
   currency?: string;
 }
 
-export async function getMutualFundProfile(symbol: string): Promise<FinnhubMutualFundProfile | null> {
-  const res = await finnhubGet<{ profile?: FinnhubMutualFundProfile }>("/mutual-fund/profile", { symbol });
+export async function getMutualFundProfile(
+  symbol: string,
+): Promise<FinnhubMutualFundProfile | null> {
+  const res = await finnhubGet<{ profile?: FinnhubMutualFundProfile }>("/mutual-fund/profile", {
+    symbol,
+  });
   if (!res.ok) return null;
   return res.data.profile ?? null;
 }
@@ -1089,12 +1095,16 @@ export interface FinnhubMutualFundHolding {
 }
 
 export async function getMutualFundHoldings(symbol: string): Promise<FinnhubMutualFundHolding[]> {
-  const res = await finnhubGet<{ holdings?: FinnhubMutualFundHolding[] }>("/mutual-fund/holdings", { symbol });
+  const res = await finnhubGet<{ holdings?: FinnhubMutualFundHolding[] }>("/mutual-fund/holdings", {
+    symbol,
+  });
   if (!res.ok) return [];
   return res.data.holdings ?? [];
 }
 
-export async function getMutualFundCountryExposure(symbol: string): Promise<FinnhubEtfExposureEntry[]> {
+export async function getMutualFundCountryExposure(
+  symbol: string,
+): Promise<FinnhubEtfExposureEntry[]> {
   const res = await finnhubGet<{ countryExposure?: FinnhubEtfExposureEntry[] }>(
     "/mutual-fund/country",
     { symbol },
@@ -1103,7 +1113,9 @@ export async function getMutualFundCountryExposure(symbol: string): Promise<Finn
   return res.data.countryExposure ?? [];
 }
 
-export async function getMutualFundSectorExposure(symbol: string): Promise<FinnhubEtfExposureEntry[]> {
+export async function getMutualFundSectorExposure(
+  symbol: string,
+): Promise<FinnhubEtfExposureEntry[]> {
   const res = await finnhubGet<{ sectorExposure?: FinnhubEtfExposureEntry[] }>(
     "/mutual-fund/sector",
     { symbol },
@@ -1162,7 +1174,7 @@ export async function getBondProfile(isin: string): Promise<FinnhubBondProfile |
 
 export async function getCryptoExchanges(): Promise<string[]> {
   const res = await finnhubGet<string[]>("/crypto/exchange", {});
-  return res.ok ? res.data ?? [] : [];
+  return res.ok ? (res.data ?? []) : [];
 }
 
 export interface FinnhubCryptoSymbol {
@@ -1173,7 +1185,7 @@ export interface FinnhubCryptoSymbol {
 
 export async function getCryptoSymbols(exchange: string): Promise<FinnhubCryptoSymbol[]> {
   const res = await finnhubGet<FinnhubCryptoSymbol[]>("/crypto/symbol", { exchange });
-  return res.ok ? res.data ?? [] : [];
+  return res.ok ? (res.data ?? []) : [];
 }
 
 export async function getCryptoCandles(
@@ -1213,12 +1225,12 @@ export async function getCryptoProfile(symbol: string): Promise<FinnhubCryptoPro
 
 export async function getForexExchanges(): Promise<string[]> {
   const res = await finnhubGet<string[]>("/forex/exchange", {});
-  return res.ok ? res.data ?? [] : [];
+  return res.ok ? (res.data ?? []) : [];
 }
 
 export async function getForexSymbols(exchange: string): Promise<FinnhubCryptoSymbol[]> {
   const res = await finnhubGet<FinnhubCryptoSymbol[]>("/forex/symbol", { exchange });
-  return res.ok ? res.data ?? [] : [];
+  return res.ok ? (res.data ?? []) : [];
 }
 
 export async function getForexCandles(
@@ -1254,7 +1266,7 @@ export interface FinnhubEconomicCode {
 
 export async function listEconomicCodes(): Promise<FinnhubEconomicCode[]> {
   const res = await finnhubGet<FinnhubEconomicCode[]>("/economic-code", {});
-  return res.ok ? res.data ?? [] : [];
+  return res.ok ? (res.data ?? []) : [];
 }
 
 export interface FinnhubEconomicSeries {

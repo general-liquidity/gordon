@@ -12,7 +12,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* */ }
+  try {
+    rmSync(tempDir, { recursive: true, force: true });
+  } catch {
+    /* */
+  }
 });
 
 interface FsCall {
@@ -21,9 +25,10 @@ interface FsCall {
   content?: string;
 }
 
-function makeFakeConnection(
-  readResponder?: (path: string) => string,
-): { connection: AgentSideConnection; calls: FsCall[] } {
+function makeFakeConnection(readResponder?: (path: string) => string): {
+  connection: AgentSideConnection;
+  calls: FsCall[];
+} {
   const calls: FsCall[] = [];
   const fake = {
     readTextFile: async ({ path }: { path: string }) => {

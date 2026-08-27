@@ -91,8 +91,9 @@ export class TastytradeAdapter implements BrokerAdapter {
   constructor(credentials: BrokerCredentials) {
     this.credentials = credentials;
     this.isPaper = credentials.paper ?? true;
-    this.baseUrl = credentials.baseUrl
-      || (this.isPaper ? DEFAULT_TASTYTRADE_PAPER_BASE_URL : DEFAULT_TASTYTRADE_LIVE_BASE_URL);
+    this.baseUrl =
+      credentials.baseUrl ||
+      (this.isPaper ? DEFAULT_TASTYTRADE_PAPER_BASE_URL : DEFAULT_TASTYTRADE_LIVE_BASE_URL);
     this.accountIdCache = credentials.accountId;
   }
 
@@ -132,10 +133,12 @@ export class TastytradeAdapter implements BrokerAdapter {
       const body = await response.text();
       const safeBody = redactString(body).slice(0, 500);
       const details = safeBody.trim() ? `: ${safeBody}` : "";
-      throw new Error(`tastytrade session creation failed (${response.status} ${response.statusText})${details}`);
+      throw new Error(
+        `tastytrade session creation failed (${response.status} ${response.statusText})${details}`,
+      );
     }
 
-    const payload = await response.json() as unknown;
+    const payload = (await response.json()) as unknown;
     const token = String(findFirstValue(payload, ["session-token", "sessionToken"]) ?? "").trim();
     if (!token) {
       throw new Error("tastytrade session token was missing from /sessions response");
@@ -168,7 +171,13 @@ export class TastytradeAdapter implements BrokerAdapter {
         headers,
       });
 
-      if (response.status === 401 && auth && allowRetry && retryOnAuth && !this.credentials.isOAuth) {
+      if (
+        response.status === 401 &&
+        auth &&
+        allowRetry &&
+        retryOnAuth &&
+        !this.credentials.isOAuth
+      ) {
         this.sessionToken = undefined;
         await this.createSession(true);
         return execute(false);
@@ -219,12 +228,18 @@ export class TastytradeAdapter implements BrokerAdapter {
     const rows = findFirstArray(root) ?? [];
     const first = rows.find(Boolean);
     const accountId = String(
-      findFirstValue(first ?? root, ["account-number", "accountNumber", "account-number-short", "id"])
-      ?? "",
+      findFirstValue(first ?? root, [
+        "account-number",
+        "accountNumber",
+        "account-number-short",
+        "id",
+      ]) ?? "",
     ).trim();
 
     if (!accountId) {
-      throw new Error("tastytrade account ID could not be resolved. Set TASTYTRADE_ACCOUNT_ID if needed.");
+      throw new Error(
+        "tastytrade account ID could not be resolved. Set TASTYTRADE_ACCOUNT_ID if needed.",
+      );
     }
 
     this.accountIdCache = accountId;
@@ -248,7 +263,8 @@ export class TastytradeAdapter implements BrokerAdapter {
       limitPrice: raw.price !== undefined ? parseNumber(raw.price) : undefined,
       stopPrice: raw["stop-trigger"] !== undefined ? parseNumber(raw["stop-trigger"]) : undefined,
       extendedHours: false,
-      submittedAt: String(raw["received-at"] ?? raw.createdAt ?? raw.submittedAt ?? "").trim() || undefined,
+      submittedAt:
+        String(raw["received-at"] ?? raw.createdAt ?? raw.submittedAt ?? "").trim() || undefined,
       filledAt: String(raw["filled-at"] ?? raw.filledAt ?? "").trim() || undefined,
       canceledAt: String(raw["cancelled-at"] ?? raw.canceledAt ?? "").trim() || undefined,
     };
@@ -267,8 +283,12 @@ export class TastytradeAdapter implements BrokerAdapter {
     try {
       const payload = await this.request<unknown>("/market-sessions");
       const root = unwrapPayload(payload);
-      const timestamp = String(findFirstValue(root, ["timestamp", "time", "dateTime"]) ?? new Date().toISOString());
-      const isOpen = parseBoolean(findFirstValue(root, ["isOpen", "is-open", "open", "marketOpen"]));
+      const timestamp = String(
+        findFirstValue(root, ["timestamp", "time", "dateTime"]) ?? new Date().toISOString(),
+      );
+      const isOpen = parseBoolean(
+        findFirstValue(root, ["isOpen", "is-open", "open", "marketOpen"]),
+      );
       const nextOpen = String(findFirstValue(root, ["nextOpen", "next-open"]) ?? timestamp);
       const nextClose = String(findFirstValue(root, ["nextClose", "next-close"]) ?? timestamp);
       return { timestamp, isOpen, nextOpen, nextClose };
@@ -279,25 +299,39 @@ export class TastytradeAdapter implements BrokerAdapter {
 
   async getAccount(): Promise<BrokerAccount> {
     const accountId = await this.resolveAccountId();
-    const payload = await this.request<unknown>(`/accounts/${encodeURIComponent(accountId)}/balances`);
+    const payload = await this.request<unknown>(
+      `/accounts/${encodeURIComponent(accountId)}/balances`,
+    );
     const root = unwrapPayload(payload);
 
     return {
       id: String(findFirstValue(root, ["account-number", "accountNumber", "id"]) ?? accountId),
-      status: String(findFirstValue(root, ["status", "account-status", "accountStatus"]) ?? "ACTIVE"),
+      status: String(
+        findFirstValue(root, ["status", "account-status", "accountStatus"]) ?? "ACTIVE",
+      ),
       currency: String(findFirstValue(root, ["currency", "base-currency"]) ?? "USD"),
       cash: parseNumber(findFirstValue(root, ["cash-balance", "cashBalance", "cash"])),
-      buyingPower: parseNumber(findFirstValue(root, ["buying-power", "buyingPower", "availableFunds"])),
-      portfolioValue: parseNumber(findFirstValue(root, ["net-liquidating-value", "netLiquidatingValue", "equity"])),
-      patternDayTrader: parseBoolean(findFirstValue(root, ["is-pattern-day-trader", "patternDayTrader"])),
-      shortingEnabled: parseBoolean(findFirstValue(root, ["shorting-enabled", "shortingEnabled", "canShort"])) || true,
+      buyingPower: parseNumber(
+        findFirstValue(root, ["buying-power", "buyingPower", "availableFunds"]),
+      ),
+      portfolioValue: parseNumber(
+        findFirstValue(root, ["net-liquidating-value", "netLiquidatingValue", "equity"]),
+      ),
+      patternDayTrader: parseBoolean(
+        findFirstValue(root, ["is-pattern-day-trader", "patternDayTrader"]),
+      ),
+      shortingEnabled:
+        parseBoolean(findFirstValue(root, ["shorting-enabled", "shortingEnabled", "canShort"])) ||
+        true,
       tradingBlocked: parseBoolean(findFirstValue(root, ["is-closed", "tradingBlocked"])),
     };
   }
 
   async getPositions(): Promise<BrokerPosition[]> {
     const accountId = await this.resolveAccountId();
-    const payload = await this.request<unknown>(`/accounts/${encodeURIComponent(accountId)}/positions`);
+    const payload = await this.request<unknown>(
+      `/accounts/${encodeURIComponent(accountId)}/positions`,
+    );
     const rows = findFirstArray(unwrapPayload(payload)) ?? [];
 
     return rows.map((entry) => {
@@ -308,16 +342,22 @@ export class TastytradeAdapter implements BrokerAdapter {
         qty: Math.abs(qtyRaw),
         side: qtyRaw < 0 || parseBoolean(row.short) ? "short" : "long",
         marketValue: parseNumber(row["market-value"] ?? row.marketValue ?? row.value),
-        avgEntryPrice: parseNumber(row["average-open-price"] ?? row.averagePrice ?? row.avgEntryPrice),
+        avgEntryPrice: parseNumber(
+          row["average-open-price"] ?? row.averagePrice ?? row.avgEntryPrice,
+        ),
         unrealizedPl: parseNumber(row["unrealized-day-gain"] ?? row.unrealizedPl ?? row.pnl),
-        unrealizedPlPercent: parseNumber(row["unrealized-day-gain-percent"] ?? row.unrealizedPlPercent ?? row.pnlPct),
+        unrealizedPlPercent: parseNumber(
+          row["unrealized-day-gain-percent"] ?? row.unrealizedPlPercent ?? row.pnlPct,
+        ),
       };
     });
   }
 
   async getOpenOrders(limit = 50): Promise<BrokerOrder[]> {
     const accountId = await this.resolveAccountId();
-    const payload = await this.request<unknown>(`/accounts/${encodeURIComponent(accountId)}/orders/live?per-page=${limit}`);
+    const payload = await this.request<unknown>(
+      `/accounts/${encodeURIComponent(accountId)}/orders/live?per-page=${limit}`,
+    );
     const rows = findFirstArray(unwrapPayload(payload)) ?? [];
     return rows.map((row) => this.toBrokerOrder(row));
   }
@@ -331,37 +371,56 @@ export class TastytradeAdapter implements BrokerAdapter {
       return this.getOpenOrders(limit);
     }
 
-    const payload = await this.request<unknown>(`/accounts/${encodeURIComponent(accountId)}/orders?per-page=${limit}`);
-    const rows = (findFirstArray(unwrapPayload(payload)) ?? []).map((row) => this.toBrokerOrder(row));
+    const payload = await this.request<unknown>(
+      `/accounts/${encodeURIComponent(accountId)}/orders?per-page=${limit}`,
+    );
+    const rows = (findFirstArray(unwrapPayload(payload)) ?? []).map((row) =>
+      this.toBrokerOrder(row),
+    );
     if (status === "all") return rows;
     return rows.filter((order) => !isOpenOrderStatus(order.status));
   }
 
   async getOrder(orderId: string): Promise<BrokerOrder> {
     const accountId = await this.resolveAccountId();
-    const payload = await this.request<unknown>(`/accounts/${encodeURIComponent(accountId)}/orders/${encodeURIComponent(orderId)}`);
+    const payload = await this.request<unknown>(
+      `/accounts/${encodeURIComponent(accountId)}/orders/${encodeURIComponent(orderId)}`,
+    );
     return this.toBrokerOrder(payload);
   }
 
   async placeOrder(params: BrokerOrderRequest): Promise<BrokerOrder> {
     if (params.qty === undefined) {
       if (params.notional !== undefined) {
-        throw new Error("tastytrade orders require qty; notional-only equity orders are not supported.");
+        throw new Error(
+          "tastytrade orders require qty; notional-only equity orders are not supported.",
+        );
       }
       throw new Error("Broker order requires either qty or notional");
     }
-    if ((params.type === "limit" || params.type === "stop_limit") && params.limitPrice === undefined) {
+    if (
+      (params.type === "limit" || params.type === "stop_limit") &&
+      params.limitPrice === undefined
+    ) {
       throw new Error("tastytrade limit orders require limitPrice");
     }
-    if ((params.type === "stop" || params.type === "stop_limit") && params.stopPrice === undefined) {
+    if (
+      (params.type === "stop" || params.type === "stop_limit") &&
+      params.stopPrice === undefined
+    ) {
       throw new Error("tastytrade stop orders require stopPrice");
     }
 
     // Kill-switch chokepoint — read-only, idempotent.
     if (isKillSwitchesEnabled()) {
-      const decision = isExecutionAllowed({ venue: this.brokerId, instrument: params.symbol.toUpperCase() });
+      const decision = isExecutionAllowed({
+        venue: this.brokerId,
+        instrument: params.symbol.toUpperCase(),
+      });
       if (!decision.allowed) {
-        throw new Error(`${decision.reason}. Reset the relevant kill switch before placing this order.`);
+        throw new Error(
+          `${decision.reason}. Reset the relevant kill switch before placing this order.`,
+        );
       }
     }
 
@@ -387,18 +446,24 @@ export class TastytradeAdapter implements BrokerAdapter {
       body["stop-trigger"] = params.stopPrice;
     }
 
-    const payload = await this.request<unknown>(`/accounts/${encodeURIComponent(accountId)}/orders`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+    const payload = await this.request<unknown>(
+      `/accounts/${encodeURIComponent(accountId)}/orders`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+    );
     return this.toBrokerOrder(payload);
   }
 
   async cancelOrder(orderId: string): Promise<void> {
     const accountId = await this.resolveAccountId();
-    await this.request<void>(`/accounts/${encodeURIComponent(accountId)}/orders/${encodeURIComponent(orderId)}`, {
-      method: "DELETE",
-    });
+    await this.request<void>(
+      `/accounts/${encodeURIComponent(accountId)}/orders/${encodeURIComponent(orderId)}`,
+      {
+        method: "DELETE",
+      },
+    );
   }
 
   async cancelAllOrders(): Promise<void> {
@@ -413,10 +478,7 @@ export class TastytradeAdapter implements BrokerAdapter {
       `/market-data/quotes?symbols=${encodeURIComponent(upper)}`,
     ]);
     const unwrapped = unwrapPayload(payload);
-    const quoteRecord =
-      asRecord(findFirstArray(unwrapped)?.[0])
-      || asRecord(unwrapped)
-      || {};
+    const quoteRecord = asRecord(findFirstArray(unwrapped)?.[0]) || asRecord(unwrapped) || {};
 
     return {
       symbol: String(quoteRecord.symbol ?? quoteRecord.ticker ?? upper),
@@ -424,7 +486,9 @@ export class TastytradeAdapter implements BrokerAdapter {
       bidSize: parseNumber(quoteRecord["bid-size"] ?? quoteRecord.bidSize),
       askPrice: parseNumber(quoteRecord["ask-price"] ?? quoteRecord.askPrice ?? quoteRecord.ask),
       askSize: parseNumber(quoteRecord["ask-size"] ?? quoteRecord.askSize),
-      timestamp: String(quoteRecord["quote-time"] ?? quoteRecord.timestamp ?? new Date().toISOString()),
+      timestamp: String(
+        quoteRecord["quote-time"] ?? quoteRecord.timestamp ?? new Date().toISOString(),
+      ),
     };
   }
 

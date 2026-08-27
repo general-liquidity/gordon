@@ -27,7 +27,11 @@ function isNamedColor(color: string): boolean {
   return typeof (chalkAny as Record<string, unknown>)[color] === "function";
 }
 
-export function colorize(str: string, color: string | undefined, type: "foreground" | "background"): string {
+export function colorize(
+  str: string,
+  color: string | undefined,
+  type: "foreground" | "background",
+): string {
   if (!color) return str;
   if (isNamedColor(color)) {
     if (type === "foreground") {

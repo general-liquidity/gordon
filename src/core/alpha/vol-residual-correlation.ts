@@ -103,7 +103,8 @@ export function computeVolResidualCorrelation(
   let minLen = Infinity;
   for (const s of symbols) minLen = Math.min(minLen, input.returnsBySymbol[s]!.length);
   if (input.volFactor) minLen = Math.min(minLen, input.volFactor.length);
-  if (!Number.isFinite(minLen) || minLen < 3) return { ...neutral, sampleSize: Number.isFinite(minLen) ? minLen : 0 };
+  if (!Number.isFinite(minLen) || minLen < 3)
+    return { ...neutral, sampleSize: Number.isFinite(minLen) ? minLen : 0 };
 
   const series: Record<string, number[]> = {};
   for (const s of symbols) series[s] = input.returnsBySymbol[s]!.slice(0, minLen);
@@ -154,7 +155,9 @@ export function computeVolResidualCorrelation(
     `Max raw |corr| ${maxRawCorr}, max residual corr ${maxResidualCorr}. ` +
     (hiddenPairCount > 0
       ? `${hiddenPairCount} HIDDEN pair(s) — correlation masked by shared vol-timing on raw returns` +
-        (worstPair ? ` (worst: ${worstPair.a}/${worstPair.b}, raw ${worstPair.rawCorr} → residual ${worstPair.residualCorr})` : "") +
+        (worstPair
+          ? ` (worst: ${worstPair.a}/${worstPair.b}, raw ${worstPair.rawCorr} → residual ${worstPair.residualCorr})`
+          : "") +
         ". Size for the residual matrix, not the raw one."
       : "No hidden correlation surfaced — raw and residual matrices agree.");
 

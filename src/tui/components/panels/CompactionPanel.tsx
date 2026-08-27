@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { Text } from "../../ink-custom";
 
 // ============================================================================
@@ -15,7 +15,7 @@ import { Text } from "../../ink-custom";
 // ============================================================================
 
 interface Props {
-  contextUsageRatio?: number;  // 0-1
+  contextUsageRatio?: number; // 0-1
   compactionCount?: number;
 }
 
@@ -31,7 +31,9 @@ export function CompactionPanel({ contextUsageRatio, compactionCount }: Props) {
     parts.push(
       <Text key="label-ctx">context </Text>,
       isHigh ? (
-        <Text key="pct" color="yellow">{usagePct}%</Text>
+        <Text key="pct" color="yellow">
+          {usagePct}%
+        </Text>
       ) : (
         <Text key="pct">{usagePct}%</Text>
       ),
@@ -42,14 +44,8 @@ export function CompactionPanel({ contextUsageRatio, compactionCount }: Props) {
     if (parts.length > 0) {
       parts.push(<Text key="sep"> · </Text>);
     }
-    parts.push(
-      <Text key="compacted">compacted {compactionCount}×</Text>,
-    );
+    parts.push(<Text key="compacted">compacted {compactionCount}×</Text>);
   }
 
-  return (
-    <Text dimColor>
-      {parts}
-    </Text>
-  );
+  return <Text dimColor>{parts}</Text>;
 }

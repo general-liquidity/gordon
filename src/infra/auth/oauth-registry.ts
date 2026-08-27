@@ -10,10 +10,7 @@
 
 import type { OAuthFlowConfig } from "./oauth-flow.ts";
 
-export type OAuthVenueId =
-  | "alpaca"
-  | "tastytrade"
-  | "gemini";
+export type OAuthVenueId = "alpaca" | "tastytrade" | "gemini";
 
 export interface OAuthVenueConfig {
   venue: OAuthVenueId;
@@ -83,7 +80,6 @@ export const OAUTH_VENUES: Record<OAuthVenueId, OAuthVenueConfig> = {
       "Self-serve OAuth. Access token: 24h. Refresh tokens single-use but non-expiring. Sandbox: exchange.sandbox.gemini.com.",
     accessTokenLifetimeSec: 86400,
   },
-
 };
 
 /**

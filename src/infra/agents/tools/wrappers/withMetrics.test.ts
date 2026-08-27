@@ -32,7 +32,8 @@ describe("withToolMetrics", () => {
 
     const result = await tool.execute({}, { requestContext });
     expect(result).toEqual({
-      error: "Human approval required for place_order. Use /runtime-approve req-123 or /runtime-deny req-123.",
+      error:
+        "Human approval required for place_order. Use /runtime-approve req-123 or /runtime-deny req-123.",
       approvalRequestId: "req-123",
       runtimeStatus: "pending",
       toolId: "place_order",
@@ -44,11 +45,17 @@ describe("withToolMetrics", () => {
     registerHook({
       id: "cap-quantity",
       point: "PreToolUse",
-      handler: (payload) => ({ action: "modify", replacement: { args: { ...(payload.args as object), qty: 1 } } }),
+      handler: (payload) => ({
+        action: "modify",
+        replacement: { args: { ...(payload.args as object), qty: 1 } },
+      }),
     });
     const tool = withToolMetrics({
       id: "test_tool",
-      execute: async (input: unknown) => { received = input; return { ok: true }; },
+      execute: async (input: unknown) => {
+        received = input;
+        return { ok: true };
+      },
     }) as { execute: (input: unknown) => Promise<unknown> };
     await tool.execute({ qty: 10 });
     expect(received).toEqual({ qty: 1 });
@@ -64,7 +71,10 @@ describe("withToolMetrics", () => {
     const tool = withToolMetrics({
       id: "sized_tool",
       inputSchema: z.object({ qty: z.number().positive() }),
-      execute: async () => { calls += 1; return { ok: true }; },
+      execute: async () => {
+        calls += 1;
+        return { ok: true };
+      },
     }) as { execute: (input: unknown) => Promise<unknown> };
 
     expect(await tool.execute({ qty: 2 })).toMatchObject({
@@ -78,10 +88,17 @@ describe("withToolMetrics", () => {
     let calls = 0;
     const tool = withToolMetrics({
       id: "test_tool",
-      execute: async () => { calls += 1; return { raw: true }; },
+      execute: async () => {
+        calls += 1;
+        return { raw: true };
+      },
     }) as { execute: (input: unknown) => Promise<unknown> };
 
-    registerHook({ id: "deny", point: "PreToolUse", handler: () => ({ action: "block", reason: "policy" }) });
+    registerHook({
+      id: "deny",
+      point: "PreToolUse",
+      handler: () => ({ action: "block", reason: "policy" }),
+    });
     expect(await tool.execute({})).toMatchObject({ runtimeStatus: "blocked" });
     expect(calls).toBe(0);
 

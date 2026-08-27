@@ -36,7 +36,11 @@ export async function beginSubagentHook(input: {
     startedAt: run.startedAt,
   });
   if (result.action === "block") {
-    return { allowed: false, reason: result.reason ?? "Subagent start blocked by lifecycle hook.", id: run.id };
+    return {
+      allowed: false,
+      reason: result.reason ?? "Subagent start blocked by lifecycle hook.",
+      id: run.id,
+    };
   }
   active.set(input.key, run);
   return { allowed: true, id: run.id };

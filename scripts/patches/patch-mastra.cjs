@@ -16,30 +16,21 @@
  *   Leaving the code path here so the patch is greppable and reversible —
  *   we just no longer mutate the Mastra binary.
  *
- * Patch 2: OpenAI-compatible provider support (Dedalus)
+ * Patch 2: OpenAI-compatible provider support (legacy Mastra only)
  *   Mastra hardcodes `.responses(modelId)` for the openai case, which hits
  *   /v1/responses. Dedalus (and other OpenAI-compatible providers) only support
  *   /v1/chat/completions. This patch makes the openai case use .chat() when
  *   a custom baseURL is set (i.e., OPENAI_BASE_URL points to a non-OpenAI API).
- *
- * Patch 3: Solana rpc-parsed-types empty CJS stubs
- *   Several @solana/rpc-parsed-types packages ship an effectively empty
- *   index.node.cjs file that only contains sourceMappingURL comments.
- *   Bun's bundler currently turns `require("@solana/rpc-parsed-types")`
- *   into invalid code (`var rpcParsedTypes = ;`) when compiling Gordon.
- *   This patch replaces those empty stubs with `module.exports = {};`
- *   so Bun emits valid bundles.
- *
- * Patch 4: Solana plugin-token CJS interop
- *   @solana-agent-kit/plugin-token imports named exports from CommonJS
- *   lightprotocol packages. Bun's standalone compiler rejects those
- *   named imports, so we rewrite them to namespace imports.
+ *   Modern Mastra resolves an object model with `url` through
+ *   `createOpenAICompatible(...).chatModel()` itself. When that native route
+ *   exists, this script records the compatibility as satisfied and makes no
+ *   dependency mutation.
  *
  * Run automatically via postinstall, or manually: node scripts/patch-mastra.cjs
  */
 
-const fs = require("fs");
-const path = require("path");
+const fs = require("node:fs");
+const path = require("node:path");
 
 let totalPatched = 0;
 const verbose = process.argv.includes("--verbose") || process.env.PATCH_MASTRA_VERBOSE === "1";
@@ -112,7 +103,7 @@ for (const filePath of responsesFiles) {
   let cjsPrefix = "";
   if (isCjs) {
     const prefixMatch = content.match(/(\w+_cjs)\.createOpenAI\(/);
-    if (prefixMatch) cjsPrefix = prefixMatch[1] + ".";
+    if (prefixMatch) cjsPrefix = `${prefixMatch[1]}.`;
   }
 
   const fn = (name) => (cjsPrefix ? `${cjsPrefix}${name}` : name);
@@ -161,88 +152,27 @@ for (const filePath of responsesFiles) {
 }
 
 if (responsesFiles.length === 0) {
-  warn(`[patch-mastra] WARNING: No chunk files found containing .responses(modelId)`);
-}
+  const nativeCompatibleFiles = fs.existsSync(distDir)
+    ? fs
+        .readdirSync(distDir)
+        .filter((fileName) => /\.(js|cjs)$/.test(fileName))
+        .map((fileName) => path.join(distDir, fileName))
+        .filter((filePath) => {
+          const content = fs.readFileSync(filePath, "utf8");
+          return (
+            content.includes("this.config.url") &&
+            content.includes("createOpenAICompatible({") &&
+            content.includes(".chatModel(modelId)")
+          );
+        })
+    : [];
 
-// ============================================================================
-// Patch 3: @solana/rpc-parsed-types empty CJS stub → module.exports = {}
-// ============================================================================
-
-const nodeModulesDir = path.resolve(__dirname, "..", "..", "node_modules");
-const solanaStubReplacement = `'use strict';\n\nmodule.exports = {};\n`;
-
-function findRpcParsedTypesCjsFiles() {
-  if (!fs.existsSync(nodeModulesDir)) return [];
-
-  return fs
-    .readdirSync(nodeModulesDir, { recursive: true })
-    .filter((relativePath) =>
-      relativePath.endsWith(path.join("@solana", "rpc-parsed-types", "dist", "index.node.cjs")),
-    )
-    .map((relativePath) => path.join(nodeModulesDir, relativePath));
-}
-
-for (const filePath of findRpcParsedTypesCjsFiles()) {
-  const content = fs.readFileSync(filePath, "utf8");
-  const normalized = content.trim();
-
-  if (normalized === "'use strict';\n\nmodule.exports = {};") {
-    continue;
-  }
-
-  const isEmptyCommonJsStub =
-    normalized.startsWith("'use strict';")
-    && normalized.includes("sourceMappingURL=index.node.cjs.map")
-    && !normalized.includes("module.exports");
-
-  if (!isEmptyCommonJsStub) {
-    continue;
-  }
-
-  fs.writeFileSync(filePath, solanaStubReplacement, "utf8");
-  totalPatched++;
-  log(`[patch-mastra] Patched empty rpc-parsed-types stub in ${path.relative(path.resolve(__dirname, "..", ".."), filePath)}`);
-}
-
-// ============================================================================
-// Patch 4: @solana-agent-kit/plugin-token named CJS imports → namespace imports
-// ============================================================================
-
-const pluginTokenDistPath = path.resolve(
-  __dirname,
-  "..",
-  "..",
-  "node_modules/@solana-agent-kit/plugin-token/dist/index.js",
-);
-const pluginTokenNeedle = [
-  'import { CompressedTokenProgram } from "@lightprotocol/compressed-token";',
-  "import {",
-  "  buildTx,",
-  "  calculateComputeUnitPrice",
-  '} from "@lightprotocol/stateless.js";',
-].join("\n");
-const pluginTokenReplacement = [
-  'import * as compressedToken from "@lightprotocol/compressed-token";',
-  'import * as statelessJs from "@lightprotocol/stateless.js";',
-  "const { CompressedTokenProgram } = compressedToken;",
-  "const { buildTx, calculateComputeUnitPrice } = statelessJs;",
-].join("\n");
-
-if (fs.existsSync(pluginTokenDistPath)) {
-  const content = fs.readFileSync(pluginTokenDistPath, "utf8");
-
-  if (content.includes(pluginTokenReplacement)) {
-    log("[patch-mastra] plugin-token lightprotocol imports already patched");
-  } else if (content.includes(pluginTokenNeedle)) {
-    fs.writeFileSync(
-      pluginTokenDistPath,
-      content.replace(pluginTokenNeedle, pluginTokenReplacement),
-      "utf8",
-    );
-    totalPatched++;
-    log("[patch-mastra] Patched plugin-token lightprotocol imports for Bun CJS interop");
+  if (nativeCompatibleFiles.length > 0) {
+    log("[patch-mastra] Native OpenAI-compatible chat routing detected; no patch required");
   } else {
-    warn("[patch-mastra] WARNING: Could not match plugin-token lightprotocol import block");
+    warn(
+      "[patch-mastra] WARNING: Neither the legacy responses pattern nor native compatible chat routing was found",
+    );
   }
 }
 

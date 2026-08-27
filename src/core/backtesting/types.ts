@@ -99,7 +99,7 @@ export const PlaybookBacktestResultSchema = z.object({
       timestamp: z.string(),
       equity: z.number(),
       drawdown_percent: z.number(),
-    })
+    }),
   ),
 
   // Individual trades

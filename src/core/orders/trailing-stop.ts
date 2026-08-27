@@ -11,7 +11,7 @@
  * - Integration with monitor cycle
  */
 
-import { EventEmitter } from "events";
+import { EventEmitter } from "node:events";
 import type { Exchange, OrderParams, Order } from "../../infra/exchange/index.ts";
 import { calculateATR } from "../indicators/atr.ts";
 import { getTrade, updateTrade } from "../../infra/storage/entities/trades.ts";
@@ -19,10 +19,27 @@ import { getPlan, updatePlan } from "../../infra/storage/entities/plans.ts";
 import { logEvent } from "../../infra/storage/entities/events.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
-import type { Trade, Plan, ExitFill } from "../../types/index.ts";
+import type { ExitFill } from "../../types/index.ts";
 import { assertConsentForExposure } from "../../infra/trading/execution/preflight.ts";
+import {
+  cancelPlanProtectiveOrders,
+  generateDeterministicClientOrderId,
+  placeOrderIdempotent,
+  repairProtectiveOrders,
+  waitForFill,
+} from "../pipeline/executor.ts";
 
 const logger = createModuleLogger("trailing-stop");
+
+async function restoreTrailingProtection(planId: string, client: Exchange): Promise<string> {
+  try {
+    const repair = await repairProtectiveOrders(planId, client);
+    if (repair.repaired || repair.reason === "protective_orders_intact") return "";
+    return `; protection was not restored (${repair.reason})`;
+  } catch (error) {
+    return `; protection repair failed (${error instanceof Error ? error.message : String(error)})`;
+  }
+}
 
 // ============================================================================
 // Types
@@ -48,6 +65,8 @@ export interface TrailingStopConfig {
   isActive: boolean;
   /** Highest price observed since activation */
   highestPrice: number;
+  /** Position direction; for shorts highestPrice stores the lowest favorable price. */
+  direction: "long" | "short";
   /** Current calculated stop price */
   currentStopPrice: number;
   /** When this trailing stop was created */
@@ -158,12 +177,15 @@ export class TrailingStopTracker extends EventEmitter {
 
     // If no activation price, the stop is immediately active
     const isActive = !config.activationPrice;
+    const trade = getTrade(config.tradeId);
+    const direction = trade ? (getPlan(trade.planId)?.direction ?? "long") : "long";
 
     // Calculate initial stop price if active
     const initialHigh = config.initialHighPrice ?? 0;
-    const initialStop = isActive && initialHigh > 0
-      ? this.calculateStopPrice(initialHigh, config.type, config.trailDistance)
-      : 0;
+    const initialStop =
+      isActive && initialHigh > 0
+        ? this.calculateStopPrice(initialHigh, config.type, config.trailDistance, direction)
+        : 0;
 
     const trailingStop: TrailingStopConfig = {
       id,
@@ -174,6 +196,7 @@ export class TrailingStopTracker extends EventEmitter {
       activationPrice: config.activationPrice,
       isActive,
       highestPrice: initialHigh,
+      direction,
       currentStopPrice: initialStop,
       createdAt: now,
       updatedAt: now,
@@ -239,17 +262,22 @@ export class TrailingStopTracker extends EventEmitter {
    * Calculate stop price based on type and trail distance
    */
   private calculateStopPrice(
-    highPrice: number,
+    favorableExtreme: number,
     type: "percentage" | "atr",
     trailDistance: number,
-    atrValue?: number
+    direction: "long" | "short",
+    atrValue?: number,
   ): number {
     if (type === "percentage") {
-      return highPrice * (1 - trailDistance);
+      return direction === "short"
+        ? favorableExtreme * (1 + trailDistance)
+        : favorableExtreme * (1 - trailDistance);
     } else if (type === "atr" && atrValue) {
-      return highPrice - (atrValue * trailDistance);
+      return direction === "short"
+        ? favorableExtreme + atrValue * trailDistance
+        : favorableExtreme - atrValue * trailDistance;
     }
-    return highPrice * (1 - 0.03); // Default 3% fallback
+    return direction === "short" ? favorableExtreme * 1.03 : favorableExtreme * 0.97;
   }
 
   /**
@@ -259,10 +287,7 @@ export class TrailingStopTracker extends EventEmitter {
    * @param tradeId - Trade ID to update
    * @returns Update result with trigger status
    */
-  async updateTrailingStop(
-    client: Exchange,
-    tradeId: string
-  ): Promise<TrailingStopUpdateResult> {
+  async updateTrailingStop(client: Exchange, tradeId: string): Promise<TrailingStopUpdateResult> {
     const config = this.trailingStops.get(tradeId);
 
     if (!config) {
@@ -275,14 +300,20 @@ export class TrailingStopTracker extends EventEmitter {
 
     // Check activation
     if (!config.isActive) {
-      if (config.activationPrice && currentPrice >= config.activationPrice) {
+      const activationReached =
+        config.activationPrice !== undefined &&
+        (config.direction === "short"
+          ? currentPrice <= config.activationPrice
+          : currentPrice >= config.activationPrice);
+      if (activationReached) {
         // Activate the trailing stop
         config.isActive = true;
         config.highestPrice = currentPrice;
         config.currentStopPrice = this.calculateStopPrice(
           currentPrice,
           config.type,
-          config.trailDistance
+          config.trailDistance,
+          config.direction,
         );
         config.updatedAt = new Date().toISOString();
 
@@ -319,9 +350,13 @@ export class TrailingStopTracker extends EventEmitter {
       };
     }
 
-    // Update highest price if new high
+    // Track the favorable extreme: highest price for longs, lowest for shorts.
     let updated = false;
-    if (currentPrice > config.highestPrice) {
+    const isNewFavorableExtreme =
+      config.direction === "short"
+        ? config.highestPrice === 0 || currentPrice < config.highestPrice
+        : currentPrice > config.highestPrice;
+    if (isNewFavorableExtreme) {
       config.highestPrice = currentPrice;
 
       // Calculate new stop based on trail type
@@ -330,7 +365,7 @@ export class TrailingStopTracker extends EventEmitter {
         const candles = await client.getCandles(
           config.symbol,
           this.atrInterval,
-          this.atrPeriod + 5
+          this.atrPeriod + 5,
         );
         const atrResult = calculateATR(candles, this.atrPeriod);
         atrValue = atrResult.current ?? undefined;
@@ -340,11 +375,15 @@ export class TrailingStopTracker extends EventEmitter {
         config.highestPrice,
         config.type,
         config.trailDistance,
-        atrValue
+        config.direction,
+        atrValue,
       );
 
-      // Only update if new stop is higher (trailing up, not down)
-      if (newStopPrice > config.currentStopPrice) {
+      const improvesStop =
+        config.direction === "short"
+          ? config.currentStopPrice === 0 || newStopPrice < config.currentStopPrice
+          : newStopPrice > config.currentStopPrice;
+      if (improvesStop) {
         config.currentStopPrice = newStopPrice;
         config.updatedAt = new Date().toISOString();
         updated = true;
@@ -366,7 +405,10 @@ export class TrailingStopTracker extends EventEmitter {
     }
 
     // Check if stop should trigger
-    const shouldTrigger = currentPrice <= config.currentStopPrice;
+    const shouldTrigger =
+      config.direction === "short"
+        ? currentPrice >= config.currentStopPrice
+        : currentPrice <= config.currentStopPrice;
 
     if (shouldTrigger) {
       this.emit("stop:triggered", {
@@ -411,9 +453,7 @@ export class TrailingStopTracker extends EventEmitter {
    * @param client - Binance client
    * @returns Map of trade ID to update results
    */
-  async updateAllTrailingStops(
-    client: Exchange
-  ): Promise<Map<string, TrailingStopUpdateResult>> {
+  async updateAllTrailingStops(client: Exchange): Promise<Map<string, TrailingStopUpdateResult>> {
     const results = new Map<string, TrailingStopUpdateResult>();
 
     for (const [tradeId] of this.trailingStops) {
@@ -437,7 +477,7 @@ export class TrailingStopTracker extends EventEmitter {
    */
   async executeTrailingStop(
     client: Exchange,
-    tradeId: string
+    tradeId: string,
   ): Promise<{ success: boolean; pnl?: number; error?: string }> {
     const config = this.trailingStops.get(tradeId);
     if (!config) {
@@ -466,23 +506,38 @@ export class TrailingStopTracker extends EventEmitter {
 
     // Round quantity
     const precision = 8;
-    const multiplier = Math.pow(10, precision);
+    const multiplier = 10 ** precision;
     const roundedQty = Math.floor(remainingQty * multiplier) / multiplier;
 
-    // Place market sell order
+    const plan = getPlan(trade.planId);
+    if (!plan) {
+      return { success: false, error: "Cannot safely close a trade whose plan is missing" };
+    }
+    const exitSide: "BUY" | "SELL" = plan.direction === "short" ? "BUY" : "SELL";
+
     const orderParams: OrderParams = {
       symbol: config.symbol,
-      side: "SELL",
+      side: exitSide,
       type: "MARKET",
       quantity: roundedQty,
-      newClientOrderId: `gordon_tsl_${tradeId.slice(4)}_${Date.now().toString(36)}`,
+      newClientOrderId: generateDeterministicClientOrderId(
+        trade.planId,
+        `tsl_${trade.exits.length.toString(36)}_${Math.round(roundedQty * 1e8).toString(36)}`,
+      ),
     };
 
-    // This site EXECUTES the stop (market-closes the remainder); it is not the
-    // placement of a resting stop order. The module is long-only (hardcoded
-    // SELL, long-only PnL), so on a short trade the verification fails and the
-    // dispatch falls back to the live-consent gate rather than doubling down.
-    const exitSide = getPlan(trade.planId)?.direction === "short" ? "BUY" : "SELL";
+    const cancelledProtection = await cancelPlanProtectiveOrders(
+      client,
+      trade.symbol,
+      trade.planId,
+    );
+    if (!cancelledProtection.success) {
+      const repairFailure = await restoreTrailingProtection(trade.planId, client);
+      return {
+        success: false,
+        error: `Cannot execute trailing stop while sibling protection remains live: ${cancelledProtection.failures.join("; ")}${repairFailure}`,
+      };
+    }
 
     let sellOrder: Order;
     try {
@@ -495,18 +550,51 @@ export class TrailingStopTracker extends EventEmitter {
           remainingQuantity: remainingQty,
         },
       });
-      sellOrder = await client.placeOrder(orderParams);
+      sellOrder = await placeOrderIdempotent(client, orderParams, {
+        direction: "REDUCES_EXPOSURE",
+        reduction: {
+          side: orderParams.side,
+          quantity: roundedQty,
+          exitSide,
+          remainingQuantity: remainingQty,
+        },
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       logger.error("Trailing stop execution failed", error as Error, { tradeId });
-      return { success: false, error: errorMessage };
+      const repairFailure = await restoreTrailingProtection(trade.planId, client);
+      return { success: false, error: `${errorMessage}${repairFailure}` };
     }
 
-    // Calculate exit details
-    const executedQty = sellOrder.executedQty;
-    const exitPrice = executedQty > 0
-      ? sellOrder.cummulativeQuoteQty / executedQty
-      : trade.averageEntry;
+    let executedQty: number;
+    let exitPrice: number;
+    try {
+      executedQty = sellOrder.executedQty;
+      exitPrice =
+        executedQty > 0 && sellOrder.cummulativeQuoteQty > 0
+          ? sellOrder.cummulativeQuoteQty / executedQty
+          : sellOrder.price;
+      if (sellOrder.status !== "FILLED") {
+        const fill = await waitForFill(client, trade.symbol, sellOrder.orderId.toString(), {
+          onPartialFill: "cancel",
+        });
+        executedQty = Math.min(roundedQty, fill.fillStatus.filledQuantity);
+        exitPrice = fill.fillStatus.averagePrice;
+      }
+    } catch (error) {
+      const repairFailure = await restoreTrailingProtection(trade.planId, client);
+      return {
+        success: false,
+        error: `${error instanceof Error ? error.message : String(error)}${repairFailure}`,
+      };
+    }
+    if (executedQty <= 0) {
+      const repairFailure = await restoreTrailingProtection(trade.planId, client);
+      return {
+        success: false,
+        error: `Trailing-stop order ${sellOrder.orderId} was acknowledged but no fill was confirmed${repairFailure}.`,
+      };
+    }
 
     // Create exit fill
     const exitFill: ExitFill = {
@@ -520,26 +608,30 @@ export class TrailingStopTracker extends EventEmitter {
     // Calculate PnL
     const exitValue = exitPrice * executedQty;
     const entryValue = trade.averageEntry * executedQty;
-    const pnl = exitValue - entryValue;
+    const pnlMultiplier = plan.direction === "short" ? -1 : 1;
+    const pnl = pnlMultiplier * (exitValue - entryValue);
     const totalRealizedPnl = trade.realizedPnl + pnl;
     const totalInvested = trade.averageEntry * totalEntryQty;
     const realizedPnlPercent = totalInvested > 0 ? (totalRealizedPnl / totalInvested) * 100 : 0;
 
     // Update trade
     const updatedExits = [...trade.exits, exitFill];
+    const fullyClosed = executedQty >= remainingQty - 1e-8;
     updateTrade(trade.id, {
       exits: updatedExits,
       realizedPnl: totalRealizedPnl,
       realizedPnlPercent,
-      status: "CLOSED",
-      closedAt: new Date().toISOString(),
+      status: fullyClosed ? "CLOSED" : "PARTIAL",
+      closedAt: fullyClosed ? new Date().toISOString() : null,
     });
 
-    // Update plan status
-    updatePlan(trade.planId, { status: "CLOSED" });
-
-    // Remove trailing stop
-    this.removeTrailingStop(tradeId);
+    let repairFailure = "";
+    if (fullyClosed) {
+      updatePlan(trade.planId, { status: "CLOSED" });
+      this.removeTrailingStop(tradeId);
+    } else {
+      repairFailure = await restoreTrailingProtection(trade.planId, client);
+    }
 
     // Log and emit events
     logger.info("Trailing stop executed", {
@@ -564,14 +656,39 @@ export class TrailingStopTracker extends EventEmitter {
       planId: trade.planId,
     });
 
-    await emitEvent("trade:closed", {
-      trade: { ...trade, exits: updatedExits, realizedPnl: totalRealizedPnl, status: "CLOSED" },
-      reason: "TRAILING_STOP",
-      pnl: totalRealizedPnl,
-      pnlPercent: realizedPnlPercent,
-    });
+    const updatedTrade = {
+      ...trade,
+      exits: updatedExits,
+      realizedPnl: totalRealizedPnl,
+      realizedPnlPercent,
+      status: fullyClosed ? ("CLOSED" as const) : ("PARTIAL" as const),
+    };
+    if (fullyClosed) {
+      await emitEvent("trade:closed", {
+        trade: updatedTrade,
+        reason: "TRAILING_STOP",
+        pnl: totalRealizedPnl,
+        pnlPercent: realizedPnlPercent,
+      });
+    } else {
+      await emitEvent("trade:partial_close", {
+        tradeId,
+        trade: updatedTrade,
+        symbol: trade.symbol,
+        reason: "TRAILING_STOP",
+        closedQuantity: executedQty,
+        remainingQuantity: remainingQty - executedQty,
+        pnl,
+      });
+    }
 
-    return { success: true, pnl: totalRealizedPnl };
+    return fullyClosed
+      ? { success: true, pnl: totalRealizedPnl }
+      : {
+          success: false,
+          pnl: totalRealizedPnl,
+          error: `Trailing stop only filled ${executedQty} of ${remainingQty}; the remainder stays open${repairFailure || " and protection was re-armed"}.`,
+        };
   }
 
   /**

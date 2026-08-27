@@ -82,7 +82,7 @@ export function createSuspendTerminal(deps: SuspendTerminalDeps): SuspendTermina
 
   const suspend = (async (
     callback?: () => void | Promise<void>,
-  ): Promise<void | TerminalSuspension> => {
+  ): Promise<undefined | TerminalSuspension> => {
     begin();
 
     if (callback) {
@@ -115,7 +115,7 @@ const noopSuspension: TerminalSuspension = {
  */
 export const noopSuspendTerminal: SuspendTerminal = (async (
   callback?: () => void | Promise<void>,
-): Promise<void | TerminalSuspension> => {
+): Promise<undefined | TerminalSuspension> => {
   if (callback) {
     await callback();
     return undefined;

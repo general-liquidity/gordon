@@ -156,8 +156,8 @@ export class EvalSandbox {
   cleanup(): void {
     if (this.disposed) return;
     this.restore();
-    // maxRetries: fire-and-forget audit writes can hold the sandbox DB
-    // briefly on Windows (EBUSY); retry instead of failing the run.
+    // Windows can briefly retain filesystem metadata after SQLite closes;
+    // bounded retries keep cleanup deterministic without hiding a real leak.
     rmSync(this.paths.home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     this.disposed = true;
   }

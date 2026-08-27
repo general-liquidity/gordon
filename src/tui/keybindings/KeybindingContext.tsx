@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useEffect, useRef, useMemo, useCallback, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+  type ReactNode,
+} from "react";
 import { useInput } from "../ink-custom";
 import { KeyContext, type KeybindingAction, type ParsedKeystroke } from "./types.js";
 import { KeybindingResolver } from "./resolver.js";
@@ -49,7 +57,23 @@ export function KeybindingProvider({ children, activeContext = KeyContext.Chat }
 
   useInput((input, key) => {
     const keystroke: ParsedKeystroke = {
-      key: key.return ? "enter" : key.escape ? "escape" : key.tab ? "tab" : key.backspace ? "backspace" : key.upArrow ? "up" : key.downArrow ? "down" : key.leftArrow ? "left" : key.rightArrow ? "right" : input,
+      key: key.return
+        ? "enter"
+        : key.escape
+          ? "escape"
+          : key.tab
+            ? "tab"
+            : key.backspace
+              ? "backspace"
+              : key.upArrow
+                ? "up"
+                : key.downArrow
+                  ? "down"
+                  : key.leftArrow
+                    ? "left"
+                    : key.rightArrow
+                      ? "right"
+                      : input,
       ctrl: key.ctrl ?? false,
       shift: key.shift ?? false,
       alt: false,
@@ -98,7 +122,10 @@ export function useKeybindings(
         current?.handler();
       }),
     );
-    return () => unsubscribes.forEach((u) => u());
+    return () =>
+      unsubscribes.forEach((u) => {
+        u();
+      });
   }, [ctx]);
 }
 

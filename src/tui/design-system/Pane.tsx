@@ -1,4 +1,4 @@
-import React, { type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Box, Text, useStdout } from "../ink-custom";
 import { useTheme } from "../themes/ThemeProvider.tsx";
 
@@ -24,14 +24,19 @@ export function Pane({ title, color, tone = "brand", modal = false, children }: 
   const { stdout } = useStdout();
   const theme = useTheme();
   const width = stdout?.columns ?? 80;
-  const resolvedColor = color ?? (
-    tone === "warning" ? theme.riskWarning
-    : tone === "danger" ? theme.riskDanger
-    : tone === "success" ? theme.riskSafe
-    : tone === "muted" ? theme.uiMuted
-    : tone === "info" ? theme.uiInfo
-    : theme.uiBrand
-  );
+  const resolvedColor =
+    color ??
+    (tone === "warning"
+      ? theme.riskWarning
+      : tone === "danger"
+        ? theme.riskDanger
+        : tone === "success"
+          ? theme.riskSafe
+          : tone === "muted"
+            ? theme.uiMuted
+            : tone === "info"
+              ? theme.uiInfo
+              : theme.uiBrand);
 
   if (modal) {
     return (

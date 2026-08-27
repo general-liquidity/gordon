@@ -112,11 +112,14 @@ export function resetIdCounterForTesting(): void {
 
 // In-memory promise registry — keyed by requestId. Cleared on process exit;
 // callers that need cross-process replay use `loadPending` instead.
-const _waiters = new Map<string, {
-  resolve: (r: HumanInputResponse) => void;
-  reject: (e: Error) => void;
-  timeoutHandle?: ReturnType<typeof setTimeout>;
-}>();
+const _waiters = new Map<
+  string,
+  {
+    resolve: (r: HumanInputResponse) => void;
+    reject: (e: Error) => void;
+    timeoutHandle?: ReturnType<typeof setTimeout>;
+  }
+>();
 
 export function resetWaitersForTesting(): void {
   for (const w of _waiters.values()) {
@@ -128,7 +131,7 @@ export function resetWaitersForTesting(): void {
 function persistRecord(record: DiskRecord, path?: string): void {
   const target = path ?? defaultHumanInputPath();
   ensureParentDir(target);
-  appendFileSync(target, JSON.stringify(record) + "\n", "utf8");
+  appendFileSync(target, `${JSON.stringify(record)}\n`, "utf8");
 }
 
 /**
@@ -160,7 +163,9 @@ export function loadAllRequests(path?: string): PendingRequest[] {
   const target = path ?? defaultHumanInputPath();
   if (!existsSync(target)) return [];
 
-  const lines = readFileSync(target, "utf8").split("\n").filter((l) => l.trim().length > 0);
+  const lines = readFileSync(target, "utf8")
+    .split("\n")
+    .filter((l) => l.trim().length > 0);
   const byId = new Map<string, PendingRequest>();
 
   for (const line of lines) {
@@ -203,10 +208,7 @@ export interface ListPendingOptions {
   limit?: number;
 }
 
-export function listPending(
-  opts: ListPendingOptions = {},
-  path?: string,
-): PendingRequest[] {
+export function listPending(opts: ListPendingOptions = {}, path?: string): PendingRequest[] {
   let all = loadAllRequests(path).filter((p) => p.status === "pending");
   if (opts.threadId) all = all.filter((p) => p.request.threadId === opts.threadId);
   if (opts.urgency) all = all.filter((p) => p.request.urgency === opts.urgency);

@@ -96,8 +96,8 @@ export interface TooGoodCheckResult {
 const DEFAULTS: Required<TooGoodCheckOptions> = {
   suspiciousSharpe: 3.0,
   catastrophicSharpe: 5.0,
-  suspiciousIc: 0.20,
-  catastrophicIc: 0.30,
+  suspiciousIc: 0.2,
+  catastrophicIc: 0.3,
   suspiciousIr: 2.0,
   catastrophicIr: 3.0,
   suspiciousWinRate: 0.85,

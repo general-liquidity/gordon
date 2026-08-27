@@ -82,7 +82,11 @@ const SENSITIVE_FIELD_MARKERS: readonly string[] = [
 const SUSPICIOUS_PATTERNS: ReadonlyArray<{ name: string; pattern: RegExp }> = [
   { name: "ignore-instructions", pattern: /ignore (prior|previous|all) instructions/i },
   { name: "embedded-system-role", pattern: /\bsystem\s*:\s*you (are|must)/i },
-  { name: "unexpected-email", pattern: /\b[a-zA-Z0-9._%+-]+@(?!gmail\.com|outlook\.com|icloud\.com|protonmail\.com|hotmail\.com|yahoo\.com)[a-zA-Z0-9.-]+\.(xyz|top|tk|click|pw)\b/ },
+  {
+    name: "unexpected-email",
+    pattern:
+      /\b[a-zA-Z0-9._%+-]+@(?!gmail\.com|outlook\.com|icloud\.com|protonmail\.com|hotmail\.com|yahoo\.com)[a-zA-Z0-9.-]+\.(xyz|top|tk|click|pw)\b/,
+  },
 ];
 
 interface UpdateWorkingMemoryParams {
@@ -215,9 +219,7 @@ export function detectSensitiveFieldChanges(
     if (afterLine === null) continue;
     if (beforeLine === afterLine) continue;
 
-    const flagged = SUSPICIOUS_PATTERNS
-      .filter((p) => p.pattern.test(afterLine))
-      .map((p) => p.name);
+    const flagged = SUSPICIOUS_PATTERNS.filter((p) => p.pattern.test(afterLine)).map((p) => p.name);
 
     changes.push({
       field: marker,
@@ -309,9 +311,10 @@ export function wrapMemoryWithGate<M extends Memory>(
 
     const sensitiveChanges = detectSensitiveFieldChanges(previousValue, truncatedValue);
     for (const change of sensitiveChanges) {
-      const flagSuffix = change.flaggedPatterns.length > 0
-        ? ` ⚠ suspicious patterns: ${change.flaggedPatterns.join(", ")}`
-        : "";
+      const flagSuffix =
+        change.flaggedPatterns.length > 0
+          ? ` ⚠ suspicious patterns: ${change.flaggedPatterns.join(", ")}`
+          : "";
       const trustSuffix = isTrustedSource(source) ? "" : " (UNTRUSTED source — review)";
       logger.warn("Working-memory sensitive field changed", {
         threadId: finalParams.threadId,
@@ -416,17 +419,13 @@ export function isWorkingMemoryDurable(env: NodeJS.ProcessEnv = flagEnv()): bool
   return _lastFlushAt !== null;
 }
 
-export async function flushDeferredWorkingMemoryWrites(
-  memory: Memory,
-): Promise<number> {
+export async function flushDeferredWorkingMemoryWrites(memory: Memory): Promise<number> {
   const buffer = _pendingByMemory.get(memory);
   if (!buffer || buffer.size === 0) return 0;
   const original = _originalByMemory.get(memory);
   if (!original) return 0;
 
-  const writes = Array.from(buffer.values()).sort(
-    (a, b) => a.enqueuedAt - b.enqueuedAt,
-  );
+  const writes = Array.from(buffer.values()).sort((a, b) => a.enqueuedAt - b.enqueuedAt);
   buffer.clear();
 
   let flushed = 0;

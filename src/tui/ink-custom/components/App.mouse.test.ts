@@ -116,7 +116,7 @@ describe("App mouse mode lifecycle", () => {
   });
 
   test("enableMouseMode skips when screen reader is active", () => {
-    process.env["GORDON_SCREEN_READER"] = "true";
+    process.env.GORDON_SCREEN_READER = "true";
     const { app, stdout } = makeApp();
     app.enableMouseMode();
     expect(stdout.captured).toBe("");

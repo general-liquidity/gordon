@@ -65,18 +65,18 @@ export interface ConsensusOptions {
 // ============================================================================
 
 function evaluateRisk(options: ConsensusOptions): AgentVote {
-  return options.riskVote ?? {
-    agent: "risk",
-    decision: "ABSTAIN",
-    confidence: 0,
-    weight: 0.3,
-    reason: "Risk vote not supplied by caller",
-  };
+  return (
+    options.riskVote ?? {
+      agent: "risk",
+      decision: "ABSTAIN",
+      confidence: 0,
+      weight: 0.3,
+      reason: "Risk vote not supplied by caller",
+    }
+  );
 }
 
-function evaluateRegime(
-  proposal: TradeProposal,
-): AgentVote {
+function evaluateRegime(proposal: TradeProposal): AgentVote {
   const detector = RegimeDetector.getInstance();
   const signal = detector.getCurrentRegime(proposal.symbol, "1h");
 
@@ -116,9 +116,7 @@ function evaluateRegime(
   };
 }
 
-function evaluatePortfolio(
-  proposal: TradeProposal,
-): AgentVote {
+function evaluatePortfolio(proposal: TradeProposal): AgentVote {
   const runtime = StrategyRuntime.getInstance();
   const result = runtime.approveTradeForSlot(proposal.slot_id, {
     symbol: proposal.symbol,
@@ -142,9 +140,7 @@ function evaluatePortfolio(
   };
 }
 
-function evaluateTechnical(
-  proposal: TradeProposal,
-): AgentVote {
+function evaluateTechnical(proposal: TradeProposal): AgentVote {
   const reasons: string[] = [];
   let score = 0;
 
@@ -199,9 +195,7 @@ function evaluateTechnical(
   };
 }
 
-function evaluateHistorical(
-  proposal: TradeProposal,
-): AgentVote {
+function evaluateHistorical(proposal: TradeProposal): AgentVote {
   // Look up backtest results for this playbook. Since we don't have direct
   // access to the backtest store from here without adding a circular dep,
   // we use the genome fitness as a proxy if available.
@@ -277,9 +271,7 @@ export async function evaluateConsensus(
     (v) => (v.agent === "risk" || v.agent === "portfolio") && v.decision === "REJECT",
   );
 
-  const dissenting = votes
-    .filter((v) => v.decision === "REJECT")
-    .map((v) => v.agent);
+  const dissenting = votes.filter((v) => v.decision === "REJECT").map((v) => v.agent);
 
   const decision: "APPROVED" | "REJECTED" =
     score >= 0.6 && quorumMet && !criticalRejection ? "APPROVED" : "REJECTED";

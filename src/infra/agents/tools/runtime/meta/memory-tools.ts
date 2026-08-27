@@ -29,12 +29,7 @@ export const searchMemoryTool = createTool({
     "Use to recall past trades, observations, insights, or market conditions.",
   inputSchema: z.object({
     query: z.string().describe("Search query (natural language or keywords)"),
-    limit: z
-      .number()
-      .min(1)
-      .max(20)
-      .default(5)
-      .describe("Max results to return"),
+    limit: z.number().min(1).max(20).default(5).describe("Max results to return"),
   }),
   outputSchema: z.object({
     results: z.array(
@@ -44,7 +39,7 @@ export const searchMemoryTool = createTool({
         score: z.number(),
         age: z.string(),
         symbols: z.array(z.string()).optional(),
-      })
+      }),
     ),
     count: z.number(),
     error: z.string().optional(),
@@ -85,13 +80,8 @@ export const recordObservationTool = createTool({
     "Use when noticing patterns, anomalies, or notable market conditions worth remembering.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair symbol (e.g., 'BTCUSDT')"),
-    observation: z
-      .string()
-      .describe("What was observed (pattern, anomaly, condition)"),
-    conditions: z
-      .string()
-      .default("")
-      .describe("Market conditions at time of observation"),
+    observation: z.string().describe("What was observed (pattern, anomaly, condition)"),
+    conditions: z.string().default("").describe("Market conditions at time of observation"),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -127,16 +117,9 @@ export const recordInsightTool = createTool({
     "Use when arriving at an important conclusion, signal, or recommendation worth preserving.",
   inputSchema: z.object({
     content: z.string().describe("The insight or conclusion"),
-    confidence: z
-      .number()
-      .min(0)
-      .max(1)
-      .describe("Confidence level (0-1)"),
+    confidence: z.number().min(0).max(1).describe("Confidence level (0-1)"),
     symbol: z.string().optional().describe("Related symbol if applicable"),
-    tags: z
-      .array(z.string())
-      .optional()
-      .describe("Tags for categorization"),
+    tags: z.array(z.string()).optional().describe("Tags for categorization"),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -173,12 +156,7 @@ export const getLessonsTool = createTool({
     "Returns past trade journal entries and insights to avoid repeating mistakes.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair symbol (e.g., 'BTCUSDT')"),
-    limit: z
-      .number()
-      .min(1)
-      .max(20)
-      .default(10)
-      .describe("Max lessons to return"),
+    limit: z.number().min(1).max(20).default(10).describe("Max lessons to return"),
   }),
   outputSchema: z.object({
     lessons: z.array(
@@ -187,7 +165,7 @@ export const getLessonsTool = createTool({
         type: z.string(),
         importance: z.number(),
         age: z.string(),
-      })
+      }),
     ),
     count: z.number(),
     error: z.string().optional(),
@@ -195,9 +173,7 @@ export const getLessonsTool = createTool({
   execute: async ({ symbol, limit }) => {
     try {
       const manager = await getMemoryManager();
-      const entries = await manager.journal.getLessonsForSymbol(
-        symbol.toUpperCase()
-      );
+      const entries = await manager.journal.getLessonsForSymbol(symbol.toUpperCase());
 
       const sliced = entries.slice(0, limit ?? 10);
 
@@ -228,10 +204,7 @@ export const getMemoryContextTool = createTool({
     "Get relevant memory context for the current conversation. " +
     "Returns formatted markdown with recent work, relevant memories, and trade history.",
   inputSchema: z.object({
-    query: z
-      .string()
-      .optional()
-      .describe("Current query or topic for semantic retrieval"),
+    query: z.string().optional().describe("Current query or topic for semantic retrieval"),
   }),
   outputSchema: z.object({
     context: z.string(),
@@ -276,12 +249,7 @@ export const searchSessionHistoryTool = createTool({
     "searches extracted durable facts, not transcripts.",
   inputSchema: z.object({
     query: z.string().describe("Search query (natural language or keywords)"),
-    limit: z
-      .number()
-      .min(1)
-      .max(20)
-      .default(5)
-      .describe("Max past-session turns to return"),
+    limit: z.number().min(1).max(20).default(5).describe("Max past-session turns to return"),
   }),
   outputSchema: z.object({
     results: z.array(
@@ -297,7 +265,7 @@ export const searchSessionHistoryTool = createTool({
           messageIndex: z.number(),
           timestamp: z.string().nullable(),
         }),
-      })
+      }),
     ),
     count: z.number(),
     error: z.string().optional(),

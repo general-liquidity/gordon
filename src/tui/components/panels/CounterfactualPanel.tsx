@@ -7,7 +7,6 @@
  * Pattern: Claude Code diff/comparison view with annotations.
  */
 
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 
@@ -84,11 +83,15 @@ export function CounterfactualPanel({ trade, scenarios, onClose }: Props) {
           <Text dimColor> {"\u00b7"} </Text>
           <Text>{trade.side.toUpperCase()}</Text>
           <Text dimColor> {"\u00b7"} </Text>
-          <Text dimColor>Entry ${trade.entryPrice.toFixed(2)} {"\u2192"} Exit ${trade.exitPrice.toFixed(2)}</Text>
+          <Text dimColor>
+            Entry ${trade.entryPrice.toFixed(2)} {"\u2192"} Exit ${trade.exitPrice.toFixed(2)}
+          </Text>
         </Box>
         <Box paddingLeft={2}>
           <Text dimColor>P&L: </Text>
-          <Text bold color={pnlColor(trade.pnl)}>{fmtPnl(trade.pnl)} ({fmtPct(trade.pnlPercent)})</Text>
+          <Text bold color={pnlColor(trade.pnl)}>
+            {fmtPnl(trade.pnl)} ({fmtPct(trade.pnlPercent)})
+          </Text>
         </Box>
       </Box>
 
@@ -104,10 +107,26 @@ export function CounterfactualPanel({ trade, scenarios, onClose }: Props) {
 
       {/* Column headers */}
       <Box paddingLeft={2}>
-        <Box width={28}><Text bold dimColor>SCENARIO</Text></Box>
-        <Box width={12}><Text bold dimColor>EXIT</Text></Box>
-        <Box width={14}><Text bold dimColor>P&L</Text></Box>
-        <Box width={10}><Text bold dimColor>DIFF</Text></Box>
+        <Box width={28}>
+          <Text bold dimColor>
+            SCENARIO
+          </Text>
+        </Box>
+        <Box width={12}>
+          <Text bold dimColor>
+            EXIT
+          </Text>
+        </Box>
+        <Box width={14}>
+          <Text bold dimColor>
+            P&L
+          </Text>
+        </Box>
+        <Box width={10}>
+          <Text bold dimColor>
+            DIFF
+          </Text>
+        </Box>
       </Box>
 
       {scenarios.map((s, i) => {
@@ -129,7 +148,8 @@ export function CounterfactualPanel({ trade, scenarios, onClose }: Props) {
             </Box>
             <Box width={10}>
               <Text color={color}>
-                {diff >= 0 ? "+" : ""}{diff.toFixed(2)}
+                {diff >= 0 ? "+" : ""}
+                {diff.toFixed(2)}
               </Text>
             </Box>
           </Box>

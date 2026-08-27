@@ -29,12 +29,5 @@ export function buildQuickStartRecommendedOptions(input: {
   if (input.permissionMode === "auto") {
     return ["chat", "scan", "orders", "positions", "preview-order", "plan"];
   }
-  return [
-    "chat",
-    "scan",
-    "portfolio",
-    "plan",
-    "orders",
-    "strategies-live",
-  ];
+  return ["chat", "scan", "portfolio", "plan", "orders", "strategies-live"];
 }

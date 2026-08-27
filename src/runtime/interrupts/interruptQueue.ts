@@ -57,9 +57,7 @@ export interface EnqueueOptions {
 export function enqueueInterrupt(message: string, options: EnqueueOptions = {}): boolean {
   const trimmed = (message ?? "").trim();
   if (trimmed.length === 0) return true;
-  const payload = options.raw
-    ? trimmed
-    : `${INTERRUPT_PREFIX} ${trimmed}`;
+  const payload = options.raw ? trimmed : `${INTERRUPT_PREFIX} ${trimmed}`;
   const evicted = queue.length >= MAX_QUEUE_DEPTH;
   if (evicted) {
     queue.shift();

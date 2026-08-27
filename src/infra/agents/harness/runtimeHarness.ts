@@ -5,7 +5,12 @@ import path from "node:path";
 import { listActionLogEntries } from "../../action-log/store.ts";
 import { digestLargeResult } from "./resultDigest.ts";
 import type { GordonContext } from "../types.ts";
-import { determineWorkflowPhase, getPhasePromptGuidance, isExecutionPhase, type WorkflowPhase } from "../cognition/workflowPhase.ts";
+import {
+  determineWorkflowPhase,
+  getPhasePromptGuidance,
+  isExecutionPhase,
+  type WorkflowPhase,
+} from "../cognition/workflowPhase.ts";
 import { dedupeParallelTasks } from "../../../core/pipeline/parallel-task-dedup.ts";
 
 interface PlanningArtifact {
@@ -198,15 +203,19 @@ export function recordVenueFailure(context: GordonContext): void {
   // reminder at count ≥ 2 (below, in evaluateReminders) is an in-conversation
   // hint; this alert is the operator-facing signal that the bus/TUI renders.
   if (state.venueFailureCount === 3 || state.venueFailureCount === 6) {
-    void import("../../platform/observability/alertEmitter.ts").then((m) => {
-      void m.emitAlert({
-        level: state.venueFailureCount >= 6 ? "critical" : "warning",
-        category: "venue",
-        message: `Venue failures crossed ${state.venueFailureCount} in this session.`,
-        context: { threadKey: key, failureCount: state.venueFailureCount },
-        dedupeKey: `venue-failure:${key}:${state.venueFailureCount}`,
+    void import("../../platform/observability/alertEmitter.ts")
+      .then((m) => {
+        void m.emitAlert({
+          level: state.venueFailureCount >= 6 ? "critical" : "warning",
+          category: "venue",
+          message: `Venue failures crossed ${state.venueFailureCount} in this session.`,
+          context: { threadKey: key, failureCount: state.venueFailureCount },
+          dedupeKey: `venue-failure:${key}:${state.venueFailureCount}`,
+        });
+      })
+      .catch(() => {
+        /* alert emission is best-effort */
       });
-    }).catch(() => { /* alert emission is best-effort */ });
   }
 }
 
@@ -250,9 +259,10 @@ export function registerPlanningArtifactFromResult(
   const symbol = extractSymbolFromUnknownResult(result);
   const summary = extractPlanningSummary(result, toolName);
   const extractedTasks = extractPlanningTasks(result, toolName);
-  const success = typeof result === "object" && result !== null
-    ? ((result as Record<string, unknown>).success !== false)
-    : true;
+  const success =
+    typeof result === "object" && result !== null
+      ? (result as Record<string, unknown>).success !== false
+      : true;
   registerPlanningArtifact(context, {
     symbol,
     artifactType: toolName === "preview_market_order" ? "preview" : "plan",
@@ -262,7 +272,10 @@ export function registerPlanningArtifactFromResult(
   });
 }
 
-export function getPlanningHandoff(context: GordonContext, symbol?: string): PlanningArtifact | null {
+export function getPlanningHandoff(
+  context: GordonContext,
+  symbol?: string,
+): PlanningArtifact | null {
   const readiness = getExecutionReadiness(context, symbol);
   return readiness.artifact ?? null;
 }
@@ -291,10 +304,7 @@ export function formatPlanningHandoffBlock(artifact: PlanningArtifact | null): s
   return lines.join("\n");
 }
 
-export function getExecutionReadiness(
-  context: GordonContext,
-  symbol?: string,
-): ExecutionReadiness {
+export function getExecutionReadiness(context: GordonContext, symbol?: string): ExecutionReadiness {
   const phase = determineWorkflowPhase(context);
   if (!isExecutionPhase(phase)) {
     return { ready: true };
@@ -329,7 +339,8 @@ export function getExecutionReadiness(
   if (!artifact.approved) {
     return {
       ready: false,
-      reason: "Execution requires a recent approved preview or explicit execution-ready handoff in this thread.",
+      reason:
+        "Execution requires a recent approved preview or explicit execution-ready handoff in this thread.",
       artifact,
     };
   }
@@ -337,10 +348,7 @@ export function getExecutionReadiness(
   return { ready: true, artifact };
 }
 
-export function buildEventDrivenReminders(
-  context: GordonContext,
-  phase: WorkflowPhase,
-): string[] {
+export function buildEventDrivenReminders(context: GordonContext, phase: WorkflowPhase): string[] {
   const reminders: string[] = [...getPhasePromptGuidance(phase)];
   const threadKey = getThreadKey(context);
   const state = getOrCreateReminderState(threadKey);
@@ -354,12 +362,16 @@ export function buildEventDrivenReminders(
       }
     }
     if (context.credentialProfile && context.credentialProfile !== "live") {
-      reminders.push(`Current credential profile is ${context.credentialProfile}; confirm the target execution profile before live orders.`);
+      reminders.push(
+        `Current credential profile is ${context.credentialProfile}; confirm the target execution profile before live orders.`,
+      );
     }
   }
 
   if ((phase === "planning" || phase === "analysis") && !context.exchange && !context.broker) {
-    reminders.push("No active venue is connected. Keep the answer read-only and note that live venue-backed checks are unavailable.");
+    reminders.push(
+      "No active venue is connected. Keep the answer read-only and note that live venue-backed checks are unavailable.",
+    );
   }
 
   // ─── Trading-specific reminder categories ──────────────────────────────────
@@ -368,7 +380,9 @@ export function buildEventDrivenReminders(
     const artifact = planningArtifacts.get(threadKey);
     if (!artifact || artifact.expiresAt < Date.now()) {
       if (!state.noPlanWarned && canFireReminder(state, "plan_missing", 1, true)) {
-        reminders.push("No trade plan has been prepared yet for this thread. Begin with analysis before proposing execution steps.");
+        reminders.push(
+          "No trade plan has been prepared yet for this thread. Begin with analysis before proposing execution steps.",
+        );
         state.noPlanWarned = true;
         markReminderFired(state, "plan_missing");
       }
@@ -380,12 +394,16 @@ export function buildEventDrivenReminders(
     const artifact = planningArtifacts.get(threadKey);
     if (artifact && artifact.expiresAt >= Date.now() && !artifact.approved) {
       if (canFireReminder(state, "execution_unapproved", 2)) {
-        reminders.push("An execution step was requested but the current plan has not been explicitly approved. Present the plan summary and request confirmation before placing any live order.");
+        reminders.push(
+          "An execution step was requested but the current plan has not been explicitly approved. Present the plan summary and request confirmation before placing any live order.",
+        );
         markReminderFired(state, "execution_unapproved");
       }
     } else if (artifact?.approved && !state.planApprovedInjected) {
       if (canFireReminder(state, "plan_approved_signal", 1, true)) {
-        reminders.push("A recent approved plan is available in this thread. Use that approved intent as the execution boundary and do not expand scope without a fresh preview.");
+        reminders.push(
+          "A recent approved plan is available in this thread. Use that approved intent as the execution boundary and do not expand scope without a fresh preview.",
+        );
         markReminderFired(state, "plan_approved_signal");
       }
       state.planApprovedInjected = true;
@@ -399,7 +417,9 @@ export function buildEventDrivenReminders(
     Date.now() - state.lastVenueFailure < VENUE_FAILURE_WINDOW_MS
   ) {
     if (canFireReminder(state, "venue_failure", 3)) {
-      reminders.push("Venue data requests have failed repeatedly in this thread. Keep the response read-only and note that live market data may be unavailable.");
+      reminders.push(
+        "Venue data requests have failed repeatedly in this thread. Keep the response read-only and note that live market data may be unavailable.",
+      );
       markReminderFired(state, "venue_failure");
     }
   }
@@ -407,7 +427,9 @@ export function buildEventDrivenReminders(
   // 4. Stale mandate — execution phase with no active action ID
   if (phase === "execution" && !context.requestedActionId) {
     if (!state.staleMandateWarned && canFireReminder(state, "stale_mandate", 1, true)) {
-      reminders.push("No active action mandate is set for this thread. Confirm the intended symbol and direction before proceeding with any execution step.");
+      reminders.push(
+        "No active action mandate is set for this thread. Confirm the intended symbol and direction before proceeding with any execution step.",
+      );
       state.staleMandateWarned = true;
       markReminderFired(state, "stale_mandate");
     }
@@ -421,13 +443,25 @@ export function buildEventDrivenReminders(
       fingerprints.set(fp, (fingerprints.get(fp) ?? 0) + 1);
     }
     const maxRepeat = Math.max(...fingerprints.values());
-    if (maxRepeat >= LOOP_BLOCK_THRESHOLD && !reminders.some((r) => r.includes("identical")) && canFireReminder(state, "repeated_loop", 2)) {
-      reminders.push("Repeated identical tool invocations detected. Change approach, venue, or scope before retrying the same action.");
+    if (
+      maxRepeat >= LOOP_BLOCK_THRESHOLD &&
+      !reminders.some((r) => r.includes("identical")) &&
+      canFireReminder(state, "repeated_loop", 2)
+    ) {
+      reminders.push(
+        "Repeated identical tool invocations detected. Change approach, venue, or scope before retrying the same action.",
+      );
       markReminderFired(state, "repeated_loop");
     }
     const cycle = detectFingerprintCycle(callLog);
-    if (cycle && !reminders.some((r) => r.includes("cycle")) && canFireReminder(state, "repeated_cycle", 2)) {
-      reminders.push(`Repeating ${cycle.cycleLen}-step tool cycle detected (${cycle.repeats}× round trips of the same action sequence). You're looping between the same calls without making progress — change approach or scope, or stop and summarize what you have.`);
+    if (
+      cycle &&
+      !reminders.some((r) => r.includes("cycle")) &&
+      canFireReminder(state, "repeated_cycle", 2)
+    ) {
+      reminders.push(
+        `Repeating ${cycle.cycleLen}-step tool cycle detected (${cycle.repeats}× round trips of the same action sequence). You're looping between the same calls without making progress — change approach or scope, or stop and summarize what you have.`,
+      );
       markReminderFired(state, "repeated_cycle");
     }
 
@@ -461,17 +495,27 @@ export function buildEventDrivenReminders(
 
   // 6. Incomplete runtime task — approved plan with outstanding next-steps
   const artifact = planningArtifacts.get(threadKey);
-  if (artifact?.approved && artifact.extractedTasks.length > 0 && canFireReminder(state, "task_lifecycle", 2)) {
-    reminders.push(`There is an approved trade artifact with outstanding next steps (${artifact.extractedTasks.slice(0, 3).join("; ")}). Do not claim completion until those steps are either executed or explicitly deferred.`);
+  if (
+    artifact?.approved &&
+    artifact.extractedTasks.length > 0 &&
+    canFireReminder(state, "task_lifecycle", 2)
+  ) {
+    reminders.push(
+      `There is an approved trade artifact with outstanding next steps (${artifact.extractedTasks.slice(0, 3).join("; ")}). Do not claim completion until those steps are either executed or explicitly deferred.`,
+    );
     markReminderFired(state, "task_lifecycle");
   }
 
   // 7. Behavioral — too many read-only analysis calls without narrowing scope
   const readOnlyHeavyCalls = recentToolCalls
     .slice(0, 10)
-    .filter((entry) => /scan|analy|market|chart|ta|predict|regime/i.test(`${entry.title} ${entry.content}`));
+    .filter((entry) =>
+      /scan|analy|market|chart|ta|predict|regime/i.test(`${entry.title} ${entry.content}`),
+    );
   if (readOnlyHeavyCalls.length >= 5 && canFireReminder(state, "behavior_read_only_loop", 2)) {
-    reminders.push("Several read-only market-analysis steps have already run in this thread. Narrow the symbol, timeframe, or requested outcome before requesting more exploratory scans.");
+    reminders.push(
+      "Several read-only market-analysis steps have already run in this thread. Narrow the symbol, timeframe, or requested outcome before requesting more exploratory scans.",
+    );
     markReminderFired(state, "behavior_read_only_loop");
   }
 
@@ -479,20 +523,40 @@ export function buildEventDrivenReminders(
   const recentFailureText = recentStatuses
     .slice(0, 8)
     .map((entry) => `${entry.title} ${entry.content}`.toLowerCase());
-  if (recentFailureText.some((text) => text.includes("rate limit") || text.includes("429")) && canFireReminder(state, "error_rate_limit", 2)) {
-    reminders.push("Recent provider throttling was detected. Retry with a narrower request or wait for the rate-limit window to cool down before repeating the same path.");
+  if (
+    recentFailureText.some((text) => text.includes("rate limit") || text.includes("429")) &&
+    canFireReminder(state, "error_rate_limit", 2)
+  ) {
+    reminders.push(
+      "Recent provider throttling was detected. Retry with a narrower request or wait for the rate-limit window to cool down before repeating the same path.",
+    );
     markReminderFired(state, "error_rate_limit");
   }
-  if (recentFailureText.some((text) => text.includes("approval") || text.includes("blocked")) && canFireReminder(state, "error_approval", 2)) {
-    reminders.push("A recent request was blocked by approval or policy controls. Present the missing approval step explicitly instead of retrying the blocked action verbatim.");
+  if (
+    recentFailureText.some((text) => text.includes("approval") || text.includes("blocked")) &&
+    canFireReminder(state, "error_approval", 2)
+  ) {
+    reminders.push(
+      "A recent request was blocked by approval or policy controls. Present the missing approval step explicitly instead of retrying the blocked action verbatim.",
+    );
     markReminderFired(state, "error_approval");
   }
-  if (recentFailureText.some((text) => text.includes("empty response")) && canFireReminder(state, "error_empty_response", 2)) {
-    reminders.push("A recent model call returned an empty response. Prefer a smaller, more concrete follow-up request or switch workflow phase before retrying.");
+  if (
+    recentFailureText.some((text) => text.includes("empty response")) &&
+    canFireReminder(state, "error_empty_response", 2)
+  ) {
+    reminders.push(
+      "A recent model call returned an empty response. Prefer a smaller, more concrete follow-up request or switch workflow phase before retrying.",
+    );
     markReminderFired(state, "error_empty_response");
   }
-  if (recentFailureText.some((text) => text.includes("validation")) && canFireReminder(state, "error_validation", 2)) {
-    reminders.push("Recent tool input validation failed. Normalize the requested symbol, venue, or parameters before retrying the same tool path.");
+  if (
+    recentFailureText.some((text) => text.includes("validation")) &&
+    canFireReminder(state, "error_validation", 2)
+  ) {
+    reminders.push(
+      "Recent tool input validation failed. Normalize the requested symbol, venue, or parameters before retrying the same tool path.",
+    );
     markReminderFired(state, "error_validation");
   }
   // ─────────────────────────────────────────────────────────────────────────
@@ -587,9 +651,14 @@ export function recordToolCallFingerprint(
   context: GordonContext,
   toolName: string,
   args: unknown,
-): { blocked: boolean; count: number; fingerprint: string; cycle: { cycleLen: number; repeats: number } | null } {
+): {
+  blocked: boolean;
+  count: number;
+  fingerprint: string;
+  cycle: { cycleLen: number; repeats: number } | null;
+} {
   const fingerprint = createHash("md5")
-    .update(toolName + ":" + JSON.stringify(args ?? {}))
+    .update(`${toolName}:${JSON.stringify(args ?? {})}`)
     .digest("hex")
     .slice(0, 16);
 
@@ -614,7 +683,7 @@ export function recordToolCallFingerprint(
 
 export function classifyRecoveryGuidance(
   error: Error | string,
-  context: GordonContext,
+  _context: GordonContext,
   recoveryContext: RecoveryContext,
 ): RecoveryGuidance {
   const message = typeof error === "string" ? error : error.message;
@@ -624,7 +693,8 @@ export function classifyRecoveryGuidance(
     return {
       category: "provider_throttle",
       title: "Model provider is rate-limited",
-      detail: "The active model provider throttled this request before Gordon could finish the response.",
+      detail:
+        "The active model provider throttled this request before Gordon could finish the response.",
       nextSteps: [
         "Retry after the rate-limit window cools down.",
         "If the request is urgent, retry manually with the same model or switch models yourself.",
@@ -632,11 +702,16 @@ export function classifyRecoveryGuidance(
     };
   }
 
-  if (lower.includes("public api request failed") || lower.includes("unable to fetch") || lower.includes("failed to fetch price")) {
+  if (
+    lower.includes("public api request failed") ||
+    lower.includes("unable to fetch") ||
+    lower.includes("failed to fetch price")
+  ) {
     return {
       category: "venue_data_failure",
       title: "Venue data request failed",
-      detail: "A venue or broker data request failed while Gordon was gathering live market context.",
+      detail:
+        "A venue or broker data request failed while Gordon was gathering live market context.",
       nextSteps: [
         "Retry after the venue recovers.",
         "If the venue remains unstable, switch to a different active venue or keep the request read-only.",
@@ -648,7 +723,8 @@ export function classifyRecoveryGuidance(
     return {
       category: "policy_block",
       title: "Policy blocked the action",
-      detail: "Gordon intentionally blocked the request because the current safety or execution policy does not allow it.",
+      detail:
+        "Gordon intentionally blocked the request because the current safety or execution policy does not allow it.",
       nextSteps: [
         "Review the mode, profile, and plan blockers in the current thread.",
         "Move back to planning or preview first, then retry the execution step.",
@@ -668,7 +744,11 @@ export function classifyRecoveryGuidance(
     };
   }
 
-  if (lower.includes("validation failed") || lower.includes("too small") || lower.includes("invalid")) {
+  if (
+    lower.includes("validation failed") ||
+    lower.includes("too small") ||
+    lower.includes("invalid")
+  ) {
     return {
       category: "tool_validation",
       title: "Tool input validation failed",
@@ -703,10 +783,7 @@ export function classifyRecoveryGuidance(
 }
 
 export function formatRecoveryGuidance(guidance: RecoveryGuidance): string {
-  const lines = [
-    `${guidance.title}.`,
-    guidance.detail,
-  ];
+  const lines = [`${guidance.title}.`, guidance.detail];
 
   if (guidance.nextSteps.length > 0) {
     lines.push("", `Try: ${guidance.nextSteps.join(" ")}`);
@@ -723,7 +800,10 @@ function buildPreviewText(serialized: string, result?: unknown): string {
   // head-slice — the model gets the row count + column aggregates + a sample
   // instead of just the first N chars. Falls back to truncation otherwise.
   if (result !== undefined) {
-    const digest = digestLargeResult(result, { sampleRows: 4, maxChars: TOOL_RESULT_PREVIEW_LIMIT * 2 });
+    const digest = digestLargeResult(result, {
+      sampleRows: 4,
+      maxChars: TOOL_RESULT_PREVIEW_LIMIT * 2,
+    });
     if (digest) return digest;
   }
   return `${serialized.slice(0, TOOL_RESULT_PREVIEW_LIMIT)}…`;
@@ -742,7 +822,11 @@ function extractSymbolFromUnknownResult(result: unknown): string | undefined {
 
   for (const key of ["plan", "preview", "result"] as const) {
     const nested = record[key];
-    if (nested && typeof nested === "object" && typeof (nested as Record<string, unknown>).symbol === "string") {
+    if (
+      nested &&
+      typeof nested === "object" &&
+      typeof (nested as Record<string, unknown>).symbol === "string"
+    ) {
       return ((nested as Record<string, unknown>).symbol as string).toUpperCase();
     }
   }
@@ -760,9 +844,18 @@ function extractPlanningSummary(result: unknown, toolName: string): string {
     }
     if (record.plan && typeof record.plan === "object") {
       const plan = record.plan as Record<string, unknown>;
-      const entry = typeof plan.entry === "number" || typeof plan.entry === "string" ? String(plan.entry) : undefined;
-      const stopLoss = typeof plan.stopLoss === "number" || typeof plan.stopLoss === "string" ? String(plan.stopLoss) : undefined;
-      const takeProfit = typeof plan.takeProfit === "number" || typeof plan.takeProfit === "string" ? String(plan.takeProfit) : undefined;
+      const entry =
+        typeof plan.entry === "number" || typeof plan.entry === "string"
+          ? String(plan.entry)
+          : undefined;
+      const stopLoss =
+        typeof plan.stopLoss === "number" || typeof plan.stopLoss === "string"
+          ? String(plan.stopLoss)
+          : undefined;
+      const takeProfit =
+        typeof plan.takeProfit === "number" || typeof plan.takeProfit === "string"
+          ? String(plan.takeProfit)
+          : undefined;
       const parts = [
         entry ? `entry ${entry}` : null,
         stopLoss ? `stop ${stopLoss}` : null,
@@ -789,11 +882,23 @@ function extractPlanningTasks(result: unknown, toolName: string): string[] {
 
   if (result && typeof result === "object") {
     const record = result as Record<string, unknown>;
-    const plan = (record.plan && typeof record.plan === "object" ? record.plan : record.preview && typeof record.preview === "object" ? record.preview : null) as Record<string, unknown> | null;
+    const plan = (
+      record.plan && typeof record.plan === "object"
+        ? record.plan
+        : record.preview && typeof record.preview === "object"
+          ? record.preview
+          : null
+    ) as Record<string, unknown> | null;
     if (plan) {
       if (plan.entry !== undefined) tasks.unshift(`Use entry reference ${String(plan.entry)}.`);
-      if (plan.stopLoss !== undefined) tasks.push(`Honor stop-loss ${String(plan.stopLoss)} unless a new approved plan supersedes it.`);
-      if (plan.takeProfit !== undefined) tasks.push(`Honor take-profit ${String(plan.takeProfit)} unless a new approved plan supersedes it.`);
+      if (plan.stopLoss !== undefined)
+        tasks.push(
+          `Honor stop-loss ${String(plan.stopLoss)} unless a new approved plan supersedes it.`,
+        );
+      if (plan.takeProfit !== undefined)
+        tasks.push(
+          `Honor take-profit ${String(plan.takeProfit)} unless a new approved plan supersedes it.`,
+        );
     }
   }
 
@@ -835,9 +940,7 @@ export async function optimizeToolResultForContext(
   // line and only error lines reach the agent. Failures here must not
   // break the path — catch and fall through to the raw result.
   try {
-    const { filterOutputForAgent } = await import(
-      "../runtime/errorOnlyOutputFilter.ts"
-    );
+    const { filterOutputForAgent } = await import("../runtime/errorOnlyOutputFilter.ts");
     if (ERROR_ONLY_FILTERABLE_TOOLS.has(toolName)) {
       serialized = filterOutputForAgent(serialized, { contextBefore: 2, contextAfter: 1 });
     }

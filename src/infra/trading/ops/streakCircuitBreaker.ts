@@ -18,9 +18,7 @@ import { flagEnv } from "../../config/flagResolver.ts";
 
 export const STREAK_CIRCUIT_BREAKER_FLAG_ENV = "GORDON_STREAK_CIRCUIT_BREAKER";
 
-export function isStreakCircuitBreakerEnabled(
-  env: NodeJS.ProcessEnv = flagEnv(),
-): boolean {
+export function isStreakCircuitBreakerEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   // Default-on protective gate: absence = enabled. Explicit "0"/"false" opts out.
   const raw = env[STREAK_CIRCUIT_BREAKER_FLAG_ENV];
   return raw !== "0" && raw !== "false";
@@ -71,7 +69,9 @@ export function evaluateCircuit(input: StreakInput): StreakResult {
   const consecutiveLosses = countLeadingLosses(input.recentResults);
 
   const elapsed =
-    input.lastTrippedAtMs !== undefined ? input.nowMs - input.lastTrippedAtMs : Number.POSITIVE_INFINITY;
+    input.lastTrippedAtMs !== undefined
+      ? input.nowMs - input.lastTrippedAtMs
+      : Number.POSITIVE_INFINITY;
   const cooldownRemaining = Math.max(0, cooldownMs - elapsed);
   const inCooldownWindow = cooldownRemaining > 0;
 

@@ -4,12 +4,14 @@ import { generateSyntheticFutures } from "./syntheticFutures.ts";
 describe("synthetic futures regime conditioning", () => {
   test("a downtrend does not invert an already-bearish scenario", () => {
     const result = generateSyntheticFutures(
-      [{
-        symbol: "BTC",
-        currentPrice: 100,
-        annualDrift: 0.365,
-        annualVol: 0,
-      }],
+      [
+        {
+          symbol: "BTC",
+          currentPrice: 100,
+          annualDrift: 0.365,
+          annualVol: 0,
+        },
+      ],
       [],
       {
         horizonDays: 1,
@@ -29,12 +31,14 @@ describe("synthetic futures regime conditioning", () => {
       scenarios: ["base"] as const,
       tradingDaysPerYear: 365,
     };
-    const assets = [{
-      symbol: "BTC",
-      currentPrice: 100,
-      annualDrift: 0.365,
-      annualVol: 0,
-    }];
+    const assets = [
+      {
+        symbol: "BTC",
+        currentPrice: 100,
+        annualDrift: 0.365,
+        annualVol: 0,
+      },
+    ];
     const base = generateSyntheticFutures(assets, [], {
       ...common,
       scenarios: [...common.scenarios],

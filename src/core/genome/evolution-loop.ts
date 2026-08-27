@@ -15,7 +15,6 @@ import { logEvent } from "../../infra/storage/entities/events.ts";
 import { listTrades } from "../../infra/storage/entities/trades.ts";
 import type { Exchange } from "../../infra/exchange/types.ts";
 import { GenomeManager } from "./manager.ts";
-import { PlaybookMutator } from "./mutator.ts";
 import { getGenomesByStatus } from "./store.ts";
 import { StrategyRuntime } from "../runtime/engine.ts";
 import { getRuntimeStore } from "../runtime/store.ts";
@@ -29,10 +28,7 @@ import {
   filterRejectedMutations,
   DEFAULT_MIN_FITNESS_DROP,
 } from "./mutationRejection.ts";
-import {
-  selectOptimizationTier,
-  filterMutationsByTier,
-} from "./optimization-tier.ts";
+import { selectOptimizationTier, filterMutationsByTier } from "./optimization-tier.ts";
 import { v4 as uuidv4 } from "uuid";
 
 const logger = createModuleLogger("evolution-loop");
@@ -208,8 +204,14 @@ export class EvolutionLoop {
     // Build lookup: genome_id → experiment + isVariant
     const genomeToExperiment = new Map<string, { experimentId: string; isVariant: boolean }>();
     for (const exp of activeExperiments) {
-      genomeToExperiment.set(exp.control_genome_id, { experimentId: exp.experiment_id, isVariant: false });
-      genomeToExperiment.set(exp.variant_genome_id, { experimentId: exp.experiment_id, isVariant: true });
+      genomeToExperiment.set(exp.control_genome_id, {
+        experimentId: exp.experiment_id,
+        isVariant: false,
+      });
+      genomeToExperiment.set(exp.variant_genome_id, {
+        experimentId: exp.experiment_id,
+        isVariant: true,
+      });
     }
 
     // Get recent closed trades
@@ -229,7 +231,7 @@ export class EvolutionLoop {
     for (const trade of closedTrades) {
       // Try to find the genome for this trade's slot
       // Trade.planId often encodes the slot reference
-      for (const [slotId, genomeId] of slotToGenome) {
+      for (const [_slotId, genomeId] of slotToGenome) {
         const expInfo = genomeToExperiment.get(genomeId);
         if (!expInfo) continue;
 
@@ -263,10 +265,7 @@ export class EvolutionLoop {
   // Phase 2: Fork Variants
   // ==========================================================================
 
-  private async forkVariants(
-    exchange: Exchange,
-    result: EvolutionTickResult,
-  ): Promise<void> {
+  private async forkVariants(_exchange: Exchange, result: EvolutionTickResult): Promise<void> {
     const runtime = StrategyRuntime.getInstance();
     const manager = GenomeManager.getInstance();
     const mutator = manager.getMutator();
@@ -367,10 +366,7 @@ export class EvolutionLoop {
         const recentSymbol = listTrades({ status: "OPEN" })[0]?.symbol ?? "BTCUSDT";
         const currentRegime = RegimeDetector.getInstance().getCurrentRegime(recentSymbol, "1h");
         if (currentRegime) {
-          const regimeMutations = mutator.suggestMutationsForRegime(
-            protocol,
-            currentRegime.regime,
-          );
+          const regimeMutations = mutator.suggestMutationsForRegime(protocol, currentRegime.regime);
           // Only take 1-2 regime mutations to avoid over-mutating
           mutations.push(...regimeMutations.slice(0, 2));
         }
@@ -394,7 +390,9 @@ export class EvolutionLoop {
           if (suppressed.length > 0) {
             logger.info("Suppressed known-regressive mutations", {
               playbook: slot.playbook_name,
-              suppressed: suppressed.map((s) => `${s.mutation.field_path}:${s.rejection.direction}`),
+              suppressed: suppressed.map(
+                (s) => `${s.mutation.field_path}:${s.rejection.direction}`,
+              ),
             });
           }
           mutations.length = 0;
@@ -439,28 +437,19 @@ export class EvolutionLoop {
         mutations.push(...tiered);
 
         // Fork the variant
-        const { genome: variant } = manager.forkWithMutations(
-          genome.genome_id,
-          mutations,
-        );
+        const { genome: variant } = manager.forkWithMutations(genome.genome_id, mutations);
 
         // Determine a symbol for the experiment (use the slot's most-traded symbol)
         const recentTrades = listTrades({ status: "CLOSED" });
-        const symbol = recentTrades.length > 0
-          ? recentTrades[recentTrades.length - 1]!.symbol
-          : "BTCUSDT";
+        const symbol =
+          recentTrades.length > 0 ? recentTrades[recentTrades.length - 1]!.symbol : "BTCUSDT";
 
         // Start A/B experiment
-        manager.startExperiment(
-          genome.genome_id,
-          variant.genome_id,
-          symbol,
-          {
-            min_trades: 10,
-            max_duration_days: 14,
-            name: `${slot.playbook_name}: gen${genome.generation} vs gen${variant.generation}`,
-          },
-        );
+        manager.startExperiment(genome.genome_id, variant.genome_id, symbol, {
+          min_trades: 10,
+          max_duration_days: 14,
+          name: `${slot.playbook_name}: gen${genome.generation} vs gen${variant.generation}`,
+        });
 
         result.variantsForked++;
 
@@ -520,10 +509,7 @@ export class EvolutionLoop {
       if (mutations.length === 0) return;
 
       // Fork the crossover child from parent1
-      const { genome: child } = manager.forkWithMutations(
-        parent1.genome_id,
-        mutations,
-      );
+      const { genome: child } = manager.forkWithMutations(parent1.genome_id, mutations);
 
       result.crossoversCreated++;
 

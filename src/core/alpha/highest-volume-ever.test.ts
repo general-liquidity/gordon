@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  detectHighestVolume,
-  formatHighestVolume,
-  type HveCandle,
-} from "./highest-volume-ever.ts";
+import { detectHighestVolume, formatHighestVolume, type HveCandle } from "./highest-volume-ever.ts";
 
 function makeCandle(
   open: number,
@@ -16,7 +12,7 @@ function makeCandle(
 }
 
 function makeSeries(volumes: number[], closing: "top" | "bottom" | "middle" = "top"): HveCandle[] {
-  return volumes.map((v, i) => {
+  return volumes.map((v, _i) => {
     const open = 100;
     const close = closing === "top" ? 105 : closing === "bottom" ? 96 : 100;
     return makeCandle(open, 106, 95, close, v);

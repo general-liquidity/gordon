@@ -35,9 +35,12 @@ export function _resetLastShadowForTesting(): void {
 const RETRY_WINDOW_MS = 60_000;
 const RETRY_ENTRY_TOLERANCE_FRACTION = 0.02;
 
-function detectImplicitRetry(
-  current: { symbol: string; direction: "long" | "short"; entry: number; invokedAtMs: number },
-): boolean {
+function detectImplicitRetry(current: {
+  symbol: string;
+  direction: "long" | "short";
+  entry: number;
+  invokedAtMs: number;
+}): boolean {
   if (!lastShadow) return false;
   if (current.invokedAtMs - lastShadow.invokedAtMs > RETRY_WINDOW_MS) return false;
   if (lastShadow.symbol !== current.symbol) return false;

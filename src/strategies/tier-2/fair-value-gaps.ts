@@ -64,7 +64,7 @@ export class FairValueGapsStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, 100);
     if (candles.length < 20) {
@@ -105,7 +105,7 @@ export class FairValueGapsStrategy extends BaseStrategy {
 
     if (nearbyGaps.length === 0) {
       return this.notDetected(
-        `Found ${unfilledGaps.length} unfilled gaps but none near current price`
+        `Found ${unfilledGaps.length} unfilled gaps but none near current price`,
       );
     }
 
@@ -113,11 +113,21 @@ export class FairValueGapsStrategy extends BaseStrategy {
     const bestGap = nearbyGaps.sort((a, b) => b.gapSize - a.gapSize)[0]!;
 
     // Check approach direction
-    const isBullishSetup = bestGap.type === "bullish" && currentPrice >= bestGap.gapLow && currentPrice <= bestGap.gapHigh;
-    const isBearishSetup = bestGap.type === "bearish" && currentPrice <= bestGap.gapHigh && currentPrice >= bestGap.gapLow;
+    const isBullishSetup =
+      bestGap.type === "bullish" &&
+      currentPrice >= bestGap.gapLow &&
+      currentPrice <= bestGap.gapHigh;
+    const isBearishSetup =
+      bestGap.type === "bearish" &&
+      currentPrice <= bestGap.gapHigh &&
+      currentPrice >= bestGap.gapLow;
     const isApproaching =
-      (bestGap.type === "bullish" && currentPrice > bestGap.gapLow - proximityThreshold && currentPrice <= bestGap.gapHigh) ||
-      (bestGap.type === "bearish" && currentPrice < bestGap.gapHigh + proximityThreshold && currentPrice >= bestGap.gapLow);
+      (bestGap.type === "bullish" &&
+        currentPrice > bestGap.gapLow - proximityThreshold &&
+        currentPrice <= bestGap.gapHigh) ||
+      (bestGap.type === "bearish" &&
+        currentPrice < bestGap.gapHigh + proximityThreshold &&
+        currentPrice >= bestGap.gapLow);
 
     if (!isBullishSetup && !isBearishSetup && !isApproaching) {
       return this.notDetected("Price not approaching any unfilled gap");
@@ -169,7 +179,7 @@ export class FairValueGapsStrategy extends BaseStrategy {
     const reasons: string[] = [];
     reasons.push(
       `${bestGap.type} FVG at ${bestGap.gapLow.toFixed(2)}-${bestGap.gapHigh.toFixed(2)} ` +
-      `(${(bestGap.gapSize / atr.current).toFixed(1)}x ATR)`
+        `(${(bestGap.gapSize / atr.current).toFixed(1)}x ATR)`,
     );
     if (isBullishSetup || isBearishSetup) {
       reasons.push("Price inside the gap zone");
@@ -244,10 +254,7 @@ export class FairValueGapsStrategy extends BaseStrategy {
     }
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", 100);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const atr = this.calculateATR(candles);
@@ -261,8 +268,10 @@ export class FairValueGapsStrategy extends BaseStrategy {
 
     const entryPrice = nearbyGap ? (nearbyGap.gapHigh + nearbyGap.gapLow) / 2 : currentPrice;
     const stopLoss = nearbyGap
-      ? (nearbyGap.type === "bullish" ? nearbyGap.gapLow - atrVal : nearbyGap.gapHigh + atrVal)
-      : (currentPrice - atrVal * 1.5);
+      ? nearbyGap.type === "bullish"
+        ? nearbyGap.gapLow - atrVal
+        : nearbyGap.gapHigh + atrVal
+      : currentPrice - atrVal * 1.5;
 
     const risk = Math.abs(entryPrice - stopLoss);
     const takeProfits = [
@@ -335,7 +344,7 @@ When creating a plan using the Fair Value Gaps strategy:
     bar: OHLC,
     _index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     const price = bar.close;
     const { rsi14, ema50, volumeRatio, atr14 } = indicators;
@@ -394,13 +403,7 @@ When creating a plan using the Fair Value Gaps strategy:
    * Get required indicators for backtesting.
    */
   override getRequiredIndicators(): string[] {
-    return [
-      "ema50",
-      "rsi14",
-      "atr14",
-      "volumeRatio",
-      "volumeAvg20",
-    ];
+    return ["ema50", "rsi14", "atr14", "volumeRatio", "volumeAvg20"];
   }
 }
 

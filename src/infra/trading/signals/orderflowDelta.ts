@@ -87,12 +87,19 @@ export const DEFAULT_ORDERFLOW_CONFIG: OrderflowConfig = {
  *   - Close near low → more selling pressure
  *   - This is the same method used by professional orderflow tools
  */
-function decomposeVolume(candle: OHLCV, config: OrderflowConfig): DeltaBar {
-  const { open, high, low, close, volume } = candle;
+function decomposeVolume(candle: OHLCV, _config: OrderflowConfig): DeltaBar {
+  const { high, low, close, volume } = candle;
   const range = high - low;
 
   if (range === 0 || volume === 0) {
-    return { buyVolume: 0, sellVolume: 0, delta: 0, deltaRatio: 0, poc: close, buyerDominated: false };
+    return {
+      buyVolume: 0,
+      sellVolume: 0,
+      delta: 0,
+      deltaRatio: 0,
+      poc: close,
+      buyerDominated: false,
+    };
   }
 
   // Close position within range (0 = at low, 1 = at high)
@@ -136,8 +143,12 @@ export function analyzeOrderflow(
 ): OrderflowResult {
   if (candles.length === 0) {
     return {
-      bars: [], cumulativeDelta: [], currentCumDelta: 0,
-      cumDeltaTrend: "flat", avgDeltaRatio: 0, signal: "neutral",
+      bars: [],
+      cumulativeDelta: [],
+      currentCumDelta: 0,
+      cumDeltaTrend: "flat",
+      avgDeltaRatio: 0,
+      signal: "neutral",
       summary: "No data.",
     };
   }
@@ -170,14 +181,14 @@ export function analyzeOrderflow(
   }
 
   // Average delta ratio
-  const avgDeltaRatio = bars.length > 0
-    ? bars.reduce((s, b) => s + b.deltaRatio, 0) / bars.length
-    : 0;
+  const avgDeltaRatio =
+    bars.length > 0 ? bars.reduce((s, b) => s + b.deltaRatio, 0) / bars.length : 0;
 
   // Signal
   const recentBars = bars.slice(-5);
   const recentBuyDominated = recentBars.filter((b) => b.buyerDominated).length;
-  const recentAvgDeltaRatio = recentBars.reduce((s, b) => s + b.deltaRatio, 0) / Math.max(1, recentBars.length);
+  const recentAvgDeltaRatio =
+    recentBars.reduce((s, b) => s + b.deltaRatio, 0) / Math.max(1, recentBars.length);
 
   let signal: OrderflowResult["signal"];
   if (cumDeltaTrend === "rising" && recentBuyDominated >= 4 && recentAvgDeltaRatio > 0.15) {
@@ -192,7 +203,8 @@ export function analyzeOrderflow(
     signal = "neutral";
   }
 
-  const summary = `Cumulative delta: ${cumDelta > 0 ? "+" : ""}${cumDelta.toFixed(0)} (${cumDeltaTrend}) | ` +
+  const summary =
+    `Cumulative delta: ${cumDelta > 0 ? "+" : ""}${cumDelta.toFixed(0)} (${cumDeltaTrend}) | ` +
     `Avg delta ratio: ${(avgDeltaRatio * 100).toFixed(1)}% | ` +
     `Recent: ${recentBuyDominated}/5 bars buyer-dominated | ` +
     `Signal: ${signal.replace("_", " ")}`;

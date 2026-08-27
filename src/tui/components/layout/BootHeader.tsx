@@ -1,13 +1,7 @@
-import React from "react";
+import type React from "react";
 import { Box, Text } from "../../ink-custom";
-import {
-  GORDON_LOGO,
-  FULL_LOGO_MIN_COLUMNS,
-} from "../../boot/banner.ts";
-import {
-  formatAge,
-  type BootStaticInfo,
-} from "../../boot/bootComposition.ts";
+import { GORDON_LOGO, FULL_LOGO_MIN_COLUMNS } from "../../boot/banner.ts";
+import { formatAge, type BootStaticInfo } from "../../boot/bootComposition.ts";
 import type { KillSwitchKey } from "../../../infra/safety/killSwitches.ts";
 import type { OutboundFetchGuardStatus } from "../../../infra/safety/outboundFetchGuard.ts";
 import type { FilesystemWriteGuardStatus } from "../../../infra/safety/filesystemWriteGuardInstaller.ts";
@@ -78,7 +72,9 @@ function Banner({ columns, version }: { columns: number; version: string }): Rea
   return (
     <Box flexDirection="column">
       <Box>
-        <Text color={TEAL} bold>{"  ≫ GORDON"}</Text>
+        <Text color={TEAL} bold>
+          {"  ≫ GORDON"}
+        </Text>
         <Text dimColor>{`  v${version}`}</Text>
       </Box>
       <Text dimColor>{"  The Frontier Trading Agent · General Liquidity, Inc."}</Text>
@@ -86,7 +82,10 @@ function Banner({ columns, version }: { columns: number; version: string }): Rea
   );
 }
 
-function GuardValue({ name, status }: {
+function GuardValue({
+  name,
+  status,
+}: {
   name: string;
   status: OutboundFetchGuardStatus | FilesystemWriteGuardStatus;
 }): React.JSX.Element {
@@ -94,7 +93,9 @@ function GuardValue({ name, status }: {
     return (
       <>
         <Text>{name} </Text>
-        <Text color="red" bold>✗ NOT INSTALLED</Text>
+        <Text color="red" bold>
+          ✗ NOT INSTALLED
+        </Text>
       </>
     );
   }
@@ -118,7 +119,12 @@ function GuardValue({ name, status }: {
 function SwitchesValue({ info }: { info: BootStaticInfo }): React.JSX.Element {
   if (info.trippedSwitches.length === 0) return <Text dimColor>none tripped</Text>;
   const firm = info.trippedSwitches.find((entry) => entry.key.scope === "firm");
-  if (firm) return <Text color="red" bold>HALTED: firm — {firm.reason}</Text>;
+  if (firm)
+    return (
+      <Text color="red" bold>
+        HALTED: firm — {firm.reason}
+      </Text>
+    );
   return (
     <Text color="red" bold>
       tripped: {info.trippedSwitches.map((entry) => keyToString(entry.key)).join(", ")}
@@ -134,10 +140,20 @@ function RadarValue({ info }: { info: BootStaticInfo }): React.JSX.Element {
   if (radar.lastCardAgeMs === null) {
     return <Text>{radar.producerCount} producers · warming up</Text>;
   }
-  return <Text>{radar.producerCount} producers · last card {formatAge(radar.lastCardAgeMs)} ago</Text>;
+  return (
+    <Text>
+      {radar.producerCount} producers · last card {formatAge(radar.lastCardAgeMs)} ago
+    </Text>
+  );
 }
 
-function SessionBox({ info, columns }: { info: BootStaticInfo; columns: number }): React.JSX.Element {
+function SessionBox({
+  info,
+  columns,
+}: {
+  info: BootStaticInfo;
+  columns: number;
+}): React.JSX.Element {
   const title = "session";
   const boxWidth = Math.min(columns - 1, 64);
   const topFill = "─".repeat(Math.max(0, boxWidth - title.length - 5));
@@ -164,12 +180,17 @@ function SessionBox({ info, columns }: { info: BootStaticInfo; columns: number }
       >
         <Row label="model">
           <Text>{modelValue}</Text>
-          {showHints && <Text dimColor>  /model to change</Text>}
+          {showHints && <Text dimColor> /model to change</Text>}
         </Row>
         <Row label="mode">
           <Text color={modeColor}>{info.permissionMode}</Text>
-          {isPaper && <Text color="yellow" bold> [PAPER]</Text>}
-          {showHints && <Text dimColor>  {isPaper ? "/live to exit" : "/auto to change"}</Text>}
+          {isPaper && (
+            <Text color="yellow" bold>
+              {" "}
+              [PAPER]
+            </Text>
+          )}
+          {showHints && <Text dimColor> {isPaper ? "/live to exit" : "/auto to change"}</Text>}
         </Row>
         <Row label="thread">
           <Text>{info.threadDisplay}</Text>
@@ -194,7 +215,13 @@ function SessionBox({ info, columns }: { info: BootStaticInfo; columns: number }
 }
 
 /** Banner + session box as one native-Ink block. Render inside <Static>. */
-export function BootHeader({ info, columns }: { info: BootStaticInfo; columns: number }): React.JSX.Element {
+export function BootHeader({
+  info,
+  columns,
+}: {
+  info: BootStaticInfo;
+  columns: number;
+}): React.JSX.Element {
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Banner columns={columns} version={info.version} />

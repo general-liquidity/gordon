@@ -88,7 +88,7 @@ export interface TradeConsistencyResult {
   summary: string;
 }
 
-const DEFAULT_STRATEGY_WEIGHT = 0.30;
+const DEFAULT_STRATEGY_WEIGHT = 0.3;
 const DEFAULT_ENTRY_WEIGHT = 0.25;
 const DEFAULT_STOP_WEIGHT = 0.225;
 const DEFAULT_TARGET_WEIGHT = 0.225;
@@ -126,9 +126,9 @@ function cvToSubscore(cvValue: number, ceiling: number): number {
 }
 
 function classifyVerdict(score: number): ConsistencyVerdict {
-  if (score >= 0.80) return "highly_consistent";
-  if (score >= 0.60) return "moderately_consistent";
-  if (score >= 0.40) return "inconsistent";
+  if (score >= 0.8) return "highly_consistent";
+  if (score >= 0.6) return "moderately_consistent";
+  if (score >= 0.4) return "inconsistent";
   return "highly_inconsistent";
 }
 

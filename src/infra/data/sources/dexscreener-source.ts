@@ -140,10 +140,7 @@ export class DexScreenerDataSource implements DataSource {
     pairAddress: string,
     signal: AbortSignal,
   ): Promise<DexScreenerPair | undefined> {
-    const body = await this.getJson(
-      `${BASE_URL}/latest/dex/pairs/${slug}/${pairAddress}`,
-      signal,
-    );
+    const body = await this.getJson(`${BASE_URL}/latest/dex/pairs/${slug}/${pairAddress}`, signal);
     if (!body) return undefined;
     if (body.pair) return body.pair;
     return body.pairs?.[0];

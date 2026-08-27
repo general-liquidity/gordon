@@ -29,7 +29,7 @@ describe("analyzeBreakoutFailureRegime", () => {
     const events = buildEvents(2, 18);
     const r = analyzeBreakoutFailureRegime(events);
     expect(r.verdict).toBe("healthy_bull");
-    expect(r.failureRate).toBeCloseTo(0.10, 4);
+    expect(r.failureRate).toBeCloseTo(0.1, 4);
   });
 
   test("weakening: 40% failure rate", () => {
@@ -55,7 +55,7 @@ describe("analyzeBreakoutFailureRegime", () => {
     const r = analyzeBreakoutFailureRegime(events);
     expect(r.evaluatedEvents).toBe(20);
     expect(r.pendingEvents).toBe(5);
-    expect(r.failureRate).toBeCloseTo(0.10, 4);
+    expect(r.failureRate).toBeCloseTo(0.1, 4);
   });
 
   test("only most recent windowSize events considered", () => {
@@ -74,7 +74,7 @@ describe("analyzeBreakoutFailureRegime", () => {
     const def = analyzeBreakoutFailureRegime(events);
     expect(def.verdict).toBe("weakening"); // 35% > 30%
     const strict = analyzeBreakoutFailureRegime(events, {
-      healthyBullCeiling: 0.40,
+      healthyBullCeiling: 0.4,
       weakeningCeiling: 0.55,
       bearLikeCeiling: 0.75,
     });

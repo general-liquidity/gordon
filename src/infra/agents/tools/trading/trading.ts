@@ -15,7 +15,11 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { generatePlan } from "../../../../core/pipeline/planner.ts";
-import { executePlan, closeTrade, closePartialPosition } from "../../../../core/pipeline/executor.ts";
+import {
+  executePlan,
+  closeTrade,
+  closePartialPosition,
+} from "../../../../core/pipeline/executor.ts";
 import { runHooks, registerHook } from "../../../hooks/engine.ts";
 import { createPriceDeviationHookDefinition } from "../../../hooks/priceDeviationHook.ts";
 
@@ -26,16 +30,18 @@ import { createPriceDeviationHookDefinition } from "../../../hooks/priceDeviatio
 registerHook(createPriceDeviationHookDefinition());
 import { analyze } from "../../../../core/pipeline/analyzer.ts";
 import { calculateGridLevels } from "../../../../core/orders/grid-calculator.ts";
-import {
-  getTrailingStopTracker,
-  type TrailingStopConfig,
-} from "../../../../core/orders/trailing-stop.ts";
+import { getTrailingStopTracker } from "../../../../core/orders/trailing-stop.ts";
 import { PlanSchema } from "../../../../types/plan.ts";
 import { TradeSchema } from "../../../../types/trade.ts";
 import { emitEvent } from "../../../../events/index.ts";
 import { recordStructuredObservation } from "../../../platform/observability/index.ts";
 import { appendActionLogEntry } from "../../../action-log/index.ts";
-import { appendExecutionRecordFresh, readExecutionRecords, getExecutionRecord, executionRecordToPayload } from "../../../safety/tradeLedger.ts";
+import {
+  appendExecutionRecordFresh,
+  readExecutionRecords,
+  getExecutionRecord,
+  executionRecordToPayload,
+} from "../../../safety/tradeLedger.ts";
 import { checkKillSwitchForOrder } from "../../../safety/killSwitchGate.ts";
 import {
   isPreTradeRateControlsEnabled,
@@ -65,7 +71,12 @@ import {
 } from "../../../storage/entities/plans.ts";
 import { validateTrade } from "../../middleware/guardrails.ts";
 import { listTrades, getTrade } from "../../../storage/entities/trades.ts";
-import { getGordonContext, normalizeSymbol, validateToolOutput, type MastraExecutionContext } from "../types.ts";
+import {
+  getGordonContext,
+  normalizeSymbol,
+  validateToolOutput,
+  type MastraExecutionContext,
+} from "../types.ts";
 import { checkTradingPermission } from "../runtime/permissionHelpers.ts";
 import { setSandboxOverride } from "../../../runtime/sandboxOverride.ts";
 import { ExchangeFactory } from "../../../exchange/index.ts";
@@ -73,7 +84,6 @@ import { BrokerFactory } from "../../../broker/factory.ts";
 import { reflectOnPlan, formatReflectionSummary } from "../../cognition/reflection.ts";
 import { getTradingService } from "../../../../services/trading.service.ts";
 import {
-  recordUserThesis,
   requiresUserThesis,
   getUserThesis,
   computeThesisDivergence,
@@ -85,10 +95,7 @@ import {
 } from "../../../safety/index.ts";
 import { classifyBlockedStatus } from "../../../observability/blockedClassification.ts";
 import { recordDecision } from "../../memory/decisionLog.ts";
-import {
-  scoreConfluences,
-  scoreToPayload,
-} from "../../../trading/ops/confluenceScorer.ts";
+import { scoreConfluences, scoreToPayload } from "../../../trading/ops/confluenceScorer.ts";
 import {
   selectPlaybookForStrategy,
   attachExecution,
@@ -102,9 +109,7 @@ import {
 } from "../../../trading/ops/terminationLayers.ts";
 import { buildTerminationPreTradeFromPlan } from "../../../trading/ops/terminationPreTrade.ts";
 import { recordExecutedPlanPosition } from "../../../../core/positions/executionSync.ts";
-import {
-  recordFriction,
-} from "../../../trading/ops/frictionTracker.ts";
+import { recordFriction } from "../../../trading/ops/frictionTracker.ts";
 import {
   createSafeOrderSubmitter,
   runExecutionPreflight,
@@ -142,12 +147,14 @@ const createPlanOutputSchema = z.object({
   plan: PlanSchema.optional(),
   summary: z.string().optional(),
   error: z.string().optional(),
-  reflection: z.object({
-    isValid: z.boolean(),
-    issues: z.array(z.string()),
-    suggestions: z.array(z.string()),
-    confidence: z.number(),
-  }).optional(),
+  reflection: z
+    .object({
+      isValid: z.boolean(),
+      issues: z.array(z.string()),
+      suggestions: z.array(z.string()),
+      confidence: z.number(),
+    })
+    .optional(),
   warnings: z.array(z.string()).optional(),
 });
 
@@ -166,16 +173,18 @@ const closeTradeOutputSchema = z.object({
 
 const listPlansOutputSchema = z.object({
   count: z.number(),
-  plans: z.array(z.object({
-    id: z.string(),
-    symbol: z.string(),
-    strategy: z.string(),
-    status: z.string(),
-    allocation: z.number(),
-    entry: z.union([z.number(), z.string()]),
-    stopLoss: z.number(),
-    createdAt: z.string(),
-  })),
+  plans: z.array(
+    z.object({
+      id: z.string(),
+      symbol: z.string(),
+      strategy: z.string(),
+      status: z.string(),
+      allocation: z.number(),
+      entry: z.union([z.number(), z.string()]),
+      stopLoss: z.number(),
+      createdAt: z.string(),
+    }),
+  ),
 });
 
 const approvePlanOutputSchema = z.object({
@@ -195,52 +204,60 @@ const setPermissionModeOutputSchema = z.object({
 
 const createGridPlanOutputSchema = z.object({
   success: z.boolean().optional(),
-  planPreview: z.object({
-    symbol: z.string(),
-    strategy: z.string(),
-    grid: z.object({
-      levels: z.array(z.object({
-        price: z.number(),
-        percentOfAllocation: z.number(),
-      })),
-      distribution: z.enum(["pyramid", "equal"]),
-      priceRange: z.object({
-        high: z.number(),
-        low: z.number(),
+  planPreview: z
+    .object({
+      symbol: z.string(),
+      strategy: z.string(),
+      grid: z.object({
+        levels: z.array(
+          z.object({
+            price: z.number(),
+            percentOfAllocation: z.number(),
+          }),
+        ),
+        distribution: z.enum(["pyramid", "equal"]),
+        priceRange: z.object({
+          high: z.number(),
+          low: z.number(),
+        }),
       }),
-    }),
-    stopLoss: z.number(),
-    takeProfits: z.array(z.number()),
-    allocation: z.object({
-      amount: z.number(),
-      percentOfPortfolio: z.number(),
-    }),
-    weightedEntry: z.number(),
-  }).optional(),
+      stopLoss: z.number(),
+      takeProfits: z.array(z.number()),
+      allocation: z.object({
+        amount: z.number(),
+        percentOfPortfolio: z.number(),
+      }),
+      weightedEntry: z.number(),
+    })
+    .optional(),
   message: z.string().optional(),
   error: z.string().optional(),
-  reflection: z.object({
-    isValid: z.boolean(),
-    issues: z.array(z.string()),
-    suggestions: z.array(z.string()),
-    confidence: z.number(),
-  }).optional(),
+  reflection: z
+    .object({
+      isValid: z.boolean(),
+      issues: z.array(z.string()),
+      suggestions: z.array(z.string()),
+      confidence: z.number(),
+    })
+    .optional(),
   warnings: z.array(z.string()).optional(),
 });
 
 const setTrailingStopOutputSchema = z.object({
   success: z.boolean(),
-  trailingStop: z.object({
-    id: z.string(),
-    tradeId: z.string(),
-    symbol: z.string(),
-    type: z.enum(["percentage", "atr"]),
-    trailDistance: z.number(),
-    activationPrice: z.number().optional(),
-    isActive: z.boolean(),
-    currentStopPrice: z.number(),
-    highestPrice: z.number(),
-  }).optional(),
+  trailingStop: z
+    .object({
+      id: z.string(),
+      tradeId: z.string(),
+      symbol: z.string(),
+      type: z.enum(["percentage", "atr"]),
+      trailDistance: z.number(),
+      activationPrice: z.number().optional(),
+      isActive: z.boolean(),
+      currentStopPrice: z.number(),
+      highestPrice: z.number(),
+    })
+    .optional(),
   message: z.string().optional(),
   error: z.string().optional(),
 });
@@ -278,10 +295,7 @@ export const createPlanTool = createTool({
     "Use this when the user wants to trade a coin, e.g., 'buy BTC' or 'create plan for ETH'",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair symbol (e.g., 'BTCUSDT')"),
-    riskLevel: z
-      .enum(["low", "medium", "high"])
-      .default("medium")
-      .describe("Risk tolerance"),
+    riskLevel: z.enum(["low", "medium", "high"]).default("medium").describe("Risk tolerance"),
     allocationPercent: z
       .number()
       .min(0.01)
@@ -305,10 +319,17 @@ export const createPlanTool = createTool({
       .describe("Specific strategy to use (auto-detected if not specified)"),
   }),
   outputSchema: createPlanOutputSchema,
-  execute: async ({ symbol, riskLevel, allocationPercent, strategyId }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, riskLevel, allocationPercent, strategyId },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange || !ctx?.llm) {
-      return validateToolOutput(createPlanOutputSchema, { error: "Exchange or LLM client not connected." }, { toolName: "create_plan" });
+      return validateToolOutput(
+        createPlanOutputSchema,
+        { error: "Exchange or LLM client not connected." },
+        { toolName: "create_plan" },
+      );
     }
 
     // Normalize symbol
@@ -492,7 +513,10 @@ export const executePlanTool = createTool({
       ),
   }),
   outputSchema: executePlanOutputSchema,
-  execute: async ({ planId, rationale, acknowledgedRisks }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { planId, rationale, acknowledgedRisks },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       recordStructuredObservation({
@@ -508,7 +532,11 @@ export const executePlanTool = createTool({
         reason: errors.noExchange.error,
         details: { rationale },
       });
-      return validateToolOutput(executePlanOutputSchema, { ...errors.noExchange, success: false }, { toolName: "execute_plan" });
+      return validateToolOutput(
+        executePlanOutputSchema,
+        { ...errors.noExchange, success: false },
+        { toolName: "execute_plan" },
+      );
     }
 
     const plan = getPlan(planId);
@@ -526,7 +554,11 @@ export const executePlanTool = createTool({
         reason: `Plan not found: ${planId}`,
         details: { rationale },
       });
-      return validateToolOutput(executePlanOutputSchema, { success: false, error: `Plan not found: ${planId}` }, { toolName: "execute_plan" });
+      return validateToolOutput(
+        executePlanOutputSchema,
+        { success: false, error: `Plan not found: ${planId}` },
+        { toolName: "execute_plan" },
+      );
     }
 
     // Plan-state gate: a plan must be APPROVED to execute. This enforces the
@@ -550,10 +582,18 @@ export const executePlanTool = createTool({
         reason: `Plan ${planId} is ${plan.status}, not APPROVED.`,
         details: { rationale, currentStatus: plan.status },
       });
-      const hint = plan.status === "DRAFT"
-        ? "Call approve_plan first."
-        : "A plan that is already EXECUTING/CLOSED/CANCELLED cannot be re-executed.";
-      return validateToolOutput(executePlanOutputSchema, { success: false, error: `Plan ${planId} is in ${plan.status} status, not APPROVED. ${hint}` }, { toolName: "execute_plan" });
+      const hint =
+        plan.status === "DRAFT"
+          ? "Call approve_plan first."
+          : "A plan that is already EXECUTING/CLOSED/CANCELLED cannot be re-executed.";
+      return validateToolOutput(
+        executePlanOutputSchema,
+        {
+          success: false,
+          error: `Plan ${planId} is in ${plan.status} status, not APPROVED. ${hint}`,
+        },
+        { toolName: "execute_plan" },
+      );
     }
 
     // Approval content binding: approve_plan stored a hash over the
@@ -580,10 +620,14 @@ export const executePlanTool = createTool({
         reason,
         details: { rationale, approvedContentHash, currentContentHash },
       });
-      return validateToolOutput(executePlanOutputSchema, {
-        success: false,
-        error: reason,
-      }, { toolName: "execute_plan" });
+      return validateToolOutput(
+        executePlanOutputSchema,
+        {
+          success: false,
+          error: reason,
+        },
+        { toolName: "execute_plan" },
+      );
     }
 
     const killBlock = checkKillSwitchForOrder(ctx, {
@@ -608,16 +652,19 @@ export const executePlanTool = createTool({
           ...killBlock.payload,
         },
       });
-      return validateToolOutput(executePlanOutputSchema, {
-        success: false,
-        error: killBlock.error,
-      }, { toolName: "execute_plan" });
+      return validateToolOutput(
+        executePlanOutputSchema,
+        {
+          success: false,
+          error: killBlock.error,
+        },
+        { toolName: "execute_plan" },
+      );
     }
 
     const constitutionHalt = activeConstitutionHalt();
     if (constitutionHalt) {
-      const reason =
-        `Trading constitution halt active (${constitutionHalt.rule}): ${constitutionHalt.message}`;
+      const reason = `Trading constitution halt active (${constitutionHalt.rule}): ${constitutionHalt.message}`;
       recordStructuredObservation({
         eventType: "execution.blocked",
         workflow: "execution",
@@ -632,10 +679,14 @@ export const executePlanTool = createTool({
         reason,
         details: { rationale, rule: constitutionHalt.rule },
       });
-      return validateToolOutput(executePlanOutputSchema, {
-        success: false,
-        error: reason,
-      }, { toolName: "execute_plan" });
+      return validateToolOutput(
+        executePlanOutputSchema,
+        {
+          success: false,
+          error: reason,
+        },
+        { toolName: "execute_plan" },
+      );
     }
 
     let wipSlotClaimed = false;
@@ -657,10 +708,14 @@ export const executePlanTool = createTool({
           reason: wipGate.message,
           details: wipResultToPayload(wipGate),
         });
-        return validateToolOutput(executePlanOutputSchema, {
-          success: false,
-          error: wipGate.message,
-        }, { toolName: "execute_plan" });
+        return validateToolOutput(
+          executePlanOutputSchema,
+          {
+            success: false,
+            error: wipGate.message,
+          },
+          { toolName: "execute_plan" },
+        );
       }
       // Claim the slot here, not after submit: gate and claim run with no
       // await between them, so a concurrent execute_plan on the same symbol
@@ -672,44 +727,8 @@ export const executePlanTool = createTool({
     // The claim above must be released on every exit path below, including a
     // throw, unless execution actually took the slot (wipSlotCommitted).
     try {
-
-    recordStructuredObservation({
-      eventType: "execution.rationale_recorded",
-      workflow: "execution",
-      source: "agent_tool",
-      component: "execute_plan",
-      toolName: "execute_plan",
-      outcome: "info",
-      planId,
-      symbol: plan.symbol,
-      details: { rationale },
-    });
-
-    // Explain-before-execute gate (GORDON_EXPLAIN_FIRST)
-    const thesisReq = requiresUserThesis(planId);
-    if (thesisReq.required) {
       recordStructuredObservation({
-        eventType: "execution.blocked",
-        workflow: "execution",
-        source: "agent_tool",
-        component: "execute_plan",
-        toolName: "execute_plan",
-        outcome: "failure",
-        status: "explain_first_missing_thesis",
-        controllability: classifyBlockedStatus("explain_first_missing_thesis"),
-        planId,
-        symbol: plan.symbol,
-        reason: thesisReq.reason ?? "User thesis required",
-      });
-      return validateToolOutput(executePlanOutputSchema, {
-        success: false,
-        error: thesisReq.reason ?? "User thesis required before execution.",
-      }, { toolName: "execute_plan" });
-    }
-    const thesis = getUserThesis(planId);
-    if (thesis) {
-      recordStructuredObservation({
-        eventType: "execution.thesis_observed",
+        eventType: "execution.rationale_recorded",
         workflow: "execution",
         source: "agent_tool",
         component: "execute_plan",
@@ -717,396 +736,508 @@ export const executePlanTool = createTool({
         outcome: "info",
         planId,
         symbol: plan.symbol,
-        details: {
-          thesis: thesis.thesis,
-          divergenceFromRationale: computeThesisDivergence(thesis.thesis, rationale),
-        },
+        details: { rationale },
       });
-    }
 
-    // Anti-rot gates (artifact-rot defenses translated from k10s.dev's
-    // "I'm going back to writing code by hand" — universe scope sentinel,
-    // thesis coherence, per-strategy mandate). All inert without flags.
-    const venue = ctx.exchange?.exchangeId;
-    // Symbol-aware: on multi-asset venues (FX/metals/crypto side by side) the
-    // symbol disambiguates the class where the venue can't (e.g. XAUUSD, EURUSD).
-    const inferredAssetClass = inferAssetClass(venue, plan.symbol);
+      // Explain-before-execute gate (GORDON_EXPLAIN_FIRST)
+      const thesisReq = requiresUserThesis(planId);
+      if (thesisReq.required) {
+        recordStructuredObservation({
+          eventType: "execution.blocked",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "failure",
+          status: "explain_first_missing_thesis",
+          controllability: classifyBlockedStatus("explain_first_missing_thesis"),
+          planId,
+          symbol: plan.symbol,
+          reason: thesisReq.reason ?? "User thesis required",
+        });
+        return validateToolOutput(
+          executePlanOutputSchema,
+          {
+            success: false,
+            error: thesisReq.reason ?? "User thesis required before execution.",
+          },
+          { toolName: "execute_plan" },
+        );
+      }
+      const thesis = getUserThesis(planId);
+      if (thesis) {
+        recordStructuredObservation({
+          eventType: "execution.thesis_observed",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "info",
+          planId,
+          symbol: plan.symbol,
+          details: {
+            thesis: thesis.thesis,
+            divergenceFromRationale: computeThesisDivergence(thesis.thesis, rationale),
+          },
+        });
+      }
 
-    // (a) Trading universe scope sentinel
-    const universeResult = checkUniverse({
-      symbol: plan.symbol,
-      assetClass: inferredAssetClass !== "unknown" ? inferredAssetClass : undefined,
-      venue,
-    });
-    if (!universeResult.allowed) {
-      recordStructuredObservation({
-        eventType: "execution.blocked",
-        workflow: "execution",
-        source: "agent_tool",
-        component: "execute_plan",
-        toolName: "execute_plan",
-        outcome: "failure",
-        status: "outside_trading_universe",
-        controllability: classifyBlockedStatus("outside_trading_universe"),
-        planId,
+      // Anti-rot gates (artifact-rot defenses translated from k10s.dev's
+      // "I'm going back to writing code by hand" — universe scope sentinel,
+      // thesis coherence, per-strategy mandate). All inert without flags.
+      const venue = ctx.exchange?.exchangeId;
+      // Symbol-aware: on multi-asset venues (FX/metals/crypto side by side) the
+      // symbol disambiguates the class where the venue can't (e.g. XAUUSD, EURUSD).
+      const inferredAssetClass = inferAssetClass(venue, plan.symbol);
+
+      // (a) Trading universe scope sentinel
+      const universeResult = checkUniverse({
         symbol: plan.symbol,
-        reason: universeResult.reason,
-        details: { violations: universeResult.violations },
-      });
-      return validateToolOutput(executePlanOutputSchema, {
-        success: false,
-        error: universeResult.reason ?? "Plan outside declared trading universe.",
-      }, { toolName: "execute_plan" });
-    }
-
-    // (b) Portfolio coherence with running thesis
-    const coherenceResult = gateCoherence({
-      direction: plan.direction,
-      assetClass: inferredAssetClass !== "unknown" ? inferredAssetClass : undefined,
-    });
-    if (!coherenceResult.ok) {
-      recordStructuredObservation({
-        eventType: "execution.blocked",
-        workflow: "execution",
-        source: "agent_tool",
-        component: "execute_plan",
-        toolName: "execute_plan",
-        outcome: "failure",
-        status: "thesis_coherence_insufficient",
-        controllability: classifyBlockedStatus("thesis_coherence_insufficient"),
-        planId,
-        symbol: plan.symbol,
-        reason: coherenceResult.reason,
-        details: {
-          score: coherenceResult.score,
-          threshold: coherenceResult.threshold,
-          failures: coherenceResult.failures,
-        },
-      });
-      return validateToolOutput(executePlanOutputSchema, {
-        success: false,
-        error: coherenceResult.reason ?? "Plan coherence below threshold.",
-      }, { toolName: "execute_plan" });
-    }
-
-    // (c) Per-strategy mandate gate (uses current portfolio state for budget check)
-    const mandateResult = gateAgainstMandate(
-      {
         assetClass: inferredAssetClass !== "unknown" ? inferredAssetClass : undefined,
         venue,
-        strategyTag: plan.strategy,
-        proposedPositionPct: plan.allocation.percentOfPortfolio,
-      },
+      });
+      if (!universeResult.allowed) {
+        recordStructuredObservation({
+          eventType: "execution.blocked",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "failure",
+          status: "outside_trading_universe",
+          controllability: classifyBlockedStatus("outside_trading_universe"),
+          planId,
+          symbol: plan.symbol,
+          reason: universeResult.reason,
+          details: { violations: universeResult.violations },
+        });
+        return validateToolOutput(
+          executePlanOutputSchema,
+          {
+            success: false,
+            error: universeResult.reason ?? "Plan outside declared trading universe.",
+          },
+          { toolName: "execute_plan" },
+        );
+      }
+
+      // (b) Portfolio coherence with running thesis
+      const coherenceResult = gateCoherence({
+        direction: plan.direction,
+        assetClass: inferredAssetClass !== "unknown" ? inferredAssetClass : undefined,
+      });
+      if (!coherenceResult.ok) {
+        recordStructuredObservation({
+          eventType: "execution.blocked",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "failure",
+          status: "thesis_coherence_insufficient",
+          controllability: classifyBlockedStatus("thesis_coherence_insufficient"),
+          planId,
+          symbol: plan.symbol,
+          reason: coherenceResult.reason,
+          details: {
+            score: coherenceResult.score,
+            threshold: coherenceResult.threshold,
+            failures: coherenceResult.failures,
+          },
+        });
+        return validateToolOutput(
+          executePlanOutputSchema,
+          {
+            success: false,
+            error: coherenceResult.reason ?? "Plan coherence below threshold.",
+          },
+          { toolName: "execute_plan" },
+        );
+      }
+
+      // (c) Per-strategy mandate gate (uses current portfolio state for budget check)
+      const mandateResult = gateAgainstMandate(
+        {
+          assetClass: inferredAssetClass !== "unknown" ? inferredAssetClass : undefined,
+          venue,
+          strategyTag: plan.strategy,
+          proposedPositionPct: plan.allocation.percentOfPortfolio,
+        },
+        {
+          // Budget approximations from live state; refined as positions
+          // are tagged to mandates in future iterations.
+          currentOpenPositions: getActiveTrades().length,
+          currentAllocationPct: 0,
+        },
+      );
+      if (!mandateResult.ok) {
+        recordStructuredObservation({
+          eventType: "execution.blocked",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "failure",
+          status: "strategy_mandate_violation",
+          controllability: classifyBlockedStatus("strategy_mandate_violation"),
+          planId,
+          symbol: plan.symbol,
+          reason: mandateResult.reason,
+          details: {
+            mandateId: mandateResult.mandate?.id,
+            violations: mandateResult.violations,
+          },
+        });
+        return validateToolOutput(
+          executePlanOutputSchema,
+          {
+            success: false,
+            error: mandateResult.reason ?? "Plan violates strategy mandate.",
+          },
+          { toolName: "execute_plan" },
+        );
+      }
+
+      // Permission mode gate: block execution for read-only / non-trading modes
+      const mode = ctx.config.permissionMode;
       {
-        // Budget approximations from live state; refined as positions
-        // are tagged to mandates in future iterations.
-        currentOpenPositions: getActiveTrades().length,
-        currentAllocationPct: 0,
-      },
-    );
-    if (!mandateResult.ok) {
-      recordStructuredObservation({
-        eventType: "execution.blocked",
-        workflow: "execution",
-        source: "agent_tool",
-        component: "execute_plan",
-        toolName: "execute_plan",
-        outcome: "failure",
-        status: "strategy_mandate_violation",
-        controllability: classifyBlockedStatus("strategy_mandate_violation"),
-        planId,
-        symbol: plan.symbol,
-        reason: mandateResult.reason,
-        details: {
-          mandateId: mandateResult.mandate?.id,
-          violations: mandateResult.violations,
-        },
-      });
-      return validateToolOutput(executePlanOutputSchema, {
-        success: false,
-        error: mandateResult.reason ?? "Plan violates strategy mandate.",
-      }, { toolName: "execute_plan" });
-    }
-
-    // Permission mode gate: block execution for read-only / non-trading modes
-    const mode = ctx.config.permissionMode;
-    {
-      const check = checkTradingPermission(mode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
-      if (!check.allowed) {
-        recordStructuredObservation({
-          eventType: "execution.blocked",
-          workflow: "execution",
-          source: "agent_tool",
-          component: "execute_plan",
-          toolName: "execute_plan",
-          outcome: "failure",
-          status: `${mode}_permission_mode`,
-          controllability: classifyBlockedStatus(`${mode}_permission_mode`),
-          mode,
-          planId,
-          symbol: plan.symbol,
-          reason: check.reason ?? `Cannot execute: permissionMode is '${mode}'.`,
+        const check = checkTradingPermission(mode, "execute", {
+          sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper,
         });
-        return validateToolOutput(executePlanOutputSchema, {
-          success: false,
-          error: check.reason ?? `Cannot execute: permissionMode is '${mode}'.`,
-        }, { toolName: "execute_plan" });
-      }
-    }
-
-    const planSide = plan.direction === "short" ? "SELL" : "BUY";
-    const planOrderSide = plan.direction === "short" ? "sell" : "buy";
-
-    // Live mark for the order-construction price gate and the fat-finger /
-    // price-deviation guard below. Multi-source quote first, then venue
-    // getPrice. Market entries fail closed when no usable quote exists.
-    let referencePrice: number | undefined;
-    let exchangePrice: number | undefined;
-    let quoteSourcesFailed: string[] = [];
-    let quoteDegradedReasons: string[] = [];
-    if (ctx.exchange) {
-      try {
-        const quoteSvc = new MultiSourceQuoteService([ctx.exchange], ctx.llm);
-        const enriched = await quoteSvc.getQuote(plan.symbol);
-        // Price-integrity degradation (source disagreement / rate limiting)
-        // means the merged price is disputed — never build orders from it.
-        // Enrichment-only degradation leaves the price itself trustworthy.
-        const priceIntegrityDegraded =
-          enriched.degraded &&
-          enriched.degradedReasons.some((r) => r !== "enrichment unavailable");
-        if (priceIntegrityDegraded) {
-          quoteDegradedReasons = enriched.degradedReasons;
-        } else {
-          referencePrice = enriched.price;
-        }
-      } catch (quoteErr) {
-        if (quoteErr instanceof QuoteUnavailableError) {
-          quoteSourcesFailed = quoteErr.sourcesFailed;
+        if (!check.allowed) {
+          recordStructuredObservation({
+            eventType: "execution.blocked",
+            workflow: "execution",
+            source: "agent_tool",
+            component: "execute_plan",
+            toolName: "execute_plan",
+            outcome: "failure",
+            status: `${mode}_permission_mode`,
+            controllability: classifyBlockedStatus(`${mode}_permission_mode`),
+            mode,
+            planId,
+            symbol: plan.symbol,
+            reason: check.reason ?? `Cannot execute: permissionMode is '${mode}'.`,
+          });
+          return validateToolOutput(
+            executePlanOutputSchema,
+            {
+              success: false,
+              error: check.reason ?? `Cannot execute: permissionMode is '${mode}'.`,
+            },
+            { toolName: "execute_plan" },
+          );
         }
       }
+
+      const planSide = plan.direction === "short" ? "SELL" : "BUY";
+      const planOrderSide = plan.direction === "short" ? "sell" : "buy";
+
+      // Live mark for the order-construction price gate and the fat-finger /
+      // price-deviation guard below. Multi-source quote first, then venue
+      // getPrice. Market entries fail closed when no usable quote exists.
+      let referencePrice: number | undefined;
+      let exchangePrice: number | undefined;
+      let quoteSourcesFailed: string[] = [];
+      let quoteDegradedReasons: string[] = [];
+      if (ctx.exchange) {
+        try {
+          const quoteSvc = new MultiSourceQuoteService([ctx.exchange], ctx.llm);
+          const enriched = await quoteSvc.getQuote(plan.symbol);
+          // Price-integrity degradation (source disagreement / rate limiting)
+          // means the merged price is disputed — never build orders from it.
+          // Enrichment-only degradation leaves the price itself trustworthy.
+          const priceIntegrityDegraded =
+            enriched.degraded &&
+            enriched.degradedReasons.some((r) => r !== "enrichment unavailable");
+          if (priceIntegrityDegraded) {
+            quoteDegradedReasons = enriched.degradedReasons;
+          } else {
+            referencePrice = enriched.price;
+          }
+        } catch (quoteErr) {
+          if (quoteErr instanceof QuoteUnavailableError) {
+            quoteSourcesFailed = quoteErr.sourcesFailed;
+          }
+        }
+        try {
+          exchangePrice = await ctx.exchange.getPrice(plan.symbol);
+        } catch {
+          exchangePrice = undefined;
+        }
+        if (referencePrice === undefined) {
+          referencePrice = exchangePrice;
+        }
+      }
+
+      // Order-construction price gate: every number an order would be built
+      // from must be finite and > 0. A NaN entry from a failed quote, a zero
+      // stop from a malformed plan, or a degraded venue quote must never reach
+      // order placement.
+      const isUsablePrice = (v: unknown): v is number =>
+        typeof v === "number" && Number.isFinite(v) && v > 0;
+      const priceFaults: string[] = [];
+      if (plan.entry.type !== "market" && !isUsablePrice(plan.entry.price)) {
+        priceFaults.push(`limit entry price (${plan.entry.price}) is not a finite number > 0`);
+      }
+      if (
+        plan.entry.type === "market" &&
+        plan.entry.price !== null &&
+        !isUsablePrice(plan.entry.price)
+      ) {
+        priceFaults.push(`entry reference price (${plan.entry.price}) is not a finite number > 0`);
+      }
+      if (!isUsablePrice(plan.stopLoss.price)) {
+        priceFaults.push(`stop-loss price (${plan.stopLoss.price}) is not a finite number > 0`);
+      }
+      for (const tp of plan.takeProfit) {
+        if (!isUsablePrice(tp.price)) {
+          priceFaults.push(`take-profit price (${tp.price}) is not a finite number > 0`);
+        }
+      }
+      if (!isUsablePrice(plan.allocation.amount)) {
+        priceFaults.push(
+          `allocation amount (${plan.allocation.amount}) is not a finite number > 0`,
+        );
+      }
+      if (exchangePrice !== undefined && !isUsablePrice(exchangePrice)) {
+        priceFaults.push(
+          `live quote for ${plan.symbol} (${exchangePrice}) is degraded — venue returned a non-positive or non-finite price; refusing to trade against a bad quote`,
+        );
+      }
+      if (plan.entry.type === "market" && !isUsablePrice(exchangePrice)) {
+        const details = [
+          quoteSourcesFailed.length > 0 ? `sources failed: ${quoteSourcesFailed.join(", ")}` : "",
+          quoteDegradedReasons.length > 0
+            ? `quote degraded: ${quoteDegradedReasons.join(", ")}`
+            : "",
+        ].filter(Boolean);
+        const sourceDetail = details.length > 0 ? ` (${details.join("; ")})` : "";
+        priceFaults.push(
+          `market entry requires a live reference price for ${plan.symbol} but none is available${sourceDetail}`,
+        );
+      }
+      if (quoteDegradedReasons.length > 0 && !isUsablePrice(exchangePrice)) {
+        priceFaults.push(
+          `multi-source quote for ${plan.symbol} is degraded (${quoteDegradedReasons.join(", ")}) and no independent venue price is available to cross-check — refusing to trade on a disputed quote`,
+        );
+      }
+      if (priceFaults.length > 0) {
+        const reason = `Order construction rejected — invalid price data: ${priceFaults.join("; ")}`;
+        recordStructuredObservation({
+          eventType: "execution.blocked",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "failure",
+          status: "invalid_price_data",
+          controllability: classifyBlockedStatus("invalid_price_data"),
+          planId,
+          symbol: plan.symbol,
+          reason,
+          details: { rationale, priceFaults, referencePrice },
+        });
+        return validateToolOutput(
+          executePlanOutputSchema,
+          {
+            success: false,
+            error: reason,
+          },
+          { toolName: "execute_plan" },
+        );
+      }
+
+      // Guardrails trade validation at the order-construction boundary
+      // (allocation cap + quantity/price sanity from middleware/guardrails.ts).
+      const constructionPriceBasis = plan.entry.price ?? referencePrice;
+      const tradeValidation = validateTrade({
+        symbol: plan.symbol,
+        side: planSide,
+        quantity: plan.allocation.amount / (constructionPriceBasis ?? 1),
+        price: constructionPriceBasis,
+        portfolioValue: ctx.portfolioValue,
+        maxAllocationPercent: ctx.config?.preferences?.maxAllocationPerTrade ?? 1,
+      });
+      if (!tradeValidation.valid) {
+        const reason = `Trade validation failed: ${tradeValidation.errors.join("; ")}`;
+        recordStructuredObservation({
+          eventType: "execution.blocked",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "failure",
+          status: "trade_validation_failed",
+          controllability: classifyBlockedStatus("trade_validation_failed"),
+          planId,
+          symbol: plan.symbol,
+          reason,
+          details: {
+            rationale,
+            errors: tradeValidation.errors,
+            warnings: tradeValidation.warnings,
+          },
+        });
+        return validateToolOutput(
+          executePlanOutputSchema,
+          {
+            success: false,
+            error: reason,
+          },
+          { toolName: "execute_plan" },
+        );
+      }
+
+      const portfolioCtx = await buildClassifierPortfolioContext(ctx);
+      const constitutionEntryPrice = plan.entry.price ?? referencePrice ?? 1;
+      const constitutionNotional = plan.allocation.amount;
+      const constitutionProposal = {
+        symbol: plan.symbol,
+        side: planSide as "BUY" | "SELL",
+        quantity: constitutionNotional / constitutionEntryPrice,
+        price: constitutionEntryPrice,
+        notionalUsd: constitutionNotional,
+        orderType: plan.entry.type === "market" ? ("MARKET" as const) : ("LIMIT" as const),
+        venue: ctx.exchange?.exchangeId,
+      };
+      const constitutionRisk = classifyTradeRisk(constitutionProposal, portfolioCtx);
+      const constitutionCheck = passesConstitution({
+        positionSizePct:
+          portfolioCtx.totalValueUsd > 0
+            ? (constitutionNotional / portfolioCtx.totalValueUsd) * 100
+            : (constitutionNotional / Math.max(ctx.portfolioValue, 1)) * 100,
+        riskPerTradePct: constitutionRisk.compositeScore > 50 ? 3 : 1,
+        currentDrawdownPct: portfolioCtx.currentDrawdownPct,
+        dailyLossPct:
+          Math.abs(portfolioCtx.dailyPnlUsd / Math.max(portfolioCtx.totalValueUsd, 1)) * 100,
+        openPositionCount: portfolioCtx.positions.length,
+        tradesThisHour: portfolioCtx.recentTradeCount,
+        tradesThisDay: portfolioCtx.todayTradeCount ?? portfolioCtx.recentTradeCount,
+        consecutiveLosses: 0,
+        hasStopLoss: plan.stopLoss.price > 0,
+        isCrypto: inferredAssetClass === "crypto",
+      });
+      if (!constitutionCheck.passes) {
+        const reason = `Trading constitution blocked execution: ${constitutionCheck.violations
+          .map((v) => v.message)
+          .join("; ")}`;
+        recordStructuredObservation({
+          eventType: "execution.blocked",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "failure",
+          status: "constitution_violation",
+          controllability: classifyBlockedStatus("constitution_violation"),
+          planId,
+          symbol: plan.symbol,
+          reason,
+          details: {
+            rationale,
+            worstSeverity: constitutionCheck.worstSeverity,
+            violations: constitutionCheck.violations.map((v) => v.message),
+          },
+        });
+        return validateToolOutput(
+          executePlanOutputSchema,
+          {
+            success: false,
+            error: reason,
+          },
+          { toolName: "execute_plan" },
+        );
+      }
+
+      // Risk gate: evaluate the plan's order against risk kernel
       try {
-        exchangePrice = await ctx.exchange.getPrice(plan.symbol);
-      } catch {
-        exchangePrice = undefined;
-      }
-      if (referencePrice === undefined) {
-        referencePrice = exchangePrice;
-      }
-    }
-
-    // Order-construction price gate: every number an order would be built
-    // from must be finite and > 0. A NaN entry from a failed quote, a zero
-    // stop from a malformed plan, or a degraded venue quote must never reach
-    // order placement.
-    const isUsablePrice = (v: unknown): v is number =>
-      typeof v === "number" && Number.isFinite(v) && v > 0;
-    const priceFaults: string[] = [];
-    if (plan.entry.type !== "market" && !isUsablePrice(plan.entry.price)) {
-      priceFaults.push(`limit entry price (${plan.entry.price}) is not a finite number > 0`);
-    }
-    if (plan.entry.type === "market" && plan.entry.price !== null && !isUsablePrice(plan.entry.price)) {
-      priceFaults.push(`entry reference price (${plan.entry.price}) is not a finite number > 0`);
-    }
-    if (!isUsablePrice(plan.stopLoss.price)) {
-      priceFaults.push(`stop-loss price (${plan.stopLoss.price}) is not a finite number > 0`);
-    }
-    for (const tp of plan.takeProfit) {
-      if (!isUsablePrice(tp.price)) {
-        priceFaults.push(`take-profit price (${tp.price}) is not a finite number > 0`);
-      }
-    }
-    if (!isUsablePrice(plan.allocation.amount)) {
-      priceFaults.push(`allocation amount (${plan.allocation.amount}) is not a finite number > 0`);
-    }
-    if (exchangePrice !== undefined && !isUsablePrice(exchangePrice)) {
-      priceFaults.push(
-        `live quote for ${plan.symbol} (${exchangePrice}) is degraded — venue returned a non-positive or non-finite price; refusing to trade against a bad quote`,
-      );
-    }
-    if (plan.entry.type === "market" && !isUsablePrice(exchangePrice)) {
-      const details = [
-        quoteSourcesFailed.length > 0 ? `sources failed: ${quoteSourcesFailed.join(", ")}` : "",
-        quoteDegradedReasons.length > 0 ? `quote degraded: ${quoteDegradedReasons.join(", ")}` : "",
-      ].filter(Boolean);
-      const sourceDetail = details.length > 0 ? ` (${details.join("; ")})` : "";
-      priceFaults.push(
-        `market entry requires a live reference price for ${plan.symbol} but none is available${sourceDetail}`,
-      );
-    }
-    if (quoteDegradedReasons.length > 0 && !isUsablePrice(exchangePrice)) {
-      priceFaults.push(
-        `multi-source quote for ${plan.symbol} is degraded (${quoteDegradedReasons.join(", ")}) and no independent venue price is available to cross-check — refusing to trade on a disputed quote`,
-      );
-    }
-    if (priceFaults.length > 0) {
-      const reason = `Order construction rejected — invalid price data: ${priceFaults.join("; ")}`;
-      recordStructuredObservation({
-        eventType: "execution.blocked",
-        workflow: "execution",
-        source: "agent_tool",
-        component: "execute_plan",
-        toolName: "execute_plan",
-        outcome: "failure",
-        status: "invalid_price_data",
-        controllability: classifyBlockedStatus("invalid_price_data"),
-        planId,
-        symbol: plan.symbol,
-        reason,
-        details: { rationale, priceFaults, referencePrice },
-      });
-      return validateToolOutput(executePlanOutputSchema, {
-        success: false,
-        error: reason,
-      }, { toolName: "execute_plan" });
-    }
-
-    // Guardrails trade validation at the order-construction boundary
-    // (allocation cap + quantity/price sanity from middleware/guardrails.ts).
-    const constructionPriceBasis = plan.entry.price ?? referencePrice;
-    const tradeValidation = validateTrade({
-      symbol: plan.symbol,
-      side: planSide,
-      quantity: plan.allocation.amount / (constructionPriceBasis ?? 1),
-      price: constructionPriceBasis,
-      portfolioValue: ctx.portfolioValue,
-      maxAllocationPercent: ctx.config?.preferences?.maxAllocationPerTrade ?? 1,
-    });
-    if (!tradeValidation.valid) {
-      const reason = `Trade validation failed: ${tradeValidation.errors.join("; ")}`;
-      recordStructuredObservation({
-        eventType: "execution.blocked",
-        workflow: "execution",
-        source: "agent_tool",
-        component: "execute_plan",
-        toolName: "execute_plan",
-        outcome: "failure",
-        status: "trade_validation_failed",
-        controllability: classifyBlockedStatus("trade_validation_failed"),
-        planId,
-        symbol: plan.symbol,
-        reason,
-        details: {
-          rationale,
-          errors: tradeValidation.errors,
-          warnings: tradeValidation.warnings,
-        },
-      });
-      return validateToolOutput(executePlanOutputSchema, {
-        success: false,
-        error: reason,
-      }, { toolName: "execute_plan" });
-    }
-
-    const portfolioCtx = await buildClassifierPortfolioContext(ctx);
-    const constitutionEntryPrice = plan.entry.price ?? referencePrice ?? 1;
-    const constitutionNotional = plan.allocation.amount;
-    const constitutionProposal = {
-      symbol: plan.symbol,
-      side: planSide as "BUY" | "SELL",
-      quantity: constitutionNotional / constitutionEntryPrice,
-      price: constitutionEntryPrice,
-      notionalUsd: constitutionNotional,
-      orderType: plan.entry.type === "market" ? "MARKET" as const : "LIMIT" as const,
-      venue: ctx.exchange?.exchangeId,
-    };
-    const constitutionRisk = classifyTradeRisk(constitutionProposal, portfolioCtx);
-    const constitutionCheck = passesConstitution({
-      positionSizePct:
-        portfolioCtx.totalValueUsd > 0
-          ? (constitutionNotional / portfolioCtx.totalValueUsd) * 100
-          : (constitutionNotional / Math.max(ctx.portfolioValue, 1)) * 100,
-      riskPerTradePct: constitutionRisk.compositeScore > 50 ? 3 : 1,
-      currentDrawdownPct: portfolioCtx.currentDrawdownPct,
-      dailyLossPct:
-        Math.abs(portfolioCtx.dailyPnlUsd / Math.max(portfolioCtx.totalValueUsd, 1)) * 100,
-      openPositionCount: portfolioCtx.positions.length,
-      tradesThisHour: portfolioCtx.recentTradeCount,
-      tradesThisDay: portfolioCtx.recentTradeCount * 3,
-      consecutiveLosses: 0,
-      hasStopLoss: plan.stopLoss.price > 0,
-      isCrypto: inferredAssetClass === "crypto",
-    });
-    if (!constitutionCheck.passes) {
-      const reason = `Trading constitution blocked execution: ${
-        constitutionCheck.violations.map((v) => v.message).join("; ")
-      }`;
-      recordStructuredObservation({
-        eventType: "execution.blocked",
-        workflow: "execution",
-        source: "agent_tool",
-        component: "execute_plan",
-        toolName: "execute_plan",
-        outcome: "failure",
-        status: "constitution_violation",
-        controllability: classifyBlockedStatus("constitution_violation"),
-        planId,
-        symbol: plan.symbol,
-        reason,
-        details: {
-          rationale,
-          worstSeverity: constitutionCheck.worstSeverity,
-          violations: constitutionCheck.violations.map((v) => v.message),
-        },
-      });
-      return validateToolOutput(executePlanOutputSchema, {
-        success: false,
-        error: reason,
-      }, { toolName: "execute_plan" });
-    }
-
-    // Risk gate: evaluate the plan's order against risk kernel
-    try {
-      const { evaluateOrderRisk } = await import("./risk-gate.ts");
-      const riskResult = await evaluateOrderRisk(
-        {
-          symbol: plan.symbol,
-          side: planSide,
-          type: plan.entry.type === "market" ? "MARKET" : "LIMIT",
-          quantity: plan.allocation.amount / (plan.entry.price || 1),
-          price: plan.entry.price ?? undefined,
-        },
-        ctx,
-        "executor"
-      );
-      if (!riskResult.approved) {
-        recordStructuredObservation({
-          eventType: "execution.blocked",
-          workflow: "execution",
-          source: "agent_tool",
-          component: "execute_plan",
-          toolName: "execute_plan",
-          outcome: "failure",
-          status: "risk_rejected",
-          controllability: classifyBlockedStatus("risk_rejected"),
-          mode: ctx.config.permissionMode,
-          planId,
-          symbol: plan.symbol,
-          reason: riskResult.reason,
-          details: {
-            warnings: riskResult.warnings,
+        const { evaluateOrderRisk } = await import("./risk-gate.ts");
+        const riskResult = await evaluateOrderRisk(
+          {
+            symbol: plan.symbol,
+            side: planSide,
+            type: plan.entry.type === "market" ? "MARKET" : "LIMIT",
+            quantity: plan.allocation.amount / (plan.entry.price || 1),
+            price: plan.entry.price ?? undefined,
           },
-        });
-        return validateToolOutput(executePlanOutputSchema, {
-          success: false,
-          error: `Risk kernel rejected this trade: ${riskResult.reason}`,
-        }, { toolName: "execute_plan" });
-      }
-      const approvedQuantity = plan.allocation.amount / (plan.entry.price || 1);
-      if (Math.abs(riskResult.quantity - approvedQuantity) > 1e-12) {
-        return validateToolOutput(executePlanOutputSchema, {
-          success: false,
-          error:
-            `Risk kernel requires quantity ${riskResult.quantity}, but the approved plan is bound to ${approvedQuantity}. `
-            + "Amend and re-approve the plan before execution.",
-        }, { toolName: "execute_plan" });
-      }
+          ctx,
+          "executor",
+        );
+        if (!riskResult.approved) {
+          recordStructuredObservation({
+            eventType: "execution.blocked",
+            workflow: "execution",
+            source: "agent_tool",
+            component: "execute_plan",
+            toolName: "execute_plan",
+            outcome: "failure",
+            status: "risk_rejected",
+            controllability: classifyBlockedStatus("risk_rejected"),
+            mode: ctx.config.permissionMode,
+            planId,
+            symbol: plan.symbol,
+            reason: riskResult.reason,
+            details: {
+              warnings: riskResult.warnings,
+            },
+          });
+          return validateToolOutput(
+            executePlanOutputSchema,
+            {
+              success: false,
+              error: `Risk kernel rejected this trade: ${riskResult.reason}`,
+            },
+            { toolName: "execute_plan" },
+          );
+        }
+        const approvedQuantity = plan.allocation.amount / (plan.entry.price || 1);
+        if (Math.abs(riskResult.quantity - approvedQuantity) > 1e-12) {
+          return validateToolOutput(
+            executePlanOutputSchema,
+            {
+              success: false,
+              error:
+                `Risk kernel requires quantity ${riskResult.quantity}, but the approved plan is bound to ${approvedQuantity}. ` +
+                "Amend and re-approve the plan before execution.",
+            },
+            { toolName: "execute_plan" },
+          );
+        }
 
-      // Risk acknowledgement gate (GORDON_RISK_ACK)
-      const ackResult = verifyAcksFromWarnings(
-        acknowledgedRisks ?? [],
-        riskResult.warnings,
-      );
-      if (!ackResult.ok) {
+        // Risk acknowledgement gate (GORDON_RISK_ACK)
+        const ackResult = verifyAcksFromWarnings(acknowledgedRisks ?? [], riskResult.warnings);
+        if (!ackResult.ok) {
+          recordStructuredObservation({
+            eventType: "execution.blocked",
+            workflow: "execution",
+            source: "agent_tool",
+            component: "execute_plan",
+            toolName: "execute_plan",
+            outcome: "failure",
+            status: "risk_ack_insufficient",
+            controllability: classifyBlockedStatus("risk_ack_insufficient"),
+            mode: ctx.config.permissionMode,
+            planId,
+            symbol: plan.symbol,
+            reason: ackResult.reason,
+            details: {
+              warnings: riskResult.warnings,
+              providedAcks: acknowledgedRisks ?? [],
+              missingAcks: ackResult.missing,
+            },
+          });
+          return validateToolOutput(
+            executePlanOutputSchema,
+            {
+              success: false,
+              error: ackResult.reason ?? "Risk acknowledgement insufficient.",
+            },
+            { toolName: "execute_plan" },
+          );
+        }
+      } catch (riskErr) {
+        const message = riskErr instanceof Error ? riskErr.message : String(riskErr);
         recordStructuredObservation({
           eventType: "execution.blocked",
           workflow: "execution",
@@ -1114,321 +1245,309 @@ export const executePlanTool = createTool({
           component: "execute_plan",
           toolName: "execute_plan",
           outcome: "failure",
-          status: "risk_ack_insufficient",
-          controllability: classifyBlockedStatus("risk_ack_insufficient"),
+          status: "risk_gate_failed",
+          controllability: classifyBlockedStatus("risk_gate_failed"),
           mode: ctx.config.permissionMode,
           planId,
           symbol: plan.symbol,
-          reason: ackResult.reason,
-          details: {
-            warnings: riskResult.warnings,
-            providedAcks: acknowledgedRisks ?? [],
-            missingAcks: ackResult.missing,
+          reason: message,
+        });
+        return validateToolOutput(
+          executePlanOutputSchema,
+          {
+            success: false,
+            error: `Risk gate evaluation failed: ${message}`,
           },
+          { toolName: "execute_plan" },
+        );
+      }
+
+      // The approved plan is content-bound. Hooks may veto it, but a mutation
+      // must go through plan amendment and approval rather than changing the
+      // order after its approval hash was checked.
+      // (referencePrice was fetched and validated at the order-construction
+      // gate above; reused here for the fat-finger / price-deviation guard.)
+      const requestedOrder = {
+        symbol: plan.symbol,
+        side: planOrderSide as "buy" | "sell",
+        quantity: plan.allocation.amount / (plan.entry.price || 1),
+        orderType: plan.entry.type === "market" ? "MARKET" : "LIMIT",
+        notionalUsd: plan.allocation.amount,
+        exchangeId: ctx.exchange?.exchangeId,
+        // Fat-finger guard inputs: only meaningful for LIMIT orders.
+        ...(plan.entry.type !== "market" &&
+          typeof plan.entry.price === "number" && { limitPrice: plan.entry.price }),
+        ...(typeof referencePrice === "number" && { referencePrice }),
+      };
+      const preOrderHook = await runHooks("PreOrderPlacement", requestedOrder);
+      if (preOrderHook.action === "block") {
+        return validateToolOutput(
+          executePlanOutputSchema,
+          {
+            success: false,
+            error: `PreOrderPlacement hook blocked: ${preOrderHook.reason}`,
+          },
+          { toolName: "execute_plan" },
+        );
+      }
+      const hookedOrder =
+        (preOrderHook.metadata?.finalPayload as typeof requestedOrder | undefined) ??
+        requestedOrder;
+      if (
+        hookedOrder.symbol !== requestedOrder.symbol ||
+        hookedOrder.side !== requestedOrder.side ||
+        hookedOrder.quantity !== requestedOrder.quantity ||
+        hookedOrder.orderType !== requestedOrder.orderType ||
+        hookedOrder.notionalUsd !== requestedOrder.notionalUsd ||
+        hookedOrder.limitPrice !== requestedOrder.limitPrice ||
+        hookedOrder.referencePrice !== requestedOrder.referencePrice
+      ) {
+        return validateToolOutput(
+          executePlanOutputSchema,
+          {
+            success: false,
+            error:
+              "PreOrderPlacement requested a modification to a content-bound plan. Amend and re-approve the plan before execution.",
+          },
+          { toolName: "execute_plan" },
+        );
+      }
+
+      const terminationPreTrade = await buildTerminationPreTradeFromPlan(plan, ctx, {
+        constitutionViolations: [],
+      });
+
+      if (isTerminationLayersEnabled()) {
+        const l1Observation = runTerminationLayers({
+          preTrade: terminationPreTrade,
+          runtime: null,
+          system: null,
         });
-        return validateToolOutput(executePlanOutputSchema, {
-          success: false,
-          error: ackResult.reason ?? "Risk acknowledgement insufficient.",
-        }, { toolName: "execute_plan" });
-      }
-
-    } catch (riskErr) {
-      const message = riskErr instanceof Error ? riskErr.message : String(riskErr);
-      recordStructuredObservation({
-        eventType: "execution.blocked",
-        workflow: "execution",
-        source: "agent_tool",
-        component: "execute_plan",
-        toolName: "execute_plan",
-        outcome: "failure",
-        status: "risk_gate_failed",
-        controllability: classifyBlockedStatus("risk_gate_failed"),
-        mode: ctx.config.permissionMode,
-        planId,
-        symbol: plan.symbol,
-        reason: message,
-      });
-      return validateToolOutput(
-        executePlanOutputSchema,
-        {
-          success: false,
-          error: `Risk gate evaluation failed: ${message}`,
-        },
-        { toolName: "execute_plan" },
-      );
-    }
-
-    // The approved plan is content-bound. Hooks may veto it, but a mutation
-    // must go through plan amendment and approval rather than changing the
-    // order after its approval hash was checked.
-    // (referencePrice was fetched and validated at the order-construction
-    // gate above; reused here for the fat-finger / price-deviation guard.)
-    const requestedOrder = {
-      symbol: plan.symbol,
-      side: planOrderSide as "buy" | "sell",
-      quantity: plan.allocation.amount / (plan.entry.price || 1),
-      orderType: plan.entry.type === "market" ? "MARKET" : "LIMIT",
-      notionalUsd: plan.allocation.amount,
-      exchangeId: ctx.exchange?.exchangeId,
-      // Fat-finger guard inputs: only meaningful for LIMIT orders.
-      ...(plan.entry.type !== "market" &&
-        typeof plan.entry.price === "number" && { limitPrice: plan.entry.price }),
-      ...(typeof referencePrice === "number" && { referencePrice }),
-    };
-    const preOrderHook = await runHooks("PreOrderPlacement", requestedOrder);
-    if (preOrderHook.action === "block") {
-      return validateToolOutput(executePlanOutputSchema, {
-        success: false,
-        error: `PreOrderPlacement hook blocked: ${preOrderHook.reason}`,
-      }, { toolName: "execute_plan" });
-    }
-    const hookedOrder =
-      (preOrderHook.metadata?.finalPayload as typeof requestedOrder | undefined) ?? requestedOrder;
-    if (
-      hookedOrder.symbol !== requestedOrder.symbol
-      || hookedOrder.side !== requestedOrder.side
-      || hookedOrder.quantity !== requestedOrder.quantity
-      || hookedOrder.orderType !== requestedOrder.orderType
-      || hookedOrder.notionalUsd !== requestedOrder.notionalUsd
-      || hookedOrder.limitPrice !== requestedOrder.limitPrice
-      || hookedOrder.referencePrice !== requestedOrder.referencePrice
-    ) {
-      return validateToolOutput(executePlanOutputSchema, {
-        success: false,
-        error: "PreOrderPlacement requested a modification to a content-bound plan. Amend and re-approve the plan before execution.",
-      }, { toolName: "execute_plan" });
-    }
-
-    const terminationPreTrade = await buildTerminationPreTradeFromPlan(plan, ctx, {
-      constitutionViolations: [],
-    });
-
-    if (isTerminationLayersEnabled()) {
-      const l1Observation = runTerminationLayers({
-        preTrade: terminationPreTrade,
-        runtime: null,
-        system: null,
-      });
-      recordStructuredObservation({
-        eventType: isTerminationLayersEnforceEnabled()
-          ? "execution.termination_layers"
-          : "execution.termination_layers_shadow",
-        workflow: "execution",
-        source: "agent_tool",
-        component: "execute_plan",
-        toolName: "execute_plan",
-        outcome: l1Observation.verdict === "pass" ? "info" : "failure",
-        planId,
-        symbol: plan.symbol,
-        details: terminationToPayload(l1Observation),
-      });
-      if (isTerminationLayersEnforceEnabled() && l1Observation.verdict === "fail") {
-        return validateToolOutput(executePlanOutputSchema, {
-          success: false,
-          error:
-            l1Observation.blockingFixInstruction ??
-            "Termination layer 1 blocked execution.",
-        }, { toolName: "execute_plan" });
-      }
-    }
-
-    // Pre-trade order-frequency cap (default-on, LAST in the safety stack —
-    // runs only after every other gate has cleared, immediately before submit).
-    // Refuses explicitly on breach; never silently drops the order.
-    if (isPreTradeRateControlsEnabled()) {
-      const rateCheck = evaluatePreTradeRate({
-        proposedKind: "submit",
-        proposedInstrument: plan.symbol,
-      });
-      if (!rateCheck.allowed) {
         recordStructuredObservation({
-          eventType: "execution.blocked",
+          eventType: isTerminationLayersEnforceEnabled()
+            ? "execution.termination_layers"
+            : "execution.termination_layers_shadow",
           workflow: "execution",
           source: "agent_tool",
           component: "execute_plan",
           toolName: "execute_plan",
-          outcome: "failure",
-          status: "rate_limit_exceeded",
-          controllability: classifyBlockedStatus("rate_limit_exceeded"),
-          mode: ctx.config.permissionMode,
+          outcome: l1Observation.verdict === "pass" ? "info" : "failure",
           planId,
           symbol: plan.symbol,
-          reason: rateCheck.reason,
-          details: rateCheckToPayload(rateCheck),
+          details: terminationToPayload(l1Observation),
         });
-        return validateToolOutput(executePlanOutputSchema, {
-          success: false,
-          error: `Pre-trade rate limit exceeded: ${rateCheck.reason}. Slow down order submission and retry.`,
-        }, { toolName: "execute_plan" });
+        if (isTerminationLayersEnforceEnabled() && l1Observation.verdict === "fail") {
+          return validateToolOutput(
+            executePlanOutputSchema,
+            {
+              success: false,
+              error:
+                l1Observation.blockingFixInstruction ?? "Termination layer 1 blocked execution.",
+            },
+            { toolName: "execute_plan" },
+          );
+        }
       }
-    }
 
-    const result = await executePlan(ctx.exchange, plan, ctx.config, {
-      totalValue: ctx.portfolioValue,
-      availableCash: ctx.availableCash,
-      openPositions: getActiveTrades().length,
-    });
-
-    // Record the submit into the in-process rate window so subsequent
-    // execute_plan calls see this order's contribution to the frequency cap.
-    if (isPreTradeRateControlsEnabled() && result.success) {
-      recordRateEvent("submit", plan.symbol);
-    }
-
-    if (!result.success) {
-      deactivateSessionPlan(planId);
-    } else {
-      activateSessionPlan(planId, plan.symbol, plan.strategy);
-      wipSlotCommitted = true;
-    }
-
-    if (isTerminationLayersEnabled()) {
-      const firstOrderId =
-        result.orders[0]?.orderId ??
-        result.trade?.entries[0]?.orderId ??
-        null;
-      const expectedQty = plan.allocation.amount / (plan.entry.price || 1);
-      const termination = runTerminationLayers({
-        preTrade: terminationPreTrade,
-        runtime: {
-          orderId: firstOrderId,
-          ackReceived: result.success,
-          ackLatencyMs: result.success ? 0 : null,
-          ackTimeoutMs: 30_000,
-          brokerRejectReason: result.success ? null : (result.error ?? "execution failed"),
-        },
-        system:
-          result.success && result.trade
-            ? {
-                expectedFillPrice: plan.entry.price,
-                actualFillPrice: result.trade.averageEntry,
-                maxSlippageFraction: 0.005,
-                expectedSize: expectedQty,
-                actualSize: result.trade.entries[0]?.quantity ?? expectedQty,
-                auditLogEntryId: planId,
-              }
-            : null,
-      });
-      const enforce = isTerminationLayersEnforceEnabled();
-      const l2Failed = termination.layers[1]?.status === "fail";
-      const l3Failed = termination.layers[2]?.status === "fail";
-      recordStructuredObservation({
-        eventType: enforce ? "execution.termination_layers" : "execution.termination_layers_shadow",
-        workflow: "execution",
-        source: "agent_tool",
-        component: "execute_plan",
-        toolName: "execute_plan",
-        outcome: termination.verdict === "pass" ? "success" : l3Failed ? "failure" : "info",
-        planId,
-        symbol: plan.symbol,
-        tradeId: result.trade?.id,
-        details: terminationToPayload(termination),
-      });
-      if (enforce && l2Failed && result.success) {
-        return validateToolOutput(executePlanOutputSchema, {
-          success: false,
-          error:
-            termination.blockingFixInstruction ??
-            "Termination layer 2 failed — do not retry blindly.",
-          tradeId: result.trade?.id,
-        }, { toolName: "execute_plan" });
+      // Pre-trade order-frequency cap (default-on, LAST in the safety stack —
+      // runs only after every other gate has cleared, immediately before submit).
+      // Refuses explicitly on breach; never silently drops the order.
+      if (isPreTradeRateControlsEnabled()) {
+        const rateCheck = evaluatePreTradeRate({
+          proposedKind: "submit",
+          proposedInstrument: plan.symbol,
+        });
+        if (!rateCheck.allowed) {
+          recordStructuredObservation({
+            eventType: "execution.blocked",
+            workflow: "execution",
+            source: "agent_tool",
+            component: "execute_plan",
+            toolName: "execute_plan",
+            outcome: "failure",
+            status: "rate_limit_exceeded",
+            controllability: classifyBlockedStatus("rate_limit_exceeded"),
+            mode: ctx.config.permissionMode,
+            planId,
+            symbol: plan.symbol,
+            reason: rateCheck.reason,
+            details: rateCheckToPayload(rateCheck),
+          });
+          return validateToolOutput(
+            executePlanOutputSchema,
+            {
+              success: false,
+              error: `Pre-trade rate limit exceeded: ${rateCheck.reason}. Slow down order submission and retry.`,
+            },
+            { toolName: "execute_plan" },
+          );
+        }
       }
-      if (enforce && l3Failed && result.success) {
+
+      const result = await executePlan(ctx.exchange, plan, ctx.config, {
+        totalValue: ctx.portfolioValue,
+        availableCash: ctx.availableCash,
+        openPositions: getActiveTrades().length,
+      });
+
+      // Record the submit into the in-process rate window so subsequent
+      // execute_plan calls see this order's contribution to the frequency cap.
+      if (isPreTradeRateControlsEnabled() && result.success) {
+        recordRateEvent("submit", plan.symbol);
+      }
+
+      if (!result.success) {
+        deactivateSessionPlan(planId);
+      } else {
+        activateSessionPlan(planId, plan.symbol, plan.strategy);
+        wipSlotCommitted = true;
+      }
+
+      if (isTerminationLayersEnabled()) {
+        const firstOrderId = result.orders[0]?.orderId ?? result.trade?.entries[0]?.orderId ?? null;
+        const expectedQty = plan.allocation.amount / (plan.entry.price || 1);
+        const termination = runTerminationLayers({
+          preTrade: terminationPreTrade,
+          runtime: {
+            orderId: firstOrderId,
+            ackReceived: result.success,
+            ackLatencyMs: result.success ? 0 : null,
+            ackTimeoutMs: 30_000,
+            brokerRejectReason: result.success ? null : (result.error ?? "execution failed"),
+          },
+          system:
+            result.success && result.trade
+              ? {
+                  expectedFillPrice: plan.entry.price,
+                  actualFillPrice: result.trade.averageEntry,
+                  maxSlippageFraction: 0.005,
+                  expectedSize: expectedQty,
+                  actualSize: result.trade.entries[0]?.quantity ?? expectedQty,
+                  auditLogEntryId: planId,
+                }
+              : null,
+        });
+        const enforce = isTerminationLayersEnforceEnabled();
+        const l2Failed = termination.layers[1]?.status === "fail";
+        const l3Failed = termination.layers[2]?.status === "fail";
         recordStructuredObservation({
-          eventType: "execution.reconciliation_alert",
+          eventType: enforce
+            ? "execution.termination_layers"
+            : "execution.termination_layers_shadow",
           workflow: "execution",
           source: "agent_tool",
           component: "execute_plan",
           toolName: "execute_plan",
-          outcome: "failure",
+          outcome: termination.verdict === "pass" ? "success" : l3Failed ? "failure" : "info",
           planId,
           symbol: plan.symbol,
           tradeId: result.trade?.id,
-          reason: termination.blockingFixInstruction,
           details: terminationToPayload(termination),
         });
-      }
-    }
-
-    // The trade already exists at this point. Await post-execution audit hooks
-    // before reporting success, while treating a block as an observable audit
-    // refusal rather than pretending it can roll the fill back.
-    if (result.success && result.trade) {
-      const postOrderHook = await runHooks("PostOrderPlacement", {
-        orderId: result.trade.id,
-        symbol: result.trade.symbol,
-        side: planOrderSide,
-        status: "filled",
-        filledQty: result.trade.entries.reduce((sum, entry) => sum + entry.quantity, 0),
-        notionalUsd: result.trade.entries.reduce(
-          (sum, entry) => sum + entry.quantity * entry.price,
-          0,
-        ),
-      });
-      if (postOrderHook.action === "block") {
-        console.error(`[hooks] PostOrderPlacement blocked after trade ${result.trade.id}: ${postOrderHook.reason ?? "blocked"}`);
-      }
-    }
-
-    if (result.success && result.trade) {
-      const exchangeId = ctx.exchange?.exchangeId ?? "unknown";
-      void recordExecutedPlanPosition(plan, result.trade, exchangeId);
-
-      {
-        const fillPrice = result.trade.averageEntry ?? plan.entry.price ?? 0;
-        const refPrice = referencePrice ?? fillPrice;
-        const slipBps =
-          refPrice > 0 ? Math.abs((fillPrice - refPrice) / refPrice) * 10_000 : 0;
-        recordFriction({
-          tradeId: result.trade.id,
-          kind: "slippage",
-          costUsd: (slipBps / 10_000) * plan.allocation.amount,
-          meta: { planId, slipBps, symbol: plan.symbol },
-        });
-      }
-      recordStructuredObservation({
-        eventType: "execution.completed",
-        workflow: "execution",
-        source: "agent_tool",
-        component: "execute_plan",
-        toolName: "execute_plan",
-        outcome: "success",
-        status: "executed",
-        mode: ctx.config.permissionMode,
-        planId,
-        tradeId: result.trade.id,
-        symbol: result.trade.symbol,
-        actionCount: result.orders.length,
-      });
-      // Bridge rationale + approval signal into the action log so ACE
-      // Reflector can extract patterns from approved-execution events.
-      // Wrapped: action-log writes go through SQLite and shouldn't break
-      // execution if storage is misconfigured.
-      try {
-        appendActionLogEntry({
-          sessionId: ctx.runtime?.sessionId,
-          threadId: ctx.threadId ?? ctx.runtime?.threadId,
-          resourceId: ctx.userId ?? ctx.runtime?.resourceId,
-          entryType: "execution_result",
-          title: `${result.trade.symbol} executed`,
-          content: `Plan ${planId} executed cleanly on ${result.trade.symbol}. User rationale: ${rationale}`,
-          payload: {
+        if (enforce && l2Failed && result.success) {
+          return validateToolOutput(
+            executePlanOutputSchema,
+            {
+              success: false,
+              error:
+                termination.blockingFixInstruction ??
+                "Termination layer 2 failed — do not retry blindly.",
+              tradeId: result.trade?.id,
+            },
+            { toolName: "execute_plan" },
+          );
+        }
+        if (enforce && l3Failed && result.success) {
+          recordStructuredObservation({
+            eventType: "execution.reconciliation_alert",
+            workflow: "execution",
+            source: "agent_tool",
+            component: "execute_plan",
+            toolName: "execute_plan",
+            outcome: "failure",
             planId,
-            tradeId: result.trade.id,
-            symbol: result.trade.symbol,
-            rationale,
-            orderCount: result.orders.length,
-          },
-        });
-      } catch {
-        // Non-critical — structured observation already captured this.
+            symbol: plan.symbol,
+            tradeId: result.trade?.id,
+            reason: termination.blockingFixInstruction,
+            details: terminationToPayload(termination),
+          });
+        }
       }
 
-      // Trade ledger append (GORDON_TRADE_LEDGER). Projection of successful
-      // execute_plan outcomes into ~/.gordon/trade-ledger.jsonl for /history
-      // navigation. State snapshots are placeholder-empty for now — a future
-      // wire can capture pre/post account state via ctx.exchange.
-      {
+      // The trade already exists at this point. Await post-execution audit hooks
+      // before reporting success, while treating a block as an observable audit
+      // refusal rather than pretending it can roll the fill back.
+      if (result.success && result.trade) {
+        const postOrderHook = await runHooks("PostOrderPlacement", {
+          orderId: result.trade.id,
+          symbol: result.trade.symbol,
+          side: planOrderSide,
+          status: "filled",
+          filledQty: result.trade.entries.reduce((sum, entry) => sum + entry.quantity, 0),
+          notionalUsd: result.trade.entries.reduce(
+            (sum, entry) => sum + entry.quantity * entry.price,
+            0,
+          ),
+        });
+        if (postOrderHook.action === "block") {
+          console.error(
+            `[hooks] PostOrderPlacement blocked after trade ${result.trade.id}: ${postOrderHook.reason ?? "blocked"}`,
+          );
+        }
+      }
+
+      if (result.success && result.trade) {
+        const exchangeId = ctx.exchange?.exchangeId ?? "unknown";
+        void recordExecutedPlanPosition(plan, result.trade, exchangeId);
+
+        {
+          const fillPrice = result.trade.averageEntry ?? plan.entry.price ?? 0;
+          const refPrice = referencePrice ?? fillPrice;
+          const slipBps = refPrice > 0 ? Math.abs((fillPrice - refPrice) / refPrice) * 10_000 : 0;
+          recordFriction({
+            tradeId: result.trade.id,
+            kind: "slippage",
+            costUsd: (slipBps / 10_000) * plan.allocation.amount,
+            meta: { planId, slipBps, symbol: plan.symbol },
+          });
+        }
+        recordStructuredObservation({
+          eventType: "execution.completed",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "success",
+          status: "executed",
+          mode: ctx.config.permissionMode,
+          planId,
+          tradeId: result.trade.id,
+          symbol: result.trade.symbol,
+          actionCount: result.orders.length,
+        });
+        // Bridge rationale + approval signal into the action log so ACE
+        // Reflector can extract patterns from approved-execution events.
+        // Wrapped: action-log writes go through SQLite and shouldn't break
+        // execution if storage is misconfigured.
+        try {
+          appendActionLogEntry({
+            sessionId: ctx.runtime?.sessionId,
+            threadId: ctx.threadId ?? ctx.runtime?.threadId,
+            resourceId: ctx.userId ?? ctx.runtime?.resourceId,
+            entryType: "execution_result",
+            title: `${result.trade.symbol} executed`,
+            content: `Plan ${planId} executed cleanly on ${result.trade.symbol}. User rationale: ${rationale}`,
+            payload: {
+              planId,
+              tradeId: result.trade.id,
+              symbol: result.trade.symbol,
+              rationale,
+              orderCount: result.orders.length,
+            },
+          });
+        } catch {
+          // Non-critical — structured observation already captured this.
+        }
         try {
           const trade = result.trade;
           await appendExecutionRecordFresh({
@@ -1436,50 +1555,60 @@ export const executePlanTool = createTool({
             symbol: trade.symbol,
             rationale,
             acknowledgedRisks,
-            operations: [{
-              action: "place_order" as const,
-              symbol: trade.symbol,
-              side: plan.direction === "long" ? "buy" as const : "sell" as const,
-              qty: plan.entry?.price ? plan.allocation.amount / plan.entry.price : undefined,
-              price: plan.entry?.price ?? undefined,
-              metadata: { tradeId: trade.id, planId },
-            }],
-            results: [{
-              operationIndex: 0,
-              status: "filled" as const,
-              brokerOrderId: trade.id,
-            }],
+            operations: [
+              {
+                action: "place_order" as const,
+                symbol: trade.symbol,
+                side: plan.direction === "long" ? ("buy" as const) : ("sell" as const),
+                qty: plan.entry?.price ? plan.allocation.amount / plan.entry.price : undefined,
+                price: plan.entry?.price ?? undefined,
+                metadata: { tradeId: trade.id, planId },
+              },
+            ],
+            results: [
+              {
+                operationIndex: 0,
+                status: "filled" as const,
+                brokerOrderId: trade.id,
+              },
+            ],
           });
         } catch {
           // Non-critical — broker has canonical truth, ledger is local nav.
         }
+
+        return validateToolOutput(
+          executePlanOutputSchema,
+          {
+            success: true,
+            trade: result.trade,
+            orderCount: result.orders.length,
+          },
+          { toolName: "execute_plan" },
+        );
       }
 
-      return validateToolOutput(executePlanOutputSchema, {
-        success: true,
-        trade: result.trade,
-        orderCount: result.orders.length,
-      }, { toolName: "execute_plan" });
-    }
-
-    recordStructuredObservation({
-      eventType: "execution.blocked",
-      workflow: "execution",
-      source: "agent_tool",
-      component: "execute_plan",
-      toolName: "execute_plan",
-      outcome: "failure",
-      status: "execution_failed",
-      mode: ctx.config.permissionMode,
-      planId,
-      symbol: plan.symbol,
-      reason: result.error,
-    });
-    return validateToolOutput(executePlanOutputSchema, {
-      success: false,
-      error: result.error,
-    }, { toolName: "execute_plan" });
-
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "execution_failed",
+        mode: ctx.config.permissionMode,
+        planId,
+        symbol: plan.symbol,
+        reason: result.error,
+      });
+      return validateToolOutput(
+        executePlanOutputSchema,
+        {
+          success: false,
+          error: result.error,
+        },
+        { toolName: "execute_plan" },
+      );
     } finally {
       if (wipSlotClaimed && !wipSlotCommitted) deactivateSessionPlan(planId);
     }
@@ -1507,12 +1636,20 @@ export const closeTradeTool = createTool({
   execute: async ({ tradeId, reason }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
-      return validateToolOutput(closeTradeOutputSchema, { ...errors.noExchange, success: false }, { toolName: "close_trade" });
+      return validateToolOutput(
+        closeTradeOutputSchema,
+        { ...errors.noExchange, success: false },
+        { toolName: "close_trade" },
+      );
     }
 
     const trade = getTrade(tradeId);
     if (!trade) {
-      return validateToolOutput(closeTradeOutputSchema, { success: false, error: `Trade not found: ${tradeId}` }, { toolName: "close_trade" });
+      return validateToolOutput(
+        closeTradeOutputSchema,
+        { success: false, error: `Trade not found: ${tradeId}` },
+        { toolName: "close_trade" },
+      );
     }
 
     // Deliberately no kill-switch check: kill switches gate NEW exposure, not exits — closing a position reduces risk.
@@ -1522,11 +1659,15 @@ export const closeTradeTool = createTool({
       deactivateSessionPlan(trade.planId);
     }
 
-    return validateToolOutput(closeTradeOutputSchema, {
-      success: result.success,
-      pnl: result.pnl,
-      error: result.error,
-    }, { toolName: "close_trade" });
+    return validateToolOutput(
+      closeTradeOutputSchema,
+      {
+        success: result.success,
+        pnl: result.pnl,
+        error: result.error,
+      },
+      { toolName: "close_trade" },
+    );
   },
 });
 
@@ -1601,7 +1742,11 @@ export const approvePlanTool = createTool({
         planId,
         reason: `Plan not found: ${planId}`,
       });
-      return validateToolOutput(approvePlanOutputSchema, { success: false, error: `Plan not found: ${planId}` }, { toolName: "approve_plan" });
+      return validateToolOutput(
+        approvePlanOutputSchema,
+        { success: false, error: `Plan not found: ${planId}` },
+        { toolName: "approve_plan" },
+      );
     }
 
     if (plan.status !== "DRAFT") {
@@ -1620,7 +1765,11 @@ export const approvePlanTool = createTool({
           previousStatus: plan.status,
         },
       });
-      return validateToolOutput(approvePlanOutputSchema, { success: false, error: `Plan is not in DRAFT status, current status: ${plan.status}` }, { toolName: "approve_plan" });
+      return validateToolOutput(
+        approvePlanOutputSchema,
+        { success: false, error: `Plan is not in DRAFT status, current status: ${plan.status}` },
+        { toolName: "approve_plan" },
+      );
     }
 
     if (isWipLimitEnabled()) {
@@ -1639,10 +1788,14 @@ export const approvePlanTool = createTool({
           reason: wipGate.message,
           details: wipResultToPayload(wipGate),
         });
-        return validateToolOutput(approvePlanOutputSchema, {
-          success: false,
-          error: wipGate.message,
-        }, { toolName: "approve_plan" });
+        return validateToolOutput(
+          approvePlanOutputSchema,
+          {
+            success: false,
+            error: wipGate.message,
+          },
+          { toolName: "approve_plan" },
+        );
       }
     }
 
@@ -1669,11 +1822,15 @@ export const approvePlanTool = createTool({
       },
     });
 
-    return validateToolOutput(approvePlanOutputSchema, {
-      success: true,
-      planId,
-      message: "Plan approved. Ready for execution when system is armed.",
-    }, { toolName: "approve_plan" });
+    return validateToolOutput(
+      approvePlanOutputSchema,
+      {
+        success: true,
+        planId,
+        message: "Plan approved. Ready for execution when system is armed.",
+      },
+      { toolName: "approve_plan" },
+    );
   },
 });
 
@@ -1741,18 +1898,23 @@ export const setPermissionModeTool = createTool({
       plan: "Planning-only mode. Plans can be created but not executed.",
     };
 
-    const sandboxNote = mode === "paper"
-      ? " Venue adapters switched to sandbox/testnet endpoints."
-      : previous === "paper"
-      ? " Venue adapters restored to live endpoints."
-      : "";
+    const sandboxNote =
+      mode === "paper"
+        ? " Venue adapters switched to sandbox/testnet endpoints."
+        : previous === "paper"
+          ? " Venue adapters restored to live endpoints."
+          : "";
 
-    return validateToolOutput(setPermissionModeOutputSchema, {
-      success: true,
-      permissionMode: mode,
-      previousMode: previous,
-      message: `Permission mode set to '${mode}'. ${descriptions[mode]}${sandboxNote}`,
-    }, { toolName: "set_permission_mode" });
+    return validateToolOutput(
+      setPermissionModeOutputSchema,
+      {
+        success: true,
+        permissionMode: mode,
+        previousMode: previous,
+        message: `Permission mode set to '${mode}'. ${descriptions[mode]}${sandboxNote}`,
+      },
+      { toolName: "set_permission_mode" },
+    );
   },
 });
 
@@ -1773,15 +1935,28 @@ Use grid entry when:
 Returns a grid plan for user approval.`,
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair symbol, e.g., ETHUSDT"),
-    allocation: z.number().optional().describe("Amount in USDT to allocate (uses default if not specified)"),
+    allocation: z
+      .number()
+      .optional()
+      .describe("Amount in USDT to allocate (uses default if not specified)"),
     numLevels: z.number().min(3).max(7).optional().describe("Number of grid levels (default: 5)"),
-    distribution: z.enum(["pyramid", "equal"]).optional().describe("Allocation distribution (default: pyramid)"),
+    distribution: z
+      .enum(["pyramid", "equal"])
+      .optional()
+      .describe("Allocation distribution (default: pyramid)"),
   }),
   outputSchema: createGridPlanOutputSchema,
-  execute: async ({ symbol, allocation, numLevels, distribution }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, allocation, numLevels, distribution },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
-      return validateToolOutput(createGridPlanOutputSchema, { error: "Exchange client not connected. Please configure API keys." }, { toolName: "create_grid_plan" });
+      return validateToolOutput(
+        createGridPlanOutputSchema,
+        { error: "Exchange client not connected. Please configure API keys." },
+        { toolName: "create_grid_plan" },
+      );
     }
 
     // Normalize symbol
@@ -1793,10 +1968,14 @@ Returns a grid plan for user approval.`,
     });
 
     if (analysis.supports.length === 0) {
-      return validateToolOutput(createGridPlanOutputSchema, {
-        success: false,
-        error: `No support levels found for ${normalizedSymbol}. Cannot create grid plan.`,
-      }, { toolName: "create_grid_plan" });
+      return validateToolOutput(
+        createGridPlanOutputSchema,
+        {
+          success: false,
+          error: `No support levels found for ${normalizedSymbol}. Cannot create grid plan.`,
+        },
+        { toolName: "create_grid_plan" },
+      );
     }
 
     // Calculate allocation amount
@@ -1814,16 +1993,15 @@ Returns a grid plan for user approval.`,
     });
 
     // Extract take profits from resistance levels (first 2)
-    const takeProfits = analysis.resistances
-      .slice(0, 2)
-      .map(r => r.price);
+    const takeProfits = analysis.resistances.slice(0, 2).map((r) => r.price);
 
     // Build take profit levels with percentages
     const takeProfitLevels = takeProfits.map((price, i) => ({
       price,
-      percentToSell: i === takeProfits.length - 1
-        ? 1 - (takeProfits.length - 1) * 0.5 // Last TP gets remaining
-        : 0.5, // First TP gets 50%
+      percentToSell:
+        i === takeProfits.length - 1
+          ? 1 - (takeProfits.length - 1) * 0.5 // Last TP gets remaining
+          : 0.5, // First TP gets 50%
     }));
 
     // Create and persist the plan to the database
@@ -1868,7 +2046,10 @@ Returns a grid plan for user approval.`,
     const reflectionResult = await reflectOnPlan(savedPlan, ctx, { skipLLM: true });
 
     const levelsSummary = gridResult.levels
-      .map((l, i) => `L${i + 1}: $${l.price.toFixed(2)} (${(l.percentOfAllocation * 100).toFixed(1)}%)`)
+      .map(
+        (l, i) =>
+          `L${i + 1}: $${l.price.toFixed(2)} (${(l.percentOfAllocation * 100).toFixed(1)}%)`,
+      )
       .join(", ");
 
     const baseMessage = `Grid plan created (ID: ${savedPlan.id}) for ${normalizedSymbol}: ${gridResult.levels.length} levels from $${gridResult.config.priceRange.high.toFixed(2)} to $${gridResult.config.priceRange.low.toFixed(2)}. ${levelsSummary}. Stop loss at $${gridResult.stopLossPrice.toFixed(2)}. Allocation: $${allocationAmount.toFixed(2)} (${(percentOfPortfolio * 100).toFixed(1)}% of portfolio). Use 'approve_plan' with ID ${savedPlan.id} to approve.`;
@@ -1913,34 +2094,57 @@ Supports:
 - Optional activation price (trailing starts after this price)`,
   inputSchema: z.object({
     tradeId: z.string().describe("The ID of the trade to set trailing stop for"),
-    type: z.enum(["percentage", "atr"]).default("percentage").describe("Type of trailing: 'percentage' or 'atr'"),
-    trailDistance: z.number().describe("Trail distance - percentage (e.g., 0.03 for 3%) or ATR multiplier (e.g., 2.0)"),
-    activationPrice: z.number().optional().describe("Price at which trailing stop activates (optional, immediate if not set)"),
+    type: z
+      .enum(["percentage", "atr"])
+      .default("percentage")
+      .describe("Type of trailing: 'percentage' or 'atr'"),
+    trailDistance: z
+      .number()
+      .describe("Trail distance - percentage (e.g., 0.03 for 3%) or ATR multiplier (e.g., 2.0)"),
+    activationPrice: z
+      .number()
+      .optional()
+      .describe("Price at which trailing stop activates (optional, immediate if not set)"),
   }),
   outputSchema: setTrailingStopOutputSchema,
-  execute: async ({ tradeId, type, trailDistance, activationPrice }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { tradeId, type, trailDistance, activationPrice },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
-      return validateToolOutput(setTrailingStopOutputSchema, {
-        success: false,
-        error: "Exchange client not connected.",
-      }, { toolName: "set_trailing_stop" });
+      return validateToolOutput(
+        setTrailingStopOutputSchema,
+        {
+          success: false,
+          error: "Exchange client not connected.",
+        },
+        { toolName: "set_trailing_stop" },
+      );
     }
 
     // Get the trade
     const trade = getTrade(tradeId);
     if (!trade) {
-      return validateToolOutput(setTrailingStopOutputSchema, {
-        success: false,
-        error: `Trade not found: ${tradeId}`,
-      }, { toolName: "set_trailing_stop" });
+      return validateToolOutput(
+        setTrailingStopOutputSchema,
+        {
+          success: false,
+          error: `Trade not found: ${tradeId}`,
+        },
+        { toolName: "set_trailing_stop" },
+      );
     }
 
     if (trade.status === "CLOSED") {
-      return validateToolOutput(setTrailingStopOutputSchema, {
-        success: false,
-        error: "Cannot set trailing stop on a closed trade.",
-      }, { toolName: "set_trailing_stop" });
+      return validateToolOutput(
+        setTrailingStopOutputSchema,
+        {
+          success: false,
+          error: "Cannot set trailing stop on a closed trade.",
+        },
+        { toolName: "set_trailing_stop" },
+      );
     }
 
     // Get current price for initial high
@@ -1952,10 +2156,14 @@ Supports:
     // Check if trailing stop already exists
     const existing = tracker.getTrailingStop(tradeId);
     if (existing) {
-      return validateToolOutput(setTrailingStopOutputSchema, {
-        success: false,
-        error: `Trailing stop already exists for trade ${tradeId}. Use update_trailing_stop to modify it.`,
-      }, { toolName: "set_trailing_stop" });
+      return validateToolOutput(
+        setTrailingStopOutputSchema,
+        {
+          success: false,
+          error: `Trailing stop already exists for trade ${tradeId}. Use update_trailing_stop to modify it.`,
+        },
+        { toolName: "set_trailing_stop" },
+      );
     }
 
     // Add trailing stop
@@ -1984,7 +2192,9 @@ Supports:
       message: `Trailing stop set for ${trade.symbol}: ${type === "atr" ? `${trailDistance}x ATR` : `${(trailDistance * 100).toFixed(1)}%`} trail${activationPrice ? ` (activates at $${activationPrice})` : " (active immediately)"}`,
     };
 
-    return validateToolOutput(setTrailingStopOutputSchema, result, { toolName: "set_trailing_stop" });
+    return validateToolOutput(setTrailingStopOutputSchema, result, {
+      toolName: "set_trailing_stop",
+    });
   },
 });
 
@@ -1998,26 +2208,37 @@ Use when:
 - Part of monitor cycle to update all trailing stops`,
   inputSchema: z.object({
     tradeId: z.string().describe("The ID of the trade with trailing stop"),
-    newTrailDistance: z.number().optional().describe("New trail distance (optional, updates if provided)"),
+    newTrailDistance: z
+      .number()
+      .optional()
+      .describe("New trail distance (optional, updates if provided)"),
   }),
   outputSchema: updateTrailingStopOutputSchema,
   execute: async ({ tradeId, newTrailDistance }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
-      return validateToolOutput(updateTrailingStopOutputSchema, {
-        success: false,
-        error: "Exchange client not connected.",
-      }, { toolName: "update_trailing_stop" });
+      return validateToolOutput(
+        updateTrailingStopOutputSchema,
+        {
+          success: false,
+          error: "Exchange client not connected.",
+        },
+        { toolName: "update_trailing_stop" },
+      );
     }
 
     const tracker = getTrailingStopTracker();
     const trailingStop = tracker.getTrailingStop(tradeId);
 
     if (!trailingStop) {
-      return validateToolOutput(updateTrailingStopOutputSchema, {
-        success: false,
-        error: `No trailing stop found for trade: ${tradeId}`,
-      }, { toolName: "update_trailing_stop" });
+      return validateToolOutput(
+        updateTrailingStopOutputSchema,
+        {
+          success: false,
+          error: `No trailing stop found for trade: ${tradeId}`,
+        },
+        { toolName: "update_trailing_stop" },
+      );
     }
 
     // Update trail distance if provided
@@ -2045,13 +2266,19 @@ Use when:
             : `Trailing stop unchanged: Stop at $${updateResult.newStopPrice.toFixed(2)}, current price $${updateResult.currentPrice.toFixed(2)}`,
       };
 
-      return validateToolOutput(updateTrailingStopOutputSchema, result, { toolName: "update_trailing_stop" });
+      return validateToolOutput(updateTrailingStopOutputSchema, result, {
+        toolName: "update_trailing_stop",
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      return validateToolOutput(updateTrailingStopOutputSchema, {
-        success: false,
-        error: errorMessage,
-      }, { toolName: "update_trailing_stop" });
+      return validateToolOutput(
+        updateTrailingStopOutputSchema,
+        {
+          success: false,
+          error: errorMessage,
+        },
+        { toolName: "update_trailing_stop" },
+      );
     }
   },
 });
@@ -2070,24 +2297,35 @@ Use when:
 - Tier-based take profit execution`,
   inputSchema: z.object({
     tradeId: z.string().describe("The ID of the trade to partially close"),
-    percentage: z.number().min(0.01).max(1).describe("Percentage of remaining position to close (0.01 to 1.0)"),
-    reason: z.enum(["TP1", "TP2", "TP3", "MANUAL"]).default("MANUAL").describe("Reason for partial close"),
+    percentage: z
+      .number()
+      .min(0.01)
+      .max(1)
+      .describe("Percentage of remaining position to close (0.01 to 1.0)"),
+    reason: z
+      .enum(["TP1", "TP2", "TP3", "MANUAL"])
+      .default("MANUAL")
+      .describe("Reason for partial close"),
   }),
   outputSchema: closePartialPositionOutputSchema,
   execute: async ({ tradeId, percentage, reason }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
-      return validateToolOutput(closePartialPositionOutputSchema, {
-        success: false,
-        error: "Exchange client not connected.",
-      }, { toolName: "close_partial_position" });
+      return validateToolOutput(
+        closePartialPositionOutputSchema,
+        {
+          success: false,
+          error: "Exchange client not connected.",
+        },
+        { toolName: "close_partial_position" },
+      );
     }
 
     const closeResult = await closePartialPosition(
       ctx.exchange,
       tradeId,
       percentage,
-      reason ?? "MANUAL"
+      reason ?? "MANUAL",
     );
 
     if (closeResult.success) {
@@ -2101,15 +2339,21 @@ Use when:
         remainingQuantity: closeResult.remainingQuantity,
         exitPrice: closeResult.exitPrice,
         pnl: closeResult.pnl,
-        message: `Closed ${(percentage * 100).toFixed(0)}% of position (${closeResult.closedQuantity.toFixed(6)} units) at $${closeResult.exitPrice.toFixed(2)}. PnL: $${closeResult.pnl.toFixed(2)}. Remaining: ${closeResult.remainingQuantity.toFixed(6)} units.`,
+        message: `Closed ${closeResult.closedQuantity.toFixed(6)} units at $${closeResult.exitPrice.toFixed(2)}. PnL: $${closeResult.pnl.toFixed(2)}. Remaining: ${closeResult.remainingQuantity.toFixed(6)} units.${closeResult.error ? ` Warning: ${closeResult.error}` : ""}`,
       };
-      return validateToolOutput(closePartialPositionOutputSchema, result, { toolName: "close_partial_position" });
+      return validateToolOutput(closePartialPositionOutputSchema, result, {
+        toolName: "close_partial_position",
+      });
     }
 
-    return validateToolOutput(closePartialPositionOutputSchema, {
-      success: false,
-      error: closeResult.error,
-    }, { toolName: "close_partial_position" });
+    return validateToolOutput(
+      closePartialPositionOutputSchema,
+      {
+        success: false,
+        error: closeResult.error,
+      },
+      { toolName: "close_partial_position" },
+    );
   },
 });
 
@@ -2142,40 +2386,70 @@ export const executeWithAlgorithmTool = createTool({
     symbol: z.string().describe("Trading pair symbol (e.g., 'BTCUSDT')"),
     side: z.enum(["BUY", "SELL"]).describe("Order side"),
     quantity: z.number().describe("Total quantity to execute"),
-    algorithm: z.enum(["TWAP", "VWAP", "ICEBERG", "POV"]).optional().describe("Execution algorithm (auto-detected if not specified)"),
-    description: z.string().optional().describe("Natural language description for algorithm detection (e.g., 'slowly over 4 hours', '10% of volume')"),
-    durationMs: z.number().optional().describe("Duration in milliseconds for TWAP/VWAP, or max duration for POV"),
+    algorithm: z
+      .enum(["TWAP", "VWAP", "ICEBERG", "POV"])
+      .optional()
+      .describe("Execution algorithm (auto-detected if not specified)"),
+    description: z
+      .string()
+      .optional()
+      .describe(
+        "Natural language description for algorithm detection (e.g., 'slowly over 4 hours', '10% of volume')",
+      ),
+    durationMs: z
+      .number()
+      .optional()
+      .describe("Duration in milliseconds for TWAP/VWAP, or max duration for POV"),
   }),
   outputSchema: executeWithAlgorithmOutputSchema,
-  execute: async ({ symbol, side, quantity, algorithm, description, durationMs }, execContext: MastraExecutionContext) => {
+  execute: async (
+    { symbol, side, quantity, algorithm, description, durationMs },
+    execContext: MastraExecutionContext,
+  ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
-      return validateToolOutput(executeWithAlgorithmOutputSchema, {
-        success: false,
-        error: "Exchange client not connected.",
-      }, { toolName: "execute_with_algorithm" });
+      return validateToolOutput(
+        executeWithAlgorithmOutputSchema,
+        {
+          success: false,
+          error: "Exchange client not connected.",
+        },
+        { toolName: "execute_with_algorithm" },
+      );
     }
 
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", {
+        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper,
+      });
       if (!check.allowed) {
-        return validateToolOutput(executeWithAlgorithmOutputSchema, {
-          success: false,
-          error: check.reason ?? "Algorithmic execution not permitted under current mode.",
-        }, { toolName: "execute_with_algorithm" });
+        return validateToolOutput(
+          executeWithAlgorithmOutputSchema,
+          {
+            success: false,
+            error: check.reason ?? "Algorithmic execution not permitted under current mode.",
+          },
+          { toolName: "execute_with_algorithm" },
+        );
       }
     }
 
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      return validateToolOutput(executeWithAlgorithmOutputSchema, {
-        success: false,
-        error: `Order construction rejected — quantity (${quantity}) is not a finite number > 0.`,
-      }, { toolName: "execute_with_algorithm" });
+      return validateToolOutput(
+        executeWithAlgorithmOutputSchema,
+        {
+          success: false,
+          error: `Order construction rejected — quantity (${quantity}) is not a finite number > 0.`,
+        },
+        { toolName: "execute_with_algorithm" },
+      );
     }
 
     // Normalize symbol
     const normalizedSymbol = normalizeSymbol(symbol);
-    const rationale = description?.trim() || `Algorithmic ${side} execution requested for ${quantity} ${normalizedSymbol}.`;
+    const rationale =
+      description?.trim() ||
+      `Algorithmic ${side} execution requested for ${quantity} ${normalizedSymbol}.`;
 
     const aggregatePreflight = await runExecutionPreflight({
       ctx,
@@ -2189,10 +2463,14 @@ export const executeWithAlgorithmTool = createTool({
       },
     });
     if (!aggregatePreflight.ok) {
-      return validateToolOutput(executeWithAlgorithmOutputSchema, {
-        success: false,
-        error: `Algorithmic execution preflight blocked: ${aggregatePreflight.reason}`,
-      }, { toolName: "execute_with_algorithm" });
+      return validateToolOutput(
+        executeWithAlgorithmOutputSchema,
+        {
+          success: false,
+          error: `Algorithmic execution preflight blocked: ${aggregatePreflight.reason}`,
+        },
+        { toolName: "execute_with_algorithm" },
+      );
     }
 
     // Build execution intent
@@ -2228,23 +2506,33 @@ export const executeWithAlgorithmTool = createTool({
       );
 
       const desc = describeIntent(intent);
-      const durationHours = "durationMs" in intent.config
-        ? ((intent.config as { durationMs: number }).durationMs / (60 * 60 * 1000)).toFixed(1) + "h"
-        : "N/A";
+      const durationHours =
+        "durationMs" in intent.config
+          ? ((intent.config as { durationMs: number }).durationMs / (60 * 60 * 1000)).toFixed(1) +
+            "h"
+          : "N/A";
 
-      return validateToolOutput(executeWithAlgorithmOutputSchema, {
-        success: true,
-        sessionId: session.sessionId,
-        algorithm: intent.algorithm,
-        description: desc,
-        slicesTotal: session.slicesTotal,
-        estimatedDuration: durationHours,
-      }, { toolName: "execute_with_algorithm" });
+      return validateToolOutput(
+        executeWithAlgorithmOutputSchema,
+        {
+          success: true,
+          sessionId: session.sessionId,
+          algorithm: intent.algorithm,
+          description: desc,
+          slicesTotal: session.slicesTotal,
+          estimatedDuration: durationHours,
+        },
+        { toolName: "execute_with_algorithm" },
+      );
     } catch (err) {
-      return validateToolOutput(executeWithAlgorithmOutputSchema, {
-        success: false,
-        error: `Algorithmic execution failed: ${(err as Error).message}`,
-      }, { toolName: "execute_with_algorithm" });
+      return validateToolOutput(
+        executeWithAlgorithmOutputSchema,
+        {
+          success: false,
+          error: `Algorithmic execution failed: ${(err as Error).message}`,
+        },
+        { toolName: "execute_with_algorithm" },
+      );
     }
   },
 });
@@ -2280,7 +2568,13 @@ export const getTradeHistoryTool = createTool({
   inputSchema: z.object({
     recordId: z.string().optional().describe("Fetch one specific record by id."),
     symbol: z.string().optional().describe("Filter to records for this symbol."),
-    limit: z.number().int().positive().max(100).optional().describe("Max records to return (default 10)."),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(100)
+      .optional()
+      .describe("Max records to return (default 10)."),
   }),
   outputSchema: getTradeHistoryOutputSchema,
   execute: async ({ recordId, symbol, limit }) => {
@@ -2288,34 +2582,50 @@ export const getTradeHistoryTool = createTool({
       if (recordId) {
         const rec = await getExecutionRecord(recordId);
         if (!rec) {
-          return validateToolOutput(getTradeHistoryOutputSchema, {
-            success: true,
-            mode: "empty" as const,
-            error: `No record with id ${recordId}`,
-          }, { toolName: "get_trade_history" });
+          return validateToolOutput(
+            getTradeHistoryOutputSchema,
+            {
+              success: true,
+              mode: "empty" as const,
+              error: `No record with id ${recordId}`,
+            },
+            { toolName: "get_trade_history" },
+          );
         }
-        return validateToolOutput(getTradeHistoryOutputSchema, {
-          success: true,
-          mode: "single" as const,
-          record: executionRecordToPayload(rec),
-        }, { toolName: "get_trade_history" });
+        return validateToolOutput(
+          getTradeHistoryOutputSchema,
+          {
+            success: true,
+            mode: "single" as const,
+            record: executionRecordToPayload(rec),
+          },
+          { toolName: "get_trade_history" },
+        );
       }
       const records = await readExecutionRecords({
         symbol,
         limit: limit ?? 10,
       });
-      return validateToolOutput(getTradeHistoryOutputSchema, {
-        success: true,
-        mode: records.length === 0 ? "empty" as const : "list" as const,
-        count: records.length,
-        records: records.map(executionRecordToPayload),
-      }, { toolName: "get_trade_history" });
+      return validateToolOutput(
+        getTradeHistoryOutputSchema,
+        {
+          success: true,
+          mode: records.length === 0 ? ("empty" as const) : ("list" as const),
+          count: records.length,
+          records: records.map(executionRecordToPayload),
+        },
+        { toolName: "get_trade_history" },
+      );
     } catch (error) {
-      return validateToolOutput(getTradeHistoryOutputSchema, {
-        success: false,
-        mode: "empty" as const,
-        error: (error as Error).message,
-      }, { toolName: "get_trade_history" });
+      return validateToolOutput(
+        getTradeHistoryOutputSchema,
+        {
+          success: false,
+          mode: "empty" as const,
+          error: (error as Error).message,
+        },
+        { toolName: "get_trade_history" },
+      );
     }
   },
 });

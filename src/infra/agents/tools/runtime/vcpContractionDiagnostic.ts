@@ -33,13 +33,35 @@ export const vcpContractionDiagnosticTool = createTool({
       )
       .min(4)
       .describe("OHLCV bars, ordered oldest → newest."),
-    window: z.number().int().min(2).optional().describe("Contraction window in candles. Default 5."),
+    window: z
+      .number()
+      .int()
+      .min(2)
+      .optional()
+      .describe("Contraction window in candles. Default 5."),
     minCandles: z.number().int().min(2).optional().describe("Min candles for verdict. Default 4."),
-    bodyShrinkThresholdPct: z.number().optional().describe("% per candle for body contraction. Default -1.0."),
-    rangeShrinkThresholdPct: z.number().optional().describe("% per candle for range contraction. Default -1.0."),
-    volumeShrinkThresholdPct: z.number().optional().describe("% per candle for vol contraction. Default -2.0."),
-    maxRelativeVolume: z.number().positive().optional().describe("Max window/baseline vol ratio. Default 0.70."),
-    maxRangeOverLow: z.number().positive().optional().describe("Max window range / low. Default 0.10."),
+    bodyShrinkThresholdPct: z
+      .number()
+      .optional()
+      .describe("% per candle for body contraction. Default -1.0."),
+    rangeShrinkThresholdPct: z
+      .number()
+      .optional()
+      .describe("% per candle for range contraction. Default -1.0."),
+    volumeShrinkThresholdPct: z
+      .number()
+      .optional()
+      .describe("% per candle for vol contraction. Default -2.0."),
+    maxRelativeVolume: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Max window/baseline vol ratio. Default 0.70."),
+    maxRangeOverLow: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Max window range / low. Default 0.10."),
   }),
   outputSchema: z.object({
     windowSize: z.number(),

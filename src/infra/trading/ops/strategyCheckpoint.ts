@@ -126,14 +126,16 @@ export function listCheckpoints(): PortfolioCheckpoint[] {
 
   for (const file of files) {
     try {
-      const cp = JSON.parse(readFileSync(join(CHECKPOINTS_DIR, file), "utf-8")) as PortfolioCheckpoint;
+      const cp = JSON.parse(
+        readFileSync(join(CHECKPOINTS_DIR, file), "utf-8"),
+      ) as PortfolioCheckpoint;
       checkpoints.push(cp);
-    } catch {
-      continue;
-    }
+    } catch {}
   }
 
-  return checkpoints.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return checkpoints.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
 }
 
 /**
@@ -206,11 +208,17 @@ export function formatCheckpoint(cp: PortfolioCheckpoint): string {
   const lines: string[] = [];
   lines.push(`Checkpoint: ${cp.label} (${cp.id})`);
   lines.push(`  Created: ${cp.createdAt} | Reason: ${cp.reason}`);
-  lines.push(`  Value: $${cp.portfolio.totalValueUsd.toLocaleString()} | Cash: $${cp.portfolio.cashUsd.toLocaleString()}`);
-  lines.push(`  Positions: ${cp.portfolio.positions.length} | Pending orders: ${cp.portfolio.pendingOrders.length}`);
+  lines.push(
+    `  Value: $${cp.portfolio.totalValueUsd.toLocaleString()} | Cash: $${cp.portfolio.cashUsd.toLocaleString()}`,
+  );
+  lines.push(
+    `  Positions: ${cp.portfolio.positions.length} | Pending orders: ${cp.portfolio.pendingOrders.length}`,
+  );
 
   for (const pos of cp.portfolio.positions.slice(0, 5)) {
-    lines.push(`    ${pos.side} ${pos.quantity} ${pos.symbol} @ $${pos.avgPrice.toFixed(2)} ($${pos.notionalUsd.toLocaleString()})`);
+    lines.push(
+      `    ${pos.side} ${pos.quantity} ${pos.symbol} @ $${pos.avgPrice.toFixed(2)} ($${pos.notionalUsd.toLocaleString()})`,
+    );
   }
   if (cp.portfolio.positions.length > 5) {
     lines.push(`    ... +${cp.portfolio.positions.length - 5} more`);

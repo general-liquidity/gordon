@@ -128,8 +128,7 @@ export function computeLoSharpeCorrection(
 
   // Determine max lag. Default truncates aggressively to avoid summing
   // noisy high-lag autocorrelations.
-  const requestedLag =
-    input.maxLag ?? Math.min(20, q - 1, Math.floor(N / 10));
+  const requestedLag = input.maxLag ?? Math.min(20, q - 1, Math.floor(N / 10));
   const maxLag = Math.max(0, Math.min(requestedLag, q - 1, N - 1));
 
   const autocorrelations: number[] = [];
@@ -154,9 +153,7 @@ export function computeLoSharpeCorrection(
 
   const correctedAnnualisedSharpe = perPeriodSharpe * correctionFactor;
   const correctionRatio =
-    Math.abs(naiveAnnualisedSharpe) > 0
-      ? correctedAnnualisedSharpe / naiveAnnualisedSharpe
-      : 1;
+    Math.abs(naiveAnnualisedSharpe) > 0 ? correctedAnnualisedSharpe / naiveAnnualisedSharpe : 1;
 
   const reasoning =
     `N=${N}, q=${q}, max-lag=${maxLag}; ` +

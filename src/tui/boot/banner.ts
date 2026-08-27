@@ -30,7 +30,9 @@ function truncatePlain(value: string, maxVisible: number): string {
   if (maxVisible <= 0) return "";
   if (visibleLength(value) <= maxVisible) return value;
   if (maxVisible === 1) return "…";
-  return `${Array.from(value).slice(0, maxVisible - 1).join("")}…`;
+  return `${Array.from(value)
+    .slice(0, maxVisible - 1)
+    .join("")}…`;
 }
 
 /** Raw-ANSI lines, no trailing newline. Caller joins with "\n". */

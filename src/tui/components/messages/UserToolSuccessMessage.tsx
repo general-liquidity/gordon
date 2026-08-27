@@ -9,7 +9,7 @@ function UserToolSuccessMessageInner({ message }: { message: Message }) {
     <Box flexDirection="row" marginTop={0}>
       <Text dimColor>{"⎿ "}</Text>
       <Text color="green">{"✓"}</Text>
-      <Text>{" "}</Text>
+      <Text> </Text>
       <Text dimColor>{message.content}</Text>
     </Box>
   );

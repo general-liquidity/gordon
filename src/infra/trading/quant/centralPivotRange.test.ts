@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeCpr,
-  cprToPayload,
-} from "./centralPivotRange.ts";
+import { computeCpr, cprToPayload } from "./centralPivotRange.ts";
 
 describe("computeCpr — formula correctness", () => {
   it("CP = (H + L + C) / 3", () => {
@@ -79,7 +76,7 @@ describe("computeCpr — bias", () => {
   it("price inside CPR band → neutral", () => {
     const r = computeCpr({
       prev: { high: 110, low: 100, close: 108 },
-      currentPrice: r0(r => (r.topCentral + r.bottomCentral) / 2)({
+      currentPrice: r0((r) => (r.topCentral + r.bottomCentral) / 2)({
         prev: { high: 110, low: 100, close: 108 },
       }),
     });
@@ -94,7 +91,9 @@ describe("computeCpr — bias", () => {
 
 // Tiny helper to derive a price from the result of a separate compute call
 // — keeps the "inside the band" test readable.
-function r0<T>(extract: (r: ReturnType<typeof computeCpr>) => T): (input: Parameters<typeof computeCpr>[0]) => T {
+function r0<T>(
+  extract: (r: ReturnType<typeof computeCpr>) => T,
+): (input: Parameters<typeof computeCpr>[0]) => T {
   return (input) => extract(computeCpr(input));
 }
 

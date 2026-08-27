@@ -371,10 +371,7 @@ function thinness(count: number, sufficient: number): number {
   return clamp01(1 - count / sufficient);
 }
 
-function distributionalLeg(
-  evidence: UncertaintyEvidence,
-  config: ResolvedConfig,
-): LegEstimate {
+function distributionalLeg(evidence: UncertaintyEvidence, config: ResolvedConfig): LegEstimate {
   const score = evidence.familiarityScore;
   if (score !== undefined && score !== null && Number.isFinite(score)) {
     const familiar = clamp01(score);
@@ -502,10 +499,7 @@ export interface ActionDecision {
   reason: string;
 }
 
-export function recommendAction(
-  legs: UncertaintyLegs,
-  config?: UncertaintyConfig,
-): ActionDecision {
+export function recommendAction(legs: UncertaintyLegs, config?: UncertaintyConfig): ActionDecision {
   const cfg = resolveConfig(config);
   const a = legs.aleatoric.value;
   const e = legs.epistemic.value;

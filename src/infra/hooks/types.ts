@@ -27,7 +27,7 @@ export const HOOK_POINTS = [
   "SubagentStop",
 ] as const;
 
-export type HookPoint = typeof HOOK_POINTS[number];
+export type HookPoint = (typeof HOOK_POINTS)[number];
 
 export type HookAction =
   /** Let execution continue unchanged. */

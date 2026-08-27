@@ -24,7 +24,11 @@ function getApprovalClass(spec: RuntimeToolSpec): RuntimeApprovalClass {
   if (spec.permissionScope === "livetrade.execute" || spec.permissionScope === "wallet.write") {
     return "per_action";
   }
-  if (spec.permissionScope === "system.mode.write" || spec.permissionScope === "plugin.install" || spec.permissionScope === "mcp.connect") {
+  if (
+    spec.permissionScope === "system.mode.write" ||
+    spec.permissionScope === "plugin.install" ||
+    spec.permissionScope === "mcp.connect"
+  ) {
     return "per_tool";
   }
   if (spec.permissionScope === "papertrade.execute") {
@@ -56,16 +60,23 @@ export async function evaluateRuntimeToolPolicy(
   toolOverride?: RuntimeToolSpec,
 ): Promise<RuntimeToolPolicyDecision> {
   const userId = context.userId || "unknown";
-  const tool = toolOverride ?? (capabilityRegistry ?? new CapabilityRegistry()).resolveToolSpec(toolName);
+  const tool =
+    toolOverride ?? (capabilityRegistry ?? new CapabilityRegistry()).resolveToolSpec(toolName);
   const approvalClass = getApprovalClass(tool);
 
   const actionPolicy = await evaluateToolRequestPolicy(toolName, context);
   if (!actionPolicy.allowed) {
-    safeAuditRecord(userId, "PERMISSION_CHECK", {
-      toolName,
-      permissionScope: tool.permissionScope,
-      approvalClass,
-    }, "BLOCKED", actionPolicy.reason || "Tool policy denied request.");
+    safeAuditRecord(
+      userId,
+      "PERMISSION_CHECK",
+      {
+        toolName,
+        permissionScope: tool.permissionScope,
+        approvalClass,
+      },
+      "BLOCKED",
+      actionPolicy.reason || "Tool policy denied request.",
+    );
 
     return {
       allowed: false,
@@ -75,8 +86,13 @@ export async function evaluateRuntimeToolPolicy(
     };
   }
 
-  const sandboxActive = (context.exchange as { isSandbox?: boolean } | null)?.isSandbox ?? context.broker?.isPaper ?? false;
-  let accessControlResult = await checkToolAccess(toolName, context.config, userId, { sandboxActive });
+  const sandboxActive =
+    (context.exchange as { isSandbox?: boolean } | null)?.isSandbox ??
+    context.broker?.isPaper ??
+    false;
+  let accessControlResult = await checkToolAccess(toolName, context.config, userId, {
+    sandboxActive,
+  });
   if (!accessControlResult.allowed) {
     return {
       allowed: false,
@@ -87,8 +103,13 @@ export async function evaluateRuntimeToolPolicy(
     };
   }
 
-  if ((tool.requiresTradePermission || actionPolicy.requiresTradePermission) && !isTradeTool(toolName)) {
-    accessControlResult = await checkToolAccess(toolName, context.config, userId, { sandboxActive });
+  if (
+    (tool.requiresTradePermission || actionPolicy.requiresTradePermission) &&
+    !isTradeTool(toolName)
+  ) {
+    accessControlResult = await checkToolAccess(toolName, context.config, userId, {
+      sandboxActive,
+    });
     if (!accessControlResult.allowed) {
       return {
         allowed: false,
@@ -100,13 +121,18 @@ export async function evaluateRuntimeToolPolicy(
     }
   }
 
-  safeAuditRecord(userId, "PERMISSION_CHECK", {
-    toolName,
-    permissionScope: tool.permissionScope,
-    approvalClass,
-    sideEffectLevel: tool.sideEffectLevel,
-    requiresTradePermission: tool.requiresTradePermission,
-  }, "ALLOWED");
+  safeAuditRecord(
+    userId,
+    "PERMISSION_CHECK",
+    {
+      toolName,
+      permissionScope: tool.permissionScope,
+      approvalClass,
+      sideEffectLevel: tool.sideEffectLevel,
+      requiresTradePermission: tool.requiresTradePermission,
+    },
+    "ALLOWED",
+  );
 
   return {
     allowed: true,

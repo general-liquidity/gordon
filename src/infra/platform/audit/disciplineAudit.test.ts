@@ -2,10 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  getDisciplineAudit,
-  summarizeDisciplineAudit,
-} from "./disciplineAudit.ts";
+import { getDisciplineAudit, summarizeDisciplineAudit } from "./disciplineAudit.ts";
 import { auditLog } from "./audit-log.ts";
 import { recordRuleOverride } from "./ruleOverride.ts";
 import { setDatabasePathForTesting } from "../../storage/database.ts";
@@ -84,13 +81,7 @@ describe("getDisciplineAudit — overtrading", () => {
 
 describe("getDisciplineAudit — trading_without_plan", () => {
   test("EXECUTE_PLAN with no matching APPROVE_PLAN triggers", () => {
-    auditLog.record(
-      "op",
-      "EXECUTE_PLAN",
-      { foo: "bar" },
-      "SUCCESS",
-      { planId: "phantom-plan" },
-    );
+    auditLog.record("op", "EXECUTE_PLAN", { foo: "bar" }, "SUCCESS", { planId: "phantom-plan" });
     const report = getDisciplineAudit();
     const m = report.modes.find((mm) => mm.mode === "trading_without_plan")!;
     expect(m.triggered).toBe(true);
@@ -118,13 +109,9 @@ describe("getDisciplineAudit — not_journaling", () => {
 
   test("trades with decisionTrace metadata do not trigger journaling mode", () => {
     for (let i = 0; i < 4; i++) {
-      auditLog.record(
-        "op",
-        "EXECUTE_PLAN",
-        { p: i },
-        "SUCCESS",
-        { metadata: { decisionTrace: { traceVersion: 1 } } },
-      );
+      auditLog.record("op", "EXECUTE_PLAN", { p: i }, "SUCCESS", {
+        metadata: { decisionTrace: { traceVersion: 1 } },
+      });
     }
     const report = getDisciplineAudit();
     const m = report.modes.find((mm) => mm.mode === "not_journaling")!;
@@ -135,13 +122,7 @@ describe("getDisciplineAudit — not_journaling", () => {
 describe("getDisciplineAudit — strategy_switching", () => {
   test("more than maxDistinctSlots distinct slot IDs triggers", () => {
     for (const slot of ["a", "b", "c", "d", "e"]) {
-      auditLog.record(
-        "op",
-        "EXECUTE_PLAN",
-        {},
-        "SUCCESS",
-        { metadata: { strategySlot: slot } },
-      );
+      auditLog.record("op", "EXECUTE_PLAN", {}, "SUCCESS", { metadata: { strategySlot: slot } });
     }
     const report = getDisciplineAudit({ maxDistinctSlots: 3 });
     const m = report.modes.find((mm) => mm.mode === "strategy_switching")!;
@@ -150,13 +131,7 @@ describe("getDisciplineAudit — strategy_switching", () => {
 
   test("few distinct slots does not trigger", () => {
     for (const slot of ["a", "a", "b"]) {
-      auditLog.record(
-        "op",
-        "EXECUTE_PLAN",
-        {},
-        "SUCCESS",
-        { metadata: { strategySlot: slot } },
-      );
+      auditLog.record("op", "EXECUTE_PLAN", {}, "SUCCESS", { metadata: { strategySlot: slot } });
     }
     const report = getDisciplineAudit({ maxDistinctSlots: 3 });
     const m = report.modes.find((mm) => mm.mode === "strategy_switching")!;
@@ -186,7 +161,9 @@ describe("getDisciplineAudit — emotional_trading", () => {
     // overrides to clear the threshold.
     const sleep = () => {
       const t = Date.now();
-      while (Date.now() - t < 5) { /* spin */ }
+      while (Date.now() - t < 5) {
+        /* spin */
+      }
     };
     recordRuleOverride("op", {
       action: "place_market_order",

@@ -108,24 +108,19 @@ function getConfigVersion(config: Record<string, unknown>): ConfigVersion {
 /**
  * Find migration path from source version to target version
  */
-function findMigrationPath(
-  fromVersion: ConfigVersion,
-  toVersion: ConfigVersion
-): Migration[] {
+function findMigrationPath(fromVersion: ConfigVersion, toVersion: ConfigVersion): Migration[] {
   const path: Migration[] = [];
   let currentVersion = fromVersion;
 
   while (compareVersions(currentVersion, toVersion) < 0) {
-    const nextMigration = migrations.find(
-      (m) => m.fromVersion === currentVersion
-    );
+    const nextMigration = migrations.find((m) => m.fromVersion === currentVersion);
 
     if (!nextMigration) {
       // No direct migration, try to find any migration from current version
       const availableMigrations = migrations.filter(
         (m) =>
           compareVersions(m.fromVersion, currentVersion) >= 0 &&
-          compareVersions(m.toVersion, toVersion) <= 0
+          compareVersions(m.toVersion, toVersion) <= 0,
       );
 
       if (availableMigrations.length === 0) {
@@ -137,9 +132,7 @@ function findMigrationPath(
       }
 
       // Sort by fromVersion and take the first applicable
-      availableMigrations.sort((a, b) =>
-        compareVersions(a.fromVersion, b.fromVersion)
-      );
+      availableMigrations.sort((a, b) => compareVersions(a.fromVersion, b.fromVersion));
       const migration = availableMigrations[0];
       if (!migration) break;
       path.push(migration);
@@ -182,10 +175,7 @@ export async function backupConfig(): Promise<string | null> {
 
     return backupPath;
   } catch (error) {
-    logger.error(
-      "Failed to backup config",
-      error instanceof Error ? error : undefined
-    );
+    logger.error("Failed to backup config", error instanceof Error ? error : undefined);
     return null;
   }
 }
@@ -286,7 +276,7 @@ export function needsMigration(config: Record<string, unknown>): boolean {
  * Returns the migrated config or null if no migration was needed
  */
 export async function migrateConfig(
-  config: Record<string, unknown>
+  config: Record<string, unknown>,
 ): Promise<Record<string, unknown> | null> {
   const fromVersion = getConfigVersion(config);
 
@@ -329,17 +319,13 @@ export async function migrateConfig(
     try {
       migratedConfig = migration.migrate(migratedConfig);
     } catch (error) {
-      logger.error(
-        "Migration failed",
-        error instanceof Error ? error : undefined,
-        {
-          migration: `${migration.fromVersion} -> ${migration.toVersion}`,
-        }
-      );
+      logger.error("Migration failed", error instanceof Error ? error : undefined, {
+        migration: `${migration.fromVersion} -> ${migration.toVersion}`,
+      });
       throw new Error(
         `Migration from ${migration.fromVersion} to ${migration.toVersion} failed: ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
       );
     }
   }
@@ -363,9 +349,7 @@ export async function migrateConfig(
 export function registerMigration(migration: Migration): void {
   // Check for duplicate
   const existing = migrations.find(
-    (m) =>
-      m.fromVersion === migration.fromVersion &&
-      m.toVersion === migration.toVersion
+    (m) => m.fromVersion === migration.fromVersion && m.toVersion === migration.toVersion,
   );
 
   if (existing) {

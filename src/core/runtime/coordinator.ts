@@ -15,11 +15,7 @@
  */
 
 import { createModuleLogger } from "../../infra/logger/index.ts";
-import type {
-  PortfolioState,
-  AutoAction,
-  PortfolioRiskConfig,
-} from "./types.ts";
+import type { PortfolioState, AutoAction, PortfolioRiskConfig } from "./types.ts";
 import { DEFAULT_PORTFOLIO_RISK_CONFIG } from "./types.ts";
 
 const logger = createModuleLogger("portfolio-coordinator");
@@ -53,7 +49,7 @@ export class PortfolioCoordinator {
       symbol: string;
       side: "long" | "short";
       size_usd: number;
-    }
+    },
   ): {
     allowed: boolean;
     reasons: string[];
@@ -186,8 +182,7 @@ export class PortfolioCoordinator {
 
     // Check total exposure
     if (state.total_capital > 0) {
-      const exposurePercent =
-        (state.deployed_capital / state.total_capital) * 100;
+      const exposurePercent = (state.deployed_capital / state.total_capital) * 100;
       if (exposurePercent > this.config.max_total_exposure_percent) {
         actions.push({
           type: "rebalance",
@@ -237,7 +232,7 @@ export class PortfolioCoordinator {
    */
   private checkTotalExposure(
     state: PortfolioState,
-    proposedSize: number
+    proposedSize: number,
   ): { passed: boolean; message: string; warning?: string } {
     if (state.total_capital <= 0) {
       return { passed: true, message: "No capital set" };
@@ -267,23 +262,19 @@ export class PortfolioCoordinator {
   /**
    * Check if portfolio drawdown has breached the limit.
    */
-  private checkPortfolioDrawdown(
-    state: PortfolioState
-  ): { passed: boolean; message: string; warning?: string } {
-    if (
-      state.portfolio_drawdown_percent >=
-      this.config.max_portfolio_drawdown_percent
-    ) {
+  private checkPortfolioDrawdown(state: PortfolioState): {
+    passed: boolean;
+    message: string;
+    warning?: string;
+  } {
+    if (state.portfolio_drawdown_percent >= this.config.max_portfolio_drawdown_percent) {
       return {
         passed: false,
         message: `Portfolio drawdown ${state.portfolio_drawdown_percent.toFixed(1)}% exceeds max ${this.config.max_portfolio_drawdown_percent}%. All new trades blocked.`,
       };
     }
 
-    if (
-      state.portfolio_drawdown_percent >=
-      this.config.max_portfolio_drawdown_percent * 0.8
-    ) {
+    if (state.portfolio_drawdown_percent >= this.config.max_portfolio_drawdown_percent * 0.8) {
       return {
         passed: true,
         message: "",
@@ -300,7 +291,7 @@ export class PortfolioCoordinator {
    */
   private checkDirectionBias(
     state: PortfolioState,
-    proposedTrade: { side: "long" | "short"; size_usd: number }
+    proposedTrade: { side: "long" | "short"; size_usd: number },
   ): { passed: boolean; message: string; warning?: string } {
     if (state.deployed_capital <= 0 && proposedTrade.size_usd <= 0) {
       return { passed: true, message: "" };
@@ -318,8 +309,7 @@ export class PortfolioCoordinator {
     // the proposed trade (worst case), plus the proposed trade.
     // In practice, the runtime would track long/short capital separately.
     // For now, this is a conservative check.
-    const directionPercent =
-      ((state.deployed_capital + proposedTrade.size_usd) / totalAfter) * 100;
+    const directionPercent = ((state.deployed_capital + proposedTrade.size_usd) / totalAfter) * 100;
 
     // This simplified check will pass because it's always ~100% in one direction
     // unless we track long vs short separately. The more meaningful check is below.
@@ -339,7 +329,7 @@ export class PortfolioCoordinator {
    */
   private checkAssetConcentration(
     state: PortfolioState,
-    proposedTrade: { symbol: string; size_usd: number }
+    proposedTrade: { symbol: string; size_usd: number },
   ): { passed: boolean; message: string; warning?: string } {
     if (state.deployed_capital <= 0 && proposedTrade.size_usd <= 0) {
       return { passed: true, message: "" };
@@ -352,8 +342,7 @@ export class PortfolioCoordinator {
       return { passed: true, message: "" };
     }
 
-    const concentrationPercent =
-      (proposedTrade.size_usd / state.total_capital) * 100;
+    const concentrationPercent = (proposedTrade.size_usd / state.total_capital) * 100;
 
     if (concentrationPercent > this.config.max_single_asset_concentration_percent) {
       return {
@@ -362,10 +351,7 @@ export class PortfolioCoordinator {
       };
     }
 
-    if (
-      concentrationPercent >
-      this.config.max_single_asset_concentration_percent * 0.8
-    ) {
+    if (concentrationPercent > this.config.max_single_asset_concentration_percent * 0.8) {
       return {
         passed: true,
         message: "",
@@ -379,9 +365,11 @@ export class PortfolioCoordinator {
   /**
    * Check portfolio-level correlation risk.
    */
-  private checkCorrelationRisk(
-    state: PortfolioState
-  ): { passed: boolean; message: string; warning?: string } {
+  private checkCorrelationRisk(state: PortfolioState): {
+    passed: boolean;
+    message: string;
+    warning?: string;
+  } {
     if (state.correlation_risk > this.config.max_correlation_risk) {
       return {
         passed: false,

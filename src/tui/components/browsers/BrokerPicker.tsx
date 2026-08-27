@@ -1,5 +1,4 @@
-import React from "react";
-import { Box, Text } from "../../ink-custom";
+import { Text } from "../../ink-custom";
 import { Select, PasswordInput } from "@inkjs/ui";
 import { MultiStepPicker, type PickerStep } from "../../design-system/MultiStepPicker.tsx";
 
@@ -38,7 +37,8 @@ interface BrokerPickerData {
 export function BrokerPicker({ activeBroker, configuredBrokers, onComplete, onCancel }: Props) {
   const steps: Record<string, PickerStep<BrokerPickerData>> = {
     action: {
-      hint: configuredBrokers.length > 0 ? `Configured: ${configuredBrokers.join(", ")}` : undefined,
+      hint:
+        configuredBrokers.length > 0 ? `Configured: ${configuredBrokers.join(", ")}` : undefined,
       render: (ctx) => (
         <Select
           options={ACTIONS}
@@ -100,7 +100,13 @@ export function BrokerPicker({ activeBroker, configuredBrokers, onComplete, onCa
       titleNote={activeBroker ? `(active: ${activeBroker})` : undefined}
       steps={steps}
       initialStep="action"
-      onComplete={(data) => onComplete(data.action, data.broker, data.apiKey ? { apiKey: data.apiKey, apiSecret: data.apiSecret } : undefined)}
+      onComplete={(data) =>
+        onComplete(
+          data.action,
+          data.broker,
+          data.apiKey ? { apiKey: data.apiKey, apiSecret: data.apiSecret } : undefined,
+        )
+      }
       onCancel={onCancel}
     />
   );

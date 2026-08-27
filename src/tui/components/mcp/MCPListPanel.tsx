@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Divider } from "../layout/Divider.tsx";
 
@@ -75,15 +75,17 @@ export function MCPListPanel({ servers, onSelect, onClose }: Props) {
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">MCP SERVERS</Text>
-        <Text dimColor>  {statusSummary(servers)}</Text>
+        <Text bold color="cyanBright">
+          MCP SERVERS
+        </Text>
+        <Text dimColor> {statusSummary(servers)}</Text>
       </Box>
 
       <Divider />
 
       {servers.length === 0 ? (
         <Box marginTop={1}>
-          <Text dimColor>  No MCP servers configured.</Text>
+          <Text dimColor> No MCP servers configured.</Text>
         </Box>
       ) : (
         <Box flexDirection="column" marginTop={1}>
@@ -92,12 +94,8 @@ export function MCPListPanel({ servers, onSelect, onClose }: Props) {
             const isReconnecting = s.status === "reconnecting";
             return (
               <Box key={s.id}>
-                <Text color={isFocused ? "cyanBright" : undefined}>
-                  {isFocused ? "▸ " : "  "}
-                </Text>
-                <Text color={STATUS_COLOR[s.status] as any}>
-                  {STATUS_ICON[s.status]}
-                </Text>
+                <Text color={isFocused ? "cyanBright" : undefined}>{isFocused ? "▸ " : "  "}</Text>
+                <Text color={STATUS_COLOR[s.status] as any}>{STATUS_ICON[s.status]}</Text>
                 <Text> </Text>
                 {isReconnecting ? (
                   <Text color="yellow" bold={isFocused}>
@@ -115,13 +113,14 @@ export function MCPListPanel({ servers, onSelect, onClose }: Props) {
                   <>
                     <Text dimColor>{String(s.toolCount).padStart(3)} tools</Text>
                     {s.latencyMs !== undefined && (
-                      <Text dimColor>{"  "}{s.latencyMs}ms</Text>
+                      <Text dimColor>
+                        {"  "}
+                        {s.latencyMs}ms
+                      </Text>
                     )}
                   </>
                 )}
-                {s.status === "error" && !isReconnecting && (
-                  <Text color="red">{"  error"}</Text>
-                )}
+                {s.status === "error" && !isReconnecting && <Text color="red">{"  error"}</Text>}
               </Box>
             );
           })}
@@ -129,7 +128,7 @@ export function MCPListPanel({ servers, onSelect, onClose }: Props) {
       )}
 
       <Box marginTop={1}>
-        <Text dimColor>↑↓ navigate  Enter select  Esc close</Text>
+        <Text dimColor>↑↓ navigate Enter select Esc close</Text>
       </Box>
     </Box>
   );

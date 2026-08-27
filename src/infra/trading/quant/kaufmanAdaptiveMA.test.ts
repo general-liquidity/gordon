@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeKama,
-  kamaToPayload,
-} from "./kaufmanAdaptiveMA.ts";
+import { computeKama, kamaToPayload } from "./kaufmanAdaptiveMA.ts";
 
 describe("computeKama — edge cases", () => {
   it("short series → NaN currentKama with reason", () => {
@@ -22,9 +19,7 @@ describe("computeKama — tracking behavior", () => {
   });
 
   it("flattens out on choppy oscillation", () => {
-    const prices = Array.from({ length: 50 }, (_, i) =>
-      i % 2 === 0 ? 100 : 105,
-    );
+    const prices = Array.from({ length: 50 }, (_, i) => (i % 2 === 0 ? 100 : 105));
     const r = computeKama({ prices });
     // In a perfectly noisy series the smoothing constant stays small,
     // so KAMA hugs a near-constant value rather than oscillating.
@@ -36,8 +31,8 @@ describe("computeKama — tracking behavior", () => {
   it("smoothing constant is bounded between slow and fast squared", () => {
     const prices = Array.from({ length: 60 }, (_, i) => 100 + Math.sin(i / 5));
     const r = computeKama({ prices });
-    const fastSc = Math.pow(2 / (2 + 1), 2);
-    const slowSc = Math.pow(2 / (30 + 1), 2);
+    const fastSc = (2 / (2 + 1)) ** 2;
+    const slowSc = (2 / (30 + 1)) ** 2;
     for (const sc of r.smoothingConstants) {
       if (Number.isFinite(sc)) {
         expect(sc).toBeGreaterThanOrEqual(slowSc * 0.99);

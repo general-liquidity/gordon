@@ -79,9 +79,7 @@ const TIER_MUTATION_POOL: Record<OptimizationTier, MutationType[]> = {
  * Falls back to "parameter" when no severity signals are present, which keeps
  * the caller's existing param-nudge behavior intact (backward-compatible).
  */
-export function selectOptimizationTier(
-  input: OptimizationTierInput = {},
-): OptimizationTierResult {
+export function selectOptimizationTier(input: OptimizationTierInput = {}): OptimizationTierResult {
   const criticalRisk = input.criticalRisk === true;
   const stabilityErrors =
     typeof input.stabilityErrors === "number" && Number.isFinite(input.stabilityErrors)

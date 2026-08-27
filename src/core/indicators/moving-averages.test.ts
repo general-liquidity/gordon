@@ -1,10 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  calculateWMA,
-  calculateDEMA,
-  calculateTEMA,
-  calculateTRIMA,
-} from "./moving-averages.ts";
+import { calculateWMA, calculateDEMA, calculateTEMA, calculateTRIMA } from "./moving-averages.ts";
 
 describe("WMA", () => {
   test("WMA of [1,2,3] period 3 = (1*1 + 2*2 + 3*3)/6 = 14/6", () => {

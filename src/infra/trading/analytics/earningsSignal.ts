@@ -123,7 +123,11 @@ export function validateEarningsSignal(raw: unknown): EarningsSignalValidation {
   };
   const biasN = biasNumeric[s.tradingBias];
   // If sentiment is strongly directional but bias disagrees in sign, warn.
-  if (Math.abs(s.sentimentScore) > 0.5 && Math.sign(s.sentimentScore) !== Math.sign(biasN) && biasN !== 0) {
+  if (
+    Math.abs(s.sentimentScore) > 0.5 &&
+    Math.sign(s.sentimentScore) !== Math.sign(biasN) &&
+    biasN !== 0
+  ) {
     issues.push({
       severity: "warning",
       field: "tradingBias",
@@ -132,14 +136,20 @@ export function validateEarningsSignal(raw: unknown): EarningsSignalValidation {
   }
 
   // Guidance + bias coherence — "raised" with "strong_short" is contradictory.
-  if (s.guidanceRevision === "raised" && (s.tradingBias === "mild_short" || s.tradingBias === "strong_short")) {
+  if (
+    s.guidanceRevision === "raised" &&
+    (s.tradingBias === "mild_short" || s.tradingBias === "strong_short")
+  ) {
     issues.push({
       severity: "warning",
       field: "tradingBias",
       message: "tradingBias is short despite raised guidance — review extraction",
     });
   }
-  if (s.guidanceRevision === "lowered" && (s.tradingBias === "mild_long" || s.tradingBias === "strong_long")) {
+  if (
+    s.guidanceRevision === "lowered" &&
+    (s.tradingBias === "mild_long" || s.tradingBias === "strong_long")
+  ) {
     issues.push({
       severity: "warning",
       field: "tradingBias",
@@ -284,11 +294,7 @@ export function summarizeEarningsSignal(
   quoteCheck?: EarningsQuoteCheck,
 ): string {
   const directionLabel =
-    score.composite > 0.3
-      ? "bullish"
-      : score.composite < -0.3
-        ? "bearish"
-        : "neutral";
+    score.composite > 0.3 ? "bullish" : score.composite < -0.3 ? "bearish" : "neutral";
   const convictionLabel =
     score.conviction > 0.7
       ? "high conviction"

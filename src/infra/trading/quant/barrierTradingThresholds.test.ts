@@ -9,9 +9,9 @@ import {
 describe("isBarrierTradingThresholdsEnabled", () => {
   it("respects the flag", () => {
     expect(isBarrierTradingThresholdsEnabled({})).toBe(false);
-    expect(
-      isBarrierTradingThresholdsEnabled({ [BARRIER_TRADING_THRESHOLDS_FLAG_ENV]: "1" }),
-    ).toBe(true);
+    expect(isBarrierTradingThresholdsEnabled({ [BARRIER_TRADING_THRESHOLDS_FLAG_ENV]: "1" })).toBe(
+      true,
+    );
   });
 });
 
@@ -101,10 +101,7 @@ describe("computeBarrierTradingThresholds — breadth", () => {
       transactionCost: 0,
       periodsPerYear: 252 * 24,
     });
-    expect(hourly.expectedBreadthPerYear / daily.expectedBreadthPerYear).toBeCloseTo(
-      24,
-      6,
-    );
+    expect(hourly.expectedBreadthPerYear / daily.expectedBreadthPerYear).toBeCloseTo(24, 6);
   });
 });
 

@@ -83,7 +83,8 @@ export function computePSI(baseline: number[], current: number[], bins = 10): PS
     perBin.push({ range: [lo, hi], expectedPct, actualPct, contribution });
   }
 
-  const verdict: DriftVerdict = psi < 0.1 ? "stable" : psi < 0.25 ? "moderate_shift" : "significant_shift";
+  const verdict: DriftVerdict =
+    psi < 0.1 ? "stable" : psi < 0.25 ? "moderate_shift" : "significant_shift";
   const top = [...perBin].sort((a, b) => b.contribution - a.contribution)[0];
   const summary =
     `PSI ${psi.toFixed(3)} — ${verdict.replace("_", " ")}` +

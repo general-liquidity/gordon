@@ -75,7 +75,7 @@ describe("deriveCyclePlan — just-in-time from current state", () => {
   });
 
   it("prepends a remediation item when the milestone carries a failedReason", () => {
-    let list = sampleList();
+    const list = sampleList();
     // markFail via a raw edit through the public helper.
     const withFail = {
       ...list,

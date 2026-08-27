@@ -82,8 +82,8 @@ export interface AggressionRatioResult {
 
 const DEFAULT_LOOKBACK = 20;
 const DEFAULT_MIN_BARS = 10;
-const DEFAULT_STRONG_BUY = 0.30;
-const DEFAULT_BUY = 0.10;
+const DEFAULT_STRONG_BUY = 0.3;
+const DEFAULT_BUY = 0.1;
 
 function ema(values: ReadonlyArray<number>, alpha: number): number {
   if (values.length === 0) return 0;

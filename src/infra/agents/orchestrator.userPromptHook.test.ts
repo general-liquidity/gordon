@@ -15,15 +15,24 @@ describe("UserPromptSubmit production bridge", () => {
     registerHook({
       id: "prefix",
       point: "UserPromptSubmit",
-      handler: (payload) => ({ action: "modify", replacement: { prompt: `[reviewed] ${payload.prompt}` } }),
+      handler: (payload) => ({
+        action: "modify",
+        replacement: { prompt: `[reviewed] ${payload.prompt}` },
+      }),
     });
     const context = { threadId: "thread-1", runtime: { sessionId: "session-1" } } as never;
     expect(await applyUserPromptSubmitHooks("hello", context)).toBe("[reviewed] hello");
   });
 
   test("turns a block into a fail-closed prompt refusal", async () => {
-    registerHook({ id: "deny", point: "UserPromptSubmit", handler: () => ({ action: "block", reason: "operator policy" }) });
-    await expect(applyUserPromptSubmitHooks("hello", {} as never)).rejects.toThrow("operator policy");
+    registerHook({
+      id: "deny",
+      point: "UserPromptSubmit",
+      handler: () => ({ action: "block", reason: "operator policy" }),
+    });
+    await expect(applyUserPromptSubmitHooks("hello", {} as never)).rejects.toThrow(
+      "operator policy",
+    );
   });
 
   test("refuses a malformed prompt replacement instead of dispatching it", async () => {
@@ -64,10 +73,12 @@ describe("inline supervisor lifecycle bridge", () => {
       pendingToolCalls: new Map(),
     };
     const delegation = buildInlineSupervisorDelegation(state, "thread-1");
-    expect(await (delegation.onDelegationStart as (ctx: unknown) => Promise<unknown>)({
-      primitiveId: "researcher",
-      toolCallId: "call-1",
-    })).toEqual({ proceed: true });
+    expect(
+      await (delegation.onDelegationStart as (ctx: unknown) => Promise<unknown>)({
+        primitiveId: "researcher",
+        toolCallId: "call-1",
+      }),
+    ).toEqual({ proceed: true });
     await (delegation.onDelegationComplete as (ctx: unknown) => Promise<unknown>)({
       primitiveId: "researcher",
       toolCallId: "call-1",

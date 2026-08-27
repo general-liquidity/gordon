@@ -76,7 +76,7 @@ export interface SizingResult {
 
 const TYPE_I_BASE_PCT = 0.01;
 const TYPE_II_BASE_PCT = 0.03;
-const TYPE_II_VARIABLE_PCT = 0.10;
+const TYPE_II_VARIABLE_PCT = 0.1;
 const TYPE_II_CAP_PCT = 0.05;
 const TYPE_III_DEFAULT_BASE_PCT = 0.05;
 const ABSOLUTE_CAP_PCT = 0.05; // 5% adjusted RC hard ceiling per Wright

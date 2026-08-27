@@ -142,9 +142,7 @@ export function conditionalDistributionTest(
   const alpha = input.alpha ?? 0.05;
 
   const cond = normalize ? zScore(input.conditionalReturns) : [...input.conditionalReturns];
-  const uncond = normalize
-    ? zScore(input.unconditionalReturns)
-    : [...input.unconditionalReturns];
+  const uncond = normalize ? zScore(input.unconditionalReturns) : [...input.unconditionalReturns];
 
   const nc = cond.length;
   const nu = uncond.length;
@@ -152,7 +150,13 @@ export function conditionalDistributionTest(
   const emptyResult = (reason: string): ConditionalDistributionResult => ({
     nConditional: nc,
     nUnconditional: nu,
-    chiSquare: { Q: 0, df: 9, pValue: 1, decileCounts: new Array(10).fill(0), decileFractions: new Array(10).fill(0) },
+    chiSquare: {
+      Q: 0,
+      df: 9,
+      pValue: 1,
+      decileCounts: new Array(10).fill(0),
+      decileFractions: new Array(10).fill(0),
+    },
     ks: { supDiff: 0, gamma: 0, pValue: 1 },
     informative: false,
     summary: `Insufficient data: ${reason}.`,

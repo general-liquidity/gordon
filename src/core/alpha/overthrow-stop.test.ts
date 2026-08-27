@@ -74,39 +74,26 @@ describe("computeOverthrowStop — null cases", () => {
       c(101, 101.5, 100.5, 101), // low >= level
       c(100.5, 101, 100.2, 100.8), // reclaim, but preceding bar not below level
     ];
-    expect(
-      computeOverthrowStop({ candles, brokenLevel: 100, side: "long" }),
-    ).toBeNull();
+    expect(computeOverthrowStop({ candles, brokenLevel: 100, side: "long" })).toBeNull();
   });
 
   test("no thrust candle (never reclaims)", () => {
-    const candles: Candle[] = [
-      c(99, 99.5, 98, 98.5),
-      c(98, 99, 97, 97.5),
-    ];
-    expect(
-      computeOverthrowStop({ candles, brokenLevel: 100, side: "long" }),
-    ).toBeNull();
+    const candles: Candle[] = [c(99, 99.5, 98, 98.5), c(98, 99, 97, 97.5)];
+    expect(computeOverthrowStop({ candles, brokenLevel: 100, side: "long" })).toBeNull();
   });
 
   test("bad level — non-finite", () => {
     const candles: Candle[] = [c(99, 99.8, 98, 99), c(99, 100.6, 99.5, 100.4)];
-    expect(
-      computeOverthrowStop({ candles, brokenLevel: NaN, side: "long" }),
-    ).toBeNull();
+    expect(computeOverthrowStop({ candles, brokenLevel: NaN, side: "long" })).toBeNull();
   });
 
   test("bad level — <= 0", () => {
     const candles: Candle[] = [c(99, 99.8, 98, 99), c(99, 100.6, 99.5, 100.4)];
-    expect(
-      computeOverthrowStop({ candles, brokenLevel: 0, side: "long" }),
-    ).toBeNull();
+    expect(computeOverthrowStop({ candles, brokenLevel: 0, side: "long" })).toBeNull();
   });
 
   test("empty / too few candles", () => {
-    expect(
-      computeOverthrowStop({ candles: [], brokenLevel: 100, side: "long" }),
-    ).toBeNull();
+    expect(computeOverthrowStop({ candles: [], brokenLevel: 100, side: "long" })).toBeNull();
     expect(
       computeOverthrowStop({
         candles: [c(99, 100.6, 99.5, 100.4)],

@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -137,10 +137,18 @@ describe("tradingUniverse", () => {
         declaredAt: "",
       };
       expect(
-        checkUniverse({ symbol: "BTCUSDT", assetClass: "crypto", venue: "binance" }, { GORDON_TRADING_UNIVERSE: "1" }, u).allowed,
+        checkUniverse(
+          { symbol: "BTCUSDT", assetClass: "crypto", venue: "binance" },
+          { GORDON_TRADING_UNIVERSE: "1" },
+          u,
+        ).allowed,
       ).toBe(true);
       expect(
-        checkUniverse({ symbol: "BTCUSDT", assetClass: "crypto", venue: "kraken" }, { GORDON_TRADING_UNIVERSE: "1" }, u).allowed,
+        checkUniverse(
+          { symbol: "BTCUSDT", assetClass: "crypto", venue: "kraken" },
+          { GORDON_TRADING_UNIVERSE: "1" },
+          u,
+        ).allowed,
       ).toBe(false);
     });
   });

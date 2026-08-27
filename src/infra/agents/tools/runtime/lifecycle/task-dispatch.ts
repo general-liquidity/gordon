@@ -46,16 +46,12 @@ export function buildTaskDispatchTool(
   profiles: ReadonlyMap<string, SubagentProfile>,
   readOnlyToolRegistry: Record<string, unknown>,
 ) {
-  const activeProfiles = [...profiles.values()].filter(
-    (p) => p.status !== "deprecated",
-  );
+  const activeProfiles = [...profiles.values()].filter((p) => p.status !== "deprecated");
 
   const roleList =
     activeProfiles.length === 0
       ? "(no profiles configured — set up .claude/subagents/*.json files to enable delegation)"
-      : activeProfiles
-          .map((p) => `'${p.name}' — ${p.description}`)
-          .join("\n  • ");
+      : activeProfiles.map((p) => `'${p.name}' — ${p.description}`).join("\n  • ");
 
   const description = [
     "Delegate a task to an operator-defined subagent. Use when the work",
@@ -81,15 +77,12 @@ export function buildTaskDispatchTool(
   const roleNames = activeProfiles.map((p) => p.name);
   const roleSchema =
     roleNames.length > 0
-      ? z.enum(roleNames as [string, ...string[]]).describe(
-          "Profile name — must be one of the configured subagent roles. Schema-narrowed so the model cannot hallucinate.",
-        )
-      : z
-          .string()
-          .min(1)
+      ? z
+          .enum(roleNames as [string, ...string[]])
           .describe(
-            "Profile name — (no profiles configured at tool-build time).",
-          );
+            "Profile name — must be one of the configured subagent roles. Schema-narrowed so the model cannot hallucinate.",
+          )
+      : z.string().min(1).describe("Profile name — (no profiles configured at tool-build time).");
 
   return createTool({
     id: "delegate_to_subagent",

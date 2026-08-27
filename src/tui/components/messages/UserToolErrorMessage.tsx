@@ -9,8 +9,10 @@ function UserToolErrorMessageInner({ message }: { message: Message }) {
     <Box flexDirection="row" marginTop={0}>
       <Text dimColor>{"⎿ "}</Text>
       <Text color="red">{"✗"}</Text>
-      <Text>{" "}</Text>
-      <Text color="red" dimColor>{message.content}</Text>
+      <Text> </Text>
+      <Text color="red" dimColor>
+        {message.content}
+      </Text>
     </Box>
   );
 }

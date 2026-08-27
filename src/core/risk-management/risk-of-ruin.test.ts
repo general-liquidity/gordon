@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeRuinDiagnostic,
-  analyticGamblersRuin,
-} from "./risk-of-ruin.ts";
+import { computeRuinDiagnostic, analyticGamblersRuin } from "./risk-of-ruin.ts";
 
 describe("analyticGamblersRuin", () => {
   it("returns null for impossible win probabilities", () => {
@@ -29,7 +26,7 @@ describe("analyticGamblersRuin", () => {
 
   it("favors high win-prob: ruin decreases as p increases", () => {
     const lowP = analyticGamblersRuin(0.45, 10, 20);
-    const fairP = analyticGamblersRuin(0.50, 10, 20);
+    const fairP = analyticGamblersRuin(0.5, 10, 20);
     const highP = analyticGamblersRuin(0.55, 10, 20);
     expect(lowP).not.toBeNull();
     expect(highP).not.toBeNull();
@@ -120,7 +117,7 @@ describe("computeRuinDiagnostic — verdict bands", () => {
     // along sample paths. Use fraction=2 to ensure each loss eats 8%
     // and the random walk has high variance.
     const result = computeRuinDiagnostic({
-      winProbability: 0.50,
+      winProbability: 0.5,
       avgWin: 0.04,
       avgLoss: 0.04,
       fraction: 2,
@@ -129,7 +126,7 @@ describe("computeRuinDiagnostic — verdict bands", () => {
       rngSeed: 12345,
     });
     expect(["dangerous", "risky", "moderate"]).toContain(result.verdict);
-    expect(result.ruinTo50Pct).toBeGreaterThan(0.20);
+    expect(result.ruinTo50Pct).toBeGreaterThan(0.2);
   });
 
   it("flags tiny-fraction high-edge play as safe", () => {

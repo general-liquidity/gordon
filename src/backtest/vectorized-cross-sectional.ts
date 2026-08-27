@@ -17,10 +17,7 @@
  * Pure function. No I/O.
  */
 
-import {
-  calculateMaxDrawdown,
-  calculateSortinoRatio,
-} from "./metrics.ts";
+import { calculateMaxDrawdown, calculateSortinoRatio } from "./metrics.ts";
 import { mean as statsMean, sampleStd as statsSampleStd } from "../core/stats/index.ts";
 import type { EquityPoint } from "./types.ts";
 
@@ -313,12 +310,9 @@ export function runCrossSectionalBacktest(
 
   const wins = returns.filter((r) => r > 0).length;
   const hitRate = periods > 0 ? wins / periods : 0;
-  const avgSpread =
-    periods > 0 ? spreads.reduce((a, b) => a + b, 0) / periods : 0;
-  const avgTurnover =
-    periods > 0 ? turnover.reduce((a, b) => a + b, 0) / periods : 0;
-  const totalCost =
-    turnover.reduce((a, b) => a + b, 0) * 2 * (costBps / 10_000);
+  const avgSpread = periods > 0 ? spreads.reduce((a, b) => a + b, 0) / periods : 0;
+  const avgTurnover = periods > 0 ? turnover.reduce((a, b) => a + b, 0) / periods : 0;
+  const totalCost = turnover.reduce((a, b) => a + b, 0) * 2 * (costBps / 10_000);
 
   const summary: CrossSectionalSummary = {
     periods,

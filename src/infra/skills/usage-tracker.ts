@@ -85,7 +85,7 @@ export function recordSkillUsage(
     const filePath = pathOverride ?? defaultSkillUsagePath();
     const dir = dirname(filePath);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    appendFileSync(filePath, JSON.stringify(record) + "\n");
+    appendFileSync(filePath, `${JSON.stringify(record)}\n`);
   } catch {
     // swallow — usage tracking must not fail the invocation
   }

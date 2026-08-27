@@ -11,16 +11,16 @@ export type LifecycleHookStage =
   | "agent_switch"
   | "before_compaction"
   | "after_compaction"
-  | "subagent_start"   // fired when a sub-agent begins execution
-  | "subagent_stop";   // fired when a sub-agent completes or errors
+  | "subagent_start" // fired when a sub-agent begins execution
+  | "subagent_stop"; // fired when a sub-agent completes or errors
 
 export type CompactionReason = "manual" | "threshold" | "overflow";
 
 export interface LifecycleHookPayload {
   threadId?: string;
   agentName?: string;
-  subagentName?: string;  // populated for subagent_start / subagent_stop
-  subagentType?: string;  // e.g. "Scanner", "Analyst", "Planner"
+  subagentName?: string; // populated for subagent_start / subagent_stop
+  subagentType?: string; // e.g. "Scanner", "Analyst", "Planner"
   toolName?: string;
   userMessage?: string;
   response?: string;
@@ -54,7 +54,7 @@ export interface LifecycleHookResult {
 export type LifecycleHook = (
   context: GordonContext,
   payload: LifecycleHookPayload,
-) => Promise<LifecycleHookResult | void> | LifecycleHookResult | void;
+) => Promise<LifecycleHookResult | undefined> | LifecycleHookResult | undefined;
 
 interface RegisteredLifecycleHook {
   id: string;

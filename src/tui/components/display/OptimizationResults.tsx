@@ -8,7 +8,7 @@
  * Pattern: Claude Code analysis output with color-coded grid.
  */
 
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 
@@ -94,11 +94,15 @@ export function OptimizationResults({ results, param1Name, param2Name, onClose }
       {/* Column headers (param2 values) */}
       <Box>
         <Box width={10}>
-          <Text bold dimColor>{param1Name.slice(0, 8)}</Text>
+          <Text bold dimColor>
+            {param1Name.slice(0, 8)}
+          </Text>
         </Box>
         {p2Values.map((v) => (
           <Box key={v} width={6}>
-            <Text bold dimColor>{v}</Text>
+            <Text bold dimColor>
+              {v}
+            </Text>
           </Box>
         ))}
       </Box>
@@ -123,11 +127,7 @@ export function OptimizationResults({ results, param1Name, param2Name, onClose }
             const overfit = r.overfitRisk > 0.7;
             return (
               <Box key={p2} width={6}>
-                <Text
-                  color={sharpeColor(r.sharpe)}
-                  bold={!!isBest}
-                  inverse={!!isBest}
-                >
+                <Text color={sharpeColor(r.sharpe)} bold={!!isBest} inverse={!!isBest}>
                   {sharpeCellChar(r.sharpe)}
                 </Text>
                 {overfit && <Text color="yellow">{"\u26A0"}</Text>}
@@ -142,11 +142,21 @@ export function OptimizationResults({ results, param1Name, param2Name, onClose }
       <Text> </Text>
       <Box>
         <Text dimColor>Legend: </Text>
-        <Text color="green">{"\u2588\u2588"} {"\u2265"}3.0 </Text>
-        <Text color="green">{"\u2593\u2593"} {"\u2265"}2.0 </Text>
-        <Text color="yellow">{"\u2592\u2592"} {"\u2265"}1.0 </Text>
-        <Text>{"\u2591\u2591"} {"\u2265"}0.0 </Text>
-        <Text color="red">{"\u00b7\u00b7"} {"<"}0 </Text>
+        <Text color="green">
+          {"\u2588\u2588"} {"\u2265"}3.0{" "}
+        </Text>
+        <Text color="green">
+          {"\u2593\u2593"} {"\u2265"}2.0{" "}
+        </Text>
+        <Text color="yellow">
+          {"\u2592\u2592"} {"\u2265"}1.0{" "}
+        </Text>
+        <Text>
+          {"\u2591\u2591"} {"\u2265"}0.0{" "}
+        </Text>
+        <Text color="red">
+          {"\u00b7\u00b7"} {"<"}0{" "}
+        </Text>
         <Text color="yellow">{"\u26A0"} overfit risk</Text>
       </Box>
 
@@ -154,11 +164,14 @@ export function OptimizationResults({ results, param1Name, param2Name, onClose }
       {best && (
         <Box marginTop={1}>
           <Text bold color="green">
-            Best: {param1Name}={best.param1} {param2Name}={best.param2}
-            {" "}{"\u2014"} Sharpe {best.sharpe.toFixed(2)} ({(best.returns * 100).toFixed(1)}% return)
+            Best: {param1Name}={best.param1} {param2Name}={best.param2} {"\u2014"} Sharpe{" "}
+            {best.sharpe.toFixed(2)} ({(best.returns * 100).toFixed(1)}% return)
           </Text>
           {best.overfitRisk > 0.7 && (
-            <Text color="yellow"> {"\u26A0"} High overfit risk ({(best.overfitRisk * 100).toFixed(0)}%)</Text>
+            <Text color="yellow">
+              {" "}
+              {"\u26A0"} High overfit risk ({(best.overfitRisk * 100).toFixed(0)}%)
+            </Text>
           )}
         </Box>
       )}

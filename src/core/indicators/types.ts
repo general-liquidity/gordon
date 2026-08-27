@@ -59,9 +59,9 @@ export interface ATRResult {
   current: number | null;
   period: number;
   stopLoss: {
-    long: number;      // Entry - (ATR * multiplier)
-    short: number;     // Entry + (ATR * multiplier)
-    distance: number;  // ATR * multiplier
+    long: number; // Entry - (ATR * multiplier)
+    short: number; // Entry + (ATR * multiplier)
+    distance: number; // ATR * multiplier
   };
   interpretation: string;
 }
@@ -279,49 +279,49 @@ export interface IchimokuResult {
 }
 
 // FlowScope Types
-export { type FlowScopeBin, type FlowScopeResult } from "./flowscope.ts";
+export type { FlowScopeBin, FlowScopeResult } from "./flowscope.ts";
 
 // Angled Market Structure Types
-export { type PivotLine, type AMSResult } from "./angled-market-structure.ts";
+export type { PivotLine, AMSResult } from "./angled-market-structure.ts";
 
 // Elliott Wave Types
-export { type ZigzagPoint, type WaveLabel, type ElliottWaveResult } from "./elliott-wave.ts";
+export type { ZigzagPoint, WaveLabel, ElliottWaveResult } from "./elliott-wave.ts";
 
 // False Breakout Types
-export { type SRLevel, type FalseBreakoutResult } from "./false-breakout.ts";
+export type { SRLevel, FalseBreakoutResult } from "./false-breakout.ts";
 
 // ADX Types
-export { type ADXResult } from "./adx.ts";
+export type { ADXResult } from "./adx.ts";
 
 // MFI Types
-export { type MFIResult } from "./mfi.ts";
+export type { MFIResult } from "./mfi.ts";
 
 // Divergence Types
-export { type DivergenceSignal, type DivergenceResult } from "./divergence.ts";
+export type { DivergenceSignal, DivergenceResult } from "./divergence.ts";
 
 // Supply/Demand Zone Types
-export { type SDZone, type SDZResult } from "./supply-demand-zones.ts";
+export type { SDZone, SDZResult } from "./supply-demand-zones.ts";
 
 // Squeeze Momentum Types
-export { type SqueezeMomentumResult } from "./squeeze-momentum.ts";
+export type { SqueezeMomentumResult } from "./squeeze-momentum.ts";
 
 // Order Block Types
-export { type OrderBlock, type OrderBlockResult } from "./order-blocks.ts";
+export type { OrderBlock, OrderBlockResult } from "./order-blocks.ts";
 
 // Fair Value Gap Types
-export { type FVGap, type FVGResult } from "./fvg.ts";
+export type { FVGap, FVGResult } from "./fvg.ts";
 
 // Parabolic SAR Types
-export { type ParabolicSARResult } from "./parabolic-sar.ts";
+export type { ParabolicSARResult } from "./parabolic-sar.ts";
 
 // Volume Price Trend Types
-export { type VPTResult } from "./vpt.ts";
+export type { VPTResult } from "./vpt.ts";
 
 // Awesome Oscillator Types
-export { type AOResult } from "./awesome-oscillator.ts";
+export type { AOResult } from "./awesome-oscillator.ts";
 
 // Three Mountains & Rivers Types
-export { type TMRPattern, type TMRResult } from "./three-mountains-rivers.ts";
+export type { TMRPattern, TMRResult } from "./three-mountains-rivers.ts";
 
 // Delta Ladder Types
-export { type DeltaLevel, type DeltaLadderResult } from "./delta-ladder.ts";
+export type { DeltaLevel, DeltaLadderResult } from "./delta-ladder.ts";

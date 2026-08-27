@@ -7,7 +7,10 @@ export interface SpecialistPolicy {
   defaultScopes: RuntimePermissionScope[];
 }
 
-export function getSpecialistPolicy(worker: string, registry: WorkerRegistry = new WorkerRegistry()): SpecialistPolicy | null {
+export function getSpecialistPolicy(
+  worker: string,
+  registry: WorkerRegistry = new WorkerRegistry(),
+): SpecialistPolicy | null {
   const definition = registry.get(worker);
   if (!definition) {
     return null;

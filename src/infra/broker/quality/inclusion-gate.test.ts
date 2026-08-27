@@ -56,4 +56,3 @@ describe("broker inclusion gate", () => {
     expect(capabilities.supportsPaperTrading).toBe(false);
   });
 });
-

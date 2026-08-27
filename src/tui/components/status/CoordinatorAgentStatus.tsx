@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 
 // ============================================================================
@@ -73,18 +73,22 @@ export function CoordinatorAgentStatus({ workers, onView, onDismiss }: Props) {
   }, []);
 
   const visible = workers.filter((w) => w.status !== "dismissed");
-  if (visible.length === 0) return null;
 
   useInput((input, key) => {
+    if (visible.length === 0) return;
     if (key.upArrow) setSelectedIndex((p) => Math.max(0, p - 1));
     else if (key.downArrow) setSelectedIndex((p) => Math.min(visible.length - 1, p + 1));
     else if (key.return && visible[selectedIndex]) onView?.(visible[selectedIndex]!.id);
     else if (input === "x" && visible[selectedIndex]) onDismiss?.(visible[selectedIndex]!.id);
   });
 
+  if (visible.length === 0) return null;
+
   return (
     <Box flexDirection="column">
-      <Text dimColor bold>AGENTS</Text>
+      <Text dimColor bold>
+        AGENTS
+      </Text>
       {visible.map((worker, i) => (
         <Box key={worker.id}>
           <Text color={i === selectedIndex ? "cyanBright" : undefined}>
@@ -97,7 +101,10 @@ export function CoordinatorAgentStatus({ workers, onView, onDismiss }: Props) {
           <Text>{worker.task.slice(0, 30).padEnd(31)}</Text>
           <Text dimColor>{elapsed(worker.startedAt, worker.completedAt).padStart(8)}</Text>
           {worker.tokenCount > 0 ? (
-            <Text dimColor> {"\u00B7"} {(worker.tokenCount / 1000).toFixed(1)}k tok</Text>
+            <Text dimColor>
+              {" "}
+              {"\u00B7"} {(worker.tokenCount / 1000).toFixed(1)}k tok
+            </Text>
           ) : null}
         </Box>
       ))}

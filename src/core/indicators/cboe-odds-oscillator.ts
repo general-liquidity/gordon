@@ -75,7 +75,7 @@ function clamp01(x: number): number {
  */
 export function calculateCboeOdds(
   candles: Candle[],
-  params?: { length?: number; rsiPeriod?: number; stochPeriod?: number }
+  params?: { length?: number; rsiPeriod?: number; stochPeriod?: number },
 ): CboeOddsResult {
   const length = params?.length ?? 14;
   const rsiPeriod = params?.rsiPeriod ?? 14;
@@ -204,7 +204,7 @@ function buildInterpretation(
   bull: number | null,
   bear: number | null,
   stag: number | null,
-  state: "bull" | "bear" | "stagnant" | null
+  state: "bull" | "bear" | "stagnant" | null,
 ): string {
   if (mi == null || bull == null || bear == null || stag == null) {
     return "Insufficient data for CBOE odds oscillator.";

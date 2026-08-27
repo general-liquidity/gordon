@@ -106,8 +106,10 @@ export function buildRollup(input: DailyRollupInput): RollupSummary {
       const symbol = (row.symbol as string | undefined) ?? "unknown";
       const tradeId = (row.tradeId as string | undefined) ?? "unknown";
       if (q === "deserved_success") reinforcements.push(`Repeat ${symbol} setup (${tradeId})`);
-      if (q === "poetic_justice") fixes.push(`${symbol} ${tradeId}: bad process + bad outcome — root-cause`);
-      if (q === "dumb_luck") fixes.push(`${symbol} ${tradeId}: rule-breaker that paid out — extinguish behavior`);
+      if (q === "poetic_justice")
+        fixes.push(`${symbol} ${tradeId}: bad process + bad outcome — root-cause`);
+      if (q === "dumb_luck")
+        fixes.push(`${symbol} ${tradeId}: rule-breaker that paid out — extinguish behavior`);
     }
   }
 
@@ -134,14 +136,17 @@ export function buildRollup(input: DailyRollupInput): RollupSummary {
 
 export function formatRollup(summary: RollupSummary): string {
   const lines: string[] = [];
-  lines.push(`Daily rollup ${summary.windowStartIso.slice(0, 10)} → ${summary.windowEndIso.slice(0, 10)}`);
+  lines.push(
+    `Daily rollup ${summary.windowStartIso.slice(0, 10)} → ${summary.windowEndIso.slice(0, 10)}`,
+  );
   lines.push(
     `  Decisions ${summary.decisionCount} | Friction $${summary.frictionUsdTotal.toFixed(2)}`,
   );
   lines.push(
     `  Debriefs: deserved=${summary.debriefCounts.deserved_success} bad_luck=${summary.debriefCounts.bad_luck} dumb_luck=${summary.debriefCounts.dumb_luck} poetic=${summary.debriefCounts.poetic_justice}`,
   );
-  if (summary.toxicAlphaWarning) lines.push("  ⚠ Toxic-alpha alarm: dumb-luck wins > 20% of total wins");
+  if (summary.toxicAlphaWarning)
+    lines.push("  ⚠ Toxic-alpha alarm: dumb-luck wins > 20% of total wins");
   if (summary.reinforcements.length > 0) {
     lines.push("  Reinforce:");
     for (const r of summary.reinforcements.slice(0, 5)) lines.push(`    - ${r}`);

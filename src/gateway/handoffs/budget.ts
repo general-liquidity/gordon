@@ -128,4 +128,3 @@ export function validateHandoffBudget(input: {
     inferredNotionalUsd,
   };
 }
-

@@ -82,9 +82,7 @@ describe("reconcileWithExchange expired-plan prune", () => {
 
     // Audit trail: prune is a status transition with a PLAN_EXPIRED event,
     // never a hard delete.
-    const events = getDatabase()
-      .query("SELECT data FROM events")
-      .all() as Array<{ data: string }>;
+    const events = getDatabase().query("SELECT data FROM events").all() as Array<{ data: string }>;
     const expiredEvents = events.filter((e) => e.data.includes("PLAN_EXPIRED"));
     expect(expiredEvents.length).toBe(2);
   });
@@ -98,7 +96,11 @@ describe("reconcileWithExchange expired-plan prune", () => {
 describe("reconcileWithExchange phantom-position sweep", () => {
   let dir: string;
 
-  function positionRecord(id: string, symbol: string, overrides: Partial<PositionRecord> = {}): PositionRecord {
+  function positionRecord(
+    id: string,
+    symbol: string,
+    overrides: Partial<PositionRecord> = {},
+  ): PositionRecord {
     const stale = new Date(Date.now() - PHANTOM_GRACE_MS - 60_000).toISOString();
     return {
       id,
@@ -133,11 +135,13 @@ describe("reconcileWithExchange phantom-position sweep", () => {
     const store = await getPositionStore();
     await store.save(positionRecord("pos_phantom_btc", "BTCUSDT"));
     await store.save(positionRecord("pos_phantom_test", "GORDONTESTUSDT"));
-    await store.save(positionRecord("pos_real", "ETHUSDT", {
-      state: "filled",
-      entryPrice: 3_000,
-      quantity: 0.5,
-    }));
+    await store.save(
+      positionRecord("pos_real", "ETHUSDT", {
+        state: "filled",
+        entryPrice: 3_000,
+        quantity: 0.5,
+      }),
+    );
 
     // No trades/plans seeded: the sweep must run before the
     // no-active-trades early return.

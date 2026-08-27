@@ -55,18 +55,11 @@ export interface TerminationResult {
   blockingFixInstruction?: string;
 }
 
-export function isTerminationLayersEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return (
-    env.GORDON_TERMINATION_LAYERS === "1" ||
-    env.GORDON_TERMINATION_LAYERS === "true"
-  );
+export function isTerminationLayersEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.GORDON_TERMINATION_LAYERS === "1" || env.GORDON_TERMINATION_LAYERS === "true";
 }
 
-export function isTerminationLayersEnforceEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function isTerminationLayersEnforceEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return (
     env.GORDON_TERMINATION_LAYERS_ENFORCE === "1" ||
     env.GORDON_TERMINATION_LAYERS_ENFORCE === "true"
@@ -95,15 +88,21 @@ export function checkPreTrade(input: PreTradeInput): LayerResult {
 
   if (input.riskClassifierVerdict === "block") {
     fails.push("risk classifier returned block");
-    fixes.push("Review the riskClassifier dimensions that pushed the score over threshold; adjust position size or cancel the plan.");
+    fixes.push(
+      "Review the riskClassifier dimensions that pushed the score over threshold; adjust position size or cancel the plan.",
+    );
   }
   if (input.constitutionViolations.length > 0) {
     fails.push(`${input.constitutionViolations.length} constitution violation(s)`);
-    fixes.push(`Resolve constitution violations: ${input.constitutionViolations.slice(0, 3).join("; ")}.`);
+    fixes.push(
+      `Resolve constitution violations: ${input.constitutionViolations.slice(0, 3).join("; ")}.`,
+    );
   }
   if (input.mandateScopeOk === false) {
     fails.push("mandate scope violation");
-    fixes.push("The trade falls outside the active strategy mandate; switch mandates or stay in-scope.");
+    fixes.push(
+      "The trade falls outside the active strategy mandate; switch mandates or stay in-scope.",
+    );
   }
   if (input.thesisCoherenceOk === false) {
     fails.push("thesis coherence below threshold");
@@ -185,8 +184,7 @@ export function checkRuntime(input: RuntimeInput): LayerResult {
       name: "runtime",
       status: "fail",
       message: `Ack arrived after timeout (${input.ackLatencyMs}ms > ${input.ackTimeoutMs}ms).`,
-      fixInstruction:
-        `Ack latency exceeded the configured timeout budget. Raise the timeout or investigate broker connectivity.`,
+      fixInstruction: `Ack latency exceeded the configured timeout budget. Raise the timeout or investigate broker connectivity.`,
     };
   }
   return {
@@ -232,14 +230,22 @@ export function checkSystemConfirmation(input: SystemConfirmationInput): LayerRe
     fails.push("no actual fill price reported");
     fixes.push("Reconciliation must capture the actual fill price from the broker.");
   } else if (input.expectedFillPrice !== null && input.expectedFillPrice > 0) {
-    const slippage = Math.abs(input.actualFillPrice - input.expectedFillPrice) / input.expectedFillPrice;
+    const slippage =
+      Math.abs(input.actualFillPrice - input.expectedFillPrice) / input.expectedFillPrice;
     if (slippage > input.maxSlippageFraction) {
-      fails.push(`slippage ${(slippage * 100).toFixed(2)}% exceeds tolerance ${(input.maxSlippageFraction * 100).toFixed(2)}%`);
-      fixes.push(`Fill slipped beyond tolerance. Investigate (likely thin book or rapid market move) and consider tightening the price band on retries.`);
+      fails.push(
+        `slippage ${(slippage * 100).toFixed(2)}% exceeds tolerance ${(input.maxSlippageFraction * 100).toFixed(2)}%`,
+      );
+      fixes.push(
+        `Fill slipped beyond tolerance. Investigate (likely thin book or rapid market move) and consider tightening the price band on retries.`,
+      );
     }
   }
 
-  if (Math.abs(input.actualSize - input.expectedSize) > Math.max(1e-9, Math.abs(input.expectedSize) * 0.001)) {
+  if (
+    Math.abs(input.actualSize - input.expectedSize) >
+    Math.max(1e-9, Math.abs(input.expectedSize) * 0.001)
+  ) {
     fails.push(`size mismatch: expected ${input.expectedSize}, got ${input.actualSize}`);
     fixes.push(`Partial or oversized fill. Reconcile position manually before continuing.`);
   }
@@ -287,10 +293,25 @@ export function runTerminationLayers(input: TerminationCheckInput): TerminationR
   let highest: 1 | 2 | 3 = 1;
 
   if (layer1.status !== "pass") {
-    layer2 = { layer: 2, name: "runtime", status: "skip", message: "Skipped — layer 1 did not pass." };
-    layer3 = { layer: 3, name: "system", status: "skip", message: "Skipped — layer 1 did not pass." };
+    layer2 = {
+      layer: 2,
+      name: "runtime",
+      status: "skip",
+      message: "Skipped — layer 1 did not pass.",
+    };
+    layer3 = {
+      layer: 3,
+      name: "system",
+      status: "skip",
+      message: "Skipped — layer 1 did not pass.",
+    };
   } else if (!input.runtime) {
-    layer2 = { layer: 2, name: "runtime", status: "skip", message: "Skipped — runtime input not provided yet." };
+    layer2 = {
+      layer: 2,
+      name: "runtime",
+      status: "skip",
+      message: "Skipped — runtime input not provided yet.",
+    };
     layer3 = { layer: 3, name: "system", status: "skip", message: "Skipped — depends on layer 2." };
   } else {
     layer2 = checkRuntime(input.runtime);
@@ -300,9 +321,10 @@ export function runTerminationLayers(input: TerminationCheckInput): TerminationR
         layer: 3,
         name: "system",
         status: "skip",
-        message: layer2.status !== "pass"
-          ? "Skipped — layer 2 did not pass."
-          : "Skipped — system input not provided yet.",
+        message:
+          layer2.status !== "pass"
+            ? "Skipped — layer 2 did not pass."
+            : "Skipped — system input not provided yet.",
       };
     } else {
       layer3 = checkSystemConfirmation(input.system);

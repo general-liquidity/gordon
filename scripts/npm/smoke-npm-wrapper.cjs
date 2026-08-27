@@ -1,6 +1,6 @@
-const fs = require("fs");
-const path = require("path");
-const { spawnSync } = require("child_process");
+const fs = require("node:fs");
+const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 
 const rootDirectory = path.resolve(__dirname, "..", "..");
 const wrapperDirectory = path.join(rootDirectory, "npm");
@@ -19,15 +19,22 @@ const bundledNpmCli = path.join(
   "node_modules",
   "npm",
   "bin",
-  "npm-cli.js"
+  "npm-cli.js",
 );
 function npmInvocation(args) {
-  if (npmExecPath) return { command: process.execPath, argv: [npmExecPath, ...args], shell: false };
-  if (fs.existsSync(bundledNpmCli)) return { command: process.execPath, argv: [bundledNpmCli, ...args], shell: false };
+  // `npm_execpath` is not guaranteed to be npm's JavaScript CLI. `bun run`
+  // sets it to bun.exe, and passing that executable as a script argument to
+  // Bun makes the runtime parse the PE binary as JavaScript. Only use the
+  // current runtime when the value is an actual JS entry point.
+  if (npmExecPath && /\.(?:c|m)?js$/i.test(npmExecPath)) {
+    return { command: process.execPath, argv: [npmExecPath, ...args], shell: false };
+  }
+  if (fs.existsSync(bundledNpmCli))
+    return { command: process.execPath, argv: [bundledNpmCli, ...args], shell: false };
   return {
     command: process.platform === "win32" ? "npm.cmd" : "npm",
     argv: args,
-    shell: process.platform === "win32"
+    shell: process.platform === "win32",
   };
 }
 
@@ -60,7 +67,7 @@ function runNode(scriptPath, args = [], env = process.env) {
   const result = spawnSync(process.execPath, [scriptPath, ...args], {
     cwd: rootDirectory,
     env,
-    stdio: "inherit"
+    stdio: "inherit",
   });
   if (result.status !== 0) {
     process.exit(result.status || 1);
@@ -73,7 +80,7 @@ function runNpm(args, options = {}) {
     cwd: options.cwd || rootDirectory,
     env: options.env || process.env,
     stdio: "inherit",
-    shell
+    shell,
   });
   if (result.status !== 0) {
     process.exit(result.status || 1);
@@ -87,7 +94,7 @@ function latestTarball(directory) {
     .sort(
       (left, right) =>
         fs.statSync(path.join(directory, right)).mtimeMs -
-        fs.statSync(path.join(directory, left)).mtimeMs
+        fs.statSync(path.join(directory, left)).mtimeMs,
     );
   if (tarballs.length === 0) {
     throw new Error(`No tarball found in ${directory}`);
@@ -117,7 +124,7 @@ runNpm([
   "--omit=optional",
   "--no-audit",
   "--no-fund",
-  tarballPath
+  tarballPath,
 ]);
 
 const installedRoot = path.join(smokeDirectory, "node_modules", "@general-liquidity", "gordon");
@@ -130,11 +137,11 @@ if (!fs.existsSync(launcherPath)) {
 const noBinary = spawnSync(process.execPath, [launcherPath, "--version"], {
   cwd: rootDirectory,
   stdio: "pipe",
-  encoding: "utf8"
+  encoding: "utf8",
 });
 if (noBinary.status !== 1) {
   throw new Error(
-    `Launcher without a platform binary should exit 1, got status=${noBinary.status}.`
+    `Launcher without a platform binary should exit 1, got status=${noBinary.status}.`,
   );
 }
 if (!/No prebuilt binary/i.test(noBinary.stderr || "")) {
@@ -156,7 +163,7 @@ runNode(path.join(rootDirectory, "scripts", "npm", "stage-platform-packages.cjs"
   "--out",
   stagingDirectory,
   "--version",
-  wrapperPkg.version
+  wrapperPkg.version,
 ]);
 
 const target = hostTarget();
@@ -169,13 +176,13 @@ const installedSubPkgDir = path.join(
   smokeDirectory,
   "node_modules",
   "@general-liquidity",
-  `gordon-${target}`
+  `gordon-${target}`,
 );
 fs.cpSync(stagedPkgDir, installedSubPkgDir, { recursive: true });
 
 const withBinary = spawnSync(process.execPath, [launcherPath, "--version"], {
   cwd: rootDirectory,
-  stdio: "ignore"
+  stdio: "ignore",
 });
 if (withBinary.status !== 0) {
   throw new Error("Launcher failed to spawn the resolved platform binary.");

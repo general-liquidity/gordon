@@ -15,10 +15,7 @@
 
 import { providerOptionsForDepth } from "../cognition/extendedThinking.ts";
 import type { WorkflowPhase } from "../cognition/workflowPhase.ts";
-import {
-  resolveThinkingDepth,
-  type ThinkingDepth,
-} from "../cognition/thinkingPhase.ts";
+import { resolveThinkingDepth, type ThinkingDepth } from "../cognition/thinkingPhase.ts";
 import type { GordonContext } from "../types.ts";
 
 export function providerOptionsForPhase(

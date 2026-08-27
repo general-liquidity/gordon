@@ -163,8 +163,7 @@ export function formatProbeReport(report: ProbeReport): string {
     `Init probe — ${report.passingCount}/${report.totalCount} pass, ${report.failingCount} fail, ${report.skippedCount} skip (${report.durationMs}ms)`,
   );
   for (const r of report.results) {
-    const tag =
-      r.status === "pass" ? "✓" : r.status === "skip" ? "·" : "✗";
+    const tag = r.status === "pass" ? "✓" : r.status === "skip" ? "·" : "✗";
     lines.push(`  ${tag} [${r.family}] ${r.id} — ${r.description} (${r.durationMs}ms)`);
     if (r.status === "fail") {
       lines.push(`      ${r.message}`);

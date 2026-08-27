@@ -23,8 +23,12 @@ describe("isPreTradeRateControlsEnabled — default-on", () => {
   });
 
   it("disabled only by the explicit opt-out env", () => {
-    expect(isPreTradeRateControlsEnabled({ [PRETRADE_RATE_CONTROLS_DISABLE_ENV]: "1" })).toBe(false);
-    expect(isPreTradeRateControlsEnabled({ [PRETRADE_RATE_CONTROLS_DISABLE_ENV]: "true" })).toBe(false);
+    expect(isPreTradeRateControlsEnabled({ [PRETRADE_RATE_CONTROLS_DISABLE_ENV]: "1" })).toBe(
+      false,
+    );
+    expect(isPreTradeRateControlsEnabled({ [PRETRADE_RATE_CONTROLS_DISABLE_ENV]: "true" })).toBe(
+      false,
+    );
   });
 });
 
@@ -35,7 +39,11 @@ describe("in-process recorder — recordRateEvent / evaluatePreTradeRate", () =>
     // Push more than maxMessagesPerSecond * windowMs/1000 submits inside the window.
     const flood = DEFAULT_LIMITS.maxMessagesPerSecond * (DEFAULT_LIMITS.windowMs / 1000) + 50;
     for (let i = 0; i < flood; i++) recordRateEvent("submit", "BTC", t0 + i);
-    const r = evaluatePreTradeRate({ proposedKind: "submit", proposedInstrument: "BTC", nowMs: t0 + flood });
+    const r = evaluatePreTradeRate({
+      proposedKind: "submit",
+      proposedInstrument: "BTC",
+      nowMs: t0 + flood,
+    });
     expect(r.allowed).toBe(false);
     expect(r.breaches).toContain("messages_per_second");
     resetRateEvents();
@@ -46,7 +54,11 @@ describe("in-process recorder — recordRateEvent / evaluatePreTradeRate", () =>
     const t0 = Date.now();
     recordRateEvent("submit", "ETH", t0);
     recordRateEvent("fill", "ETH", t0 + 1);
-    const r = evaluatePreTradeRate({ proposedKind: "submit", proposedInstrument: "ETH", nowMs: t0 + 2 });
+    const r = evaluatePreTradeRate({
+      proposedKind: "submit",
+      proposedInstrument: "ETH",
+      nowMs: t0 + 2,
+    });
     expect(r.allowed).toBe(true);
     resetRateEvents();
   });
@@ -57,7 +69,11 @@ describe("in-process recorder — recordRateEvent / evaluatePreTradeRate", () =>
     for (let i = 0; i < DEFAULT_LIMITS.maxOpenOrdersPerInstrument; i++) {
       recordRateEvent("submit", "SOL", t0 + i);
     }
-    const r = evaluatePreTradeRate({ proposedKind: "submit", proposedInstrument: "SOL", nowMs: t0 + 100 });
+    const r = evaluatePreTradeRate({
+      proposedKind: "submit",
+      proposedInstrument: "SOL",
+      nowMs: t0 + 100,
+    });
     expect(r.breaches).toContain("open_orders_per_instrument");
     resetRateEvents();
   });
@@ -66,7 +82,11 @@ describe("in-process recorder — recordRateEvent / evaluatePreTradeRate", () =>
     resetRateEvents();
     recordRateEvent("submit", "BTC");
     resetRateEvents();
-    const r = evaluatePreTradeRate({ proposedKind: "submit", proposedInstrument: "BTC", nowMs: Date.now() });
+    const r = evaluatePreTradeRate({
+      proposedKind: "submit",
+      proposedInstrument: "BTC",
+      nowMs: Date.now(),
+    });
     expect(r.observed.messagesPerSecond).toBe(0);
   });
 });

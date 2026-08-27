@@ -23,8 +23,16 @@ interface Props {
 }
 
 const TEMPLATES: { type: TemplateType; name: string; description: string }[] = [
-  { type: "agent-ts", name: "Agent (TypeScript)", description: "Trading agent with event loop and strategy hooks" },
-  { type: "strategy-ts", name: "Strategy (TypeScript)", description: "Custom strategy with backtest harness" },
+  {
+    type: "agent-ts",
+    name: "Agent (TypeScript)",
+    description: "Trading agent with event loop and strategy hooks",
+  },
+  {
+    type: "strategy-ts",
+    name: "Strategy (TypeScript)",
+    description: "Custom strategy with backtest harness",
+  },
 ];
 
 interface TemplateStepProps {
@@ -51,7 +59,8 @@ function TemplateStep({ cursor, setCursor, onNext }: TemplateStepProps): React.R
           <Box key={template.type} paddingLeft={2} flexDirection="column">
             <Box>
               <Text color={isFocused ? theme.uiBrand : undefined}>
-                {isFocused ? "\u25B8 " : "  "}{template.name}
+                {isFocused ? "\u25B8 " : "  "}
+                {template.name}
               </Text>
             </Box>
             {isFocused ? (
@@ -63,7 +72,9 @@ function TemplateStep({ cursor, setCursor, onNext }: TemplateStepProps): React.R
         );
       })}
       <Text> </Text>
-      <Text dimColor>{"\u2191\u2193"} select {"\u00b7"} Enter next</Text>
+      <Text dimColor>
+        {"\u2191\u2193"} select {"\u00b7"} Enter next
+      </Text>
     </Box>
   );
 }
@@ -111,7 +122,9 @@ function TextFieldStep({
         <Text color={theme.uiBrand}>{"\u2588"}</Text>
       </Box>
       <Text> </Text>
-      <Text dimColor>{hint} {"\u00b7"} Enter next</Text>
+      <Text dimColor>
+        {hint} {"\u00b7"} Enter next
+      </Text>
     </Box>
   );
 }
@@ -134,12 +147,23 @@ function ConfirmStep({ config, templateName, onComplete }: ConfirmStepProps): Re
       <Text bold>Confirm Scaffold:</Text>
       <Text> </Text>
       <Box paddingLeft={2} flexDirection="column">
-        <Box><Text dimColor>Template:  </Text><Text bold>{templateName}</Text></Box>
-        <Box><Text dimColor>Project:   </Text><Text bold>{config.projectName}</Text></Box>
-        <Box><Text dimColor>Directory: </Text><Text>{config.outputDir}</Text></Box>
+        <Box>
+          <Text dimColor>Template: </Text>
+          <Text bold>{templateName}</Text>
+        </Box>
+        <Box>
+          <Text dimColor>Project: </Text>
+          <Text bold>{config.projectName}</Text>
+        </Box>
+        <Box>
+          <Text dimColor>Directory: </Text>
+          <Text>{config.outputDir}</Text>
+        </Box>
       </Box>
       <Text> </Text>
-      <Text bold color={theme.riskSafe}>Press Enter to scaffold</Text>
+      <Text bold color={theme.riskSafe}>
+        Press Enter to scaffold
+      </Text>
     </Box>
   );
 }

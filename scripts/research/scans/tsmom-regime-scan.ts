@@ -56,7 +56,14 @@ const IS_FRAC = 0.7; // clean IS(70)/OOS(30) split.
 const MIN_OVERLAP_FRAC = 0.5;
 
 // ── Raw bar shapes ──────────────────────────────────────────────────────────
-interface RawBar { time: number; open: number; high: number; low: number; close: number; spread: number; }
+interface RawBar {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  spread: number;
+}
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, "utf8")) as T;
@@ -261,7 +268,9 @@ function annualizedSharpe(rets: number[]): number {
 }
 
 function maxDrawdownPct(rets: number[]): number {
-  let eq = 1, peak = 1, maxDD = 0;
+  let eq = 1,
+    peak = 1,
+    maxDD = 0;
   for (const r of rets) {
     eq *= 1 + r;
     if (eq > peak) peak = eq;
@@ -302,17 +311,33 @@ function main(): void {
   const book = alignBook(instruments);
 
   console.log("=".repeat(82));
-  console.log("PORTFOLIO TSMOM ACROSS REGIMES — the one lead, tested portfolio-level + multi-regime");
+  console.log(
+    "PORTFOLIO TSMOM ACROSS REGIMES — the one lead, tested portfolio-level + multi-regime",
+  );
   console.log("=".repeat(82));
   const spanStart = new Date(book.times[0]! * 1000).toISOString().slice(0, 16).replace("T", " ");
-  const spanEnd = new Date(book.times[book.T - 1]! * 1000).toISOString().slice(0, 16).replace("T", " ");
+  const spanEnd = new Date(book.times[book.T - 1]! * 1000)
+    .toISOString()
+    .slice(0, 16)
+    .replace("T", " ");
   console.log(`Universe        : ${book.symbols.length} instruments (${book.symbols.join(", ")})`);
-  if (book.dropped.length) console.log(`Dropped (thin)  : ${book.dropped.join(", ")} (< ${(MIN_OVERLAP_FRAC * 100).toFixed(0)}% overlap with densest grid)`);
-  console.log(`Aligned bars    : ${book.T} shared-timestamp ${TF} bars/asset  [${spanStart} → ${spanEnd} UTC]`);
-  console.log(`Sweep           : lookback {${LOOKBACKS.join(",")}} × rebalance {${REBALANCES.join(",")}} = ${EFFECTIVE_TRIALS} configs`);
-  console.log(`Cost            : per-side spread/2, FLOORED at ${COST_FLOOR_BPS}bps (crypto bars ship spread=0 — floor is a fiction-guard)`);
+  if (book.dropped.length)
+    console.log(
+      `Dropped (thin)  : ${book.dropped.join(", ")} (< ${(MIN_OVERLAP_FRAC * 100).toFixed(0)}% overlap with densest grid)`,
+    );
+  console.log(
+    `Aligned bars    : ${book.T} shared-timestamp ${TF} bars/asset  [${spanStart} → ${spanEnd} UTC]`,
+  );
+  console.log(
+    `Sweep           : lookback {${LOOKBACKS.join(",")}} × rebalance {${REBALANCES.join(",")}} = ${EFFECTIVE_TRIALS} configs`,
+  );
+  console.log(
+    `Cost            : per-side spread/2, FLOORED at ${COST_FLOOR_BPS}bps (crypto bars ship spread=0 — floor is a fiction-guard)`,
+  );
   console.log(`Risk weighting  : inverse trailing vol (${VOL_WINDOW}-bar), gross-normalized to 1`);
-  console.log(`Splits          : thirds (early/mid/late regimes) + clean IS(${(IS_FRAC * 100).toFixed(0)})/OOS(${((1 - IS_FRAC) * 100).toFixed(0)})`);
+  console.log(
+    `Splits          : thirds (early/mid/late regimes) + clean IS(${(IS_FRAC * 100).toFixed(0)})/OOS(${((1 - IS_FRAC) * 100).toFixed(0)})`,
+  );
   console.log("");
 
   // Regime thirds on the FULL aligned timeline (same boundaries for every config
@@ -332,15 +357,19 @@ function main(): void {
 
   console.log("BUY-&-HOLD BENCHMARK (equal-weight long-only, per regime third)");
   console.log("-".repeat(82));
-  console.log(["third".padEnd(8), "bars".padStart(8), "sharpe".padStart(9), "return%".padStart(10)].join(" "));
+  console.log(
+    ["third".padEnd(8), "bars".padStart(8), "sharpe".padStart(9), "return%".padStart(10)].join(" "),
+  );
   const thirdNames = ["early", "mid", "late"];
   for (let i = 0; i < 3; i++) {
-    console.log([
-      thirdNames[i]!.padEnd(8),
-      `${thirds[i]![0]}-${thirds[i]![1]}`.padStart(8),
-      fmt(bhThirdSharpe[i]!, 4).padStart(9),
-      fmt(bhThirdRet[i]!, 2).padStart(10),
-    ].join(" "));
+    console.log(
+      [
+        thirdNames[i]!.padEnd(8),
+        `${thirds[i]![0]}-${thirds[i]![1]}`.padStart(8),
+        fmt(bhThirdSharpe[i]!, 4).padStart(9),
+        fmt(bhThirdRet[i]!, 2).padStart(10),
+      ].join(" "),
+    );
   }
   console.log("");
 
@@ -400,29 +429,43 @@ function main(): void {
 
   console.log("SWEEP RESULTS (ranked by OOS 15m Sharpe)");
   console.log("-".repeat(82));
-  console.log([
-    "lkbk".padStart(5), "reb".padStart(4),
-    "oosSh".padStart(7), "oosAnn".padStart(7), "oosDD%".padStart(7), "oosR%".padStart(7),
-    "turn".padStart(6), "PSR".padStart(5), "DSR".padStart(5),
-    "earlySh".padStart(8), "midSh".padStart(8), "lateSh".padStart(8),
-  ].join(" "));
+  console.log(
+    [
+      "lkbk".padStart(5),
+      "reb".padStart(4),
+      "oosSh".padStart(7),
+      "oosAnn".padStart(7),
+      "oosDD%".padStart(7),
+      "oosR%".padStart(7),
+      "turn".padStart(6),
+      "PSR".padStart(5),
+      "DSR".padStart(5),
+      "earlySh".padStart(8),
+      "midSh".padStart(8),
+      "lateSh".padStart(8),
+    ].join(" "),
+  );
   for (const r of rows) {
-    console.log([
-      String(r.lookback).padStart(5),
-      String(r.rebalance).padStart(4),
-      fmt(r.oosSharpe15m, 3).padStart(7),
-      fmt(r.oosSharpeAnnual, 2).padStart(7),
-      fmt(r.oosMaxDD, 1).padStart(7),
-      fmt(r.oosReturnPct, 1).padStart(7),
-      fmt(r.turnover, 2).padStart(6),
-      fmt(r.psr, 2).padStart(5),
-      fmt(r.dsr, 2).padStart(5),
-      `${fmt(r.thirdSharpes[0]!, 3)}${r.thirdBeatsBH[0] ? "*" : " "}`.padStart(8),
-      `${fmt(r.thirdSharpes[1]!, 3)}${r.thirdBeatsBH[1] ? "*" : " "}`.padStart(8),
-      `${fmt(r.thirdSharpes[2]!, 3)}${r.thirdBeatsBH[2] ? "*" : " "}`.padStart(8),
-    ].join(" "));
+    console.log(
+      [
+        String(r.lookback).padStart(5),
+        String(r.rebalance).padStart(4),
+        fmt(r.oosSharpe15m, 3).padStart(7),
+        fmt(r.oosSharpeAnnual, 2).padStart(7),
+        fmt(r.oosMaxDD, 1).padStart(7),
+        fmt(r.oosReturnPct, 1).padStart(7),
+        fmt(r.turnover, 2).padStart(6),
+        fmt(r.psr, 2).padStart(5),
+        fmt(r.dsr, 2).padStart(5),
+        `${fmt(r.thirdSharpes[0]!, 3)}${r.thirdBeatsBH[0] ? "*" : " "}`.padStart(8),
+        `${fmt(r.thirdSharpes[1]!, 3)}${r.thirdBeatsBH[1] ? "*" : " "}`.padStart(8),
+        `${fmt(r.thirdSharpes[2]!, 3)}${r.thirdBeatsBH[2] ? "*" : " "}`.padStart(8),
+      ].join(" "),
+    );
   }
-  console.log("(* = that third's TSMOM Sharpe beat the equal-weight buy-&-hold benchmark for the same third)");
+  console.log(
+    "(* = that third's TSMOM Sharpe beat the equal-weight buy-&-hold benchmark for the same third)",
+  );
   console.log("");
 
   // ── Regime-persistence analysis ──────────────────────────────────────────
@@ -434,31 +477,55 @@ function main(): void {
   console.log("=".repeat(82));
   console.log("VERDICT — does long-short TSMOM hold up across regimes after costs?");
   console.log("=".repeat(82));
-  console.log(`Configs with POSITIVE Sharpe in all 3 regime thirds : ${allThreePositive.length}/${rows.length}`);
-  console.log(`Configs that BEAT buy-&-hold in all 3 thirds        : ${allThreeBeatBH.length}/${rows.length}`);
-  console.log(`Best config (by OOS 15m Sharpe)                     : lookback=${best.lookback}, rebalance=${best.rebalance}`);
-  console.log(`  OOS 15m Sharpe ${fmt(best.oosSharpe15m, 4)} | annualized ${fmt(best.oosSharpeAnnual, 2)} | maxDD ${fmt(best.oosMaxDD, 1)}% | turnover ${fmt(best.turnover, 2)}/rebal`);
-  console.log(`  per-third Sharpe: early ${fmt(best.thirdSharpes[0]!, 3)} / mid ${fmt(best.thirdSharpes[1]!, 3)} / late ${fmt(best.thirdSharpes[2]!, 3)}`);
-  console.log(`  beats buy-&-hold: early ${best.thirdBeatsBH[0]} / mid ${best.thirdBeatsBH[1]} / late ${best.thirdBeatsBH[2]}`);
-  console.log(`  PSR ${fmt(best.psr, 3)} | DSR ${fmt(best.dsr, 3)} (effectiveTrials=${EFFECTIVE_TRIALS}) | E[max Sharpe|null] ${fmt(best.expectedMaxNull, 2)}`);
+  console.log(
+    `Configs with POSITIVE Sharpe in all 3 regime thirds : ${allThreePositive.length}/${rows.length}`,
+  );
+  console.log(
+    `Configs that BEAT buy-&-hold in all 3 thirds        : ${allThreeBeatBH.length}/${rows.length}`,
+  );
+  console.log(
+    `Best config (by OOS 15m Sharpe)                     : lookback=${best.lookback}, rebalance=${best.rebalance}`,
+  );
+  console.log(
+    `  OOS 15m Sharpe ${fmt(best.oosSharpe15m, 4)} | annualized ${fmt(best.oosSharpeAnnual, 2)} | maxDD ${fmt(best.oosMaxDD, 1)}% | turnover ${fmt(best.turnover, 2)}/rebal`,
+  );
+  console.log(
+    `  per-third Sharpe: early ${fmt(best.thirdSharpes[0]!, 3)} / mid ${fmt(best.thirdSharpes[1]!, 3)} / late ${fmt(best.thirdSharpes[2]!, 3)}`,
+  );
+  console.log(
+    `  beats buy-&-hold: early ${best.thirdBeatsBH[0]} / mid ${best.thirdBeatsBH[1]} / late ${best.thirdBeatsBH[2]}`,
+  );
+  console.log(
+    `  PSR ${fmt(best.psr, 3)} | DSR ${fmt(best.dsr, 3)} (effectiveTrials=${EFFECTIVE_TRIALS}) | E[max Sharpe|null] ${fmt(best.expectedMaxNull, 2)}`,
+  );
   console.log("");
 
   const deflatedPass = rows.some((r) => r.dsr > 0.95 && r.oosSharpe15m > 0);
   if (allThreeBeatBH.length === 0) {
     console.log("HONEST READ: long-short TSMOM does NOT hold up across regimes.");
     console.log("No config beats equal-weight buy-&-hold in all three regime thirds. The signal's");
-    console.log("apparent strength is regime-specific (it works in the directional/trending leg and");
+    console.log(
+      "apparent strength is regime-specific (it works in the directional/trending leg and",
+    );
     console.log("fails in the others) — consistent with the earlier positive being the single");
     console.log("crypto-bear slice, not a durable cross-regime edge.");
   } else if (!deflatedPass) {
     console.log("HONEST READ: long-short TSMOM survives some regimes but NOT the deflated bar.");
-    console.log(`${allThreeBeatBH.length} config(s) beat passive in all three thirds, but no config clears the`);
-    console.log("deflated-Sharpe test (DSR>0.95) after correcting for the 12-config search. Treat as");
+    console.log(
+      `${allThreeBeatBH.length} config(s) beat passive in all three thirds, but no config clears the`,
+    );
+    console.log(
+      "deflated-Sharpe test (DSR>0.95) after correcting for the 12-config search. Treat as",
+    );
     console.log("a lead to re-test on fresh data, not an edge to allocate.");
   } else {
-    console.log("HONEST READ: long-short TSMOM holds up across regimes AND clears the deflated bar.");
+    console.log(
+      "HONEST READ: long-short TSMOM holds up across regimes AND clears the deflated bar.",
+    );
     console.log("At least one config is positive in all three regime thirds, beats passive, and");
-    console.log("survives the multiple-testing correction. Still re-test OOS on a fresh window before");
+    console.log(
+      "survives the multiple-testing correction. Still re-test OOS on a fresh window before",
+    );
     console.log("allocating — the deflated bar controls selection bias, not regime change.");
   }
   console.log("");

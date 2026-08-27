@@ -93,7 +93,7 @@ function zeros(n: number): Matrix {
   return Array.from({ length: n }, () => new Array<number>(n).fill(0));
 }
 
-function frobeniusNorm(M: Matrix): number {
+function _frobeniusNorm(M: Matrix): number {
   let s = 0;
   for (const row of M) for (const v of row) s += v * v;
   return Math.sqrt(s);
@@ -145,9 +145,7 @@ function symmetrize(M: Matrix): Matrix {
  * column sign flip cancels and reordering is just summation reordering),
  * so no sort/sign-canonicalization is needed here.
  */
-function jacobiEigendecomposition(
-  A: Matrix,
-): { eigenvalues: number[]; eigenvectors: Matrix } {
+function jacobiEigendecomposition(A: Matrix): { eigenvalues: number[]; eigenvectors: Matrix } {
   const evd = eigenDecomposition(A);
   if (!evd) return { eigenvalues: [], eigenvectors: [] };
   return { eigenvalues: evd.eigenvalues, eigenvectors: evd.eigenvectors };
@@ -236,7 +234,7 @@ export function computeNearestCorrelationMatrix(
   }
 
   let Y = symmetrize(input.matrix);
-  let dS = zeros(n);
+  const dS = zeros(n);
   let residual = Infinity;
   let iter = 0;
   let converged = false;

@@ -194,7 +194,9 @@ export function blendRecommendations(
       .reduce((s, p) => s + p.weightedConviction, 0);
 
     const contested = longConviction > 0 && shortConviction > 0;
-    const penalty = contested ? Math.min(longConviction, shortConviction) * config.disagreementPenalty : 0;
+    const penalty = contested
+      ? Math.min(longConviction, shortConviction) * config.disagreementPenalty
+      : 0;
 
     let direction: BlendedRecommendation["direction"];
     let finalConviction: number;

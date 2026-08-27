@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 
 // ============================================================================
@@ -18,7 +17,7 @@ interface Props {
 const STATUS_CONFIG: Record<string, { icon: string; color: string; label: string }> = {
   running: { icon: "\u25CF", color: "green", label: "running" },
   stopped: { icon: "\u25CB", color: "gray", label: "stopped" },
-  error:   { icon: "\u2717", color: "red",   label: "error" },
+  error: { icon: "\u2717", color: "red", label: "error" },
 };
 
 export function DaemonStatus({ status, taskCount, uptime }: Props) {
@@ -29,7 +28,9 @@ export function DaemonStatus({ status, taskCount, uptime }: Props) {
   return (
     <Box>
       <Text dimColor>daemon: </Text>
-      <Text color={cfg.color}>{cfg.icon} {cfg.label}</Text>
+      <Text color={cfg.color}>
+        {cfg.icon} {cfg.label}
+      </Text>
       {status === "running" && (
         <>
           <Text dimColor> {"\u00b7"} </Text>
@@ -41,7 +42,9 @@ export function DaemonStatus({ status, taskCount, uptime }: Props) {
       {status === "error" && (
         <>
           <Text dimColor> {"\u00b7"} </Text>
-          <Text color="red" dimColor>check logs</Text>
+          <Text color="red" dimColor>
+            check logs
+          </Text>
         </>
       )}
     </Box>

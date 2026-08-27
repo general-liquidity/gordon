@@ -1,10 +1,24 @@
-import type { RuntimePermissionScope, RuntimeWorkerDefinition, RuntimeWorkerRole } from "../contracts/types.ts";
+import type {
+  RuntimePermissionScope,
+  RuntimeWorkerDefinition,
+  RuntimeWorkerRole,
+} from "../contracts/types.ts";
 
 const WORKER_DEFINITIONS: Record<RuntimeWorkerRole, RuntimeWorkerDefinition> = {
   Gordon: {
     name: "Gordon",
     description: "Primary coordinator for plan-first financial workflows.",
-    handoffTargets: ["Scanner", "Analyst", "Planner", "Executor", "Monitor", "Teacher", "Backtester", "Critic", "Auditor"],
+    handoffTargets: [
+      "Scanner",
+      "Analyst",
+      "Planner",
+      "Executor",
+      "Monitor",
+      "Teacher",
+      "Backtester",
+      "Critic",
+      "Auditor",
+    ],
     defaultScopes: ["analysis.run"],
   },
   Scanner: {

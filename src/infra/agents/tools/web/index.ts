@@ -16,11 +16,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import {
-  fetchUrl,
-  searchWeb,
-  WEB_SEARCH_MAX_RESULTS,
-} from "./fetchService.ts";
+import { fetchUrl, searchWeb, WEB_SEARCH_MAX_RESULTS } from "./fetchService.ts";
 
 export const webFetchTool = createTool({
   id: "web_fetch",
@@ -33,7 +29,13 @@ export const webFetchTool = createTool({
     "URL for. For open-ended discovery, use web_search first.",
   inputSchema: z.object({
     url: z.string().url().describe("Absolute http(s) URL to fetch."),
-    timeoutMs: z.number().int().positive().max(60_000).optional().describe("Fetch timeout, default 15000."),
+    timeoutMs: z
+      .number()
+      .int()
+      .positive()
+      .max(60_000)
+      .optional()
+      .describe("Fetch timeout, default 15000."),
   }),
   outputSchema: z.object({
     ok: z.boolean(),
@@ -85,7 +87,15 @@ export const webSearchTool = createTool({
     notConfigured: z.boolean(),
     error: z.string().optional(),
   }),
-  execute: async ({ query, count, timeoutMs }: { query: string; count?: number; timeoutMs?: number }) => {
+  execute: async ({
+    query,
+    count,
+    timeoutMs,
+  }: {
+    query: string;
+    count?: number;
+    timeoutMs?: number;
+  }) => {
     return searchWeb(query, { count, timeoutMs });
   },
 });

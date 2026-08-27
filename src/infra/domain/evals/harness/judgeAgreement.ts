@@ -95,10 +95,7 @@ export function cohensKappa(pairs: ReadonlyArray<LabelPair>): number {
  * Spearman rank correlation between two aligned numeric series (ties get
  * average ranks). Returns 0 for degenerate input (length < 2 or zero variance).
  */
-export function spearmanRho(
-  a: ReadonlyArray<number>,
-  b: ReadonlyArray<number>,
-): number {
+export function spearmanRho(a: ReadonlyArray<number>, b: ReadonlyArray<number>): number {
   const n = Math.min(a.length, b.length);
   if (n < 2) return 0;
   const ra = averageRanks(a.slice(0, n));
@@ -111,10 +108,7 @@ export function spearmanRho(
  * to turn a continuous judge score and a human gold score into the categorical
  * inputs kappa needs. `score >= threshold` => "pass".
  */
-export function binarizeByThreshold(
-  scores: ReadonlyArray<number>,
-  threshold: number,
-): string[] {
+export function binarizeByThreshold(scores: ReadonlyArray<number>, threshold: number): string[] {
   return scores.map((s) => (s >= threshold ? "pass" : "fail"));
 }
 
@@ -129,9 +123,7 @@ export function computeJudgeAgreement(input: JudgeAgreementInput): JudgeAgreemen
   const agreement = n === 0 ? 0 : agree / n;
   const kappa = cohensKappa(pairs);
 
-  const categories = Array.from(
-    new Set(pairs.flatMap((p) => [p.judge, p.human])),
-  ).sort();
+  const categories = Array.from(new Set(pairs.flatMap((p) => [p.judge, p.human]))).sort();
 
   let spearman: number | undefined;
   if (input.judgeScores && input.humanScores) {

@@ -74,9 +74,7 @@ function rowToEvent(row: Record<string, unknown>): Event {
 /**
  * Logs a new event to the database
  */
-export function logEvent(
-  event: Omit<Event, "id" | "timestamp">
-): Event {
+export function logEvent(event: Omit<Event, "id" | "timestamp">): Event {
   const db = getDatabase();
 
   const id = generateEventId();
@@ -93,7 +91,7 @@ export function logEvent(
     event.type,
     JSON.stringify(event.data),
     event.planId ?? null,
-    event.tradeId ?? null
+    event.tradeId ?? null,
   );
 
   return {
@@ -133,7 +131,7 @@ export function getEvents(filter?: {
   }
 
   if (conditions.length > 0) {
-    query += " WHERE " + conditions.join(" AND ");
+    query += ` WHERE ${conditions.join(" AND ")}`;
   }
 
   query += " ORDER BY timestamp DESC";

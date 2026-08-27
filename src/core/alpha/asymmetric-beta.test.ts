@@ -33,6 +33,8 @@ describe("computeAsymmetricBeta", () => {
   });
 
   it("is insufficient on too little data", () => {
-    expect(computeAsymmetricBeta({ strategyReturns: [1, 2, 3], benchmarkReturns: [1, 2, 3] }).verdict).toBe("insufficient");
+    expect(
+      computeAsymmetricBeta({ strategyReturns: [1, 2, 3], benchmarkReturns: [1, 2, 3] }).verdict,
+    ).toBe("insufficient");
   });
 });

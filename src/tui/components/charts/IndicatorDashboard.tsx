@@ -11,7 +11,7 @@
  * Pattern: Claude Code context visualization panel.
  */
 
-import React from "react";
+import type React from "react";
 import { Box, Text } from "../../ink-custom";
 
 // ============================================================================
@@ -126,16 +126,12 @@ export function IndicatorDashboard({ symbol, rsi, macd, trend, bollinger, volume
   const volAbove = volRatio >= 1;
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
-      paddingX={1}
-      paddingY={0}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1} paddingY={0}>
       {/* Header */}
       <Box>
-        <Text bold color="cyan">INDICATORS</Text>
+        <Text bold color="cyan">
+          INDICATORS
+        </Text>
         <Text dimColor> {"\u00b7"} </Text>
         <Text bold>{symbol}</Text>
       </Box>
@@ -152,7 +148,11 @@ export function IndicatorDashboard({ symbol, rsi, macd, trend, bollinger, volume
         <Text color={macdInfo.color}>
           {macdInfo.arrow} {macdInfo.label}
         </Text>
-        <Text dimColor> ({macd.histogram > 0 ? "+" : ""}{macd.histogram.toFixed(4)})</Text>
+        <Text dimColor>
+          {" "}
+          ({macd.histogram > 0 ? "+" : ""}
+          {macd.histogram.toFixed(4)})
+        </Text>
       </KVRow>
 
       {/* Trend */}
@@ -167,13 +167,18 @@ export function IndicatorDashboard({ symbol, rsi, macd, trend, bollinger, volume
       {/* Bollinger Bands */}
       <KVRow label="BB">
         <Text color={bbInfo.color}>{bbInfo.label}</Text>
-        <Text dimColor> (L:{bollinger.lower.toFixed(2)} M:{bollinger.middle.toFixed(2)} U:{bollinger.upper.toFixed(2)})</Text>
+        <Text dimColor>
+          {" "}
+          (L:{bollinger.lower.toFixed(2)} M:{bollinger.middle.toFixed(2)} U:
+          {bollinger.upper.toFixed(2)})
+        </Text>
       </KVRow>
 
       {/* Volume */}
       <KVRow label="Volume">
         <Text color={volAbove ? "green" : "red"}>
-          {renderGauge(Math.min(volRatio * 50, 100), 100, 10)} {volRatio.toFixed(1)}x avg {volAbove ? "ABOVE" : "BELOW"}
+          {renderGauge(Math.min(volRatio * 50, 100), 100, 10)} {volRatio.toFixed(1)}x avg{" "}
+          {volAbove ? "ABOVE" : "BELOW"}
         </Text>
       </KVRow>
     </Box>

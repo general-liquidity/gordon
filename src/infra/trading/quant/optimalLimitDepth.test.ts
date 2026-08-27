@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeOptimalLimitDepth,
-  optimalLimitDepthToPayload,
-} from "./optimalLimitDepth.ts";
+import { computeOptimalLimitDepth, optimalLimitDepthToPayload } from "./optimalLimitDepth.ts";
 
 describe("computeOptimalLimitDepth — validation", () => {
   const base = {

@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text, Spacer } from "../../ink-custom";
 
 // ============================================================================
@@ -29,7 +28,8 @@ export function FooterHints({
   effortLevel,
   tokenBudgetRatio,
 }: Props) {
-  const modeColor = permissionMode === "auto" ? "red" : permissionMode === "strict" ? "green" : "cyanBright";
+  const modeColor =
+    permissionMode === "auto" ? "red" : permissionMode === "strict" ? "green" : "cyanBright";
 
   return (
     <Box>
@@ -41,7 +41,9 @@ export function FooterHints({
       {effortLevel && effortLevel !== "auto" && (
         <>
           <Text dimColor> {"\u00b7"} </Text>
-          <Text color="yellow">{"\u21AF"} {effortLevel}</Text>
+          <Text color="yellow">
+            {"\u21AF"} {effortLevel}
+          </Text>
         </>
       )}
 
@@ -60,7 +62,8 @@ export function FooterHints({
         <>
           <Text dimColor> {"\u00b7"} </Text>
           <Text color="magentaBright">
-            {"\u25C8"} {autonomousStrategyCount} {autonomousStrategyCount === 1 ? "strategy" : "strategies"}
+            {"\u25C8"} {autonomousStrategyCount}{" "}
+            {autonomousStrategyCount === 1 ? "strategy" : "strategies"}
           </Text>
         </>
       )}
@@ -78,7 +81,10 @@ export function FooterHints({
       )}
 
       {/* Shortcuts */}
-      <Text dimColor> {"\u00b7"} Ctrl+P {"\u00b7"} ? help</Text>
+      <Text dimColor>
+        {" "}
+        {"\u00b7"} Ctrl+P {"\u00b7"} ? help
+      </Text>
     </Box>
   );
 }

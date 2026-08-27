@@ -92,10 +92,7 @@ export const DEFAULT_HARNESS_PROFILES: ReadonlyArray<HarnessProfile> = [
   XAI_PROFILE,
 ];
 
-function readEnvOverride(
-  profile: HarnessProfile,
-  env: NodeJS.ProcessEnv,
-): string {
+function readEnvOverride(profile: HarnessProfile, env: NodeJS.ProcessEnv): string {
   const raw = env[profile.envOverride];
   if (typeof raw !== "string") return profile.suffix;
   return raw;
@@ -166,9 +163,7 @@ export function getHarnessSuffixForModel(
  * the flag on but no env overrides set, behavior is also identical
  * (resolver returns empty string).
  */
-export function isHarnessProfilesEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function isHarnessProfilesEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   const raw = env.GORDON_HARNESS_PROFILES;
   if (typeof raw !== "string") return false;
   const normalized = raw.trim().toLowerCase();

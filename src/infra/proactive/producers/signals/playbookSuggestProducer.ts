@@ -31,7 +31,9 @@ type RegimeSignal = {
 
 interface RegimeDetectorClass {
   new (...args: unknown[]): unknown;
-  getInstance: () => { detectRegime: (candles: unknown[], symbol: string, timeframe?: string) => RegimeSignal };
+  getInstance: () => {
+    detectRegime: (candles: unknown[], symbol: string, timeframe?: string) => RegimeSignal;
+  };
 }
 
 const lastSuggestedKey = new Map<string, string>();
@@ -48,10 +50,9 @@ async function ensurePlaybooksLoaded(): Promise<void> {
   }
 }
 
-async function loadRegimeDetector(): Promise<
-  | { detectRegime: (candles: unknown[], symbol: string, timeframe?: string) => RegimeSignal }
-  | null
-> {
+async function loadRegimeDetector(): Promise<{
+  detectRegime: (candles: unknown[], symbol: string, timeframe?: string) => RegimeSignal;
+} | null> {
   try {
     const mod = (await import("../../../../core/regime/detector.ts" as string)) as {
       RegimeDetector?: RegimeDetectorClass;
@@ -99,10 +100,12 @@ function pickPlaybook(symbol: string, regime: string): Playbook | null {
     return pb.symbols.some((s) => s.toUpperCase().includes(base.toUpperCase()));
   });
 
-  return (symbolScoped[0] ?? pool[0]) ?? null;
+  return symbolScoped[0] ?? pool[0] ?? null;
 }
 
-export const playbookSuggestProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
+export const playbookSuggestProducer: CandidateProducer = async (
+  obs,
+): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop" || obs.eventType !== "tick_playbook_suggest") return [];
 
   await ensurePlaybooksLoaded();

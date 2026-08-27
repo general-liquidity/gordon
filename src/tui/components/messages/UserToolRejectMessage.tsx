@@ -9,8 +9,10 @@ function UserToolRejectMessageInner({ message }: { message: Message }) {
     <Box flexDirection="row" marginTop={0}>
       <Text dimColor>{"⎿ "}</Text>
       <Text color="yellow">{"⊘"}</Text>
-      <Text>{" "}</Text>
-      <Text color="yellow" bold>{"Rejected by risk kernel"}</Text>
+      <Text> </Text>
+      <Text color="yellow" bold>
+        {"Rejected by risk kernel"}
+      </Text>
       <Text color="yellow">{": "}</Text>
       <Text color="yellow">{message.content}</Text>
     </Box>

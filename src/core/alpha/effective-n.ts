@@ -74,7 +74,7 @@ export interface EffectiveNOptions {
 const DEFAULT_OPTIONS: Required<EffectiveNOptions> = {
   diversifiedThreshold: 0.15,
   moderateThreshold: 0.35,
-  highThreshold: 0.60,
+  highThreshold: 0.6,
   topK: 5,
 };
 

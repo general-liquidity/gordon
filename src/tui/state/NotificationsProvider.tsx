@@ -8,7 +8,7 @@
  * Phase 2 of the 100% parity plan.
  */
 
-import React, {
+import {
   createContext,
   useContext,
   useCallback,
@@ -126,9 +126,7 @@ export function NotificationsProvider({
 
   // ── Dismiss ──
   const dismiss = useCallback((id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, dismissed: true } : n)),
-    );
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, dismissed: true } : n)));
     const timer = timersRef.current.get(id);
     if (timer) {
       clearTimeout(timer);
@@ -158,17 +156,11 @@ export function NotificationsProvider({
   const active = useMemo(() => {
     return notifications
       .filter((n) => !n.dismissed)
-      .sort(
-        (a, b) =>
-          (VARIANT_PRIORITY[b.variant] ?? 0) - (VARIANT_PRIORITY[a.variant] ?? 0),
-      );
+      .sort((a, b) => (VARIANT_PRIORITY[b.variant] ?? 0) - (VARIANT_PRIORITY[a.variant] ?? 0));
   }, [notifications]);
 
   // ── Derived: visible (top N) ──
-  const visible = useMemo(
-    () => active.slice(0, maxVisible),
-    [active, maxVisible],
-  );
+  const visible = useMemo(() => active.slice(0, maxVisible), [active, maxVisible]);
 
   // ── Derived: folded (group same-type, keep most recent) ──
   const folded = useMemo<FoldedNotification[]>(() => {
@@ -211,11 +203,7 @@ export function NotificationsProvider({
     [notifications, active, visible, push, dismiss, clearAll, folded],
   );
 
-  return (
-    <NotificationsContext.Provider value={value}>
-      {children}
-    </NotificationsContext.Provider>
-  );
+  return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
 }
 
 // ============================================================================

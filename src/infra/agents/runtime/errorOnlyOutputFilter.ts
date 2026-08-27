@@ -85,7 +85,8 @@ export const DEFAULT_ERROR_PATTERNS: readonly FilterRule[] = [
   },
   {
     id: "broker_reject_keywords",
-    pattern: /\b(?:reject|rejected|denied|cancel(?:l)?ed|insufficient|timeout|unauthorized|forbidden)\b/i,
+    pattern:
+      /\b(?:reject|rejected|denied|cancel(?:l)?ed|insufficient|timeout|unauthorized|forbidden)\b/i,
     action: "surface",
     priority: 90,
   },

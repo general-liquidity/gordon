@@ -1,5 +1,5 @@
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
@@ -47,7 +47,7 @@ function rowsToCsv<T extends object>(rows: T[]): string {
   const headers = Object.keys(normalizedRows[0] ?? {});
   const escaped = (value: unknown): string => {
     const text = String(value ?? "");
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, "\"\"")}"` : text;
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
   return [
     headers.join(","),
@@ -64,55 +64,67 @@ export const getSystematicStrategyStatusTool = createTool({
     strategyId: z.string().describe("Strategy or playbook identifier"),
   }),
   outputSchema: z.object({
-    profile: z.object({
-      strategyId: z.string(),
-      strategyName: z.string(),
-      marketFamily: z.enum(["crypto", "stocks"]),
-      status: z.enum(["research", "validated", "paper", "live", "degraded", "retired"]),
-      validationStatus: z.enum(["passed", "warning", "failed"]),
-      validationScore: z.number(),
-      returnDriver: z.string(),
-      regimeTag: z.string(),
-      capitalWeight: z.number(),
-      maxAllocation: z.number(),
-      latestDatasetId: z.string().optional(),
-      latestDatasetSnapshotId: z.string().optional(),
-      latestBacktestResultId: z.string().optional(),
-      latestValidationId: z.string().optional(),
-      liveEligible: z.boolean(),
-      decayScore: z.number(),
-    }).optional(),
-    latestValidation: z.object({
-      validationId: z.string(),
-      status: z.enum(["passed", "warning", "failed"]),
-      score: z.number(),
-      liveEligible: z.boolean(),
-      createdAt: z.string(),
-      gates: z.array(z.object({
-        name: z.string(),
-        passed: z.boolean(),
-        score: z.number(),
-        detail: z.string(),
-      })),
-      biasDiagnostics: z.object({
+    profile: z
+      .object({
+        strategyId: z.string(),
+        strategyName: z.string(),
+        marketFamily: z.enum(["crypto", "stocks"]),
+        status: z.enum(["research", "validated", "paper", "live", "degraded", "retired"]),
+        validationStatus: z.enum(["passed", "warning", "failed"]),
+        validationScore: z.number(),
+        returnDriver: z.string(),
+        regimeTag: z.string(),
+        capitalWeight: z.number(),
+        maxAllocation: z.number(),
+        latestDatasetId: z.string().optional(),
+        latestDatasetSnapshotId: z.string().optional(),
+        latestBacktestResultId: z.string().optional(),
+        latestValidationId: z.string().optional(),
+        liveEligible: z.boolean(),
+        decayScore: z.number(),
+      })
+      .optional(),
+    latestValidation: z
+      .object({
+        validationId: z.string(),
         status: z.enum(["passed", "warning", "failed"]),
         score: z.number(),
-        blockerCount: z.number(),
-        warningCount: z.number(),
-        notes: z.array(z.string()),
-      }).optional(),
-    }).optional(),
-    recentExperiments: z.array(z.object({
-      experimentId: z.string(),
-      status: z.enum(["research", "validated", "paper", "live", "archived"]),
-      hypothesis: z.string(),
-      updatedAt: z.string(),
-    })),
-    recentLifecycle: z.array(z.object({
-      eventId: z.string(),
-      eventType: z.string(),
-      createdAt: z.string(),
-    })),
+        liveEligible: z.boolean(),
+        createdAt: z.string(),
+        gates: z.array(
+          z.object({
+            name: z.string(),
+            passed: z.boolean(),
+            score: z.number(),
+            detail: z.string(),
+          }),
+        ),
+        biasDiagnostics: z
+          .object({
+            status: z.enum(["passed", "warning", "failed"]),
+            score: z.number(),
+            blockerCount: z.number(),
+            warningCount: z.number(),
+            notes: z.array(z.string()),
+          })
+          .optional(),
+      })
+      .optional(),
+    recentExperiments: z.array(
+      z.object({
+        experimentId: z.string(),
+        status: z.enum(["research", "validated", "paper", "live", "archived"]),
+        hypothesis: z.string(),
+        updatedAt: z.string(),
+      }),
+    ),
+    recentLifecycle: z.array(
+      z.object({
+        eventId: z.string(),
+        eventType: z.string(),
+        createdAt: z.string(),
+      }),
+    ),
     operatorReport: operatorReportSchema.optional(),
     formattedSummary: z.string().optional(),
   }),
@@ -199,18 +211,20 @@ export const listSystematicDatasetsTool = createTool({
     formattedSummary: z.string().optional(),
   }),
   execute: async ({ marketFamily, symbol, timeframe, limit }) => {
-    const datasets = listDatasetRecords({ marketFamily, symbol, timeframe, limit }).map((dataset) => ({
-      datasetId: dataset.datasetId,
-      symbol: dataset.symbol,
-      timeframe: dataset.timeframe,
-      marketFamily: dataset.marketFamily,
-      sourceId: dataset.sourceId,
-      sourceKind: dataset.sourceKind,
-      candleCount: dataset.candleCount,
-      qualityScore: dataset.quality.qualityScore,
-      coveragePercent: dataset.quality.coveragePercent,
-      updatedAt: dataset.updatedAt,
-    }));
+    const datasets = listDatasetRecords({ marketFamily, symbol, timeframe, limit }).map(
+      (dataset) => ({
+        datasetId: dataset.datasetId,
+        symbol: dataset.symbol,
+        timeframe: dataset.timeframe,
+        marketFamily: dataset.marketFamily,
+        sourceId: dataset.sourceId,
+        sourceKind: dataset.sourceKind,
+        candleCount: dataset.candleCount,
+        qualityScore: dataset.quality.qualityScore,
+        coveragePercent: dataset.quality.coveragePercent,
+        updatedAt: dataset.updatedAt,
+      }),
+    );
     const operatorReport = buildDatasetInventoryReport({
       datasets: listDatasetRecords({ marketFamily, symbol, timeframe, limit }),
       snapshots: listDatasetSnapshots().slice(0, limit),
@@ -226,27 +240,32 @@ export const listSystematicDatasetsTool = createTool({
 
 export const listDatasetSnapshotsTool = createTool({
   id: "list_dataset_snapshots",
-  description: "List reproducible dataset snapshots for a systematic dataset or across all datasets.",
+  description:
+    "List reproducible dataset snapshots for a systematic dataset or across all datasets.",
   inputSchema: z.object({
     datasetId: z.string().optional(),
     limit: z.number().min(1).max(100).default(20),
   }),
   outputSchema: z.object({
-    snapshots: z.array(z.object({
-      snapshotId: z.string(),
-      datasetId: z.string(),
-      startTime: z.number(),
-      endTime: z.number(),
-      candleCount: z.number(),
-      createdAt: z.string(),
-    })),
+    snapshots: z.array(
+      z.object({
+        snapshotId: z.string(),
+        datasetId: z.string(),
+        startTime: z.number(),
+        endTime: z.number(),
+        candleCount: z.number(),
+        createdAt: z.string(),
+      }),
+    ),
     operatorReport: operatorReportSchema.optional(),
     formattedSummary: z.string().optional(),
   }),
   execute: async ({ datasetId, limit }) => {
     const snapshots = listDatasetSnapshots(datasetId).slice(0, limit);
     const operatorReport = buildDatasetInventoryReport({
-      datasets: datasetId ? listDatasetRecords().filter((dataset) => dataset.datasetId === datasetId) : listDatasetRecords({ limit }),
+      datasets: datasetId
+        ? listDatasetRecords().filter((dataset) => dataset.datasetId === datasetId)
+        : listDatasetRecords({ limit }),
       snapshots,
     });
 
@@ -267,29 +286,32 @@ export const listDatasetSnapshotsTool = createTool({
 
 export const getDatasetSnapshotTool = createTool({
   id: "get_dataset_snapshot",
-  description:
-    "Retrieve a saved reproducible dataset snapshot for a systematic backtest run.",
+  description: "Retrieve a saved reproducible dataset snapshot for a systematic backtest run.",
   inputSchema: z.object({
     snapshotId: z.string().describe("Snapshot identifier"),
   }),
   outputSchema: z.object({
-    snapshot: z.object({
-      snapshotId: z.string(),
-      datasetId: z.string(),
-      candleCount: z.number(),
-      startTime: z.number(),
-      endTime: z.number(),
-      createdAt: z.string(),
-      metadata: z.record(z.string(), z.unknown()),
-      candles: z.array(z.object({
-        timestamp: z.number(),
-        open: z.number(),
-        high: z.number(),
-        low: z.number(),
-        close: z.number(),
-        volume: z.number(),
-      })),
-    }).optional(),
+    snapshot: z
+      .object({
+        snapshotId: z.string(),
+        datasetId: z.string(),
+        candleCount: z.number(),
+        startTime: z.number(),
+        endTime: z.number(),
+        createdAt: z.string(),
+        metadata: z.record(z.string(), z.unknown()),
+        candles: z.array(
+          z.object({
+            timestamp: z.number(),
+            open: z.number(),
+            high: z.number(),
+            low: z.number(),
+            close: z.number(),
+            volume: z.number(),
+          }),
+        ),
+      })
+      .optional(),
     formattedSummary: z.string().optional(),
     error: z.string().optional(),
   }),
@@ -322,16 +344,18 @@ export const listResearchExperimentsTool = createTool({
     limit: z.number().min(1).max(50).default(20),
   }),
   outputSchema: z.object({
-    experiments: z.array(z.object({
-      experimentId: z.string(),
-      strategyId: z.string(),
-      strategyName: z.string(),
-      status: z.enum(["research", "validated", "paper", "live", "archived"]),
-      hypothesis: z.string(),
-      notes: z.string(),
-      updatedAt: z.string(),
-      validationId: z.string().optional(),
-    })),
+    experiments: z.array(
+      z.object({
+        experimentId: z.string(),
+        strategyId: z.string(),
+        strategyName: z.string(),
+        status: z.enum(["research", "validated", "paper", "live", "archived"]),
+        hypothesis: z.string(),
+        notes: z.string(),
+        updatedAt: z.string(),
+        validationId: z.string().optional(),
+      }),
+    ),
     operatorReport: operatorReportSchema.optional(),
     formattedSummary: z.string().optional(),
     diversityHint: z
@@ -379,19 +403,21 @@ export const analyzeSystematicPortfolioTool = createTool({
     diversificationScore: z.number(),
     concentrationRisk: z.enum(["low", "medium", "high"]),
     notes: z.array(z.string()),
-    entries: z.array(z.object({
-      strategyId: z.string(),
-      strategyName: z.string(),
-      marketFamily: z.enum(["crypto", "stocks"]),
-      status: z.enum(["research", "validated", "paper", "live", "degraded", "retired"]),
-      validationScore: z.number(),
-      capitalWeight: z.number(),
-      maxAllocation: z.number(),
-      returnDriver: z.string(),
-      regimeTag: z.string(),
-      estimatedCorrelation: z.number(),
-      diversificationContribution: z.number(),
-    })),
+    entries: z.array(
+      z.object({
+        strategyId: z.string(),
+        strategyName: z.string(),
+        marketFamily: z.enum(["crypto", "stocks"]),
+        status: z.enum(["research", "validated", "paper", "live", "degraded", "retired"]),
+        validationScore: z.number(),
+        capitalWeight: z.number(),
+        maxAllocation: z.number(),
+        returnDriver: z.string(),
+        regimeTag: z.string(),
+        estimatedCorrelation: z.number(),
+        diversificationContribution: z.number(),
+      }),
+    ),
     operatorReport: operatorReportSchema.optional(),
     formattedSummary: z.string().optional(),
   }),
@@ -416,20 +442,24 @@ export const diagnoseStrategyBiasTool = createTool({
   }),
   outputSchema: z.object({
     validationId: z.string().optional(),
-    biasDiagnostics: z.object({
-      status: z.enum(["passed", "warning", "failed"]),
-      score: z.number(),
-      blockerCount: z.number(),
-      warningCount: z.number(),
-      checks: z.array(z.object({
-        name: z.string(),
+    biasDiagnostics: z
+      .object({
         status: z.enum(["passed", "warning", "failed"]),
         score: z.number(),
-        detail: z.string(),
-        blocker: z.boolean(),
-      })),
-      notes: z.array(z.string()),
-    }).optional(),
+        blockerCount: z.number(),
+        warningCount: z.number(),
+        checks: z.array(
+          z.object({
+            name: z.string(),
+            status: z.enum(["passed", "warning", "failed"]),
+            score: z.number(),
+            detail: z.string(),
+            blocker: z.boolean(),
+          }),
+        ),
+        notes: z.array(z.string()),
+      })
+      .optional(),
     operatorReport: operatorReportSchema.optional(),
     formattedSummary: z.string().optional(),
     error: z.string().optional(),
@@ -437,7 +467,9 @@ export const diagnoseStrategyBiasTool = createTool({
   execute: async ({ strategyId }) => {
     const status = getSystematicStrategyStatus(strategyId);
     if (!status.latestValidation?.biasDiagnostics) {
-      return { error: `No bias diagnostics found for ${strategyId}. Run a systematic backtest first.` };
+      return {
+        error: `No bias diagnostics found for ${strategyId}. Run a systematic backtest first.`,
+      };
     }
 
     const operatorReport = buildStrategyStatusReport({
@@ -465,13 +497,15 @@ export const getStrategyDecayReportTool = createTool({
     strategyId: z.string(),
   }),
   outputSchema: z.object({
-    profile: z.object({
-      strategyId: z.string(),
-      strategyName: z.string(),
-      status: z.string(),
-      decayScore: z.number(),
-      validationScore: z.number(),
-    }).optional(),
+    profile: z
+      .object({
+        strategyId: z.string(),
+        strategyName: z.string(),
+        status: z.string(),
+        decayScore: z.number(),
+        validationScore: z.number(),
+      })
+      .optional(),
     operatorReport: operatorReportSchema.optional(),
     formattedSummary: z.string().optional(),
     error: z.string().optional(),
@@ -508,12 +542,14 @@ export const listSystematicLifecycleTool = createTool({
     limit: z.number().min(1).max(100).default(20),
   }),
   outputSchema: z.object({
-    events: z.array(z.object({
-      eventId: z.string(),
-      eventType: z.string(),
-      createdAt: z.string(),
-      payload: z.record(z.string(), z.unknown()),
-    })),
+    events: z.array(
+      z.object({
+        eventId: z.string(),
+        eventType: z.string(),
+        createdAt: z.string(),
+        payload: z.record(z.string(), z.unknown()),
+      }),
+    ),
     operatorReport: operatorReportSchema.optional(),
     formattedSummary: z.string().optional(),
   }),
@@ -561,18 +597,30 @@ export const exportSystematicArtifactTool = createTool({
     if (artifactType === "dataset_snapshot") {
       const snapshotId = id ?? strategyStatus?.profile?.latestDatasetSnapshotId;
       if (!snapshotId) {
-        return { success: false, artifactType, error: "No dataset snapshot id provided and no strategy snapshot available." };
+        return {
+          success: false,
+          artifactType,
+          error: "No dataset snapshot id provided and no strategy snapshot available.",
+        };
       }
       payload = getDatasetSnapshot(snapshotId);
       if (!payload) {
-        return { success: false, artifactType, error: `Dataset snapshot '${snapshotId}' not found.` };
+        return {
+          success: false,
+          artifactType,
+          error: `Dataset snapshot '${snapshotId}' not found.`,
+        };
       }
       exportPrefix = `dataset-snapshot-${snapshotId}`;
       summary = `Exported dataset snapshot ${snapshotId}.`;
     } else if (artifactType === "validation") {
       const validationId = id ?? strategyStatus?.profile?.latestValidationId;
       if (!validationId) {
-        return { success: false, artifactType, error: "No validation id provided and no strategy validation available." };
+        return {
+          success: false,
+          artifactType,
+          error: "No validation id provided and no strategy validation available.",
+        };
       }
       payload = getValidationRun(validationId);
       if (!payload) {
@@ -581,10 +629,12 @@ export const exportSystematicArtifactTool = createTool({
       exportPrefix = `validation-${validationId}`;
       summary = `Exported validation ${validationId}.`;
     } else if (artifactType === "experiment") {
-      const experiments = strategyId ? listResearchExperiments(strategyId) : listResearchExperiments();
+      const experiments = strategyId
+        ? listResearchExperiments(strategyId)
+        : listResearchExperiments();
       payload = id
-        ? experiments.find((experiment) => experiment.experimentId === id) ?? null
-        : experiments[0] ?? null;
+        ? (experiments.find((experiment) => experiment.experimentId === id) ?? null)
+        : (experiments[0] ?? null);
       if (!payload) {
         return { success: false, artifactType, error: "No matching experiment found." };
       }
@@ -593,7 +643,11 @@ export const exportSystematicArtifactTool = createTool({
     } else {
       const backtestId = id ?? strategyStatus?.profile?.latestBacktestResultId;
       if (!backtestId) {
-        return { success: false, artifactType, error: "No backtest id provided and no strategy backtest available." };
+        return {
+          success: false,
+          artifactType,
+          error: "No backtest id provided and no strategy backtest available.",
+        };
       }
       payload = loadBacktestResult(backtestId);
       if (!payload) {
@@ -614,37 +668,43 @@ export const exportSystematicArtifactTool = createTool({
         const snapshot = payload as ReturnType<typeof getDatasetSnapshot>;
         content = rowsToCsv(snapshot?.candles ?? []);
       } else if (artifactType === "experiment") {
-        content = rowsToCsv(Array.isArray(payload) ? payload : [payload as Record<string, unknown>]);
+        content = rowsToCsv(
+          Array.isArray(payload) ? payload : [payload as Record<string, unknown>],
+        );
       } else if (artifactType === "validation") {
         const validation = payload as ReturnType<typeof getValidationRun>;
-        content = rowsToCsv(validation?.gates?.map((gate) => ({
-          gate: gate.name,
-          passed: gate.passed,
-          score: gate.score,
-          detail: gate.detail,
-        })) ?? []);
+        content = rowsToCsv(
+          validation?.gates?.map((gate) => ({
+            gate: gate.name,
+            passed: gate.passed,
+            score: gate.score,
+            detail: gate.detail,
+          })) ?? [],
+        );
       } else {
         const backtest = payload as ReturnType<typeof loadBacktestResult>;
         content = rowsToCsv(backtest?.trades ?? []);
       }
     } else {
-      const report = artifactType === "validation" && payload
-        ? buildStrategyStatusReport({
-            strategyId: (payload as { strategyId: string }).strategyId,
-            profile: strategyStatus?.profile ?? null,
-            validation: payload as ReturnType<typeof getValidationRun>,
-            experiments: strategyStatus?.experiments ?? [],
-            lifecycle: strategyStatus?.lifecycle ?? [],
-          })
-        : undefined;
+      const report =
+        artifactType === "validation" && payload
+          ? buildStrategyStatusReport({
+              strategyId: (payload as { strategyId: string }).strategyId,
+              profile: strategyStatus?.profile ?? null,
+              validation: payload as ReturnType<typeof getValidationRun>,
+              experiments: strategyStatus?.experiments ?? [],
+              lifecycle: strategyStatus?.lifecycle ?? [],
+            })
+          : undefined;
       content = report ? formatOperatorReport(report) : JSON.stringify(payload, null, 2);
     }
 
     await writeFile(exportPath, content, "utf8");
 
-    const notebookHint = format === "csv"
-      ? `import pandas as pd\nartifact = pd.read_csv(r\"${exportPath}\")`
-      : `import json\nwith open(r\"${exportPath}\", \"r\", encoding=\"utf-8\") as fh:\n    artifact = json.load(fh)`;
+    const notebookHint =
+      format === "csv"
+        ? `import pandas as pd\nartifact = pd.read_csv(r"${exportPath}")`
+        : `import json\nwith open(r"${exportPath}", "r", encoding="utf-8") as fh:\n    artifact = json.load(fh)`;
 
     return {
       success: true,

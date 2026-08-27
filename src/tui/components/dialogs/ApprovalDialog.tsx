@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import type React from "react";
+import { useState, useEffect } from "react";
 import { Box, Text } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 import { KeyboardHints } from "../../design-system/KeyboardHints.tsx";
@@ -70,7 +71,10 @@ export function buildApprovalOptions(
     });
   }
   if (opts.critical) {
-    options.push({ label: approval.counterOffer ? "CONFIRM ORIGINAL SIZE (CRITICAL)" : "CONFIRM (CRITICAL)", value: "once" });
+    options.push({
+      label: approval.counterOffer ? "CONFIRM ORIGINAL SIZE (CRITICAL)" : "CONFIRM (CRITICAL)",
+      value: "once",
+    });
     options.push({ label: "DENY", value: "deny" });
     return options;
   }
@@ -89,9 +93,12 @@ function RiskReasons({ reasons }: { reasons?: string[] }) {
   if (!reasons || reasons.length === 0) return null;
   return (
     <>
-      <Text color={theme.riskWarning}>  Why this needs approval:</Text>
+      <Text color={theme.riskWarning}> Why this needs approval:</Text>
       {reasons.slice(0, MAX_VISIBLE_REASONS).map((reason, i) => (
-        <Text key={i} dimColor>    {"•"} {reason}</Text>
+        <Text key={i} dimColor>
+          {" "}
+          {"•"} {reason}
+        </Text>
       ))}
     </>
   );
@@ -121,11 +128,19 @@ function StandardApproval({ approval, onDecision }: Props) {
       <Divider />
       <Box paddingX={2} flexDirection="column">
         <Box>
-          <Text color={theme.riskWarning} bold>{"\u26A0"} APPROVAL [{approval.shortId}]</Text>
+          <Text color={theme.riskWarning} bold>
+            {"\u26A0"} APPROVAL [{approval.shortId}]
+          </Text>
         </Box>
-        <Text>  Gordon wants to use <Text bold color={theme.uiBrand}>`{approval.toolName}`</Text></Text>
+        <Text>
+          {" "}
+          Gordon wants to use{" "}
+          <Text bold color={theme.uiBrand}>
+            `{approval.toolName}`
+          </Text>
+        </Text>
         <Box>
-          <Text dimColor>  Scope: {approval.permissionScope}</Text>
+          <Text dimColor> Scope: {approval.permissionScope}</Text>
           <Text dimColor> {"\u00b7"} </Text>
           <Text color={riskTone} bold>
             Risk: {approval.riskClass.toUpperCase()}
@@ -165,16 +180,30 @@ function HighApproval({ approval, onDecision }: Props) {
         paddingY={1}
       >
         <Box>
-          <Text color={riskTone} bold>{"\u26A0"} HIGH RISK APPROVAL [{approval.shortId}]</Text>
+          <Text color={riskTone} bold>
+            {"\u26A0"} HIGH RISK APPROVAL [{approval.shortId}]
+          </Text>
         </Box>
         <Text> </Text>
-        <Text>  Tool: <Text bold color={theme.uiBrand}>{approval.toolName}</Text></Text>
-        <Text>  Scope: <Text dimColor>{approval.permissionScope}</Text></Text>
-        <Text>  Effect: <Text color={theme.riskWarning}>{approval.sideEffectLevel}</Text></Text>
-        {approval.reason && <Text dimColor>  {approval.reason}</Text>}
+        <Text>
+          {" "}
+          Tool:{" "}
+          <Text bold color={theme.uiBrand}>
+            {approval.toolName}
+          </Text>
+        </Text>
+        <Text>
+          {" "}
+          Scope: <Text dimColor>{approval.permissionScope}</Text>
+        </Text>
+        <Text>
+          {" "}
+          Effect: <Text color={theme.riskWarning}>{approval.sideEffectLevel}</Text>
+        </Text>
+        {approval.reason && <Text dimColor> {approval.reason}</Text>}
         <RiskReasons reasons={approval.riskReasons} />
         <Text> </Text>
-        <Text color={riskTone}>  This action has significant side effects. Review carefully.</Text>
+        <Text color={riskTone}> This action has significant side effects. Review carefully.</Text>
         <Text> </Text>
         <Box paddingLeft={2}>
           <Select
@@ -198,19 +227,25 @@ function CriticalApproval({ approval, onDecision }: Props) {
   const riskTone = getRiskColor("critical", theme);
 
   useEffect(() => {
-    if (countdown <= 0) { setUnlocked(true); return; }
+    if (countdown <= 0) {
+      setUnlocked(true);
+      return;
+    }
     const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(t);
   }, [countdown]);
 
-  useRoutedInput((input, key) => {
-    if (input === "?") {
-      setShowKeys((show) => !show);
-      return;
-    }
-    if (!key.escape) return false;
-    onDecision("deny", approval.id);
-  }, { id: `approval:${approval.id}`, priority: FOCUS_PRIORITY.DIALOG + 10 });
+  useRoutedInput(
+    (input, key) => {
+      if (input === "?") {
+        setShowKeys((show) => !show);
+        return;
+      }
+      if (!key.escape) return false;
+      onDecision("deny", approval.id);
+    },
+    { id: `approval:${approval.id}`, priority: FOCUS_PRIORITY.DIALOG + 10 },
+  );
 
   return (
     <Box flexDirection="column" marginTop={1}>
@@ -222,20 +257,43 @@ function CriticalApproval({ approval, onDecision }: Props) {
         paddingY={1}
       >
         <Box>
-          <Text color={riskTone} bold inverse>{" CRITICAL "}</Text>
-          <Text color={riskTone} bold> APPROVAL [{approval.shortId}]</Text>
+          <Text color={riskTone} bold inverse>
+            {" CRITICAL "}
+          </Text>
+          <Text color={riskTone} bold>
+            {" "}
+            APPROVAL [{approval.shortId}]
+          </Text>
         </Box>
         <Text> </Text>
-        <Text>  Tool: <Text bold color={theme.uiBrand}>{approval.toolName}</Text></Text>
-        <Text>  Scope: <Text dimColor>{approval.permissionScope}</Text></Text>
-        <Text>  Effect: <Text color={riskTone} bold>{approval.sideEffectLevel}</Text></Text>
-        {approval.reason && <Text dimColor>  {approval.reason}</Text>}
+        <Text>
+          {" "}
+          Tool:{" "}
+          <Text bold color={theme.uiBrand}>
+            {approval.toolName}
+          </Text>
+        </Text>
+        <Text>
+          {" "}
+          Scope: <Text dimColor>{approval.permissionScope}</Text>
+        </Text>
+        <Text>
+          {" "}
+          Effect:{" "}
+          <Text color={riskTone} bold>
+            {approval.sideEffectLevel}
+          </Text>
+        </Text>
+        {approval.reason && <Text dimColor> {approval.reason}</Text>}
         <RiskReasons reasons={approval.riskReasons} />
         <Text> </Text>
-        <Text color={riskTone} bold>  {"\u26A0"} CRITICAL — This action may be irreversible.</Text>
+        <Text color={riskTone} bold>
+          {" "}
+          {"\u26A0"} CRITICAL — This action may be irreversible.
+        </Text>
         <Text> </Text>
         {!unlocked ? (
-          <Text dimColor>  Confirm available in {countdown}s... (Esc to deny)</Text>
+          <Text dimColor> Confirm available in {countdown}s... (Esc to deny)</Text>
         ) : (
           <Box paddingLeft={2}>
             <Select
@@ -250,11 +308,17 @@ function CriticalApproval({ approval, onDecision }: Props) {
   );
 }
 
-function useApprovalKeyHelp(showKeys: boolean, setShowKeys: (updater: (show: boolean) => boolean) => void): void {
-  useRoutedInput((input) => {
-    if (input !== "?") return false;
-    setShowKeys(() => !showKeys);
-  }, { id: "approval-keys", priority: FOCUS_PRIORITY.DIALOG + 10 });
+function useApprovalKeyHelp(
+  showKeys: boolean,
+  setShowKeys: (updater: (show: boolean) => boolean) => void,
+): void {
+  useRoutedInput(
+    (input) => {
+      if (input !== "?") return false;
+      setShowKeys(() => !showKeys);
+    },
+    { id: "approval-keys", priority: FOCUS_PRIORITY.DIALOG + 10 },
+  );
 }
 
 function ApprovalKeyHints({ expanded }: { expanded: boolean }): React.ReactElement {
@@ -270,9 +334,9 @@ function ApprovalKeyHints({ expanded }: { expanded: boolean }): React.ReactEleme
       {expanded && (
         <Box flexDirection="column" paddingLeft={2}>
           <Text dimColor>? keys —</Text>
-          <Text dimColor>  ↑↓        choose an option</Text>
-          <Text dimColor>  Enter     confirm selection</Text>
-          <Text dimColor>  Esc       cancels stream, not this approval</Text>
+          <Text dimColor> ↑↓ choose an option</Text>
+          <Text dimColor> Enter confirm selection</Text>
+          <Text dimColor> Esc cancels stream, not this approval</Text>
         </Box>
       )}
     </Box>

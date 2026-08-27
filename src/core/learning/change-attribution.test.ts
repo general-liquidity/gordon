@@ -42,7 +42,12 @@ describe("analyzeChangeAttribution", () => {
     const out: StrategyChange[] = [];
     for (let i = 0; i < 30; i++) {
       const delta = i % 2 === 0 ? 0.2 : -0.2;
-      out.push({ changeId: `mix-${i}`, changeType: "entry_logic", beforeMetric: 1, afterMetric: 1 + delta });
+      out.push({
+        changeId: `mix-${i}`,
+        changeType: "entry_logic",
+        beforeMetric: 1,
+        afterMetric: 1 + delta,
+      });
     }
     const r = analyzeChangeAttribution(out);
     const agg = r.aggregates[0]!;

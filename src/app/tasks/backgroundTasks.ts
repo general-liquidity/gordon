@@ -56,12 +56,12 @@ export function buildBackgroundTaskTreeSignature(input: BackgroundStatusResponse
 }
 
 const BUILT_IN_TASK_LABELS: Record<string, string> = {
-  "__health_check": "Health check",
-  "__circuit_breaker_eval": "Circuit breaker evaluation",
-  "__regime_check": "Regime check",
-  "__evolution_tick": "Evolution tick",
-  "__capital_refresh": "Capital refresh",
-  "__autonomous_cycle": "Autonomous cycle trigger",
+  __health_check: "Health check",
+  __circuit_breaker_eval: "Circuit breaker evaluation",
+  __regime_check: "Regime check",
+  __evolution_tick: "Evolution tick",
+  __capital_refresh: "Capital refresh",
+  __autonomous_cycle: "Autonomous cycle trigger",
 };
 
 function createNode(
@@ -142,7 +142,9 @@ function formatAutonomousDetail(status: BackgroundAutonomousStatus): string {
     parts.push(status.mandate.timeframe);
   }
   if (status.mandate?.symbols && status.mandate.symbols.length > 0) {
-    parts.push(`${status.mandate.symbols.length} symbol${status.mandate.symbols.length === 1 ? "" : "s"}`);
+    parts.push(
+      `${status.mandate.symbols.length} symbol${status.mandate.symbols.length === 1 ? "" : "s"}`,
+    );
   }
   parts.push(`${status.cycleCount} cycle${status.cycleCount === 1 ? "" : "s"}`);
   if (status.totalOpportunities > 0) {
@@ -161,7 +163,9 @@ function getAutonomousStatus(status: BackgroundAutonomousStatus): TaskTreeNode["
   return "running";
 }
 
-export function buildBackgroundTaskTree(input: BackgroundStatusResponse | null): TaskTreeState | null {
+export function buildBackgroundTaskTree(
+  input: BackgroundStatusResponse | null,
+): TaskTreeState | null {
   if (!input?.daemon.running) {
     return null;
   }
@@ -182,14 +186,7 @@ export function buildBackgroundTaskTree(input: BackgroundStatusResponse | null):
       "running",
       `${sortedTasks.length} scheduled task${sortedTasks.length === 1 ? "" : "s"}`,
     ),
-    createNode(
-      daemonId,
-      rootId,
-      "family",
-      "Daemon",
-      "running",
-      "Local background services online",
-    ),
+    createNode(daemonId, rootId, "family", "Daemon", "running", "Local background services online"),
     createNode(
       schedulerId,
       daemonId,

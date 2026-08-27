@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { z } from "zod";
 import type {
   GordonContext,
   GordonRuntimeAccess,
@@ -20,21 +20,21 @@ import type {
   RuntimeToolSpec,
   RuntimeToolSummary,
 } from "../contracts/types.ts";
-import { RuntimeBridge } from "../bridge/RuntimeBridge.ts";
-import { RuntimeHistoryManager } from "../history/RuntimeHistoryManager.ts";
-import { RuntimePersistence } from "../persistence/RuntimePersistence.ts";
-import { PermissionEngine } from "../permissions/PermissionEngine.ts";
-import { RuntimePluginManager } from "../plugins/RuntimePluginManager.ts";
+import type { RuntimeBridge } from "../bridge/RuntimeBridge.ts";
+import type { RuntimeHistoryManager } from "../history/RuntimeHistoryManager.ts";
+import type { RuntimePersistence } from "../persistence/RuntimePersistence.ts";
+import type { PermissionEngine } from "../permissions/PermissionEngine.ts";
+import type { RuntimePluginManager } from "../plugins/RuntimePluginManager.ts";
 import { QueryRuntime } from "../query/QueryRuntime.ts";
-import { RuntimeStore } from "../state/RuntimeStore.ts";
-import { CompactionManager } from "../transcript/CompactionManager.ts";
-import { ReplayManager, type ReplayFrame } from "../transcript/ReplayManager.ts";
-import { TranscriptStore } from "../transcript/TranscriptStore.ts";
-import { TranscriptProjector } from "../transcript/TranscriptProjector.ts";
+import type { RuntimeStore } from "../state/RuntimeStore.ts";
+import type { CompactionManager } from "../transcript/CompactionManager.ts";
+import type { ReplayManager, ReplayFrame } from "../transcript/ReplayManager.ts";
+import type { TranscriptStore } from "../transcript/TranscriptStore.ts";
+import type { TranscriptProjector } from "../transcript/TranscriptProjector.ts";
 import { evaluateRuntimeToolPolicy } from "../tools/ToolPolicy.ts";
-import { ToolRegistry } from "../tools/ToolRegistry.ts";
-import { ScratchpadStore } from "../workers/ScratchpadStore.ts";
-import { WorkerRegistry } from "../workers/WorkerRegistry.ts";
+import type { ToolRegistry } from "../tools/ToolRegistry.ts";
+import type { ScratchpadStore } from "../workers/ScratchpadStore.ts";
+import type { WorkerRegistry } from "../workers/WorkerRegistry.ts";
 import { createRuntimeSessionContext } from "./SessionContext.ts";
 import { SessionController } from "./SessionController.ts";
 import { emitHook, runHooks } from "../../infra/hooks/engine.ts";
@@ -196,7 +196,9 @@ export class SessionRuntime {
     return this.permissionEngine.listRules();
   }
 
-  denyAllPending(options: { scope?: RuntimeApprovalRequest["permissionScope"]; reason?: string } = {}): number {
+  denyAllPending(
+    options: { scope?: RuntimeApprovalRequest["permissionScope"]; reason?: string } = {},
+  ): number {
     return this.permissionEngine.denyAll({
       scope: options.scope,
       actor: "user",
@@ -217,7 +219,12 @@ export class SessionRuntime {
 
   denyPendingRequest(
     requestId: string,
-    options?: { actor?: string; persist?: boolean; scope?: "session" | "persistent"; reason?: string },
+    options?: {
+      actor?: string;
+      persist?: boolean;
+      scope?: "session" | "persistent";
+      reason?: string;
+    },
   ): RuntimeApprovalRequest | null {
     return this.permissionEngine.deny(this.resolvePendingApprovalId(requestId), options);
   }
@@ -309,14 +316,16 @@ export class SessionRuntime {
       origin: definition.origin,
       pluginId: incomingToolMap.get(definition.spec.id)?.pluginId ?? definition.spec.pluginId,
       serverId: incomingToolMap.get(definition.spec.id)?.serverId ?? definition.spec.serverId,
-      displayName: incomingToolMap.get(definition.spec.id)?.displayName ?? definition.spec.displayName,
+      displayName:
+        incomingToolMap.get(definition.spec.id)?.displayName ?? definition.spec.displayName,
     }));
     this.runtimeStore.setToolingState({
       ...input,
       tools: toolSummaries,
       lastSyncedAt: input.lastSyncedAt ?? new Date().toISOString(),
       lastReloadAt: input.lastReloadAt ?? this.runtimeStore.getState().tooling.lastReloadAt,
-      hotReloadEnabled: input.hotReloadEnabled ?? this.runtimeStore.getState().tooling.hotReloadEnabled,
+      hotReloadEnabled:
+        input.hotReloadEnabled ?? this.runtimeStore.getState().tooling.hotReloadEnabled,
       routingCount: input.routingCount ?? this.runtimeStore.getState().tooling.routingCount,
       commands: input.commands ?? this.runtimeStore.getState().tooling.commands,
       plugins: input.plugins ?? this.runtimeStore.getState().tooling.plugins,
@@ -328,7 +337,14 @@ export class SessionRuntime {
     this.runtimeStore.setRemoteState(remote);
   }
 
-  setBackgroundTasks(tasks: Array<{ id: string; label: string; status: "idle" | "running" | "completed" | "failed"; updatedAt: string }>): void {
+  setBackgroundTasks(
+    tasks: Array<{
+      id: string;
+      label: string;
+      status: "idle" | "running" | "completed" | "failed";
+      updatedAt: string;
+    }>,
+  ): void {
     this.runtimeStore.setBackgroundTasks(tasks);
   }
 
@@ -376,7 +392,9 @@ export class SessionRuntime {
     });
   }
 
-  async initializeSession(options: { autoResume?: boolean; forceNewThread?: boolean } = {}): Promise<SessionInfo> {
+  async initializeSession(
+    options: { autoResume?: boolean; forceNewThread?: boolean } = {},
+  ): Promise<SessionInfo> {
     const checkpoint = await this.sessionController.captureState();
     let session: SessionInfo;
     let snapshot: RuntimeSessionSnapshot;
@@ -448,7 +466,9 @@ export class SessionRuntime {
     return session;
   }
 
-  emitLifecycleEnd(reason: "user_quit" | "timeout" | "error" | "graceful" | "external_signal" = "graceful"): void {
+  emitLifecycleEnd(
+    reason: "user_quit" | "timeout" | "error" | "graceful" | "external_signal" = "graceful",
+  ): void {
     const state = this.runtimeStore.getState();
     const sessionId = state.session.sessionId ?? this.sessionId ?? this.runtimeId;
     const transcript = this.transcriptStore.list();
@@ -495,7 +515,10 @@ export class SessionRuntime {
       failures.push(new Error(sessionEnd.reason ?? `SessionEnd hook failed for ${sessionId}`));
     }
     if (failures.length > 0) {
-      throw new AggregateError(failures, `Runtime lifecycle teardown hooks failed for ${sessionId}`);
+      throw new AggregateError(
+        failures,
+        `Runtime lifecycle teardown hooks failed for ${sessionId}`,
+      );
     }
   }
 
@@ -558,7 +581,9 @@ export class SessionRuntime {
     return this.queryRuntime.processStructuredMessage(userMessage, schema, session, options);
   }
 
-  async quickScan(options: RuntimeQueryExecutionOptions = {}): Promise<Awaited<ReturnType<QueryRuntime["quickScan"]>>> {
+  async quickScan(
+    options: RuntimeQueryExecutionOptions = {},
+  ): Promise<Awaited<ReturnType<QueryRuntime["quickScan"]>>> {
     const session = await this.resolveActiveSession(options);
     return this.queryRuntime.quickScan(session, options);
   }
@@ -570,7 +595,9 @@ export class SessionRuntime {
     return this.queryRuntime.quickCheckPositions(session, options);
   }
 
-  private async resolveActiveSession(options: RuntimeQueryExecutionOptions): Promise<RuntimeSessionContext> {
+  private async resolveActiveSession(
+    options: RuntimeQueryExecutionOptions,
+  ): Promise<RuntimeSessionContext> {
     const snapshot = await this.sessionController.getCurrentSession();
     if (!snapshot.threadId && !options.threadId) {
       const initialized = await this.initializeSession({ autoResume: true });
@@ -615,7 +642,8 @@ export class SessionRuntime {
       sessionId: session.sessionId,
       resourceId: session.resourceId,
       threadId: session.threadId,
-      evaluateToolAccess: (toolName, context, args) => this.evaluateToolAccess(toolName, context, args),
+      evaluateToolAccess: (toolName, context, args) =>
+        this.evaluateToolAccess(toolName, context, args),
       refreshPlugins: async () => {
         await this.refreshPlugins();
       },

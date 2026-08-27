@@ -3,14 +3,11 @@
  * CLI utilities for exporting recent results and session data to files.
  */
 
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 
 import type { ChatMessage } from "../chat/chatTypes.ts";
-import {
-  formatScanResults,
-  formatAnalysisResults,
-} from "../presenters/resultFormatting.ts";
+import { formatScanResults, formatAnalysisResults } from "../presenters/resultFormatting.ts";
 
 export interface ScanExportData {
   timestamp?: string;
@@ -83,7 +80,11 @@ function nowStamp(): string {
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
-export function resolveOutputPath(type: string, ext: string, filename?: string): { filePath: string; dir: string } {
+export function resolveOutputPath(
+  type: string,
+  ext: string,
+  filename?: string,
+): { filePath: string; dir: string } {
   const baseDir = path.join(process.cwd(), EXPORT_DIR);
   if (!filename) {
     return {
@@ -131,7 +132,10 @@ function formatSessionMarkdown(messages: ChatMessage[]): string {
   return lines.join("\n");
 }
 
-export async function handleExportCommand(args: string, ctx: ExportContext): Promise<ExportCommandResult> {
+export async function handleExportCommand(
+  args: string,
+  ctx: ExportContext,
+): Promise<ExportCommandResult> {
   const parts = args.trim().split(/\s+/).filter(Boolean);
   const type = parts[0]?.toLowerCase();
 
@@ -154,17 +158,21 @@ export async function handleExportCommand(args: string, ctx: ExportContext): Pro
       if (format === "json") {
         content = JSON.stringify(ctx.lastScan, null, 2);
       } else if (format === "csv") {
-        const rows: Array<Array<unknown>> = [["symbol", "price", "change24h", "setupConfidence", "bias", "risk"]];
+        const rows: Array<Array<unknown>> = [
+          ["symbol", "price", "change24h", "setupConfidence", "bias", "risk"],
+        ];
         for (const op of ctx.lastScan.opportunities || []) {
           rows.push([op.symbol, op.price, op.change24h, op.setupConfidence, op.bias, op.risk]);
         }
         content = rowsToCsv(rows);
       } else if (format === "md") {
-        const summary = ctx.lastScan.formattedSummary ?? formatScanResults({
-          coinsScanned: ctx.lastScan.coinsScanned ?? 0,
-          opportunities: ctx.lastScan.opportunities ?? [],
-          executionTime: ctx.lastScan.executionTime ?? 0,
-        });
+        const summary =
+          ctx.lastScan.formattedSummary ??
+          formatScanResults({
+            coinsScanned: ctx.lastScan.coinsScanned ?? 0,
+            opportunities: ctx.lastScan.opportunities ?? [],
+            executionTime: ctx.lastScan.executionTime ?? 0,
+          });
         content = summary;
       } else {
         return { success: false, message: `Unsupported format: ${format}. Use csv, json, or md.` };
@@ -179,7 +187,10 @@ export async function handleExportCommand(args: string, ctx: ExportContext): Pro
 
     case "analysis": {
       if (!ctx.lastAnalysis) {
-        return { success: false, message: "No recent analysis results to export. Run /analyze first." };
+        return {
+          success: false,
+          message: "No recent analysis results to export. Run /analyze first.",
+        };
       }
       const symbol = parts[1]?.toUpperCase();
       const format = normalizeFormat(parts[2], "json");
@@ -196,21 +207,23 @@ export async function handleExportCommand(args: string, ctx: ExportContext): Pro
       if (format === "json") {
         content = JSON.stringify(ctx.lastAnalysis, null, 2);
       } else if (format === "md") {
-        const summary = ctx.lastAnalysis.formattedSummary ?? formatAnalysisResults({
-          symbol: ctx.lastAnalysis.symbol ?? symbol ?? "",
-          price: ctx.lastAnalysis.price ?? 0,
-          trend: ctx.lastAnalysis.trend ?? "N/A",
-          setupDetected: ctx.lastAnalysis.setupDetected ?? false,
-          setupConfidence: ctx.lastAnalysis.setupConfidence ?? 0,
-          indicators: {
-            rsi: ctx.lastAnalysis.indicators?.rsi ?? null,
-            macdState: ctx.lastAnalysis.indicators?.macdState,
-            volumeTrend: ctx.lastAnalysis.indicators?.volumeTrend,
-          },
-          supports: ctx.lastAnalysis.supports ?? [],
-          resistances: ctx.lastAnalysis.resistances ?? [],
-          executionTime: ctx.lastAnalysis.executionTime ?? 0,
-        });
+        const summary =
+          ctx.lastAnalysis.formattedSummary ??
+          formatAnalysisResults({
+            symbol: ctx.lastAnalysis.symbol ?? symbol ?? "",
+            price: ctx.lastAnalysis.price ?? 0,
+            trend: ctx.lastAnalysis.trend ?? "N/A",
+            setupDetected: ctx.lastAnalysis.setupDetected ?? false,
+            setupConfidence: ctx.lastAnalysis.setupConfidence ?? 0,
+            indicators: {
+              rsi: ctx.lastAnalysis.indicators?.rsi ?? null,
+              macdState: ctx.lastAnalysis.indicators?.macdState,
+              volumeTrend: ctx.lastAnalysis.indicators?.volumeTrend,
+            },
+            supports: ctx.lastAnalysis.supports ?? [],
+            resistances: ctx.lastAnalysis.resistances ?? [],
+            executionTime: ctx.lastAnalysis.executionTime ?? 0,
+          });
         content = summary;
       } else {
         return { success: false, message: `Unsupported format: ${format}. Use json or md.` };
@@ -225,7 +238,10 @@ export async function handleExportCommand(args: string, ctx: ExportContext): Pro
 
     case "backtest": {
       if (!ctx.lastBacktest) {
-        return { success: false, message: "No recent backtest results to export. Run /backtest first." };
+        return {
+          success: false,
+          message: "No recent backtest results to export. Run /backtest first.",
+        };
       }
       const format = normalizeFormat(parts[1], "json");
       const filename = parts[2];
@@ -234,7 +250,10 @@ export async function handleExportCommand(args: string, ctx: ExportContext): Pro
       if (format === "json") {
         content = JSON.stringify(ctx.lastBacktest, null, 2);
       } else if (format === "md") {
-        content = ctx.lastBacktest.formattedSummary ?? ctx.lastBacktest.summary ?? "Backtest result available.";
+        content =
+          ctx.lastBacktest.formattedSummary ??
+          ctx.lastBacktest.summary ??
+          "Backtest result available.";
       } else {
         return { success: false, message: `Unsupported format: ${format}. Use json or md.` };
       }
@@ -255,7 +274,11 @@ export async function handleExportCommand(args: string, ctx: ExportContext): Pro
 
       let content = "";
       if (format === "json") {
-        content = JSON.stringify({ exportedAt: new Date().toISOString(), messages: ctx.sessionMessages }, null, 2);
+        content = JSON.stringify(
+          { exportedAt: new Date().toISOString(), messages: ctx.sessionMessages },
+          null,
+          2,
+        );
       } else if (format === "md") {
         content = formatSessionMarkdown(ctx.sessionMessages);
       } else {
@@ -276,4 +299,3 @@ export async function handleExportCommand(args: string, ctx: ExportContext): Pro
       };
   }
 }
-

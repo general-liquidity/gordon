@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useCallback, useRef, useState, useMemo, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useCallback,
+  useRef,
+  useState,
+  useMemo,
+  type ReactNode,
+} from "react";
 
 // ============================================================================
 // StatsProvider — Session cost, trading P&L, and usage statistics
@@ -27,8 +35,8 @@ interface StatsContextValue {
 }
 
 /** Default per-token pricing (configurable) */
-const DEFAULT_INPUT_COST_PER_TOKEN = 0.000003;   // $3 per 1M input tokens
-const DEFAULT_OUTPUT_COST_PER_TOKEN = 0.000015;   // $15 per 1M output tokens
+const DEFAULT_INPUT_COST_PER_TOKEN = 0.000003; // $3 per 1M input tokens
+const DEFAULT_OUTPUT_COST_PER_TOKEN = 0.000015; // $15 per 1M output tokens
 
 const StatsContext = createContext<StatsContextValue | null>(null);
 
@@ -65,8 +73,7 @@ export function StatsProvider({
         const newInput = prev.tokenInput + input;
         const newOutput = prev.tokenOutput + output;
         const newTotal = newInput + newOutput;
-        const newCost =
-          newInput * inputCostPerToken + newOutput * outputCostPerToken;
+        const newCost = newInput * inputCostPerToken + newOutput * outputCostPerToken;
         return {
           ...prev,
           tokenInput: newInput,
@@ -100,11 +107,7 @@ export function StatsProvider({
     [stats, observeTokens, observeTrade, incrementTurn],
   );
 
-  return (
-    <StatsContext.Provider value={value}>
-      {children}
-    </StatsContext.Provider>
-  );
+  return <StatsContext.Provider value={value}>{children}</StatsContext.Provider>;
 }
 
 // ============================================================================

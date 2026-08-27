@@ -8,11 +8,7 @@ import { TokenLimiterProcessor } from "@mastra/core/processors";
 import { composeAgentInstructionsWithSlots } from "../context/promptSections.ts";
 import { createModuleLogger } from "../../logger/logger.ts";
 import { getScopedMCPTools } from "../../ai/mcp/client.ts";
-import { getRoutingToolsForAgent } from "../../runtime/routing/manager.ts";
-import {
-  formatCapabilityTruthSummary,
-  GORDON_PRODUCT_TRUTH,
-} from "../capabilityTruth.ts";
+import { formatCapabilityTruthSummary, GORDON_PRODUCT_TRUTH } from "../capabilityTruth.ts";
 import {
   // System + observability + meta utilities (no surface-tool equivalent).
   instrumentedOffloadedResultTools,
@@ -33,11 +29,13 @@ import {
   gordonOutputSanitizer,
 } from "../tooling/instrumentedTools.ts";
 import { createMemory } from "../memory/memoryFactory.ts";
-import { createModelResolver, resolveRuntimeModel, formatModelLabel, registerObservability } from "../agentHelpers.ts";
 import {
-  getHarnessSuffixForModel,
-  isHarnessProfilesEnabled,
-} from "../profiles/harnessProfile.ts";
+  createModelResolver,
+  resolveRuntimeModel,
+  formatModelLabel,
+  registerObservability,
+} from "../agentHelpers.ts";
+import { getHarnessSuffixForModel, isHarnessProfilesEnabled } from "../profiles/harnessProfile.ts";
 import { getSubagentProfileRegistry } from "../profiles/subagentProfileRegistry.ts";
 import {
   buildTaskDispatchTool,
@@ -369,7 +367,14 @@ export function getGordon(): Agent {
 
     // MCP plugin tools — external, never gated.
     ...getScopedMCPTools({
-      categories: ["data-provider", "analytics", "research", "portfolio", "utility", "infrastructure"],
+      categories: [
+        "data-provider",
+        "analytics",
+        "research",
+        "portfolio",
+        "utility",
+        "infrastructure",
+      ],
     }),
 
     // FW7 — operator-authored subagent delegation. Surface-level
@@ -387,9 +392,7 @@ export function getGordon(): Agent {
   // cancel_* with a `requireApproval` predicate that DEFERS to the existing
   // deny-first gate (riskClassifier + PermissionEngine + kill switch). No-op
   // when the flag is unset; never replaces or bypasses the deny-first gate.
-  applyNativeApprovalMarkers(
-    tools as Record<string, { id?: string; requireApproval?: unknown }>,
-  );
+  applyNativeApprovalMarkers(tools as Record<string, { id?: string; requireApproval?: unknown }>);
 
   const agent = new Agent({
     id: "gordon",
@@ -397,9 +400,7 @@ export function getGordon(): Agent {
     description: GORDON_PRODUCT_TRUTH.headline,
     instructions: composeAgentInstructionsWithSlots("gordon", {
       user: GORDON_INSTRUCTIONS,
-      suffix: isHarnessProfilesEnabled()
-        ? getHarnessSuffixForModel(initialModel)
-        : undefined,
+      suffix: isHarnessProfilesEnabled() ? getHarnessSuffixForModel(initialModel) : undefined,
     }),
     model: createModelResolver("orchestrator"),
 

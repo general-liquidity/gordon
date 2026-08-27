@@ -53,10 +53,8 @@ function writeOSC(sequence: string): void {
 // string carrying an embedded ESC) can't inject its own terminal sequence.
 // Standard ansi-regex pattern (covers CSI/SGR and BEL-terminated OSC), built
 // via RegExp() with \u escapes so the source carries no raw control bytes.
-const TITLE_ANSI = new RegExp(
-  "[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|[a-zA-Z\\d]+(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-ntqry=><~]))",
-  "g",
-);
+const TITLE_ANSI =
+  /[\u001B\u009B][[\]()#;?]*(?:(?:(?:(?:;[-a-zA-Z\d\\/#&.:=?%@~_]+)*|[a-zA-Z\d]+(?:;[-a-zA-Z\d\\/#&.:=?%@~_]*)*)?\u0007)|(?:(?:\d{1,4}(?:;\d{0,4})*)?[\dA-PR-TZcf-ntqry=><~]))/g;
 
 /** Remove ANSI/escape sequences from a title string before it is written. */
 export function stripTitleAnsi(title: string): string {
@@ -97,12 +95,12 @@ interface StateColor {
 }
 
 const STATE_COLORS: Record<string, StateColor> = {
-  idle:       { r: 40, g: 40, b: 40 },      // Dark gray
-  streaming:  { r: 30, g: 80, b: 180 },     // Blue
-  approving:  { r: 200, g: 150, b: 30 },    // Amber
-  executing:  { r: 200, g: 50, b: 50 },     // Red (trade in progress)
-  auto:       { r: 50, g: 180, b: 80 },     // Green (auto mode)
-  strict:     { r: 100, g: 100, b: 100 },   // Gray (read-only)
+  idle: { r: 40, g: 40, b: 40 }, // Dark gray
+  streaming: { r: 30, g: 80, b: 180 }, // Blue
+  approving: { r: 200, g: 150, b: 30 }, // Amber
+  executing: { r: 200, g: 50, b: 50 }, // Red (trade in progress)
+  auto: { r: 50, g: 180, b: 80 }, // Green (auto mode)
+  strict: { r: 100, g: 100, b: 100 }, // Gray (read-only)
 };
 
 // ============================================================================
@@ -152,10 +150,13 @@ export function updateTerminalTab(state: TabState): void {
   if (state.symbol) parts.push(`[${state.symbol}]`);
 
   const activitySuffix =
-    state.activity === "streaming" ? " ..." :
-    state.activity === "approving" ? " ⚠" :
-    state.activity === "executing" ? " ⚡" :
-    "";
+    state.activity === "streaming"
+      ? " ..."
+      : state.activity === "approving"
+        ? " ⚠"
+        : state.activity === "executing"
+          ? " ⚡"
+          : "";
 
   const title = parts.join(" ") + activitySuffix;
 
@@ -168,18 +169,27 @@ export function updateTerminalTab(state: TabState): void {
   // iTerm2-specific enhancements
   if (terminal === "iterm2") {
     // Badge shows permission mode
-    const badge = state.permissionMode === "auto" ? "AUTO"
-      : state.permissionMode === "strict" ? "STRICT"
-      : state.permissionMode === "paper" ? "PAPER"
-      : state.permissionMode === "observe" ? "OBS"
-      : state.permissionMode === "plan" ? "PLAN"
-      : "ASK";
+    const badge =
+      state.permissionMode === "auto"
+        ? "AUTO"
+        : state.permissionMode === "strict"
+          ? "STRICT"
+          : state.permissionMode === "paper"
+            ? "PAPER"
+            : state.permissionMode === "observe"
+              ? "OBS"
+              : state.permissionMode === "plan"
+                ? "PLAN"
+                : "ASK";
     setIterm2Badge(badge);
 
     // Tab color reflects state
-    const colorKey = state.permissionMode === "auto" ? "auto"
-      : state.permissionMode === "strict" ? "strict"
-      : state.activity;
+    const colorKey =
+      state.permissionMode === "auto"
+        ? "auto"
+        : state.permissionMode === "strict"
+          ? "strict"
+          : state.activity;
     const color = STATE_COLORS[colorKey] ?? STATE_COLORS.idle!;
     setIterm2TabColor(color.r, color.g, color.b);
   }

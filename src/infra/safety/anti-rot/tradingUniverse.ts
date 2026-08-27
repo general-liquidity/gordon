@@ -39,13 +39,8 @@ export const EMPTY_UNIVERSE: TradingUniverse = {
 
 let cachedUniverse: TradingUniverse | null = null;
 
-export function isUniverseEnabled(
-  env: NodeJS.ProcessEnv = flagEnv(),
-): boolean {
-  return (
-    env.GORDON_TRADING_UNIVERSE === "1" ||
-    env.GORDON_TRADING_UNIVERSE === "true"
-  );
+export function isUniverseEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
+  return env.GORDON_TRADING_UNIVERSE === "1" || env.GORDON_TRADING_UNIVERSE === "true";
 }
 
 export function defaultUniversePath(): string {
@@ -54,9 +49,7 @@ export function defaultUniversePath(): string {
   return join(homedir(), ".gordon", "trading-universe.json");
 }
 
-export function loadUniverse(
-  path: string = defaultUniversePath(),
-): TradingUniverse {
+export function loadUniverse(path: string = defaultUniversePath()): TradingUniverse {
   if (cachedUniverse) return cachedUniverse;
   if (!existsSync(path)) return EMPTY_UNIVERSE;
   try {
@@ -163,9 +156,7 @@ export function checkUniverse(
     if (universe.venues.includes(venue)) {
       matchedOn.push("venue");
     } else {
-      violations.push(
-        `venue '${venue}' not in declared universe [${universe.venues.join(", ")}]`,
-      );
+      violations.push(`venue '${venue}' not in declared universe [${universe.venues.join(", ")}]`);
     }
   }
 

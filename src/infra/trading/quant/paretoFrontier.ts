@@ -123,7 +123,9 @@ function validateInputs(input: ParetoFrontierInput): { objKeys: string[] } {
         throw new Error(`candidates[${i}] ("${c.id}") missing objective "${key}"`);
       }
       if (!Number.isFinite(v)) {
-        throw new Error(`candidates[${i}] ("${c.id}") objective "${key}" must be finite (got ${v})`);
+        throw new Error(
+          `candidates[${i}] ("${c.id}") objective "${key}" must be finite (got ${v})`,
+        );
       }
     }
   }
@@ -274,7 +276,15 @@ export function computeParetoPerTask(
       if (best === null || better(v, best)) best = v;
     }
     perTaskWinners[task] =
-      best === null ? [] : candidates.filter((c) => c.taskScores[task] !== undefined && Math.abs(c.taskScores[task]! - best!) <= PARETO_TASK_EPS).map((c) => c.id);
+      best === null
+        ? []
+        : candidates
+            .filter(
+              (c) =>
+                c.taskScores[task] !== undefined &&
+                Math.abs(c.taskScores[task]! - best!) <= PARETO_TASK_EPS,
+            )
+            .map((c) => c.id);
   }
 
   // wins[id] = set of tasks this candidate wins.
@@ -291,7 +301,8 @@ export function computeParetoPerTask(
     return true;
   };
   const frontier = winners.filter(
-    (c) => !winners.some((d) => d.id !== c.id && isStrictSuperset(wins.get(d.id)!, wins.get(c.id)!)),
+    (c) =>
+      !winners.some((d) => d.id !== c.id && isStrictSuperset(wins.get(d.id)!, wins.get(c.id)!)),
   );
 
   const frontierIds = new Set(frontier.map((c) => c.id));

@@ -6,7 +6,7 @@
  * routes crypto trades through CCXT; onchain reads go through data adapters.
  */
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 import { Tabs } from "../../design-system/Tabs.js";
@@ -47,8 +47,8 @@ const TABS = [
 ];
 
 function fmtNum(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toFixed(2);
 }
 
@@ -56,21 +56,42 @@ const POOL_COLS: Column<DexPoolRow>[] = [
   { key: "pool", header: "POOL", width: 16, format: (v) => String(v) },
   { key: "chain", header: "CHAIN", width: 12, format: (v) => String(v) },
   { key: "tvl", header: "TVL", width: 12, align: "right", format: (v) => `$${fmtNum(Number(v))}` },
-  { key: "volume24h", header: "VOL 24H", width: 12, align: "right", format: (v) => `$${fmtNum(Number(v))}` },
+  {
+    key: "volume24h",
+    header: "VOL 24H",
+    width: 12,
+    align: "right",
+    format: (v) => `$${fmtNum(Number(v))}`,
+  },
 ];
 
 const YIELD_COLS: Column<YieldEntry>[] = [
   { key: "protocol", header: "PROTOCOL", width: 14, format: (v) => String(v) },
   { key: "pool", header: "POOL", width: 16, format: (v) => String(v) },
   { key: "tvl", header: "TVL", width: 12, align: "right", format: (v) => `$${fmtNum(Number(v))}` },
-  { key: "apy", header: "APY", width: 10, align: "right", format: (v) => `${Number(v).toFixed(1)}%`, color: (v) => (Number(v) >= 20 ? "green" : Number(v) >= 10 ? "yellow" : Number(v) < 5 ? undefined : "yellow") },
+  {
+    key: "apy",
+    header: "APY",
+    width: 10,
+    align: "right",
+    format: (v) => `${Number(v).toFixed(1)}%`,
+    color: (v) =>
+      Number(v) >= 20 ? "green" : Number(v) >= 10 ? "yellow" : Number(v) < 5 ? undefined : "yellow",
+  },
 ];
 
 const ONCHAIN_COLS: Column<OnChainSignal>[] = [
   { key: "signal", header: "SIGNAL", width: 20, format: (v) => String(v) },
   { key: "chain", header: "CHAIN", width: 12, format: (v) => String(v) },
   { key: "type", header: "TYPE", width: 12, format: (v) => String(v) },
-  { key: "confidence", header: "CONF", width: 8, align: "right", format: (v) => `${Number(v)}%`, color: (v) => (Number(v) >= 80 ? "green" : Number(v) >= 50 ? "yellow" : "red") },
+  {
+    key: "confidence",
+    header: "CONF",
+    width: 8,
+    align: "right",
+    format: (v) => `${Number(v)}%`,
+    color: (v) => (Number(v) >= 80 ? "green" : Number(v) >= 50 ? "yellow" : "red"),
+  },
 ];
 
 export function DeFiOverviewPanel({

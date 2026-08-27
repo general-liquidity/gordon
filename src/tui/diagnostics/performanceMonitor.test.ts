@@ -126,8 +126,8 @@ describe("PerformanceMonitor — lifecycle + events", () => {
     const snap = mon.snapshot();
     expect(snap.totalFrames).toBe(3);
     expect(snap.totalRenders).toBe(3);
-    expect(snap.rendersByLabel["ADD_MESSAGE"]).toBe(2);
-    expect(snap.rendersByLabel["OTHER"]).toBe(1);
+    expect(snap.rendersByLabel.ADD_MESSAGE).toBe(2);
+    expect(snap.rendersByLabel.OTHER).toBe(1);
     expect(snap.frameHistogram.samples).toBe(3);
     expect(snap.frameHistogram.meanBytes).toBeCloseTo(150, 5);
   });

@@ -17,7 +17,7 @@
  *     Risk/reward below 2:1 threshold (1.8:1). Skipped.
  */
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text } from "../../ink-custom";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { WorkerBadge } from "../status/WorkerBadge.tsx";
@@ -76,57 +76,62 @@ export function AuditBrowser({ entries, onClose }: Props) {
 
   const visibleEntries = sorted.slice(scrollOffset, scrollOffset + PAGE_SIZE);
 
-  useRoutedInput((input, key) => {
-    if (key.escape) {
-      onClose();
-      return;
-    }
+  useRoutedInput(
+    (input, key) => {
+      if (key.escape) {
+        onClose();
+        return;
+      }
 
-    if (key.upArrow) {
-      setSelectedIndex((i) => {
-        const next = Math.max(0, i - 1);
-        // Scroll up if needed
-        if (next < scrollOffset) {
-          setScrollOffset(next);
-        }
-        return next;
-      });
-      return;
-    }
-
-    if (key.downArrow) {
-      setSelectedIndex((i) => {
-        const next = Math.min(sorted.length - 1, i + 1);
-        // Scroll down if needed
-        if (next >= scrollOffset + PAGE_SIZE) {
-          setScrollOffset(next - PAGE_SIZE + 1);
-        }
-        return next;
-      });
-      return;
-    }
-
-    // Toggle reasoning collapse with Enter or space
-    if (key.return || input === " ") {
-      const entry = sorted[selectedIndex];
-      if (entry?.reasoning) {
-        setExpandedIds((prev) => {
-          const next = new Set(prev);
-          if (next.has(entry.id)) {
-            next.delete(entry.id);
-          } else {
-            next.add(entry.id);
+      if (key.upArrow) {
+        setSelectedIndex((i) => {
+          const next = Math.max(0, i - 1);
+          // Scroll up if needed
+          if (next < scrollOffset) {
+            setScrollOffset(next);
           }
           return next;
         });
+        return;
       }
-    }
-  }, { id: "auditBrowser", priority: FOCUS_PRIORITY.DIALOG });
+
+      if (key.downArrow) {
+        setSelectedIndex((i) => {
+          const next = Math.min(sorted.length - 1, i + 1);
+          // Scroll down if needed
+          if (next >= scrollOffset + PAGE_SIZE) {
+            setScrollOffset(next - PAGE_SIZE + 1);
+          }
+          return next;
+        });
+        return;
+      }
+
+      // Toggle reasoning collapse with Enter or space
+      if (key.return || input === " ") {
+        const entry = sorted[selectedIndex];
+        if (entry?.reasoning) {
+          setExpandedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(entry.id)) {
+              next.delete(entry.id);
+            } else {
+              next.add(entry.id);
+            }
+            return next;
+          });
+        }
+      }
+    },
+    { id: "auditBrowser", priority: FOCUS_PRIORITY.DIALOG },
+  );
 
   if (sorted.length === 0) {
     return (
       <Box flexDirection="column" paddingLeft={2}>
-        <Text bold color="cyanBright">AUDIT TRAIL</Text>
+        <Text bold color="cyanBright">
+          AUDIT TRAIL
+        </Text>
         <Text> </Text>
         <Text dimColor>No audit entries found.</Text>
         <Text> </Text>
@@ -143,13 +148,20 @@ export function AuditBrowser({ entries, onClose }: Props) {
     <Box flexDirection="column" paddingLeft={2}>
       {/* Header */}
       <Box>
-        <Text bold color="cyanBright">AUDIT TRAIL</Text>
-        <Text dimColor>
-          {" "}({sorted.length} entries {"\u00b7"}{" "}
+        <Text bold color="cyanBright">
+          AUDIT TRAIL
         </Text>
-        <Text color="green">{successes} {"\u2713"}</Text>
+        <Text dimColor>
+          {" "}
+          ({sorted.length} entries {"\u00b7"}{" "}
+        </Text>
+        <Text color="green">
+          {successes} {"\u2713"}
+        </Text>
         <Text dimColor> {"\u00b7"} </Text>
-        <Text color="red">{failures} {"\u2717"}</Text>
+        <Text color="red">
+          {failures} {"\u2717"}
+        </Text>
         <Text dimColor>)</Text>
       </Box>
       <Text> </Text>
@@ -167,19 +179,17 @@ export function AuditBrowser({ entries, onClose }: Props) {
           <Box key={entry.id} flexDirection="column">
             {/* Main row */}
             <Box>
-              <Text color={isSelected ? "yellow" : undefined}>
-                {isSelected ? "\u25B8 " : "  "}
-              </Text>
-              <Text dimColor>{formatTime(entry.timestamp)}  </Text>
+              <Text color={isSelected ? "yellow" : undefined}>{isSelected ? "\u25B8 " : "  "}</Text>
+              <Text dimColor>{formatTime(entry.timestamp)} </Text>
               <Box width={12}>
                 <WorkerBadge agent={entry.agent} showBullet={false} />
               </Box>
               <Text>{entry.action}</Text>
-              <Text>  </Text>
-              <Text color={resultColor} bold>{resultIcon}</Text>
-              {hasReasoning && (
-                <Text dimColor>{isExpanded ? " \u25BC" : " \u25B6"}</Text>
-              )}
+              <Text> </Text>
+              <Text color={resultColor} bold>
+                {resultIcon}
+              </Text>
+              {hasReasoning && <Text dimColor>{isExpanded ? " \u25BC" : " \u25B6"}</Text>}
             </Box>
 
             {/* Expanded reasoning */}
@@ -196,7 +206,8 @@ export function AuditBrowser({ entries, onClose }: Props) {
       <Text> </Text>
       {sorted.length > PAGE_SIZE && (
         <Text dimColor>
-          Showing {scrollOffset + 1}-{Math.min(scrollOffset + PAGE_SIZE, sorted.length)} of {sorted.length}
+          Showing {scrollOffset + 1}-{Math.min(scrollOffset + PAGE_SIZE, sorted.length)} of{" "}
+          {sorted.length}
         </Text>
       )}
       <Text dimColor>

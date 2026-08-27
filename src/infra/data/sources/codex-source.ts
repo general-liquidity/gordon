@@ -141,7 +141,9 @@ export class CodexDataSource implements DataSource {
       }
       bars = json.data?.getBars;
     } catch (err) {
-      logger.warn(`fetch failed for ${symbol}: ${err instanceof Error ? err.message : String(err)}`);
+      logger.warn(
+        `fetch failed for ${symbol}: ${err instanceof Error ? err.message : String(err)}`,
+      );
       return [];
     } finally {
       clearTimeout(timer);
@@ -157,13 +159,7 @@ export class CodexDataSource implements DataSource {
       const high = h?.[i];
       const low = l?.[i];
       const close = c?.[i];
-      if (
-        ts == null ||
-        open == null ||
-        high == null ||
-        low == null ||
-        close == null
-      ) {
+      if (ts == null || open == null || high == null || low == null || close == null) {
         continue;
       }
       const openTime = ts * 1000;

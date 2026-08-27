@@ -15,9 +15,14 @@ describe("onchain data sources", () => {
 
   it("registers all six onchain price sources with distinct ids + priorities", () => {
     const ids = sources.map((s) => s.id);
-    expect(ids.sort()).toEqual(
-      ["birdeye", "codex", "coingecko-onchain", "defillama", "dexscreener", "oneinch"],
-    );
+    expect(ids.sort()).toEqual([
+      "birdeye",
+      "codex",
+      "coingecko-onchain",
+      "defillama",
+      "dexscreener",
+      "oneinch",
+    ]);
     // Unique priorities so the manager has a deterministic fallback order.
     expect(new Set(sources.map((s) => s.priority)).size).toBe(sources.length);
   });

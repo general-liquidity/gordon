@@ -73,9 +73,7 @@ export class RegimeWatcher {
     };
 
     const runtime = StrategyRuntime.getInstance();
-    const allSlots = [
-      ...runtime.getActiveSlots(),
-    ];
+    const allSlots = [...runtime.getActiveSlots()];
 
     if (allSlots.length === 0) {
       logger.debug("No active slots to watch");
@@ -134,12 +132,11 @@ export class RegimeWatcher {
 
       // Find the primary symbol for this slot (from its open trades)
       // Match trades to this specific slot via planId containing the slot's playbook name
-      const slotTrades = [...openTrades, ...partialTrades].filter(
-        (t) => t.planId && t.planId.includes(slot.playbook_name.slice(0, 8)),
+      const slotTrades = [...openTrades, ...partialTrades].filter((t) =>
+        t.planId?.includes(slot.playbook_name.slice(0, 8)),
       );
       // Fallback: if no direct match, use the first symbol with a detected regime
-      const slotSymbol = slotTrades[0]?.symbol
-        ?? Object.keys(result.symbolRegimes)[0];
+      const slotSymbol = slotTrades[0]?.symbol ?? Object.keys(result.symbolRegimes)[0];
 
       if (!slotSymbol || !result.symbolRegimes[slotSymbol]) {
         result.slotActions.push({

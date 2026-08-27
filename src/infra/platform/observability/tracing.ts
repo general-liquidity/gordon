@@ -282,7 +282,7 @@ export function getTracingStatus(): {
 export async function withTracing<T>(
   operationName: string,
   fn: (context: SpanContext) => Promise<T>,
-  options?: { parentContext?: SpanContext; metadata?: Record<string, unknown> }
+  options?: { parentContext?: SpanContext; metadata?: Record<string, unknown> },
 ): Promise<T> {
   const spanContext = createSpanContext(options?.parentContext);
   const spanKey = `${operationName}-${spanContext.spanId}`;

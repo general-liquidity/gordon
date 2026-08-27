@@ -15,16 +15,16 @@ import type { KillSwitchStatus } from "./killSwitchStatus.ts";
 // ============================================================================
 
 export type NotificationVariant =
-  | "fill"       // trade fills, approvals
-  | "alert"      // price alerts, position changes, risk rejections
-  | "strategy"   // autonomous loop, opportunities
-  | "info"       // plan created, general info
-  | "error"      // system errors
-  | "system";    // agent fallbacks, internal
+  | "fill" // trade fills, approvals
+  | "alert" // price alerts, position changes, risk rejections
+  | "strategy" // autonomous loop, opportunities
+  | "info" // plan created, general info
+  | "error" // system errors
+  | "system"; // agent fallbacks, internal
 
 export interface TuiNotification {
   id: string;
-  type: string;           // e.g. "trade:opened", "system:error"
+  type: string; // e.g. "trade:opened", "system:error"
   variant: NotificationVariant;
   message: string;
   timestamp: string;
@@ -36,12 +36,12 @@ export interface TuiNotification {
 // ============================================================================
 
 export type PermissionMode =
-  | "auto"        // Trades execute without per-action approval (only constitution + rules block)
-  | "ask"         // Each trade requires explicit user approval via ApprovalDialog
-  | "strict"      // Read-only mode; all trades blocked, analysis-only
-  | "paper"       // Paper trading only — real orders blocked, simulated fills allowed
-  | "observe"     // Pure observation — no execution of any kind, even paper trades
-  | "plan"        // Preview/planning only — can create plans but not execute them;
+  | "auto" // Trades execute without per-action approval (only constitution + rules block)
+  | "ask" // Each trade requires explicit user approval via ApprovalDialog
+  | "strict" // Read-only mode; all trades blocked, analysis-only
+  | "paper" // Paper trading only — real orders blocked, simulated fills allowed
+  | "observe" // Pure observation — no execution of any kind, even paper trades
+  | "plan"; // Preview/planning only — can create plans but not execute them;
 
 export type BootPhase = "boot" | "ready";
 
@@ -76,19 +76,70 @@ export interface PagerContent {
 }
 
 export type DialogId =
-  | "settings" | "export" | "emergency" | "context" | "sessions" | "memory"
-  | "feedback" | "audit" | "scheduler" | "playbooks" | "strategies" | "genome"
-  | "indicators" | "consensus" | "orderbook" | "autonomous" | "skills"
-  | "constitution" | "injectionDefense" | "dataHealth" | "riskConfig" | "defi"
-  | "marketOverview" | "regime" | "stats" | "globalSearch" | "exitFlow"
-  | "backtestWizard" | "brokerManager" | "exchangeManager" | "genomeEvolution"
-  | "historySearch" | "indicatorValue" | "insights" | "marketPulse"
-  | "messageSelector" | "optimization" | "planEditor" | "plugins" | "quickOpen"
-  | "reconciliation" | "taskDeps" | "walkForward" | "hip3"
-  | "modelPicker" | "mcpManager" | "marketplace" | "cliBrowser" | "themePicker"
-  | "exchangePicker" | "brokerPicker" | "doctor" | "helpBrowser" | "configEditor"
-  | "threadBrowser" | "journal" | "shortcuts" | "approvalBrowser" | "labs"
-  | "planDiff" | "postTradeFeedback" | "counterfactual" | "debateView" | "elicitation";
+  | "settings"
+  | "export"
+  | "emergency"
+  | "context"
+  | "sessions"
+  | "memory"
+  | "feedback"
+  | "audit"
+  | "scheduler"
+  | "playbooks"
+  | "strategies"
+  | "genome"
+  | "indicators"
+  | "consensus"
+  | "orderbook"
+  | "autonomous"
+  | "skills"
+  | "constitution"
+  | "injectionDefense"
+  | "dataHealth"
+  | "riskConfig"
+  | "defi"
+  | "marketOverview"
+  | "regime"
+  | "stats"
+  | "globalSearch"
+  | "exitFlow"
+  | "backtestWizard"
+  | "brokerManager"
+  | "exchangeManager"
+  | "genomeEvolution"
+  | "historySearch"
+  | "indicatorValue"
+  | "insights"
+  | "marketPulse"
+  | "messageSelector"
+  | "optimization"
+  | "planEditor"
+  | "plugins"
+  | "quickOpen"
+  | "reconciliation"
+  | "taskDeps"
+  | "walkForward"
+  | "hip3"
+  | "modelPicker"
+  | "mcpManager"
+  | "marketplace"
+  | "cliBrowser"
+  | "themePicker"
+  | "exchangePicker"
+  | "brokerPicker"
+  | "doctor"
+  | "helpBrowser"
+  | "configEditor"
+  | "threadBrowser"
+  | "journal"
+  | "shortcuts"
+  | "approvalBrowser"
+  | "labs"
+  | "planDiff"
+  | "postTradeFeedback"
+  | "counterfactual"
+  | "debateView"
+  | "elicitation";
 
 export interface OpenDialog {
   id: DialogId;

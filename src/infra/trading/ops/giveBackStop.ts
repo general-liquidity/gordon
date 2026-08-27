@@ -20,9 +20,7 @@ import { flagEnv } from "../../config/flagResolver.ts";
 
 export const GIVE_BACK_STOP_FLAG_ENV = "GORDON_GIVE_BACK_STOP";
 
-export function isGiveBackStopEnabled(
-  env: NodeJS.ProcessEnv = flagEnv(),
-): boolean {
+export function isGiveBackStopEnabled(env: NodeJS.ProcessEnv = flagEnv()): boolean {
   // Default-on protective gate: absence = enabled. Explicit "0"/"false" opts out.
   const raw = env[GIVE_BACK_STOP_FLAG_ENV];
   return raw !== "0" && raw !== "false";

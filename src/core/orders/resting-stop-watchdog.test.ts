@@ -27,7 +27,10 @@ describe("scanRestingStops", () => {
   });
 
   it("PARTIALLY_FILLED counts as working by default", () => {
-    const r = scanRestingStops({ positions: [pos()], orders: [ord({ status: "PARTIALLY_FILLED" })] });
+    const r = scanRestingStops({
+      positions: [pos()],
+      orders: [ord({ status: "PARTIALLY_FILLED" })],
+    });
     expect(r.reArmRequired).toBe(false);
     expect(r.protectedCount).toBe(1);
   });
@@ -81,15 +84,24 @@ describe("scanRestingStops", () => {
   });
 
   it("explicit isWorking flag overrides status vocabulary", () => {
-    const working = scanRestingStops({ positions: [pos()], orders: [ord({ status: "CANCELED", isWorking: true })] });
+    const working = scanRestingStops({
+      positions: [pos()],
+      orders: [ord({ status: "CANCELED", isWorking: true })],
+    });
     expect(working.alerts).toHaveLength(0);
-    const dead = scanRestingStops({ positions: [pos()], orders: [ord({ status: "NEW", isWorking: false })] });
+    const dead = scanRestingStops({
+      positions: [pos()],
+      orders: [ord({ status: "NEW", isWorking: false })],
+    });
     expect(dead.alerts).toHaveLength(1);
     expect(dead.reArmRequired).toBe(true);
   });
 
   it("flat positions (quantity 0) are skipped", () => {
-    const r = scanRestingStops({ positions: [pos({ quantity: 0, stopOrderId: undefined })], orders: [] });
+    const r = scanRestingStops({
+      positions: [pos({ quantity: 0, stopOrderId: undefined })],
+      orders: [],
+    });
     expect(r.scanned).toBe(0);
     expect(r.alerts).toHaveLength(0);
     expect(r.summary).toBe("no open positions to scan");

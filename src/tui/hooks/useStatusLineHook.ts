@@ -11,10 +11,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import {
-  runStatusLineHook,
-  type StatusLineRunner,
-} from "../components/status/statusLineHook.ts";
+import { runStatusLineHook, type StatusLineRunner } from "../components/status/statusLineHook.ts";
 
 /** Refresh cadence — a status hook reflects slow-moving external state. */
 export const STATUS_LINE_REFRESH_MS = 5_000;

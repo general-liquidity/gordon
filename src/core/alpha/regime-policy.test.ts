@@ -47,7 +47,12 @@ describe("regimePolicyIteration", () => {
   const actions = defaultDiscreteActions(2); // [[1,0],[0,1],[0.5,0.5]]
 
   test("picks the max-expected-return action per regime (current reward)", () => {
-    const r = regimePolicyIteration({ transitions, actions, expectedReturns, rewardModel: "current" });
+    const r = regimePolicyIteration({
+      transitions,
+      actions,
+      expectedReturns,
+      rewardModel: "current",
+    });
     expect(r.converged).toBe(true);
     expect(r.policy).toEqual([0, 1]); // state0→asset0, state1→asset1
     expect(r.policyWeights[0]).toEqual([1, 0]);
@@ -87,8 +92,18 @@ describe("regimePolicyIteration", () => {
       [1, 0],
       [0, 1],
     ];
-    const cur = regimePolicyIteration({ transitions: t, actions: acts, expectedReturns: er, rewardModel: "current" });
-    const look = regimePolicyIteration({ transitions: t, actions: acts, expectedReturns: er, rewardModel: "lookahead" });
+    const cur = regimePolicyIteration({
+      transitions: t,
+      actions: acts,
+      expectedReturns: er,
+      rewardModel: "current",
+    });
+    const look = regimePolicyIteration({
+      transitions: t,
+      actions: acts,
+      expectedReturns: er,
+      rewardModel: "lookahead",
+    });
     expect(cur.policy[0]).toBe(0); // current: hold asset 0 (state 0 favors it)
     expect(look.policy[0]).toBe(1); // lookahead: anticipate the move into state 1 → asset 1
   });
@@ -107,7 +122,12 @@ describe("regimePolicyIteration", () => {
       [0.0001, 0.126, 0.874],
     ];
     const acts = defaultDiscreteActions(3); // A0=TLT, A1=GLD, A2=SPY, A3=equal
-    const r = regimePolicyIteration({ transitions: t, actions: acts, expectedReturns: er, rewardModel: "current" });
+    const r = regimePolicyIteration({
+      transitions: t,
+      actions: acts,
+      expectedReturns: er,
+      rewardModel: "current",
+    });
     // Paper Table 4 Top-1: State0→SPY, State1→GLD, State2→TLT.
     expect(r.policy).toEqual([2, 1, 0]);
     expect(r.policyWeights[0]).toEqual([0, 0, 1]); // SPY
@@ -145,14 +165,14 @@ describe("runRegimeAllocationPolicy (full pipeline)", () => {
     const safe: number[] = [];
     for (let i = 0; i < 80; i++) {
       // calm regime: small positive, low vol
-      const d = 0.010 + (i % 2 === 0 ? 0.002 : -0.002);
+      const d = 0.01 + (i % 2 === 0 ? 0.002 : -0.002);
       driver.push(d);
       risky.push(d);
       safe.push(0.001 + (i % 2 === 0 ? 0.0005 : -0.0005));
     }
     for (let i = 0; i < 80; i++) {
       // stressed regime: negative mean, high vol
-      const d = -0.020 + (i % 2 === 0 ? 0.030 : -0.030);
+      const d = -0.02 + (i % 2 === 0 ? 0.03 : -0.03);
       driver.push(d);
       risky.push(d);
       safe.push(0.004 + (i % 2 === 0 ? 0.001 : -0.001)); // safe haven: positive in stress

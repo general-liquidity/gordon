@@ -43,11 +43,18 @@ import {
   exportResultsCsv,
   generateHtmlReport,
 } from "../../../../../backtest/reporting/export.ts";
-import { filterExcludeMonths, filterMarketHours, filterFirstLastHour } from "../../../../../backtest/prerun/filters.ts";
+import {
+  filterExcludeMonths,
+  filterMarketHours,
+  filterFirstLastHour,
+} from "../../../../../backtest/prerun/filters.ts";
 import { analyzeAlphaDecay } from "../../../../../backtest/analysis/alpha-decay.ts";
 import { generateBacktestChart } from "../../../../../backtest/plotting.ts";
-import { walkForwardTest, type WalkForwardConfig } from "../../../../../backtest/analysis/walk-forward.ts";
-import { runMonteCarloSimulation, type MonteCarloConfig } from "../../../../../backtest/analysis/monte-carlo.ts";
+import {
+  walkForwardTest,
+  type WalkForwardConfig,
+} from "../../../../../backtest/analysis/walk-forward.ts";
+import { runMonteCarloSimulation } from "../../../../../backtest/analysis/monte-carlo.ts";
 import { detectOverfitting } from "../../../../../backtest/optimization/overfitting.ts";
 import {
   saveBacktestResult,
@@ -66,7 +73,11 @@ import {
   processSystematicBacktest,
 } from "../../../../domain/systematic/index.ts";
 import { getGordonContext, type MastraExecutionContext } from "../../types.ts";
-import { normalizeCryptoSymbol, normalizeStockSymbol, resolveInstrument } from "../../../../domain/markets/instruments.ts";
+import {
+  normalizeCryptoSymbol,
+  normalizeStockSymbol,
+  resolveInstrument,
+} from "../../../../domain/markets/instruments.ts";
 import { ensureDataset } from "../../../../domain/systematic/service.ts";
 import type { Exchange } from "../../../../exchange/types.ts";
 import type { BackgroundEligibleTool } from "../../../background/backgroundDispatch.ts";
@@ -103,8 +114,7 @@ function mapExitReason(reason: string): BacktestTrade["exitReason"] {
 }
 
 function looksExplicitlyCrypto(symbol: string): boolean {
-  return symbol.includes("/")
-    || /USDT|USDC|BUSD|USD|PERP$/i.test(symbol.trim().toUpperCase());
+  return symbol.includes("/") || /USDT|USDC|BUSD|USD|PERP$/i.test(symbol.trim().toUpperCase());
 }
 
 async function resolveHistoricalClient(
@@ -121,7 +131,8 @@ async function resolveHistoricalClient(
   }
 
   if (market === "stocks") {
-    if (!ctx.broker) throw new Error("Broker client not connected. Please configure a broker first.");
+    if (!ctx.broker)
+      throw new Error("Broker client not connected. Please configure a broker first.");
     if (!ctx.broker.capabilities.supportsHistoricalBars) {
       throw new Error(`${ctx.broker.displayName} does not support historical bars in Gordon yet.`);
     }
@@ -150,7 +161,11 @@ async function resolveHistoricalClient(
     };
   }
 
-  if (instrument.route === "broker" && ctx.broker && ctx.broker.capabilities.supportsHistoricalBars) {
+  if (
+    instrument.route === "broker" &&
+    ctx.broker &&
+    ctx.broker.capabilities.supportsHistoricalBars
+  ) {
     return {
       client: ctx.broker,
       normalizedSymbol: instrument.normalizedSymbol,
@@ -218,7 +233,17 @@ async function fetchHistoricalSeries(
     startTime?: number;
     endTime?: number;
   },
-): Promise<{ data: Array<{ timestamp: number; open: number; high: number; low: number; close: number; volume: number }>; metadata: HistoricalFetchMetadata }> {
+): Promise<{
+  data: Array<{
+    timestamp: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+  }>;
+  metadata: HistoricalFetchMetadata;
+}> {
   const selection = await resolveHistoricalClient(ctx, params.symbol, params.market);
 
   if (params.startTime !== undefined && params.endTime !== undefined) {
@@ -274,7 +299,7 @@ function buildBacktestConfig(
     timeframe,
     days,
     initialCapital,
-    positionSizePercent: (DEFAULT_BACKTEST_CONFIG.positionSizePercent ?? 10),
+    positionSizePercent: DEFAULT_BACKTEST_CONFIG.positionSizePercent ?? 10,
     compounding: DEFAULT_BACKTEST_CONFIG.compounding ?? false,
     feePercent: commissionRate * 100,
     slippagePercent: DEFAULT_BACKTEST_CONFIG.slippagePercent ?? 0.05,
@@ -304,7 +329,7 @@ function buildBacktestResult(
   strategy: Strategy,
   config: BacktestConfig,
   engineResult: ReturnType<typeof runBacktest>,
-  executionTime: number
+  executionTime: number,
 ): BacktestResult {
   const trades: BacktestTrade[] = engineResult.trades.map((trade) => ({
     id: trade.id,
@@ -410,38 +435,44 @@ const backtestResultSchema = z.object({
   config: backtestConfigSchema,
   metrics: backtestMetricsSchema,
   trades: z.array(backtestTradeSchema),
-  equityCurve: z.array(z.object({
-    timestamp: z.number(),
-    equity: z.number(),
-  })),
-  drawdownCurve: z.array(z.object({
-    timestamp: z.number(),
-    drawdown: z.number(),
-  })),
+  equityCurve: z.array(
+    z.object({
+      timestamp: z.number(),
+      equity: z.number(),
+    }),
+  ),
+  drawdownCurve: z.array(
+    z.object({
+      timestamp: z.number(),
+      drawdown: z.number(),
+    }),
+  ),
   startDate: z.string(),
   endDate: z.string(),
   executionTime: z.number(),
   createdAt: z.string(),
   warnings: z.array(z.string()),
-  systematic: z.object({
-    datasetId: z.string(),
-    datasetSnapshotId: z.string().optional(),
-    validationId: z.string().optional(),
-    researchExperimentId: z.string().optional(),
-    sourceId: z.string(),
-    sourceKind: z.enum(["exchange", "broker", "cache"]),
-    marketFamily: z.enum(["crypto", "stocks"]),
-    quality: z.object({
-      qualityScore: z.number(),
-      coveragePercent: z.number(),
-      expectedCandles: z.number(),
-      actualCandles: z.number(),
-      gapCount: z.number(),
-      duplicateCount: z.number(),
-      stale: z.boolean(),
-      warnings: z.array(z.string()),
-    }),
-  }).optional(),
+  systematic: z
+    .object({
+      datasetId: z.string(),
+      datasetSnapshotId: z.string().optional(),
+      validationId: z.string().optional(),
+      researchExperimentId: z.string().optional(),
+      sourceId: z.string(),
+      sourceKind: z.enum(["exchange", "broker", "cache"]),
+      marketFamily: z.enum(["crypto", "stocks"]),
+      quality: z.object({
+        qualityScore: z.number(),
+        coveragePercent: z.number(),
+        expectedCandles: z.number(),
+        actualCandles: z.number(),
+        gapCount: z.number(),
+        duplicateCount: z.number(),
+        stale: z.boolean(),
+        warnings: z.array(z.string()),
+      }),
+    })
+    .optional(),
 });
 
 const ohlcSchema = z.object({
@@ -467,15 +498,23 @@ export const runBacktestTool = createTool({
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     strategyId: z.string().describe("Strategy ID (e.g., 'support_bounce')"),
-    market: z.enum(["auto", "crypto", "stocks"]).default("auto").describe("Market family to backtest against"),
+    market: z
+      .enum(["auto", "crypto", "stocks"])
+      .default("auto")
+      .describe("Market family to backtest against"),
     timeframe: z.string().default("4h").describe("Candle timeframe"),
-    days: z.number().default(90).describe("Number of days to backtest. Ignored when startTime/endTime are set."),
+    days: z
+      .number()
+      .default(90)
+      .describe("Number of days to backtest. Ignored when startTime/endTime are set."),
     startTime: z
       .number()
       .int()
       .positive()
       .optional()
-      .describe("Window start in epoch milliseconds. Pair with endTime for a calendar-bounded backtest (overrides days)."),
+      .describe(
+        "Window start in epoch milliseconds. Pair with endTime for a calendar-bounded backtest (overrides days).",
+      ),
     endTime: z
       .number()
       .int()
@@ -498,7 +537,7 @@ export const runBacktestTool = createTool({
   }),
   execute: async (
     { symbol, strategyId, market, timeframe, days, startTime, endTime, initialCapital, commission },
-    execContext: MastraExecutionContext
+    execContext: MastraExecutionContext,
   ) => {
     const ctx = getGordonContext(execContext);
 
@@ -569,22 +608,23 @@ export const runBacktestTool = createTool({
       };
 
       const saveResult = saveBacktestResult(result);
-      getAuditLogger(ctx?.userId || "system").success("SYSTEMATIC_VALIDATION", {
-        strategyId,
-        symbol: metadata.symbol,
-        marketFamily: metadata.marketFamily,
-      }, {
-        metadata: {
-          validationStatus: systematic.validation.status,
-          validationScore: systematic.validation.score,
-          liveEligible: systematic.validation.liveEligible,
-          datasetId: systematic.dataset.datasetId,
+      getAuditLogger(ctx?.userId || "system").success(
+        "SYSTEMATIC_VALIDATION",
+        {
+          strategyId,
+          symbol: metadata.symbol,
+          marketFamily: metadata.marketFamily,
         },
-      });
-      const summary = [
-        formatBacktestSummary(result),
-        ...enrichment.summaryLines,
-      ].join("\n");
+        {
+          metadata: {
+            validationStatus: systematic.validation.status,
+            validationScore: systematic.validation.score,
+            liveEligible: systematic.validation.liveEligible,
+            datasetId: systematic.dataset.datasetId,
+          },
+        },
+      );
+      const summary = [formatBacktestSummary(result), ...enrichment.summaryLines].join("\n");
       const operatorReport = buildBacktestOperatorReport({
         strategyName: strategy.name,
         symbol: metadata.symbol,
@@ -640,23 +680,18 @@ export const optimizeStrategyTool = createTool({
     "Use when the user asks to 'optimize X strategy', 'find best parameters', " +
     "or 'tune strategy settings'.",
   inputSchema: z.object({
-    symbol: z
-      .string()
-      .describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETH')"),
+    symbol: z.string().describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETH')"),
     market: z
       .enum(["auto", "crypto", "stocks"])
       .default("auto")
       .describe("Market family to source candles from"),
-    strategyId: z
-      .string()
-      .describe("Strategy ID to optimize"),
-    timeframe: z
-      .string()
-      .default("4h")
-      .describe("Candle timeframe for analysis"),
+    strategyId: z.string().describe("Strategy ID to optimize"),
+    timeframe: z.string().default("4h").describe("Candle timeframe for analysis"),
     parameterRanges: z
       .record(z.string(), z.array(z.number()))
-      .describe("Parameters to optimize with their value ranges (e.g., { 'period': [10, 14, 20] })"),
+      .describe(
+        "Parameters to optimize with their value ranges (e.g., { 'period': [10, 14, 20] })",
+      ),
     optimizeFor: z
       .enum(["sharpe", "return", "winRate", "drawdown"])
       .default("sharpe")
@@ -675,18 +710,22 @@ export const optimizeStrategyTool = createTool({
     bestParameters: z.record(z.string(), z.unknown()).optional(),
     bestMetrics: backtestMetricsSchema.optional(),
     iterationsTested: z.number().optional(),
-    allResults: z.array(z.object({
-      parameters: z.record(z.string(), z.unknown()),
-      metrics: backtestMetricsSchema,
-      score: z.number(),
-    })).optional(),
+    allResults: z
+      .array(
+        z.object({
+          parameters: z.record(z.string(), z.unknown()),
+          metrics: backtestMetricsSchema,
+          score: z.number(),
+        }),
+      )
+      .optional(),
     warnings: z.array(z.string()).optional(),
     error: z.string().optional(),
   }),
   execute: async (
     { symbol, market, strategyId, timeframe, parameterRanges, optimizeFor, maxIterations },
-    execContext: MastraExecutionContext
-    ) => {
+    execContext: MastraExecutionContext,
+  ) => {
     try {
       const ctx = getGordonContext(execContext);
       const realism = buildSimulationRealismProfile(ctx?.config);
@@ -744,7 +783,11 @@ export const optimizeStrategyTool = createTool({
         score: number;
       }> = [];
 
-      const engineParams = buildEngineParams(DEFAULT_BACKTEST_CONFIG.initialCapital, 0.001, realism);
+      const engineParams = buildEngineParams(
+        DEFAULT_BACKTEST_CONFIG.initialCapital,
+        0.001,
+        realism,
+      );
 
       for (const params of testCombinations) {
         const result = runBacktest(strategy, ohlcData, engineParams, params);
@@ -760,16 +803,17 @@ export const optimizeStrategyTool = createTool({
 
       allResults.sort((a, b) => b.score - a.score);
       const best = allResults[0];
-      const overfitSummary = allResults.length > 1
-        ? detectOverfitting(
-            allResults.map((result) => ({
-              parameters: result.parameters,
-              metrics: result.metrics,
-              score: result.score,
-            })),
-            { metric: metricKey },
-          )
-        : undefined;
+      const overfitSummary =
+        allResults.length > 1
+          ? detectOverfitting(
+              allResults.map((result) => ({
+                parameters: result.parameters,
+                metrics: result.metrics,
+                score: result.score,
+              })),
+              { metric: metricKey },
+            )
+          : undefined;
       const operatorReport = buildOptimizationOperatorReport({
         strategyName: strategy.name,
         symbol: metadata.symbol,
@@ -818,28 +862,15 @@ export const compareBacktestsTool = createTool({
     "Use when the user asks to 'compare strategies', 'which strategy is better', " +
     "or 'rank strategies for X coin'.",
   inputSchema: z.object({
-    symbol: z
-      .string()
-      .describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETH')"),
+    symbol: z.string().describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETH')"),
     market: z
       .enum(["auto", "crypto", "stocks"])
       .default("auto")
       .describe("Market family to source candles from"),
-    strategyIds: z
-      .array(z.string())
-      .describe("List of strategy IDs to compare"),
-    timeframe: z
-      .string()
-      .default("4h")
-      .describe("Candle timeframe for analysis"),
-    startDate: z
-      .string()
-      .optional()
-      .describe("Comparison start date (ISO format)"),
-    endDate: z
-      .string()
-      .optional()
-      .describe("Comparison end date (ISO format)"),
+    strategyIds: z.array(z.string()).describe("List of strategy IDs to compare"),
+    timeframe: z.string().default("4h").describe("Candle timeframe for analysis"),
+    startDate: z.string().optional().describe("Comparison start date (ISO format)"),
+    endDate: z.string().optional().describe("Comparison end date (ISO format)"),
     rankBy: z
       .enum(["sharpe", "return", "winRate", "drawdown"])
       .default("sharpe")
@@ -848,23 +879,31 @@ export const compareBacktestsTool = createTool({
   outputSchema: z.object({
     symbol: z.string().optional(),
     timeframe: z.string().optional(),
-    period: z.object({
-      startDate: z.string(),
-      endDate: z.string(),
-      days: z.number(),
-    }).optional(),
+    period: z
+      .object({
+        startDate: z.string(),
+        endDate: z.string(),
+        days: z.number(),
+      })
+      .optional(),
     rankedBy: z.string().optional(),
-    rankings: z.array(z.object({
-      rank: z.number(),
-      strategy: z.string(),
-      strategyId: z.string(),
-      metrics: backtestMetricsSchema,
-      score: z.number(),
-    })).optional(),
-    buyAndHold: z.object({
-      totalReturn: z.number(),
-      maxDrawdown: z.number(),
-    }).optional(),
+    rankings: z
+      .array(
+        z.object({
+          rank: z.number(),
+          strategy: z.string(),
+          strategyId: z.string(),
+          metrics: backtestMetricsSchema,
+          score: z.number(),
+        }),
+      )
+      .optional(),
+    buyAndHold: z
+      .object({
+        totalReturn: z.number(),
+        maxDrawdown: z.number(),
+      })
+      .optional(),
     executionTime: z.number().optional(),
     formattedSummary: z.string().optional(),
     operatorReport: operatorReportSchema.optional(),
@@ -873,8 +912,8 @@ export const compareBacktestsTool = createTool({
   }),
   execute: async (
     { symbol, market, strategyIds, timeframe, startDate, endDate, rankBy },
-    execContext: MastraExecutionContext
-    ) => {
+    execContext: MastraExecutionContext,
+  ) => {
     try {
       const ctx = getGordonContext(execContext);
       const realism = buildSimulationRealismProfile(ctx?.config);
@@ -905,10 +944,12 @@ export const compareBacktestsTool = createTool({
       }
 
       const end = endDate ? new Date(endDate) : new Date();
-      const start = startDate ? new Date(startDate) : new Date(end.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const start = startDate
+        ? new Date(startDate)
+        : new Date(end.getTime() - 90 * 24 * 60 * 60 * 1000);
       const periodDays = Math.max(
         1,
-        Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
+        Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)),
       );
 
       const { data: ohlcData, metadata } = await fetchHistoricalSeries(ctx, {
@@ -924,7 +965,11 @@ export const compareBacktestsTool = createTool({
         return { error: errors.insufficientData(metadata.symbol).error };
       }
 
-      const engineParams = buildEngineParams(DEFAULT_BACKTEST_CONFIG.initialCapital, 0.001, realism);
+      const engineParams = buildEngineParams(
+        DEFAULT_BACKTEST_CONFIG.initialCapital,
+        0.001,
+        realism,
+      );
 
       const results: BacktestResult[] = [];
       for (const strat of validStrategies) {
@@ -943,7 +988,7 @@ export const compareBacktestsTool = createTool({
           strat,
           config,
           engineResult,
-          Date.now() - execStart
+          Date.now() - execStart,
         );
         results.push(backtestResult);
       }
@@ -1085,13 +1130,16 @@ export const getBacktestSummaryTool = createTool({
 
     // Analyze trade count
     if (metrics.totalTrades < 10) {
-      weaknesses.push(`Very few trades (${metrics.totalTrades}) - results may not be statistically significant`);
+      weaknesses.push(
+        `Very few trades (${metrics.totalTrades}) - results may not be statistically significant`,
+      );
       recommendations.push("Run backtest over a longer period for more trades");
     }
 
     // Determine verdict
     let verdict: "excellent" | "good" | "fair" | "poor" | "avoid";
-    const score = (metrics.sharpeRatio || 0) * 0.4 +
+    const score =
+      (metrics.sharpeRatio || 0) * 0.4 +
       (metrics.totalReturn / 50) * 0.3 +
       ((100 - metrics.maxDrawdown) / 100) * 0.2 +
       ((metrics.winRate || 50) / 100) * 0.1;
@@ -1103,7 +1151,8 @@ export const getBacktestSummaryTool = createTool({
     else verdict = "avoid";
 
     // Generate summary
-    const summary = `${backtestResult.strategyName} on ${backtestResult.config.symbol} (${backtestResult.config.timeframe}): ` +
+    const summary =
+      `${backtestResult.strategyName} on ${backtestResult.config.symbol} (${backtestResult.config.timeframe}): ` +
       `${metrics.totalReturn.toFixed(2)}% return over ${backtestResult.config.days} days with ` +
       `${metrics.totalTrades} trades. ` +
       `Sharpe ratio: ${metrics.sharpeRatio.toFixed(2)}. ` +
@@ -1161,7 +1210,9 @@ export const compareBacktestResultsTool = createTool({
       return { error: "No results provided." };
     }
 
-    const metricKey = (sortBy in results[0]!.metrics ? sortBy : "totalReturn") as keyof BacktestMetrics;
+    const metricKey = (
+      sortBy in results[0]!.metrics ? sortBy : "totalReturn"
+    ) as keyof BacktestMetrics;
     return { comparison: compareBacktestResults(results, metricKey) };
   },
 });
@@ -1174,18 +1225,24 @@ export const rankStrategiesByMetricTool = createTool({
     metric: z.string().default("totalReturn"),
   }),
   outputSchema: z.object({
-    rankings: z.array(z.object({
-      strategy: z.string(),
-      value: z.number(),
-      rank: z.number(),
-    })).optional(),
+    rankings: z
+      .array(
+        z.object({
+          strategy: z.string(),
+          value: z.number(),
+          rank: z.number(),
+        }),
+      )
+      .optional(),
     error: z.string().optional(),
   }),
   execute: async ({ results, metric }) => {
     if (results.length === 0) {
       return { error: "No results provided." };
     }
-    const metricKey = (metric in results[0]!.metrics ? metric : "totalReturn") as keyof BacktestMetrics;
+    const metricKey = (
+      metric in results[0]!.metrics ? metric : "totalReturn"
+    ) as keyof BacktestMetrics;
     return { rankings: rankStrategiesByMetric(results, metricKey) };
   },
 });
@@ -1205,7 +1262,9 @@ export const findBestStrategyTool = createTool({
     if (results.length === 0) {
       return { error: "No results provided." };
     }
-    const metricKey = (metric in results[0]!.metrics ? metric : "totalReturn") as keyof BacktestMetrics;
+    const metricKey = (
+      metric in results[0]!.metrics ? metric : "totalReturn"
+    ) as keyof BacktestMetrics;
     return { best: findBestStrategy(results, metricKey) };
   },
 });
@@ -1326,8 +1385,20 @@ export const filterFirstLastHourTool = createTool({
     rowsRemoved: z.number().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ ohlcData, marketOpenStr, oneHourAfterOpenStr, oneHourBeforeCloseStr, marketCloseStr }) => {
-    return filterFirstLastHour(ohlcData, marketOpenStr, oneHourAfterOpenStr, oneHourBeforeCloseStr, marketCloseStr);
+  execute: async ({
+    ohlcData,
+    marketOpenStr,
+    oneHourAfterOpenStr,
+    oneHourBeforeCloseStr,
+    marketCloseStr,
+  }) => {
+    return filterFirstLastHour(
+      ohlcData,
+      marketOpenStr,
+      oneHourAfterOpenStr,
+      oneHourBeforeCloseStr,
+      marketCloseStr,
+    );
   },
 });
 
@@ -1372,9 +1443,11 @@ export const generateBacktestChartTool = createTool({
   description: "Generate an ASCII chart for backtest visualization.",
   inputSchema: z.object({
     ohlcData: z.array(ohlcSchema),
-    stats: z.object({
-      equityCurve: z.array(z.number()).optional(),
-    }).optional(),
+    stats: z
+      .object({
+        equityCurve: z.array(z.number()).optional(),
+      })
+      .optional(),
     title: z.string().default("Backtest Result"),
   }),
   outputSchema: z.object({
@@ -1397,10 +1470,12 @@ export const gridSearchOptimizationTool = createTool({
   description: "Perform grid search optimization on precomputed backtest results.",
   inputSchema: z.object({
     param_grid: z.record(z.string(), z.array(z.unknown())),
-    backtest_results: z.array(z.object({
-      params: z.record(z.string(), z.unknown()),
-      stats: z.record(z.string(), z.unknown()),
-    })),
+    backtest_results: z.array(
+      z.object({
+        params: z.record(z.string(), z.unknown()),
+        stats: z.record(z.string(), z.unknown()),
+      }),
+    ),
     metric: z.string().default("sharpe_ratio"),
     constraint_func_code: z.string().optional(),
   }),
@@ -1476,10 +1551,12 @@ export const randomSearchOptimizationTool = createTool({
   description: "Perform random search optimization on precomputed backtest results.",
   inputSchema: z.object({
     param_distributions: z.record(z.string(), z.unknown()),
-    backtest_results: z.array(z.object({
-      params: z.record(z.string(), z.unknown()),
-      stats: z.record(z.string(), z.unknown()),
-    })),
+    backtest_results: z.array(
+      z.object({
+        params: z.record(z.string(), z.unknown()),
+        stats: z.record(z.string(), z.unknown()),
+      }),
+    ),
     n_iter: z.number().default(50),
     metric: z.string().default("sharpe_ratio"),
   }),
@@ -1557,7 +1634,10 @@ export const runWalkForwardTestTool = createTool({
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     strategyId: z.string().describe("Strategy ID to test"),
-    market: z.enum(["auto", "crypto", "stocks"]).default("auto").describe("Market family to source candles from"),
+    market: z
+      .enum(["auto", "crypto", "stocks"])
+      .default("auto")
+      .describe("Market family to source candles from"),
     timeframe: z.string().default("4h").describe("Candle timeframe"),
     days: z.number().default(180).describe("Number of days of data to use"),
     trainRatio: z.number().default(0.7).describe("Ratio of data for training (0-1)"),
@@ -1574,35 +1654,53 @@ export const runWalkForwardTestTool = createTool({
   outputSchema: z.object({
     strategyId: z.string().optional(),
     strategyName: z.string().optional(),
-    windows: z.array(z.object({
-      windowNumber: z.number(),
-      trainReturn: z.number(),
-      testReturn: z.number(),
-      overfitRatio: z.number(),
-      testTrades: z.number(),
-    })).optional(),
-    aggregatedMetrics: z.object({
-      avgReturn: z.number(),
-      medianReturn: z.number(),
-      avgSharpeRatio: z.number(),
-      avgWinRate: z.number(),
-      maxDrawdown: z.number(),
-      totalTrades: z.number(),
-      avgOverfitRatio: z.number(),
-      profitableWindowsPercent: z.number(),
-    }).optional(),
-    stability: z.object({
-      consistencyScore: z.number(),
-      robustnessScore: z.number(),
-      verdict: z.enum(["excellent", "good", "fair", "poor", "unreliable"]),
-      warnings: z.array(z.string()),
-    }).optional(),
+    windows: z
+      .array(
+        z.object({
+          windowNumber: z.number(),
+          trainReturn: z.number(),
+          testReturn: z.number(),
+          overfitRatio: z.number(),
+          testTrades: z.number(),
+        }),
+      )
+      .optional(),
+    aggregatedMetrics: z
+      .object({
+        avgReturn: z.number(),
+        medianReturn: z.number(),
+        avgSharpeRatio: z.number(),
+        avgWinRate: z.number(),
+        maxDrawdown: z.number(),
+        totalTrades: z.number(),
+        avgOverfitRatio: z.number(),
+        profitableWindowsPercent: z.number(),
+      })
+      .optional(),
+    stability: z
+      .object({
+        consistencyScore: z.number(),
+        robustnessScore: z.number(),
+        verdict: z.enum(["excellent", "good", "fair", "poor", "unreliable"]),
+        warnings: z.array(z.string()),
+      })
+      .optional(),
     executionTime: z.number().optional(),
     error: z.string().optional(),
   }),
   execute: async (
-    { symbol, strategyId, market, timeframe, days, trainRatio, numWindows, parameterRanges, optimizeFor },
-    execContext: MastraExecutionContext
+    {
+      symbol,
+      strategyId,
+      market,
+      timeframe,
+      days,
+      trainRatio,
+      numWindows,
+      parameterRanges,
+      optimizeFor,
+    },
+    execContext: MastraExecutionContext,
   ) => {
     const ctx = getGordonContext(execContext);
 
@@ -1620,7 +1718,9 @@ export const runWalkForwardTestTool = createTool({
       });
 
       if (ohlcData.length < 200) {
-        return { error: `Insufficient data for walk-forward test. Need at least 200 candles, got ${ohlcData.length}.` };
+        return {
+          error: `Insufficient data for walk-forward test. Need at least 200 candles, got ${ohlcData.length}.`,
+        };
       }
 
       const config: WalkForwardConfig = {
@@ -1668,7 +1768,10 @@ export const runMonteCarloTool = createTool({
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     strategyId: z.string().describe("Strategy ID to simulate"),
-    market: z.enum(["auto", "crypto", "stocks"]).default("auto").describe("Market family to source candles from"),
+    market: z
+      .enum(["auto", "crypto", "stocks"])
+      .default("auto")
+      .describe("Market family to source candles from"),
     timeframe: z.string().default("4h").describe("Candle timeframe"),
     days: z.number().default(90).describe("Number of days to backtest"),
     iterations: z.number().default(1000).describe("Number of Monte Carlo iterations"),
@@ -1679,46 +1782,56 @@ export const runMonteCarloTool = createTool({
     originalMaxDrawdown: z.number().optional(),
     tradeCount: z.number().optional(),
     iterations: z.number().optional(),
-    returnDistribution: z.object({
-      min: z.number(),
-      max: z.number(),
-      mean: z.number(),
-      median: z.number(),
-      stdDev: z.number(),
-      percentile5: z.number(),
-      percentile95: z.number(),
-    }).optional(),
-    drawdownDistribution: z.object({
-      min: z.number(),
-      max: z.number(),
-      mean: z.number(),
-      median: z.number(),
-      percentile95: z.number(),
-    }).optional(),
-    scenarios: z.object({
-      worstCaseReturn: z.number(),
-      bestCaseReturn: z.number(),
-      medianReturn: z.number(),
-      profitProbability: z.number(),
-      majorLossProbability: z.number(),
-    }).optional(),
-    riskMetrics: z.object({
-      valueAtRisk5: z.number(),
-      valueAtRisk1: z.number(),
-      expectedShortfall: z.number(),
-      riskOfRuin: z.number(),
-    }).optional(),
-    robustness: z.object({
-      score: z.number(),
-      verdict: z.enum(["excellent", "good", "fair", "poor", "unreliable"]),
-      observations: z.array(z.string()),
-    }).optional(),
+    returnDistribution: z
+      .object({
+        min: z.number(),
+        max: z.number(),
+        mean: z.number(),
+        median: z.number(),
+        stdDev: z.number(),
+        percentile5: z.number(),
+        percentile95: z.number(),
+      })
+      .optional(),
+    drawdownDistribution: z
+      .object({
+        min: z.number(),
+        max: z.number(),
+        mean: z.number(),
+        median: z.number(),
+        percentile95: z.number(),
+      })
+      .optional(),
+    scenarios: z
+      .object({
+        worstCaseReturn: z.number(),
+        bestCaseReturn: z.number(),
+        medianReturn: z.number(),
+        profitProbability: z.number(),
+        majorLossProbability: z.number(),
+      })
+      .optional(),
+    riskMetrics: z
+      .object({
+        valueAtRisk5: z.number(),
+        valueAtRisk1: z.number(),
+        expectedShortfall: z.number(),
+        riskOfRuin: z.number(),
+      })
+      .optional(),
+    robustness: z
+      .object({
+        score: z.number(),
+        verdict: z.enum(["excellent", "good", "fair", "poor", "unreliable"]),
+        observations: z.array(z.string()),
+      })
+      .optional(),
     executionTime: z.number().optional(),
     error: z.string().optional(),
   }),
   execute: async (
     { symbol, strategyId, market, timeframe, days, iterations, initialCapital },
-    execContext: MastraExecutionContext
+    execContext: MastraExecutionContext,
   ) => {
     const ctx = getGordonContext(execContext);
 
@@ -1748,7 +1861,9 @@ export const runMonteCarloTool = createTool({
       const backtestResult = runBacktest(strategy, ohlcData, engineParams);
 
       if (backtestResult.trades.length < 10) {
-        return { error: `Insufficient trades for Monte Carlo (${backtestResult.trades.length}). Need at least 10.` };
+        return {
+          error: `Insufficient trades for Monte Carlo (${backtestResult.trades.length}). Need at least 10.`,
+        };
       }
 
       // Run Monte Carlo simulation
@@ -1817,28 +1932,29 @@ export const getBacktestHistoryTool = createTool({
       .enum(["createdAt", "totalReturn", "sharpeRatio", "maxDrawdown", "winRate"])
       .default("createdAt")
       .describe("Field to order by"),
-    orderDirection: z
-      .enum(["asc", "desc"])
-      .default("desc")
-      .describe("Sort direction"),
+    orderDirection: z.enum(["asc", "desc"]).default("desc").describe("Sort direction"),
     limit: z.number().default(20).describe("Maximum number of results"),
   }),
   outputSchema: z.object({
-    results: z.array(z.object({
-      id: z.string(),
-      strategyId: z.string(),
-      strategyName: z.string(),
-      symbol: z.string(),
-      timeframe: z.string(),
-      startDate: z.string(),
-      endDate: z.string(),
-      totalReturn: z.number(),
-      maxDrawdown: z.number(),
-      sharpeRatio: z.number(),
-      winRate: z.number(),
-      totalTrades: z.number(),
-      createdAt: z.string(),
-    })).optional(),
+    results: z
+      .array(
+        z.object({
+          id: z.string(),
+          strategyId: z.string(),
+          strategyName: z.string(),
+          symbol: z.string(),
+          timeframe: z.string(),
+          startDate: z.string(),
+          endDate: z.string(),
+          totalReturn: z.number(),
+          maxDrawdown: z.number(),
+          sharpeRatio: z.number(),
+          winRate: z.number(),
+          totalTrades: z.number(),
+          createdAt: z.string(),
+        }),
+      )
+      .optional(),
     totalCount: z.number().optional(),
     error: z.string().optional(),
   }),

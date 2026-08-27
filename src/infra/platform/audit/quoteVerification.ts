@@ -83,7 +83,7 @@ export function verifyQuote(
   options: { method?: QuoteVerificationMethod } = {},
 ): boolean {
   const method = options.method ?? "string_match";
-  if (!quote || !quote.trim() || !sourceText) return false;
+  if (!quote?.trim() || !sourceText) return false;
 
   if (method === "string_match") {
     return normalizeForComparison(sourceText).includes(normalizeForComparison(quote));

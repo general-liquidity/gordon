@@ -63,9 +63,7 @@ export function buildShadowDivergenceReport(opts?: {
   );
   const shadow = summarizeShadowFills(shadowFills);
 
-  const outcomes = getTradeOutcomes(
-    opts?.sinceDate ? { sinceDate: opts.sinceDate } : undefined,
-  );
+  const outcomes = getTradeOutcomes(opts?.sinceDate ? { sinceDate: opts.sinceDate } : undefined);
   const real = outcomesToShadowSummary(outcomes);
   const comparison = compareShadowVsReal(shadow, real);
 
@@ -80,9 +78,7 @@ export function buildShadowDivergenceReport(opts?: {
 export function formatShadowDivergenceReport(report: ShadowDivergenceReport): string {
   const { shadow, real, divergencePnl, divergencePnlFraction } = report;
   const divFrac =
-    divergencePnlFraction !== null
-      ? `${(divergencePnlFraction * 100).toFixed(2)}%`
-      : "n/a";
+    divergencePnlFraction !== null ? `${(divergencePnlFraction * 100).toFixed(2)}%` : "n/a";
 
   return [
     "◈ Shadow vs realized divergence",

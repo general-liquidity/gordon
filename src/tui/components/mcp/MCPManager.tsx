@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 
@@ -60,33 +60,75 @@ export function MCPManager({ servers, onAdd, onRemove, onReconnect, onCancel }: 
   const [step, setStep] = useState<Step>("menu");
   const [newName, setNewName] = useState("");
   const [newTransport, setNewTransport] = useState("");
+  const [newCommand, setNewCommand] = useState("");
 
-  useInput((_input, key) => {
+  useInput((input, key) => {
     if (key.escape) {
       if (step === "menu") onCancel();
       else setStep("menu");
+      return;
     }
+    if (step !== "add_name" && step !== "add_command") return;
+    const setValue = step === "add_name" ? setNewName : setNewCommand;
+    const value = step === "add_name" ? newName : newCommand;
+    if (key.backspace || key.delete) {
+      setValue(value.slice(0, -1));
+      return;
+    }
+    if (key.return) {
+      if (!value.trim()) return;
+      if (step === "add_name") {
+        setNewName(value.trim());
+        setStep("add_transport");
+      } else {
+        onAdd({ name: newName, transport: newTransport, command: value.trim() });
+        setNewName("");
+        setNewTransport("");
+        setNewCommand("");
+        setStep("menu");
+      }
+      return;
+    }
+    if (input && !key.ctrl && !key.meta) setValue(`${value}${input}`);
   });
+
+  if (step === "add_name") {
+    return (
+      <Box flexDirection="column" paddingX={1} paddingY={1}>
+        <Text bold color="cyanBright">
+          ADD MCP SERVER
+        </Text>
+        <Text>Name: {newName || "_"}</Text>
+        <Text dimColor>Type a name and press Enter · Esc cancel</Text>
+      </Box>
+    );
+  }
 
   // ── List view ──
   if (step === "list") {
     return (
       <Box flexDirection="column" paddingX={1} paddingY={1}>
         <Box marginBottom={1}>
-          <Text bold color="cyanBright">MCP SERVERS</Text>
-          <Text dimColor>  ({servers.length} configured)</Text>
+          <Text bold color="cyanBright">
+            MCP SERVERS
+          </Text>
+          <Text dimColor> ({servers.length} configured)</Text>
         </Box>
-        {servers.length === 0 && <Text dimColor>  No MCP servers configured. Use "Add new" to connect one.</Text>}
+        {servers.length === 0 && (
+          <Text dimColor> No MCP servers configured. Use "Add new" to connect one.</Text>
+        )}
         {servers.map((s) => (
           <Box key={s.id}>
             <Text color={STATUS_COLORS[s.status] as any}> {STATUS_ICONS[s.status]} </Text>
             <Text bold>{s.name.padEnd(25)}</Text>
             <Text dimColor>{s.transport.padEnd(8)}</Text>
             <Text>{s.toolCount} tools</Text>
-            {s.endpoint && <Text dimColor>  {s.endpoint}</Text>}
+            {s.endpoint && <Text dimColor> {s.endpoint}</Text>}
           </Box>
         ))}
-        <Box marginTop={1}><Text dimColor>Esc to go back</Text></Box>
+        <Box marginTop={1}>
+          <Text dimColor>Esc to go back</Text>
+        </Box>
       </Box>
     );
   }
@@ -95,13 +137,23 @@ export function MCPManager({ servers, onAdd, onRemove, onReconnect, onCancel }: 
   if (step === "add_transport") {
     return (
       <Box flexDirection="column" paddingX={1} paddingY={1}>
-        <Text bold color="cyanBright">ADD MCP SERVER</Text>
+        <Text bold color="cyanBright">
+          ADD MCP SERVER
+        </Text>
         <Text dimColor>Name: {newName}</Text>
         <Text bold>Select transport:</Text>
         <Box marginTop={1}>
-          <Select options={TRANSPORTS} onChange={(v) => { setNewTransport(v); setStep("add_command"); }} />
+          <Select
+            options={TRANSPORTS}
+            onChange={(v) => {
+              setNewTransport(v);
+              setStep("add_command");
+            }}
+          />
         </Box>
-        <Box marginTop={1}><Text dimColor>Esc to go back</Text></Box>
+        <Box marginTop={1}>
+          <Text dimColor>Esc to go back</Text>
+        </Box>
       </Box>
     );
   }
@@ -109,14 +161,20 @@ export function MCPManager({ servers, onAdd, onRemove, onReconnect, onCancel }: 
   if (step === "add_command") {
     return (
       <Box flexDirection="column" paddingX={1} paddingY={1}>
-        <Text bold color="cyanBright">ADD MCP SERVER</Text>
-        <Text dimColor>Name: {newName} | Transport: {newTransport}</Text>
+        <Text bold color="cyanBright">
+          ADD MCP SERVER
+        </Text>
+        <Text dimColor>
+          Name: {newName} | Transport: {newTransport}
+        </Text>
         <Text bold>Enter command (e.g., npx -y @coingecko/coingecko-mcp):</Text>
         <Box marginTop={1}>
           <Text color="cyanBright">{"\u276F"} </Text>
-          <Text dimColor>Type command and press Enter</Text>
+          <Text>{newCommand || "_"}</Text>
         </Box>
-        <Box marginTop={1}><Text dimColor>Esc to go back</Text></Box>
+        <Box marginTop={1}>
+          <Text dimColor>Esc to go back</Text>
+        </Box>
       </Box>
     );
   }
@@ -126,23 +184,37 @@ export function MCPManager({ servers, onAdd, onRemove, onReconnect, onCancel }: 
     if (servers.length === 0) {
       return (
         <Box flexDirection="column" paddingX={1} paddingY={1}>
-          <Text bold color="cyanBright">REMOVE MCP SERVER</Text>
+          <Text bold color="cyanBright">
+            REMOVE MCP SERVER
+          </Text>
           <Text dimColor>No servers to remove.</Text>
-          <Box marginTop={1}><Text dimColor>Esc to go back</Text></Box>
+          <Box marginTop={1}>
+            <Text dimColor>Esc to go back</Text>
+          </Box>
         </Box>
       );
     }
     return (
       <Box flexDirection="column" paddingX={1} paddingY={1}>
-        <Text bold color="cyanBright">REMOVE MCP SERVER</Text>
+        <Text bold color="cyanBright">
+          REMOVE MCP SERVER
+        </Text>
         <Text dimColor>Select server to remove:</Text>
         <Box marginTop={1}>
           <Select
-            options={servers.map((s) => ({ label: `${s.name} (${s.transport}, ${s.toolCount} tools)`, value: s.id }))}
-            onChange={(id) => { onRemove(id); setStep("menu"); }}
+            options={servers.map((s) => ({
+              label: `${s.name} (${s.transport}, ${s.toolCount} tools)`,
+              value: s.id,
+            }))}
+            onChange={(id) => {
+              onRemove(id);
+              setStep("menu");
+            }}
           />
         </Box>
-        <Box marginTop={1}><Text dimColor>Esc to go back</Text></Box>
+        <Box marginTop={1}>
+          <Text dimColor>Esc to go back</Text>
+        </Box>
       </Box>
     );
   }
@@ -151,14 +223,19 @@ export function MCPManager({ servers, onAdd, onRemove, onReconnect, onCancel }: 
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">MCP SERVER MANAGEMENT</Text>
-        <Text dimColor>  ({servers.filter((s) => s.status === "connected").length}/{servers.length} connected)</Text>
+        <Text bold color="cyanBright">
+          MCP SERVER MANAGEMENT
+        </Text>
+        <Text dimColor>
+          {" "}
+          ({servers.filter((s) => s.status === "connected").length}/{servers.length} connected)
+        </Text>
       </Box>
       <Select
         options={ACTIONS}
         onChange={(action) => {
           if (action === "list") setStep("list");
-          else if (action === "add") setStep("add_transport");
+          else if (action === "add") setStep("add_name");
           else if (action === "remove") setStep("remove");
           else if (action === "reconnect") {
             const failed = servers.find((s) => s.status === "error");
@@ -166,7 +243,9 @@ export function MCPManager({ servers, onAdd, onRemove, onReconnect, onCancel }: 
           }
         }}
       />
-      <Box marginTop={1}><Text dimColor>Esc to close</Text></Box>
+      <Box marginTop={1}>
+        <Text dimColor>Esc to close</Text>
+      </Box>
     </Box>
   );
 }

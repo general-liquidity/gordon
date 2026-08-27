@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  computeMinHalfLifeHedgeRatio,
-  type MinHalfLifeResult,
-} from "./minHalfLifeHedgeRatio.ts";
+import { computeMinHalfLifeHedgeRatio, type MinHalfLifeResult } from "./minHalfLifeHedgeRatio.ts";
 
 // Seeded LCG for reproducible synthetic series.
 function makeLcg(seed: number): () => number {

@@ -94,10 +94,7 @@ export function calculateTrimState(
 
   const closes = candles.map((c) => c.close);
   const lastIdx = candles.length - 1;
-  const entryIdx = Math.max(
-    0,
-    Math.min(params.entryBarIndex ?? lastIdx, lastIdx),
-  );
+  const entryIdx = Math.max(0, Math.min(params.entryBarIndex ?? lastIdx, lastIdx));
   const daysSinceEntry = lastIdx - entryIdx;
 
   // Full-series EMAs so we can read values at every bar after entry.
@@ -111,7 +108,10 @@ export function calculateTrimState(
 
   // Reached-resistance: any high from entryIdx..lastIdx >= level.
   let reachedFirstResistance: boolean | null = null;
-  if (typeof params.firstResistanceLevel === "number" && Number.isFinite(params.firstResistanceLevel)) {
+  if (
+    typeof params.firstResistanceLevel === "number" &&
+    Number.isFinite(params.firstResistanceLevel)
+  ) {
     reachedFirstResistance = false;
     for (let i = entryIdx; i <= lastIdx; i++) {
       if (candles[i]!.high >= params.firstResistanceLevel) {
@@ -158,7 +158,8 @@ export function calculateTrimState(
     recommendation = "Close below 8 EMA — second 25% trim due if first trim already taken.";
   } else if (reachedFirstResistance === true) {
     severityLevel = 1;
-    recommendation = "First resistance reached — first 25% trim due; move stop to breakeven on remaining.";
+    recommendation =
+      "First resistance reached — first 25% trim due; move stop to breakeven on remaining.";
   }
 
   return {

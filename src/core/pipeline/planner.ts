@@ -5,8 +5,13 @@
  * The planner is the brain that turns analysis into actionable plans.
  */
 
-import { LLMClient, loadPrompt, buildMessages, executeWithFailover } from "../../infra/ai/llm/index.ts";
-import { PlanSchema, type Plan, type GordonConfig } from "../../types/index.ts";
+import {
+  type LLMClient,
+  loadPrompt,
+  buildMessages,
+  executeWithFailover,
+} from "../../infra/ai/llm/index.ts";
+import { PlanSchema, type Plan } from "../../types/index.ts";
 import type { DetailedAnalysis } from "./analyzer.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
@@ -38,7 +43,7 @@ export interface PlannerInput {
  */
 interface LLMPlanResponse {
   symbol: string;
-  direction: "long";
+  direction: "long" | "short";
   strategy: "support_bounce" | "grid_entry";
   allocation: {
     currency: "USDT";
@@ -86,9 +91,9 @@ const MIN_RISK_REWARD_RATIO = 1.2; // Minimum acceptable R:R
 
 // Stop loss distance ranges by risk level (percentage from entry)
 const STOP_LOSS_RANGES: Record<string, { min: number; max: number }> = {
-  low: { min: 0.03, max: 0.05 },    // 3-5%
+  low: { min: 0.03, max: 0.05 }, // 3-5%
   medium: { min: 0.05, max: 0.08 }, // 5-8%
-  high: { min: 0.08, max: 0.12 },   // 8-12%
+  high: { min: 0.08, max: 0.12 }, // 8-12%
 };
 
 // ============================================================================
@@ -143,30 +148,26 @@ function buildPlannerContext(input: PlannerInput): Record<string, unknown> {
       macdSignal: analysis.macdState.includes("bullish")
         ? "bullish"
         : analysis.macdState.includes("bearish")
-        ? "bearish"
-        : "neutral",
+          ? "bearish"
+          : "neutral",
       volumeTrend:
         analysis.volumeTrend === "rising"
           ? "increasing"
           : analysis.volumeTrend === "falling"
-          ? "decreasing"
-          : "stable",
+            ? "decreasing"
+            : "stable",
     },
 
     // Market conditions
     trend:
-      analysis.trend === "up"
-        ? "uptrend"
-        : analysis.trend === "down"
-        ? "downtrend"
-        : "sideways",
+      analysis.trend === "up" ? "uptrend" : analysis.trend === "down" ? "downtrend" : "sideways",
     volatility: analysis.risk, // Using risk as a proxy for volatility
     setupQuality:
       analysis.setupConfidence >= 0.7
         ? "strong"
         : analysis.setupConfidence >= 0.4
-        ? "moderate"
-        : "weak",
+          ? "moderate"
+          : "weak",
 
     // User preferences
     preferences: {
@@ -189,14 +190,15 @@ function buildPlannerContext(input: PlannerInput): Record<string, unknown> {
 function calculateRiskReward(
   entryPrice: number | null,
   stopPrice: number,
-  takeProfits: Array<{ price: number; percentToSell: number }>
+  takeProfits: Array<{ price: number; percentToSell: number }>,
+  direction: "long" | "short",
 ): number {
   if (entryPrice === null || takeProfits.length === 0) {
     return 0;
   }
 
-  // Risk is distance from entry to stop
-  const risk = entryPrice - stopPrice;
+  const multiplier = direction === "short" ? -1 : 1;
+  const risk = multiplier * (entryPrice - stopPrice);
   if (risk <= 0) {
     return 0;
   }
@@ -204,7 +206,7 @@ function calculateRiskReward(
   // Calculate weighted average reward based on TP levels
   let weightedReward = 0;
   for (const tp of takeProfits) {
-    const reward = tp.price - entryPrice;
+    const reward = multiplier * (tp.price - entryPrice);
     weightedReward += reward * tp.percentToSell;
   }
 
@@ -223,11 +225,16 @@ function validatePlanStructure(plan: LLMPlanResponse, input: PlannerInput): stri
     errors.push("Limit order requires an entry price");
   }
 
-  // Stop loss must exist and be below entry for long
+  // Stop geometry must oppose the intended profit direction.
   if (!plan.stopLoss || plan.stopLoss.price === undefined) {
     errors.push("Stop loss is required");
-  } else if (plan.entry.price !== null && plan.stopLoss.price >= plan.entry.price) {
-    errors.push("Stop loss must be below entry price for long positions");
+  } else if (plan.entry.price !== null) {
+    if (plan.direction === "long" && plan.stopLoss.price >= plan.entry.price) {
+      errors.push("Stop loss must be below entry price for long positions");
+    }
+    if (plan.direction === "short" && plan.stopLoss.price <= plan.entry.price) {
+      errors.push("Stop loss must be above entry price for short positions");
+    }
   }
 
   // Take profits must exist
@@ -240,11 +247,14 @@ function validatePlanStructure(plan: LLMPlanResponse, input: PlannerInput): stri
       errors.push(`Take profit percentages must sum to 100%, got ${(tpSum * 100).toFixed(1)}%`);
     }
 
-    // TPs must be above entry
+    // TPs must lie in the profit direction.
     if (plan.entry.price !== null) {
       for (const tp of plan.takeProfit) {
-        if (tp.price <= plan.entry.price) {
+        if (plan.direction === "long" && tp.price <= plan.entry.price) {
           errors.push(`Take profit ${tp.price} must be above entry ${plan.entry.price}`);
+        }
+        if (plan.direction === "short" && tp.price >= plan.entry.price) {
+          errors.push(`Take profit ${tp.price} must be below entry ${plan.entry.price}`);
         }
       }
     }
@@ -252,18 +262,18 @@ function validatePlanStructure(plan: LLMPlanResponse, input: PlannerInput): stri
 
   // Validate stop loss distance based on risk level
   if (plan.entry.price !== null && plan.stopLoss?.price) {
-    const stopDistance = (plan.entry.price - plan.stopLoss.price) / plan.entry.price;
+    const stopDistance = Math.abs(plan.entry.price - plan.stopLoss.price) / plan.entry.price;
     const range = STOP_LOSS_RANGES[preferences.riskLevel];
 
     if (range) {
       if (stopDistance < range.min) {
         errors.push(
-          `Stop loss too tight for ${preferences.riskLevel} risk: ${(stopDistance * 100).toFixed(1)}% (min: ${(range.min * 100).toFixed(0)}%)`
+          `Stop loss too tight for ${preferences.riskLevel} risk: ${(stopDistance * 100).toFixed(1)}% (min: ${(range.min * 100).toFixed(0)}%)`,
         );
       }
       if (stopDistance > range.max) {
         errors.push(
-          `Stop loss too wide for ${preferences.riskLevel} risk: ${(stopDistance * 100).toFixed(1)}% (max: ${(range.max * 100).toFixed(0)}%)`
+          `Stop loss too wide for ${preferences.riskLevel} risk: ${(stopDistance * 100).toFixed(1)}% (max: ${(range.max * 100).toFixed(0)}%)`,
         );
       }
     }
@@ -271,10 +281,15 @@ function validatePlanStructure(plan: LLMPlanResponse, input: PlannerInput): stri
 
   // Validate risk/reward ratio
   if (plan.entry.price !== null && plan.stopLoss?.price && plan.takeProfit?.length > 0) {
-    const rr = calculateRiskReward(plan.entry.price, plan.stopLoss.price, plan.takeProfit);
+    const rr = calculateRiskReward(
+      plan.entry.price,
+      plan.stopLoss.price,
+      plan.takeProfit,
+      plan.direction,
+    );
     if (rr < MIN_RISK_REWARD_RATIO) {
       errors.push(
-        `Risk/reward ratio ${rr.toFixed(2)}:1 is below minimum ${MIN_RISK_REWARD_RATIO}:1`
+        `Risk/reward ratio ${rr.toFixed(2)}:1 is below minimum ${MIN_RISK_REWARD_RATIO}:1`,
       );
     }
   }
@@ -282,7 +297,7 @@ function validatePlanStructure(plan: LLMPlanResponse, input: PlannerInput): stri
   // Allocation must not exceed max
   if (plan.allocation.amount > preferences.maxAllocation) {
     errors.push(
-      `Allocation ${plan.allocation.amount} exceeds max allowed ${preferences.maxAllocation}`
+      `Allocation ${plan.allocation.amount} exceeds max allowed ${preferences.maxAllocation}`,
     );
   }
 
@@ -293,11 +308,14 @@ function validatePlanStructure(plan: LLMPlanResponse, input: PlannerInput): stri
       errors.push(`DCA percentages must sum to 100%, got ${(dcaSum * 100).toFixed(1)}%`);
     }
 
-    // DCA prices must be below entry
+    // DCA levels add in the adverse direction.
     if (plan.entry.price !== null) {
       for (const dca of plan.dca) {
-        if (dca.price >= plan.entry.price) {
+        if (plan.direction === "long" && dca.price >= plan.entry.price) {
           errors.push(`DCA level ${dca.price} must be below entry ${plan.entry.price}`);
+        }
+        if (plan.direction === "short" && dca.price <= plan.entry.price) {
+          errors.push(`DCA level ${dca.price} must be above entry ${plan.entry.price}`);
         }
       }
     }
@@ -350,11 +368,11 @@ function validatePlanStructure(plan: LLMPlanResponse, input: PlannerInput): stri
  * @returns A complete trade plan ready for execution
  * @throws Error if plan generation or validation fails
  */
-export async function generatePlan(
-  client: LLMClient,
-  input: PlannerInput
-): Promise<Plan> {
-  logger.info("Generating plan", { symbol: input.analysis.symbol, riskLevel: input.preferences.riskLevel });
+export async function generatePlan(client: LLMClient, input: PlannerInput): Promise<Plan> {
+  logger.info("Generating plan", {
+    symbol: input.analysis.symbol,
+    riskLevel: input.preferences.riskLevel,
+  });
 
   // Step 1: Load the planner prompt
   const systemPrompt = await loadPrompt("planner");
@@ -387,7 +405,9 @@ Respond with a JSON object containing the plan. Follow all the rules in the syst
   });
 
   if (!failover.ok || !failover.result) {
-    throw new Error(`Plan generation failed across all LLM providers: ${formatFailoverErrors(failover.errors)}`);
+    throw new Error(
+      `Plan generation failed across all LLM providers: ${formatFailoverErrors(failover.errors)}`,
+    );
   }
 
   if (failover.degraded) {
@@ -436,7 +456,10 @@ Respond with a JSON object containing the plan. Follow all the rules in the syst
     throw new Error(`Final plan validation failed: ${errorMessages}`);
   }
 
-  logger.info("Plan generated successfully", { planId: parseResult.data.id, symbol: parseResult.data.symbol });
+  logger.info("Plan generated successfully", {
+    planId: parseResult.data.id,
+    symbol: parseResult.data.symbol,
+  });
   await emitEvent("plan:created", { plan: parseResult.data });
 
   return parseResult.data;

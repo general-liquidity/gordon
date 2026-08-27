@@ -24,15 +24,7 @@ const BASE = "https://api.zerion.io/v1";
 const TIMEOUT_MS = 10_000;
 
 // Zerion chain ids → the chain slugs the rest of Gordon uses.
-const EVM_CHAINS = [
-  "ethereum",
-  "base",
-  "arbitrum",
-  "optimism",
-  "polygon",
-  "bsc",
-  "avalanche",
-];
+const EVM_CHAINS = ["ethereum", "base", "arbitrum", "optimism", "polygon", "bsc", "avalanche"];
 
 interface PositionAttributes {
   fungible_info?: {
@@ -81,7 +73,7 @@ export class ZerionWalletSource implements WalletIntelSource {
   }
 
   private authHeader(): string {
-    return "Basic " + Buffer.from(`${this.key ?? ""}:`).toString("base64");
+    return `Basic ${Buffer.from(`${this.key ?? ""}:`).toString("base64")}`;
   }
 
   private async fetchJson(path: string): Promise<unknown | null> {
@@ -112,8 +104,7 @@ export class ZerionWalletSource implements WalletIntelSource {
     if (!fung?.symbol) return null;
     const chain = item.relationships?.chain?.data?.id ?? "ethereum";
     const impl =
-      fung.implementations?.find((i) => i.chain_id === chain) ??
-      fung.implementations?.[0];
+      fung.implementations?.find((i) => i.chain_id === chain) ?? fung.implementations?.[0];
     return {
       tokenAddress: impl?.address ?? "",
       symbol: fung.symbol,
@@ -144,13 +135,9 @@ export class ZerionWalletSource implements WalletIntelSource {
     const positions = await this.getTokenBalances(query);
 
     let totalValueUsd: number | undefined;
-    const portfolioJson = await this.fetchJson(
-      `/wallets/${query.address}/portfolio?currency=usd`,
-    );
+    const portfolioJson = await this.fetchJson(`/wallets/${query.address}/portfolio?currency=usd`);
     const total = (
-      portfolioJson as
-        | { data?: { attributes?: { total?: { positions?: number } } } }
-        | null
+      portfolioJson as { data?: { attributes?: { total?: { positions?: number } } } } | null
     )?.data?.attributes?.total?.positions;
     if (typeof total === "number") totalValueUsd = total;
 

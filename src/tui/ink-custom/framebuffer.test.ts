@@ -1,9 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { createFrameBuffer } from "./framebuffer.ts";
-import type {
-  CellBuffer,
-  CellWidth,
-} from "./internal/contracts.ts";
+import type { CellBuffer, CellWidth } from "./internal/contracts.ts";
 import {
   CELL_CHAR_MASK,
   CELL_STYLE_MASK,
@@ -23,13 +20,7 @@ function makeMockCellBuffer(width: number, height: number): CellBuffer {
   const buf: CellBuffer = {
     width,
     height,
-    set(
-      x: number,
-      y: number,
-      charIdx: number,
-      styleId: number,
-      cellWidth: CellWidth,
-    ): void {
+    set(x: number, y: number, charIdx: number, styleId: number, cellWidth: CellWidth): void {
       if (x < 0 || x >= width || y < 0 || y >= height) return;
       const packed =
         (charIdx & CELL_CHAR_MASK) |

@@ -17,12 +17,7 @@
 
 import type { Exchange } from "../../../infra/exchange/types.ts";
 import { createModuleLogger } from "../../../infra/logger/index.ts";
-import type {
-  POVConfig,
-  ExecutionSession,
-  ExecutionSlice,
-  OrderSubmitter,
-} from "./types.ts";
+import type { POVConfig, ExecutionSession, ExecutionSlice, OrderSubmitter } from "./types.ts";
 
 const logger = createModuleLogger("pov-executor");
 
@@ -110,7 +105,10 @@ export class POVExecutor {
       return;
     }
 
-    if (this.config.maxDurationMs > 0 && Date.now() - this.startTimeMs > this.config.maxDurationMs) {
+    if (
+      this.config.maxDurationMs > 0 &&
+      Date.now() - this.startTimeMs > this.config.maxDurationMs
+    ) {
       logger.warn("POV max duration reached, terminating", {
         sessionId: this.session.sessionId,
         filled: this.session.quantityFilled,
@@ -188,9 +186,7 @@ export class POVExecutor {
       slice.status = "filled";
       slice.filledQuantity = result.executedQty ?? quantity;
       slice.avgFillPrice =
-        result.executedQty > 0
-          ? result.cummulativeQuoteQty / result.executedQty
-          : result.price;
+        result.executedQty > 0 ? result.cummulativeQuoteQty / result.executedQty : result.price;
       slice.placedAt = new Date().toISOString();
       slice.filledAt = new Date().toISOString();
 

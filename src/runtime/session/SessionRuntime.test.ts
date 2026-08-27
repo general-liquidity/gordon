@@ -16,10 +16,11 @@ afterEach(() => {
 describe("SessionRuntime", () => {
   it("preserves routed tool metadata when syncing tooling state", () => {
     const factory = new SessionRuntimeFactory({
-      resolveContext: async () => ({
-        userId: "user-1",
-        config: { permissionMode: "ask" },
-      }) as any,
+      resolveContext: async () =>
+        ({
+          userId: "user-1",
+          config: { permissionMode: "ask" },
+        }) as any,
     });
 
     try {
@@ -49,12 +50,41 @@ describe("SessionRuntime", () => {
 
   it("emits session start, stop, and end through the production runtime lifecycle", async () => {
     const events: string[] = [];
-    registerHook({ id: "start", point: "SessionStart", handler: () => { events.push("start"); return { action: "allow" }; } });
-    registerHook({ id: "stop", point: "Stop", handler: async () => { await Bun.sleep(5); events.push("stop"); return { action: "allow" }; } });
-    registerHook({ id: "end", point: "SessionEnd", handler: async () => { await Bun.sleep(5); events.push("end"); return { action: "allow" }; } });
-    const info = { resourceId: "user-1", threadId: "thread-1", isNewSession: true, previousThreadId: null };
+    registerHook({
+      id: "start",
+      point: "SessionStart",
+      handler: () => {
+        events.push("start");
+        return { action: "allow" };
+      },
+    });
+    registerHook({
+      id: "stop",
+      point: "Stop",
+      handler: async () => {
+        await Bun.sleep(5);
+        events.push("stop");
+        return { action: "allow" };
+      },
+    });
+    registerHook({
+      id: "end",
+      point: "SessionEnd",
+      handler: async () => {
+        await Bun.sleep(5);
+        events.push("end");
+        return { action: "allow" };
+      },
+    });
+    const info = {
+      resourceId: "user-1",
+      threadId: "thread-1",
+      isNewSession: true,
+      previousThreadId: null,
+    };
     const factory = new SessionRuntimeFactory({
-      resolveContext: async () => ({ userId: "user-1", config: { permissionMode: "ask" } }) as never,
+      resolveContext: async () =>
+        ({ userId: "user-1", config: { permissionMode: "ask" } }) as never,
       sessionController: {
         captureState: async () => ({ marker: "before" }),
         restoreState: async () => undefined,
@@ -86,7 +116,8 @@ describe("SessionRuntime", () => {
       },
     });
     const factory = new SessionRuntimeFactory({
-      resolveContext: async () => ({ userId: "user-1", config: { permissionMode: "ask" } }) as never,
+      resolveContext: async () =>
+        ({ userId: "user-1", config: { permissionMode: "ask" } }) as never,
     });
     factory.get("app", { sessionId: "app" });
 
@@ -102,12 +133,20 @@ describe("SessionRuntime", () => {
       point: "SessionStart",
       handler: () => ({ action: "block", reason: "maintenance window" }),
     });
-    const info = { resourceId: "user-2", threadId: "rejected-thread", isNewSession: true, previousThreadId: "old-thread" };
+    const info = {
+      resourceId: "user-2",
+      threadId: "rejected-thread",
+      isNewSession: true,
+      previousThreadId: "old-thread",
+    };
     const factory = new SessionRuntimeFactory({
-      resolveContext: async () => ({ userId: "user-2", config: { permissionMode: "ask" } }) as never,
+      resolveContext: async () =>
+        ({ userId: "user-2", config: { permissionMode: "ask" } }) as never,
       sessionController: {
         captureState: async () => ({ threadId: "old-thread" }),
-        restoreState: async (state: unknown) => { restored.push(state); },
+        restoreState: async (state: unknown) => {
+          restored.push(state);
+        },
         initializeSession: async () => info,
         resumeSession: async () => info,
         startNewSession: async () => info,
@@ -127,7 +166,8 @@ describe("SessionRuntime", () => {
 
   it("clears every session alias for the active ACE revision on synchronous teardown", () => {
     const factory = new SessionRuntimeFactory({
-      resolveContext: async () => ({ userId: "user-1", config: { permissionMode: "ask" } }) as never,
+      resolveContext: async () =>
+        ({ userId: "user-1", config: { permissionMode: "ask" } }) as never,
     });
     const runtime = factory.get("runtime-1", { sessionId: "session-1" });
     runtime.getState().session.threadId = "thread-1";

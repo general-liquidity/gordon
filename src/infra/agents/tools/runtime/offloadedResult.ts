@@ -30,10 +30,7 @@ export const OFFLOAD_READ_MAX_CHARS = 100_000;
 
 /** The only directories this tool will read from. */
 export function offloadRoots(): string[] {
-  return [
-    path.join(os.tmpdir(), "gordon-tool-results"),
-    path.join(GORDON_DIR, "tool-results"),
-  ];
+  return [path.join(os.tmpdir(), "gordon-tool-results"), path.join(GORDON_DIR, "tool-results")];
 }
 
 /** Resolve symlinks where the path exists; fall back to the lexical path. */
@@ -125,10 +122,7 @@ export const readOffloadedResultTool = createTool({
     "will refuse any path outside the offload directories.",
   ].join("\n"),
   inputSchema: z.object({
-    path: z
-      .string()
-      .min(1)
-      .describe("The spill path handed to you (scratchFile / _spilledTo)."),
+    path: z.string().min(1).describe("The spill path handed to you (scratchFile / _spilledTo)."),
     startChar: z
       .number()
       .int()

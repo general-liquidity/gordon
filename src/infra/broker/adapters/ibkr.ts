@@ -26,35 +26,21 @@ const IBKR_CONFIG: RestBrokerAdapterConfig = {
   // No defaultPaperBaseUrl: both used to resolve to the same gateway URL, which
   // presented a paper/live distinction the transport does not have.
   defaultLiveBaseUrl: process.env.IBKR_GATEWAY_URL ?? IBKR_DEFAULT_URL,
-  accountDiscoveryPaths: [
-    "/v1/api/iserver/accounts",
-  ],
-  clockPaths: [
-    "/v1/api/iserver/auth/status",
-  ],
-  accountPaths: [
-    "/v1/api/portfolio/{accountId}/summary",
-  ],
+  accountDiscoveryPaths: ["/v1/api/iserver/accounts"],
+  clockPaths: ["/v1/api/iserver/auth/status"],
+  accountPaths: ["/v1/api/portfolio/{accountId}/summary"],
   positionsPaths: [
     "/v1/api/portfolio/{accountId}/positions/0",
     "/v1/api/portfolio/{accountId}/positions",
   ],
-  openOrdersPaths: [
-    "/v1/api/iserver/account/orders",
-  ],
-  listOrdersPaths: [
-    "/v1/api/iserver/account/orders",
-  ],
+  openOrdersPaths: ["/v1/api/iserver/account/orders"],
+  listOrdersPaths: ["/v1/api/iserver/account/orders"],
   getOrderPaths: [
     "/v1/api/iserver/account/order/status/{orderId}",
     "/v1/api/iserver/account/orders",
   ],
-  placeOrderPaths: [
-    "/v1/api/iserver/account/{accountId}/orders",
-  ],
-  cancelOrderPaths: [
-    "/v1/api/iserver/account/{accountId}/order/{orderId}",
-  ],
+  placeOrderPaths: ["/v1/api/iserver/account/{accountId}/orders"],
+  cancelOrderPaths: ["/v1/api/iserver/account/{accountId}/order/{orderId}"],
   quotePaths: [
     "/v1/api/iserver/marketdata/snapshot?symbols={symbol}",
     "/v1/api/iserver/marketdata/snapshot?conids={symbol}",

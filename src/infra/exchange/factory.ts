@@ -4,7 +4,12 @@
  */
 
 import type { Exchange, ExchangeId, NativeExchangeId, ExchangeCredentials } from "./types.ts";
-import { isCcxtExchangeId, extractCcxtSubId, normalizeExchangeId, ccxtIdToNativeVenue } from "./types.ts";
+import {
+  isCcxtExchangeId,
+  extractCcxtSubId,
+  normalizeExchangeId,
+  ccxtIdToNativeVenue,
+} from "./types.ts";
 import { CcxtAdapter } from "./adapters/ccxt-adapter.ts";
 import { loadOAuthExchangeCredentials, exchangeSupportsOAuth } from "./oauth-bridge.ts";
 import { resolveFlag } from "../config/flagResolver.ts";
@@ -38,9 +43,10 @@ function getCacheKey(
 ): string {
   // Use first 8 characters of key as identifier to avoid storing full key.
   // For wallet-based venues (hyperliquid), use the wallet key; else the API key.
-  const key = ccxtIdToNativeVenue(exchangeId) === "hyperliquid"
-    ? credentials.walletPrivateKey || credentials.apiKey
-    : credentials.apiKey;
+  const key =
+    ccxtIdToNativeVenue(exchangeId) === "hyperliquid"
+      ? credentials.walletPrivateKey || credentials.apiKey
+      : credentials.apiKey;
   const keyPrefix = key.substring(0, 8);
   // The resolved mode is part of the adapter's identity: without it, a live
   // adapter cached earlier is handed back to a caller asking for sandbox.
@@ -52,7 +58,7 @@ function getCacheKey(
  *
  * Features:
  * - Singleton pattern for exchange instances (cached by exchange + credentials)
-   * - CCXT adapter for all supported exchanges
+ * - CCXT adapter for all supported exchanges
  *
  * @example
  * ```typescript
@@ -132,7 +138,7 @@ export class ExchangeFactory {
     assertSandboxSupported(canonical, resolvedSandbox);
 
     const cacheKey = getCacheKey(canonical, credentials, resolvedSandbox);
-    const cached = this.instanceCache.get(cacheKey);
+    const cached = ExchangeFactory.instanceCache.get(cacheKey);
     if (cached) return cached;
 
     // Per-venue auth requirements, still enforced before construction.
@@ -159,7 +165,7 @@ export class ExchangeFactory {
         : undefined,
     );
 
-    this.instanceCache.set(cacheKey, exchange);
+    ExchangeFactory.instanceCache.set(cacheKey, exchange);
     return exchange;
   }
 
@@ -178,10 +184,10 @@ export class ExchangeFactory {
         sandbox: fallbackCredentials.sandbox,
       });
       if (oauthCreds?.accessToken) {
-        return this.create(exchangeId, oauthCreds as ExchangeCredentials);
+        return ExchangeFactory.create(exchangeId, oauthCreds as ExchangeCredentials);
       }
     }
-    return this.create(exchangeId, fallbackCredentials);
+    return ExchangeFactory.create(exchangeId, fallbackCredentials);
   }
 
   static exchangeSupportsOAuth(exchangeId: ExchangeId): boolean {
@@ -213,7 +219,7 @@ export class ExchangeFactory {
    * Useful for testing or when credentials change
    */
   static clearCache(): void {
-    this.instanceCache.clear();
+    ExchangeFactory.instanceCache.clear();
   }
 
   /**
@@ -226,8 +232,8 @@ export class ExchangeFactory {
     // `create` caches under the canonical id, so normalize before evicting.
     const canonical = normalizeExchangeId(exchangeId);
     // The caller names credentials, not a mode, so evict both mode entries.
-    this.instanceCache.delete(getCacheKey(canonical, credentials, true));
-    this.instanceCache.delete(getCacheKey(canonical, credentials, false));
+    ExchangeFactory.instanceCache.delete(getCacheKey(canonical, credentials, true));
+    ExchangeFactory.instanceCache.delete(getCacheKey(canonical, credentials, false));
   }
 
   /**
@@ -236,6 +242,6 @@ export class ExchangeFactory {
    * @returns Number of cached exchange instances
    */
   static getCacheSize(): number {
-    return this.instanceCache.size;
+    return ExchangeFactory.instanceCache.size;
   }
 }

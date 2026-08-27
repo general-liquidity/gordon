@@ -70,7 +70,7 @@ describe("toolFrictionTracker — threshold + dedup", () => {
   test("records the tool name sequence in order", () => {
     const ctx = makeContext();
     const seq = ["alpha", "beta", "gamma", "delta", "epsilon"];
-    let last;
+    let last: ReturnType<typeof recordToolCallForFriction> | undefined;
     for (const t of seq) last = recordToolCallForFriction(ctx, t, { suppressFire: true });
     expect(last!.toolNames).toEqual(seq);
   });
@@ -91,13 +91,15 @@ describe("toolFrictionTracker — turn boundaries", () => {
     let firedFirstTurn = 0;
     let firedSecondTurn = 0;
     for (let i = 0; i < DEFAULT_FRICTION_THRESHOLD + 2; i++) {
-      if (recordToolCallForFriction(ctx, `t${i}`, { suppressFire: true }).frictionTriggered) firedFirstTurn += 1;
+      if (recordToolCallForFriction(ctx, `t${i}`, { suppressFire: true }).frictionTriggered)
+        firedFirstTurn += 1;
     }
     expect(firedFirstTurn).toBe(1);
 
     recordUserTurnStart(ctx);
     for (let i = 0; i < DEFAULT_FRICTION_THRESHOLD + 2; i++) {
-      if (recordToolCallForFriction(ctx, `u${i}`, { suppressFire: true }).frictionTriggered) firedSecondTurn += 1;
+      if (recordToolCallForFriction(ctx, `u${i}`, { suppressFire: true }).frictionTriggered)
+        firedSecondTurn += 1;
     }
     expect(firedSecondTurn).toBe(1);
   });

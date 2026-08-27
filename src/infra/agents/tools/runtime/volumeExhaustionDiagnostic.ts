@@ -30,10 +30,7 @@ export const volumeExhaustionDiagnosticTool = createTool({
       .number()
       .min(0)
       .describe("Mean USD volume over the entry-window candles."),
-    currentMeanVolUSD: z
-      .number()
-      .min(0)
-      .describe("Mean USD volume over the post-entry candles."),
+    currentMeanVolUSD: z.number().min(0).describe("Mean USD volume over the post-entry candles."),
     postEntryCandles: z
       .number()
       .int()

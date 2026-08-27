@@ -31,7 +31,6 @@ export function notify(title: string, body?: string): void {
     case "ghostty":
       process.stdout.write(wrapForMultiplexer(`\x1b]777;notify;${title};${body ?? ""}\x1b\\`));
       break;
-    case "bell":
     default:
       // Raw BEL, never wrapped — tmux must see \x07 to set the window bell flag.
       process.stdout.write("\x07");

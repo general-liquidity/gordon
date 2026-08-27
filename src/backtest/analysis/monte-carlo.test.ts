@@ -35,9 +35,7 @@ describe("Monte Carlo resampling", () => {
       seed: 42,
     });
     expect(r.returnDistribution.stdDev).toBeLessThan(1e-9);
-    expect(
-      r.robustness.observations.some((o) => o.includes("return variability")),
-    ).toBe(false);
+    expect(r.robustness.observations.some((o) => o.includes("return variability"))).toBe(false);
   });
 
   it("permutation still varies the drawdown, which is what it can measure", async () => {
@@ -61,9 +59,7 @@ describe("Monte Carlo resampling", () => {
       resampleMode: "bootstrap",
     });
     expect(r.returnDistribution.stdDev).toBeGreaterThan(0.5);
-    expect(
-      r.robustness.observations.some((o) => o.includes("return variability")),
-    ).toBe(true);
+    expect(r.robustness.observations.some((o) => o.includes("return variability"))).toBe(true);
   });
 
   it("is reproducible under a seed", async () => {

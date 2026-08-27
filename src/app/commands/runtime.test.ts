@@ -29,7 +29,8 @@ class MockSessionController extends SessionController {
 }
 
 function createMockContext(): GordonContext {
-  return {    exchange: null,
+  return {
+    exchange: null,
     broker: null,
     llm: {} as GordonContext["llm"],
     config: {
@@ -51,7 +52,7 @@ function createMockContext(): GordonContext {
         memoryWarningThreshold: 0.8,
       },
       permissionMode: "ask",
-      
+
       onboardingComplete: true,
       startupBannerMode: "full",
       useKeyring: false,
@@ -198,7 +199,9 @@ describe("runtime commands", () => {
 
       expect(formatRuntimeApprovals(runtime)).toContain("Runtime Approvals");
       expect(formatRuntimeApprovals(runtime)).toContain("12345678");
-      expect(applyRuntimeApprovalDecision(runtime, "12345678 persist", "approve")).toContain("Runtime Approval Approved");
+      expect(applyRuntimeApprovalDecision(runtime, "12345678 persist", "approve")).toContain(
+        "Runtime Approval Approved",
+      );
       expect(formatRuntimeHistory(runtime, "BTC 5")).toContain("No runtime history matches");
     } finally {
       factory.dispose();

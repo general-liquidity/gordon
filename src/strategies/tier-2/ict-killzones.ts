@@ -58,12 +58,12 @@ interface KillzoneDefinition {
 // Constants
 // ============================================================================
 
-const KILLZONES: KillzoneDefinition[] = [
-  { name: "asia", startHour: 20, endHour: 0 },       // 20:00-00:00 UTC (wraps midnight)
-  { name: "london", startHour: 2, endHour: 5 },       // 02:00-05:00 UTC
-  { name: "ny_am", startHour: 7, endHour: 10 },       // 07:00-10:00 UTC
-  { name: "ny_lunch", startHour: 12, endHour: 13 },   // 12:00-13:00 UTC
-  { name: "ny_pm", startHour: 13, endHour: 16 },      // 13:00-16:00 UTC
+const _KILLZONES: KillzoneDefinition[] = [
+  { name: "asia", startHour: 20, endHour: 0 }, // 20:00-00:00 UTC (wraps midnight)
+  { name: "london", startHour: 2, endHour: 5 }, // 02:00-05:00 UTC
+  { name: "ny_am", startHour: 7, endHour: 10 }, // 07:00-10:00 UTC
+  { name: "ny_lunch", startHour: 12, endHour: 13 }, // 12:00-13:00 UTC
+  { name: "ny_pm", startHour: 13, endHour: 16 }, // 13:00-16:00 UTC
 ];
 
 const MIN_CANDLES = 50;
@@ -95,20 +95,20 @@ export class IctKillzonesStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     // Guard: need intraday data for session detection
     if (!INTRADAY_TIMEFRAMES.includes(timeframe)) {
       return this.notDetected(
         "ICT Killzones requires intraday data (15m or 1h recommended). " +
-        "Cannot detect sessions on 4h/1d timeframes."
+          "Cannot detect sessions on 4h/1d timeframes.",
       );
     }
 
     const candles = await this.fetchCandles(ctx, symbol, timeframe, 200);
     if (candles.length < MIN_CANDLES) {
       return this.notDetected(
-        `Insufficient data (need ${MIN_CANDLES}+ candles, got ${candles.length})`
+        `Insufficient data (need ${MIN_CANDLES}+ candles, got ${candles.length})`,
       );
     }
 
@@ -121,30 +121,22 @@ export class IctKillzonesStrategy extends BaseStrategy {
     const latestCandle = candles[candles.length - 1]!;
     const currentHour = this.getUtcHour(latestCandle);
     if (currentHour === null) {
-      return this.notDetected(
-        "Cannot determine candle timestamp for session detection"
-      );
+      return this.notDetected("Cannot determine candle timestamp for session detection");
     }
 
     // Identify which killzone we are in (or approaching)
     const currentKillzone = this.identifyKillzone(currentHour);
     if (currentKillzone === null) {
-      return this.notDetected(
-        `Current hour (${currentHour} UTC) is not in an active killzone`
-      );
+      return this.notDetected(`Current hour (${currentHour} UTC) is not in an active killzone`);
     }
     if (currentKillzone === "ny_lunch") {
-      return this.notDetected(
-        "Currently in NY Lunch dead zone (12:00-13:00 UTC) — avoid trading"
-      );
+      return this.notDetected("Currently in NY Lunch dead zone (12:00-13:00 UTC) — avoid trading");
     }
 
     // Group candles by session and compute Asia range
     const asiaRange = this.computeSessionRange(candles, "asia");
     if (asiaRange === null || asiaRange.candleCount < 2) {
-      return this.notDetected(
-        "Not enough Asia session candles to define range"
-      );
+      return this.notDetected("Not enough Asia session candles to define range");
     }
 
     const asiaHigh = asiaRange.high;
@@ -188,24 +180,15 @@ export class IctKillzonesStrategy extends BaseStrategy {
     }
 
     if (breakoutDirection === null) {
-      return this.notDetected(
-        "Price is still within Asia range — no breakout detected"
-      );
+      return this.notDetected("Price is still within Asia range — no breakout detected");
     }
 
     // Determine if NY is continuing London direction
     let isLondonContinuation = false;
-    if (
-      londonRange !== null &&
-      nyAmRange !== null &&
-      currentKillzone === "ny_am"
-    ) {
+    if (londonRange !== null && nyAmRange !== null && currentKillzone === "ny_am") {
       if (breakoutDirection === "above" && nyAmRange.high > londonRange.high) {
         isLondonContinuation = true;
-      } else if (
-        breakoutDirection === "below" &&
-        nyAmRange.low < londonRange.low
-      ) {
+      } else if (breakoutDirection === "below" && nyAmRange.low < londonRange.low) {
         isLondonContinuation = true;
       }
     }
@@ -218,7 +201,7 @@ export class IctKillzonesStrategy extends BaseStrategy {
 
     // Clean Asia range (< 1.5 ATR): +0.10
     if (asiaRangeSize < atrVal * ASIA_RANGE_ATR_MAX) {
-      confidence += 0.10;
+      confidence += 0.1;
     }
 
     // London broke with conviction: +0.15
@@ -229,16 +212,12 @@ export class IctKillzonesStrategy extends BaseStrategy {
     // Volume increasing in killzone vs Asia: +0.10
     const sessionVolume = this.getCurrentSessionVolume(candles, currentKillzone);
     if (asiaRange.volume > 0 && sessionVolume > asiaRange.volume * 1.2) {
-      confidence += 0.10;
+      confidence += 0.1;
     }
 
     // RSI not extreme (30-70): +0.05
     const rsi = this.calculateRSI(candles);
-    if (
-      rsi.current !== null &&
-      rsi.current >= 30 &&
-      rsi.current <= 70
-    ) {
+    if (rsi.current !== null && rsi.current >= 30 && rsi.current <= 70) {
       confidence += 0.05;
     }
 
@@ -252,7 +231,7 @@ export class IctKillzonesStrategy extends BaseStrategy {
       (nearestResistance &&
         Math.abs(this.calculateDistancePercent(currentPrice, nearestResistance.price)) < 1.5);
     if (nearSR) {
-      confidence += 0.10;
+      confidence += 0.1;
     }
 
     // ========================================================================
@@ -273,10 +252,10 @@ export class IctKillzonesStrategy extends BaseStrategy {
 
     const reasons: string[] = [];
     reasons.push(
-      `Currently in ${currentKillzone.toUpperCase()} killzone (hour ${currentHour} UTC)`
+      `Currently in ${currentKillzone.toUpperCase()} killzone (hour ${currentHour} UTC)`,
     );
     reasons.push(
-      `Asia range: ${asiaLow.toFixed(2)} - ${asiaHigh.toFixed(2)} (${asiaRangeSize.toFixed(2)})`
+      `Asia range: ${asiaLow.toFixed(2)} - ${asiaHigh.toFixed(2)} (${asiaRangeSize.toFixed(2)})`,
     );
     reasons.push(`Breakout ${breakoutDirection} Asia range`);
     if (breakoutConviction) {
@@ -299,10 +278,7 @@ export class IctKillzonesStrategy extends BaseStrategy {
   // Plan Parameters
   // ==========================================================================
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "1h", 200);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const atr = this.calculateATR(candles);
@@ -312,7 +288,7 @@ export class IctKillzonesStrategy extends BaseStrategy {
     const asiaRange = this.computeSessionRange(candles, "asia");
     const asiaHigh = asiaRange?.high ?? currentPrice + atrVal;
     const asiaLow = asiaRange?.low ?? currentPrice - atrVal;
-    const asiaRangeSize = asiaHigh - asiaLow;
+    const _asiaRangeSize = asiaHigh - asiaLow;
 
     // Determine breakout direction
     let breakoutDirection: "above" | "below" = "above";
@@ -336,25 +312,22 @@ export class IctKillzonesStrategy extends BaseStrategy {
     const risk = Math.abs(entryPrice - stopLoss);
 
     // TP1: 1R (40%), TP2: 2R (35%), TP3: 3R (25%)
-    let takeProfits;
+    let takeProfits: Array<{ price: number; percentToSell: number }>;
     if (breakoutDirection === "above") {
       takeProfits = [
-        { price: entryPrice + risk * 1, percentToSell: 0.40 },
+        { price: entryPrice + risk * 1, percentToSell: 0.4 },
         { price: entryPrice + risk * 2, percentToSell: 0.35 },
         { price: entryPrice + risk * 3, percentToSell: 0.25 },
       ];
     } else {
       takeProfits = [
-        { price: entryPrice - risk * 1, percentToSell: 0.40 },
+        { price: entryPrice - risk * 1, percentToSell: 0.4 },
         { price: entryPrice - risk * 2, percentToSell: 0.35 },
         { price: entryPrice - risk * 3, percentToSell: 0.25 },
       ];
     }
 
-    const avgTp = takeProfits.reduce(
-      (sum, tp) => sum + tp.price * tp.percentToSell,
-      0
-    );
+    const avgTp = takeProfits.reduce((sum, tp) => sum + tp.price * tp.percentToSell, 0);
     const riskRewardRatio = this.calculateRiskReward(entryPrice, stopLoss, avgTp);
 
     return {
@@ -431,7 +404,7 @@ When creating a plan using the ICT Killzones strategy:
     bar: OHLC,
     index: number,
     data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     // Need enough history for session analysis
     if (index < 30) return null;
@@ -521,20 +494,14 @@ When creating a plan using the ICT Killzones strategy:
       }
     } else if (inLondon) {
       // During London session: detect initial breakout
-      if (
-        bar.close > asiaHigh + atr * BREAKOUT_ATR_FACTOR &&
-        cleanRange
-      ) {
+      if (bar.close > asiaHigh + atr * BREAKOUT_ATR_FACTOR && cleanRange) {
         return {
           type: "BUY",
           price: bar.close,
           timestamp: bar.timestamp,
           reason: `ICT Killzones: London breakout above Asia range with conviction (${asiaLow.toFixed(2)}-${asiaHigh.toFixed(2)})`,
         };
-      } else if (
-        bar.close < asiaLow - atr * BREAKOUT_ATR_FACTOR &&
-        cleanRange
-      ) {
+      } else if (bar.close < asiaLow - atr * BREAKOUT_ATR_FACTOR && cleanRange) {
         return {
           type: "SELL",
           price: bar.close,
@@ -604,10 +571,7 @@ When creating a plan using the ICT Killzones strategy:
    * Looks through recent candles (backward from end) to find the most recent
    * occurrence of the session.
    */
-  private computeSessionRange(
-    candles: Candle[],
-    session: KillzoneName
-  ): SessionRange | null {
+  private computeSessionRange(candles: Candle[], session: KillzoneName): SessionRange | null {
     let high = -Infinity;
     let low = Infinity;
     let volume = 0;
@@ -617,7 +581,7 @@ When creating a plan using the ICT Killzones strategy:
     // Limit search to last 96 candles (covers ~4 days on 1h, ~1 day on 15m)
     const searchLimit = Math.max(0, candles.length - 96);
     let foundSession = false;
-    let passedSession = false;
+    let _passedSession = false;
 
     for (let i = candles.length - 1; i >= searchLimit; i--) {
       const candle = candles[i]!;
@@ -634,7 +598,7 @@ When creating a plan using the ICT Killzones strategy:
         count++;
       } else if (foundSession && !inSession) {
         // We've passed through the session, stop collecting
-        passedSession = true;
+        _passedSession = true;
         break;
       }
     }
@@ -647,10 +611,7 @@ When creating a plan using the ICT Killzones strategy:
   /**
    * Get aggregate volume for candles in the current session.
    */
-  private getCurrentSessionVolume(
-    candles: Candle[],
-    session: KillzoneName
-  ): number {
+  private getCurrentSessionVolume(candles: Candle[], session: KillzoneName): number {
     let volume = 0;
     // Look at last 20 candles for current session volume
     const startIdx = Math.max(0, candles.length - 20);

@@ -1,4 +1,3 @@
-import React from "react";
 import { Text } from "../../ink-custom";
 
 // ============================================================================
@@ -18,12 +17,12 @@ interface ModeConfig {
 }
 
 const MODE_CONFIG: Record<string, ModeConfig> = {
-  auto:    { label: "[AUTO]",   color: "cyanBright" },
-  ask:     { label: "[ASK]",    color: "yellow"     },
-  strict:  { label: "[STRICT]", color: "red"        },
-  paper:   { label: "[PAPER]",  color: "blue"       },
-  observe: { label: "[OBS]",    color: "gray"       },
-  plan:    { label: "[PLAN]",   color: "magenta"    },
+  auto: { label: "[AUTO]", color: "cyanBright" },
+  ask: { label: "[ASK]", color: "yellow" },
+  strict: { label: "[STRICT]", color: "red" },
+  paper: { label: "[PAPER]", color: "blue" },
+  observe: { label: "[OBS]", color: "gray" },
+  plan: { label: "[PLAN]", color: "magenta" },
 };
 
 export function PromptInputModeIndicator({ mode }: Props) {

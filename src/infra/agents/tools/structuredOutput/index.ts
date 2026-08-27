@@ -56,14 +56,10 @@ export interface StructuredOutputValidationError {
   message: string;
 }
 
-export type StructuredOutputResult =
-  | StructuredOutputSuccess
-  | StructuredOutputValidationError;
+export type StructuredOutputResult = StructuredOutputSuccess | StructuredOutputValidationError;
 
 /** Type guard — true when the tool emitted a final validated result. */
-export function isStructuredOutputSuccess(
-  result: unknown,
-): result is StructuredOutputSuccess {
+export function isStructuredOutputSuccess(result: unknown): result is StructuredOutputSuccess {
   return (
     typeof result === "object" &&
     result !== null &&

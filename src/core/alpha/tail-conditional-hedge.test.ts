@@ -32,7 +32,7 @@ function buildTargetWithRegimes(n: number, seed: number): number[] {
   const out: number[] = [];
   for (let i = 0; i < n; i++) {
     // Every 50 steps inject a crisis window of ~10 steps
-    const inCrisis = (i % 50) >= 40;
+    const inCrisis = i % 50 >= 40;
     const vol = inCrisis ? 0.04 : 0.008;
     const drift = inCrisis ? -0.005 : 0.0005;
     out.push(drift + vol * gaussian(rng));
@@ -45,7 +45,7 @@ function buildPeaceTimeHedge(target: number[], seed: number): number[] {
   const rng = mulberry32(seed);
   const out: number[] = [];
   for (let i = 0; i < target.length; i++) {
-    const inCrisis = (i % 50) >= 40;
+    const inCrisis = i % 50 >= 40;
     if (inCrisis) {
       // In crisis, the hedge moves WITH the target — fails as a hedge
       out.push(0.5 * target[i]! + 0.005 * gaussian(rng));
@@ -190,9 +190,9 @@ describe("classifyTailConditionalHedges", () => {
     // Default: top 10% tail, bottom 50% peace
     const valid = target.length - 19;
     expect(r.tailObservations).toBeGreaterThan(valid * 0.05);
-    expect(r.tailObservations).toBeLessThan(valid * 0.20);
-    expect(r.peaceObservations).toBeGreaterThan(valid * 0.40);
-    expect(r.peaceObservations).toBeLessThan(valid * 0.60);
+    expect(r.tailObservations).toBeLessThan(valid * 0.2);
+    expect(r.peaceObservations).toBeGreaterThan(valid * 0.4);
+    expect(r.peaceObservations).toBeLessThan(valid * 0.6);
   });
 
   test("Matt's Treasury hedge anecdote: peace-time correlation strong, tail-time fails", () => {

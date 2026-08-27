@@ -5,24 +5,9 @@
  * compatible with the backtesting engine.
  */
 
-import type {
-  StrategyDSL,
-  SignalRule,
-  Condition,
-  StopLoss,
-  TakeProfit,
-} from "./schema.ts";
-import type {
-  OHLC,
-  Signal,
-  IndicatorState,
-  Position,
-} from "../../backtest/types.ts";
-import {
-  evaluateCondition,
-  evaluateSignalRule,
-  type EvaluationContext,
-} from "./conditions.ts";
+import type { StrategyDSL, SignalRule, TakeProfit } from "./schema.ts";
+import type { OHLC, Signal, IndicatorState, Position } from "../../backtest/types.ts";
+import { evaluateSignalRule, type EvaluationContext } from "./conditions.ts";
 
 // ============================================================================
 // DSL Strategy Adapter
@@ -49,11 +34,7 @@ export class DSLStrategyAdapter {
    * Generate a trading signal based on the DSL rules.
    * This is the main interface for the backtesting engine.
    */
-  generateSignal(
-    bar: OHLC,
-    indicators: IndicatorState,
-    position: Position | null
-  ): Signal {
+  generateSignal(bar: OHLC, indicators: IndicatorState, position: Position | null): Signal {
     const ctx: EvaluationContext = {
       bar,
       indicators,
@@ -176,7 +157,7 @@ export class DSLStrategyAdapter {
   private evaluateEntryRules(
     rules: SignalRule[],
     direction: "LONG" | "SHORT",
-    ctx: EvaluationContext
+    ctx: EvaluationContext,
   ): Signal | null {
     let totalWeight = 0;
     let weightedScore = 0;
@@ -216,7 +197,7 @@ export class DSLStrategyAdapter {
   private checkExitConditions(
     bar: OHLC,
     indicators: IndicatorState,
-    position: Position
+    position: Position,
   ): Signal | null {
     const { exitRules } = this.dsl;
 
@@ -279,7 +260,7 @@ export class DSLStrategyAdapter {
   private calculateStopPrice(
     position: Position,
     indicators: IndicatorState,
-    bar: OHLC
+    _bar: OHLC,
   ): number | null {
     const { stopLoss } = this.dsl.exitRules;
     const entry = position.entryPrice;
@@ -287,9 +268,7 @@ export class DSLStrategyAdapter {
     switch (stopLoss.type) {
       case "percent": {
         const stopDistance = entry * (stopLoss.value / 100);
-        return position.side === "LONG"
-          ? entry - stopDistance
-          : entry + stopDistance;
+        return position.side === "LONG" ? entry - stopDistance : entry + stopDistance;
       }
 
       case "atr": {
@@ -297,9 +276,7 @@ export class DSLStrategyAdapter {
         if (atr === null || atr === undefined) return null;
         const multiplier = stopLoss.multiplier ?? 2;
         const stopDistance = atr * multiplier;
-        return position.side === "LONG"
-          ? entry - stopDistance
-          : entry + stopDistance;
+        return position.side === "LONG" ? entry - stopDistance : entry + stopDistance;
       }
 
       case "support": {
@@ -311,9 +288,7 @@ export class DSLStrategyAdapter {
       }
 
       case "fixed": {
-        return position.side === "LONG"
-          ? entry - stopLoss.value
-          : entry + stopLoss.value;
+        return position.side === "LONG" ? entry - stopLoss.value : entry + stopLoss.value;
       }
 
       default:
@@ -328,10 +303,9 @@ export class DSLStrategyAdapter {
     position: Position,
     tp: TakeProfit,
     indicators: IndicatorState,
-    bar: OHLC
+    bar: OHLC,
   ): number | null {
     const entry = position.entryPrice;
-    const { stopLoss } = this.dsl.exitRules;
 
     // Handle special target types
     if (typeof tp.target === "string") {
@@ -342,9 +316,7 @@ export class DSLStrategyAdapter {
         const atr = indicators.atr14;
         if (atr === null || atr === undefined) return null;
         const targetValue = tp.targetValue ?? 3;
-        return position.side === "LONG"
-          ? entry + atr * targetValue
-          : entry - atr * targetValue;
+        return position.side === "LONG" ? entry + atr * targetValue : entry - atr * targetValue;
       }
       return null;
     }
@@ -359,9 +331,7 @@ export class DSLStrategyAdapter {
     const risk = Math.abs(entry - stopPrice);
     const reward = risk * rrRatio;
 
-    return position.side === "LONG"
-      ? entry + reward
-      : entry - reward;
+    return position.side === "LONG" ? entry + reward : entry - reward;
   }
 
   /**
@@ -370,24 +340,24 @@ export class DSLStrategyAdapter {
   private checkTrailingStop(
     bar: OHLC,
     position: Position,
-    config: NonNullable<StrategyDSL["exitRules"]["trailingStop"]>
+    config: NonNullable<StrategyDSL["exitRules"]["trailingStop"]>,
   ): Signal | null {
     const { activation, distance } = config;
     if (!activation || !distance) return null;
 
     const entry = position.entryPrice;
-    const pnlPercent = position.side === "LONG"
-      ? ((bar.close - entry) / entry) * 100
-      : ((entry - bar.close) / entry) * 100;
+    const pnlPercent =
+      position.side === "LONG"
+        ? ((bar.close - entry) / entry) * 100
+        : ((entry - bar.close) / entry) * 100;
 
     // Only activate if profit threshold reached
     if (pnlPercent < activation) return null;
 
     // Calculate trailing stop price
     const trailDistance = bar.close * (distance / 100);
-    const trailPrice = position.side === "LONG"
-      ? bar.close - trailDistance
-      : bar.close + trailDistance;
+    const trailPrice =
+      position.side === "LONG" ? bar.close - trailDistance : bar.close + trailDistance;
 
     // Check if price hit trailing stop
     if (position.side === "LONG" && bar.low <= trailPrice) {

@@ -11,7 +11,15 @@ function c(openTime: number, low: number, high: number, close = (low + high) / 2
   return { openTime, open: close, high, low, close, volume: 1, closeTime: openTime + 1 };
 }
 
-const LONG: DeclinedDecision = { id: "d1", symbol: "BTCUSDT", side: "long", entry: 100, stop: 95, target: 110, decidedAt: 0 };
+const LONG: DeclinedDecision = {
+  id: "d1",
+  symbol: "BTCUSDT",
+  side: "long",
+  entry: 100,
+  stop: 95,
+  target: 110,
+  decidedAt: 0,
+};
 
 describe("scoreDeclinedDecision", () => {
   it("credits a veto that dodged a loss (would have hit stop → +1R veto value)", () => {
@@ -43,7 +51,15 @@ describe("scoreDeclinedDecision", () => {
   });
 
   it("handles the short side (stop is above entry)", () => {
-    const short: DeclinedDecision = { id: "s1", symbol: "ETHUSDT", side: "short", entry: 100, stop: 105, target: 90, decidedAt: 0 };
+    const short: DeclinedDecision = {
+      id: "s1",
+      symbol: "ETHUSDT",
+      side: "short",
+      entry: 100,
+      stop: 105,
+      target: 90,
+      decidedAt: 0,
+    };
     const o = scoreDeclinedDecision(short, [c(1, 99, 106)])!;
     expect(o.wouldHave).toBe("hit_stop");
     expect(o.vetoValueR).toBeCloseTo(1, 9); // avoided a 1R loss

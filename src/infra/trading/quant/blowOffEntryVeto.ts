@@ -112,10 +112,7 @@ const DOWNGRADE_THRESHOLD = 40;
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
 
-function allow(
-  reasoning: string,
-  partial: Partial<BlowOffVetoResult> = {},
-): BlowOffVetoResult {
+function allow(reasoning: string, partial: Partial<BlowOffVetoResult> = {}): BlowOffVetoResult {
   return {
     verdict: "allow",
     vetoScore: 0,
@@ -141,11 +138,7 @@ function perBarAtr(candles: ReadonlyArray<BlowOffCandle>, lookback: number): num
     const cur = candles[i]!;
     const prevClose = candles[i - 1]!.close;
     trs.push(
-      Math.max(
-        cur.high - cur.low,
-        Math.abs(cur.high - prevClose),
-        Math.abs(cur.low - prevClose),
-      ),
+      Math.max(cur.high - cur.low, Math.abs(cur.high - prevClose), Math.abs(cur.low - prevClose)),
     );
   }
   if (trs.length === 0) return 0;
@@ -167,7 +160,9 @@ export function assessBlowOffEntryVeto(input: BlowOffVetoInput): BlowOffVetoResu
   const n = candles.length;
 
   if (n < extensionBars + 1) {
-    return allow(`insufficient bars for vertical-extension (need >= ${extensionBars + 1}, got ${n})`);
+    return allow(
+      `insufficient bars for vertical-extension (need >= ${extensionBars + 1}, got ${n})`,
+    );
   }
 
   // Vertical extension: net close-to-close move over the trailing window.
@@ -190,8 +185,7 @@ export function assessBlowOffEntryVeto(input: BlowOffVetoInput): BlowOffVetoResu
   const parabolic = extensionAtrMultiple >= parabolicMult && directionalAgreement >= minAgreement;
   const blowOffDirection: "up" | "down" | "none" = parabolic ? moveDir : "none";
   const chasing =
-    (input.side === "long" && moveDir === "up") ||
-    (input.side === "short" && moveDir === "down");
+    (input.side === "long" && moveDir === "up") || (input.side === "short" && moveDir === "down");
 
   // ── ATR daily-progression leg ──
   const progCandles: AtrProgressionCandle[] = candles.map((c) => ({
@@ -286,8 +280,7 @@ export function assessBlowOffEntryVeto(input: BlowOffVetoInput): BlowOffVetoResu
     return {
       ...base,
       vetoScore: 0,
-      reasoning:
-        `blow-off is ${blowOffDirection} but ${input.side} entry fades it — counter-trend entry allowed`,
+      reasoning: `blow-off is ${blowOffDirection} but ${input.side} entry fades it — counter-trend entry allowed`,
     };
   }
 

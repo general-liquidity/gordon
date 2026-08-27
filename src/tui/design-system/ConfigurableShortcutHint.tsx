@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Text } from "../ink-custom";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -61,8 +61,8 @@ export function ConfigurableShortcutHint({ action, fallback, label }: Props) {
         >;
 
         // Support old format: { bindings: [...] } from keybindings.ts
-        if (parsed["bindings"] && Array.isArray((parsed as any)["bindings"])) {
-          const bindings: Array<{ key: string; action: string }> = (parsed as any)["bindings"];
+        if (parsed.bindings && Array.isArray((parsed as any).bindings)) {
+          const bindings: Array<{ key: string; action: string }> = (parsed as any).bindings;
           const match = bindings.find((b) => b.action === action);
           if (match && !cancelled) {
             setKeyDisplay(formatKey(match.key));

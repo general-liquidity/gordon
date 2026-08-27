@@ -136,7 +136,9 @@ export function simulateDoubleHalfPath(
 
 export function formatRebalance(result: RebalanceResult): string {
   const lines: string[] = [];
-  lines.push(`Shannon's Demon rebalance ($${result.totalValueUsd.toFixed(2)}): ${result.triggered ? "TRIGGERED" : "skipped"}`);
+  lines.push(
+    `Shannon's Demon rebalance ($${result.totalValueUsd.toFixed(2)}): ${result.triggered ? "TRIGGERED" : "skipped"}`,
+  );
   lines.push(`  ${result.reason}`);
   if (result.triggered) {
     for (const t of result.trades) {

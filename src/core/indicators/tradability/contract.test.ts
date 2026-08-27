@@ -19,21 +19,9 @@ import {
 
 const WINDOW = 4;
 const SERIES = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
-const MASK = maskFromFlags([
-  true,
-  true,
-  false,
-  true,
-  true,
-  true,
-  true,
-  false,
-  true,
-  true,
-]);
+const MASK = maskFromFlags([true, true, false, true, true, true, true, false, true, true]);
 
-const correctOperator: MaskedOperator = (series, mask) =>
-  maskedRollingMean(series, mask, WINDOW);
+const correctOperator: MaskedOperator = (series, mask) => maskedRollingMean(series, mask, WINDOW);
 
 /** Averages the whole window regardless of executability: the bug this module exists to catch. */
 const leakyOperator: MaskedOperator = (series, mask) => {

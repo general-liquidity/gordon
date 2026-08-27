@@ -9,8 +9,6 @@
 
 import { createModuleLogger } from "../../logger/index.ts";
 import { listTrades } from "../../storage/entities/trades.ts";
-import { listPlans } from "../../storage/entities/plans.ts";
-import type { Trade, Plan } from "../../../types/index.ts";
 
 const logger = createModuleLogger("metrics");
 
@@ -138,7 +136,7 @@ export interface AgentCallRecord {
  * guard; this is a coarse secondary ceiling, not the primary safety control.
  */
 const DEFAULT_RATE_LIMIT = (() => {
-  const raw = process.env["GORDON_TOOL_RATE_LIMIT"];
+  const raw = process.env.GORDON_TOOL_RATE_LIMIT;
   if (raw == null || raw === "") return 60;
   const n = Number(raw);
   return Number.isFinite(n) && n >= 0 ? n : 60;
@@ -297,14 +295,14 @@ export function calculateRiskMetrics(): RiskMetrics {
   const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
 
   // Standard deviation of returns
-  const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
+  const variance = returns.reduce((sum, r) => sum + (r - avgReturn) ** 2, 0) / returns.length;
   const stdDev = Math.sqrt(variance);
 
   // Downside deviation (for Sortino)
   const negativeReturns = returns.filter((r) => r < 0);
   const downsideVariance =
     negativeReturns.length > 0
-      ? negativeReturns.reduce((sum, r) => sum + Math.pow(r, 2), 0) / negativeReturns.length
+      ? negativeReturns.reduce((sum, r) => sum + r ** 2, 0) / negativeReturns.length
       : 0;
   const downsideDeviation = Math.sqrt(downsideVariance);
 
@@ -316,7 +314,9 @@ export function calculateRiskMetrics(): RiskMetrics {
 
   // Sortino Ratio (annualized)
   const sortinoRatio =
-    downsideDeviation > 0 ? ((avgReturn - riskFreeRate) / downsideDeviation) * Math.sqrt(365) : null;
+    downsideDeviation > 0
+      ? ((avgReturn - riskFreeRate) / downsideDeviation) * Math.sqrt(365)
+      : null;
 
   // Max Drawdown calculation
   let peak = 0;
@@ -418,7 +418,7 @@ function cleanupRateLimitTracker(key: string): void {
   if (!timestamps) return;
 
   const now = Date.now();
-  const validTimestamps = timestamps.filter(ts => now - ts < RATE_LIMIT_WINDOW_MS);
+  const validTimestamps = timestamps.filter((ts) => now - ts < RATE_LIMIT_WINDOW_MS);
 
   if (validTimestamps.length === 0) {
     rateLimitTracker.delete(key);
@@ -438,7 +438,7 @@ function cleanupRateLimitTracker(key: string): void {
 export function checkRateLimit(
   agentName: string,
   toolName: string,
-  limit: number = DEFAULT_RATE_LIMIT
+  limit: number = DEFAULT_RATE_LIMIT,
 ): RateLimitResult {
   // limit <= 0 disables rate limiting (GORDON_TOOL_RATE_LIMIT=0).
   if (limit <= 0) {
@@ -484,7 +484,8 @@ export function checkRateLimit(
   return {
     allowed: true,
     remaining: remaining - 1, // After this call
-    resetInMs: timestamps.length > 0 ? RATE_LIMIT_WINDOW_MS - (now - timestamps[0]!) : RATE_LIMIT_WINDOW_MS,
+    resetInMs:
+      timestamps.length > 0 ? RATE_LIMIT_WINDOW_MS - (now - timestamps[0]!) : RATE_LIMIT_WINDOW_MS,
   };
 }
 
@@ -514,7 +515,7 @@ export function recordRateLimitedCall(agentName: string, toolName: string): void
 export function enforceRateLimit(
   agentName: string,
   toolName: string,
-  limit: number = DEFAULT_RATE_LIMIT
+  limit: number = DEFAULT_RATE_LIMIT,
 ): RateLimitResult {
   const result = checkRateLimit(agentName, toolName, limit);
 
@@ -531,7 +532,7 @@ export function enforceRateLimit(
 export function getRateLimitStatus(
   agentName: string,
   toolName: string,
-  limit: number = DEFAULT_RATE_LIMIT
+  limit: number = DEFAULT_RATE_LIMIT,
 ): {
   used: number;
   remaining: number;
@@ -544,9 +545,10 @@ export function getRateLimitStatus(
   const timestamps = rateLimitTracker.get(key) || [];
   const used = timestamps.length;
   const remaining = Math.max(0, limit - used);
-  const resetInMs = timestamps.length > 0
-    ? RATE_LIMIT_WINDOW_MS - (Date.now() - timestamps[0]!)
-    : RATE_LIMIT_WINDOW_MS;
+  const resetInMs =
+    timestamps.length > 0
+      ? RATE_LIMIT_WINDOW_MS - (Date.now() - timestamps[0]!)
+      : RATE_LIMIT_WINDOW_MS;
 
   return {
     used,
@@ -584,7 +586,7 @@ export function getRateLimitViolations(options?: {
 }): number {
   const since = options?.sinceMs ? Date.now() - options.sinceMs : 0;
 
-  return sessionMetrics.rateLimitViolations.filter(v => {
+  return sessionMetrics.rateLimitViolations.filter((v) => {
     if (v.timestamp < since) return false;
     if (options?.agentName && v.agentName !== options.agentName) return false;
     if (options?.toolName && v.toolName !== options.toolName) return false;
@@ -622,7 +624,7 @@ export function recordAgentCall(
   success: boolean,
   tokens: number,
   errorType?: string,
-  errorMessage?: string
+  errorMessage?: string,
 ): void {
   const record: AgentCallRecord = {
     agentName,
@@ -654,9 +656,7 @@ export function recordAgentCall(
  * Get metrics for a specific agent
  */
 export function getAgentMetrics(agentName: string): PerAgentMetrics {
-  const agentCalls = sessionMetrics.agentCalls.filter(
-    (call) => call.agentName === agentName
-  );
+  const agentCalls = sessionMetrics.agentCalls.filter((call) => call.agentName === agentName);
 
   if (agentCalls.length === 0) {
     return {
@@ -692,13 +692,11 @@ export function getAgentMetrics(agentName: string): PerAgentMetrics {
   }
 
   // Get recent errors (last 10)
-  const recentErrors = failedCalls
-    .slice(-10)
-    .map((call) => ({
-      timestamp: call.timestamp,
-      errorType: call.errorType || "Unknown",
-      message: call.errorMessage || "No message",
-    }));
+  const recentErrors = failedCalls.slice(-10).map((call) => ({
+    timestamp: call.timestamp,
+    errorType: call.errorType || "Unknown",
+    message: call.errorMessage || "No message",
+  }));
 
   return {
     agentName,
@@ -744,7 +742,8 @@ export function getAgentHealthReport(): AgentHealthReport {
   for (const [name, metrics] of Object.entries(agents)) {
     if (metrics.totalCalls >= 3 && metrics.successRate < 0.8) {
       unhealthyAgents.push(name);
-    } else if (metrics.avgLatencyMs > 30000) { // > 30 seconds average
+    } else if (metrics.avgLatencyMs > 30000) {
+      // > 30 seconds average
       unhealthyAgents.push(name);
     }
   }
@@ -761,20 +760,22 @@ export function getAgentHealthReport(): AgentHealthReport {
   // Generate recommendations
   const recommendations: string[] = [];
   if (unhealthyAgents.length > 0) {
-    recommendations.push(
-      `Investigate failing agents: ${unhealthyAgents.join(", ")}`
-    );
+    recommendations.push(`Investigate failing agents: ${unhealthyAgents.join(", ")}`);
   }
   if (overallSuccessRate < 0.9) {
     recommendations.push("Overall success rate is below 90%. Check for systematic issues.");
   }
   for (const [name, metrics] of Object.entries(agents)) {
     if (metrics.avgLatencyMs > 10000) {
-      recommendations.push(`${name} has high latency (${(metrics.avgLatencyMs / 1000).toFixed(1)}s avg). Consider optimization.`);
+      recommendations.push(
+        `${name} has high latency (${(metrics.avgLatencyMs / 1000).toFixed(1)}s avg). Consider optimization.`,
+      );
     }
     const topError = Object.entries(metrics.errorTypes).sort(([, a], [, b]) => b - a)[0];
     if (topError && topError[1] >= 3) {
-      recommendations.push(`${name} frequently fails with "${topError[0]}" (${topError[1]} times).`);
+      recommendations.push(
+        `${name} frequently fails with "${topError[0]}" (${topError[1]} times).`,
+      );
     }
   }
 
@@ -804,10 +805,12 @@ export function formatAgentHealthReport(): string {
   lines.push("");
 
   // Overall health
-  const healthEmoji = report.overallHealthScore >= 90 ? "GREEN" :
-                      report.overallHealthScore >= 70 ? "YELLOW" : "RED";
+  const healthEmoji =
+    report.overallHealthScore >= 90 ? "GREEN" : report.overallHealthScore >= 70 ? "YELLOW" : "RED";
   lines.push(`Overall Health: ${report.overallHealthScore}/100 [${healthEmoji}]`);
-  lines.push(`Total Calls: ${report.totalAgentCalls} (${report.totalSuccessfulCalls} OK, ${report.totalFailedCalls} FAILED)`);
+  lines.push(
+    `Total Calls: ${report.totalAgentCalls} (${report.totalSuccessfulCalls} OK, ${report.totalFailedCalls} FAILED)`,
+  );
   lines.push(`Success Rate: ${(report.overallSuccessRate * 100).toFixed(1)}%`);
   lines.push("");
 
@@ -816,12 +819,17 @@ export function formatAgentHealthReport(): string {
   lines.push("───────────────────────────────────────────");
 
   for (const [agentName, metrics] of Object.entries(report.agents)) {
-    const status = metrics.successRate >= 0.9 ? "OK" :
-                   metrics.successRate >= 0.7 ? "WARN" : "FAIL";
+    const status = metrics.successRate >= 0.9 ? "OK" : metrics.successRate >= 0.7 ? "WARN" : "FAIL";
     lines.push(`[${status}] ${agentName}`);
-    lines.push(`    Calls: ${metrics.totalCalls} | Success: ${(metrics.successRate * 100).toFixed(1)}%`);
-    lines.push(`    Latency: ${metrics.avgLatencyMs.toFixed(0)}ms avg (${metrics.minLatencyMs.toFixed(0)}-${metrics.maxLatencyMs.toFixed(0)}ms)`);
-    lines.push(`    Tokens: ${metrics.totalTokens} total (${metrics.avgTokensPerCall.toFixed(0)} avg/call)`);
+    lines.push(
+      `    Calls: ${metrics.totalCalls} | Success: ${(metrics.successRate * 100).toFixed(1)}%`,
+    );
+    lines.push(
+      `    Latency: ${metrics.avgLatencyMs.toFixed(0)}ms avg (${metrics.minLatencyMs.toFixed(0)}-${metrics.maxLatencyMs.toFixed(0)}ms)`,
+    );
+    lines.push(
+      `    Tokens: ${metrics.totalTokens} total (${metrics.avgTokensPerCall.toFixed(0)} avg/call)`,
+    );
     if (Object.keys(metrics.errorTypes).length > 0) {
       const errStr = Object.entries(metrics.errorTypes)
         .map(([type, count]) => `${type}: ${count}`)
@@ -856,7 +864,7 @@ export function calculateAgentMetrics(): AgentMetrics {
   const errors = sessionMetrics.errors;
   const networkRoutings = sessionMetrics.networkRoutings;
 
-  const successfulRequests = requests.filter((r) => r.success);
+  const _successfulRequests = requests.filter((r) => r.success);
   const successfulToolCalls = toolCalls.filter((t) => t.success);
 
   return {
@@ -942,13 +950,27 @@ export function formatMetricsReport(): string {
   // Trade Performance
   lines.push("📊 TRADE PERFORMANCE");
   lines.push("───────────────────────────────────────────");
-  lines.push(`Total Trades: ${metrics.trade.totalTrades} (${metrics.trade.openTrades} open, ${metrics.trade.closedTrades} closed)`);
-  lines.push(`Win Rate: ${(metrics.trade.winRate * 100).toFixed(1)}% (${metrics.trade.winningTrades}W / ${metrics.trade.losingTrades}L)`);
-  lines.push(`Profit Factor: ${metrics.trade.profitFactor === Infinity ? "∞" : metrics.trade.profitFactor.toFixed(2)}`);
-  lines.push(`Total P&L: $${metrics.trade.totalPnl.toFixed(2)} (${metrics.trade.totalPnlPercent.toFixed(2)}%)`);
-  lines.push(`Avg Win: $${metrics.trade.avgWin.toFixed(2)} | Avg Loss: $${metrics.trade.avgLoss.toFixed(2)}`);
-  lines.push(`Largest Win: $${metrics.trade.largestWin.toFixed(2)} | Largest Loss: $${metrics.trade.largestLoss.toFixed(2)}`);
-  lines.push(`Max Consecutive: ${metrics.trade.consecutiveWins}W / ${metrics.trade.consecutiveLosses}L`);
+  lines.push(
+    `Total Trades: ${metrics.trade.totalTrades} (${metrics.trade.openTrades} open, ${metrics.trade.closedTrades} closed)`,
+  );
+  lines.push(
+    `Win Rate: ${(metrics.trade.winRate * 100).toFixed(1)}% (${metrics.trade.winningTrades}W / ${metrics.trade.losingTrades}L)`,
+  );
+  lines.push(
+    `Profit Factor: ${metrics.trade.profitFactor === Infinity ? "∞" : metrics.trade.profitFactor.toFixed(2)}`,
+  );
+  lines.push(
+    `Total P&L: $${metrics.trade.totalPnl.toFixed(2)} (${metrics.trade.totalPnlPercent.toFixed(2)}%)`,
+  );
+  lines.push(
+    `Avg Win: $${metrics.trade.avgWin.toFixed(2)} | Avg Loss: $${metrics.trade.avgLoss.toFixed(2)}`,
+  );
+  lines.push(
+    `Largest Win: $${metrics.trade.largestWin.toFixed(2)} | Largest Loss: $${metrics.trade.largestLoss.toFixed(2)}`,
+  );
+  lines.push(
+    `Max Consecutive: ${metrics.trade.consecutiveWins}W / ${metrics.trade.consecutiveLosses}L`,
+  );
   lines.push(`Avg Holding Period: ${metrics.trade.avgHoldingPeriod.toFixed(1)} hours`);
   lines.push("");
 
@@ -959,7 +981,9 @@ export function formatMetricsReport(): string {
   lines.push(`Sortino Ratio: ${metrics.risk.sortinoRatio?.toFixed(2) ?? "N/A"}`);
   lines.push(`Max Drawdown: ${(metrics.risk.maxDrawdown * 100).toFixed(1)}%`);
   lines.push(`Current Drawdown: ${(metrics.risk.currentDrawdown * 100).toFixed(1)}%`);
-  lines.push(`Volatility (Ann.): ${metrics.risk.volatility ? (metrics.risk.volatility * 100).toFixed(1) + "%" : "N/A"}`);
+  lines.push(
+    `Volatility (Ann.): ${metrics.risk.volatility ? `${(metrics.risk.volatility * 100).toFixed(1)}%` : "N/A"}`,
+  );
   lines.push("");
 
   // Agent Metrics
@@ -967,7 +991,9 @@ export function formatMetricsReport(): string {
   lines.push("───────────────────────────────────────────");
   lines.push(`Total Requests: ${metrics.agent.totalRequests}`);
   lines.push(`Avg Response Time: ${metrics.agent.avgResponseTimeMs.toFixed(0)}ms`);
-  lines.push(`Tool Calls: ${metrics.agent.toolCallCount} (${(metrics.agent.toolSuccessRate * 100).toFixed(1)}% success)`);
+  lines.push(
+    `Tool Calls: ${metrics.agent.toolCallCount} (${(metrics.agent.toolSuccessRate * 100).toFixed(1)}% success)`,
+  );
   lines.push(`Error Rate: ${(metrics.agent.errorRate * 100).toFixed(1)}%`);
   lines.push("");
 

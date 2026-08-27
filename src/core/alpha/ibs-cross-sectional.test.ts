@@ -58,10 +58,7 @@ describe("rankIbsCrossSectional", () => {
   });
 
   test("all degenerate → verdict degenerate_bars", () => {
-    const bars = [
-      bar("A", 100, 100, 100),
-      bar("B", 50, 50, 50),
-    ];
+    const bars = [bar("A", 100, 100, 100), bar("B", 50, 50, 50)];
     const r = rankIbsCrossSectional(bars);
     expect(r.verdict).toBe("degenerate_bars");
   });

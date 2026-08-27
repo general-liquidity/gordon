@@ -10,7 +10,8 @@ import {
 import type { GordonContext } from "./types.ts";
 
 function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
-  return {    exchange: null,
+  return {
+    exchange: null,
     broker: null,
     llm: {} as GordonContext["llm"],
     config: GordonConfigSchema.parse({
@@ -30,8 +31,8 @@ describe("integration glossary grounding", () => {
     const anthropic = glossary.find((entry) => entry.id === "anthropic");
 
     expect(hyperliquid).toBeDefined();
-    expect((hyperliquid?.summary.length ?? 0)).toBeGreaterThan(0);
-    expect((anthropic?.summary.length ?? 0)).toBeGreaterThan(0);
+    expect(hyperliquid?.summary.length ?? 0).toBeGreaterThan(0);
+    expect(anthropic?.summary.length ?? 0).toBeGreaterThan(0);
   });
 
   it("retrieves a selective glossary slice for explicitly mentioned integrations", async () => {
@@ -51,7 +52,10 @@ describe("integration glossary grounding", () => {
     const context = createContext({
       requestedTaskScope: "analysis",
     });
-    const selection = await selectRelevantIntegrationGlossary("Use Hyperliquid for perps trading", context);
+    const selection = await selectRelevantIntegrationGlossary(
+      "Use Hyperliquid for perps trading",
+      context,
+    );
     const envelope = buildPromptEnvelope(
       "Use Hyperliquid for perps trading",
       context,
@@ -66,7 +70,9 @@ describe("integration glossary grounding", () => {
     expect(envelope.report.cache.supported).toBe(false);
     expect(envelope.report.workflowPhase).toBe("analysis");
     expect(envelope.report.sectionBudget.totalEstimated).toBeGreaterThan(0);
-    expect(envelope.contextPieces.some((piece) => piece.source === "prompt-section-registry")).toBeTrue();
+    expect(
+      envelope.contextPieces.some((piece) => piece.source === "prompt-section-registry"),
+    ).toBeTrue();
   });
 
   it("attaches transport-level Anthropic cache hints to the stable system message", async () => {
@@ -77,7 +83,10 @@ describe("integration glossary grounding", () => {
         modelConfig: { provider: "anthropic", model: "claude-sonnet-4-5-20250929" },
       }),
     });
-    const selection = await selectRelevantIntegrationGlossary("Review my approved execution plan", context);
+    const selection = await selectRelevantIntegrationGlossary(
+      "Review my approved execution plan",
+      context,
+    );
     const envelope = buildPromptEnvelope(
       "Review my approved execution plan",
       context,
@@ -88,8 +97,10 @@ describe("integration glossary grounding", () => {
     expect(envelope.messages[0]?.providerOptions).toEqual({
       anthropic: { cacheControl: { type: "ephemeral" } },
     });
-    expect((envelope.requestOptions.providerOptions as Record<string, unknown>)?.anthropic).toEqual({
-      cacheControl: { type: "ephemeral" },
-    });
+    expect((envelope.requestOptions.providerOptions as Record<string, unknown>)?.anthropic).toEqual(
+      {
+        cacheControl: { type: "ephemeral" },
+      },
+    );
   });
 });

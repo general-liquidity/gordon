@@ -100,13 +100,15 @@ export class ServiceContainer {
     }
 
     // Create LLM client if any configured provider key is available
-    const llmConfig = config.llm ?? (config.openai?.apiKey
-      ? {
-          openaiApiKey: config.openai.apiKey,
-          defaultProvider: "openai" as const,
-          model: config.openai.model,
-        }
-      : undefined);
+    const llmConfig =
+      config.llm ??
+      (config.openai?.apiKey
+        ? {
+            openaiApiKey: config.openai.apiKey,
+            defaultProvider: "openai" as const,
+            model: config.openai.model,
+          }
+        : undefined);
 
     if (llmConfig) {
       this.services.llm = new LLMClient({

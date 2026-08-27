@@ -68,8 +68,7 @@ export interface DriftReport {
 
 export function defaultEvaluatorCalibrationPath(env: NodeJS.ProcessEnv = process.env): string {
   return (
-    env[EVALUATOR_CALIBRATION_PATH_ENV] ??
-    join(homedir(), ".gordon", "evaluator-calibration.jsonl")
+    env[EVALUATOR_CALIBRATION_PATH_ENV] ?? join(homedir(), ".gordon", "evaluator-calibration.jsonl")
   );
 }
 
@@ -92,14 +91,16 @@ export function registerCalibrationExample(
   };
   const target = opts.path ?? defaultEvaluatorCalibrationPath();
   ensureParentDir(target);
-  appendFileSync(target, JSON.stringify(full) + "\n", "utf8");
+  appendFileSync(target, `${JSON.stringify(full)}\n`, "utf8");
   return full;
 }
 
 export function loadCalibrationSet(path?: string): CalibrationExample[] {
   const target = path ?? defaultEvaluatorCalibrationPath();
   if (!existsSync(target)) return [];
-  const lines = readFileSync(target, "utf8").split("\n").filter((l) => l.trim().length > 0);
+  const lines = readFileSync(target, "utf8")
+    .split("\n")
+    .filter((l) => l.trim().length > 0);
   const out: CalibrationExample[] = [];
   for (const line of lines) {
     try {
@@ -145,7 +146,7 @@ export function selectRelevantExamples(
     if (e.tags) {
       for (const t of e.tags) if (tagSet.has(t)) score += 2;
     }
-    const hay = (e.description + " " + e.inputSummary).toLowerCase();
+    const hay = `${e.description} ${e.inputSummary}`.toLowerCase();
     for (const w of kws) if (hay.includes(w)) score += 1;
     return { e, score };
   });

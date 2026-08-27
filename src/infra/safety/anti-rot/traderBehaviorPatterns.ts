@@ -61,9 +61,7 @@ function detectStopReversal(entries: ActionLogEntry[]): BehaviorPattern | null {
   const matches = entries.filter((e) => {
     if (e.entryType !== "execution_result") return false;
     if (e.payload?.kind !== "cancel") return false;
-    const rationale = (
-      (e.payload?.rationale as string | undefined) ?? ""
-    ).toLowerCase();
+    const rationale = ((e.payload?.rationale as string | undefined) ?? "").toLowerCase();
     return /(\bmoved stop|stop moved|widen(ed)? (the )?stop|reversed (the )?stop|kept (it|the trade) running|changed my mind|gave it room|let it breathe)/.test(
       rationale,
     );
@@ -128,16 +126,9 @@ function detectCancelRecurrence(entries: ActionLogEntry[]): BehaviorPattern | nu
     (e) => e.entryType === "execution_result" && e.payload?.kind === "cancel",
   );
   if (cancels.length < CANCEL_RECURRENCE_MIN_COUNT) return null;
-  const buckets = new Map<
-    string,
-    { samples: string[]; ts: number[]; count: number }
-  >();
+  const buckets = new Map<string, { samples: string[]; ts: number[]; count: number }>();
   for (const e of cancels) {
-    const rationale = (
-      (e.payload?.rationale as string | undefined) ?? ""
-    )
-      .toLowerCase()
-      .trim();
+    const rationale = ((e.payload?.rationale as string | undefined) ?? "").toLowerCase().trim();
     if (rationale.length < 5) continue;
     const bucket = rationale
       .replace(/[^a-z0-9\s]/g, " ")
@@ -160,7 +151,10 @@ function detectCancelRecurrence(entries: ActionLogEntry[]): BehaviorPattern | nu
       });
     }
   }
-  let topTheme: { bucket: string; data: { samples: string[]; ts: number[]; count: number } } | null = null;
+  let topTheme: {
+    bucket: string;
+    data: { samples: string[]; ts: number[]; count: number };
+  } | null = null;
   for (const [bucket, data] of buckets) {
     if (data.count < CANCEL_RECURRENCE_MIN_COUNT) continue;
     if (!topTheme || data.count > topTheme.data.count) {
@@ -262,9 +256,7 @@ export function detectTraderBehaviorPatterns(
  * reading from the action-log store, so tests can exercise detection
  * logic directly.
  */
-export function _detectPatternsForTest(
-  entries: ActionLogEntry[],
-): BehaviorPattern[] {
+export function _detectPatternsForTest(entries: ActionLogEntry[]): BehaviorPattern[] {
   const patterns: BehaviorPattern[] = [];
   for (const detect of [
     detectStopReversal,

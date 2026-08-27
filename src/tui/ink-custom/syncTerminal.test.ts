@@ -4,9 +4,7 @@ import { createSyncTerminal, detectTerminalCapability } from "./syncTerminal.ts"
 
 // Build an isolated env bag so tests never touch the real process.env.
 // Each field is explicitly listed so a stray inherited value can't leak in.
-function makeEnv(
-  overrides: Partial<Record<string, string>> = {},
-): NodeJS.ProcessEnv {
+function makeEnv(overrides: Partial<Record<string, string>> = {}): NodeJS.ProcessEnv {
   const base: Record<string, string> = {};
   return { ...base, ...overrides } as NodeJS.ProcessEnv;
 }
@@ -144,9 +142,7 @@ describe("createSyncTerminal.wrapFrame", () => {
   });
 
   it("exposes the detected capability on the returned object", () => {
-    const term = createSyncTerminal(
-      makeEnv({ TERM: "xterm-256color", WT_SESSION: "deadbeef" }),
-    );
+    const term = createSyncTerminal(makeEnv({ TERM: "xterm-256color", WT_SESSION: "deadbeef" }));
     expect(term.capability.supportsSyncUpdate).toBe(true);
     expect(term.capability.hasAlternateScreen).toBe(true);
     expect(term.capability.detectedAs).toContain("WindowsTerminal");

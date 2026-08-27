@@ -23,7 +23,13 @@ function randomWalkPrices(start: number, n: number, sigma: number, seed: number)
   return out;
 }
 
-function trendingPrices(start: number, n: number, mu: number, sigma: number, seed: number): number[] {
+function trendingPrices(
+  start: number,
+  n: number,
+  mu: number,
+  sigma: number,
+  seed: number,
+): number[] {
   // AR(1) on returns with strong positive persistence ⇒ trending.
   // High φ + low noise lifts H well above 0.5 with VR > 1.
   const rng = lcg(seed);

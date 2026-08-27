@@ -87,7 +87,10 @@ const PAPER_ADOPTION_DECAY_RATE = LN2 / PAPER_CROWDED_HALF_LIFE_MONTHS - PAPER_N
  * keeps the preset on 18 months, which is the property the test pins.
  */
 const SOLVED_BASE_MARKET_DEPTH =
-  (CHOSEN_COMPETING_ADOPTERS * CHOSEN_ATTENTION_INTENSITY * PAPER_ADOPTION_SHARE * PAPER_STRATEGY_CORRELATION) /
+  (CHOSEN_COMPETING_ADOPTERS *
+    CHOSEN_ATTENTION_INTENSITY *
+    PAPER_ADOPTION_SHARE *
+    PAPER_STRATEGY_CORRELATION) /
   (PAPER_ADOPTION_DECAY_RATE * (1 - CHOSEN_DEPTH_EROSION * PAPER_ADOPTION_SHARE));
 
 /**
@@ -142,7 +145,9 @@ function assertConfig(config: SignalHalfLifeConfig): void {
   assertInRange("attentionIntensity", config.attentionIntensity, 0, Number.MAX_VALUE);
   assertInRange("depthErosion", config.depthErosion, 0, 0.999999);
   if (!Number.isFinite(config.baseMarketDepth) || config.baseMarketDepth <= 0) {
-    throw new RangeError(`baseMarketDepth must be a finite number above 0, got ${config.baseMarketDepth}`);
+    throw new RangeError(
+      `baseMarketDepth must be a finite number above 0, got ${config.baseMarketDepth}`,
+    );
   }
 }
 
@@ -178,7 +183,10 @@ export function computeSignalHalfLife(config: SignalHalfLifeConfig): HalfLifeAss
   }
 
   const adoptionDecayRate =
-    (config.competingAdopters * config.adoptionShare * config.strategyCorrelation * config.attentionIntensity) /
+    (config.competingAdopters *
+      config.adoptionShare *
+      config.strategyCorrelation *
+      config.attentionIntensity) /
     depth;
   const totalDecayRate = config.naturalDecayRate + adoptionDecayRate;
 
@@ -220,13 +228,18 @@ export function remainingEdgeFraction(halfLifeMonths: number, monthsElapsed: num
   if (halfLifeMonths <= 0) {
     return monthsElapsed === 0 ? 1 : 0;
   }
-  return Math.pow(2, -monthsElapsed / halfLifeMonths);
+  return 2 ** (-monthsElapsed / halfLifeMonths);
 }
 
 /** Months until only `remainingFractionThreshold` of the original edge is left. */
-export function monthsUntilEdgeBelow(halfLifeMonths: number, remainingFractionThreshold: number): number {
+export function monthsUntilEdgeBelow(
+  halfLifeMonths: number,
+  remainingFractionThreshold: number,
+): number {
   if (!(remainingFractionThreshold > 0) || remainingFractionThreshold > 1) {
-    throw new RangeError(`remainingFractionThreshold must be in (0, 1], got ${remainingFractionThreshold}`);
+    throw new RangeError(
+      `remainingFractionThreshold must be in (0, 1], got ${remainingFractionThreshold}`,
+    );
   }
   if (remainingFractionThreshold === 1) {
     return 0;
@@ -276,7 +289,8 @@ export function monthsUntilBelowCostFloor(input: CostFloorHorizonInput): CostFlo
       halfLifeMonths: input.halfLifeMonths,
       monthsUntilBelowFloor: 0,
       alreadyBelowFloor: true,
-      summary: "The backtested edge is already at or below the cost floor before any decay is applied.",
+      summary:
+        "The backtested edge is already at or below the cost floor before any decay is applied.",
     };
   }
 
@@ -331,7 +345,7 @@ function averageRemainingFraction(halfLifeMonths: number, windowMonths: number):
   if (halfLifeMonths <= 0) {
     return 0;
   }
-  return (halfLifeMonths / (windowMonths * LN2)) * (1 - Math.pow(2, -windowMonths / halfLifeMonths));
+  return (halfLifeMonths / (windowMonths * LN2)) * (1 - 2 ** (-windowMonths / halfLifeMonths));
 }
 
 /**
@@ -340,7 +354,9 @@ function averageRemainingFraction(halfLifeMonths: number, windowMonths: number):
  */
 export function assessBacktestValidity(input: BacktestValidityInput): BacktestValidity {
   if (!(input.backtestWindowMonths >= 0)) {
-    throw new RangeError(`backtestWindowMonths must not be negative, got ${input.backtestWindowMonths}`);
+    throw new RangeError(
+      `backtestWindowMonths must not be negative, got ${input.backtestWindowMonths}`,
+    );
   }
   if (!(input.liveHorizonMonths >= 0)) {
     throw new RangeError(`liveHorizonMonths must not be negative, got ${input.liveHorizonMonths}`);
@@ -359,7 +375,10 @@ export function assessBacktestValidity(input: BacktestValidityInput): BacktestVa
 
   const windowAverageEdgeFraction = averageRemainingFraction(halfLifeMonths, backtestWindowMonths);
   const edgeAtWindowEnd = remainingEdgeFraction(halfLifeMonths, backtestWindowMonths);
-  const edgeAtHorizonEnd = remainingEdgeFraction(halfLifeMonths, backtestWindowMonths + liveHorizonMonths);
+  const edgeAtHorizonEnd = remainingEdgeFraction(
+    halfLifeMonths,
+    backtestWindowMonths + liveHorizonMonths,
+  );
 
   const warnings: string[] = [];
   if (measuresDecayedAverage) {
@@ -449,7 +468,11 @@ function isConvexDecreasing(points: readonly AdoptionSensitivityPoint[]): boolea
   for (let index = 1; index < finite.length; index += 1) {
     const previous = finite[index - 1];
     const current = finite[index];
-    if (previous === undefined || current === undefined || current.halfLifeMonths >= previous.halfLifeMonths) {
+    if (
+      previous === undefined ||
+      current === undefined ||
+      current.halfLifeMonths >= previous.halfLifeMonths
+    ) {
       return false;
     }
   }
@@ -472,7 +495,10 @@ function isConvexDecreasing(points: readonly AdoptionSensitivityPoint[]): boolea
  * phi*, the adoption share past which the signal class is spent. Found by bisection
  * because the half-life is strictly decreasing in adoption, so the crossing is unique.
  */
-export function criticalAdoptionShare(config: SignalHalfLifeConfig, halfLifeFloorMonths: number): number | null {
+export function criticalAdoptionShare(
+  config: SignalHalfLifeConfig,
+  halfLifeFloorMonths: number,
+): number | null {
   if (!(halfLifeFloorMonths > 0)) {
     throw new RangeError(`halfLifeFloorMonths must be above 0, got ${halfLifeFloorMonths}`);
   }
@@ -490,7 +516,10 @@ export function criticalAdoptionShare(config: SignalHalfLifeConfig, halfLifeFloo
   // 60 halvings takes the bracket well below float resolution on [0, 1].
   for (let iteration = 0; iteration < 60; iteration += 1) {
     const middle = (low + high) / 2;
-    if (computeSignalHalfLife({ ...config, adoptionShare: middle }).halfLifeMonths > halfLifeFloorMonths) {
+    if (
+      computeSignalHalfLife({ ...config, adoptionShare: middle }).halfLifeMonths >
+      halfLifeFloorMonths
+    ) {
       low = middle;
     } else {
       high = middle;
@@ -540,7 +569,10 @@ export function projectExtinctionCascade(
   }
   const redistribute = options.redistributeAdoption ?? true;
 
-  let active: SignalClass[] = signals.map((signal) => ({ name: signal.name, config: signal.config }));
+  let active: SignalClass[] = signals.map((signal) => ({
+    name: signal.name,
+    config: signal.config,
+  }));
   const events: ExtinctionEvent[] = [];
 
   for (let round = 0; round < signals.length; round += 1) {
@@ -567,7 +599,10 @@ export function projectExtinctionCascade(
     const perSurvivor = redistribute && survivors.length > 0 ? freedShare / survivors.length : 0;
     active = survivors.map((signal) => ({
       name: signal.name,
-      config: { ...signal.config, adoptionShare: Math.min(1, signal.config.adoptionShare + perSurvivor) },
+      config: {
+        ...signal.config,
+        adoptionShare: Math.min(1, signal.config.adoptionShare + perSurvivor),
+      },
     }));
 
     const firstSurvivor = active[0];

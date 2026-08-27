@@ -34,10 +34,7 @@ const REINFORCE_MAX_DELTA = 0.2;
  * Post-process search results with temporal decay + MMR diversification.
  * Keeps Gordon's existing BM25+embedding scoring — only re-ranks the output.
  */
-function applyEnhancement(
-  results: MemorySearchResult[],
-  limit: number,
-): MemorySearchResult[] {
+function applyEnhancement(results: MemorySearchResult[], limit: number): MemorySearchResult[] {
   if (results.length <= 1) return results;
   const ranked = results.map((r) => ({
     id: r.entry.id,
@@ -104,7 +101,7 @@ export interface RecentContextOptions {
 export class TradeJournal {
   constructor(
     private store: MemoryStore,
-    private embedder: EmbeddingProvider
+    private embedder: EmbeddingProvider,
   ) {}
 
   // --------------------------------------------------------------------------
@@ -386,10 +383,7 @@ export class TradeJournal {
    * Search the journal with hybrid search (keyword + semantic).
    * Falls back to keyword-only if embeddings are unavailable.
    */
-  async search(
-    query: string,
-    options: JournalSearchOptions = {}
-  ): Promise<MemorySearchResult[]> {
+  async search(query: string, options: JournalSearchOptions = {}): Promise<MemorySearchResult[]> {
     const searchOptions = {
       limit: options.limit ?? 10,
       type: options.type,
@@ -426,7 +420,7 @@ export class TradeJournal {
       (entry) =>
         entry.type === "trade_journal" ||
         entry.type === "agent_insight" ||
-        entry.type === "strategy_note"
+        entry.type === "strategy_note",
     );
   }
 
@@ -434,10 +428,7 @@ export class TradeJournal {
    * Find similar past trades by description.
    * Uses semantic search to find trades with similar setups, conditions, or patterns.
    */
-  async getSimilarTrades(
-    description: string,
-    limit: number = 5
-  ): Promise<MemoryEntry[]> {
+  async getSimilarTrades(description: string, limit: number = 5): Promise<MemoryEntry[]> {
     const results = await this.search(description, {
       type: "trade_journal",
       limit,
@@ -464,9 +455,7 @@ export class TradeJournal {
 
     if (options.symbols && options.symbols.length > 0) {
       const symbolSet = new Set(options.symbols);
-      filtered = filtered.filter(
-        (e) => e.symbols?.some((s) => symbolSet.has(s)) ?? false
-      );
+      filtered = filtered.filter((e) => e.symbols?.some((s) => symbolSet.has(s)) ?? false);
     }
 
     // Take the requested limit after filtering
@@ -480,15 +469,11 @@ export class TradeJournal {
     const blocks = filtered.map((entry) => {
       const age = this.formatAge(entry.createdAt);
       const typeLabel = entry.type.replace(/_/g, " ");
-      const symbolTag = entry.symbols?.length
-        ? ` [${entry.symbols.join(", ")}]`
-        : "";
+      const symbolTag = entry.symbols?.length ? ` [${entry.symbols.join(", ")}]` : "";
 
       // Truncate content to keep context injection manageable
       const truncatedContent =
-        entry.content.length > 300
-          ? entry.content.slice(0, 297) + "..."
-          : entry.content;
+        entry.content.length > 300 ? `${entry.content.slice(0, 297)}...` : entry.content;
 
       return `- (${typeLabel}${symbolTag}, ${age}) ${truncatedContent}`;
     });

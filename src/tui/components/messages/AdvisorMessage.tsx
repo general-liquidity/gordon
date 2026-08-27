@@ -8,7 +8,7 @@ function AdvisorMessageInner({ message }: { message: Message }) {
   return (
     <Box flexDirection="row" marginTop={1} paddingLeft={2}>
       <Text color="magenta">{"◈"}</Text>
-      <Text>{" "}</Text>
+      <Text> </Text>
       <Text>{message.content}</Text>
     </Box>
   );

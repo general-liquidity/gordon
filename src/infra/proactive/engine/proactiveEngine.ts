@@ -266,7 +266,11 @@ export class ProactiveEngine {
     return { ok: true };
   }
 
-  private async emitResolved(suggestionId: string, category: ProactiveCategory, status: "accepted" | "dismissed" | "suppressed" | "expired"): Promise<void> {
+  private async emitResolved(
+    suggestionId: string,
+    category: ProactiveCategory,
+    status: "accepted" | "dismissed" | "suppressed" | "expired",
+  ): Promise<void> {
     try {
       await getEventBus().send("proactive:suggestion_resolved", {
         suggestionId,
@@ -388,7 +392,10 @@ export class ProactiveEngine {
     });
   }
 
-  private recordCalibrationOutcome(suggestion: ProactiveSuggestion, outcome: SuggestionOutcome): void {
+  private recordCalibrationOutcome(
+    suggestion: ProactiveSuggestion,
+    outcome: SuggestionOutcome,
+  ): void {
     recordCalibrationOutcome({
       decisionId: suggestion.id,
       result: proactiveOutcomeToCalibrationResult(outcome),
@@ -415,7 +422,9 @@ export function buildCandidate(
   category: ProactiveCategory,
   title: string,
   body: string,
-  options: Partial<Omit<ProactiveSuggestion, "id" | "createdAt" | "status" | "category" | "title" | "body">> = {},
+  options: Partial<
+    Omit<ProactiveSuggestion, "id" | "createdAt" | "status" | "category" | "title" | "body">
+  > = {},
 ): ProactiveSuggestion {
   const suggestion: ProactiveSuggestion = {
     id: generateId(),

@@ -9,7 +9,7 @@ export interface VWAPResult {
   values: (number | null)[];
   current: number | null;
   pricePosition: "above" | "below" | "at";
-  deviation: number | null;  // How far price is from VWAP as percentage
+  deviation: number | null; // How far price is from VWAP as percentage
   interpretation: string;
 }
 
@@ -28,10 +28,7 @@ export interface VWAPResult {
  * @param currentPrice - Current price for position calculation
  * @returns VWAP result with values and interpretation
  */
-export function calculateVWAP(
-  candles: Candle[],
-  currentPrice?: number
-): VWAPResult {
+export function calculateVWAP(candles: Candle[], currentPrice?: number): VWAPResult {
   if (candles.length < 1) {
     return {
       values: [],
@@ -43,7 +40,7 @@ export function calculateVWAP(
   }
 
   const vwapValues: (number | null)[] = [];
-  let cumulativeTPV = 0;  // Cumulative Typical Price * Volume
+  let cumulativeTPV = 0; // Cumulative Typical Price * Volume
   let cumulativeVolume = 0;
 
   for (const candle of candles) {
@@ -62,7 +59,7 @@ export function calculateVWAP(
 
   const currentVWAP = vwapValues[vwapValues.length - 1] ?? null;
   const lastCandle = candles[candles.length - 1];
-  const price = currentPrice ?? (lastCandle?.close ?? 0);
+  const price = currentPrice ?? lastCandle?.close ?? 0;
 
   // Determine price position relative to VWAP
   let pricePosition: "above" | "below" | "at" = "at";
@@ -180,7 +177,7 @@ export function calculateRollingVWAP(
 
   const current = values[n - 1] ?? null;
   const lastCandle = candles[n - 1];
-  const price = currentPrice ?? (lastCandle?.close ?? 0);
+  const price = currentPrice ?? lastCandle?.close ?? 0;
 
   let pricePosition: "above" | "below" | "at" = "at";
   let deviation: number | null = null;
@@ -220,7 +217,16 @@ export function calculateRollingVWAP(
     interpretation = `Price at ${w}-bar rolling VWAP — fair value, watch for direction`;
   }
 
-  return { values, current, pricePosition, deviation, upperBand, lowerBand, window: w, interpretation };
+  return {
+    values,
+    current,
+    pricePosition,
+    deviation,
+    upperBand,
+    lowerBand,
+    window: w,
+    interpretation,
+  };
 }
 
 export interface AnchoredVWAPResult {
@@ -308,7 +314,7 @@ export function calculateAnchoredVWAP(
   }
 
   const current = values[n - 1] ?? null;
-  const price = currentPrice ?? (candles[n - 1]?.close ?? 0);
+  const price = currentPrice ?? candles[n - 1]?.close ?? 0;
   if (current === null) return { ...empty, values, anchorIndex };
 
   const deviation = ((price - current) / current) * 100;
@@ -356,7 +362,13 @@ export function calculateAnchoredVWAP(
   }
 
   const anchorDesc =
-    anchor === "low" ? "swing-low" : anchor === "high" ? "swing-high" : anchor === "first" ? "start" : `bar ${anchorIndex}`;
+    anchor === "low"
+      ? "swing-low"
+      : anchor === "high"
+        ? "swing-high"
+        : anchor === "first"
+          ? "start"
+          : `bar ${anchorIndex}`;
   const interpretation =
     signal === "reclaim"
       ? `price reclaimed the ${anchorDesc} AVWAP from below — bullish trigger`
@@ -368,7 +380,18 @@ export function calculateAnchoredVWAP(
             ? `price ${Math.abs(deviation).toFixed(2)}% below a falling ${anchorDesc} AVWAP — dynamic resistance`
             : `price ${deviation.toFixed(2)}% vs ${anchorDesc} AVWAP (${slope})`;
 
-  return { values, current, anchorIndex, pricePosition, deviation, upperBand, lowerBand, slope, signal, interpretation };
+  return {
+    values,
+    current,
+    anchorIndex,
+    pricePosition,
+    deviation,
+    upperBand,
+    lowerBand,
+    slope,
+    signal,
+    interpretation,
+  };
 }
 
 /**
@@ -378,7 +401,7 @@ export function calculateAnchoredVWAP(
 export function calculateVWAPBands(
   candles: Candle[],
   stdDevMultiplier: number = 2,
-  currentPrice?: number
+  currentPrice?: number,
 ): {
   vwap: VWAPResult;
   upperBand: number | null;
@@ -408,15 +431,15 @@ export function calculateVWAPBands(
 
     if (cumulativeVolume > 0) {
       const vwapAtPoint = cumulativeTPV / cumulativeVolume;
-      sumSquaredDev += Math.pow(typicalPrice - vwapAtPoint, 2);
+      sumSquaredDev += (typicalPrice - vwapAtPoint) ** 2;
     }
   }
 
   const variance = sumSquaredDev / candles.length;
   const stdDev = Math.sqrt(variance);
 
-  const upperBand = vwap.current + (stdDev * stdDevMultiplier);
-  const lowerBand = vwap.current - (stdDev * stdDevMultiplier);
+  const upperBand = vwap.current + stdDev * stdDevMultiplier;
+  const lowerBand = vwap.current - stdDev * stdDevMultiplier;
   const bandwidth = ((upperBand - lowerBand) / vwap.current) * 100;
 
   return {

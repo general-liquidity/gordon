@@ -17,7 +17,7 @@ const AVAILABILITY_CHECK_CONCURRENCY = 4;
 async function mapWithConcurrency<T>(
   items: T[],
   concurrency: number,
-  mapper: (item: T) => Promise<void>
+  mapper: (item: T) => Promise<void>,
 ): Promise<void> {
   if (items.length === 0) {
     return;
@@ -306,9 +306,7 @@ export class DataSourceManager {
    * @param requests - Array of OHLC params to prefetch
    * @returns Summary of prefetch results
    */
-  async prefetch(
-    requests: OHLCParams[]
-  ): Promise<{
+  async prefetch(requests: OHLCParams[]): Promise<{
     succeeded: number;
     failed: number;
     errors: Array<{ params: OHLCParams; error: string }>;

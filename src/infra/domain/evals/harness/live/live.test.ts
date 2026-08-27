@@ -74,9 +74,9 @@ describe("EvalSandbox", () => {
   it("runScenarioLive in live mode refuses a disposed sandbox", async () => {
     const sandbox = createEvalSandbox();
     sandbox.cleanup();
-    await expect(
-      runScenarioLive(SAMPLE_SCENARIO, { dryRun: false, sandbox }),
-    ).rejects.toThrow(/sandbox/i);
+    await expect(runScenarioLive(SAMPLE_SCENARIO, { dryRun: false, sandbox })).rejects.toThrow(
+      /sandbox/i,
+    );
   });
 });
 
@@ -123,9 +123,6 @@ describe("EvalSandbox risk-kernel isolation", () => {
       );
       expect(decision.approved).toBe(true);
       expect(decision.reason).toContain("Paper mode");
-      // Let the kernel's fire-and-forget audit write into the sandbox DB
-      // settle before cleanup removes the sandbox directory.
-      await new Promise((resolve) => setTimeout(resolve, 100));
     });
   });
 });

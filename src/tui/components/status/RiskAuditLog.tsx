@@ -8,7 +8,7 @@
  * Pattern: Claude Code task history with expandable detail.
  */
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 
@@ -112,11 +112,31 @@ export function RiskAuditLog({ entries, onClose }: Props) {
 
       {/* Column headers */}
       <Box paddingLeft={3}>
-        <Box width={18}><Text bold dimColor>TIMESTAMP</Text></Box>
-        <Box width={10}><Text bold dimColor>SYMBOL</Text></Box>
-        <Box width={12}><Text bold dimColor>DECISION</Text></Box>
-        <Box width={12}><Text bold dimColor>CHECKS</Text></Box>
-        <Box width={8}><Text bold dimColor>MODE</Text></Box>
+        <Box width={18}>
+          <Text bold dimColor>
+            TIMESTAMP
+          </Text>
+        </Box>
+        <Box width={10}>
+          <Text bold dimColor>
+            SYMBOL
+          </Text>
+        </Box>
+        <Box width={12}>
+          <Text bold dimColor>
+            DECISION
+          </Text>
+        </Box>
+        <Box width={12}>
+          <Text bold dimColor>
+            CHECKS
+          </Text>
+        </Box>
+        <Box width={8}>
+          <Text bold dimColor>
+            MODE
+          </Text>
+        </Box>
       </Box>
 
       {/* Entries */}

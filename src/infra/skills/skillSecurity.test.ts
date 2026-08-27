@@ -35,12 +35,16 @@ describe("scanSkillSecurity", () => {
   });
 
   it("blocks a blocking-level body injection when the guard is explicitly enabled", () => {
-    const r = scanSkillSecurity("Momentum read", INJECTED, "plugin", { GORDON_SKILL_INJECTION_GUARD: "1" });
+    const r = scanSkillSecurity("Momentum read", INJECTED, "plugin", {
+      GORDON_SKILL_INJECTION_GUARD: "1",
+    });
     expect(r.block).toBe(true);
   });
 
   it("warns only (does not block) when the operator opts OUT of the guard", () => {
-    const r = scanSkillSecurity("Momentum read", INJECTED, "plugin", { GORDON_SKILL_INJECTION_GUARD: "0" });
+    const r = scanSkillSecurity("Momentum read", INJECTED, "plugin", {
+      GORDON_SKILL_INJECTION_GUARD: "0",
+    });
     expect(r.scan.injectionDetected).toBe(true);
     expect(r.scan.riskLevel).toBe("critical");
     expect(r.block).toBe(false); // guard opted out → warn mode
@@ -60,7 +64,11 @@ describe("loadSkillFromFile — injection scan integration", () => {
     dir = mkdtempSync(join(tmpdir(), "gordon-skillsec-test-"));
   });
   afterEach(() => {
-    try { rmSync(dir, { recursive: true, force: true }); } catch { /* */ }
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      /* */
+    }
   });
 
   function writeSkill(name: string, body: string): string {

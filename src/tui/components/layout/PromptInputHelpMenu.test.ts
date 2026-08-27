@@ -32,7 +32,10 @@ describe("buildHelpMenuEntries", () => {
   });
 
   test("trims Claude Code entries that do not apply to a trading agent", () => {
-    const joined = entries.map((e) => `${e.keys} ${e.label}`).join(" ").toLowerCase();
+    const joined = entries
+      .map((e) => `${e.keys} ${e.label}`)
+      .join(" ")
+      .toLowerCase();
     expect(joined).not.toContain("bash");
     expect(joined).not.toContain("file path");
     expect(joined).not.toContain("@");

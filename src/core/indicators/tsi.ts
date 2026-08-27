@@ -66,7 +66,12 @@ export function calculateTSI(closes: number[], input: TSIInput = {}): TSIResult 
   const n = closes.length;
 
   const empty: TSIResult = {
-    values: [], signalValues: [], current: null, signal: null, zeroLine: "neutral", crossover: "none",
+    values: [],
+    signalValues: [],
+    current: null,
+    signal: null,
+    zeroLine: "neutral",
+    crossover: "none",
     interpretation: `insufficient data — need ≥ ${longP + shortP + 1} closes, got ${n}`,
   };
   if (n < longP + shortP + 1) return empty;
@@ -103,7 +108,8 @@ export function calculateTSI(closes: number[], input: TSIInput = {}): TSIResult 
 
   if (current === null) return { ...empty, values, signalValues };
 
-  const zeroLine: TSIResult["zeroLine"] = current > 1 ? "bullish" : current < -1 ? "bearish" : "neutral";
+  const zeroLine: TSIResult["zeroLine"] =
+    current > 1 ? "bullish" : current < -1 ? "bearish" : "neutral";
 
   // Crossover on the last bar where both TSI and signal are defined.
   let crossover: TSIResult["crossover"] = "none";

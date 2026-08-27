@@ -2,11 +2,15 @@
 // Stickers — Tag trades with emoji badges for journal review
 // ============================================================================
 
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { join } from "path";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import { getGordonDir } from "../../../infra/storage/paths.ts";
 
-export interface Sticker { id: string; emoji: string; label: string; }
+export interface Sticker {
+  id: string;
+  emoji: string;
+  label: string;
+}
 
 const STICKERS_PATH = join(getGordonDir(), "stickers.json");
 
@@ -29,10 +33,14 @@ export class StickerService {
   constructor() {
     try {
       if (existsSync(STICKERS_PATH)) this.tags = JSON.parse(readFileSync(STICKERS_PATH, "utf-8"));
-    } catch { this.tags = {}; }
+    } catch {
+      this.tags = {};
+    }
   }
 
-  listStickers(): Sticker[] { return AVAILABLE; }
+  listStickers(): Sticker[] {
+    return AVAILABLE;
+  }
 
   tagTrade(tradeId: string, stickerId: string): void {
     if (!this.tags[tradeId]) this.tags[tradeId] = [];
@@ -48,6 +56,8 @@ export class StickerService {
   }
 
   private save(): void {
-    try { writeFileSync(STICKERS_PATH, JSON.stringify(this.tags, null, 2)); } catch {}
+    try {
+      writeFileSync(STICKERS_PATH, JSON.stringify(this.tags, null, 2));
+    } catch {}
   }
 }

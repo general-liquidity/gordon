@@ -42,12 +42,7 @@ export interface DualVwapInput {
   divergencePct?: number;
 }
 
-export type DualVwapPosition =
-  | "far_above"
-  | "above"
-  | "at"
-  | "below"
-  | "far_below";
+export type DualVwapPosition = "far_above" | "above" | "at" | "below" | "far_below";
 
 export interface DualVwapBands {
   vwap: number;
@@ -172,12 +167,12 @@ export function computeDualVwap(input: DualVwapInput): DualVwapResult {
   const sessionPosition = positionRelativeTo(price, session);
   const rollingPosition = positionRelativeTo(price, rolling);
 
-  const divergence = Number.isFinite(session.vwap) && Number.isFinite(rolling.vwap)
-    ? session.vwap - rolling.vwap
-    : 0;
-  const divergencePctValue = Number.isFinite(rolling.vwap) && rolling.vwap !== 0
-    ? divergence / rolling.vwap
-    : 0;
+  const divergence =
+    Number.isFinite(session.vwap) && Number.isFinite(rolling.vwap)
+      ? session.vwap - rolling.vwap
+      : 0;
+  const divergencePctValue =
+    Number.isFinite(rolling.vwap) && rolling.vwap !== 0 ? divergence / rolling.vwap : 0;
   const divergenceSignificant = Math.abs(divergencePctValue) >= divPct;
 
   const reasoning =
@@ -204,8 +199,12 @@ export function computeDualVwap(input: DualVwapInput): DualVwapResult {
 export function dualVwapToPayload(result: DualVwapResult): Record<string, unknown> {
   return {
     kind: "dual_vwap.computed",
-    sessionVwap: Number.isFinite(result.session.vwap) ? Number(result.session.vwap.toFixed(6)) : null,
-    rollingVwap: Number.isFinite(result.rolling.vwap) ? Number(result.rolling.vwap.toFixed(6)) : null,
+    sessionVwap: Number.isFinite(result.session.vwap)
+      ? Number(result.session.vwap.toFixed(6))
+      : null,
+    rollingVwap: Number.isFinite(result.rolling.vwap)
+      ? Number(result.rolling.vwap.toFixed(6))
+      : null,
     sessionPosition: result.sessionPosition,
     rollingPosition: result.rollingPosition,
     divergencePct: Number((result.divergencePctValue * 100).toFixed(4)),

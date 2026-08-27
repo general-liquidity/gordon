@@ -86,10 +86,14 @@ export function formatScanResults(options: ScanResultFormatOptions): string {
   const { coinsScanned, opportunities, executionTime, maxRows = 10 } = options;
   const lines: string[] = [];
   lines.push("=== SCAN RESULTS ===");
-  lines.push(`Scanned: ${coinsScanned} coins | Found: ${opportunities.length} setups | Filtered: ${coinsScanned - opportunities.length}`);
+  lines.push(
+    `Scanned: ${coinsScanned} coins | Found: ${opportunities.length} setups | Filtered: ${coinsScanned - opportunities.length}`,
+  );
   if (opportunities.length > 0) {
     const topSetup = opportunities[0]!;
-    lines.push(`Top Setup: ${topSetup.symbol} at ${formatCurrency(topSetup.price)} (${Math.round(topSetup.setupConfidence * 100)}% confidence)`);
+    lines.push(
+      `Top Setup: ${topSetup.symbol} at ${formatCurrency(topSetup.price)} (${Math.round(topSetup.setupConfidence * 100)}% confidence)`,
+    );
   }
   lines.push(`Execution: ${formatExecutionTime(executionTime)}`);
   lines.push("");
@@ -134,14 +138,17 @@ export function formatAnalysisResults(options: AnalysisResultFormatOptions): str
   const lines: string[] = [];
   lines.push(`=== ANALYSIS: ${symbol} ===`);
   lines.push(`Price: ${formatCurrency(price)} | Trend: ${trend}`);
-  lines.push(setupDetected
-    ? `Setup: DETECTED (${Math.round(setupConfidence * 100)}% confidence)`
-    : "Setup: Not detected");
+  lines.push(
+    setupDetected
+      ? `Setup: DETECTED (${Math.round(setupConfidence * 100)}% confidence)`
+      : "Setup: Not detected",
+  );
   lines.push(`Execution: ${formatExecutionTime(executionTime)}`);
   lines.push("");
   lines.push("--- Indicators ---");
   if (indicators.rsi !== null) {
-    const rsiStatus = indicators.rsi < 30 ? "(Oversold)" : indicators.rsi > 70 ? "(Overbought)" : "";
+    const rsiStatus =
+      indicators.rsi < 30 ? "(Oversold)" : indicators.rsi > 70 ? "(Overbought)" : "";
     lines.push(`RSI: ${indicators.rsi.toFixed(1)} ${rsiStatus}`.trim());
   }
   if (indicators.macdState) lines.push(`MACD: ${indicators.macdState}`);
@@ -152,7 +159,9 @@ export function formatAnalysisResults(options: AnalysisResultFormatOptions): str
     lines.push("--- Support Levels ---");
     for (const level of supports.slice(0, 3)) {
       const strength = "=".repeat(Math.round(level.strength * 5));
-      lines.push(`${formatCurrency(level.price)} [${strength}] ${Math.round(level.strength * 100)}%`);
+      lines.push(
+        `${formatCurrency(level.price)} [${strength}] ${Math.round(level.strength * 100)}%`,
+      );
     }
     lines.push("");
   }
@@ -161,7 +170,9 @@ export function formatAnalysisResults(options: AnalysisResultFormatOptions): str
     lines.push("--- Resistance Levels ---");
     for (const level of resistances.slice(0, 3)) {
       const strength = "=".repeat(Math.round(level.strength * 5));
-      lines.push(`${formatCurrency(level.price)} [${strength}] ${Math.round(level.strength * 100)}%`);
+      lines.push(
+        `${formatCurrency(level.price)} [${strength}] ${Math.round(level.strength * 100)}%`,
+      );
     }
   }
 

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import type React from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import type { PermissionMode } from "../../state/types.ts";
 import { buildApprovalOptions, type ApprovalRequest } from "../dialogs/ApprovalDialog.tsx";
@@ -39,13 +40,13 @@ export function FirstTradeTour({ permissionMode, onDone }: FirstTradeTourProps):
   const [screen, setScreen] = useState<0 | 1>(0);
   const [preview, setPreview] = useState<"standard" | "critical">("standard");
 
-  useInput((input, key) => {
+  useInput((_input, key) => {
     if (key.escape) {
       onDone();
       return;
     }
     if (screen === 1 && key.tab) {
-      setPreview((current) => current === "standard" ? "critical" : "standard");
+      setPreview((current) => (current === "standard" ? "critical" : "standard"));
       return;
     }
     if (key.return) {
@@ -55,8 +56,18 @@ export function FirstTradeTour({ permissionMode, onDone }: FirstTradeTourProps):
   });
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="cyanBright" paddingX={2} paddingY={1}>
-      {screen === 0 ? <TourIntro permissionMode={permissionMode} /> : <TourApproval preview={preview} />}
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor="cyanBright"
+      paddingX={2}
+      paddingY={1}
+    >
+      {screen === 0 ? (
+        <TourIntro permissionMode={permissionMode} />
+      ) : (
+        <TourApproval preview={preview} />
+      )}
     </Box>
   );
 }
@@ -64,19 +75,19 @@ export function FirstTradeTour({ permissionMode, onDone }: FirstTradeTourProps):
 function TourIntro({ permissionMode }: { permissionMode: PermissionMode }): React.JSX.Element {
   return (
     <>
-      <Text bold>FIRST TRADE - how Gordon works                       1/2</Text>
+      <Text bold>FIRST TRADE - how Gordon works 1/2</Text>
       <Text> </Text>
       <Text>Every trade follows the same loop. You stay in control</Text>
       <Text>at every step:</Text>
       <Text> </Text>
-      <Text> 1  /scan trending      find what's moving</Text>
-      <Text> 2  /plan BTC           Gordon drafts entry, stop, size</Text>
-      <Text> 3  approve             you say yes (or no) in a dialog</Text>
-      <Text> 4  Gordon executes     and tracks the position</Text>
+      <Text> 1 /scan trending find what's moving</Text>
+      <Text> 2 /plan BTC Gordon drafts entry, stop, size</Text>
+      <Text> 3 approve you say yes (or no) in a dialog</Text>
+      <Text> 4 Gordon executes and tracks the position</Text>
       <Text> </Text>
       <Text>{modeLine(permissionMode)}</Text>
       <Text> </Text>
-      <Text dimColor>[Enter] Next  ·  [Esc] Skip - won't show again</Text>
+      <Text dimColor>[Enter] Next · [Esc] Skip - won't show again</Text>
     </>
   );
 }
@@ -85,40 +96,65 @@ function TourApproval({ preview }: { preview: "standard" | "critical" }): React.
   const critical = preview === "critical";
   return (
     <>
-      <Text bold>FIRST TRADE - approvals are your guardrail           2/2</Text>
+      <Text bold>FIRST TRADE - approvals are your guardrail 2/2</Text>
       <Text> </Text>
       <Text>Before money moves, Gordon stops and asks. This is a</Text>
       <Text>preview - nothing below is real:</Text>
       <Text> </Text>
-      <Text dimColor>{critical ? "-- PREVIEW: a critical approval ---------------------" : "-- PREVIEW: a routine approval ----------------------"}</Text>
-      <ApprovalPreview approval={critical ? TOUR_MOCK_CRITICAL : TOUR_MOCK_STANDARD} critical={critical} />
+      <Text dimColor>
+        {critical
+          ? "-- PREVIEW: a critical approval ---------------------"
+          : "-- PREVIEW: a routine approval ----------------------"}
+      </Text>
+      <ApprovalPreview
+        approval={critical ? TOUR_MOCK_CRITICAL : TOUR_MOCK_STANDARD}
+        critical={critical}
+      />
       <Text> </Text>
       <Text dimColor>
         {critical ? "[Tab] Back to the routine variant" : "[Tab] See the critical variant"}
       </Text>
-      <Text dimColor>[Enter] Start trading  ·  [Esc] Skip - won't show again</Text>
+      <Text dimColor>[Enter] Start trading · [Esc] Skip - won't show again</Text>
     </>
   );
 }
 
-function ApprovalPreview({ approval, critical }: { approval: ApprovalRequest; critical: boolean }): React.JSX.Element {
+function ApprovalPreview({
+  approval,
+  critical,
+}: {
+  approval: ApprovalRequest;
+  critical: boolean;
+}): React.JSX.Element {
   const options = buildApprovalOptions(approval, { critical });
   return (
-    <Box flexDirection="column" borderStyle={critical ? "double" : undefined} borderColor={critical ? "red" : undefined} paddingX={critical ? 1 : 0}>
+    <Box
+      flexDirection="column"
+      borderStyle={critical ? "double" : undefined}
+      borderColor={critical ? "red" : undefined}
+      paddingX={critical ? 1 : 0}
+    >
       <Text color={critical ? "red" : "yellow"} bold>
         {critical ? `CRITICAL  APPROVAL [${approval.shortId}]` : `⚠ APPROVAL [${approval.shortId}]`}
       </Text>
-      <Text>  Gordon wants to use `{approval.toolName}`</Text>
-      <Text>  Scope: {approval.permissionScope} · Risk: {approval.riskClass.toUpperCase()}</Text>
-      <Text>  Why this needs approval:</Text>
+      <Text> Gordon wants to use `{approval.toolName}`</Text>
+      <Text>
+        {" "}
+        Scope: {approval.permissionScope} · Risk: {approval.riskClass.toUpperCase()}
+      </Text>
+      <Text> Why this needs approval:</Text>
       {(approval.riskReasons ?? []).map((reason) => (
-        <Text key={reason}>    • {reason}</Text>
+        <Text key={reason}> • {reason}</Text>
       ))}
-      {critical && <Text color="red">  ⚠ CRITICAL - This action may be irreversible.</Text>}
+      {critical && <Text color="red"> ⚠ CRITICAL - This action may be irreversible.</Text>}
       {options.map((option, index) => (
-        <Text key={option.value}>    {index === 0 ? "❯ " : "  "}{option.label}</Text>
+        <Text key={option.value}>
+          {" "}
+          {index === 0 ? "❯ " : "  "}
+          {option.label}
+        </Text>
       ))}
-      {critical && <Text dimColor>  (real dialogs add a 3s hold before confirm)</Text>}
+      {critical && <Text dimColor> (real dialogs add a 3s hold before confirm)</Text>}
     </Box>
   );
 }

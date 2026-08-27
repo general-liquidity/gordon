@@ -20,10 +20,7 @@ describe("Donchian Channel", () => {
 
   test("rolls forward: window drops the first bar", () => {
     // bars 1..3 (highs 5,4,7 lows 2,2,3) → upper=7, lower=2, mid=4.5
-    const r = calculateDonchian(
-      [bar(3, 1, 2), bar(5, 2, 4), bar(4, 2, 3), bar(7, 3, 6)],
-      3,
-    );
+    const r = calculateDonchian([bar(3, 1, 2), bar(5, 2, 4), bar(4, 2, 3), bar(7, 3, 6)], 3);
     expect(r.upper[3]).toBeCloseTo(7, 6);
     expect(r.lower[3]).toBeCloseTo(2, 6);
     expect(r.middle[3]).toBeCloseTo(4.5, 6);

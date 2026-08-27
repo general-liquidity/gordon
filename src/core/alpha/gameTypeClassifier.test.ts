@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  classifyGameType,
-  formatGameType,
-  type GameTypeInputs,
-} from "./gameTypeClassifier.ts";
+import { classifyGameType, formatGameType, type GameTypeInputs } from "./gameTypeClassifier.ts";
 
 describe("classifyGameType", () => {
   test("productive asset with real yield above drag => positive-sum", () => {

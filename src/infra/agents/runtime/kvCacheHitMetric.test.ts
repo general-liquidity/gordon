@@ -58,10 +58,7 @@ describe("recordCacheCall", () => {
 
   it("creates parent dir", () => {
     const nested = join(tempDir, "a", "b", "c.jsonl");
-    recordCacheCall(
-      { callId: "c", prefixHash: "h", hit: false, totalInputTokens: 1 },
-      nested,
-    );
+    recordCacheCall({ callId: "c", prefixHash: "h", hit: false, totalInputTokens: 1 }, nested);
     expect(existsSync(nested)).toBe(true);
   });
 });
@@ -73,11 +70,23 @@ describe("readCacheCalls", () => {
 
   it("returns newest-first", () => {
     recordCacheCall(
-      { callId: "old", prefixHash: "h", hit: false, totalInputTokens: 1, now: "2026-01-01T00:00:00Z" },
+      {
+        callId: "old",
+        prefixHash: "h",
+        hit: false,
+        totalInputTokens: 1,
+        now: "2026-01-01T00:00:00Z",
+      },
       logPath,
     );
     recordCacheCall(
-      { callId: "new", prefixHash: "h", hit: false, totalInputTokens: 1, now: "2026-05-01T00:00:00Z" },
+      {
+        callId: "new",
+        prefixHash: "h",
+        hit: false,
+        totalInputTokens: 1,
+        now: "2026-05-01T00:00:00Z",
+      },
       logPath,
     );
     const out = readCacheCalls({}, logPath);
@@ -86,11 +95,23 @@ describe("readCacheCalls", () => {
 
   it("filters by sinceMs", () => {
     recordCacheCall(
-      { callId: "old", prefixHash: "h", hit: false, totalInputTokens: 1, now: "2025-01-01T00:00:00Z" },
+      {
+        callId: "old",
+        prefixHash: "h",
+        hit: false,
+        totalInputTokens: 1,
+        now: "2025-01-01T00:00:00Z",
+      },
       logPath,
     );
     recordCacheCall(
-      { callId: "new", prefixHash: "h", hit: false, totalInputTokens: 1, now: "2026-01-01T00:00:00Z" },
+      {
+        callId: "new",
+        prefixHash: "h",
+        hit: false,
+        totalInputTokens: 1,
+        now: "2026-01-01T00:00:00Z",
+      },
       logPath,
     );
     const cutoff = Date.parse("2025-06-01T00:00:00Z");
@@ -127,9 +148,30 @@ describe("summarizeHitRate", () => {
 
   it("computes hit rate correctly", () => {
     const calls = [
-      { callId: "1", prefixHash: "h", hit: true, cachedTokens: 0, totalInputTokens: 100, capturedAt: "x" },
-      { callId: "2", prefixHash: "h", hit: false, cachedTokens: 0, totalInputTokens: 100, capturedAt: "x" },
-      { callId: "3", prefixHash: "h", hit: true, cachedTokens: 0, totalInputTokens: 100, capturedAt: "x" },
+      {
+        callId: "1",
+        prefixHash: "h",
+        hit: true,
+        cachedTokens: 0,
+        totalInputTokens: 100,
+        capturedAt: "x",
+      },
+      {
+        callId: "2",
+        prefixHash: "h",
+        hit: false,
+        cachedTokens: 0,
+        totalInputTokens: 100,
+        capturedAt: "x",
+      },
+      {
+        callId: "3",
+        prefixHash: "h",
+        hit: true,
+        cachedTokens: 0,
+        totalInputTokens: 100,
+        capturedAt: "x",
+      },
     ];
     const s = summarizeHitRate(calls);
     expect(s.hits).toBe(2);
@@ -139,7 +181,14 @@ describe("summarizeHitRate", () => {
 
   it("computes cache token ratio", () => {
     const calls = [
-      { callId: "1", prefixHash: "h", hit: true, cachedTokens: 800, totalInputTokens: 1000, capturedAt: "x" },
+      {
+        callId: "1",
+        prefixHash: "h",
+        hit: true,
+        cachedTokens: 800,
+        totalInputTokens: 1000,
+        capturedAt: "x",
+      },
     ];
     expect(summarizeHitRate(calls).cacheTokenRatio).toBeCloseTo(0.8);
   });
@@ -147,7 +196,14 @@ describe("summarizeHitRate", () => {
   it("computes estimated savings (Manus 10x anchor)", () => {
     // 1M cached tokens at $3/M uncached price → saved 90% of $3 = $2.70
     const calls = [
-      { callId: "1", prefixHash: "h", hit: true, cachedTokens: 1_000_000, totalInputTokens: 1_000_000, capturedAt: "x" },
+      {
+        callId: "1",
+        prefixHash: "h",
+        hit: true,
+        cachedTokens: 1_000_000,
+        totalInputTokens: 1_000_000,
+        capturedAt: "x",
+      },
     ];
     const s = summarizeHitRate(calls);
     expect(s.estimatedSavingsUsd).toBeCloseTo(2.7, 1);
@@ -155,7 +211,14 @@ describe("summarizeHitRate", () => {
 
   it("respects custom price override", () => {
     const calls = [
-      { callId: "1", prefixHash: "h", hit: true, cachedTokens: 1_000_000, totalInputTokens: 1_000_000, capturedAt: "x" },
+      {
+        callId: "1",
+        prefixHash: "h",
+        hit: true,
+        cachedTokens: 1_000_000,
+        totalInputTokens: 1_000_000,
+        capturedAt: "x",
+      },
     ];
     const s = summarizeHitRate(calls, { usdPerMillionUncached: 15 });
     expect(s.estimatedSavingsUsd).toBeCloseTo(15 * 0.9, 1);
@@ -165,7 +228,14 @@ describe("summarizeHitRate", () => {
 describe("formatHitRateSummary", () => {
   it("includes hit rate, ratio, and savings", () => {
     const calls = [
-      { callId: "1", prefixHash: "h", hit: true, cachedTokens: 500, totalInputTokens: 1000, capturedAt: "x" },
+      {
+        callId: "1",
+        prefixHash: "h",
+        hit: true,
+        cachedTokens: 500,
+        totalInputTokens: 1000,
+        capturedAt: "x",
+      },
     ];
     const out = formatHitRateSummary(summarizeHitRate(calls));
     expect(out).toContain("hit rate");

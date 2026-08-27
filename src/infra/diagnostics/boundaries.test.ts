@@ -98,22 +98,21 @@ describe("checkBoundaries", () => {
     writeFile("src/infra/foo.ts", `import { x } from "../app/bar.ts";`);
     writeFile("src/app/bar.ts", `export const x = 1;`);
 
-    const rules: BoundaryRule[] = [
-      { from: "src/core", forbidden: ["src/infra", "src/app"] },
-    ];
+    const rules: BoundaryRule[] = [{ from: "src/core", forbidden: ["src/infra", "src/app"] }];
     const result = checkBoundaries(rules, { rootDir: tempDir });
     expect(result.violations).toEqual([]);
   });
 
   it("ignores non-relative imports (packages, node:*)", () => {
-    writeFile("src/core/foo.ts", `
+    writeFile(
+      "src/core/foo.ts",
+      `
       import { readFile } from "node:fs";
       import zod from "zod";
-    `);
+    `,
+    );
 
-    const rules: BoundaryRule[] = [
-      { from: "src/core", forbidden: ["src/infra"] },
-    ];
+    const rules: BoundaryRule[] = [{ from: "src/core", forbidden: ["src/infra"] }];
     const result = checkBoundaries(rules, { rootDir: tempDir });
     expect(result.violations).toEqual([]);
   });
@@ -121,9 +120,7 @@ describe("checkBoundaries", () => {
   it("strips .ts extension before matching", () => {
     writeFile("src/core/foo.ts", `import { x } from "../infra/bar.ts";`);
 
-    const rules: BoundaryRule[] = [
-      { from: "src/core", forbidden: ["src/infra"] },
-    ];
+    const rules: BoundaryRule[] = [{ from: "src/core", forbidden: ["src/infra"] }];
     const result = checkBoundaries(rules, { rootDir: tempDir });
     expect(result.violations.length).toBe(1);
     expect(result.violations[0]!.resolvedTarget).toBe("src/infra/bar");
@@ -132,9 +129,7 @@ describe("checkBoundaries", () => {
   it("walks nested directories", () => {
     writeFile("src/core/deep/nest/foo.ts", `import { x } from "../../../infra/bar.ts";`);
 
-    const rules: BoundaryRule[] = [
-      { from: "src/core", forbidden: ["src/infra"] },
-    ];
+    const rules: BoundaryRule[] = [{ from: "src/core", forbidden: ["src/infra"] }];
     const result = checkBoundaries(rules, { rootDir: tempDir });
     expect(result.violations.length).toBe(1);
   });
@@ -144,9 +139,7 @@ describe("checkBoundaries", () => {
     writeFile("node_modules/junk/baz.ts", `import { x } from "../infra/bar.ts";`);
     writeFile("dist/out.ts", `import { x } from "../infra/bar.ts";`);
 
-    const rules: BoundaryRule[] = [
-      { from: "src/core", forbidden: ["src/infra"] },
-    ];
+    const rules: BoundaryRule[] = [{ from: "src/core", forbidden: ["src/infra"] }];
     const result = checkBoundaries(rules, { rootDir: tempDir });
     // Only src/core/foo.ts should produce a violation
     expect(result.violations.length).toBe(1);
@@ -155,9 +148,7 @@ describe("checkBoundaries", () => {
   it("allows configurable extensions", () => {
     writeFile("src/core/foo.tsx", `import { x } from "../infra/bar.ts";`);
 
-    const rules: BoundaryRule[] = [
-      { from: "src/core", forbidden: ["src/infra"] },
-    ];
+    const rules: BoundaryRule[] = [{ from: "src/core", forbidden: ["src/infra"] }];
     const result = checkBoundaries(rules, { rootDir: tempDir });
     expect(result.violations.length).toBe(1);
   });
@@ -173,25 +164,24 @@ describe("checkBoundaries", () => {
   });
 
   it("aggregates violations across multiple rules", () => {
-    writeFile("src/events/types.ts", `
+    writeFile(
+      "src/events/types.ts",
+      `
       import { x } from "../core/foo.ts";
       import { y } from "../infra/bar.ts";
-    `);
+    `,
+    );
     writeFile("src/core/foo.ts", `export const x = 1;`);
     writeFile("src/infra/bar.ts", `export const y = 2;`);
 
-    const rules: BoundaryRule[] = [
-      { from: "src/events", forbidden: ["src/core", "src/infra"] },
-    ];
+    const rules: BoundaryRule[] = [{ from: "src/events", forbidden: ["src/core", "src/infra"] }];
     const result = checkBoundaries(rules, { rootDir: tempDir });
     expect(result.violations.length).toBe(2);
   });
 
   it("a file matching no rule is not scanned for violations", () => {
     writeFile("src/random/x.ts", `import { y } from "../infra/bar.ts";`);
-    const rules: BoundaryRule[] = [
-      { from: "src/core", forbidden: ["src/infra"] },
-    ];
+    const rules: BoundaryRule[] = [{ from: "src/core", forbidden: ["src/infra"] }];
     const result = checkBoundaries(rules, { rootDir: tempDir });
     expect(result.violations).toEqual([]);
   });

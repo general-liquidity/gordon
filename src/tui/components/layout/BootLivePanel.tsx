@@ -49,7 +49,13 @@ function VenueValue({ data }: { data: BootLiveData | null }): React.JSX.Element 
     <>
       <Text>{label}</Text>
       <Text> </Text>
-      {data.venue.paper ? <Text>(paper)</Text> : <Text color="red" bold>(live)</Text>}
+      {data.venue.paper ? (
+        <Text>(paper)</Text>
+      ) : (
+        <Text color="red" bold>
+          (live)
+        </Text>
+      )}
       <Text dimColor> · </Text>
       {data.venue.connectivity === "connected" ? (
         <>
@@ -68,31 +74,39 @@ function VenueValue({ data }: { data: BootLiveData | null }): React.JSX.Element 
 function AuditValue({ data }: { data: BootLiveData | null }): React.JSX.Element {
   if (!data || data.audit.state === "checking") return <Text dimColor>verifying chain...</Text>;
   if (data.audit.state === "ok") return <Text>chain ok ({data.audit.checked} traces)</Text>;
-  if (data.audit.state === "broken") return <Text color="red" bold>CHAIN BROKEN — run /audit verify</Text>;
+  if (data.audit.state === "broken")
+    return (
+      <Text color="red" bold>
+        CHAIN BROKEN — run /audit verify
+      </Text>
+    );
   return <Text dimColor>unavailable</Text>;
 }
 
 function TickerLine({ data }: { data: BootLiveData | null }): React.JSX.Element {
   if (!data) return <Text dimColor>fetching market data...</Text>;
-  if (!data.ticker || data.ticker.length === 0) return <Text dimColor>market data unavailable</Text>;
+  if (!data.ticker || data.ticker.length === 0)
+    return <Text dimColor>market data unavailable</Text>;
 
   return (
     <Box>
       {data.ticker.map((item, index) => {
-        const change = item.changePercent24h === null
-          ? "—"
-          : `${item.changePercent24h >= 0 ? "+" : ""}${item.changePercent24h.toFixed(1)}%`;
-        const changeColor = item.changePercent24h === null
-          ? undefined
-          : item.changePercent24h >= 0
-            ? "green"
-            : "red";
+        const change =
+          item.changePercent24h === null
+            ? "—"
+            : `${item.changePercent24h >= 0 ? "+" : ""}${item.changePercent24h.toFixed(1)}%`;
+        const changeColor =
+          item.changePercent24h === null ? undefined : item.changePercent24h >= 0 ? "green" : "red";
         return (
           <React.Fragment key={`${item.kind}:${item.symbol}`}>
-            {index > 0 && <Text>    </Text>}
+            {index > 0 && <Text> </Text>}
             <Text bold>{item.symbol}</Text>
             <Text> {formatTickerPrice(item.priceUsd)} </Text>
-            {changeColor ? <Text color={changeColor}>{change}</Text> : <Text dimColor>{change}</Text>}
+            {changeColor ? (
+              <Text color={changeColor}>{change}</Text>
+            ) : (
+              <Text dimColor>{change}</Text>
+            )}
           </React.Fragment>
         );
       })}
@@ -117,7 +131,7 @@ export function BootLivePanel({ hint }: Props): React.JSX.Element | null {
       try {
         const ticker = await refreshBootTicker(symbols);
         if (mounted && ticker) {
-          setData((previous) => previous ? { ...previous, ticker } : previous);
+          setData((previous) => (previous ? { ...previous, ticker } : previous));
         }
       } finally {
         tickerRefreshInFlight = false;
@@ -148,7 +162,7 @@ export function BootLivePanel({ hint }: Props): React.JSX.Element | null {
   // (`┌─ trading preflight ─…┐`) — ink boxes have no title support.
   const topFill = "─".repeat(Math.max(0, boxWidth - title.length - 5));
   const dividerWidth = Math.max(0, boxWidth - 4);
-  const showEquity = !data || data.venue.connectivity !== "none";
+  const showEquity = data?.venue.connectivity !== "none";
 
   return (
     <Box flexDirection="column" marginBottom={1}>
@@ -169,7 +183,11 @@ export function BootLivePanel({ hint }: Props): React.JSX.Element | null {
         </Row>
         {showEquity && (
           <Row label="equity">
-            {data?.equityUsd != null ? <Text>{formatCurrency(data.equityUsd)}</Text> : <Text dimColor>—</Text>}
+            {data?.equityUsd != null ? (
+              <Text>{formatCurrency(data.equityUsd)}</Text>
+            ) : (
+              <Text dimColor>—</Text>
+            )}
           </Row>
         )}
         <Row label="audit">

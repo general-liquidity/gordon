@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 
@@ -43,7 +42,10 @@ export function ConstitutionPanel({ results, blockedCount, passedCount, onClose 
           {allPassed ? "\u2713" : "\u2717"} {passedCount}/{totalRules} rules passed
         </Text>
         {blockedCount > 0 && (
-          <Text color="red"> {"\u00b7"} {blockedCount} blocked</Text>
+          <Text color="red">
+            {" "}
+            {"\u00b7"} {blockedCount} blocked
+          </Text>
         )}
       </Box>
       <Text> </Text>
@@ -57,7 +59,9 @@ export function ConstitutionPanel({ results, blockedCount, passedCount, onClose 
         return (
           <Box key={i} flexDirection="column" marginBottom={1}>
             <Box>
-              <Text color={layerColor} bold>{layerIcon} {layer.layer.toUpperCase()}</Text>
+              <Text color={layerColor} bold>
+                {layerIcon} {layer.layer.toUpperCase()}
+              </Text>
               <Text dimColor> ({layer.rules.length} rules)</Text>
             </Box>
 
@@ -69,16 +73,22 @@ export function ConstitutionPanel({ results, blockedCount, passedCount, onClose 
                 </Text>
                 <Text dimColor={rule.passed}> {rule.name}</Text>
                 {rule.value && rule.limit && (
-                  <Text dimColor> ({rule.value} / {rule.limit})</Text>
+                  <Text dimColor>
+                    {" "}
+                    ({rule.value} / {rule.limit})
+                  </Text>
                 )}
                 {!rule.passed && rule.reason && (
-                  <Text color="red"> {"\u2014"} {rule.reason}</Text>
+                  <Text color="red">
+                    {" "}
+                    {"\u2014"} {rule.reason}
+                  </Text>
                 )}
               </Box>
             ))}
             {layerFails.length === 0 && layer.rules.length > 3 && (
               <Box paddingLeft={2}>
-                <Text dimColor>  +{layer.rules.length - 3} more (all passing)</Text>
+                <Text dimColor> +{layer.rules.length - 3} more (all passing)</Text>
               </Box>
             )}
           </Box>

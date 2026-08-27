@@ -125,10 +125,7 @@ export interface MCPTResult {
   reasoning: string;
 }
 
-export function computeMCPT(
-  input: MCPTInput,
-  options: MCPTOptions = {},
-): MCPTResult {
+export function computeMCPT(input: MCPTInput, options: MCPTOptions = {}): MCPTResult {
   const numPerms = input.numPermutations ?? 1000;
   const sig = options.significanceThreshold ?? 0.01;
   const seed = input.seed ?? 0;
@@ -163,12 +160,8 @@ export function computeMCPT(
   const verdict: "pass" | "fail" = pValue < sig ? "pass" : "fail";
 
   const sortedPFs = [...permPFs].sort((a, b) => a - b);
-  const meanPerm =
-    permPFs.length > 0
-      ? permPFs.reduce((a, b) => a + b, 0) / permPFs.length
-      : NaN;
-  const medianPerm =
-    sortedPFs.length > 0 ? sortedPFs[Math.floor(sortedPFs.length / 2)]! : NaN;
+  const meanPerm = permPFs.length > 0 ? permPFs.reduce((a, b) => a + b, 0) / permPFs.length : NaN;
+  const medianPerm = sortedPFs.length > 0 ? sortedPFs[Math.floor(sortedPFs.length / 2)]! : NaN;
   const belowReal = permPFs.filter((p) => p < realPF).length;
   const realPercentile = permPFs.length > 0 ? belowReal / permPFs.length : NaN;
 

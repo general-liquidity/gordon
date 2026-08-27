@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.10/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -12,6 +12,7 @@
       "!**/dist",
       "!**/node_modules",
       "!**/*.min.js",
+      "!.site-index.js",
       "!docs/generated",
       "!.public-dist",
       "!**/__pycache__"
@@ -33,7 +34,7 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "suspicious": {
         "noExplicitAny": "off"
       },
@@ -42,6 +43,49 @@
       }
     }
   },
+  "overrides": [
+    {
+      "includes": ["src/tui/**/*.ts", "src/tui/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noArrayIndexKey": "off",
+            "noControlCharactersInRegex": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/utils/update-notifier.test.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noControlCharactersInRegex": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/tui/vim/operators.ts"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noVoidTypeReturn": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/infra/broker/factory.ts", "src/infra/exchange/factory.ts"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noStaticOnlyClass": "off"
+          }
+        }
+      }
+    }
+  ],
   "assist": {
     "enabled": false
   }

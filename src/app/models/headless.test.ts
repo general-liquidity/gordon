@@ -46,9 +46,7 @@ describe("headlessResultToJson", () => {
 
   it("emits error and omits response on failure", () => {
     const parsed = JSON.parse(
-      headlessResultToJson(
-        fakeResult({ exitCode: 1, response: undefined, error: "boom" }),
-      ),
+      headlessResultToJson(fakeResult({ exitCode: 1, response: undefined, error: "boom" })),
     );
     expect(parsed.exitCode).toBe(1);
     expect(parsed.error).toBe("boom");
@@ -57,26 +55,20 @@ describe("headlessResultToJson", () => {
 
   it("emits error on safety-block (exitCode 2)", () => {
     const parsed = JSON.parse(
-      headlessResultToJson(
-        fakeResult({ exitCode: 2, response: undefined, error: "Empty prompt" }),
-      ),
+      headlessResultToJson(fakeResult({ exitCode: 2, response: undefined, error: "Empty prompt" })),
     );
     expect(parsed.exitCode).toBe(2);
     expect(parsed.error).toContain("Empty");
   });
 
   it("preserves duration measurement", () => {
-    const parsed = JSON.parse(
-      headlessResultToJson(fakeResult({ durationMs: 9876 })),
-    );
+    const parsed = JSON.parse(headlessResultToJson(fakeResult({ durationMs: 9876 })));
     expect(parsed.durationMs).toBe(9876);
   });
 
   it("survives a response containing quotes and newlines", () => {
     const tricky = 'Line one\nLine "two" with quotes\nLine three';
-    const parsed = JSON.parse(
-      headlessResultToJson(fakeResult({ response: tricky })),
-    );
+    const parsed = JSON.parse(headlessResultToJson(fakeResult({ response: tricky })));
     expect(parsed.response).toBe(tricky);
   });
 });

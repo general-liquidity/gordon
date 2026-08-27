@@ -35,13 +35,15 @@ export interface HintContext {
 export const HINTS: InlineHint[] = [
   {
     id: "init_gordon_md",
-    message: "Tip: Run /init to create a GORDON.md file with your trading preferences and risk rules.",
+    message:
+      "Tip: Run /init to create a GORDON.md file with your trading preferences and risk rules.",
     maxShows: 4,
     condition: (ctx) => ctx.onboardingComplete && !ctx.hasGordonMd,
   },
   {
     id: "permission_mode",
-    message: "Tip: Use /auto for hands-free trading, /ask for per-trade approval (default), or /strict for read-only mode. /modes shows the full matrix.",
+    message:
+      "Tip: Use /auto for hands-free trading, /ask for per-trade approval (default), or /strict for read-only mode. /modes shows the full matrix.",
     maxShows: 3,
     condition: (ctx) => ctx.sessionCount <= 5,
   },
@@ -53,13 +55,15 @@ export const HINTS: InlineHint[] = [
   },
   {
     id: "radar_cards",
-    message: "Tip: Radar cards are unsolicited heads-ups from Gordon's market observer — news, regime shifts, volatility spikes. They show up inline in chat, marked as suggestions. Turn on with /radar on, inspect with /radar status.",
+    message:
+      "Tip: Radar cards are unsolicited heads-ups from Gordon's market observer — news, regime shifts, volatility spikes. They show up inline in chat, marked as suggestions. Turn on with /radar on, inspect with /radar status.",
     maxShows: 3,
     condition: (ctx) => ctx.sessionCount >= 2 && ctx.sessionCount <= 12,
   },
   {
     id: "keybindings",
-    message: "Tip: Customize keyboard shortcuts in ~/.gordon/keybindings.json. Vim mode is supported.",
+    message:
+      "Tip: Customize keyboard shortcuts in ~/.gordon/keybindings.json. Vim mode is supported.",
     maxShows: 2,
     condition: (ctx) => ctx.sessionCount >= 3 && ctx.sessionCount <= 8,
   },
@@ -77,7 +81,8 @@ export const HINTS: InlineHint[] = [
   },
   {
     id: "risk_disclosure",
-    message: "Remember: Gordon can place real trades. Always review orders before approving. Use /strict for read-only mode.",
+    message:
+      "Remember: Gordon can place real trades. Always review orders before approving. Use /strict for read-only mode.",
     maxShows: 5,
     condition: (ctx) => ctx.permissionMode === "auto",
   },

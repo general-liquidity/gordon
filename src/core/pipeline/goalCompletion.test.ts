@@ -29,7 +29,13 @@ function step(goalText: string, obs: GoalObservation) {
 describe("finalizeGoalCompletion (A1 verifier gate)", () => {
   it("seals achieved when self-score proposes completion and verifier confirms", async () => {
     const { state, score } = step("trade until Sharpe >= 1.5", { sharpe: 2.0 });
-    const result = await finalizeGoalCompletion(state, score, { sharpe: 2.0 }, getCompletionVerifier(), 1);
+    const result = await finalizeGoalCompletion(
+      state,
+      score,
+      { sharpe: 2.0 },
+      getCompletionVerifier(),
+      1,
+    );
     expect(result.sealed).toBe(true);
     expect(result.state.status).toBe("achieved");
     expect(isGoalComplete(result.state)).toBe(true);
@@ -37,7 +43,13 @@ describe("finalizeGoalCompletion (A1 verifier gate)", () => {
 
   it("does not seal (and is not a blocked-premature) when self-score does not propose completion", async () => {
     const { state, score } = step("trade until Sharpe >= 1.5", { sharpe: 1.0 });
-    const result = await finalizeGoalCompletion(state, score, { sharpe: 1.0 }, getCompletionVerifier(), 1);
+    const result = await finalizeGoalCompletion(
+      state,
+      score,
+      { sharpe: 1.0 },
+      getCompletionVerifier(),
+      1,
+    );
     expect(result.sealed).toBe(false);
     expect(result.blockedPrematureCompletion).toBe(false);
     expect(result.state.status).toBe("active");
@@ -57,7 +69,13 @@ describe("finalizeGoalCompletion (A1 verifier gate)", () => {
     };
     setCompletionVerifier(refusing);
     const { state, score } = step("trade until Sharpe >= 1.5", { sharpe: 2.0 });
-    const result = await finalizeGoalCompletion(state, score, { sharpe: 2.0 }, getCompletionVerifier(), 1);
+    const result = await finalizeGoalCompletion(
+      state,
+      score,
+      { sharpe: 2.0 },
+      getCompletionVerifier(),
+      1,
+    );
     expect(result.sealed).toBe(false);
     expect(result.blockedPrematureCompletion).toBe(true);
     expect(result.state.status).toBe("active");
@@ -67,7 +85,13 @@ describe("finalizeGoalCompletion (A1 verifier gate)", () => {
 
   it("surfaces the derived unmet set alongside the verdict", async () => {
     const { state, score } = step("trade until Sharpe >= 1.5", { sharpe: 1.0 });
-    const result = await finalizeGoalCompletion(state, score, { sharpe: 1.0 }, getCompletionVerifier(), 1);
+    const result = await finalizeGoalCompletion(
+      state,
+      score,
+      { sharpe: 1.0 },
+      getCompletionVerifier(),
+      1,
+    );
     expect(result.unmet.length).toBeGreaterThan(0);
   });
 });

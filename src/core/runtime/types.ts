@@ -24,24 +24,24 @@ export const StrategySlotSchema = z.object({
   playbook_name: z.string(),
 
   // Capital allocation
-  allocated_capital: z.number(),       // USD allocated to this strategy
-  allocated_percent: z.number(),       // % of total portfolio
-  used_capital: z.number(),            // currently deployed in positions
-  available_capital: z.number(),       // allocated - used
+  allocated_capital: z.number(), // USD allocated to this strategy
+  allocated_percent: z.number(), // % of total portfolio
+  used_capital: z.number(), // currently deployed in positions
+  available_capital: z.number(), // allocated - used
 
   // Status
   status: z.enum([
-    "active",     // accepting new trades
-    "paused",     // not accepting new trades, existing positions maintained
-    "cooldown",   // temporarily paused after hitting a limit
-    "draining",   // closing existing positions, no new trades
-    "stopped",    // fully stopped, no positions
+    "active", // accepting new trades
+    "paused", // not accepting new trades, existing positions maintained
+    "cooldown", // temporarily paused after hitting a limit
+    "draining", // closing existing positions, no new trades
+    "stopped", // fully stopped, no positions
   ]),
 
   // Constraints (override playbook defaults if set)
   max_positions: z.number(),
   max_daily_trades: z.number(),
-  max_loss_percent: z.number(),        // max loss before auto-pause
+  max_loss_percent: z.number(), // max loss before auto-pause
 
   // Performance tracking (live)
   total_pnl: z.number(),
@@ -80,9 +80,9 @@ export type SlotStatus = StrategySlot["status"];
  */
 export const PortfolioStateSchema = z.object({
   total_capital: z.number(),
-  allocated_capital: z.number(),     // sum of all slot allocations
-  unallocated_capital: z.number(),   // total - allocated
-  deployed_capital: z.number(),      // actually in positions
+  allocated_capital: z.number(), // sum of all slot allocations
+  unallocated_capital: z.number(), // total - allocated
+  deployed_capital: z.number(), // actually in positions
 
   total_open_positions: z.number(),
   total_pnl: z.number(),
@@ -92,7 +92,7 @@ export const PortfolioStateSchema = z.object({
   // Portfolio-level risk
   portfolio_drawdown_percent: z.number(),
   portfolio_max_drawdown_percent: z.number(),
-  correlation_risk: z.number(),      // 0-1, how correlated are active positions
+  correlation_risk: z.number(), // 0-1, how correlated are active positions
 
   last_updated: z.string().datetime(),
 });
@@ -107,10 +107,10 @@ export type PortfolioState = z.infer<typeof PortfolioStateSchema>;
  * How capital is distributed across strategy slots.
  */
 export const AllocationStrategySchema = z.enum([
-  "equal_weight",   // split equally among active slots
-  "risk_parity",    // allocate inversely to volatility
-  "performance",    // allocate more to better-performing slots
-  "fixed",          // manual fixed allocations
+  "equal_weight", // split equally among active slots
+  "risk_parity", // allocate inversely to volatility
+  "performance", // allocate more to better-performing slots
+  "fixed", // manual fixed allocations
 ]);
 
 export type AllocationStrategy = z.infer<typeof AllocationStrategySchema>;

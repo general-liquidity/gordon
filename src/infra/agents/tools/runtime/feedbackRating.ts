@@ -80,7 +80,7 @@ export const feedbackRatingTool = createTool({
     const path = defaultFeedbackPath();
     try {
       mkdirSync(dirname(path), { recursive: true });
-      appendFileSync(path, JSON.stringify(entry) + "\n", "utf8");
+      appendFileSync(path, `${JSON.stringify(entry)}\n`, "utf8");
     } catch {
       /* best-effort */
     }

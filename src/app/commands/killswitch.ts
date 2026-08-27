@@ -46,7 +46,10 @@ function usage(): string {
   ].join("\n");
 }
 
-function parseKey(scopeRaw: string | undefined, idRaw: string | undefined): { key?: KillSwitchKey; restOffset: number; error?: string } {
+function parseKey(
+  scopeRaw: string | undefined,
+  idRaw: string | undefined,
+): { key?: KillSwitchKey; restOffset: number; error?: string } {
   if (!isScope(scopeRaw)) {
     return { restOffset: 0, error: `Unknown scope '${scopeRaw ?? ""}'.\n${usage()}` };
   }
@@ -92,8 +95,9 @@ export async function handleKillSwitchCommand(args: string): Promise<KillSwitchC
     if (trips.length === 0) {
       return { success: true, message: "No kill switches are tripped." };
     }
-    const lines = trips.map((trip) =>
-      `- ${keyLabel(trip.key)} tripped ${new Date(trip.trippedAt).toISOString()}: ${trip.reason}`
+    const lines = trips.map(
+      (trip) =>
+        `- ${keyLabel(trip.key)} tripped ${new Date(trip.trippedAt).toISOString()}: ${trip.reason}`,
     );
     return { success: true, message: `Tripped kill switches:\n${lines.join("\n")}` };
   }

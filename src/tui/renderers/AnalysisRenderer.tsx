@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../ink-custom";
 import { DataTable, type Column } from "../components/charts/DataTable.tsx";
 import { InlineChart } from "../components/charts/InlineChart.tsx";
@@ -41,9 +40,7 @@ export function AnalysisRenderer({ data }: Props) {
   for (let i = 0; i < maxLevels; i++) {
     levelRows.push({
       support:
-        data.supports[i] != null
-          ? `S${i + 1}  ${data.supports[i]!.toLocaleString()}`
-          : "\u2014",
+        data.supports[i] != null ? `S${i + 1}  ${data.supports[i]!.toLocaleString()}` : "\u2014",
       resistance:
         data.resistances[i] != null
           ? `R${i + 1}  ${data.resistances[i]!.toLocaleString()}`
@@ -96,7 +93,7 @@ export function AnalysisRenderer({ data }: Props) {
 
       {/* Indicators line */}
       <Box marginTop={1}>
-        <Text dimColor>  RSI </Text>
+        <Text dimColor> RSI </Text>
         <Text>{data.rsiState}</Text>
         <Text dimColor> {"\u00b7"} MACD </Text>
         <Text>{data.macdState}</Text>
@@ -113,7 +110,7 @@ export function AnalysisRenderer({ data }: Props) {
 
       {/* Signal */}
       <Box marginTop={1}>
-        <Text dimColor>  Signal: </Text>
+        <Text dimColor> Signal: </Text>
         <Text bold color={signalColor}>
           {data.signal}
         </Text>

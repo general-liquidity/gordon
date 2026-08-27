@@ -89,10 +89,7 @@ function saveState(s: TelemetryState): void {
  * Check if telemetry is forcibly disabled via environment.
  */
 function isEnvDisabled(): boolean {
-  return (
-    process.env.DO_NOT_TRACK === "1" ||
-    process.env.GORDON_TELEMETRY_DISABLED === "1"
-  );
+  return process.env.DO_NOT_TRACK === "1" || process.env.GORDON_TELEMETRY_DISABLED === "1";
 }
 
 /**
@@ -194,10 +191,7 @@ function getSystemInfo(): typeof cachedSystemInfo & {} {
 /**
  * Record a telemetry event. No-op if telemetry is disabled.
  */
-export function record(
-  event: TelemetryEventName,
-  properties?: Partial<TelemetryProperties>,
-): void {
+export function record(event: TelemetryEventName, properties?: Partial<TelemetryProperties>): void {
   if (!isEnabled() && !isDebugMode()) return;
 
   const fullEvent: TelemetryEvent = {

@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import { enrichBacktestResult } from "./enrichment.ts";
-import { DEFAULT_BACKTEST_PARAMS, type BacktestEngineResult, type BacktestMetrics, type Trade } from "./types.ts";
+import {
+  DEFAULT_BACKTEST_PARAMS,
+  type BacktestEngineResult,
+  type BacktestMetrics,
+  type Trade,
+} from "./types.ts";
 import type { OptimizationEntry } from "./optimization/overfitting.ts";
 
 const DAY_MS = 86_400_000;
@@ -57,12 +62,8 @@ function makeMetrics(overrides: Partial<BacktestMetrics> = {}): BacktestMetrics 
   };
 }
 
-function makeEngineResult(
-  overrides: Partial<BacktestEngineResult> = {},
-): BacktestEngineResult {
-  const trades = Array.from({ length: 30 }, (_, i) =>
-    makeTrade(i, i % 3 === 0 ? -50 : 100),
-  );
+function makeEngineResult(overrides: Partial<BacktestEngineResult> = {}): BacktestEngineResult {
+  const trades = Array.from({ length: 30 }, (_, i) => makeTrade(i, i % 3 === 0 ? -50 : 100));
   return {
     strategyId: "test-strategy",
     params: DEFAULT_BACKTEST_PARAMS,
@@ -138,9 +139,7 @@ describe("enrichBacktestResult", () => {
     });
     expect(enrichment.overfitting?.isLikelyOverfit).toBe(true);
     expect(enrichment.overfitting?.analysis.combinationsTested).toBe(4);
-    expect(
-      enrichment.summaryLines.some((l) => l.startsWith("[OVERFITTING]")),
-    ).toBe(true);
+    expect(enrichment.summaryLines.some((l) => l.startsWith("[OVERFITTING]"))).toBe(true);
   });
 
   test("delayed results trigger alpha-decay analysis", async () => {
@@ -159,9 +158,7 @@ describe("enrichBacktestResult", () => {
     } else {
       throw new Error("expected alpha-decay result, got error");
     }
-    expect(
-      enrichment.summaryLines.some((l) => l.startsWith("[ALPHA_DECAY]")),
-    ).toBe(true);
+    expect(enrichment.summaryLines.some((l) => l.startsWith("[ALPHA_DECAY]"))).toBe(true);
   });
 
   test("window days derived from engine dates feeds the exposure check", async () => {
@@ -173,8 +170,6 @@ describe("enrichBacktestResult", () => {
       { monteCarlo: false },
     );
     expect(enrichment.verdict.verdict).toBe("DISCARD_SAMPLE_SIZE");
-    expect(
-      enrichment.verdict.violations.some((v) => v.startsWith("exposure")),
-    ).toBe(true);
+    expect(enrichment.verdict.violations.some((v) => v.startsWith("exposure"))).toBe(true);
   });
 });

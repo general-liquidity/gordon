@@ -18,7 +18,12 @@ describe("scoreConfluences — tier mapping", () => {
 
   it("all confluences present → A*", () => {
     const r = scoreConfluences({
-      observations: allPresent(["divergence", "ema_alignment", "regime_fit", "key_level_proximity"]),
+      observations: allPresent([
+        "divergence",
+        "ema_alignment",
+        "regime_fit",
+        "key_level_proximity",
+      ]),
     });
     expect(r.tier).toBe("A*");
     expect(r.ratio).toBe(1);

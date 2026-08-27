@@ -31,13 +31,10 @@ export const usdVolumeGateDiagnosticTool = createTool({
         }),
       )
       .min(1)
-      .describe("Recent candles with close + volume (volume in contract / base-asset units, NOT USD)."),
-    maPeriod: z
-      .number()
-      .int()
-      .min(1)
-      .optional()
-      .describe("MA window. Default 60."),
+      .describe(
+        "Recent candles with close + volume (volume in contract / base-asset units, NOT USD).",
+      ),
+    maPeriod: z.number().int().min(1).optional().describe("MA window. Default 60."),
     thresholdUSD: z
       .number()
       .positive()

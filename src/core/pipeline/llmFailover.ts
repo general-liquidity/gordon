@@ -29,9 +29,7 @@ export function buildFailoverModelChain(
 
   return providers.map((provider) => ({
     provider,
-    model: provider === preset.provider
-      ? preset.model
-      : FALLBACK_MODEL_BY_PROVIDER[provider],
+    model: provider === preset.provider ? preset.model : FALLBACK_MODEL_BY_PROVIDER[provider],
     temperature: preset.temperature,
     maxTokens: preset.maxTokens,
   }));

@@ -92,7 +92,7 @@ describe("leveragePrivilege", () => {
     const r = leveragePrivilege({
       sharpeAnnualized: 2.0,
       observedMaxDrawdown: 0.15,
-      drawdownTolerance: 0.10,
+      drawdownTolerance: 0.1,
     });
     expect(r.earned).toBe(false);
     expect(r.reasons.some((s) => s.includes("exceeds tolerance"))).toBe(true);
@@ -131,8 +131,12 @@ describe("leveragePrivilege", () => {
   });
 
   it("respects custom Sharpe floor", () => {
-    expect(leveragePrivilege({ sharpeAnnualized: 1.0, minSharpeAnnualized: 0.8 }).earned).toBe(true);
-    expect(leveragePrivilege({ sharpeAnnualized: 1.0, minSharpeAnnualized: 1.2 }).earned).toBe(false);
+    expect(leveragePrivilege({ sharpeAnnualized: 1.0, minSharpeAnnualized: 0.8 }).earned).toBe(
+      true,
+    );
+    expect(leveragePrivilege({ sharpeAnnualized: 1.0, minSharpeAnnualized: 1.2 }).earned).toBe(
+      false,
+    );
   });
 });
 
@@ -157,10 +161,7 @@ describe("compareStrategies", () => {
   });
 
   it("declares tie when geometric returns match within epsilon", () => {
-    const r = compareStrategies(
-      { arithmetic: 0.1, stddev: 0.2 },
-      { arithmetic: 0.1, stddev: 0.2 },
-    );
+    const r = compareStrategies({ arithmetic: 0.1, stddev: 0.2 }, { arithmetic: 0.1, stddev: 0.2 });
     expect(r.winner).toBe("tie");
   });
 });

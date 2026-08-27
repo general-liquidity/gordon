@@ -48,7 +48,7 @@ describe("analyzeFakeLiquidity", () => {
       .map((_, i) => realBookCandle(i));
     const r = analyzeFakeLiquidity(candles);
     expect(r.verdict).toBe("real_liquidity");
-    expect(r.outlierFraction).toBeLessThan(0.10);
+    expect(r.outlierFraction).toBeLessThan(0.1);
   });
 
   test("mixed window with ~12% outliers → suspicious", () => {
@@ -71,7 +71,7 @@ describe("analyzeFakeLiquidity", () => {
     }
     const r = analyzeFakeLiquidity(candles);
     expect(r.verdict).toBe("fake_liquidity");
-    expect(r.outlierFraction).toBeGreaterThanOrEqual(0.20);
+    expect(r.outlierFraction).toBeGreaterThanOrEqual(0.2);
   });
 
   test("respects custom outlier z-threshold", () => {

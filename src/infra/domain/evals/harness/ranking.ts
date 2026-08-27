@@ -93,8 +93,7 @@ export function wilsonInterval(
   const z2 = z * z;
   const denom = 1 + z2 / n;
   const center = (p + z2 / (2 * n)) / denom;
-  const margin =
-    (z / denom) * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n));
+  const margin = (z / denom) * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n));
   return {
     p: clamp01(p),
     low: clamp01(center - margin),
@@ -254,7 +253,9 @@ export function rankVariantResults(
 /** Pretty-print a leaderboard for CI logs. */
 export function formatLeaderboard(board: Leaderboard): string {
   const lines: string[] = [];
-  lines.push(`[leaderboard] ${board.variants.length} variants @ ${(board.confidence * 100).toFixed(0)}% CI`);
+  lines.push(
+    `[leaderboard] ${board.variants.length} variants @ ${(board.confidence * 100).toFixed(0)}% CI`,
+  );
   for (const v of board.variants) {
     const tie = v.tiedWithPrevious ? "  ~tied with above" : "";
     lines.push(
@@ -287,21 +288,18 @@ function inverseNormalCdf(p: number): number {
 
   // Coefficients (Peter Acklam).
   const a = [
-    -3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2,
-    1.38357751867269e2, -3.066479806614716e1, 2.506628277459239,
+    -3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2, 1.38357751867269e2,
+    -3.066479806614716e1, 2.506628277459239,
   ];
   const b = [
-    -5.447609879822406e1, 1.615858368580409e2, -1.556989798598866e2,
-    6.680131188771972e1, -1.328068155288572e1,
+    -5.447609879822406e1, 1.615858368580409e2, -1.556989798598866e2, 6.680131188771972e1,
+    -1.328068155288572e1,
   ];
   const cc = [
-    -7.784894002430293e-3, -3.223964580411365e-1, -2.400758277161838,
-    -2.549732539343734, 4.374664141464968, 2.938163982698783,
+    -7.784894002430293e-3, -3.223964580411365e-1, -2.400758277161838, -2.549732539343734,
+    4.374664141464968, 2.938163982698783,
   ];
-  const d = [
-    7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996,
-    3.754408661907416,
-  ];
+  const d = [7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996, 3.754408661907416];
 
   const pLow = 0.02425;
   const pHigh = 1 - pLow;

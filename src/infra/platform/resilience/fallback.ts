@@ -76,7 +76,7 @@ export interface CircuitBreakerStats {
 export async function withRetry<T>(
   fn: () => Promise<T>,
   maxRetries: number = 3,
-  baseDelay: number = 1000
+  baseDelay: number = 1000,
 ): Promise<T> {
   let lastError: Error | undefined;
 
@@ -87,7 +87,7 @@ export async function withRetry<T>(
       lastError = error instanceof Error ? error : new Error(String(error));
 
       if (attempt < maxRetries) {
-        const delay = baseDelay * Math.pow(2, attempt);
+        const delay = baseDelay * 2 ** attempt;
         const jitter = Math.random() * 0.3 * delay;
         const totalDelay = delay + jitter;
 
@@ -131,7 +131,7 @@ export class CircuitBreaker {
   constructor(
     private readonly threshold: number = 5,
     private readonly resetTimeout: number = 30000,
-    private readonly halfOpenMaxAttempts: number = 3
+    private readonly halfOpenMaxAttempts: number = 3,
   ) {}
 
   /**
@@ -146,10 +146,7 @@ export class CircuitBreaker {
         this.halfOpenAttempts = 0;
         logger.info("Circuit breaker entering half-open state");
       } else {
-        throw new CircuitBreakerOpenError(
-          "Circuit breaker is open",
-          this.getStats()
-        );
+        throw new CircuitBreakerOpenError("Circuit breaker is open", this.getStats());
       }
     }
 
@@ -159,7 +156,7 @@ export class CircuitBreaker {
         this.trip();
         throw new CircuitBreakerOpenError(
           "Circuit breaker tripped during half-open",
-          this.getStats()
+          this.getStats(),
         );
       }
     }
@@ -277,7 +274,7 @@ export class CircuitBreaker {
 export class CircuitBreakerOpenError extends Error {
   constructor(
     message: string,
-    public readonly stats: CircuitBreakerStats
+    public readonly stats: CircuitBreakerStats,
   ) {
     super(message);
     this.name = "CircuitBreakerOpenError";
@@ -320,8 +317,8 @@ class FallbackCache<T> {
     return undefined;
   }
 
-  set(key: string, value: T): void {
-    this.freshCache.set(key, value);
+  set(key: string, value: T, freshTTL?: number): void {
+    this.freshCache.set(key, value, freshTTL);
     this.staleCache.set(key, value);
   }
 
@@ -342,11 +339,7 @@ const globalFallbackCache = new FallbackCache<unknown>(60000, 300000);
 // Global circuit breakers by key
 const circuitBreakers = new Map<string, CircuitBreaker>();
 
-function getCircuitBreaker(
-  key: string,
-  threshold: number,
-  timeout: number
-): CircuitBreaker {
+function getCircuitBreaker(key: string, threshold: number, timeout: number): CircuitBreaker {
   const existingBreaker = circuitBreakers.get(key);
   if (existingBreaker) {
     return existingBreaker;
@@ -378,7 +371,7 @@ function getCircuitBreaker(
 export async function withFallback<T>(
   fn: () => Promise<T>,
   cacheKey: string,
-  options: FallbackOptions<T> = {}
+  options: FallbackOptions<T> = {},
 ): Promise<ResilientResult<T>> {
   const {
     cacheTTL = 60000,
@@ -393,7 +386,7 @@ export async function withFallback<T>(
   const circuitBreaker = getCircuitBreaker(
     cacheKey,
     circuitBreakerThreshold,
-    circuitBreakerTimeout
+    circuitBreakerTimeout,
   );
 
   // Check fresh cache first
@@ -416,7 +409,7 @@ export async function withFallback<T>(
     });
 
     // Update cache on success
-    globalFallbackCache.set(cacheKey, data);
+    globalFallbackCache.set(cacheKey, data, cacheTTL);
 
     return {
       data,
@@ -465,7 +458,7 @@ export async function withFallback<T>(
 export async function withFallbackSimple<T>(
   fn: () => Promise<T>,
   cacheKey: string,
-  options: FallbackOptions<T> = {}
+  options: FallbackOptions<T> = {},
 ): Promise<T> {
   const result = await withFallback(fn, cacheKey, options);
   return result.data;

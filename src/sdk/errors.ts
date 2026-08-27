@@ -253,12 +253,7 @@ export function createSDKErrorFromGateway(error: {
       return new GordonSDKError(error.message, code, true, details);
 
     default:
-      return new GordonSDKError(
-        error.message,
-        "SDK_ERROR",
-        error.retryable ?? false,
-        details,
-      );
+      return new GordonSDKError(error.message, "SDK_ERROR", error.retryable ?? false, details);
   }
 }
 

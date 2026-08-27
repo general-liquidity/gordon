@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 import { Divider } from "../layout/Divider.tsx";
@@ -39,8 +38,13 @@ function ChangeList({ changes }: { changes: FieldChange[] }) {
         <Box key={change.field} paddingLeft={2}>
           <Text dimColor>{change.field.padEnd(maxField + 2)}</Text>
           <Text dimColor>{change.from.padEnd(maxFrom + 2)}</Text>
-          <Text color="gray">{"→"}{"  "}</Text>
-          <Text color="cyanBright" bold>{change.to}</Text>
+          <Text color="gray">
+            {"→"}
+            {"  "}
+          </Text>
+          <Text color="cyanBright" bold>
+            {change.to}
+          </Text>
         </Box>
       ))}
     </>
@@ -56,20 +60,21 @@ export function StrategyModificationPermissionRequest({
 
   const content = (
     <>
-      <Text color="yellow" bold>{"⚠"} STRATEGY MODIFICATION REQUEST</Text>
+      <Text color="yellow" bold>
+        {"⚠"} STRATEGY MODIFICATION REQUEST
+      </Text>
       <Text> </Text>
       <Text>
         {"  "}Gordon wants to modify strategy:{" "}
-        <Text bold color="cyanBright">{strategyName}</Text>
+        <Text bold color="cyanBright">
+          {strategyName}
+        </Text>
       </Text>
       <Text> </Text>
       <ChangeList changes={changes} />
       <Text> </Text>
       <Box paddingLeft={2}>
-        <Select
-          options={OPTIONS}
-          onChange={(v) => onDecision(v as "approve" | "deny")}
-        />
+        <Select options={OPTIONS} onChange={(v) => onDecision(v as "approve" | "deny")} />
       </Box>
     </>
   );
@@ -77,13 +82,7 @@ export function StrategyModificationPermissionRequest({
   if (isHighRisk) {
     return (
       <Box flexDirection="column" marginTop={1}>
-        <Box
-          flexDirection="column"
-          borderStyle="round"
-          borderColor="red"
-          paddingX={2}
-          paddingY={1}
-        >
+        <Box flexDirection="column" borderStyle="round" borderColor="red" paddingX={2} paddingY={1}>
           {content}
         </Box>
       </Box>

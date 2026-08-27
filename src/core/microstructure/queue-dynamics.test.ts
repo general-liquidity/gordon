@@ -44,21 +44,44 @@ describe("queuePositionSignal", () => {
 
 describe("spreadCrossingProbability", () => {
   it("crossing probability rises with aggressive flow", () => {
-    const slow = spreadCrossingProbability({ snapshot: book(200, 200), buyFlowRate: 50, sellFlowRate: 0 });
-    const fast = spreadCrossingProbability({ snapshot: book(200, 200), buyFlowRate: 400, sellFlowRate: 0 });
+    const slow = spreadCrossingProbability({
+      snapshot: book(200, 200),
+      buyFlowRate: 50,
+      sellFlowRate: 0,
+    });
+    const fast = spreadCrossingProbability({
+      snapshot: book(200, 200),
+      buyFlowRate: 400,
+      sellFlowRate: 0,
+    });
     expect(fast.pCrossUp).toBeGreaterThan(slow.pCrossUp);
     expect(slow.pCrossUp).toBeGreaterThan(0);
     expect(fast.pCrossUp).toBeLessThan(1);
   });
 
   it("crossing probability rises with horizon", () => {
-    const short = spreadCrossingProbability({ snapshot: book(200, 200), buyFlowRate: 100, sellFlowRate: 0, horizonSec: 1 });
-    const long = spreadCrossingProbability({ snapshot: book(200, 200), buyFlowRate: 100, sellFlowRate: 0, horizonSec: 5 });
+    const short = spreadCrossingProbability({
+      snapshot: book(200, 200),
+      buyFlowRate: 100,
+      sellFlowRate: 0,
+      horizonSec: 1,
+    });
+    const long = spreadCrossingProbability({
+      snapshot: book(200, 200),
+      buyFlowRate: 100,
+      sellFlowRate: 0,
+      horizonSec: 5,
+    });
     expect(long.pCrossUp).toBeGreaterThan(short.pCrossUp);
   });
 
   it("expected clear time = touchSize / flow; matches the exp formula", () => {
-    const r = spreadCrossingProbability({ snapshot: book(100, 200), buyFlowRate: 100, sellFlowRate: 100, horizonSec: 2 });
+    const r = spreadCrossingProbability({
+      snapshot: book(100, 200),
+      buyFlowRate: 100,
+      sellFlowRate: 100,
+      horizonSec: 2,
+    });
     expect(r.expClearAskSec).toBeCloseTo(2, 6); // 200 / 100
     expect(r.expClearBidSec).toBeCloseTo(1, 6); // 100 / 100
     expect(r.pCrossUp).toBeCloseTo(1 - Math.exp(-2 / 2), 6);
@@ -68,9 +91,17 @@ describe("spreadCrossingProbability", () => {
   });
 
   it("an empty touch is already crossed (p=1); zero flow can never cross (p=0)", () => {
-    const emptyAsk = spreadCrossingProbability({ snapshot: book(200, 0), buyFlowRate: 10, sellFlowRate: 10 });
+    const emptyAsk = spreadCrossingProbability({
+      snapshot: book(200, 0),
+      buyFlowRate: 10,
+      sellFlowRate: 10,
+    });
     expect(emptyAsk.pCrossUp).toBe(1);
-    const noFlow = spreadCrossingProbability({ snapshot: book(200, 200), buyFlowRate: 0, sellFlowRate: 0 });
+    const noFlow = spreadCrossingProbability({
+      snapshot: book(200, 200),
+      buyFlowRate: 0,
+      sellFlowRate: 0,
+    });
     expect(noFlow.pCrossUp).toBe(0);
     expect(noFlow.pCrossDown).toBe(0);
     expect(noFlow.expClearAskSec).toBeNull();

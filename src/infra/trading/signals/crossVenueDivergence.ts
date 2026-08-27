@@ -131,9 +131,7 @@ export function detectCrossVenueDivergence(input: DivergenceInput): DivergenceRe
     }
   }
 
-  const anyAlert = pairs.some(
-    (p) => p.persistentBars >= persistence || p.quoteExecutionFlip,
-  );
+  const anyAlert = pairs.some((p) => p.persistentBars >= persistence || p.quoteExecutionFlip);
 
   let reason: string;
   if (!anyAlert) {
@@ -152,8 +150,7 @@ export function divergenceToPayload(result: DivergenceResult): Record<string, un
     anyAlert: result.anyAlert,
     maxObservedDivergence: Number(result.maxObservedDivergence.toFixed(5)),
     pairCount: result.pairs.length,
-    flaggedPairCount: result.pairs.filter(
-      (p) => p.persistentBars >= 3 || p.quoteExecutionFlip,
-    ).length,
+    flaggedPairCount: result.pairs.filter((p) => p.persistentBars >= 3 || p.quoteExecutionFlip)
+      .length,
   };
 }

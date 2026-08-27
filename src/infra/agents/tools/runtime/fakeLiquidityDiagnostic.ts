@@ -35,12 +35,7 @@ export const fakeLiquidityDiagnosticTool = createTool({
       )
       .min(20)
       .describe("OHLCV candles. Need ≥ 20 for a verdict (default minCandles=20)."),
-    window: z
-      .number()
-      .int()
-      .min(5)
-      .optional()
-      .describe("Lookback window in candles. Default 60."),
+    window: z.number().int().min(5).optional().describe("Lookback window in candles. Default 60."),
     outlierZThreshold: z
       .number()
       .positive()

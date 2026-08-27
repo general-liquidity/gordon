@@ -49,15 +49,17 @@ export function startAlertAuditMirror(): () => void {
 
     const action = event.level === "critical" ? "ALERT_CRITICAL" : "ALERT_WARNING";
     try {
-      audit.success(action, {
-        category: event.category,
-        message: event.message,
-        dedupeKey: event.dedupeKey,
-      }, {
-        metadata: event.context
-          ? { alertContext: event.context }
-          : undefined,
-      });
+      audit.success(
+        action,
+        {
+          category: event.category,
+          message: event.message,
+          dedupeKey: event.dedupeKey,
+        },
+        {
+          metadata: event.context ? { alertContext: event.context } : undefined,
+        },
+      );
     } catch (err) {
       // Audit failures never block the event bus
       logger.error("Failed to mirror alert to audit log", err as Error);

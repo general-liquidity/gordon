@@ -117,11 +117,7 @@ export function computeMarketProfile(input: MarketProfileInput): MarketProfileRe
       if (b.high > blockHigh) blockHigh = b.high;
     }
     const touched = new Set<number>();
-    for (
-      let p = bucketPrice(blockLow, tick, basis);
-      p <= blockHigh + tick * 1e-9;
-      p += tick
-    ) {
+    for (let p = bucketPrice(blockLow, tick, basis); p <= blockHigh + tick * 1e-9; p += tick) {
       const bp = bucketPrice(p, tick, basis);
       touched.add(Math.round(bp / tick));
     }

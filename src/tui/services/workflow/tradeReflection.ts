@@ -10,8 +10,8 @@
 // Feeds into memory system + denial memory for continuous learning.
 // ============================================================================
 
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { join } from "path";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import { getGordonDir } from "../../../infra/storage/paths.ts";
 
 const REFLECTIONS_PATH = join(getGordonDir(), "reflections.json");
@@ -50,7 +50,14 @@ export interface ReflectionResult {
   correctnessScore: number; // -1 to 1 (magnitude of correctness)
   primaryCause: string; // main reason for success/failure
   contributingFactors: Array<{
-    category: "technical" | "fundamental" | "news" | "sentiment" | "macro" | "execution" | "risk_management";
+    category:
+      | "technical"
+      | "fundamental"
+      | "news"
+      | "sentiment"
+      | "macro"
+      | "execution"
+      | "risk_management";
     factor: string;
     impact: "positive" | "negative" | "neutral";
   }>;
@@ -106,8 +113,7 @@ Respond in JSON:
 }`;
 
 export function buildReflectionPrompt(outcome: TradeOutcome, context: TradeContext = {}): string {
-  return REFLECTION_PROMPT
-    .replace("{symbol}", outcome.symbol)
+  return REFLECTION_PROMPT.replace("{symbol}", outcome.symbol)
     .replace("{side}", outcome.side)
     .replace("{entry}", outcome.entryPrice.toFixed(2))
     .replace("{exit}", outcome.exitPrice.toFixed(2))
@@ -135,7 +141,9 @@ function formatDuration(ms: number): string {
 export class TradeReflectionStore {
   private reflections: ReflectionResult[] = [];
 
-  constructor() { this.load(); }
+  constructor() {
+    this.load();
+  }
 
   record(result: Omit<ReflectionResult, "id" | "timestamp">): string {
     const id = `refl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -153,7 +161,9 @@ export class TradeReflectionStore {
   }
 
   getRecentLessons(n: number = 10): string[] {
-    return this.getAll().slice(0, n).map((r) => r.lessonLearned);
+    return this.getAll()
+      .slice(0, n)
+      .map((r) => r.lessonLearned);
   }
 
   // Get patterns that repeat across multiple reflections
@@ -195,11 +205,15 @@ export class TradeReflectionStore {
       if (existsSync(REFLECTIONS_PATH)) {
         this.reflections = JSON.parse(readFileSync(REFLECTIONS_PATH, "utf-8"));
       }
-    } catch { this.reflections = []; }
+    } catch {
+      this.reflections = [];
+    }
   }
 
   private save(): void {
-    try { writeFileSync(REFLECTIONS_PATH, JSON.stringify(this.reflections, null, 2)); } catch {}
+    try {
+      writeFileSync(REFLECTIONS_PATH, JSON.stringify(this.reflections, null, 2));
+    } catch {}
   }
 }
 

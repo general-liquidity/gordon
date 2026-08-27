@@ -33,7 +33,6 @@ import {
   type LegEstimate,
 } from "../../../core/alpha/uncertainty-decomposition.ts";
 
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -42,8 +41,8 @@ export type RiskTier = "low" | "medium" | "high" | "critical";
 
 export interface RiskDimension {
   name: string;
-  score: number;    // 0-100 (0 = no risk, 100 = max risk)
-  weight: number;   // Importance multiplier
+  score: number; // 0-100 (0 = no risk, 100 = max risk)
+  weight: number; // Importance multiplier
   reason: string;
 }
 
@@ -92,6 +91,8 @@ export interface PortfolioContext {
   currentDrawdownPct: number;
   /** Trades executed in the last hour. */
   recentTradeCount: number;
+  /** Trades executed since the current UTC day began, when known. */
+  todayTradeCount?: number;
   /** Symbols the user has traded before. */
   tradedSymbols: Set<string>;
   // ── Hedge fund-grade data (optional — enhances scoring when available) ──
@@ -157,11 +158,7 @@ export interface PortfolioContext {
   marginOfError?: {
     grade: "A+" | "A" | "B" | "C";
     rawScore: number;
-    recommendation:
-      | "take_aggressively"
-      | "take_normally"
-      | "take_only_high_quality"
-      | "skip";
+    recommendation: "take_aggressively" | "take_normally" | "take_only_high_quality" | "skip";
   };
 }
 
@@ -194,7 +191,7 @@ export const DEFAULT_CLASSIFIER_CONFIG: ClassifierConfig = {
   maxTradesPerHour: 10,
   volatilityMultiplier: 1.0,
   isMarketHours: true,
-  regimeTransitionThreshold: 0.30,
+  regimeTransitionThreshold: 0.3,
 };
 
 // ============================================================================
@@ -232,16 +229,28 @@ export function validatePortfolioContext(portfolio: PortfolioContext): string[] 
     errors.push(`dailyPnlUsd must be a finite number (got ${portfolio.dailyPnlUsd})`);
   }
   if (!Number.isFinite(portfolio.dailyLossLimitUsd) || portfolio.dailyLossLimitUsd < 0) {
-    errors.push(`dailyLossLimitUsd must be a finite non-negative number (got ${portfolio.dailyLossLimitUsd})`);
+    errors.push(
+      `dailyLossLimitUsd must be a finite non-negative number (got ${portfolio.dailyLossLimitUsd})`,
+    );
   }
-  if (!Number.isFinite(portfolio.maxDrawdownPct) || portfolio.maxDrawdownPct <= 0 || portfolio.maxDrawdownPct > 100) {
+  if (
+    !Number.isFinite(portfolio.maxDrawdownPct) ||
+    portfolio.maxDrawdownPct <= 0 ||
+    portfolio.maxDrawdownPct > 100
+  ) {
     errors.push(`maxDrawdownPct must be in (0, 100] (got ${portfolio.maxDrawdownPct})`);
   }
-  if (!Number.isFinite(portfolio.currentDrawdownPct) || portfolio.currentDrawdownPct < 0 || portfolio.currentDrawdownPct > 100) {
+  if (
+    !Number.isFinite(portfolio.currentDrawdownPct) ||
+    portfolio.currentDrawdownPct < 0 ||
+    portfolio.currentDrawdownPct > 100
+  ) {
     errors.push(`currentDrawdownPct must be in [0, 100] (got ${portfolio.currentDrawdownPct})`);
   }
   if (!Number.isFinite(portfolio.recentTradeCount) || portfolio.recentTradeCount < 0) {
-    errors.push(`recentTradeCount must be a finite non-negative number (got ${portfolio.recentTradeCount})`);
+    errors.push(
+      `recentTradeCount must be a finite non-negative number (got ${portfolio.recentTradeCount})`,
+    );
   }
   return errors;
 }
@@ -250,12 +259,14 @@ function invalidInputAssessment(errors: string[]): RiskAssessment {
   return {
     compositeScore: 100,
     tier: "critical",
-    dimensions: [{
-      name: "Input Validation",
-      score: 100,
-      weight: 1,
-      reason: errors.join("; "),
-    }],
+    dimensions: [
+      {
+        name: "Input Validation",
+        score: 100,
+        weight: 1,
+        reason: errors.join("; "),
+      },
+    ],
     topFactors: errors.slice(0, 3),
     recommendation: "block",
     summary: `BLOCKED — invalid trade input: ${errors[0]}`,
@@ -355,7 +366,8 @@ export function classifyTradeRisk(
 
   // 3. Drawdown proximity
   const drawdownRoom = config.maxPositionPct - portfolio.currentDrawdownPct;
-  const drawdownScore = drawdownRoom <= 0 ? 100 : Math.min(100, (1 - drawdownRoom / portfolio.maxDrawdownPct) * 100);
+  const drawdownScore =
+    drawdownRoom <= 0 ? 100 : Math.min(100, (1 - drawdownRoom / portfolio.maxDrawdownPct) * 100);
   dimensions.push({
     name: "Drawdown Proximity",
     score: Math.max(0, drawdownScore),
@@ -365,9 +377,10 @@ export function classifyTradeRisk(
 
   // 4. Daily loss proximity
   const dailyLossUsed = Math.abs(Math.min(0, portfolio.dailyPnlUsd));
-  const dailyLossScore = portfolio.dailyLossLimitUsd > 0
-    ? Math.min(100, (dailyLossUsed / portfolio.dailyLossLimitUsd) * 100)
-    : 0;
+  const dailyLossScore =
+    portfolio.dailyLossLimitUsd > 0
+      ? Math.min(100, (dailyLossUsed / portfolio.dailyLossLimitUsd) * 100)
+      : 0;
   dimensions.push({
     name: "Daily Loss Budget",
     score: dailyLossScore,
@@ -386,7 +399,8 @@ export function classifyTradeRisk(
 
   // 6. Volatility regime
   const volMultiplier = config.volatilityMultiplier ?? 1.0;
-  const volScore = volMultiplier > 2.0 ? 80 : volMultiplier > 1.5 ? 50 : volMultiplier > 1.2 ? 20 : 0;
+  const volScore =
+    volMultiplier > 2.0 ? 80 : volMultiplier > 1.5 ? 50 : volMultiplier > 1.2 ? 20 : 0;
   dimensions.push({
     name: "Volatility",
     score: volScore,
@@ -442,8 +456,7 @@ export function classifyTradeRisk(
         }
       }
     } catch (err) {
-      familiarityReason +=
-        `; state familiarity unavailable (${err instanceof Error ? err.message : String(err)})`;
+      familiarityReason += `; state familiarity unavailable (${err instanceof Error ? err.message : String(err)})`;
     }
   }
 
@@ -469,12 +482,14 @@ export function classifyTradeRisk(
       // Score: if proposed size exceeds vol-adjusted limit, escalate
       const proposedPct = (trade.notionalUsd / portfolio.totalValueUsd) * 100;
       const overageRatio = proposedPct / Math.max(1, volProfile.recommendedSizePct);
-      const volSizeScore = overageRatio > 2 ? 90 : overageRatio > 1.5 ? 70 : overageRatio > 1 ? 40 : 0;
+      const volSizeScore =
+        overageRatio > 2 ? 90 : overageRatio > 1.5 ? 70 : overageRatio > 1 ? 40 : 0;
       dimensions.push({
         name: "Vol-Adjusted Sizing",
         score: volSizeScore,
         weight: 1.6,
-        reason: `Vol regime: ${volProfile.regime} (${(currentVol * 100).toFixed(0)}% annualized). ` +
+        reason:
+          `Vol regime: ${volProfile.regime} (${(currentVol * 100).toFixed(0)}% annualized). ` +
           `Recommended max: ${volProfile.recommendedSizePct.toFixed(1)}%, proposed: ${proposedPct.toFixed(1)}%`,
       });
     } catch (err) {
@@ -488,7 +503,11 @@ export function classifyTradeRisk(
   }
 
   // 10. Correlation with existing positions
-  if (portfolio.targetReturns && portfolio.positionReturns && Object.keys(portfolio.positionReturns).length > 0) {
+  if (
+    portfolio.targetReturns &&
+    portfolio.positionReturns &&
+    Object.keys(portfolio.positionReturns).length > 0
+  ) {
     try {
       const corrCheck = checkCorrelationRisk(
         trade.symbol,
@@ -496,15 +515,20 @@ export function classifyTradeRisk(
         portfolio.positionReturns,
         (trade.notionalUsd / portfolio.totalValueUsd) * 100,
       );
-      const corrScore = corrCheck.maxCorrelation > 0.8 ? 80
-        : corrCheck.maxCorrelation > 0.6 ? 50
-        : corrCheck.maxCorrelation > 0.4 ? 20
-        : 0;
+      const corrScore =
+        corrCheck.maxCorrelation > 0.8
+          ? 80
+          : corrCheck.maxCorrelation > 0.6
+            ? 50
+            : corrCheck.maxCorrelation > 0.4
+              ? 20
+              : 0;
       dimensions.push({
         name: "Correlation Risk",
         score: corrScore,
         weight: 1.4,
-        reason: `Max correlation: ${(corrCheck.maxCorrelation * 100).toFixed(0)}% with ${corrCheck.mostCorrelatedWith}` +
+        reason:
+          `Max correlation: ${(corrCheck.maxCorrelation * 100).toFixed(0)}% with ${corrCheck.mostCorrelatedWith}` +
           (corrCheck.concentrationWarning ? " — CONCENTRATION WARNING" : ""),
       });
     } catch (err) {
@@ -539,13 +563,12 @@ export function classifyTradeRisk(
   // edge assumption shouldn't get the usual auto-approval discount.
   if (portfolio.regimeTransition) {
     const rt = portfolio.regimeTransition;
-    const threshold = config.regimeTransitionThreshold ?? 0.30;
+    const threshold = config.regimeTransitionThreshold ?? 0.3;
     const probShift = Math.max(0, Math.min(1, rt.probShift));
 
     // Base score from shift probability above threshold
-    let regimeScore = probShift > threshold
-      ? Math.min(80, ((probShift - threshold) / (1 - threshold)) * 80)
-      : 0;
+    let regimeScore =
+      probShift > threshold ? Math.min(80, ((probShift - threshold) / (1 - threshold)) * 80) : 0;
 
     // Matrix-stability multiplier: drifting → +20, unstable → +40,
     // insufficient_data → +10 (signal too weak to trust either way)
@@ -620,15 +643,20 @@ export function classifyTradeRisk(
   if (portfolio.targetPriceHistory && portfolio.targetPriceHistory.length >= 60) {
     try {
       const tailProfile = computeTailRisk(portfolio.targetPriceHistory);
-      const tailScore = tailProfile.classification === "highly_fragile" ? 90
-        : tailProfile.classification === "fragile" ? 60
-        : tailProfile.classification === "robust" ? 20
-        : 0; // antifragile = bonus
+      const tailScore =
+        tailProfile.classification === "highly_fragile"
+          ? 90
+          : tailProfile.classification === "fragile"
+            ? 60
+            : tailProfile.classification === "robust"
+              ? 20
+              : 0; // antifragile = bonus
       dimensions.push({
         name: "Tail Risk",
         score: tailScore,
         weight: 1.3,
-        reason: `${tailProfile.classification} (score: ${tailProfile.tailRiskScore.toFixed(0)}/100, ` +
+        reason:
+          `${tailProfile.classification} (score: ${tailProfile.tailRiskScore.toFixed(0)}/100, ` +
           `skew: ${tailProfile.skewness.toFixed(2)}, max DD: ${(tailProfile.maxDrawdown * 100).toFixed(0)}%)`,
       });
     } catch (err) {
@@ -711,10 +739,13 @@ export function classifyTradeRisk(
 
   // Classify tier
   const tier: RiskTier =
-    compositeScore >= config.tiers.high ? "critical" :
-    compositeScore >= config.tiers.medium ? "high" :
-    compositeScore >= config.tiers.low ? "medium" :
-    "low";
+    compositeScore >= config.tiers.high
+      ? "critical"
+      : compositeScore >= config.tiers.medium
+        ? "high"
+        : compositeScore >= config.tiers.low
+          ? "medium"
+          : "low";
 
   // Top factors
   const topFactors = dimensions
@@ -725,14 +756,18 @@ export function classifyTradeRisk(
 
   // Recommendation
   const recommendation =
-    tier === "critical" ? "block" as const :
-    tier === "high" ? "require_confirmation" as const :
-    tier === "medium" ? "prompt_user" as const :
-    "auto_approve" as const;
+    tier === "critical"
+      ? ("block" as const)
+      : tier === "high"
+        ? ("require_confirmation" as const)
+        : tier === "medium"
+          ? ("prompt_user" as const)
+          : ("auto_approve" as const);
 
-  const summary = tier === "low"
-    ? `Low risk trade: ${trade.side} ${trade.quantity} ${trade.symbol} ($${trade.notionalUsd.toFixed(0)})`
-    : `${tier.toUpperCase()} risk: ${topFactors[0] ?? "multiple factors"}`;
+  const summary =
+    tier === "low"
+      ? `Low risk trade: ${trade.side} ${trade.quantity} ${trade.symbol} ($${trade.notionalUsd.toFixed(0)})`
+      : `${tier.toUpperCase()} risk: ${topFactors[0] ?? "multiple factors"}`;
 
   return {
     compositeScore: Math.round(compositeScore),

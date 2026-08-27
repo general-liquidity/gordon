@@ -76,10 +76,7 @@ export interface ConstraintIdentifierResult {
   dominantConstraint: ComponentDeficit | null;
   /** True when sample size is below minSampleSize threshold. */
   lowConfidence: boolean;
-  verdict:
-    | "no_constraint"
-    | "constraint_identified"
-    | "insufficient_data";
+  verdict: "no_constraint" | "constraint_identified" | "insufficient_data";
   summary: string;
 }
 
@@ -111,15 +108,9 @@ function normalizedDeficit(component: EvComponent, current: number, target: numb
   return (target - current) / Math.abs(target);
 }
 
-function buildDeficit(
-  component: EvComponent,
-  data: EvComponentTarget,
-): ComponentDeficit {
+function buildDeficit(component: EvComponent, data: EvComponentTarget): ComponentDeficit {
   const nd = normalizedDeficit(component, data.current, data.target);
-  const rawGap =
-    component === "avg_loss"
-      ? data.current - data.target
-      : data.target - data.current;
+  const rawGap = component === "avg_loss" ? data.current - data.target : data.target - data.current;
   return {
     component,
     current: data.current,
@@ -133,8 +124,7 @@ function buildDeficit(
 
 export function identifyConstraint(input: ConstraintIdentifierInput): ConstraintIdentifierResult {
   const minSample = input.minSampleSize ?? DEFAULT_MIN_SAMPLE_SIZE;
-  const lowConfidence =
-    input.sampleSize !== undefined && input.sampleSize < minSample;
+  const lowConfidence = input.sampleSize !== undefined && input.sampleSize < minSample;
 
   const components: ComponentDeficit[] = [
     buildDeficit("win_rate", input.winRate),
@@ -143,9 +133,7 @@ export function identifyConstraint(input: ConstraintIdentifierInput): Constraint
     buildDeficit("frequency", input.frequency),
   ];
 
-  const rankedByDeficit = [...components].sort(
-    (a, b) => b.normalizedDeficit - a.normalizedDeficit,
-  );
+  const rankedByDeficit = [...components].sort((a, b) => b.normalizedDeficit - a.normalizedDeficit);
 
   const allMeet = components.every((c) => c.meetsTarget);
   let verdict: ConstraintIdentifierResult["verdict"];
@@ -174,9 +162,7 @@ export function identifyConstraint(input: ConstraintIdentifierInput): Constraint
       `Dominant constraint: ${dc.component} (${(dc.normalizedDeficit * 100).toFixed(1)}% ${dirWord} target). ` +
       `Current ${dc.current.toFixed(4)}, target ${dc.target.toFixed(4)}. ` +
       `Recommended lever: ${dc.recommendedLever}` +
-      (lowConfidence
-        ? ` ⚠ Low confidence (sample size ${input.sampleSize} < ${minSample}).`
-        : ".");
+      (lowConfidence ? ` ⚠ Low confidence (sample size ${input.sampleSize} < ${minSample}).` : ".");
   }
 
   return {

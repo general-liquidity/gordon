@@ -81,12 +81,7 @@ export interface EdgeDiagnostic {
   isPositiveAfterCosts: boolean;
 }
 
-export type IcVerdict =
-  | "active"
-  | "decaying"
-  | "noise"
-  | "unstable"
-  | "insufficient_data";
+export type IcVerdict = "active" | "decaying" | "noise" | "unstable" | "insufficient_data";
 
 export interface IcOptions {
   /** Number of sub-windows to slice the series into for stability analysis. Default 5. */
@@ -234,10 +229,7 @@ export function trackIc(
     ic95HalfWidth: 0,
   };
 
-  if (
-    signalValues.length !== forwardReturns.length ||
-    signalValues.length < opts.minSampleSize
-  ) {
+  if (signalValues.length !== forwardReturns.length || signalValues.length < opts.minSampleSize) {
     return {
       ...baseSnapshot,
       verdict: "insufficient_data",

@@ -39,16 +39,20 @@ describe("pickNextFlag", () => {
     const recentTs = new Date().toISOString();
     const except = HARNESS_FLAGS[5]?.name;
     expect(except).toBeDefined();
-    const entries = HARNESS_FLAGS
-      .filter((f) => f.name !== except)
-      .map((f) => ({ flag: f.name, lastTestedAt: recentTs, outcome: "keep" as const }));
+    const entries = HARNESS_FLAGS.filter((f) => f.name !== except).map((f) => ({
+      flag: f.name,
+      lastTestedAt: recentTs,
+      outcome: "keep" as const,
+    }));
     const next = pickNextFlag({ entries });
     expect(next?.name).toBe(except);
   });
 
   it("skips flags marked 'remove'", () => {
     const removed = HARNESS_FLAGS[0]!.name;
-    const entries = [{ flag: removed, lastTestedAt: new Date().toISOString(), outcome: "remove" as const }];
+    const entries = [
+      { flag: removed, lastTestedAt: new Date().toISOString(), outcome: "remove" as const },
+    ];
     const next = pickNextFlag({ entries });
     expect(next?.name).not.toBe(removed);
   });
@@ -58,7 +62,7 @@ describe("pickNextFlag", () => {
     const target = HARNESS_FLAGS[2]!.name;
     // Mark every other flag tested recently
     const recentTs = new Date().toISOString();
-    const entries = HARNESS_FLAGS.map((f, i) =>
+    const entries = HARNESS_FLAGS.map((f, _i) =>
       f.name === target
         ? { flag: f.name, lastTestedAt: oldTs, outcome: "keep" as const }
         : { flag: f.name, lastTestedAt: recentTs, outcome: "keep" as const },
@@ -107,7 +111,9 @@ describe("recordOutcome", () => {
 
   it("replaces an existing entry instead of appending", () => {
     const flag = HARNESS_FLAGS[0]!.name;
-    const prior = { entries: [{ flag, lastTestedAt: "2020-01-01T00:00:00.000Z", outcome: "keep" as const }] };
+    const prior = {
+      entries: [{ flag, lastTestedAt: "2020-01-01T00:00:00.000Z", outcome: "keep" as const }],
+    };
     const next = recordOutcome(prior, flag, "remove", "deprecated");
     expect(next.entries).toHaveLength(1);
     expect(next.entries[0]?.outcome).toBe("remove");

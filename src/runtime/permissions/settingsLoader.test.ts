@@ -1,15 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import {
-  loadOperatorSettings,
-  summarizeLoadedSettings,
-} from "./settingsLoader.ts";
+import { loadOperatorSettings, summarizeLoadedSettings } from "./settingsLoader.ts";
 
 const PROJECT_PATH = "/proj/.claude/settings.json";
 const USER_PATH = "/home/user/.claude/settings.json";
 
-function makeOptions(
-  files: Record<string, string>,
-): Parameters<typeof loadOperatorSettings>[0] {
+function makeOptions(files: Record<string, string>): Parameters<typeof loadOperatorSettings>[0] {
   return {
     sources: [
       { path: PROJECT_PATH, origin: "project" },
@@ -56,9 +51,7 @@ describe("loadOperatorSettings — empty / missing files", () => {
 
 describe("loadOperatorSettings — malformed input", () => {
   test("malformed JSON → warning, no rules", () => {
-    const r = loadOperatorSettings(
-      makeOptions({ [PROJECT_PATH]: "{ not valid json" }),
-    );
+    const r = loadOperatorSettings(makeOptions({ [PROJECT_PATH]: "{ not valid json" }));
     expect(r.rules).toEqual([]);
     expect(r.warnings.length).toBe(1);
     expect(r.warnings[0]).toContain("Malformed JSON");
@@ -66,9 +59,7 @@ describe("loadOperatorSettings — malformed input", () => {
   });
 
   test("JSON root is not an object → warning", () => {
-    const r = loadOperatorSettings(
-      makeOptions({ [PROJECT_PATH]: "[1, 2, 3]" }),
-    );
+    const r = loadOperatorSettings(makeOptions({ [PROJECT_PATH]: "[1, 2, 3]" }));
     expect(r.rules).toEqual([]);
     expect(r.warnings.length).toBe(1);
     expect(r.warnings[0]).toContain("settings root must be a JSON object");
@@ -114,9 +105,7 @@ describe("loadOperatorSettings — basic happy path", () => {
     expect(r.warnings).toEqual([]);
     expect(r.sources[0]!.hadInterruptOn).toBe(true);
     expect(r.sources[0]!.accepted).toBe(2);
-    const byKey = new Map(
-      r.rules.map((rule) => [rule.toolName ?? rule.toolNamePattern, rule]),
-    );
+    const byKey = new Map(r.rules.map((rule) => [rule.toolName ?? rule.toolNamePattern, rule]));
     expect(byKey.get("place_order")?.decision).toBe("deny");
     expect(byKey.get("research_*")?.decision).toBe("allow");
   });
@@ -250,9 +239,7 @@ describe("loadOperatorSettings — full rule shape", () => {
       }),
     );
     expect(r.totalAccepted).toBe(2);
-    const byKey = new Map(
-      r.rules.map((rule) => [rule.toolName ?? rule.toolNamePattern, rule]),
-    );
+    const byKey = new Map(r.rules.map((rule) => [rule.toolName ?? rule.toolNamePattern, rule]));
     expect(byKey.get("place_*")?.toolNamePattern).toBe("place_*");
     expect(byKey.get("execute_plan")?.toolName).toBe("execute_plan");
     expect(byKey.get("execute_plan")?.scope).toBe("persistent");
@@ -285,9 +272,7 @@ describe("loadOperatorSettings — provenance reporting", () => {
         { path: PROJECT_PATH, origin: "project" },
         { path: USER_PATH, origin: "user" },
       ],
-      fileContent: new Map([
-        [PROJECT_PATH, JSON.stringify({ interruptOn: { x: "allow" } })],
-      ]),
+      fileContent: new Map([[PROJECT_PATH, JSON.stringify({ interruptOn: { x: "allow" } })]]),
     });
     expect(r.sources.find((s) => s.origin === "project")?.found).toBe(true);
     expect(r.sources.find((s) => s.origin === "user")?.found).toBe(false);

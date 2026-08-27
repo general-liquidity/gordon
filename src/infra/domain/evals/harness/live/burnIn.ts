@@ -110,48 +110,51 @@ export async function runUnattendedBurnIn(
   const runId = randomUUID();
   const heartbeats: BurnInHeartbeat[] = [];
 
-  await withEvalSandbox(async (sandbox) => {
-    for (let cycle = 1; cycle <= cycles; cycle++) {
-      if (options.signal?.aborted) throw new Error("Unattended burn-in aborted");
-      let trajectoryCount = 0;
-      let allProcessChecksPassed = true;
+  await withEvalSandbox(
+    async (sandbox) => {
+      for (let cycle = 1; cycle <= cycles; cycle++) {
+        if (options.signal?.aborted) throw new Error("Unattended burn-in aborted");
+        let trajectoryCount = 0;
+        let allProcessChecksPassed = true;
 
-      for (const scenario of options.scenarios) {
-        const result = await produceKRuns({
-          scenario,
-          k,
-          sandbox,
+        for (const scenario of options.scenarios) {
+          const result = await produceKRuns({
+            scenario,
+            k,
+            sandbox,
+            dryRun: true,
+            variantLabel: `burn-in-${runId}-c${cycle}`,
+          });
+          trajectoryCount += result.trajectories.length;
+          allProcessChecksPassed &&= result.processResults.every((entry) => entry.passed);
+          assertDryRunTools(
+            result.normalizedTraces.flatMap((trace) => trace.toolCalls.map((call) => call.name)),
+          );
+        }
+
+        const heartbeat: BurnInHeartbeat = {
+          schemaVersion: 1,
+          runId,
+          cycle,
+          totalCycles: cycles,
+          completedAt: new Date().toISOString(),
+          scenarioCount: options.scenarios.length,
+          trajectoryCount,
+          allProcessChecksPassed,
           dryRun: true,
-          variantLabel: `burn-in-${runId}-c${cycle}`,
-        });
-        trajectoryCount += result.trajectories.length;
-        allProcessChecksPassed &&= result.processResults.every((entry) => entry.passed);
-        assertDryRunTools(
-          result.normalizedTraces.flatMap((trace) => trace.toolCalls.map((call) => call.name)),
-        );
+          modelInference: false,
+          orderDispatch: false,
+        };
+        appendHeartbeat(evidencePath, heartbeat);
+        heartbeats.push(heartbeat);
+        if (!allProcessChecksPassed) {
+          throw new Error(`Unattended burn-in process checks failed in cycle ${cycle}`);
+        }
+        if (cycle < cycles) await waitForNextCycle(intervalMs, options.signal);
       }
-
-      const heartbeat: BurnInHeartbeat = {
-        schemaVersion: 1,
-        runId,
-        cycle,
-        totalCycles: cycles,
-        completedAt: new Date().toISOString(),
-        scenarioCount: options.scenarios.length,
-        trajectoryCount,
-        allProcessChecksPassed,
-        dryRun: true,
-        modelInference: false,
-        orderDispatch: false,
-      };
-      appendHeartbeat(evidencePath, heartbeat);
-      heartbeats.push(heartbeat);
-      if (!allProcessChecksPassed) {
-        throw new Error(`Unattended burn-in process checks failed in cycle ${cycle}`);
-      }
-      if (cycle < cycles) await waitForNextCycle(intervalMs, options.signal);
-    }
-  }, { dryRun: true, prefix: "gordon-unattended-burn-in-" });
+    },
+    { dryRun: true, prefix: "gordon-unattended-burn-in-" },
+  );
 
   return { runId, cyclesCompleted: heartbeats.length, heartbeats, evidencePath };
 }

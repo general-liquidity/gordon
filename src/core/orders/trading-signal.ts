@@ -34,7 +34,10 @@ export function isActionableSignal(signal: TradingSignal, minConfidence = 6): bo
   return signal.signal !== "NEUTRAL" && signal.confidence >= minConfidence;
 }
 
-export function confidenceToPositionSize(confidence: number, maxPositionPct: number = 0.05): number {
+export function confidenceToPositionSize(
+  confidence: number,
+  maxPositionPct: number = 0.05,
+): number {
   return maxPositionPct * (confidence / 10);
 }
 

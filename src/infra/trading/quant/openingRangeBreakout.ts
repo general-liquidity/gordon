@@ -128,7 +128,7 @@ const MIN_AVG_VOLUME = 1_000_000;
 const MIN_ATR = 0.5;
 
 export function evaluateORBSetup(input: ORBSetupInput): ORBSignal {
-  const stopFrac = input.stopLossAtrFraction ?? 0.10;
+  const stopFrac = input.stopLossAtrFraction ?? 0.1;
   const riskFrac = input.riskFraction ?? 0.01;
   const maxLev = input.maxLeverage ?? 4;
 
@@ -145,9 +145,7 @@ export function evaluateORBSetup(input: ORBSetupInput): ORBSignal {
     rejections.push(`open ${input.openPrice.toFixed(2)} <= $${MIN_OPEN_PRICE}`);
   }
   if (input.avg14dVolume < MIN_AVG_VOLUME) {
-    rejections.push(
-      `avg 14d volume ${input.avg14dVolume.toFixed(0)} < ${MIN_AVG_VOLUME}`,
-    );
+    rejections.push(`avg 14d volume ${input.avg14dVolume.toFixed(0)} < ${MIN_AVG_VOLUME}`);
   }
   if (input.dailyATR <= MIN_ATR) {
     rejections.push(`ATR ${input.dailyATR.toFixed(2)} <= $${MIN_ATR}`);
@@ -210,8 +208,7 @@ export function evaluateORBSetup(input: ORBSetupInput): ORBSignal {
   }
 
   const riskPerShare = stopFrac * input.dailyATR;
-  const stopLossPrice =
-    side === "long" ? entryStop - riskPerShare : entryStop + riskPerShare;
+  const stopLossPrice = side === "long" ? entryStop - riskPerShare : entryStop + riskPerShare;
 
   // Position size: shares such that worst-case loss = riskFrac × capital
   const riskDollarsTarget = riskFrac * input.capital;
@@ -333,8 +330,7 @@ export function simulateORBTrade(input: ORBSimulationInput): ORBTradeOutcome {
     exitReason = "end_of_day";
   }
 
-  const pnlPerShare =
-    sig.side === "long" ? exitPrice - fillPrice : fillPrice - exitPrice;
+  const pnlPerShare = sig.side === "long" ? exitPrice - fillPrice : fillPrice - exitPrice;
   const rMultiple = pnlPerShare / sig.riskPerShare;
   const pnlDollars = pnlPerShare * sig.positionShares;
 
@@ -359,9 +355,7 @@ export function openingRangeBreakoutToPayload(
     kind: "opening_range_breakout.computed",
     eligible: signal.eligible,
     side: signal.side,
-    entryStop: Number.isFinite(signal.entryStop)
-      ? Number(signal.entryStop.toFixed(4))
-      : null,
+    entryStop: Number.isFinite(signal.entryStop) ? Number(signal.entryStop.toFixed(4)) : null,
     stopLossPrice: Number.isFinite(signal.stopLossPrice)
       ? Number(signal.stopLossPrice.toFixed(4))
       : null,
@@ -375,17 +369,11 @@ export function openingRangeBreakoutToPayload(
   if (outcome) {
     base.outcome = {
       filled: outcome.filled,
-      fillPrice: Number.isFinite(outcome.fillPrice)
-        ? Number(outcome.fillPrice.toFixed(4))
-        : null,
-      exitPrice: Number.isFinite(outcome.exitPrice)
-        ? Number(outcome.exitPrice.toFixed(4))
-        : null,
+      fillPrice: Number.isFinite(outcome.fillPrice) ? Number(outcome.fillPrice.toFixed(4)) : null,
+      exitPrice: Number.isFinite(outcome.exitPrice) ? Number(outcome.exitPrice.toFixed(4)) : null,
       exitReason: outcome.exitReason,
       pnlPerShare: Number(outcome.pnlPerShare.toFixed(4)),
-      rMultiple: Number.isFinite(outcome.rMultiple)
-        ? Number(outcome.rMultiple.toFixed(3))
-        : null,
+      rMultiple: Number.isFinite(outcome.rMultiple) ? Number(outcome.rMultiple.toFixed(3)) : null,
       pnlDollars: Number(outcome.pnlDollars.toFixed(2)),
     };
   }

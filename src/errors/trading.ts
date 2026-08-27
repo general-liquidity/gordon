@@ -16,12 +16,12 @@ export class InsufficientFundsError extends GordonError {
     required: number,
     available: number,
     currency: string = "USDT",
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(
       `Insufficient funds. Required: ${required} ${currency}, Available: ${available} ${currency}`,
       "INSUFFICIENT_FUNDS",
-      { ...context, required, available, currency }
+      { ...context, required, available, currency },
     );
     this.name = "InsufficientFundsError";
     this.required = required;
@@ -37,16 +37,12 @@ export class InvalidPlanError extends GordonError {
   public readonly planId?: string;
   public readonly reason: string;
 
-  constructor(
-    reason: string,
-    planId?: string,
-    context?: Record<string, unknown>
-  ) {
-    super(
-      `Invalid trading plan${planId ? ` (${planId})` : ""}: ${reason}`,
-      "INVALID_PLAN",
-      { ...context, planId, reason }
-    );
+  constructor(reason: string, planId?: string, context?: Record<string, unknown>) {
+    super(`Invalid trading plan${planId ? ` (${planId})` : ""}: ${reason}`, "INVALID_PLAN", {
+      ...context,
+      planId,
+      reason,
+    });
     this.name = "InvalidPlanError";
     this.planId = planId;
     this.reason = reason;
@@ -57,15 +53,12 @@ export class InvalidPlanError extends GordonError {
  * Error when trying to execute while permissionMode blocks trading
  */
 export class TradingModeError extends InvalidStateError {
-  constructor(
-    currentMode: "auto" | "ask" | "strict",
-    context?: Record<string, unknown>
-  ) {
+  constructor(currentMode: "auto" | "ask" | "strict", context?: Record<string, unknown>) {
     super(
       `Cannot execute trade: permissionMode is '${currentMode}'. Use /auto or /ask to enable trading.`,
       currentMode,
       "non-strict",
-      context
+      context,
     );
     this.name = "TradingModeError";
   }
@@ -103,17 +96,11 @@ export class TradeNotFoundError extends GordonError {
 export class TradeNotModifiableError extends InvalidStateError {
   public readonly tradeId: string;
 
-  constructor(
-    tradeId: string,
-    currentStatus: string,
-    context?: Record<string, unknown>
-  ) {
-    super(
-      `Trade ${tradeId} cannot be modified in ${currentStatus} status`,
-      currentStatus,
-      "OPEN",
-      { ...context, tradeId }
-    );
+  constructor(tradeId: string, currentStatus: string, context?: Record<string, unknown>) {
+    super(`Trade ${tradeId} cannot be modified in ${currentStatus} status`, currentStatus, "OPEN", {
+      ...context,
+      tradeId,
+    });
     this.name = "TradeNotModifiableError";
     this.tradeId = tradeId;
   }
@@ -131,7 +118,7 @@ export class RiskLimitExceededError extends GordonError {
     limitType: "allocation" | "positions" | "drawdown",
     limit: number,
     current: number,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     const messages = {
       allocation: `Allocation limit exceeded. Max: ${limit * 100}%, Requested: ${current * 100}%`,
@@ -153,11 +140,7 @@ export class RiskLimitExceededError extends GordonError {
 export class AnalysisError extends GordonError {
   public readonly symbol: string;
 
-  constructor(
-    symbol: string,
-    reason: string,
-    context?: Record<string, unknown>
-  ) {
+  constructor(symbol: string, reason: string, context?: Record<string, unknown>) {
     super(`Failed to analyze ${symbol}: ${reason}`, "ANALYSIS_ERROR", { ...context, symbol });
     this.name = "AnalysisError";
     this.symbol = symbol;

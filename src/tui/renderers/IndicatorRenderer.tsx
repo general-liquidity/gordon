@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../ink-custom";
 
 /**
@@ -55,25 +54,29 @@ export function IndicatorRenderer({ data }: Props) {
     <Box flexDirection="column" paddingLeft={2} marginTop={1}>
       {/* Header */}
       <Box>
-        <Text bold color="cyanBright">{data.symbol}</Text>
+        <Text bold color="cyanBright">
+          {data.symbol}
+        </Text>
         <Text dimColor> {"\u00b7"} INDICATORS</Text>
       </Box>
 
       {/* RSI gauge */}
       <Box marginTop={1}>
         <Box width={12}>
-          <Text bold>  RSI</Text>
+          <Text bold> RSI</Text>
         </Box>
         <Text color={rsi.color}>{rsi.bar}</Text>
         <Text> </Text>
-        <Text color={rsi.color} bold>{data.rsi.toFixed(1)}</Text>
+        <Text color={rsi.color} bold>
+          {data.rsi.toFixed(1)}
+        </Text>
         <Text dimColor> {data.rsiState}</Text>
       </Box>
 
       {/* MACD */}
       <Box>
         <Box width={12}>
-          <Text bold>  MACD</Text>
+          <Text bold> MACD</Text>
         </Box>
         <Text color={macdColor}>
           {data.macdHistogram > 0 ? "\u25B2" : data.macdHistogram < 0 ? "\u25BC" : "\u25C6"}{" "}
@@ -87,18 +90,21 @@ export function IndicatorRenderer({ data }: Props) {
       {/* Trend */}
       <Box>
         <Box width={12}>
-          <Text bold>  TREND</Text>
+          <Text bold> TREND</Text>
         </Box>
         <Text color={trendColor(data.trend)}>
           {trendArrow(data.trend)} {data.trend}
         </Text>
-        <Text dimColor> {"\u00b7"} strength {Math.round(data.trendStrength * 100)}%</Text>
+        <Text dimColor>
+          {" "}
+          {"\u00b7"} strength {Math.round(data.trendStrength * 100)}%
+        </Text>
       </Box>
 
       {/* EMAs if available */}
       {(data.ema20 != null || data.ema50 != null || data.ema200 != null) && (
         <Box marginTop={1}>
-          <Text dimColor>  EMAs: </Text>
+          <Text dimColor> EMAs: </Text>
           {data.ema20 != null && <Text>20={data.ema20.toLocaleString()} </Text>}
           {data.ema50 != null && <Text>50={data.ema50.toLocaleString()} </Text>}
           {data.ema200 != null && <Text>200={data.ema200.toLocaleString()}</Text>}

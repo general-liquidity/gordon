@@ -63,8 +63,9 @@ export function recordSessionCostUsage(input: SessionCostUsageInput): SessionCos
 
   executeWithLogging(
     () =>
-      db.query(
-        `INSERT INTO session_cost_ledger
+      db
+        .query(
+          `INSERT INTO session_cost_ledger
           (threadId, sessionId, resourceId, provider, model, requestCount, promptTokens, completionTokens, totalTokens, updatedAt)
          VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
          ON CONFLICT(threadId) DO UPDATE SET
@@ -77,17 +78,18 @@ export function recordSessionCostUsage(input: SessionCostUsageInput): SessionCos
            completionTokens = session_cost_ledger.completionTokens + excluded.completionTokens,
            totalTokens = session_cost_ledger.totalTokens + excluded.totalTokens,
            updatedAt = excluded.updatedAt`,
-      ).run(
-        input.threadId,
-        input.sessionId ?? null,
-        input.resourceId ?? null,
-        input.provider ?? null,
-        input.model ?? null,
-        input.promptTokens,
-        input.completionTokens,
-        input.totalTokens,
-        updatedAt,
-      ),
+        )
+        .run(
+          input.threadId,
+          input.sessionId ?? null,
+          input.resourceId ?? null,
+          input.provider ?? null,
+          input.model ?? null,
+          input.promptTokens,
+          input.completionTokens,
+          input.totalTokens,
+          updatedAt,
+        ),
     "UPSERT session_cost_ledger",
   );
 
@@ -121,7 +123,9 @@ export function getSessionCostLedgerEntry(threadId?: string): SessionCostLedgerE
   const db = getDatabase();
   const row = executeWithLogging(
     () =>
-      db.query("SELECT * FROM session_cost_ledger WHERE threadId = ?").get(threadId) as SessionCostLedgerRow | null,
+      db
+        .query("SELECT * FROM session_cost_ledger WHERE threadId = ?")
+        .get(threadId) as SessionCostLedgerRow | null,
     "SELECT session_cost_ledger one",
   );
 

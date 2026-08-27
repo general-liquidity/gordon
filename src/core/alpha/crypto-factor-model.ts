@@ -33,7 +33,14 @@ import { populationStd, zScore, linearRegression } from "../stats/index.ts";
 
 export type StyleFactor = "size" | "reversal" | "volatility" | "quality" | "value" | "funding";
 
-export const STYLE_FACTORS: StyleFactor[] = ["size", "reversal", "volatility", "quality", "value", "funding"];
+export const STYLE_FACTORS: StyleFactor[] = [
+  "size",
+  "reversal",
+  "volatility",
+  "quality",
+  "value",
+  "funding",
+];
 
 export interface CryptoTokenInput {
   symbol: string;
@@ -125,7 +132,10 @@ function residualizeMasked(y: number[], x: number[], mask: boolean[]): number[] 
 
 /** Mean of per-metric cross-sectional z-scores → one composite per token.
  *  Tokens whose metric arrays are empty are masked out (neutral). */
-function onChainComposite(rows: (number[] | undefined)[]): { composite: number[]; mask: boolean[] } {
+function onChainComposite(rows: (number[] | undefined)[]): {
+  composite: number[];
+  mask: boolean[];
+} {
   const mask = rows.map((r) => Array.isArray(r) && r.length > 0);
   const width = Math.max(0, ...rows.map((r) => (r && mask.length ? r.length : 0)));
   const composite = new Array(rows.length).fill(0);
@@ -160,11 +170,24 @@ export function computeCryptoFactorModel(
   const all = tokens.map(() => true);
 
   // size: small-cap positive.
-  const size = zscoreMasked(tokens.map((t) => -Math.log(Math.max(t.marketCap, Number.EPSILON))), all);
+  const size = zscoreMasked(
+    tokens.map((t) => -Math.log(Math.max(t.marketCap, Number.EPSILON))),
+    all,
+  );
   // reversal: past losers positive (negated lookback return).
-  const reversal = zscoreMasked(tokens.map((t) => -t.lookbackReturn), all);
+  const reversal = zscoreMasked(
+    tokens.map((t) => -t.lookbackReturn),
+    all,
+  );
   // volatility: high-vol positive (crypto premium), ⊥ size.
-  const volatility = residualizeMasked(zscoreMasked(tokens.map((t) => t.residualVol), all), size, all);
+  const volatility = residualizeMasked(
+    zscoreMasked(
+      tokens.map((t) => t.residualVol),
+      all,
+    ),
+    size,
+    all,
+  );
 
   // quality: genuine on-chain usage positive, ⊥ size. Neutral where data is absent.
   const q = onChainComposite(tokens.map((t) => t.qualityMetrics));
@@ -172,13 +195,30 @@ export function computeCryptoFactorModel(
 
   // value: cheap (low mcap/output ratio) positive → negate the valuation composite, ⊥ size.
   const v = onChainComposite(tokens.map((t) => t.valuationRatios));
-  const value = residualizeMasked(zscoreMasked(v.composite.map((x) => -x), v.mask), size, v.mask);
+  const value = residualizeMasked(
+    zscoreMasked(
+      v.composite.map((x) => -x),
+      v.mask,
+    ),
+    size,
+    v.mask,
+  );
 
   // funding: contrarian (high funding = crowded longs = negative), ⊥ size then reversal.
-  const fundingBase = zscoreMasked(tokens.map((t) => -t.fundingRate), all);
+  const fundingBase = zscoreMasked(
+    tokens.map((t) => -t.fundingRate),
+    all,
+  );
   const funding = residualizeMasked(residualizeMasked(fundingBase, size, all), reversal, all);
 
-  const factorVecs: Record<StyleFactor, number[]> = { size, reversal, volatility, quality, value, funding };
+  const factorVecs: Record<StyleFactor, number[]> = {
+    size,
+    reversal,
+    volatility,
+    quality,
+    value,
+    funding,
+  };
 
   const scored: TokenFactorScore[] = tokens.map((t, i) => {
     const exposures = {} as Record<StyleFactor, number>;
@@ -187,7 +227,12 @@ export function computeCryptoFactorModel(
       exposures[f] = factorVecs[f][i]!;
       composite += (weights[f] ?? 0) * exposures[f];
     }
-    return { symbol: t.symbol, exposures, composite, hasOnChain: (q.mask[i] ?? false) || (v.mask[i] ?? false) };
+    return {
+      symbol: t.symbol,
+      exposures,
+      composite,
+      hasOnChain: (q.mask[i] ?? false) || (v.mask[i] ?? false),
+    };
   });
 
   scored.sort((a, b) => b.composite - a.composite);

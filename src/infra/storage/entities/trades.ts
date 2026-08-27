@@ -52,7 +52,7 @@ export function createTrade(trade: Omit<Trade, "id">): Trade {
     trade.averageEntry,
     trade.realizedPnl,
     trade.realizedPnlPercent,
-    trade.status
+    trade.status,
   );
 
   return {
@@ -107,7 +107,7 @@ export function updateTrade(id: string, updates: Partial<Trade>): Trade {
     updated.realizedPnl,
     updated.realizedPnlPercent,
     updated.status,
-    id
+    id,
   );
 
   return updated;

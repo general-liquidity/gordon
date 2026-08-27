@@ -25,15 +25,11 @@ export interface TelemetryCommandResult {
 }
 
 function formatStructuredAxiomSummary(): string[] {
-  return [
-    "Structured export: Disabled (external export removed from this build)",
-  ];
+  return ["Structured export: Disabled (external export removed from this build)"];
 }
 
 function formatTracingSummary(): string[] {
-  return [
-    "OTEL tracing: Disabled (external export removed from this build)",
-  ];
+  return ["OTEL tracing: Disabled (external export removed from this build)"];
 }
 
 function formatTelemetryStatus(): string {
@@ -51,7 +47,9 @@ function formatTelemetryStatus(): string {
   ];
 
   if (research.localFiles.length > 0) {
-    lines.push(`Local research files: ${research.localFiles.length} (${research.totalSizeMb.toFixed(2)} MB)`);
+    lines.push(
+      `Local research files: ${research.localFiles.length} (${research.totalSizeMb.toFixed(2)} MB)`,
+    );
     for (const file of research.localFiles) {
       lines.push(`  - ${file.name}: ${file.lines} record(s), ${file.sizeMb.toFixed(2)} MB`);
     }
@@ -64,14 +62,16 @@ function formatTelemetryStatus(): string {
   lines.push("");
   lines.push(...formatTracingSummary());
   lines.push("");
-  lines.push("Note: External trace/observability export (Axiom/Logfire/OTLP) has been removed from this build.");
+  lines.push(
+    "Note: External trace/observability export (Axiom/Logfire/OTLP) has been removed from this build.",
+  );
   lines.push("");
   lines.push("Note: Gordon still stores local config, sessions, memory, and logs under ~/.gordon.");
   return lines.join("\n");
 }
 
 async function updateTelemetryConfig(
-  update: (config: Awaited<ReturnType<typeof loadConfig>>) => void
+  update: (config: Awaited<ReturnType<typeof loadConfig>>) => void,
 ): Promise<void> {
   const config = await loadConfig();
   update(config);
@@ -170,11 +170,7 @@ export async function handleTelemetryCommand(args: string): Promise<TelemetryCom
     }
     case "retention-status": {
       const last = getLastSweepResult();
-      const lines = [
-        "**Data Retention Policy**",
-        "",
-        describeRetentionPolicy(),
-      ];
+      const lines = ["**Data Retention Policy**", "", describeRetentionPolicy()];
       if (last) {
         lines.push("");
         lines.push("**Last Sweep**");
@@ -291,7 +287,8 @@ async function exportAllData(): Promise<{
     }
 
     // Note about audit log
-    payload.note = "Audit log is stored in SQLite (~/.gordon/gordon.db). To export it, query the audit_log table directly or use /telemetry retention-status to see retention policy.";
+    payload.note =
+      "Audit log is stored in SQLite (~/.gordon/gordon.db). To export it, query the audit_log table directly or use /telemetry retention-status to see retention policy.";
 
     const json = JSON.stringify(payload, null, 2);
     fs.writeFileSync(filePath, json, { mode: 0o600 });
@@ -341,7 +338,11 @@ async function forgetAllData(): Promise<{
   try {
     fs.writeFileSync(
       telemetryStateFile,
-      JSON.stringify({ enabled: false, anonymousId: newAnonymousId, salt: newSalt, notifiedAt: null }, null, 2),
+      JSON.stringify(
+        { enabled: false, anonymousId: newAnonymousId, salt: newSalt, notifiedAt: null },
+        null,
+        2,
+      ),
       "utf-8",
     );
   } catch {

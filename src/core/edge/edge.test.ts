@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "fs";
-import { join } from "path";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { parseEdgeSpec } from "./parser.ts";
 import { loadEdgeSpecs, loadLiveEdges } from "./loader.ts";
 import {
@@ -83,20 +83,60 @@ describe("parseEdgeSpec", () => {
 });
 
 describe("evaluateCondition", () => {
-  const metrics: EdgeMetrics = { netEdgeBps: 5, regime: "ranging", winRate: 0.52, avgVol1mUsd: 250000 };
+  const metrics: EdgeMetrics = {
+    netEdgeBps: 5,
+    regime: "ranging",
+    winRate: 0.52,
+    avgVol1mUsd: 250000,
+  };
 
   it("evaluates numeric comparators", () => {
-    expect(evaluateCondition({ id: "a", metric: "netEdgeBps", comparator: ">", threshold: 0, description: "" }, metrics).satisfied).toBe(true);
-    expect(evaluateCondition({ id: "a", metric: "netEdgeBps", comparator: "<=", threshold: 0, description: "" }, metrics).satisfied).toBe(false);
+    expect(
+      evaluateCondition(
+        { id: "a", metric: "netEdgeBps", comparator: ">", threshold: 0, description: "" },
+        metrics,
+      ).satisfied,
+    ).toBe(true);
+    expect(
+      evaluateCondition(
+        { id: "a", metric: "netEdgeBps", comparator: "<=", threshold: 0, description: "" },
+        metrics,
+      ).satisfied,
+    ).toBe(false);
   });
 
   it("evaluates in / not-in against string arrays", () => {
-    expect(evaluateCondition({ id: "a", metric: "regime", comparator: "in", threshold: ["ranging", "chop"], description: "" }, metrics).satisfied).toBe(true);
-    expect(evaluateCondition({ id: "a", metric: "regime", comparator: "not-in", threshold: ["ranging", "chop"], description: "" }, metrics).satisfied).toBe(false);
+    expect(
+      evaluateCondition(
+        {
+          id: "a",
+          metric: "regime",
+          comparator: "in",
+          threshold: ["ranging", "chop"],
+          description: "",
+        },
+        metrics,
+      ).satisfied,
+    ).toBe(true);
+    expect(
+      evaluateCondition(
+        {
+          id: "a",
+          metric: "regime",
+          comparator: "not-in",
+          threshold: ["ranging", "chop"],
+          description: "",
+        },
+        metrics,
+      ).satisfied,
+    ).toBe(false);
   });
 
   it("treats a missing metric as not-satisfied", () => {
-    const check = evaluateCondition({ id: "a", metric: "absent", comparator: ">", threshold: 0, description: "" }, metrics);
+    const check = evaluateCondition(
+      { id: "a", metric: "absent", comparator: ">", threshold: 0, description: "" },
+      metrics,
+    );
     expect(check.satisfied).toBe(false);
     expect(check.value).toBeUndefined();
   });
@@ -106,22 +146,39 @@ describe("evaluateEdgeInvariants", () => {
   const spec = parseEdgeSpec(FIXTURE);
 
   it("is stable when all invariants hold and no kill fires", () => {
-    const r = evaluateEdgeInvariants(spec, { netEdgeBps: 5, regime: "ranging", avgVol1mUsd: 250000, winRate: 0.55 });
+    const r = evaluateEdgeInvariants(spec, {
+      netEdgeBps: 5,
+      regime: "ranging",
+      avgVol1mUsd: 250000,
+      winRate: 0.55,
+    });
     expect(r.health).toBe("stable");
     expect(r.violatedInvariants).toHaveLength(0);
     expect(r.firedKills).toHaveLength(0);
   });
 
   it("is degraded when an invariant is violated but no kill fires", () => {
-    const r = evaluateEdgeInvariants(spec, { netEdgeBps: -2, regime: "ranging", avgVol1mUsd: 250000, winRate: 0.55 });
+    const r = evaluateEdgeInvariants(spec, {
+      netEdgeBps: -2,
+      regime: "ranging",
+      avgVol1mUsd: 250000,
+      winRate: 0.55,
+    });
     expect(r.health).toBe("degraded");
     expect(r.violatedInvariants.map((c) => c.invariant.id)).toContain("ev-net-positive");
   });
 
   it("retires when a kill condition fires, taking precedence over invariant violations", () => {
-    const r = evaluateEdgeInvariants(spec, { netEdgeBps: -2, regime: "trending", avgVol1mUsd: 250000, winRate: 0.3 });
+    const r = evaluateEdgeInvariants(spec, {
+      netEdgeBps: -2,
+      regime: "trending",
+      avgVol1mUsd: 250000,
+      winRate: 0.3,
+    });
     expect(r.health).toBe("retire");
-    expect(r.firedKills.map((c) => c.invariant.id)).toEqual(expect.arrayContaining(["regime-flip", "winrate-broke"]));
+    expect(r.firedKills.map((c) => c.invariant.id)).toEqual(
+      expect.arrayContaining(["regime-flip", "winrate-broke"]),
+    );
   });
 
   it("fails safe on missing data: absent invariant metric degrades, absent kill metric does not fire", () => {

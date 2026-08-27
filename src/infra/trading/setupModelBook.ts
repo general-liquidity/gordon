@@ -94,7 +94,7 @@ function appendRow(row: ModelBookRow, pathOverride?: string): void {
   const filePath = pathOverride ?? defaultModelBookPath();
   const dir = dirname(filePath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  appendFileSync(filePath, JSON.stringify(row) + "\n");
+  appendFileSync(filePath, `${JSON.stringify(row)}\n`);
 }
 
 /** Log a new screener candidate into the model-book. */
@@ -198,12 +198,8 @@ export function computeForwardOutcome(params: ComputeOutcomeParams): ForwardOutc
   let levelTag: OutcomeTag | null = null;
 
   for (const bar of bars) {
-    const favorable = long
-      ? (bar.high - entryRef) / entryRef
-      : (entryRef - bar.low) / entryRef;
-    const adverse = long
-      ? (bar.low - entryRef) / entryRef
-      : (entryRef - bar.high) / entryRef;
+    const favorable = long ? (bar.high - entryRef) / entryRef : (entryRef - bar.low) / entryRef;
+    const adverse = long ? (bar.low - entryRef) / entryRef : (entryRef - bar.high) / entryRef;
     if (favorable > mfePct) mfePct = favorable;
     if (adverse < maePct) maePct = adverse;
 
@@ -281,7 +277,15 @@ export function cohortStats(
   const horizon = options.horizon ?? "5d";
   const byTag = new Map<
     string,
-    { n: number; mfe: number[]; mae: number[]; close: number[]; wins: number; targets: number; stops: number }
+    {
+      n: number;
+      mfe: number[];
+      mae: number[];
+      close: number[];
+      wins: number;
+      targets: number;
+      stops: number;
+    }
   >();
 
   for (const entry of entries) {

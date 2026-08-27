@@ -85,7 +85,7 @@ export interface BarPermutationResult {
 }
 
 function makeLCG(seed: number): () => number {
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   return () => {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return s / 0x100000000;
@@ -110,16 +110,12 @@ export function permuteOHLCBars(input: BarPermutationInput): BarPermutationResul
 
   if (startIndex < 0) throw new Error("startIndex must be ≥ 0");
   if (N < startIndex + 2) {
-    throw new Error(
-      `need at least startIndex + 2 bars; got ${N} bars, startIndex=${startIndex}`,
-    );
+    throw new Error(`need at least startIndex + 2 bars; got ${N} bars, startIndex=${startIndex}`);
   }
   for (let i = 0; i < N; i++) {
     const b = input.ohlc[i]!;
     if (b.open <= 0 || b.high <= 0 || b.low <= 0 || b.close <= 0) {
-      throw new Error(
-        `bar ${i} has non-positive price; log-transform requires strict positives`,
-      );
+      throw new Error(`bar ${i} has non-positive price; log-transform requires strict positives`);
     }
     if (b.high < b.low) {
       throw new Error(`bar ${i} has high < low (${b.high} < ${b.low})`);
@@ -185,9 +181,7 @@ export function permuteOHLCBars(input: BarPermutationInput): BarPermutationResul
   return { ohlc, startIndex, seed, perm1, perm2 };
 }
 
-export function barPermutationToPayload(
-  result: BarPermutationResult,
-): Record<string, unknown> {
+export function barPermutationToPayload(result: BarPermutationResult): Record<string, unknown> {
   return {
     kind: "bar_permutation.computed",
     startIndex: result.startIndex,

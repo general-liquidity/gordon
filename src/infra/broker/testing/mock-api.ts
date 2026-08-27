@@ -112,11 +112,17 @@ function match(pathname: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(pathname));
 }
 
-function detectOperation(brokerId: BrokerId, method: string, pathname: string): MockBrokerOperation {
+function detectOperation(
+  brokerId: BrokerId,
+  method: string,
+  pathname: string,
+): MockBrokerOperation {
   const rules = BROKER_RULES[brokerId];
 
-  if (method === "POST" && rules.oauthToken && match(pathname, rules.oauthToken)) return "oauthToken";
-  if (method === "POST" && brokerId === "tastytrade" && match(pathname, [/^\/sessions$/i])) return "sessionCreate";
+  if (method === "POST" && rules.oauthToken && match(pathname, rules.oauthToken))
+    return "oauthToken";
+  if (method === "POST" && brokerId === "tastytrade" && match(pathname, [/^\/sessions$/i]))
+    return "sessionCreate";
 
   if (method === "GET") {
     if (match(pathname, rules.accountDiscovery)) return "accountDiscovery";
@@ -189,26 +195,30 @@ function buildRestPayload(operation: MockBrokerOperation): Response {
           patternDayTrader: false,
           shortingEnabled: true,
           tradingBlocked: false,
-          positions: [{
+          positions: [
+            {
+              symbol: "AAPL",
+              qty: "2",
+              marketValue: "410.20",
+              avgEntryPrice: "200.00",
+              unrealizedPl: "10.20",
+              unrealizedPlPercent: "0.0255",
+            },
+          ],
+        },
+      });
+    case "positions":
+      return json({
+        data: [
+          {
             symbol: "AAPL",
             qty: "2",
             marketValue: "410.20",
             avgEntryPrice: "200.00",
             unrealizedPl: "10.20",
             unrealizedPlPercent: "0.0255",
-          }],
-        },
-      });
-    case "positions":
-      return json({
-        data: [{
-          symbol: "AAPL",
-          qty: "2",
-          marketValue: "410.20",
-          avgEntryPrice: "200.00",
-          unrealizedPl: "10.20",
-          unrealizedPlPercent: "0.0255",
-        }],
+          },
+        ],
       });
     case "listOrders":
       return json({ data: [defaultOrder("accepted")] });
@@ -221,14 +231,16 @@ function buildRestPayload(operation: MockBrokerOperation): Response {
       return new Response(null, { status: 204 });
     case "quote":
       return json({
-        data: [{
-          symbol: "AAPL",
-          bidPrice: 205.10,
-          bidSize: 10,
-          askPrice: 205.20,
-          askSize: 12,
-          timestamp: ISO_NOW,
-        }],
+        data: [
+          {
+            symbol: "AAPL",
+            bidPrice: 205.1,
+            bidSize: 10,
+            askPrice: 205.2,
+            askSize: 12,
+            timestamp: ISO_NOW,
+          },
+        ],
       });
     default:
       return new Response("Unhandled operation", { status: 500 });
@@ -257,28 +269,32 @@ function buildAlpacaPayload(operation: MockBrokerOperation): Response {
         trading_blocked: false,
       });
     case "positions":
-      return json([{
-        symbol: "AAPL",
-        qty: "2",
-        side: "long",
-        market_value: "410.20",
-        avg_entry_price: "200.00",
-        unrealized_pl: "10.20",
-        unrealized_plpc: "0.0255",
-      }]);
+      return json([
+        {
+          symbol: "AAPL",
+          qty: "2",
+          side: "long",
+          market_value: "410.20",
+          avg_entry_price: "200.00",
+          unrealized_pl: "10.20",
+          unrealized_plpc: "0.0255",
+        },
+      ]);
     case "listOrders":
-      return json([{
-        id: "order-1",
-        client_order_id: "client-1",
-        symbol: "AAPL",
-        side: "buy",
-        type: "market",
-        time_in_force: "day",
-        status: "accepted",
-        qty: "1",
-        filled_qty: "0",
-        extended_hours: false,
-      }]);
+      return json([
+        {
+          id: "order-1",
+          client_order_id: "client-1",
+          symbol: "AAPL",
+          side: "buy",
+          type: "market",
+          time_in_force: "day",
+          status: "accepted",
+          qty: "1",
+          filled_qty: "0",
+          extended_hours: false,
+        },
+      ]);
     case "getOrder":
       return json({
         id: "order-1",
@@ -312,9 +328,9 @@ function buildAlpacaPayload(operation: MockBrokerOperation): Response {
       return json({
         symbol: "AAPL",
         quote: {
-          ap: 205.20,
+          ap: 205.2,
           as: 10,
-          bp: 205.10,
+          bp: 205.1,
           bs: 12,
           t: ISO_NOW,
         },
@@ -336,9 +352,11 @@ function buildTastytradePayload(operation: MockBrokerOperation): Response {
     case "accountDiscovery":
       return json({
         data: {
-          items: [{
-            "account-number": "TT-ACC-1",
-          }],
+          items: [
+            {
+              "account-number": "TT-ACC-1",
+            },
+          ],
         },
       });
     case "clock":
@@ -365,31 +383,37 @@ function buildTastytradePayload(operation: MockBrokerOperation): Response {
     case "positions":
       return json({
         data: {
-          items: [{
-            symbol: "AAPL",
-            quantity: "2",
-            "market-value": "410.20",
-            "average-open-price": "200.00",
-            "unrealized-day-gain": "10.20",
-            "unrealized-day-gain-percent": "0.0255",
-          }],
+          items: [
+            {
+              symbol: "AAPL",
+              quantity: "2",
+              "market-value": "410.20",
+              "average-open-price": "200.00",
+              "unrealized-day-gain": "10.20",
+              "unrealized-day-gain-percent": "0.0255",
+            },
+          ],
         },
       });
     case "listOrders":
       return json({
         data: {
-          items: [{
-            id: "order-1",
-            status: "Live",
-            "order-type": "Market",
-            "time-in-force": "Day",
-            legs: [{
-              symbol: "AAPL",
-              action: "Buy to Open",
-              quantity: "1",
-            }],
-            "filled-quantity": "0",
-          }],
+          items: [
+            {
+              id: "order-1",
+              status: "Live",
+              "order-type": "Market",
+              "time-in-force": "Day",
+              legs: [
+                {
+                  symbol: "AAPL",
+                  action: "Buy to Open",
+                  quantity: "1",
+                },
+              ],
+              "filled-quantity": "0",
+            },
+          ],
         },
       });
     case "getOrder":
@@ -399,11 +423,13 @@ function buildTastytradePayload(operation: MockBrokerOperation): Response {
           status: "Filled",
           "order-type": "Market",
           "time-in-force": "Day",
-          legs: [{
-            symbol: "AAPL",
-            action: "Buy to Open",
-            quantity: "1",
-          }],
+          legs: [
+            {
+              symbol: "AAPL",
+              action: "Buy to Open",
+              quantity: "1",
+            },
+          ],
           "filled-quantity": "1",
         },
       });
@@ -414,11 +440,13 @@ function buildTastytradePayload(operation: MockBrokerOperation): Response {
           status: "Live",
           "order-type": "Market",
           "time-in-force": "Day",
-          legs: [{
-            symbol: "AAPL",
-            action: "Buy to Open",
-            quantity: "1",
-          }],
+          legs: [
+            {
+              symbol: "AAPL",
+              action: "Buy to Open",
+              quantity: "1",
+            },
+          ],
           "filled-quantity": "0",
         },
       });
@@ -428,14 +456,16 @@ function buildTastytradePayload(operation: MockBrokerOperation): Response {
     case "quote":
       return json({
         data: {
-          items: [{
-            symbol: "AAPL",
-            "bid-price": 205.10,
-            "bid-size": 10,
-            "ask-price": 205.20,
-            "ask-size": 12,
-            "quote-time": ISO_NOW,
-          }],
+          items: [
+            {
+              symbol: "AAPL",
+              "bid-price": 205.1,
+              "bid-size": 10,
+              "ask-price": 205.2,
+              "ask-size": 12,
+              "quote-time": ISO_NOW,
+            },
+          ],
         },
       });
     default:
@@ -449,7 +479,10 @@ function buildPayload(brokerId: BrokerId, operation: MockBrokerOperation): Respo
   return buildRestPayload(operation);
 }
 
-export function installMockBrokerApi(brokerId: BrokerId, options: MockBrokerApiOptions = {}): MockBrokerApiHarness {
+export function installMockBrokerApi(
+  brokerId: BrokerId,
+  options: MockBrokerApiOptions = {},
+): MockBrokerApiHarness {
   const realFetch = globalThis.fetch;
   const counts = new Map<MockBrokerOperation, number>();
   let totalCalls = 0;
@@ -462,18 +495,21 @@ export function installMockBrokerApi(brokerId: BrokerId, options: MockBrokerApiO
   const getCount = (operation: MockBrokerOperation): number => counts.get(operation) ?? 0;
 
   globalThis.fetch = (async (input: FetchInput, init?: FetchInit): Promise<Response> => {
-    const url = typeof input === "string"
-      ? new URL(input)
-      : input instanceof URL
-        ? input
-        : new URL(input.url);
+    const url =
+      typeof input === "string"
+        ? new URL(input)
+        : input instanceof URL
+          ? input
+          : new URL(input.url);
 
-    const method = (init?.method || (typeof input === "object" && "method" in input ? input.method : "GET")).toUpperCase();
+    const method = (
+      init?.method || (typeof input === "object" && "method" in input ? input.method : "GET")
+    ).toUpperCase();
     let operation = detectOperation(brokerId, method, url.pathname);
     if (
-      operation === "listOrders"
-      && method === "GET"
-      && (url.searchParams.has("id") || url.searchParams.has("orderId"))
+      operation === "listOrders" &&
+      method === "GET" &&
+      (url.searchParams.has("id") || url.searchParams.has("orderId"))
     ) {
       operation = "getOrder";
     }
@@ -486,21 +522,19 @@ export function installMockBrokerApi(brokerId: BrokerId, options: MockBrokerApiO
     }
 
     if (
-      operation === "getOrder"
-      && (
-        url.pathname.toLowerCase().includes("missing-order")
-        || url.search.toLowerCase().includes("missing-order")
-      )
+      operation === "getOrder" &&
+      (url.pathname.toLowerCase().includes("missing-order") ||
+        url.search.toLowerCase().includes("missing-order"))
     ) {
       return new Response("not found", { status: 404 });
     }
 
     if (operation === "quote") {
       const querySymbol = (
-        url.searchParams.get("symbol")
-        || url.searchParams.get("symbols")
-        || url.searchParams.get("conids")
-        || ""
+        url.searchParams.get("symbol") ||
+        url.searchParams.get("symbols") ||
+        url.searchParams.get("conids") ||
+        ""
       ).toUpperCase();
       if (querySymbol.includes("UNKNOWN") || url.pathname.toUpperCase().includes("UNKNOWN")) {
         return new Response("quote not found", { status: 404 });

@@ -101,7 +101,7 @@ export class BreakoutDetector {
     symbol: string,
     candles: Candle[],
     currentBid: number,
-    currentAsk: number
+    currentAsk: number,
   ): BreakoutResult {
     try {
       if (candles.length < this.lookbackBars) {
@@ -129,18 +129,13 @@ export class BreakoutDetector {
       const breakdown = currentAsk < support;
 
       // Calculate entry prices with buffer
-      const breakoutPrice = breakout
-        ? resistance * (1 + this.retestBufferPercent)
-        : null;
-      const breakdownPrice = breakdown
-        ? support * (1 - this.retestBufferPercent)
-        : null;
+      const breakoutPrice = breakout ? resistance * (1 + this.retestBufferPercent) : null;
+      const breakdownPrice = breakdown ? support * (1 - this.retestBufferPercent) : null;
 
       // Calculate distances
       const distanceToResistance =
         resistance > 0 ? ((resistance - currentPrice) / currentPrice) * 100 : 0;
-      const distanceToSupport =
-        support > 0 ? ((currentPrice - support) / currentPrice) * 100 : 0;
+      const distanceToSupport = support > 0 ? ((currentPrice - support) / currentPrice) * 100 : 0;
 
       return {
         symbol,
@@ -179,10 +174,7 @@ export class BreakoutDetector {
    * 2. Price pulls back to test the old resistance as new support
    * 3. Entry is placed at the retest level
    */
-  detectBreakoutRetest(
-    candles: Candle[],
-    currentPrice: number
-  ): BreakoutRetestResult {
+  detectBreakoutRetest(candles: Candle[], currentPrice: number): BreakoutRetestResult {
     try {
       const { support, resistance } = this.calculateSupportResistance(candles);
 
@@ -252,7 +244,7 @@ export class BreakoutDetector {
       candles: Candle[];
       bid: number;
       ask: number;
-    }>
+    }>,
   ): Promise<BreakoutResult[]> {
     const results: BreakoutResult[] = [];
 
@@ -273,11 +265,11 @@ export class BreakoutDetector {
       // Then sort by proximity to levels (closer = more interesting)
       const aMinDistance = Math.min(
         Math.abs(a.distanceToResistance),
-        Math.abs(a.distanceToSupport)
+        Math.abs(a.distanceToSupport),
       );
       const bMinDistance = Math.min(
         Math.abs(b.distanceToResistance),
-        Math.abs(b.distanceToSupport)
+        Math.abs(b.distanceToSupport),
       );
 
       return aMinDistance - bMinDistance;

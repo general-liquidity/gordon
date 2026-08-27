@@ -29,8 +29,6 @@ describe("toneColor", () => {
   });
 
   test("daltonized success follows riskSafe", () => {
-    expect(toneColor("success", DARK_DALTONIZED_THEME).color).toBe(
-      DARK_DALTONIZED_THEME.riskSafe,
-    );
+    expect(toneColor("success", DARK_DALTONIZED_THEME).color).toBe(DARK_DALTONIZED_THEME.riskSafe);
   });
 });

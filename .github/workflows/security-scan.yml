@@ -1,22 +1,21 @@
 name: Security Scan
 
-# Pre-launch verification layer. Two legs:
+# Pre-launch verification layer. Three legs:
 #   secret-scan — HARD gate. A committed exchange/broker/LLM key is catastrophic
 #                 for a money-handling agent, so any gitleaks finding fails the
 #                 build. False positives are silenced in .gitleaks.toml, never by
 #                 disabling the gate.
-#   sast        — Semgrep. DIFF-AWARE HARD GATE on pull_request (`semgrep ci`
-#                 fails only on findings introduced by the PR, so the existing
-#                 baseline never blocks); INFORMATIONAL full scan on push.
-#   deps-osv    — osv-scanner over the lockfile, informational (pairs with the
-#                 `bun audit` job in ci.yml). Socket.dev is a GitHub App, not a
+#   sast        — Semgrep. DIFF-AWARE HARD GATE on pull requests and pushes;
+#                 only findings introduced since the relevant base commit fail.
+#   deps-osv    — checksummed osv-scanner over bun.lock, hard-gated outside the
+#                 narrow, expiring exception in osv-scanner.toml. Socket.dev is
+#                 a GitHub App, not a
 #                 workflow step — install github.com/apps/socket-security to get
 #                 supply-chain PR review; nothing to wire here.
 #
-# gitleaks runs from its official image (ghcr.io/gitleaks/gitleaks) rather than
-# the GitHub Action because this repo is org-owned (general-liquidity), and the
-# Action requires a paid GITLEAKS_LICENSE for organizations. The binary/image is
-# license-free regardless of owner.
+# Gitleaks runs as a fixed release binary whose archive digest is committed in
+# this workflow. The GitHub Action requires a paid organization license; the
+# upstream CLI does not.
 
 on:
   pull_request:
@@ -25,13 +24,17 @@ on:
       - main
       - v*
 
+permissions:
+  contents: read
+
 jobs:
   secret-scan:
     name: Secret Scan (gitleaks)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # Full history so a secret committed in ANY past commit is caught,
           # not just the PR tip.
@@ -46,62 +49,63 @@ jobs:
         # is benign: gitleaks git . --config .gitleaks.toml --redact \
         #   --report-path .gitleaks-baseline.json --report-format json
         run: |
-          docker run --rm -v "${{ github.workspace }}:/repo" \
-            ghcr.io/gitleaks/gitleaks:latest \
-            git /repo --config /repo/.gitleaks.toml \
-            --baseline-path /repo/.gitleaks-baseline.json \
+          set -euo pipefail
+          archive="gitleaks_8.30.1_linux_x64.tar.gz"
+          curl -fsSLo "$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/$archive"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $archive" \
+            | sha256sum -c -
+          tar -xzf "$archive" gitleaks
+          ./gitleaks git . --config .gitleaks.toml \
+            --baseline-path .gitleaks-baseline.json \
             --redact --verbose --exit-code 1
 
   sast:
     name: SAST (semgrep)
     runs-on: ubuntu-latest
-    env:
-      # Rulesets for a TypeScript money CLI: injection, secrets, the general
-      # audit packs, and Trail of Bits' AI-agent rules. Consumed by both
-      # `semgrep ci` (via SEMGREP_RULES) and the `semgrep scan` fallback.
-      SEMGREP_RULES: "p/typescript p/javascript p/secrets p/security-audit p/command-injection p/trailofbits"
-      SEMGREP_SEND_METRICS: "off"
+    timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          # Full history so `semgrep ci` can compute the merge-base for its
-          # diff-aware scan on pull requests.
+          # Full history so the scanner can compare against the relevant base
+          # commit on pull requests and protected-branch pushes.
           fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install Semgrep
-        run: pip install --quiet semgrep
-
-      - name: Semgrep — diff-aware hard gate (pull requests)
-        # `semgrep ci` scans only what the PR changed against the merge-base, so
-        # it fails the build on a NEWLY introduced finding while the pre-existing
-        # baseline never blocks. No token needed — rules come from SEMGREP_RULES.
+      - name: Fetch pull-request base
         if: github.event_name == 'pull_request'
-        run: semgrep ci --sarif --output semgrep.sarif
+        run: git fetch origin "${{ github.base_ref }}" --depth=1
 
-      - name: Semgrep — informational full scan (push)
-        # On push (post-merge), a full scan would trip on the existing baseline,
-        # so keep it informational until that baseline is triaged from the SARIF.
-        if: github.event_name != 'pull_request'
-        run: >
-          semgrep scan
-          --config p/typescript
-          --config p/javascript
-          --config p/secrets
-          --config p/security-audit
-          --config p/command-injection
-          --config p/trailofbits
-          --sarif --output semgrep.sarif
-          --metrics off || true
+      - name: Semgrep — diff-aware hard gate
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            baseline="origin/${BASE_REF}"
+          elif git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+            baseline="${BEFORE_SHA}"
+          else
+            baseline="HEAD^"
+          fi
+          docker run --rm \
+            -v "${{ github.workspace }}:/src" -w /src \
+            semgrep/semgrep@sha256:b94b53d02fd4a022f9eac4e2af1380f5c3c4c21400e79d3336bdff1d1db5e796 \
+            semgrep scan \
+            --baseline-commit "$baseline" \
+            --config p/typescript \
+            --config p/javascript \
+            --config p/secrets \
+            --config p/security-audit \
+            --config p/command-injection \
+            --config p/trailofbits \
+            --sarif --output semgrep.sarif \
+            --metrics off --error
 
       - name: Upload SARIF artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: semgrep-sarif
           path: semgrep.sarif
@@ -110,18 +114,19 @@ jobs:
   deps-osv:
     name: Dependency Scan (osv-scanner)
     runs-on: ubuntu-latest
-    # Informational: surfaces known-vuln advisories across the dependency tree
-    # via Google's OSV database, complementing the `bun audit` job in ci.yml.
-    # Tighten to a hard gate once the noise floor (long-tail crypto transitives)
-    # is triaged, the same path the bun-audit job documents.
+    timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install & run osv-scanner
         run: |
-          url="$(curl -sSL https://api.github.com/repos/google/osv-scanner/releases/latest \
-            | grep browser_download_url | grep linux_amd64 | grep -v -E 'sigstore|\.sig|\.pem' \
-            | head -1 | cut -d '"' -f4)"
-          curl -sSL "$url" -o osv-scanner && chmod +x osv-scanner
-          ./osv-scanner --recursive --skip-git ./ || true
+          set -euo pipefail
+          curl -fsSLo osv-scanner \
+            https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_linux_amd64
+          echo "f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be  osv-scanner" \
+            | sha256sum -c -
+          chmod +x osv-scanner
+          ./osv-scanner scan source \
+            --lockfile bun.lock \
+            --config osv-scanner.toml

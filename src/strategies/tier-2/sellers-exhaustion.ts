@@ -79,7 +79,7 @@ export class SellersExhaustionStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, CANDLE_LIMIT);
     if (candles.length < SWING_LOW_LOOKBACK + PIVOT_BARS + 5) {
@@ -94,7 +94,7 @@ export class SellersExhaustionStrategy extends BaseStrategy {
     // Calculate shared indicators
     const rsi = this.calculateRSI(candles);
     const atr = this.calculateATR(candles);
-    const atrVal = atr.current ?? currentPrice * 0.02;
+    const _atrVal = atr.current ?? currentPrice * 0.02;
 
     // Detect support/resistance for proximity check
     const levels = this.detectLevels(candles, currentPrice);
@@ -119,7 +119,7 @@ export class SellersExhaustionStrategy extends BaseStrategy {
           lowerLowCount: null,
           nearSupport,
         },
-        patternA.reasoning
+        patternA.reasoning,
       );
     }
 
@@ -139,14 +139,14 @@ export class SellersExhaustionStrategy extends BaseStrategy {
           lowerLowCount: patternB.lowerLowCount,
           nearSupport,
         },
-        patternB.reasoning
+        patternB.reasoning,
       );
     }
 
     return this.notDetected(
       "No seller exhaustion pattern detected. " +
         `RSI: ${rsi.current?.toFixed(1) ?? "N/A"}, ` +
-        `Price: $${currentPrice.toFixed(2)}`
+        `Price: $${currentPrice.toFixed(2)}`,
     );
   }
 
@@ -157,7 +157,7 @@ export class SellersExhaustionStrategy extends BaseStrategy {
   private detectClimaxVolumeRebound(
     candles: Candle[],
     rsiCurrent: number | null,
-    nearSupport: boolean
+    nearSupport: boolean,
   ): {
     confidence: number;
     volumeSpike: number;
@@ -171,8 +171,7 @@ export class SellersExhaustionStrategy extends BaseStrategy {
 
     // 1. Calculate 20-period average volume
     const volumeSlice = candles.slice(-(VOLUME_AVG_PERIOD + 1), -1);
-    const avgVolume =
-      volumeSlice.reduce((sum, c) => sum + c.volume, 0) / volumeSlice.length;
+    const avgVolume = volumeSlice.reduce((sum, c) => sum + c.volume, 0) / volumeSlice.length;
 
     if (avgVolume === 0) return null;
 
@@ -192,18 +191,18 @@ export class SellersExhaustionStrategy extends BaseStrategy {
     // --- Confidence scoring ---
     let confidence = 0.55;
 
-    if (volumeSpike > CLIMAX_VOLUME_HIGH) confidence += 0.10;
-    if (reboundPct > CLIMAX_REBOUND_HIGH) confidence += 0.10;
-    if (rsiCurrent !== null && rsiCurrent < RSI_DEEP_OVERSOLD) confidence += 0.10;
-    if (nearSupport) confidence += 0.10;
+    if (volumeSpike > CLIMAX_VOLUME_HIGH) confidence += 0.1;
+    if (reboundPct > CLIMAX_REBOUND_HIGH) confidence += 0.1;
+    if (rsiCurrent !== null && rsiCurrent < RSI_DEEP_OVERSOLD) confidence += 0.1;
+    if (nearSupport) confidence += 0.1;
 
     // Build reasoning
     const reasons: string[] = [];
     reasons.push(
-      `Climax volume rebound detected: volume ${volumeSpike.toFixed(1)}x average (threshold: ${CLIMAX_VOLUME_MULTIPLIER}x)`
+      `Climax volume rebound detected: volume ${volumeSpike.toFixed(1)}x average (threshold: ${CLIMAX_VOLUME_MULTIPLIER}x)`,
     );
     reasons.push(
-      `Candle closed in upper ${(reboundPct * 100).toFixed(0)}% of range (sellers absorbed)`
+      `Candle closed in upper ${(reboundPct * 100).toFixed(0)}% of range (sellers absorbed)`,
     );
     reasons.push("Previous candle was bearish (selling pressure preceded the climax)");
     if (rsiCurrent !== null) reasons.push(`RSI: ${rsiCurrent.toFixed(1)}`);
@@ -225,7 +224,7 @@ export class SellersExhaustionStrategy extends BaseStrategy {
   private detectDecliningVolumeLowerLows(
     candles: Candle[],
     rsiCurrent: number | null,
-    nearSupport: boolean
+    nearSupport: boolean,
   ): {
     confidence: number;
     volumeDeclinePct: number;
@@ -301,25 +300,23 @@ export class SellersExhaustionStrategy extends BaseStrategy {
     if (rsiCurrent === null || rsiCurrent >= RSI_OVERSOLD_THRESHOLD) return null;
 
     // --- Confidence scoring ---
-    let confidence = 0.50;
+    let confidence = 0.5;
 
     // Volume decline > 50% (stronger exhaustion)
-    if (lastLowVolume < firstLowVolume * VOLUME_DECLINE_DEEP) confidence += 0.10;
+    if (lastLowVolume < firstLowVolume * VOLUME_DECLINE_DEEP) confidence += 0.1;
     // 3+ successive lower lows with declining volume
-    if (lowerLowCount >= 3) confidence += 0.10;
+    if (lowerLowCount >= 3) confidence += 0.1;
     // Deeply oversold RSI
-    if (rsiCurrent < RSI_DEEP_OVERSOLD) confidence += 0.10;
+    if (rsiCurrent < RSI_DEEP_OVERSOLD) confidence += 0.1;
     // Near support
-    if (nearSupport) confidence += 0.10;
+    if (nearSupport) confidence += 0.1;
 
     // Build reasoning
     const reasons: string[] = [];
     reasons.push(
-      `Declining volume on lower lows: ${lowerLowCount + 1} successive lower lows detected`
+      `Declining volume on lower lows: ${lowerLowCount + 1} successive lower lows detected`,
     );
-    reasons.push(
-      `Volume declined ${volumeDeclinePct.toFixed(0)}% from first to last swing low`
-    );
+    reasons.push(`Volume declined ${volumeDeclinePct.toFixed(0)}% from first to last swing low`);
     reasons.push(`RSI: ${rsiCurrent.toFixed(1)} (oversold, confirms exhaustion)`);
     if (nearSupport) reasons.push("Price near support level (adds confluence)");
     reasons.push(`Confidence: ${(confidence * 100).toFixed(0)}%`);
@@ -336,10 +333,7 @@ export class SellersExhaustionStrategy extends BaseStrategy {
   // Plan Parameters
   // ==========================================================================
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", CANDLE_LIMIT);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const atr = this.calculateATR(candles);
@@ -381,18 +375,11 @@ export class SellersExhaustionStrategy extends BaseStrategy {
     const takeProfits: TakeProfitLevel[] = [
       { price: entryPrice + risk * 1.5, percentToSell: 0.35 },
       { price: entryPrice + risk * 2.5, percentToSell: 0.35 },
-      { price: entryPrice + risk * 4.0, percentToSell: 0.30 },
+      { price: entryPrice + risk * 4.0, percentToSell: 0.3 },
     ];
 
-    const avgTpPrice = takeProfits.reduce(
-      (sum, tp) => sum + tp.price * tp.percentToSell,
-      0
-    );
-    const riskRewardRatio = this.calculateRiskReward(
-      entryPrice,
-      stopLoss,
-      avgTpPrice
-    );
+    const avgTpPrice = takeProfits.reduce((sum, tp) => sum + tp.price * tp.percentToSell, 0);
+    const riskRewardRatio = this.calculateRiskReward(entryPrice, stopLoss, avgTpPrice);
 
     return {
       entryPrice,
@@ -479,7 +466,7 @@ the remaining sell orders. Two distinct patterns signal this:
     bar: OHLC,
     index: number,
     data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     if (index < VOLUME_AVG_PERIOD + 2) return null;
 
@@ -490,8 +477,7 @@ the remaining sell orders. Two distinct patterns signal this:
     const volumeSlice = data.slice(index - VOLUME_AVG_PERIOD, index);
     if (volumeSlice.length < VOLUME_AVG_PERIOD) return null;
 
-    const avgVolume =
-      volumeSlice.reduce((sum, c) => sum + c.volume, 0) / volumeSlice.length;
+    const avgVolume = volumeSlice.reduce((sum, c) => sum + c.volume, 0) / volumeSlice.length;
     if (avgVolume === 0) return null;
 
     const volumeRatio = bar.volume / avgVolume;

@@ -80,8 +80,18 @@ function bucketStats(label: string, returns: number[]): BucketResult {
 }
 
 const MONTH_NAMES = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -136,9 +146,7 @@ export function computeHolidayEffect(input: HolidayEffectInput): HolidayEffectRe
   const windowMs = window * ONE_DAY_MS;
   const pre: number[] = [];
   const post: number[] = [];
-  const holidaySet = new Set(
-    input.holidayDates.map((d) => Math.floor(d / ONE_DAY_MS)),
-  );
+  const holidaySet = new Set(input.holidayDates.map((d) => Math.floor(d / ONE_DAY_MS)));
   for (const r of input.returns) {
     const day = Math.floor(r.t / ONE_DAY_MS);
     for (let offset = 1; offset <= window; offset++) {

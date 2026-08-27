@@ -33,15 +33,12 @@ export function calculateRollSpread(
 
   const requested = opts?.window;
   const window =
-    requested == null || requested >= candles.length
-      ? candles.length
-      : Math.max(3, requested);
+    requested == null || requested >= candles.length ? candles.length : Math.max(3, requested);
   const slice = candles.slice(candles.length - window);
 
   // --- Roll (1984) ---
   const closes = slice.map((c) => c.close);
-  const meanClose =
-    closes.reduce((sum, c) => sum + c, 0) / closes.length;
+  const meanClose = closes.reduce((sum, c) => sum + c, 0) / closes.length;
 
   const deltas: number[] = [];
   for (let i = 1; i < closes.length; i++) {
@@ -83,24 +80,19 @@ export function calculateRollSpread(
     if (cur.high <= 0 || cur.low <= 0 || prev.high <= 0 || prev.low <= 0) {
       continue;
     }
-    const beta =
-      Math.log(cur.high / cur.low) ** 2 +
-      Math.log(prev.high / prev.low) ** 2;
+    const beta = Math.log(cur.high / cur.low) ** 2 + Math.log(prev.high / prev.low) ** 2;
     const hiMax = Math.max(cur.high, prev.high);
     const loMin = Math.min(cur.low, prev.low);
     const gamma = Math.log(hiMax / loMin) ** 2;
 
-    const alpha =
-      (Math.sqrt(2 * beta) - Math.sqrt(beta)) / k - Math.sqrt(gamma / k);
+    const alpha = (Math.sqrt(2 * beta) - Math.sqrt(beta)) / k - Math.sqrt(gamma / k);
     const eAlpha = Math.exp(alpha);
     const s = (2 * (eAlpha - 1)) / (1 + eAlpha);
     csSpreads.push(s < 0 ? 0 : s);
   }
 
   const corwinSchultzSpread =
-    csSpreads.length > 0
-      ? csSpreads.reduce((sum, v) => sum + v, 0) / csSpreads.length
-      : 0;
+    csSpreads.length > 0 ? csSpreads.reduce((sum, v) => sum + v, 0) / csSpreads.length : 0;
 
   const interpretation = `${rollNote}. Corwin-Schultz mean spread ${(corwinSchultzSpread * 100).toFixed(2)}% over ${window} bars`;
 

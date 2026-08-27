@@ -7,7 +7,11 @@
  * Also re-exports the shared processor instances (gordonInputGuard, gordonOutputSanitizer).
  */
 
-import { GordonInputGuard, GordonOutputSanitizer, GordonToolCallReconciler } from "../processors/index.ts";
+import {
+  GordonInputGuard,
+  GordonOutputSanitizer,
+  GordonToolCallReconciler,
+} from "../processors/index.ts";
 import {
   askUserTools,
   indicatorTools,
@@ -116,7 +120,9 @@ export const instrumentedAccountTools = withToolsMetrics(accountTools);
 export const instrumentedTradingTools = withToolsMetrics(tradingTools);
 export const instrumentedPeerTools = withToolsMetrics(peerTools);
 export const instrumentedMarketAnalysisTools = withToolsMetrics(marketAnalysisTools);
-export const instrumentedLiquidationIntelligenceTools = withToolsMetrics(liquidationIntelligenceTools);
+export const instrumentedLiquidationIntelligenceTools = withToolsMetrics(
+  liquidationIntelligenceTools,
+);
 export const instrumentedRiskManagementTools = withToolsMetrics(riskManagementTools);
 export const instrumentedStrategyTools = withToolsMetrics(strategyTools);
 export const instrumentedMetricsTools = withToolsMetrics(metricsTools);

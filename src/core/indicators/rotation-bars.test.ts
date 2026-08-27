@@ -4,14 +4,22 @@ import { constructRotationBars } from "./rotation-bars.ts";
 describe("constructRotationBars — range", () => {
   it("emits a bar each time the high-low span reaches size", () => {
     // 100→150 spans 50 (bar1), then 150→{130,200} spans 70 → 200 (bar2).
-    const r = constructRotationBars({ values: [100, 120, 150, 130, 200], method: "range", size: 50 });
+    const r = constructRotationBars({
+      values: [100, 120, 150, 130, 200],
+      method: "range",
+      size: 50,
+    });
     expect(r.barCount).toBe(2);
     expect(r.bars[0]).toEqual({ open: 100, high: 150, low: 100, close: 150, direction: 1 });
     expect(r.bars[1]).toEqual({ open: 150, high: 200, low: 130, close: 200, direction: 1 });
   });
 
   it("filters sub-size noise to zero bars", () => {
-    const r = constructRotationBars({ values: [100, 110, 100, 110, 100], method: "range", size: 50 });
+    const r = constructRotationBars({
+      values: [100, 110, 100, 110, 100],
+      method: "range",
+      size: 50,
+    });
     expect(r.barCount).toBe(0);
   });
 });

@@ -1,12 +1,9 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computePcaPairClustering,
-  pcaPairClusteringToPayload,
-} from "./pcaPairClustering.ts";
+import { computePcaPairClustering, pcaPairClusteringToPayload } from "./pcaPairClustering.ts";
 
 // Deterministic seeded RNG for reproducible test data
 function makeRng(seed: number): () => number {
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   return () => {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return s / 0x100000000;
@@ -121,9 +118,7 @@ describe("computePcaPairClustering — variance explained", () => {
   it("varianceExplained ∈ [0, 1]", () => {
     const rng = makeRng(33);
     const T = 100;
-    const returns = Array.from({ length: 5 }, () =>
-      Array.from({ length: T }, () => gaussian(rng)),
-    );
+    const returns = Array.from({ length: 5 }, () => Array.from({ length: T }, () => gaussian(rng)));
     const r = computePcaPairClustering({
       returns,
       epsilon: 1,
@@ -138,9 +133,7 @@ describe("computePcaPairClustering — variance explained", () => {
     const rng = makeRng(55);
     const T = 100;
     const N = 4;
-    const returns = Array.from({ length: N }, () =>
-      Array.from({ length: T }, () => gaussian(rng)),
-    );
+    const returns = Array.from({ length: N }, () => Array.from({ length: T }, () => gaussian(rng)));
     const r = computePcaPairClustering({
       returns,
       epsilon: 1,
@@ -211,9 +204,7 @@ describe("computePcaPairClustering — validation", () => {
     const N = 20;
     const T = 30;
     const rng = makeRng(1);
-    const returns = Array.from({ length: N }, () =>
-      Array.from({ length: T }, () => gaussian(rng)),
-    );
+    const returns = Array.from({ length: N }, () => Array.from({ length: T }, () => gaussian(rng)));
     expect(() =>
       computePcaPairClustering({
         returns,
@@ -228,9 +219,7 @@ describe("pcaPairClusteringToPayload", () => {
   it("emits stable shape", () => {
     const rng = makeRng(101);
     const T = 50;
-    const returns = Array.from({ length: 3 }, () =>
-      Array.from({ length: T }, () => gaussian(rng)),
-    );
+    const returns = Array.from({ length: 3 }, () => Array.from({ length: T }, () => gaussian(rng)));
     const r = computePcaPairClustering({
       returns,
       epsilon: 1,

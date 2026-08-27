@@ -12,21 +12,13 @@ describe("detectPsp", () => {
   });
 
   test("all three bullish → all_bullish, no PSP", () => {
-    const r = detectPsp([
-      bar("NQ", 100, 101),
-      bar("ES", 100, 100.5),
-      bar("YM", 100, 100.8),
-    ]);
+    const r = detectPsp([bar("NQ", 100, 101), bar("ES", 100, 100.5), bar("YM", 100, 100.8)]);
     expect(r.verdict).toBe("all_bullish");
     expect(r.pspAsset).toBeNull();
   });
 
   test("all three bearish → all_bearish, no PSP", () => {
-    const r = detectPsp([
-      bar("NQ", 100, 99),
-      bar("ES", 100, 99.5),
-      bar("YM", 100, 99.2),
-    ]);
+    const r = detectPsp([bar("NQ", 100, 99), bar("ES", 100, 99.5), bar("YM", 100, 99.2)]);
     expect(r.verdict).toBe("all_bearish");
   });
 
@@ -53,10 +45,7 @@ describe("detectPsp", () => {
   });
 
   test("equal split → split verdict", () => {
-    const r = detectPsp([
-      bar("NQ", 100, 101),
-      bar("ES", 100, 99),
-    ]);
+    const r = detectPsp([bar("NQ", 100, 101), bar("ES", 100, 99)]);
     expect(r.verdict).toBe("split");
     expect(r.pspAsset).toBeNull();
   });
@@ -153,11 +142,7 @@ describe("detectPsp", () => {
 
 describe("formatPsp", () => {
   test("renders header + per-asset table + dissenter note", () => {
-    const r = detectPsp([
-      bar("NQ", 100, 99),
-      bar("ES", 100, 101),
-      bar("YM", 100, 100.5),
-    ]);
+    const r = detectPsp([bar("NQ", 100, 99), bar("ES", 100, 101), bar("YM", 100, 100.5)]);
     const text = formatPsp(r);
     expect(text).toContain("PSP Detector");
     expect(text).toContain("PSP_DETECTED");

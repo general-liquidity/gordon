@@ -32,7 +32,12 @@ export const marketProfileDiagnosticTool = createTool({
       )
       .min(1)
       .describe("Intraday bars sorted by timestamp."),
-    tpoBlockMs: z.number().int().positive().default(30 * 60 * 1000).describe("TPO block size in ms. Default 30 min."),
+    tpoBlockMs: z
+      .number()
+      .int()
+      .positive()
+      .default(30 * 60 * 1000)
+      .describe("TPO block size in ms. Default 30 min."),
     tickSize: z.number().positive().optional().describe("Price bin size. Default auto from range."),
     valueAreaFraction: z
       .number()

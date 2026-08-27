@@ -25,9 +25,9 @@ export interface ProjectionConfig {
 
 export const DEFAULT_PROJECTION_CONFIG: ProjectionConfig = {
   contextWindow: 200_000,
-  warnThreshold: 0.70,
-  microcompactThreshold: 0.80,
-  compactThreshold: 0.90,
+  warnThreshold: 0.7,
+  microcompactThreshold: 0.8,
+  compactThreshold: 0.9,
   hardLimit: 0.97,
 };
 
@@ -108,9 +108,8 @@ export function projectUsage(
 
   const projected = latest.tokens + growth;
   const hardLimitTokens = config.contextWindow * config.hardLimit;
-  const turnsUntilLimit = growth > 0
-    ? Math.max(0, Math.ceil((hardLimitTokens - latest.tokens) / growth))
-    : undefined;
+  const turnsUntilLimit =
+    growth > 0 ? Math.max(0, Math.ceil((hardLimitTokens - latest.tokens) / growth)) : undefined;
 
   let recommendation: string;
   switch (stage) {
@@ -124,9 +123,10 @@ export function projectUsage(
       recommendation = "Run microcompact to trim old tool results";
       break;
     case "warn":
-      recommendation = turnsUntilLimit !== undefined
-        ? `Approaching limit (${Math.round(currentFraction * 100)}%) — ~${turnsUntilLimit} turns to hard cap`
-        : `Context at ${Math.round(currentFraction * 100)}% of window`;
+      recommendation =
+        turnsUntilLimit !== undefined
+          ? `Approaching limit (${Math.round(currentFraction * 100)}%) — ~${turnsUntilLimit} turns to hard cap`
+          : `Context at ${Math.round(currentFraction * 100)}% of window`;
       break;
     default:
       recommendation = "Context healthy";

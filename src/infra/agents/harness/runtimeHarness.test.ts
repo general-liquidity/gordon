@@ -38,7 +38,8 @@ afterEach(() => {
 });
 
 function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
-  return {    exchange: null,
+  return {
+    exchange: null,
     broker: null,
     llm: {} as GordonContext["llm"],
     config: GordonConfigSchema.parse({
@@ -78,19 +79,21 @@ describe("runtimeHarness", () => {
   it("detects repeated identical tool fingerprints within the sliding call window", () => {
     const context = createContext();
     resetLoopSignals(context);
-    expect(recordToolCallFingerprint(context, "scan_market", { symbol: "BTCUSDT" }).blocked).toBeFalse();
-    expect(recordToolCallFingerprint(context, "scan_market", { symbol: "BTCUSDT" }).blocked).toBeFalse();
+    expect(
+      recordToolCallFingerprint(context, "scan_market", { symbol: "BTCUSDT" }).blocked,
+    ).toBeFalse();
+    expect(
+      recordToolCallFingerprint(context, "scan_market", { symbol: "BTCUSDT" }).blocked,
+    ).toBeFalse();
     const finalState = recordToolCallFingerprint(context, "scan_market", { symbol: "BTCUSDT" });
     expect(finalState.blocked).toBeTrue();
     expect(finalState.count).toBe(3);
   });
 
   it("classifies provider throttles", () => {
-    const guidance = classifyRecoveryGuidance(
-      new Error("Rate limit reached"),
-      createContext(),
-      { phase: "analysis" },
-    );
+    const guidance = classifyRecoveryGuidance(new Error("Rate limit reached"), createContext(), {
+      phase: "analysis",
+    });
     expect(guidance.category).toBe("provider_throttle");
     expect(formatRecoveryGuidance(guidance)).toContain("Try:");
   });
@@ -127,7 +130,11 @@ describe("runtimeHarness", () => {
     // Same decision surface (BTCUSDT buy), varied args → 20 DISTINCT fingerprints
     // (the identical-fingerprint doom-loop misses this), one decision surface.
     for (let i = 0; i < 20; i++) {
-      recordToolCallFingerprint(context, "preview_market_order", { symbol: "BTCUSDT", action: "buy", note: i });
+      recordToolCallFingerprint(context, "preview_market_order", {
+        symbol: "BTCUSDT",
+        action: "buy",
+        note: i,
+      });
     }
     const reminders = buildEventDrivenReminders(context, "execution");
     expect(reminders.some((line) => line.includes("amplification"))).toBeTrue();
@@ -136,7 +143,10 @@ describe("runtimeHarness", () => {
   it("does not flag amplification when surfaces are genuinely distinct", () => {
     const context = createContext({ threadId: "thread-amp-distinct" });
     for (let i = 0; i < 20; i++) {
-      recordToolCallFingerprint(context, "preview_market_order", { symbol: `SYM${i}`, action: "buy" });
+      recordToolCallFingerprint(context, "preview_market_order", {
+        symbol: `SYM${i}`,
+        action: "buy",
+      });
     }
     const reminders = buildEventDrivenReminders(context, "execution");
     expect(reminders.some((line) => line.includes("amplification"))).toBeFalse();

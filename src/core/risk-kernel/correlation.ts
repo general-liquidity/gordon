@@ -75,57 +75,88 @@ export interface CorrelationResult {
  */
 const CORRELATION_GROUPS: Map<string, string[]> = new Map([
   // BTC ecosystem
-  ["btc_ecosystem", [
-    "BTCUSDT", "WBTCUSDT", "BTCBUSDT",
-  ]],
+  ["btc_ecosystem", ["BTCUSDT", "WBTCUSDT", "BTCBUSDT"]],
 
   // Major L1s (high BTC correlation)
-  ["major_l1", [
-    "ETHUSDT", "SOLUSDT", "ADAUSDT", "AVAXUSDT", "DOTUSDT",
-    "ATOMUSDT", "NEARUSDT", "APTUSDT", "SUIUSDT", "SEIUSDT",
-  ]],
+  [
+    "major_l1",
+    [
+      "ETHUSDT",
+      "SOLUSDT",
+      "ADAUSDT",
+      "AVAXUSDT",
+      "DOTUSDT",
+      "ATOMUSDT",
+      "NEARUSDT",
+      "APTUSDT",
+      "SUIUSDT",
+      "SEIUSDT",
+    ],
+  ],
 
   // L2 / Ethereum ecosystem
-  ["eth_l2", [
-    "MATICUSDT", "ARBUSDT", "OPUSDT", "STRKUSDT", "ZKUSDT",
-    "MANTAUSDT", "METISUSDT", "IMXUSDT",
-  ]],
+  [
+    "eth_l2",
+    ["MATICUSDT", "ARBUSDT", "OPUSDT", "STRKUSDT", "ZKUSDT", "MANTAUSDT", "METISUSDT", "IMXUSDT"],
+  ],
 
   // DeFi
-  ["defi", [
-    "UNIUSDT", "AAVEUSDT", "MKRUSDT", "COMPUSDT", "SUSHIUSDT",
-    "CRVUSDT", "LDOUSDT", "PENDLEUSDT", "JUPUSDT", "RAYUSDT",
-    "DYDXUSDT", "1INCHUSDT",
-  ]],
+  [
+    "defi",
+    [
+      "UNIUSDT",
+      "AAVEUSDT",
+      "MKRUSDT",
+      "COMPUSDT",
+      "SUSHIUSDT",
+      "CRVUSDT",
+      "LDOUSDT",
+      "PENDLEUSDT",
+      "JUPUSDT",
+      "RAYUSDT",
+      "DYDXUSDT",
+      "1INCHUSDT",
+    ],
+  ],
 
   // Meme coins
-  ["meme", [
-    "DOGEUSDT", "SHIBUSDT", "PEPEUSDT", "FLOKIUSDT", "BONKUSDT",
-    "WIFUSDT", "MEMEUSDT", "BOMEUSDT",
-  ]],
+  [
+    "meme",
+    [
+      "DOGEUSDT",
+      "SHIBUSDT",
+      "PEPEUSDT",
+      "FLOKIUSDT",
+      "BONKUSDT",
+      "WIFUSDT",
+      "MEMEUSDT",
+      "BOMEUSDT",
+    ],
+  ],
 
   // AI tokens
-  ["ai", [
-    "FETUSDT", "AGIXUSDT", "OCEANUSDT", "RENDERUSDT", "TAOUSDT",
-    "AKTUSDT", "ARKMUSDT",
-  ]],
+  ["ai", ["FETUSDT", "AGIXUSDT", "OCEANUSDT", "RENDERUSDT", "TAOUSDT", "AKTUSDT", "ARKMUSDT"]],
 
   // Gaming / Metaverse
-  ["gaming", [
-    "AXSUSDT", "SANDUSDT", "MANAUSDT", "GALAUSDT", "ENJUSDT",
-    "ILVUSDT", "PIXELUSDT", "PORTALUSDT",
-  ]],
+  [
+    "gaming",
+    [
+      "AXSUSDT",
+      "SANDUSDT",
+      "MANAUSDT",
+      "GALAUSDT",
+      "ENJUSDT",
+      "ILVUSDT",
+      "PIXELUSDT",
+      "PORTALUSDT",
+    ],
+  ],
 
   // Exchange tokens
-  ["exchange", [
-    "BNBUSDT", "FTMUSDT", "OKBUSDT", "CAKEUSDT",
-  ]],
+  ["exchange", ["BNBUSDT", "FTMUSDT", "OKBUSDT", "CAKEUSDT"]],
 
   // Staking / Infrastructure
-  ["infra", [
-    "LINKUSDT", "GRTUSDT", "FILUSDT", "ARUSDT", "THETAUSDT",
-    "HNTUSDT",
-  ]],
+  ["infra", ["LINKUSDT", "GRTUSDT", "FILUSDT", "ARUSDT", "THETAUSDT", "HNTUSDT"]],
 ]);
 
 /**
@@ -144,21 +175,21 @@ for (const [group, symbols] of CORRELATION_GROUPS) {
  */
 const INTRA_GROUP_CORRELATION: Record<string, number> = {
   btc_ecosystem: 0.95,
-  major_l1: 0.80,
+  major_l1: 0.8,
   eth_l2: 0.85,
   defi: 0.75,
-  meme: 0.70,
+  meme: 0.7,
   ai: 0.75,
-  gaming: 0.70,
-  exchange: 0.60,
+  gaming: 0.7,
+  exchange: 0.6,
   infra: 0.65,
 };
 
 /** Default cross-group correlation (BTC beta) */
-const DEFAULT_CROSS_GROUP_CORRELATION = 0.40;
+const DEFAULT_CROSS_GROUP_CORRELATION = 0.4;
 
 /** Default intra-group correlation for unknown groups */
-const DEFAULT_INTRA_GROUP_CORRELATION = 0.50;
+const DEFAULT_INTRA_GROUP_CORRELATION = 0.5;
 
 // ============================================================================
 // Correlation Checker
@@ -187,7 +218,7 @@ export class CorrelationChecker {
     newSide: "long" | "short",
     existingPositions: OpenPosition[],
     maxCorrelatedExposurePercent: number = 40,
-    totalEquity: number = 0
+    totalEquity: number = 0,
   ): Promise<CorrelationResult> {
     try {
       if (existingPositions.length === 0) {
@@ -214,9 +245,7 @@ export class CorrelationChecker {
         const correlation = this.getCorrelation(newSymbol, pos.symbol);
 
         // If opposite sides, effective correlation is negative (hedging)
-        const effectiveCorrelation = newSide === pos.side
-          ? correlation
-          : -correlation;
+        const effectiveCorrelation = newSide === pos.side ? correlation : -correlation;
 
         if (effectiveCorrelation > maxCorrelation) {
           maxCorrelation = effectiveCorrelation;
@@ -235,9 +264,7 @@ export class CorrelationChecker {
         }
       }
 
-      const groupExposurePercent = totalEquity > 0
-        ? (groupExposureValue / totalEquity) * 100
-        : 0;
+      const groupExposurePercent = totalEquity > 0 ? (groupExposureValue / totalEquity) * 100 : 0;
 
       // Determine if acceptable
       const acceptable = groupExposurePercent < maxCorrelatedExposurePercent;
@@ -299,10 +326,7 @@ export class CorrelationChecker {
    * Symbols involved in the check that the static table has never heard of.
    * Their correlation is assumed, not measured.
    */
-  private collectUnknownSymbols(
-    newSymbol: string,
-    existingPositions: OpenPosition[],
-  ): string[] {
+  private collectUnknownSymbols(newSymbol: string, existingPositions: OpenPosition[]): string[] {
     const unknown = new Set<string>();
     if (!this.getGroup(newSymbol)) unknown.add(newSymbol.toUpperCase());
     for (const pos of existingPositions) {
@@ -333,8 +357,7 @@ export class CorrelationChecker {
     }
 
     // BTC correlates more with everything
-    const isBtcRelated = (s: string) =>
-      s.startsWith("BTC") || this.getGroup(s) === "btc_ecosystem";
+    const isBtcRelated = (s: string) => s.startsWith("BTC") || this.getGroup(s) === "btc_ecosystem";
 
     if (isBtcRelated(symbolA) || isBtcRelated(symbolB)) {
       // BTC vs major L1 = higher correlation
@@ -342,7 +365,7 @@ export class CorrelationChecker {
       const otherGroup = this.getGroup(other);
       if (otherGroup === "major_l1") return 0.65;
       if (otherGroup === "eth_l2") return 0.55;
-      return 0.50;
+      return 0.5;
     }
 
     // Different groups (or unknown)

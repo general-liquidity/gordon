@@ -1,8 +1,5 @@
-import type {
-  RuntimeHistoryResult,
-  RuntimeHistorySessionSummary,
-} from "../contracts/types.ts";
-import { RuntimePersistence } from "../persistence/RuntimePersistence.ts";
+import type { RuntimeHistoryResult, RuntimeHistorySessionSummary } from "../contracts/types.ts";
+import type { RuntimePersistence } from "../persistence/RuntimePersistence.ts";
 
 export class RuntimeHistoryManager {
   private readonly persistence: RuntimePersistence;
@@ -11,7 +8,10 @@ export class RuntimeHistoryManager {
     this.persistence = persistence;
   }
 
-  search(query: string, options: { limit?: number; runtimeId?: string } = {}): RuntimeHistoryResult[] {
+  search(
+    query: string,
+    options: { limit?: number; runtimeId?: string } = {},
+  ): RuntimeHistoryResult[] {
     return this.persistence.searchHistory(query, options);
   }
 

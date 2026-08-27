@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { homedir, tmpdir } from "node:os";
-import { join, resolve, sep } from "node:path";
+import { join, resolve } from "node:path";
 
 import {
   isFilesystemWriteGuardEnabled,
@@ -11,7 +11,6 @@ import {
   listAllowedPaths,
   resetGuardForTesting,
   resultToPayload,
-  BlockedWriteError,
   FILESYSTEM_WRITE_GUARD_FLAG_ENV,
   FILESYSTEM_WRITE_GUARD_MODE_ENV,
 } from "./filesystemWriteGuard.ts";
@@ -26,7 +25,9 @@ describe("isFilesystemWriteGuardEnabled", () => {
     expect(isFilesystemWriteGuardEnabled({ [FILESYSTEM_WRITE_GUARD_FLAG_ENV]: "1" })).toBe(true);
     expect(isFilesystemWriteGuardEnabled({ [FILESYSTEM_WRITE_GUARD_FLAG_ENV]: "true" })).toBe(true);
     expect(isFilesystemWriteGuardEnabled({ [FILESYSTEM_WRITE_GUARD_FLAG_ENV]: "0" })).toBe(false);
-    expect(isFilesystemWriteGuardEnabled({ [FILESYSTEM_WRITE_GUARD_FLAG_ENV]: "false" })).toBe(false);
+    expect(isFilesystemWriteGuardEnabled({ [FILESYSTEM_WRITE_GUARD_FLAG_ENV]: "false" })).toBe(
+      false,
+    );
   });
 });
 
@@ -138,9 +139,7 @@ describe("checkWrite — proper subpath only", () => {
 
 describe("enforceWrite — block mode", () => {
   it("throws BlockedWriteError on a miss", () => {
-    expect(() =>
-      enforceWrite({ path: "/etc/something-blocked" }, { mode: "block" }),
-    ).toThrow();
+    expect(() => enforceWrite({ path: "/etc/something-blocked" }, { mode: "block" })).toThrow();
   });
 
   it("returns the result on an allowed path", () => {
@@ -161,10 +160,7 @@ describe("custom rules option", () => {
   it("honors caller-supplied rules", () => {
     // Use resolve so this works the same on Windows + Unix
     const root = resolve("custom-rule-root");
-    const r = checkWrite(
-      { path: join(root, "here") },
-      { rules: [{ prefix: root }] },
-    );
+    const r = checkWrite({ path: join(root, "here") }, { rules: [{ prefix: root }] });
     expect(r.allowed).toBe(true);
   });
 });
@@ -185,7 +181,8 @@ describe("Anthropic Claude Code parity — cwd allowed, parents blocked", () => 
   });
   it("blocks writes to a definitively-outside path", () => {
     // Resolve to ensure we're definitely outside cwd
-    const outside = process.platform === "win32" ? "C:\\Windows\\System32\\test" : "/etc/test-not-real";
+    const outside =
+      process.platform === "win32" ? "C:\\Windows\\System32\\test" : "/etc/test-not-real";
     const r = checkWrite({ path: outside });
     // On Windows when cwd is on C: drive this still includes System32 inside C: — accept either outcome
     if (process.platform !== "win32") {

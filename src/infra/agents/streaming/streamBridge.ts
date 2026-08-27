@@ -11,7 +11,7 @@
  */
 
 import { emitAgentEvent } from "./coordinator.ts";
-import { createEvent, type AgentEventKind, type AgentEvent } from "./events.ts";
+import { createEvent } from "./events.ts";
 
 interface MastraStreamChunk {
   type: string;
@@ -34,20 +34,24 @@ export function bridgeStreamEvent(chunk: MastraStreamChunk, iteration: number): 
   switch (chunk.type) {
     // ── Agent lifecycle ──
     case "agent-execution-start":
-      emitAgentEvent(createEvent("start", iteration, {
-        query: (chunk.content ?? "") as string,
-        agentName: chunk.agentName,
-      }));
+      emitAgentEvent(
+        createEvent("start", iteration, {
+          query: (chunk.content ?? "") as string,
+          agentName: chunk.agentName,
+        }),
+      );
       break;
 
     // ── Thinking / text ──
     case "routing-agent-text-delta":
     case "agent-execution-event-text-delta":
       if (chunk.content) {
-        emitAgentEvent(createEvent("thinking", iteration, {
-          chunk: chunk.content,
-          agentName: chunk.agentName,
-        }));
+        emitAgentEvent(
+          createEvent("thinking", iteration, {
+            chunk: chunk.content,
+            agentName: chunk.agentName,
+          }),
+        );
       }
       break;
 
@@ -56,21 +60,25 @@ export function bridgeStreamEvent(chunk: MastraStreamChunk, iteration: number): 
       if (chunk.toolCallId) {
         toolStartTimes.set(chunk.toolCallId, Date.now());
       }
-      emitAgentEvent(createEvent("tool_start", iteration, {
-        toolName: chunk.toolName ?? "unknown",
-        toolCallId: chunk.toolCallId ?? "",
-        args: chunk.args,
-        agentName: chunk.agentName,
-      }));
+      emitAgentEvent(
+        createEvent("tool_start", iteration, {
+          toolName: chunk.toolName ?? "unknown",
+          toolCallId: chunk.toolCallId ?? "",
+          args: chunk.args,
+          agentName: chunk.agentName,
+        }),
+      );
       break;
 
     case "tool-call-streaming":
       if (chunk.toolCallId && chunk.content) {
-        emitAgentEvent(createEvent("tool_progress", iteration, {
-          toolCallId: chunk.toolCallId,
-          message: chunk.content,
-          agentName: chunk.agentName,
-        }));
+        emitAgentEvent(
+          createEvent("tool_progress", iteration, {
+            toolCallId: chunk.toolCallId,
+            message: chunk.content,
+            agentName: chunk.agentName,
+          }),
+        );
       }
       break;
 
@@ -80,14 +88,17 @@ export function bridgeStreamEvent(chunk: MastraStreamChunk, iteration: number): 
       const durationMs = startTime ? Date.now() - startTime : 0;
       if (chunk.toolCallId) toolStartTimes.delete(chunk.toolCallId);
 
-      emitAgentEvent(createEvent("tool_end", iteration, {
-        toolName: chunk.toolName ?? "unknown",
-        toolCallId: chunk.toolCallId ?? "",
-        success: !(chunk as { error?: unknown }).error,
-        durationMs,
-        resultPreview: typeof chunk.content === "string" ? chunk.content.slice(0, 200) : undefined,
-        agentName: chunk.agentName,
-      }));
+      emitAgentEvent(
+        createEvent("tool_end", iteration, {
+          toolName: chunk.toolName ?? "unknown",
+          toolCallId: chunk.toolCallId ?? "",
+          success: !(chunk as { error?: unknown }).error,
+          durationMs,
+          resultPreview:
+            typeof chunk.content === "string" ? chunk.content.slice(0, 200) : undefined,
+          agentName: chunk.agentName,
+        }),
+      );
       break;
     }
 
@@ -95,30 +106,36 @@ export function bridgeStreamEvent(chunk: MastraStreamChunk, iteration: number): 
     case "usage":
     case "step-finish":
       if (chunk.usage) {
-        emitAgentEvent(createEvent("iteration_end", iteration, {
-          inputTokens: chunk.usage.inputTokens ?? 0,
-          outputTokens: chunk.usage.outputTokens ?? 0,
-          agentName: chunk.agentName,
-        }));
+        emitAgentEvent(
+          createEvent("iteration_end", iteration, {
+            inputTokens: chunk.usage.inputTokens ?? 0,
+            outputTokens: chunk.usage.outputTokens ?? 0,
+            agentName: chunk.agentName,
+          }),
+        );
       }
       break;
 
     // ── Done ──
     case "done":
     case "finish":
-      emitAgentEvent(createEvent("final", iteration, {
-        content: chunk.content ?? "",
-        success: true,
-        agentName: chunk.agentName,
-      }));
+      emitAgentEvent(
+        createEvent("final", iteration, {
+          content: chunk.content ?? "",
+          success: true,
+          agentName: chunk.agentName,
+        }),
+      );
       break;
 
     case "error":
-      emitAgentEvent(createEvent("error", iteration, {
-        message: chunk.content ?? (chunk as { error?: string }).error ?? "Unknown error",
-        recoverable: false,
-        agentName: chunk.agentName,
-      }));
+      emitAgentEvent(
+        createEvent("error", iteration, {
+          message: chunk.content ?? (chunk as { error?: string }).error ?? "Unknown error",
+          recoverable: false,
+          agentName: chunk.agentName,
+        }),
+      );
       break;
 
     // Other Mastra events (handoff, etc.) — no-op for now.

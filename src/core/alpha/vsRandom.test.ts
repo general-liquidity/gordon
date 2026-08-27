@@ -89,10 +89,20 @@ describe("computeVsRandom — reproducibility", () => {
   test("same seed produces same distribution", () => {
     const closes = noisyCloses(100);
     const a = computeVsRandom({
-      closes, actualFitness: 0, fitness: "sharpe", exposureRate: 0.5, nRandom: 100, seed: 123,
+      closes,
+      actualFitness: 0,
+      fitness: "sharpe",
+      exposureRate: 0.5,
+      nRandom: 100,
+      seed: 123,
     });
     const b = computeVsRandom({
-      closes, actualFitness: 0, fitness: "sharpe", exposureRate: 0.5, nRandom: 100, seed: 123,
+      closes,
+      actualFitness: 0,
+      fitness: "sharpe",
+      exposureRate: 0.5,
+      nRandom: 100,
+      seed: 123,
     });
     expect(a.bestRandomFitness).toBe(b.bestRandomFitness);
     expect(a.meanRandomFitness).toBe(b.meanRandomFitness);
@@ -104,7 +114,12 @@ describe("computeVsRandom — fitness functions", () => {
     const closes = trendingCloses(100);
     for (const fitness of ["sharpe", "profit_factor", "win_rate", "total_return"] as const) {
       const r = computeVsRandom({
-        closes, actualFitness: 0.5, fitness, exposureRate: 0.5, nRandom: 50, seed: 1,
+        closes,
+        actualFitness: 0.5,
+        fitness,
+        exposureRate: 0.5,
+        nRandom: 50,
+        seed: 1,
       });
       expect(r.verdict).toMatch(/pass|borderline|fail/);
     }
@@ -120,19 +135,35 @@ describe("computeVsRandom — error handling", () => {
 
   test("throws on non-finite actualFitness", () => {
     expect(() =>
-      computeVsRandom({ closes: [100, 101], actualFitness: NaN, fitness: "sharpe", exposureRate: 0.5 }),
+      computeVsRandom({
+        closes: [100, 101],
+        actualFitness: NaN,
+        fitness: "sharpe",
+        exposureRate: 0.5,
+      }),
     ).toThrow(/finite/);
   });
 
   test("throws on out-of-range exposureRate", () => {
     expect(() =>
-      computeVsRandom({ closes: [100, 101], actualFitness: 0, fitness: "sharpe", exposureRate: 1.5 }),
+      computeVsRandom({
+        closes: [100, 101],
+        actualFitness: 0,
+        fitness: "sharpe",
+        exposureRate: 1.5,
+      }),
     ).toThrow(/exposureRate/);
   });
 
   test("throws on nRandom = 0", () => {
     expect(() =>
-      computeVsRandom({ closes: [100, 101], actualFitness: 0, fitness: "sharpe", exposureRate: 0.5, nRandom: 0 }),
+      computeVsRandom({
+        closes: [100, 101],
+        actualFitness: 0,
+        fitness: "sharpe",
+        exposureRate: 0.5,
+        nRandom: 0,
+      }),
     ).toThrow(/nRandom/);
   });
 });

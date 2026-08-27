@@ -69,11 +69,7 @@ describe("installAlternateScreen", () => {
   test("restores when the app exits via waitUntilExit", async () => {
     const out = new FakeTty();
     const inst = fakeInstance([]) as Instance & { __resolveExit: () => void };
-    const wrapped = installAlternateScreen(
-      inst,
-      out as unknown as NodeJS.WriteStream,
-      true,
-    );
+    const wrapped = installAlternateScreen(inst, out as unknown as NodeJS.WriteStream, true);
     const done = wrapped.waitUntilExit();
     inst.__resolveExit();
     await done;

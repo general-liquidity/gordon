@@ -33,14 +33,7 @@ describe("cli command parsing", () => {
     ];
     expect(parseCommand()).toEqual({
       name: "bootstrap",
-      args: [
-        "--profile",
-        "quickstart",
-        "--llm-provider",
-        "openai",
-        "--llm-key",
-        "sk-test",
-      ],
+      args: ["--profile", "quickstart", "--llm-provider", "openai", "--llm-key", "sk-test"],
     });
   });
 });

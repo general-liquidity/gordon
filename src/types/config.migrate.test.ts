@@ -10,9 +10,13 @@ describe("migrateExchangeConfigTypes", () => {
       ],
     });
 
-    const parsed = ExchangeTypeSchema.parse((migrated.exchanges as Array<{ type: string }>)[0]!.type);
+    const parsed = ExchangeTypeSchema.parse(
+      (migrated.exchanges as Array<{ type: string }>)[0]!.type,
+    );
     expect(parsed).toBe("ccxt:binance");
-    expect(ExchangeTypeSchema.parse((migrated.exchanges as Array<{ type: string }>)[1]!.type)).toBe("ccxt:bybit");
+    expect(ExchangeTypeSchema.parse((migrated.exchanges as Array<{ type: string }>)[1]!.type)).toBe(
+      "ccxt:bybit",
+    );
   });
 
   it("maps binance_us to ccxt:binanceus", () => {

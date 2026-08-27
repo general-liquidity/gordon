@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 import { getRiskColor, getSignalColor } from "../../design-system/colorMap.ts";
@@ -56,7 +56,9 @@ function TradeBody({ tradeDetails, reason }: { tradeDetails: TradeDetails; reaso
         <Text dimColor>{priceStr}</Text>
       </Text>
       {estimatedValue != null && (
-        <Text dimColor>{"  "}Estimated value: ~${estimatedValue.toLocaleString()}</Text>
+        <Text dimColor>
+          {"  "}Estimated value: ~${estimatedValue.toLocaleString()}
+        </Text>
       )}
       <Box>
         <Text dimColor>{"  "}Risk class: </Text>
@@ -64,7 +66,12 @@ function TradeBody({ tradeDetails, reason }: { tradeDetails: TradeDetails; reaso
           {riskClass.toUpperCase()}
         </Text>
       </Box>
-      {reason && <Text dimColor>{"  "}{reason}</Text>}
+      {reason && (
+        <Text dimColor>
+          {"  "}
+          {reason}
+        </Text>
+      )}
     </>
   );
 }
@@ -139,7 +146,10 @@ function CriticalTrade({ tradeDetails, reason, onDecision }: Props) {
   const riskTone = getRiskColor("critical", theme);
 
   useEffect(() => {
-    if (countdown <= 0) { setUnlocked(true); return; }
+    if (countdown <= 0) {
+      setUnlocked(true);
+      return;
+    }
     const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(t);
   }, [countdown]);
@@ -158,18 +168,26 @@ function CriticalTrade({ tradeDetails, reason, onDecision }: Props) {
         paddingY={1}
       >
         <Box>
-          <Text color={riskTone} bold inverse>{" CRITICAL "}</Text>
-          <Text color={riskTone} bold> TRADE EXECUTION REQUEST</Text>
+          <Text color={riskTone} bold inverse>
+            {" CRITICAL "}
+          </Text>
+          <Text color={riskTone} bold>
+            {" "}
+            TRADE EXECUTION REQUEST
+          </Text>
         </Box>
         <Text> </Text>
         <TradeBody tradeDetails={tradeDetails} reason={reason} />
         <Text> </Text>
         <Text color={riskTone} bold>
-          {"  "}{"⚠"} CRITICAL — This trade may be irreversible.
+          {"  "}
+          {"⚠"} CRITICAL — This trade may be irreversible.
         </Text>
         <Text> </Text>
         {!unlocked ? (
-          <Text dimColor>{"  "}Confirm available in {countdown}s... (Esc to deny)</Text>
+          <Text dimColor>
+            {"  "}Confirm available in {countdown}s... (Esc to deny)
+          </Text>
         ) : (
           <Box paddingLeft={2}>
             <Select

@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 
@@ -11,13 +10,22 @@ interface Props {
   onCancel: () => void;
 }
 
-export function ExitFlow({ openPositionCount, autonomousActive, onSaveAndExit, onExitWithoutSave, onCancel }: Props) {
+export function ExitFlow({
+  openPositionCount,
+  autonomousActive,
+  onSaveAndExit,
+  onExitWithoutSave,
+  onCancel,
+}: Props) {
   useInput((_input, key) => {
     if (key.escape) onCancel();
   });
 
   const warnings: string[] = [];
-  if (openPositionCount > 0) warnings.push(`${openPositionCount} open position${openPositionCount !== 1 ? "s" : ""} — they will remain on the exchange`);
+  if (openPositionCount > 0)
+    warnings.push(
+      `${openPositionCount} open position${openPositionCount !== 1 ? "s" : ""} — they will remain on the exchange`,
+    );
   if (autonomousActive) warnings.push("Autonomous loop is running — it will stop on exit");
 
   return (
@@ -26,7 +34,9 @@ export function ExitFlow({ openPositionCount, autonomousActive, onSaveAndExit, o
       {warnings.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
           {warnings.map((w, i) => (
-            <Text key={i} color="yellow">{"\u26A0"} {w}</Text>
+            <Text key={i} color="yellow">
+              {"\u26A0"} {w}
+            </Text>
           ))}
         </Box>
       )}

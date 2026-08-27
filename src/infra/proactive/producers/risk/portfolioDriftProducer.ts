@@ -48,7 +48,9 @@ async function loadPositionStore(): Promise<MinimalPositionStore | null> {
   }
 }
 
-export const portfolioDriftProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
+export const portfolioDriftProducer: CandidateProducer = async (
+  obs,
+): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop" || obs.eventType !== "tick_portfolio_drift") return [];
 
   const store = await loadPositionStore();

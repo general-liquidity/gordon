@@ -72,9 +72,7 @@ export class ToolRegistry {
     return definition;
   }
 
-  registerExternalTools(
-    definitions: Array<Pick<RuntimeToolDefinition, "spec" | "origin">>,
-  ): void {
+  registerExternalTools(definitions: Array<Pick<RuntimeToolDefinition, "spec" | "origin">>): void {
     let changed = false;
     for (const definition of definitions) {
       this.definitions.set(definition.spec.id, definition);
@@ -98,7 +96,9 @@ export class ToolRegistry {
   }
 
   listDefinitions(): RuntimeToolDefinition[] {
-    return [...this.definitions.values()].sort((left, right) => left.spec.id.localeCompare(right.spec.id));
+    return [...this.definitions.values()].sort((left, right) =>
+      left.spec.id.localeCompare(right.spec.id),
+    );
   }
 
   private emit(): void {

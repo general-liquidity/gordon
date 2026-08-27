@@ -83,7 +83,7 @@ function compileGlob(pattern: string): RegExp {
     if (ch === "*") {
       body += "[^:]*";
     } else if ("\\^$.|?+()[]{}".includes(ch)) {
-      body += "\\" + ch;
+      body += `\\${ch}`;
     } else {
       body += ch;
     }

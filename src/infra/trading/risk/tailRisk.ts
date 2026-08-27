@@ -93,10 +93,7 @@ function conditionalVaR(returns: number[], percentile: number = 0.05): number {
  * @param prices Historical prices (oldest first).
  * @param returns Daily returns (decimal). If not provided, computed from prices.
  */
-export function computeTailRisk(
-  prices: number[],
-  returns?: number[],
-): TailRiskProfile {
+export function computeTailRisk(prices: number[], returns?: number[]): TailRiskProfile {
   if (!returns) {
     returns = [];
     for (let i = 1; i < prices.length; i++) {
@@ -106,9 +103,16 @@ export function computeTailRisk(
 
   if (returns.length < 20) {
     return {
-      skewness: 0, kurtosis: 0, maxDrawdown: 0, downsideUpsideRatio: 1,
-      var5Pct: 0, cvar5Pct: 0, tailRiskScore: 50, convexityScore: 0,
-      classification: "robust", assessment: "Insufficient data for tail risk analysis.",
+      skewness: 0,
+      kurtosis: 0,
+      maxDrawdown: 0,
+      downsideUpsideRatio: 1,
+      var5Pct: 0,
+      cvar5Pct: 0,
+      tailRiskScore: 50,
+      convexityScore: 0,
+      classification: "robust",
+      assessment: "Insufficient data for tail risk analysis.",
     };
   }
 
@@ -148,7 +152,8 @@ export function computeTailRisk(
   const parts: string[] = [];
   if (skew < -0.5) parts.push("Negative skew (fat left tail — risk of sudden drops)");
   if (kurt > 3) parts.push(`Excess kurtosis ${kurt.toFixed(1)} (fatter tails than normal)`);
-  if (mdd > 0.3) parts.push(`Max drawdown ${(mdd * 100).toFixed(0)}% (significant historical loss)`);
+  if (mdd > 0.3)
+    parts.push(`Max drawdown ${(mdd * 100).toFixed(0)}% (significant historical loss)`);
   if (duRatio > 1.3) parts.push("Downside dominates upside (asymmetric risk)");
   if (convexityScore > 20) parts.push("Favorable convexity (limited downside, room to run)");
   if (parts.length === 0) parts.push("Normal risk profile, no extreme tail characteristics.");
@@ -163,6 +168,6 @@ export function computeTailRisk(
     tailRiskScore,
     convexityScore,
     classification,
-    assessment: parts.join(". ") + ".",
+    assessment: `${parts.join(". ")}.`,
   };
 }

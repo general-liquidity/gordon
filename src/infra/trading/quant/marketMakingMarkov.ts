@@ -109,9 +109,7 @@ export function computeMarketMakingMarkov(input: {
 }): MmMarkovResult {
   const wRaw = input.waitingPeriods;
   const waitingPeriods =
-    wRaw == null || !Number.isFinite(wRaw) || wRaw < 0
-      ? DEFAULT_WAITING_PERIODS
-      : Math.floor(wRaw);
+    wRaw == null || !Number.isFinite(wRaw) || wRaw < 0 ? DEFAULT_WAITING_PERIODS : Math.floor(wRaw);
 
   let matrix: number[][] | null = null;
   let sampleSize = 0;
@@ -119,12 +117,18 @@ export function computeMarketMakingMarkov(input: {
   if (input.transitionMatrix != null) {
     matrix = input.transitionMatrix;
     if (!isValidMatrix(matrix)) {
-      return neutral(waitingPeriods, "Invalid transition matrix (must be 3×3 with rows summing to 1).");
+      return neutral(
+        waitingPeriods,
+        "Invalid transition matrix (must be 3×3 with rows summing to 1).",
+      );
     }
   } else if (input.states != null) {
     const estimated = estimateFromStates(input.states);
     if (estimated == null) {
-      return neutral(waitingPeriods, "Insufficient state data (need ≥2 states in {0,1,2}) to estimate transitions.");
+      return neutral(
+        waitingPeriods,
+        "Insufficient state data (need ≥2 states in {0,1,2}) to estimate transitions.",
+      );
     }
     matrix = estimated;
     sampleSize = input.states.filter((s) => s === 0 || s === 1 || s === 2).length;
@@ -142,11 +146,11 @@ export function computeMarketMakingMarkov(input: {
   // Σ_{n=0..W} P[1][1]^n · P[1][2]
   let waitFillSum = 0;
   for (let n = 0; n <= waitingPeriods; n++) {
-    waitFillSum += Math.pow(p11, n) * p12;
+    waitFillSum += p11 ** n * p12;
   }
 
   const pMakeSpread = p02 + p01 * waitFillSum;
-  const pOneSideFill = p01 * Math.pow(p11, waitingPeriods) * p10;
+  const pOneSideFill = p01 * p11 ** waitingPeriods * p10;
 
   const roundedMatrix = P.map((row) => row.map((v) => Number(v.toFixed(6))));
   const make = Number(pMakeSpread.toFixed(6));

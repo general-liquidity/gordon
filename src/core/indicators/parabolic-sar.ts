@@ -43,7 +43,7 @@ export function calculateParabolicSAR(
   candles: Candle[],
   afStart: number = 0.02,
   afIncrement: number = 0.02,
-  afMax: number = 0.2
+  afMax: number = 0.2,
 ): ParabolicSARResult {
   if (candles.length < 5) {
     return {
@@ -129,13 +129,22 @@ export function calculateParabolicSAR(
   const trendChange = currentDir !== prevDir;
 
   const currentPrice = candles[candles.length - 1]!.close;
-  const distance = parseFloat(((Math.abs(currentPrice - currentSar) / currentPrice) * 100).toFixed(2));
+  const distance = parseFloat(
+    ((Math.abs(currentPrice - currentSar) / currentPrice) * 100).toFixed(2),
+  );
 
   let signal: "buy" | "sell" | "hold" = "hold";
   if (trendChange && currentDir === 1) signal = "buy";
   else if (trendChange && currentDir === -1) signal = "sell";
 
-  const interpretation = buildSARInterpretation(currentSar, currentDir, trendChange, distance, af, currentPrice);
+  const interpretation = buildSARInterpretation(
+    currentSar,
+    currentDir,
+    trendChange,
+    distance,
+    af,
+    currentPrice,
+  );
 
   return {
     values: sarValues,
@@ -151,19 +160,26 @@ export function calculateParabolicSAR(
 }
 
 function buildSARInterpretation(
-  sar: number, dir: number, change: boolean, dist: number, af: number, price: number
+  sar: number,
+  dir: number,
+  change: boolean,
+  dist: number,
+  af: number,
+  _price: number,
 ): string {
   let msg = `Parabolic SAR: ${sar.toFixed(2)} (${dir === 1 ? "UPTREND" : "DOWNTREND"}). `;
   msg += `Distance: ${dist}% ${dir === 1 ? "below" : "above"} price. AF: ${af}. `;
 
   if (change) {
-    msg += dir === 1
-      ? "TREND REVERSAL to BULLISH — SAR flipped below price. Buy signal."
-      : "TREND REVERSAL to BEARISH — SAR flipped above price. Sell signal.";
+    msg +=
+      dir === 1
+        ? "TREND REVERSAL to BULLISH — SAR flipped below price. Buy signal."
+        : "TREND REVERSAL to BEARISH — SAR flipped above price. Sell signal.";
   } else {
-    msg += dir === 1
-      ? "Uptrend intact — SAR acts as trailing stop below."
-      : "Downtrend intact — SAR acts as trailing stop above.";
+    msg +=
+      dir === 1
+        ? "Uptrend intact — SAR acts as trailing stop below."
+        : "Downtrend intact — SAR acts as trailing stop above.";
   }
 
   return msg;

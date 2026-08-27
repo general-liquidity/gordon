@@ -15,10 +15,7 @@
  */
 
 import { createHash } from "node:crypto";
-import {
-  getDatabase,
-  executeWithLogging,
-} from "../storage/database.ts";
+import { getDatabase, executeWithLogging } from "../storage/database.ts";
 
 let tableInitialized = false;
 
@@ -119,15 +116,7 @@ export function upsertOrderbookSnapshot(snap: OrderbookSnapshot): boolean {
   const db = getDatabase();
   const info = db.run(
     "INSERT OR IGNORE INTO orderbook_snapshots (venue, symbol, taken_at, bids_json, asks_json, stored_at, source_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    [
-      venue,
-      symbol,
-      snap.takenAt,
-      JSON.stringify(bids),
-      JSON.stringify(asks),
-      now,
-      hash,
-    ],
+    [venue, symbol, snap.takenAt, JSON.stringify(bids), JSON.stringify(asks), now, hash],
   );
   return ((info as { changes?: number }).changes ?? 0) > 0;
 }
@@ -279,9 +268,6 @@ export function countOrderbookSnapshots(venue: string, symbol: string): number {
 export function pruneOrderbookCacheBefore(thresholdMs: number): number {
   ensureTable();
   const db = getDatabase();
-  const result = db.run(
-    "DELETE FROM orderbook_snapshots WHERE stored_at < ?",
-    [thresholdMs],
-  );
+  const result = db.run("DELETE FROM orderbook_snapshots WHERE stored_at < ?", [thresholdMs]);
   return (result as { changes?: number }).changes ?? 0;
 }

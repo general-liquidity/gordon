@@ -76,9 +76,7 @@ function detectDominantTool(assistantContent: string): { count: number; dominant
   const counts = new Map<string, number>();
   let total = 0;
   for (const pattern of TOOL_CALL_PATTERNS) {
-    pattern.re.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = pattern.re.exec(assistantContent)) !== null) {
+    for (const m of assistantContent.matchAll(pattern.re)) {
       const name = m[1];
       if (!name) continue;
       counts.set(name, (counts.get(name) ?? 0) + 1);

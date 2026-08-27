@@ -39,20 +39,14 @@ describe("parseInterruptOnConfig — empty / invalid input", () => {
 
   test("non-object in strict mode → throws", () => {
     expect(() =>
-      parseInterruptOnConfig(
-        "not-an-object" as unknown as InterruptOnConfig,
-        { strict: true },
-      ),
+      parseInterruptOnConfig("not-an-object" as unknown as InterruptOnConfig, { strict: true }),
     ).toThrow();
   });
 });
 
 describe("parseInterruptOnConfig — shorthand strings", () => {
   test("'allow' shorthand produces allow rule with exact toolName", () => {
-    const r = parseInterruptOnConfig(
-      { place_order: "allow" },
-      withFixedIds(),
-    );
+    const r = parseInterruptOnConfig({ place_order: "allow" }, withFixedIds());
     expect(r.acceptedCount).toBe(1);
     expect(r.rules[0]).toMatchObject({
       toolName: "place_order",
@@ -64,10 +58,7 @@ describe("parseInterruptOnConfig — shorthand strings", () => {
   });
 
   test("'deny' shorthand produces deny rule", () => {
-    const r = parseInterruptOnConfig(
-      { place_order: "deny" },
-      withFixedIds(),
-    );
+    const r = parseInterruptOnConfig({ place_order: "deny" }, withFixedIds());
     expect(r.rules[0]!.decision).toBe("deny");
   });
 
@@ -84,37 +75,25 @@ describe("parseInterruptOnConfig — shorthand strings", () => {
 
   test("strict mode throws on invalid shorthand", () => {
     expect(() =>
-      parseInterruptOnConfig(
-        { place_order: "maybe" as unknown as "allow" },
-        { strict: true },
-      ),
+      parseInterruptOnConfig({ place_order: "maybe" as unknown as "allow" }, { strict: true }),
     ).toThrow();
   });
 });
 
 describe("parseInterruptOnConfig — glob patterns vs exact names", () => {
   test("glob with * sets toolNamePattern", () => {
-    const r = parseInterruptOnConfig(
-      { "cancel_*": "deny" },
-      withFixedIds(),
-    );
+    const r = parseInterruptOnConfig({ "cancel_*": "deny" }, withFixedIds());
     expect(r.rules[0]!.toolNamePattern).toBe("cancel_*");
     expect(r.rules[0]!.toolName).toBeUndefined();
   });
 
   test("glob with ? sets toolNamePattern", () => {
-    const r = parseInterruptOnConfig(
-      { "test_?": "allow" },
-      withFixedIds(),
-    );
+    const r = parseInterruptOnConfig({ "test_?": "allow" }, withFixedIds());
     expect(r.rules[0]!.toolNamePattern).toBe("test_?");
   });
 
   test("exact name sets toolName", () => {
-    const r = parseInterruptOnConfig(
-      { search_memory: "allow" },
-      withFixedIds(),
-    );
+    const r = parseInterruptOnConfig({ search_memory: "allow" }, withFixedIds());
     expect(r.rules[0]!.toolName).toBe("search_memory");
     expect(r.rules[0]!.toolNamePattern).toBeUndefined();
   });
@@ -192,18 +171,12 @@ describe("parseInterruptOnConfig — full rule shape", () => {
 
 describe("parseInterruptOnConfig — defaults", () => {
   test("scope defaults to 'session'", () => {
-    const r = parseInterruptOnConfig(
-      { search_memory: { decision: "allow" } },
-      withFixedIds(),
-    );
+    const r = parseInterruptOnConfig({ search_memory: { decision: "allow" } }, withFixedIds());
     expect(r.rules[0]!.scope).toBe("session");
   });
 
   test("createdBy defaults to 'operator-config'", () => {
-    const r = parseInterruptOnConfig(
-      { search_memory: "allow" },
-      withFixedIds(),
-    );
+    const r = parseInterruptOnConfig({ search_memory: "allow" }, withFixedIds());
     expect(r.rules[0]!.createdBy).toBe("operator-config");
   });
 
@@ -216,10 +189,7 @@ describe("parseInterruptOnConfig — defaults", () => {
   });
 
   test("custom now applied to createdAt", () => {
-    const r = parseInterruptOnConfig(
-      { search_memory: "allow" },
-      withFixedIds(),
-    );
+    const r = parseInterruptOnConfig({ search_memory: "allow" }, withFixedIds());
     expect(r.rules[0]!.createdAt).toBe(FIXED_NOW.toISOString());
   });
 
@@ -233,11 +203,7 @@ describe("parseInterruptOnConfig — defaults", () => {
       },
       { now: FIXED_NOW, idGenerator: idGen },
     );
-    expect(r.rules.map((rule) => rule.id)).toEqual([
-      "rule-1",
-      "rule-2",
-      "rule-3",
-    ]);
+    expect(r.rules.map((rule) => rule.id)).toEqual(["rule-1", "rule-2", "rule-3"]);
   });
 });
 
@@ -263,17 +229,13 @@ describe("parseInterruptOnConfig — Deep-Agents-shaped operator config", () => 
     expect(r.rejectedCount).toBe(0);
     expect(r.warnings).toEqual([]);
 
-    const byKey = new Map(
-      r.rules.map((rule) => [rule.toolName ?? rule.toolNamePattern, rule]),
-    );
+    const byKey = new Map(r.rules.map((rule) => [rule.toolName ?? rule.toolNamePattern, rule]));
     expect(byKey.get("place_*")?.decision).toBe("deny");
     expect(byKey.get("place_*")?.toolNamePattern).toBe("place_*");
     expect(byKey.get("research_*")?.decision).toBe("allow");
     expect(byKey.get("execute_plan")?.toolName).toBe("execute_plan");
     expect(byKey.get("classify_trade_risk")?.scope).toBe("persistent");
-    expect(byKey.get("classify_trade_risk")?.permissionScope).toBe(
-      "analysis.run",
-    );
+    expect(byKey.get("classify_trade_risk")?.permissionScope).toBe("analysis.run");
   });
 
   test("partial valid + invalid: keeps valid, warns on invalid", () => {
@@ -314,10 +276,7 @@ describe("parseInterruptOnConfig — edge cases", () => {
 
 describe("summarizeParsedInterruptOn", () => {
   test("renders accepted-only summary", () => {
-    const r = parseInterruptOnConfig(
-      { a: "allow", b: "deny" },
-      withFixedIds(),
-    );
+    const r = parseInterruptOnConfig({ a: "allow", b: "deny" }, withFixedIds());
     const text = summarizeParsedInterruptOn(r);
     expect(text).toContain("2 rules");
     expect(text).not.toContain("dropped");
@@ -337,10 +296,7 @@ describe("summarizeParsedInterruptOn", () => {
 
   test("singular vs plural rule wording", () => {
     const single = parseInterruptOnConfig({ a: "allow" }, withFixedIds());
-    const plural = parseInterruptOnConfig(
-      { a: "allow", b: "deny" },
-      withFixedIds(),
-    );
+    const plural = parseInterruptOnConfig({ a: "allow", b: "deny" }, withFixedIds());
     expect(summarizeParsedInterruptOn(single)).toContain("1 rule.");
     expect(summarizeParsedInterruptOn(plural)).toContain("2 rules.");
   });

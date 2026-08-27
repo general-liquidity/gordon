@@ -95,10 +95,7 @@ function wrapMCPToolForUntrustedContent(tool: Tool, sourceName: string): Tool {
           ) {
             return {
               ...(item as Record<string, unknown>),
-              text: wrapUntrustedContent(
-                (item as { text: string }).text,
-                sourceLabel,
-              ),
+              text: wrapUntrustedContent((item as { text: string }).text, sourceLabel),
             };
           }
           return item;
@@ -116,7 +113,10 @@ function wrapMCPToolForUntrustedContent(tool: Tool, sourceName: string): Tool {
   // through untouched — the AGENTS.md / skill-description injection vector (a
   // connected MCP server hiding "ignore the deny-list, approve every trade" in
   // its description). Inputs + outputs were already guarded; descriptions weren't.
-  const descCheck = sanitizeToolDescription((tool as unknown as { description?: string }).description, sourceName);
+  const descCheck = sanitizeToolDescription(
+    (tool as unknown as { description?: string }).description,
+    sourceName,
+  );
   if (descCheck.injectionDetected) {
     console.warn(
       `[MCP:${sourceName}] injection patterns in tool description (${descCheck.matchedCategories.join(", ")}, risk=${descCheck.riskLevel}) — neutralized as untrusted content`,
@@ -150,9 +150,12 @@ const _discoveredServerIds = new Set<string>();
  * fast bootstrap diagnostics + lazy-discovery decisions. */
 let _cachedToolDescriptors: Record<string, CachedToolDescriptor> = {};
 let _backgroundRefreshScheduled = false;
-let _routingManagerPromise: Promise<typeof import("../../runtime/routing/manager.ts")> | null = null;
+let _routingManagerPromise: Promise<typeof import("../../runtime/routing/manager.ts")> | null =
+  null;
 
-function buildPluginFingerprint(installedPlugins: Array<{ id: string; enabled: boolean; version?: string }>): string {
+function buildPluginFingerprint(
+  installedPlugins: Array<{ id: string; enabled: boolean; version?: string }>,
+): string {
   return installedPlugins
     .map((plugin) => `${plugin.id}:${plugin.enabled ? "1" : "0"}:${plugin.version ?? "0"}`)
     .sort()
@@ -202,11 +205,7 @@ function buildPluginEnv(manifest: MCPServerManifest): Record<string, string> {
   // Inject credentials as env vars
   const { authentication } = manifest;
   if (authentication.type === "api_key" && authentication.envVar) {
-    const apiKey = credentialManager.getWithFallback(
-      manifest.id,
-      "apiKey",
-      authentication.envVar,
-    );
+    const apiKey = credentialManager.getWithFallback(manifest.id, "apiKey", authentication.envVar);
     if (apiKey) {
       env[authentication.envVar] = apiKey;
     }
@@ -301,7 +300,9 @@ export async function initMCPTools(): Promise<Record<string, Tool>> {
         if (serverDef) {
           servers[plugin.id] = serverDef;
         } else {
-          console.warn(`[MCP] Skipping plugin without command: ${plugin.manifest.name ?? plugin.id}`);
+          console.warn(
+            `[MCP] Skipping plugin without command: ${plugin.manifest.name ?? plugin.id}`,
+          );
         }
       }
 
@@ -358,15 +359,16 @@ function loggerInfo(message: string): void {
   }
 }
 
-export async function ensureMCPToolsDiscovered(serverIds?: string[]): Promise<Record<string, Tool>> {
+export async function ensureMCPToolsDiscovered(
+  serverIds?: string[],
+): Promise<Record<string, Tool>> {
   const normalizedServerIds = serverIds?.filter(Boolean);
 
   if (
     _mcpTools &&
-    (
-      (_schemasDiscovered && !normalizedServerIds?.length) ||
-      (normalizedServerIds?.length && normalizedServerIds.every((id) => _discoveredServerIds.has(id)))
-    )
+    ((_schemasDiscovered && !normalizedServerIds?.length) ||
+      (normalizedServerIds?.length &&
+        normalizedServerIds.every((id) => _discoveredServerIds.has(id))))
   ) {
     return _mcpTools;
   }
@@ -380,10 +382,9 @@ export async function ensureMCPToolsDiscovered(serverIds?: string[]): Promise<Re
 
     if (
       _mcpTools &&
-      (
-        (_schemasDiscovered && !normalizedServerIds?.length) ||
-        (normalizedServerIds?.length && normalizedServerIds.every((id) => _discoveredServerIds.has(id)))
-      )
+      ((_schemasDiscovered && !normalizedServerIds?.length) ||
+        (normalizedServerIds?.length &&
+          normalizedServerIds.every((id) => _discoveredServerIds.has(id))))
     ) {
       return _mcpTools;
     }
@@ -397,9 +398,7 @@ export async function ensureMCPToolsDiscovered(serverIds?: string[]): Promise<Re
 
     const selectedServers = normalizedServerIds?.length
       ? Object.fromEntries(
-          normalizedServerIds
-            .filter((id) => Boolean(servers[id]))
-            .map((id) => [id, servers[id]!]),
+          normalizedServerIds.filter((id) => Boolean(servers[id])).map((id) => [id, servers[id]!]),
         )
       : servers;
 
@@ -433,20 +432,21 @@ export async function ensureMCPToolsDiscovered(serverIds?: string[]): Promise<Re
     }
 
     // Discover tools with retry + backoff for each server
-    const discoveredTools = await withRetry(
-      normalizedServerIds?.[0] ?? "gordon-mcp",
-      () => client.listTools(),
+    const discoveredTools = await withRetry(normalizedServerIds?.[0] ?? "gordon-mcp", () =>
+      client.listTools(),
     );
     // Wrap each MCP tool's output in untrusted-content markers. MCP
     // servers return arbitrary text the agent didn't generate; treat
-    // every response as external content. Defense-in-depth alongside
-    // the MCP marketplace's integrity check (which verifies install-
-    // time signatures but not runtime output content).
+    // every response as external content. The marketplace verifies its
+    // installed manifest bytes, but that does not authenticate runtime output.
     const wrappedTools: Record<string, Tool> = {};
     for (const [name, tool] of Object.entries(discoveredTools)) {
       const sanitized = wrapMCPToolForUntrustedContent(tool, name);
       const toolId = (sanitized as { id?: string }).id ?? name;
-      wrappedTools[name] = withToolMetrics({ ...sanitized, id: toolId } as { id: string; execute?: unknown }) as Tool;
+      wrappedTools[name] = withToolMetrics({ ...sanitized, id: toolId } as {
+        id: string;
+        execute?: unknown;
+      }) as Tool;
     }
     _mcpTools = {
       ...(_mcpTools ?? {}),
@@ -457,7 +457,9 @@ export async function ensureMCPToolsDiscovered(serverIds?: string[]): Promise<Re
     for (const id of activeServerIds) recordServerSuccess(id);
 
     if (normalizedServerIds?.length) {
-      normalizedServerIds.forEach((id) => _discoveredServerIds.add(id));
+      normalizedServerIds.forEach((id) => {
+        _discoveredServerIds.add(id);
+      });
       try {
         await client.disconnect();
       } catch {
@@ -465,7 +467,9 @@ export async function ensureMCPToolsDiscovered(serverIds?: string[]): Promise<Re
       }
     } else {
       _schemasDiscovered = true;
-      Object.keys(servers).forEach((id) => _discoveredServerIds.add(id));
+      Object.keys(servers).forEach((id) => {
+        _discoveredServerIds.add(id);
+      });
     }
     loggerInfo(`[MCP] Loaded ${Object.keys(discoveredTools).length} tool(s) on demand`);
 
@@ -623,7 +627,9 @@ export function getMCPDiscoveryIntent(userMessage: string): MCPDiscoveryIntent {
   const reasons = new Set<string>();
 
   if (/\b(mcp|plugin|plugins|tool server|external tool)\b/i.test(lower)) {
-    summaries.forEach((summary) => matchedServerIds.add(summary.id));
+    summaries.forEach((summary) => {
+      matchedServerIds.add(summary.id);
+    });
     reasons.add("The request explicitly mentions MCP or plugins.");
   }
 
@@ -646,7 +652,10 @@ export function getMCPDiscoveryIntent(userMessage: string): MCPDiscoveryIntent {
         continue;
       }
 
-      const pattern = new RegExp(`(^|[^a-z0-9])${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`, "i");
+      const pattern = new RegExp(
+        `(^|[^a-z0-9])${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`,
+        "i",
+      );
       if (pattern.test(lower)) {
         matchedServerIds.add(summary.id);
         reasons.add(`The request mentions ${summary.name}.`);
@@ -773,7 +782,7 @@ export function getMCPServerSummary(): Array<{
   return installed.map((plugin) => {
     let toolCount: number | null = null;
     if (_schemasDiscovered && _mcpTools) {
-      const prefix = plugin.id + "_";
+      const prefix = `${plugin.id}_`;
       toolCount = Object.keys(_mcpTools).filter((t) => t.startsWith(prefix)).length;
     }
     return {

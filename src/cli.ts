@@ -13,7 +13,9 @@ function loadVersion(): string {
   try {
     const currentFile = fileURLToPath(import.meta.url);
     const packageJsonPath = path.resolve(path.dirname(currentFile), "../package.json");
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")) as { version?: string };
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")) as {
+      version?: string;
+    };
     if (typeof packageJson.version === "string" && packageJson.version.length > 0) {
       return packageJson.version;
     }
@@ -425,7 +427,9 @@ export async function runUninstall(): Promise<void> {
     await rm(GORDON_DIR, { recursive: true, force: true });
     console.log(`\nRemoved ${GORDON_DIR}`);
     console.log("To reinstall: npm install -g @general-liquidity/gordon");
-    console.log("If global npm permissions are blocked: npx @general-liquidity/gordon@latest install");
+    console.log(
+      "If global npm permissions are blocked: npx @general-liquidity/gordon@latest install",
+    );
   } catch (error) {
     console.error(`\nFailed to remove ${GORDON_DIR}:`, error);
     process.exit(1);

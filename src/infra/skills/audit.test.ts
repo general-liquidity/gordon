@@ -14,7 +14,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* */ }
+  try {
+    rmSync(tempDir, { recursive: true, force: true });
+  } catch {
+    /* */
+  }
 });
 
 function makeSkill(
@@ -48,13 +52,13 @@ describe("runSkillAudit — verdict bands", () => {
     ];
     writeFileSync(
       usagePath,
-      [
+      `${[
         { timestamp: "2026-05-22T00:00:00Z", skillId: "a", source: "user" },
         { timestamp: "2026-05-21T00:00:00Z", skillId: "b", source: "user" },
         { timestamp: "2026-05-20T00:00:00Z", skillId: "c", source: "user" },
       ]
         .map((r) => JSON.stringify(r))
-        .join("\n") + "\n",
+        .join("\n")}\n`,
     );
     const report = runSkillAudit(skills, { now, path: usagePath });
     expect(report.verdict).toBe("clean");
@@ -71,12 +75,12 @@ describe("runSkillAudit — verdict bands", () => {
     // degraded (which requires high stale ratio AND high unused ratio).
     writeFileSync(
       usagePath,
-      [
+      `${[
         { timestamp: "2026-05-22T00:00:00Z", skillId: "stale1", source: "user" },
         { timestamp: "2026-05-22T00:00:00Z", skillId: "ok", source: "user" },
       ]
         .map((r) => JSON.stringify(r))
-        .join("\n") + "\n",
+        .join("\n")}\n`,
     );
     const report = runSkillAudit(skills, { now, path: usagePath });
     expect(report.verdict).toBe("needs_attention");
@@ -151,7 +155,7 @@ describe("runSkillAudit — fields", () => {
     const skills = [makeSkill("a"), makeSkill("b"), makeSkill("c")];
     writeFileSync(
       usagePath,
-      JSON.stringify({ timestamp: "2026-05-22T00:00:00Z", skillId: "a", source: "user" }) + "\n",
+      `${JSON.stringify({ timestamp: "2026-05-22T00:00:00Z", skillId: "a", source: "user" })}\n`,
     );
     const report = runSkillAudit(skills, { now, path: usagePath });
     expect(report.neverInvoked).toEqual(["b", "c"]);
@@ -197,7 +201,7 @@ describe("formatAuditReport", () => {
     const skills = [makeSkill("a")];
     writeFileSync(
       usagePath,
-      JSON.stringify({ timestamp: "2026-05-22T00:00:00Z", skillId: "a", source: "user" }) + "\n",
+      `${JSON.stringify({ timestamp: "2026-05-22T00:00:00Z", skillId: "a", source: "user" })}\n`,
     );
     const report = runSkillAudit(skills, { now, path: usagePath });
     const text = formatAuditReport(report);

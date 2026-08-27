@@ -12,23 +12,21 @@ import type { PoolStats, StylePool } from "./internal/contracts.ts";
 // and they never get evicted under pressure (they sit at the MRU tail after
 // any touch). Order matters — index = initial ID.
 const BASELINE_STYLES: readonly string[] = [
-  "",             // 0: empty / no style
-  "\x1b[0m",     // 1: reset
-  "\x1b[1m",     // 2: bold
-  "\x1b[2m",     // 3: dim
-  "\x1b[3m",     // 4: italic
-  "\x1b[4m",     // 5: underline
-  "\x1b[7m",     // 6: inverse (used by selection overlay in Phase 4)
-  "\x1b[22m",    // 7: bold/dim off
-  "\x1b[39m",    // 8: default foreground
-  "\x1b[49m",    // 9: default background
+  "", // 0: empty / no style
+  "\x1b[0m", // 1: reset
+  "\x1b[1m", // 2: bold
+  "\x1b[2m", // 3: dim
+  "\x1b[3m", // 4: italic
+  "\x1b[4m", // 5: underline
+  "\x1b[7m", // 6: inverse (used by selection overlay in Phase 4)
+  "\x1b[22m", // 7: bold/dim off
+  "\x1b[39m", // 8: default foreground
+  "\x1b[49m", // 9: default background
 ];
 
 export function createStylePool(capacity: number = 256): StylePool {
   if (!Number.isInteger(capacity) || capacity < BASELINE_STYLES.length) {
-    throw new Error(
-      `createStylePool: capacity ${capacity} must be >= ${BASELINE_STYLES.length}`,
-    );
+    throw new Error(`createStylePool: capacity ${capacity} must be >= ${BASELINE_STYLES.length}`);
   }
 
   // Two maps implement LRU: `strToId` for interning, `idToNode` for ordering.

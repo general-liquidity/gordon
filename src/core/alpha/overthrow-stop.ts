@@ -34,9 +34,7 @@ function round(x: number, n: number): number {
   return parseFloat(x.toFixed(n));
 }
 
-export function computeOverthrowStop(
-  input: OverthrowStopInput,
-): OverthrowStopResult | null {
+export function computeOverthrowStop(input: OverthrowStopInput): OverthrowStopResult | null {
   const { candles, brokenLevel, side } = input;
   const lookback = input.lookback ?? 20;
 

@@ -101,9 +101,7 @@ function signFlip(returns: ReadonlyArray<number>, rng: () => number): number[] {
   return out;
 }
 
-export function runDirectionalEdgeTest(
-  input: DirectionalEdgeTestInput,
-): DirectionalEdgeTestResult {
+export function runDirectionalEdgeTest(input: DirectionalEdgeTestInput): DirectionalEdgeTestResult {
   const returns = input.returns;
   const samples = input.samples ?? DEFAULT_SAMPLES;
   const ppy = input.periodsPerYear ?? DEFAULT_PPY;

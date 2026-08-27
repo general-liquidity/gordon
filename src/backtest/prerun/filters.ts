@@ -22,7 +22,7 @@ function isWeekday(timestamp: number): boolean {
 export function filterExcludeMonths(
   ohlcData: OHLC[],
   startMonth: number = 5,
-  endMonth: number = 9
+  endMonth: number = 9,
 ): {
   status: "success" | "error";
   filteredData?: OHLC[];
@@ -55,7 +55,7 @@ export function filterExcludeMonths(
 export function filterMarketHours(
   ohlcData: OHLC[],
   openTimeStr: string = "13:30",
-  closeTimeStr: string = "20:00"
+  closeTimeStr: string = "20:00",
 ): {
   status: "success" | "error";
   marketHoursData?: OHLC[];
@@ -100,7 +100,7 @@ export function filterFirstLastHour(
   marketOpenStr: string = "13:30",
   oneHourAfterOpenStr: string = "14:30",
   oneHourBeforeCloseStr: string = "19:00",
-  marketCloseStr: string = "20:00"
+  marketCloseStr: string = "20:00",
 ): {
   status: "success" | "error";
   filteredData?: OHLC[];

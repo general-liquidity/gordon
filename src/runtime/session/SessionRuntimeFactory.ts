@@ -7,7 +7,10 @@ import { RuntimeBridge } from "../bridge/RuntimeBridge.ts";
 import { RuntimeHistoryManager } from "../history/RuntimeHistoryManager.ts";
 import { PermissionEngine } from "../permissions/PermissionEngine.ts";
 import { registerPermissionEngine } from "../permissions/defaultPermissionEngine.ts";
-import { buildTrustTrajectoryHook, getDefaultTrustTrajectory } from "../permissions/trustTrajectory.ts";
+import {
+  buildTrustTrajectoryHook,
+  getDefaultTrustTrajectory,
+} from "../permissions/trustTrajectory.ts";
 import { buildPermissionProfileHook } from "../permissions/profiles.ts";
 import { RuntimePluginManager } from "../plugins/RuntimePluginManager.ts";
 import { CompactionManager } from "../transcript/CompactionManager.ts";
@@ -34,8 +37,7 @@ const OPERATOR_SETTINGS_FLAG = "GORDON_OPERATOR_SETTINGS";
 
 function isOperatorSettingsEnabled(): boolean {
   return (
-    process.env[OPERATOR_SETTINGS_FLAG] === "1" ||
-    process.env[OPERATOR_SETTINGS_FLAG] === "true"
+    process.env[OPERATOR_SETTINGS_FLAG] === "1" || process.env[OPERATOR_SETTINGS_FLAG] === "true"
   );
 }
 
@@ -122,7 +124,9 @@ export class SessionRuntimeFactory {
       return existing;
     }
 
-    const runtimeStore = new RuntimeStore(createDefaultRuntimeSessionState(runtimeId, options.sessionId));
+    const runtimeStore = new RuntimeStore(
+      createDefaultRuntimeSessionState(runtimeId, options.sessionId),
+    );
     const transcriptStore = new TranscriptStore();
     const scratchpadStore = new ScratchpadStore();
     const toolRegistry = new ToolRegistry(this.capabilityRegistry);
@@ -227,7 +231,7 @@ export class SessionRuntimeFactory {
     );
     this.runtimes.clear();
     const failures = lifecycleResults.flatMap((result) =>
-      result.status === "rejected" ? [result.reason] : []
+      result.status === "rejected" ? [result.reason] : [],
     );
     try {
       this.persistence.close();
@@ -235,7 +239,10 @@ export class SessionRuntimeFactory {
       failures.push(error);
     }
     if (failures.length > 0) {
-      throw new AggregateError(failures, "Session runtime factory disposed with lifecycle failures");
+      throw new AggregateError(
+        failures,
+        "Session runtime factory disposed with lifecycle failures",
+      );
     }
   }
 }

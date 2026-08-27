@@ -23,7 +23,11 @@ beforeEach(() => {
 });
 
 const cleanup = () => {
-  try { rmSync(workDir, { recursive: true, force: true }); } catch { /* ignore */ }
+  try {
+    rmSync(workDir, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
 };
 
 describe("classifyDebrief — four quadrants", () => {
@@ -61,9 +65,9 @@ describe("classifyDebrief — threshold + clamping", () => {
   });
 
   it("respects custom threshold", () => {
-    expect(
-      classifyDebrief({ processScore: 4, outcomeScore: 4, goodThreshold: 4 }).quadrant,
-    ).toBe("deserved_success");
+    expect(classifyDebrief({ processScore: 4, outcomeScore: 4, goodThreshold: 4 }).quadrant).toBe(
+      "deserved_success",
+    );
   });
 
   it("clamps out-of-range scores", () => {
@@ -112,11 +116,7 @@ describe("recordDebrief", () => {
   });
 });
 
-const makeEntry = (
-  tradeId: string,
-  processScore: number,
-  outcomeScore: number,
-): DebriefEntry => {
+const makeEntry = (tradeId: string, processScore: number, outcomeScore: number): DebriefEntry => {
   const c = classifyDebrief({ processScore, outcomeScore });
   return {
     ...c,

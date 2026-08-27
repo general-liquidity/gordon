@@ -53,9 +53,11 @@ describe("simulateConvictionFilteredExpectancy", () => {
     const r = simulateConvictionFilteredExpectancy(trades);
     // With random data, baseline might be optimal OR filtering finds noise
     // depending on the random seed. The test asserts the result is reasonable.
-    expect(["baseline_already_optimal", "filtered_edge_found", "no_edge_at_any_threshold"]).toContain(
-      r.verdict,
-    );
+    expect([
+      "baseline_already_optimal",
+      "filtered_edge_found",
+      "no_edge_at_any_threshold",
+    ]).toContain(r.verdict);
   });
 
   test("no edge at any threshold — strategy is just unprofitable", () => {
@@ -79,9 +81,7 @@ describe("simulateConvictionFilteredExpectancy", () => {
     expect(avg.optimalThreshold!.keptFraction).toBeLessThanOrEqual(
       total.optimalThreshold!.keptFraction,
     );
-    expect(avg.optimalThreshold!.avgPnl).toBeGreaterThan(
-      total.optimalThreshold!.avgPnl,
-    );
+    expect(avg.optimalThreshold!.avgPnl).toBeGreaterThan(total.optimalThreshold!.avgPnl);
   });
 
   test("sharpe objective penalizes variance", () => {
@@ -124,9 +124,7 @@ describe("simulateConvictionFilteredExpectancy", () => {
     const lax = simulateConvictionFilteredExpectancy(trades, { minKeptTrades: 3 });
     const strict = simulateConvictionFilteredExpectancy(trades, { minKeptTrades: 30 });
     // Lax allows degenerate small subsets; strict forces broader subset
-    expect(lax.optimalThreshold!.keptCount).toBeLessThanOrEqual(
-      strict.optimalThreshold!.keptCount,
-    );
+    expect(lax.optimalThreshold!.keptCount).toBeLessThanOrEqual(strict.optimalThreshold!.keptCount);
   });
 
   test("hit rate improves with higher threshold when conviction is informative", () => {

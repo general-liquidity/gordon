@@ -88,26 +88,28 @@ export function appendActionLogEntry(input: AppendActionLogEntryInput): ActionLo
 
   executeWithLogging(
     () =>
-      db.query(
-        `INSERT INTO action_log_entries
+      db
+        .query(
+          `INSERT INTO action_log_entries
           (id, threadId, resourceId, sessionId, correlationId, runId, parentEntryId, entryType, title, content, payloadJson, label, bookmarked, createdAt)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).run(
-        entry.id,
-        entry.threadId ?? null,
-        entry.resourceId ?? null,
-        entry.sessionId ?? null,
-        entry.correlationId ?? null,
-        entry.runId ?? null,
-        entry.parentEntryId ?? null,
-        entry.entryType,
-        entry.title,
-        entry.content,
-        serializePayload(entry.payload),
-        entry.label ?? null,
-        entry.bookmarked ? 1 : 0,
-        entry.createdAt,
-      ),
+        )
+        .run(
+          entry.id,
+          entry.threadId ?? null,
+          entry.resourceId ?? null,
+          entry.sessionId ?? null,
+          entry.correlationId ?? null,
+          entry.runId ?? null,
+          entry.parentEntryId ?? null,
+          entry.entryType,
+          entry.title,
+          entry.content,
+          serializePayload(entry.payload),
+          entry.label ?? null,
+          entry.bookmarked ? 1 : 0,
+          entry.createdAt,
+        ),
     "INSERT action_log_entries",
   );
 
@@ -117,7 +119,8 @@ export function appendActionLogEntry(input: AppendActionLogEntryInput): ActionLo
 export function getActionLogEntry(entryId: string): ActionLogEntry | null {
   const db = getDatabase();
   const row = executeWithLogging(
-    () => db.query("SELECT * FROM action_log_entries WHERE id = ?").get(entryId) as ActionLogRow | null,
+    () =>
+      db.query("SELECT * FROM action_log_entries WHERE id = ?").get(entryId) as ActionLogRow | null,
     "SELECT action_log_entries one",
   );
   return row ? rowToEntry(row) : null;
@@ -165,7 +168,9 @@ export function listActionLogEntries(options: ListActionLogEntriesOptions = {}):
     clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "",
     "ORDER BY datetime(createdAt) DESC, rowid DESC",
     "LIMIT ?",
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
   params.push(options.limit ?? 100);
 
   const rows = executeWithLogging(
@@ -176,15 +181,21 @@ export function listActionLogEntries(options: ListActionLogEntriesOptions = {}):
   return rows.map(rowToEntry);
 }
 
-export function setActionLogBookmarked(entryId: string, bookmarked: boolean, label?: string): boolean {
+export function setActionLogBookmarked(
+  entryId: string,
+  bookmarked: boolean,
+  label?: string,
+): boolean {
   const db = getDatabase();
   const result = executeWithLogging(
     () =>
-      db.query(
-        `UPDATE action_log_entries
+      db
+        .query(
+          `UPDATE action_log_entries
          SET bookmarked = ?, label = COALESCE(?, label)
          WHERE id = ?`,
-      ).run(bookmarked ? 1 : 0, label ?? null, entryId),
+        )
+        .run(bookmarked ? 1 : 0, label ?? null, entryId),
     "UPDATE action_log_entries bookmark",
   );
   return Number(result.changes ?? 0) > 0;

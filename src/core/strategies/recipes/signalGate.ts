@@ -44,7 +44,12 @@ export interface SignalGateResult {
   /** What the caller should actually trade now. */
   execute: GateSide;
   /** Why this output was produced. */
-  status: "executed-immediately" | "executed-after-confirmation" | "pending" | "passthrough" | "cancelled";
+  status:
+    | "executed-immediately"
+    | "executed-after-confirmation"
+    | "pending"
+    | "passthrough"
+    | "cancelled";
   state: SignalGateState;
   /** Set when status is "executed-after-confirmation". Positive means
    *  waiting paid off relative to the original signal price. */

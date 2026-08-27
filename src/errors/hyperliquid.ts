@@ -15,7 +15,7 @@ export class HyperliquidError extends GordonError {
     message: string,
     hyperliquidCode?: string,
     endpoint?: string,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, "HYPERLIQUID_ERROR", { ...context, hyperliquidCode, endpoint });
     this.name = "HyperliquidError";
@@ -35,8 +35,7 @@ export class HyperliquidError extends GordonError {
    */
   isAuthError(): boolean {
     return (
-      this.hyperliquidCode === "INVALID_SIGNATURE" ||
-      this.hyperliquidCode === "INVALID_ADDRESS"
+      this.hyperliquidCode === "INVALID_SIGNATURE" || this.hyperliquidCode === "INVALID_ADDRESS"
     );
   }
 }
@@ -47,7 +46,7 @@ export class HyperliquidError extends GordonError {
 export class WalletSigningError extends HyperliquidError {
   constructor(
     message: string = "Failed to sign transaction with wallet",
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, "SIGNING_ERROR", undefined, context);
     this.name = "WalletSigningError";
@@ -58,10 +57,7 @@ export class WalletSigningError extends HyperliquidError {
  * Invalid wallet/private key error
  */
 export class InvalidWalletError extends HyperliquidError {
-  constructor(
-    message: string = "Invalid wallet private key",
-    context?: Record<string, unknown>
-  ) {
+  constructor(message: string = "Invalid wallet private key", context?: Record<string, unknown>) {
     super(message, "INVALID_WALLET", undefined, context);
     this.name = "InvalidWalletError";
   }
@@ -73,16 +69,12 @@ export class InvalidWalletError extends HyperliquidError {
 export class HyperliquidRateLimitError extends HyperliquidError {
   public readonly retryAfter?: number;
 
-  constructor(
-    retryAfter?: number,
-    endpoint?: string,
-    context?: Record<string, unknown>
-  ) {
+  constructor(retryAfter?: number, endpoint?: string, context?: Record<string, unknown>) {
     super(
       `Rate limit exceeded${retryAfter ? `. Retry after ${retryAfter}ms` : ""}`,
       "RATE_LIMIT",
       endpoint,
-      { ...context, retryAfter }
+      { ...context, retryAfter },
     );
     this.name = "HyperliquidRateLimitError";
     this.retryAfter = retryAfter;
@@ -101,13 +93,13 @@ export class InsufficientMarginError extends HyperliquidError {
     asset: string,
     required: number,
     available: number,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(
       `Insufficient ${asset} margin. Required: ${required}, Available: ${available}`,
       "INSUFFICIENT_MARGIN",
       "/exchange",
-      { ...context, asset, required, available }
+      { ...context, asset, required, available },
     );
     this.name = "InsufficientMarginError";
     this.asset = asset;
@@ -138,7 +130,7 @@ export class HyperliquidInvalidAssetError extends HyperliquidError {
 export class HyperliquidConnectionError extends GordonError {
   constructor(
     message: string = "Failed to connect to Hyperliquid API",
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, "HYPERLIQUID_CONNECTION_ERROR", context);
     this.name = "HyperliquidConnectionError";
@@ -149,15 +141,12 @@ export class HyperliquidConnectionError extends GordonError {
  * Not supported error (for spot-only operations on perpetuals exchange)
  */
 export class HyperliquidNotSupportedError extends HyperliquidError {
-  constructor(
-    operation: string,
-    context?: Record<string, unknown>
-  ) {
+  constructor(operation: string, context?: Record<string, unknown>) {
     super(
       `Operation '${operation}' is not supported on Hyperliquid (perpetuals-only exchange)`,
       "NOT_SUPPORTED",
       undefined,
-      { ...context, operation }
+      { ...context, operation },
     );
     this.name = "HyperliquidNotSupportedError";
   }
@@ -169,7 +158,7 @@ export class HyperliquidNotSupportedError extends HyperliquidError {
 export function createHyperliquidError(
   code: string,
   message: string,
-  endpoint?: string
+  endpoint?: string,
 ): HyperliquidError {
   switch (code) {
     case "RATE_LIMIT":

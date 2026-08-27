@@ -125,7 +125,13 @@ export function checkCostBudget(sessionTotalUsd: number, callCostUsd: number): C
         warnedThresholds.add(key);
         result.warning = `Session cost at ${(threshold * 100).toFixed(0)}% of $${sessionLimit.toFixed(2)} budget ($${sessionTotalUsd.toFixed(4)})`;
         costLogger.warn(result.warning);
-        void emitCostAlert({ threshold, kind: "session", total: sessionTotalUsd, limit: sessionLimit, key });
+        void emitCostAlert({
+          threshold,
+          kind: "session",
+          total: sessionTotalUsd,
+          limit: sessionLimit,
+          key,
+        });
       }
     }
     if (dailyLimit && (result.dailyFraction ?? 0) >= threshold) {
@@ -134,7 +140,13 @@ export function checkCostBudget(sessionTotalUsd: number, callCostUsd: number): C
         warnedThresholds.add(key);
         result.warning = `Daily cost at ${(threshold * 100).toFixed(0)}% of $${dailyLimit.toFixed(2)} budget ($${dailyTotalUsd.toFixed(4)})`;
         costLogger.warn(result.warning);
-        void emitCostAlert({ threshold, kind: "daily", total: dailyTotalUsd, limit: dailyLimit, key });
+        void emitCostAlert({
+          threshold,
+          kind: "daily",
+          total: dailyTotalUsd,
+          limit: dailyLimit,
+          key,
+        });
       }
     }
   }
@@ -223,17 +235,47 @@ interface ModelPricing {
 
 const MODEL_PRICING: Record<string, ModelPricing> = {
   // Anthropic
-  "claude-opus-4-6":   { inputPer1M: 15.00, outputPer1M: 75.00, cacheReadPer1M: 1.50, cacheWritePer1M: 18.75 },
-  "claude-sonnet-4-6": { inputPer1M: 3.00,  outputPer1M: 15.00, cacheReadPer1M: 0.30, cacheWritePer1M: 3.75 },
-  "claude-haiku-4-5":  { inputPer1M: 1.00,  outputPer1M: 5.00,  cacheReadPer1M: 0.10, cacheWritePer1M: 1.25 },
+  "claude-opus-4-6": {
+    inputPer1M: 15.0,
+    outputPer1M: 75.0,
+    cacheReadPer1M: 1.5,
+    cacheWritePer1M: 18.75,
+  },
+  "claude-sonnet-4-6": {
+    inputPer1M: 3.0,
+    outputPer1M: 15.0,
+    cacheReadPer1M: 0.3,
+    cacheWritePer1M: 3.75,
+  },
+  "claude-haiku-4-5": {
+    inputPer1M: 1.0,
+    outputPer1M: 5.0,
+    cacheReadPer1M: 0.1,
+    cacheWritePer1M: 1.25,
+  },
   // OpenAI
-  "gpt-5.4":           { inputPer1M: 3.00,  outputPer1M: 15.00, cacheReadPer1M: 0.30, cacheWritePer1M: 3.75 },
-  "gpt-5.4-pro":       { inputPer1M: 3.00,  outputPer1M: 15.00, cacheReadPer1M: 0.30, cacheWritePer1M: 3.75 },
-  "gpt-5.4-mini":      { inputPer1M: 0.75,  outputPer1M: 5.00,  cacheReadPer1M: 0.08, cacheWritePer1M: 0.94 },
-  "gpt-5.4-nano":      { inputPer1M: 0.20,  outputPer1M: 1.00,  cacheReadPer1M: 0.02, cacheWritePer1M: 0.25 },
+  "gpt-5.4": { inputPer1M: 3.0, outputPer1M: 15.0, cacheReadPer1M: 0.3, cacheWritePer1M: 3.75 },
+  "gpt-5.4-pro": { inputPer1M: 3.0, outputPer1M: 15.0, cacheReadPer1M: 0.3, cacheWritePer1M: 3.75 },
+  "gpt-5.4-mini": {
+    inputPer1M: 0.75,
+    outputPer1M: 5.0,
+    cacheReadPer1M: 0.08,
+    cacheWritePer1M: 0.94,
+  },
+  "gpt-5.4-nano": {
+    inputPer1M: 0.2,
+    outputPer1M: 1.0,
+    cacheReadPer1M: 0.02,
+    cacheWritePer1M: 0.25,
+  },
 };
 
-const DEFAULT_PRICING: ModelPricing = { inputPer1M: 3.00, outputPer1M: 15.00, cacheReadPer1M: 0.30, cacheWritePer1M: 3.75 };
+const DEFAULT_PRICING: ModelPricing = {
+  inputPer1M: 3.0,
+  outputPer1M: 15.0,
+  cacheReadPer1M: 0.3,
+  cacheWritePer1M: 3.75,
+};
 
 function getPricing(modelId: string): ModelPricing {
   // Try exact match, then prefix match
@@ -244,12 +286,18 @@ function getPricing(modelId: string): ModelPricing {
   return DEFAULT_PRICING;
 }
 
-function computeCost(pricing: ModelPricing, input: number, output: number, cacheRead: number, cacheWrite: number): number {
+function computeCost(
+  pricing: ModelPricing,
+  input: number,
+  output: number,
+  cacheRead: number,
+  cacheWrite: number,
+): number {
   return (
-    (input * pricing.inputPer1M / 1_000_000) +
-    (output * pricing.outputPer1M / 1_000_000) +
-    (cacheRead * pricing.cacheReadPer1M / 1_000_000) +
-    (cacheWrite * pricing.cacheWritePer1M / 1_000_000)
+    (input * pricing.inputPer1M) / 1_000_000 +
+    (output * pricing.outputPer1M) / 1_000_000 +
+    (cacheRead * pricing.cacheReadPer1M) / 1_000_000 +
+    (cacheWrite * pricing.cacheWritePer1M) / 1_000_000
   );
 }
 
@@ -309,8 +357,11 @@ export class CostTracker {
     entry.apiCalls++;
 
     entry.totalCostUsd = computeCost(
-      pricing, entry.inputTokens, entry.outputTokens,
-      entry.cacheReadTokens, entry.cacheWriteTokens,
+      pricing,
+      entry.inputTokens,
+      entry.outputTokens,
+      entry.cacheReadTokens,
+      entry.cacheWriteTokens,
     );
 
     // Budget check — runs after the call, doesn't block this call but flags
@@ -342,8 +393,12 @@ export class CostTracker {
    */
   snapshot(): CostSnapshot {
     const models: Record<string, ModelCostEntry> = {};
-    let totalInput = 0, totalOutput = 0, totalCacheRead = 0, totalCacheWrite = 0;
-    let totalCost = 0, totalCalls = 0;
+    let totalInput = 0,
+      totalOutput = 0,
+      totalCacheRead = 0,
+      totalCacheWrite = 0;
+    let totalCost = 0,
+      totalCalls = 0;
 
     for (const [id, entry] of this.models) {
       models[id] = { ...entry };
@@ -380,20 +435,28 @@ export class CostTracker {
   formatDisplay(): string {
     const snap = this.snapshot();
     const lines: string[] = [];
-    lines.push(`Session cost: $${snap.totalCostUsd.toFixed(4)} | ${snap.totalApiCalls} calls | ${Math.round(snap.durationMs / 1000)}s`);
+    lines.push(
+      `Session cost: $${snap.totalCostUsd.toFixed(4)} | ${snap.totalApiCalls} calls | ${Math.round(snap.durationMs / 1000)}s`,
+    );
 
     // Surface cacheRead pressure. When this percentage trends above ~50%, the
     // agent is paying primarily to replay historical context. Above ~70% (the
     // OpenClaw failure case) is a context-bloat signal worth investigating.
     const cachePct = Math.round(snap.cacheReadPercentage * 100);
     if (snap.totalCacheReadTokens > 0) {
-      const flag = cachePct >= 70 ? " ⚠ context-bloat suspected" : cachePct >= 50 ? " (cache-heavy)" : "";
-      lines.push(`  cacheRead: ${snap.totalCacheReadTokens.toLocaleString()} tokens (${cachePct}% of total)${flag}`);
+      const flag =
+        cachePct >= 70 ? " ⚠ context-bloat suspected" : cachePct >= 50 ? " (cache-heavy)" : "";
+      lines.push(
+        `  cacheRead: ${snap.totalCacheReadTokens.toLocaleString()} tokens (${cachePct}% of total)${flag}`,
+      );
     }
 
     for (const entry of Object.values(snap.models)) {
-      const pct = snap.totalCostUsd > 0 ? Math.round((entry.totalCostUsd / snap.totalCostUsd) * 100) : 0;
-      lines.push(`  ${entry.displayName}: $${entry.totalCostUsd.toFixed(4)} (${pct}%) — ${entry.inputTokens.toLocaleString()}in/${entry.outputTokens.toLocaleString()}out`);
+      const pct =
+        snap.totalCostUsd > 0 ? Math.round((entry.totalCostUsd / snap.totalCostUsd) * 100) : 0;
+      lines.push(
+        `  ${entry.displayName}: $${entry.totalCostUsd.toFixed(4)} (${pct}%) — ${entry.inputTokens.toLocaleString()}in/${entry.outputTokens.toLocaleString()}out`,
+      );
     }
 
     return lines.join("\n");
@@ -406,7 +469,10 @@ export class CostTracker {
     const dir = join(GORDON_DIR, "sessions");
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     const file = join(dir, `${this.sessionId}.cost.json`);
-    writeFileSync(file, JSON.stringify(this.snapshot(), null, 2), { encoding: "utf-8", mode: 0o600 });
+    writeFileSync(file, JSON.stringify(this.snapshot(), null, 2), {
+      encoding: "utf-8",
+      mode: 0o600,
+    });
   }
 
   /**

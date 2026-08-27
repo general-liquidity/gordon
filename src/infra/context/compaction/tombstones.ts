@@ -19,11 +19,11 @@ import { GORDON_DIR } from "../../storage/paths.ts";
 // ============================================================================
 
 export type TombstoneReason =
-  | "microcompact"    // Content cleared by microcompact
-  | "full_compact"    // Replaced during full LLM summarization
-  | "budget_trim"     // Trimmed by conversation budget enforcement
-  | "user_delete"     // User explicitly deleted
-  | "session_end"     // Session cleanup
+  | "microcompact" // Content cleared by microcompact
+  | "full_compact" // Replaced during full LLM summarization
+  | "budget_trim" // Trimmed by conversation budget enforcement
+  | "user_delete" // User explicitly deleted
+  | "session_end" // Session cleanup
   | "error_recovery"; // Discarded during error recovery
 
 export interface Tombstone {
@@ -119,7 +119,7 @@ export async function recordTombstone(params: {
     };
 
     const file = getSessionFile(params.sessionId ?? "default");
-    appendFileSync(file, JSON.stringify(tombstone) + "\n", { encoding: "utf-8", mode: 0o600 });
+    appendFileSync(file, `${JSON.stringify(tombstone)}\n`, { encoding: "utf-8", mode: 0o600 });
 
     return tombstone;
   } catch {

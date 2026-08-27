@@ -30,9 +30,7 @@ import { WORKING_MEMORY_LABELS } from "../capabilityTruth.ts";
 /** Env flag that activates the native OM path. Default off. */
 export const OBSERVATIONAL_MEMORY_FLAG = "GORDON_OBSERVATIONAL_MEMORY";
 
-export function isObservationalMemoryEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function isObservationalMemoryEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env[OBSERVATIONAL_MEMORY_FLAG] === "1";
 }
 
@@ -101,10 +99,7 @@ export const OM_THRESHOLDS = {
 export function buildTraderProfileExtractor(): Extractor<Record<string, unknown>> {
   const schema = z
     .object({
-      riskTolerance: z
-        .string()
-        .describe("conservative | moderate | aggressive")
-        .optional(),
+      riskTolerance: z.string().describe("conservative | moderate | aggressive").optional(),
       maxRiskPerTrade: z
         .string()
         .describe("e.g. 2% — durable stated cap, not a single trade")
@@ -113,18 +108,9 @@ export function buildTraderProfileExtractor(): Extractor<Record<string, unknown>
         .string()
         .describe("max portfolio allocation per position, e.g. 10%")
         .optional(),
-      defaultVenue: z
-        .string()
-        .describe(WORKING_MEMORY_LABELS.defaultVenue)
-        .optional(),
-      accountType: z
-        .string()
-        .describe("spot | margin | futures | cash")
-        .optional(),
-      marketFocus: z
-        .string()
-        .describe("crypto | stocks | mixed")
-        .optional(),
+      defaultVenue: z.string().describe(WORKING_MEMORY_LABELS.defaultVenue).optional(),
+      accountType: z.string().describe("spot | margin | futures | cash").optional(),
+      marketFocus: z.string().describe("crypto | stocks | mixed").optional(),
       baseCurrency: z.string().describe("e.g. USD or USDT").optional(),
       preferredTimeframes: z.string().optional(),
     })

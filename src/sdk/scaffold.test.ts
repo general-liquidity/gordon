@@ -48,7 +48,11 @@ describe("scaffoldProject", () => {
 
   test("the strategy starter does not arm live trading", async () => {
     const target = tmpTarget();
-    await scaffoldProject(target, { name: "demo-project", template: "strategy", packageManager: "bun" });
+    await scaffoldProject(target, {
+      name: "demo-project",
+      template: "strategy",
+      packageManager: "bun",
+    });
     const source = readFileSync(path.join(target, "src", "index.ts"), "utf-8");
     expect(source).not.toContain("gordon.arm(");
     expect(source).not.toContain("gordon.disarm(");
@@ -56,7 +60,11 @@ describe("scaffoldProject", () => {
 
   test("writes a package.json that parses and carries the project name", async () => {
     const target = tmpTarget();
-    await scaffoldProject(target, { name: "demo-project", template: "agent", packageManager: "npm" });
+    await scaffoldProject(target, {
+      name: "demo-project",
+      template: "agent",
+      packageManager: "npm",
+    });
     const pkg = JSON.parse(readFileSync(path.join(target, "package.json"), "utf-8"));
     expect(pkg.name).toBe("demo-project");
     expect(pkg.scripts.postinstall).toBeUndefined();

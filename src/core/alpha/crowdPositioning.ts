@@ -137,8 +137,8 @@ export interface CrowdPositioningVerdict {
  * classes will want smaller numbers; in altcoin perp meta during
  * speculative blowoffs, 100%+ funding is common.
  */
-const FUNDING_RATE_MILD = 0.10;
-const FUNDING_RATE_STRONG = 0.30;
+const FUNDING_RATE_MILD = 0.1;
+const FUNDING_RATE_STRONG = 0.3;
 
 /**
  * Z-score thresholds. ±1.5 = elevated, ±3 = extreme. Matches the
@@ -148,8 +148,8 @@ const Z_MILD = 1.5;
 const Z_STRONG = 3.0;
 
 /** OI change thresholds (fraction). */
-const OI_MILD = 0.10;
-const OI_STRONG = 0.30;
+const OI_MILD = 0.1;
+const OI_STRONG = 0.3;
 
 /** Sentiment thresholds. */
 const SENTIMENT_MILD = 0.3;
@@ -167,11 +167,7 @@ const SEVERITY_ELEVATED = 0.7;
  * Score a single value into a -1..+1 contribution, mapped through
  * mild/strong thresholds. Returns 0 when input is null/undefined.
  */
-function scoreThresholded(
-  value: number | undefined,
-  mild: number,
-  strong: number,
-): number {
+function scoreThresholded(value: number | undefined, mild: number, strong: number): number {
   if (value === undefined || Number.isNaN(value)) return 0;
   const sign = Math.sign(value);
   const mag = Math.abs(value);
@@ -300,7 +296,10 @@ export function summarizeCrowdPositioning(v: CrowdPositioningVerdict): string {
     return `Crowd positioning: balanced (netScore=${v.netScore.toFixed(2)}, ${v.signalCount} signal${v.signalCount === 1 ? "" : "s"}). No Shapiro setup.`;
   }
   const trappedSide = v.side === "long" ? "longs" : "shorts";
-  const exitMove = v.expectedExitDirection === "down" ? "downward (longs liquidating)" : "upward (shorts covering)";
+  const exitMove =
+    v.expectedExitDirection === "down"
+      ? "downward (longs liquidating)"
+      : "upward (shorts covering)";
   const tradeSide = v.expectedExitDirection === "down" ? "short" : "long";
   return `Crowd positioning: ${trappedSide} ${v.concentration}-concentrated (netScore=${v.netScore.toFixed(2)}). Expected exit move ${exitMove}; Shapiro trade is ${tradeSide} on the move start.`;
 }

@@ -54,7 +54,7 @@ export class VWAPBounceStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, 100);
     if (candles.length < 30) {
@@ -77,7 +77,7 @@ export class VWAPBounceStrategy extends BaseStrategy {
 
     if (distanceToVWAP > VWAP_TOUCH_THRESHOLD) {
       return this.notDetected(
-        `Price too far from VWAP (${(distanceToVWAP * 100).toFixed(2)}% vs ${VWAP_TOUCH_THRESHOLD * 100}% threshold)`
+        `Price too far from VWAP (${(distanceToVWAP * 100).toFixed(2)}% vs ${VWAP_TOUCH_THRESHOLD * 100}% threshold)`,
       );
     }
 
@@ -91,7 +91,7 @@ export class VWAPBounceStrategy extends BaseStrategy {
     const rsi = this.calculateRSI(candles);
     if (rsi.current !== null && rsi.current < RSI_PULLBACK_LOW) {
       return this.notDetected(
-        `RSI too low (${rsi.current.toFixed(1)} < ${RSI_PULLBACK_LOW}) - possible capitulation`
+        `RSI too low (${rsi.current.toFixed(1)} < ${RSI_PULLBACK_LOW}) - possible capitulation`,
       );
     }
 
@@ -173,7 +173,7 @@ export class VWAPBounceStrategy extends BaseStrategy {
    */
   private detectPullbackToVWAP(
     candles: { close: number; high: number }[],
-    vwapValues: (number | null)[]
+    vwapValues: (number | null)[],
   ): boolean {
     // Look at last 10 candles
     const lookback = Math.min(10, candles.length);
@@ -196,7 +196,7 @@ export class VWAPBounceStrategy extends BaseStrategy {
    */
   private countVWAPTouches(
     candles: { low: number; high: number }[],
-    vwapValues: (number | null)[]
+    vwapValues: (number | null)[],
   ): number {
     let touches = 0;
     const threshold = 0.003; // 0.3% considered a touch
@@ -232,10 +232,7 @@ export class VWAPBounceStrategy extends BaseStrategy {
     return true;
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "1h", 100);
     const currentPrice = this.getCurrentPrice(candles, ctx);
 
@@ -265,7 +262,8 @@ export class VWAPBounceStrategy extends BaseStrategy {
       stopLoss,
       takeProfits,
       riskRewardRatio,
-      notes: `VWAP bounce trade. VWAP at $${(vwap.current ?? 0).toFixed(2)}. ` +
+      notes:
+        `VWAP bounce trade. VWAP at $${(vwap.current ?? 0).toFixed(2)}. ` +
         `Stop below recent swing at $${stopLoss.toFixed(2)}. R:R ${riskRewardRatio.toFixed(1)}:1`,
     };
   }
@@ -325,7 +323,7 @@ When creating a plan using the VWAP Bounce strategy:
     bar: OHLC,
     _index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     const price = bar.close;
     const { rsi14, vwap, sma20, nearestResistance } = indicators;
@@ -386,14 +384,7 @@ When creating a plan using the VWAP Bounce strategy:
    * Get required indicators for backtesting.
    */
   override getRequiredIndicators(): string[] {
-    return [
-      "vwap",
-      "sma20",
-      "rsi14",
-      "atr14",
-      "volumeRatio",
-      "nearestResistance",
-    ];
+    return ["vwap", "sma20", "rsi14", "atr14", "volumeRatio", "nearestResistance"];
   }
 }
 

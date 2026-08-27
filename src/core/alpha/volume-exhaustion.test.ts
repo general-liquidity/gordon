@@ -99,8 +99,8 @@ describe("detectVolumeExhaustion", () => {
       baselineMeanVolUSD: 1_000_000,
       currentMeanVolUSD: 850_000,
       postEntryCandles: 10,
-      mildDropThreshold: 0.10,
-      severeDropThreshold: 0.20,
+      mildDropThreshold: 0.1,
+      severeDropThreshold: 0.2,
     });
     expect(r.severity).toBe("mild");
     expect(r.action).toBe("scale_out");

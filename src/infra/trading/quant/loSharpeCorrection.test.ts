@@ -1,12 +1,9 @@
 import { describe, it, expect } from "bun:test";
-import {
-  computeLoSharpeCorrection,
-  loSharpeCorrectionToPayload,
-} from "./loSharpeCorrection.ts";
+import { computeLoSharpeCorrection, loSharpeCorrectionToPayload } from "./loSharpeCorrection.ts";
 
 // Deterministic RNG for synthetic returns.
 function makeRng(seed: number): () => number {
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   return () => {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return s / 0x100000000;
@@ -53,9 +50,7 @@ describe("computeLoSharpeCorrection — positive serial correlation shrinks Shar
       maxLag: 10,
     });
     // Positive serial correlation → corrected Sharpe smaller in magnitude than naive
-    expect(Math.abs(r.correctedAnnualisedSharpe)).toBeLessThan(
-      Math.abs(r.naiveAnnualisedSharpe),
-    );
+    expect(Math.abs(r.correctedAnnualisedSharpe)).toBeLessThan(Math.abs(r.naiveAnnualisedSharpe));
     expect(r.correctionRatio).toBeLessThan(1);
     // First-lag autocorrelation should reflect the AR(1) coefficient
     expect(r.autocorrelations[0]!).toBeGreaterThan(0.2);
@@ -109,14 +104,10 @@ describe("computeLoSharpeCorrection — autocorrelation accuracy", () => {
 
 describe("computeLoSharpeCorrection — validation", () => {
   it("throws on N < 2", () => {
-    expect(() =>
-      computeLoSharpeCorrection({ returns: [0.01], periodsPerYear: 252 }),
-    ).toThrow();
+    expect(() => computeLoSharpeCorrection({ returns: [0.01], periodsPerYear: 252 })).toThrow();
   });
   it("throws on non-positive periodsPerYear", () => {
-    expect(() =>
-      computeLoSharpeCorrection({ returns: [0.01, 0.02], periodsPerYear: 0 }),
-    ).toThrow();
+    expect(() => computeLoSharpeCorrection({ returns: [0.01, 0.02], periodsPerYear: 0 })).toThrow();
   });
 });
 

@@ -1,16 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import {
-  redactDeep,
-  redactString,
-  redactValues,
-  REDACTION_PLACEHOLDER,
-} from "./valueRedaction.ts";
+import { redactDeep, redactString, redactValues, REDACTION_PLACEHOLDER } from "./valueRedaction.ts";
 
 describe("redactValues — Anthropic API keys", () => {
   test("redacts sk-ant-api01 prefix", () => {
-    const result = redactValues(
-      "the key is sk-ant-api01-aaaaaaaaaaaaaaaaaaaaaaaa and that's it",
-    );
+    const result = redactValues("the key is sk-ant-api01-aaaaaaaaaaaaaaaaaaaaaaaa and that's it");
     expect(result.text).toContain(REDACTION_PLACEHOLDER);
     expect(result.text).not.toContain("aaaaaaaaaaaa");
     expect(result.matched).toContain("anthropic_api_key");
@@ -69,16 +62,12 @@ describe("redactValues — AWS", () => {
   test("aws_secret_access_key only matches with prefix", () => {
     // 40-char base64-ish without prefix should NOT be redacted as AWS
     // secret (too ambiguous — would false-positive on hashes).
-    const result = redactValues(
-      "random 40-char string: abcd1234abcd1234abcd1234abcd1234abcd1234",
-    );
+    const result = redactValues("random 40-char string: abcd1234abcd1234abcd1234abcd1234abcd1234");
     expect(result.matched).not.toContain("aws_secret_access_key");
   });
 
   test("aws_secret_access_key matches when prefixed", () => {
-    const result = redactValues(
-      "aws_secret_access_key=abcd1234abcd1234abcd1234abcd1234abcd1234",
-    );
+    const result = redactValues("aws_secret_access_key=abcd1234abcd1234abcd1234abcd1234abcd1234");
     expect(result.matched).toContain("aws_secret_access_key");
     // The secret value should be replaced, but the key-name preserved.
     expect(result.text).toContain("aws_secret_access_key=");
@@ -101,7 +90,8 @@ describe("redactValues — Slack tokens", () => {
 
 describe("redactValues — JWTs", () => {
   test("redacts a three-segment JWT", () => {
-    const jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+    const jwt =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
     const result = redactValues(`token: ${jwt} done`);
     expect(result.matched).toContain("jwt");
     expect(result.text).not.toContain("eyJhbGciOi");
@@ -110,9 +100,7 @@ describe("redactValues — JWTs", () => {
 
 describe("redactValues — Bearer header", () => {
   test("redacts Bearer value, preserves prefix", () => {
-    const result = redactValues(
-      "Authorization: Bearer abcdef1234567890.token-value here",
-    );
+    const result = redactValues("Authorization: Bearer abcdef1234567890.token-value here");
     expect(result.matched).toContain("bearer_token");
     // Operator should still see "Authorization: Bearer ..." surface,
     // just without the actual token.

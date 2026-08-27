@@ -8,7 +8,6 @@
  * Pattern: Claude Code analysis results with quality scoring.
  */
 
-import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Pane } from "../../design-system/Pane.js";
 import { ProgressBar } from "../../design-system/ProgressBar.js";
@@ -79,17 +78,39 @@ export function WalkForwardResults({ windows, overallScore, onClose }: Props) {
         </Box>
         <ProgressBar value={overallScore / 100} width={20} fillColor={scoreColor(overallScore)} />
         <Text> </Text>
-        <Text bold color={scoreColor(overallScore)}>{overallScore}/100</Text>
+        <Text bold color={scoreColor(overallScore)}>
+          {overallScore}/100
+        </Text>
       </Box>
       <Text> </Text>
 
       {/* Column headers */}
       <Box>
-        <Box width={8}><Text bold dimColor>WINDOW</Text></Box>
-        <Box width={14}><Text bold dimColor>IN-SAMPLE RET</Text></Box>
-        <Box width={15}><Text bold dimColor>OUT-SAMPLE RET</Text></Box>
-        <Box width={14}><Text bold dimColor>IN-SAMPLE SR</Text></Box>
-        <Box width={15}><Text bold dimColor>OUT-SAMPLE SR</Text></Box>
+        <Box width={8}>
+          <Text bold dimColor>
+            WINDOW
+          </Text>
+        </Box>
+        <Box width={14}>
+          <Text bold dimColor>
+            IN-SAMPLE RET
+          </Text>
+        </Box>
+        <Box width={15}>
+          <Text bold dimColor>
+            OUT-SAMPLE RET
+          </Text>
+        </Box>
+        <Box width={14}>
+          <Text bold dimColor>
+            IN-SAMPLE SR
+          </Text>
+        </Box>
+        <Box width={15}>
+          <Text bold dimColor>
+            OUT-SAMPLE SR
+          </Text>
+        </Box>
       </Box>
 
       {/* Data rows */}
@@ -128,7 +149,11 @@ export function WalkForwardResults({ windows, overallScore, onClose }: Props) {
           {windows.length} windows {"\u00b7"}{" "}
         </Text>
         <Text color={scoreColor(overallScore)}>
-          {overallScore >= 70 ? "Robust strategy" : overallScore >= 40 ? "Moderate robustness" : "Poor robustness \u2014 consider refit"}
+          {overallScore >= 70
+            ? "Robust strategy"
+            : overallScore >= 40
+              ? "Moderate robustness"
+              : "Poor robustness \u2014 consider refit"}
         </Text>
       </Box>
 

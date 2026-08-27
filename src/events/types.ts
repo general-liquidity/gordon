@@ -4,11 +4,7 @@
  */
 
 import type { Plan, Trade } from "../types/index.ts";
-import type {
-  PositionRecord,
-  PositionState,
-  TradeReview,
-} from "../core/positions/types.ts";
+import type { PositionRecord, PositionState, TradeReview } from "../core/positions/types.ts";
 
 /**
  * Base event interface

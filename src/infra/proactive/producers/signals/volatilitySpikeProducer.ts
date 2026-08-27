@@ -43,8 +43,7 @@ type ATRResult = {
 };
 
 async function loadAtrCalculator(): Promise<
-  | ((candles: unknown[], period?: number) => ATRResult)
-  | null
+  ((candles: unknown[], period?: number) => ATRResult) | null
 > {
   try {
     const mod = (await import("../../../../core/indicators/atr.ts" as string)) as {
@@ -58,7 +57,9 @@ async function loadAtrCalculator(): Promise<
   }
 }
 
-export const volatilitySpikeProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
+export const volatilitySpikeProducer: CandidateProducer = async (
+  obs,
+): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop" || obs.eventType !== "tick_volatility") return [];
 
   const calculateATR = await loadAtrCalculator();

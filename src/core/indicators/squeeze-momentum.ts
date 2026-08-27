@@ -75,7 +75,10 @@ function linRegSlope(values: number[], period: number): number {
   if (values.length < period) return 0;
   const y = values.slice(-period);
   const n = y.length;
-  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+  let sumX = 0,
+    sumY = 0,
+    sumXY = 0,
+    sumX2 = 0;
   for (let i = 0; i < n; i++) {
     sumX += i;
     sumY += y[i]!;
@@ -104,7 +107,7 @@ export function calculateSqueezeMomentum(
   bbMult: number = 2.0,
   kcLength: number = 20,
   kcMult: number = 1.5,
-  momLength: number = 12
+  momLength: number = 12,
 ): SqueezeMomentumResult {
   if (candles.length < Math.max(bbLength, kcLength, momLength) + 5) {
     return {
@@ -119,9 +122,9 @@ export function calculateSqueezeMomentum(
     };
   }
 
-  const closes = candles.map(c => c.close);
-  const highs = candles.map(c => c.high);
-  const lows = candles.map(c => c.low);
+  const closes = candles.map((c) => c.close);
+  const highs = candles.map((c) => c.high);
+  const lows = candles.map((c) => c.low);
 
   // Bollinger Bands
   const bbSma = sma(closes, bbLength);
@@ -134,7 +137,7 @@ export function calculateSqueezeMomentum(
     const tr = Math.max(
       highs[i]! - lows[i]!,
       Math.abs(highs[i]! - closes[i - 1]!),
-      Math.abs(lows[i]! - closes[i - 1]!)
+      Math.abs(lows[i]! - closes[i - 1]!),
     );
     trValues.push(tr);
   }
@@ -220,14 +223,20 @@ export function calculateSqueezeMomentum(
   else if (!squeezeOn && currentMom > 0 && momentumColor === "lime") signal = "buy";
   else if (!squeezeOn && currentMom < 0 && momentumColor === "maroon") signal = "sell";
 
-  const interpretation = buildSqueezeInterpretation(squeezeOn, squeezeFired, currentMom, momentumColor, signal);
+  const interpretation = buildSqueezeInterpretation(
+    squeezeOn,
+    squeezeFired,
+    currentMom,
+    momentumColor,
+    signal,
+  );
 
   return {
     squeezeOn,
     squeezeFired,
     momentum: parseFloat(currentMom.toFixed(4)),
     momentumColor,
-    momentumValues: momSlopes.map(v => parseFloat(v.toFixed(4))),
+    momentumValues: momSlopes.map((v) => parseFloat(v.toFixed(4))),
     squeezeStates,
     signal,
     interpretation,
@@ -239,7 +248,7 @@ function buildSqueezeInterpretation(
   fired: boolean,
   mom: number,
   color: string,
-  signal: string
+  signal: string,
 ): string {
   let msg = "";
   if (fired) {

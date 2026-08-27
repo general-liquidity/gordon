@@ -27,16 +27,12 @@
 
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { getEventBus } from "../../events/bus.ts";
-import {
-  PositionSizer,
-  DailyLimitTracker,
-  DrawdownTracker,
-} from "../risk-management/index.ts";
+import { DailyLimitTracker, DrawdownTracker } from "../risk-management/index.ts";
 import { CorrelationChecker } from "./correlation.ts";
-import { RiskAuditLog, riskAuditLog } from "./audit.ts";
+import { type RiskAuditLog, riskAuditLog } from "./audit.ts";
 import type { RiskKernelConfig } from "./config.ts";
 import { DEFAULT_RISK_CONFIG, resolveLiveSafeMode } from "./config.ts";
-import type { PortfolioContext, OpenPosition } from "./portfolio-context.ts";
+import type { PortfolioContext } from "./portfolio-context.ts";
 import type { RiskCheck, RiskDecision, OrderRequest } from "./audit.ts";
 
 const logger = createModuleLogger("risk-kernel");
@@ -47,15 +43,11 @@ const logger = createModuleLogger("risk-kernel");
 
 export class RiskKernel {
   private config: RiskKernelConfig;
-  private positionSizer: PositionSizer;
   private correlationChecker: CorrelationChecker;
   private auditLog: RiskAuditLog;
 
   constructor(config?: Partial<RiskKernelConfig>) {
     this.config = { ...DEFAULT_RISK_CONFIG, ...config };
-    this.positionSizer = new PositionSizer({
-      maxPositionSize: this.config.maxPositionSizeUsd,
-    });
     this.correlationChecker = new CorrelationChecker();
     this.auditLog = riskAuditLog;
 
@@ -109,10 +101,7 @@ export class RiskKernel {
     // `warn` mode (from config/env) is upgraded to `enforce` on a non-sandbox
     // venue so hard sizing caps cannot be silently disabled on real capital.
     const requestedMode = opts?.modeOverride ?? this.config.mode;
-    const effectiveMode = resolveLiveSafeMode(
-      requestedMode,
-      opts?.sandboxActive ?? false,
-    );
+    const effectiveMode = resolveLiveSafeMode(requestedMode, opts?.sandboxActive ?? false);
 
     if (effectiveMode === "paper") {
       // Paper mode: always approve
@@ -159,9 +148,7 @@ export class RiskKernel {
         // Rather than maintain a list of which checks a resize can fix, which
         // would drift as checks are added, re-run every check against the
         // adjusted order and require it to come back clean.
-        const candidate = this.config.autoAdjustSize
-          ? this.tryAdjustOrder(order, context)
-          : null;
+        const candidate = this.config.autoAdjustSize ? this.tryAdjustOrder(order, context) : null;
         let adjustedOrder: OrderRequest | null = null;
         let adjustedChecks: RiskCheck[] = [];
         if (candidate) {
@@ -234,22 +221,23 @@ export class RiskKernel {
     // Emit event
     this.emitDecision(decision);
 
-    // Audit log (fire and forget). If the caller threaded a decisionTrace
+    // Persist the audit before returning the decision. Fire-and-forget writes
+    // raced database rotation in eval sandboxes: cleanup could close or remove
+    // the SQLite file while the insert was still pending, losing the record.
+    // RiskAuditLog.log contains its own error boundary, so awaiting durability
+    // does not turn an audit-storage fault into an order approval/refusal.
+    // If the caller threaded a decisionTrace
     // into order.metadata (via `withDecisionTrace`), pull it out and pass
     // it alongside so reasoning chains persist without a schema change.
     const auditId = `ra_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const decisionTrace = order.metadata?.decisionTrace as
-      | Record<string, unknown>
-      | undefined;
-    this.auditLog.log({
+    const decisionTrace = order.metadata?.decisionTrace as Record<string, unknown> | undefined;
+    await this.auditLog.log({
       id: auditId,
       timestamp: decision.timestamp,
       order,
       decision,
       portfolioSnapshot: context,
       ...(decisionTrace ? { decisionTrace } : {}),
-    }).catch((err) => {
-      logger.error("Failed to write audit log", err as Error);
     });
 
     const durationMs = performance.now() - startTime;
@@ -365,7 +353,7 @@ export class RiskKernel {
    * Check if portfolio drawdown has exceeded the configured limit.
    * Uses the DrawdownTracker for peak-to-trough tracking.
    */
-  private checkDrawdownLimit(order: OrderRequest, context: PortfolioContext): RiskCheck {
+  private checkDrawdownLimit(_order: OrderRequest, context: PortfolioContext): RiskCheck {
     const tracker = new DrawdownTracker({
       maxDrawdownPercent: this.config.maxDrawdownPercent,
     });
@@ -446,7 +434,10 @@ export class RiskKernel {
   /**
    * Check if adding this position creates too much correlated exposure.
    */
-  private async checkCorrelation(order: OrderRequest, context: PortfolioContext): Promise<RiskCheck> {
+  private async checkCorrelation(
+    order: OrderRequest,
+    context: PortfolioContext,
+  ): Promise<RiskCheck> {
     const side = order.side === "buy" ? "long" : "short";
 
     const result = await this.correlationChecker.checkCorrelation(
@@ -454,7 +445,7 @@ export class RiskKernel {
       side as "long" | "short",
       context.openPositions,
       this.config.maxCorrelatedExposure,
-      context.totalEquity
+      context.totalEquity,
     );
 
     // A check that threw measured nothing, so it cannot contribute a pass.
@@ -557,7 +548,7 @@ export class RiskKernel {
     // Calculate effective leverage: total position value / equity
     const totalPositionValue = context.openPositions.reduce(
       (sum, p) => sum + p.size * p.currentPrice,
-      0
+      0,
     );
     const newOrderValue = this.estimateOrderValueUsd(order, context);
     if (newOrderValue === undefined) {
@@ -565,9 +556,7 @@ export class RiskKernel {
     }
     const totalAfterOrder = totalPositionValue + newOrderValue;
 
-    const effectiveLeverage = context.totalEquity > 0
-      ? totalAfterOrder / context.totalEquity
-      : 0;
+    const effectiveLeverage = context.totalEquity > 0 ? totalAfterOrder / context.totalEquity : 0;
 
     if (effectiveLeverage > this.config.maxLeverage) {
       return {
@@ -638,10 +627,7 @@ export class RiskKernel {
   // ==========================================================================
 
   /** Every risk check, in order, against one candidate order. */
-  private async runChecks(
-    order: OrderRequest,
-    context: PortfolioContext,
-  ): Promise<RiskCheck[]> {
+  private async runChecks(order: OrderRequest, context: PortfolioContext): Promise<RiskCheck[]> {
     return [
       this.checkPositionSize(order, context),
       this.checkDailyLossLimit(order, context),
@@ -658,14 +644,12 @@ export class RiskKernel {
    * Try to adjust the order size to fit within risk limits.
    * Returns the adjusted order, or null if no viable adjustment exists.
    */
-  private tryAdjustOrder(
-    order: OrderRequest,
-    context: PortfolioContext,
-  ): OrderRequest | null {
+  private tryAdjustOrder(order: OrderRequest, context: PortfolioContext): OrderRequest | null {
     let adjustedQuantity = order.quantity;
-    const orderPrice = order.price && order.price > 0
-      ? order.price
-      : context.openPositions.find((p) => p.symbol === order.symbol)?.currentPrice ?? 0;
+    const orderPrice =
+      order.price && order.price > 0
+        ? order.price
+        : (context.openPositions.find((p) => p.symbol === order.symbol)?.currentPrice ?? 0);
 
     // An order that cannot be priced cannot be meaningfully resized: halving an
     // unpriced base quantity does not bring it under a dollar cap, it just
@@ -676,9 +660,10 @@ export class RiskKernel {
 
     // Adjust for position size limits
     const maxByUsd = this.config.maxPositionSizeUsd;
-    const maxByPercent = context.totalEquity > 0
-      ? context.totalEquity * (this.config.maxPositionSizePercent / 100)
-      : Infinity;
+    const maxByPercent =
+      context.totalEquity > 0
+        ? context.totalEquity * (this.config.maxPositionSizePercent / 100)
+        : Infinity;
     const maxPositionValue = Math.min(maxByUsd, maxByPercent);
 
     if (currentOrderValue > maxPositionValue) {
@@ -715,12 +700,8 @@ export class RiskKernel {
     // oversized order cut to a size that still breached, and the breach was
     // only caught by the re-check that now follows every adjustment.
     if (this.config.maxLeverage > 0 && context.totalEquity > 0) {
-      const heldValue = context.openPositions.reduce(
-        (sum, p) => sum + p.size * p.currentPrice,
-        0,
-      );
-      const leverageRoom =
-        this.config.maxLeverage * context.totalEquity - heldValue;
+      const heldValue = context.openPositions.reduce((sum, p) => sum + p.size * p.currentPrice, 0);
+      const leverageRoom = this.config.maxLeverage * context.totalEquity - heldValue;
       if (leverageRoom <= 0) return null;
       if (adjustedQuantity * orderPrice > leverageRoom) {
         adjustedQuantity = leverageRoom / orderPrice;
@@ -769,28 +750,32 @@ export class RiskKernel {
       const bus = getEventBus();
 
       if (decision.approved) {
-        bus.emit({
-          type: "risk:approved",
-          timestamp: decision.timestamp,
-          symbol: decision.originalOrder.symbol,
-          action: decision.action as "approve" | "modify",
-          agentId: decision.originalOrder.agentId,
-          checks: decision.checks.length,
-          reason: decision.reason,
-        }).catch((err) => {
-          logger.error("Failed to emit risk:approved event", err as Error);
-        });
+        bus
+          .emit({
+            type: "risk:approved",
+            timestamp: decision.timestamp,
+            symbol: decision.originalOrder.symbol,
+            action: decision.action as "approve" | "modify",
+            agentId: decision.originalOrder.agentId,
+            checks: decision.checks.length,
+            reason: decision.reason,
+          })
+          .catch((err) => {
+            logger.error("Failed to emit risk:approved event", err as Error);
+          });
       } else {
-        bus.emit({
-          type: "risk:rejected",
-          timestamp: decision.timestamp,
-          symbol: decision.originalOrder.symbol,
-          agentId: decision.originalOrder.agentId,
-          checks: decision.checks.filter((c) => !c.passed).map((c) => c.name),
-          reason: decision.reason,
-        }).catch((err) => {
-          logger.error("Failed to emit risk:rejected event", err as Error);
-        });
+        bus
+          .emit({
+            type: "risk:rejected",
+            timestamp: decision.timestamp,
+            symbol: decision.originalOrder.symbol,
+            agentId: decision.originalOrder.agentId,
+            checks: decision.checks.filter((c) => !c.passed).map((c) => c.name),
+            reason: decision.reason,
+          })
+          .catch((err) => {
+            logger.error("Failed to emit risk:rejected event", err as Error);
+          });
       }
     } catch (error) {
       // Event emission should never block order processing
@@ -813,7 +798,10 @@ export class RiskKernel {
    * dollar-denominated checks can fail closed instead of comparing a limit
    * against a number that is wrong by orders of magnitude.
    */
-  private estimateOrderValueUsd(order: OrderRequest, context: PortfolioContext): number | undefined {
+  private estimateOrderValueUsd(
+    order: OrderRequest,
+    context: PortfolioContext,
+  ): number | undefined {
     if (order.price && order.price > 0) {
       return order.quantity * order.price;
     }
@@ -851,9 +839,6 @@ export class RiskKernel {
 
     // Update position sizer if max size changed
     if (updates.maxPositionSizeUsd !== undefined) {
-      this.positionSizer = new PositionSizer({
-        maxPositionSize: this.config.maxPositionSizeUsd,
-      });
     }
 
     logger.debug("Risk kernel config updated", updates);

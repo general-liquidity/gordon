@@ -41,7 +41,11 @@ function normalizeShortcutTokens(input: string): string[] {
 }
 
 function matchesRepeatedPhrase(tokens: string[], phraseTokens: string[]): boolean {
-  if (tokens.length === 0 || phraseTokens.length === 0 || tokens.length % phraseTokens.length !== 0) {
+  if (
+    tokens.length === 0 ||
+    phraseTokens.length === 0 ||
+    tokens.length % phraseTokens.length !== 0
+  ) {
     return false;
   }
 
@@ -95,9 +99,10 @@ export function parseRuntimeApprovalShortcut(input: string): RuntimeApprovalShor
   const remainder = tokens.slice(2);
   const persistIndex = remainder.findIndex((token) => token.toLowerCase() === "persist");
   const persist = persistIndex >= 0;
-  const reasonTokens = verb === "approve"
-    ? []
-    : remainder.filter((token, index) => !(persist && index === persistIndex));
+  const reasonTokens =
+    verb === "approve"
+      ? []
+      : remainder.filter((_token, index) => !(persist && index === persistIndex));
 
   return {
     decision: verb === "approve" ? "approve" : "deny",

@@ -5,7 +5,8 @@ const lastDefined = (xs: (number | null)[]): number | null => {
   for (let i = xs.length - 1; i >= 0; i--) if (xs[i] != null) return xs[i]!;
   return null;
 };
-const allFinite = (xs: (number | null)[]): boolean => xs.every((v) => v === null || Number.isFinite(v));
+const allFinite = (xs: (number | null)[]): boolean =>
+  xs.every((v) => v === null || Number.isFinite(v));
 
 describe("Hull variants (EHMA / THMA)", () => {
   const ramp = Array.from({ length: 60 }, (_, i) => 100 + i);

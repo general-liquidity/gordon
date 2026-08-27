@@ -49,7 +49,9 @@ export const pcaConcentrationDiagnosticTool = createTool({
       .min(0)
       .max(1)
       .default(0.9)
-      .describe("Cumulative variance fraction used for the `nForCumulativeTarget` report. Default 0.9."),
+      .describe(
+        "Cumulative variance fraction used for the `nForCumulativeTarget` report. Default 0.9.",
+      ),
     topK: z
       .number()
       .int()
@@ -89,7 +91,12 @@ export const pcaConcentrationDiagnosticTool = createTool({
       source: "agent_tool",
       component: "compute_pca_concentration",
       toolName: "compute_pca_concentration",
-      outcome: result.verdict === "critical" ? "failure" : result.verdict === "concentrated" ? "info" : "success",
+      outcome:
+        result.verdict === "critical"
+          ? "failure"
+          : result.verdict === "concentrated"
+            ? "info"
+            : "success",
       details: { ...(pcaConcentrationToPayload(result) as Record<string, unknown>) },
     });
 

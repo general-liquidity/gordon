@@ -16,7 +16,13 @@
  * exists — this is the producer for that signal).
  */
 
-export type ZoneKind = "support" | "resistance" | "round_number" | "moving_average" | "session_high" | "session_low";
+export type ZoneKind =
+  | "support"
+  | "resistance"
+  | "round_number"
+  | "moving_average"
+  | "session_high"
+  | "session_low";
 
 export interface StructuralLevel {
   price: number;
@@ -114,7 +120,10 @@ export function mapLiquidity(input: LiquidityMapInput): LiquidityMapResult {
     } else if (level.kind === "round_number") {
       const side = level.price < input.currentPrice ? "below" : "above";
       zones.push({
-        price: side === "below" ? level.price - input.stopBufferPriceUnits : level.price + input.stopBufferPriceUnits,
+        price:
+          side === "below"
+            ? level.price - input.stopBufferPriceUnits
+            : level.price + input.stopBufferPriceUnits,
         side,
         strength: strengthFromLevel(level),
         sources: ["round_number"],

@@ -1,7 +1,11 @@
 import { describe, it, expect } from "bun:test";
 import { walkForwardIc } from "./walk-forward-ic.ts";
 
-function makeSignal(n: number, factor: (i: number) => number, noise = 0.005): {
+function makeSignal(
+  n: number,
+  factor: (i: number) => number,
+  noise = 0.005,
+): {
   sig: number[];
   ret: number[];
 } {
@@ -84,8 +88,7 @@ describe("walkForwardIc — unstable verdict", () => {
     });
     expect(result.validWindowCount).toBeGreaterThanOrEqual(5);
     // Std should be elevated OR negative streak should be long
-    const violatesStability =
-      result.stdIc > 0.2 || result.longestNegativeStreak > 5;
+    const violatesStability = result.stdIc > 0.2 || result.longestNegativeStreak > 5;
     if (violatesStability) {
       expect(result.verdict).toBe("unstable");
     } else {

@@ -77,7 +77,7 @@ function normalCDF(x: number): number {
 function chiSquaredPValue(statistic: number, df: number): number {
   if (df <= 0) return 1;
   // Wilson-Hilferty approximation
-  const z = Math.pow(statistic / df, 1 / 3) - (1 - 2 / (9 * df));
+  const z = (statistic / df) ** (1 / 3) - (1 - 2 / (9 * df));
   const denom = Math.sqrt(2 / (9 * df));
   if (denom === 0) return 1;
   const normalZ = z / denom;
@@ -113,7 +113,13 @@ export function ljungBoxTest(returns: number[], maxLag: number = 10): Efficiency
   const m = mean(returns);
   const gamma0 = returns.reduce((s, r) => s + (r - m) ** 2, 0) / n;
   if (gamma0 === 0) {
-    return { test: "Ljung-Box", statistic: 0, pValue: 1, rejectNull: false, interpretation: "Zero variance — no signal." };
+    return {
+      test: "Ljung-Box",
+      statistic: 0,
+      pValue: 1,
+      rejectNull: false,
+      interpretation: "Zero variance — no signal.",
+    };
   }
 
   let Q = 0;
@@ -179,7 +185,13 @@ export function varianceRatioTest(prices: number[], period: number = 5): Efficie
   // 1-period variance
   const var1 = variance(logReturns);
   if (var1 === 0) {
-    return { test: "Variance Ratio", statistic: 1, pValue: 1, rejectNull: false, interpretation: "Zero variance." };
+    return {
+      test: "Variance Ratio",
+      statistic: 1,
+      pValue: 1,
+      rejectNull: false,
+      interpretation: "Zero variance.",
+    };
   }
 
   // k-period returns
@@ -249,7 +261,13 @@ export function runsTest(returns: number[]): EfficiencyTestResult {
   const nNeg = signs.filter((s) => s === -1).length;
 
   if (nPos === 0 || nNeg === 0) {
-    return { test: "Runs Test", statistic: 0, pValue: 1, rejectNull: false, interpretation: "All returns same sign." };
+    return {
+      test: "Runs Test",
+      statistic: 0,
+      pValue: 1,
+      rejectNull: false,
+      interpretation: "All returns same sign.",
+    };
   }
 
   // Count runs (consecutive sequences of same sign)
@@ -261,12 +279,17 @@ export function runsTest(returns: number[]): EfficiencyTestResult {
   // Expected runs and standard deviation under H0
   const expectedRuns = 1 + (2 * nPos * nNeg) / (nPos + nNeg);
   const stdRuns = Math.sqrt(
-    (2 * nPos * nNeg * (2 * nPos * nNeg - nPos - nNeg)) /
-    ((nPos + nNeg) ** 2 * (nPos + nNeg - 1))
+    (2 * nPos * nNeg * (2 * nPos * nNeg - nPos - nNeg)) / ((nPos + nNeg) ** 2 * (nPos + nNeg - 1)),
   );
 
   if (stdRuns === 0) {
-    return { test: "Runs Test", statistic: 0, pValue: 1, rejectNull: false, interpretation: "Cannot compute." };
+    return {
+      test: "Runs Test",
+      statistic: 0,
+      pValue: 1,
+      rejectNull: false,
+      interpretation: "Cannot compute.",
+    };
   }
 
   const z = (runs - expectedRuns) / stdRuns;
@@ -302,10 +325,7 @@ export function runsTest(returns: number[]): EfficiencyTestResult {
  * @param prices Historical prices (oldest first).
  * @returns Full efficiency profile with tradeability score.
  */
-export function assessMarketEfficiency(
-  symbol: string,
-  prices: number[],
-): MarketEfficiencyProfile {
+export function assessMarketEfficiency(symbol: string, prices: number[]): MarketEfficiencyProfile {
   // Compute returns
   const returns: number[] = [];
   for (let i = 1; i < prices.length; i++) {

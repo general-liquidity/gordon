@@ -37,7 +37,9 @@ export function denoiseCovariance(covariance: number[][], observations: number):
   const q = observations / n;
   const sigma2 = decomposition.eigenvalues.reduce((sum, value) => sum + value, 0) / n;
   const band = marchenkoPasturBand(q, sigma2);
-  const noisy = decomposition.eigenvalues.filter((value) => value >= band.lower && value <= band.upper);
+  const noisy = decomposition.eigenvalues.filter(
+    (value) => value >= band.lower && value <= band.upper,
+  );
   const replacement = noisy.length
     ? noisy.reduce((sum, value) => sum + value, 0) / noisy.length
     : sigma2;

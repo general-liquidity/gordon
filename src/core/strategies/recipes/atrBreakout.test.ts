@@ -1,8 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  evaluateAtrBreakout,
-  DEFAULT_ATR_BREAKOUT_SETTINGS,
-} from "./atrBreakout.ts";
+import { evaluateAtrBreakout, DEFAULT_ATR_BREAKOUT_SETTINGS } from "./atrBreakout.ts";
 
 describe("evaluateAtrBreakout — invalid input", () => {
   it("returns invalid_input when atrLong <= 0", () => {
@@ -191,7 +188,9 @@ describe("evaluateAtrBreakout — defaults + diagnostics", () => {
       settings: { entryMultiplier: 3.0 },
     });
     expect(result.effectiveSettings.entryMultiplier).toBe(3.0);
-    expect(result.effectiveSettings.exitMultiplier).toBe(DEFAULT_ATR_BREAKOUT_SETTINGS.exitMultiplier);
+    expect(result.effectiveSettings.exitMultiplier).toBe(
+      DEFAULT_ATR_BREAKOUT_SETTINGS.exitMultiplier,
+    );
   });
 
   it("reports the expansion ratio in the result", () => {

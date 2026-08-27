@@ -232,9 +232,7 @@ function validateInput(input: TrendlineDetectionInput): {
     throw new Error(`minInliers must be an integer >= 2 (got ${minInliers})`);
   }
   if (minInliers > input.bars.length) {
-    throw new Error(
-      `minInliers (${minInliers}) cannot exceed bar count (${input.bars.length})`,
-    );
+    throw new Error(`minInliers (${minInliers}) cannot exceed bar count (${input.bars.length})`);
   }
   const tolerance = input.touchTolerance ?? 0.002;
   if (!Number.isFinite(tolerance) || tolerance < 0) {

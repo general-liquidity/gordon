@@ -41,8 +41,8 @@ describe("computePortfolioCombine — Parrondo / rebalancing premium", () => {
     // Two strategies that alternate winning/losing in opposite phases.
     // Each on its own is roughly flat; rebalanced combination should
     // harvest the spread.
-    const a = curveFromReturns([0.10, -0.08, 0.10, -0.08, 0.10, -0.08, 0.10, -0.08]);
-    const b = curveFromReturns([-0.08, 0.10, -0.08, 0.10, -0.08, 0.10, -0.08, 0.10]);
+    const a = curveFromReturns([0.1, -0.08, 0.1, -0.08, 0.1, -0.08, 0.1, -0.08]);
+    const b = curveFromReturns([-0.08, 0.1, -0.08, 0.1, -0.08, 0.1, -0.08, 0.1]);
     const r = computePortfolioCombine({
       equityCurves: [a, b],
       rebalanceCadence: "daily",
@@ -99,7 +99,12 @@ describe("computePortfolioCombine — error handling", () => {
 
   test("throws on mismatched curve lengths", () => {
     expect(() =>
-      computePortfolioCombine({ equityCurves: [[1, 1, 1], [1, 1]] }),
+      computePortfolioCombine({
+        equityCurves: [
+          [1, 1, 1],
+          [1, 1],
+        ],
+      }),
     ).toThrow(/length/);
   });
 
@@ -110,7 +115,10 @@ describe("computePortfolioCombine — error handling", () => {
   test("throws on weights not summing to 1", () => {
     expect(() =>
       computePortfolioCombine({
-        equityCurves: [[1, 1], [1, 1]],
+        equityCurves: [
+          [1, 1],
+          [1, 1],
+        ],
         weights: [0.3, 0.3],
       }),
     ).toThrow(/sum to 1/);
@@ -119,7 +127,10 @@ describe("computePortfolioCombine — error handling", () => {
   test("throws on weights length mismatch", () => {
     expect(() =>
       computePortfolioCombine({
-        equityCurves: [[1, 1], [1, 1]],
+        equityCurves: [
+          [1, 1],
+          [1, 1],
+        ],
         weights: [0.5, 0.3, 0.2],
       }),
     ).toThrow(/length/);

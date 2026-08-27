@@ -39,10 +39,7 @@ export const aggressionRatioDiagnosticTool = createTool({
       .number()
       .optional()
       .describe("Log-ratio threshold for strong_buy. Default 0.30."),
-    buyThreshold: z
-      .number()
-      .optional()
-      .describe("Log-ratio threshold for buy. Default 0.10."),
+    buyThreshold: z.number().optional().describe("Log-ratio threshold for buy. Default 0.10."),
     sellThreshold: z
       .number()
       .optional()
@@ -58,14 +55,7 @@ export const aggressionRatioDiagnosticTool = createTool({
     emaSellVolume: z.number(),
     ratio: z.number(),
     logRatio: z.number(),
-    verdict: z.enum([
-      "strong_buy",
-      "buy",
-      "neutral",
-      "sell",
-      "strong_sell",
-      "insufficient_data",
-    ]),
+    verdict: z.enum(["strong_buy", "buy", "neutral", "sell", "strong_sell", "insufficient_data"]),
     directionalBias: z.enum(["long", "short"]).nullable(),
     summary: z.string(),
   }),

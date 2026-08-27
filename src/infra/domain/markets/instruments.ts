@@ -56,11 +56,13 @@ function sanitizeCryptoSymbol(symbol: string): string {
 
 function isExplicitCryptoSyntax(symbol: string): boolean {
   const upper = symbol.trim().toUpperCase();
-  return /[/:_-]/.test(upper)
-    || upper.endsWith("PERP")
-    || FALLBACK_CRYPTO_QUOTES.some(
+  return (
+    /[/:_-]/.test(upper) ||
+    upper.endsWith("PERP") ||
+    FALLBACK_CRYPTO_QUOTES.some(
       (quote) => upper.length > quote.length && sanitizeCryptoSymbol(upper).endsWith(quote),
-    );
+    )
+  );
 }
 
 function looksLikeStockSymbol(symbol: string): boolean {
@@ -156,8 +158,9 @@ async function resolveExchangeInstrument(
     const catalog = await getExchangeCatalog(exchange);
     const normalizedInput = sanitizeCryptoSymbol(symbol);
     const exact = catalog.bySymbol.get(normalizedInput);
-    const matched = exact
-      ?? choosePreferredExchangeSymbol(catalog.byBaseAsset.get(sanitizeStockSymbol(symbol)) ?? []);
+    const matched =
+      exact ??
+      choosePreferredExchangeSymbol(catalog.byBaseAsset.get(sanitizeStockSymbol(symbol)) ?? []);
 
     if (!matched) return null;
 
@@ -187,7 +190,8 @@ async function brokerSymbolExists(broker: BrokerAdapter, symbol: string): Promis
 
   let probe = cache.get(normalized);
   if (!probe) {
-    probe = broker.getLatestQuote(normalized)
+    probe = broker
+      .getLatestQuote(normalized)
       .then(() => true)
       .catch(() => false);
     cache.set(normalized, probe);
@@ -278,9 +282,8 @@ export async function resolveInstrument(
 
   return {
     rawSymbol: symbol,
-    normalizedSymbol: marketFamily === "crypto"
-      ? normalizeCryptoFallback(symbol)
-      : sanitizeStockSymbol(symbol),
+    normalizedSymbol:
+      marketFamily === "crypto" ? normalizeCryptoFallback(symbol) : sanitizeStockSymbol(symbol),
     marketFamily,
     route: marketFamily === "crypto" ? "exchange" : "broker",
     resolutionSource: "heuristic",
@@ -293,8 +296,15 @@ export function resolveMarketVenue(
   symbol?: string,
   preferredMarket?: IntegrationMarketFamily,
 ): ResolvedMarketVenue | null {
-  const marketFamily = preferredMarket
-    ?? (symbol ? inferMarketFamily(ctx, symbol) : ctx.exchange ? "crypto" : ctx.broker ? "stocks" : undefined);
+  const marketFamily =
+    preferredMarket ??
+    (symbol
+      ? inferMarketFamily(ctx, symbol)
+      : ctx.exchange
+        ? "crypto"
+        : ctx.broker
+          ? "stocks"
+          : undefined);
 
   if (!marketFamily) return null;
   if (marketFamily === "crypto" && ctx.exchange) {
@@ -321,7 +331,6 @@ export function isValidTradingSymbol(symbol: string): boolean {
   const normalizedStock = sanitizeStockSymbol(symbol);
   const normalizedCrypto = sanitizeCryptoSymbol(symbol);
   return (
-    /^[A-Z][A-Z0-9.-]{0,14}$/.test(normalizedStock)
-    || /^[A-Z0-9]{3,24}$/.test(normalizedCrypto)
+    /^[A-Z][A-Z0-9.-]{0,14}$/.test(normalizedStock) || /^[A-Z0-9]{3,24}$/.test(normalizedCrypto)
   );
 }

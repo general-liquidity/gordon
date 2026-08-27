@@ -14,7 +14,9 @@ function c(close: number, opts: { high?: number; low?: number; volume?: number }
 }
 
 /** Steady uptrend, then breakdown — enough bars to seat the 50 EMA. */
-function uptrendThenBreakdown(steps: { phase: "up" | "side" | "down"; bars: number; rate: number }[]): Candle[] {
+function uptrendThenBreakdown(
+  steps: { phase: "up" | "side" | "down"; bars: number; rate: number }[],
+): Candle[] {
   const closes: number[] = [];
   let price = 100;
   for (const step of steps) {
@@ -107,8 +109,14 @@ describe("calculateTrimState", () => {
     // into the rally so spot has cleanly crossed above the EMA.
     const closes: number[] = [];
     let p = 100;
-    for (let i = 0; i < 30; i++) { p = p * 0.98; closes.push(p); }
-    for (let i = 0; i < 60; i++) { p = p * 1.02; closes.push(p); }
+    for (let i = 0; i < 30; i++) {
+      p = p * 0.98;
+      closes.push(p);
+    }
+    for (let i = 0; i < 60; i++) {
+      p = p * 1.02;
+      closes.push(p);
+    }
     const candles = closes.map((x) => c(x));
     const r = calculateTrimState(candles, { entryBarIndex: 45 });
     expect(r.closesBelowEma8SinceEntry).toBe(0);

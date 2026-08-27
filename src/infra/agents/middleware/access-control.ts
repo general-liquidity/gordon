@@ -20,7 +20,11 @@ import {
 
 const logger = createModuleLogger("access-control");
 
-function safeAuditBlocked(userId: string, parameters: Record<string, unknown>, reason: string): void {
+function safeAuditBlocked(
+  userId: string,
+  parameters: Record<string, unknown>,
+  reason: string,
+): void {
   try {
     auditLog.blocked(userId, "ACCESS_DENIED", parameters, reason);
   } catch {
@@ -36,14 +40,29 @@ export interface AccessControlResult {
 /** Tools that require permissionMode !== "strict" to execute. */
 const TRADING_TOOLS = new Set([
   // CEX/broker order tools
-  "execute_plan", "close_trade", "cancel_trade", "place_order",
-  "place_market_order", "place_limit_order", "place_bracket_order",
-  "place_oco_order", "cancel_order", "cancel_all_orders",
-  "cancel_replace_order", "cancel_order_list", "set_trailing_stop",
-  "update_trailing_stop", "place_stop_loss", "place_take_profit",
-  "modify_order", "replace_order", "close_position", "reduce_position",
+  "execute_plan",
+  "close_trade",
+  "cancel_trade",
+  "place_order",
+  "place_market_order",
+  "place_limit_order",
+  "place_bracket_order",
+  "place_oco_order",
+  "cancel_order",
+  "cancel_all_orders",
+  "cancel_replace_order",
+  "cancel_order_list",
+  "set_trailing_stop",
+  "update_trailing_stop",
+  "place_stop_loss",
+  "place_take_profit",
+  "modify_order",
+  "replace_order",
+  "close_position",
+  "reduce_position",
   // Withdrawals
-  "withdraw_to_external", "withdraw_from_exchange",
+  "withdraw_to_external",
+  "withdraw_from_exchange",
 ]);
 
 const STATE_MODIFYING_TOOLS = new Set(["approve_plan"]);
@@ -64,7 +83,8 @@ export function isStateModifyingTool(toolName: string): boolean {
  */
 function operationContextFor(toolName: string): TradingOperationContext {
   if (toolName.startsWith("cancel_") || toolName === "cancel_order_list") return "cancel";
-  if (toolName === "withdraw_to_external" || toolName === "withdraw_from_exchange") return "transfer";
+  if (toolName === "withdraw_to_external" || toolName === "withdraw_from_exchange")
+    return "transfer";
   if (toolName === "transfer_funds") return "transfer";
   if (toolName === "start_autonomous_mode") return "autonomous";
   if (toolName === "approve_plan" || toolName === "create_plan") return "plan_create";
@@ -106,7 +126,11 @@ export async function checkToolAccess(
   });
   if (!check.allowed) {
     const reason = `Tool ${toolName} blocked — ${check.reason}`;
-    safeAuditBlocked(userId, { toolName, permissionMode: config.permissionMode, operation }, reason);
+    safeAuditBlocked(
+      userId,
+      { toolName, permissionMode: config.permissionMode, operation },
+      reason,
+    );
     logger.info("Tool blocked by permissionMode", {
       toolName,
       userId,
@@ -122,7 +146,10 @@ export async function checkToolAccess(
 export function createAccessControlMiddleware(userId: string) {
   return async (toolName: string): Promise<AccessControlResult> => {
     const config = await loadConfig().catch((err) => {
-      logger.error("Config load failed — access control failing closed", err instanceof Error ? err : new Error(String(err)));
+      logger.error(
+        "Config load failed — access control failing closed",
+        err instanceof Error ? err : new Error(String(err)),
+      );
       return null;
     });
     return checkToolAccess(toolName, config, userId);

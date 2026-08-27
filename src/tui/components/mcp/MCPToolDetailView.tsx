@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Divider } from "../layout/Divider.tsx";
 
@@ -39,7 +39,7 @@ function renderSchema(schema: object): React.ReactNode {
   if (!s.properties) {
     return (
       <Box>
-        <Text dimColor>    (no input parameters)</Text>
+        <Text dimColor> (no input parameters)</Text>
       </Box>
     );
   }
@@ -54,13 +54,11 @@ function renderSchema(schema: object): React.ReactNode {
         const typeName = prop.type ?? "any";
         return (
           <Box key={key}>
-            <Text dimColor>    </Text>
+            <Text dimColor> </Text>
             <Text color="cyanBright">{key}</Text>
             <Text dimColor>: {typeName}</Text>
             {!isRequired && <Text dimColor> (optional)</Text>}
-            {prop.description && (
-              <Text dimColor>  — {prop.description}</Text>
-            )}
+            {prop.description && <Text dimColor> — {prop.description}</Text>}
           </Box>
         );
       })}
@@ -76,7 +74,9 @@ export function MCPToolDetailView({ tool, lastResult, latencyMs, onClose }: Prop
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">TOOL: {tool.name}</Text>
+        <Text bold color="cyanBright">
+          TOOL: {tool.name}
+        </Text>
       </Box>
 
       <Divider />
@@ -91,21 +91,19 @@ export function MCPToolDetailView({ tool, lastResult, latencyMs, onClose }: Prop
           <Text bold>Input Schema:</Text>
         </Box>
 
-        {tool.inputSchema
-          ? renderSchema(tool.inputSchema)
-          : (
-            <Box>
-              <Text dimColor>    (no schema defined)</Text>
-            </Box>
-          )}
+        {tool.inputSchema ? (
+          renderSchema(tool.inputSchema)
+        ) : (
+          <Box>
+            <Text dimColor> (no schema defined)</Text>
+          </Box>
+        )}
 
         {lastResult !== undefined && (
           <Box marginTop={1}>
             <Text dimColor>Last result: </Text>
             <Text color="green">{lastResult}</Text>
-            {latencyMs !== undefined && (
-              <Text dimColor>  ({latencyMs}ms)</Text>
-            )}
+            {latencyMs !== undefined && <Text dimColor> ({latencyMs}ms)</Text>}
           </Box>
         )}
 

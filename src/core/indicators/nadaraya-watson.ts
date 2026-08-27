@@ -90,7 +90,7 @@ export function calculateNadarayaWatson(
   candles: Candle[],
   bandwidth: number = 100,
   bandMultiplier: number = 2.0,
-  atrPeriod: number = 14
+  atrPeriod: number = 14,
 ): NadarayaWatsonResult {
   if (candles.length < 10) {
     return {
@@ -166,7 +166,7 @@ export function calculateNadarayaWatson(
     currentLower,
     position,
     trend,
-    envelopeWidth
+    envelopeWidth,
   );
 
   return {
@@ -187,7 +187,7 @@ function getPosition(
   price: number,
   upper: number,
   lower: number,
-  middle: number
+  middle: number,
 ): "above_upper" | "upper_zone" | "middle" | "lower_zone" | "below_lower" {
   if (price > upper) return "above_upper";
   if (price > middle) return "upper_zone";
@@ -197,13 +197,13 @@ function getPosition(
 }
 
 function buildNWInterpretation(
-  price: number,
+  _price: number,
   nw: number,
   upper: number,
   lower: number,
   position: string,
   trend: string,
-  width: number
+  width: number,
 ): string {
   const trendStr = trend === "bullish" ? "upward" : trend === "bearish" ? "downward" : "flat";
 

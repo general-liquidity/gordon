@@ -52,7 +52,7 @@ export class SqueezeBreakoutStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, CANDLE_LIMIT);
     if (candles.length < 30) {
@@ -73,20 +73,20 @@ export class SqueezeBreakoutStrategy extends BaseStrategy {
 
     if (squeeze.squeezeOn && !squeeze.squeezeFired) {
       return this.notDetected(
-        "Squeeze is ON (compressing) but hasn't fired yet — wait for breakout"
+        "Squeeze is ON (compressing) but hasn't fired yet — wait for breakout",
       );
     }
 
     // Squeeze just fired — check momentum direction
     if (squeeze.momentum === null || squeeze.momentum <= 0) {
       return this.notDetected(
-        `Squeeze fired but momentum is ${squeeze.momentum?.toFixed(4) ?? "N/A"} (bearish/flat) — only trade bullish breakouts`
+        `Squeeze fired but momentum is ${squeeze.momentum?.toFixed(4) ?? "N/A"} (bearish/flat) — only trade bullish breakouts`,
       );
     }
 
     if (squeeze.momentumColor !== "lime") {
       return this.notDetected(
-        `Squeeze fired with positive momentum but decelerating (${squeeze.momentumColor}) — want accelerating (lime)`
+        `Squeeze fired with positive momentum but decelerating (${squeeze.momentumColor}) — want accelerating (lime)`,
       );
     }
 
@@ -127,7 +127,9 @@ export class SqueezeBreakoutStrategy extends BaseStrategy {
 
     const reasons: string[] = [];
     reasons.push("SQUEEZE FIRED — volatility breakout");
-    reasons.push(`Momentum: +${squeeze.momentum.toFixed(4)} (${squeeze.momentumColor}, accelerating)`);
+    reasons.push(
+      `Momentum: +${squeeze.momentum.toFixed(4)} (${squeeze.momentumColor}, accelerating)`,
+    );
     if (adxResult.adx !== null) {
       reasons.push(`ADX: ${adxResult.adx.toFixed(1)} (${adxResult.adxTrend})`);
     }
@@ -157,7 +159,7 @@ export class SqueezeBreakoutStrategy extends BaseStrategy {
       const tr = Math.max(
         current.high - current.low,
         Math.abs(current.high - previous.close),
-        Math.abs(current.low - previous.close)
+        Math.abs(current.low - previous.close),
       );
       trueRanges.push(tr);
 
@@ -177,8 +179,8 @@ export class SqueezeBreakoutStrategy extends BaseStrategy {
     for (let i = 0; i < smoothTR.length; i++) {
       const pdi = (smoothPlusDM[i]! / smoothTR[i]!) * 100;
       const mdi = (smoothMinusDM[i]! / smoothTR[i]!) * 100;
-      const dx = Math.abs(pdi - mdi) / (pdi + mdi) * 100;
-      if (!isNaN(dx)) dxValues.push(dx);
+      const dx = (Math.abs(pdi - mdi) / (pdi + mdi)) * 100;
+      if (!Number.isNaN(dx)) dxValues.push(dx);
     }
 
     const adxValues = this.wilderSmooth(dxValues, period);
@@ -206,10 +208,7 @@ export class SqueezeBreakoutStrategy extends BaseStrategy {
     return result;
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", CANDLE_LIMIT);
     const currentPrice = this.getCurrentPrice(candles, ctx);
     const atr = this.calculateATR(candles);
@@ -280,12 +279,13 @@ When creating a plan using the Squeeze Breakout strategy:
     bar: OHLC,
     index: number,
     data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     if (index < 25) return null;
 
     const bbWidth = indicators.bbWidth;
-    const prevBbWidth = index > 0 ? (data[index - 1] as OHLC & { bbWidth?: number })?.bbWidth : undefined;
+    const prevBbWidth =
+      index > 0 ? (data[index - 1] as OHLC & { bbWidth?: number })?.bbWidth : undefined;
 
     // Simple proxy: BB width expanding after contraction
     if (bbWidth != null && prevBbWidth != null && bbWidth > prevBbWidth * 1.2) {

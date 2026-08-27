@@ -77,9 +77,7 @@ export interface TransientImpactResult {
 
 const LN2 = Math.log(2);
 
-export function computeTransientImpact(
-  input: TransientImpactInput,
-): TransientImpactResult {
+export function computeTransientImpact(input: TransientImpactInput): TransientImpactResult {
   if (input.halfLife <= 0) {
     throw new Error("halfLife must be > 0");
   }
@@ -100,9 +98,7 @@ export function computeTransientImpact(
   for (const fill of input.fills) {
     const age = input.now - fill.time;
     if (age < 0) {
-      throw new Error(
-        `Fill at time ${fill.time} is in the future relative to now=${input.now}`,
-      );
+      throw new Error(`Fill at time ${fill.time} is in the future relative to now=${input.now}`);
     }
     permanentSum += fill.signedSize;
     const weight = Math.exp(-decayRate * age);
@@ -133,9 +129,7 @@ export function computeTransientImpact(
   };
 }
 
-export function transientImpactToPayload(
-  result: TransientImpactResult,
-): Record<string, unknown> {
+export function transientImpactToPayload(result: TransientImpactResult): Record<string, unknown> {
   return {
     kind: "transient_impact.computed",
     totalImpact: Number(result.totalImpact.toFixed(6)),

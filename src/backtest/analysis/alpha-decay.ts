@@ -22,7 +22,7 @@ export interface AlphaDecayResult {
 
 export function analyzeAlphaDecay(
   results: Record<number, Record<string, unknown>>,
-  metric: string = "return_pct"
+  metric: string = "return_pct",
 ): AlphaDecayResult | { error: string } {
   const delays = Object.keys(results)
     .map((key) => Number(key))
@@ -71,7 +71,7 @@ export function analyzeAlphaDecay(
 
   const decayAtDelay = (target: number): number | null => {
     const idx = delays.indexOf(target);
-    return idx >= 0 ? decayRates[idx] ?? null : null;
+    return idx >= 0 ? (decayRates[idx] ?? null) : null;
   };
 
   const worstPerformance = Math.min(...metricValues);

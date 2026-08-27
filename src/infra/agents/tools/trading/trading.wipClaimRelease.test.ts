@@ -3,10 +3,7 @@ import { RequestContext } from "@mastra/core/request-context";
 import type { Plan } from "../../../../types/plan.ts";
 import { resetAllKillSwitches } from "../../../safety/killSwitches.ts";
 import { WIP_FLAG_ENV } from "../../../safety/wipLimit.ts";
-import {
-  deactivateSessionPlan,
-  sessionWipSnapshot,
-} from "../../../safety/wipSessionRegistry.ts";
+import { deactivateSessionPlan, sessionWipSnapshot } from "../../../safety/wipSessionRegistry.ts";
 import { installTempGordonHome } from "../../../../test-utils/tempGordonHome.ts";
 
 installTempGordonHome("gordon-wipclaim-test-");
@@ -82,12 +79,14 @@ describe("execute_plan — WIP claim is exception-safe", () => {
   });
 
   test("a throw between claim and submit does not leak the slot", async () => {
-    const run = (executePlanTool as unknown as {
-      execute: (
-        input: { planId: string; rationale: string },
-        ctx: { requestContext: RequestContext },
-      ) => Promise<{ success: boolean; error?: string }>;
-    }).execute({ planId: PLAN_ID, rationale: RATIONALE }, makeExecContext());
+    const run = (
+      executePlanTool as unknown as {
+        execute: (
+          input: { planId: string; rationale: string },
+          ctx: { requestContext: RequestContext },
+        ) => Promise<{ success: boolean; error?: string }>;
+      }
+    ).execute({ planId: PLAN_ID, rationale: RATIONALE }, makeExecContext());
 
     await run.then(
       () => undefined,

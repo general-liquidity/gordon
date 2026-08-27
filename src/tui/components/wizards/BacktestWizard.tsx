@@ -35,12 +35,18 @@ interface StrategyStepProps {
   onNext: () => void;
 }
 
-function StrategyStep({ strategies, cursor, setCursor, onNext }: StrategyStepProps): React.ReactElement {
+function StrategyStep({
+  strategies,
+  cursor,
+  setCursor,
+  onNext,
+}: StrategyStepProps): React.ReactElement {
   const theme = useTheme();
 
   useInput((_input, key) => {
     if (key.upArrow) setCursor((current) => Math.max(0, current - 1));
-    if (key.downArrow) setCursor((current) => Math.min(Math.max(0, strategies.length - 1), current + 1));
+    if (key.downArrow)
+      setCursor((current) => Math.min(Math.max(0, strategies.length - 1), current + 1));
     if (key.return) onNext();
   });
 
@@ -52,13 +58,16 @@ function StrategyStep({ strategies, cursor, setCursor, onNext }: StrategyStepPro
         return (
           <Box key={strategy} paddingLeft={2}>
             <Text color={isFocused ? theme.uiBrand : undefined}>
-              {isFocused ? "\u25B8 " : "  "}{strategy}
+              {isFocused ? "\u25B8 " : "  "}
+              {strategy}
             </Text>
           </Box>
         );
       })}
       <Text> </Text>
-      <Text dimColor>{"\u2191\u2193"} select {"\u00b7"} Enter next</Text>
+      <Text dimColor>
+        {"\u2191\u2193"} select {"\u00b7"} Enter next
+      </Text>
     </Box>
   );
 }
@@ -107,7 +116,8 @@ function SymbolStep({
 
     if (activeField === 1) {
       if (key.upArrow) setTimeframeCursor((current) => Math.max(0, current - 1));
-      if (key.downArrow) setTimeframeCursor((current) => Math.min(TIMEFRAMES.length - 1, current + 1));
+      if (key.downArrow)
+        setTimeframeCursor((current) => Math.min(TIMEFRAMES.length - 1, current + 1));
       if (key.return) {
         setActiveField(0);
         onNext();
@@ -118,18 +128,23 @@ function SymbolStep({
   return (
     <Box flexDirection="column">
       <Box>
-        <Text bold color={activeField === 0 ? theme.uiBrand : undefined}>Symbol: </Text>
+        <Text bold color={activeField === 0 ? theme.uiBrand : undefined}>
+          Symbol:{" "}
+        </Text>
         <Text>{symbol || "..."}</Text>
         {activeField === 0 ? <Text color={theme.uiBrand}>{"\u2588"}</Text> : null}
       </Box>
       <Text> </Text>
-      <Text bold color={activeField === 1 ? theme.uiBrand : undefined}>Timeframe:</Text>
+      <Text bold color={activeField === 1 ? theme.uiBrand : undefined}>
+        Timeframe:
+      </Text>
       {TIMEFRAMES.map((timeframe, index) => {
         const isFocused = activeField === 1 && index === timeframeCursor;
         return (
           <Box key={timeframe} paddingLeft={2}>
             <Text color={isFocused ? theme.uiBrand : undefined}>
-              {isFocused ? "\u25B8 " : "  "}{timeframe}
+              {isFocused ? "\u25B8 " : "  "}
+              {timeframe}
             </Text>
           </Box>
         );
@@ -195,17 +210,23 @@ function DatesStep({
   return (
     <Box flexDirection="column">
       <Box>
-        <Text bold color={activeField === 0 ? theme.uiBrand : undefined}>Start Date: </Text>
+        <Text bold color={activeField === 0 ? theme.uiBrand : undefined}>
+          Start Date:{" "}
+        </Text>
         <Text>{startDate}</Text>
         {activeField === 0 ? <Text color={theme.uiBrand}>{"\u2588"}</Text> : null}
       </Box>
       <Box>
-        <Text bold color={activeField === 1 ? theme.uiBrand : undefined}>End Date:   </Text>
+        <Text bold color={activeField === 1 ? theme.uiBrand : undefined}>
+          End Date:{" "}
+        </Text>
         <Text>{endDate}</Text>
         {activeField === 1 ? <Text color={theme.uiBrand}>{"\u2588"}</Text> : null}
       </Box>
       <Box>
-        <Text bold color={activeField === 2 ? theme.uiBrand : undefined}>Capital:    $</Text>
+        <Text bold color={activeField === 2 ? theme.uiBrand : undefined}>
+          Capital: $
+        </Text>
         <Text>{capital}</Text>
         {activeField === 2 ? <Text color={theme.uiBrand}>{"\u2588"}</Text> : null}
       </Box>
@@ -221,7 +242,11 @@ interface OptimizationStepProps {
   onNext: () => void;
 }
 
-function OptimizationStep({ cursor, setCursor, onNext }: OptimizationStepProps): React.ReactElement {
+function OptimizationStep({
+  cursor,
+  setCursor,
+  onNext,
+}: OptimizationStepProps): React.ReactElement {
   const theme = useTheme();
 
   useInput((_input, key) => {
@@ -235,18 +260,29 @@ function OptimizationStep({ cursor, setCursor, onNext }: OptimizationStepProps):
       <Text bold>Optimization Mode:</Text>
       {OPT_MODES.map((mode, index) => {
         const isFocused = index === cursor;
-        const desc = mode === "none" ? "No optimization" : mode === "grid" ? "Grid search over parameter space" : "Random parameter sampling";
+        const desc =
+          mode === "none"
+            ? "No optimization"
+            : mode === "grid"
+              ? "Grid search over parameter space"
+              : "Random parameter sampling";
         return (
           <Box key={mode} paddingLeft={2}>
             <Text color={isFocused ? theme.uiBrand : undefined}>
-              {isFocused ? "\u25B8 " : "  "}{mode.toUpperCase()}
+              {isFocused ? "\u25B8 " : "  "}
+              {mode.toUpperCase()}
             </Text>
-            <Text dimColor> {"\u2014"} {desc}</Text>
+            <Text dimColor>
+              {" "}
+              {"\u2014"} {desc}
+            </Text>
           </Box>
         );
       })}
       <Text> </Text>
-      <Text dimColor>{"\u2191\u2193"} select {"\u00b7"} Enter next</Text>
+      <Text dimColor>
+        {"\u2191\u2193"} select {"\u00b7"} Enter next
+      </Text>
     </Box>
   );
 }
@@ -269,15 +305,37 @@ function ReviewStep({ config, strategyLabel, onRun }: ReviewStepProps): React.Re
       <Text bold>Review Configuration:</Text>
       <Text> </Text>
       <Box paddingLeft={2} flexDirection="column">
-        <Box><Text dimColor>Strategy:     </Text><Text bold>{strategyLabel}</Text></Box>
-        <Box><Text dimColor>Symbol:       </Text><Text bold>{config.symbol}</Text></Box>
-        <Box><Text dimColor>Timeframe:    </Text><Text bold>{config.timeframe}</Text></Box>
-        <Box><Text dimColor>Period:       </Text><Text>{config.startDate} to {config.endDate}</Text></Box>
-        <Box><Text dimColor>Capital:      </Text><Text>${config.initialCapital}</Text></Box>
-        <Box><Text dimColor>Optimization: </Text><Text>{config.optimization.toUpperCase()}</Text></Box>
+        <Box>
+          <Text dimColor>Strategy: </Text>
+          <Text bold>{strategyLabel}</Text>
+        </Box>
+        <Box>
+          <Text dimColor>Symbol: </Text>
+          <Text bold>{config.symbol}</Text>
+        </Box>
+        <Box>
+          <Text dimColor>Timeframe: </Text>
+          <Text bold>{config.timeframe}</Text>
+        </Box>
+        <Box>
+          <Text dimColor>Period: </Text>
+          <Text>
+            {config.startDate} to {config.endDate}
+          </Text>
+        </Box>
+        <Box>
+          <Text dimColor>Capital: </Text>
+          <Text>${config.initialCapital}</Text>
+        </Box>
+        <Box>
+          <Text dimColor>Optimization: </Text>
+          <Text>{config.optimization.toUpperCase()}</Text>
+        </Box>
       </Box>
       <Text> </Text>
-      <Text bold color={theme.riskSafe}>Press Enter to run backtest</Text>
+      <Text bold color={theme.riskSafe}>
+        Press Enter to run backtest
+      </Text>
     </Box>
   );
 }

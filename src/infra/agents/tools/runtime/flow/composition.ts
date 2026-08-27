@@ -53,7 +53,7 @@ export interface ToolChain<TInput, TOutput> {
 export type ToolExecutor = (
   toolId: string,
   input: unknown,
-  context: MastraExecutionContext
+  context: MastraExecutionContext,
 ) => Promise<unknown>;
 
 // ============================================================================
@@ -95,7 +95,7 @@ async function getToolRegistry(): Promise<Record<string, MastraTool>> {
 export async function executeTool<T = unknown>(
   toolId: string,
   input: unknown,
-  context: MastraExecutionContext
+  context: MastraExecutionContext,
 ): Promise<T> {
   const registry = await getToolRegistry();
   const tool = registry[toolId];
@@ -129,11 +129,14 @@ export async function executeTool<T = unknown>(
  * ```
  */
 export function createToolChain<TInput, TOutput>(
-  steps: ToolChainStep<unknown, unknown>[]
+  steps: ToolChainStep<unknown, unknown>[],
 ): ToolChain<TInput, TOutput> {
   return {
     steps,
-    execute: async (input: TInput, context: MastraExecutionContext): Promise<ToolResult<TOutput>> => {
+    execute: async (
+      input: TInput,
+      context: MastraExecutionContext,
+    ): Promise<ToolResult<TOutput>> => {
       let currentValue: unknown = input;
 
       for (const step of steps) {
@@ -160,7 +163,7 @@ export function createToolChain<TInput, TOutput>(
 export async function runChain<TInput, TOutput>(
   chain: ToolChain<TInput, TOutput>,
   input: TInput,
-  context: MastraExecutionContext
+  context: MastraExecutionContext,
 ): Promise<ToolResult<TOutput>> {
   return chain.execute(input, context);
 }
@@ -191,7 +194,7 @@ export interface ParallelToolSpec {
  */
 export async function runParallel<T extends Record<string, unknown>>(
   tools: { [K in keyof T]: ParallelToolSpec },
-  context: MastraExecutionContext
+  context: MastraExecutionContext,
 ): Promise<ToolResult<T>> {
   const keys = Object.keys(tools) as (keyof T)[];
   const specs = Object.values(tools) as ParallelToolSpec[];
@@ -200,7 +203,7 @@ export async function runParallel<T extends Record<string, unknown>>(
     specs.map(async (spec) => {
       const result = await executeTool(spec.tool, spec.input, context);
       return { result, hasError: isErrorResult(result) };
-    })
+    }),
   );
 
   // Check for any errors
@@ -256,7 +259,7 @@ export async function runConditional<TA, TB>(
   toolA: ParallelToolSpec,
   toolB: ParallelToolSpec,
   condition: ConditionFn<TA>,
-  context: MastraExecutionContext
+  context: MastraExecutionContext,
 ): Promise<ToolResult<{ first: TA; second?: TB; conditionMet: boolean }>> {
   const resultA = await executeTool<TA>(toolA.tool, toolA.input, context);
 
@@ -298,7 +301,7 @@ export async function runConditionalChain<T>(
     spec: ParallelToolSpec;
     condition?: ConditionFn<unknown>;
   }>,
-  context: MastraExecutionContext
+  context: MastraExecutionContext,
 ): Promise<ToolResult<T[]>> {
   const results: unknown[] = [];
 
@@ -348,7 +351,7 @@ function getErrorMessage(result: unknown): string {
 export function calculateCombinedScore(
   signals: { score?: number; bias?: string } | null,
   rsi: { rsi?: string; signal?: string } | null,
-  whales: { strength?: number; bias?: string } | null
+  whales: { strength?: number; bias?: string } | null,
 ): number {
   let score = 50; // Neutral baseline
   let factors = 0;
@@ -362,7 +365,7 @@ export function calculateCombinedScore(
   // RSI contribution (weight: 25%)
   if (rsi?.rsi) {
     const rsiValue = parseFloat(rsi.rsi);
-    if (!isNaN(rsiValue)) {
+    if (!Number.isNaN(rsiValue)) {
       // RSI 30 = +25, RSI 50 = 0, RSI 70 = -25
       const rsiContribution = ((50 - rsiValue) / 50) * 25;
       score += rsiContribution;
@@ -372,7 +375,12 @@ export function calculateCombinedScore(
 
   // Whale analysis contribution (weight: 35%)
   if (whales?.strength !== undefined && whales?.bias) {
-    const whaleScore = whales.bias === "bullish" ? whales.strength : whales.bias === "bearish" ? -whales.strength : 0;
+    const whaleScore =
+      whales.bias === "bullish"
+        ? whales.strength
+        : whales.bias === "bearish"
+          ? -whales.strength
+          : 0;
     score += (whaleScore / 100) * 35;
     factors++;
   }
@@ -420,51 +428,63 @@ export const marketStructureChain = createToolChain<string, unknown>([
 const fullAnalysisOutputSchema = z.object({
   symbol: z.string(),
   timestamp: z.string(),
-  signals: z.object({
-    symbol: z.string(),
-    rsi: z.string().optional(),
-    rsiSignal: z.string().optional(),
-    trend: z.string().optional(),
-    macd: z.string().optional(),
-    priceVsEma200: z.string().optional(),
-    bollingerPosition: z.string().optional(),
-    bias: z.string().optional(),
-    score: z.number().optional(),
-    error: z.string().optional(),
-  }).nullable(),
-  rsi: z.object({
-    symbol: z.string(),
-    rsi: z.string().optional(),
-    signal: z.string().optional(),
-    action: z.string().optional(),
-    interpretation: z.string().optional(),
-    error: z.string().optional(),
-  }).nullable(),
-  whales: z.object({
-    symbol: z.string(),
-    bias: z.string().optional(),
-    strength: z.number().optional(),
-    whaleBidsValue: z.number().optional(),
-    whaleAsksValue: z.number().optional(),
-    interpretation: z.string().optional(),
-    error: z.string().optional(),
-  }).nullable(),
-  orderbook: z.object({
-    symbol: z.string(),
-    spread: z.object({
-      value: z.string(),
-      percent: z.string(),
-      bestBid: z.number(),
-      bestAsk: z.number(),
-    }).optional(),
-    liquidity: z.object({
-      bidDepth: z.string(),
-      askDepth: z.string(),
-      ratio: z.string(),
-      imbalance: z.string(),
-    }).optional(),
-    error: z.string().optional(),
-  }).nullable(),
+  signals: z
+    .object({
+      symbol: z.string(),
+      rsi: z.string().optional(),
+      rsiSignal: z.string().optional(),
+      trend: z.string().optional(),
+      macd: z.string().optional(),
+      priceVsEma200: z.string().optional(),
+      bollingerPosition: z.string().optional(),
+      bias: z.string().optional(),
+      score: z.number().optional(),
+      error: z.string().optional(),
+    })
+    .nullable(),
+  rsi: z
+    .object({
+      symbol: z.string(),
+      rsi: z.string().optional(),
+      signal: z.string().optional(),
+      action: z.string().optional(),
+      interpretation: z.string().optional(),
+      error: z.string().optional(),
+    })
+    .nullable(),
+  whales: z
+    .object({
+      symbol: z.string(),
+      bias: z.string().optional(),
+      strength: z.number().optional(),
+      whaleBidsValue: z.number().optional(),
+      whaleAsksValue: z.number().optional(),
+      interpretation: z.string().optional(),
+      error: z.string().optional(),
+    })
+    .nullable(),
+  orderbook: z
+    .object({
+      symbol: z.string(),
+      spread: z
+        .object({
+          value: z.string(),
+          percent: z.string(),
+          bestBid: z.number(),
+          bestAsk: z.number(),
+        })
+        .optional(),
+      liquidity: z
+        .object({
+          bidDepth: z.string(),
+          askDepth: z.string(),
+          ratio: z.string(),
+          imbalance: z.string(),
+        })
+        .optional(),
+      error: z.string().optional(),
+    })
+    .nullable(),
   combinedScore: z.number(),
   consensus: z.enum(["STRONG_BULLISH", "BULLISH", "NEUTRAL", "BEARISH", "STRONG_BEARISH"]),
   confidence: z.number(),
@@ -478,32 +498,32 @@ const fullAnalysisOutputSchema = z.object({
  */
 export async function runFullAnalysis(
   symbol: string,
-  context: MastraExecutionContext
+  context: MastraExecutionContext,
 ): Promise<z.infer<typeof fullAnalysisOutputSchema>> {
   const normalizedSymbol = normalizeSymbol(symbol);
 
   // Run all analyses in parallel
   const [signalsResult, rsiResult, whalesResult, orderbookResult] = await Promise.all([
-    executeTool("get_technical_signals", { symbol: normalizedSymbol, interval: "4h" }, context)
-      .catch((err) => ({ error: err.message })),
-    executeTool("get_rsi", { symbol: normalizedSymbol, interval: "4h", period: 14 }, context)
-      .catch((err) => ({ error: err.message })),
-    executeTool("analyze_whale_orders", { symbol: normalizedSymbol }, context)
-      .catch((err) => ({ error: err.message })),
-    executeTool("get_order_book", { symbol: normalizedSymbol, limit: 20 }, context)
-      .catch((err) => ({ error: err.message })),
+    executeTool(
+      "get_technical_signals",
+      { symbol: normalizedSymbol, interval: "4h" },
+      context,
+    ).catch((err) => ({ error: err.message })),
+    executeTool("get_rsi", { symbol: normalizedSymbol, interval: "4h", period: 14 }, context).catch(
+      (err) => ({ error: err.message }),
+    ),
+    executeTool("analyze_whale_orders", { symbol: normalizedSymbol }, context).catch((err) => ({
+      error: err.message,
+    })),
+    executeTool("get_order_book", { symbol: normalizedSymbol, limit: 20 }, context).catch(
+      (err) => ({ error: err.message }),
+    ),
   ]);
 
   // Extract results with type safety
-  const signals = !isErrorResult(signalsResult)
-    ? (signalsResult as Record<string, unknown>)
-    : null;
-  const rsi = !isErrorResult(rsiResult)
-    ? (rsiResult as Record<string, unknown>)
-    : null;
-  const whales = !isErrorResult(whalesResult)
-    ? (whalesResult as Record<string, unknown>)
-    : null;
+  const signals = !isErrorResult(signalsResult) ? (signalsResult as Record<string, unknown>) : null;
+  const rsi = !isErrorResult(rsiResult) ? (rsiResult as Record<string, unknown>) : null;
+  const whales = !isErrorResult(whalesResult) ? (whalesResult as Record<string, unknown>) : null;
   const orderbook = !isErrorResult(orderbookResult)
     ? (orderbookResult as Record<string, unknown>)
     : null;
@@ -519,7 +539,7 @@ export async function runFullAnalysis(
   const combinedScore = calculateCombinedScore(
     signals as { score?: number; bias?: string } | null,
     rsi as { rsi?: string; signal?: string } | null,
-    whales as { strength?: number; bias?: string } | null
+    whales as { strength?: number; bias?: string } | null,
   );
 
   // Determine consensus and confidence

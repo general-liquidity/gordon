@@ -36,9 +36,7 @@ export class TaskDependencyGraph {
       }
     }
 
-    const allDepsComplete = deps.every(
-      (depId) => this.nodes.get(depId)!.status === "completed",
-    );
+    const allDepsComplete = deps.every((depId) => this.nodes.get(depId)!.status === "completed");
 
     const node: TaskNode = {
       id,
@@ -185,7 +183,7 @@ export class TaskDependencyGraph {
 
   private checkUnblock(id: string): void {
     const node = this.nodes.get(id);
-    if (!node || node.status !== "blocked") return;
+    if (node?.status !== "blocked") return;
 
     const allDepsComplete = node.dependencies.every(
       (depId) => this.nodes.get(depId)?.status === "completed",

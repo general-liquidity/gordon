@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 
 // ============================================================================
@@ -32,24 +31,26 @@ function formatDuration(ms: number): string {
   return `${Math.floor(ms / 60000)}m${Math.floor((ms % 60000) / 1000)}s`;
 }
 
-export function TeammateSpinnerLine({ agentName, status, taskLabel, duration, isLast = false }: Props) {
+export function TeammateSpinnerLine({
+  agentName,
+  status,
+  taskLabel,
+  duration,
+  isLast = false,
+}: Props) {
   const connector = isLast ? "└─" : "├─";
 
-  const iconChar = status === "running"
-    ? "●"
-    : status === "done"
-      ? "✓"
-      : status === "error"
-        ? "✗"
-        : "○";
+  const iconChar =
+    status === "running" ? "●" : status === "done" ? "✓" : status === "error" ? "✗" : "○";
 
-  const iconColor = status === "running"
-    ? "cyanBright"
-    : status === "done"
-      ? "green"
-      : status === "error"
-        ? "red"
-        : undefined; // dimColor handled via prop below
+  const iconColor =
+    status === "running"
+      ? "cyanBright"
+      : status === "done"
+        ? "green"
+        : status === "error"
+          ? "red"
+          : undefined; // dimColor handled via prop below
 
   const isDim = status === "pending" || status === "waiting";
 
@@ -77,19 +78,11 @@ export function TeammateSpinnerLine({ agentName, status, taskLabel, duration, is
       <Text dimColor>{connector} </Text>
 
       {/* Status icon */}
-      {iconColor ? (
-        <Text color={iconColor}>{iconChar}</Text>
-      ) : (
-        <Text dimColor>{iconChar}</Text>
-      )}
+      {iconColor ? <Text color={iconColor}>{iconChar}</Text> : <Text dimColor>{iconChar}</Text>}
 
       {/* Agent name */}
       <Text> </Text>
-      {isDim ? (
-        <Text dimColor>{agentName}</Text>
-      ) : (
-        <Text color="white">{agentName}</Text>
-      )}
+      {isDim ? <Text dimColor>{agentName}</Text> : <Text color="white">{agentName}</Text>}
 
       {/* Trailing info */}
       {trailingText && (

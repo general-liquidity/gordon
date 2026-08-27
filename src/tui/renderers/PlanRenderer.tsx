@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../ink-custom";
 import { DataTable, fmtNum, type Column } from "../components/charts/DataTable.tsx";
 
@@ -26,9 +25,7 @@ interface Props {
 
 export function PlanRenderer({ data }: Props) {
   const sideColor =
-    data.side.toLowerCase() === "long" || data.side.toLowerCase() === "buy"
-      ? "green"
-      : "red";
+    data.side.toLowerCase() === "long" || data.side.toLowerCase() === "buy" ? "green" : "red";
 
   const rows: Record<string, unknown>[] = [
     { field: "ENTRY", value: fmtNum(data.entry) },
@@ -51,11 +48,7 @@ export function PlanRenderer({ data }: Props) {
   ];
 
   const reviewColor =
-    data.reviewState === "approved"
-      ? "green"
-      : data.reviewState === "rejected"
-        ? "red"
-        : "yellow";
+    data.reviewState === "approved" ? "green" : data.reviewState === "rejected" ? "red" : "yellow";
 
   return (
     <Box flexDirection="column" paddingLeft={2} marginTop={1}>

@@ -30,12 +30,7 @@ export const volumeTrendDiagnosticTool = createTool({
       )
       .min(2)
       .describe("Recent OHLCV candles with close + volume (contract units, not USD)."),
-    window: z
-      .number()
-      .int()
-      .min(2)
-      .optional()
-      .describe("Lookback window in candles. Default 20."),
+    window: z.number().int().min(2).optional().describe("Lookback window in candles. Default 20."),
     minCandles: z
       .number()
       .int()

@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  estimateFatTailCredibility,
-  formatFatTailCredibility,
-} from "./fat-tail-credibility.ts";
+import { estimateFatTailCredibility, formatFatTailCredibility } from "./fat-tail-credibility.ts";
 
 function mulberry32(seed: number): () => number {
   let a = seed;
@@ -19,7 +16,7 @@ function mulberry32(seed: number): () => number {
 /** Sample from a Pareto distribution with tail index α. F(x) = 1 - (xm/x)^α. */
 function paretoSample(rng: () => number, alpha: number, xm = 1): number {
   const u = rng();
-  return xm / Math.pow(1 - u, 1 / alpha);
+  return xm / (1 - u) ** (1 / alpha);
 }
 
 function paretoReturns(n: number, alpha: number, seed: number, signSwap = true): number[] {
@@ -77,9 +74,7 @@ describe("estimateFatTailCredibility", () => {
       returns: paretoReturns(3000, 1.1, 8),
     });
     expect(light.tailIndex).toBeGreaterThan(heavy.tailIndex);
-    expect(light.sampleSizeMultiplier).toBeLessThanOrEqual(
-      heavy.sampleSizeMultiplier,
-    );
+    expect(light.sampleSizeMultiplier).toBeLessThanOrEqual(heavy.sampleSizeMultiplier);
   });
 
   test("Pareto α=1.7 → heavy_tailed with multiplier 10×", () => {
@@ -89,9 +84,7 @@ describe("estimateFatTailCredibility", () => {
     expect(r.tailIndex).toBeGreaterThan(1.3);
     expect(r.tailIndex).toBeLessThan(2.3);
     // Class should be heavy_tailed or near-by bands
-    expect(["heavy_tailed", "very_heavy_tailed", "moderately_heavy"]).toContain(
-      r.fatTailClass,
-    );
+    expect(["heavy_tailed", "very_heavy_tailed", "moderately_heavy"]).toContain(r.fatTailClass);
     expect(r.sampleSizeMultiplier).toBeGreaterThanOrEqual(5);
   });
 
@@ -141,7 +134,7 @@ describe("estimateFatTailCredibility", () => {
   test("custom kFractionGrid changes per-k output", () => {
     const r = estimateFatTailCredibility({
       returns: gaussianReturns(2000, 1),
-      kFractionGrid: [0.05, 0.10],
+      kFractionGrid: [0.05, 0.1],
     });
     expect(r.perK.length).toBe(2);
   });

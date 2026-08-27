@@ -17,17 +17,17 @@
  */
 
 export type RetryClassification =
-  | "rate_limit"        // 429 — model usage rate limit, retry with short backoff
-  | "overloaded"        // 529 / specific provider strings — retry with longer backoff
-  | "server_error"      // 500 / 502 / 503 — provider transient
-  | "timeout"           // upstream / our timeout — retry quickly
-  | "network"           // fetch failure / DNS / connection reset
-  | "auth"              // 401 / 403 — terminal, don't retry
-  | "bad_request"       // 400 / 422 — terminal, don't retry
-  | "quota_exceeded"    // hard quota cap — terminal until window resets
-  | "context_window"    // prompt too long — terminal, caller must compact
-  | "content_filter"    // safety / moderation block — terminal
-  | "unknown";          // unclassified — caller decides default
+  | "rate_limit" // 429 — model usage rate limit, retry with short backoff
+  | "overloaded" // 529 / specific provider strings — retry with longer backoff
+  | "server_error" // 500 / 502 / 503 — provider transient
+  | "timeout" // upstream / our timeout — retry quickly
+  | "network" // fetch failure / DNS / connection reset
+  | "auth" // 401 / 403 — terminal, don't retry
+  | "bad_request" // 400 / 422 — terminal, don't retry
+  | "quota_exceeded" // hard quota cap — terminal until window resets
+  | "context_window" // prompt too long — terminal, caller must compact
+  | "content_filter" // safety / moderation block — terminal
+  | "unknown"; // unclassified — caller decides default
 
 export interface RetryDecision {
   /** Whether the caller should retry. */
@@ -56,17 +56,17 @@ export const RETRY_CONSTANTS = {
 
 /** Per-classification recommended initial delay (ms). */
 const DELAY_BY_CLASS: Record<RetryClassification, number> = {
-  rate_limit: 2_000,        // tight backoff — usually clears within a few seconds
-  overloaded: 5_000,        // provider is stressed; give it longer
-  server_error: 1_500,      // transient provider blip
-  timeout: 500,              // probably a tail-latency event
-  network: 750,              // DNS/connection blip
-  auth: 0,                   // terminal — delay irrelevant
+  rate_limit: 2_000, // tight backoff — usually clears within a few seconds
+  overloaded: 5_000, // provider is stressed; give it longer
+  server_error: 1_500, // transient provider blip
+  timeout: 500, // probably a tail-latency event
+  network: 750, // DNS/connection blip
+  auth: 0, // terminal — delay irrelevant
   bad_request: 0,
-  quota_exceeded: 0,         // terminal — would require human action
-  context_window: 0,         // terminal — caller must reshape prompt
+  quota_exceeded: 0, // terminal — would require human action
+  context_window: 0, // terminal — caller must reshape prompt
   content_filter: 0,
-  unknown: 1_000,            // moderate default
+  unknown: 1_000, // moderate default
 };
 
 const TERMINAL_CLASSES = new Set<RetryClassification>([
@@ -101,13 +101,25 @@ export function classifyHttpStatus(status: number, errorType?: string): RetryDec
   if (lowerType.includes("overloaded") || lowerType === "overloaded_error") {
     return buildDecision("overloaded", `provider overloaded (HTTP ${status})`);
   }
-  if (lowerType.includes("context_length") || lowerType.includes("context_window") || lowerType.includes("prompt_too_long")) {
+  if (
+    lowerType.includes("context_length") ||
+    lowerType.includes("context_window") ||
+    lowerType.includes("prompt_too_long")
+  ) {
     return buildDecision("context_window", `prompt exceeds context window`);
   }
-  if (lowerType.includes("content_filter") || lowerType.includes("content_policy") || lowerType.includes("moderation")) {
+  if (
+    lowerType.includes("content_filter") ||
+    lowerType.includes("content_policy") ||
+    lowerType.includes("moderation")
+  ) {
     return buildDecision("content_filter", `blocked by content moderation`);
   }
-  if (lowerType.includes("quota") || lowerType.includes("billing") || lowerType.includes("insufficient_quota")) {
+  if (
+    lowerType.includes("quota") ||
+    lowerType.includes("billing") ||
+    lowerType.includes("insufficient_quota")
+  ) {
     return buildDecision("quota_exceeded", `account quota exhausted`);
   }
 
@@ -144,14 +156,23 @@ export function classifyError(error: unknown): RetryDecision {
 
   // Carry-status errors (LLMError has .statusCode and .errorType)
   if (typeof error === "object" && error !== null) {
-    const obj = error as { statusCode?: unknown; errorType?: unknown; name?: unknown; message?: unknown };
+    const obj = error as {
+      statusCode?: unknown;
+      errorType?: unknown;
+      name?: unknown;
+      message?: unknown;
+    };
     if (typeof obj.statusCode === "number") {
       const errorType = typeof obj.errorType === "string" ? obj.errorType : undefined;
       return classifyHttpStatus(obj.statusCode, errorType);
     }
 
     // Native node fetch failure surfaces as TypeError("fetch failed")
-    if (obj.name === "TypeError" && typeof obj.message === "string" && obj.message.includes("fetch failed")) {
+    if (
+      obj.name === "TypeError" &&
+      typeof obj.message === "string" &&
+      obj.message.includes("fetch failed")
+    ) {
       return buildDecision("network", `fetch failed — likely connection / DNS issue`);
     }
 
@@ -166,7 +187,12 @@ export function classifyError(error: unknown): RetryDecision {
   if (lower.includes("timeout") || lower.includes("timed out")) {
     return buildDecision("timeout", msg);
   }
-  if (lower.includes("econnreset") || lower.includes("enotfound") || lower.includes("etimedout") || lower.includes("network")) {
+  if (
+    lower.includes("econnreset") ||
+    lower.includes("enotfound") ||
+    lower.includes("etimedout") ||
+    lower.includes("network")
+  ) {
     return buildDecision("network", msg);
   }
   if (lower.includes("overload")) {
@@ -192,7 +218,7 @@ export function backoffDelayMs(
   jitter: number = Math.random() * 0.2,
 ): number {
   const base = decision.recommendedDelayMs;
-  const factor = Math.pow(2, Math.max(0, attempt));
+  const factor = 2 ** Math.max(0, attempt);
   const raw = base * factor * (1 + Math.max(0, Math.min(1, jitter)));
   return Math.min(RETRY_CONSTANTS.maxDelayMs, Math.round(raw));
 }

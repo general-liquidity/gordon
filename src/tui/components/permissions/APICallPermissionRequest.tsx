@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 import { Divider } from "../layout/Divider.tsx";
@@ -19,13 +18,22 @@ export function APICallPermissionRequest({ endpoint, method, reason, onDecision 
     <Box flexDirection="column" marginTop={1}>
       <Divider />
       <Box paddingX={2} flexDirection="column">
-        <Text color="yellow" bold>{"⚠"} API CALL REQUEST</Text>
+        <Text color="yellow" bold>
+          {"⚠"} API CALL REQUEST
+        </Text>
         <Text> </Text>
         <Text>
           {"  "}Gordon wants to call:{" "}
-          <Text bold color="cyanBright">{method} {endpoint}</Text>
+          <Text bold color="cyanBright">
+            {method} {endpoint}
+          </Text>
         </Text>
-        {reason && <Text dimColor>{"  "}{reason}</Text>}
+        {reason && (
+          <Text dimColor>
+            {"  "}
+            {reason}
+          </Text>
+        )}
         <Text> </Text>
         <Box paddingLeft={2}>
           <Select

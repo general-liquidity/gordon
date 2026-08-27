@@ -264,13 +264,7 @@ export function diffCells(
   // any cell there differs we abandon the fast path and full-scan.
   // ---------------------------------------------------------------
   let usedFastPath = false;
-  if (
-    tracker &&
-    tracker.box !== null &&
-    !tracker.mustFullScan &&
-    width > 0 &&
-    height > 0
-  ) {
+  if (tracker && tracker.box !== null && !tracker.mustFullScan && width > 0 && height > 0) {
     const prevBox = tracker.box;
     const isEmpty = prevBox.minY > prevBox.maxY;
     if (isEmpty) {
@@ -306,16 +300,7 @@ export function diffCells(
         tracker.invalidate();
       } else {
         // Safe to confine the walk to [boxStartY, boxEndY].
-        scanRows(
-          prevRaw,
-          currRaw,
-          width,
-          charPool,
-          boxStartY,
-          boxEndY + 1,
-          patches,
-          acc,
-        );
+        scanRows(prevRaw, currRaw, width, charPool, boxStartY, boxEndY + 1, patches, acc);
         usedFastPath = true;
       }
     }

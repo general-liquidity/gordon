@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import { DARK_THEME, THEMES, type GordonTheme } from "./themes.js";
 
 // ============================================================================
@@ -10,7 +10,13 @@ const ThemeContext = createContext<{ theme: GordonTheme; setTheme: (name: string
   setTheme: () => {},
 });
 
-export function ThemeProvider({ children, initialTheme }: { children: ReactNode; initialTheme?: string }) {
+export function ThemeProvider({
+  children,
+  initialTheme,
+}: {
+  children: ReactNode;
+  initialTheme?: string;
+}) {
   const [theme, setThemeState] = useState<GordonTheme>(
     (initialTheme ? THEMES[initialTheme] : undefined) ?? DARK_THEME,
   );
@@ -20,11 +26,7 @@ export function ThemeProvider({ children, initialTheme }: { children: ReactNode;
     if (t) setThemeState(t);
   }, []);
 
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme(): GordonTheme {

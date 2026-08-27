@@ -76,7 +76,15 @@ export function queuePositionSignal(input: QueuePositionInput): QueuePositionRes
     (timeToFillBidSec != null ? `; tFillBid≈${timeToFillBidSec.toFixed(1)}s` : "") +
     (timeToFillAskSec != null ? `; tFillAsk≈${timeToFillAskSec.toFixed(1)}s` : "");
 
-  return { bidQueue, askQueue, queueImbalance, timeToFillBidSec, timeToFillAskSec, verdict, reasoning };
+  return {
+    bidQueue,
+    askQueue,
+    queueImbalance,
+    timeToFillBidSec,
+    timeToFillAskSec,
+    verdict,
+    reasoning,
+  };
 }
 
 export interface SpreadCrossingInput {

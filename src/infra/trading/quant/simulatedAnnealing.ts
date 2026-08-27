@@ -71,7 +71,7 @@ export interface SimulatedAnnealingResult {
 }
 
 function makeLCG(seed: number): () => number {
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   return () => {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return s / 0x100000000;
@@ -91,9 +91,7 @@ export function computeSimulatedAnnealing(
 ): SimulatedAnnealingResult {
   const N = input.initialState.length;
   if (input.bounds.length !== N) {
-    throw new Error(
-      `bounds length ${input.bounds.length} ≠ initialState length ${N}`,
-    );
+    throw new Error(`bounds length ${input.bounds.length} ≠ initialState length ${N}`);
   }
   for (let i = 0; i < N; i++) {
     const [lo, hi] = input.bounds[i]!;

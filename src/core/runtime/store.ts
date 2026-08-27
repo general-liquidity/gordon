@@ -13,11 +13,7 @@
 import type { Database } from "bun:sqlite";
 import { getDatabase, executeWithLogging } from "../../infra/storage/database.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
-import type {
-  StrategySlot,
-  SlotTradeRecord,
-  PortfolioSnapshot,
-} from "./types.ts";
+import type { StrategySlot, SlotTradeRecord, PortfolioSnapshot } from "./types.ts";
 
 const logger = createModuleLogger("runtime-store");
 
@@ -88,7 +84,9 @@ export function initRuntimeTables(db: Database): void {
   db.run("CREATE INDEX IF NOT EXISTS idx_strategy_slots_playbook ON strategy_slots(playbook_name)");
   db.run("CREATE INDEX IF NOT EXISTS idx_slot_trades_slot_id ON slot_trades(slot_id)");
   db.run("CREATE INDEX IF NOT EXISTS idx_slot_trades_opened_at ON slot_trades(opened_at)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_at ON portfolio_snapshots(snapshot_at)");
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_at ON portfolio_snapshots(snapshot_at)",
+  );
 
   logger.debug("Runtime tables initialized");
 }
@@ -228,7 +226,7 @@ export class RuntimeStore {
           slot.paused_at ?? null,
           slot.last_trade_at ?? null,
         ),
-      "INSERT OR REPLACE strategy_slots"
+      "INSERT OR REPLACE strategy_slots",
     );
   }
 
@@ -239,7 +237,7 @@ export class RuntimeStore {
     const stmt = this.db.prepare("SELECT * FROM strategy_slots WHERE slot_id = ?");
     const row = executeWithLogging(
       () => stmt.get(slotId) as Record<string, unknown> | null,
-      "SELECT strategy_slots by slot_id"
+      "SELECT strategy_slots by slot_id",
     );
 
     return row ? rowToSlot(row) : null;
@@ -252,7 +250,7 @@ export class RuntimeStore {
     const stmt = this.db.prepare("SELECT * FROM strategy_slots WHERE status = ?");
     const rows = executeWithLogging(
       () => stmt.all(status) as Record<string, unknown>[],
-      "SELECT strategy_slots by status"
+      "SELECT strategy_slots by status",
     );
 
     return rows.map(rowToSlot);
@@ -265,7 +263,7 @@ export class RuntimeStore {
     const stmt = this.db.prepare("SELECT * FROM strategy_slots ORDER BY started_at DESC");
     const rows = executeWithLogging(
       () => stmt.all() as Record<string, unknown>[],
-      "SELECT all strategy_slots"
+      "SELECT all strategy_slots",
     );
 
     return rows.map(rowToSlot);
@@ -293,7 +291,7 @@ export class RuntimeStore {
     const stmt = this.db.prepare(sql);
     const row = executeWithLogging(
       () => stmt.get(playbookName) as Record<string, unknown> | null,
-      "SELECT strategy_slots by playbook_name"
+      "SELECT strategy_slots by playbook_name",
     );
 
     return row ? rowToSlot(row) : null;
@@ -327,7 +325,7 @@ export class RuntimeStore {
           trade.opened_at,
           trade.closed_at ?? null,
         ),
-      "INSERT slot_trades"
+      "INSERT slot_trades",
     );
   }
 
@@ -364,11 +362,11 @@ export class RuntimeStore {
    */
   getTradesForSlot(slotId: string, limit = 50): SlotTradeRecord[] {
     const stmt = this.db.prepare(
-      "SELECT * FROM slot_trades WHERE slot_id = ? ORDER BY opened_at DESC LIMIT ?"
+      "SELECT * FROM slot_trades WHERE slot_id = ? ORDER BY opened_at DESC LIMIT ?",
     );
     const rows = executeWithLogging(
       () => stmt.all(slotId, limit) as Record<string, unknown>[],
-      "SELECT slot_trades by slot_id"
+      "SELECT slot_trades by slot_id",
     );
 
     return rows.map(rowToSlotTrade);
@@ -381,11 +379,11 @@ export class RuntimeStore {
     const todayStart = new Date();
     todayStart.setUTCHours(0, 0, 0, 0);
     const stmt = this.db.prepare(
-      "SELECT COUNT(*) as count FROM slot_trades WHERE slot_id = ? AND opened_at >= ?"
+      "SELECT COUNT(*) as count FROM slot_trades WHERE slot_id = ? AND opened_at >= ?",
     );
     const row = executeWithLogging(
       () => stmt.get(slotId, todayStart.toISOString()) as { count: number } | null,
-      "SELECT COUNT slot_trades today"
+      "SELECT COUNT slot_trades today",
     );
 
     return row?.count ?? 0;
@@ -421,7 +419,7 @@ export class RuntimeStore {
           snapshot.total_open_positions,
           snapshot.snapshot_at,
         ),
-      "INSERT portfolio_snapshots"
+      "INSERT portfolio_snapshots",
     );
   }
 
@@ -430,11 +428,11 @@ export class RuntimeStore {
    */
   getRecentSnapshots(limit = 100): PortfolioSnapshot[] {
     const stmt = this.db.prepare(
-      "SELECT * FROM portfolio_snapshots ORDER BY snapshot_at DESC LIMIT ?"
+      "SELECT * FROM portfolio_snapshots ORDER BY snapshot_at DESC LIMIT ?",
     );
     const rows = executeWithLogging(
       () => stmt.all(limit) as Record<string, unknown>[],
-      "SELECT recent portfolio_snapshots"
+      "SELECT recent portfolio_snapshots",
     );
 
     return rows.map(rowToSnapshot);
@@ -445,11 +443,11 @@ export class RuntimeStore {
    */
   getSnapshotsInRange(from: string, to: string): PortfolioSnapshot[] {
     const stmt = this.db.prepare(
-      "SELECT * FROM portfolio_snapshots WHERE snapshot_at >= ? AND snapshot_at <= ? ORDER BY snapshot_at ASC"
+      "SELECT * FROM portfolio_snapshots WHERE snapshot_at >= ? AND snapshot_at <= ? ORDER BY snapshot_at ASC",
     );
     const rows = executeWithLogging(
       () => stmt.all(from, to) as Record<string, unknown>[],
-      "SELECT portfolio_snapshots in range"
+      "SELECT portfolio_snapshots in range",
     );
 
     return rows.map(rowToSnapshot);

@@ -125,9 +125,7 @@ export class AuditChain {
     const from = new Date(Date.now() - hours * 60 * 60 * 1000);
     const allAgentTraces = getTracesByAgent(agentId, 200);
     const fromMs = from.getTime();
-    return allAgentTraces.filter(
-      (t) => new Date(t.started_at).getTime() >= fromMs
-    );
+    return allAgentTraces.filter((t) => new Date(t.started_at).getTime() >= fromMs);
   }
 
   /**
@@ -189,12 +187,8 @@ export class AuditChain {
     const lines: string[] = [];
 
     // Trigger line
-    const eventInfo = trace.trigger.event_type
-      ? ` ${trace.trigger.event_type}`
-      : "";
-    lines.push(
-      `[${trace.trigger.type}]${eventInfo} from ${trace.trigger.source}`
-    );
+    const eventInfo = trace.trigger.event_type ? ` ${trace.trigger.event_type}` : "";
+    lines.push(`[${trace.trigger.type}]${eventInfo} from ${trace.trigger.source}`);
     lines.push(`  "${trace.trigger.payload_summary}"`);
 
     // Agent steps
@@ -212,15 +206,13 @@ export class AuditChain {
       }
       if (step.handed_off_to) {
         lines.push(
-          `    => handed off to ${step.handed_off_to} (${step.handoff_reason ?? "no reason"})`
+          `    => handed off to ${step.handed_off_to} (${step.handoff_reason ?? "no reason"})`,
         );
       }
     }
 
     // Outcome
-    const posInfo = trace.outcome.position_id
-      ? ` [pos: ${trace.outcome.position_id}]`
-      : "";
+    const posInfo = trace.outcome.position_id ? ` [pos: ${trace.outcome.position_id}]` : "";
     lines.push(` => Outcome: ${trace.outcome.type}${posInfo}`);
     lines.push(`    "${trace.outcome.details}"`);
 
@@ -276,7 +268,7 @@ export class AuditChain {
         if (step.handed_off_to) {
           lines.push("");
           lines.push(
-            `*Handed off to **${step.handed_off_to}*** — ${step.handoff_reason ?? "no reason given"}`
+            `*Handed off to **${step.handed_off_to}*** — ${step.handoff_reason ?? "no reason given"}`,
           );
         }
         lines.push("");

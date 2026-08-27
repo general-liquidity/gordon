@@ -8,9 +8,10 @@ interface FakeRequestCapture {
   options: Array<{ optionId: string; kind: string }>;
 }
 
-function makeFakeConnection(
-  responder: () => Promise<unknown> | unknown,
-): { connection: AgentSideConnection; calls: FakeRequestCapture[] } {
+function makeFakeConnection(responder: () => Promise<unknown> | unknown): {
+  connection: AgentSideConnection;
+  calls: FakeRequestCapture[];
+} {
   const calls: FakeRequestCapture[] = [];
   const fake = {
     requestPermission: async (req: unknown) => {

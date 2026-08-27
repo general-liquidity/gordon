@@ -25,7 +25,7 @@ describe("assessMatrixStability", () => {
     const states = [...half, ...half];
     const result = assessMatrixStability(states);
     expect(result.verdict).toBe("stable");
-    expect(result.pValue).toBeGreaterThan(0.10);
+    expect(result.pValue).toBeGreaterThan(0.1);
   });
 
   it("classifies a series with a hard regime break as unstable", () => {
@@ -111,12 +111,14 @@ describe("calculateMarkovRegime — stability integration", () => {
     const closes: number[] = [];
     let p = 100;
     for (let i = 0; i < 200; i++) {
-      p *= 1 + (Math.sin(i / 10) * 0.005);
+      p *= 1 + Math.sin(i / 10) * 0.005;
       closes.push(p);
     }
     const result = calculateMarkovRegime(makeCandles(closes));
     expect(result.stability).toBeDefined();
-    expect(["stable", "drifting", "unstable", "insufficient_data"]).toContain(result.stability.verdict);
+    expect(["stable", "drifting", "unstable", "insufficient_data"]).toContain(
+      result.stability.verdict,
+    );
     expect(typeof result.stability.chiSquare).toBe("number");
     expect(typeof result.stability.pValue).toBe("number");
     expect(typeof result.stability.frobeniusDistance).toBe("number");

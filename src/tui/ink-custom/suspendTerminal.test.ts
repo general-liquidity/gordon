@@ -62,13 +62,7 @@ describe("createSuspendTerminal (callback form)", () => {
     expect(paintingDuringCallback).toBe(false);
     expect(h.painting()).toBe(true);
     // Order: pause both, run external, resume both.
-    expect(h.log).toEqual([
-      "pauseRender",
-      "pauseInput",
-      "external",
-      "resumeInput",
-      "resumeRender",
-    ]);
+    expect(h.log).toEqual(["pauseRender", "pauseInput", "external", "resumeInput", "resumeRender"]);
   });
 
   test("restores the terminal even when the callback throws", async () => {

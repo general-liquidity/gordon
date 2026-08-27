@@ -21,10 +21,10 @@ export function formatBacktestSummary(result: PlaybookBacktestResult): string {
   lines.push("");
   lines.push(`**Symbol:** ${result.config.symbol} | **Timeframe:** ${result.config.timeframe}`);
   lines.push(
-    `**Period:** ${formatDate(result.config.start_date)} to ${formatDate(result.config.end_date)}`
+    `**Period:** ${formatDate(result.config.start_date)} to ${formatDate(result.config.end_date)}`,
   );
   lines.push(
-    `**Capital:** $${result.config.initial_capital.toLocaleString()} | **Fees:** ${result.config.fee_percent}% | **Slippage:** ${result.config.slippage_percent}%`
+    `**Capital:** $${result.config.initial_capital.toLocaleString()} | **Fees:** ${result.config.fee_percent}% | **Slippage:** ${result.config.slippage_percent}%`,
   );
   lines.push("");
 
@@ -46,7 +46,9 @@ export function formatBacktestSummary(result: PlaybookBacktestResult): string {
   lines.push(`| Metric | Value |`);
   lines.push(`|--------|-------|`);
   lines.push(`| Total Trades | ${result.total_trades} |`);
-  lines.push(`| Win Rate | ${result.win_rate}% (${result.winning_trades}W / ${result.losing_trades}L) |`);
+  lines.push(
+    `| Win Rate | ${result.win_rate}% (${result.winning_trades}W / ${result.losing_trades}L) |`,
+  );
   lines.push(`| Avg Win | ${sign(result.avg_win_percent)}% |`);
   lines.push(`| Avg Loss | ${sign(result.avg_loss_percent)}% |`);
   lines.push(`| Largest Win | ${sign(result.largest_win_percent)}% |`);
@@ -79,10 +81,7 @@ export function formatBacktestSummary(result: PlaybookBacktestResult): string {
  * Format the trade list as a markdown table.
  * Shows at most `maxTrades` trades.
  */
-export function formatTradeList(
-  trades: PlaybookBacktestTrade[],
-  maxTrades: number = 20
-): string {
+export function formatTradeList(trades: PlaybookBacktestTrade[], maxTrades: number = 20): string {
   if (trades.length === 0) {
     return "No trades executed.";
   }
@@ -97,7 +96,7 @@ export function formatTradeList(
   for (let i = 0; i < show.length; i++) {
     const t = show[i]!;
     lines.push(
-      `| ${i + 1} | ${t.side.toUpperCase()} | $${t.entry_price} | $${t.exit_price} | ${sign(t.pnl_percent)}% | ${formatExitReason(t.exit_reason)} | ${formatDuration(t.duration_hours)} |`
+      `| ${i + 1} | ${t.side.toUpperCase()} | $${t.entry_price} | $${t.exit_price} | ${sign(t.pnl_percent)}% | ${formatExitReason(t.exit_reason)} | ${formatDuration(t.duration_hours)} |`,
     );
   }
 
@@ -118,7 +117,7 @@ export function formatTradeList(
  */
 export function formatEquityCurve(
   equityCurve: PlaybookBacktestResult["equity_curve"],
-  width: number = 40
+  width: number = 40,
 ): string {
   if (equityCurve.length === 0) {
     return "No equity curve data.";
@@ -156,10 +155,10 @@ export function formatEquityCurve(
 
   lines.push(`\`${sparkline}\``);
   lines.push(
-    `Low: $${min.toLocaleString(undefined, { maximumFractionDigits: 2 })} | High: $${max.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+    `Low: $${min.toLocaleString(undefined, { maximumFractionDigits: 2 })} | High: $${max.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
   );
   lines.push(
-    `Start: ${formatDate(equityCurve[0]!.timestamp)} | End: ${formatDate(equityCurve[equityCurve.length - 1]!.timestamp)}`
+    `Start: ${formatDate(equityCurve[0]!.timestamp)} | End: ${formatDate(equityCurve[equityCurve.length - 1]!.timestamp)}`,
   );
 
   return lines.join("\n");
@@ -214,12 +213,8 @@ export function formatBacktestComparison(results: PlaybookBacktestResult[]): str
   lines.push("");
 
   // Determine winner
-  const best = results.reduce((a, b) =>
-    a.sharpe_ratio > b.sharpe_ratio ? a : b
-  );
-  lines.push(
-    `**Best by Sharpe Ratio:** ${best.playbook_name} (${best.sharpe_ratio})`
-  );
+  const best = results.reduce((a, b) => (a.sharpe_ratio > b.sharpe_ratio ? a : b));
+  lines.push(`**Best by Sharpe Ratio:** ${best.playbook_name} (${best.sharpe_ratio})`);
 
   return lines.join("\n");
 }
@@ -266,41 +261,36 @@ function generateWarnings(result: PlaybookBacktestResult): string[] {
 
   if (result.total_trades < 10) {
     warnings.push(
-      `Low trade count (${result.total_trades}). Results may not be statistically significant.`
+      `Low trade count (${result.total_trades}). Results may not be statistically significant.`,
     );
   }
 
   if (result.max_drawdown_percent > 25) {
     warnings.push(
-      `High max drawdown (${result.max_drawdown_percent}%). Consider tighter risk management.`
+      `High max drawdown (${result.max_drawdown_percent}%). Consider tighter risk management.`,
     );
   }
 
   if (result.profit_factor > 0 && result.profit_factor < 1) {
-    warnings.push(
-      `Profit factor below 1 (${result.profit_factor}). Strategy is unprofitable.`
-    );
+    warnings.push(`Profit factor below 1 (${result.profit_factor}). Strategy is unprofitable.`);
   }
 
   if (result.win_rate < 30) {
-    warnings.push(
-      `Low win rate (${result.win_rate}%). Ensure reward/risk ratio compensates.`
-    );
+    warnings.push(`Low win rate (${result.win_rate}%). Ensure reward/risk ratio compensates.`);
   }
 
   if (result.max_consecutive_losses >= 5) {
     warnings.push(
-      `${result.max_consecutive_losses} consecutive losses recorded. Watch for psychological impact.`
+      `${result.max_consecutive_losses} consecutive losses recorded. Watch for psychological impact.`,
     );
   }
 
   const periodDays =
-    (new Date(result.config.end_date).getTime() -
-      new Date(result.config.start_date).getTime()) /
+    (new Date(result.config.end_date).getTime() - new Date(result.config.start_date).getTime()) /
     (1000 * 60 * 60 * 24);
   if (periodDays < 30) {
     warnings.push(
-      `Short backtest period (${Math.round(periodDays)} days). Results may not be representative.`
+      `Short backtest period (${Math.round(periodDays)} days). Results may not be representative.`,
     );
   }
 

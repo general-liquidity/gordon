@@ -30,15 +30,8 @@
  * reason="unknown".
  */
 
-import type {
-  Processor,
-  ProcessInputArgs,
-  ProcessInputResult,
-} from "@mastra/core/processors";
-import {
-  reconcileToolCalls,
-  type InterruptionReason,
-} from "../runtime/toolCallReconciler.ts";
+import type { Processor, ProcessInputArgs, ProcessInputResult } from "@mastra/core/processors";
+import { reconcileToolCalls, type InterruptionReason } from "../runtime/toolCallReconciler.ts";
 
 interface KnownInterruption {
   reason: InterruptionReason;
@@ -71,10 +64,7 @@ export function reportToolCallInterruption(
 ): void {
   if (!callId) return;
   // Evict oldest if at capacity (drop entries reportedAt earlier).
-  if (
-    knownInterruptionQueue.size >= MAX_QUEUE_SIZE &&
-    !knownInterruptionQueue.has(callId)
-  ) {
+  if (knownInterruptionQueue.size >= MAX_QUEUE_SIZE && !knownInterruptionQueue.has(callId)) {
     let oldestKey: string | null = null;
     let oldestTime = Infinity;
     for (const [key, value] of knownInterruptionQueue) {
@@ -136,7 +126,7 @@ interface MessageLike {
 function findToolUseIds(messages: ReadonlyArray<MessageLike>): Set<string> {
   const ids = new Set<string>();
   for (const msg of messages) {
-    if (msg && (msg.role === "assistant") && Array.isArray(msg.content)) {
+    if (msg && msg.role === "assistant" && Array.isArray(msg.content)) {
       for (const part of msg.content as unknown[]) {
         if (typeof part !== "object" || part === null) continue;
         const p = part as Record<string, unknown>;
@@ -153,9 +143,7 @@ function findToolUseIds(messages: ReadonlyArray<MessageLike>): Set<string> {
   return ids;
 }
 
-export class GordonToolCallReconciler
-  implements Processor<"gordon-toolcall-reconciler">
-{
+export class GordonToolCallReconciler implements Processor<"gordon-toolcall-reconciler"> {
   readonly id = "gordon-toolcall-reconciler" as const;
   readonly name = "Gordon Tool-Call Reconciler";
   readonly description =

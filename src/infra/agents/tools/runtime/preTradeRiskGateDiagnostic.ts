@@ -54,12 +54,7 @@ export const preTradeRiskGateDiagnosticTool = createTool({
     dailyDrawdownLimitPct: z.number().min(0).optional().describe("Default 0.01 (1%)."),
     weeklyDrawdownLimitPct: z.number().min(0).optional().describe("Default 0.02 (2%)."),
     weeklyWindowDays: z.number().int().min(1).optional().describe("Default 5."),
-    minReturnSeriesForCorrelation: z
-      .number()
-      .int()
-      .min(2)
-      .optional()
-      .describe("Default 10."),
+    minReturnSeriesForCorrelation: z.number().int().min(2).optional().describe("Default 10."),
   }),
   outputSchema: z.object({
     proposedSymbol: z.string(),
@@ -75,9 +70,7 @@ export const preTradeRiskGateDiagnosticTool = createTool({
         detail: z.record(z.string(), z.unknown()).optional(),
       }),
     ),
-    blockingLayer: z
-      .enum(["position_size", "correlation", "sector", "drawdown_window"])
-      .nullable(),
+    blockingLayer: z.enum(["position_size", "correlation", "sector", "drawdown_window"]).nullable(),
     verdict: z.enum([
       "allow",
       "block_position_size",

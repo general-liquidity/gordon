@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { Box, Text } from "../../ink-custom";
 import { getBinding, type BindableAction } from "../../keybindings/keybindings.ts";
 

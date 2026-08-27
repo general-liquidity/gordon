@@ -64,7 +64,7 @@ export class EMARSICrossoverStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, 100);
     if (candles.length < 60) {
@@ -88,7 +88,7 @@ export class EMARSICrossoverStrategy extends BaseStrategy {
     // Check for bullish crossover (EMA9 > EMA21)
     if (ema9.current <= ema21.current) {
       return this.notDetected(
-        `No bullish crossover (EMA9: $${ema9.current.toFixed(2)} <= EMA21: $${ema21.current.toFixed(2)})`
+        `No bullish crossover (EMA9: $${ema9.current.toFixed(2)} <= EMA21: $${ema21.current.toFixed(2)})`,
       );
     }
 
@@ -96,14 +96,14 @@ export class EMARSICrossoverStrategy extends BaseStrategy {
     const crossoverAge = this.findCrossoverAge(ema9.values, ema21.values);
     if (crossoverAge > CROSSOVER_LOOKBACK) {
       return this.notDetected(
-        `Crossover too old (${crossoverAge} candles ago > ${CROSSOVER_LOOKBACK})`
+        `Crossover too old (${crossoverAge} candles ago > ${CROSSOVER_LOOKBACK})`,
       );
     }
 
     // Check price above EMA50 (medium-term trend)
     if (currentPrice < ema50.current) {
       return this.notDetected(
-        `Price below EMA50 ($${currentPrice.toFixed(2)} < $${ema50.current.toFixed(2)})`
+        `Price below EMA50 ($${currentPrice.toFixed(2)} < $${ema50.current.toFixed(2)})`,
       );
     }
 
@@ -114,15 +114,11 @@ export class EMARSICrossoverStrategy extends BaseStrategy {
     }
 
     if (rsi.current < RSI_THRESHOLD) {
-      return this.notDetected(
-        `RSI below threshold (${rsi.current.toFixed(1)} < ${RSI_THRESHOLD})`
-      );
+      return this.notDetected(`RSI below threshold (${rsi.current.toFixed(1)} < ${RSI_THRESHOLD})`);
     }
 
     if (rsi.current > RSI_OVERBOUGHT) {
-      return this.notDetected(
-        `RSI overbought (${rsi.current.toFixed(1)} > ${RSI_OVERBOUGHT})`
-      );
+      return this.notDetected(`RSI overbought (${rsi.current.toFixed(1)} > ${RSI_OVERBOUGHT})`);
     }
 
     // Check RSI is rising
@@ -180,10 +176,7 @@ export class EMARSICrossoverStrategy extends BaseStrategy {
   /**
    * Find how many candles ago the crossover occurred
    */
-  private findCrossoverAge(
-    fastValues: (number | null)[],
-    slowValues: (number | null)[]
-  ): number {
+  private findCrossoverAge(fastValues: (number | null)[], slowValues: (number | null)[]): number {
     for (let i = fastValues.length - 1; i >= 1; i--) {
       const currentFast = fastValues[i];
       const currentSlow = slowValues[i];
@@ -219,15 +212,12 @@ export class EMARSICrossoverStrategy extends BaseStrategy {
     return recent[2]! > recent[0]!;
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", 100);
     const currentPrice = this.getCurrentPrice(candles, ctx);
 
     const ema21 = this.calculateEMA(candles, MEDIUM_EMA);
-    const atr = this.calculateATR(candles);
+    const _atr = this.calculateATR(candles);
 
     const entryPrice = currentPrice;
 
@@ -252,7 +242,8 @@ export class EMARSICrossoverStrategy extends BaseStrategy {
       stopLoss,
       takeProfits,
       riskRewardRatio,
-      notes: `EMA crossover with RSI confirmation. Stop below EMA21 at $${stopLoss.toFixed(2)}. ` +
+      notes:
+        `EMA crossover with RSI confirmation. Stop below EMA21 at $${stopLoss.toFixed(2)}. ` +
         `R:R ${riskRewardRatio.toFixed(1)}:1`,
     };
   }
@@ -318,14 +309,14 @@ When creating a plan using the EMA+RSI Crossover strategy:
     bar: OHLC,
     _index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     const price = bar.close;
     const { rsi14, rsi14Prev, ema12, ema26, ema50 } = indicators;
 
     // Use custom ema9/ema21 if available, otherwise fall back to ema12/ema26
-    const fastEMA = (indicators["ema9"] as number | null | undefined) ?? ema12;
-    const mediumEMA = (indicators["ema21"] as number | null | undefined) ?? ema26;
+    const fastEMA = (indicators.ema9 as number | null | undefined) ?? ema12;
+    const mediumEMA = (indicators.ema21 as number | null | undefined) ?? ema26;
 
     // SELL signals (exit conditions)
     if (fastEMA != null && mediumEMA != null && fastEMA < mediumEMA) {

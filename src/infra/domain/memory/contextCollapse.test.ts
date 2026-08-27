@@ -100,11 +100,17 @@ describe("collapseContext", () => {
   it("hash is stable for identical content", () => {
     const content = bigJson("same", 2000);
     const a = collapseContext(
-      [{ role: "assistant", content }, { role: "user", content: "x" }],
+      [
+        { role: "assistant", content },
+        { role: "user", content: "x" },
+      ],
       { recentMessagesToKeep: 1 },
     );
     const b = collapseContext(
-      [{ role: "assistant", content }, { role: "user", content: "y" }],
+      [
+        { role: "assistant", content },
+        { role: "user", content: "y" },
+      ],
       { recentMessagesToKeep: 1 },
     );
     expect(a.collapsedBlocks[0]?.hash).toBe(b.collapsedBlocks[0]?.hash);

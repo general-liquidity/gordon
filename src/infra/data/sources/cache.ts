@@ -177,7 +177,7 @@ export class HistoricalDataCache {
           candle.close,
           candle.volume,
           sourceId,
-          now
+          now,
         );
       }
     });
@@ -203,10 +203,7 @@ export class HistoricalDataCache {
     const db = getDatabase();
     const upperSymbol = symbol.toUpperCase();
 
-    const query = db.prepare<
-      { min_ts: number | null; max_ts: number | null },
-      [string, string]
-    >(`
+    const query = db.prepare<{ min_ts: number | null; max_ts: number | null }, [string, string]>(`
       SELECT MIN(timestamp) as min_ts, MAX(timestamp) as max_ts
       FROM data_source_cache
       WHERE symbol = ? AND timeframe = ?
@@ -283,35 +280,45 @@ export class HistoricalDataCache {
     const db = getDatabase();
 
     // Total entries
-    const totalResult = db.prepare<{ count: number }, []>(
-      `SELECT COUNT(*) as count FROM data_source_cache`
-    ).get();
+    const totalResult = db
+      .prepare<{ count: number }, []>(`SELECT COUNT(*) as count FROM data_source_cache`)
+      .get();
     const totalEntries = totalResult?.count ?? 0;
 
     // Distinct symbols
-    const symbolRows = db.prepare<{ symbol: string }, []>(
-      `SELECT DISTINCT symbol FROM data_source_cache ORDER BY symbol`
-    ).all();
+    const symbolRows = db
+      .prepare<{ symbol: string }, []>(
+        `SELECT DISTINCT symbol FROM data_source_cache ORDER BY symbol`,
+      )
+      .all();
     const symbols = symbolRows.map((r) => r.symbol);
 
     // Distinct timeframes
-    const timeframeRows = db.prepare<{ timeframe: string }, []>(
-      `SELECT DISTINCT timeframe FROM data_source_cache ORDER BY timeframe`
-    ).all();
+    const timeframeRows = db
+      .prepare<{ timeframe: string }, []>(
+        `SELECT DISTINCT timeframe FROM data_source_cache ORDER BY timeframe`,
+      )
+      .all();
     const timeframes = timeframeRows.map((r) => r.timeframe);
 
     // Oldest and newest
-    const minResult = db.prepare<{ min_ts: number | null }, []>(
-      `SELECT MIN(timestamp) as min_ts FROM data_source_cache`
-    ).get();
-    const maxResult = db.prepare<{ max_ts: number | null }, []>(
-      `SELECT MAX(timestamp) as max_ts FROM data_source_cache`
-    ).get();
+    const minResult = db
+      .prepare<{ min_ts: number | null }, []>(
+        `SELECT MIN(timestamp) as min_ts FROM data_source_cache`,
+      )
+      .get();
+    const maxResult = db
+      .prepare<{ max_ts: number | null }, []>(
+        `SELECT MAX(timestamp) as max_ts FROM data_source_cache`,
+      )
+      .get();
 
     // Count by source
-    const sourceRows = db.prepare<{ source_id: string; count: number }, []>(
-      `SELECT source_id, COUNT(*) as count FROM data_source_cache GROUP BY source_id`
-    ).all();
+    const sourceRows = db
+      .prepare<{ source_id: string; count: number }, []>(
+        `SELECT source_id, COUNT(*) as count FROM data_source_cache GROUP BY source_id`,
+      )
+      .all();
     const bySource: Record<string, number> = {};
     for (const row of sourceRows) {
       bySource[row.source_id] = row.count;

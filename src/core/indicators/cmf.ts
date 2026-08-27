@@ -29,7 +29,7 @@ export interface CMFResult {
 function moneyFlowVolume(c: Candle): number {
   const range = c.high - c.low;
   if (range <= 0) return 0;
-  const mfm = ((c.close - c.low) - (c.high - c.close)) / range;
+  const mfm = (c.close - c.low - (c.high - c.close)) / range;
   return mfm * c.volume;
 }
 
@@ -84,7 +84,7 @@ export function calculateCMF(candles: Candle[], period: number = 20): CMFResult 
 
 function buildInterpretation(
   current: number | null,
-  signal: "accumulation" | "distribution" | "neutral"
+  signal: "accumulation" | "distribution" | "neutral",
 ): string {
   if (current === null) return "Insufficient data for CMF.";
   const val = current.toFixed(3);

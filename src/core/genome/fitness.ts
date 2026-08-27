@@ -27,18 +27,18 @@ const MIN_TRADES_THRESHOLD = 10;
 
 /** Weight configuration for the fitness formula */
 const WEIGHTS = {
-  sharpe: 0.30,
-  win_rate: 0.20,
-  profit_factor: 0.20,
+  sharpe: 0.3,
+  win_rate: 0.2,
+  profit_factor: 0.2,
   max_drawdown: 0.15,
   trade_count: 0.15,
 } as const;
 
 /** Normalization targets */
-const SHARPE_MAX = 2.0;       // Sharpe 2.0 maps to 100
+const SHARPE_MAX = 2.0; // Sharpe 2.0 maps to 100
 const PROFIT_FACTOR_MAX = 3.0; // PF 3.0 maps to 100
-const DRAWDOWN_MAX = 50;       // 50% drawdown maps to 0
-const TRADE_COUNT_IDEAL = 50;  // 50+ trades = full score
+const DRAWDOWN_MAX = 50; // 50% drawdown maps to 0
+const TRADE_COUNT_IDEAL = 50; // 50+ trades = full score
 
 // ============================================================================
 // FitnessCalculator
@@ -57,8 +57,14 @@ export class FitnessCalculator {
     const winRate = genome.live_win_rate ?? genome.paper_win_rate ?? genome.backtest_win_rate;
     const profitFactor = genome.backtest_profit_factor;
     const maxDrawdown = genome.backtest_max_drawdown;
-    const totalTrades = genome.live_trades + genome.paper_trades +
-      (genome.backtest_win_rate !== undefined ? (genome.backtest_profit_factor !== undefined ? MIN_TRADES_THRESHOLD : 0) : 0);
+    const totalTrades =
+      genome.live_trades +
+      genome.paper_trades +
+      (genome.backtest_win_rate !== undefined
+        ? genome.backtest_profit_factor !== undefined
+          ? MIN_TRADES_THRESHOLD
+          : 0
+        : 0);
 
     // Need at least sharpe or win rate to compute anything meaningful
     if (sharpe === undefined && winRate === undefined) {
@@ -116,7 +122,7 @@ export class FitnessCalculator {
    */
   compareGenomes(
     control: Genome,
-    variant: Genome
+    variant: Genome,
   ): {
     winner: "control" | "variant" | "undecided";
     reason: string;

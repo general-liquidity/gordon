@@ -101,7 +101,8 @@ export function deriveRejectedMutations(
     if (!child.parent_genome_id) continue;
     const parent = byId.get(child.parent_genome_id);
     if (!parent) continue;
-    if (typeof child.fitness_score !== "number" || typeof parent.fitness_score !== "number") continue;
+    if (typeof child.fitness_score !== "number" || typeof parent.fitness_score !== "number")
+      continue;
 
     // Positive drop = the child regressed relative to its parent.
     const drop = parent.fitness_score - child.fitness_score;

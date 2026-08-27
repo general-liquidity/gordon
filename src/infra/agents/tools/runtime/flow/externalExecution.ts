@@ -74,7 +74,11 @@ export class ExternalExecutionManager {
     toolName: string,
     args: Record<string, unknown>,
     reason: string,
-  ): { id: string; requirement: ExternalExecutionRequirement; result: Promise<ExternalExecutionResolution> } {
+  ): {
+    id: string;
+    requirement: ExternalExecutionRequirement;
+    result: Promise<ExternalExecutionResolution>;
+  } {
     const id = crypto.randomUUID();
     const requirement: ExternalExecutionRequirement = {
       id,

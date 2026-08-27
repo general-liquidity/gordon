@@ -113,10 +113,7 @@ describe("reconcileToolCalls", () => {
     expect(r.repairCount).toBe(3);
     // One inserted tool message with 3 result parts
     expect(r.reconciledMessages.length).toBe(3); // user + assistant + 1 tool msg
-    const insertedContent = r.reconciledMessages[2]!.content as Record<
-      string,
-      unknown
-    >[];
+    const insertedContent = r.reconciledMessages[2]!.content as Record<string, unknown>[];
     expect(insertedContent.length).toBe(3);
   });
 
@@ -132,9 +129,9 @@ describe("reconcileToolCalls", () => {
     // Original 4 + 2 inserted tool messages
     expect(r.reconciledMessages.length).toBe(6);
     // After assistant call_1 (originally idx 1) → tool msg at idx 2
-    expect((r.reconciledMessages[2]!.role as string)).toBe("tool");
+    expect(r.reconciledMessages[2]!.role as string).toBe("tool");
     // After assistant call_2 → tool msg at end
-    expect((r.reconciledMessages[5]!.role as string)).toBe("tool");
+    expect(r.reconciledMessages[5]!.role as string).toBe("tool");
   });
 
   test("partial result: one call paired, one dangling in same assistant message", () => {
@@ -283,9 +280,7 @@ describe("reconcileToolCalls", () => {
     ];
     const r = reconcileToolCalls({
       messages: msgs,
-      knownInterruptions: new Map([
-        ["call_1", { reason: "force_stop" as const }],
-      ]),
+      knownInterruptions: new Map([["call_1", { reason: "force_stop" as const }]]),
     });
     const text = formatReconciliationReport(r);
     expect(text).toContain("Tool-Call Reconciler");

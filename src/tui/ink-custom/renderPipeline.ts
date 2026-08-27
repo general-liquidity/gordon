@@ -127,8 +127,7 @@ function naiveDiff(
       const charIdx = currCell & CELL_CHAR_MASK;
       const styleId = (currCell >>> CELL_STYLE_SHIFT) & CELL_STYLE_MASK;
       const widthBits = (currCell >>> CELL_WIDTH_SHIFT) & CELL_WIDTH_MASK;
-      const cellVisualWidth =
-        widthBits === 1 ? 2 : widthBits === 2 ? 0 : 1;
+      const cellVisualWidth = widthBits === 1 ? 2 : widthBits === 2 ? 0 : 1;
       const content = charPool.get(charIdx) ?? "";
       if (runY === y && runNextX === x && runStyleId === styleId) {
         runContent += content;
@@ -164,11 +163,7 @@ const SGR_RESET = "\x1b[0m";
  */
 export function createAnsiPatcher(): AnsiPatcher {
   return {
-    write(
-      patches: readonly Patch[],
-      stylePool: StylePool,
-      charPool: CharPool,
-    ): string {
+    write(patches: readonly Patch[], stylePool: StylePool, charPool: CharPool): string {
       if (patches.length === 0) return "";
 
       // Sort by (y, x). Copy first — `patches` is readonly on the type.
@@ -188,7 +183,7 @@ export function createAnsiPatcher(): AnsiPatcher {
         // Cursor move on row boundary, or when this patch is not the next
         // cell on the current row (gap or out-of-order).
         if (patch.y !== lastY || patch.x !== lastX) {
-          out += CSI + (patch.y + 1) + ";" + (patch.x + 1) + "H";
+          out += `${CSI + (patch.y + 1)};${patch.x + 1}H`;
         }
         // Style change. `styleId === -1` means neutral — no SGR emitted.
         if (patch.styleId >= 0 && patch.styleId !== lastStyleId) {
@@ -208,9 +203,7 @@ export function createAnsiPatcher(): AnsiPatcher {
         }
         out += patch.content;
         lastY = patch.y;
-        lastX =
-          patch.x +
-          (patch.visualWidth > 0 ? patch.visualWidth : patch.content.length);
+        lastX = patch.x + (patch.visualWidth > 0 ? patch.visualWidth : patch.content.length);
       }
 
       if (styleUsed) out += SGR_RESET;
@@ -292,7 +285,7 @@ export function createRelativeAnsiPatcher(): RelativeAnsiPatcher {
       const pullBack = Math.max(0, previousFrameHeight);
       let out = "";
       if (pullBack > 0) {
-        out += CSI + pullBack + "A" + "\r";
+        out += `${CSI + pullBack}A\r`;
       } else {
         out += "\r";
       }
@@ -311,27 +304,27 @@ export function createRelativeAnsiPatcher(): RelativeAnsiPatcher {
           // Move down to the target row, then reset column and advance to
           // the target column. `\r` + cursorForward is cleaner than computing
           // a lateral delta across rows.
-          out += CSI + rowDelta + "B";
+          out += `${CSI + rowDelta}B`;
           out += "\r";
           if (patch.x > 0) {
-            out += CSI + patch.x + "C";
+            out += `${CSI + patch.x}C`;
           }
         } else if (rowDelta < 0) {
           // Defensive: sorted input shouldn't produce this, but if a caller
           // passes an unsorted patch list we don't want to corrupt the frame.
-          out += CSI + -rowDelta + "A";
+          out += `${CSI + -rowDelta}A`;
           out += "\r";
           if (patch.x > 0) {
-            out += CSI + patch.x + "C";
+            out += `${CSI + patch.x}C`;
           }
         } else {
           // Same row — use lateral delta from current column.
           const colDelta = patch.x - currentCol;
           if (colDelta > 0) {
-            out += CSI + colDelta + "C";
+            out += `${CSI + colDelta}C`;
           } else if (colDelta < 0) {
             // Defensive — not expected with sorted input.
-            out += CSI + -colDelta + "D";
+            out += `${CSI + -colDelta}D`;
           }
           // colDelta === 0 → adjacent patch, no cursor move needed.
         }
@@ -354,9 +347,7 @@ export function createRelativeAnsiPatcher(): RelativeAnsiPatcher {
         out += patch.content;
 
         currentRow = patch.y;
-        currentCol =
-          patch.x +
-          (patch.visualWidth > 0 ? patch.visualWidth : patch.content.length);
+        currentCol = patch.x + (patch.visualWidth > 0 ? patch.visualWidth : patch.content.length);
       }
 
       if (styleUsed) out += SGR_RESET;
@@ -367,7 +358,7 @@ export function createRelativeAnsiPatcher(): RelativeAnsiPatcher {
       // `pullBack - currentRow` lines lands on the line below the frame.
       const downBy = pullBack - currentRow;
       if (downBy > 0) {
-        out += CSI + downBy + "B";
+        out += `${CSI + downBy}B`;
       }
       out += "\r";
 

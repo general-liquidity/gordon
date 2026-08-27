@@ -39,7 +39,9 @@ type RegisterPromptArgsSchema = NonNullable<
 // Helpers
 // ---------------------------------------------------------------------------
 
-function skillArgumentsSchema(skill: Skill): Record<string, z.ZodOptional<z.ZodString>> | undefined {
+function skillArgumentsSchema(
+  skill: Skill,
+): Record<string, z.ZodOptional<z.ZodString>> | undefined {
   const args = skill.frontmatter.arguments;
   if (!args) return undefined;
 
@@ -129,9 +131,7 @@ export function registerGordonPrompts(server: McpServer): PromptRegistrationSumm
         // zod-version identity skew), so the otherwise-valid raw shape needs a cast to the
         // SDK's own expected shape type (extracted via `Parameters`, which keeps the
         // generic `Args` inference — and thus the callback typing — intact).
-        ...(argsSchema
-          ? { argsSchema: argsSchema as unknown as RegisterPromptArgsSchema }
-          : {}),
+        ...(argsSchema ? { argsSchema: argsSchema as unknown as RegisterPromptArgsSchema } : {}),
       },
       (args) => {
         const rendered = renderSkillBodyWithArgs(skill, args ?? {});

@@ -49,19 +49,9 @@ function isCSIFinal(byte: number): boolean {
   return byte >= 0x40 && byte <= 0x7e;
 }
 
-export type Token =
-  | { type: "text"; value: string }
-  | { type: "sequence"; value: string };
+export type Token = { type: "text"; value: string } | { type: "sequence"; value: string };
 
-type State =
-  | "ground"
-  | "escape"
-  | "escapeIntermediate"
-  | "csi"
-  | "ss3"
-  | "osc"
-  | "dcs"
-  | "apc";
+type State = "ground" | "escape" | "escapeIntermediate" | "csi" | "ss3" | "osc" | "dcs" | "apc";
 
 export type Tokenizer = {
   /** Feed a chunk; returns complete tokens, buffering any trailing incomplete sequence. */
@@ -348,7 +338,8 @@ export function createInputPipeline(
   const normalTimeout = options.normalTimeoutMs ?? NORMAL_TIMEOUT_MS;
   const pasteTimeout = options.pasteTimeoutMs ?? PASTE_TIMEOUT_MS;
   const setT = options.setTimeoutFn ?? ((fn, ms) => setTimeout(fn, ms) as unknown as TimerHandle);
-  const clearT = options.clearTimeoutFn ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
+  const clearT =
+    options.clearTimeoutFn ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
 
   let pasteActive = false;
   let pasteChunks: string[] = [];

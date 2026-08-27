@@ -32,10 +32,7 @@ function normalizeScopes(scope?: RevisionScope): string[] {
 }
 
 /** Set the active revision (the one injected into the prompt this session). */
-export function setActiveACELessonRevision(
-  revision: number,
-  scope?: RevisionScope,
-): void {
+export function setActiveACELessonRevision(revision: number, scope?: RevisionScope): void {
   if (Number.isFinite(revision) && revision >= 0) {
     const normalized = Math.floor(revision);
     for (const key of normalizeScopes(scope)) activeRevisions.set(key, normalized);
@@ -43,9 +40,7 @@ export function setActiveACELessonRevision(
 }
 
 /** The ACE lesson revision the agent is operating under. 0 = none / ACE off. */
-export function getActiveACELessonRevision(
-  scope?: RevisionScope,
-): number {
+export function getActiveACELessonRevision(scope?: RevisionScope): number {
   for (const key of normalizeScopes(scope)) {
     const revision = activeRevisions.get(key);
     if (revision !== undefined) return revision;
@@ -54,9 +49,7 @@ export function getActiveACELessonRevision(
 }
 
 /** Clear one session's aliases, or every scope when omitted (test/process reset). */
-export function resetActiveACELessonRevision(
-  scope?: RevisionScope,
-): void {
+export function resetActiveACELessonRevision(scope?: RevisionScope): void {
   if (scope === undefined) {
     activeRevisions.clear();
     return;

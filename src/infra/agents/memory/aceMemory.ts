@@ -31,7 +31,7 @@ function toMessages(threadId: string, limit = 24): Message[] {
   return [...entries]
     .reverse()
     .map((entry) => ({
-      role: entry.entryType === "assistant_message" ? "assistant" as const : "user" as const,
+      role: entry.entryType === "assistant_message" ? ("assistant" as const) : ("user" as const),
       content: entry.content || entry.title,
     }))
     .filter((message) => message.content.trim().length > 0);
@@ -55,20 +55,17 @@ export function rebuildACEMemoryForThread(threadId?: string): CuratorResult | nu
 
   executeWithLogging(
     () =>
-      db.query(
-        `INSERT INTO ace_memory
+      db
+        .query(
+          `INSERT INTO ace_memory
           (threadId, bulletJson, renderedBlock, updatedAt)
          VALUES (?, ?, ?, ?)
          ON CONFLICT(threadId) DO UPDATE SET
            bulletJson = excluded.bulletJson,
            renderedBlock = excluded.renderedBlock,
            updatedAt = excluded.updatedAt`,
-      ).run(
-        threadId,
-        JSON.stringify(curated.retained),
-        renderedBlock,
-        updatedAt,
-      ),
+        )
+        .run(threadId, JSON.stringify(curated.retained), renderedBlock, updatedAt),
     "UPSERT ace_memory",
   );
 
@@ -82,7 +79,8 @@ export function getACEMemorySnapshot(threadId?: string): ACEMemorySnapshot | nul
 
   const db = getDatabase();
   const row = executeWithLogging(
-    () => db.query("SELECT * FROM ace_memory WHERE threadId = ?").get(threadId) as ACEMemoryRow | null,
+    () =>
+      db.query("SELECT * FROM ace_memory WHERE threadId = ?").get(threadId) as ACEMemoryRow | null,
     "SELECT ace_memory one",
   );
   if (!row) {

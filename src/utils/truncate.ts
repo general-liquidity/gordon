@@ -29,13 +29,13 @@ export function displayWidth(str: string): number {
     const cp = segment.codePointAt(0) ?? 0;
     // CJK Unified Ideographs, CJK Compatibility, Fullwidth forms
     if (
-      (cp >= 0x1100 && cp <= 0x115f) ||  // Hangul Jamo
-      (cp >= 0x2e80 && cp <= 0x9fff) ||  // CJK
-      (cp >= 0xac00 && cp <= 0xd7af) ||  // Hangul Syllables
-      (cp >= 0xf900 && cp <= 0xfaff) ||  // CJK Compatibility Ideographs
-      (cp >= 0xfe10 && cp <= 0xfe6f) ||  // CJK Compatibility Forms
-      (cp >= 0xff01 && cp <= 0xff60) ||  // Fullwidth Forms
-      (cp >= 0x20000 && cp <= 0x2ffff)   // CJK Extension B+
+      (cp >= 0x1100 && cp <= 0x115f) || // Hangul Jamo
+      (cp >= 0x2e80 && cp <= 0x9fff) || // CJK
+      (cp >= 0xac00 && cp <= 0xd7af) || // Hangul Syllables
+      (cp >= 0xf900 && cp <= 0xfaff) || // CJK Compatibility Ideographs
+      (cp >= 0xfe10 && cp <= 0xfe6f) || // CJK Compatibility Forms
+      (cp >= 0xff01 && cp <= 0xff60) || // Fullwidth Forms
+      (cp >= 0x20000 && cp <= 0x2ffff) // CJK Extension B+
     ) {
       width += 2;
     } else if (cp >= 0x1f000 && cp <= 0x1faff) {
@@ -80,7 +80,11 @@ export function truncateToWidth(str: string, maxWidth: number, ellipsis: string 
  * Truncate from the start (keeps the end). Useful for paths where the
  * filename is more important than the directory.
  */
-export function truncateStartToWidth(str: string, maxWidth: number, ellipsis: string = "…"): string {
+export function truncateStartToWidth(
+  str: string,
+  maxWidth: number,
+  ellipsis: string = "…",
+): string {
   if (displayWidth(str) <= maxWidth) return str;
 
   const ellipsisWidth = displayWidth(ellipsis);
@@ -123,7 +127,12 @@ export function truncatePathMiddle(path: string, maxWidth: number): string {
   const last = parts[parts.length - 1] ?? "";
   const middle = "…";
 
-  const fixedWidth = displayWidth(first) + displayWidth(sep) + displayWidth(middle) + displayWidth(sep) + displayWidth(last);
+  const fixedWidth =
+    displayWidth(first) +
+    displayWidth(sep) +
+    displayWidth(middle) +
+    displayWidth(sep) +
+    displayWidth(last);
   if (fixedWidth >= maxWidth) {
     // Even first + last don't fit — truncate the filename
     return truncateToWidth(`${first}${sep}${middle}${sep}${last}`, maxWidth);
@@ -151,7 +160,7 @@ export function wrapText(text: string, maxWidth: number): string[] {
       currentLine = word;
       currentWidth = wordWidth;
     } else if (currentWidth + 1 + wordWidth <= maxWidth) {
-      currentLine += " " + word;
+      currentLine += ` ${word}`;
       currentWidth += 1 + wordWidth;
     } else {
       lines.push(currentLine);

@@ -20,4 +20,3 @@ describe("stocks command routing", () => {
     expect(message).toContain("classify_trade_risk");
   });
 });
-

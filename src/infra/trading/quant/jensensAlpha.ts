@@ -73,11 +73,21 @@ export function computeJensensAlpha(input: JensensAlphaInput): JensensAlphaResul
   const n = k > 0 ? Math.min(y.length, ...factors.map((f) => f.length)) : 0;
 
   const insufficient = (reason: string): JensensAlphaResult => ({
-    alpha: 0, alphaTStat: 0, alphaPValue: 1, alphaPValueOLS: 1, betas: [],
-    rSquared: 0, adjRSquared: 0, lags: 0, sampleSize: n, verdict: "insufficient", interpretation: reason,
+    alpha: 0,
+    alphaTStat: 0,
+    alphaPValue: 1,
+    alphaPValueOLS: 1,
+    betas: [],
+    rSquared: 0,
+    adjRSquared: 0,
+    lags: 0,
+    sampleSize: n,
+    verdict: "insufficient",
+    interpretation: reason,
   });
   if (k < 1) return insufficient("need ≥ 1 factor series");
-  if (n < MIN_OBS || n - p < 10) return insufficient(`need ≥ ${MIN_OBS} aligned obs with n − params ≥ 10, got n=${n}`);
+  if (n < MIN_OBS || n - p < 10)
+    return insufficient(`need ≥ ${MIN_OBS} aligned obs with n − params ≥ 10, got n=${n}`);
 
   // Design matrix rows x_t = [1, f1_t, …, fk_t].
   const X: number[][] = [];
@@ -116,11 +126,11 @@ export function computeJensensAlpha(input: JensensAlphaInput): JensensAlphaResul
   let tss = 0;
   for (let t = 0; t < n; t++) tss += (y[t]! - ybar) * (y[t]! - ybar);
   const rSquared = tss > 0 ? 1 - rss / tss : 0;
-  const adjR = tss > 0 ? 1 - (1 - rSquared) * (n - 1) / (n - p) : 0;
+  const adjR = tss > 0 ? 1 - ((1 - rSquared) * (n - 1)) / (n - p) : 0;
   const sigma2 = rss / (n - p);
 
   // Newey-West HAC meat Ω = Σ eₜ²xₜxₜᵀ + Σ_l w_l Σ eₜe_{t-l}(xₜx_{t-l}ᵀ + x_{t-l}xₜᵀ).
-  const L = Math.max(1, Math.min(input.lags ?? Math.floor(4 * Math.pow(n / 100, 2 / 9)), n - 2));
+  const L = Math.max(1, Math.min(input.lags ?? Math.floor(4 * (n / 100) ** (2 / 9)), n - 2));
   const omega: number[][] = Array.from({ length: p }, () => new Array(p).fill(0));
   for (let t = 0; t < n; t++) {
     const xt = X[t]!;
@@ -133,9 +143,10 @@ export function computeJensensAlpha(input: JensensAlphaInput): JensensAlphaResul
       const xt = X[t]!;
       const xtl = X[t - l]!;
       const g = w * e[t] * e[t - l];
-      for (let i = 0; i < p; i++) for (let j = 0; j < p; j++) {
-        omega[i]![j]! += g * (xt[i]! * xtl[j]! + xtl[i]! * xt[j]!);
-      }
+      for (let i = 0; i < p; i++)
+        for (let j = 0; j < p; j++) {
+          omega[i]![j]! += g * (xt[i]! * xtl[j]! + xtl[i]! * xt[j]!);
+        }
     }
   }
   const vHac = multiply(multiply(XtXinv, omega), XtXinv); // (XᵀX)⁻¹ Ω (XᵀX)⁻¹
@@ -162,7 +173,11 @@ export function computeJensensAlpha(input: JensensAlphaInput): JensensAlphaResul
   }
 
   const verdict: JensensAlphaResult["verdict"] =
-    alpha < 0 && alphaPValue < 0.05 ? "negative_alpha" : alpha > 0 && alphaPValue < 0.05 ? "significant_alpha" : "insignificant_alpha";
+    alpha < 0 && alphaPValue < 0.05
+      ? "negative_alpha"
+      : alpha > 0 && alphaPValue < 0.05
+        ? "significant_alpha"
+        : "insignificant_alpha";
 
   const interpretation =
     verdict === "significant_alpha"

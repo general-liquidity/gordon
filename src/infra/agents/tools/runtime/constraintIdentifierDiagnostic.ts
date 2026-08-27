@@ -32,7 +32,9 @@ export const constraintIdentifierDiagnosticTool = createTool({
     }),
     avgLoss: z.object({
       current: z.number().describe("Average losing trade as POSITIVE magnitude (R-multiple or $)."),
-      target: z.number().describe("Target average losing trade — also positive magnitude (max acceptable)."),
+      target: z
+        .number()
+        .describe("Target average losing trade — also positive magnitude (max acceptable)."),
     }),
     frequency: z.object({
       current: z.number().min(0).describe("Current trade frequency (e.g. trades per week)."),
@@ -53,9 +55,7 @@ export const constraintIdentifierDiagnosticTool = createTool({
   }),
   outputSchema: z.object({
     verdict: z.enum(["no_constraint", "constraint_identified", "insufficient_data"]),
-    dominantComponent: z
-      .enum(["win_rate", "avg_win", "avg_loss", "frequency"])
-      .nullable(),
+    dominantComponent: z.enum(["win_rate", "avg_win", "avg_loss", "frequency"]).nullable(),
     dominantNormalizedDeficit: z.number().nullable(),
     recommendedLever: z.string().nullable(),
     lowConfidence: z.boolean(),
@@ -97,8 +97,7 @@ export const constraintIdentifierDiagnosticTool = createTool({
     return {
       verdict: result.verdict,
       dominantComponent: result.dominantConstraint?.component ?? null,
-      dominantNormalizedDeficit:
-        result.dominantConstraint?.normalizedDeficit ?? null,
+      dominantNormalizedDeficit: result.dominantConstraint?.normalizedDeficit ?? null,
       recommendedLever: result.dominantConstraint?.recommendedLever ?? null,
       lowConfidence: result.lowConfidence,
       rankedComponents: result.rankedByDeficit.map((c) => ({

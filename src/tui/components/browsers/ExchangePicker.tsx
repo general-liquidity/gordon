@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Text } from "../../ink-custom";
 import { Select, TextInput, PasswordInput } from "@inkjs/ui";
 import { loadConfig, saveConfig } from "../../../infra/storage/config/config.ts";
@@ -44,10 +44,26 @@ interface Props {
 const COMMUNITY_RESULT_LIMIT = 12;
 
 const SANDBOX_EXCHANGES = [
-  { label: "Binance Testnet  (testnet.binance.vision)", value: "ccxt:binance", sandboxId: "binance-testnet" },
-  { label: "OKX Demo  (simulated trading, x-simulated-trading: 1)", value: "ccxt:okx", sandboxId: "okx-demo" },
-  { label: "Gemini Sandbox  (exchange.sandbox.gemini.com)", value: "ccxt:gemini", sandboxId: "gemini-sandbox" },
-  { label: "Hyperliquid Testnet  (testnet.hyperliquid.xyz)", value: "ccxt:hyperliquid", sandboxId: "hyperliquid-testnet" },
+  {
+    label: "Binance Testnet  (testnet.binance.vision)",
+    value: "ccxt:binance",
+    sandboxId: "binance-testnet",
+  },
+  {
+    label: "OKX Demo  (simulated trading, x-simulated-trading: 1)",
+    value: "ccxt:okx",
+    sandboxId: "okx-demo",
+  },
+  {
+    label: "Gemini Sandbox  (exchange.sandbox.gemini.com)",
+    value: "ccxt:gemini",
+    sandboxId: "gemini-sandbox",
+  },
+  {
+    label: "Hyperliquid Testnet  (testnet.hyperliquid.xyz)",
+    value: "ccxt:hyperliquid",
+    sandboxId: "hyperliquid-testnet",
+  },
 ];
 
 const ACTIONS = [
@@ -133,79 +149,90 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
     value: exchange.id,
   }));
 
-  const handleSwitch = useCallback(async (id: string) => {
-    const result = await exchangeSwitch(id);
-    onComplete(result.success ? result.message! : `Error: ${result.message}`);
-  }, [onComplete]);
+  const handleSwitch = useCallback(
+    async (id: string) => {
+      const result = await exchangeSwitch(id);
+      onComplete(result.success ? result.message! : `Error: ${result.message}`);
+    },
+    [onComplete],
+  );
 
-  const finishAdd = useCallback(async (state: AddState) => {
-    try {
-      const cfg = await loadConfig();
-      const type = normalizeExchangeId(state.exchangeType as ExchangeId) as ExchangeType;
-      const caps = capsFor(type);
+  const finishAdd = useCallback(
+    async (state: AddState) => {
+      try {
+        const cfg = await loadConfig();
+        const type = normalizeExchangeId(state.exchangeType as ExchangeId) as ExchangeType;
+        const caps = capsFor(type);
 
-      const baseId = state.sandboxId ?? extractCcxtSubId(type as CcxtExchangeId);
-      let id = baseId;
-      let n = 1;
-      while (cfg.exchanges.some((exchange) => exchange.id === id)) {
-        id = `${baseId}-${n++}`;
+        const baseId = state.sandboxId ?? extractCcxtSubId(type as CcxtExchangeId);
+        let id = baseId;
+        let n = 1;
+        while (cfg.exchanges.some((exchange) => exchange.id === id)) {
+          id = `${baseId}-${n++}`;
+        }
+
+        const entry: MultiExchangeConfig = {
+          id,
+          type,
+          apiKey: caps.isDex ? "" : state.apiKey,
+          apiSecret: caps.isDex ? "" : state.apiSecret,
+          sandbox: state.isSandbox,
+          isDefault: cfg.exchanges.length === 0,
+          ...(state.passphrase ? { passphrase: state.passphrase } : {}),
+          ...(state.walletKey ? { walletPrivateKey: state.walletKey } : {}),
+        };
+
+        cfg.exchanges.push(entry);
+        if (!cfg.activeExchangeId) cfg.activeExchangeId = id;
+        await saveConfig(cfg);
+
+        // Persist credentials to .env under the generic <UPPER(subId)>_* names so
+        // resolveExchangeCredentials picks them up for any (incl. uncurated) venue.
+        const subId = extractCcxtSubId(type as CcxtExchangeId);
+        const names = genericEnvNames(subId);
+        const envWrite: Record<string, string> = {};
+        if (caps.isDex) {
+          if (state.walletKey) envWrite[names.walletKey] = state.walletKey;
+        } else {
+          if (state.apiKey) envWrite[names.key] = state.apiKey;
+          if (state.apiSecret) envWrite[names.secret] = state.apiSecret;
+          if (state.passphrase) envWrite[names.passphrase] = state.passphrase;
+        }
+        if (Object.keys(envWrite).length > 0) {
+          await saveEnvKeys(envWrite as Parameters<typeof saveEnvKeys>[0]);
+        }
+        await refreshRuntimeCredentials();
+
+        const label = state.isSandbox ? `${subId} (sandbox)` : subId;
+        onComplete(
+          `Added ${label} as '${id}'.${cfg.exchanges.length === 1 ? " Set as active exchange." : " Use /exchange switch to activate."}`,
+        );
+      } catch (err) {
+        onComplete(`Error saving exchange: ${err instanceof Error ? err.message : String(err)}`);
       }
+    },
+    [onComplete],
+  );
 
-      const entry: MultiExchangeConfig = {
-        id,
-        type,
-        apiKey: caps.isDex ? "" : state.apiKey,
-        apiSecret: caps.isDex ? "" : state.apiSecret,
-        sandbox: state.isSandbox,
-        isDefault: cfg.exchanges.length === 0,
-        ...(state.passphrase ? { passphrase: state.passphrase } : {}),
-        ...(state.walletKey ? { walletPrivateKey: state.walletKey } : {}),
-      };
-
-      cfg.exchanges.push(entry);
-      if (!cfg.activeExchangeId) cfg.activeExchangeId = id;
-      await saveConfig(cfg);
-
-      // Persist credentials to .env under the generic <UPPER(subId)>_* names so
-      // resolveExchangeCredentials picks them up for any (incl. uncurated) venue.
-      const subId = extractCcxtSubId(type as CcxtExchangeId);
-      const names = genericEnvNames(subId);
-      const envWrite: Record<string, string> = {};
-      if (caps.isDex) {
-        if (state.walletKey) envWrite[names.walletKey] = state.walletKey;
-      } else {
-        if (state.apiKey) envWrite[names.key] = state.apiKey;
-        if (state.apiSecret) envWrite[names.secret] = state.apiSecret;
-        if (state.passphrase) envWrite[names.passphrase] = state.passphrase;
+  const handleRemove = useCallback(
+    async (id: string) => {
+      try {
+        const cfg = await loadConfig();
+        if (cfg.exchanges.length <= 1) {
+          onComplete("Cannot remove the only configured exchange.");
+          return;
+        }
+        cfg.exchanges = cfg.exchanges.filter((exchange) => exchange.id !== id);
+        if (cfg.activeExchangeId === id) cfg.activeExchangeId = cfg.exchanges[0]?.id;
+        await saveConfig(cfg);
+        await refreshRuntimeCredentials();
+        onComplete(`Removed exchange '${id}'.`);
+      } catch (err) {
+        onComplete(`Error removing exchange: ${err instanceof Error ? err.message : String(err)}`);
       }
-      if (Object.keys(envWrite).length > 0) {
-        await saveEnvKeys(envWrite as Parameters<typeof saveEnvKeys>[0]);
-      }
-      await refreshRuntimeCredentials();
-
-      const label = state.isSandbox ? `${subId} (sandbox)` : subId;
-      onComplete(`Added ${label} as '${id}'.${cfg.exchanges.length === 1 ? " Set as active exchange." : " Use /exchange switch to activate."}`);
-    } catch (err) {
-      onComplete(`Error saving exchange: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }, [onComplete]);
-
-  const handleRemove = useCallback(async (id: string) => {
-    try {
-      const cfg = await loadConfig();
-      if (cfg.exchanges.length <= 1) {
-        onComplete("Cannot remove the only configured exchange.");
-        return;
-      }
-      cfg.exchanges = cfg.exchanges.filter((exchange) => exchange.id !== id);
-      if (cfg.activeExchangeId === id) cfg.activeExchangeId = cfg.exchanges[0]?.id;
-      await saveConfig(cfg);
-      await refreshRuntimeCredentials();
-      onComplete(`Removed exchange '${id}'.`);
-    } catch (err) {
-      onComplete(`Error removing exchange: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }, [onComplete]);
+    },
+    [onComplete],
+  );
 
   // Route a freshly-picked exchange to the right first credential step based on
   // its CCXT capabilities (DEX → wallet key; everything else → api key).
@@ -226,7 +253,9 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
   if (loading) {
     return (
       <Box flexDirection="column" paddingX={1} paddingY={1}>
-        <Text bold color={theme.uiBrand}>EXCHANGE SETUP</Text>
+        <Text bold color={theme.uiBrand}>
+          EXCHANGE SETUP
+        </Text>
         <Text dimColor>Loading config...</Text>
       </Box>
     );
@@ -234,9 +263,10 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
 
   const steps: Record<string, PickerStep<ExchangePickerData>> = {
     action: {
-      hint: configuredExchanges.length > 0
-        ? `${configuredExchanges.length} exchange${configuredExchanges.length > 1 ? "s" : ""} configured`
-        : undefined,
+      hint:
+        configuredExchanges.length > 0
+          ? `${configuredExchanges.length} exchange${configuredExchanges.length > 1 ? "s" : ""} configured`
+          : undefined,
       render: (ctx) => (
         <Select
           options={ACTIONS}
@@ -266,7 +296,11 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
       title: "Select exchange to activate:",
       render: () => {
         if (switchOptions.length === 0) {
-          return <Text color={theme.riskWarning}>No exchanges configured yet. Use 'Add' to connect one.</Text>;
+          return (
+            <Text color={theme.riskWarning}>
+              No exchanges configured yet. Use 'Add' to connect one.
+            </Text>
+          );
         }
         return <Select options={switchOptions} onChange={handleSwitch} />;
       },
@@ -311,7 +345,10 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
               <Text dimColor>No matches. Refine your search.</Text>
             ) : (
               <Select
-                options={communityMatches.map((e) => ({ label: `${e.name}  (${e.id})`, value: ccxtValue(e.id) }))}
+                options={communityMatches.map((e) => ({
+                  label: `${e.name}  (${e.id})`,
+                  value: ccxtValue(e.id),
+                }))}
                 onChange={(value) => beginCredentials(value, false, undefined, ctx.go)}
               />
             )}
@@ -324,7 +361,10 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
       hint: "These use fake money - safe for demos and testing",
       render: (ctx) => (
         <Select
-          options={SANDBOX_EXCHANGES.map((exchange) => ({ label: exchange.label, value: exchange.sandboxId }))}
+          options={SANDBOX_EXCHANGES.map((exchange) => ({
+            label: exchange.label,
+            value: exchange.sandboxId,
+          }))}
           onChange={(value) => {
             const entry = SANDBOX_EXCHANGES.find((exchange) => exchange.sandboxId === value);
             if (!entry) return;
@@ -358,9 +398,10 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
     },
     "cred-apisecret": {
       title: `API Secret - ${add.exchangeType}${add.isSandbox ? " (testnet)" : ""}`,
-      hint: nativeVenueId(add.exchangeType) === "coinbase"
-        ? "For CDP keys: paste the full EC private key (-----BEGIN EC PRIVATE KEY-----...)"
-        : "Paste your exchange API secret:",
+      hint:
+        nativeVenueId(add.exchangeType) === "coinbase"
+          ? "For CDP keys: paste the full EC private key (-----BEGIN EC PRIVATE KEY-----...)"
+          : "Paste your exchange API secret:",
       render: (ctx) => (
         <PasswordInput
           placeholder="API secret..."
@@ -419,7 +460,9 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
         }
         return (
           <>
-            <Text bold color={theme.riskDanger}>Removal updates local exchange configuration.</Text>
+            <Text bold color={theme.riskDanger}>
+              Removal updates local exchange configuration.
+            </Text>
             <Box marginTop={1}>
               <Select options={removeOptions} onChange={handleRemove} />
             </Box>

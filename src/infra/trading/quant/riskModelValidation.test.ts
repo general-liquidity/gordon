@@ -18,13 +18,23 @@ describe("computePopulationStability", () => {
   });
 
   it("PSI increases monotonically with shift size", () => {
-    const small = computePopulationStability({ expected: ref, actual: ref.map((x) => x + 0.5), bins: 10 }).psi;
-    const big = computePopulationStability({ expected: ref, actual: ref.map((x) => x + 3), bins: 10 }).psi;
+    const small = computePopulationStability({
+      expected: ref,
+      actual: ref.map((x) => x + 0.5),
+      bins: 10,
+    }).psi;
+    const big = computePopulationStability({
+      expected: ref,
+      actual: ref.map((x) => x + 3),
+      bins: 10,
+    }).psi;
     expect(big).toBeGreaterThan(small);
   });
 
   it("insufficient on too little data", () => {
-    expect(computePopulationStability({ expected: [1, 2], actual: [1], bins: 10 }).verdict).toBe("insufficient");
+    expect(computePopulationStability({ expected: [1, 2], actual: [1], bins: 10 }).verdict).toBe(
+      "insufficient",
+    );
   });
 });
 
@@ -38,7 +48,11 @@ describe("computeVaRBacktest", () => {
 
   it("well-calibrated: ~1% violations, spread out → both tests pass", () => {
     const idx = new Set(Array.from({ length: 10 }, (_, k) => k * 100)); // 10 breaches, every 100 bars
-    const r = computeVaRBacktest({ returns: build(idx), varForecasts: new Array(N).fill(VAR), confidence: 0.99 });
+    const r = computeVaRBacktest({
+      returns: build(idx),
+      varForecasts: new Array(N).fill(VAR),
+      confidence: 0.99,
+    });
     expect(r.violations).toBe(10);
     expect(r.kupiecReject).toBe(false);
     expect(r.independenceReject).toBe(false);
@@ -47,14 +61,22 @@ describe("computeVaRBacktest", () => {
 
   it("rate miscalibrated: way too many violations → Kupiec rejects", () => {
     const idx = new Set(Array.from({ length: 50 }, (_, k) => k * 20)); // 50 breaches (5% vs 1%)
-    const r = computeVaRBacktest({ returns: build(idx), varForecasts: new Array(N).fill(VAR), confidence: 0.99 });
+    const r = computeVaRBacktest({
+      returns: build(idx),
+      varForecasts: new Array(N).fill(VAR),
+      confidence: 0.99,
+    });
     expect(r.violations).toBe(50);
     expect(r.kupiecReject).toBe(true);
   });
 
   it("clustered: right count but consecutive → Christoffersen independence rejects", () => {
     const idx = new Set(Array.from({ length: 10 }, (_, k) => 500 + k)); // 10 consecutive breaches
-    const r = computeVaRBacktest({ returns: build(idx), varForecasts: new Array(N).fill(VAR), confidence: 0.99 });
+    const r = computeVaRBacktest({
+      returns: build(idx),
+      varForecasts: new Array(N).fill(VAR),
+      confidence: 0.99,
+    });
     expect(r.violations).toBe(10);
     expect(r.kupiecReject).toBe(false); // rate is fine
     expect(r.independenceReject).toBe(true); // but clustered
@@ -62,6 +84,8 @@ describe("computeVaRBacktest", () => {
   });
 
   it("insufficient on too little data", () => {
-    expect(computeVaRBacktest({ returns: [0.01, -0.02], varForecasts: [0.03, 0.03] }).verdict).toBe("insufficient");
+    expect(computeVaRBacktest({ returns: [0.01, -0.02], varForecasts: [0.03, 0.03] }).verdict).toBe(
+      "insufficient",
+    );
   });
 });

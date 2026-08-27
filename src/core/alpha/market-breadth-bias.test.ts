@@ -21,7 +21,11 @@ describe("classifyMarketBreadth", () => {
   });
 
   it("small mixed returns + choppy structure → neutral direction + mean-reversion both sides", () => {
-    const syms = Array.from({ length: 25 }, (_, i) => ({ symbol: `S${i}`, return: i % 2 ? 0.01 : -0.01, trendCleanliness: 0.2 }));
+    const syms = Array.from({ length: 25 }, (_, i) => ({
+      symbol: `S${i}`,
+      return: i % 2 ? 0.01 : -0.01,
+      trendCleanliness: 0.2,
+    }));
     const r = classifyMarketBreadth({ symbols: syms })!;
     expect(r.direction).toBe("neutral");
     expect(r.strategy).toBe("strong_mean_reversion");
@@ -30,7 +34,11 @@ describe("classifyMarketBreadth", () => {
   });
 
   it("mixed direction but clean significant movers → neutral direction, momentum both sides", () => {
-    const syms = Array.from({ length: 24 }, (_, i) => ({ symbol: `S${i}`, return: i < 12 ? 0.08 : -0.08, trendCleanliness: 0.85 }));
+    const syms = Array.from({ length: 24 }, (_, i) => ({
+      symbol: `S${i}`,
+      return: i < 12 ? 0.08 : -0.08,
+      trendCleanliness: 0.85,
+    }));
     const r = classifyMarketBreadth({ symbols: syms })!;
     expect(r.breadthScore).toBeCloseTo(0, 6);
     expect(r.direction).toBe("neutral");
@@ -40,8 +48,12 @@ describe("classifyMarketBreadth", () => {
 
   it("activity modifier tips the strategy axis (elevated → momentum, depressed → mean-reversion)", () => {
     expect(classifyMarketBreadth({ symbols: universe(25, 0.08, 0.5) })!.strategy).toBe("neutral");
-    expect(classifyMarketBreadth({ symbols: universe(25, 0.08, 0.5), activityRatio: 1.3 })!.strategy).toBe("mild_momentum");
-    expect(classifyMarketBreadth({ symbols: universe(25, 0.08, 0.5), activityRatio: 0.7 })!.strategy).toBe("mild_mean_reversion");
+    expect(
+      classifyMarketBreadth({ symbols: universe(25, 0.08, 0.5), activityRatio: 1.3 })!.strategy,
+    ).toBe("mild_momentum");
+    expect(
+      classifyMarketBreadth({ symbols: universe(25, 0.08, 0.5), activityRatio: 0.7 })!.strategy,
+    ).toBe("mild_mean_reversion");
   });
 
   it("conviction scales with universe size (more breadth = more conviction)", () => {

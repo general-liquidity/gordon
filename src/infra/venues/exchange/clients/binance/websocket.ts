@@ -9,7 +9,7 @@
  * - Event-based updates
  */
 
-import { EventEmitter } from "events";
+import { EventEmitter } from "node:events";
 import { createModuleLogger } from "../../../../logger/index.ts";
 import { recordStructuredObservation } from "../../../../platform/observability/index.ts";
 
@@ -344,8 +344,8 @@ export class BinanceWebSocket extends EventEmitter {
     return {
       symbol: data.s as string,
       price: parseFloat(data.c as string),
-      priceChange: parseFloat(data.p as string || "0"),
-      priceChangePercent: parseFloat(data.P as string || "0"),
+      priceChange: parseFloat((data.p as string) || "0"),
+      priceChangePercent: parseFloat((data.P as string) || "0"),
       volume: parseFloat(data.v as string),
       quoteVolume: parseFloat(data.q as string),
       timestamp: data.E as number,
@@ -422,7 +422,7 @@ export class BinanceWebSocket extends EventEmitter {
    */
   private calculateReconnectDelay(): number {
     // Exponential backoff: baseDelay * 2^(attempt-1)
-    const exponentialDelay = this.config.reconnectDelayMs * Math.pow(2, this.reconnectAttempts - 1);
+    const exponentialDelay = this.config.reconnectDelayMs * 2 ** (this.reconnectAttempts - 1);
 
     // Cap at max delay
     const cappedDelay = Math.min(exponentialDelay, this.config.maxReconnectDelayMs);
@@ -440,7 +440,10 @@ export class BinanceWebSocket extends EventEmitter {
 
     if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
       this.setState("failed");
-      this.emit("unhealthy", `Max reconnect attempts (${this.config.maxReconnectAttempts}) reached`);
+      this.emit(
+        "unhealthy",
+        `Max reconnect attempts (${this.config.maxReconnectAttempts}) reached`,
+      );
       this.recordConnectionObservation("venue.websocket_unhealthy", "failure", {
         reason: `Max reconnect attempts (${this.config.maxReconnectAttempts}) reached`,
       });
@@ -629,11 +632,13 @@ export class BinanceWebSocket extends EventEmitter {
     // If connected, send subscribe message
     if (this.ws?.readyState === WebSocket.OPEN) {
       const stream = this.getStreamName(type, symbol, interval);
-      this.ws.send(JSON.stringify({
-        method: "SUBSCRIBE",
-        params: [stream],
-        id: Date.now(),
-      }));
+      this.ws.send(
+        JSON.stringify({
+          method: "SUBSCRIBE",
+          params: [stream],
+          id: Date.now(),
+        }),
+      );
     }
   }
 
@@ -643,11 +648,13 @@ export class BinanceWebSocket extends EventEmitter {
 
     if (this.ws?.readyState === WebSocket.OPEN) {
       const stream = this.getStreamName(type, symbol, interval);
-      this.ws.send(JSON.stringify({
-        method: "UNSUBSCRIBE",
-        params: [stream],
-        id: Date.now(),
-      }));
+      this.ws.send(
+        JSON.stringify({
+          method: "UNSUBSCRIBE",
+          params: [stream],
+          id: Date.now(),
+        }),
+      );
     }
   }
 

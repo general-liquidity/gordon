@@ -38,7 +38,7 @@ export async function oauthList(): Promise<OAuthCommandResult> {
   const now = Date.now();
   const decorated = entries.map((e) => ({
     venue: e.venue,
-    clientId: e.clientId.slice(0, 12) + "…",
+    clientId: `${e.clientId.slice(0, 12)}…`,
     label: e.label ?? "",
     scope: e.scope ?? "",
     expired: now >= e.expiresAt,

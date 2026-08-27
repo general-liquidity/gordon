@@ -107,10 +107,7 @@ export function calibrateOU(
   const halfLife = theta > 0 ? Math.log(2) / theta : Infinity;
   const ouStd = theta > 0 ? sigma / Math.sqrt(2 * theta) : Infinity;
 
-  const tradeable =
-    Number.isFinite(halfLife) &&
-    halfLife >= minHalfLife &&
-    halfLife <= maxHalfLife;
+  const tradeable = Number.isFinite(halfLife) && halfLife >= minHalfLife && halfLife <= maxHalfLife;
 
   return { theta, mu, sigma, halfLife, ouStd, tradeable };
 }
@@ -161,9 +158,7 @@ export function formatOUParams(p: OUParams): string {
   lines.push(
     `  Half-Life: ${Number.isFinite(p.halfLife) ? `${p.halfLife.toFixed(1)} periods` : "N/A (no mean reversion)"}`,
   );
-  lines.push(
-    `  OU Std (equilibrium): ${Number.isFinite(p.ouStd) ? p.ouStd.toFixed(4) : "N/A"}`,
-  );
+  lines.push(`  OU Std (equilibrium): ${Number.isFinite(p.ouStd) ? p.ouStd.toFixed(4) : "N/A"}`);
   lines.push(`  Tradeable: ${p.tradeable ? "YES" : "NO"}`);
   return lines.join("\n");
 }

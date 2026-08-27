@@ -8,7 +8,7 @@
  * Pattern: Claude Code agent definitions view (grouped list, no borders on items).
  */
 
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Box, Text } from "../../ink-custom";
 import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 
@@ -18,10 +18,7 @@ import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.t
 
 export type RiskLevel = "low" | "medium" | "high" | "extreme";
 
-export type PlaybookCategory =
-  | "tier-1-conservative"
-  | "tier-2-intermediate"
-  | "custom";
+export type PlaybookCategory = "tier-1-conservative" | "tier-2-intermediate" | "custom";
 
 export interface Playbook {
   id: string;
@@ -44,11 +41,7 @@ interface Props {
 // Constants
 // ============================================================================
 
-const CATEGORY_ORDER: PlaybookCategory[] = [
-  "tier-1-conservative",
-  "tier-2-intermediate",
-  "custom",
-];
+const CATEGORY_ORDER: PlaybookCategory[] = ["tier-1-conservative", "tier-2-intermediate", "custom"];
 
 const CATEGORY_LABEL: Record<PlaybookCategory, string> = {
   "tier-1-conservative": "TIER 1 \u00b7 CONSERVATIVE",
@@ -110,62 +103,52 @@ function buildFlatList(playbooks: Playbook[]): FlatEntry[] {
 }
 
 function selectableIndices(entries: FlatEntry[]): number[] {
-  return entries
-    .map((e, i) => (e.type === "playbook" ? i : -1))
-    .filter((i) => i >= 0);
+  return entries.map((e, i) => (e.type === "playbook" ? i : -1)).filter((i) => i >= 0);
 }
 
 // ============================================================================
 // Component
 // ============================================================================
 
-export function PlaybookBrowser({
-  playbooks,
-  onSelect,
-  onDeploy,
-  onClose,
-}: Props) {
+export function PlaybookBrowser({ playbooks, onSelect, onDeploy, onClose }: Props) {
   const flatList = useMemo(() => buildFlatList(playbooks), [playbooks]);
   const selectable = useMemo(() => selectableIndices(flatList), [flatList]);
   const [cursor, setCursor] = useState(0);
 
-  useRoutedInput((input, key) => {
-    if (key.escape) {
-      onClose();
-      return;
-    }
-    if (key.upArrow) {
-      setCursor((c) => Math.max(0, c - 1));
-      return;
-    }
-    if (key.downArrow) {
-      setCursor((c) => Math.min(selectable.length - 1, c + 1));
-      return;
-    }
-    if (key.return) {
-      const idx = selectable[cursor];
-      if (idx === undefined) return;
-      const entry = flatList[idx];
-      if (entry?.playbook) onDeploy(entry.playbook);
-      return;
-    }
-    if (input === " ") {
-      const idx = selectable[cursor];
-      if (idx === undefined) return;
-      const entry = flatList[idx];
-      if (entry?.playbook) onSelect(entry.playbook);
-    }
-  }, { id: "playbookBrowser", priority: FOCUS_PRIORITY.DIALOG });
+  useRoutedInput(
+    (input, key) => {
+      if (key.escape) {
+        onClose();
+        return;
+      }
+      if (key.upArrow) {
+        setCursor((c) => Math.max(0, c - 1));
+        return;
+      }
+      if (key.downArrow) {
+        setCursor((c) => Math.min(selectable.length - 1, c + 1));
+        return;
+      }
+      if (key.return) {
+        const idx = selectable[cursor];
+        if (idx === undefined) return;
+        const entry = flatList[idx];
+        if (entry?.playbook) onDeploy(entry.playbook);
+        return;
+      }
+      if (input === " ") {
+        const idx = selectable[cursor];
+        if (idx === undefined) return;
+        const entry = flatList[idx];
+        if (entry?.playbook) onSelect(entry.playbook);
+      }
+    },
+    { id: "playbookBrowser", priority: FOCUS_PRIORITY.DIALOG },
+  );
 
   if (playbooks.length === 0) {
     return (
-      <Box
-        flexDirection="column"
-        borderStyle="round"
-        borderColor="cyan"
-        paddingX={2}
-        paddingY={1}
-      >
+      <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
         <Text bold color="cyan">
           PLAYBOOK BROWSER
         </Text>
@@ -180,13 +163,7 @@ export function PlaybookBrowser({
   const selectedFlatIdx = selectable[cursor];
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
-      paddingX={2}
-      paddingY={1}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
       <Box>
         <Text bold color="cyan">
           PLAYBOOK BROWSER
@@ -214,22 +191,17 @@ export function PlaybookBrowser({
         return (
           <Box key={pb.id} flexDirection="column">
             <Box>
-              <Text color={isFocused ? "cyanBright" : undefined}>
-                {pointer}
-              </Text>
+              <Text color={isFocused ? "cyanBright" : undefined}>{pointer}</Text>
               <Text bold={isFocused}>{pb.name}</Text>
               <Text> </Text>
-              <Text color={RISK_COLOR[pb.riskLevel]}>
-                [{RISK_LABEL[pb.riskLevel]}]
-              </Text>
+              <Text color={RISK_COLOR[pb.riskLevel]}>[{RISK_LABEL[pb.riskLevel]}]</Text>
             </Box>
             <Box paddingLeft={4}>
               <Text dimColor>{pb.description}</Text>
             </Box>
             <Box paddingLeft={4}>
               <Text dimColor>
-                indicators: {pb.indicators.join(", ")} {"\u00b7"} tf:{" "}
-                {pb.timeframes.join(", ")}
+                indicators: {pb.indicators.join(", ")} {"\u00b7"} tf: {pb.timeframes.join(", ")}
               </Text>
             </Box>
           </Box>
@@ -238,8 +210,8 @@ export function PlaybookBrowser({
 
       <Text> </Text>
       <Text dimColor>
-        {"\u2191\u2193"} navigate {"\u00b7"} Space details {"\u00b7"} Enter
-        deploy {"\u00b7"} Esc close
+        {"\u2191\u2193"} navigate {"\u00b7"} Space details {"\u00b7"} Enter deploy {"\u00b7"} Esc
+        close
       </Text>
     </Box>
   );

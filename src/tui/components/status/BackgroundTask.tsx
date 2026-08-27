@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 
 // ============================================================================
@@ -16,10 +15,10 @@ export interface BackgroundTaskData {
   label: string;
   type: "monitoring" | "scan" | "autonomous" | "backtest" | "scheduled";
   status: "running" | "paused" | "completed" | "failed" | "scheduled";
-  startedAt?: number;     // unix ms
-  nextRunAt?: number;     // for scheduled tasks
-  progress?: number;      // 0-100
-  result?: string;        // brief result summary
+  startedAt?: number; // unix ms
+  nextRunAt?: number; // for scheduled tasks
+  progress?: number; // 0-100
+  result?: string; // brief result summary
   errorMessage?: string;
 }
 
@@ -31,11 +30,11 @@ interface Props {
 }
 
 const STATUS_ICONS: Record<BackgroundTaskData["status"], string> = {
-  running: "●",    // ●
-  paused: "⏸",     // ⏸
-  completed: "✓",  // ✓
-  failed: "✗",     // ✗
-  scheduled: "⏰",  // ⏰
+  running: "●", // ●
+  paused: "⏸", // ⏸
+  completed: "✓", // ✓
+  failed: "✗", // ✗
+  scheduled: "⏰", // ⏰
 };
 
 const STATUS_COLORS: Record<BackgroundTaskData["status"], string> = {
@@ -91,7 +90,7 @@ export function BackgroundTask({ task, onPause, onResume, onStop }: Props) {
       <Box>
         <Text color={color}>{icon} </Text>
         <Text bold>{task.label}</Text>
-        <Text dimColor>  </Text>
+        <Text dimColor> </Text>
         <Text color={color}>{task.status}</Text>
         {elapsed && (
           <>
@@ -99,7 +98,7 @@ export function BackgroundTask({ task, onPause, onResume, onStop }: Props) {
             <Text dimColor>{elapsed}</Text>
           </>
         )}
-        <Text dimColor>  [{typeLabel}]</Text>
+        <Text dimColor> [{typeLabel}]</Text>
       </Box>
 
       {/* Progress bar if applicable */}
@@ -137,15 +136,9 @@ export function BackgroundTask({ task, onPause, onResume, onStop }: Props) {
       {/* Action hints */}
       {(task.status === "running" || task.status === "paused") && (
         <Box paddingLeft={2} gap={2}>
-          {task.status === "running" && onPause && (
-            <Text dimColor>[P] Pause</Text>
-          )}
-          {task.status === "paused" && onResume && (
-            <Text dimColor>[R] Resume</Text>
-          )}
-          {onStop && (
-            <Text dimColor>[S] Stop</Text>
-          )}
+          {task.status === "running" && onPause && <Text dimColor>[P] Pause</Text>}
+          {task.status === "paused" && onResume && <Text dimColor>[R] Resume</Text>}
+          {onStop && <Text dimColor>[S] Stop</Text>}
         </Box>
       )}
     </Box>

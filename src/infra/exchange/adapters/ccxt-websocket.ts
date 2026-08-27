@@ -27,17 +27,15 @@
  */
 
 import ccxt, { type Exchange as CcxtBase } from "ccxt";
-import type {
-  ExchangeWebSocket,
-  Ticker24hr,
-  OrderBook,
-} from "../types.ts";
+import type { ExchangeWebSocket, Ticker24hr, OrderBook } from "../types.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { toCcxtSymbol } from "./ccxt-adapter.ts";
 
 const logger = createModuleLogger("ccxt-websocket");
 
-type CcxtProClass = new (config: Record<string, unknown>) => CcxtBase & {
+type CcxtProClass = new (
+  config: Record<string, unknown>,
+) => CcxtBase & {
   watchTicker(symbol: string): Promise<unknown>;
   watchOrderBook(symbol: string, limit?: number): Promise<unknown>;
   close?(): Promise<void>;
@@ -69,8 +67,7 @@ export function isPermanentSubscribeError(err: unknown): boolean {
     "NotSupported",
   ]);
 
-  const name = (err as { constructor?: { name?: string } } | null | undefined)
-    ?.constructor?.name;
+  const name = (err as { constructor?: { name?: string } } | null | undefined)?.constructor?.name;
   if (name && permanentNames.has(name)) return true;
 
   const message = err instanceof Error ? err.message : String(err ?? "");
@@ -84,11 +81,15 @@ export function isPermanentSubscribeError(err: unknown): boolean {
 function resolveCcxtProClass(subId: string): CcxtProClass {
   const pro = (ccxt as unknown as { pro?: Record<string, unknown> }).pro;
   if (!pro) {
-    throw new Error("CCXT Pro module not available — install the full `ccxt` package (Pro is bundled).");
+    throw new Error(
+      "CCXT Pro module not available — install the full `ccxt` package (Pro is bundled).",
+    );
   }
   const klass = pro[subId];
   if (typeof klass !== "function") {
-    throw new Error(`CCXT Pro does not support WebSocket streaming for '${subId}'. (Pro covers 73 of CCXT's 107 exchanges.)`);
+    throw new Error(
+      `CCXT Pro does not support WebSocket streaming for '${subId}'. (Pro covers 73 of CCXT's 107 exchanges.)`,
+    );
   }
   return klass as CcxtProClass;
 }

@@ -69,59 +69,77 @@ describe("gatePlan", () => {
   });
 
   it("blocks per-symbol when limit reached", () => {
-    const r = gatePlan({
-      symbol: "BTC/USD",
-      strategy: "macd",
-      active: [plan("p1", "BTC/USD", "rsi")],
-    }, DEFAULT_LIMITS);
+    const r = gatePlan(
+      {
+        symbol: "BTC/USD",
+        strategy: "macd",
+        active: [plan("p1", "BTC/USD", "rsi")],
+      },
+      DEFAULT_LIMITS,
+    );
     expect(r.allowed).toBe(false);
     expect(r.reason).toBe("per-symbol");
     expect(r.blockingPlanIds).toEqual(["p1"]);
   });
 
   it("allows plans for different symbols up to per-symbol limit each", () => {
-    const r = gatePlan({
-      symbol: "ETH/USD",
-      strategy: "rsi",
-      active: [plan("p1", "BTC/USD", "rsi")],
-    }, DEFAULT_LIMITS);
+    const r = gatePlan(
+      {
+        symbol: "ETH/USD",
+        strategy: "rsi",
+        active: [plan("p1", "BTC/USD", "rsi")],
+      },
+      DEFAULT_LIMITS,
+    );
     expect(r.allowed).toBe(true);
   });
 
   it("respects perSymbol=2", () => {
     const limits = { ...DEFAULT_LIMITS, perSymbol: 2 };
-    const oneActive = gatePlan({
-      symbol: "BTC/USD",
-      strategy: "rsi",
-      active: [plan("p1", "BTC/USD", "x")],
-    }, limits);
+    const oneActive = gatePlan(
+      {
+        symbol: "BTC/USD",
+        strategy: "rsi",
+        active: [plan("p1", "BTC/USD", "x")],
+      },
+      limits,
+    );
     expect(oneActive.allowed).toBe(true);
-    const twoActive = gatePlan({
-      symbol: "BTC/USD",
-      strategy: "rsi",
-      active: [plan("p1", "BTC/USD", "x"), plan("p2", "BTC/USD", "y")],
-    }, limits);
+    const twoActive = gatePlan(
+      {
+        symbol: "BTC/USD",
+        strategy: "rsi",
+        active: [plan("p1", "BTC/USD", "x"), plan("p2", "BTC/USD", "y")],
+      },
+      limits,
+    );
     expect(twoActive.allowed).toBe(false);
   });
 
   it("blocks per-strategy when limit reached", () => {
     const limits = { ...DEFAULT_LIMITS, perSymbol: Infinity, perStrategy: 1 };
-    const r = gatePlan({
-      symbol: "ETH/USD",
-      strategy: "rsi",
-      active: [plan("p1", "BTC/USD", "rsi")],
-    }, limits);
+    const r = gatePlan(
+      {
+        symbol: "ETH/USD",
+        strategy: "rsi",
+        active: [plan("p1", "BTC/USD", "rsi")],
+      },
+      limits,
+    );
     expect(r.allowed).toBe(false);
     expect(r.reason).toBe("per-strategy");
   });
 
   it("blocks global when limit reached", () => {
     const limits = { perSymbol: Infinity, perStrategy: Infinity, global: 2 };
-    const r = gatePlan({
-      symbol: "DOGE/USD",
-      strategy: "x",
-      active: [plan("p1", "BTC/USD", "a"), plan("p2", "ETH/USD", "b")],
-    }, limits);
+    const r = gatePlan(
+      {
+        symbol: "DOGE/USD",
+        strategy: "x",
+        active: [plan("p1", "BTC/USD", "a"), plan("p2", "ETH/USD", "b")],
+      },
+      limits,
+    );
     expect(r.allowed).toBe(false);
     expect(r.reason).toBe("global");
     expect(r.blockingPlanIds.length).toBe(2);
@@ -129,11 +147,14 @@ describe("gatePlan", () => {
 
   it("global block takes precedence over per-symbol", () => {
     const limits = { perSymbol: Infinity, perStrategy: Infinity, global: 1 };
-    const r = gatePlan({
-      symbol: "BTC/USD",
-      strategy: "x",
-      active: [plan("p1", "ETH/USD", "y")],
-    }, limits);
+    const r = gatePlan(
+      {
+        symbol: "BTC/USD",
+        strategy: "x",
+        active: [plan("p1", "ETH/USD", "y")],
+      },
+      limits,
+    );
     expect(r.reason).toBe("global");
   });
 });

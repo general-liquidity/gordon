@@ -70,7 +70,7 @@ describe("OHLCV fallback", () => {
         { close: 11, volume: 50, closeTime: 2 },
       ],
       "volume",
-      100
+      100,
     );
     expect(r.bars).toHaveLength(1);
     expect(r.bars[0]!.close).toBe(11);

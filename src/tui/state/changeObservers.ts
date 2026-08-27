@@ -77,8 +77,8 @@ export function observeStateChanges(prev: AppState, next: AppState): void {
  * Can be used as the onMessagesChanged callback.
  */
 export function createMessagePersister(sessionDir: string) {
-  const fs = require("fs") as typeof import("fs");
-  const path = require("path") as typeof import("path");
+  const fs = require("node:fs") as typeof import("fs");
+  const path = require("node:path") as typeof import("path");
 
   let writeQueued = false;
   let latestMessages: AppState["messages"] = [];

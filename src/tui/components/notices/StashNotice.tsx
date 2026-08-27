@@ -1,4 +1,3 @@
-import React from "react";
 import { Text } from "../../ink-custom";
 
 // Stash notice — shows when input is stashed during history navigation
@@ -8,5 +7,5 @@ interface Props {
 
 export function StashNotice({ visible }: Props) {
   if (!visible) return null;
-  return <Text dimColor>  Stashed — auto-restores after submit</Text>;
+  return <Text dimColor> Stashed — auto-restores after submit</Text>;
 }

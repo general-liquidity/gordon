@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { FlashingChar } from "./FlashingChar.js";
 
@@ -38,7 +37,9 @@ export function StalledSpinner({ stalledForMs, toolName, retryCount }: Props) {
         /* Waiting for a specific tool */
         <>
           <Text color={indicatorColor}>{"Waiting for "}</Text>
-          <Text color={indicatorColor} bold>{toolName}</Text>
+          <Text color={indicatorColor} bold>
+            {toolName}
+          </Text>
           <Text color={indicatorColor}>{"..."}</Text>
           <Text dimColor>{` ${dot} `}</Text>
           <Text dimColor>{`${seconds}s`}</Text>
@@ -51,9 +52,7 @@ export function StalledSpinner({ stalledForMs, toolName, retryCount }: Props) {
           <Text dimColor>{`${seconds}s`}</Text>
           <Text dimColor>{` ${dot} `}</Text>
           <Text dimColor>
-            {retryCount != null && retryCount > 0
-              ? `retrying (${retryCount})...`
-              : "retrying..."}
+            {retryCount != null && retryCount > 0 ? `retrying (${retryCount})...` : "retrying..."}
           </Text>
         </>
       )}

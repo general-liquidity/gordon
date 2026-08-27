@@ -73,9 +73,7 @@ export class OutcomeTracker {
   /** Stats for a specific category. */
   statsByCategory(category: ProactiveCategory, windowMs?: number): OutcomeStats {
     const cutoff = windowMs ? Date.now() - windowMs : 0;
-    const relevant = this.outcomes.filter(
-      (o) => o.category === category && o.at >= cutoff,
-    );
+    const relevant = this.outcomes.filter((o) => o.category === category && o.at >= cutoff);
     return this.computeStats(relevant);
   }
 
@@ -101,7 +99,10 @@ export class OutcomeTracker {
   // ---- internal ----
 
   private computeStats(list: typeof this.outcomes): OutcomeStats {
-    let mn = 0, cd = 0, fa = 0, nr = 0;
+    let mn = 0,
+      cd = 0,
+      fa = 0,
+      nr = 0;
     for (const o of list) {
       if (o.outcome === "MN") mn += 1;
       else if (o.outcome === "CD") cd += 1;

@@ -45,7 +45,7 @@ describe("calculateHiddenDivergence", () => {
     // Second pullback: sharper drop in momentum, but bottoms at higher price (~115)
     for (let i = 0; i < 8; i++) closes.push(121 - i * 0.85); // sharp dip, lands ~115 (higher low)
 
-    const candles = closes.map(c => candle(c));
+    const candles = closes.map((c) => candle(c));
     const result = calculateHiddenDivergence(candles, { lookback: 8 });
 
     expect(result.rsi).not.toBeNull();
@@ -81,7 +81,7 @@ describe("calculateHiddenDivergence", () => {
     // Second relief rally: stronger momentum, but tops at lower price (~85)
     for (let i = 0; i < 8; i++) closes.push(79 + i * 0.85); // sharp bounce, lands ~85 (lower high)
 
-    const candles = closes.map(c => candle(c));
+    const candles = closes.map((c) => candle(c));
     const result = calculateHiddenDivergence(candles, { lookback: 8 });
 
     expect(result.rsi).not.toBeNull();
@@ -101,7 +101,7 @@ describe("calculateHiddenDivergence", () => {
   test("no-signal case: steady monotonic uptrend produces no hidden divergence", () => {
     // A clean, steady uptrend has aligned price/RSI lows — no hidden divergence.
     const closes = Array.from({ length: 60 }, (_, i) => 100 + i * 0.8);
-    const candles = closes.map(c => candle(c));
+    const candles = closes.map((c) => candle(c));
     const result = calculateHiddenDivergence(candles, { lookback: 10 });
 
     expect(result.rsi).not.toBeNull();
@@ -113,7 +113,7 @@ describe("calculateHiddenDivergence", () => {
 
   test("rsiValues series is populated and rounded", () => {
     const closes = Array.from({ length: 60 }, (_, i) => 100 + Math.sin(i / 3) * 5);
-    const candles = closes.map(c => candle(c));
+    const candles = closes.map((c) => candle(c));
     const result = calculateHiddenDivergence(candles);
 
     expect(result.rsiValues.length).toBeGreaterThan(0);

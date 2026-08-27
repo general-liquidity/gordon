@@ -132,7 +132,9 @@ describe("persistence", () => {
 
   it("reset with a rationale clears the trip durably", () => {
     tripKillSwitch({ scope: "venue", id: "binance" }, "venue degraded");
-    expect(resetKillSwitch({ scope: "venue", id: "binance" }, "venue recovered, latency normal")).toBe(true);
+    expect(
+      resetKillSwitch({ scope: "venue", id: "binance" }, "venue recovered, latency normal"),
+    ).toBe(true);
 
     reloadKillSwitchState();
     expect(isExecutionAllowed({ venue: "binance" }).allowed).toBe(true);

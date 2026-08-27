@@ -43,9 +43,8 @@ export function useShimmerAnimation(
   const sweepLength = textLength + glowRadius * 2;
 
   // Current shimmer position in the sweep
-  const shimmerIndex = isActive && sweepLength > 0
-    ? Math.floor(tick / speed) % sweepLength - glowRadius
-    : -1;
+  const shimmerIndex =
+    isActive && sweepLength > 0 ? (Math.floor(tick / speed) % sweepLength) - glowRadius : -1;
 
   const getBrightness = useMemo(() => {
     return (charIndex: number): number => {

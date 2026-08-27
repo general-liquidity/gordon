@@ -1,8 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  computeExposureCeiling,
-  formatExposureCoach,
-} from "./exposure-coach.ts";
+import { computeExposureCeiling, formatExposureCoach } from "./exposure-coach.ts";
 
 describe("computeExposureCeiling", () => {
   it("gives a strong uptrend with positive breadth a high ceiling and allows entries", () => {
@@ -100,10 +97,7 @@ describe("computeExposureCeiling", () => {
     const base = computeExposureCeiling({ regime: "quiet", breadth: 0 });
     expect(base.netExposureCeiling).toBe(40);
     expect(base.entriesAllowed).toBe(true);
-    const strict = computeExposureCeiling(
-      { regime: "quiet", breadth: 0 },
-      { entriesFloor: 50 },
-    );
+    const strict = computeExposureCeiling({ regime: "quiet", breadth: 0 }, { entriesFloor: 50 });
     expect(strict.entriesAllowed).toBe(false);
   });
 
@@ -128,13 +122,9 @@ describe("computeExposureCeiling", () => {
     expect(computeExposureCeiling({ regime: "ranging", breadth: 0.2 }).posture).toBe(
       "constructive",
     );
-    expect(computeExposureCeiling({ regime: "quiet", breadth: 0 }).posture).toBe(
-      "neutral",
-    );
+    expect(computeExposureCeiling({ regime: "quiet", breadth: 0 }).posture).toBe("neutral");
     // base 40 - breadth 15 = 25 -> defensive (above floor 20, below 35).
-    expect(computeExposureCeiling({ regime: "quiet", breadth: -0.5 }).posture).toBe(
-      "defensive",
-    );
+    expect(computeExposureCeiling({ regime: "quiet", breadth: -0.5 }).posture).toBe("defensive");
   });
 
   it("formats a readable report", () => {

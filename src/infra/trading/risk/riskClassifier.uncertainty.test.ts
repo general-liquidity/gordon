@@ -41,7 +41,7 @@ function baseContext(overrides: Partial<PortfolioContext> = {}): PortfolioContex
 
 /** Steady drift with a small oscillation, so returns disperse without trending wildly. */
 function steadyPrices(n: number): number[] {
-  return Array.from({ length: n }, (_, i) => 100 * Math.pow(1.0005, i) + Math.sin(i) * 0.05);
+  return Array.from({ length: n }, (_, i) => 100 * 1.0005 ** i + Math.sin(i) * 0.05);
 }
 
 /** Symmetric alternating moves: pure market noise, no drift for estimators to argue over. */
@@ -220,9 +220,7 @@ describe("classifyTradeRisk — uncertainty decomposition dimension", () => {
     );
     const before = tierWithoutUncertainty(assessment);
 
-    expect(TIER_ORDER.indexOf(assessment.tier)).toBeGreaterThanOrEqual(
-      TIER_ORDER.indexOf(before),
-    );
+    expect(TIER_ORDER.indexOf(assessment.tier)).toBeGreaterThanOrEqual(TIER_ORDER.indexOf(before));
     expect(assessment.recommendation).not.toBe("auto_approve");
   });
 

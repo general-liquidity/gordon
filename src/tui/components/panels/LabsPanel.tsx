@@ -12,7 +12,7 @@
  *   Esc:     cancel (no save)
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -172,7 +172,9 @@ export function LabsPanel({ onComplete, onCancel }: Props) {
       onComplete("Labs flags unchanged.");
       return;
     }
-    onComplete(`Labs flags saved (${changed} change${changed === 1 ? "" : "s"}). Restart Gordon for restart-required flags to take effect.`);
+    onComplete(
+      `Labs flags saved (${changed} change${changed === 1 ? "" : "s"}). Restart Gordon for restart-required flags to take effect.`,
+    );
   }, [draft, persisted, onComplete]);
 
   useInput((input, key) => {
@@ -203,7 +205,9 @@ export function LabsPanel({ onComplete, onCancel }: Props) {
   if (!loaded) {
     return (
       <Box flexDirection="column" paddingX={1} paddingY={1}>
-        <Text bold color="cyanBright">EXPERIMENTAL FLAGS</Text>
+        <Text bold color="cyanBright">
+          EXPERIMENTAL FLAGS
+        </Text>
         <Text dimColor>Loading labs.json…</Text>
       </Box>
     );
@@ -212,14 +216,19 @@ export function LabsPanel({ onComplete, onCancel }: Props) {
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="cyanBright" paddingX={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">EXPERIMENTAL FLAGS</Text>
-        <Text dimColor>  ({labsPath()})</Text>
+        <Text bold color="cyanBright">
+          EXPERIMENTAL FLAGS
+        </Text>
+        <Text dimColor> ({labsPath()})</Text>
       </Box>
       {visibleFlags.map((flag, i) => {
         const enabled = !!draft[flag.envName];
         const isCursor = i === cursor;
-        const envOverride = process.env[flag.envName] !== undefined && process.env[flag.envName] !== "";
-        const gateInactive = !!flag.gateEnv && !(process.env[flag.gateEnv] === "1" || process.env[flag.gateEnv] === "true");
+        const envOverride =
+          process.env[flag.envName] !== undefined && process.env[flag.envName] !== "";
+        const gateInactive =
+          !!flag.gateEnv &&
+          !(process.env[flag.gateEnv] === "1" || process.env[flag.gateEnv] === "true");
         const hint =
           flag.effect === "restart"
             ? "(restart required)"
@@ -238,14 +247,18 @@ export function LabsPanel({ onComplete, onCancel }: Props) {
             </Box>
             {isCursor && (
               <Box paddingLeft={6}>
-                <Text dimColor>{flag.description} — env: {flag.envName}</Text>
+                <Text dimColor>
+                  {flag.description} — env: {flag.envName}
+                </Text>
               </Box>
             )}
           </Box>
         );
       })}
       <Box marginTop={1}>
-        <Text dimColor>Up/Down navigate {"·"} Space toggle {"·"} Enter save {"·"} Esc cancel</Text>
+        <Text dimColor>
+          Up/Down navigate {"·"} Space toggle {"·"} Enter save {"·"} Esc cancel
+        </Text>
       </Box>
     </Box>
   );

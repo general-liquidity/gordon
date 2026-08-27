@@ -19,11 +19,7 @@
  * fresh work items. No mutation of the list, no I/O.
  */
 
-import {
-  type FeatureEntry,
-  type FeatureList,
-  pickHighestPriority,
-} from "./tradingFeatureList.ts";
+import { type FeatureEntry, type FeatureList, pickHighestPriority } from "./tradingFeatureList.ts";
 
 // ============================================================================
 // Types
@@ -104,7 +100,10 @@ function selectMilestone(
  * A prior failure becomes a leading remediation item; each step becomes a
  * step item, split into active vs deferred by the blocked-step set.
  */
-function deriveItemsFor(entry: FeatureEntry, blockedSteps: Set<string>): {
+function deriveItemsFor(
+  entry: FeatureEntry,
+  blockedSteps: Set<string>,
+): {
   items: WorkItem[];
   deferred: WorkItem[];
 } {

@@ -150,7 +150,10 @@ const ALLOWLIST = [
 ] as const;
 
 function scannedFiles(): string[] {
-  const roots = [join(process.cwd(), "src/tui/components"), join(process.cwd(), "src/tui/design-system")];
+  const roots = [
+    join(process.cwd(), "src/tui/components"),
+    join(process.cwd(), "src/tui/design-system"),
+  ];
   const files: string[] = [];
 
   for (const root of roots) {

@@ -14,7 +14,12 @@ function read(rel: string): string {
 describe("credential inputs are masked", () => {
   test("ExchangePicker masks every secret field, leaves search as TextInput", () => {
     const src = read("src/tui/components/browsers/ExchangePicker.tsx");
-    for (const placeholder of ["API key...", "API secret...", "Passphrase...", "0x... or base58..."]) {
+    for (const placeholder of [
+      "API key...",
+      "API secret...",
+      "Passphrase...",
+      "0x... or base58...",
+    ]) {
       const escaped = placeholder.replace(/[.]/g, "\\.");
       expect(
         new RegExp(`<PasswordInput\\s+placeholder="${escaped}"`).test(src),
@@ -29,9 +34,7 @@ describe("credential inputs are masked", () => {
     const src = read("src/tui/components/browsers/BrokerPicker.tsx");
     for (const placeholder of ["API key...", "API secret..."]) {
       const escaped = placeholder.replace(/[.]/g, "\\.");
-      expect(
-        new RegExp(`<PasswordInput\\s+placeholder="${escaped}"`).test(src),
-      ).toBe(true);
+      expect(new RegExp(`<PasswordInput\\s+placeholder="${escaped}"`).test(src)).toBe(true);
     }
     expect(src.includes("<TextInput")).toBe(false);
   });

@@ -40,7 +40,7 @@ export function calculateMFI(
   candles: Candle[],
   period: number = 14,
   overboughtLevel: number = 80,
-  oversoldLevel: number = 20
+  oversoldLevel: number = 20,
 ): MFIResult {
   if (candles.length < period + 1) {
     return {
@@ -56,7 +56,7 @@ export function calculateMFI(
   }
 
   // Step 1: Calculate Typical Price for each candle
-  const typicalPrices: number[] = candles.map(c => (c.high + c.low + c.close) / 3);
+  const typicalPrices: number[] = candles.map((c) => (c.high + c.low + c.close) / 3);
 
   // Step 2: Calculate Raw Money Flow = Typical Price × Volume
   const rawMoneyFlow: number[] = candles.map((c, i) => typicalPrices[i]! * c.volume);
@@ -134,7 +134,13 @@ export function calculateMFI(
     else if (current < 45) flowDirection = "negative";
   }
 
-  const interpretation = buildMFIInterpretation(current, signal, flowDirection, currentPosFlow, currentNegFlow);
+  const interpretation = buildMFIInterpretation(
+    current,
+    signal,
+    flowDirection,
+    currentPosFlow,
+    currentNegFlow,
+  );
 
   return {
     current,
@@ -153,14 +159,15 @@ function buildMFIInterpretation(
   signal: string,
   flowDir: string,
   posFlow: number,
-  negFlow: number
+  negFlow: number,
 ): string {
   if (mfi === null) return "Insufficient data for MFI.";
 
   let msg = `MFI: ${mfi.toFixed(1)} — `;
 
   if (signal === "overbought") {
-    msg += "OVERBOUGHT zone. Heavy buying pressure may be exhausting — potential reversal/pullback. ";
+    msg +=
+      "OVERBOUGHT zone. Heavy buying pressure may be exhausting — potential reversal/pullback. ";
   } else if (signal === "oversold") {
     msg += "OVERSOLD zone. Heavy selling pressure may be exhausting — potential bounce. ";
   } else {

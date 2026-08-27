@@ -34,10 +34,13 @@ const MAX_COMPLETED_SESSIONS = 100;
 export class ExecutionSessionManager {
   private static instance: ExecutionSessionManager;
 
-  private activeSessions = new Map<string, {
-    session: ExecutionSession;
-    executor: TWAPExecutor | VWAPExecutor | IcebergExecutor | POVExecutor;
-  }>();
+  private activeSessions = new Map<
+    string,
+    {
+      session: ExecutionSession;
+      executor: TWAPExecutor | VWAPExecutor | IcebergExecutor | POVExecutor;
+    }
+  >();
   private completedSessions: ExecutionSession[] = [];
 
   private constructor() {}
@@ -89,22 +92,34 @@ export class ExecutionSessionManager {
 
     switch (intent.algorithm) {
       case "TWAP": {
-        const config: TWAPConfig = { ...DEFAULT_TWAP_CONFIG, ...intent.config as Partial<TWAPConfig> };
+        const config: TWAPConfig = {
+          ...DEFAULT_TWAP_CONFIG,
+          ...(intent.config as Partial<TWAPConfig>),
+        };
         executor = new TWAPExecutor(session, exchange, config, submitOrder, onComplete);
         break;
       }
       case "VWAP": {
-        const config: VWAPConfig = { ...DEFAULT_VWAP_CONFIG, ...intent.config as Partial<VWAPConfig> };
+        const config: VWAPConfig = {
+          ...DEFAULT_VWAP_CONFIG,
+          ...(intent.config as Partial<VWAPConfig>),
+        };
         executor = new VWAPExecutor(session, exchange, config, submitOrder, onComplete);
         break;
       }
       case "ICEBERG": {
-        const config: IcebergConfig = { ...DEFAULT_ICEBERG_CONFIG, ...intent.config as Partial<IcebergConfig> };
+        const config: IcebergConfig = {
+          ...DEFAULT_ICEBERG_CONFIG,
+          ...(intent.config as Partial<IcebergConfig>),
+        };
         executor = new IcebergExecutor(session, exchange, config, submitOrder, onComplete);
         break;
       }
       case "POV": {
-        const config: POVConfig = { ...DEFAULT_POV_CONFIG, ...intent.config as Partial<POVConfig> };
+        const config: POVConfig = {
+          ...DEFAULT_POV_CONFIG,
+          ...(intent.config as Partial<POVConfig>),
+        };
         executor = new POVExecutor(session, exchange, config, submitOrder, onComplete);
         break;
       }

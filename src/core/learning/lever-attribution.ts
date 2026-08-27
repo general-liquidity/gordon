@@ -122,7 +122,8 @@ function welchT(a: number[], b: number[]): { t: number; df: number } | null {
 function bucketStats(rs: number[], robust: number, preliminary: number): LeverBucketStats {
   const n = rs.length;
   const wins = rs.filter((r) => r > 0).length;
-  const significance: SignificanceTier = n >= robust ? "robust" : n >= preliminary ? "preliminary" : "insufficient";
+  const significance: SignificanceTier =
+    n >= robust ? "robust" : n >= preliminary ? "preliminary" : "insufficient";
   return {
     n,
     expectancyR: mean(rs),
@@ -212,7 +213,16 @@ export function analyzeLeverAttribution(
       .filter((r) => counts[r])
       .map((r) => `${counts[r]} ${r}`)
       .join(", ") +
-    (topLever ? `. Sharpen first: ${topLever.leverId} (+${topLever.discriminationR.toFixed(2)}R).` : ".");
+    (topLever
+      ? `. Sharpen first: ${topLever.leverId} (+${topLever.discriminationR.toFixed(2)}R).`
+      : ".");
 
-  return { edge: edge.name, leversTested: edge.invariants.length, correctedAlpha, levers, topLever, summary };
+  return {
+    edge: edge.name,
+    leversTested: edge.invariants.length,
+    correctedAlpha,
+    levers,
+    topLever,
+    summary,
+  };
 }

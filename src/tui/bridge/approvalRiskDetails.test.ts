@@ -114,10 +114,23 @@ describe("buildApprovalRiskDetails", () => {
   test("surfaces top 3 failed-check reasons, critical first", () => {
     const checks: RiskCheck[] = [
       check({ name: "daily_loss_limit", severity: "warning", details: "warning A" }),
-      check({ name: "leverage_limit", severity: "critical", details: "Effective leverage 4.20x would exceed max 2x." }),
+      check({
+        name: "leverage_limit",
+        severity: "critical",
+        details: "Effective leverage 4.20x would exceed max 2x.",
+      }),
       check({ name: "liquidity", severity: "warning", details: "warning B" }),
-      check({ name: "position_size", severity: "critical", details: "Position size $5000.00 exceeds max $1000.00." }),
-      check({ name: "correlation", passed: true, severity: "info", details: "passed — must not appear" }),
+      check({
+        name: "position_size",
+        severity: "critical",
+        details: "Position size $5000.00 exceeds max $1000.00.",
+      }),
+      check({
+        name: "correlation",
+        passed: true,
+        severity: "info",
+        details: "passed — must not appear",
+      }),
     ];
     const details = buildApprovalRiskDetails([entry({ checks })], {
       toolName: "place_order",
@@ -133,19 +146,19 @@ describe("buildApprovalRiskDetails", () => {
 
   test("truncates long reasons gracefully", () => {
     const long = "x".repeat(MAX_REASON_CHARS * 2);
-    const details = buildApprovalRiskDetails(
-      [entry({ checks: [check({ details: long })] })],
-      { toolName: "place_order", requestedAt: REQUESTED_AT },
-    );
+    const details = buildApprovalRiskDetails([entry({ checks: [check({ details: long })] })], {
+      toolName: "place_order",
+      requestedAt: REQUESTED_AT,
+    });
     expect(details!.riskReasons[0]!.length).toBeLessThanOrEqual(MAX_REASON_CHARS);
     expect(details!.riskReasons[0]!.endsWith("…")).toBe(true);
   });
 
   test("extracts the kernel's counter-offer from a modify decision", () => {
-    const details = buildApprovalRiskDetails(
-      [entry({ action: "modify", modifiedQuantity: 0.5 })],
-      { toolName: "place_order", requestedAt: REQUESTED_AT },
-    );
+    const details = buildApprovalRiskDetails([entry({ action: "modify", modifiedQuantity: 0.5 })], {
+      toolName: "place_order",
+      requestedAt: REQUESTED_AT,
+    });
     expect(details!.counterOffer).toEqual({
       symbol: "BTCUSDT",
       side: "buy",

@@ -87,13 +87,7 @@ describe("runKillList — multiple flags aggregate", () => {
       scaredMoney: true,
     });
     expect(r.blockers.length).toBe(5);
-    expect(r.blockers).toEqual([
-      "bored",
-      "angry",
-      "rushing",
-      "moved_stop",
-      "scared_money",
-    ]);
+    expect(r.blockers).toEqual(["bored", "angry", "rushing", "moved_stop", "scared_money"]);
   });
 });
 

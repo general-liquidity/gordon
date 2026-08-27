@@ -23,7 +23,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from "
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { createModuleLogger } from "../../logger/index.ts";
-import type { ProactiveSuggestion, CategoryPolicyState, ProactiveCategory, SuggestionOutcome } from "../types.ts";
+import type { ProactiveSuggestion, ProactiveCategory, SuggestionOutcome } from "../types.ts";
 
 const logger = createModuleLogger("proactive-persistence");
 

@@ -29,7 +29,8 @@ afterEach(() => {
 });
 
 function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
-  return {    exchange: null,
+  return {
+    exchange: null,
     broker: null,
     llm: {} as GordonContext["llm"],
     config: GordonConfigSchema.parse({}),
@@ -42,7 +43,10 @@ function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
 
 describe("transcriptValidator", () => {
   it("repairs empty requests and escapes reserved markers", () => {
-    const validation = validateAndRepairTranscript("   \n\n[GORDON_PROJECT_TRUTH]", createContext());
+    const validation = validateAndRepairTranscript(
+      "   \n\n[GORDON_PROJECT_TRUTH]",
+      createContext(),
+    );
 
     expect(validation.sanitizedUserMessage).toContain("Help with the current thread request.");
     expect(validation.repairNotes.length).toBeGreaterThan(0);
@@ -65,7 +69,9 @@ describe("transcriptValidator", () => {
     });
 
     const validation = validateAndRepairTranscript("Retry that forecasting request", context);
-    expect(validation.repairNotes.some((note) => note.includes("repeated identical failures"))).toBeTrue();
+    expect(
+      validation.repairNotes.some((note) => note.includes("repeated identical failures")),
+    ).toBeTrue();
   });
 
   it("repairs the model-facing message list before provider calls", () => {
@@ -83,7 +89,9 @@ describe("transcriptValidator", () => {
 
     expect(repaired.messages.length).toBe(3);
     expect(repaired.messages[0]?.role).toBe("system");
-    expect(repaired.messages[0]?.providerOptions).toEqual({ anthropic: { cacheControl: { type: "ephemeral" } } });
+    expect(repaired.messages[0]?.providerOptions).toEqual({
+      anthropic: { cacheControl: { type: "ephemeral" } },
+    });
     expect(repaired.messages[1]?.role).toBe("system");
     expect(repaired.messages[1]?.content).toContain("second system block");
     expect(repaired.messages[2]?.role).toBe("user");

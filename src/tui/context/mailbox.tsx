@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useRef, useCallback, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useRef, useCallback, useEffect, type ReactNode } from "react";
 
 // ============================================================================
 // Mailbox — Pub/sub inter-component communication
@@ -44,9 +44,7 @@ export function MailboxProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <MailboxContext.Provider value={{ publish, subscribe }}>
-      {children}
-    </MailboxContext.Provider>
+    <MailboxContext.Provider value={{ publish, subscribe }}>{children}</MailboxContext.Provider>
   );
 }
 

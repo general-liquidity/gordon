@@ -162,10 +162,18 @@ export function regimeAdaptiveSignal(
   const oneSigma = price * Math.max(volFraction, 1e-6);
 
   if (price > hi) {
-    return { side: "long", stopDistance: oneSigma * stopMult, targetDistance: oneSigma * targetMult };
+    return {
+      side: "long",
+      stopDistance: oneSigma * stopMult,
+      targetDistance: oneSigma * targetMult,
+    };
   }
   if (price < lo) {
-    return { side: "short", stopDistance: oneSigma * stopMult, targetDistance: oneSigma * targetMult };
+    return {
+      side: "short",
+      stopDistance: oneSigma * stopMult,
+      targetDistance: oneSigma * targetMult,
+    };
   }
   return null;
 }

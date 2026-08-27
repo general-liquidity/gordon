@@ -141,7 +141,7 @@ export function shouldUseCustomRenderer(
   resolvedStderr: NodeJS.WriteStream,
   isScreenReaderEnabled: boolean,
 ): boolean {
-  const flag = process.env["GORDON_CUSTOM_RENDER"];
+  const flag = process.env.GORDON_CUSTOM_RENDER;
   // Default OFF: only enabled by explicit opt-in.
   if (flag !== "1" && flag !== "true") {
     return false;
@@ -158,17 +158,17 @@ export function shouldUseCustomRenderer(
     emitFallbackNotice(resolvedStderr, "stdout is not a TTY");
     return false;
   }
-  if (process.env["TERM"] === "dumb") {
+  if (process.env.TERM === "dumb") {
     emitFallbackNotice(resolvedStderr, "TERM=dumb");
     return false;
   }
   // tmux/screen strip DEC sync-output BSU/ESU pairs that the syncTerminal
   // helper depends on, breaking our atomic-frame guarantee.
-  if (process.env["TMUX"]) {
+  if (process.env.TMUX) {
     emitFallbackNotice(resolvedStderr, "tmux detected");
     return false;
   }
-  if (process.env["STY"]) {
+  if (process.env.STY) {
     emitFallbackNotice(resolvedStderr, "screen detected");
     return false;
   }
@@ -182,9 +182,11 @@ export function _resetFallbackNoticeForTests(): void {
 
 /** Normalize options: coerce stream-only arg to an object. */
 function resolveOptions(options?: NodeJS.WriteStream | RenderOptions): Required<RenderOptions> {
-  const opts = (options && typeof (options as NodeJS.WriteStream).write === "function"
-    ? { stdout: options as NodeJS.WriteStream }
-    : (options ?? {})) as RenderOptions;
+  const opts = (
+    options && typeof (options as NodeJS.WriteStream).write === "function"
+      ? { stdout: options as NodeJS.WriteStream }
+      : (options ?? {})
+  ) as RenderOptions;
 
   return {
     stdout: opts.stdout ?? process.stdout,
@@ -194,8 +196,7 @@ function resolveOptions(options?: NodeJS.WriteStream | RenderOptions): Required<
     exitOnCtrlC: opts.exitOnCtrlC ?? true,
     patchConsole: opts.patchConsole ?? true,
     onRender: opts.onRender ?? (() => {}),
-    isScreenReaderEnabled:
-      opts.isScreenReaderEnabled ?? isScreenReaderEnvironment(),
+    isScreenReaderEnabled: opts.isScreenReaderEnabled ?? isScreenReaderEnvironment(),
     maxFps: opts.maxFps ?? 30,
     incrementalRendering: opts.incrementalRendering ?? false,
     alternateScreen: opts.alternateScreen ?? false,
@@ -205,12 +206,12 @@ function resolveOptions(options?: NodeJS.WriteStream | RenderOptions): Required<
 function isScreenReaderEnvironment(): boolean {
   const env = process.env;
   return (
-    env["INK_SCREEN_READER"] === "true" ||
-    env["ACCESSIBILITY_ENABLED"] === "true" ||
-    env["SCREEN_READER"] === "true" ||
-    env["GORDON_SCREEN_READER"] === "true" ||
-    env["VOICE_OVER_ENABLED"] === "1" ||
-    env["NARRATOR_RUNNING"] === "1"
+    env.INK_SCREEN_READER === "true" ||
+    env.ACCESSIBILITY_ENABLED === "true" ||
+    env.SCREEN_READER === "true" ||
+    env.GORDON_SCREEN_READER === "true" ||
+    env.VOICE_OVER_ENABLED === "1" ||
+    env.NARRATOR_RUNNING === "1"
   );
 }
 
@@ -373,11 +374,7 @@ function VanillaInkContextBridge({
       React.createElement(
         OurStdoutContext.Provider,
         { value: stdout },
-        React.createElement(
-          OurStderrContext.Provider,
-          { value: stderr },
-          children,
-        ),
+        React.createElement(OurStderrContext.Provider, { value: stderr }, children),
       ),
     ),
   );
@@ -391,18 +388,9 @@ function VanillaInkContextBridge({
  * hook shims see populated owned contexts. The custom path's owned App
  * populates them directly, no bridge needed.
  */
-export const render = (
-  node: ReactNode,
-  options?: NodeJS.WriteStream | RenderOptions,
-): Instance => {
+export const render = (node: ReactNode, options?: NodeJS.WriteStream | RenderOptions): Instance => {
   const resolved = resolveOptions(options);
-  if (
-    shouldUseCustomRenderer(
-      resolved.stdout,
-      resolved.stderr,
-      resolved.isScreenReaderEnabled,
-    )
-  ) {
+  if (shouldUseCustomRenderer(resolved.stdout, resolved.stderr, resolved.isScreenReaderEnabled)) {
     const customInstance = startCustomRender(node, resolved);
     return installAlternateScreen(customInstance, resolved.stdout, resolved.alternateScreen);
   }
@@ -468,10 +456,7 @@ export const render = (
     },
   });
 
-  const instance = inkRender(
-    buildBridged(),
-    options as NodeJS.WriteStream | undefined,
-  ) as Instance;
+  const instance = inkRender(buildBridged(), options as NodeJS.WriteStream | undefined) as Instance;
   instanceHolder.instance = instance;
   return installAlternateScreen(instance, resolved.stdout, resolved.alternateScreen);
 };

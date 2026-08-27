@@ -1,7 +1,7 @@
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
 import { resolveStructuredSchema } from "../../infra/agents/schemas/index.ts";
-import { z } from "zod";
+import type { z } from "zod";
 import type { GordonContext } from "../../infra/agents/types.ts";
 import { SessionRuntimeFactory } from "../../runtime/index.ts";
 import {
@@ -48,7 +48,10 @@ import {
 import { getTrade } from "../../infra/storage/entities/trades.ts";
 import { executeEmergencyLiquidation } from "../../core/safety/emergency-liquidation.ts";
 import { cleanupStalePositions } from "../../core/positions/cleanup.ts";
-import { getAutonomousLoopStatus, runAutonomousCycleOnce } from "../../core/pipeline/autonomous-loop.ts";
+import {
+  getAutonomousLoopStatus,
+  runAutonomousCycleOnce,
+} from "../../core/pipeline/autonomous-loop.ts";
 import { appendActionLogEntry } from "../../infra/action-log/index.ts";
 import type { ActionLogEntryType } from "../../infra/action-log/index.ts";
 import { recordStructuredObservation } from "../../infra/platform/observability/index.ts";
@@ -78,7 +81,10 @@ export class GatewayRuntime {
     onDaemonShutdown: NonNullable<GatewayRuntimeDeps["onDaemonShutdown"]>;
   };
   private readonly sessionRuntimeFactory: SessionRuntimeFactory;
-  private readonly handlers = new Map<GatewayCommandType, (envelope: GatewayCommandEnvelope) => Promise<unknown>>();
+  private readonly handlers = new Map<
+    GatewayCommandType,
+    (envelope: GatewayCommandEnvelope) => Promise<unknown>
+  >();
 
   constructor(deps: GatewayRuntimeDeps) {
     this.deps = {
@@ -92,9 +98,12 @@ export class GatewayRuntime {
       maxPendingPerSession: 256,
       retryBackoffMs: 1_500,
     });
-    this.sessionRuntimeFactory = deps.sessionRuntimeFactory ?? new SessionRuntimeFactory({
-      resolveContext: async ({ session }) => this.deps.resolveContext(session.sessionId ?? session.runtimeId),
-    });
+    this.sessionRuntimeFactory =
+      deps.sessionRuntimeFactory ??
+      new SessionRuntimeFactory({
+        resolveContext: async ({ session }) =>
+          this.deps.resolveContext(session.sessionId ?? session.runtimeId),
+      });
     this.registerDefaultHandlers();
   }
 
@@ -152,7 +161,10 @@ export class GatewayRuntime {
     if (envelope.command.type === "autonomous.run_cycle") {
       return "autonomous_cycle";
     }
-    if (envelope.command.type === "runtime.health_check" || envelope.command.type === "runtime.background_status") {
+    if (
+      envelope.command.type === "runtime.health_check" ||
+      envelope.command.type === "runtime.background_status"
+    ) {
       return "runtime_health";
     }
     if (envelope.command.type === "monitor.run_cycle") {
@@ -176,7 +188,11 @@ export class GatewayRuntime {
     });
 
     if (envelope.command.type === "chat.send_message") {
-      const payload = envelope.command.payload as { text: string; threadId?: string; resourceId?: string };
+      const payload = envelope.command.payload as {
+        text: string;
+        threadId?: string;
+        resourceId?: string;
+      };
       appendActionLogEntry({
         threadId: payload.threadId,
         resourceId: payload.resourceId,
@@ -256,7 +272,11 @@ export class GatewayRuntime {
 
   private registerDefaultHandlers(): void {
     this.registerHandler("chat.send_message", async (envelope) => {
-      const payload = envelope.command.payload as { text: string; threadId?: string; resourceId?: string };
+      const payload = envelope.command.payload as {
+        text: string;
+        threadId?: string;
+        resourceId?: string;
+      };
       return this.getSessionRuntime(envelope.meta.sessionId).processMessage(payload.text, {
         sessionId: envelope.meta.sessionId,
         threadId: payload.threadId,
@@ -264,8 +284,23 @@ export class GatewayRuntime {
       });
     });
 
-    (this as unknown as { registerHandler(type: string, handler: (envelope: unknown) => Promise<unknown>): void }).registerHandler("chat.structured_message", async (envelope: unknown) => {
-      const env = envelope as { meta: { sessionId: string }; command: { payload: { text: string; schemaName?: string; jsonSchema?: unknown; threadId?: string; resourceId?: string } } };
+    (
+      this as unknown as {
+        registerHandler(type: string, handler: (envelope: unknown) => Promise<unknown>): void;
+      }
+    ).registerHandler("chat.structured_message", async (envelope: unknown) => {
+      const env = envelope as {
+        meta: { sessionId: string };
+        command: {
+          payload: {
+            text: string;
+            schemaName?: string;
+            jsonSchema?: unknown;
+            threadId?: string;
+            resourceId?: string;
+          };
+        };
+      };
       const payload = env.command.payload;
       // Either a built-in named schema OR an arbitrary caller-supplied JSON
       // Schema (compiled via jsonSchemaToZod). Throws a clear error on neither /
@@ -292,7 +327,9 @@ export class GatewayRuntime {
             ...context.config,
             preferences: {
               ...context.config.preferences,
-              topNCoins: (envelope.command.payload as { topN?: number }).topN ?? context.config.preferences.topNCoins,
+              topNCoins:
+                (envelope.command.payload as { topN?: number }).topN ??
+                context.config.preferences.topNCoins,
               defaultTimeframes:
                 (envelope.command.payload as { timeframes?: string[] }).timeframes ??
                 context.config.preferences.defaultTimeframes,
@@ -309,7 +346,10 @@ export class GatewayRuntime {
     });
 
     this.registerHandler("system.set_permission_mode", async (envelope) => {
-      const payload = envelope.command.payload as { mode: "auto" | "ask" | "strict"; reason?: string };
+      const payload = envelope.command.payload as {
+        mode: "auto" | "ask" | "strict";
+        reason?: string;
+      };
       const config = await loadConfig();
       const updated = { ...config, permissionMode: payload.mode };
       await saveConfig(updated);
@@ -578,14 +618,34 @@ export class GatewayRuntime {
       if (!payload.side || (payload.side !== "BUY" && payload.side !== "SELL")) {
         return { started: false, reason: "Missing or invalid 'side' (must be BUY or SELL)" };
       }
-      if (!payload.totalQuantity || typeof payload.totalQuantity !== "number" || payload.totalQuantity <= 0) {
-        return { started: false, reason: "Missing or invalid 'totalQuantity' (must be positive number)" };
+      if (
+        !payload.totalQuantity ||
+        typeof payload.totalQuantity !== "number" ||
+        payload.totalQuantity <= 0
+      ) {
+        return {
+          started: false,
+          reason: "Missing or invalid 'totalQuantity' (must be positive number)",
+        };
       }
-      if (!payload.algorithm || !["TWAP", "VWAP", "ICEBERG", "POV"].includes(payload.algorithm as string)) {
-        return { started: false, reason: "Missing or invalid 'algorithm' (must be TWAP, VWAP, ICEBERG, or POV)" };
+      if (
+        !payload.algorithm ||
+        !["TWAP", "VWAP", "ICEBERG", "POV"].includes(payload.algorithm as string)
+      ) {
+        return {
+          started: false,
+          reason: "Missing or invalid 'algorithm' (must be TWAP, VWAP, ICEBERG, or POV)",
+        };
       }
-      if (!payload.rationale || typeof payload.rationale !== "string" || payload.rationale.trim().length < 10) {
-        return { started: false, reason: "Missing or invalid 'rationale' (must describe why execution is warranted)" };
+      if (
+        !payload.rationale ||
+        typeof payload.rationale !== "string" ||
+        payload.rationale.trim().length < 10
+      ) {
+        return {
+          started: false,
+          reason: "Missing or invalid 'rationale' (must describe why execution is warranted)",
+        };
       }
 
       const symbol = payload.symbol as string;
@@ -680,7 +740,11 @@ export class GatewayRuntime {
 
       const status = getAutonomousLoopStatus();
       if (!status.isRunning) {
-        return { ran: false, reason: "Autonomous loop not active. Start via create_swing_mandate + start_autonomous_mode." };
+        return {
+          ran: false,
+          reason:
+            "Autonomous loop not active. Start via create_swing_mandate + start_autonomous_mode.",
+        };
       }
       if (status.isPaused) {
         return { ran: false, reason: "Autonomous loop is paused." };
@@ -693,11 +757,14 @@ export class GatewayRuntime {
         return { ran: false, reason: (err as Error).message };
       }
     });
-
   }
 
-  registerHandler(type: GatewayCommandType, handler: (envelope: GatewayCommandEnvelope) => Promise<unknown>): void {
-    const wrapped = (envelope: GatewayCommandEnvelope) => this.executeLoggedHandler(envelope, handler);
+  registerHandler(
+    type: GatewayCommandType,
+    handler: (envelope: GatewayCommandEnvelope) => Promise<unknown>,
+  ): void {
+    const wrapped = (envelope: GatewayCommandEnvelope) =>
+      this.executeLoggedHandler(envelope, handler);
     this.handlers.set(type, wrapped);
     this.queue.registerHandler(type, async ({ envelope }) => wrapped(envelope));
   }
@@ -724,10 +791,14 @@ export class GatewayRuntime {
     if (this.deps.requireAuth) {
       const principal = await resolvePrincipalFromToken(options.token);
       if (!principal || !principalHasCapability(principal, capability)) {
-        const error = createGatewayError("AUTH_REQUIRED", "Authentication required or capability missing.", {
-          requiredCapability: capability,
-          commandType: envelope.command.type,
-        });
+        const error = createGatewayError(
+          "AUTH_REQUIRED",
+          "Authentication required or capability missing.",
+          {
+            requiredCapability: capability,
+            commandType: envelope.command.type,
+          },
+        );
         this.logFailure(envelope, error.code, error.message);
         return { ok: false, correlationId: envelope.meta.correlationId, error };
       }
@@ -824,7 +895,12 @@ export class GatewayRuntime {
     return this.queue.drainSession(sessionId, 64);
   }
 
-  getQueueDepth(sessionId: string): { pending: number; running: number; failed: number; limit: number } {
+  getQueueDepth(sessionId: string): {
+    pending: number;
+    running: number;
+    failed: number;
+    limit: number;
+  } {
     return this.queue.getDepth(sessionId);
   }
 

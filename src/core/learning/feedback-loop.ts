@@ -60,7 +60,7 @@ export class FeedbackLoop {
 
       // Fetch candles with buffer (2x the trade duration before and after)
       const bufferMs = Math.max(durationMs, 60 * 60 * 1000); // min 1 hour buffer
-      const startTime = entryTime - bufferMs;
+      const _startTime = entryTime - bufferMs;
       const totalCandles = Math.ceil((durationMs + 2 * bufferMs) / (60 * 60 * 1000)); // 1h candles
 
       const candles = await exchange.getCandles(
@@ -120,7 +120,7 @@ export class FeedbackLoop {
   /**
    * Manually trigger analysis for a specific trade.
    */
-  async analyzeTrade(tradeId: string, trade: Trade, exchange: Exchange): Promise<void> {
+  async analyzeTrade(_tradeId: string, trade: Trade, exchange: Exchange): Promise<void> {
     await this.onTradeClosed(trade, exchange);
   }
 

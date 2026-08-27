@@ -75,7 +75,7 @@ describe("fitHmmRegime — basic recovery", () => {
     let agreeInv = 0;
     for (let i = 0; i < trueStates.length; i++) {
       if (trueStates[i] === r.stateSequence[i]) agreeDirect++;
-      if ((1 - trueStates[i]!) === r.stateSequence[i]) agreeInv++;
+      if (1 - trueStates[i]! === r.stateSequence[i]) agreeInv++;
     }
     const best = Math.max(agreeDirect, agreeInv);
     // Expect at least 80% agreement on a clean two-regime split.
@@ -138,7 +138,9 @@ describe("fitHmmRegime — error handling", () => {
   });
 
   test("throws on nStates < 2", () => {
-    expect(() => fitHmmRegime({ observations: Array(20).fill(0.1), nStates: 1 })).toThrow(/nStates/);
+    expect(() => fitHmmRegime({ observations: Array(20).fill(0.1), nStates: 1 })).toThrow(
+      /nStates/,
+    );
   });
 
   test("throws on non-finite observations", () => {

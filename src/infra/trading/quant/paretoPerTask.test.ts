@@ -38,7 +38,7 @@ describe("computeParetoPerTask (GEPA specialist preservation)", () => {
     const r = computeParetoPerTask(
       [
         { id: "lowDD", taskScores: { drawdown: 0.05 } },
-        { id: "highDD", taskScores: { drawdown: 0.30 } },
+        { id: "highDD", taskScores: { drawdown: 0.3 } },
       ],
       { direction: "minimize" },
     );

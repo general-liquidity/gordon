@@ -34,12 +34,7 @@ export interface RsiMidpointResult {
   /** True when RSI is chopping across 50 with no clear bias */
   consolidation: boolean;
   /** Most recent interaction with the 50 line, classified by regime */
-  lastTest:
-    | "held_support"
-    | "held_resistance"
-    | "broke_support"
-    | "broke_resistance"
-    | "none";
+  lastTest: "held_support" | "held_resistance" | "broke_support" | "broke_resistance" | "none";
   /** Human-readable summary */
   interpretation: string;
 }
@@ -105,7 +100,7 @@ function neutralResult(rsiPeriod: number, lookback: number): RsiMidpointResult {
  */
 export function calculateRsiMidpoint(
   closes: number[],
-  opts?: { rsiPeriod?: number; lookback?: number }
+  opts?: { rsiPeriod?: number; lookback?: number },
 ): RsiMidpointResult {
   const rsiPeriod = opts?.rsiPeriod ?? 14;
   const requestedLookback = opts?.lookback ?? 50;
@@ -145,7 +140,7 @@ export function calculateRsiMidpoint(
     const prev = window[i - 1]! - 50;
     const cur = window[i]! - 50;
     if (prev === 0 || cur === 0) continue;
-    if ((prev > 0) !== (cur > 0)) crossings++;
+    if (prev > 0 !== cur > 0) crossings++;
   }
   const crossingsPerBar = parseFloat((crossings / lookback).toFixed(4));
 
@@ -193,7 +188,7 @@ export function calculateRsiMidpoint(
  */
 function classifyLastTest(
   window: number[],
-  bias: "bullish" | "bearish" | "neutral"
+  bias: "bullish" | "bearish" | "neutral",
 ): RsiMidpointResult["lastTest"] {
   if (bias === "neutral") return "none";
 

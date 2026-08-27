@@ -117,10 +117,10 @@ export interface TailConditionalHedgeResult {
 }
 
 const DEFAULT_VOL_WINDOW = 20;
-const DEFAULT_TAIL_Q = 0.90;
-const DEFAULT_PEACE_Q = 0.50;
+const DEFAULT_TAIL_Q = 0.9;
+const DEFAULT_PEACE_Q = 0.5;
 const DEFAULT_MIN_OBS = 20;
-const DEFAULT_STRONG = 0.40;
+const DEFAULT_STRONG = 0.4;
 const DEFAULT_WEAK = 0.15;
 
 function rollingVol(returns: ReadonlyArray<number>, window: number): number[] {
@@ -274,13 +274,8 @@ export function classifyTailConditionalHedges(
     const tailHedge = tailIdx.map((i) => candidate.returns[i]!);
 
     const peaceCorr =
-      peaceTarget.length >= minObs
-        ? pearsonCorrelation(peaceTarget, peaceHedge)
-        : null;
-    const tailCorr =
-      tailTarget.length >= minObs
-        ? pearsonCorrelation(tailTarget, tailHedge)
-        : null;
+      peaceTarget.length >= minObs ? pearsonCorrelation(peaceTarget, peaceHedge) : null;
+    const tailCorr = tailTarget.length >= minObs ? pearsonCorrelation(tailTarget, tailHedge) : null;
     const unconditional = pearsonCorrelation(
       [...target] as number[],
       [...candidate.returns] as number[],
@@ -304,9 +299,7 @@ export function classifyTailConditionalHedges(
 
   const bestRobust = hedges.find((h) => h.reliability === "robust");
   const verdict: OverallVerdict =
-    peaceTarget.length >= minObs && tailTarget.length >= minObs
-      ? "ranked"
-      : "insufficient_data";
+    peaceTarget.length >= minObs && tailTarget.length >= minObs ? "ranked" : "insufficient_data";
 
   const summary =
     `${target.length} target observations: ${peaceTarget.length} peace, ${tailTarget.length} tail. ` +
@@ -326,9 +319,7 @@ export function classifyTailConditionalHedges(
   };
 }
 
-export function formatTailConditionalHedge(
-  result: TailConditionalHedgeResult,
-): string {
+export function formatTailConditionalHedge(result: TailConditionalHedgeResult): string {
   const lines = [
     `Tail-Conditional Hedge — ${result.verdict.toUpperCase()}`,
     "",
@@ -339,11 +330,11 @@ export function formatTailConditionalHedge(
     "  Candidates (sorted best to worst):",
   ];
   for (const h of result.hedges) {
-    const peaceStr = h.peaceTimeCorrelation === null ? " n/a " : h.peaceTimeCorrelation.toFixed(3).padStart(5);
-    const tailStr = h.tailTimeCorrelation === null ? " n/a " : h.tailTimeCorrelation.toFixed(3).padStart(5);
-    lines.push(
-      `    ${h.symbol.padEnd(10)} peace=${peaceStr}  tail=${tailStr}  → ${h.reliability}`,
-    );
+    const peaceStr =
+      h.peaceTimeCorrelation === null ? " n/a " : h.peaceTimeCorrelation.toFixed(3).padStart(5);
+    const tailStr =
+      h.tailTimeCorrelation === null ? " n/a " : h.tailTimeCorrelation.toFixed(3).padStart(5);
+    lines.push(`    ${h.symbol.padEnd(10)} peace=${peaceStr}  tail=${tailStr}  → ${h.reliability}`);
     lines.push(`      ${h.reason}`);
   }
   lines.push("");

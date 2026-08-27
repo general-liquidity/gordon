@@ -46,7 +46,13 @@ describe("ReminderScheduler", () => {
 
   it("filters out null handler returns and throwing handlers", () => {
     s.register({ id: "null", everyNTurns: 1, handler: () => null });
-    s.register({ id: "throws", everyNTurns: 1, handler: () => { throw new Error("bug"); } });
+    s.register({
+      id: "throws",
+      everyNTurns: 1,
+      handler: () => {
+        throw new Error("bug");
+      },
+    });
     s.register({ id: "ok", everyNTurns: 1, handler: () => "ok!" });
     s.advance();
     expect(s.collect()).toEqual(["ok!"]);
@@ -61,9 +67,7 @@ describe("ReminderScheduler", () => {
   });
 
   it("rejects everyNTurns < 1", () => {
-    expect(() =>
-      s.register({ id: "bad", everyNTurns: 0, handler: () => "x" }),
-    ).toThrow();
+    expect(() => s.register({ id: "bad", everyNTurns: 0, handler: () => "x" })).toThrow();
   });
 
   it("unregister removes a reminder", () => {
@@ -95,7 +99,11 @@ describe("trading reminder factories", () => {
   it("mandateScopeReminder lists venues", () => {
     const s = new ReminderScheduler();
     s.register(
-      mandateScopeReminder(() => ({ id: "M-1", venues: ["binance", "kraken"], expiresAt: "2026-12-31" })),
+      mandateScopeReminder(() => ({
+        id: "M-1",
+        venues: ["binance", "kraken"],
+        expiresAt: "2026-12-31",
+      })),
     );
     for (let i = 0; i < 15; i++) s.advance();
     const out = s.collect();

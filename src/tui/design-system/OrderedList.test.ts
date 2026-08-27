@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  DARK_THEME,
-  DARK_DALTONIZED_THEME,
-  LIGHT_THEME,
-} from "../themes/themes.ts";
+import { DARK_THEME, DARK_DALTONIZED_THEME, LIGHT_THEME } from "../themes/themes.ts";
 import { orderedListMarker, orderedMarkerColor } from "./OrderedList.tsx";
 
 describe("orderedListMarker", () => {

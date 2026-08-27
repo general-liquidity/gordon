@@ -61,7 +61,7 @@ export function calculateFVG(
   candles: Candle[],
   minGapPct: number = 0.005,
   volumeMultiplier: number = 1.2,
-  buyRatioThreshold: number = 0.6
+  buyRatioThreshold: number = 0.6,
 ): FVGResult {
   if (candles.length < 25) {
     return {
@@ -137,7 +137,7 @@ export function calculateFVG(
           gapPct: parseFloat((gapPct * 100).toFixed(3)),
           bar: i,
           filled: false,
-          volumeConfirmed: volConfirmed && buyRatio <= (1 - buyRatioThreshold),
+          volumeConfirmed: volConfirmed && buyRatio <= 1 - buyRatioThreshold,
           buyRatio: parseFloat(buyRatio.toFixed(3)),
         });
       }
@@ -160,9 +160,9 @@ export function calculateFVG(
   }
 
   // Filter active gaps
-  const activeGaps = allGaps.filter(g => !g.filled);
-  const bullishGaps = activeGaps.filter(g => g.type === "bullish").slice(-10);
-  const bearishGaps = activeGaps.filter(g => g.type === "bearish").slice(-10);
+  const activeGaps = allGaps.filter((g) => !g.filled);
+  const bullishGaps = activeGaps.filter((g) => g.type === "bullish").slice(-10);
+  const bearishGaps = activeGaps.filter((g) => g.type === "bearish").slice(-10);
 
   // Nearest gaps
   let nearestBullishFVG: FVGap | null = null;
@@ -186,19 +186,26 @@ export function calculateFVG(
   }
 
   // New gap detection
-  const recentGaps = allGaps.filter(g => g.bar >= lastBar - 1 && !g.filled);
+  const recentGaps = allGaps.filter((g) => g.bar >= lastBar - 1 && !g.filled);
   const newGap = recentGaps.length > 0;
   const newGapType = newGap ? recentGaps[recentGaps.length - 1]!.type : "none";
 
   // Signal
   let signal: "buy" | "sell" | "neutral" = "neutral";
-  if (newGap && newGapType === "bullish" && recentGaps[recentGaps.length - 1]!.volumeConfirmed) signal = "buy";
-  else if (newGap && newGapType === "bearish" && recentGaps[recentGaps.length - 1]!.volumeConfirmed) signal = "sell";
+  if (newGap && newGapType === "bullish" && recentGaps[recentGaps.length - 1]!.volumeConfirmed)
+    signal = "buy";
+  else if (newGap && newGapType === "bearish" && recentGaps[recentGaps.length - 1]!.volumeConfirmed)
+    signal = "sell";
 
   const interpretation = buildFVGInterpretation(
-    bullishGaps.length, bearishGaps.length,
-    nearestBullishFVG, nearestBearishFVG,
-    currentPrice, newGap, newGapType, signal
+    bullishGaps.length,
+    bearishGaps.length,
+    nearestBullishFVG,
+    nearestBearishFVG,
+    currentPrice,
+    newGap,
+    newGapType,
+    signal,
   );
 
   return {
@@ -215,9 +222,14 @@ export function calculateFVG(
 }
 
 function buildFVGInterpretation(
-  bullCount: number, bearCount: number,
-  nearBull: FVGap | null, nearBear: FVGap | null,
-  price: number, newGap: boolean, newType: string, signal: string
+  bullCount: number,
+  bearCount: number,
+  nearBull: FVGap | null,
+  nearBear: FVGap | null,
+  _price: number,
+  newGap: boolean,
+  newType: string,
+  signal: string,
 ): string {
   let msg = `FVG: ${bullCount} bullish, ${bearCount} bearish unfilled gaps. `;
 

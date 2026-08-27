@@ -34,10 +34,7 @@ import StdoutContext from "../contexts/StdoutContext.ts";
 import StderrContext from "../contexts/StderrContext.ts";
 import FocusContext from "../contexts/FocusContext.ts";
 import ErrorOverview from "./ErrorOverview.ts";
-import {
-  MOUSE_ENABLE,
-  MOUSE_DISABLE,
-} from "../parse-mouse.ts";
+import { MOUSE_ENABLE, MOUSE_DISABLE } from "../parse-mouse.ts";
 import {
   createInputPipeline,
   type InputPipeline,
@@ -71,10 +68,7 @@ type Props = {
    * `suspendTerminal` can release and reclaim raw mode around a child process,
    * without disturbing the raw-mode ref count the components still own.
    */
-  readonly registerInputControl?: (
-    pauseInput: () => void,
-    resumeInput: () => void,
-  ) => void;
+  readonly registerInputControl?: (pauseInput: () => void, resumeInput: () => void) => void;
 };
 
 type Focusable = {
@@ -226,12 +220,12 @@ export default class App extends PureComponent<Props, State> {
   isScreenReaderActive(): boolean {
     const env = process.env;
     return (
-      env["INK_SCREEN_READER"] === "true" ||
-      env["ACCESSIBILITY_ENABLED"] === "true" ||
-      env["SCREEN_READER"] === "true" ||
-      env["GORDON_SCREEN_READER"] === "true" ||
-      env["VOICE_OVER_ENABLED"] === "1" ||
-      env["NARRATOR_RUNNING"] === "1"
+      env.INK_SCREEN_READER === "true" ||
+      env.ACCESSIBILITY_ENABLED === "true" ||
+      env.SCREEN_READER === "true" ||
+      env.GORDON_SCREEN_READER === "true" ||
+      env.VOICE_OVER_ENABLED === "1" ||
+      env.NARRATOR_RUNNING === "1"
     );
   }
 
@@ -431,9 +425,7 @@ export default class App extends PureComponent<Props, State> {
 
   focus = (id: string): void => {
     this.setState((previousState) => {
-      const hasFocusableId = previousState.focusables.some(
-        (focusable) => focusable?.id === id,
-      );
+      const hasFocusableId = previousState.focusables.some((focusable) => focusable?.id === id);
       if (!hasFocusableId) {
         return previousState;
       }
@@ -443,9 +435,7 @@ export default class App extends PureComponent<Props, State> {
 
   focusNext = (): void => {
     this.setState((previousState) => {
-      const firstFocusableId = previousState.focusables.find(
-        (focusable) => focusable.isActive,
-      )?.id;
+      const firstFocusableId = previousState.focusables.find((focusable) => focusable.isActive)?.id;
       const nextFocusableId = this.findNextFocusable(previousState);
       return {
         ...previousState,
@@ -490,10 +480,7 @@ export default class App extends PureComponent<Props, State> {
   removeFocusable = (id: string): void => {
     this.setState((previousState) => ({
       ...previousState,
-      activeFocusId:
-        previousState.activeFocusId === id
-          ? undefined
-          : previousState.activeFocusId,
+      activeFocusId: previousState.activeFocusId === id ? undefined : previousState.activeFocusId,
       focusables: previousState.focusables.filter((focusable) => {
         return focusable.id !== id;
       }),
@@ -518,10 +505,7 @@ export default class App extends PureComponent<Props, State> {
   deactivateFocusable = (id: string): void => {
     this.setState((previousState) => ({
       ...previousState,
-      activeFocusId:
-        previousState.activeFocusId === id
-          ? undefined
-          : previousState.activeFocusId,
+      activeFocusId: previousState.activeFocusId === id ? undefined : previousState.activeFocusId,
       focusables: previousState.focusables.map((focusable) => {
         if (focusable.id !== id) {
           return focusable;

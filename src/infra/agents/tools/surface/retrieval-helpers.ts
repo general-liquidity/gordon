@@ -147,8 +147,12 @@ function defaultKey(r: Record<string, unknown>): string {
   // Content + first available timestamp is a reasonable fingerprint.
   const content = typeof r.content === "string" ? r.content.slice(0, 80) : "";
   const ts =
-    typeof r.createdAt === "string" ? r.createdAt :
-    typeof r.publishedAt === "string" ? r.publishedAt :
-    typeof r.timestamp === "number" ? String(r.timestamp) : "";
+    typeof r.createdAt === "string"
+      ? r.createdAt
+      : typeof r.publishedAt === "string"
+        ? r.publishedAt
+        : typeof r.timestamp === "number"
+          ? String(r.timestamp)
+          : "";
   return content || ts ? `c:${content}|t:${ts}` : "";
 }

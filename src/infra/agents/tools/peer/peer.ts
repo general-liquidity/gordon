@@ -56,7 +56,9 @@ export const delegateToPeerTool = createTool({
     prompt: z
       .string()
       .min(5, { message: "prompt must be at least 5 characters" })
-      .describe("The task description handed to the peer. The peer interprets this in its own context."),
+      .describe(
+        "The task description handed to the peer. The peer interprets this in its own context.",
+      ),
     timeoutMs: z
       .number()
       .int()
@@ -80,7 +82,9 @@ export const delegateToPeerTool = createTool({
 
     const target = getPeer(peer);
     if (!target) {
-      const available = listPeers().map((p) => p.id).join(", ");
+      const available = listPeers()
+        .map((p) => p.id)
+        .join(", ");
       return validateToolOutput(
         delegateToPeerOutputSchema,
         {
@@ -104,9 +108,7 @@ export const delegateToPeerTool = createTool({
     const result = await target.delegate(prompt, { timeoutMs });
 
     recordStructuredObservation({
-      eventType: result.success
-        ? "peer_delegation.completed"
-        : "peer_delegation.failed",
+      eventType: result.success ? "peer_delegation.completed" : "peer_delegation.failed",
       workflow: "delegation",
       source: "agent_tool",
       component: "delegate_to_peer",

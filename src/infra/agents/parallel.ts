@@ -23,14 +23,12 @@ import type {
   StreamChunk,
   StreamingWorkflowOptions,
   ProgressData,
-  ResultData,
   AnalysisChunk,
   StreamingResult,
 } from "./streaming/streamWriter.ts";
 import {
   createChunk,
   createProgressChunk,
-  createResultChunk,
   createErrorChunk,
   createStartChunk,
   createEndChunk,
@@ -196,7 +194,7 @@ export interface WorkflowStepDef<TInput, TOutput> {
  */
 export async function runParallel<T>(
   operations: Array<() => Promise<T>>,
-  options: ParallelOptions = {}
+  options: ParallelOptions = {},
 ): Promise<ParallelResult<T>> {
   const {
     concurrency = 5,
@@ -227,7 +225,7 @@ export async function runParallel<T>(
         const result = await Promise.race([
           operation(),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(`Operation timed out after ${timeout}ms`)), timeout)
+            setTimeout(() => reject(new Error(`Operation timed out after ${timeout}ms`)), timeout),
           ),
         ]);
 
@@ -290,7 +288,7 @@ export async function runParallel<T>(
 export async function runParallelAgentCalls<TInput, TOutput>(
   calls: Array<AgentCallSpec<TInput, TOutput>>,
   context: GordonContext,
-  options: ParallelOptions = {}
+  options: ParallelOptions = {},
 ): Promise<Record<string, AgentCallResult<TOutput>>> {
   const startTime = Date.now();
   const { label = "agent-calls" } = options;
@@ -357,7 +355,7 @@ export async function runParallelCoinAnalysis<T>(
   symbols: string[],
   analyzeFunction: (symbol: string, context: GordonContext) => Promise<T>,
   context: GordonContext,
-  options: ParallelOptions = {}
+  options: ParallelOptions = {},
 ): Promise<ParallelResult<{ symbol: string; analysis: T }>> {
   const operations = symbols.map((symbol) => async () => {
     const analysis = await analyzeFunction(symbol, context);
@@ -378,7 +376,7 @@ export async function runParallelTimeframeAnalysis<T>(
   timeframes: string[],
   analyzeFunction: (symbol: string, timeframe: string, context: GordonContext) => Promise<T>,
   context: GordonContext,
-  options: ParallelOptions = {}
+  options: ParallelOptions = {},
 ): Promise<ParallelResult<{ timeframe: string; analysis: T }>> {
   const operations = timeframes.map((timeframe) => async () => {
     const analysis = await analyzeFunction(symbol, timeframe, context);
@@ -422,7 +420,7 @@ export async function runDeepParallelAnalysis(
     whale?: (symbol: string, context: GordonContext) => Promise<unknown>;
     orderbook?: (symbol: string, context: GordonContext) => Promise<unknown>;
   },
-  context: GordonContext
+  context: GordonContext,
 ): Promise<DeepParallelAnalysisResult> {
   const startTime = Date.now();
   const normalizedSymbol = normalizeCryptoSymbol(symbol);
@@ -511,7 +509,7 @@ export async function runDeepParallelAnalysis(
  * Calculate consensus bias from multiple analysis results.
  */
 function calculateConsensus(
-  results: DeepParallelAnalysisResult["results"]
+  results: DeepParallelAnalysisResult["results"],
 ): DeepParallelAnalysisResult["consensus"] | undefined {
   const biases: string[] = [];
   const confidences: number[] = [];
@@ -570,9 +568,7 @@ function calculateConsensus(
 
   // Average confidence
   const avgConfidence =
-    confidences.length > 0
-      ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length
-      : 50;
+    confidences.length > 0 ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length : 50;
 
   return {
     bias: dominantBias,
@@ -606,10 +602,10 @@ export async function runMultiCoinParallelAnalysis(
   symbols: string[],
   analyzeFunction: (
     symbol: string,
-    context: GordonContext
+    context: GordonContext,
   ) => Promise<{ bias?: string; setupConfidence?: number; [key: string]: unknown }>,
   context: GordonContext,
-  options: ParallelOptions = {}
+  options: ParallelOptions = {},
 ): Promise<MultiCoinParallelResult> {
   const startTime = Date.now();
 
@@ -688,7 +684,7 @@ export async function runMultiCoinParallelAnalysis(
  * This is a lightweight alternative that doesn't require Mastra's complex type system.
  */
 export function createWorkflowStep<TInput, TOutput>(
-  def: WorkflowStepDef<TInput, TOutput>
+  def: WorkflowStepDef<TInput, TOutput>,
 ): WorkflowStepDef<TInput, TOutput> {
   return def;
 }
@@ -700,7 +696,7 @@ export function createWorkflowStep<TInput, TOutput>(
 export function createScanAnalyzeWorkflow(
   scanFunction: (context: GordonContext) => Promise<unknown>,
   analyzeFunction: (symbol: string, context: GordonContext) => Promise<unknown>,
-  context: GordonContext
+  context: GordonContext,
 ): (symbol: string) => Promise<ParallelScanAnalyzeResult> {
   return async (symbol: string): Promise<ParallelScanAnalyzeResult> => {
     const normalizedSymbol = normalizeCryptoSymbol(symbol);
@@ -725,7 +721,8 @@ export function createScanAnalyzeWorkflow(
         };
 
     // Process analysis results
-    const analyzeHasError = analyzeResult && typeof analyzeResult === "object" && "error" in analyzeResult;
+    const analyzeHasError =
+      analyzeResult && typeof analyzeResult === "object" && "error" in analyzeResult;
     const analysisOutput: ParallelScanAnalyzeResult["analysis"] = analyzeHasError
       ? { success: false, error: (analyzeResult as { error: string }).error }
       : {
@@ -758,7 +755,7 @@ export function createScanAnalyzeWorkflow(
  * Helper to extract opportunities from scan result
  */
 function extractOpportunities(
-  scanResult: unknown
+  scanResult: unknown,
 ): Array<{ symbol: string; price: number; confidence: number; bias: string }> | undefined {
   if (!scanResult || typeof scanResult !== "object") return undefined;
 
@@ -850,7 +847,7 @@ export interface StreamingParallelOptions extends ParallelOptions {
  */
 export function createStreamingWorkflow<T>(
   generator: () => AsyncGenerator<T, void, unknown>,
-  options?: StreamingWorkflowOptions
+  options?: StreamingWorkflowOptions,
 ): StreamingWorkflowResult<T> {
   const source = generator();
   return createStreamingPipeline(source, options);
@@ -882,7 +879,7 @@ export async function streamParallelAnalysis(
     orderbook?: (symbol: string, context: GordonContext) => Promise<unknown>;
   },
   context: GordonContext,
-  options?: StreamingParallelOptions
+  options?: StreamingParallelOptions,
 ): Promise<StreamingResult<DeepParallelAnalysisResult>> {
   const startTime = Date.now();
   const normalizedSymbol = normalizeCryptoSymbol(symbol);
@@ -891,7 +888,7 @@ export async function streamParallelAnalysis(
 
   // Count total analyzers
   const analyzerKeys = Object.keys(analyzers).filter(
-    (k) => analyzers[k as keyof typeof analyzers] !== undefined
+    (k) => analyzers[k as keyof typeof analyzers] !== undefined,
   );
   const total = analyzerKeys.length;
   let completed = 0;
@@ -900,18 +897,27 @@ export async function streamParallelAnalysis(
 
   try {
     // Write start chunk
-    await writer.write(createStartChunk(`parallel-analysis-${normalizedSymbol}`, total) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+    await writer.write(
+      createStartChunk(`parallel-analysis-${normalizedSymbol}`, total) as unknown as StreamChunk<
+        AnalysisChunk | ProgressData
+      >,
+    );
     chunksWritten++;
 
     // Write initial progress
     if (options?.enableProgress !== false) {
-      await writer.write(createProgressChunk({
-        step: "Starting analysis",
-        current: 0,
-        total,
-        percent: 0,
-        status: "running",
-      }, normalizedSymbol) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+      await writer.write(
+        createProgressChunk(
+          {
+            step: "Starting analysis",
+            current: 0,
+            total,
+            percent: 0,
+            status: "running",
+          },
+          normalizedSymbol,
+        ) as unknown as StreamChunk<AnalysisChunk | ProgressData>,
+      );
       chunksWritten++;
     }
 
@@ -921,7 +927,11 @@ export async function streamParallelAnalysis(
       const interval = options.heartbeatInterval || 5000;
       heartbeatInterval = setInterval(async () => {
         try {
-          await writer.write(createHeartbeatChunk(normalizedSymbol) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+          await writer.write(
+            createHeartbeatChunk(normalizedSymbol) as unknown as StreamChunk<
+              AnalysisChunk | ProgressData
+            >,
+          );
         } catch {
           // Ignore heartbeat errors
         }
@@ -934,7 +944,7 @@ export async function streamParallelAnalysis(
 
     const createAnalyzerPromise = (
       key: keyof typeof analyzers,
-      executeFn: () => Promise<unknown>
+      executeFn: () => Promise<unknown>,
     ) => {
       return async () => {
         const analyzerStart = Date.now();
@@ -956,26 +966,33 @@ export async function streamParallelAnalysis(
             duration,
           };
 
-          await writer.write(createChunk("result", analysisChunk, {
-            source: `${normalizedSymbol}-${key}`,
-          }) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+          await writer.write(
+            createChunk("result", analysisChunk, {
+              source: `${normalizedSymbol}-${key}`,
+            }) as unknown as StreamChunk<AnalysisChunk | ProgressData>,
+          );
           chunksWritten++;
 
           completed++;
 
           // Stream progress update
           if (options?.enableProgress !== false) {
-            await writer.write(createProgressChunk({
-              step: `Completed ${key} analysis`,
-              current: completed,
-              total,
-              percent: Math.round((completed / total) * 100),
-              status: completed === total ? "completed" : "running",
-            }, normalizedSymbol) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+            await writer.write(
+              createProgressChunk(
+                {
+                  step: `Completed ${key} analysis`,
+                  current: completed,
+                  total,
+                  percent: Math.round((completed / total) * 100),
+                  status: completed === total ? "completed" : "running",
+                },
+                normalizedSymbol,
+              ) as unknown as StreamChunk<AnalysisChunk | ProgressData>,
+            );
             chunksWritten++;
           }
         } catch (err) {
-          const duration = Date.now() - analyzerStart;
+          const _duration = Date.now() - analyzerStart;
           const errorMessage = err instanceof Error ? err.message : String(err);
 
           results[key] = {
@@ -984,10 +1001,12 @@ export async function streamParallelAnalysis(
           };
 
           // Stream error
-          await writer.write(createErrorChunk(
-            err instanceof Error ? err : new Error(errorMessage),
-            `${normalizedSymbol}-${key}`
-          ) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+          await writer.write(
+            createErrorChunk(
+              err instanceof Error ? err : new Error(errorMessage),
+              `${normalizedSymbol}-${key}`,
+            ) as unknown as StreamChunk<AnalysisChunk | ProgressData>,
+          );
           chunksWritten++;
           errors++;
 
@@ -995,13 +1014,18 @@ export async function streamParallelAnalysis(
 
           // Stream progress update even on error
           if (options?.enableProgress !== false) {
-            await writer.write(createProgressChunk({
-              step: `Failed ${key} analysis`,
-              current: completed,
-              total,
-              percent: Math.round((completed / total) * 100),
-              status: completed === total ? "completed" : "running",
-            }, normalizedSymbol) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+            await writer.write(
+              createProgressChunk(
+                {
+                  step: `Failed ${key} analysis`,
+                  current: completed,
+                  total,
+                  percent: Math.round((completed / total) * 100),
+                  status: completed === total ? "completed" : "running",
+                },
+                normalizedSymbol,
+              ) as unknown as StreamChunk<AnalysisChunk | ProgressData>,
+            );
             chunksWritten++;
           }
         }
@@ -1019,21 +1043,27 @@ export async function streamParallelAnalysis(
     if (analyzers.technical) {
       promises.push({
         key: "technical",
-        promise: createAnalyzerPromise("technical", () => analyzers.technical!(normalizedSymbol, context))(),
+        promise: createAnalyzerPromise("technical", () =>
+          analyzers.technical!(normalizedSymbol, context),
+        )(),
       });
     }
 
     if (analyzers.whale) {
       promises.push({
         key: "whale",
-        promise: createAnalyzerPromise("whale", () => analyzers.whale!(normalizedSymbol, context))(),
+        promise: createAnalyzerPromise("whale", () =>
+          analyzers.whale!(normalizedSymbol, context),
+        )(),
       });
     }
 
     if (analyzers.orderbook) {
       promises.push({
         key: "orderbook",
-        promise: createAnalyzerPromise("orderbook", () => analyzers.orderbook!(normalizedSymbol, context))(),
+        promise: createAnalyzerPromise("orderbook", () =>
+          analyzers.orderbook!(normalizedSymbol, context),
+        )(),
       });
     }
 
@@ -1058,13 +1088,15 @@ export async function streamParallelAnalysis(
     };
 
     // Write end chunk with summary
-    await writer.write(createEndChunk(`parallel-analysis-${normalizedSymbol}`, {
-      symbol: normalizedSymbol,
-      duration,
-      succeeded: Object.values(results).filter((r) => r?.success).length,
-      failed: Object.values(results).filter((r) => !r?.success).length,
-      consensus,
-    }) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+    await writer.write(
+      createEndChunk(`parallel-analysis-${normalizedSymbol}`, {
+        symbol: normalizedSymbol,
+        duration,
+        succeeded: Object.values(results).filter((r) => r?.success).length,
+        failed: Object.values(results).filter((r) => !r?.success).length,
+        consensus,
+      }) as unknown as StreamChunk<AnalysisChunk | ProgressData>,
+    );
     chunksWritten++;
 
     await writer.close();
@@ -1085,7 +1117,11 @@ export async function streamParallelAnalysis(
     const error = err instanceof Error ? err : new Error(String(err));
     logger.error(`Streaming parallel analysis failed for ${normalizedSymbol}`, error);
 
-    await writer.write(createErrorChunk(error, normalizedSymbol) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+    await writer.write(
+      createErrorChunk(error, normalizedSymbol) as unknown as StreamChunk<
+        AnalysisChunk | ProgressData
+      >,
+    );
 
     if (writer.abort) {
       await writer.abort(error);
@@ -1124,10 +1160,10 @@ export async function streamMultiCoinAnalysis(
   writer: StreamWriter<AnalysisChunk | ProgressData>,
   analyzeFunction: (
     symbol: string,
-    context: GordonContext
+    context: GordonContext,
   ) => Promise<{ bias?: string; setupConfidence?: number; [key: string]: unknown }>,
   context: GordonContext,
-  options?: StreamingParallelOptions
+  options?: StreamingParallelOptions,
 ): Promise<StreamingResult<MultiCoinParallelResult>> {
   const startTime = Date.now();
   const { concurrency = 5 } = options || {};
@@ -1148,18 +1184,27 @@ export async function streamMultiCoinAnalysis(
 
   try {
     // Write start chunk
-    await writer.write(createStartChunk(`multi-coin-analysis`, total) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+    await writer.write(
+      createStartChunk(`multi-coin-analysis`, total) as unknown as StreamChunk<
+        AnalysisChunk | ProgressData
+      >,
+    );
     chunksWritten++;
 
     // Write initial progress
     if (options?.enableProgress !== false) {
-      await writer.write(createProgressChunk({
-        step: "Starting multi-coin analysis",
-        current: 0,
-        total,
-        percent: 0,
-        status: "running",
-      }, "multi-coin") as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+      await writer.write(
+        createProgressChunk(
+          {
+            step: "Starting multi-coin analysis",
+            current: 0,
+            total,
+            percent: 0,
+            status: "running",
+          },
+          "multi-coin",
+        ) as unknown as StreamChunk<AnalysisChunk | ProgressData>,
+      );
       chunksWritten++;
     }
 
@@ -1169,7 +1214,11 @@ export async function streamMultiCoinAnalysis(
       const interval = options.heartbeatInterval || 5000;
       heartbeatInterval = setInterval(async () => {
         try {
-          await writer.write(createHeartbeatChunk("multi-coin") as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+          await writer.write(
+            createHeartbeatChunk("multi-coin") as unknown as StreamChunk<
+              AnalysisChunk | ProgressData
+            >,
+          );
         } catch {
           // Ignore heartbeat errors
         }
@@ -1217,9 +1266,11 @@ export async function streamMultiCoinAnalysis(
             duration,
           };
 
-          await writer.write(createChunk("result", analysisChunk, {
-            source: normalizedSymbol,
-          }) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+          await writer.write(
+            createChunk("result", analysisChunk, {
+              source: normalizedSymbol,
+            }) as unknown as StreamChunk<AnalysisChunk | ProgressData>,
+          );
           chunksWritten++;
           succeeded++;
         } catch (err) {
@@ -1241,9 +1292,11 @@ export async function streamMultiCoinAnalysis(
             duration,
           };
 
-          await writer.write(createChunk("result", analysisChunk, {
-            source: normalizedSymbol,
-          }) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+          await writer.write(
+            createChunk("result", analysisChunk, {
+              source: normalizedSymbol,
+            }) as unknown as StreamChunk<AnalysisChunk | ProgressData>,
+          );
           chunksWritten++;
           errors++;
         }
@@ -1252,13 +1305,18 @@ export async function streamMultiCoinAnalysis(
 
         // Stream progress update
         if (options?.enableProgress !== false) {
-          await writer.write(createProgressChunk({
-            step: `Analyzed ${completed}/${total} coins`,
-            current: completed,
-            total,
-            percent: Math.round((completed / total) * 100),
-            status: completed === total ? "completed" : "running",
-          }, "multi-coin") as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+          await writer.write(
+            createProgressChunk(
+              {
+                step: `Analyzed ${completed}/${total} coins`,
+                current: completed,
+                total,
+                percent: Math.round((completed / total) * 100),
+                status: completed === total ? "completed" : "running",
+              },
+              "multi-coin",
+            ) as unknown as StreamChunk<AnalysisChunk | ProgressData>,
+          );
           chunksWritten++;
         }
       });
@@ -1289,13 +1347,15 @@ export async function streamMultiCoinAnalysis(
     };
 
     // Write end chunk with summary
-    await writer.write(createEndChunk("multi-coin-analysis", {
-      total: symbols.length,
-      analyzed: succeeded,
-      failed: errors,
-      topOpportunities: opportunities.slice(0, 3).map((o) => o.symbol),
-      duration,
-    }) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+    await writer.write(
+      createEndChunk("multi-coin-analysis", {
+        total: symbols.length,
+        analyzed: succeeded,
+        failed: errors,
+        topOpportunities: opportunities.slice(0, 3).map((o) => o.symbol),
+        duration,
+      }) as unknown as StreamChunk<AnalysisChunk | ProgressData>,
+    );
     chunksWritten++;
 
     await writer.close();
@@ -1318,7 +1378,9 @@ export async function streamMultiCoinAnalysis(
     const error = err instanceof Error ? err : new Error(String(err));
     logger.error("Streaming multi-coin analysis failed", error);
 
-    await writer.write(createErrorChunk(error, "multi-coin") as unknown as StreamChunk<AnalysisChunk | ProgressData>);
+    await writer.write(
+      createErrorChunk(error, "multi-coin") as unknown as StreamChunk<AnalysisChunk | ProgressData>,
+    );
 
     if (writer.abort) {
       await writer.abort(error);
@@ -1355,13 +1417,13 @@ export function createStreamingDeepAnalysis(
     orderbook?: (symbol: string, context: GordonContext) => Promise<unknown>;
   },
   context: GordonContext,
-  options?: StreamingWorkflowOptions
+  options?: StreamingWorkflowOptions,
 ): StreamingWorkflowResult<AnalysisChunk | ProgressData> {
   const normalizedSymbol = normalizeCryptoSymbol(symbol);
 
   async function* generator(): AsyncGenerator<AnalysisChunk | ProgressData, void, unknown> {
     const analyzerKeys = Object.keys(analyzers).filter(
-      (k) => analyzers[k as keyof typeof analyzers] !== undefined
+      (k) => analyzers[k as keyof typeof analyzers] !== undefined,
     );
     const total = analyzerKeys.length;
     let completed = 0;
@@ -1411,7 +1473,7 @@ export function createStreamingDeepAnalysis(
           current: completed,
           total,
           percent: Math.round((completed / total) * 100),
-          status: completed === total ? "completed" as const : "running" as const,
+          status: completed === total ? ("completed" as const) : ("running" as const),
         };
       } catch (err) {
         const duration = Date.now() - analyzerStart;
@@ -1433,7 +1495,7 @@ export function createStreamingDeepAnalysis(
           current: completed,
           total,
           percent: Math.round((completed / total) * 100),
-          status: completed === total ? "completed" as const : "running" as const,
+          status: completed === total ? ("completed" as const) : ("running" as const),
         };
       }
     }
@@ -1468,10 +1530,10 @@ export function createStreamingMultiCoinAnalysis(
   symbols: string[],
   analyzeFunction: (
     symbol: string,
-    context: GordonContext
+    context: GordonContext,
   ) => Promise<{ bias?: string; setupConfidence?: number; [key: string]: unknown }>,
   context: GordonContext,
-  options?: StreamingWorkflowOptions
+  options?: StreamingWorkflowOptions,
 ): StreamingWorkflowResult<AnalysisChunk | ProgressData> {
   const total = symbols.length;
 
@@ -1528,7 +1590,7 @@ export function createStreamingMultiCoinAnalysis(
         current: completed,
         total,
         percent: Math.round((completed / total) * 100),
-        status: completed === total ? "completed" as const : "running" as const,
+        status: completed === total ? ("completed" as const) : ("running" as const),
       };
     }
   }

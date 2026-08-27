@@ -62,19 +62,11 @@ function analyzeTrades(result: BacktestResult): BacktestAnalysisResult["tradeAna
   const wins = trades.filter((t) => t.pnl > 0);
   const losses = trades.filter((t) => t.pnl <= 0);
 
-  const avgWin = wins.length > 0
-    ? wins.reduce((sum, t) => sum + t.pnl, 0) / wins.length
-    : 0;
-  const avgLoss = losses.length > 0
-    ? losses.reduce((sum, t) => sum + t.pnl, 0) / losses.length
-    : 0;
+  const avgWin = wins.length > 0 ? wins.reduce((sum, t) => sum + t.pnl, 0) / wins.length : 0;
+  const avgLoss = losses.length > 0 ? losses.reduce((sum, t) => sum + t.pnl, 0) / losses.length : 0;
 
-  const largestWin = wins.length > 0
-    ? Math.max(...wins.map((t) => t.pnl))
-    : 0;
-  const largestLoss = losses.length > 0
-    ? Math.min(...losses.map((t) => t.pnl))
-    : 0;
+  const largestWin = wins.length > 0 ? Math.max(...wins.map((t) => t.pnl)) : 0;
+  const largestLoss = losses.length > 0 ? Math.min(...losses.map((t) => t.pnl)) : 0;
 
   return {
     total: trades.length,
@@ -117,7 +109,7 @@ export function analyzeBacktestResult(result: BacktestResult): BacktestAnalysisR
 
 export function compareBacktestResults(
   results: BacktestResult[],
-  sortBy: keyof BacktestMetrics = "totalReturn"
+  sortBy: keyof BacktestMetrics = "totalReturn",
 ): {
   comparisonTable: Array<Record<string, unknown>>;
   bestStrategy: Record<string, unknown> | null;
@@ -187,7 +179,7 @@ export function compareBacktestResults(
 
 export function rankStrategiesByMetric(
   results: BacktestResult[],
-  metric: keyof BacktestMetrics = "totalReturn"
+  metric: keyof BacktestMetrics = "totalReturn",
 ): Array<{ strategy: string; value: number; rank: number }> {
   if (results.length === 0) {
     return [];
@@ -209,7 +201,7 @@ export function rankStrategiesByMetric(
 
 export function findBestStrategy(
   results: BacktestResult[],
-  metric: keyof BacktestMetrics = "totalReturn"
+  metric: keyof BacktestMetrics = "totalReturn",
 ): {
   bestStrategy: string | null;
   bestMetricValue: number | null;

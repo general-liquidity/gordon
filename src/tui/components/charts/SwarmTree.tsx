@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { WorkerBadge } from "../status/WorkerBadge.tsx";
 
@@ -28,10 +27,10 @@ interface Props {
 }
 
 const STATUS_ICON: Record<string, string> = {
-  running: "\u25CF",  // ●
-  done: "\u2713",     // ✓
-  error: "\u2717",    // ✗
-  queued: "\u25CB",   // ○
+  running: "\u25CF", // ●
+  done: "\u2713", // ✓
+  error: "\u2717", // ✗
+  queued: "\u25CB", // ○
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -47,7 +46,9 @@ export function SwarmTree({ agents }: Props) {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Box>
-        <Text bold color="cyanBright">GORDON</Text>
+        <Text bold color="cyanBright">
+          GORDON
+        </Text>
         <Text dimColor> {"\u00b7"} </Text>
         <Text color="cyanBright">Coordinator</Text>
       </Box>
@@ -56,19 +57,20 @@ export function SwarmTree({ agents }: Props) {
         const connector = isLast ? "\u2514\u2500" : "\u251C\u2500";
         const icon = STATUS_ICON[agent.status] ?? "\u25CB";
         const iconColor = STATUS_COLOR[agent.status] ?? "gray";
-        const label = agent.symbol ? `${agent.name} (${agent.symbol})` : agent.name;
+        const _label = agent.symbol ? `${agent.name} (${agent.symbol})` : agent.name;
         const durationStr = agent.duration ? ` (${formatMs(agent.duration)})` : "";
 
         return (
           <Box key={agent.id}>
-            <Text dimColor>  {connector} </Text>
+            <Text dimColor> {connector} </Text>
             <WorkerBadge agent={agent.name} showBullet={false} />
             {agent.symbol && <Text dimColor> ({agent.symbol})</Text>}
-            <Text>  </Text>
+            <Text> </Text>
             <Text color={iconColor}>{icon}</Text>
             <Text> </Text>
             <Text dimColor={agent.status === "queued"}>
-              {agent.detail ?? agent.status}{durationStr}
+              {agent.detail ?? agent.status}
+              {durationStr}
             </Text>
           </Box>
         );

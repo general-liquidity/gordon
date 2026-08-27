@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  analyzeStallCut,
-  formatStallCut,
-  type StallBar,
-} from "./stall-cut-tracker.ts";
+import { analyzeStallCut, formatStallCut, type StallBar } from "./stall-cut-tracker.ts";
 
 function bar(close: number, volume: number, open?: number): StallBar {
   const o = open ?? close;

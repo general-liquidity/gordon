@@ -43,8 +43,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
     const nativeApiKey = process.env.GORDON_NATIVE_OPENAI_API_KEY;
     const nativeBaseUrl = process.env.GORDON_NATIVE_OPENAI_BASE_URL;
     const currentBaseUrl = process.env.OPENAI_BASE_URL;
-    const looksLikeNativeOpenAI =
-      !currentBaseUrl || currentBaseUrl === "https://api.openai.com/v1";
+    const looksLikeNativeOpenAI = !currentBaseUrl || currentBaseUrl === "https://api.openai.com/v1";
 
     this.apiKey =
       options?.apiKey ??
@@ -59,9 +58,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
     this.model = options?.model ?? "text-embedding-3-small";
 
     if (!this.apiKey) {
-      throw new Error(
-        "OpenAIEmbeddingProvider requires OPENAI_API_KEY or an explicit apiKey"
-      );
+      throw new Error("OpenAIEmbeddingProvider requires OPENAI_API_KEY or an explicit apiKey");
     }
   }
 
@@ -92,9 +89,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");
-      throw new Error(
-        `OpenAI embeddings API error ${response.status}: ${body}`
-      );
+      throw new Error(`OpenAI embeddings API error ${response.status}: ${body}`);
     }
 
     const json = (await response.json()) as {
@@ -236,8 +231,7 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
 export function createEmbeddingProvider(): EmbeddingProvider {
   const nativeApiKey = process.env.GORDON_NATIVE_OPENAI_API_KEY;
   const currentBaseUrl = process.env.OPENAI_BASE_URL;
-  const looksLikeNativeOpenAI =
-    !currentBaseUrl || currentBaseUrl === "https://api.openai.com/v1";
+  const looksLikeNativeOpenAI = !currentBaseUrl || currentBaseUrl === "https://api.openai.com/v1";
   const apiKey = nativeApiKey ?? (looksLikeNativeOpenAI ? process.env.OPENAI_API_KEY : undefined);
 
   if (apiKey) {

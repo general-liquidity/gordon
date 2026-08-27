@@ -62,10 +62,7 @@ export interface RankedIbsAsset {
   position: IbsPosition;
 }
 
-export type IbsVerdict =
-  | "ranked"
-  | "insufficient_data"
-  | "degenerate_bars";
+export type IbsVerdict = "ranked" | "insufficient_data" | "degenerate_bars";
 
 export interface IbsCrossSectionalResult {
   totalSymbols: number;
@@ -82,8 +79,8 @@ export interface IbsCrossSectionalResult {
   summary: string;
 }
 
-const DEFAULT_TOP_FRACTION = 0.10;
-const DEFAULT_BOTTOM_FRACTION = 0.10;
+const DEFAULT_TOP_FRACTION = 0.1;
+const DEFAULT_BOTTOM_FRACTION = 0.1;
 const DEFAULT_MIN_SYMBOLS = 5;
 
 function mean(values: number[]): number {

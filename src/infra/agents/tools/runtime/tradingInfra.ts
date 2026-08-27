@@ -23,19 +23,15 @@ import { getGordonContext } from "../types.ts";
 import {
   saveCheckpoint,
   listCheckpoints,
-  getLatestCheckpoint,
-  formatCheckpoint,
   type PortfolioCheckpoint,
 } from "../../../trading/ops/strategyCheckpoint.ts";
-import {
-  createRebalanceCycle,
-  startStep,
-  completeStep,
-  failStep,
-  detectDrift,
-  formatCycleStatus,
-} from "../../../trading/portfolio/autoRebalance.ts";
+import { detectDrift } from "../../../trading/portfolio/autoRebalance.ts";
 import { getMarketContext, formatSymbolHover } from "../../../trading/signals/marketContext.ts";
+import {
+  checkConstitution,
+  formatViolations,
+  type ConstitutionViolation,
+} from "../../../safety/defense/tradingConstitution.ts";
 
 // ============================================================================
 // Strategy Sandbox Tools
@@ -116,7 +112,16 @@ export const classify_trade_risk = createTool({
     side: z.enum(["BUY", "SELL"]),
     quantity: z.number().positive(),
     price: z.number().positive(),
-    notionalUsd: z.number().positive(),
+    notionalUsd: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Optional display estimate; Gordon derives risk notional as quantity × price."),
+    stopLossPrice: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Protective stop price. Omission is a constitution violation."),
     orderType: z.enum(["MARKET", "LIMIT", "STOP"]).default("MARKET"),
     venue: z
       .string()
@@ -127,45 +132,61 @@ export const classify_trade_risk = createTool({
           "Exposure) is included in the verdict.",
       ),
   }),
-  execute: async (trade, execContext) => {
-    const { classifyVenue } = require("../../../trading/risk/venueMevExposure.ts") as typeof import(
-      "../../../trading/risk/venueMevExposure.ts"
-    );
+  execute: async (input, execContext) => {
+    const { classifyVenue } =
+      require("../../../trading/risk/venueMevExposure.ts") as typeof import("../../../trading/risk/venueMevExposure.ts");
 
     const ctx = getGordonContext(execContext);
     const portfolioContext = await buildClassifierPortfolioContext(ctx ?? undefined);
+    const notionalUsd = input.quantity * input.price;
+    const trade = { ...input, notionalUsd };
     if (trade.venue) {
       portfolioContext.venueMevExposure = classifyVenue(trade.venue);
     }
 
     const assessment = classifyTradeRisk(trade, portfolioContext, DEFAULT_CLASSIFIER_CONFIG);
 
-    // Wire: Trading Constitution check (immutable rules that cannot be overridden)
-    let constitutionViolations: any[] = [];
-    try {
-      const { checkConstitution, formatViolations } = require("../../safety/tradingConstitution.ts") as typeof import("../../../safety/defense/tradingConstitution.ts");
-      const result = checkConstitution({
-        positionSizePct: (trade.notionalUsd / portfolioContext.totalValueUsd) * 100,
-        riskPerTradePct: assessment.compositeScore > 50 ? 3 : 1, // Estimate
-        currentDrawdownPct: portfolioContext.currentDrawdownPct,
-        dailyLossPct: Math.abs(portfolioContext.dailyPnlUsd / portfolioContext.totalValueUsd) * 100,
-        openPositionCount: portfolioContext.positions.length,
-        tradesThisHour: portfolioContext.recentTradeCount,
-        tradesThisDay: portfolioContext.recentTradeCount * 3, // Estimate
-        consecutiveLosses: 0,
-        hasStopLoss: true, // Assume — Executor instructions require it
-        isCrypto: true,
-      });
-      constitutionViolations = result;
+    // Wire: Trading Constitution check (immutable rules that cannot be overridden).
+    // The former dynamic import pointed at a nonexistent path and its catch
+    // silently skipped this entire block. Derive the stop risk from the
+    // proposal instead of assuming every order has a stop.
+    const stopIsProtective =
+      input.stopLossPrice !== undefined &&
+      (input.side === "BUY"
+        ? input.stopLossPrice < input.price
+        : input.stopLossPrice > input.price);
+    const stopDistancePct = stopIsProtective
+      ? (Math.abs(input.price - input.stopLossPrice!) / input.price) * 100
+      : undefined;
+    const riskPerTradePct =
+      stopIsProtective && portfolioContext.totalValueUsd > 0
+        ? ((Math.abs(input.price - input.stopLossPrice!) * input.quantity) /
+            portfolioContext.totalValueUsd) *
+          100
+        : 100;
+    const constitutionViolations: ConstitutionViolation[] = checkConstitution({
+      positionSizePct: (notionalUsd / portfolioContext.totalValueUsd) * 100,
+      riskPerTradePct,
+      currentDrawdownPct: portfolioContext.currentDrawdownPct,
+      dailyLossPct: Math.abs(portfolioContext.dailyPnlUsd / portfolioContext.totalValueUsd) * 100,
+      openPositionCount: portfolioContext.positions.length,
+      tradesThisHour: portfolioContext.recentTradeCount,
+      tradesThisDay: portfolioContext.todayTradeCount ?? portfolioContext.recentTradeCount,
+      consecutiveLosses: 0,
+      hasStopLoss: stopIsProtective,
+      stopDistancePct,
+      isCrypto: true,
+    });
 
-      // If any constitution violation is "halt" or "emergency" → override risk tier to critical
-      const hasHalt = result.some((v: any) => v.severity === "halt" || v.severity === "emergency");
-      if (hasHalt) {
-        assessment.tier = "critical";
-        assessment.recommendation = "block";
-        assessment.summary = formatViolations(result);
-      }
-    } catch { /* non-critical */ }
+    const hasHalt = constitutionViolations.some(
+      (violation) => violation.severity === "halt" || violation.severity === "emergency",
+    );
+    const hasBlock = constitutionViolations.some((violation) => violation.severity === "block");
+    if (hasHalt || hasBlock) {
+      assessment.tier = hasHalt ? "critical" : "high";
+      assessment.recommendation = "block";
+      assessment.summary = formatViolations(constitutionViolations);
+    }
 
     return { success: true, ...assessment, constitutionViolations };
   },
@@ -182,7 +203,9 @@ export const save_checkpoint = createTool({
     "Use before executing multi-trade operations so you can compare before/after.",
   inputSchema: z.object({
     label: z.string().describe("Human-readable label (e.g., 'Before BTC rebalance')"),
-    reason: z.enum(["manual", "pre_rebalance", "pre_strategy_change", "pre_execution"]).default("manual"),
+    reason: z
+      .enum(["manual", "pre_rebalance", "pre_strategy_change", "pre_execution"])
+      .default("manual"),
   }),
   execute: async ({ label, reason }, execContext) => {
     const ctx = getGordonContext(execContext);
@@ -214,7 +237,9 @@ export const save_checkpoint = createTool({
       }
     } else if (ctx?.exchange) {
       try {
-        const { PortfolioContextBuilder } = await import("../../../../core/risk-kernel/portfolio-context.ts");
+        const { PortfolioContextBuilder } = await import(
+          "../../../../core/risk-kernel/portfolio-context.ts"
+        );
         const portfolio = await new PortfolioContextBuilder().buildFromExchange(ctx.exchange);
         totalValueUsd = portfolio.totalEquity;
         cashUsd = portfolio.availableBalance;
@@ -298,9 +323,14 @@ export const detect_portfolio_drift = createTool({
     "Check if the portfolio has drifted from target allocations. " +
     "Use to decide if rebalancing is needed. Returns drifted positions and total drift %.",
   inputSchema: z.object({
-    targetAllocations: z.record(z.string(), z.number()).describe("Target allocation by symbol (e.g., { BTC: 40, ETH: 30, SOL: 30 })"),
+    targetAllocations: z
+      .record(z.string(), z.number())
+      .describe("Target allocation by symbol (e.g., { BTC: 40, ETH: 30, SOL: 30 })"),
     currentAllocations: z.record(z.string(), z.number()).describe("Current allocation by symbol"),
-    thresholdPct: z.number().default(5).describe("Drift threshold to trigger rebalance (default 5%)"),
+    thresholdPct: z
+      .number()
+      .default(5)
+      .describe("Drift threshold to trigger rebalance (default 5%)"),
   }),
   execute: async ({ targetAllocations, currentAllocations, thresholdPct }) => {
     const currentMap: Record<string, number> = {};

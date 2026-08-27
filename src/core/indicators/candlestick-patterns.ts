@@ -306,9 +306,7 @@ export function detectCandlestickPatterns(
   if (!candles || candles.length === 0) {
     return { matches: [], latestBarMatches: [] };
   }
-  const wanted = new Set<CandlestickPatternName>(
-    params.patterns ?? ALL_CANDLESTICK_PATTERNS,
-  );
+  const wanted = new Set<CandlestickPatternName>(params.patterns ?? ALL_CANDLESTICK_PATTERNS);
   const windowBars = params.windowBars ?? DEFAULT_WINDOW;
   const dojiThreshold = params.dojiBodyThresholdPct ?? DEFAULT_DOJI_THRESHOLD;
   const shadowRatio = params.shadowToBodyRatio ?? DEFAULT_SHADOW_RATIO;
@@ -323,15 +321,23 @@ export function detectCandlestickPatterns(
     // 1-bar checks.
     if (wanted.has("hammer")) {
       const c = checkHammer(curr, shadowRatio);
-      if (c != null) matches.push({ pattern: "hammer", barIndex: i, confidence: c, direction: "bullish" });
+      if (c != null)
+        matches.push({ pattern: "hammer", barIndex: i, confidence: c, direction: "bullish" });
     }
     if (wanted.has("shooting_star")) {
       const c = checkShootingStar(curr, shadowRatio);
-      if (c != null) matches.push({ pattern: "shooting_star", barIndex: i, confidence: c, direction: "bearish" });
+      if (c != null)
+        matches.push({
+          pattern: "shooting_star",
+          barIndex: i,
+          confidence: c,
+          direction: "bearish",
+        });
     }
     if (wanted.has("doji")) {
       const c = checkDoji(curr, dojiThreshold);
-      if (c != null) matches.push({ pattern: "doji", barIndex: i, confidence: c, direction: "neutral" });
+      if (c != null)
+        matches.push({ pattern: "doji", barIndex: i, confidence: c, direction: "neutral" });
     }
 
     // 2-bar checks.
@@ -340,7 +346,13 @@ export function detectCandlestickPatterns(
       for (const spec of TWO_BAR) {
         if (!wanted.has(spec.name)) continue;
         const c = spec.check(prev, curr);
-        if (c != null) matches.push({ pattern: spec.name, barIndex: i, confidence: c, direction: spec.direction });
+        if (c != null)
+          matches.push({
+            pattern: spec.name,
+            barIndex: i,
+            confidence: c,
+            direction: spec.direction,
+          });
       }
     }
 
@@ -351,7 +363,13 @@ export function detectCandlestickPatterns(
       for (const spec of THREE_BAR) {
         if (!wanted.has(spec.name)) continue;
         const c = spec.check(c1, c2, curr);
-        if (c != null) matches.push({ pattern: spec.name, barIndex: i, confidence: c, direction: spec.direction });
+        if (c != null)
+          matches.push({
+            pattern: spec.name,
+            barIndex: i,
+            confidence: c,
+            direction: spec.direction,
+          });
       }
     }
   }

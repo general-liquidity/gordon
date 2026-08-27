@@ -61,7 +61,7 @@ describe("analyzeCalendarEffect — day_of_week", () => {
     // Add small per-observation noise
     const noisy = data.map((d, i) => ({
       timestamp: d.timestamp,
-      return: d.return + (i % 11 - 5) * 0.0001,
+      return: d.return + ((i % 11) - 5) * 0.0001,
     }));
     const r = analyzeCalendarEffect(noisy, { segment: "day_of_week" });
 
@@ -99,20 +99,38 @@ describe("analyzeCalendarEffect — day_of_week", () => {
 
 describe("analyzeCalendarEffect — significance tiers", () => {
   it("labels < 30 obs per segment as insufficient", () => {
-    const data = buildWeekdaySeries(5, { Mon: 0.001, Tue: 0.002, Wed: 0.003, Thu: 0.004, Fri: 0.005 });
+    const data = buildWeekdaySeries(5, {
+      Mon: 0.001,
+      Tue: 0.002,
+      Wed: 0.003,
+      Thu: 0.004,
+      Fri: 0.005,
+    });
     const r = analyzeCalendarEffect(data, { segment: "day_of_week" });
     expect(r.segments.every((s) => s.significance === "insufficient")).toBe(true);
   });
 
   it("labels 30-99 obs per segment as preliminary", () => {
-    const data = buildWeekdaySeries(50, { Mon: 0.001, Tue: 0.001, Wed: 0.001, Thu: 0.001, Fri: 0.001 });
+    const data = buildWeekdaySeries(50, {
+      Mon: 0.001,
+      Tue: 0.001,
+      Wed: 0.001,
+      Thu: 0.001,
+      Fri: 0.001,
+    });
     const r = analyzeCalendarEffect(data, { segment: "day_of_week" });
     // 50 weeks × 1 entry/day = 50 obs per segment
     expect(r.segments.every((s) => s.significance === "preliminary")).toBe(true);
   });
 
   it("labels ≥ 100 obs per segment as robust", () => {
-    const data = buildWeekdaySeries(150, { Mon: 0.001, Tue: 0.001, Wed: 0.001, Thu: 0.001, Fri: 0.001 });
+    const data = buildWeekdaySeries(150, {
+      Mon: 0.001,
+      Tue: 0.001,
+      Wed: 0.001,
+      Thu: 0.001,
+      Fri: 0.001,
+    });
     const r = analyzeCalendarEffect(data, { segment: "day_of_week" });
     expect(r.segments.every((s) => s.significance === "robust")).toBe(true);
   });
@@ -163,7 +181,7 @@ describe("analyzeCalendarEffect — custom segmenter function", () => {
     const data: CalendarReturn[] = [];
     const start = Date.parse("2024-01-01T12:00:00Z");
     for (let i = 0; i < 100; i++) {
-      data.push({ timestamp: start + i * 86400000, return: (i % 2 === 0 ? 0.01 : -0.01) });
+      data.push({ timestamp: start + i * 86400000, return: i % 2 === 0 ? 0.01 : -0.01 });
     }
     // Custom segmenter: even-day-of-month vs odd-day-of-month
     const r = analyzeCalendarEffect(data, {
@@ -226,7 +244,13 @@ describe("analyzeCalendarEffect — useUtc flag", () => {
 
 describe("formatCalendarEffect", () => {
   it("renders header + per-segment rows + summary", () => {
-    const data = buildWeekdaySeries(100, { Mon: 0.005, Tue: 0.005, Wed: 0.005, Thu: 0.005, Fri: 0.005 });
+    const data = buildWeekdaySeries(100, {
+      Mon: 0.005,
+      Tue: 0.005,
+      Wed: 0.005,
+      Thu: 0.005,
+      Fri: 0.005,
+    });
     const r = analyzeCalendarEffect(data, { segment: "day_of_week" });
     const text = formatCalendarEffect(r);
     expect(text).toContain("Calendar Effect Analysis");
@@ -244,7 +268,13 @@ describe("formatCalendarEffect", () => {
 
   it("marks significant segments with ✓", () => {
     // Strong effect: 200 obs, large mean
-    const data = buildWeekdaySeries(200, { Mon: 0.005, Tue: 0.005, Wed: 0.005, Thu: 0.005, Fri: 0.005 });
+    const data = buildWeekdaySeries(200, {
+      Mon: 0.005,
+      Tue: 0.005,
+      Wed: 0.005,
+      Thu: 0.005,
+      Fri: 0.005,
+    });
     const r = analyzeCalendarEffect(data, { segment: "day_of_week" });
     const text = formatCalendarEffect(r);
     // At least one segment should be significant given the strong injected effect
@@ -256,7 +286,13 @@ describe("formatCalendarEffect", () => {
 
 describe("analyzeCalendarEffect — summary text", () => {
   it("mentions total observations + significant segment count", () => {
-    const data = buildWeekdaySeries(100, { Mon: 0.005, Tue: 0.005, Wed: 0.005, Thu: 0.005, Fri: 0.005 });
+    const data = buildWeekdaySeries(100, {
+      Mon: 0.005,
+      Tue: 0.005,
+      Wed: 0.005,
+      Thu: 0.005,
+      Fri: 0.005,
+    });
     const r = analyzeCalendarEffect(data, { segment: "day_of_week" });
     expect(r.summary).toContain("observations");
     expect(r.summary).toContain("segment");

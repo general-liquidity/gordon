@@ -77,10 +77,7 @@ export interface CostBreakdown {
   advFraction: number;
 }
 
-function resolveVenue(
-  venue: string | VenueParams | undefined,
-  params: CostModelParams,
-): number {
+function resolveVenue(venue: string | VenueParams | undefined, params: CostModelParams): number {
   if (venue === undefined) return params.venueBps;
   if (typeof venue === "string") {
     const found = DEFAULT_VENUES.find((v) => v.id === venue);
@@ -160,7 +157,7 @@ function defaultSizePoints(adv: number): number[] {
   // Log-spaced from 0.0001% to 10% of ADV
   const out: number[] = [];
   for (let exp = -6; exp <= -1; exp += 0.5) {
-    out.push(adv * Math.pow(10, exp));
+    out.push(adv * 10 ** exp);
   }
   return out;
 }
@@ -172,10 +169,7 @@ function defaultSizePoints(adv: number): number[] {
  * Returns the size at which net Sharpe falls below `minSharpe` (default 0.5)
  * — the strategy's effective capacity at this turnover.
  */
-export function capacitySweep(
-  input: CapacitySweepInput,
-  minSharpe: number = 0.5,
-): CapacityCurve {
+export function capacitySweep(input: CapacitySweepInput, minSharpe: number = 0.5): CapacityCurve {
   if (input.adv <= 0) throw new Error("ADV must be > 0");
   if (input.volAnn <= 0) throw new Error("Annualized vol must be > 0");
 
@@ -322,8 +316,7 @@ export function efficientTradingFrontier(input: FrontierInput): EfficientTrading
   const points: FrontierPoint[] = horizons.map((T) => {
     if (T <= 0) throw new Error(`horizonDays entries must be > 0 (got ${T})`);
     const participationRate = input.orderSize / (input.adv * T);
-    const expectedImpactBps =
-      costParams.impactCoef * Math.sqrt(participationRate) * 100;
+    const expectedImpactBps = costParams.impactCoef * Math.sqrt(participationRate) * 100;
     const timingRiskBps = volAnn * Math.sqrt(T / daysPerYear) * 1e4;
     const expectedCostBps = halfSpreadBps + expectedImpactBps + venueBps;
     const totalObjectiveBps = expectedCostBps + lambda * timingRiskBps;

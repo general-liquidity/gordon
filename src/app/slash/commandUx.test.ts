@@ -1,13 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
-import {
-  buildQuickStartRecommendedOptions,
-} from "../models/quickStartModel.ts";
-import {
-  getQuickActionItems,
-  normalizeCommandUx,
-  resolveWorkflowTopic,
-} from "./commandUx.ts";
+import { buildQuickStartRecommendedOptions } from "../models/quickStartModel.ts";
+import { getQuickActionItems, normalizeCommandUx, resolveWorkflowTopic } from "./commandUx.ts";
 
 describe("command UX model", () => {
   it("maps analysis-style market commands into the Analyze workflow", () => {

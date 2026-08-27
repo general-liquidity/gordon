@@ -54,10 +54,7 @@ describe("recordAttempt", () => {
 
   it("creates parent directory if missing", () => {
     const nested = join(tempDir, "a", "b", "c.jsonl");
-    recordAttempt(
-      { family: "x", codeHash: "h", observedSharpe: 0, verdict: "errored" },
-      nested,
-    );
+    recordAttempt({ family: "x", codeHash: "h", observedSharpe: 0, verdict: "errored" }, nested);
     expect(existsSync(nested)).toBe(true);
   });
 
@@ -81,11 +78,23 @@ describe("readAttempts", () => {
 
   it("returns newest-first", () => {
     recordAttempt(
-      { family: "x", codeHash: "h1", observedSharpe: 1, verdict: "rejected", now: "2026-01-01T00:00:00.000Z" },
+      {
+        family: "x",
+        codeHash: "h1",
+        observedSharpe: 1,
+        verdict: "rejected",
+        now: "2026-01-01T00:00:00.000Z",
+      },
       logPath,
     );
     recordAttempt(
-      { family: "x", codeHash: "h2", observedSharpe: 1, verdict: "rejected", now: "2026-02-01T00:00:00.000Z" },
+      {
+        family: "x",
+        codeHash: "h2",
+        observedSharpe: 1,
+        verdict: "rejected",
+        now: "2026-02-01T00:00:00.000Z",
+      },
       logPath,
     );
     const out = readAttempts({}, logPath);
@@ -94,18 +103,36 @@ describe("readAttempts", () => {
   });
 
   it("filters by family", () => {
-    recordAttempt({ family: "mom", codeHash: "a", observedSharpe: 1, verdict: "rejected" }, logPath);
-    recordAttempt({ family: "rev", codeHash: "b", observedSharpe: 1, verdict: "rejected" }, logPath);
+    recordAttempt(
+      { family: "mom", codeHash: "a", observedSharpe: 1, verdict: "rejected" },
+      logPath,
+    );
+    recordAttempt(
+      { family: "rev", codeHash: "b", observedSharpe: 1, verdict: "rejected" },
+      logPath,
+    );
     expect(readAttempts({ family: "mom" }, logPath).length).toBe(1);
   });
 
   it("filters by sinceMs", () => {
     recordAttempt(
-      { family: "x", codeHash: "old", observedSharpe: 1, verdict: "rejected", now: "2025-01-01T00:00:00.000Z" },
+      {
+        family: "x",
+        codeHash: "old",
+        observedSharpe: 1,
+        verdict: "rejected",
+        now: "2025-01-01T00:00:00.000Z",
+      },
       logPath,
     );
     recordAttempt(
-      { family: "x", codeHash: "new", observedSharpe: 1, verdict: "rejected", now: "2026-01-01T00:00:00.000Z" },
+      {
+        family: "x",
+        codeHash: "new",
+        observedSharpe: 1,
+        verdict: "rejected",
+        now: "2026-01-01T00:00:00.000Z",
+      },
       logPath,
     );
     const cutoff = Date.parse("2025-06-01T00:00:00.000Z");
@@ -147,8 +174,14 @@ describe("countTrials", () => {
   });
 
   it("scopes counts per family", () => {
-    recordAttempt({ family: "mom", codeHash: "a", observedSharpe: 1, verdict: "rejected" }, logPath);
-    recordAttempt({ family: "rev", codeHash: "b", observedSharpe: 1, verdict: "rejected" }, logPath);
+    recordAttempt(
+      { family: "mom", codeHash: "a", observedSharpe: 1, verdict: "rejected" },
+      logPath,
+    );
+    recordAttempt(
+      { family: "rev", codeHash: "b", observedSharpe: 1, verdict: "rejected" },
+      logPath,
+    );
     expect(countTrials("mom", logPath).distinctCount).toBe(1);
     expect(countTrials("rev", logPath).distinctCount).toBe(1);
   });
@@ -392,12 +425,15 @@ describe("dynamicDeflatedThreshold: dimensional correctness", () => {
     // exp(-x^2/2), substituting the /sqrt(2) in the exponent only. Peak error
     // ~0.037 near x = 0.57, biased HIGH, which inflates every DSR p-value.
     const misScaled = (x: number): number => {
-      const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
-      const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+      const a1 = 0.254829592,
+        a2 = -0.284496736,
+        a3 = 1.421413741;
+      const a4 = -1.453152027,
+        a5 = 1.061405429,
+        p = 0.3275911;
       const sign = x < 0 ? -1 : 1;
       const t = 1.0 / (1.0 + p * Math.abs(x));
-      const y =
-        1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-(x * x) / 2);
+      const y = 1.0 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-(x * x) / 2);
       return 0.5 * (1.0 + sign * y);
     };
 

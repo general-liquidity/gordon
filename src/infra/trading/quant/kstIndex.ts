@@ -142,7 +142,9 @@ export function kstToPayload(result: KstResult): Record<string, unknown> {
   return {
     kind: "kst_index.computed",
     currentKst: Number.isFinite(result.currentKst) ? Number(result.currentKst.toFixed(4)) : null,
-    currentSignal: Number.isFinite(result.currentSignal) ? Number(result.currentSignal.toFixed(4)) : null,
+    currentSignal: Number.isFinite(result.currentSignal)
+      ? Number(result.currentSignal.toFixed(4))
+      : null,
     lastCross: result.lastCross,
     sampleSize: result.sampleSize,
   };

@@ -11,24 +11,18 @@
  * ./orchestrator/ for stream processing, error handling, guardrails, etc.
  */
 
-import { RequestContext } from "@mastra/core/request-context";
-import { z } from "zod";
+import type { RequestContext } from "@mastra/core/request-context";
+import type { z } from "zod";
 
 import { gordonAgent } from "./agents.ts";
-import {
-  buildPromptEnvelope,
-  type GroundedPromptMessage,
-} from "./context/contextBudget.ts";
+import { buildPromptEnvelope, type GroundedPromptMessage } from "./context/contextBudget.ts";
 import {
   formatIntegrationGlossary,
   selectRelevantIntegrationGlossary,
 } from "./integrationGlossary.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
-import {
-  checkInputGuardrails,
-  checkOutputGuardrails,
-} from "./middleware/index.ts";
+import { checkInputGuardrails, checkOutputGuardrails } from "./middleware/index.ts";
 import {
   initializeTracing as initTracingModule,
   buildTracingOptions,
@@ -78,8 +72,6 @@ import { createAgentRequestContext } from "./orchestrator/RequestContextFactory.
 import { recordPromptUsage, resolveNormalizedUsage } from "./orchestrator/UsageTracker.ts";
 import { bridgeStreamEvent } from "./streaming/streamBridge.ts";
 import { getCompactionTrigger } from "../context/compaction/compactionTrigger.ts";
-import { getConversationBudget } from "../context/budgeting/conversationBudget.ts";
-import { recordTombstone } from "../context/compaction/tombstones.ts";
 import { getCostTracker } from "../platform/costTracker.ts";
 import { toMessageStreamChunk, type MessageStreamChunk } from "./orchestrator/StreamCoordinator.ts";
 import {
@@ -97,7 +89,6 @@ import {
   scheduleBackgroundDiscoveryRefresh,
 } from "../ai/mcp/client.ts";
 import { captureAuditedRequest } from "./context/promptCacheAudit.ts";
-import type { Message } from "../ai/llm/types.ts";
 import { resetAgents } from "./agents.ts";
 import { rebuildACEMemoryForThread, getACEMemorySnapshot } from "./memory/aceMemory.ts";
 import {
@@ -111,13 +102,8 @@ import {
 } from "./streaming/streamWriter.ts";
 
 // ── Extracted modules ──────────────────────────────────────────────────────
-import {
-  type StreamEvent,
-  type ProcessMessageStreamOptions,
-} from "./orchestrator/types.ts";
-import {
-  getAgentForTool,
-} from "./orchestrator/toolAgentMap.ts";
+import type { StreamEvent, ProcessMessageStreamOptions } from "./orchestrator/types.ts";
+import { getAgentForTool } from "./orchestrator/toolAgentMap.ts";
 import {
   isNativeSupervisorEnabled,
   buildNativeSupervisorDelegation,
@@ -187,9 +173,7 @@ export function buildInlineSupervisorDelegation(
     onDelegationComplete: async (ctx: any) => {
       const primitiveId = String(ctx?.primitiveId ?? state.currentAgent ?? "unknown");
       await endSubagentHook({
-        key:
-          state.activeSubagentHookKey
-          ?? `stream:${scopeKey}:${ctx?.toolCallId ?? primitiveId}`,
+        key: state.activeSubagentHookKey ?? `stream:${scopeKey}:${ctx?.toolCallId ?? primitiveId}`,
         type: primitiveId,
         parent: "Gordon",
         status: ctx?.error ? "failed" : "completed",
@@ -263,7 +247,7 @@ function registerLifecycleProcessHooks(): void {
 export function validateHandoff(
   fromAgent: string,
   toAgent: string,
-  context?: Record<string, unknown>
+  context?: Record<string, unknown>,
 ): HandoffValidation {
   return defaultHandoffCoordinator.validate(fromAgent, toAgent, context);
 }
@@ -274,7 +258,7 @@ export function validateHandoff(
 export async function trackHandoff(
   fromAgent: string,
   toAgent: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): Promise<HandoffRecord> {
   return defaultHandoffCoordinator.track(fromAgent, toAgent, metadata);
 }
@@ -356,29 +340,65 @@ async function buildGroundedPrompt(
   const transcriptRepairBlock = formatTranscriptRepairBlock(transcriptValidation);
   const planningHandoffBlock = formatPlanningHandoffBlock(planningHandoff);
   const aceSnapshot = getACEMemorySnapshot(context.threadId);
-  const lifecycleAnnotationBlock = lifecycleResult.annotations.length > 0
-    ? ["[GORDON_LIFECYCLE_NOTES]", ...lifecycleResult.annotations.map((note) => `- ${note}`)].join("\n")
-    : "";
+  const lifecycleAnnotationBlock =
+    lifecycleResult.annotations.length > 0
+      ? [
+          "[GORDON_LIFECYCLE_NOTES]",
+          ...lifecycleResult.annotations.map((note) => `- ${note}`),
+        ].join("\n")
+      : "";
 
-  const envelope = buildPromptEnvelope(sanitizedUserMessage, context, glossarySelection, glossaryText, {
-    additionalSections: [
-      transcriptRepairBlock
-        ? { kind: "transcript_repair" as const, source: "transcript-validator", priority: 70, content: transcriptRepairBlock }
-        : null,
-      planningHandoffBlock
-        ? { kind: "planning_handoff" as const, source: "runtime-harness", priority: 80, content: planningHandoffBlock }
-        : null,
-      lifecycleAnnotationBlock
-        ? { kind: "runtime_reminders" as const, source: "lifecycle-hooks", priority: 90, content: lifecycleAnnotationBlock }
-        : null,
-      mcpDiscoveryNote
-        ? { kind: "runtime_reminders" as const, source: "mcp-discovery", priority: 95, content: `[GORDON_RUNTIME_REMINDERS]\n- ${mcpDiscoveryNote}` }
-        : null,
-      aceSnapshot?.renderedBlock
-        ? { kind: "tool_hints" as const, source: "ace-memory", stable: false, priority: 96, content: aceSnapshot.renderedBlock }
-        : null,
-    ].filter((section): section is NonNullable<typeof section> => Boolean(section)),
-  });
+  const envelope = buildPromptEnvelope(
+    sanitizedUserMessage,
+    context,
+    glossarySelection,
+    glossaryText,
+    {
+      additionalSections: [
+        transcriptRepairBlock
+          ? {
+              kind: "transcript_repair" as const,
+              source: "transcript-validator",
+              priority: 70,
+              content: transcriptRepairBlock,
+            }
+          : null,
+        planningHandoffBlock
+          ? {
+              kind: "planning_handoff" as const,
+              source: "runtime-harness",
+              priority: 80,
+              content: planningHandoffBlock,
+            }
+          : null,
+        lifecycleAnnotationBlock
+          ? {
+              kind: "runtime_reminders" as const,
+              source: "lifecycle-hooks",
+              priority: 90,
+              content: lifecycleAnnotationBlock,
+            }
+          : null,
+        mcpDiscoveryNote
+          ? {
+              kind: "runtime_reminders" as const,
+              source: "mcp-discovery",
+              priority: 95,
+              content: `[GORDON_RUNTIME_REMINDERS]\n- ${mcpDiscoveryNote}`,
+            }
+          : null,
+        aceSnapshot?.renderedBlock
+          ? {
+              kind: "tool_hints" as const,
+              source: "ace-memory",
+              stable: false,
+              priority: 96,
+              content: aceSnapshot.renderedBlock,
+            }
+          : null,
+      ].filter((section): section is NonNullable<typeof section> => Boolean(section)),
+    },
+  );
 
   const messageValidation = validateAndRepairModelMessages(envelope.messages);
   if (messageValidation.repairNotes.length > 0) {
@@ -393,7 +413,9 @@ async function buildGroundedPrompt(
   // out-of-band without re-running the prompt build pipeline.
   try {
     captureAuditedRequest(messageValidation.messages, envelope.report.provider, context.threadId);
-  } catch { /* non-critical diagnostic */ }
+  } catch {
+    /* non-critical diagnostic */
+  }
   requestContext.set("workflowPhase", envelope.report.workflowPhase);
   requestContext.set("executionReadiness", envelope.report.executionReadiness);
   requestContext.set("transcriptValidation", transcriptValidation);
@@ -447,11 +469,15 @@ export async function initializeTracing(): Promise<void> {
       endpoint: config.endpoint,
     });
   } else {
-    logger.debug("Tracing disabled (set OTEL_TRACING_ENABLED=true and GORDON_TRACING_REVIEWED=true to enable)");
+    logger.debug(
+      "Tracing disabled (set OTEL_TRACING_ENABLED=true and GORDON_TRACING_REVIEWED=true to enable)",
+    );
   }
 }
 
-function createAgentTracingOptions(parentContext?: SpanContext): Record<string, unknown> | undefined {
+function createAgentTracingOptions(
+  parentContext?: SpanContext,
+): Record<string, unknown> | undefined {
   if (!isTracingEnabled()) return undefined;
   const tracingOpts = buildTracingOptions({
     parentContext,
@@ -476,7 +502,7 @@ export async function* processMessageStream(
   context: GordonContext,
   threadId?: string,
   resourceId?: string,
-  options: ProcessMessageStreamOptions = {}
+  options: ProcessMessageStreamOptions = {},
 ): AsyncGenerator<StreamEvent, void> {
   const startTime = Date.now();
   logger.debug("Starting streaming message processing", { messageLength: userMessage.length });
@@ -513,19 +539,37 @@ export async function* processMessageStream(
         _thinkingResolution.source === "env" ||
         _thinkingResolution.source === "override") &&
       _thinkingDepth !== "off";
-    const _depthForRun: typeof _thinkingDepth =
-      _explicitThinking ? _thinkingDepth : (_toolFreeGate.run ? (_thinkingDepth === "off" ? "medium" : _thinkingDepth) : "off");
+    const _depthForRun: typeof _thinkingDepth = _explicitThinking
+      ? _thinkingDepth
+      : _toolFreeGate.run
+        ? _thinkingDepth === "off"
+          ? "medium"
+          : _thinkingDepth
+        : "off";
     if (_depthForRun !== "off") {
       _thinkingResult = await runThinkingPhase(userMessage, [], context, _depthForRun);
-      if (_depthForRun === "high" && _thinkingResult && !_thinkingResult.skipped && _thinkingResult.trace) {
+      if (
+        _depthForRun === "high" &&
+        _thinkingResult &&
+        !_thinkingResult.skipped &&
+        _thinkingResult.trace
+      ) {
         const _critique = await runCritiquePhase(_thinkingResult.trace, userMessage, context);
         if (_critique && _critique !== "Reasoning is sound.") {
-          _thinkingResult = { ..._thinkingResult, trace: `${_thinkingResult.trace}\n[Critique]: ${_critique}` };
+          _thinkingResult = {
+            ..._thinkingResult,
+            trace: `${_thinkingResult.trace}\n[Critique]: ${_critique}`,
+          };
         }
       }
       // When the flag is on, also prepend the trace to the messages array so
       // the tool-enabled action call has explicit reasoning to act on.
-      if (_toolFreeGate.run && _thinkingResult && !_thinkingResult.skipped && _thinkingResult.trace) {
+      if (
+        _toolFreeGate.run &&
+        _thinkingResult &&
+        !_thinkingResult.skipped &&
+        _thinkingResult.trace
+      ) {
         groundedMessages = prependThinkingTrace(groundedMessages, _thinkingResult.trace);
         logger.info("Tool-free thinking active", {
           reason: _toolFreeGate.reason,
@@ -565,13 +609,17 @@ export async function* processMessageStream(
       context,
     });
     const streamObj = await awaitWithAbort(
-      gordonAgent().stream(groundedMessages, ({
+      gordonAgent().stream(groundedMessages, {
         requestContext,
-        ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
+        ...(threadId && effectiveResourceId
+          ? { memory: { thread: threadId, resource: effectiveResourceId } }
+          : {}),
         maxSteps: 20,
         modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS_STREAM },
         ...(options.toolsets ? { toolsets: options.toolsets } : {}),
-        ...(Object.keys(extendedThinkingOpts).length > 0 ? { providerOptions: extendedThinkingOpts } : {}),
+        ...(Object.keys(extendedThinkingOpts).length > 0
+          ? { providerOptions: extendedThinkingOpts }
+          : {}),
         ...groundedPrompt.requestOptions,
         ...(tracingOptions && { tracingOptions }),
         // Delegation hooks for supervisor → sub-agent routing.
@@ -580,23 +628,29 @@ export async function* processMessageStream(
         // split + loop-safety + feedback drain). Default (flag off) keeps the
         // existing minimal inline hooks — identical behavior.
         delegation: isNativeSupervisorEnabled()
-          ? buildNativeSupervisorDelegation(state, defaultHandoffCoordinator, context.threadId ?? "standalone")
+          ? buildNativeSupervisorDelegation(
+              state,
+              defaultHandoffCoordinator,
+              context.threadId ?? "standalone",
+            )
           : buildInlineSupervisorDelegation(state, context.threadId ?? "standalone"),
         onError: ({ error }: { error: string | Error }) => {
           logger.error("Stream error", { error: error instanceof Error ? error.message : error });
         },
-      } as any)),
+      } as any),
       signal,
     );
     reactStage = advanceReActStage(reactStage, "action_started");
 
     // Log available properties for debugging
     const streamKeys = Object.keys(streamObj ?? {});
-    logger.info("Stream result keys: " + streamKeys.join(", "));
+    logger.info(`Stream result keys: ${streamKeys.join(", ")}`);
 
     // ── Primary: fullStream (rich typed events — tool calls, reasoning, agent switches) ──
     if (streamObj?.fullStream) {
-      const reader = (streamObj.fullStream as unknown as ReadableStream<InternalStreamChunk>).getReader();
+      const reader = (
+        streamObj.fullStream as unknown as ReadableStream<InternalStreamChunk>
+      ).getReader();
       let streamEndedNormally = false;
       try {
         while (true) {
@@ -606,7 +660,11 @@ export async function* processMessageStream(
             break;
           }
           const chunk = value as InternalStreamChunk;
-          try { bridgeStreamEvent(chunk as any, 0); } catch { /* non-critical */ }
+          try {
+            bridgeStreamEvent(chunk as any, 0);
+          } catch {
+            /* non-critical */
+          }
           yield* processFullStreamChunk(chunk, state, context);
         }
       } finally {
@@ -614,18 +672,15 @@ export async function* processMessageStream(
         if (state.currentAgent && state.currentAgent.toLowerCase() !== "gordon") {
           await endSubagentHook({
             key:
-              state.activeSubagentHookKey
-              ?? `stream:${context.threadId ?? "standalone"}:${state.currentAgent}`,
+              state.activeSubagentHookKey ??
+              `stream:${context.threadId ?? "standalone"}:${state.currentAgent}`,
             type: state.currentAgent,
             parent: "Gordon",
-            status: signal?.aborted
-              ? "aborted"
-              : streamEndedNormally
-                ? "completed"
-                : "failed",
-            error: !signal?.aborted && !streamEndedNormally
-              ? "stream ended before delegation completion"
-              : undefined,
+            status: signal?.aborted ? "aborted" : streamEndedNormally ? "completed" : "failed",
+            error:
+              !signal?.aborted && !streamEndedNormally
+                ? "stream ended before delegation completion"
+                : undefined,
           });
           state.activeSubagentHookKey = undefined;
           await runLifecycleHooks("subagent_stop", context, {
@@ -649,9 +704,10 @@ export async function* processMessageStream(
     // ── Last resort: text promise ───────────────────────────────────────
     else if (streamObj?.text) {
       await throwIfStreamAborted(signal);
-      const rawText = typeof (streamObj as any).text === "function"
-        ? await (streamObj as any).text()
-        : await streamObj.text;
+      const rawText =
+        typeof (streamObj as any).text === "function"
+          ? await (streamObj as any).text()
+          : await streamObj.text;
       if (rawText && typeof rawText === "string" && rawText.trim()) {
         const outputCheck = await checkOutputGuardrails(rawText);
         state.fullText = outputCheck.sanitized;
@@ -668,11 +724,12 @@ export async function* processMessageStream(
         await throwIfStreamAborted(signal);
         try {
           let finalText: string | undefined;
-          if (typeof (streamObj as any).text === 'function') finalText = await (streamObj as any).text();
+          if (typeof (streamObj as any).text === "function")
+            finalText = await (streamObj as any).text();
           else if ((streamObj as any).text instanceof Promise) finalText = await streamObj.text;
-          else if (typeof (streamObj as any).text === 'string') finalText = (streamObj as any).text;
+          else if (typeof (streamObj as any).text === "string") finalText = (streamObj as any).text;
 
-          if (finalText && finalText.trim()) {
+          if (finalText?.trim()) {
             const outputCheck = await checkOutputGuardrails(finalText);
             state.fullText = outputCheck.sanitized;
             yield { type: "text_delta", content: state.fullText, agentName: state.currentAgent };
@@ -691,10 +748,21 @@ export async function* processMessageStream(
 
     // Wire: compaction trigger — check token thresholds after each API response
     try {
-      const inputToks = (usage as unknown as Record<string, unknown>).inputTokens as number ?? usage.totalTokens ?? 0;
+      const inputToks =
+        ((usage as unknown as Record<string, unknown>).inputTokens as number) ??
+        usage.totalTokens ??
+        0;
       const compactionDecision = getCompactionTrigger().check(inputToks);
-      if (compactionDecision.action === "warn" || compactionDecision.action === "microcompact" || compactionDecision.action === "compact") {
-        logger.info("Compaction trigger fired", { action: compactionDecision.action, stage: compactionDecision.stage, tokens: inputToks });
+      if (
+        compactionDecision.action === "warn" ||
+        compactionDecision.action === "microcompact" ||
+        compactionDecision.action === "compact"
+      ) {
+        logger.info("Compaction trigger fired", {
+          action: compactionDecision.action,
+          stage: compactionDecision.stage,
+          tokens: inputToks,
+        });
       }
       if (compactionDecision.action === "microcompact" || compactionDecision.action === "compact") {
         const { applyCompactionIfNeeded } = await import("../domain/memory/compactionHandler.ts");
@@ -711,18 +779,23 @@ export async function* processMessageStream(
           logger.info("Compaction applied post-turn", { detail: compacted.detail });
         }
       }
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
 
     // Wire: per-model cost tracking
     try {
-      const inputToks = (usage as unknown as Record<string, unknown>).inputTokens as number ?? 0;
-      const outputToks = (usage as unknown as Record<string, unknown>).outputTokens as number ?? 0;
+      const inputToks = ((usage as unknown as Record<string, unknown>).inputTokens as number) ?? 0;
+      const outputToks =
+        ((usage as unknown as Record<string, unknown>).outputTokens as number) ?? 0;
       getCostTracker().record({
         modelId: context.config?.modelConfig?.model ?? "unknown",
         inputTokens: inputToks,
         outputTokens: outputToks,
       });
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
 
     await emitEvent("agent:stream_completed", { responseLength: state.fullText.length });
     recordRequest(Date.now() - startTime, true);
@@ -746,7 +819,11 @@ export async function* processMessageStream(
         }
       } else {
         state.fullText = formatRecoveryGuidance(
-          classifyRecoveryGuidance("empty_response", context, { emptyResponse: true, phase: workflowPhase, currentAgent: state.currentAgent }),
+          classifyRecoveryGuidance("empty_response", context, {
+            emptyResponse: true,
+            phase: workflowPhase,
+            currentAgent: state.currentAgent,
+          }),
         );
       }
       yield { type: "text_delta", content: state.fullText, agentName: state.currentAgent };
@@ -756,16 +833,23 @@ export async function* processMessageStream(
     reactStage = advanceReActStage(reactStage, "response_dispatched");
     // Phase 2 lazy MCP discovery — refresh cache in background AFTER the
     // first user-visible response so subsequent cold starts are fast.
-    try { scheduleBackgroundDiscoveryRefresh(); } catch { /* best-effort */ }
+    try {
+      scheduleBackgroundDiscoveryRefresh();
+    } catch {
+      /* best-effort */
+    }
     await finalizeAfterRequest(context, {
       threadId: threadId ?? context.threadId,
       agentName: state.currentAgent,
       userMessage,
       response: state.fullText,
-      payload: { promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, totalTokens: usage.totalTokens },
+      payload: {
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        totalTokens: usage.totalTokens,
+      },
     });
     reactStage = advanceReActStage(reactStage, "persisted");
-
   } catch (err) {
     // FW1 emitter — report any in-flight tool calls so the next turn's
     // reconciler synthesizes matching tool_result blocks. Reason is
@@ -795,12 +879,24 @@ export async function* processMessageStream(
     logger.error("Streaming error", error);
     recordRequest(Date.now() - startTime, false);
     recordError(error.name || "UnknownError");
-    recordAgentCall("Gordon", Date.now() - startTime, false, 0, error.name || "UnknownError", error.message);
+    recordAgentCall(
+      "Gordon",
+      Date.now() - startTime,
+      false,
+      0,
+      error.name || "UnknownError",
+      error.message,
+    );
 
     await emitEvent("system:error", { error: { name: error.name, message: error.message } });
     yield {
       type: "error",
-      error: formatRecoveryGuidance(classifyRecoveryGuidance(error, context, { phase: workflowPhase, currentAgent: state.currentAgent })),
+      error: formatRecoveryGuidance(
+        classifyRecoveryGuidance(error, context, {
+          phase: workflowPhase,
+          currentAgent: state.currentAgent,
+        }),
+      ),
     };
     await finalizeAfterRequest(context, {
       threadId: threadId ?? context.threadId,
@@ -855,9 +951,17 @@ async function* processFullStreamChunk(
     case "agent-execution-start":
     case "routing-agent-start":
       if (chunk.payload?.agentId) {
-        const agentName = chunk.payload.agentId.charAt(0).toUpperCase() + chunk.payload.agentId.slice(1);
+        const agentName =
+          chunk.payload.agentId.charAt(0).toUpperCase() + chunk.payload.agentId.slice(1);
         if (agentName !== state.currentAgent && agentName.toLowerCase() !== "gordon") {
-          const switchEvent = await handleAgentSwitch(agentName, state, context, undefined, undefined, chunk.type);
+          const switchEvent = await handleAgentSwitch(
+            agentName,
+            state,
+            context,
+            undefined,
+            undefined,
+            chunk.type,
+          );
           if (switchEvent) yield switchEvent;
         }
       }
@@ -866,7 +970,11 @@ async function* processFullStreamChunk(
     case "routing-agent-text-delta":
       if (chunk.payload?.text) {
         state.fullText += chunk.payload.text;
-        yield { type: "text_delta", content: chunk.payload.text, agentName: state.currentAgent || "Gordon" };
+        yield {
+          type: "text_delta",
+          content: chunk.payload.text,
+          agentName: state.currentAgent || "Gordon",
+        };
       }
       break;
 
@@ -890,7 +998,13 @@ async function* processToolCallChunk(
 ): AsyncGenerator<StreamEvent, void> {
   const detectedAgent = getAgentForTool(toolName);
 
-  const validation = await validateToolCall(toolName, toolArgs, detectedAgent, state.currentAgent, context);
+  const validation = await validateToolCall(
+    toolName,
+    toolArgs,
+    detectedAgent,
+    state.currentAgent,
+    context,
+  );
   if (!validation.allowed) {
     if (validation.event) yield validation.event;
     return;
@@ -943,7 +1057,13 @@ async function* processAgentExecutionEvent(
     const toolName = innerPayload.payload.toolName;
     const detectedAgent = getAgentForTool(toolName);
 
-    const validation = await validateToolCall(toolName, innerPayload.payload.args, detectedAgent, state.currentAgent, context);
+    const validation = await validateToolCall(
+      toolName,
+      innerPayload.payload.args,
+      detectedAgent,
+      state.currentAgent,
+      context,
+    );
     if (!validation.allowed) {
       if (validation.event) yield validation.event;
       return;
@@ -951,7 +1071,12 @@ async function* processAgentExecutionEvent(
 
     if (detectedAgent && detectedAgent !== state.currentAgent) {
       const switchEvent = await handleAgentSwitch(
-        detectedAgent, state, context, toolName, innerPayload.payload.args, "agent-execution-event",
+        detectedAgent,
+        state,
+        context,
+        toolName,
+        innerPayload.payload.args,
+        "agent-execution-event",
       );
       if (switchEvent) yield switchEvent;
     }
@@ -977,12 +1102,22 @@ async function* processAgentExecutionEvent(
       });
     }
 
-    yield { type: "tool_call_start", toolName, toolArgs: innerPayload.payload.args, agentName: state.currentAgent };
+    yield {
+      type: "tool_call_start",
+      toolName,
+      toolArgs: innerPayload.payload.args,
+      agentName: state.currentAgent,
+    };
   } else if (innerType === "tool-result") {
     if (innerPayload?.payload?.toolCallId) {
       state.pendingToolCalls.delete(innerPayload.payload.toolCallId);
     }
-    yield await processToolResult(innerPayload?.payload?.toolName, innerPayload?.payload?.result, state, context);
+    yield await processToolResult(
+      innerPayload?.payload?.toolName,
+      innerPayload?.payload?.result,
+      state,
+      context,
+    );
   }
 }
 
@@ -999,7 +1134,10 @@ export async function processStructuredMessage<T extends Record<string, unknown>
   context: GordonContext,
   threadId?: string,
   resourceId?: string,
-): Promise<{ data: T; usage: { promptTokens: number; completionTokens: number; totalTokens: number } }> {
+): Promise<{
+  data: T;
+  usage: { promptTokens: number; completionTokens: number; totalTokens: number };
+}> {
   const startTime = Date.now();
   logger.debug("Processing structured message", { messageLength: userMessage.length });
 
@@ -1012,7 +1150,9 @@ export async function processStructuredMessage<T extends Record<string, unknown>
     const groundedPrompt = await buildGroundedPrompt(userMessage, context, requestContext);
     const result = await gordonAgent().generate(groundedPrompt.messages, {
       requestContext,
-      ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
+      ...(threadId && effectiveResourceId
+        ? { memory: { thread: threadId, resource: effectiveResourceId } }
+        : {}),
       maxSteps: 20,
       modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS_GENERATE },
       structuredOutput: { schema },
@@ -1020,14 +1160,19 @@ export async function processStructuredMessage<T extends Record<string, unknown>
       ...(tracingOptions && { tracingOptions }),
     });
 
-    const resultObj = result as unknown as { object?: T; text?: string; usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number } };
+    const resultObj = result as unknown as {
+      object?: T;
+      text?: string;
+      usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
+    };
     if (!resultObj.object) throw new Error("Agent did not return structured output");
 
     recordRequest(Date.now() - startTime, true);
     const normalizedUsage = await resolveNormalizedUsage(resultObj.usage);
     recordPromptUsage(context, threadId, normalizedUsage);
     await finalizeAfterRequest(context, {
-      threadId: threadId ?? context.threadId, userMessage,
+      threadId: threadId ?? context.threadId,
+      userMessage,
       payload: { structured: true, ...normalizedUsage },
     });
     return { data: resultObj.object, usage: normalizedUsage };
@@ -1037,10 +1182,16 @@ export async function processStructuredMessage<T extends Record<string, unknown>
     recordRequest(Date.now() - startTime, false);
     recordError(error.name || "StructuredOutputError");
     await finalizeAfterRequest(context, {
-      threadId: threadId ?? context.threadId, userMessage, error: error.message,
+      threadId: threadId ?? context.threadId,
+      userMessage,
+      error: error.message,
       payload: { structured: true, failed: true },
     });
-    throw new Error(formatRecoveryGuidance(classifyRecoveryGuidance(error, context, { phase: determineWorkflowPhase(context) })));
+    throw new Error(
+      formatRecoveryGuidance(
+        classifyRecoveryGuidance(error, context, { phase: determineWorkflowPhase(context) }),
+      ),
+    );
   }
 }
 
@@ -1055,8 +1206,11 @@ export async function processMessage(
   userMessage: string,
   context: GordonContext,
   threadId?: string,
-  resourceId?: string
-): Promise<{ response: string; usage: { promptTokens: number; completionTokens: number; totalTokens: number } }> {
+  resourceId?: string,
+): Promise<{
+  response: string;
+  usage: { promptTokens: number; completionTokens: number; totalTokens: number };
+}> {
   const startTime = Date.now();
   logger.debug("Processing message with Mastra", { messageLength: userMessage.length });
   const requestContext = createRequestContext(context);
@@ -1069,14 +1223,19 @@ export async function processMessage(
 
     const result = await gordonAgent().generate(groundedPrompt.messages, {
       requestContext,
-      ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
+      ...(threadId && effectiveResourceId
+        ? { memory: { thread: threadId, resource: effectiveResourceId } }
+        : {}),
       maxSteps: 20,
       modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS_GENERATE },
       ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
     });
 
-    const resultObj = result as unknown as { text?: string; usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number } };
+    const resultObj = result as unknown as {
+      text?: string;
+      usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
+    };
     const response = resultObj.text || "I'm not sure how to help with that.";
 
     await emitEvent("agent:message_processed", {
@@ -1088,7 +1247,9 @@ export async function processMessage(
     const usage = await resolveNormalizedUsage(resultObj.usage);
     recordPromptUsage(context, threadId, usage);
     await finalizeAfterRequest(context, {
-      threadId: threadId ?? context.threadId, userMessage, response,
+      threadId: threadId ?? context.threadId,
+      userMessage,
+      response,
       payload: { ...usage },
     });
     return { response, usage };
@@ -1098,10 +1259,16 @@ export async function processMessage(
     recordRequest(Date.now() - startTime, false);
     recordError(error.name || "UnknownError");
     await finalizeAfterRequest(context, {
-      threadId: threadId ?? context.threadId, userMessage, error: error.message,
+      threadId: threadId ?? context.threadId,
+      userMessage,
+      error: error.message,
       payload: { failed: true },
     });
-    throw new Error(formatRecoveryGuidance(classifyRecoveryGuidance(error, context, { phase: determineWorkflowPhase(context) })));
+    throw new Error(
+      formatRecoveryGuidance(
+        classifyRecoveryGuidance(error, context, { phase: determineWorkflowPhase(context) }),
+      ),
+    );
   }
 }
 
@@ -1110,7 +1277,7 @@ export async function processMessage(
  */
 export async function processSimpleMessage(
   userMessage: string,
-  context: GordonContext
+  context: GordonContext,
 ): Promise<string> {
   const startTime = Date.now();
 
@@ -1145,14 +1312,19 @@ export async function processSimpleMessage(
       ...(tracingOptions && { tracingOptions }),
     });
 
-    const resultObj = result as unknown as { text?: string; usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number } };
+    const resultObj = result as unknown as {
+      text?: string;
+      usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
+    };
     const rawResponse = resultObj.text || "I'm not sure how to help with that.";
     const outputCheck = await checkOutputGuardrails(rawResponse);
 
     recordRequest(Date.now() - startTime, true);
     recordPromptUsage(context, context.threadId, await resolveNormalizedUsage(resultObj.usage));
     await finalizeAfterRequest(context, {
-      threadId: context.threadId, userMessage, response: outputCheck.sanitized,
+      threadId: context.threadId,
+      userMessage,
+      response: outputCheck.sanitized,
       payload: { simple: true },
     });
     return outputCheck.sanitized;
@@ -1161,7 +1333,9 @@ export async function processSimpleMessage(
     recordRequest(Date.now() - startTime, false);
     recordError(error.name || "UnknownError");
     await finalizeAfterRequest(context, {
-      threadId: context.threadId, userMessage, error: error.message,
+      threadId: context.threadId,
+      userMessage,
+      error: error.message,
       payload: { simple: true, failed: true },
     });
     throw error;
@@ -1176,7 +1350,10 @@ export async function quickScan(context: GordonContext) {
   const { exchange, config } = context;
   if (!exchange) throw new Error("Exchange client not connected");
   const { scan } = await import("../../core/pipeline/scanner.ts");
-  return scan(exchange, { topN: config.preferences.topNCoins, timeframes: config.preferences.defaultTimeframes });
+  return scan(exchange, {
+    topN: config.preferences.topNCoins,
+    timeframes: config.preferences.defaultTimeframes,
+  });
 }
 
 export async function quickCheckPositions(context: GordonContext) {
@@ -1195,8 +1372,13 @@ export async function processMessageStreamWithPipe(
   context: GordonContext,
   writer: StreamWriter<MessageStreamChunk>,
   threadId?: string,
-  resourceId?: string
-): Promise<StreamingResult<{ response: string; usage: { promptTokens: number; completionTokens: number; totalTokens: number } }>> {
+  resourceId?: string,
+): Promise<
+  StreamingResult<{
+    response: string;
+    usage: { promptTokens: number; completionTokens: number; totalTokens: number };
+  }>
+> {
   const startTime = Date.now();
   let chunksWritten = 0;
   let errors = 0;
@@ -1204,17 +1386,19 @@ export async function processMessageStreamWithPipe(
   let finalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
   try {
-    await writer.write(createStartChunk("message-processing") as unknown as StreamChunk<MessageStreamChunk>);
+    await writer.write(
+      createStartChunk("message-processing") as unknown as StreamChunk<MessageStreamChunk>,
+    );
     chunksWritten++;
 
     const stream = processMessageStream(userMessage, context, threadId, resourceId);
     for await (const event of stream) {
       const chunk = toMessageStreamChunk(event);
-      await writer.write(createChunk(
-        event.type === "error" ? "error" : "result",
-        chunk,
-        { source: event.agentName || "Gordon" }
-      ) as StreamChunk<MessageStreamChunk>);
+      await writer.write(
+        createChunk(event.type === "error" ? "error" : "result", chunk, {
+          source: event.agentName || "Gordon",
+        }) as StreamChunk<MessageStreamChunk>,
+      );
       chunksWritten++;
 
       if (event.type === "text_delta" && event.content) fullText += event.content;
@@ -1225,15 +1409,27 @@ export async function processMessageStreamWithPipe(
       if (event.type === "error") errors++;
     }
 
-    await writer.write(createEndChunk("message-processing", { responseLength: fullText.length, usage: finalUsage }) as unknown as StreamChunk<MessageStreamChunk>);
+    await writer.write(
+      createEndChunk("message-processing", {
+        responseLength: fullText.length,
+        usage: finalUsage,
+      }) as unknown as StreamChunk<MessageStreamChunk>,
+    );
     chunksWritten++;
     await writer.close();
 
-    return { chunksWritten, errors, duration: Date.now() - startTime, summary: { response: fullText, usage: finalUsage } };
+    return {
+      chunksWritten,
+      errors,
+      duration: Date.now() - startTime,
+      summary: { response: fullText, usage: finalUsage },
+    };
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
     logger.error("Message stream with pipe failed", error);
-    await writer.write(createErrorChunk(error, "Gordon") as unknown as StreamChunk<MessageStreamChunk>);
+    await writer.write(
+      createErrorChunk(error, "Gordon") as unknown as StreamChunk<MessageStreamChunk>,
+    );
     chunksWritten++;
     errors++;
     if (writer.abort) await writer.abort(error);
@@ -1246,9 +1442,14 @@ export function createMessageStreamWorkflow(
   userMessage: string,
   context: GordonContext,
   threadId?: string,
-  resourceId?: string
+  resourceId?: string,
 ): {
-  pipeTo: (writer: StreamWriter<MessageStreamChunk>) => Promise<StreamingResult<{ response: string; usage: { promptTokens: number; completionTokens: number; totalTokens: number } }>>;
+  pipeTo: (writer: StreamWriter<MessageStreamChunk>) => Promise<
+    StreamingResult<{
+      response: string;
+      usage: { promptTokens: number; completionTokens: number; totalTokens: number };
+    }>
+  >;
   [Symbol.asyncIterator]: () => AsyncIterator<MessageStreamChunk>;
 } {
   async function* generator(): AsyncGenerator<MessageStreamChunk, void, unknown> {
@@ -1260,8 +1461,12 @@ export function createMessageStreamWorkflow(
   const source = generator();
 
   return {
-    async pipeTo(writer) { return processMessageStreamWithPipe(userMessage, context, writer, threadId, resourceId); },
-    [Symbol.asyncIterator]() { return source[Symbol.asyncIterator](); },
+    async pipeTo(writer) {
+      return processMessageStreamWithPipe(userMessage, context, writer, threadId, resourceId);
+    },
+    [Symbol.asyncIterator]() {
+      return source[Symbol.asyncIterator]();
+    },
   };
 }
 

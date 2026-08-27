@@ -2,7 +2,11 @@ import type { GordonConfig } from "../../types/index.ts";
 import { extractCcxtSubId, isCcxtExchangeId } from "../exchange/types.ts";
 import { discoverProviderCapabilities } from "../runtime/actions/discovery.ts";
 import { getActionById } from "../runtime/actions/registry.ts";
-import type { ActionProviderKind, ActionTaskScope, CapabilitySnapshot } from "../runtime/actions/types.ts";
+import type {
+  ActionProviderKind,
+  ActionTaskScope,
+  CapabilitySnapshot,
+} from "../runtime/actions/types.ts";
 import type { GordonContext } from "./types.ts";
 
 export interface IntegrationGlossaryEntry {
@@ -48,20 +52,32 @@ const TASK_SCOPE_FALLBACK_DOMAINS: Partial<Record<ActionTaskScope, string[]>> = 
 };
 
 const DOMAIN_TOOL_HINTS: Partial<Record<string, string>> = {
-  execution_venue: "Use normalized venue adapters for execution facts, positions, orders, and account state.",
-  market_data_source: "Use read-only market-data sources for candles, quotes, order books, and discovery context.",
-  research_analytics_provider: "Use research analytics providers for forecasting, option-pricing, and probabilistic context rather than treating them as raw feeds.",
-  model_provider: "Provider/model identity should come from grounded runtime metadata, not general model priors.",
-  model_gateway: "Gateway-routed models inherit the gateway parent and should not be described as native providers.",
-  automation_provider: "Automation providers are browser/web operators, not market-data vendors or execution venues.",
-  observability_provider: "Observability surfaces are for tracing, telemetry, and diagnostics rather than trading decisions.",
-  plugin_runtime: "Plugin runtime surfaces expose installable tools and should be described as extensions, not native provider capabilities.",
+  execution_venue:
+    "Use normalized venue adapters for execution facts, positions, orders, and account state.",
+  market_data_source:
+    "Use read-only market-data sources for candles, quotes, order books, and discovery context.",
+  research_analytics_provider:
+    "Use research analytics providers for forecasting, option-pricing, and probabilistic context rather than treating them as raw feeds.",
+  model_provider:
+    "Provider/model identity should come from grounded runtime metadata, not general model priors.",
+  model_gateway:
+    "Gateway-routed models inherit the gateway parent and should not be described as native providers.",
+  automation_provider:
+    "Automation providers are browser/web operators, not market-data vendors or execution venues.",
+  observability_provider:
+    "Observability surfaces are for tracing, telemetry, and diagnostics rather than trading decisions.",
+  plugin_runtime:
+    "Plugin runtime surfaces expose installable tools and should be described as extensions, not native provider capabilities.",
 };
 
 function fingerprintConfig(config: GordonConfig): string {
   return JSON.stringify({
-    exchanges: config.exchanges.map((exchange) => `${exchange.id}:${exchange.type}:${exchange.isDefault ? "1" : "0"}`).sort(),
-    brokers: config.brokers.map((broker) => `${broker.id}:${broker.type}:${broker.isDefault ? "1" : "0"}`).sort(),
+    exchanges: config.exchanges
+      .map((exchange) => `${exchange.id}:${exchange.type}:${exchange.isDefault ? "1" : "0"}`)
+      .sort(),
+    brokers: config.brokers
+      .map((broker) => `${broker.id}:${broker.type}:${broker.isDefault ? "1" : "0"}`)
+      .sort(),
     modelProvider: config.modelConfig?.provider ?? "default",
     modelId: config.modelConfig?.model ?? "",
   });
@@ -181,7 +197,9 @@ function toGlossaryEntry(snapshot: CapabilitySnapshot): IntegrationGlossaryEntry
   };
 }
 
-export async function getCanonicalIntegrationGlossary(config: GordonConfig): Promise<IntegrationGlossaryEntry[]> {
+export async function getCanonicalIntegrationGlossary(
+  config: GordonConfig,
+): Promise<IntegrationGlossaryEntry[]> {
   const key = fingerprintConfig(config);
   let cached = glossaryCache.get(key);
   if (!cached) {
@@ -212,10 +230,13 @@ function collectActiveIntegrationIds(context: GordonContext): string[] {
   return [...ids];
 }
 
-function collectMentionMatches(message: string, glossary: IntegrationGlossaryEntry[]): IntegrationGlossaryEntry[] {
+function collectMentionMatches(
+  message: string,
+  glossary: IntegrationGlossaryEntry[],
+): IntegrationGlossaryEntry[] {
   const lower = message.toLowerCase();
   return glossary.filter((entry) =>
-    entry.aliases.some((alias) => alias.length >= 3 && matchesAlias(lower, alias))
+    entry.aliases.some((alias) => alias.length >= 3 && matchesAlias(lower, alias)),
   );
 }
 
@@ -231,7 +252,10 @@ function matchesAlias(message: string, alias: string): boolean {
   return pattern.test(message);
 }
 
-function getRelevantDomains(requestedActionId?: string, requestedTaskScope?: ActionTaskScope): string[] {
+function getRelevantDomains(
+  requestedActionId?: string,
+  requestedTaskScope?: ActionTaskScope,
+): string[] {
   const domains = new Set<string>();
   if (requestedActionId) {
     const action = getActionById(requestedActionId);
@@ -265,16 +289,27 @@ export async function selectRelevantIntegrationGlossary(
     reasons.push("Matched integrations named directly in the user request.");
   }
 
-  const relevantDomains = new Set(getRelevantDomains(context.requestedActionId, context.requestedTaskScope));
+  const relevantDomains = new Set(
+    getRelevantDomains(context.requestedActionId, context.requestedTaskScope),
+  );
   if (relevantDomains.size > 0) {
-    reasons.push(`Constrained glossary to domains relevant for ${context.requestedTaskScope ?? "the active action"}.`);
+    reasons.push(
+      `Constrained glossary to domains relevant for ${context.requestedTaskScope ?? "the active action"}.`,
+    );
   }
 
   const activeIds = collectActiveIntegrationIds(context);
   for (const activeId of activeIds) {
-    const entry = glossary.find((candidate) => candidate.id === activeId || candidate.aliases.includes(activeId.toLowerCase()));
+    const entry = glossary.find(
+      (candidate) =>
+        candidate.id === activeId || candidate.aliases.includes(activeId.toLowerCase()),
+    );
     if (!entry) continue;
-    if (relevantDomains.size === 0 || relevantDomains.has(entry.integrationDomain) || selected.size === 0) {
+    if (
+      relevantDomains.size === 0 ||
+      relevantDomains.has(entry.integrationDomain) ||
+      selected.size === 0
+    ) {
       selected.set(entry.id, entry);
     }
   }

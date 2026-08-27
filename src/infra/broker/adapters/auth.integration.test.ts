@@ -21,11 +21,12 @@ describe("tastytrade adapter session auth", () => {
     requests.length = 0;
     accountCalls = 0;
     globalThis.fetch = (async (input: FetchInput, init?: FetchInit): Promise<Response> => {
-      const url = typeof input === "string"
-        ? new URL(input)
-        : input instanceof URL
-          ? input
-          : new URL(input.url);
+      const url =
+        typeof input === "string"
+          ? new URL(input)
+          : input instanceof URL
+            ? input
+            : new URL(input.url);
       const method = (init?.method || "GET").toUpperCase();
       const headers = new Headers(init?.headers);
       const bodyText = typeof init?.body === "string" ? init.body : "";
@@ -84,9 +85,11 @@ describe("tastytrade adapter session auth", () => {
 
     const sessionCalls = requests.filter((request) => request.url.pathname === "/sessions");
     expect(sessionCalls.length).toBe(2);
-    expect(sessionCalls[0]?.bodyText).toContain("\"login\":\"user@example.com\"");
+    expect(sessionCalls[0]?.bodyText).toContain('"login":"user@example.com"');
 
-    const balanceCalls = requests.filter((request) => request.url.pathname === "/accounts/TT-ACC-1/balances");
+    const balanceCalls = requests.filter(
+      (request) => request.url.pathname === "/accounts/TT-ACC-1/balances",
+    );
     expect(balanceCalls.length).toBe(2);
     expect(balanceCalls[1]?.headers.get("session-token")).toContain("tt-session");
   });

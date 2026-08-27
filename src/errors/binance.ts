@@ -15,7 +15,7 @@ export class BinanceError extends GordonError {
     message: string,
     binanceCode: number,
     endpoint?: string,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, "BINANCE_ERROR", { ...context, binanceCode, endpoint });
     this.name = "BinanceError";
@@ -44,16 +44,12 @@ export class BinanceError extends GordonError {
 export class RateLimitError extends BinanceError {
   public readonly retryAfter?: number;
 
-  constructor(
-    retryAfter?: number,
-    endpoint?: string,
-    context?: Record<string, unknown>
-  ) {
+  constructor(retryAfter?: number, endpoint?: string, context?: Record<string, unknown>) {
     super(
       `Rate limit exceeded${retryAfter ? `. Retry after ${retryAfter}ms` : ""}`,
       -1015,
       endpoint,
-      { ...context, retryAfter }
+      { ...context, retryAfter },
     );
     this.name = "RateLimitError";
     this.retryAfter = retryAfter;
@@ -67,7 +63,7 @@ export class BinanceAuthError extends BinanceError {
   constructor(
     message: string = "Invalid API key or signature",
     binanceCode: number = -2015,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, binanceCode, undefined, context);
     this.name = "BinanceAuthError";
@@ -86,13 +82,13 @@ export class InsufficientBalanceError extends BinanceError {
     asset: string,
     required: number,
     available: number,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(
       `Insufficient ${asset} balance. Required: ${required}, Available: ${available}`,
       -2010,
       "/api/v3/order",
-      { ...context, asset, required, available }
+      { ...context, asset, required, available },
     );
     this.name = "InsufficientBalanceError";
     this.asset = asset;
@@ -123,7 +119,7 @@ export class OrderWouldTriggerError extends BinanceError {
       "Order would immediately trigger stop loss or take profit",
       -2021,
       "/api/v3/order",
-      context
+      context,
     );
     this.name = "OrderWouldTriggerError";
   }
@@ -133,7 +129,10 @@ export class OrderWouldTriggerError extends BinanceError {
  * Connection error (network issues)
  */
 export class BinanceConnectionError extends GordonError {
-  constructor(message: string = "Failed to connect to Binance API", context?: Record<string, unknown>) {
+  constructor(
+    message: string = "Failed to connect to Binance API",
+    context?: Record<string, unknown>,
+  ) {
     super(message, "BINANCE_CONNECTION_ERROR", context);
     this.name = "BinanceConnectionError";
   }
@@ -142,11 +141,7 @@ export class BinanceConnectionError extends GordonError {
 /**
  * Create appropriate error from Binance API response
  */
-export function createBinanceError(
-  code: number,
-  message: string,
-  endpoint?: string
-): BinanceError {
+export function createBinanceError(code: number, message: string, endpoint?: string): BinanceError {
   switch (code) {
     case -1015:
     case -1003:

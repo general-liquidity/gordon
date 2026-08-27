@@ -21,8 +21,12 @@ describe("economicOrderFloor", () => {
   });
 
   it("moves with the fixed cost: a $1.00 ticket floors at $100 and a $9.99 ticket at $999", () => {
-    expect(economicOrderFloor({ ...TICKETED, fixedPerTrancheMinor: USD(1) }, ONE_PERCENT)).toBe(USD(100));
-    expect(economicOrderFloor({ ...TICKETED, fixedPerTrancheMinor: USD(9.99) }, ONE_PERCENT)).toBe(USD(999));
+    expect(economicOrderFloor({ ...TICKETED, fixedPerTrancheMinor: USD(1) }, ONE_PERCENT)).toBe(
+      USD(100),
+    );
+    expect(economicOrderFloor({ ...TICKETED, fixedPerTrancheMinor: USD(9.99) }, ONE_PERCENT)).toBe(
+      USD(999),
+    );
   });
 
   it("moves with the tolerance: halving tau doubles the floor", () => {
@@ -106,7 +110,11 @@ describe("money arithmetic", () => {
   });
 
   it("rounds a proportional fee up to the next whole cent", () => {
-    const schedule: FeeSchedule = { fixedPerTrancheMinor: 0, trancheSizeMinor: 0, proportionalBps: 10 };
+    const schedule: FeeSchedule = {
+      fixedPerTrancheMinor: 0,
+      trancheSizeMinor: 0,
+      proportionalBps: 10,
+    };
     expect(feeForNotional(schedule, USD(100.5))).toBe(11);
   });
 });

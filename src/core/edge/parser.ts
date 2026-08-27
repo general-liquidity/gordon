@@ -34,7 +34,11 @@ function parseFrontmatter(raw: string): { meta: Record<string, string | string[]
     const key = line.slice(0, idx).trim();
     const val = line.slice(idx + 1).trim();
     if (val.startsWith("[") && val.endsWith("]")) {
-      meta[key] = val.slice(1, -1).split(",").map((s) => s.trim()).filter(Boolean);
+      meta[key] = val
+        .slice(1, -1)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
     } else {
       meta[key] = val;
     }
@@ -51,7 +55,10 @@ function section(body: string, heading: string): string {
 
 function parseThreshold(raw: string, comparator: Comparator): number | string | string[] {
   if (comparator === "in" || comparator === "not-in") {
-    return raw.split(",").map((s) => s.trim()).filter(Boolean);
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
   const n = Number(raw);
   return Number.isFinite(n) && raw.trim() !== "" ? n : raw.trim();
@@ -66,7 +73,10 @@ function parseInvariantTable(body: string, heading: string): EdgeInvariant[] {
   for (const line of text.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed.startsWith("|")) continue;
-    const cells = trimmed.split("|").slice(1, -1).map((c) => c.trim());
+    const cells = trimmed
+      .split("|")
+      .slice(1, -1)
+      .map((c) => c.trim());
     if (cells.length < 4) continue;
     const id = cells[0]!;
     // Skip the header row and the `|---|---|` separator row.
@@ -89,7 +99,9 @@ export function parseEdgeSpec(markdown: string): EdgeSpec {
   const asArray = (v: string | string[] | undefined): string[] =>
     Array.isArray(v) ? v : v ? [v] : [];
   const rawStatus = (meta.status as string) ?? "proposed";
-  const status = (STATUSES as string[]).includes(rawStatus) ? (rawStatus as EdgeStatus) : "proposed";
+  const status = (STATUSES as string[]).includes(rawStatus)
+    ? (rawStatus as EdgeStatus)
+    : "proposed";
   const verification = section(body, "Verification");
   return {
     name: (meta.name as string) ?? "unnamed-edge",

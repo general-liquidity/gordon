@@ -1,9 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import {
-  DEFAULT_TTL_MS,
-  ToolResultCache,
-  buildCacheKey,
-} from "./toolResultCache.ts";
+import { DEFAULT_TTL_MS, ToolResultCache, buildCacheKey } from "./toolResultCache.ts";
 
 const NOW = 1_700_000_000_000;
 

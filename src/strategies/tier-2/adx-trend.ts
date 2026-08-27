@@ -61,7 +61,7 @@ export class ADXTrendStrategy extends BaseStrategy {
   async detect(
     symbol: string,
     timeframe: string,
-    ctx: StrategyContext
+    ctx: StrategyContext,
   ): Promise<StrategyDetectionResult> {
     const candles = await this.fetchCandles(ctx, symbol, timeframe, 100);
     if (candles.length < 30) {
@@ -84,14 +84,14 @@ export class ADXTrendStrategy extends BaseStrategy {
     // Check ADX strength
     if (adx < ADX_THRESHOLD) {
       return this.notDetected(
-        `ADX too low (${adx.toFixed(1)} < ${ADX_THRESHOLD}) - no strong trend`
+        `ADX too low (${adx.toFixed(1)} < ${ADX_THRESHOLD}) - no strong trend`,
       );
     }
 
     // Check trend direction (+DI > -DI for bullish)
     if (plusDI <= minusDI) {
       return this.notDetected(
-        `Bearish trend (+DI ${plusDI.toFixed(1)} <= -DI ${minusDI.toFixed(1)})`
+        `Bearish trend (+DI ${plusDI.toFixed(1)} <= -DI ${minusDI.toFixed(1)})`,
       );
     }
 
@@ -105,18 +105,16 @@ export class ADXTrendStrategy extends BaseStrategy {
     const distanceToEMA = (currentPrice - ema20.current) / ema20.current;
 
     if (distanceToEMA < -PULLBACK_THRESHOLD) {
-      return this.notDetected(
-        `Price too far below EMA20 (${(distanceToEMA * 100).toFixed(1)}%)`
-      );
+      return this.notDetected(`Price too far below EMA20 (${(distanceToEMA * 100).toFixed(1)}%)`);
     }
 
     // Ideal entry is pullback to EMA (not too far above either)
-    const isPullbackEntry = distanceToEMA >= -PULLBACK_THRESHOLD &&
-                           distanceToEMA <= PULLBACK_THRESHOLD;
+    const isPullbackEntry =
+      distanceToEMA >= -PULLBACK_THRESHOLD && distanceToEMA <= PULLBACK_THRESHOLD;
 
     if (distanceToEMA > PULLBACK_THRESHOLD * 3) {
       return this.notDetected(
-        `Price extended above EMA20 (${(distanceToEMA * 100).toFixed(1)}%) - wait for pullback`
+        `Price extended above EMA20 (${(distanceToEMA * 100).toFixed(1)}%) - wait for pullback`,
       );
     }
 
@@ -127,7 +125,7 @@ export class ADXTrendStrategy extends BaseStrategy {
     if (adx >= ADX_STRONG) {
       confidence += 0.15;
     } else {
-      confidence += (adx - ADX_THRESHOLD) / (ADX_STRONG - ADX_THRESHOLD) * 0.1;
+      confidence += ((adx - ADX_THRESHOLD) / (ADX_STRONG - ADX_THRESHOLD)) * 0.1;
     }
 
     // Rising ADX bonus
@@ -208,7 +206,7 @@ export class ADXTrendStrategy extends BaseStrategy {
       const tr = Math.max(
         current.high - current.low,
         Math.abs(current.high - previous.close),
-        Math.abs(current.low - previous.close)
+        Math.abs(current.low - previous.close),
       );
       trueRanges.push(tr);
 
@@ -234,15 +232,16 @@ export class ADXTrendStrategy extends BaseStrategy {
 
     // Calculate DI values
     const plusDI = (smoothPlusDM[smoothPlusDM.length - 1]! / smoothTR[smoothTR.length - 1]!) * 100;
-    const minusDI = (smoothMinusDM[smoothMinusDM.length - 1]! / smoothTR[smoothTR.length - 1]!) * 100;
+    const minusDI =
+      (smoothMinusDM[smoothMinusDM.length - 1]! / smoothTR[smoothTR.length - 1]!) * 100;
 
     // Calculate DX values
     const dxValues: number[] = [];
     for (let i = 0; i < smoothTR.length; i++) {
       const pdi = (smoothPlusDM[i]! / smoothTR[i]!) * 100;
       const mdi = (smoothMinusDM[i]! / smoothTR[i]!) * 100;
-      const dx = Math.abs(pdi - mdi) / (pdi + mdi) * 100;
-      if (!isNaN(dx)) dxValues.push(dx);
+      const dx = (Math.abs(pdi - mdi) / (pdi + mdi)) * 100;
+      if (!Number.isNaN(dx)) dxValues.push(dx);
     }
 
     // Smooth DX to get ADX
@@ -281,10 +280,7 @@ export class ADXTrendStrategy extends BaseStrategy {
     return result;
   }
 
-  async getPlanParameters(
-    symbol: string,
-    ctx: StrategyContext
-  ): Promise<StrategyPlanParams> {
+  async getPlanParameters(symbol: string, ctx: StrategyContext): Promise<StrategyPlanParams> {
     const candles = await this.fetchCandles(ctx, symbol, "4h", 100);
     const currentPrice = this.getCurrentPrice(candles, ctx);
 
@@ -314,7 +310,8 @@ export class ADXTrendStrategy extends BaseStrategy {
       stopLoss,
       takeProfits,
       riskRewardRatio,
-      notes: `ADX trend trade. Strong trend confirmed. ` +
+      notes:
+        `ADX trend trade. Strong trend confirmed. ` +
         `Stop below EMA20 at $${stopLoss.toFixed(2)}. Trail stops as trend develops. R:R ${riskRewardRatio.toFixed(1)}:1`,
     };
   }
@@ -380,13 +377,13 @@ When creating a plan using the ADX Trend Strength strategy:
     bar: OHLC,
     _index: number,
     _data: OHLC[],
-    indicators: IndicatorState
+    indicators: IndicatorState,
   ): Signal | null {
     const price = bar.close;
     const { rsi14, sma20, sma50 } = indicators;
-    const adx = indicators["adx"] as number | null | undefined;
-    const plusDI = indicators["plusDI"] as number | null | undefined;
-    const minusDI = indicators["minusDI"] as number | null | undefined;
+    const adx = indicators.adx as number | null | undefined;
+    const plusDI = indicators.plusDI as number | null | undefined;
+    const minusDI = indicators.minusDI as number | null | undefined;
 
     // SELL signals (exit conditions)
     if (sma20 != null && price < sma20) {
@@ -424,9 +421,8 @@ When creating a plan using the ADX Trend Strength strategy:
       const rsiHealthy = rsi14 == null || (rsi14 >= 40 && rsi14 <= 60);
 
       // Pullback to SMA20 — price within 2% of SMA20
-      const nearSMA20 = sma20 != null
-        ? Math.abs(price - sma20) / sma20 <= PULLBACK_THRESHOLD
-        : false;
+      const nearSMA20 =
+        sma20 != null ? Math.abs(price - sma20) / sma20 <= PULLBACK_THRESHOLD : false;
 
       if (strongTrend && bullishDirection && nearSMA20 && rsiHealthy) {
         return {
@@ -439,9 +435,8 @@ When creating a plan using the ADX Trend Strength strategy:
     } else {
       // Fallback: use SMA crossover + RSI as trend proxy
       const trendUp = sma20 != null && sma50 != null && sma20 > sma50;
-      const nearSMA20 = sma20 != null
-        ? Math.abs(price - sma20) / sma20 <= PULLBACK_THRESHOLD
-        : false;
+      const nearSMA20 =
+        sma20 != null ? Math.abs(price - sma20) / sma20 <= PULLBACK_THRESHOLD : false;
       const rsiHealthy = rsi14 != null && rsi14 >= 40 && rsi14 <= 60;
 
       if (trendUp && nearSMA20 && rsiHealthy) {
@@ -461,15 +456,7 @@ When creating a plan using the ADX Trend Strength strategy:
    * Get required indicators for backtesting.
    */
   override getRequiredIndicators(): string[] {
-    return [
-      "sma20",
-      "sma50",
-      "rsi14",
-      "atr14",
-      "adx",
-      "plusDI",
-      "minusDI",
-    ];
+    return ["sma20", "sma50", "rsi14", "atr14", "adx", "plusDI", "minusDI"];
   }
 }
 

@@ -47,18 +47,8 @@ export const queryAuditTrailTool = createTool({
       .string()
       .optional()
       .describe("Filter by position ID to see all decisions related to a position"),
-    hours: z
-      .number()
-      .min(1)
-      .max(720)
-      .optional()
-      .describe("Look back N hours (default: all time)"),
-    limit: z
-      .number()
-      .min(1)
-      .max(50)
-      .default(10)
-      .describe("Max results to return"),
+    hours: z.number().min(1).max(720).optional().describe("Look back N hours (default: all time)"),
+    limit: z.number().min(1).max(50).default(10).describe("Max results to return"),
   }),
   outputSchema: z.object({
     traces: z.array(
@@ -69,7 +59,7 @@ export const queryAuditTrailTool = createTool({
         outcome: z.string(),
         duration_ms: z.number().optional(),
         started_at: z.string(),
-      })
+      }),
     ),
     count: z.number(),
     error: z.string().optional(),
@@ -94,7 +84,8 @@ export const queryAuditTrailTool = createTool({
       return {
         traces: traces.slice(0, limit ?? 10).map((t) => ({
           trace_id: t.trace_id,
-          trigger: `[${t.trigger.type}] ${t.trigger.event_type ?? ""} from ${t.trigger.source}: ${t.trigger.payload_summary}`.trim(),
+          trigger:
+            `[${t.trigger.type}] ${t.trigger.event_type ?? ""} from ${t.trigger.source}: ${t.trigger.payload_summary}`.trim(),
           agents_involved: t.agent_steps.map((s) => s.agent_id),
           outcome: `${t.outcome.type}: ${t.outcome.details}`,
           duration_ms: t.duration_ms,
@@ -121,14 +112,8 @@ export const getDecisionPathTool = createTool({
     "Shows the complete chain: trigger -> agent reasoning -> tool calls -> outcome. " +
     "Use to answer 'why did we buy X?' or 'what happened with position Y?'",
   inputSchema: z.object({
-    trace_id: z
-      .string()
-      .optional()
-      .describe("Specific trace ID to inspect"),
-    position_id: z
-      .string()
-      .optional()
-      .describe("Position ID to find all related decision paths"),
+    trace_id: z.string().optional().describe("Specific trace ID to inspect"),
+    position_id: z.string().optional().describe("Position ID to find all related decision paths"),
   }),
   outputSchema: z.object({
     paths: z.array(
@@ -136,7 +121,7 @@ export const getDecisionPathTool = createTool({
         trace_id: z.string(),
         decision_path: z.string(),
         markdown: z.string(),
-      })
+      }),
     ),
     count: z.number(),
     error: z.string().optional(),
@@ -201,13 +186,10 @@ export const getAgentActivityTool = createTool({
   inputSchema: z.object({
     agent_id: z
       .string()
-      .describe("Agent ID to inspect (e.g., 'Scanner', 'Analyst', 'Executor', 'Monitor', 'Planner', 'Teacher', 'Backtester')"),
-    hours: z
-      .number()
-      .min(1)
-      .max(720)
-      .default(24)
-      .describe("Look back N hours (default: 24)"),
+      .describe(
+        "Agent ID to inspect (e.g., 'Scanner', 'Analyst', 'Executor', 'Monitor', 'Planner', 'Teacher', 'Backtester')",
+      ),
+    hours: z.number().min(1).max(720).default(24).describe("Look back N hours (default: 24)"),
   }),
   outputSchema: z.object({
     agent_id: z.string(),
@@ -219,7 +201,7 @@ export const getAgentActivityTool = createTool({
         tools_used: z.array(z.string()),
         outcome: z.string(),
         started_at: z.string(),
-      })
+      }),
     ),
     summary: z.object({
       total_traces: z.number(),
@@ -238,16 +220,12 @@ export const getAgentActivityTool = createTool({
 
       const formattedTraces = traces.map((t) => {
         // Find the step(s) for this agent
-        const agentSteps = t.agent_steps.filter(
-          (s) => s.agent_id === agent_id
-        );
+        const agentSteps = t.agent_steps.filter((s) => s.agent_id === agent_id);
         const reasoning = agentSteps
           .map((s) => s.reasoning_summary)
           .filter(Boolean)
           .join("; ");
-        const tools = agentSteps.flatMap((s) =>
-          s.tool_calls.map((tc) => tc.tool_name)
-        );
+        const tools = agentSteps.flatMap((s) => s.tool_calls.map((tc) => tc.tool_name));
 
         totalToolCalls += tools.length;
 

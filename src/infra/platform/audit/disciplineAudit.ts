@@ -122,11 +122,7 @@ function defaultEnd(): string {
  */
 const TRADE_ACTIONS = ["EXECUTE_PLAN", "CLOSE_TRADE", "PLACE_OCO_ORDER"] as const;
 
-function fetchTradeExecutions(
-  startTime: string,
-  endTime: string,
-  userId?: string,
-): AuditEntry[] {
+function fetchTradeExecutions(startTime: string, endTime: string, userId?: string): AuditEntry[] {
   const out: AuditEntry[] = [];
   for (const action of TRADE_ACTIONS) {
     out.push(
@@ -143,11 +139,7 @@ function fetchTradeExecutions(
   return out.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 }
 
-function fetchOverrides(
-  startTime: string,
-  endTime: string,
-  userId?: string,
-): AuditEntry[] {
+function fetchOverrides(startTime: string, endTime: string, userId?: string): AuditEntry[] {
   return getAuditHistory({
     action: "RULE_OVERRIDE",
     result: "SUCCESS",
@@ -248,10 +240,7 @@ function detectRiskTooHigh(overrides: AuditEntry[]): FailureModeResult {
   };
 }
 
-function detectOvertrading(
-  trades: AuditEntry[],
-  maxTradesPerDay: number,
-): FailureModeResult {
+function detectOvertrading(trades: AuditEntry[], maxTradesPerDay: number): FailureModeResult {
   const perDay = new Map<string, number>();
   for (const t of trades) {
     const k = dayKey(t.timestamp);
@@ -265,12 +254,7 @@ function detectOvertrading(
   return {
     mode: "overtrading",
     triggered,
-    severity:
-      worstCount > maxTradesPerDay * 3
-        ? "alert"
-        : triggered
-          ? "warning"
-          : "info",
+    severity: worstCount > maxTradesPerDay * 3 ? "alert" : triggered ? "warning" : "info",
     description: triggered
       ? `${offendingDays.length} day(s) exceeded ${maxTradesPerDay} trades — worst was ${worstCount} on ${offendingDays[0]?.[0]}.`
       : `All days within ${maxTradesPerDay}-trade cap.`,
@@ -291,8 +275,7 @@ function detectNotJournaling(trades: AuditEntry[]): FailureModeResult {
     const meta = (t.metadata ?? {}) as Record<string, unknown>;
     const trace = meta.decisionTrace as Record<string, unknown> | undefined;
     const hasTrace = trace !== undefined && trace !== null;
-    const hasRationale =
-      typeof t.resultDetails === "string" && t.resultDetails.trim().length > 0;
+    const hasRationale = typeof t.resultDetails === "string" && t.resultDetails.trim().length > 0;
     return !hasTrace && !hasRationale;
   });
   const rate = trades.length === 0 ? 0 : unjournaled.length / trades.length;
@@ -356,9 +339,7 @@ function detectEmotionalTrading(
     })
     .map((t) => new Date(t.timestamp).getTime());
 
-  const overrideTimes = overrides
-    .map((o) => new Date(o.timestamp).getTime())
-    .sort((a, b) => a - b);
+  const overrideTimes = overrides.map((o) => new Date(o.timestamp).getTime()).sort((a, b) => a - b);
 
   let count = 0;
   for (const ot of overrideTimes) {
@@ -396,9 +377,7 @@ function baseInfo(mode: DisciplineFailureMode, description: string): FailureMode
 /**
  * Run the full discipline audit over the given window.
  */
-export function getDisciplineAudit(
-  config: DisciplineAuditConfig = {},
-): DisciplineAuditReport {
+export function getDisciplineAudit(config: DisciplineAuditConfig = {}): DisciplineAuditReport {
   const startTime = config.startTime ?? defaultStart();
   const endTime = config.endTime ?? defaultEnd();
   const maxTradesPerDay = config.maxTradesPerDay ?? DEFAULT_MAX_TRADES_PER_DAY;
@@ -443,8 +422,6 @@ export function summarizeDisciplineAudit(report: DisciplineAuditReport): string 
   if (report.triggeredCount === 0) {
     return `Discipline audit: clean (score ${report.score.toFixed(2)}, no failure modes triggered).`;
   }
-  const triggered = report.modes
-    .filter((m) => m.triggered)
-    .map((m) => m.mode.replace(/_/g, " "));
+  const triggered = report.modes.filter((m) => m.triggered).map((m) => m.mode.replace(/_/g, " "));
   return `Discipline audit: ${report.triggeredCount}/${report.modes.length} modes triggered (score ${report.score.toFixed(2)}, ${report.headlineSeverity}) — ${triggered.join("; ")}.`;
 }

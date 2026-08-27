@@ -46,10 +46,9 @@ export function appendToPromotionQueue(
   try {
     mkdirSync(dirname(path), { recursive: true });
     const now = new Date().toISOString();
-    const lines =
-      entries
-        .map((e) => JSON.stringify({ status: "candidate", ...e, appendedAt: now }))
-        .join("\n") + "\n";
+    const lines = `${entries
+      .map((e) => JSON.stringify({ status: "candidate", ...e, appendedAt: now }))
+      .join("\n")}\n`;
     appendFileSync(path, lines, { encoding: "utf-8" });
     return { written: entries.length, path };
   } catch (err) {

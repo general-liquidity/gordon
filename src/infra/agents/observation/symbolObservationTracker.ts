@@ -47,7 +47,10 @@ export function recordSymbolObservation(symbol: unknown): void {
 
 /** Did any data tool touch this symbol in the last `windowMs` ms?
  *  Default window: 4 hours. */
-export function hasRecentSymbolObservation(symbol: string, windowMs: number = DEFAULT_WINDOW_MS): boolean {
+export function hasRecentSymbolObservation(
+  symbol: string,
+  windowMs: number = DEFAULT_WINDOW_MS,
+): boolean {
   if (typeof symbol !== "string") return false;
   const list = observations.get(normalize(symbol));
   if (!list || list.length === 0) return false;
@@ -57,7 +60,10 @@ export function hasRecentSymbolObservation(symbol: string, windowMs: number = DE
 }
 
 /** Count observations on this symbol within the window. */
-export function getSymbolObservationCount(symbol: string, windowMs: number = DEFAULT_WINDOW_MS): number {
+export function getSymbolObservationCount(
+  symbol: string,
+  windowMs: number = DEFAULT_WINDOW_MS,
+): number {
   if (typeof symbol !== "string") return 0;
   const list = observations.get(normalize(symbol));
   if (!list) return 0;

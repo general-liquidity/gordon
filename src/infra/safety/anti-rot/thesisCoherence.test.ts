@@ -132,20 +132,13 @@ describe("thesisCoherence", () => {
 
     it("neutral bias accepts both directions", () => {
       const t = { ...FRESH_THESIS, bias: "neutral" as const };
-      expect(
-        scoreCoherence({ direction: "long", assetClass: "crypto" }, t).score,
-      ).toBe(1);
-      expect(
-        scoreCoherence({ direction: "short", assetClass: "crypto" }, t).score,
-      ).toBe(1);
+      expect(scoreCoherence({ direction: "long", assetClass: "crypto" }, t).score).toBe(1);
+      expect(scoreCoherence({ direction: "short", assetClass: "crypto" }, t).score).toBe(1);
     });
 
     it("scores asset class as aligned when thesis focus is empty", () => {
       const t = { ...FRESH_THESIS, marketFocus: [] };
-      const s = scoreCoherence(
-        { direction: "long", assetClass: "us_equity" },
-        t,
-      );
+      const s = scoreCoherence({ direction: "long", assetClass: "us_equity" }, t);
       expect(s.score).toBe(1);
     });
   });
@@ -157,11 +150,7 @@ describe("thesisCoherence", () => {
     });
 
     it("blocks when flag on but no thesis", () => {
-      const r = gateCoherence(
-        { direction: "long" },
-        { GORDON_THESIS_COHERENCE: "1" },
-        null,
-      );
+      const r = gateCoherence({ direction: "long" }, { GORDON_THESIS_COHERENCE: "1" }, null);
       expect(r.ok).toBe(false);
       expect(r.reason).toContain("no running thesis");
     });

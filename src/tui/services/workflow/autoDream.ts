@@ -15,9 +15,9 @@
 // (GORDON_AUTODREAM_ENABLED) is on AND the gates below pass. Read-only-safe:
 // the only writes are memory curation the manual paths already perform.
 
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
-import { join, dirname } from "path";
-import { homedir } from "os";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { homedir } from "node:os";
 
 import { runACECycle } from "../../../infra/agents/ace/index.ts";
 import { dedupeSessionMemories } from "../../../infra/memory/sessionMemory.ts";
@@ -65,9 +65,13 @@ export class AutoDreamManager {
     this.consolidator = consolidator;
   }
 
-  async checkAndConsolidate(sessionCount: number, lastConsolidatedAt: Date | null): Promise<boolean> {
+  async checkAndConsolidate(
+    sessionCount: number,
+    lastConsolidatedAt: Date | null,
+  ): Promise<boolean> {
     // Gate 1: Time (24h since last)
-    if (lastConsolidatedAt && Date.now() - lastConsolidatedAt.getTime() < 24 * 60 * 60 * 1000) return false;
+    if (lastConsolidatedAt && Date.now() - lastConsolidatedAt.getTime() < 24 * 60 * 60 * 1000)
+      return false;
     // Gate 2: Session count (5+)
     if (sessionCount < 5) return false;
     // Gate 3: Lock
@@ -105,8 +109,12 @@ export class AutoDreamManager {
         // Stale lock detection (> 1 hour)
         if (Date.now() - lockData.timestamp > 3600000) {
           unlinkSync(LOCK_PATH);
-        } else { return false; }
-      } catch { unlinkSync(LOCK_PATH); }
+        } else {
+          return false;
+        }
+      } catch {
+        unlinkSync(LOCK_PATH);
+      }
     }
     // Default-on feature: on a fresh install ~/.gordon may not exist yet.
     // Create the lock's parent dir rather than ENOENT-crashing consolidation.
@@ -116,6 +124,8 @@ export class AutoDreamManager {
   }
 
   private releaseLock(): void {
-    try { if (existsSync(LOCK_PATH)) unlinkSync(LOCK_PATH); } catch {}
+    try {
+      if (existsSync(LOCK_PATH)) unlinkSync(LOCK_PATH);
+    } catch {}
   }
 }

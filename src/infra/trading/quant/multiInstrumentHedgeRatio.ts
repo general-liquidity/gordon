@@ -208,9 +208,7 @@ function estimateConditionNumber(M: number[][], MInv: number[][]): number {
   return normM * normMInv;
 }
 
-export function computeMultiInstrumentHedgeRatio(
-  input: HedgeRatioInput,
-): HedgeRatioResult {
+export function computeMultiInstrumentHedgeRatio(input: HedgeRatioInput): HedgeRatioResult {
   const { T, K, names, ridge } = validateInputs(input);
 
   const xMean = mean(input.positionReturns);
@@ -273,8 +271,7 @@ export function computeMultiInstrumentHedgeRatio(
   for (let i = 0; i < K; i++) hDotSigmaXY += hStar[i]! * sigmaXY[i]!;
   const residualVariance = Math.max(0, positionVariance - hDotSigmaXY);
 
-  const varianceReduction =
-    positionVariance > 0 ? 1 - residualVariance / positionVariance : 0;
+  const varianceReduction = positionVariance > 0 ? 1 - residualVariance / positionVariance : 0;
 
   const conditionNumber = estimateConditionNumber(sigmaY, sigmaYInv);
 

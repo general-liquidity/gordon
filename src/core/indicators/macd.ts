@@ -40,7 +40,7 @@ export function calculateMACD(
   closes: number[],
   fastPeriod: number = 12,
   slowPeriod: number = 26,
-  signalPeriod: number = 9
+  signalPeriod: number = 9,
 ): MACDResult {
   const minRequired = slowPeriod + signalPeriod;
 

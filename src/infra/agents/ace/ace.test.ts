@@ -268,7 +268,8 @@ describe("ACE Reflector — agent_self_block rule", () => {
     const entry = makeEntry({
       entryType: "run_status",
       title: "Agent reported blocked (severity: high)",
-      content: 'Agent reported blocked while attempting: "place BTC long". Blocker: risk classifier blocks all variants because drawdown is at 4.8% of 5% cap.',
+      content:
+        'Agent reported blocked while attempting: "place BTC long". Blocker: risk classifier blocks all variants because drawdown is at 4.8% of 5% cap.',
       payload: {
         intent: "place BTC long after user confirmed plan",
         blocker: "risk classifier blocks all variants because drawdown is at 4.8% of 5% cap",
@@ -314,11 +315,13 @@ describe("ACE Reflector — approved_plan_rationale rule", () => {
     const entry = makeEntry({
       entryType: "execution_result",
       title: "BTCUSDT executed",
-      content: "Plan p1 executed cleanly on BTCUSDT. User rationale: Breakout above 100K confirmed with volume, plan stops sit below structural level.",
+      content:
+        "Plan p1 executed cleanly on BTCUSDT. User rationale: Breakout above 100K confirmed with volume, plan stops sit below structural level.",
       payload: {
         planId: "p1",
         symbol: "BTCUSDT",
-        rationale: "Breakout above 100K confirmed with volume, plan stops sit below structural level",
+        rationale:
+          "Breakout above 100K confirmed with volume, plan stops sit below structural level",
       },
     });
     const matches = _applyPatternRulesForTest(entry as never);

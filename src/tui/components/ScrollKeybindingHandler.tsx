@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import type React from "react";
+import { useState } from "react";
 import { Box } from "../ink-custom";
 import { SearchBox } from "../design-system/SearchBox.js";
 import type { ScrollBoxHandle } from "./layout/ScrollBox.tsx";

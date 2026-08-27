@@ -23,16 +23,12 @@ import type { Message } from "../components/messages/MessageBubble.tsx";
 
 type AddMessageAction = { type: "ADD_MESSAGE"; message: Message };
 
-export function useProactiveChatSubscription(
-  dispatch: Dispatch<AddMessageAction>,
-): void {
+export function useProactiveChatSubscription(dispatch: Dispatch<AddMessageAction>): void {
   useEffect(() => {
     const bus = getEventBus();
     const unsubscribe = bus.on("proactive:suggestion_fired", (event) => {
       const confidence = typeof event.confidence === "number" ? event.confidence : 0;
-      const formatted =
-        `${event.title}\n\n${event.body}` +
-        (event.action ? `\n\n→ ${event.action}` : "");
+      const formatted = `${event.title}\n\n${event.body}${event.action ? `\n\n→ ${event.action}` : ""}`;
 
       const message: Message = {
         id: `proactive-${event.suggestionId}`,

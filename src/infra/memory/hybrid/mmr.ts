@@ -85,10 +85,7 @@ export function mmrRerank<T extends MMRCandidate>(
       const rel = norm(candidate.score);
       const sim = maxSimToSelected(candidate, selected, cache);
       const mmr = clamped * rel - (1 - clamped) * sim;
-      if (
-        mmr > bestMMR ||
-        (mmr === bestMMR && candidate.score > (best?.score ?? -Infinity))
-      ) {
+      if (mmr > bestMMR || (mmr === bestMMR && candidate.score > (best?.score ?? -Infinity))) {
         bestMMR = mmr;
         best = candidate;
       }

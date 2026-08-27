@@ -1,4 +1,3 @@
-import React from "react";
 import { Box, Text } from "../../ink-custom";
 
 // ============================================================================
@@ -16,7 +15,7 @@ export function HandoffArrow({ from, to }: Props) {
   return (
     <Box marginY={0} paddingLeft={2}>
       <Text color="cyanBright">{"\u2192"}</Text>
-      <Text dimColor> Handing off to </Text>
+      <Text dimColor> {from} handing off to </Text>
       <Text color="cyanBright">{to}</Text>
     </Box>
   );

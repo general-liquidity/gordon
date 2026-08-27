@@ -4,22 +4,27 @@ import { GordonConfigSchema, type GordonConfig } from "../../../types/index.ts";
 import type { GordonContext } from "../../agents/types.ts";
 import { evaluateToolRequestPolicy, planActionExecution } from "./runtime.ts";
 
-function createConfig(permissionMode: "auto" | "ask" | "strict" | "paper" | "observe" | "plan" = "ask"): GordonConfig {
+function createConfig(
+  permissionMode: "auto" | "ask" | "strict" | "paper" | "observe" | "plan" = "ask",
+): GordonConfig {
   return GordonConfigSchema.parse({
     permissionMode,
-    exchanges: [{
-      id: "binance-default",
-      type: "ccxt:binance",
-      apiKey: "key",
-      apiSecret: "secret",
-      isDefault: true,
-    }],
+    exchanges: [
+      {
+        id: "binance-default",
+        type: "ccxt:binance",
+        apiKey: "key",
+        apiSecret: "secret",
+        isDefault: true,
+      },
+    ],
     activeExchangeId: "binance-default",
   });
 }
 
 function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
-  return {    exchange: {
+  return {
+    exchange: {
       exchangeId: "binance",
       displayName: "Binance",
       getPrice: async () => 50000,
@@ -48,7 +53,9 @@ describe("action runtime", () => {
     expect(plan.preview?.symbol).toBe("BTCUSDT");
     expect(plan.preview?.resolutionSource).toBe("heuristic");
     expect(plan.preview?.quoteAsset).toBeUndefined();
-    expect((plan.preview?.capabilities as { supportsOrderBook: boolean } | undefined)?.supportsOrderBook).toBeTrue();
+    expect(
+      (plan.preview?.capabilities as { supportsOrderBook: boolean } | undefined)?.supportsOrderBook,
+    ).toBeTrue();
     expect(plan.preview?.estimatedBaseQty).toBeGreaterThan(0);
     expect(plan.blockers).toContain("permissionMode is 'strict' (read-only).");
     expect(plan.ready).toBeFalse();
@@ -63,7 +70,13 @@ describe("action runtime", () => {
         broker: {
           brokerId: "alpaca",
           displayName: "Alpaca",
-          getLatestQuote: async () => ({ symbol: "AAPL", bidPrice: 210, askPrice: 211, lastPrice: 210.5, timestamp: Date.now() }),
+          getLatestQuote: async () => ({
+            symbol: "AAPL",
+            bidPrice: 210,
+            askPrice: 211,
+            lastPrice: 210.5,
+            timestamp: Date.now(),
+          }),
           getAccount: async () => ({
             accountId: "acct-1",
             accountType: "cash",

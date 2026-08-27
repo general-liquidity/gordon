@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { setDatabasePathForTesting } from "../storage/database.ts";
+import { StrategyRuntime } from "../../core/runtime/engine.ts";
+import { resetRuntimeStore } from "../../core/runtime/store.ts";
 import { placeLimitOrderTool } from "../agents/tools/market/orderbook.ts";
 import { placeMarketOrderTool } from "../agents/tools/news/discovery.ts";
 import { registerHook } from "./engine.ts";
@@ -19,6 +21,11 @@ beforeAll(() => {
 
 afterAll(() => {
   setDatabasePathForTesting(null);
+  // Risk evaluation creates the runtime singleton against this test database.
+  // Reset it before removing the database so later test files cannot retain a
+  // repository handle that points at a closed SQLite connection.
+  StrategyRuntime.resetInstance();
+  resetRuntimeStore();
   if (previousHome === undefined) delete process.env.GORDON_HOME;
   else process.env.GORDON_HOME = previousHome;
   try {
@@ -35,7 +42,10 @@ function exchangeContext(placed: Array<Record<string, unknown>>) {
     getPrice: async () => 100,
     getBalance: async () => 100_000,
     getOpenOrders: async () => [],
-    getFullAccountDetails: async () => ({ totalUsdtValue: 100_000, nonZeroBalances: [] }),
+    getFullAccountDetails: async () => ({
+      totalUsdtValue: 100_000,
+      nonZeroBalances: [{ asset: "USDT", free: 100_000, locked: 0, total: 100_000 }],
+    }),
     placeOrder: async (params: Record<string, unknown>) => {
       placed.push(params);
       const quantity = Number(params.quantity ?? Number(params.quoteOrderQty) / 100);
@@ -144,10 +154,10 @@ describe("production order hooks", () => {
     });
 
     try {
-      const result = await placeLimitOrderTool.execute!(
+      const result = (await placeLimitOrderTool.execute!(
         { symbol: "BTCUSDT", side: "BUY", quantity: 1, price: 100, timeInForce: "GTC" },
         exchangeContext(placed),
-      ) as { success?: boolean; error?: string };
+      )) as { success?: boolean; error?: string };
       expect(result.error).toBeUndefined();
       expect(result.success).toBe(true);
       expect(placed[0]?.quantity).toBe(0.5);
@@ -170,10 +180,10 @@ describe("production order hooks", () => {
     });
 
     try {
-      const result = await placeMarketOrderTool.execute!(
+      const result = (await placeMarketOrderTool.execute!(
         { symbol: "BTCUSDT", side: "BUY", quoteOrderQty: 100 },
         exchangeContext(placed),
-      ) as { success?: boolean; error?: string };
+      )) as { success?: boolean; error?: string };
       expect(result.error).toBeUndefined();
       expect(result.success).toBe(true);
       expect(placed[0]?.quoteOrderQty).toBe(50);
@@ -196,10 +206,10 @@ describe("production order hooks", () => {
     });
 
     try {
-      const result = await placeMarketOrderTool.execute!(
+      const result = (await placeMarketOrderTool.execute!(
         { symbol: "AAPL", side: "BUY", quantity: 1 },
         brokerContext(placed),
-      ) as { success?: boolean; error?: string };
+      )) as { success?: boolean; error?: string };
       expect(result.error).toBeUndefined();
       expect(result.success).toBe(true);
       expect(placed).toHaveLength(1);

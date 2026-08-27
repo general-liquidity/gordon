@@ -112,8 +112,7 @@ function computeFitness(equity: number[], fitness: Fitness): number {
       return equity[equity.length - 1]! / equity[0]! - 1;
     case "sharpe": {
       const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
-      const variance =
-        returns.reduce((a, b) => a + (b - mean) * (b - mean), 0) / returns.length;
+      const variance = returns.reduce((a, b) => a + (b - mean) * (b - mean), 0) / returns.length;
       const sd = Math.sqrt(variance);
       // Annualize-agnostic — caller can scale. Avoid div-by-0.
       return sd > 1e-12 ? mean / sd : 0;

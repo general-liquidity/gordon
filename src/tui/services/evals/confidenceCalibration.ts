@@ -5,8 +5,8 @@
 // If conf=9 is only 60% accurate, the model is OVERCONFIDENT.
 // ============================================================================
 
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { join } from "path";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import { getGordonDir } from "../../../infra/storage/paths.ts";
 
 const CALIBRATION_PATH = join(getGordonDir(), "calibration.json");
@@ -43,7 +43,9 @@ export interface CalibrationReport {
 export class ConfidenceCalibrationTracker {
   private entries: CalibrationEntry[] = [];
 
-  constructor() { this.load(); }
+  constructor() {
+    this.load();
+  }
 
   record(entry: Omit<CalibrationEntry, "id" | "timestamp">): string {
     const id = `cal_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -57,9 +59,11 @@ export class ConfidenceCalibrationTracker {
     if (!entry) return;
     entry.actualReturn = actualReturn;
     if (entry.predictedSignal === "BULLISH") {
-      entry.actualOutcome = actualReturn > 0.005 ? "correct" : actualReturn < -0.005 ? "incorrect" : "neutral";
+      entry.actualOutcome =
+        actualReturn > 0.005 ? "correct" : actualReturn < -0.005 ? "incorrect" : "neutral";
     } else if (entry.predictedSignal === "BEARISH") {
-      entry.actualOutcome = actualReturn < -0.005 ? "correct" : actualReturn > 0.005 ? "incorrect" : "neutral";
+      entry.actualOutcome =
+        actualReturn < -0.005 ? "correct" : actualReturn > 0.005 ? "incorrect" : "neutral";
     } else {
       entry.actualOutcome = Math.abs(actualReturn) < 0.005 ? "correct" : "incorrect";
     }
@@ -81,19 +85,22 @@ export class ConfidenceCalibrationTracker {
       buckets.push({
         confidence: conf,
         totalPredictions: bucket.length,
-        correct, incorrect, accuracy,
+        correct,
+        incorrect,
+        accuracy,
         expectedAccuracy: expected,
         calibrationError: Math.abs(accuracy - expected),
       });
     }
 
     const maxError = buckets.length > 0 ? Math.max(...buckets.map((b) => b.calibrationError)) : 1;
-    const overallAcc = resolved.length > 0
-      ? resolved.filter((e) => e.actualOutcome === "correct").length / resolved.length
-      : 0;
-    const overconfidence = buckets.reduce((sum, b) =>
-      sum + (b.expectedAccuracy - b.accuracy) * b.totalPredictions, 0
-    ) / Math.max(1, resolved.length);
+    const overallAcc =
+      resolved.length > 0
+        ? resolved.filter((e) => e.actualOutcome === "correct").length / resolved.length
+        : 0;
+    const overconfidence =
+      buckets.reduce((sum, b) => sum + (b.expectedAccuracy - b.accuracy) * b.totalPredictions, 0) /
+      Math.max(1, resolved.length);
 
     return {
       totalPredictions: this.entries.length,
@@ -110,11 +117,15 @@ export class ConfidenceCalibrationTracker {
       if (existsSync(CALIBRATION_PATH)) {
         this.entries = JSON.parse(readFileSync(CALIBRATION_PATH, "utf-8"));
       }
-    } catch { this.entries = []; }
+    } catch {
+      this.entries = [];
+    }
   }
 
   private save(): void {
-    try { writeFileSync(CALIBRATION_PATH, JSON.stringify(this.entries, null, 2)); } catch {}
+    try {
+      writeFileSync(CALIBRATION_PATH, JSON.stringify(this.entries, null, 2));
+    } catch {}
   }
 }
 

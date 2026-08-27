@@ -54,11 +54,7 @@ export interface LatencyCostInput {
   scalingConstant?: number;
 }
 
-export type LatencyCostVerdict =
-  | "negligible"
-  | "marginal"
-  | "material"
-  | "dominant";
+export type LatencyCostVerdict = "negligible" | "marginal" | "material" | "dominant";
 
 export interface LatencyCostResult {
   /** Estimated latency cost per share in price units. */
@@ -85,14 +81,14 @@ function classifyVerdict(
   if (commission !== null && commission > 0) {
     const commissionFraction = costPerShare / commission;
     if (commissionFraction < 0.01) return "negligible";
-    if (commissionFraction < 0.10) return "marginal";
-    if (commissionFraction < 0.50) return "material";
+    if (commissionFraction < 0.1) return "marginal";
+    if (commissionFraction < 0.5) return "material";
     return "dominant";
   }
   // Without commission context, anchor to bid-ask spread:
   if (spreadFraction < 0.05) return "negligible";
-  if (spreadFraction < 0.20) return "marginal";
-  if (spreadFraction < 0.50) return "material";
+  if (spreadFraction < 0.2) return "marginal";
+  if (spreadFraction < 0.5) return "material";
   return "dominant";
 }
 
@@ -118,12 +114,11 @@ export function estimateLatencyCost(input: LatencyCostInput): LatencyCostResult 
   const latencyCostPerShare =
     k * input.annualizedVolatility * latencyHorizonRatio * input.bidAskSpread;
 
-  const spreadFraction = input.bidAskSpread > 0
-    ? latencyCostPerShare / input.bidAskSpread
-    : 0;
-  const commissionFraction = input.commissionPerShare !== undefined && input.commissionPerShare > 0
-    ? latencyCostPerShare / input.commissionPerShare
-    : null;
+  const spreadFraction = input.bidAskSpread > 0 ? latencyCostPerShare / input.bidAskSpread : 0;
+  const commissionFraction =
+    input.commissionPerShare !== undefined && input.commissionPerShare > 0
+      ? latencyCostPerShare / input.commissionPerShare
+      : null;
 
   const verdict = classifyVerdict(
     latencyCostPerShare,
@@ -134,9 +129,7 @@ export function estimateLatencyCost(input: LatencyCostInput): LatencyCostResult 
   const summary =
     `Latency cost ≈ ${latencyCostPerShare.toFixed(6)} per share ` +
     `(${(spreadFraction * 100).toFixed(1)}% of bid-ask spread${
-      commissionFraction !== null
-        ? `, ${(commissionFraction * 100).toFixed(1)}% of commission`
-        : ""
+      commissionFraction !== null ? `, ${(commissionFraction * 100).toFixed(1)}% of commission` : ""
     }). ` +
     `σ=${(input.annualizedVolatility * 100).toFixed(0)}%, ` +
     `spread=${input.bidAskSpread.toFixed(4)}, ` +

@@ -16,7 +16,8 @@ class MockSessionController extends SessionController {
 }
 
 function createMockContext(): GordonContext {
-  return {    exchange: null,
+  return {
+    exchange: null,
     broker: null,
     llm: {} as GordonContext["llm"],
     config: {
@@ -38,7 +39,7 @@ function createMockContext(): GordonContext {
         memoryWarningThreshold: 0.8,
       },
       permissionMode: "ask",
-      
+
       onboardingComplete: true,
       startupBannerMode: "full",
       useKeyring: false,

@@ -29,10 +29,7 @@
  * reports). Deterministic given its inputs.
  */
 
-import type {
-  DisciplineAuditReport,
-  DisciplineFailureMode,
-} from "./disciplineAudit.ts";
+import type { DisciplineAuditReport, DisciplineFailureMode } from "./disciplineAudit.ts";
 
 export type TrajectoryDirection = "improving" | "flat" | "declining";
 export type DispersionTrend = "rising" | "flat" | "falling";
@@ -136,9 +133,7 @@ function median(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1]! + sorted[mid]!) / 2
-    : sorted[mid]!;
+  return sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!;
 }
 
 /** Least-squares slope of y over x = 0..n-1. Returns 0 for n < 2. */
@@ -270,8 +265,7 @@ export function computeDisciplineTrajectory(
     const dSlope = slope(dispersions);
     const dMean = mean(dispersions.map((d) => Math.abs(d)));
     const relSlope = dMean === 0 ? 0 : dSlope / dMean;
-    dispersionTrend =
-      relSlope > dispFlat ? "rising" : relSlope < -dispFlat ? "falling" : "flat";
+    dispersionTrend = relSlope > dispFlat ? "rising" : relSlope < -dispFlat ? "falling" : "flat";
   }
 
   // Per-mode trend: earliest window vs latest window.
@@ -318,7 +312,9 @@ export function computeDisciplineTrajectory(
   const interpretation =
     `Stage ${stage} (${STAGE_NAMES[stage]}). Discipline score ${latestScore.toFixed(2)} ` +
     `over ${windowCount} window(s), trend ${trendWord} (slope ${disciplineSlope.toFixed(3)}/window).` +
-    (latestConsistency !== null ? ` Consistency ${latestConsistency.toFixed(2)} (${consistencyDirection}).` : "") +
+    (latestConsistency !== null
+      ? ` Consistency ${latestConsistency.toFixed(2)} (${consistencyDirection}).`
+      : "") +
     (latestDispersion !== null ? ` Return dispersion ${dispersionTrend}.` : "") +
     (resolvedModes.length > 0 ? ` Resolved: ${resolvedModes.join(", ")}.` : "") +
     (regressedModes.length > 0 ? ` Regressed: ${regressedModes.join(", ")}.` : "") +

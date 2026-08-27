@@ -22,7 +22,11 @@ describe("verifyExtensionIntegrity", () => {
     testDir = mkdtempSync(join(tmpdir(), "integrity-"));
   });
   afterEach(() => {
-    try { rmSync(testDir, { recursive: true, force: true }); } catch {/* ignore */}
+    try {
+      rmSync(testDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
   });
 
   it("returns file_missing when the path doesn't exist", async () => {
@@ -65,7 +69,7 @@ describe("verifyExtensionIntegrity", () => {
   it("normalises 0x-prefixed and uppercase expected hashes", async () => {
     const contents = "case-test";
     const path = fileWith("d.bin", contents);
-    const upperExpected = "0x" + sha256Of(contents).toUpperCase();
+    const upperExpected = `0x${sha256Of(contents).toUpperCase()}`;
     const r = await verifyExtensionIntegrity({
       filePath: path,
       expectedSha256: upperExpected,

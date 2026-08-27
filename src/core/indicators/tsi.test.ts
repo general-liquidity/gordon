@@ -27,10 +27,11 @@ describe("calculateTSI", () => {
   it("TSI is bounded in [−100, 100]", () => {
     const closes = Array.from({ length: 120 }, (_, i) => 100 + 10 * Math.sin(i * 0.4) + i * 0.1);
     const r = calculateTSI(closes);
-    for (const v of r.values) if (v !== null) {
-      expect(v).toBeGreaterThanOrEqual(-100.0001);
-      expect(v).toBeLessThanOrEqual(100.0001);
-    }
+    for (const v of r.values)
+      if (v !== null) {
+        expect(v).toBeGreaterThanOrEqual(-100.0001);
+        expect(v).toBeLessThanOrEqual(100.0001);
+      }
   });
 
   it("flips to a bullish crossover when a downtrend turns up", () => {

@@ -1,10 +1,5 @@
-import React from "react";
 import { Box, Text } from "../ink-custom";
-import {
-  DataTable,
-  timeAgo,
-  type Column,
-} from "../components/charts/DataTable.tsx";
+import { DataTable, type Column } from "../components/charts/DataTable.tsx";
 
 /**
  * SECFilingRenderer -- SEC filing search results table
@@ -67,7 +62,7 @@ const COLUMNS: Column<FilingRow>[] = [
     align: "left",
     format: (v) => {
       const s = String(v);
-      return s.length > 23 ? s.slice(0, 22) + "\u2026" : s;
+      return s.length > 23 ? `${s.slice(0, 22)}\u2026` : s;
     },
   },
   {
@@ -77,7 +72,7 @@ const COLUMNS: Column<FilingRow>[] = [
     align: "left",
     format: (v) => {
       const s = String(v);
-      return s.length > 29 ? s.slice(0, 28) + "\u2026" : s;
+      return s.length > 29 ? `${s.slice(0, 28)}\u2026` : s;
     },
   },
 ];
@@ -90,7 +85,7 @@ export function SECFilingRenderer({ data, detail }: Props) {
         data={data as unknown as Record<string, unknown>[]}
       />
 
-      {detail && detail.fullText && (
+      {detail?.fullText && (
         <Box
           flexDirection="column"
           marginTop={1}
@@ -103,10 +98,7 @@ export function SECFilingRenderer({ data, detail }: Props) {
           </Text>
           <Box marginTop={1}>
             <Text dimColor wrap="wrap">
-              {detail.fullText
-                .split("\n")
-                .slice(0, 50)
-                .join("\n")}
+              {detail.fullText.split("\n").slice(0, 50).join("\n")}
             </Text>
           </Box>
           {detail.fullText.split("\n").length > 50 && (
