@@ -226,6 +226,9 @@ export const PositionRecordSchema = z.object({
   cancelReason: z.string().optional(),
   rejectReason: z.string().optional(),
   closeReason: z.string().optional(),
+  /** Stable venue/account/mode key; never a local Gordon user/profile ID. */
+  portfolioIdentity: z.string().optional(),
+  tradeId: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   closedAt: z.string().optional(),
@@ -245,6 +248,8 @@ export interface CreatePositionParams {
   strategyId?: string;
   playbookId?: string;
   tags?: string[];
+  portfolioIdentity?: string;
+  tradeId?: string;
 }
 
 export interface FillData {

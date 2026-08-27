@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 /**
  * CCXT Adapter — full Exchange + ExchangeExtended impl over CCXT v4.
  *
@@ -317,6 +319,23 @@ function ccxtTradeToTrade(ccxtTrade: Record<string, unknown>): Trade {
   };
 }
 
+function ccxtAccountType(client: CcxtBase, balance: unknown): string {
+  const options = (client as unknown as { options?: Record<string, unknown> }).options;
+  const info =
+    balance && typeof balance === "object"
+      ? ((balance as Record<string, unknown>).info as Record<string, unknown> | undefined)
+      : undefined;
+  const raw = String(info?.accountType ?? info?.type ?? options?.defaultType ?? "unknown")
+    .trim()
+    .toLowerCase();
+  if (raw === "spot" || raw === "cash") return "SPOT";
+  if (raw === "margin" || raw === "cross" || raw === "isolated") return "MARGIN";
+  if (raw === "swap" || raw === "future" || raw === "futures" || raw === "option") {
+    return "DERIVATIVE";
+  }
+  return "UNKNOWN";
+}
+
 function ccxtPublicTradeToTrade(ccxtTrade: Record<string, unknown>): PublicTrade {
   const side = typeof ccxtTrade.side === "string" ? ccxtTrade.side.toLowerCase() : "";
   return {
@@ -378,6 +397,8 @@ export interface CcxtAdapterCredentials {
   passphrase?: string;
   walletAddress?: string;
   walletPrivateKey?: string;
+  /** Stable venue account/subaccount ID; preferred over credential fingerprints. */
+  accountIdentity?: string;
   /** Custom override headers — some venues require extra headers. */
   headers?: Record<string, string>;
 }
@@ -472,6 +493,7 @@ export class CcxtAdapter
     ExchangeAccountManagement,
     ExchangeOrderManagement
 {
+  readonly connectionIdentity: string;
   protected client: CcxtBase;
   readonly exchangeId: ExchangeId;
   readonly displayName: string;
@@ -528,6 +550,19 @@ export class CcxtAdapter
     this.exchangeId = `ccxt:${ccxtSubId}` as ExchangeId;
     this.displayName = `${ccxtSubId} (via CCXT)`;
     this.isSandbox = Boolean(sandbox);
+    // API keys and public wallet addresses identify an exchange account but
+    // must never be written to the safety ledger. Persist only a one-way,
+    // domain-separated fingerprint so two accounts on the same venue cannot
+    // share halt state.
+    const publicAccountHandle =
+      credentials.accountIdentity || credentials.walletAddress || credentials.apiKey;
+    this.connectionIdentity = publicAccountHandle
+      ? `sha256:${createHash("sha256")
+          .update(
+            `${credentials.accountIdentity ? "gordon-stable-exchange-account" : "gordon-exchange-account"}\0${ccxtSubId}\0${publicAccountHandle}`,
+          )
+          .digest("hex")}`
+      : "unauthenticated";
 
     if (sandbox) {
       // CAPITAL-SAFETY: refuse to construct a sandbox adapter for a venue known
@@ -818,7 +853,7 @@ export class CcxtAdapter
         canTrade: true,
         canWithdraw: this.client.has?.withdraw === true,
         canDeposit: this.client.has?.fetchDepositAddress === true,
-        accountType: "SPOT",
+        accountType: ccxtAccountType(this.client, balance),
         balances,
         updateTime: Date.now(),
       };
@@ -1488,6 +1523,33 @@ export class CcxtAdapter
   supports(method: string): boolean {
     const has = (this.client as unknown as { has?: Record<string, unknown> }).has;
     return Boolean(has?.[method]);
+  }
+
+  /** Resolve the routed symbol's market type from CCXT's market metadata. */
+  async getMarketType(symbol: string): Promise<"spot" | "derivative" | "unknown"> {
+    return this.withCallTracking(async () => {
+      const client = this.client as unknown as {
+        loadMarkets?: () => Promise<unknown>;
+        market?: (symbol: string) => unknown;
+      };
+      if (typeof client.loadMarkets === "function") await client.loadMarkets();
+      if (typeof client.market !== "function") return "unknown";
+      const raw = client.market(toCcxtSymbol(symbol));
+      if (!raw || typeof raw !== "object") return "unknown";
+      const market = raw as Record<string, unknown>;
+      if (
+        market.contract === true ||
+        market.swap === true ||
+        market.future === true ||
+        market.option === true ||
+        market.type === "swap" ||
+        market.type === "future" ||
+        market.type === "option"
+      ) {
+        return "derivative";
+      }
+      return market.spot === true || market.type === "spot" ? "spot" : "unknown";
+    });
   }
 
   // -------------------------------------------------------------------------

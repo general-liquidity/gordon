@@ -11,6 +11,7 @@
  */
 
 import { createModuleLogger } from "../../infra/logger/index.ts";
+import { recordPortfolioTradeOutcome } from "../../infra/safety/durableHaltState.ts";
 import { InvalidStateError, NotFoundError } from "../../errors/index.ts";
 import type { EventBus } from "../../events/bus.ts";
 import type { PositionStore } from "./store.ts";
@@ -51,6 +52,30 @@ function generatePositionId(): string {
   return `pos_${timestamp}_${random}`;
 }
 
+function normalizeCloseReason(
+  raw: string | undefined,
+): "manual" | "stop_loss" | "take_profit" | "trailing_stop" | "liquidation" | "timeout" {
+  switch (raw?.toLowerCase()) {
+    case "stop":
+    case "stop_loss":
+      return "stop_loss";
+    case "tp1":
+    case "tp2":
+    case "tp3":
+    case "take_profit":
+      return "take_profit";
+    case "trailing":
+    case "trailing_stop":
+      return "trailing_stop";
+    case "liquidation":
+      return "liquidation";
+    case "timeout":
+      return "timeout";
+    default:
+      return "manual";
+  }
+}
+
 // ============================================================================
 // Position State Machine
 // ============================================================================
@@ -83,6 +108,8 @@ export class PositionStateMachine {
       strategyId: params.strategyId,
       playbookId: params.playbookId,
       tags: params.tags,
+      portfolioIdentity: params.portfolioIdentity,
+      tradeId: params.tradeId,
       createdAt: now,
       updatedAt: now,
     };
@@ -326,14 +353,39 @@ export class PositionStateMachine {
         break;
 
       case "closed":
-        await this.bus.emit({
-          type: "position:closed" as const,
-          timestamp: now,
-          positionId: position.id,
-          symbol: position.symbol,
-          realizedPnL: position.realizedPnL ?? 0,
-          position,
-        });
+        {
+          const realizedPnl = position.realizedPnL ?? 0;
+          const entryPrice = position.entryPrice ?? 0;
+          const exitPrice = position.exitPrice ?? entryPrice;
+          const holdDurationMs = Math.max(0, Date.parse(now) - Date.parse(position.createdAt));
+          const resolvedTradeId = position.tradeId ?? position.id;
+          if (position.portfolioIdentity) {
+            recordPortfolioTradeOutcome(position.portfolioIdentity, {
+              tradeId: resolvedTradeId,
+              outcome: realizedPnl > 0 ? "win" : realizedPnl < 0 ? "loss" : "scratch",
+              recordedAtMs: Date.parse(now),
+            });
+          }
+          await this.bus.emit({
+            type: "position:closed" as const,
+            timestamp: now,
+            positionId: position.id,
+            symbol: position.symbol,
+            side: position.side,
+            entryPrice,
+            exitPrice,
+            quantity: position.quantity ?? 0,
+            realizedPnL: realizedPnl,
+            realizedPnl,
+            realizedPnlPercent: position.realizedPnLPercent ?? 0,
+            holdDurationMs,
+            reason: normalizeCloseReason(position.closeReason ?? reason),
+            strategy: position.strategyId,
+            tradeId: resolvedTradeId,
+            portfolioIdentity: position.portfolioIdentity,
+            position,
+          });
+        }
         break;
 
       case "cancelled":

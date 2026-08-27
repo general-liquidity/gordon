@@ -27,6 +27,7 @@ afterAll(() => {
 function makeExecContext(placed: string[], isSandbox: boolean) {
   const exchange = {
     exchangeId: "binance",
+    connectionIdentity: "discovery-account",
     isSandbox,
     getPrice: async () => 100,
     getBalance: async () => 100_000,
@@ -129,6 +130,7 @@ function makeBracketExecContext(
 ) {
   const exchange = {
     exchangeId: "binance",
+    connectionIdentity: "discovery-bracket-account",
     isSandbox: true,
     getPrice: async () => 100,
     getOrderHistory: async () => [],

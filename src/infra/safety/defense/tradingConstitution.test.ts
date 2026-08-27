@@ -44,6 +44,16 @@ afterEach(() => {
 });
 
 describe("constitution halt recording", () => {
+  it("blocks on the calibrated 50th daily trade, not the 49th", () => {
+    expect(passesConstitution({ ...cleanParams(), tradesThisDay: 49 }).passes).toBe(true);
+
+    const atLimit = passesConstitution({ ...cleanParams(), tradesThisDay: 50 });
+    expect(atLimit.passes).toBe(false);
+    expect(atLimit.violations).toContainEqual(
+      expect.objectContaining({ rule: "MAX_TRADES_PER_DAY", limit: 50, actual: 50 }),
+    );
+  });
+
   it("ignores warning/block severities", () => {
     recordConstitutionHalt({
       rule: "MAX_POSITION_SIZE_PCT",

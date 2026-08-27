@@ -53,15 +53,25 @@ export class PositionManager {
    * Scanner calls this when it finds a setup.
    * Creates a new position in the 'idea' state.
    */
-  async reportSetup(signal: SetupSignal): Promise<PositionRecord> {
+  async reportSetup(
+    signal: SetupSignal,
+    execution?: {
+      exchangeId: string;
+      side: "long" | "short";
+      portfolioIdentity?: string;
+      tradeId?: string;
+    },
+  ): Promise<PositionRecord> {
     logger.info("Setup reported", { symbol: signal.symbol, strategy: signal.strategy });
 
     const position = await this.sm.create({
       symbol: signal.symbol,
-      exchangeId: "default", // Can be overridden later
-      side: "long", // Default; will be refined by Analyst/Planner
+      exchangeId: execution?.exchangeId ?? "default",
+      side: execution?.side ?? "long",
       setupSignal: signal,
       strategyId: signal.strategy,
+      portfolioIdentity: execution?.portfolioIdentity,
+      tradeId: execution?.tradeId,
     });
 
     return position;

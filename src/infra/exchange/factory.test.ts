@@ -30,6 +30,24 @@ describe("ExchangeFactory instance cache", () => {
     expect(ExchangeFactory.getCacheSize()).toBe(1);
   });
 
+  test("API-key rotation creates a fresh adapter without changing stable halt identity", () => {
+    const first = ExchangeFactory.create("binance", {
+      ...CREDENTIALS,
+      accountIdentity: "operator-subaccount-7",
+      sandbox: true,
+    });
+    const rotated = ExchangeFactory.create("binance", {
+      ...CREDENTIALS,
+      apiKey: "dummy-rotated-api-key",
+      accountIdentity: "operator-subaccount-7",
+      sandbox: true,
+    });
+
+    expect(rotated).not.toBe(first);
+    expect(rotated.connectionIdentity).toBe(first.connectionIdentity);
+    expect(ExchangeFactory.getCacheSize()).toBe(2);
+  });
+
   test("removeFromCache evicts both modes for the credentials", () => {
     ExchangeFactory.create("binance", { ...CREDENTIALS, sandbox: false });
     ExchangeFactory.create("binance", { ...CREDENTIALS, sandbox: true });

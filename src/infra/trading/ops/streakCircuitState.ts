@@ -1,5 +1,5 @@
 /**
- * Process-scoped holder for the streak circuit breaker's trip timestamp.
+ * Durable holder for the streak circuit breaker's trip timestamp.
  *
  * `evaluateCircuit` is pure: it is handed the recent results and the moment
  * the breaker last tripped, and somebody has to remember that moment between
@@ -14,35 +14,44 @@
  * it, so a cooldown that expires with no new trades does not immediately
  * re-trip on the same three losses and strand the operator.
  *
- * DURABILITY SCOPE, stated plainly, and the same as `absorbingBarrierState`:
- * this is memory in one process. A restart forgets the trip, which shortens
- * the cooldown rather than extending it. Operators who want a trip to survive
- * a restart can state it with GORDON_STREAK_LAST_TRIPPED_MS, which is read
- * whenever this process has not tripped the breaker itself.
+ * The authenticated halt ledger is keyed by the strongest stable portfolio
+ * identity available at the order chokepoint. A restart reloads the trip;
+ * GORDON_STREAK_LAST_TRIPPED_MS remains an operator-declared fallback when no
+ * trip has been persisted for that identity.
  */
 
 import { flagEnv } from "../../config/flagResolver.ts";
+import {
+  clearPortfolioHaltStateForTesting,
+  readPortfolioHaltState,
+  updatePortfolioHaltState,
+} from "../../safety/durableHaltState.ts";
 
 export const STREAK_LAST_TRIPPED_ENV = "GORDON_STREAK_LAST_TRIPPED_MS";
 
-let lastTrippedAtMs: number | null = null;
-
 /**
  * Epoch ms of the most recent trip, or null when the breaker has not tripped
- * in this process and the operator declared no earlier trip.
+ * for this portfolio and the operator declared no earlier trip.
  */
-export function lastStreakTripAtMs(env: NodeJS.ProcessEnv = flagEnv()): number | null {
-  if (lastTrippedAtMs !== null) return lastTrippedAtMs;
+export function lastStreakTripAtMs(
+  identity: string = "default",
+  env: NodeJS.ProcessEnv = flagEnv(),
+): number | null {
+  const persisted = readPortfolioHaltState(identity).streakLastTrippedAtMs;
+  if (persisted !== null) return persisted;
   const declared = Number(env[STREAK_LAST_TRIPPED_ENV] ?? 0);
   return Number.isFinite(declared) && declared > 0 ? declared : null;
 }
 
-export function recordStreakTrip(nowMs: number): void {
-  if (!Number.isFinite(nowMs) || nowMs <= 0) return;
-  lastTrippedAtMs = nowMs;
+export function recordStreakTrip(identity: string, nowMs: number): boolean {
+  if (!Number.isFinite(nowMs) || nowMs <= 0) return false;
+  return updatePortfolioHaltState(identity, (state) => ({
+    ...state,
+    streakLastTrippedAtMs: nowMs,
+  }));
 }
 
 /** Tests only. */
 export function resetStreakCircuitForTesting(): void {
-  lastTrippedAtMs = null;
+  clearPortfolioHaltStateForTesting();
 }

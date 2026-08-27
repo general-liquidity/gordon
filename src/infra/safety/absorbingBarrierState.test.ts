@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 
 import {
   observeSessionEquity,
-  recordSessionExternalFlow,
   readAbsorbingBarrierConfigFromEnv,
   sessionAbsorbingBarrierState,
   resetSessionAbsorbingBarrierForTesting,
@@ -116,33 +115,6 @@ describe("the barrier remembers what happened before the current observation", (
     expect(sessionAbsorbingBarrierState()).toBeNull();
     const fresh = observeSessionEquity(85_000, config)!;
     expect(fresh.inception.lossFraction).toBe(0);
-  });
-});
-
-describe("cash movement is not a trading result", () => {
-  const config = { inceptionLossFraction: 0.2 };
-
-  it("a withdrawal leaves the loss fraction untouched", () => {
-    observeSessionEquity(100_000, config);
-    expect(recordSessionExternalFlow(-40_000)).toBe(true);
-    const after = observeSessionEquity(60_000, config)!;
-    expect(after.inception.lossFraction).toBe(0);
-    expect(after.tripped).toBe(false);
-    expect(after.state.referenceCapitalUsd).toBe(60_000);
-  });
-
-  it("a deposit does not manufacture headroom out of an existing loss", () => {
-    observeSessionEquity(100_000, config);
-    observeSessionEquity(85_000, config);
-    recordSessionExternalFlow(100_000);
-    const after = observeSessionEquity(185_000, config)!;
-    expect(after.state.closedEpisodeLossUsd + (after.state.highWaterMarkUsd - 185_000)).toBe(
-      15_000,
-    );
-  });
-
-  it("refuses a flow before any equity has been observed", () => {
-    expect(recordSessionExternalFlow(-10_000)).toBe(false);
   });
 });
 

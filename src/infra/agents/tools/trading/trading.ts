@@ -110,6 +110,7 @@ import {
 } from "../../../trading/ops/terminationLayers.ts";
 import { buildTerminationPreTradeFromPlan } from "../../../trading/ops/terminationPreTrade.ts";
 import { recordExecutedPlanPosition } from "../../../../core/positions/executionSync.ts";
+import { resolvePortfolioIdentity } from "../../../safety/portfolioIdentity.ts";
 import { recordFriction } from "../../../trading/ops/frictionTracker.ts";
 import {
   createSafeOrderSubmitter,
@@ -1505,7 +1506,8 @@ export const executePlanTool = createTool({
 
       if (result.success && result.trade) {
         const exchangeId = ctx.exchange?.exchangeId ?? "unknown";
-        void recordExecutedPlanPosition(plan, result.trade, exchangeId);
+        const portfolioIdentity = await resolvePortfolioIdentity(ctx);
+        void recordExecutedPlanPosition(plan, result.trade, exchangeId, portfolioIdentity.identity);
 
         {
           const fillPrice = result.trade.averageEntry ?? plan.entry.price ?? 0;

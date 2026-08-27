@@ -1,22 +1,13 @@
 /**
- * Process-scoped fold for the inception-referenced absorbing barrier.
+ * Durable fold for the inception-referenced absorbing barrier.
  *
  * `evaluateAbsorbingBarrier` is a pure fold: it takes a state, one equity
  * observation, and returns the next state. Somebody has to hold that state
  * between observations or the barrier resets every tick and can never trip.
- * This module is that holder, following the same convention as
- * `wipSessionRegistry.ts`: a module-level singleton, seeded lazily, reset only
- * by an explicit test hook.
- *
- * DURABILITY SCOPE, stated plainly: this is memory in one process. It does not
- * survive a restart, and two Gordon processes do not share it. On restart the
- * fold begins again from the equity then observed, so cumulative destroyed
- * capital from earlier runs is forgotten and the barrier is at that moment
- * MORE permissive than a durable one would be. It is never more permissive
- * than today's behaviour, which tracks nothing at all across ticks. A durable
- * store belongs behind an operator-visible reset (an operator who wired a
- * fresh account to a stale ledger would be halted for losses that are not
- * theirs), and that decision is not made here.
+ * This module stores the fold in the HMAC-authenticated halt ledger. The order
+ * path supplies a broker-account ID or exchange-connection fingerprint, so separate
+ * portfolios do not inherit one another's loss history and a process restart
+ * cannot erase a terminal trip.
  *
  * Reference capital is seeded from GORDON_INCEPTION_EQUITY_USD when the
  * operator has declared it, otherwise from the first equity this process sees.
@@ -25,18 +16,20 @@
 import {
   createAbsorbingBarrierState,
   evaluateAbsorbingBarrier,
-  recordExternalFlow,
   type AbsorbingBarrierConfig,
   type AbsorbingBarrierEvaluation,
   type AbsorbingBarrierState,
 } from "./absorbingBarrier.ts";
 import { flagEnv } from "../config/flagResolver.ts";
+import {
+  clearPortfolioHaltStateForTesting,
+  readPortfolioHaltState,
+  updatePortfolioHaltState,
+} from "./durableHaltState.ts";
 
 export const INCEPTION_LOSS_FRACTION_ENV = "GORDON_INCEPTION_LOSS_FRACTION";
 export const TRAILING_DD_FRACTION_ENV = "GORDON_TRAILING_DD_FRACTION";
 export const INCEPTION_EQUITY_ENV = "GORDON_INCEPTION_EQUITY_USD";
-
-let sessionState: AbsorbingBarrierState | null = null;
 
 function readFraction(raw: string | undefined): number | undefined {
   if (raw === undefined || raw.trim() === "") return undefined;
@@ -86,27 +79,28 @@ export function observeSessionEquity(
   currentEquityUsd: number,
   config: AbsorbingBarrierConfig = readAbsorbingBarrierConfigFromEnv(),
   env: NodeJS.ProcessEnv = flagEnv(),
+  identity: string = "default",
 ): AbsorbingBarrierEvaluation | null {
   if (!hasConfiguredLimit(config)) return null;
-  return foldEquity(currentEquityUsd, config, env);
+  return foldEquity(currentEquityUsd, config, env, identity);
 }
 
 function foldEquity(
   currentEquityUsd: number,
   config: AbsorbingBarrierConfig,
   env: NodeJS.ProcessEnv,
+  identity: string,
 ): AbsorbingBarrierEvaluation | null {
   if (!Number.isFinite(currentEquityUsd) || currentEquityUsd <= 0) return null;
 
-  if (sessionState === null) {
-    const seed = seedEquity(currentEquityUsd, env);
-    if (seed <= 0) return null;
-    sessionState = createAbsorbingBarrierState(seed);
-  }
-
-  const evaluation = evaluateAbsorbingBarrier(sessionState, currentEquityUsd, config);
-  sessionState = evaluation.state;
-  return evaluation;
+  let evaluation: AbsorbingBarrierEvaluation | null = null;
+  const updated = updatePortfolioHaltState(identity, (state) => {
+    const sessionState =
+      state.barrierState ?? createAbsorbingBarrierState(seedEquity(currentEquityUsd, env));
+    evaluation = evaluateAbsorbingBarrier(sessionState, currentEquityUsd, config);
+    return { ...state, barrierState: evaluation.state };
+  });
+  return updated ? evaluation : null;
 }
 
 /**
@@ -114,7 +108,11 @@ function foldEquity(
  *
  * The give-back stop wants a session start, a session high-water mark and a
  * current equity. All three already exist here, and a second store would
- * disagree with this one the first time an external flow landed. Unlike
+ * disagree with this one. Gordon does not currently have one authoritative,
+ * synchronous capital-flow feed across every venue; deposits and withdrawals
+ * therefore are not silently guessed or adjusted here. Operators must use the
+ * audited halt-state archive/reset after an external capital-flow event before
+ * relying on inception-relative loss again. Unlike
  * `observeSessionEquity` this maintains the fold even when no terminal limit
  * is configured, because the figures are useful without one; with no limit the
  * barrier readings stay inactive and `barrier` is null, so nothing can trip.
@@ -137,8 +135,9 @@ export function trackSessionEquity(
   currentEquityUsd: number,
   config: AbsorbingBarrierConfig = readAbsorbingBarrierConfigFromEnv(),
   env: NodeJS.ProcessEnv = flagEnv(),
+  identity: string = "default",
 ): SessionEquityTrack | null {
-  const evaluation = foldEquity(currentEquityUsd, config, env);
+  const evaluation = foldEquity(currentEquityUsd, config, env, identity);
   if (evaluation === null) return null;
   return {
     sessionStartEquityUsd: evaluation.state.referenceCapitalUsd,
@@ -148,25 +147,13 @@ export function trackSessionEquity(
   };
 }
 
-/**
- * Deposits positive, withdrawals negative. Cash movement is not a trading
- * result and must never reach the barrier as an equity observation.
- *
- * Returns false when no state exists yet: the first observation will seed
- * reference capital from the equity that already includes the flow.
- */
-export function recordSessionExternalFlow(flowUsd: number): boolean {
-  if (sessionState === null) return false;
-  if (!Number.isFinite(flowUsd) || flowUsd === 0) return false;
-  sessionState = recordExternalFlow(sessionState, flowUsd);
-  return true;
-}
-
-export function sessionAbsorbingBarrierState(): AbsorbingBarrierState | null {
-  return sessionState;
+export function sessionAbsorbingBarrierState(
+  identity: string = "default",
+): AbsorbingBarrierState | null {
+  return readPortfolioHaltState(identity).barrierState;
 }
 
 /** Tests only. */
 export function resetSessionAbsorbingBarrierForTesting(): void {
-  sessionState = null;
+  clearPortfolioHaltStateForTesting();
 }

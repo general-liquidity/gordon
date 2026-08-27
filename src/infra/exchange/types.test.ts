@@ -138,6 +138,8 @@ describe("resolveExchangeCredentials — generic env fallback for long-tail venu
     "BYBIT_API_SECRET",
     "CCXT_BYBIT_API_KEY",
     "CCXT_BYBIT_API_SECRET",
+    "BYBIT_ACCOUNT_ID",
+    "CCXT_BYBIT_ACCOUNT_ID",
   ];
   const SAVED: Record<string, string | undefined> = {};
 
@@ -178,5 +180,18 @@ describe("resolveExchangeCredentials — generic env fallback for long-tail venu
     });
     expect(creds.apiKey).toBe("ccxt-key");
     expect(creds.apiSecret).toBe("ccxt-secret");
+  });
+
+  it("resolves an operator-owned stable account identity for key rotation", () => {
+    for (const n of NAMES) SAVED[n] = process.env[n];
+    process.env.CCXT_BYBIT_ACCOUNT_ID = "venue-subaccount-7";
+
+    const creds = resolveExchangeCredentials({
+      type: "ccxt:bybit",
+      apiKey: "key",
+      apiSecret: "secret",
+    });
+
+    expect(creds.accountIdentity).toBe("venue-subaccount-7");
   });
 });

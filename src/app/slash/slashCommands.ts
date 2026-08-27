@@ -316,12 +316,14 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     target: "handle_kill_switch_command",
     whenToUse:
       "Immediately halt or restore execution by firm, venue, instrument, strategy, account, or trader scope",
-    subcommands: ["list", "trip", "reset", "reset-all"],
+    subcommands: ["list", "trip", "reset", "reset-all", "archive-halt-state"],
     subcommandDescriptions: {
       list: "Show every currently tripped kill switch",
       trip: "Trip a scoped kill switch and fire a risk radar card",
       reset: "Reset one scoped kill switch",
       "reset-all": "Clear every tripped kill switch",
+      "archive-halt-state":
+        "Archive corrupt or key-rotated halt state and create a signed replacement",
     },
   },
   {

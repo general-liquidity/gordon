@@ -28,6 +28,8 @@ import {
   repairProtectiveOrders,
 } from "./executor.ts";
 import { getTrailingStopTracker } from "../orders/trailing-stop.ts";
+import { exchangePortfolioIdentity } from "../../infra/safety/portfolioIdentity.ts";
+import { recordTradeClosureDebrief } from "../../infra/trading/ops/debriefMatrix.ts";
 
 const logger = createModuleLogger("monitor");
 
@@ -662,6 +664,16 @@ async function applyConfirmedProtectiveFills(
   updatedTrade.realizedPnl = realizedPnl;
   updatedTrade.realizedPnlPercent = realizedPnlPercent;
   updateTrade(trade.id, updatedTrade);
+  if (remaining <= 1e-8) {
+    recordTradeClosureDebrief({
+      tradeId: trade.id,
+      symbol: trade.symbol,
+      pnlUsd: realizedPnl,
+      pnlPercent: realizedPnlPercent,
+      reason: updatedTrade.exits.at(-1)?.reason ?? "MANUAL",
+      portfolioIdentity: exchangePortfolioIdentity(client),
+    });
+  }
 
   const cancelled = await cancelPlanProtectiveOrders(client, trade.symbol, trade.planId);
   if (!cancelled.success) {

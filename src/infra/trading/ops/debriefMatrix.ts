@@ -27,6 +27,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { recordPortfolioTradeOutcome } from "../../safety/durableHaltState.ts";
 
 export const DEBRIEF_MATRIX_PATH_ENV = "GORDON_DEBRIEF_MATRIX_PATH";
 
@@ -100,6 +101,8 @@ export interface DebriefEntry extends Classification {
   tradeId: string;
   symbol: string;
   pnlUsd: number;
+  /** Stable venue/account/mode key used by account-scoped halt gates. */
+  portfolioIdentity?: string;
   notes?: string;
 }
 
@@ -109,9 +112,19 @@ export interface RecordDebriefInput {
   pnlUsd: number;
   processScore: number;
   outcomeScore: number;
+  portfolioIdentity?: string;
   notes?: string;
   goodThreshold?: number;
   now?: string;
+}
+
+export interface TradeClosureDebriefInput {
+  tradeId: string;
+  symbol: string;
+  pnlUsd: number;
+  pnlPercent: number;
+  reason: string;
+  portfolioIdentity: string | null | undefined;
 }
 
 function newDebriefId(): string {
@@ -135,15 +148,87 @@ export function recordDebrief(
     tradeId: input.tradeId,
     symbol: input.symbol,
     pnlUsd: input.pnlUsd,
+    portfolioIdentity: input.portfolioIdentity,
     notes: input.notes,
   };
   try {
     mkdirSync(dirname(path), { recursive: true });
     appendFileSync(path, `${JSON.stringify(entry)}\n`, "utf8");
   } catch {
-    /* best-effort */
+    return null;
   }
   return entry;
+}
+
+/**
+ * Record an automatic debrief from a confirmed production close.
+ *
+ * Unidentified closes are deliberately not written: an unscoped loss cannot
+ * later be assigned to a capital account without either forgiving the wrong
+ * account or halting every account. Manual/legacy unscoped rows remain visible
+ * to reports and to the explicit `default` fallback identity only.
+ */
+export function recordTradeClosureDebrief(
+  input: TradeClosureDebriefInput,
+  env: NodeJS.ProcessEnv = process.env,
+  path: string = defaultDebriefPath(env),
+): DebriefEntry | null {
+  if (!input.portfolioIdentity) return null;
+
+  // Streak safety evidence is not the best-effort teaching log. Persist the
+  // account-scoped outcome in the authenticated halt ledger first. A lock or
+  // write failure latches that ledger fail-closed, so the next new-risk order
+  // cannot proceed on a vanished loss sequence.
+  const outcome = input.pnlUsd > 0 ? "win" : input.pnlUsd < 0 ? "loss" : "scratch";
+  const recordedAtMs = Date.now();
+  if (
+    !recordPortfolioTradeOutcome(input.portfolioIdentity, {
+      tradeId: input.tradeId,
+      outcome,
+      recordedAtMs,
+    })
+  ) {
+    return null;
+  }
+
+  const existing = readDebriefLog(path).find(
+    (entry) =>
+      entry.tradeId === input.tradeId && entry.portfolioIdentity === input.portfolioIdentity,
+  );
+  if (existing) return existing;
+
+  const planFollowed = [
+    "STOP",
+    "TP1",
+    "TP2",
+    "TP3",
+    "TRAILING",
+    "stop_loss",
+    "take_profit",
+    "trailing_stop",
+  ].includes(input.reason);
+  const processScore = planFollowed ? 8 : 4;
+  let outcomeScore = 5;
+  if (input.pnlPercent >= 5) outcomeScore = 9;
+  else if (input.pnlPercent >= 1) outcomeScore = 7;
+  else if (input.pnlPercent >= 0) outcomeScore = 6;
+  else if (input.pnlPercent >= -1) outcomeScore = 4;
+  else if (input.pnlPercent >= -5) outcomeScore = 2;
+  else outcomeScore = 1;
+
+  return recordDebrief(
+    {
+      tradeId: input.tradeId,
+      symbol: input.symbol,
+      pnlUsd: input.pnlUsd,
+      portfolioIdentity: input.portfolioIdentity,
+      processScore,
+      outcomeScore,
+      notes: `auto-debrief: close reason=${input.reason}`,
+    },
+    env,
+    path,
+  );
 }
 
 export function readDebriefLog(path: string): DebriefEntry[] {
@@ -197,6 +282,7 @@ export function debriefToPayload(entry: DebriefEntry): Record<string, unknown> {
   return {
     kind: "debrief_matrix.classified",
     tradeId: entry.tradeId,
+    portfolioIdentity: entry.portfolioIdentity,
     quadrant: entry.quadrant,
     action: entry.action,
     processScore: entry.processScore,

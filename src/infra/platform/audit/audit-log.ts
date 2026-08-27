@@ -136,6 +136,7 @@ export type AuditAction =
   | "SYSTEMATIC_PROMOTION"
   | "ALERT_WARNING"
   | "ALERT_CRITICAL"
+  | "HALT_STATE_RESET"
   // Per-trade rule-override event (Gap 1). Emitted when the operator
   // approves a trade despite classify_trade_risk returning a
   // non-auto-approve recommendation (prompt_user / require_confirmation

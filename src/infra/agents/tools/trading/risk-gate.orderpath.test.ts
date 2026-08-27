@@ -36,6 +36,7 @@ function contextWith(options: { cashUsd: number; holdings?: StubBalance[] }): Go
   const holdings = options.holdings ?? [];
   const exchange = {
     exchangeId: "stub",
+    connectionIdentity: "orderpath-paper-account",
     isSandbox: true,
     getFullAccountDetails: async () => ({
       totalUsdtValue: EQUITY_USD,
@@ -109,25 +110,27 @@ function clearFeeEnv(): void {
 
 afterEach(clearFeeEnv);
 
-// The streak halt gate is default-on and reads the debrief log, which resolves
-// to ~/.gordon/debriefs.jsonl when unset. This suite is about the kernel and
-// the fee floor, so point it at a path that does not exist: otherwise three
-// consecutive losers in the developer's own trade history start refusing the
-// orders these cases expect to be approved, and the suite fails on a machine
-// rather than on a change.
+// This suite is about the kernel, executable-price selection and fee floor.
+// Streak behavior has its own order-path suite; disable it here so the broker
+// fixtures exercise those layers instead of the deliberate no-close-feed
+// refusal, and pin the legacy debrief path so local history cannot leak in.
 const previousDebriefPath = process.env[DEBRIEF_MATRIX_PATH_ENV];
+const previousStreakFlag = process.env.GORDON_STREAK_CIRCUIT_BREAKER;
 
 beforeEach(() => {
   process.env[DEBRIEF_MATRIX_PATH_ENV] = join(
     tmpdir(),
     "gordon-orderpath-no-debriefs-fixture.jsonl",
   );
+  process.env.GORDON_STREAK_CIRCUIT_BREAKER = "0";
   drawdownTracker.reset(EQUITY_USD);
 });
 
 afterEach(() => {
   if (previousDebriefPath === undefined) delete process.env[DEBRIEF_MATRIX_PATH_ENV];
   else process.env[DEBRIEF_MATRIX_PATH_ENV] = previousDebriefPath;
+  if (previousStreakFlag === undefined) delete process.env.GORDON_STREAK_CIRCUIT_BREAKER;
+  else process.env.GORDON_STREAK_CIRCUIT_BREAKER = previousStreakFlag;
 });
 
 describe("evaluateOrderRisk order path", () => {

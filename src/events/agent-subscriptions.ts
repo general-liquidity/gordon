@@ -14,6 +14,7 @@ import { createModuleLogger } from "../infra/logger/index.ts";
 import { recordStructuredObservation } from "../infra/platform/observability/structured.ts";
 import { type EventBus, getEventBus } from "./bus.ts";
 import type { MarketEventType, MarketEvent } from "./market-events.ts";
+import { PositionClosedEventSchema } from "./market-events.ts";
 import type { EventType } from "./types.ts";
 
 const logger = createModuleLogger("agent-subscriptions");
@@ -1034,7 +1035,14 @@ export function createDefaultSubscriptions(
       priority: 5,
       description: "Teacher performs a post-trade review when positions close",
       handler: async (event) => {
-        const e = event as Extract<MarketEvent, { type: "position:closed" }>;
+        const parsed = PositionClosedEventSchema.safeParse(event);
+        if (!parsed.success) {
+          logger.warn("position:closed event did not match the shared schema", {
+            issues: parsed.error.issues.map((issue) => issue.message),
+          });
+          return;
+        }
+        const e = parsed.data;
         const outcome = e.realizedPnl >= 0 ? "winning" : "losing";
         await invoke(
           "teacher",
@@ -1049,33 +1057,17 @@ export function createDefaultSubscriptions(
         );
 
         try {
-          const { recordDebrief } = await import("../infra/trading/ops/debriefMatrix.ts");
+          const { recordTradeClosureDebrief } = await import(
+            "../infra/trading/ops/debriefMatrix.ts"
+          );
           {
-            // Auto-debrief: process_score is high when the close reason is
-            // a plan-defined exit (stop_loss, take_profit), low when the
-            // operator force-closed or the broker liquidated. Outcome_score
-            // tracks realized PnL sign + magnitude into a 1-10 scale.
-            const planFollowed =
-              e.reason === "stop_loss" ||
-              e.reason === "take_profit" ||
-              e.reason === "trailing_stop";
-            const processScore = planFollowed ? 8 : 4;
-            const pnlPct = e.realizedPnlPercent;
-            let outcomeScore = 5;
-            if (pnlPct >= 5) outcomeScore = 9;
-            else if (pnlPct >= 1) outcomeScore = 7;
-            else if (pnlPct >= 0) outcomeScore = 6;
-            else if (pnlPct >= -1) outcomeScore = 4;
-            else if (pnlPct >= -5) outcomeScore = 2;
-            else outcomeScore = 1;
-
-            const debrief = recordDebrief({
+            const debrief = recordTradeClosureDebrief({
               tradeId: e.tradeId ?? `${e.symbol}-${e.holdDurationMs}`,
               symbol: e.symbol,
               pnlUsd: e.realizedPnl,
-              processScore,
-              outcomeScore,
-              notes: `auto-debrief: close reason=${e.reason}`,
+              pnlPercent: e.realizedPnlPercent,
+              portfolioIdentity: e.portfolioIdentity,
+              reason: e.reason,
             });
             if (debrief) {
               logger.info("debrief-matrix entry recorded", {

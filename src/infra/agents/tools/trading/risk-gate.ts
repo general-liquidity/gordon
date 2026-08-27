@@ -38,6 +38,8 @@ import type { GordonContext } from "../types.ts";
 import { createModuleLogger } from "../../../logger/index.ts";
 import { evaluateBaselineCircuitBreakers } from "../../../../gateway/circuit-breakers/index.ts";
 import { computeCircuitBreakerLiveData } from "../../../../gateway/circuit-breakers/data-provider.ts";
+import { resolvePortfolioIdentity } from "../../../safety/portfolioIdentity.ts";
+import { isStreakCircuitBreakerEnabled } from "../../../trading/ops/streakCircuitBreaker.ts";
 import { evaluateConsensus } from "../../../../core/consensus/protocol.ts";
 import type {
   TradeProposal,
@@ -340,23 +342,52 @@ export async function evaluateOrderRisk(
   // Operator halt gates. Re-evaluated on every order and self-clearing, so a
   // timed cooldown or a recovered equity curve releases without an operator
   // reset. Exposure-reducing orders are exempt: these stop new risk.
-  const haltGates = evaluatePreTradeHaltGates({
-    currentEquityUsd: portfolioContext.totalEquity,
-    exposureReducing: reducesExposure(
-      order.symbol,
-      orderRequest.side,
-      order.quantity * referencePrice,
-      portfolioContext,
-    ),
-  });
-  warnings.push(...haltGates.warnings);
-  if (haltGates.blocks.length > 0) {
-    return {
-      approved: false,
-      quantity: order.quantity,
-      reason: `Rejected by halt gate: ${haltGates.blocks.map((b) => `${b.gate} — ${b.reason}`).join("; ")}`,
-      warnings: [...warnings, ...haltGates.blocks.map((b) => b.reason)],
-    };
+  const exposureReducing = reducesExposure(
+    order.symbol,
+    orderRequest.side,
+    order.quantity * referencePrice,
+    portfolioContext,
+  );
+  if (ctx.broker && !ctx.broker.isPaper && isStreakCircuitBreakerEnabled()) {
+    const unavailableReason =
+      "GORDON_STREAK_CIRCUIT_BREAKER has no confirmed broker-close outcome feed";
+    if (!exposureReducing) {
+      return {
+        approved: false,
+        quantity: order.quantity,
+        reason: `Rejected: ${unavailableReason}; refusing new broker risk. Explicitly disable the streak gate only if this protection is not required.`,
+        warnings: [unavailableReason],
+      };
+    }
+    warnings.push(`${unavailableReason}; exposure-reducing broker order remains allowed.`);
+  }
+  const haltIdentity = await resolvePortfolioIdentity(ctx);
+  if (!haltIdentity.identity) {
+    const identityReason = `halt-state portfolio identity unavailable (${haltIdentity.error ?? "unknown reason"})`;
+    if (!exposureReducing) {
+      return {
+        approved: false,
+        quantity: order.quantity,
+        reason: `Rejected: ${identityReason}; refusing new risk.`,
+        warnings: [identityReason],
+      };
+    }
+    warnings.push(`${identityReason}; halt gates skipped for this exposure-reducing order.`);
+  } else {
+    const haltGates = evaluatePreTradeHaltGates({
+      currentEquityUsd: portfolioContext.totalEquity,
+      exposureReducing,
+      portfolioIdentity: haltIdentity.identity,
+    });
+    warnings.push(...haltGates.warnings);
+    if (haltGates.blocks.length > 0) {
+      return {
+        approved: false,
+        quantity: order.quantity,
+        reason: `Rejected by halt gate: ${haltGates.blocks.map((b) => `${b.gate} — ${b.reason}`).join("; ")}`,
+        warnings: [...warnings, ...haltGates.blocks.map((b) => b.reason)],
+      };
+    }
   }
 
   const sandboxActive =

@@ -210,6 +210,7 @@ export interface PositionClosedEvent extends BaseMarketEvent {
   reason: "manual" | "stop_loss" | "take_profit" | "trailing_stop" | "liquidation" | "timeout";
   strategy?: string;
   tradeId?: string;
+  portfolioIdentity?: string;
 }
 
 // ============================================================================
@@ -460,4 +461,5 @@ export const PositionClosedEventSchema = z.object({
   reason: z.enum(["manual", "stop_loss", "take_profit", "trailing_stop", "liquidation", "timeout"]),
   strategy: z.string().optional(),
   tradeId: z.string().optional(),
+  portfolioIdentity: z.string().optional(),
 });

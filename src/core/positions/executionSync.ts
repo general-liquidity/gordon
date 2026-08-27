@@ -32,7 +32,8 @@ async function cancelDebrisPosition(positionId: string, reason: string): Promise
 export async function recordExecutedPlanPosition(
   plan: Plan,
   trade: Trade,
-  _exchangeId: string,
+  exchangeId: string,
+  portfolioIdentity?: string,
 ): Promise<string | null> {
   let positionId: string | null = null;
   try {
@@ -44,14 +45,22 @@ export async function recordExecutedPlanPosition(
     const qty =
       trade.entries[0]?.quantity || (entryPrice > 0 ? plan.allocation.amount / entryPrice : 0);
 
-    const position = await pm.reportSetup({
-      symbol: plan.symbol,
-      strategy: plan.strategy,
-      confidence: 0.7,
-      setupType: plan.strategy,
-      price: entryPrice,
-      notes: `Synced from execute_plan ${plan.id}`,
-    });
+    const position = await pm.reportSetup(
+      {
+        symbol: plan.symbol,
+        strategy: plan.strategy,
+        confidence: 0.7,
+        setupType: plan.strategy,
+        price: entryPrice,
+        notes: `Synced from execute_plan ${plan.id}`,
+      },
+      {
+        exchangeId,
+        side: plan.direction,
+        portfolioIdentity,
+        tradeId: trade.id,
+      },
+    );
     positionId = position.id;
 
     await pm.reportAnalysis(position.id, {

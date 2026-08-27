@@ -16,6 +16,11 @@ const previousHome = process.env.GORDON_HOME;
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "gordon-order-hooks-"));
   process.env.GORDON_HOME = root;
+  // A monolithic run may already have initialized the runtime against another
+  // test database. Drop that singleton before setDatabasePathForTesting closes
+  // its connection, or these order-risk checks retain a closed repository.
+  StrategyRuntime.resetInstance();
+  resetRuntimeStore();
   setDatabasePathForTesting(join(root, "gordon.db"));
 });
 
@@ -38,6 +43,7 @@ afterAll(() => {
 function exchangeContext(placed: Array<Record<string, unknown>>) {
   const exchange = {
     exchangeId: "binance",
+    connectionIdentity: "order-hooks-paper-account",
     isSandbox: true,
     getPrice: async () => 100,
     getBalance: async () => 100_000,

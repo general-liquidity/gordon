@@ -11,13 +11,7 @@
  * - Permission validation before trading
  */
 
-import type {
-  Exchange,
-  Order,
-  OrderParams,
-  ExchangeExtended,
-  OCOOrderParams,
-} from "../../infra/exchange/index.ts";
+import type { Exchange, Order, OrderParams, OCOOrderParams } from "../../infra/exchange/index.ts";
 import { validatePlan } from "./validator.ts";
 import {
   createTrade,
@@ -33,13 +27,38 @@ import { isGordonError } from "../../errors/index.ts";
 import { auditLog } from "../../infra/platform/audit/index.ts";
 import { checkKillSwitchForOrder } from "../../infra/safety/killSwitchGate.ts";
 import {
+  getNativeOcoExchangeForTakeProfits,
+  isManagedExitsAcknowledged,
+  MANAGED_EXITS_ACK_FLAG,
+  requiresProcessManagedTakeProfit,
+} from "../../infra/safety/managedExits.ts";
+import {
   assertConsentForExposure,
   assertLiveConsent,
   type ExposureEffect,
 } from "../../infra/trading/execution/preflight.ts";
 import type { Plan, Trade, GordonConfig, EntryFill, ExitFill } from "../../types/index.ts";
+import { exchangePortfolioIdentity } from "../../infra/safety/portfolioIdentity.ts";
+import { recordTradeClosureDebrief } from "../../infra/trading/ops/debriefMatrix.ts";
 
 const logger = createModuleLogger("executor");
+
+function recordConfirmedTradeClosure(
+  client: Exchange,
+  trade: Pick<Trade, "id" | "symbol">,
+  pnlUsd: number,
+  pnlPercent: number,
+  reason: string,
+): void {
+  recordTradeClosureDebrief({
+    tradeId: trade.id,
+    symbol: trade.symbol,
+    pnlUsd,
+    pnlPercent,
+    reason,
+    portfolioIdentity: exchangePortfolioIdentity(client),
+  });
+}
 
 /** Default maximum concurrent trades if not configured */
 const DEFAULT_MAX_CONCURRENT_TRADES = 5;
@@ -415,6 +434,25 @@ export async function executePlan(
     });
   }
 
+  const usesProcessManagedTakeProfit = requiresProcessManagedTakeProfit(
+    client,
+    plan.takeProfit.length,
+  );
+  if (
+    !(client.isSandbox ?? false) &&
+    usesProcessManagedTakeProfit &&
+    !isManagedExitsAcknowledged()
+  ) {
+    return {
+      success: false,
+      error:
+        `Live take-profits without venue-native OCO require the process-managed exit reconciler. ` +
+        `Acknowledge that Gordon must remain running by enabling ${MANAGED_EXITS_ACK_FLAG}, ` +
+        "or use a venue-native OCO take-profit.",
+      orders: [],
+    };
+  }
+
   // Step 3.5: Check concurrent trade limit
   const concurrentTradeCheck = checkConcurrentTradeLimit(config);
   if (!concurrentTradeCheck.canOpen) {
@@ -582,10 +620,9 @@ export async function executePlan(
     // For multiple take-profit levels (tiered exits), we fall back to
     // placing separate orders because OCO is a 1:1 pairing.
 
-    const canUseOCO =
-      plan.takeProfit.length === 1 && plan.takeProfit[0] && getOCOCapableExchange(client) !== null;
+    const ocoExchange = getNativeOcoExchangeForTakeProfits(client, plan.takeProfit.length);
 
-    if (canUseOCO) {
+    if (ocoExchange) {
       // --- OCO path: single atomic order for SL + TP ---
       const tp = plan.takeProfit[0]!;
 
@@ -1305,6 +1342,14 @@ async function closeTradeUnlocked(
       });
       updatePlan(trade.planId, { status: "CLOSED" });
 
+      recordConfirmedTradeClosure(
+        client,
+        trade,
+        trade.realizedPnl,
+        trade.realizedPnlPercent,
+        reason,
+      );
+
       await emitEvent("trade:closed", {
         trade,
         reason,
@@ -1417,6 +1462,13 @@ async function closeTradeUnlocked(
       status: fullyClosed ? ("CLOSED" as const) : ("PARTIAL" as const),
     };
     if (fullyClosed) {
+      recordConfirmedTradeClosure(
+        client,
+        updatedTrade,
+        totalRealizedPnl,
+        realizedPnlPercent,
+        reason,
+      );
       await emitEvent("trade:closed", {
         trade: updatedTrade,
         reason,
@@ -2114,6 +2166,7 @@ async function closePartialPositionUnlocked(
     repairFailure = await protectionRepairFailure(trade.planId, client);
   } else {
     updatePlan(trade.planId, { status: "CLOSED" });
+    recordConfirmedTradeClosure(client, trade, totalRealizedPnl, realizedPnlPercent, reason);
   }
 
   // Log and emit events
@@ -2216,26 +2269,14 @@ export interface OCOResult {
 }
 
 /**
- * Check whether an exchange supports native OCO orders.
- * Returns the exchange cast to ExchangeExtended if OCO is available, null otherwise.
- */
-function getOCOCapableExchange(exchange: Exchange): ExchangeExtended | null {
-  const ext = exchange as ExchangeExtended;
-  if (typeof ext.placeOCOOrder === "function") {
-    return ext;
-  }
-  return null;
-}
-
-/**
  * Place an OCO (One-Cancels-Other) order combining stop-loss and take-profit.
  *
  * For Binance-family exchanges that support native OCO, this uses the atomic
  * /api/v3/orderList/oco endpoint so both legs are guaranteed to be coordinated.
  *
- * For other exchanges, this places two separate orders (stop-loss-limit + limit)
- * and returns both order IDs. NOTE: without native OCO the caller is responsible
- * for cancelling the other leg when one fills (the Monitor handles this).
+ * Exchanges without native OCO are refused without placing either leg. Two
+ * independent orders do not provide OCO atomicity, so process-managed exits use
+ * the protected-stop path after the operator acknowledges that dependency.
  *
  * @param client - Authenticated exchange client
  * @param symbol - Trading pair (e.g. "BTCUSDT")
@@ -2268,9 +2309,9 @@ export async function placeOCOOrders(
     takeProfitPrice,
   });
 
-  // Both the native-OCO path and the two-leg fallback dispatch to the venue.
-  // Gated: `side` and `quantity` are caller-supplied and unrelated to any open
-  // position, so a BUY OCO opens or grows one. Not verifiably reducing.
+  // The native-OCO path dispatches to the venue. Gated: `side` and `quantity`
+  // are caller-supplied and unrelated to any open position, so a BUY OCO opens
+  // or grows one. Not verifiably reducing.
   try {
     assertLiveConsent(client, "executor.place_oco_orders");
   } catch (error) {
@@ -2302,7 +2343,7 @@ export async function placeOCOOrders(
   // -----------------------------------------------------------------------
   // Path A: Native OCO (Binance-family)
   // -----------------------------------------------------------------------
-  const ocoExchange = getOCOCapableExchange(client);
+  const ocoExchange = getNativeOcoExchangeForTakeProfits(client, 1);
   if (ocoExchange) {
     try {
       const ocoParams: OCOOrderParams = {

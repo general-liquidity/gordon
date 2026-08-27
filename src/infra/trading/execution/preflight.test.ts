@@ -24,6 +24,7 @@ beforeEach(() => {
 function mockContext(onPlace?: (order: OrderParams) => void): GordonContext {
   const exchange = {
     exchangeId: "ccxt:binance",
+    connectionIdentity: "preflight-paper-account",
     displayName: "Mock Binance",
     isSandbox: true,
     async getFullAccountDetails() {

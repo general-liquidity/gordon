@@ -3,13 +3,10 @@
  * Creates and caches exchange adapter instances
  */
 
+import { createHash } from "node:crypto";
+
 import type { Exchange, ExchangeId, NativeExchangeId, ExchangeCredentials } from "./types.ts";
-import {
-  isCcxtExchangeId,
-  extractCcxtSubId,
-  normalizeExchangeId,
-  ccxtIdToNativeVenue,
-} from "./types.ts";
+import { isCcxtExchangeId, extractCcxtSubId, normalizeExchangeId } from "./types.ts";
 import { CcxtAdapter } from "./adapters/ccxt-adapter.ts";
 import { loadOAuthExchangeCredentials, exchangeSupportsOAuth } from "./oauth-bridge.ts";
 import { resolveFlag } from "../config/flagResolver.ts";
@@ -41,16 +38,25 @@ function getCacheKey(
   credentials: ExchangeCredentials,
   resolvedSandbox: boolean,
 ): string {
-  // Use first 8 characters of key as identifier to avoid storing full key.
-  // For wallet-based venues (hyperliquid), use the wallet key; else the API key.
-  const key =
-    ccxtIdToNativeVenue(exchangeId) === "hyperliquid"
-      ? credentials.walletPrivateKey || credentials.apiKey
-      : credentials.apiKey;
-  const keyPrefix = key.substring(0, 8);
+  // Account identity is deliberately stable across credential rotation for
+  // durable halt state, but the live adapter must not be reused after a key or
+  // secret changes. Hash every constructor-affecting credential so the cache
+  // retains no raw secret and rotations always create a fresh client.
+  const credentialFingerprint = createHash("sha256")
+    .update(
+      JSON.stringify({
+        accountIdentity: credentials.accountIdentity ?? null,
+        apiKey: credentials.apiKey,
+        apiSecret: credentials.apiSecret,
+        passphrase: credentials.passphrase ?? null,
+        walletAddress: credentials.walletAddress ?? null,
+        walletPrivateKey: credentials.walletPrivateKey ?? null,
+      }),
+    )
+    .digest("hex");
   // The resolved mode is part of the adapter's identity: without it, a live
   // adapter cached earlier is handed back to a caller asking for sandbox.
-  return `${exchangeId}:${keyPrefix}:${resolvedSandbox ? "sandbox" : "live"}`;
+  return `${exchangeId}:${credentialFingerprint}:${resolvedSandbox ? "sandbox" : "live"}`;
 }
 
 /**
@@ -158,6 +164,7 @@ export class ExchangeFactory {
         passphrase: credentials.passphrase,
         walletPrivateKey: credentials.walletPrivateKey,
         walletAddress: credentials.walletAddress,
+        accountIdentity: credentials.accountIdentity,
       },
       resolvedSandbox,
       Number.isFinite(envMaxLeverage) && envMaxLeverage > 0

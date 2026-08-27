@@ -536,7 +536,19 @@ export interface PositionClosedEventV2 extends BaseEvent {
   type: "position:closed";
   positionId: string;
   symbol: string;
+  side: "long" | "short";
+  entryPrice: number;
+  exitPrice: number;
+  quantity: number;
+  /** Compatibility spelling retained for existing core-event consumers. */
   realizedPnL: number;
+  realizedPnl: number;
+  realizedPnlPercent: number;
+  holdDurationMs: number;
+  reason: "manual" | "stop_loss" | "take_profit" | "trailing_stop" | "liquidation" | "timeout";
+  strategy?: string;
+  tradeId?: string;
+  portfolioIdentity?: string;
   position: PositionRecord;
 }
 

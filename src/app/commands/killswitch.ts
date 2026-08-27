@@ -8,6 +8,8 @@ import {
   type KillSwitchScope,
 } from "../../infra/safety/killSwitches.ts";
 import { getProactiveEngine } from "../../infra/proactive/index.ts";
+import { archiveAndResetHaltState } from "../../infra/safety/durableHaltState.ts";
+import { auditLog } from "../../infra/platform/audit/audit-log.ts";
 
 export interface KillSwitchCommandResult {
   success: boolean;
@@ -42,6 +44,7 @@ function usage(): string {
     "  /killswitch reset firm <rationale>",
     "  /killswitch reset venue <id> <rationale>",
     "  /killswitch reset-all <rationale>",
+    "  /killswitch archive-halt-state <rationale>",
     `Scopes: ${VALID_SCOPES.join(", ")}`,
   ].join("\n");
 }
@@ -116,6 +119,28 @@ export async function handleKillSwitchCommand(args: string): Promise<KillSwitchC
       "Operator reset every kill switch. Execution gates are clear unless another switch is tripped.",
     );
     return { success: true, message: "All kill switches reset." };
+  }
+
+  if (subcommand === "archive-halt-state") {
+    const rationale = parts.slice(1).join(" ").trim();
+    const reset = archiveAndResetHaltState(rationale);
+    if (!reset.ok) {
+      auditLog.failure(
+        "operator",
+        "HALT_STATE_RESET",
+        { rationale },
+        reset.error ?? "reset refused",
+      );
+      return { success: false, message: reset.error ?? "Halt-state recovery refused." };
+    }
+    auditLog.success("operator", "HALT_STATE_RESET", {
+      rationale,
+      archivePath: reset.archivePath,
+    });
+    return {
+      success: true,
+      message: `Authenticated halt state archived${reset.archivePath ? ` at ${reset.archivePath}` : ""} and reset.`,
+    };
   }
 
   if (subcommand === "trip") {

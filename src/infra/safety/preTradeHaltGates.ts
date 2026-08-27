@@ -42,6 +42,7 @@ import {
   shouldBlockTrade,
 } from "../trading/ops/streakCircuitBreaker.ts";
 import { lastStreakTripAtMs, recordStreakTrip } from "../trading/ops/streakCircuitState.ts";
+import { haltStateIntegrityError, readPortfolioHaltState } from "./durableHaltState.ts";
 
 export type HaltGateName =
   | "GORDON_STREAK_CIRCUIT_BREAKER"
@@ -65,6 +66,7 @@ export interface HaltGateInput {
   nowMs?: number;
   env?: NodeJS.ProcessEnv;
   debriefPath?: string;
+  portfolioIdentity?: string;
 }
 
 /** Trade results older than this are not part of a "current" streak. */
@@ -79,22 +81,35 @@ function streakBlock(
   env: NodeJS.ProcessEnv,
   nowMs: number,
   debriefPath: string,
+  identity: string,
 ): HaltGateBlock | null {
-  const trippedAt = lastStreakTripAtMs(env);
+  const trippedAt = lastStreakTripAtMs(identity, env);
   // Results banked BEFORE the last trip are what that trip already punished.
   // Counting them again would re-trip the breaker the instant its cooldown
   // expired, turning a 60-minute lockout into a permanent one.
-  const recentResults = readDebriefLog(debriefPath)
-    .slice(-STREAK_WINDOW)
-    .filter((entry) => trippedAt === null || Date.parse(entry.recordedAt) > trippedAt)
-    .reverse()
-    .map((entry) =>
-      entry.pnlUsd > 0
-        ? ("win" as const)
-        : entry.pnlUsd < 0
-          ? ("loss" as const)
-          : ("scratch" as const),
-    );
+  const recentResults =
+    identity === "default"
+      ? readDebriefLog(debriefPath)
+          // Legacy rows had no identity and cannot be attributed safely.
+          // Preserve them only for the explicit fallback identity.
+          .filter((entry) => entry.portfolioIdentity === undefined)
+          .slice(-STREAK_WINDOW)
+          .filter((entry) => trippedAt === null || Date.parse(entry.recordedAt) > trippedAt)
+          .reverse()
+          .map((entry) =>
+            entry.pnlUsd > 0
+              ? ("win" as const)
+              : entry.pnlUsd < 0
+                ? ("loss" as const)
+                : ("scratch" as const),
+          )
+      : readPortfolioHaltState(identity)
+          .recentTradeOutcomes.filter(
+            (entry) => trippedAt === null || entry.recordedAtMs > trippedAt,
+          )
+          .slice(-STREAK_WINDOW)
+          .reverse()
+          .map((entry) => entry.outcome);
 
   const result = evaluateCircuit({
     recentResults,
@@ -102,7 +117,7 @@ function streakBlock(
     nowMs,
   });
   if (!shouldBlockTrade(result)) return null;
-  if (result.state === "tripped") recordStreakTrip(nowMs);
+  if (result.state === "tripped") recordStreakTrip(identity, nowMs);
   return {
     gate: "GORDON_STREAK_CIRCUIT_BREAKER",
     reason: `streak circuit breaker (${result.state}): ${result.reason}`,
@@ -185,12 +200,18 @@ export function evaluatePreTradeHaltGates(input: HaltGateInput): HaltGateVerdict
   const nowMs = input.nowMs ?? Date.now();
   const blocks: HaltGateBlock[] = [];
   const warnings: string[] = [];
+  const identity = input.portfolioIdentity ?? "default";
 
   const giveBackOn = isGiveBackStopEnabled(env);
   const barrierOn = isAbsorbingBarrierEnabled(env);
   const track =
     giveBackOn || barrierOn
-      ? trackSessionEquity(input.currentEquityUsd, readAbsorbingBarrierConfigFromEnv(env), env)
+      ? trackSessionEquity(
+          input.currentEquityUsd,
+          readAbsorbingBarrierConfigFromEnv(env),
+          env,
+          identity,
+        )
       : null;
 
   if (input.exposureReducing) {
@@ -200,8 +221,17 @@ export function evaluatePreTradeHaltGates(input: HaltGateInput): HaltGateVerdict
     return { blocks, warnings };
   }
 
+  const stateError = haltStateIntegrityError();
+  if (stateError) {
+    blocks.push({
+      gate: "GORDON_ABSORBING_BARRIER",
+      reason: `authenticated halt state unavailable (${stateError}); refusing new risk`,
+    });
+    return { blocks, warnings };
+  }
+
   if (isStreakCircuitBreakerEnabled(env)) {
-    const block = streakBlock(env, nowMs, input.debriefPath ?? defaultDebriefPath(env));
+    const block = streakBlock(env, nowMs, input.debriefPath ?? defaultDebriefPath(env), identity);
     if (block) blocks.push(block);
   }
 

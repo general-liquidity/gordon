@@ -28,6 +28,8 @@ import {
   repairProtectiveOrders,
   waitForFill,
 } from "../pipeline/executor.ts";
+import { exchangePortfolioIdentity } from "../../infra/safety/portfolioIdentity.ts";
+import { recordTradeClosureDebrief } from "../../infra/trading/ops/debriefMatrix.ts";
 
 const logger = createModuleLogger("trailing-stop");
 
@@ -629,6 +631,14 @@ export class TrailingStopTracker extends EventEmitter {
     if (fullyClosed) {
       updatePlan(trade.planId, { status: "CLOSED" });
       this.removeTrailingStop(tradeId);
+      recordTradeClosureDebrief({
+        tradeId,
+        symbol: trade.symbol,
+        pnlUsd: totalRealizedPnl,
+        pnlPercent: realizedPnlPercent,
+        reason: "TRAILING",
+        portfolioIdentity: exchangePortfolioIdentity(client),
+      });
     } else {
       repairFailure = await restoreTrailingProtection(trade.planId, client);
     }

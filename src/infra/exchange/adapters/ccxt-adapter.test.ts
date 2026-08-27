@@ -43,6 +43,32 @@ describe("fromCcxtSymbol", () => {
 // =================== adapter construction ===================
 
 describe("CcxtAdapter construction", () => {
+  it("uses a stable non-secret account fingerprint for durable safety state", () => {
+    const first = new CcxtAdapter("binance", { apiKey: "account-one", apiSecret: "secret" }, true);
+    const same = new CcxtAdapter("binance", { apiKey: "account-one", apiSecret: "other" }, true);
+    const second = new CcxtAdapter("binance", { apiKey: "account-two", apiSecret: "secret" }, true);
+
+    expect(first.connectionIdentity).toBe(same.connectionIdentity);
+    expect(first.connectionIdentity).not.toBe(second.connectionIdentity);
+    expect(first.connectionIdentity).not.toContain("account-one");
+    expect(first.connectionIdentity).toStartWith("sha256:");
+  });
+
+  it("keeps a configured account identity stable across API-key rotation", () => {
+    const before = new CcxtAdapter(
+      "binance",
+      { apiKey: "old-key", apiSecret: "secret", accountIdentity: "venue-subaccount-7" },
+      true,
+    );
+    const after = new CcxtAdapter(
+      "binance",
+      { apiKey: "rotated-key", apiSecret: "secret", accountIdentity: "venue-subaccount-7" },
+      true,
+    );
+
+    expect(before.connectionIdentity).toBe(after.connectionIdentity);
+    expect(before.connectionIdentity).not.toContain("venue-subaccount-7");
+  });
   it("throws on invalid CCXT sub-id", () => {
     expect(() => new CcxtAdapter("not_a_real_exchange", {})).toThrow();
   });
@@ -68,11 +94,41 @@ describe("CcxtAdapter construction", () => {
   });
 });
 
+describe("CcxtAdapter market type metadata", () => {
+  it("distinguishes a spot symbol from a derivative symbol without using accountType", async () => {
+    const spot = CcxtAdapter.__forTesting(
+      "binance",
+      makeMockClient({
+        market: () => ({ type: "spot", spot: true, contract: false }),
+      }),
+    );
+    const derivative = CcxtAdapter.__forTesting(
+      "binance",
+      makeMockClient({
+        market: () => ({ type: "swap", spot: false, contract: true }),
+      }),
+    );
+
+    expect(await spot.getMarketType("BTCUSDT")).toBe("spot");
+    expect(await derivative.getMarketType("BTCUSDT")).toBe("derivative");
+  });
+
+  it("keeps incomplete CCXT market metadata unknown", async () => {
+    const adapter = CcxtAdapter.__forTesting(
+      "binance",
+      makeMockClient({ market: () => ({ symbol: "BTC/USDT" }) }),
+    );
+
+    expect(await adapter.getMarketType("BTCUSDT")).toBe("unknown");
+  });
+});
+
 // =================== mocked behavior ===================
 
 function makeMockClient(overrides: Record<string, unknown> = {}): unknown {
   return {
     rateLimit: 100,
+    options: { defaultType: "spot" },
     has: { withdraw: false, fetchDepositAddress: false },
     loadMarkets: async () => ({}),
     fetchTicker: async (_symbol: string) => ({ last: 50000, close: 50000 }),
@@ -283,6 +339,16 @@ describe("CcxtAdapter — account (mocked)", () => {
     expect(usdt?.total).toBe(5100);
     expect(usdt?.free).toBe(5000);
     expect(usdt?.locked).toBe(100);
+    expect(info.accountType).toBe("SPOT");
+  });
+
+  it("does not mislabel a CCXT margin connection as a cash spot account", async () => {
+    const adapter = CcxtAdapter.__forTesting(
+      "binance",
+      makeMockClient({ options: { defaultType: "margin" } }),
+    );
+
+    expect((await adapter.getAccountInfo()).accountType).toBe("MARGIN");
   });
 
   it("getBalance returns asset total", async () => {

@@ -93,6 +93,8 @@ export interface ExchangeCredentials {
   walletAddress?: string;
   /** OAuth 2.0 bearer access token (e.g., Gemini) — takes precedence over apiKey/apiSecret */
   accessToken?: string;
+  /** Operator-supplied stable venue account/subaccount ID, preserved across API-key rotation. */
+  accountIdentity?: string;
 }
 
 /**
@@ -159,6 +161,7 @@ export function ccxtEnvNames(ccxtSubId: string): {
   passphrase: string;
   walletKey: string;
   walletAddress: string;
+  accountIdentity: string;
 } {
   const upper = ccxtSubId.toUpperCase().replace(/[^A-Z0-9]/g, "_");
   return {
@@ -167,6 +170,7 @@ export function ccxtEnvNames(ccxtSubId: string): {
     passphrase: `CCXT_${upper}_PASSPHRASE`,
     walletKey: `CCXT_${upper}_WALLET_PRIVATE_KEY`,
     walletAddress: `CCXT_${upper}_WALLET_ADDRESS`,
+    accountIdentity: `CCXT_${upper}_ACCOUNT_ID`,
   };
 }
 
@@ -184,6 +188,7 @@ export function genericEnvNames(ccxtSubId: string): {
   passphrase: string;
   walletKey: string;
   walletAddress: string;
+  accountIdentity: string;
 } {
   const upper = ccxtSubId.toUpperCase().replace(/[^A-Z0-9]/g, "_");
   return {
@@ -192,6 +197,7 @@ export function genericEnvNames(ccxtSubId: string): {
     passphrase: `${upper}_PASSPHRASE`,
     walletKey: `${upper}_WALLET_PRIVATE_KEY`,
     walletAddress: `${upper}_WALLET_ADDRESS`,
+    accountIdentity: `${upper}_ACCOUNT_ID`,
   };
 }
 
@@ -253,6 +259,7 @@ export function resolveExchangeCredentials(config: {
   walletPrivateKey?: string;
   sandbox?: boolean;
   live?: boolean;
+  accountIdentity?: string;
 }): ExchangeCredentials {
   // CCXT exchanges use their own env var pattern (CCXT_<UPPER>_*). For the
   // first-class venues (ccxt:binance, …) we ALSO fall back to their curated
@@ -278,6 +285,7 @@ export function resolveExchangeCredentials(config: {
     let apiSecret = config.apiSecret;
     let passphrase = config.passphrase;
     let walletPrivateKey = config.walletPrivateKey;
+    let accountIdentity = config.accountIdentity;
     if (isRedacted(apiKey)) apiKey = fromEnv(legacy?.key, envs.key, generic.key) || "";
     if (isRedacted(apiSecret))
       apiSecret = fromEnv(legacy?.secret, envs.secret, generic.secret) || "";
@@ -286,6 +294,9 @@ export function resolveExchangeCredentials(config: {
     if (isRedacted(walletPrivateKey))
       walletPrivateKey = fromEnv(legacy?.wallet, envs.walletKey, generic.walletKey);
     const walletAddress = fromEnv(legacy?.walletAddress, envs.walletAddress, generic.walletAddress);
+    if (isRedacted(accountIdentity)) {
+      accountIdentity = fromEnv(envs.accountIdentity, generic.accountIdentity);
+    }
     apiSecret = normalizePemSecret(apiSecret);
     if (!passphrase) passphrase = undefined;
     return {
@@ -296,6 +307,7 @@ export function resolveExchangeCredentials(config: {
       live: config.live,
       walletPrivateKey,
       walletAddress,
+      accountIdentity,
     };
   }
 
@@ -336,6 +348,7 @@ export function resolveExchangeCredentials(config: {
     live: config.live,
     walletPrivateKey,
     walletAddress,
+    accountIdentity: config.accountIdentity,
   };
 }
 
@@ -698,6 +711,9 @@ export interface Exchange {
    */
   readonly isSandbox?: boolean;
 
+  /** Stable, non-secret fingerprint of the authenticated account connection. */
+  readonly connectionIdentity?: string;
+
   // -------------------------------------------------------------------------
   // Connection
   // -------------------------------------------------------------------------
@@ -738,6 +754,12 @@ export interface Exchange {
 
   /** Get recent public market trades for a symbol */
   getRecentTrades(symbol: string, limit?: number): Promise<PublicTrade[]>;
+
+  /**
+   * Authoritative venue metadata for the routed instrument, when available.
+   * An adapter must return unknown instead of inferring from method presence.
+   */
+  getMarketType?(symbol: string): Promise<"spot" | "derivative" | "unknown">;
 
   // -------------------------------------------------------------------------
   // Account (Authenticated)

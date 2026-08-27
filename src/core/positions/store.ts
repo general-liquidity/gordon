@@ -67,6 +67,7 @@ function rowToPosition(row: Record<string, unknown>): PositionRecord {
     exitOrder: safeJsonParseOptional(row.exitOrder as string | null),
     exitPrice: optScalar<number>(row.exitPrice),
     realizedPnL: optScalar<number>(row.realizedPnL),
+    realizedPnLPercent: optScalar<number>(row.realizedPnLPercent),
 
     // Review phase
     review: safeJsonParseOptional(row.review as string | null),
@@ -78,6 +79,8 @@ function rowToPosition(row: Record<string, unknown>): PositionRecord {
     cancelReason: optScalar<string>(row.cancelReason),
     rejectReason: optScalar<string>(row.rejectReason),
     closeReason: optScalar<string>(row.closeReason),
+    portfolioIdentity: optScalar<string>(row.portfolioIdentity),
+    tradeId: optScalar<string>(row.tradeId),
     createdAt: row.createdAt as string,
     updatedAt: row.updatedAt as string,
     closedAt: optScalar<string>(row.closedAt),
@@ -175,6 +178,7 @@ export class PositionStore {
             exitOrder TEXT,
             exitPrice REAL,
             realizedPnL REAL,
+            realizedPnLPercent REAL,
 
             -- Review phase
             review TEXT,
@@ -186,6 +190,8 @@ export class PositionStore {
             cancelReason TEXT,
             rejectReason TEXT,
             closeReason TEXT,
+            portfolioIdentity TEXT,
+            tradeId TEXT,
             createdAt TEXT NOT NULL,
             updatedAt TEXT NOT NULL,
             closedAt TEXT
@@ -193,6 +199,23 @@ export class PositionStore {
         `),
       "CREATE TABLE positions",
     );
+
+    // Existing operator databases predate account-scoped close events. Keep
+    // the migration idempotent rather than letting INSERT OR REPLACE silently
+    // discard the fields that the streak gate relies on.
+    for (const [column, type] of [
+      ["realizedPnLPercent", "REAL"],
+      ["portfolioIdentity", "TEXT"],
+      ["tradeId", "TEXT"],
+    ] as const) {
+      try {
+        db.run(`ALTER TABLE positions ADD COLUMN ${column} ${type}`);
+      } catch (error) {
+        if (!/duplicate column/i.test(error instanceof Error ? error.message : String(error))) {
+          throw error;
+        }
+      }
+    }
 
     // Indexes for common query patterns
     executeWithLogging(
@@ -249,15 +272,16 @@ export class PositionStore {
           setupSignal, analysis, plan, riskDecision,
           entryOrder, entryPrice, quantity,
           stopLoss, takeProfit, trailingStop, currentPrice, unrealizedPnL, highWaterMark,
-          exitOrder, exitPrice, realizedPnL,
+          exitOrder, exitPrice, realizedPnL, realizedPnLPercent,
           review,
           strategyId, playbookId, tags, cancelReason, rejectReason, closeReason,
+          portfolioIdentity, tradeId,
           createdAt, updatedAt, closedAt
         ) VALUES (
           ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?,
-          ?, ?, ?,
-          ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?,
           ?,
           ?, ?, ?, ?, ?, ?,
@@ -294,6 +318,7 @@ export class PositionStore {
               position.exitOrder ? JSON.stringify(position.exitOrder) : null,
               position.exitPrice ?? null,
               position.realizedPnL ?? null,
+              position.realizedPnLPercent ?? null,
               // Review phase
               position.review ? JSON.stringify(position.review) : null,
               // Metadata
@@ -303,6 +328,8 @@ export class PositionStore {
               position.cancelReason ?? null,
               position.rejectReason ?? null,
               position.closeReason ?? null,
+              position.portfolioIdentity ?? null,
+              position.tradeId ?? null,
               position.createdAt,
               position.updatedAt,
               position.closedAt ?? null,
