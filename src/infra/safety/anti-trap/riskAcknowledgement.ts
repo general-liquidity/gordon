@@ -7,7 +7,10 @@
  * explicit acknowledgement of what could go wrong — anti-rubber-stamp
  * defense from Faye's coding-agent trap critique applied to trading.
  *
- * Only gates medium+ tier assessments; low-tier trades pass through.
+ * Two triggers, both live in execute_plan: the tier gate below (medium+ tier
+ * must name the top weighted dimensions) and `verifyAcksFromWarnings` (any
+ * risk-kernel warning needs a distinct substantive acknowledgement). A
+ * low-tier plan with no warnings passes through untouched.
  */
 
 import type { RiskAssessment, RiskDimension } from "../../trading/risk/riskClassifier.ts";
@@ -80,8 +83,14 @@ export function verifyRiskAcknowledgement(
 /**
  * Warning-based variant for code paths that have a risk-gate warnings
  * array but not a full RiskAssessment. Requires acknowledgedRisks to
- * have at least one substantive entry (>=20 chars) per warning.
- * Used by execute_plan where the existing risk-gate returns warnings.
+ * have at least one substantive (>=20 chars) and DISTINCT entry per
+ * warning. Used by execute_plan alongside the tier gate above, where the
+ * existing risk-gate returns warnings rather than an assessment.
+ *
+ * Distinctness is what makes the length check more than a character count:
+ * without it, N copies of one 20-character sentence satisfy N warnings.
+ * Entries are still not matched to individual warnings — the warning text
+ * comes from the risk kernel and is not a stable vocabulary to match on.
  */
 export function verifyAcksFromWarnings(
   provided: ReadonlyArray<string>,
@@ -94,19 +103,23 @@ export function verifyAcksFromWarnings(
   if (warnings.length === 0) {
     return { ok: true, required: [], missing: [] };
   }
-  const substantive = provided.filter((s) => s.trim().length >= 20);
-  if (substantive.length >= warnings.length) {
+  const distinct = new Set(
+    provided
+      .filter((s) => s.trim().length >= 20)
+      .map((s) => s.trim().toLowerCase().replace(/\s+/g, " ")),
+  );
+  if (distinct.size >= warnings.length) {
     return { ok: true, required: warnings.slice(), missing: [] };
   }
   return {
     ok: false,
     required: warnings.slice(),
-    missing: warnings.slice(substantive.length),
+    missing: warnings.slice(distinct.size),
     reason:
       `GORDON_RISK_ACK is enabled. The risk gate raised ${warnings.length} warnings: ${warnings.join(" | ")}. ` +
-      `Provide at least ${warnings.length} substantive (>=20 chars) entries in acknowledgedRisks — one per warning — ` +
+      `Provide at least ${warnings.length} substantive (>=20 chars) and distinct entries in acknowledgedRisks — one per warning — ` +
       `each stating why that specific risk is acceptable in this setup. ` +
-      `Boilerplate ("acknowledged", "OK", "yes") will not satisfy this gate. ` +
+      `Boilerplate ("acknowledged", "OK", "yes") and repeated copies of one sentence will not satisfy this gate. ` +
       `This is an anti-rubber-stamp guard: forcing explicit supervision instead of single-keystroke approval.`,
   };
 }

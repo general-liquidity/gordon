@@ -137,6 +137,21 @@ describe("verifyAcksFromWarnings", () => {
     expect(r.ok).toBe(false);
   });
 
+  it("rejects repeated copies of one substantive sentence", () => {
+    const r = verifyAcksFromWarnings(
+      [
+        "Concentration is 18% — within mandate",
+        "Concentration is 18%  —  within   mandate",
+        "concentration is 18% — within mandate",
+      ],
+      ["concentration approaching cap", "vol regime elevated"],
+      { GORDON_RISK_ACK: "1" },
+    );
+    expect(r.ok).toBe(false);
+    expect(r.reason).toContain("distinct");
+    expect(r.missing).toEqual(["vol regime elevated"]);
+  });
+
   it("accepts when enough substantive acks are provided", () => {
     const r = verifyAcksFromWarnings(
       ["Concentration is 18% — within mandate", "Volatility is elevated but plan sizes for ATR"],

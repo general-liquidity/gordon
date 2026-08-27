@@ -88,6 +88,7 @@ import {
   getUserThesis,
   computeThesisDivergence,
   verifyAcksFromWarnings,
+  verifyRiskAcknowledgement,
   checkUniverse,
   gateCoherence,
   gateAgainstMandate,
@@ -1205,8 +1206,14 @@ export const executePlanTool = createTool({
           );
         }
 
-        // Risk acknowledgement gate (GORDON_RISK_ACK)
-        const ackResult = verifyAcksFromWarnings(acknowledgedRisks ?? [], riskResult.warnings);
+        // Risk acknowledgement gate (GORDON_RISK_ACK). Two halves: the tier
+        // gate the flag documents (medium+ tier must name the top weighted
+        // dimensions) and the warning gate, which covers a low-tier plan that
+        // the risk kernel still warned about.
+        const tierAck = verifyRiskAcknowledgement(acknowledgedRisks ?? [], constitutionRisk);
+        const ackResult = tierAck.ok
+          ? verifyAcksFromWarnings(acknowledgedRisks ?? [], riskResult.warnings)
+          : tierAck;
         if (!ackResult.ok) {
           recordStructuredObservation({
             eventType: "execution.blocked",

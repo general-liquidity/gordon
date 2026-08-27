@@ -677,7 +677,8 @@ const KEEPER_FLAGS = [
   },
   {
     name: "GORDON_RISK_ACK",
-    description: "Anti-rubber-stamp risk-acknowledgement gate on medium+ tier execute_plan.",
+    description:
+      "Anti-rubber-stamp risk-acknowledgement gate on execute_plan: medium+ tier must name the top risk dimensions, and every risk-kernel warning needs a distinct acknowledgement.",
     truthy: ["1", "true"],
     defaultOn: false,
   },
