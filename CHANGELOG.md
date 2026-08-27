@@ -10,6 +10,34 @@ called out explicitly, whatever their size.
 
 ## [Unreleased]
 
+### Fixed
+
+- The release matrix builds `gordon-windows-arm64.exe` again. `0ec0bebd` pinned
+  every job to Bun 1.3.7, but `--target=bun-windows-arm64` resolves the
+  `@oven/bun-windows-aarch64` package, first published at Bun 1.3.10, so that
+  leg failed with "Target platform 'bun-windows-aarch64-v1.3.7' is not
+  available for download" on every run. It failed under `continue-on-error`, so
+  v0.5.4 shipped seven binaries where v0.4.0 shipped eight and nothing reported
+  it. The build job now pins Bun 1.4.0, the version that produced v0.4.0's
+  complete set, and no target is marked experimental: a failing leg fails the
+  release instead of dropping a platform silently.
+- `StreamingMarkdown` no longer drops finished paragraphs out of a settled
+  message. The stable-prefix blocks were memoized on an empty dependency list,
+  so they froze at the first render's empty prefix while the tail stopped
+  carrying what the prefix had absorbed.
+- `useEventBusSubscriptions` no longer tears down and re-registers its
+  subscriptions on every render. It depended on the identity of the event-type
+  array, which every caller passes as an inline literal, so events fired in the
+  unsubscribe/re-register window were lost. It now keys on the list contents.
+
+### Removed
+
+- The inert `GORDON_DECISION_OBSERVABILITY` and `GORDON_STRATEGY_EDGE_THESIS`
+  readers. Both were exported and never called, so the flags gated nothing and
+  `flagRegistry.test.ts` carried a standing exclusion for them. The modules'
+  actual functionality is unchanged and still reachable through their agent
+  tools; only the flag plumbing and the exclusion are gone.
+
 ## [0.5.4] - 2026-08-27
 
 Covers `0ec0bebd`, `783a9ebf` and `95a20ed3`, which landed after the v0.4.0 tag.
