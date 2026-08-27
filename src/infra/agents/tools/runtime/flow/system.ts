@@ -550,26 +550,38 @@ export const switchExchangeTool = createTool({
 // Behavior-flag inspector + toggle
 // ============================================================================
 
-const KEEPER_FLAGS = [
+/**
+ * The operator-toggleable flags `/flags` shows.
+ *
+ * `defaultOn` and `truthy` MUST mirror what the flag's reader actually does:
+ * this table is only a display, and a row that disagrees with its reader tells
+ * the operator a protective gate is off while it is running. The default-on
+ * gates below read `raw !== "0" && raw !== "false"`, so an unset flag means
+ * ENABLED; the rows previously declared them off.
+ *
+ * Every boolean flag reader under `src/infra/safety/` belongs here — see
+ * `flagRegistry.test.ts`, which fails when one is added without a row.
+ */
+export const KEEPER_FLAGS = [
   {
     name: "GORDON_ACE_ENABLED",
     description:
-      "ACE (Agentic Context Engineering): /reflect distills the action log into lessons, injected into the system prompt of future sessions. Writes across sessions — opt-in for safety.",
-    truthy: ["true", "1", "yes", "on"],
+      "ACE (Agentic Context Engineering): /reflect distills the action log into lessons, injected into the request context of future sessions. Writes across sessions — opt-in for safety.",
+    truthy: ["true"],
     defaultOn: false,
   },
   {
     name: "GORDON_DYNAMIC_SUBAGENTS",
     description:
       "Enables the FW7 delegate_subagent dispatcher. Requires operator-authored .claude/subagents/*.json profiles.",
-    truthy: ["1", "true"],
+    truthy: ["1", "true", "yes"],
     defaultOn: false,
   },
   {
     name: "GORDON_DEFER_WORKING_MEMORY",
     description:
       "Buffer mid-session working-memory writes to preserve prompt-cache stability; flush at session boundaries.",
-    truthy: ["1", "true"],
+    truthy: ["1"],
     defaultOn: false,
   },
   {
@@ -589,62 +601,128 @@ const KEEPER_FLAGS = [
   // --- Reasoning passes (default-on architecture; disable to save latency) ---
   {
     name: "GORDON_TOOL_FREE_THINKING",
-    description: "Tool-free pre-action reasoning pass on non-trivial requests.",
-    truthy: ["true", "1"],
-    defaultOn: false,
-  },
-  {
-    name: "GORDON_ADVERSARIAL_EVALUATOR",
-    description: "Hostile-review critique prompt at HIGH thinking depth.",
-    truthy: ["1", "true"],
-    defaultOn: false,
-  },
-  {
-    name: "GORDON_CITATION_AGENT",
-    description: "Post-hoc claim→evidence citation manifest over tool results.",
-    truthy: ["1", "true"],
-    defaultOn: false,
-  },
-  {
-    name: "GORDON_PEER_DELEGATION",
-    description: "Peer-agent delegation dispatcher. Default-on; set 0/false to disable.",
+    description:
+      "Tool-free pre-action reasoning pass on non-trivial requests. Default-on; set 0/false to disable.",
     truthy: ["1", "true"],
     defaultOn: true,
   },
   {
-    name: "GORDON_AUTODREAM_ENABLED",
-    description: "Background memory consolidation (ACE distill + session dedupe) on cadence.",
-    truthy: ["true", "1"],
+    name: "GORDON_ADVERSARIAL_EVALUATOR",
+    description:
+      "Hostile-review critique prompt at HIGH thinking depth. Default-on; set 0/false to disable.",
+    truthy: ["1", "true"],
+    defaultOn: true,
+  },
+  {
+    name: "GORDON_CITATION_AGENT",
+    description:
+      "Post-hoc claim→evidence citation manifest over tool results. Default-on; set 0/false to disable.",
+    truthy: ["1", "true"],
+    defaultOn: true,
+  },
+  {
+    name: "GORDON_PEER_DELEGATION",
+    description:
+      "Peer-agent delegation dispatcher (Cursor / Warp CLI). Off unless set to 1/true — it spawns an external agent process.",
+    truthy: ["1", "true"],
     defaultOn: false,
+  },
+  {
+    name: "GORDON_AUTODREAM_ENABLED",
+    description:
+      "Background memory consolidation (ACE distill + session dedupe) on cadence. Default-on; set 0/false to disable.",
+    truthy: ["1", "true"],
+    defaultOn: true,
   },
   {
     name: "GORDON_REFLECTION_ENABLED",
-    description: "Warm the post-trade reflection store at boot.",
-    truthy: ["true", "1"],
-    defaultOn: false,
+    description:
+      "Warm the post-trade reflection store at boot. Default-on; set 0/false to disable.",
+    truthy: ["1", "true"],
+    defaultOn: true,
   },
-  // --- Trade-halt gates ---
+  // --- Trade-halt gates. The protective ones are default-on: an unset gate is
+  // ENABLED and the operator opts out with 0/false. The order-time three are
+  // enforced in evaluateOrderRisk and exempt exposure-reducing orders.
   {
     name: "GORDON_WIP_LIMIT_ENABLED",
-    description: "Work-in-progress plan gate (WIP=N per symbol / M per strategy).",
+    description:
+      "Work-in-progress plan gate (WIP=N per symbol / M per strategy). Default-on; set 0/false to disable.",
     truthy: ["1", "true"],
-    defaultOn: false,
+    defaultOn: true,
   },
   {
     name: "GORDON_STREAK_CIRCUIT_BREAKER",
-    description: "Consecutive-loss cooldown lockout (Rule of Three).",
+    description:
+      "Consecutive-loss cooldown lockout (Rule of Three), re-checked at order time and self-expiring. Default-on; set 0/false to disable.",
     truthy: ["1", "true"],
-    defaultOn: false,
+    defaultOn: true,
   },
   {
     name: "GORDON_GIVE_BACK_STOP",
-    description: "Flatten when session gives back >50% of intraday high-water P&L.",
+    description:
+      "Refuse new risk once the session gives back more than half its high-water P&L. Exits are exempt. Default-on; set 0/false to disable.",
+    truthy: ["1", "true"],
+    defaultOn: true,
+  },
+  {
+    name: "GORDON_ABSORBING_BARRIER",
+    description:
+      "Distance-to-ruin gate (broker / prop-firm / psychological barriers plus the terminal loss fold). Dormant until the barrier inputs are configured. Default-on; set 0/false to disable.",
+    truthy: ["1", "true"],
+    defaultOn: true,
+  },
+  {
+    name: "GORDON_KILL_SWITCHES",
+    description:
+      "Firm-wide / venue / strategy kill switches checked before execution. Default-on; set 0/false to disable.",
+    truthy: ["1", "true"],
+    defaultOn: true,
+  },
+  {
+    name: "GORDON_PRETRADE_RATE_CONTROLS_DISABLE",
+    description:
+      "Opts OUT of the default-on pre-trade message-rate controls. On means the rate controls are OFF.",
     truthy: ["1", "true"],
     defaultOn: false,
   },
   {
-    name: "GORDON_ABSORBING_BARRIER",
-    description: "Distance-to-ruin classifier (broker / prop-firm / psychological barriers).",
+    name: "GORDON_CLEAN_STATE_GATE",
+    description:
+      "Refuse to start an autonomous loop from dirty session state (open plans, unresolved halts).",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_PLAN_RUBRIC",
+    description: "Score a plan against the rubric before it can be approved.",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_EXPLAIN_FIRST",
+    description:
+      "Require the operator's own thesis for a plan before Gordon states its view (anti-anchoring).",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_TRADING_UNIVERSE",
+    description:
+      "Restrict trading to the operator's declared universe file (anti-rot). Refuses symbols outside it.",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_STRATEGY_MANDATES",
+    description:
+      "Enforce the operator's declared per-strategy mandates (anti-rot): a plan outside its mandate is refused.",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_THESIS_COHERENCE",
+    description: "Score a plan against the running thesis (anti-rot) and flag incoherent entries.",
     truthy: ["1", "true"],
     defaultOn: false,
   },
@@ -686,6 +764,41 @@ const KEEPER_FLAGS = [
     name: "GORDON_MEMORY_WRITE_GUARD",
     description:
       "Enforce (not just log) the working-memory sensitive-field guard on untrusted writes.",
+    truthy: ["1"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_NETWORK_ALLOWLIST",
+    description:
+      "Outbound-fetch allowlist guard (warn mode by default; GORDON_NETWORK_ALLOWLIST_MODE=block enforces). Default-on; set 0/false to disable.",
+    truthy: ["1", "true"],
+    defaultOn: true,
+  },
+  {
+    name: "GORDON_FILESYSTEM_WRITE_GUARD",
+    description:
+      "Filesystem write guard (warn mode by default; GORDON_FILESYSTEM_WRITE_GUARD_MODE=block enforces). Default-on; set 0/false to disable.",
+    truthy: ["1", "true"],
+    defaultOn: true,
+  },
+  {
+    name: "GORDON_SAFETY_CONFIG_GUARD",
+    description:
+      "Refuse config edits that would loosen a safety setting without an explicit operator confirmation.",
+    truthy: ["1", "true"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_SANDBOX_SUBPROCESS",
+    description:
+      "Sandbox spawned subprocesses. When unset the value falls through to the settings file rather than defaulting here.",
+    truthy: ["1", "true", "yes", "on"],
+    defaultOn: false,
+  },
+  {
+    name: "GORDON_LOCAL_FALLBACK",
+    description:
+      "Fall back to a local model (GORDON_LOCAL_MODEL_URL) when the hosted provider is unavailable.",
     truthy: ["1", "true"],
     defaultOn: false,
   },

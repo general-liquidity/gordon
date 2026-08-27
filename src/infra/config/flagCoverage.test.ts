@@ -80,6 +80,9 @@ function readPatterns(flag: string, aliases: Set<string>): RegExp[] {
   const patterns: RegExp[] = [
     new RegExp(`\\benv\\.${flag}\\b`),
     new RegExp(`\\bprocess\\.env\\.${flag}\\b`),
+    // `flagEnv().GORDON_X` — a read straight off the resolver proxy, without
+    // the intermediate `env` binding the first pattern assumes.
+    new RegExp(`flagEnv\\(\\)\\.${flag}\\b`),
   ];
   for (const name of names) {
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

@@ -117,9 +117,29 @@ Every new `instrumentedXTools` registration added to `gordon.ts`, `executor.ts`,
 
 Why this matters: Gordon's schema is already at 405 tools / ~45K tokens. Past published guidance for tool-selection accuracy (~30-50 tools per Anthropic/OpenAI), but mitigated by Anthropic prompt caching + the tier system. The convention exists to prevent further accretion without thought.
 
-## Behavior flags (opt-in only)
+## Behavior flags
 
-Most behavior primitives are now defaults-on as part of the core architecture. The remaining flags genuinely require operator opt-in — either because they write across sessions, change spawn behavior, or are calibrated thresholds the operator may want to tune.
+`/flags` (`KEEPER_FLAGS` in `infra/agents/tools/runtime/flow/system.ts`) is the registry, and its rows must mirror what each flag's READER does. `flagRegistry.test.ts` fails when a boolean gate under `src/infra/safety/` has no row, or when one of the default-on rows below is declared off.
+
+**Default-on gates.** These read `raw !== "0" && raw !== "false"`, so an unset flag means ENABLED and the operator opts out with `0`/`false`:
+
+| Env flag | Gate |
+|---|---|
+| `GORDON_KILL_SWITCHES` | Firm-wide / venue / strategy kill switches, checked before execution. |
+| `GORDON_WIP_LIMIT_ENABLED` | Work-in-progress plan gate (N per symbol, M per strategy). |
+| `GORDON_STREAK_CIRCUIT_BREAKER` | Consecutive-loss cooldown, enforced in `evaluateOrderRisk` via `infra/safety/preTradeHaltGates.ts`. Timed and self-expiring, NOT a kill switch; the trip timestamp lives in `trading/ops/streakCircuitState.ts`. |
+| `GORDON_GIVE_BACK_STOP` | Refuses new risk once the session gives back more than half its high-water P&L. Reads session equity from the `absorbingBarrierState` fold. |
+| `GORDON_ABSORBING_BARRIER` | Distance-to-ruin gate plus the terminal loss fold. Dormant until the barrier inputs are configured. |
+| `GORDON_NETWORK_ALLOWLIST` | Outbound-fetch allowlist (warn mode unless `GORDON_NETWORK_ALLOWLIST_MODE=block`). |
+| `GORDON_FILESYSTEM_WRITE_GUARD` | Filesystem write guard (warn mode unless `..._MODE=block`). |
+| `GORDON_TOOL_FREE_THINKING` / `GORDON_ADVERSARIAL_EVALUATOR` / `GORDON_CITATION_AGENT` | Reasoning passes, throttled by the cost budget. |
+| `GORDON_AUTODREAM_ENABLED` / `GORDON_REFLECTION_ENABLED` | Background memory consolidation; post-trade reflection warm-up. |
+
+The three order-time halt gates skip exposure-REDUCING orders. They exist to stop new risk, and a gate that prevented flattening would trap the operator in the position it was written to get them out of.
+
+`GORDON_PRETRADE_RATE_CONTROLS_DISABLE` is the inverted case: the rate controls are default-on and this flag turns them OFF.
+
+**Opt-in flags.** These require operator opt-in — they write across sessions, change spawn behavior, need operator-authored input files, or are calibrated thresholds.
 
 | Env flag | Activates |
 |---|---|
@@ -141,6 +161,13 @@ Most behavior primitives are now defaults-on as part of the core architecture. T
 | `GORDON_INCEPTION_LOSS_FRACTION` | Fraction of reference capital whose cumulative destruction halts trading (`infra/safety/absorbingBarrierState.ts`). Unset leaves the barrier inactive and behaviour unchanged. Evaluated alongside the trailing high-water barrier, and the gate is the union of their blocks. Seed the reference with `GORDON_INCEPTION_EQUITY_USD`, else the first equity the process observes. State is process-scoped: it does not survive a restart. |
 | `GORDON_TRAILING_DD_FRACTION` | Trailing give-back limit consumed by the same barrier fold. Unset leaves it inactive. |
 | `GORDON_FEE_FIXED_PER_TRANCHE_USD` | Fixed commission per fee tranche, with `GORDON_FEE_TRANCHE_SIZE_USD`, optional `GORDON_FEE_MIN_PER_ORDER_USD`, and `GORDON_FEE_TOLERANCE_BPS` (default 100). Together they derive the economic order floor enforced in `evaluateOrderRisk`: an order clearing the venue minimum can still hand a fixed commission more of the position than the fee tolerance allows. Unset means the floor is not evaluated and a warning is emitted, since Gordon has no venue commission feed and a guessed floor would refuse good orders. |
+| `GORDON_CLEAN_STATE_GATE=1` | Refuse to start an autonomous loop from dirty session state. |
+| `GORDON_PLAN_RUBRIC=1` | Score a plan against the rubric before it can be approved. |
+| `GORDON_EXPLAIN_FIRST=1` | Require the operator's own thesis before Gordon states its view (anti-anchoring). |
+| `GORDON_TRADING_UNIVERSE=1` / `GORDON_STRATEGY_MANDATES=1` / `GORDON_THESIS_COHERENCE=1` | The three anti-rot gates. Each needs an operator-authored file (`*_PATH`), which is why none can be default-on. |
+| `GORDON_SAFETY_CONFIG_GUARD=1` | Refuse config edits that loosen a safety setting without explicit confirmation. |
+| `GORDON_SANDBOX_SUBPROCESS` | Sandbox spawned subprocesses. Unset falls through to the settings file rather than defaulting in the reader. |
+| `GORDON_LOCAL_FALLBACK=1` | Fall back to a local model (`GORDON_LOCAL_MODEL_URL`) when the hosted provider is unavailable. |
 
 Use `/flags` in the TUI to see the current state of these and toggle them at runtime.
 
@@ -150,7 +177,7 @@ a behavior toggle. Supply it through the process environment (and optionally
 override the file with `GORDON_POLICY_PATH`). A policy file that exists without
 a valid signature is refused rather than applied or demoted.
 
-Defaults-on (previously flagged, now part of the architecture): result-cache delta envelopes, semantic output filtering, extended thinking by workflow phase, recovery-tier escalation, autonomous-loop reminders, kill switches (checked in `execute_plan` via `isExecutionAllowed`), network allowlist (warn mode, wired via `installOutboundFetchGuard` in `src/index.tsx`), filesystem write guard (warn mode, wired via `installFilesystemWriteGuard` in `src/index.tsx`), trade ledger, plan rubric, bar-permutation test, WIP-limit gate, boundary check, clean-state gate, init probe, lifecycle reconstruction, family-diversity detector, all microstructure detectors (touch dynamics, microstructure toxicity, MEV detection, manufactured imbalance, manipulation context, cross-venue divergence, ATR progression), session memory, artifact index, tool context, explain-first.
+Defaults-on (previously flagged, now part of the architecture): result-cache delta envelopes, semantic output filtering, extended thinking by workflow phase, recovery-tier escalation, autonomous-loop reminders, kill switches (checked in `execute_plan` via `isExecutionAllowed`), network allowlist (warn mode, wired via `installOutboundFetchGuard` in `src/index.tsx`), filesystem write guard (warn mode, wired via `installFilesystemWriteGuard` in `src/index.tsx`), trade ledger, bar-permutation test, WIP-limit gate, boundary check, init probe, lifecycle reconstruction, family-diversity detector, all microstructure detectors (touch dynamics, microstructure toxicity, MEV detection, manufactured imbalance, manipulation context, cross-venue divergence, ATR progression), session memory, artifact index, tool context.
 
 **LLM provider resilience:** `src/infra/ai/llm/providerCaching.ts` (Anthropic prompt-cache breakpoints) and `providerFailover.ts` (`executeWithFailover`) compose with the settings-layer priority chain — env keys → `settings.json` provider order → per-call overrides.
 
