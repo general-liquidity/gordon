@@ -27,15 +27,85 @@ const LOCAL_SETTINGS_PATH = join(GORDON_DIR, "settings.local.json");
 
 let cachedFlags: Record<string, string> | null = null;
 
+/**
+ * Flags that halt trading, gate money movement, set risk limits, or point a
+ * safety gate at its state file.
+ *
+ * The `project` layer is `<cwd>/.gordon/settings.json` — a file a repository
+ * can carry. Once flag reads fall through to the settings layers, a cloned repo
+ * that ships one of these values governs the halt it is supposed to be subject
+ * to: `GORDON_KILL_SWITCHES: "0"` disables the firm-wide halt at every venue,
+ * and the `GORDON_RISK_*` values widen the kernel that gates order size. So
+ * these resolve from env, the operator's own home-directory settings, and the
+ * signed policy layer only. Every other flag keeps the full chain.
+ */
+const SAFETY_CRITICAL_FLAGS = new Set([
+  "GORDON_KILL_SWITCHES",
+  "GORDON_KILL_SWITCH_STATE_PATH",
+  "GORDON_ALLOW_LIVE",
+  "GORDON_PRODUCTION",
+  "GORDON_GUARDS",
+  "GORDON_DISABLE_GUARDS",
+  "GORDON_SAFETY_CONFIG_GUARD",
+  "GORDON_PROCESS_HARDENING",
+  "GORDON_SANDBOX_SUBPROCESS",
+  "GORDON_EXTERNAL_HOOK_RUNNER",
+  "GORDON_EXTERNAL_HOOKS_PATH",
+  "GORDON_PERMISSION_PROFILE",
+  "GORDON_TRUST_LEDGER_PATH",
+  "GORDON_CONSENT_PATH",
+  "GORDON_CONSTITUTION_HALT_PATH",
+  "GORDON_RISK_ACK",
+  "GORDON_RISK_MODE",
+  "GORDON_RISK_AUTO_ADJUST",
+  "GORDON_RISK_REQUIRE_APPROVAL",
+  "GORDON_RISK_MAX_LEVERAGE",
+  "GORDON_RISK_MAX_POSITION_USD",
+  "GORDON_RISK_MAX_POSITION_PERCENT",
+  "GORDON_RISK_MAX_OPEN_POSITIONS",
+  "GORDON_RISK_MAX_DRAWDOWN_PERCENT",
+  "GORDON_RISK_MAX_SINGLE_ASSET_EXPOSURE",
+  "GORDON_RISK_MAX_CORRELATED_EXPOSURE",
+  "GORDON_RISK_DAILY_LOSS_USD",
+  "GORDON_RISK_DAILY_LOSS_PERCENT",
+  "GORDON_ABSORBING_BARRIER",
+  "GORDON_INCEPTION_LOSS_FRACTION",
+  "GORDON_INCEPTION_EQUITY_USD",
+  "GORDON_TRAILING_DD_FRACTION",
+  "GORDON_PRETRADE_RATE_CONTROLS",
+  "GORDON_PRETRADE_RATE_CONTROLS_DISABLE",
+  "GORDON_NETWORK_ALLOWLIST",
+  "GORDON_NETWORK_ALLOWLIST_MODE",
+  "GORDON_FILESYSTEM_WRITE_GUARD",
+  "GORDON_FILESYSTEM_WRITE_GUARD_MODE",
+  "GORDON_CLEAN_STATE_GATE",
+  "GORDON_CLEAN_STATE_GATE_OVERRIDE",
+  "GORDON_WIP_LIMIT",
+  "GORDON_WIP_LIMIT_ENABLED",
+  "GORDON_WIP_LIMIT_GLOBAL",
+  "GORDON_WIP_LIMIT_PER_STRATEGY",
+  "GORDON_WIP_LIMIT_PER_SYMBOL",
+]);
+
+/** Layers a repository can supply, and therefore an attacker who ships one. */
+const UNTRUSTED_SAFETY_LAYERS = new Set(["project"]);
+
 function loadSettingsFlags(): Record<string, string> {
   if (cachedFlags) return cachedFlags;
   const out: Record<string, string> = {};
   try {
-    const { config } = loadLayeredSettings();
-    const flags = config.flags;
-    if (flags && typeof flags === "object" && !Array.isArray(flags)) {
+    // Walked per layer rather than off the merged config: the merge is what
+    // erases which file a given flag came from, and that is exactly what
+    // decides whether a safety-critical value is allowed to apply. The array
+    // is already sorted low-to-high priority by loadLayeredSettings.
+    const { layers } = loadLayeredSettings();
+    for (const layer of layers) {
+      const flags = (layer.values as Record<string, unknown>).flags;
+      if (!flags || typeof flags !== "object" || Array.isArray(flags)) continue;
+      const untrusted = UNTRUSTED_SAFETY_LAYERS.has(layer.layer);
       for (const [k, v] of Object.entries(flags as Record<string, unknown>)) {
         if (v === undefined || v === null) continue;
+        if (untrusted && SAFETY_CRITICAL_FLAGS.has(k)) continue;
         out[k] = typeof v === "string" ? v : String(v);
       }
     }

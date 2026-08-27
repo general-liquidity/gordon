@@ -88,3 +88,38 @@ describe("flagEnv proxy", () => {
     expect(env.PATH).toBe(process.env.PATH);
   });
 });
+
+describe("safety-critical flags are not settable from the project layer", () => {
+  // A repository can ship `<cwd>/.gordon/settings.json`. Cloning one must not
+  // be able to disable the firm-wide halt or widen the risk kernel.
+  const KILL = "GORDON_KILL_SWITCHES";
+  const LEVERAGE = "GORDON_RISK_MAX_LEVERAGE";
+
+  beforeEach(() => {
+    delete process.env[KILL];
+    delete process.env[LEVERAGE];
+  });
+
+  test("a repo-carried kill-switch disable does not resolve", () => {
+    useTempProjectSettings({ [KILL]: "0" });
+    expect(resolveFlag(KILL)).toBeUndefined();
+    expect(flagEnv()[KILL]).toBeUndefined();
+  });
+
+  test("a repo-carried risk-limit widening does not resolve", () => {
+    useTempProjectSettings({ [LEVERAGE]: "100" });
+    expect(resolveFlag(LEVERAGE)).toBeUndefined();
+  });
+
+  test("the operator's own env still governs the same flags", () => {
+    useTempProjectSettings({ [KILL]: "0" });
+    process.env[KILL] = "0";
+    expect(resolveFlag(KILL)).toBe("0");
+  });
+
+  test("non-safety flags still resolve from the project layer", () => {
+    useTempProjectSettings({ [KILL]: "0", [FLAG]: "from-settings" });
+    expect(resolveFlag(FLAG)).toBe("from-settings");
+    expect(resolveFlag(KILL)).toBeUndefined();
+  });
+});

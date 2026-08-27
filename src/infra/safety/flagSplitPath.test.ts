@@ -12,10 +12,8 @@
  */
 
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { resetFlagCache } from "../config/flagResolver.ts";
+import { setSessionOverride, clearSessionOverrides } from "../config/settingsLayers.ts";
 import { isFilesystemWriteGuardEnabled, getGuardMode } from "./filesystemWriteGuard.ts";
 import { isNetworkAllowlistEnabled, getAllowlistMode } from "./networkAllowlist.ts";
 import { isKillSwitchesEnabled } from "./killSwitches.ts";
@@ -33,7 +31,6 @@ import { isUniverseEnabled } from "./anti-rot/tradingUniverse.ts";
 import { isExternalHookRunnerEnabled } from "../hooks/externalHookRunner.ts";
 
 const prevCwd = process.cwd();
-const dirs: string[] = [];
 const TOUCHED = [
   "GORDON_FILESYSTEM_WRITE_GUARD",
   "GORDON_FILESYSTEM_WRITE_GUARD_MODE",
@@ -54,33 +51,33 @@ const TOUCHED = [
   "GORDON_EXTERNAL_HOOK_RUNNER",
 ];
 
-/** Write a project-layer settings.json holding only the given flags. */
+/**
+ * Publish the given flags through the settings store, with env unset.
+ *
+ * The session layer rather than a project-layer `.gordon/settings.json`: these
+ * gates are safety-critical, and `flagResolver` deliberately refuses to source
+ * those from the project layer, because a cloned repository can ship that file
+ * and would otherwise govern the halt it is subject to. `/flags set` persists
+ * to the operator's own home-directory settings, which is a trusted layer like
+ * this one, so the split-path bug under test is reproduced faithfully.
+ */
 function settingsLayerOnly(flags: Record<string, string>): void {
-  const dir = mkdtempSync(join(tmpdir(), "gordon-splitpath-"));
-  dirs.push(dir);
-  mkdirSync(join(dir, ".gordon"), { recursive: true });
-  writeFileSync(join(dir, ".gordon", "settings.json"), JSON.stringify({ flags }), "utf-8");
-  process.chdir(dir);
+  setSessionOverride("flags", flags);
   resetFlagCache();
 }
 
 beforeEach(() => {
   for (const name of TOUCHED) delete process.env[name];
   process.chdir(prevCwd);
+  clearSessionOverrides();
   resetFlagCache();
 });
 
 afterAll(() => {
   for (const name of TOUCHED) delete process.env[name];
   process.chdir(prevCwd);
+  clearSessionOverrides();
   resetFlagCache();
-  for (const dir of dirs) {
-    try {
-      rmSync(dir, { recursive: true, force: true });
-    } catch {
-      // best-effort temp cleanup
-    }
-  }
 });
 
 describe("settings-layer flags reach their gate", () => {
