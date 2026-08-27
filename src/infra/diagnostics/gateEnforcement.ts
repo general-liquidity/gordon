@@ -41,7 +41,35 @@ export interface GateDescriptor {
   remedy: string;
 }
 
-export const EMITTED_HOOK_POINTS: ReadonlySet<HookPoint> = new Set(HOOK_POINTS);
+/**
+ * Production emit site per hook point: [module path relative to this file, the
+ * emit call that module must contain]. This table, NOT `HOOK_POINTS`, is what
+ * "emitted" means. A point declared in `HOOK_POINTS` with no entry here is
+ * inert and {@link checkHookCoverage} fails on it — deriving the set from the
+ * declarations instead would make the check unable to fail. `gateEnforcement.test.ts`
+ * reads each module and asserts the token is present, so an entry cannot
+ * outlive the call site it names.
+ */
+export const PRODUCTION_HOOK_BRIDGES: Partial<Record<HookPoint, readonly [string, string]>> = {
+  PreToolUse: ["../agents/tools/wrappers/withMetrics.ts", 'runHooks("PreToolUse"'],
+  PostToolUse: ["../agents/tools/wrappers/withMetrics.ts", 'runHooks("PostToolUse"'],
+  PreCompact: ["../domain/memory/summarizer.ts", 'runHooks("PreCompact"'],
+  PostCompact: ["../domain/memory/summarizer.ts", 'runHooks("PostCompact"'],
+  SessionStart: ["../../runtime/session/SessionRuntime.ts", 'runHooks("SessionStart"'],
+  Stop: ["../../runtime/session/SessionRuntime.ts", 'runHooks("Stop"'],
+  UserPromptSubmit: ["../agents/orchestrator.ts", 'runHooks("UserPromptSubmit"'],
+  SessionEnd: ["../../runtime/session/SessionRuntime.ts", 'runHooks("SessionEnd"'],
+  PreApproval: ["../../runtime/permissions/PermissionEngine.ts", 'runHooks("PreApproval"'],
+  PostApproval: ["../../runtime/permissions/PermissionEngine.ts", 'emitHook("PostApproval"'],
+  PreOrderPlacement: ["../agents/tools/market/orderbook.ts", 'runHooks("PreOrderPlacement"'],
+  PostOrderPlacement: ["../agents/tools/market/orderbook.ts", 'runHooks("PostOrderPlacement"'],
+  SubagentStart: ["../hooks/subagentHookBridge.ts", 'runHooks("SubagentStart"'],
+  SubagentStop: ["../hooks/subagentHookBridge.ts", 'runHooks("SubagentStop"'],
+};
+
+export const EMITTED_HOOK_POINTS: ReadonlySet<HookPoint> = new Set(
+  Object.keys(PRODUCTION_HOOK_BRIDGES) as HookPoint[],
+);
 
 export const DEFAULT_GATES: readonly GateDescriptor[] = [
   {
@@ -126,27 +154,40 @@ export function checkPolicyLayerIntegrity(
 }
 
 /**
- * Registered hooks attached to a point nothing emits. Such a hook looks
- * installed to every caller of `listHooks` and never runs.
+ * Two ways a hook point stops meaning anything: a point is declared and never
+ * emitted, or a hook is registered on a point nothing emits. Both look
+ * installed to every caller of `listHooks` and never run.
  */
 export function checkHookCoverage(
   emitted: ReadonlySet<HookPoint> = EMITTED_HOOK_POINTS,
+  declared: readonly HookPoint[] = HOOK_POINTS,
 ): DiagnosticCheck {
+  const unemitted = declared.filter((point) => !emitted.has(point));
   const inert = listHooks()
     .filter((h) => !emitted.has(h.point))
     .map((h) => `${h.id}@${h.point}`);
-  if (inert.length === 0) {
+  if (unemitted.length === 0 && inert.length === 0) {
     return {
       id: "gate.hook-coverage",
       label: "Hook coverage",
       status: "pass",
-      message: "Every registered hook is attached to a point that is actually emitted.",
+      message:
+        "Every declared hook point is emitted, and every registered hook is attached to one.",
     };
+  }
+  const problems: string[] = [];
+  if (unemitted.length > 0) {
+    problems.push(`Declared with no production emit site: ${unemitted.join(", ")}`);
+  }
+  if (inert.length > 0) {
+    problems.push(
+      `Registered at hook points nothing emits, so they never run: ${inert.join(", ")}`,
+    );
   }
   return {
     id: "gate.hook-coverage",
     label: "Hook coverage",
     status: "fail",
-    message: `Registered at hook points nothing emits, so they never run: ${inert.join(", ")}. Emitted points: ${[...emitted].join(", ")}.`,
+    message: `${problems.join(". ")}. Emitted points: ${[...emitted].join(", ")}.`,
   };
 }

@@ -30,7 +30,7 @@ describe("permission racing removal", () => {
   });
 });
 
-describe("PreToolUse is a declared-but-unemitted hook point", () => {
+describe("the permission fast path does not emit PreToolUse", () => {
   test("a registered PreToolUse hook only runs if something emits it", async () => {
     clearHooks();
     let fired = 0;
@@ -42,10 +42,10 @@ describe("PreToolUse is a declared-but-unemitted hook point", () => {
         return { action: "allow" };
       },
     });
-    // Nothing in the permission path emits PreToolUse any more.
+    // PreToolUse is emitted by the tool wrapper (withMetrics.ts), not here.
     quickPermissionCheck([], "place_order", {});
     expect(fired).toBe(0);
-    // The engine itself still works — the gap is the missing emit site, which
+    // The engine itself still works; a point with no emit site at all is what
     // `checkHookCoverage` in diagnostics/gateEnforcement.ts reports.
     await runHooks("PreToolUse", { toolName: "place_order", toolCallId: "1", args: {} });
     expect(fired).toBe(1);
