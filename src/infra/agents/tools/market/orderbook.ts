@@ -26,6 +26,10 @@ import { placeOCOOrders } from "../../../../core/pipeline/executor.ts";
 import { resolveInstrument } from "../../../domain/markets/instruments.ts";
 import { checkKillSwitchForOrder } from "../../../safety/killSwitchGate.ts";
 import { requireLiveConsent } from "../../../safety/consent.ts";
+import {
+  classifyCancellationExposure,
+  inspectCancellationMarket,
+} from "../../../trading/risk/cancelExposure.ts";
 
 function killSwitchOrderError(
   ctx: ReturnType<typeof getGordonContext>,
@@ -657,25 +661,47 @@ export const cancelAllOrdersTool = createTool({
       // Storage failures must not block the cancellation itself.
     }
 
-    // A blanket cancellation can remove a protective stop. It does not change
-    // current exposure, but it can turn a bounded position into an unprotected
-    // one, so the agent-issued path requires the same live-capital
-    // acknowledgement as other risk-increasing mutations. Emergency
-    // liquidation uses its narrower, position-aware cancellation routine and
-    // remains available after consent expires.
     const consent = requireLiveConsent({ sandboxActive: ctx.exchange.isSandbox ?? false });
-    if (!consent.ok) {
-      return {
-        error: consent.reason ?? "Live-trading consent required.",
-        symbol: normalizedSymbol,
-      };
-    }
     try {
-      const cancelled = await ctx.exchange.cancelAllOrders(normalizedSymbol);
+      if (consent.ok) {
+        const cancelled = await ctx.exchange.cancelAllOrders(normalizedSymbol);
+
+        return {
+          success: true,
+          message: `Cancelled ${cancelled.length} orders on ${normalizedSymbol}`,
+          cancelledOrders: cancelled.map((o) => ({
+            orderId: Number(o.orderId) || 0,
+            type: o.type,
+            side: o.side,
+            price: o.price.toFixed(8),
+            quantity: o.quantity.toFixed(8),
+          })),
+        };
+      }
+
+      const openOrders = await ctx.exchange.getOpenOrders(normalizedSymbol);
+      const market = await inspectCancellationMarket(ctx.exchange, normalizedSymbol);
+      const cancelled = [];
+      const retained: string[] = [];
+      for (const order of openOrders) {
+        const exposure = classifyCancellationExposure(order, market.balances, market.context);
+        if (exposure !== "reduces_risk") {
+          retained.push(`${order.orderId} (${exposure})`);
+          continue;
+        }
+        try {
+          await ctx.exchange.cancelOrder(order.symbol, String(order.orderId));
+          cancelled.push(order);
+        } catch (error) {
+          retained.push(
+            `${order.orderId} (cancel failed: ${error instanceof Error ? error.message : String(error)})`,
+          );
+        }
+      }
 
       return {
-        success: true,
-        message: `Cancelled ${cancelled.length} orders on ${normalizedSymbol}`,
+        success: retained.length === 0,
+        message: `Cancelled ${cancelled.length} exposure-increasing orders on ${normalizedSymbol}`,
         cancelledOrders: cancelled.map((o) => ({
           orderId: Number(o.orderId) || 0,
           type: o.type,
@@ -683,6 +709,10 @@ export const cancelAllOrdersTool = createTool({
           price: o.price.toFixed(8),
           quantity: o.quantity.toFixed(8),
         })),
+        error:
+          retained.length > 0
+            ? `${consent.reason ?? "Live-trading consent required."} Retained ${retained.join(", ")}.`
+            : undefined,
       };
     } catch (error) {
       return { error: `Failed to cancel orders: ${(error as Error).message}` };
@@ -1213,17 +1243,22 @@ export const cancelOrderTool = createTool({
       // Storage failures must not block the cancellation itself.
     }
 
-    // A specific order can still be a protective stop. The public agent tool
-    // cannot prove from an exchange order id alone that cancellation only
-    // removes an unfilled entry, so it fails closed on a live venue until the
-    // operator has acknowledged live-capital control. Position-aware emergency
-    // cleanup remains separately exempt.
     const consent = requireLiveConsent({ sandboxActive: ctx.exchange.isSandbox ?? false });
     if (!consent.ok) {
-      return {
-        error: consent.reason ?? "Live-trading consent required.",
-        symbol: normalizedSymbol,
-      };
+      const [openOrders, market] = await Promise.all([
+        ctx.exchange.getOpenOrders(normalizedSymbol),
+        inspectCancellationMarket(ctx.exchange, normalizedSymbol),
+      ]);
+      const order = openOrders.find((candidate) => String(candidate.orderId) === String(orderId));
+      const exposure = order
+        ? classifyCancellationExposure(order, market.balances, market.context)
+        : "unknown";
+      if (exposure !== "reduces_risk") {
+        return {
+          error: `${consent.reason ?? "Live-trading consent required."} Cancellation classified as ${exposure}.`,
+          symbol: normalizedSymbol,
+        };
+      }
     }
     try {
       await ctx.exchange.cancelOrder(normalizedSymbol, String(orderId));

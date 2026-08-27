@@ -30,7 +30,40 @@ afterAll(() => {
   else process.env[CONSENT_PATH_ENV] = previousConsentPath;
 });
 
-function makeExecContext(placed: string[], isSandbox: boolean, cancelled: string[] = []) {
+function openOrder(
+  overrides: Partial<{
+    orderId: string;
+    symbol: string;
+    side: "BUY" | "SELL";
+    type: "LIMIT" | "STOP_LOSS_LIMIT";
+    quantity: number;
+  }> = {},
+) {
+  return {
+    orderId: "42",
+    symbol: "BTCUSDT",
+    side: "BUY" as const,
+    type: "LIMIT" as const,
+    status: "NEW" as const,
+    price: 100,
+    quantity: 1,
+    executedQty: 0,
+    cummulativeQuoteQty: 0,
+    ...overrides,
+  };
+}
+
+function makeExecContext(
+  placed: string[],
+  isSandbox: boolean,
+  cancelled: string[] = [],
+  options: {
+    orders?: ReturnType<typeof openOrder>[];
+    accountType?: string;
+    balances?: Array<{ asset: string; free: number; locked: number; total: number }>;
+    position?: { side: "long" | "short"; contracts: number; contractSize: number } | null;
+  } = {},
+) {
   const exchange = {
     exchangeId: "binance",
     displayName: "Binance",
@@ -57,6 +90,27 @@ function makeExecContext(placed: string[], isSandbox: boolean, cancelled: string
     cancelOrder: async (symbol: string, orderId: string) => {
       cancelled.push(`${symbol}:${orderId}`);
     },
+    getOpenOrders: async () => options.orders ?? [],
+    getFullAccountDetails: async () => ({
+      accountInfo: {
+        accountType: options.accountType ?? "SPOT",
+        canTrade: true,
+        canDeposit: true,
+        canWithdraw: true,
+        balances: options.balances ?? [],
+        updateTime: Date.now(),
+      },
+      nonZeroBalances: options.balances ?? [],
+      totalUsdtValue: 10_000,
+    }),
+    ...(options.accountType === "FUTURES"
+      ? {
+          getMarketType: async () => "derivative" as const,
+          supports: (method: string) => method === "fetchPositions",
+          fetchPositions: async () =>
+            options.position ? [{ symbol: "BTCUSDT", ...options.position }] : [],
+        }
+      : {}),
   };
   const values: Record<string, unknown> = { exchange, config: { permissionMode: "auto" } };
   return { requestContext: { get: (key: string) => values[key] } } as never;
@@ -76,19 +130,28 @@ describe("place_limit_order live-consent gate", () => {
 });
 
 describe("cancel_all_orders live-consent gate", () => {
-  it("refuses a blanket live cancellation that could remove protective stops", async () => {
+  it("cancels live entry risk while retaining a protective stop without consent", async () => {
     const placed: string[] = [];
     const cancelled: string[] = [];
+    const orders = [
+      openOrder({ orderId: "41", side: "BUY", type: "LIMIT" }),
+      openOrder({ orderId: "42", side: "SELL", type: "STOP_LOSS_LIMIT" }),
+    ];
     const res = (await cancelAllOrdersTool.execute!(
       {
         symbol: "BTCUSDT",
         rationale: "Operator requested a full cancellation after a regime change",
       } as never,
-      makeExecContext(placed, false, cancelled),
-    )) as { error?: string };
+      makeExecContext(placed, false, cancelled, {
+        orders,
+        balances: [{ asset: "BTC", free: 1, locked: 0, total: 1 }],
+      }),
+    )) as { success?: boolean; error?: string; cancelledOrders?: Array<{ orderId: number }> };
 
-    expect(res.error).toMatch(/have not yet acknowledged live trading/);
-    expect(cancelled).toEqual([]);
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/Retained 42 \(removes_protection\)/);
+    expect(res.cancelledOrders).toEqual([expect.objectContaining({ orderId: 41 })]);
+    expect(cancelled).toEqual(["BTCUSDT:41"]);
   });
 
   it("keeps blanket cancellation available on a sandbox venue", async () => {
@@ -106,10 +169,52 @@ describe("cancel_all_orders live-consent gate", () => {
     expect(res.success).toBe(true);
     expect(cancelled).toEqual(["BTCUSDT"]);
   });
+
+  it("preserves earlier per-order results when a later live cancellation fails", async () => {
+    const cancelled: string[] = [];
+    const context = makeExecContext([], false, cancelled, {
+      orders: [openOrder({ orderId: "41" }), openOrder({ orderId: "42" })],
+    });
+    const exchange = (context as any).requestContext.get("exchange");
+    exchange.cancelOrder = async (symbol: string, orderId: string) => {
+      if (orderId === "42") throw new Error("venue rejected second cancel");
+      cancelled.push(`${symbol}:${orderId}`);
+    };
+
+    const result = (await cancelAllOrdersTool.execute!(
+      {
+        symbol: "BTCUSDT",
+        rationale: "Operator is removing both pending entries after thesis invalidation",
+      },
+      context,
+    )) as { success?: boolean; cancelledOrders?: unknown[]; error?: string };
+
+    expect(result.success).toBe(false);
+    expect(result.cancelledOrders).toHaveLength(1);
+    expect(result.error).toContain("42 (cancel failed: venue rejected second cancel)");
+    expect(cancelled).toEqual(["BTCUSDT:41"]);
+  });
 });
 
 describe("cancel_order live-consent gate", () => {
-  it("refuses a live cancellation whose protective status cannot be proven", async () => {
+  it("allows cancelling a proven live spot entry without consent", async () => {
+    const placed: string[] = [];
+    const cancelled: string[] = [];
+    const res = (await cancelOrderTool.execute!(
+      {
+        symbol: "BTCUSDT",
+        orderId: 42,
+        rationale: "Operator invalidated this resting entry after review",
+      } as never,
+      makeExecContext(placed, false, cancelled, { orders: [openOrder()] }),
+    )) as { success?: boolean; error?: string };
+
+    expect(res.error).toBeUndefined();
+    expect(res.success).toBe(true);
+    expect(cancelled).toEqual(["BTCUSDT:42"]);
+  });
+
+  it("refuses cancelling a protective live spot exit without consent", async () => {
     const placed: string[] = [];
     const cancelled: string[] = [];
     const res = (await cancelOrderTool.execute!(
@@ -118,10 +223,32 @@ describe("cancel_order live-consent gate", () => {
         orderId: 42,
         rationale: "Operator invalidated this resting order after review",
       } as never,
-      makeExecContext(placed, false, cancelled),
+      makeExecContext(placed, false, cancelled, {
+        orders: [openOrder({ side: "SELL", type: "STOP_LOSS_LIMIT" })],
+        balances: [{ asset: "BTC", free: 1, locked: 0, total: 1 }],
+      }),
     )) as { error?: string };
 
-    expect(res.error).toMatch(/have not yet acknowledged live trading/);
+    expect(res.error).toMatch(/removes_protection/);
+    expect(cancelled).toEqual([]);
+  });
+
+  it("refuses cancelling a BUY that protects a live derivative short", async () => {
+    const cancelled: string[] = [];
+    const res = (await cancelOrderTool.execute!(
+      {
+        symbol: "BTCUSDT",
+        orderId: 42,
+        rationale: "Operator invalidated the short-position protective exit",
+      } as never,
+      makeExecContext([], false, cancelled, {
+        orders: [openOrder({ side: "BUY", type: "STOP_LOSS_LIMIT" })],
+        accountType: "FUTURES",
+        position: { side: "short", contracts: 1, contractSize: 1 },
+      }),
+    )) as { error?: string };
+
+    expect(res.error).toMatch(/removes_protection/);
     expect(cancelled).toEqual([]);
   });
 });

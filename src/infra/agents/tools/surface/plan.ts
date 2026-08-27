@@ -51,6 +51,10 @@ import {
   PAPER_CALIBRATION_2026,
 } from "../../../../core/alpha/signal-half-life.ts";
 import { requireLiveConsent } from "../../../safety/consent.ts";
+import {
+  classifyCancellationExposure,
+  inspectCancellationMarket,
+} from "../../../trading/risk/cancelExposure.ts";
 
 // ============================================================================
 // signal decay (shared by backtest + verify_plan)
@@ -928,9 +932,27 @@ export const cancelTool = createTool({
               error: "Both `id` and `symbol` are required for target='order'.",
             };
           }
-          const consent = requireLiveConsent({ sandboxActive: ctx.exchange.isSandbox ?? false });
+          const consent = requireLiveConsent({
+            sandboxActive: ctx.exchange.isSandbox ?? false,
+          });
           if (!consent.ok) {
-            return { success: false, target: args.target, error: consent.reason };
+            const [orders, market] = await Promise.all([
+              ctx.exchange.getOpenOrders(args.symbol),
+              inspectCancellationMarket(ctx.exchange, args.symbol),
+            ]);
+            const openOrder = orders.find(
+              (order) => String(order.orderId) === args.id && order.symbol === args.symbol,
+            );
+            const exposure = openOrder
+              ? classifyCancellationExposure(openOrder, market.balances, market.context)
+              : "unknown";
+            if (exposure !== "reduces_risk") {
+              return {
+                success: false,
+                target: args.target,
+                error: `${consent.reason} Cancellation classified as ${exposure}.`,
+              };
+            }
           }
           await ctx.exchange.cancelOrder(args.symbol, args.id);
           auditLog.record(
@@ -957,18 +979,63 @@ export const cancelTool = createTool({
             };
           }
           const consent = requireLiveConsent({ sandboxActive: ctx.exchange.isSandbox ?? false });
-          if (!consent.ok) {
-            return { success: false, target: args.target, error: consent.reason };
+          if (consent.ok) {
+            const cancelled = await ctx.exchange.cancelAllOrders(args.symbol);
+            auditLog.record(
+              "operator",
+              "CANCEL_ALL_ORDERS" as Parameters<typeof auditLog.record>[1],
+              { symbol: args.symbol, reason: args.reason, count: cancelled.length },
+              "SUCCESS",
+              { resultDetails: args.reason },
+            );
+            return { success: true, target: "all_orders", cancelled };
           }
-          const cancelled = await ctx.exchange.cancelAllOrders(args.symbol);
+
+          const openOrders = await ctx.exchange.getOpenOrders(args.symbol);
+          const market = await inspectCancellationMarket(ctx.exchange, args.symbol);
+          const cancelled: unknown[] = [];
+          const retained: string[] = [];
+          for (const order of openOrders) {
+            const exposure = classifyCancellationExposure(order, market.balances, market.context);
+            if (!(ctx.exchange.isSandbox ?? false) && exposure !== "reduces_risk" && !consent.ok) {
+              retained.push(`${order.orderId} (${exposure})`);
+              continue;
+            }
+            try {
+              await ctx.exchange.cancelOrder(order.symbol, String(order.orderId));
+              cancelled.push(order);
+            } catch (error) {
+              retained.push(
+                `${order.orderId} (cancel failed: ${error instanceof Error ? error.message : String(error)})`,
+              );
+            }
+          }
           auditLog.record(
             "operator",
             "CANCEL_ALL_ORDERS" as Parameters<typeof auditLog.record>[1],
-            { symbol: args.symbol, reason: args.reason, count: cancelled.length },
-            "SUCCESS",
-            { resultDetails: args.reason },
+            {
+              symbol: args.symbol,
+              reason: args.reason,
+              count: cancelled.length,
+              retained,
+            },
+            retained.length === 0 ? "SUCCESS" : "FAILURE",
+            {
+              resultDetails:
+                retained.length === 0
+                  ? args.reason
+                  : `${args.reason}; protective/unknown orders retained: ${retained.join(", ")}`,
+            },
           );
-          return { success: true, target: "all_orders", cancelled };
+          return {
+            success: retained.length === 0,
+            target: "all_orders",
+            cancelled,
+            error:
+              retained.length > 0
+                ? `${consent.reason} Retained ${retained.join(", ")}.`
+                : undefined,
+          };
         }
         case "position": {
           if (!args.id)
