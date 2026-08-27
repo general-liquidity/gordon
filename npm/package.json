@@ -1,6 +1,6 @@
 {
   "name": "@general-liquidity/gordon",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "The Frontier Trading Agent",
   "author": "General Liquidity, Inc.",
   "license": "MIT",
@@ -34,13 +34,13 @@
     "provenance": true
   },
   "optionalDependencies": {
-    "@general-liquidity/gordon-linux-x64": "0.5.3",
-    "@general-liquidity/gordon-linux-arm64": "0.5.3",
-    "@general-liquidity/gordon-linux-x64-musl": "0.5.3",
-    "@general-liquidity/gordon-linux-arm64-musl": "0.5.3",
-    "@general-liquidity/gordon-darwin-x64": "0.5.3",
-    "@general-liquidity/gordon-darwin-arm64": "0.5.3",
-    "@general-liquidity/gordon-win32-x64": "0.5.3",
-    "@general-liquidity/gordon-win32-arm64": "0.5.3"
+    "@general-liquidity/gordon-linux-x64": "0.5.4",
+    "@general-liquidity/gordon-linux-arm64": "0.5.4",
+    "@general-liquidity/gordon-linux-x64-musl": "0.5.4",
+    "@general-liquidity/gordon-linux-arm64-musl": "0.5.4",
+    "@general-liquidity/gordon-darwin-x64": "0.5.4",
+    "@general-liquidity/gordon-darwin-arm64": "0.5.4",
+    "@general-liquidity/gordon-win32-x64": "0.5.4",
+    "@general-liquidity/gordon-win32-arm64": "0.5.4"
   }
 }
