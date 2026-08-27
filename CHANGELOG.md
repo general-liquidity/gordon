@@ -10,6 +10,8 @@ called out explicitly, whatever their size.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-27
+
 Covers `0ec0bebd`, `783a9ebf` and `95a20ed3`, which landed after the v0.4.0 tag.
 `0ec0bebd` also carried a repo-wide Biome reformat across 2,300 files; only its
 behavioural changes are listed here, alongside the fixes made since.
@@ -379,7 +381,8 @@ The permission change is behavioral: a tool that was previously auto-approved
 through the unknown-name fallthrough now queues for human approval. That is the
 intent, and it is why this is a minor rather than a patch release.
 
-[Unreleased]: https://github.com/general-liquidity/gordon/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/general-liquidity/gordon/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/general-liquidity/gordon/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/general-liquidity/gordon/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/general-liquidity/gordon/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/general-liquidity/gordon/compare/v0.3.0...v0.3.1
