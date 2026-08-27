@@ -14,14 +14,38 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resetFlagCache } from "../config/flagResolver.ts";
+import { clearSessionOverrides, setSessionOverride } from "../config/settingsLayers.ts";
 import { setCostBudget } from "../platform/costTracker.ts";
 import { isACEEnabled } from "./ace/Reflector.ts";
 import { dispatchSubagentTask, isDynamicSubagentsEnabled } from "./profiles/subagentDispatcher.ts";
-import { discoverCostCeiling } from "./processors/nativeProcessors.ts";
+import {
+  discoverCostCeiling,
+  getNativeInputProcessors,
+  isNativeProcessorsEnabled,
+} from "./processors/nativeProcessors.ts";
 
 const prevCwd = process.cwd();
 const dirs: string[] = [];
-const TOUCHED = ["GORDON_ACE_ENABLED", "GORDON_DYNAMIC_SUBAGENTS", "GORDON_COST_BUDGET_USD"];
+const TOUCHED = [
+  "GORDON_ACE_ENABLED",
+  "GORDON_DYNAMIC_SUBAGENTS",
+  "GORDON_COST_BUDGET_USD",
+  "GORDON_MASTRA_PROCESSORS",
+  "GORDON_MASTRA_PROCESSORS_MODEL",
+];
+
+/**
+ * Publish flags through the SESSION settings layer with env unset.
+ *
+ * The session layer rather than the project-layer file the helper above
+ * writes: `flagResolver` refuses safety-critical flags from the project layer,
+ * because a cloned repository can ship that file, so a project-layer fixture
+ * would not reproduce the split path for anything on that list.
+ */
+function sessionLayerOnly(flags: Record<string, string>): void {
+  setSessionOverride("flags", flags);
+  resetFlagCache();
+}
 
 /** Write a project-layer settings.json holding only the given flags. */
 function settingsLayerOnly(flags: Record<string, string>): void {
@@ -36,6 +60,7 @@ function settingsLayerOnly(flags: Record<string, string>): void {
 beforeEach(() => {
   for (const name of TOUCHED) delete process.env[name];
   process.chdir(prevCwd);
+  clearSessionOverrides();
   resetFlagCache();
   setCostBudget(null);
 });
@@ -43,6 +68,7 @@ beforeEach(() => {
 afterAll(() => {
   for (const name of TOUCHED) delete process.env[name];
   process.chdir(prevCwd);
+  clearSessionOverrides();
   resetFlagCache();
   setCostBudget(null);
   for (const dir of dirs) {
@@ -86,6 +112,23 @@ describe("settings-layer flags reach their agent-tree reader", () => {
   test("GORDON_COST_BUDGET_USD reaches the native cost-guard ceiling", () => {
     settingsLayerOnly({ GORDON_COST_BUDGET_USD: "7" });
     expect(discoverCostCeiling()).toBe(7);
+  });
+
+  test("GORDON_MASTRA_PROCESSORS reaches the native-processor gate", () => {
+    sessionLayerOnly({ GORDON_MASTRA_PROCESSORS: "1" });
+    expect(isNativeProcessorsEnabled()).toBe(true);
+  });
+
+  test("GORDON_MASTRA_PROCESSORS_MODEL reaches the detection-model choice", () => {
+    // The model override is only observable through a processor the gate built,
+    // so both flags are published together and the detector is inspected.
+    sessionLayerOnly({
+      GORDON_MASTRA_PROCESSORS: "1",
+      GORDON_MASTRA_PROCESSORS_MODEL: "openai/gpt-5-nano",
+    });
+    const detector = getNativeInputProcessors().find((p) => p.id === "prompt-injection-detector");
+    expect(detector).toBeDefined();
+    expect(JSON.stringify(detector)).toContain("gpt-5-nano");
   });
 
   test("an explicit env var still wins over the settings layer", () => {
