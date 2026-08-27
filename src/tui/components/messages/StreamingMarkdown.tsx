@@ -269,10 +269,14 @@ export function StreamingMarkdown({ content, isStreaming }: Props) {
     stablePrefixRef.current = stripped.substring(0, boundary + advance);
   }
 
-  // Stable prefix blocks (memoized, never re-parsed)
+  // Stable prefix blocks (memoized, re-parsed only when the prefix advances).
+  // Read the ref into a local first: a ref is not a valid dependency, and an
+  // empty dependency list froze this at the first render's empty prefix, so
+  // everything the prefix absorbed vanished from allBlocks.
+  const stablePrefix = stablePrefixRef.current;
   const stableBlocks = useMemo(
-    () => (stablePrefixRef.current ? parseBlocks(stablePrefixRef.current) : []),
-    [],
+    () => (stablePrefix ? parseBlocks(stablePrefix) : []),
+    [stablePrefix],
   );
 
   const allBlocks = [...stableBlocks, ...tailBlocks];
