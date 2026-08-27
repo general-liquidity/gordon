@@ -10,6 +10,129 @@ called out explicitly, whatever their size.
 
 ## [Unreleased]
 
+Covers `0ec0bebd`, `783a9ebf` and `95a20ed3`, which landed after the v0.4.0 tag.
+`0ec0bebd` also carried a repo-wide Biome reformat across 2,300 files; only its
+behavioural changes are listed here, alongside the fixes made since.
+
+### Security
+
+- Safety-critical flags no longer resolve from the project settings layer.
+  Unifying the flag readers on `flagEnv()` had widened the trust boundary for
+  the kill switches, the risk-kernel caps, the pre-trade rate controls, the
+  network and filesystem guards, the subprocess sandbox and the clean-state
+  override from environment variables to any settings layer, including
+  `<cwd>/.gordon/settings.json`, which a repository can carry. A cloned repo
+  could disable the firm-wide halt at every order-placing adapter and lift the
+  leverage and position caps with an unsigned file. Those flags now resolve
+  from the environment, the operator's home-directory settings and the signed
+  policy layer only; every other flag keeps the full chain.
+- `withdraw_to_external` now takes the live-capital consent gate before it
+  reaches the venue. It is deny-listed and always required an explicit human
+  approval, but the permission helper it called returns allowed unconditionally
+  for both `auto` and `ask`, so the most irreversible action Gordon can take
+  was the one order-adjacent path with no consent check.
+- `GORDON_RISK_ACK` now enforces the tier its description names. `execute_plan`
+  ran only the warning-triggered half, so a critical-tier plan that raised no
+  risk-kernel warning needed no acknowledgement at all. Medium and higher tiers
+  must now name the top weighted risk dimensions, and warning acknowledgements
+  must be distinct rather than merely long enough.
+- Emergency liquidation and every protective order now dispatch through the
+  idempotent path with a deterministic client order ID and an explicit
+  exposure-reducing consent effect. The previous emergency close used a
+  timestamped ID, so a retry could liquidate twice, and a missing plan silently
+  defaulted the exit side to SELL instead of refusing.
+- Marketplace plugin manifests are verified against an expected SHA-256 before
+  install, and an update cannot replace an installed, previously verified
+  plugin with content that fails the check.
+- Supply-chain gates are pinned and blocking. Gitleaks, Semgrep and osv-scanner
+  run from digest or checksum-pinned versions as hard gates rather than
+  `latest` with `|| true`, workflow actions are pinned to commit SHAs,
+  `actionlint` validates the workflows, and the dependency audit is a single
+  `bun audit --audit-level=moderate` gate with no per-advisory ignores. The one
+  remaining exception lives in `osv-scanner.toml` with an expiry date. The
+  LLM-judge eval leg moved to a separate manually dispatched job so an
+  untrusted pull request cannot execute secret-bearing code.
+- The dependency surface shrank: the Solana, Coinbase AgentKit, Chainlink and
+  ethers subtrees were removed, and 17 transitive packages are pinned through
+  `overrides` for advisory remediation.
+
+### Changed
+
+- Take-profits are no longer rested on the venue. `executePlan` places the
+  protective stop only, and the monitor executes at most one managed partial
+  close per cycle when price crosses a level, leaving a native OCO take-profit
+  venue-managed where one exists.
+- Entries are fill-confirmed for every order type. An entry that is not
+  `FILLED` now waits for the fill and cancels on partial, a zero-fill entry is
+  cancelled and reported as an error instead of proceeding to protective
+  orders, and the exit quantity comes strictly from the confirmed executed
+  quantity.
+- Close paths are serialized and plan-scoped. A trade already being closed
+  refuses re-entry, `closeTrade` requires the plan to exist, cancels only that
+  plan's orders instead of every open order on the symbol, aborts if a
+  cancellation is not confirmed, and leaves a partially closed trade in
+  `PARTIAL` with a `trade:partial_close` event rather than reporting a clean
+  close. `cancelTrade` refuses a trade that still holds exposure.
+- The non-native OCO fallback was removed. On a venue without native OCO,
+  `placeOCOOrders` refuses and places nothing rather than emulating it with two
+  independent orders.
+- The CCXT adapter refuses instead of guessing. An unknown order type, status
+  or side, a missing symbol, inconsistent quantities and a negative commission
+  now throw rather than defaulting to `LIMIT` / `NEW` / `BUY`,
+  `cancelAllOrders` reports an `AggregateError` instead of swallowing failures,
+  `testOrder` no longer returns `true` without contacting a validator, and
+  account valuation throws when a positive non-stable balance has no usable
+  mark instead of reporting it as zero.
+- The live portfolio snapshot fails closed. An unpriceable positive balance
+  invalidates the whole snapshot, since omitting it made concentration and
+  leverage look safer than they were; available cash comes from the account
+  snapshot rather than per-asset queries that could turn an adapter failure
+  into a fabricated zero; and every context is schema-validated before it
+  reaches the risk kernel.
+- Short plans are handled end to end. Risk/reward validation, stop and
+  take-profit placement rules, unrealized and realized PnL, distance to stop
+  and to the next target, and the user-facing plan explanation all apply the
+  direction, where several were long-only arithmetic before.
+- Daily trade counts are no longer conflated with the rolling recent count: the
+  classifier portfolio context carries `todayTradeCount` and the constitution
+  checks use it.
+
+### Fixed
+
+- The monitor no longer infers fills from price. It used to mark a trade closed
+  with a synthetic exit as soon as the last price crossed the stop; exits are
+  now ledgered only from venue-confirmed fills, using executed-quantity deltas
+  and real fill prices. A confirmed protective fill cancels the sibling
+  protection, repairs protection after a partial exit, and raises a critical
+  alert when either step is incomplete.
+- Risk-audit records could be lost. Schema initialisation was cached per
+  process, so any database opened after the first skipped the table creation,
+  and the audit write was fire-and-forget, which raced database rotation. The
+  write is now awaited and initialisation is keyed to the database generation.
+  Prepared statements are finalised so Windows file handles do not outlive
+  `Database.close()`.
+- The hook-coverage diagnostic can fail again. `EMITTED_HOOK_POINTS` was
+  derived from the declaration list, which made "emitted" mean "declared" and
+  left `checkHookCoverage` structurally unable to report a failure. It now
+  derives from a table of production emit sites, and a declared point with no
+  emit site is a failure.
+- The CCXT adapter header no longer claims a paper-trading guarantee it cannot
+  make. The refusal covers first-class venues in the sandbox support matrix;
+  for a long-tail CCXT venue there is no matrix entry and `setSandboxMode` can
+  no-op silently, so `isSandbox` can read true against a live endpoint.
+- `GORDON_REVENGE_TRADE_GUARD` was advertised in `/flags` as a trade-halt gate,
+  but nothing read it and the guard it names blocks nothing. The flag entry and
+  its unused reader are gone; the advisory evaluator and its agent tool are
+  unchanged.
+- The termination Layer-1 gate had four tests that could not fail, one of them
+  asserting against a status union that does not exist. They now pin each
+  blocking reason, the passing case, and that `execute_plan` refuses without
+  reaching the executor when layer 1 fails under enforce.
+- CI workflow and scanner false positives are cleared: GitHub context is routed
+  through quoted environment variables, an intentional JavaScript quote
+  boundary is marked for ShellCheck, and public redaction fixtures no longer
+  resemble committed credentials.
+
 ## [0.4.0] - 2026-08-26
 
 ### Security
