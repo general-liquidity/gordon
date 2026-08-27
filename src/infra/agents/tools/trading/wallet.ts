@@ -21,6 +21,7 @@ import { z } from "zod";
 
 import { getGordonContext, type MastraExecutionContext } from "../types.ts";
 import { checkTradingPermission } from "../runtime/permissionHelpers.ts";
+import { requireLiveConsent } from "../../../safety/consent.ts";
 import type { ExchangeExtended, WithdrawalInfo } from "../../../exchange/types.ts";
 
 // ============================================================================
@@ -724,6 +725,25 @@ export const withdrawToExternalTool = createTool({
           tag: tag || undefined,
         },
       };
+    }
+
+    // Sending funds off the venue is the most irreversible action Gordon can
+    // take, so it needs the same live-capital acknowledgement as an order or a
+    // blanket cancellation. checkTradingPermission below returns allowed for
+    // both `auto` and `ask`, so it is not that gate.
+    {
+      const consent = requireLiveConsent({
+        sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper ?? false,
+      });
+      if (!consent.ok) {
+        return {
+          error: consent.reason ?? "Live-trading consent required.",
+          coin: coinUpper,
+          amount,
+          network: networkInfo.network,
+          address,
+        };
+      }
     }
 
     // Gate withdrawal across all permission modes
