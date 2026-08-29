@@ -145,9 +145,9 @@ describe("the rehearsal and the release agree on their toolchain", () => {
     // The compile target is resolved by the newest pin in each file: the build
     // job. Comparing the maximum avoids depending on job order in either file.
     const newest = (versions: string[]) =>
-      versions.slice().sort((a, b) =>
-        a.localeCompare(b, undefined, { numeric: true }),
-      )[versions.length - 1];
+      versions.slice().sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))[
+        versions.length - 1
+      ];
     expect(newest(rehearsal)).toBe(newest(release));
   });
 
