@@ -125,3 +125,37 @@ describe("pre-tag release rehearsal", () => {
     expect(source(".github/workflows/release.yml")).toContain("bun_target: bun-windows-arm64");
   });
 });
+
+// The rehearsal is a copy of the release path, so every pin it duplicates can
+// drift out of step with the real one. The bun version is the pin that matters
+// most: v0.5.4 shipped without gordon-windows-arm64.exe because the build job
+// was on 1.3.7, which does not publish that cross-compile target. A rehearsal
+// green on a different bun than the release proves nothing about the release.
+describe("the rehearsal and the release agree on their toolchain", () => {
+  function bunVersions(path: string): string[] {
+    return [...source(path).matchAll(/bun-version:\s*(\S+)/g)].map((m) => m[1] as string);
+  }
+
+  test("the binary-building bun version is the same in both", () => {
+    const release = bunVersions(".github/workflows/release.yml");
+    const rehearsal = bunVersions(".github/workflows/release-rehearsal.yml");
+
+    expect(release.length).toBeGreaterThan(0);
+    expect(rehearsal.length).toBeGreaterThan(0);
+    // The compile target is resolved by the newest pin in each file: the build
+    // job. Comparing the maximum avoids depending on job order in either file.
+    const newest = (versions: string[]) =>
+      versions.slice().sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true }),
+      )[versions.length - 1];
+    expect(newest(rehearsal)).toBe(newest(release));
+  });
+
+  test("every bun version the rehearsal pins is one the release also pins", () => {
+    const release = new Set(bunVersions(".github/workflows/release.yml"));
+
+    for (const version of bunVersions(".github/workflows/release-rehearsal.yml")) {
+      expect([...release]).toContain(version);
+    }
+  });
+});

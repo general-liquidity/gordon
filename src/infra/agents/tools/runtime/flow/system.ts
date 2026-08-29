@@ -864,7 +864,7 @@ export const manageFlagsTool = createTool({
   id: "manage_flags",
   description: [
     "Inspect or toggle Gordon's operator-toggleable flags at runtime. Covers the",
-    "opt-in behavior flags (ACE, subagents, memory deferral, supervision, compaction),",
+    "opt-in behavior flags (ACE, subagents, memory deferral, compaction),",
     "the reasoning passes, the trade-halt gates, cost/risk config, and the safety flags.",
     "",
     "Resolution precedence: process.env override > settings.json (flags) > built-in default.",

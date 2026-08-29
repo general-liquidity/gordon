@@ -1,5 +1,13 @@
 # Harness-Engineering Deferred Wiring
 
+> **Archived snapshot, superseded. Do not read as current behavior.** Much of
+> this punch list has since shipped, and shipped differently: the streak, give-
+> back and absorbing-barrier gates now block in `evaluateOrderRisk` rather than
+> running in shadow mode, `GORDON_AGENT_READINESS_GATE` only adds doctor rows
+> and blocks nothing (there is no override flag), and the supervision-rust
+> module has been deleted. `CLAUDE.md` is the current source of truth for what
+> each flag does.
+
 Working punch list for turning cold harness modules into hot-path enforcement.
 All modules below already exist, are tested, and ship behind feature flags
 (`GORDON_*`). What's deferred is the **integration** — connecting each module

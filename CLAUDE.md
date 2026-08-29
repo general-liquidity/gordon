@@ -160,6 +160,14 @@ The three order-time halt gates skip exposure-REDUCING orders. They exist to sto
 | `GORDON_MANAGED_EXITS_ACK=1` | Acknowledge that any live take-profit without venue-native OCO requires Gordon's managed exit reconciler to remain running. Default-off: without this acknowledgement, those live plans are refused before entry; the venue-resident protective stop and all sandbox/backtest paths are unaffected. |
 | `GORDON_RATIONALE_CONSISTENCY=1` | Triangular rationale gate on plan reflection (`infra/agents/cognition/reflection.ts`): scores evidence-to-reasoning, reasoning-to-decision and evidence-to-decision separately, and can invalidate a plan the rule checks accepted. Opt-in because it costs three extra LLM calls per plan. A judge outage degrades to a suggestion and never blocks. |
 | `GORDON_INCEPTION_LOSS_FRACTION` | Fraction of reference capital whose cumulative destruction halts trading (`infra/safety/absorbingBarrierState.ts`). Unset leaves the barrier inactive and behaviour unchanged. Evaluated alongside the trailing high-water barrier, and the gate is the union of their blocks. Seed the reference with `GORDON_INCEPTION_EQUITY_USD`, else the first observed equity. State survives restart in the HMAC-authenticated ledger keyed by broker account ID or a non-secret exchange-connection fingerprint. For CCXT, set `CCXT_<VENUE>_ACCOUNT_ID` (or the first-class `<VENUE>_ACCOUNT_ID`) before credential rotation to retain the same durable identity. Without that stable ID, rotation creates a new namespace and requires the audited archive/reset. Deposits, withdrawals, corrupt files and replacement accounts also require `/killswitch archive-halt-state <rationale>` because Gordon has no authoritative cross-venue capital-flow feed. |
+| `GORDON_TRAILING_DD_FRACTION` | Trailing give-back limit consumed by the same barrier fold. Unset leaves it inactive. |
+| `GORDON_FEE_FIXED_PER_TRANCHE_USD` | Fixed commission per fee tranche, with `GORDON_FEE_TRANCHE_SIZE_USD`, optional `GORDON_FEE_MIN_PER_ORDER_USD`, and `GORDON_FEE_TOLERANCE_BPS` (default 100). Together they derive the economic order floor enforced in `evaluateOrderRisk`: an order clearing the venue minimum can still hand a fixed commission more of the position than the fee tolerance allows. Unset means the floor is not evaluated and a warning is emitted, since Gordon has no venue commission feed and a guessed floor would refuse good orders. |
+| `GORDON_CLEAN_STATE_GATE=1` | Refuse to start an autonomous loop from dirty session state. |
+| `GORDON_PLAN_RUBRIC=1` | Score a plan against the rubric before it can be approved. |
+| `GORDON_EXPLAIN_FIRST=1` | Require the operator's own thesis before Gordon states its view (anti-anchoring). |
+| `GORDON_TRADING_UNIVERSE=1` / `GORDON_STRATEGY_MANDATES=1` / `GORDON_THESIS_COHERENCE=1` | The three anti-rot gates. Each needs an operator-authored file (`*_PATH`), which is why none can be default-on. |
+| `GORDON_SAFETY_CONFIG_GUARD=1` | Refuse config edits that loosen a safety setting without explicit confirmation. |
+| `GORDON_SANDBOX_SUBPROCESS` | Sandbox spawned subprocesses. Unset falls through to the settings file rather than defaulting in the reader. |
 
 The halt ledger detects invalid content, replacement after it has been observed
 by the running process, and failures to lock or persist. Those failures stay
@@ -171,14 +179,6 @@ ledger and its `GORDON_AUDIT_HMAC_KEY` (preferably supplied through
 `GORDON_AUDIT_HMAC_KEY_PATH` or the default `~/.gordon/audit-hmac.key`) in
 durable operator-controlled storage, and resolve persistence errors before
 restarting.
-| `GORDON_TRAILING_DD_FRACTION` | Trailing give-back limit consumed by the same barrier fold. Unset leaves it inactive. |
-| `GORDON_FEE_FIXED_PER_TRANCHE_USD` | Fixed commission per fee tranche, with `GORDON_FEE_TRANCHE_SIZE_USD`, optional `GORDON_FEE_MIN_PER_ORDER_USD`, and `GORDON_FEE_TOLERANCE_BPS` (default 100). Together they derive the economic order floor enforced in `evaluateOrderRisk`: an order clearing the venue minimum can still hand a fixed commission more of the position than the fee tolerance allows. Unset means the floor is not evaluated and a warning is emitted, since Gordon has no venue commission feed and a guessed floor would refuse good orders. |
-| `GORDON_CLEAN_STATE_GATE=1` | Refuse to start an autonomous loop from dirty session state. |
-| `GORDON_PLAN_RUBRIC=1` | Score a plan against the rubric before it can be approved. |
-| `GORDON_EXPLAIN_FIRST=1` | Require the operator's own thesis before Gordon states its view (anti-anchoring). |
-| `GORDON_TRADING_UNIVERSE=1` / `GORDON_STRATEGY_MANDATES=1` / `GORDON_THESIS_COHERENCE=1` | The three anti-rot gates. Each needs an operator-authored file (`*_PATH`), which is why none can be default-on. |
-| `GORDON_SAFETY_CONFIG_GUARD=1` | Refuse config edits that loosen a safety setting without explicit confirmation. |
-| `GORDON_SANDBOX_SUBPROCESS` | Sandbox spawned subprocesses. Unset falls through to the settings file rather than defaulting in the reader. |
 
 Use `/flags` in the TUI to see and manage these settings. Rows marked
 startup-only (`GORDON_GUARDS`, `GORDON_DISABLE_GUARDS`,
