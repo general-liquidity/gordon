@@ -175,19 +175,34 @@ function buildSafetyState(
  * name of an exit. The halt gates read this so a give-back stop or a streak
  * cooldown cannot prevent an operator from flattening.
  */
+function signedSizeOf(position: OpenPosition): number {
+  const magnitude = Math.abs(position.size);
+  return position.side === "short" ? -magnitude : magnitude;
+}
+
+/** `BTC/USDT`, `BTC-USDT` and `BTCUSDT` name one position to the operator. */
+function normalizeExposureSymbol(symbol: string): string {
+  return symbol.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+}
+
 function reducesExposure(
   symbol: string,
   side: "buy" | "sell",
-  proposedNotionalUsd: number,
+  proposedQuantity: number,
   portfolio: PortfolioContext,
 ): boolean {
-  const netNotional = portfolio.openPositions
-    .filter((position) => position.symbol === symbol)
-    .reduce((sum, position) => sum + signedNotionalOf(position), 0);
-  if (netNotional === 0) return false;
-  const delta = side === "sell" ? -proposedNotionalUsd : proposedNotionalUsd;
-  if (Math.sign(delta) === Math.sign(netNotional)) return false;
-  return Math.abs(delta) <= Math.abs(netNotional);
+  // Quantities, not notionals. The order's notional is priced at the limit
+  // price and the position's at the mark, so comparing them made a sell-to-
+  // close priced above the mark look larger than the position it closes, and
+  // the halt gates refused the exit. A flatten is a flatten at any price.
+  const target = normalizeExposureSymbol(symbol);
+  const netSize = portfolio.openPositions
+    .filter((position) => normalizeExposureSymbol(position.symbol) === target)
+    .reduce((sum, position) => sum + signedSizeOf(position), 0);
+  if (netSize === 0) return false;
+  const delta = side === "sell" ? -proposedQuantity : proposedQuantity;
+  if (Math.sign(delta) === Math.sign(netSize)) return false;
+  return Math.abs(delta) <= Math.abs(netSize);
 }
 
 /** The audit value of the projection is the geometry, so it is reported verbatim. */
@@ -345,7 +360,7 @@ export async function evaluateOrderRisk(
   const exposureReducing = reducesExposure(
     order.symbol,
     orderRequest.side,
-    order.quantity * referencePrice,
+    order.quantity,
     portfolioContext,
   );
   if (ctx.broker && !ctx.broker.isPaper && isStreakCircuitBreakerEnabled()) {

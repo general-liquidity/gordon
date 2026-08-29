@@ -425,3 +425,54 @@ describe("absorbing barrier on the order path", () => {
     expect(result.approved).toBe(true);
   });
 });
+
+// The exposure test above sells half the position exactly at the mark, which is
+// the one exit shape that cannot expose a price-scaled comparison. These pin
+// the shapes that can: an exit priced away from the mark, and a position whose
+// symbol is punctuated differently from the order's.
+describe("an exit stays an exit whatever it is priced at", () => {
+  test("a take-profit sell above the mark is not new risk", async () => {
+    const result = await evaluateOrderRisk(
+      { symbol: "BTCUSDT", side: "SELL", type: "LIMIT", quantity: 1, price: PRICE_USD * 1.05 },
+      brokerContextWith(1),
+    );
+
+    expect(result.approved).toBe(true);
+  });
+
+  test("a partial reduction above the mark is not new risk", async () => {
+    const result = await evaluateOrderRisk(
+      { symbol: "BTCUSDT", side: "SELL", type: "LIMIT", quantity: 0.99, price: PRICE_USD * 1.05 },
+      brokerContextWith(1),
+    );
+
+    expect(result.approved).toBe(true);
+  });
+
+  test("the venue's symbol punctuation does not hide the position", async () => {
+    const result = await evaluateOrderRisk(
+      { symbol: "BTC/USDT", side: "SELL", type: "LIMIT", quantity: 1, price: PRICE_USD },
+      brokerContextWith(1),
+    );
+
+    expect(result.approved).toBe(true);
+  });
+
+  test("a sell larger than the position is a flip, and still refused", async () => {
+    const result = await evaluateOrderRisk(
+      { symbol: "BTCUSDT", side: "SELL", type: "LIMIT", quantity: 5, price: PRICE_USD },
+      brokerContextWith(1),
+    );
+
+    expect(result.approved).toBe(false);
+  });
+
+  test("a buy alongside the position is new risk, and still refused", async () => {
+    const result = await evaluateOrderRisk(
+      { symbol: "BTCUSDT", side: "BUY", type: "LIMIT", quantity: 1, price: PRICE_USD },
+      brokerContextWith(1),
+    );
+
+    expect(result.approved).toBe(false);
+  });
+});
