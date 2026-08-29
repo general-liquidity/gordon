@@ -10,6 +10,8 @@ called out explicitly, whatever their size.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-30
+
 ### Security
 
 - Repository-owned dotenv files can no longer disable kill switches, widen
@@ -499,7 +501,8 @@ The permission change is behavioral: a tool that was previously auto-approved
 through the unknown-name fallthrough now queues for human approval. That is the
 intent, and it is why this is a minor rather than a patch release.
 
-[Unreleased]: https://github.com/general-liquidity/gordon/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/general-liquidity/gordon/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/general-liquidity/gordon/compare/v0.5.5...v0.6.0
 [0.5.5]: https://github.com/general-liquidity/gordon/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/general-liquidity/gordon/compare/v0.4.0...v0.5.4
 [0.4.0]: https://github.com/general-liquidity/gordon/compare/v0.3.2...v0.4.0
