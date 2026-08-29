@@ -186,11 +186,18 @@ Gordon is **three agents split along a security boundary**, not one model wearin
 Around them sits the runtime that makes a long session trustworthy:
 
 - **Cognition in phases:** a tool-free thinking pass, in-band extended thinking, an adversarial self-critique at high depth, and a citation audit. These reasoning passes are on by default and throttled by the session cost budget (`GORDON_COST_BUDGET_USD`); set any of them to `0` for a cheaper run.
-- **Protective halts on by default:** the streak circuit breaker, give-back stop,
-  WIP limit, and absorbing barrier all arm themselves out of the box, with
-  their thresholds left tunable. Every one refuses new risk on the order path
-  while leaving exposure-reducing exits available; shadow telemetry reports
-  the same verdicts for observability.
+- **Protective halts on by default:** the streak circuit breaker, give-back stop
+  and absorbing barrier arm themselves out of the box, with their thresholds
+  left tunable. All three refuse new risk on the order path while exempting
+  exposure-reducing orders, so a halt cannot trap you in a position. The
+  absorbing barrier stays dormant until its inputs are configured, and the
+  streak gate fails closed for live brokers, which do not yet report confirmed
+  close outcomes: live broker trading means disabling it deliberately. The WIP
+  limit is also on by default but is a different thing, a cap on concurrent
+  plans per symbol and strategy, applied when a plan is approved or executed
+  rather than per order. `/shadow` runs the same primitives interactively over
+  a synthetic plan; it is a walkthrough of the chain, not a mirror of what the
+  live gates decided.
 - **A canonical 22-tool surface:** 5 data, 4 analytics (two of them meta-dispatchers over ~94 indicator and 9 microstructure ops), 6 plan/exec, 3 memory/audit, 4 workflow. Integration feeds (Finnhub, X, MCP, onchain) spread on top.
 - **A doom-loop harness:** dual-layer fingerprinting catches both identical-call loops and A-B-A-B cycles; oversized tool results are offloaded to scratch.
 - **5-stage memory compaction:** masking → pruning → aggressive → collapse → full, triggered by context pressure, with a reversible read-time collapse before any lossy summary.
