@@ -10,6 +10,27 @@ called out explicitly, whatever their size.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-31
+
+### Security
+
+- Halt-gate exit exemptions and cancellation classification now preserve venue
+  and instrument identity instead of deleting punctuation. The unambiguous
+  exchange spelling `BTC/USDT` may still match `BTCUSDT`, while broker share
+  classes and derivative contract suffixes remain distinct and fail closed.
+- Durable halt-state replacement now flushes the signed temporary file before
+  rename and flushes the resulting directory entry on POSIX or destination
+  handle on Windows. A failed durability step is reported through the existing
+  fail-closed persistence latch rather than being treated as a successful save.
+
+### CI
+
+- Release rehearsal compares the Bun version from the exact binary-build jobs;
+  an unrelated newer toolchain pin can no longer mask a stale release compiler.
+- Release test-shard validation parses Bun mock imports and follows local
+  runtime helpers, so aliases are quarantined while comments, strings, and
+  type-only imports no longer misclassify a suite.
+
 ## [0.6.0] - 2026-08-30
 
 ### Security
@@ -501,7 +522,8 @@ The permission change is behavioral: a tool that was previously auto-approved
 through the unknown-name fallthrough now queues for human approval. That is the
 intent, and it is why this is a minor rather than a patch release.
 
-[Unreleased]: https://github.com/general-liquidity/gordon/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/general-liquidity/gordon/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/general-liquidity/gordon/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/general-liquidity/gordon/compare/v0.5.5...v0.6.0
 [0.5.5]: https://github.com/general-liquidity/gordon/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/general-liquidity/gordon/compare/v0.4.0...v0.5.4
