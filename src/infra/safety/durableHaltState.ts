@@ -6,16 +6,15 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
-  renameSync,
   statSync,
   unlinkSync,
-  writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { resolveAuditHmacKey } from "../../core/audit/signing.ts";
 import type { AbsorbingBarrierState } from "./absorbingBarrier.ts";
 import { getGordonDir } from "../storage/paths.ts";
+import { replaceFileCrashDurably } from "../storage/crashDurableFile.ts";
 
 export const HALT_STATE_PATH_ENV = "GORDON_HALT_STATE_PATH";
 
@@ -214,11 +213,8 @@ function ensureLoaded(): string | null {
 
 function persist(path: string, next: HaltStatePayload): boolean {
   try {
-    mkdirSync(dirname(path), { recursive: true });
     const signed: SignedHaltState = { ...next, signature: sign(next) };
-    const tmp = `${path}.${process.pid}.tmp`;
-    writeFileSync(tmp, JSON.stringify(signed, null, 2), { encoding: "utf8", mode: 0o600 });
-    renameSync(tmp, path);
+    replaceFileCrashDurably(path, JSON.stringify(signed, null, 2));
     return true;
   } catch {
     return false;
