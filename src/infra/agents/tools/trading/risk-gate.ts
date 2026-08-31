@@ -40,6 +40,10 @@ import { evaluateBaselineCircuitBreakers } from "../../../../gateway/circuit-bre
 import { computeCircuitBreakerLiveData } from "../../../../gateway/circuit-breakers/data-provider.ts";
 import { resolvePortfolioIdentity } from "../../../safety/portfolioIdentity.ts";
 import { isStreakCircuitBreakerEnabled } from "../../../trading/ops/streakCircuitBreaker.ts";
+import {
+  sameVenueInstrumentSymbol,
+  type InstrumentRoute,
+} from "../../../domain/markets/instrumentIdentity.ts";
 import { evaluateConsensus } from "../../../../core/consensus/protocol.ts";
 import type {
   TradeProposal,
@@ -104,6 +108,8 @@ function signedNotionalOf(position: OpenPosition): number {
  */
 function buildSafetyState(
   symbol: string,
+  venueId: string,
+  route: InstrumentRoute,
   side: "buy" | "sell",
   proposedNotionalUsd: number,
   portfolio: PortfolioContext,
@@ -112,15 +118,20 @@ function buildSafetyState(
   nowMs: number,
 ): SafetyState {
   const bySymbol = new Map<string, number>();
+  let currentNotionalUsd = 0;
   for (const position of portfolio.openPositions) {
+    if (
+      position.exchangeId === venueId &&
+      sameVenueInstrumentSymbol(position.symbol, symbol, route)
+    ) {
+      currentNotionalUsd += signedNotionalOf(position);
+      continue;
+    }
     bySymbol.set(
       position.symbol,
       (bySymbol.get(position.symbol) ?? 0) + signedNotionalOf(position),
     );
   }
-
-  const currentNotionalUsd = bySymbol.get(symbol) ?? 0;
-  bySymbol.delete(symbol);
 
   const legs: LegState[] = [
     {
@@ -180,13 +191,10 @@ function signedSizeOf(position: OpenPosition): number {
   return position.side === "short" ? -magnitude : magnitude;
 }
 
-/** `BTC/USDT`, `BTC-USDT` and `BTCUSDT` name one position to the operator. */
-function normalizeExposureSymbol(symbol: string): string {
-  return symbol.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-}
-
 function reducesExposure(
   symbol: string,
+  venueId: string,
+  route: InstrumentRoute,
   side: "buy" | "sell",
   proposedQuantity: number,
   portfolio: PortfolioContext,
@@ -195,9 +203,12 @@ function reducesExposure(
   // price and the position's at the mark, so comparing them made a sell-to-
   // close priced above the mark look larger than the position it closes, and
   // the halt gates refused the exit. A flatten is a flatten at any price.
-  const target = normalizeExposureSymbol(symbol);
   const netSize = portfolio.openPositions
-    .filter((position) => normalizeExposureSymbol(position.symbol) === target)
+    .filter(
+      (position) =>
+        position.exchangeId === venueId &&
+        sameVenueInstrumentSymbol(position.symbol, symbol, route),
+    )
     .reduce((sum, position) => sum + signedSizeOf(position), 0);
   if (netSize === 0) return false;
   const delta = side === "sell" ? -proposedQuantity : proposedQuantity;
@@ -359,6 +370,8 @@ export async function evaluateOrderRisk(
   // reset. Exposure-reducing orders are exempt: these stop new risk.
   const exposureReducing = reducesExposure(
     order.symbol,
+    orderRequest.exchangeId,
+    ctx.exchange ? "exchange" : "broker",
     orderRequest.side,
     order.quantity,
     portfolioContext,
@@ -464,6 +477,8 @@ export async function evaluateOrderRisk(
 
     const state = buildSafetyState(
       order.symbol,
+      orderRequest.exchangeId,
+      ctx.exchange ? "exchange" : "broker",
       orderRequest.side,
       proposedNotionalUsd,
       portfolioContext,

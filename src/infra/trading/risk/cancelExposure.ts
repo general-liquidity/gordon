@@ -5,6 +5,7 @@ import type {
   Order,
   Position,
 } from "../../exchange/types.ts";
+import { sameVenueInstrumentSymbol } from "../../domain/markets/instrumentIdentity.ts";
 
 export type CancellationExposure = "reduces_risk" | "removes_protection" | "unknown";
 
@@ -21,16 +22,12 @@ export type CancellationMarketContext =
   | { market: "unknown" };
 
 function baseAssetFor(symbol: string, balances: readonly PositionBalance[]): string | null {
-  const normalized = symbol.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const normalized = symbol.trim().toUpperCase().replace(/\s+/g, "");
   const candidates = balances
-    .map((balance) => balance.asset.toUpperCase())
+    .map((balance) => balance.asset.trim().toUpperCase())
     .filter((asset) => asset.length > 0 && normalized.startsWith(asset))
     .sort((a, b) => b.length - a.length);
   return candidates[0] ?? null;
-}
-
-function normalizedSymbol(symbol: string | undefined): string {
-  return (symbol ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 }
 
 /**
@@ -98,10 +95,9 @@ export async function inspectCancellationMarket(
     (typeof supports !== "function" || supports.call(exchange, "fetchPositions"));
   if (supportsAllPositions) {
     try {
-      const targetSymbol = normalizedSymbol(symbol);
       const positions = (await fetchPositions.call(exchange, [symbol])).filter(
         (position) =>
-          normalizedSymbol(position.symbol) === targetSymbol &&
+          sameVenueInstrumentSymbol(position.symbol, symbol, "exchange") &&
           Number.isFinite(position.contracts) &&
           Math.abs(position.contracts) > 0,
       );

@@ -149,6 +149,35 @@ describe("cancellation exposure direction", () => {
     expect(classifyCancellationExposure(entry, [], context.context)).toBe("unknown");
   });
 
+  test("contract punctuation cannot alias a different derivative instrument", async () => {
+    const context = await inspectCancellationMarket(
+      {
+        getFullAccountDetails: async () => ({
+          accountInfo: { accountType: "SPOT" },
+          nonZeroBalances: [],
+        }),
+        getMarketType: async () => "derivative",
+        supports: (method: string) => method === "fetchPositions",
+        fetchPositions: async () => [
+          { symbol: "BTC/USDT:USDT", side: "short", contracts: 1, contractSize: 1 },
+        ],
+      } as never,
+      "BTCUSDTUSDT",
+    );
+
+    expect(context.context).toEqual({ market: "unknown" });
+  });
+
+  test("spot punctuation cannot fabricate a held base asset", () => {
+    expect(
+      classifyCancellationExposure(
+        { ...entry, symbol: "AB-CD", side: "SELL", quantity: 1 },
+        [{ asset: "ABCD", total: 1 }],
+        { market: "spot" },
+      ),
+    ).toBe("unknown");
+  });
+
   test("a flat or unsupported derivative surface is not treated as a proven spot entry", async () => {
     for (const fetchPosition of [async () => null, async () => Promise.reject(new Error("nope"))]) {
       const context = await inspectCancellationMarket(

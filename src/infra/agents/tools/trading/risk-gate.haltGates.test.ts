@@ -92,7 +92,11 @@ function heldContext(): GordonContext {
   return contextWith({ cashUsd: 6_000, holdings: [{ asset: "BTC", total: 1 }] });
 }
 
-function brokerContextWith(positionQty = 0, isPaper = false): GordonContext {
+function brokerContextWith(
+  positionQty = 0,
+  isPaper = false,
+  positionSymbol = "BTCUSDT",
+): GordonContext {
   const broker = {
     brokerId: "alpaca",
     isPaper,
@@ -111,7 +115,7 @@ function brokerContextWith(positionQty = 0, isPaper = false): GordonContext {
       positionQty > 0
         ? [
             {
-              symbol: "BTCUSDT",
+              symbol: positionSymbol,
               qty: positionQty,
               side: "long" as const,
               marketValue: positionQty * PRICE_USD,
@@ -452,10 +456,20 @@ describe("an exit stays an exit whatever it is priced at", () => {
   test("the venue's symbol punctuation does not hide the position", async () => {
     const result = await evaluateOrderRisk(
       { symbol: "BTC/USDT", side: "SELL", type: "LIMIT", quantity: 1, price: PRICE_USD },
-      brokerContextWith(1),
+      heldContext(),
     );
 
     expect(result.approved).toBe(true);
+  });
+
+  test("punctuation with instrument meaning cannot borrow another broker position", async () => {
+    const result = await evaluateOrderRisk(
+      { symbol: "BRKB", side: "SELL", type: "LIMIT", quantity: 1, price: PRICE_USD },
+      brokerContextWith(1, false, "BRK.B"),
+    );
+
+    expect(result.approved).toBe(false);
+    expect(result.reason).toContain("no confirmed broker-close outcome feed");
   });
 
   test("a sell larger than the position is a flip, and still refused", async () => {
