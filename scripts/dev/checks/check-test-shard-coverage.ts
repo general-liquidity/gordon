@@ -1,5 +1,6 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
+import { findReachableBunModuleMock } from "./test-shard-mocks.ts";
 
 const repoRoot = resolve(import.meta.dir, "..", "..", "..");
 const workflowPath = resolve(repoRoot, ".github", "workflows", "release.yml");
@@ -56,21 +57,17 @@ const mockPlacement: string[] = [];
 for (const [input, shard] of shardOf) {
   if (!input.endsWith(".test.ts")) continue;
   if (shard !== MOCK_SHARD && !REAL_STORE_SHARDS.has(shard)) continue;
-  let body: string;
-  try {
-    body = readFileSync(resolve(repoRoot, input), "utf8");
-  } catch {
-    continue; // a path matching no file is already reported as a missing input
-  }
-  const mocks = body.includes("mock.module");
-  if (mocks && REAL_STORE_SHARDS.has(shard)) {
+  const testPath = resolve(repoRoot, input);
+  if (!existsSync(testPath)) continue; // reported as a missing input below
+  const mockSource = findReachableBunModuleMock(testPath);
+  if (mockSource && REAL_STORE_SHARDS.has(shard)) {
     mockPlacement.push(
-      `${input} calls mock.module but sits in '${shard}', where suites use the real store`,
+      `${input} reaches mock.module in ${toRepoPath(relative(repoRoot, mockSource))} but sits in '${shard}', where suites use the real store`,
     );
   }
-  if (!mocks && shard === MOCK_SHARD) {
+  if (!mockSource && shard === MOCK_SHARD) {
     mockPlacement.push(
-      `${input} calls no mock.module but sits in '${shard}', so other suites' mocks reach it`,
+      `${input} reaches no mock.module but sits in '${shard}', so other suites' mocks reach it`,
     );
   }
 }
