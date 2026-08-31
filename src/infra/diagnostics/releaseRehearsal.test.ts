@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import {
   assertGordonVersionOutput,
+  deriveJobBunVersion,
+  deriveJobBunVersionFromSource,
   deriveReleaseBinaryTargets,
   deriveReleaseTestShards,
 } from "../../../scripts/dev/release/release-matrix.ts";
@@ -137,18 +139,30 @@ describe("the rehearsal and the release agree on their toolchain", () => {
   }
 
   test("the binary-building bun version is the same in both", () => {
-    const release = bunVersions(".github/workflows/release.yml");
-    const rehearsal = bunVersions(".github/workflows/release-rehearsal.yml");
+    const release = deriveJobBunVersion(resolve(root, ".github/workflows/release.yml"), "build");
+    const rehearsal = deriveJobBunVersion(
+      resolve(root, ".github/workflows/release-rehearsal.yml"),
+      "binary-targets",
+    );
 
-    expect(release.length).toBeGreaterThan(0);
-    expect(rehearsal.length).toBeGreaterThan(0);
-    // The compile target is resolved by the newest pin in each file: the build
-    // job. Comparing the maximum avoids depending on job order in either file.
-    const newest = (versions: string[]) =>
-      versions.slice().sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))[
-        versions.length - 1
-      ];
-    expect(newest(rehearsal)).toBe(newest(release));
+    expect(rehearsal).toBe(release);
+  });
+
+  test("an unrelated newer pin cannot hide a binary-job regression", () => {
+    const workflow = `jobs:
+  test:
+    steps:
+      - with:
+          bun-version: 1.4.0
+  build:
+    steps:
+      - with:
+          bun-version: 1.3.7
+  publish:
+    steps: []
+`;
+
+    expect(deriveJobBunVersionFromSource(workflow, "build")).toBe("1.3.7");
   });
 
   test("every bun version the rehearsal pins is one the release also pins", () => {
