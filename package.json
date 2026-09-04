@@ -62,6 +62,7 @@
     "harness:simplify:status": "bun scripts/dev/harness/harness-simplification.ts --status",
     "eval:burn-in": "bun run scripts/dev/eval/eval-unattended-burn-in.ts",
     "check:daemon-startup": "bun run scripts/dev/checks/validate-daemon-startup.ts",
+    "check:docs": "bun run scripts/dev/checks/check-public-docs.ts",
     "check:test-shards": "bun run scripts/dev/checks/check-test-shard-coverage.ts",
     "prepublishOnly": "bun run build && node scripts/build/check-no-sourcemaps.cjs",
     "test": "bun test",

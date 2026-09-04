@@ -118,6 +118,9 @@ jobs:
       - name: Verify exact test-shard coverage
         run: bun run check:test-shards
 
+      - name: Verify public documentation
+        run: bun run check:docs
+
       - name: Run broker conformance matrix
         run: bun run test:broker-conformance
 

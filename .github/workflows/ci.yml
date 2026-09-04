@@ -41,6 +41,9 @@ jobs:
       - name: Verify exact release test-shard coverage
         run: bun run check:test-shards
 
+      - name: Verify public documentation
+        run: bun run check:docs
+
       - name: Focused safety and execution tests
         run: >
           bun test

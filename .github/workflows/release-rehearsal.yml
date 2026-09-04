@@ -32,6 +32,8 @@ jobs:
         run: node scripts/dev/codegen/generate-sbom.cjs --output gordon-sbom.json
       - name: Verify exact test-shard ownership
         run: bun run check:test-shards
+      - name: Verify public documentation
+        run: bun run check:docs
       - name: Run every release test shard in a fresh process
         run: bun scripts/dev/release/rehearse-test-shards.ts
       - name: Typecheck
