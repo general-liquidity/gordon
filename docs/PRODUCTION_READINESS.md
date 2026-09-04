@@ -1,4 +1,9 @@
-# Gordon — Production Readiness Backlog
+# Gordon production-readiness audit, completed June 2026
+
+> [!NOTE]
+> This is a completed historical backlog. It preserves the audit and burn-down record, but the
+> maintained product documentation begins at [`docs/README.md`](./README.md). Runtime source and
+> current guides override any count or status in this snapshot.
 
 Derived from the 15-slice fan-out audit of `src/` on 2026-06-10 (15 parallel read-only agents, ~330 files read fully / ~1,290 skimmed, three high-severity findings independently re-verified). Product thesis anchoring the priorities: **Gordon is the Claude Code for vibe trading** — one product, multiple surfaces (TUI / gateway+SDK / ACP), and the capital-safety plane is the precondition for the category, not a feature.
 

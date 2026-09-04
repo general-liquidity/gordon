@@ -5,12 +5,11 @@
 > layered-profile analog of how Codex / Claude Code centralize named permission tiers with
 > inheritance and stated justification.
 >
-> **Documentation, not a new gate.** These profiles describe the *desired* trust posture in terms of
-> Gordon's **existing** enforcement (`PermissionEngine`, the safety-critical deny-list, the risk
-> classifier, kill switches). They do not change runtime behavior. The optional typed data table at
-> [`../../src/runtime/permissions/profiles.ts`](../../src/runtime/permissions/profiles.ts) encodes the
-> same three profiles for future use and is **not wired into the permission engine** — see
-> "Status" below.
+> **Runtime behavior.** These profiles are a narrow, default-off layer over Gordon's existing
+> enforcement. The typed table and hook live in
+> [`../../src/runtime/permissions/profiles.ts`](../../src/runtime/permissions/profiles.ts).
+> `defaultPermissionEngine.ts` and `SessionRuntimeFactory.ts` prepend the hook to every permission
+> engine. With `GORDON_PERMISSION_PROFILE` unset, the hook abstains and default behavior is unchanged.
 
 Companion documents: [`RISK-TAXONOMY.md`](./RISK-TAXONOMY.md), [`../../SECURITY.md`](../../SECURITY.md).
 
@@ -72,7 +71,7 @@ The base profile. Data and analytics only; no side effects on any venue.
 | `get_account_state`, `get_portfolio` | `portfolio.read` | **Permitted** (read) |
 | `compute_indicator`, `compute_regime`, `compute_risk`, `compute_microstructure` | `analysis.run` | **Permitted** (compute, no side effect) |
 | `memory_search` | `analysis.run` | **Permitted** (read) |
-| `verify_plan`, `backtest` | `analysis.run` | **Permitted** (read-only evaluation; `verify_plan` runs the 15-dim risk gate but places nothing) |
+| `verify_plan`, `backtest` | `analysis.run` | **Permitted** (read-only evaluation; `verify_plan` runs the 16-dimension risk gate but places nothing) |
 | Anything under `papertrade.execute` / `livetrade.execute` / `transfer.execute` / `wallet.write` | — | **Denied / not permitted** |
 
 Why: matches `PermissionEngine`'s `classifier:read-only` path — `sideEffectLevel === "read"` and
@@ -115,11 +114,13 @@ is on the table at all*, but the per-action safety chain is unconditional. Grant
 
 ## Status
 
-- **Documentation:** authoritative as a description of intended trust posture.
-- **Data table:** `src/runtime/permissions/profiles.ts` exports the three profiles as a typed
-  const and is covered by `src/runtime/permissions/profiles.test.ts`, which asserts that **no
-  profile auto-allows any safety-critical deny-list tool**.
-- **Wiring:** **not wired** into `PermissionEngine`. Days-before-launch safety call — wiring a new
-  profile layer into live gating risks changing default behavior. The table exists as a future,
-  tested building block. Current gating is unchanged and still owned by `PermissionEngine` +
-  `trustTrajectory` + `riskClassifier` + `killSwitches` + `tradingConstitution`.
+- **Selection:** set `GORDON_PERMISSION_PROFILE` to `read_only`, `paper_trading`, or
+  `live_trading`. Unset means no profile. An unknown value applies no profile and emits a warning.
+- **Data and tests:** `src/runtime/permissions/profiles.ts` exports the typed chain, while
+  `profiles.test.ts` proves no profile auto-allows a safety-critical deny-list tool.
+- **Wiring:** `buildPermissionProfileHook()` is prepended by `defaultPermissionEngine.ts` and
+  `SessionRuntimeFactory.ts`. The hook can add an allow only for a listed benign tool. It rechecks
+  the safety-critical deny-list and `always_require_human` policy before allowing anything.
+- **Remaining owners:** per-action enforcement still belongs to `PermissionEngine`,
+  `trustTrajectory`, `riskClassifier`, `killSwitches`, and `tradingConstitution`. A profile grants
+  scope; it does not replace those controls.

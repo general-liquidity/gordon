@@ -1,14 +1,13 @@
 /**
- * Named permission profiles — DOCUMENTATION DATA TABLE (not wired).
+ * Named permission profiles, wired into every PermissionEngine instance.
  *
  * Three trust profiles expressed as an inheritance chain:
  *   read_only → paper_trading → live_trading
  *
  * This is the typed source the security docs derive from
- * (docs/security/PERMISSION-PROFILES.md). It is intentionally **not**
- * registered with `PermissionEngine` — wiring a new profile layer into
- * live gating could change default behavior, which is off-limits this
- * close to launch. The table exists as a future, tested building block.
+ * (docs/security/PERMISSION-PROFILES.md). `buildPermissionProfileHook()` is
+ * prepended by both defaultPermissionEngine and SessionRuntimeFactory. It
+ * abstains when no profile is selected, preserving the default behavior.
  *
  * Invariant (asserted in profiles.test.ts): no profile may auto-allow a
  * safety-critical deny-list tool. Profiles gate the easy stuff; the

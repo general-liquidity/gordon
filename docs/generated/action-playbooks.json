@@ -69,49 +69,36 @@
     ]
   },
   {
-    "actionId": "wallet.fund",
-    "title": "Wallet Funding",
-    "taskScope": "funding",
-    "capability": "plan",
-    "promptExample": "/fund [buy|sell|swap|quote|limits|history] ...",
-    "tags": [
-      "wallet",
-      "funding",
-      "moonpay"
-    ]
-  },
-  {
-    "actionId": "payments.intent",
-    "title": "Prepare Payment Intent",
-    "taskScope": "funding",
-    "capability": "plan",
-    "promptExample": "/pay <resource> <amount>",
-    "tags": [
-      "payments",
-      "polygon",
-      "x402"
-    ]
-  },
-  {
-    "actionId": "system.arm",
-    "title": "Arm System",
+    "actionId": "system.set_auto",
+    "title": "Set permissionMode=auto",
     "taskScope": "system",
     "capability": "configure",
-    "promptExample": "/arm",
+    "promptExample": "/auto",
     "tags": [
       "system",
-      "armed"
+      "auto"
     ]
   },
   {
-    "actionId": "system.disarm",
-    "title": "Disarm System",
+    "actionId": "system.set_ask",
+    "title": "Set permissionMode=ask",
     "taskScope": "system",
     "capability": "configure",
-    "promptExample": "/disarm",
+    "promptExample": "/ask",
     "tags": [
       "system",
-      "safe"
+      "ask"
+    ]
+  },
+  {
+    "actionId": "system.set_strict",
+    "title": "Set permissionMode=strict",
+    "taskScope": "system",
+    "capability": "configure",
+    "promptExample": "/strict",
+    "tags": [
+      "system",
+      "strict"
     ]
   }
 ]

@@ -23,7 +23,7 @@ of them: **safety-critical tools never auto-approve, regardless of trust, profil
 |---|---|---|
 | Permission gate | `src/runtime/permissions/PermissionEngine.ts` | Deny-first hook chain; `allow / deny / queue / abstain` per tool call |
 | Safety-critical deny-list | `src/runtime/permissions/trustTrajectory.ts` (`SAFETY_CRITICAL_PATTERNS`, `isSafetyCritical`) | Tools that can NEVER auto-approve via trust |
-| Risk classifier | `src/infra/trading/risk/riskClassifier.ts` (`classifyTradeRisk`, 15 dims) | Per-trade composite score → `auto_approve / prompt_user / require_confirmation / block` |
+| Risk classifier | `src/infra/trading/risk/riskClassifier.ts` (`classifyTradeRisk`, 16 dimensions) | Per-trade composite score → `auto_approve / prompt_user / require_confirmation / block` |
 | Trading constitution | `src/infra/safety/defense/tradingConstitution.ts` (`TRADING_CONSTITUTION`) | Immutable hard limits the LLM/user cannot override |
 | Kill switches | `src/infra/safety/killSwitches.ts` (`isExecutionAllowed`) | Multi-scope tripwires gating any irreversible action |
 | Injection defense | `src/infra/safety/defense/injectionDefense.ts` | Pattern defense run before input reaches the agent |

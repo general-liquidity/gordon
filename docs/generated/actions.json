@@ -207,7 +207,7 @@
     "capability": "execute",
     "taskScope": "execution",
     "sideEffectLevel": "funds",
-    "approvalPolicy": "armed_mode",
+    "approvalPolicy": "trade_permission",
     "dryRunSupported": true,
     "visibility": [
       "agent"
@@ -282,96 +282,9 @@
     ]
   },
   {
-    "id": "wallet.fund",
-    "title": "Wallet Funding",
-    "description": "Fund wallets or fetch MoonPay funding flows and quotes.",
-    "domain": "wallet",
-    "capability": "plan",
-    "taskScope": "funding",
-    "sideEffectLevel": "preview",
-    "approvalPolicy": "external",
-    "dryRunSupported": true,
-    "visibility": [
-      "interactive",
-      "json",
-      "agent",
-      "mcp"
-    ],
-    "providerRequirements": [
-      {
-        "kind": "wallet"
-      }
-    ],
-    "slash": {
-      "name": "fund",
-      "aliases": [
-        "onramp",
-        "offramp"
-      ],
-      "description": "Create MoonPay flows or fetch quotes and limits",
-      "usage": "/fund [buy|sell|swap|quote|limits|history] ...",
-      "category": "trading",
-      "level": 2,
-      "workflow": "trade",
-      "audience": "advanced",
-      "action": "agent",
-      "target": "executor",
-      "whenToUse": "Fund a wallet, off-ramp, create a hosted swap flow, or inspect live MoonPay pricing and limits"
-    },
-    "promptExample": "/fund [buy|sell|swap|quote|limits|history] ...",
-    "tags": [
-      "wallet",
-      "funding",
-      "moonpay"
-    ]
-  },
-  {
-    "id": "payments.intent",
-    "title": "Prepare Payment Intent",
-    "description": "Prepare a Polygon x402 payment intent for a paid API or agent payment.",
-    "domain": "payments",
-    "capability": "plan",
-    "taskScope": "funding",
-    "sideEffectLevel": "preview",
-    "approvalPolicy": "external",
-    "dryRunSupported": true,
-    "visibility": [
-      "interactive",
-      "json",
-      "agent"
-    ],
-    "providerRequirements": [
-      {
-        "kind": "payments"
-      }
-    ],
-    "slash": {
-      "name": "pay",
-      "aliases": [
-        "x402",
-        "payments"
-      ],
-      "description": "Prepare Polygon x402 payment intents for paid APIs or agent payments",
-      "usage": "/pay <resource> <amount>",
-      "category": "trading",
-      "level": 2,
-      "workflow": "trade",
-      "audience": "advanced",
-      "action": "agent",
-      "target": "executor",
-      "whenToUse": "Prepare Gordon-native payment headers for external services"
-    },
-    "promptExample": "/pay <resource> <amount>",
-    "tags": [
-      "payments",
-      "polygon",
-      "x402"
-    ]
-  },
-  {
-    "id": "system.arm",
-    "title": "Arm System",
-    "description": "Switch Gordon into ARMED mode for live execution.",
+    "id": "system.set_auto",
+    "title": "Set permissionMode=auto",
+    "description": "Auto-execute trades without per-action approval.",
     "domain": "system",
     "capability": "configure",
     "taskScope": "system",
@@ -389,27 +302,27 @@
       }
     ],
     "slash": {
-      "name": "arm",
+      "name": "auto",
       "aliases": [],
-      "description": "Enable live trading (ARMED mode)",
-      "usage": "/arm",
+      "description": "Auto-execute trades without per-action approval",
+      "usage": "/auto",
       "category": "trading",
       "level": 2,
-      "workflow": "operate",
+      "workflow": "monitor",
       "audience": "advanced",
       "action": "tool",
-      "target": "arm_system"
+      "target": "set_permission_mode"
     },
-    "promptExample": "/arm",
+    "promptExample": "/auto",
     "tags": [
       "system",
-      "armed"
+      "auto"
     ]
   },
   {
-    "id": "system.disarm",
-    "title": "Disarm System",
-    "description": "Return Gordon to SAFE mode.",
+    "id": "system.set_ask",
+    "title": "Set permissionMode=ask",
+    "description": "Each trade requires approval via dialog (default).",
     "domain": "system",
     "capability": "configure",
     "taskScope": "system",
@@ -427,23 +340,61 @@
       }
     ],
     "slash": {
-      "name": "disarm",
-      "aliases": [
-        "safe"
-      ],
-      "description": "Return to SAFE mode",
-      "usage": "/disarm",
+      "name": "ask",
+      "aliases": [],
+      "description": "Each trade requires approval via dialog (default)",
+      "usage": "/ask",
       "category": "trading",
       "level": 2,
-      "workflow": "operate",
+      "workflow": "monitor",
       "audience": "advanced",
       "action": "tool",
-      "target": "arm_system"
+      "target": "set_permission_mode"
     },
-    "promptExample": "/disarm",
+    "promptExample": "/ask",
     "tags": [
       "system",
-      "safe"
+      "ask"
+    ]
+  },
+  {
+    "id": "system.set_strict",
+    "title": "Set permissionMode=strict",
+    "description": "Read-only — all trades blocked.",
+    "domain": "system",
+    "capability": "configure",
+    "taskScope": "system",
+    "sideEffectLevel": "state",
+    "approvalPolicy": "none",
+    "dryRunSupported": false,
+    "visibility": [
+      "interactive",
+      "json",
+      "agent"
+    ],
+    "providerRequirements": [
+      {
+        "kind": "system"
+      }
+    ],
+    "slash": {
+      "name": "strict",
+      "aliases": [
+        "readonly"
+      ],
+      "description": "Read-only — all trades blocked",
+      "usage": "/strict",
+      "category": "trading",
+      "level": 2,
+      "workflow": "monitor",
+      "audience": "advanced",
+      "action": "tool",
+      "target": "set_permission_mode"
+    },
+    "promptExample": "/strict",
+    "tags": [
+      "system",
+      "strict"
     ]
   }
 ]

@@ -27,7 +27,7 @@ It is **not** a coding agent. Most patterns from Claude Code's coding-agent desi
 | `src/infra/hooks/` | Hook engine + lifecycle types (PreToolUse, PreOrderPlacement, …) with `asyncRewake` and `statusMessage` |
 | `src/infra/news/` | RSS headline fetcher (12 crypto + Yahoo + EDGAR) + sentiment classifier |
 | `src/infra/proactive/producers/` | Radar producers (news, regime, volatility, funding, stock events, …) |
-| `src/infra/trading/risk/riskClassifier.ts` | Pre-trade risk classifier — 15 dimensions (8 base + 7 optional hedge-fund-grade) including vol-adjusted sizing, tail risk, correlation |
+| `src/infra/trading/risk/riskClassifier.ts` | Pre-trade risk classifier: 16 dimensions (8 base + 8 conditional) including vol-adjusted sizing, tail risk, correlation, and uncertainty decomposition |
 | `src/runtime/permissions/PermissionEngine.ts` | Deny-first permission gate; exposes `registerHook` / `prependHook` |
 | `src/runtime/permissions/trustTrajectory.ts` | Adaptive auto-approval with safety-critical deny-list |
 | `src/core/strategies/recipes/` | Pure signal-processing primitives (regime-RSI, bounce counter, signal gate, max-exposure timeout) |
@@ -205,14 +205,14 @@ Gordon's orchestrator + researcher expose a canonical 22-tool surface for genera
 
 Tool layout (22 total):
 - **data (5)**: `get_market_data`, `get_account_state`, `get_portfolio`, `get_news`, `get_fundamentals`
-- **analytics (4)**: `compute_indicator` (80+ ops via enum), `compute_regime`, `compute_risk`, `compute_microstructure` (9 ops via enum)
+- **analytics (4)**: `compute_indicator` (100 ops via enum), `compute_regime`, `compute_risk`, `compute_microstructure` (87 advanced-analysis ops via enum)
 - **plan / exec (6)**: `create_plan`, `verify_plan`, `approve_plan`, `execute_plan`, `cancel`, `backtest`
 - **memory (3)**: `memory_search`, `memory_write`, `audit_event`
 - **workflow (4)**: `skill`, `delegate_subagent`, `ask_user`, `schedule_task`
 
 Only 2 meta-dispatchers (`compute_indicator`, `compute_microstructure`) — everything else is a single-purpose typed tool per the Dexter/Claude-Code preference for explicit-over-meta on safety-critical surfaces.
 
-Safety semantics: surface tools don't re-implement risk classifier / signed audit / deny-list / trading constitution. Each tool calls into the existing handler module — rationale-required on `create_plan` / `approve_plan` / `execute_plan` / `cancel`, full 15-dim risk gate inside `verify_plan`, signed audit log on every write.
+Safety semantics: surface tools don't re-implement risk classifier / signed audit / deny-list / trading constitution. Each tool calls into the existing handler module: rationale-required on `create_plan` / `approve_plan` / `execute_plan` / `cancel`, full 16-dimension risk gate inside `verify_plan`, signed audit log on every write.
 
 Skills aligned with the surface: `backtest-validate`, `strategy-build`, `regime-shift`, `microstructure-dive`, `crowd-trapped`, `filing-analysis`, `recovery-trade` are authored against surface tool names. Existing 35+ skills are mostly natural-language workflows; `learn-*` documentation skills intentionally retain legacy tool names since they explain the broader implementation modules.
 
