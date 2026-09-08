@@ -490,3 +490,57 @@ describe("an exit stays an exit whatever it is priced at", () => {
     expect(result.approved).toBe(false);
   });
 });
+
+// The portfolio builder falls back to the broker when the exchange leg throws,
+// which a live exchange does on something as ordinary as one positive balance
+// with no quote market. The order still carries the preferred venue's id, so
+// matching positions on it found none and the operator's exit read as new
+// exposure. These pin the venue the positions actually came from.
+describe("an exit is an exit whichever adapter supplied the positions", () => {
+  function brokenExchange(): GordonContext["exchange"] {
+    return {
+      exchangeId: "binance",
+      isSandbox: false,
+      getFullAccountDetails: async () => ({
+        totalUsdtValue: 0,
+        nonZeroBalances: [{ asset: "XYZ", free: 5, locked: 0, total: 5 }],
+      }),
+      getBalance: async () => 0,
+      getPrice: async () => {
+        throw new Error("no market for XYZ");
+      },
+    } as unknown as GordonContext["exchange"];
+  }
+
+  function mixedContext(positionQty: number): GordonContext {
+    const broker = brokerContextWith(positionQty).broker;
+    return { exchange: brokenExchange(), broker } as GordonContext;
+  }
+
+  test("the exit is allowed when the exchange leg fell through to the broker", async () => {
+    const result = await evaluateOrderRisk(
+      { symbol: "BTCUSDT", side: "SELL", type: "LIMIT", quantity: 1, price: PRICE_USD },
+      mixedContext(1),
+    );
+
+    expect(result.approved).toBe(true);
+  });
+
+  test("new risk on that same fallback portfolio is still refused", async () => {
+    const result = await evaluateOrderRisk(
+      { symbol: "BTCUSDT", side: "BUY", type: "LIMIT", quantity: 1, price: PRICE_USD },
+      mixedContext(1),
+    );
+
+    expect(result.approved).toBe(false);
+  });
+
+  test("a flip on that same fallback portfolio is still refused", async () => {
+    const result = await evaluateOrderRisk(
+      { symbol: "BTCUSDT", side: "SELL", type: "LIMIT", quantity: 5, price: PRICE_USD },
+      mixedContext(1),
+    );
+
+    expect(result.approved).toBe(false);
+  });
+});

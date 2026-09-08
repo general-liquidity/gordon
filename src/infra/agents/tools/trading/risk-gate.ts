@@ -248,9 +248,20 @@ export async function evaluateOrderRisk(
   const builder = new PortfolioContextBuilder();
   let portfolioContext: PortfolioContext | undefined;
 
+  // Which adapter actually produced the positions, not which one ctx prefers.
+  // The exchange leg can throw on a live account (an unpriced positive balance
+  // is enough) and fall through to the broker, and then every position carries
+  // the broker id while the order carries the exchange id. Matching positions
+  // on the preferred venue found none, so an operator's exit read as brand-new
+  // exposure and the halt gates refused it.
+  let portfolioVenueId: string | undefined;
+  let portfolioRoute: InstrumentRoute = "broker";
+
   if (ctx.exchange) {
     try {
       portfolioContext = await builder.buildFromExchange(ctx.exchange);
+      portfolioVenueId = ctx.exchange.exchangeId;
+      portfolioRoute = "exchange";
     } catch (err) {
       logger.warn("Could not build portfolio context from exchange", {
         error: (err as Error).message,
@@ -261,6 +272,8 @@ export async function evaluateOrderRisk(
   if (!portfolioContext && ctx.broker) {
     try {
       portfolioContext = await builder.buildFromBroker(ctx.broker);
+      portfolioVenueId = ctx.broker.brokerId;
+      portfolioRoute = "broker";
     } catch (err) {
       logger.warn("Could not build portfolio context from broker", {
         error: (err as Error).message,
@@ -370,8 +383,8 @@ export async function evaluateOrderRisk(
   // reset. Exposure-reducing orders are exempt: these stop new risk.
   const exposureReducing = reducesExposure(
     order.symbol,
-    orderRequest.exchangeId,
-    ctx.exchange ? "exchange" : "broker",
+    portfolioVenueId ?? orderRequest.exchangeId,
+    portfolioRoute,
     orderRequest.side,
     order.quantity,
     portfolioContext,
@@ -477,8 +490,8 @@ export async function evaluateOrderRisk(
 
     const state = buildSafetyState(
       order.symbol,
-      orderRequest.exchangeId,
-      ctx.exchange ? "exchange" : "broker",
+      portfolioVenueId ?? orderRequest.exchangeId,
+      portfolioRoute,
       orderRequest.side,
       proposedNotionalUsd,
       portfolioContext,
