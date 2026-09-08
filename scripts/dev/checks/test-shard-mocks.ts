@@ -13,9 +13,18 @@ function isAstNode(value: unknown): value is AstNode {
 }
 
 function statements(source: string, fileName: string): AstNode[] {
+  // `jsx` only for the extensions that can carry it. Adding it everywhere would
+  // make `<T>value` in a .ts file parse as an unclosed element, and leaving it
+  // off entirely threw on the first .tsx reached: resolveLocalModule accepts
+  // .tsx and src/ holds hundreds of them, so the gate would have failed with a
+  // Babel syntax error instead of a shard verdict.
+  const jsx = extname(fileName) === ".tsx" || extname(fileName) === ".jsx";
   const parsed = parseSync(source, {
     filename: fileName,
-    parserOpts: { sourceType: "module", plugins: ["typescript"] },
+    parserOpts: {
+      sourceType: "module",
+      plugins: jsx ? ["typescript", "jsx"] : ["typescript"],
+    },
   }) as unknown as { program?: { body?: unknown[] } } | null;
   return (parsed?.program?.body ?? []).filter(isAstNode);
 }
@@ -40,28 +49,82 @@ function visit(node: AstNode, callback: (candidate: AstNode) => void): void {
   }
 }
 
+const BUN_TEST = "bun:test";
+
+/**
+ * Export names in `path` that are Bun's own `mock`, following re-export chains.
+ *
+ * A helper doing `export { mock } from "bun:test"` hands its importers the real
+ * binding, so those importers can install a process-wide mock. Binding `mock`
+ * only from a literal `"bun:test"` import left every one of them undetected and
+ * free to sit in a real-store shard, which is the ordering hazard the shard
+ * split exists to prevent.
+ */
+function bunTestMockExports(path: string | null, seen = new Set<string>()): Set<string> {
+  const names = new Set<string>();
+  if (!path || seen.has(path)) return names;
+  seen.add(path);
+  let source: string;
+  try {
+    source = readFileSync(path, "utf8");
+  } catch {
+    return names;
+  }
+  for (const statement of statements(source, path)) {
+    if (statement.type !== "ExportNamedDeclaration" && statement.type !== "ExportAllDeclaration") {
+      continue;
+    }
+    if (statement.exportKind === "type") continue;
+    const from = stringValue(statement.source);
+    if (!from) continue;
+    const fromBunTest = from === BUN_TEST;
+    const nested =
+      !fromBunTest && from.startsWith(".")
+        ? bunTestMockExports(resolveLocalModule(path, from), seen)
+        : new Set<string>();
+    if (statement.type === "ExportAllDeclaration") {
+      if (fromBunTest) names.add("mock");
+      else for (const name of nested) names.add(name);
+      continue;
+    }
+    for (const specifier of Array.isArray(statement.specifiers) ? statement.specifiers : []) {
+      if (!isAstNode(specifier) || specifier.exportKind === "type") continue;
+      const local = identifierName(specifier.local);
+      const exported = identifierName(specifier.exported);
+      if (!local || !exported) continue;
+      if (fromBunTest ? local === "mock" : nested.has(local)) names.add(exported);
+    }
+  }
+  return names;
+}
+
 export function sourceUsesBunModuleMock(source: string, fileName = "fixture.ts"): boolean {
   const body = statements(source, fileName);
   const mockBindings = new Set<string>();
   const bunTestNamespaces = new Set<string>();
 
   for (const statement of body) {
-    if (
-      statement.type !== "ImportDeclaration" ||
-      statement.importKind === "type" ||
-      stringValue(statement.source) !== "bun:test"
-    ) {
-      continue;
-    }
+    if (statement.type !== "ImportDeclaration" || statement.importKind === "type") continue;
+    const from = stringValue(statement.source);
+    if (!from) continue;
+    const fromBunTest = from === BUN_TEST;
+    const reexported = fromBunTest
+      ? new Set<string>()
+      : from.startsWith(".")
+        ? bunTestMockExports(resolveLocalModule(fileName, from))
+        : new Set<string>();
+    if (!fromBunTest && reexported.size === 0) continue;
     for (const specifier of Array.isArray(statement.specifiers) ? statement.specifiers : []) {
       if (!isAstNode(specifier) || specifier.importKind === "type") continue;
-      if (specifier.type === "ImportNamespaceSpecifier") {
+      if (specifier.type === "ImportNamespaceSpecifier" && fromBunTest) {
         const local = identifierName(specifier.local);
         if (local) bunTestNamespaces.add(local);
       }
-      if (specifier.type === "ImportSpecifier" && identifierName(specifier.imported) === "mock") {
+      if (specifier.type === "ImportSpecifier") {
+        const imported = identifierName(specifier.imported);
         const local = identifierName(specifier.local);
-        if (local) mockBindings.add(local);
+        if (!imported || !local) continue;
+        if (fromBunTest ? imported === "mock" : reexported.has(imported)) mockBindings.add(local);
       }
     }
   }
@@ -123,6 +186,24 @@ function runtimeRelativeImports(source: string, fileName: string): string[] {
       const sourceValue = stringValue(statement.source);
       if (sourceValue) imports.push(sourceValue);
     }
+    // `await import("./helper")` is an expression, not a declaration, so walking
+    // the statement list alone left a mocking helper reached that way invisible
+    // and the file free to sit in a real-store shard.
+    visit(statement, (node) => {
+      // Two shapes, because Babel has emitted both: `ImportExpression` with a
+      // `source`, and a `CallExpression` whose callee is `Import`. Matching only
+      // the second silently found nothing here.
+      if (node.type === "ImportExpression") {
+        const specifier = stringValue(node.source);
+        if (specifier) imports.push(specifier);
+        return;
+      }
+      if (node.type !== "CallExpression" || !isAstNode(node.callee)) return;
+      if (node.callee.type !== "Import") return;
+      const args = Array.isArray(node.arguments) ? node.arguments : [];
+      const specifier = stringValue(args[0]);
+      if (specifier) imports.push(specifier);
+    });
   }
   return imports.filter((specifier) => specifier.startsWith("."));
 }
